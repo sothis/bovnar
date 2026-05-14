@@ -12,9 +12,9 @@ import time via the standard `ctypes.CDLL` machinery.
 
 | Requirement | Notes |
 |---|---|
-| Python ≥ 3.9 | `dataclasses`, `enum.IntEnum` |
+| Python ≥ 3.10 | `dataclasses`, `enum.IntEnum`, union-type annotations (`X \| Y`) |
 | `libbvnr_shared.so` | Runtime only; see *Library discovery* below |
-| pytest ≥ 7.4 | Test suite only (`pip install bovnar[dev]`) |
+| pytest ≥ 7 | Test suite only (`pip install bovnar[dev]`) |
 
 ---
 
@@ -73,16 +73,20 @@ assert recovered["sensor_id"] == 42
 
 ### SAX-style streaming reader
 
+The verified callback receives exactly **two** positional arguments: the event
+code and the data payload.  There is no userdata/context argument — capture
+external state via closure instead.
+
 ```python
 from bovnar.reader import Reader
 from bovnar import Event
 
-def on_event(ctx, ev, data):
+def on_event(ev, data):
     if ev == Event.ASSIGNMENT_START:
         print("key:", data.raw_str())
     elif ev == Event.DATA:
         print("value bytes:", data.raw_bytes())
-    return True   # returning False aborts parsing
+    return True   # returning False stops parsing (raises BovnarParseError)
 
 with Reader() as r:
     r.read_mem(bvnr_bytes, on_verified=on_event)
@@ -96,6 +100,31 @@ from bovnar.reader import Reader
 with Reader() as r:
     for payload in r.iter_mem(bvnr_bytes):
         print(payload.event, payload.text)
+```
+
+### DOM (random-access) API
+
+```python
+import bovnar
+
+doc = bovnar.dom_parse(bvnr_bytes)
+
+# Top-level key lookup
+node = doc["sensor_id"]
+print(node.as_i64())        # → 42
+print(node.value_type)      # ValueTypeSpec(family=UINT, width=64, base=0)
+
+# Struct traversal
+cfg = doc["config"]
+host = cfg["host"].as_str()
+
+# Array access
+arr = doc["values"]
+for i in range(len(arr)):
+    print(arr[i].as_float())
+
+# Convert entire document to a plain Python dict (drops type/unit info)
+d = doc.to_dict()
 ```
 
 ### Low-level writer
@@ -126,9 +155,45 @@ vu = bovnar.parse_unit("k-g·m/s²")
 # Convert a ValueUnit back to its canonical string
 s = bovnar.unit_to_str(vu)     # → "k-g·m/s²"
 
-# Scalar SI/IEC factor for a unit string
+# Scalar SI/IEC prefix factor for a unit string
 f = bovnar.unit_factor("M-Hz") # → 1_000_000.0
 ```
+
+### Extended unit functions
+
+The following functions operate on `ValueUnit` objects and are available both
+from the top-level `bovnar` namespace and from `bovnar.units`.
+
+```python
+from bovnar import (
+    unit_to_si_factor, units_compatible,
+    unit_convert_factor, unit_dimension_vector,
+    unit_reduce, convert_value,
+)
+
+# Full SI conversion including affine terms (e.g. Celsius → Kelvin)
+conv = unit_to_si_factor(vu)
+# conv.factor, conv.is_affine, conv.affine_offset
+
+# Check dimensional compatibility
+ok = units_compatible(vu_a, vu_b)     # True if same SI dimension vector
+
+# Conversion factor between two compatible units
+c = unit_convert_factor(vu_from, vu_to)
+# c.factor, c.requires_affine
+
+# 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]
+dims = unit_dimension_vector(vu)       # e.g. [1, 0, -1, 0, 0, 0, 0] for m/s
+
+# Reduce a compound unit to its canonical named SI unit
+r = unit_reduce(vu)                   # r.unit, r.scale
+
+# Convert a scalar value between units (handles affine conversions)
+kelvin = convert_value(25.0, vu_celsius, vu_kelvin)
+```
+
+`SI_DIM_NAMES` is the ordered tuple `('m', 'kg', 's', 'A', 'K', 'mol', 'cd')`
+— the index positions used by `unit_dimension_vector`.
 
 ### Inline unit suffix
 
@@ -150,6 +215,295 @@ The validator raises `ErrorCode.UNIT_MISMATCH` (38 / `BovnarParseError`) when
 an inline suffix is present and a type-annotation unit is also present but the
 two do not resolve to the same `value_unit_t`. Inline unit suffixes inside
 array elements always raise `ErrorCode.UNEXPECTED_INPUT_BYTE`.
+
+---
+
+## `write_array` helper
+
+`write_array` is a high-level helper exported from the top-level `bovnar`
+namespace. It handles both flat and multi-dimensional arrays.
+
+```python
+from bovnar import write_array, Writer
+from bovnar.structs import make_type_spec, make_unit_si
+from bovnar.enums import ValueTypeFamily, BaseUnit
+
+with Writer.to_mem() as w:
+    # Single-row array
+    write_array(w, "primes", [2, 3, 5, 7])
+
+    # Multi-row array (rows separated by /)
+    write_array(w, "matrix", [[1, 2, 3], [4, 5, 6]])
+
+    # Typed array: whole-array type annotation
+    vt = make_type_spec(ValueTypeFamily.UINT, 16)
+    write_array(w, "ports", [80, 443, 8080], vt=vt)
+```
+
+Element types accepted per element: `int`, `float`, `str`, `bool`, `None`,
+`dict` (written as a struct), or nested `list`/`tuple` (written as a nested
+array). When *rows* is a flat sequence it is treated as a single-row array;
+when all top-level elements are themselves `list` or `tuple` it is treated as a
+multi-row array.
+
+---
+
+## `Reader` reference
+
+### Construction
+
+```python
+with Reader() as r:
+    ...
+```
+
+`Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
+manager or call `r.close()` explicitly to release the C object.
+
+### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error)`
+
+Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `data` | `bytes \| bytearray \| memoryview` | — | Input buffer |
+| `on_verified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for validated events |
+| `on_unverified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for raw pre-validation events |
+| `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
+| `continue_on_error` | `bool` | `False` | Enable resync mode |
+
+### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error)`
+
+Parse BVNR from an open POSIX file descriptor. Parameters identical to
+`read_mem` except the first argument is a non-negative `int` fd.
+
+### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error)`
+
+Convenience wrapper: opens `path` with `os.O_RDONLY`, calls `read_fd`, closes
+the fd in a `finally` block. The `max_file_size` default is `MAX_FILESIZE_BYTES`
+(16 MiB) rather than unlimited.
+
+### `iter_mem(data, *, verified_only, max_file_size)`
+
+Generator that collects all events from `read_mem` and yields
+`EventPayload(event, raw, value_type, value_unit)` objects.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `verified_only` | `True` | When `False`, both callbacks fire and events may appear twice |
+| `max_file_size` | `0` | Forwarded to `read_mem` |
+
+`EventPayload` fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `event` | `Event` | The event code |
+| `raw` | `bytes` | Raw token bytes |
+| `value_type` | `ValueTypeSpec \| None` | Type annotation if present |
+| `value_unit` | `ValueUnit \| None` | Unit if present |
+| `text` | `str` (property) | `raw` decoded as UTF-8 (with `errors='replace'`) |
+
+### Error-state properties
+
+These properties query the C reader object after a failed parse.
+
+| Property | Type | Description |
+|---|---|---|
+| `error_code` | `ErrorCode` | Most recent error code |
+| `error_line` | `int` | 1-based line number of the error |
+| `error_column` | `int` | 1-based column of the error |
+| `error_offset` | `int` | Byte offset of the error |
+| `recovery_count` | `int` | Number of times resync was entered (incremented at error entry, not at resync completion) |
+
+### `MAX_FILESIZE_BYTES`
+
+```python
+from bovnar import MAX_FILESIZE_BYTES   # 16 * 1024 * 1024  (16 MiB)
+```
+
+Default `max_file_size` cap used by `Reader.read_file`.
+
+---
+
+## `Writer` reference
+
+### Construction class methods
+
+| Method | Description |
+|---|---|
+| `Writer.to_mem(buf=None, cap=262144, *, pretty=True)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
+| `Writer.to_fd(fd, *, pretty=True)` | Write to an open POSIX file descriptor. |
+| `Writer.to_file(path, *, pretty=True)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
+
+All three are used as context managers.  On clean exit (`exc_type is None`)
+the context manager calls `finish()` automatically.
+
+### Output retrieval
+
+| Method / property | Description |
+|---|---|
+| `w.get_output() -> bytes` | Return the bytes written so far (mem writers only). |
+| `w.bytes_written` | Number of bytes written (all writer modes). |
+| `w.finish()` | Flush and seal the output. Raises `BovnarWriteError` if any struct is still open. |
+| `w.destroy()` | Release the underlying C writer object immediately. |
+
+### Scalar write methods
+
+All scalar writers accept keyword-only unit parameters.  Unit resolution
+priority: `unit_str` (parsed via `bvn_parse_unit_n`) → `unit_iec_base` →
+`unit_si_base` → `BVN_UNIT_NONE` (no annotation emitted).
+
+#### `write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)`
+
+Write an unsigned integer. `base` selects the numeral system (10 or 16 for
+inline values; any Bovnar-supported base for `write_bvni`).
+
+#### `write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+
+Write a signed integer.
+
+#### `write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+
+Write an IEEE 754 binary float.
+
+#### `write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+
+Write a Q-format fixed-point value. `q` is the number of fractional bits
+(`0 ≤ q < width`).
+
+#### `write_float_dec(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+
+Write an IEEE 754-2008 decimal float.
+
+#### `write_string(key, value)`
+
+Write a bare quoted UTF-8 string with no type annotation:
+```bovnar
+.host = "localhost";
+```
+To emit an explicit `<utf8>` annotation, use the low-level `emit` API with
+`Event.TYPE_ANNOTATION_START` / `TYPE_ANNOTATION_END` before `Event.DATA`.
+
+#### `write_bool(key, value)`
+
+Write the symbol `true` or `false` (no type annotation, no quotes).
+
+#### `write_null(key)`
+
+Write a null value (empty slot).
+
+### Extended integer writers
+
+#### `write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+
+Arbitrary-width integer writer that supports all Bovnar numeral bases (2, 8,
+10, 16, 36, 62, 64, 85). Non-decimal values are formatted using Python's own
+big-integer arithmetic and emitted as quoted strings.  `signed` defaults to
+`True` when `value < 0`.
+
+#### `write_bvnf_base(key, value_str, *, width=0, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+
+Write a float from a pre-formatted string in base 10 or 16. `base` must be
+10 or 16; any other value raises `BovnarArgumentError`.
+
+### Struct helpers
+
+```python
+w.begin_struct(key)   # emit ASSIGNMENT_START + STRUCT_START, increment depth
+w.end_struct()        # emit STRUCT_END, decrement depth
+```
+
+`finish()` verifies that the struct depth is zero; an unclosed struct raises
+`BovnarWriteError(GOT_INCOMPLETE_BVNR_STREAM)`.
+
+### Array helpers
+
+```python
+w.begin_array_row()   # emit ARRAY_ROW_START
+w.end_array_row()     # emit ARRAY_ROW_END
+w.new_array_dim()     # emit ARRAY_DIM_START (the / separator between rows)
+```
+
+### Low-level `emit`
+
+```python
+w.emit(event, *, key=None, value=None, vt=None, vu=None)
+```
+
+Send an arbitrary event to the C writer. `key` and `value` are encoded as
+UTF-8. When both `vt` and `value` are supplied the token type is inferred:
+`_TOKEN_IS_STRING` for `ValueTypeFamily.UTF8`, `_TOKEN_IS_NUMBER` otherwise.
+
+---
+
+## DOM API
+
+The DOM API parses a complete BVNR document into an in-memory tree for
+random-access queries without writing a SAX callback.
+
+### `dom_parse(data) -> DomDoc`
+
+Top-level convenience function (mirrors `DomDoc.parse`).
+
+```python
+import bovnar
+doc = bovnar.dom_parse(bvnr_bytes)
+```
+
+### `DomDoc`
+
+Owning wrapper around `bvn_dom_doc_t`. Destroying the object frees the entire
+tree; any `DomNode` derived from it becomes invalid after that point.
+
+| Method / property | Description |
+|---|---|
+| `DomDoc.parse(data)` | Class method. Parse `bytes \| bytearray \| memoryview`. |
+| `DomDoc.parse_fd(fd)` | Class method. Parse from an open file descriptor. |
+| `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). |
+| `doc.parse_error` | `ErrorCode` — `NONE` on success. |
+| `doc[key]` | Return top-level `DomNode` by key; raises `KeyError` when absent. |
+| `key in doc` | `True` when the top-level key exists. |
+| `len(doc)` | Number of top-level entries. |
+| `iter(doc)` | Iterate over `(key, DomNode)` pairs. |
+| `doc.entries()` | Return all top-level `(key, DomNode)` pairs as a list. |
+| `doc.lookup(path)` | Dot-separated path lookup, e.g. `'server.tls.cert'`. Returns `None` when absent. |
+| `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
+
+### `DomNode`
+
+Non-owning view into a `bvn_dom_node_t`. The parent `DomDoc` must remain alive
+for as long as any derived `DomNode` is in use.
+
+| Property / method | Description |
+|---|---|
+| `node.dom_type` | `DomType` enum value |
+| `node.value_type` | `ValueTypeSpec` |
+| `node.unit` | `ValueUnit` |
+| `node.unit_str` | Unit as a string via `bvn_dom_get_unit_string`, or `''` |
+| `node.is_null()` | `True` for null values |
+| `node.value_in_base_units()` | Numeric value scaled to SI base units (`float`) |
+| `node.as_i64()` / `as_u64()` | Signed / unsigned 64-bit integer |
+| `node.as_i32()` / `as_u32()` | Signed / unsigned 32-bit integer |
+| `node.as_i16()` / `as_u16()` | Signed / unsigned 16-bit integer |
+| `node.as_i8()` / `as_u8()` | Signed / unsigned 8-bit integer |
+| `node.as_float()` | `float` (64-bit) |
+| `node.as_str()` | Python `str` for `STRING`, `SYMBOL`, or `REFERENCE` nodes |
+| `node.as_bytes()` | `bytes` for `OCTET_STREAM` nodes |
+| `node.as_int_str(base=10)` | Integer value as a string in the given base; result C string is freed before return |
+| `node[key]` | Child `DomNode` by string key (STRUCT) or integer index (ARRAY) |
+| `key in node` | Membership test for STRUCT nodes |
+| `len(node)` | Element count for STRUCT or ARRAY nodes |
+| `iter(node)` | For STRUCT: iterate `(key, DomNode)` pairs; for ARRAY: iterate elements |
+| `node.entries()` | List of `(key, DomNode)` pairs (STRUCT nodes only) |
+| `node.array_dims()` | Number of `/`-separated dimensions (ARRAY nodes only) |
+| `node.to_python()` | Recursively convert to a native Python value (drops type/unit info) |
+
+### `DomType`
+
+```
+NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
+REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8
+```
 
 ---
 
@@ -175,21 +529,27 @@ pytest -v --tb=short
 
 ```
 bovnar/
-├── __init__.py      # loads() / dumps() / unit helpers — public API
+├── __init__.py      # loads() / dumps() / dom_parse() / unit helpers — public API
 ├── _ffi.py          # ctypes FFI: library discovery + argtypes/restype
-├── enums.py         # Python IntEnum mirrors of C enums (see note below)
+├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
+├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
 ├── reader.py        # Reader class + EventPayload dataclass
 ├── structs.py       # ctypes Structure/Union definitions + make_* helpers
+├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
 
 tests/
-├── conftest.py      # shared fixtures, needs_lib marker
-├── test_enums.py    # pure-Python enum tests
-├── test_structs.py  # pure-Python struct / helper tests
-├── test_reader.py   # integration: Reader (needs_lib)
-├── test_writer.py   # integration: Writer (needs_lib)
-└── test_units.py    # mixed: unit parsing / serialisation (needs_lib for FFI)
+├── conftest.py          # shared fixtures, needs_lib marker
+├── test_array_parser.py # array parsing integration tests (needs_lib)
+├── test_dom.py          # DOM API integration tests (needs_lib)
+├── test_enums.py        # pure-Python enum tests
+├── test_reader.py       # integration: Reader (needs_lib)
+├── test_structs.py      # pure-Python struct / helper tests
+├── test_unit_physics.py # unit physics / conversion tests (needs_lib)
+├── test_units.py        # mixed: unit parsing / serialisation (needs_lib for FFI)
+├── test_write_array.py  # write_array integration tests (needs_lib)
+└── test_writer.py       # integration: Writer (needs_lib)
 ```
 
 ---
@@ -201,10 +561,20 @@ All errors surface as subclasses of `BovnarError`:
 | Exception | When raised |
 |---|---|
 | `BovnarLibraryNotFound` | `libbvnr_shared.so` not found at import |
-| `BovnarParseError` | Parse error in `Reader` (carries `code`, `line`, `column`, `offset`) |
+| `BovnarParseError` | Parse error in `Reader` (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error in `Writer` (carries `code`, `offset`) |
-| `BovnarCallbackAbort` | Event callback returned `False` |
-| `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string) |
+| `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer) |
+
+**Callbacks returning `False`:** When an `on_verified` or `on_unverified`
+callback returns `False`, the C parser stops and `bvnr_read` returns failure.
+The Python layer then calls `_raise_error()` and raises `BovnarParseError` with
+whatever error code the reader recorded.  `BovnarCallbackAbort` is defined in
+`exceptions.py` but is not raised by the current implementation.
+
+**Callbacks raising exceptions:** If the callback itself raises a Python
+exception, that exception is captured, the C callback returns `False` to stop
+the parse, and the original exception is re-raised from `read_mem` / `read_fd`
+after the C call returns.
 
 ---
 
@@ -243,7 +613,7 @@ ON_ERROR_FUNC = ctypes.CFUNCTYPE(
 `BvnrWriteFlags` mirrors the C `bvnr_write_flags_s` struct in full, including
 the trailing `unit_flags` field (`bvn_unit_flags_t`, a `uint32_t`):
 
-| Flag constant | Value | Effect |
+| Flag constant (C) | Value | Effect |
 |---|---|---|
 | `BVN_UNIT_FLAGS_NONE` | `0` | Default: full Unicode exponent characters |
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units before serialising |
@@ -292,6 +662,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 37–38 | `TONNE`, `BAR` |
 | 39–41 | `ELECTRONVOLT`, `DALTON`, `ASTRONOMICAL_UNIT` |
 | 42–44 | `HECTARE`, `WEEK`, `YEAR` |
+| 45 | `_SENTINEL` (internal bound; do not use) |
 
 ---
 

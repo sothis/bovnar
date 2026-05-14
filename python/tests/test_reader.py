@@ -1,0 +1,363 @@
+
+
+import os
+import tempfile
+import pytest
+
+from conftest import needs_lib
+import bovnar
+from bovnar.reader import Reader
+from bovnar.enums import Event, ValueTypeFamily, ErrorCode
+from bovnar.exceptions import BovnarParseError, BovnarArgumentError
+
+@needs_lib
+class TestReaderLifecycle:
+    def test_create_and_close(self):
+        r = Reader()
+        r.close()
+        r.close()
+
+    def test_context_manager(self):
+        with Reader() as r:
+            assert r._ptr is not None
+        assert r._ptr is None
+
+    def test_closed_read_raises(self):
+        r = Reader()
+        r.close()
+        with pytest.raises(BovnarArgumentError):
+            r.read_mem(b'.x = 1;')
+
+    def test_error_properties_before_read(self):
+        with Reader() as r:
+            assert r.error_code == ErrorCode.NONE
+            assert r.error_line == 0
+            assert r.recovery_count == 0
+
+@needs_lib
+class TestEventDelivery:
+    def _collect(self, data: bytes) -> list[tuple]:
+        events = []
+        def cb(ev, d):
+            events.append((ev, d.raw_bytes() if d else b''))
+            return True
+        with Reader() as r:
+            r.read_mem(data, on_verified=cb)
+        return events
+
+    def test_stream_begin_fired(self, simple_scalar_uint):
+        events = self._collect(simple_scalar_uint)
+        assert events[0][0] == Event.STREAM_START
+
+    def test_assignment_start_key(self, simple_scalar_uint):
+        events = self._collect(simple_scalar_uint)
+        keys = [raw for ev, raw in events if ev == Event.ASSIGNMENT_START]
+        assert b'port' in keys
+
+    def test_data_event_value(self, simple_scalar_uint):
+        events = self._collect(simple_scalar_uint)
+        values = [raw for ev, raw in events if ev == Event.DATA]
+        assert b'8080' in values
+
+    def test_type_annotation_family(self, simple_scalar_uint):
+        events = self._collect(simple_scalar_uint)
+        families = [raw for ev, raw in events
+                    if ev == Event.TYPE_ANNOTATION_TYPE_FAMILY]
+
+        assert any(fam.startswith(b'uint') for fam in families)
+
+    def test_annotation_events_order(self, simple_scalar_float):
+        events = [ev for ev, _ in self._collect(simple_scalar_float)]
+        ann_start = events.index(Event.TYPE_ANNOTATION_START)
+        ann_end   = events.index(Event.TYPE_ANNOTATION_END)
+        assert ann_start < ann_end
+        data_idx = events.index(Event.DATA)
+        assert data_idx > ann_end
+
+    def test_struct_events(self, struct_payload):
+        events = [ev for ev, _ in self._collect(struct_payload)]
+        assert Event.STRUCT_START in events
+        assert Event.STRUCT_END   in events
+        assert events.index(Event.STRUCT_START) < events.index(Event.STRUCT_END)
+
+    def test_array_row_events(self, array_1d):
+        events = [ev for ev, _ in self._collect(array_1d)]
+        assert Event.ARRAY_ROW_START in events
+        assert Event.ARRAY_ROW_END in events
+
+    def test_array_2d_events(self, array_2d):
+        events = [ev for ev, _ in self._collect(array_2d)]
+        assert Event.ARRAY_DIM_START in events
+
+@needs_lib
+class TestValueTypeFamily:
+    def _data_events(self, data: bytes):
+        items = []
+        def cb(ev, d):
+
+            if ev in (Event.TYPE_ANNOTATION_TYPE_FAMILY,
+                      Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM) and d:
+                items.append(d.value_type)
+            return True
+        with Reader() as r:
+            r.read_mem(data, on_verified=cb)
+        return items
+
+    def test_uint16_type(self, simple_scalar_uint):
+        specs = self._data_events(simple_scalar_uint)
+        families = [ValueTypeFamily(s.family) for s in specs]
+        assert ValueTypeFamily.UINT in families
+
+    def test_sint_type(self, simple_scalar_sint):
+        specs = self._data_events(simple_scalar_sint)
+        families = [ValueTypeFamily(s.family) for s in specs]
+        assert ValueTypeFamily.SINT in families
+
+    def test_float_type(self, simple_scalar_float):
+        specs = self._data_events(simple_scalar_float)
+        families = [ValueTypeFamily(s.family) for s in specs]
+        assert ValueTypeFamily.FLOAT in families
+
+    def test_string_type(self):
+
+        typed_string = b'.host = <utf8> "localhost";\n'
+        specs = self._data_events(typed_string)
+        families = [ValueTypeFamily(s.family) for s in specs]
+        assert ValueTypeFamily.UTF8 in families
+
+    def test_untyped_integer_synthesises_uint64(self, untyped_integer):
+        specs = self._data_events(untyped_integer)
+        assert any(ValueTypeFamily(s.family) == ValueTypeFamily.UINT and s.width == 64
+                   for s in specs)
+
+    def test_untyped_float_synthesises_float64(self, untyped_float):
+        specs = self._data_events(untyped_float)
+        assert any(ValueTypeFamily(s.family) == ValueTypeFamily.FLOAT and s.width == 64
+                   for s in specs)
+
+    def test_negative_integer_synthesises_sint64(self, untyped_negative):
+        specs = self._data_events(untyped_negative)
+        assert any(ValueTypeFamily(s.family) == ValueTypeFamily.SINT
+                   for s in specs)
+
+@needs_lib
+class TestIterMem:
+    def test_yields_event_payloads(self, multi_assignment):
+        with Reader() as r:
+            events = list(r.iter_mem(multi_assignment))
+        assert len(events) > 0
+        from bovnar.reader import EventPayload
+        assert all(isinstance(e, EventPayload) for e in events)
+
+    def test_text_property(self, simple_scalar_string):
+        with Reader() as r:
+            events = list(r.iter_mem(simple_scalar_string))
+        keys = [e.text for e in events if e.event == Event.ASSIGNMENT_START]
+        assert 'host' in keys
+
+    def test_assignment_key_found(self, multi_assignment):
+        with Reader() as r:
+            events = list(r.iter_mem(multi_assignment))
+        keys = {e.text for e in events if e.event == Event.ASSIGNMENT_START}
+        assert 'name' in keys
+        assert 'age'  in keys
+
+@needs_lib
+class TestCallbackAbort:
+    def test_false_return_raises(self):
+        def aborting(ev, d):
+            return False
+
+        with pytest.raises(BovnarParseError) as exc_info:
+            with Reader() as r:
+                r.read_mem(b'.x = 1;', on_verified=aborting)
+        assert exc_info.value.code == ErrorCode.SCANNER_CALLBACK_FAILED
+
+    def test_exception_in_callback_raises(self):
+        def crashing(ev, d):
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            with Reader() as r:
+                r.read_mem(b'.x = 1;', on_verified=crashing)
+
+@needs_lib
+class TestReadFile:
+    def test_read_file_by_path(self, simple_scalar_uint):
+        with tempfile.NamedTemporaryFile(suffix='.bvnr', delete=False) as f:
+            f.write(simple_scalar_uint)
+            name = f.name
+        try:
+            keys = []
+            def cb(ev, d):
+                if ev == Event.ASSIGNMENT_START:
+                    keys.append(d.raw_str())
+                return True
+            with Reader() as r:
+                r.read_file(name, on_verified=cb)
+            assert 'port' in keys
+        finally:
+            os.unlink(name)
+
+    def test_read_fd(self, simple_scalar_uint):
+        with tempfile.NamedTemporaryFile(suffix='.bvnr', delete=False) as f:
+            f.write(simple_scalar_uint)
+            name = f.name
+        try:
+            fd = os.open(name, os.O_RDONLY)
+            keys = []
+            def cb(ev, d):
+                if ev == Event.ASSIGNMENT_START:
+                    keys.append(d.raw_str())
+                return True
+            try:
+                with Reader() as r:
+                    r.read_fd(fd, on_verified=cb)
+                assert 'port' in keys
+            finally:
+                os.close(fd)
+        finally:
+            os.unlink(name)
+
+@needs_lib
+class TestNestedStructures:
+    def _keys(self, data: bytes) -> list[str]:
+        keys = []
+        def cb(ev, d):
+            if ev == Event.ASSIGNMENT_START:
+                keys.append(d.raw_str())
+            return True
+        with Reader() as r:
+            r.read_mem(data, on_verified=cb)
+        return keys
+
+    def test_nested_struct_keys(self, nested_struct):
+        keys = self._keys(nested_struct)
+        assert 'server'   in keys
+        assert 'host'     in keys
+        assert 'limits'   in keys
+        assert 'max_conn' in keys
+        assert 'timeout'  in keys
+
+    def test_deep_nesting(self, deep_struct):
+        events = []
+        def cb(ev, d):
+            events.append(ev)
+            return True
+        with Reader() as r:
+            r.read_mem(deep_struct, on_verified=cb)
+        structs = [e for e in events if e == Event.STRUCT_START]
+        assert len(structs) == 4
+
+    def test_array_element_count(self, array_1d):
+        data_events = []
+        def cb(ev, d):
+            if ev == Event.DATA:
+                data_events.append(d.raw_bytes())
+            return True
+        with Reader() as r:
+            r.read_mem(array_1d, on_verified=cb)
+
+        assert len(data_events) == 3
+
+@needs_lib
+class TestNullValues:
+    def test_null_value_empty_raw(self, null_value):
+        data_events = []
+        def cb(ev, d):
+            if ev == Event.DATA:
+                data_events.append(d.raw_bytes() if d else b'__NONE__')
+            return True
+        with Reader() as r:
+            r.read_mem(null_value, on_verified=cb)
+        assert b'' in data_events
+
+    def test_typed_null(self, null_typed):
+        vts = []
+        def cb(ev, d):
+            if ev == Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM and d:
+                vts.append(d.value_type)
+            return True
+        with Reader() as r:
+            r.read_mem(null_typed, on_verified=cb)
+        families = [ValueTypeFamily(s.family) for s in vts]
+        assert ValueTypeFamily.UINT in families
+
+@needs_lib
+class TestSpecialFloats:
+    def test_nan_infinity_parsed(self, special_floats):
+        values = []
+        def cb(ev, d):
+            if ev == Event.DATA:
+                values.append(d.raw_bytes())
+            return True
+        with Reader() as r:
+            r.read_mem(special_floats, on_verified=cb)
+        raw_strs = [v.decode('utf-8') for v in values if v]
+        assert 'nan'       in raw_strs
+        assert 'infinity'  in raw_strs
+        assert '-infinity' in raw_strs
+
+@needs_lib
+class TestComments:
+    def test_comments_ignored(self, comment_payload):
+        keys = []
+        def cb(ev, d):
+            if ev == Event.ASSIGNMENT_START:
+                keys.append(d.raw_str())
+            return True
+        with Reader() as r:
+            r.read_mem(comment_payload, on_verified=cb)
+        assert 'foo' in keys
+        assert 'bar' in keys
+        assert len(keys) == 2
+
+@needs_lib
+class TestStringFeatures:
+    def test_string_value(self, simple_scalar_string):
+        values = []
+        def cb(ev, d):
+            if ev == Event.DATA:
+                values.append(d.raw_str())
+            return True
+        with Reader() as r:
+            r.read_mem(simple_scalar_string, on_verified=cb)
+        assert 'localhost' in values
+
+    def test_string_concat(self, string_concat):
+        values = []
+        def cb(ev, d):
+            if ev == Event.DATA and d:
+                values.append(d.raw_str())
+            return True
+        with Reader() as r:
+            r.read_mem(string_concat, on_verified=cb)
+        assert 'hello world' in values
+
+@needs_lib
+class TestMaxFileSize:
+    def test_max_file_size_exceeded(self):
+
+        data = b'.x = 1; .y = 2; .z = 3; .w = 4; .v = 5; .u = 6; .t = 7;\n'
+        with pytest.raises(BovnarParseError) as exc_info:
+            with Reader() as r:
+                r.read_mem(data, max_file_size=10)
+        assert exc_info.value.code == ErrorCode.FILE_TOO_LONG
+
+    def test_max_file_size_not_exceeded(self, simple_scalar_uint):
+
+        with Reader() as r:
+            r.read_mem(simple_scalar_uint, max_file_size=1024)
+
+@needs_lib
+class TestInvalidArguments:
+    def test_non_bytes_raises(self):
+        with Reader() as r:
+            with pytest.raises(BovnarArgumentError):
+                r.read_mem("not bytes")
+
+    def test_invalid_fd(self):
+        with Reader() as r:
+            with pytest.raises(BovnarArgumentError):
+                r.read_fd(-1)
+

@@ -1,0 +1,92 @@
+# strings.bvnr — demonstrates every string feature in BVNR
+#
+# Type annotation:  <utf8>  (the only string type family)
+# Default synth:    bare quoted literal → <utf8> (no parameters emitted)
+# Safe bytes:       0x09–0x0D (whitespace), 0x20–0x7E (except " and \),
+#                   0x80–0xFF (UTF-8 multi-byte continuation)
+# Rejected:         0x00–0x08, 0x0E–0x1F, 0x7F (DEL)
+
+
+# ── 1. Untyped strings (default type synthesis → <utf8>) ─────────────────────
+
+.simple      = "hello";                 # plain ASCII string
+.empty       = "";                      # empty string is valid
+
+
+# ── 2. Explicit <utf8> annotation ────────────────────────────────────────────
+
+.typed_str   = <utf8> "hello world";    # explicit UTF-8 annotation
+.typed_empty = <utf8> "";               # typed empty string
+
+
+# ── 3. Escape sequences ───────────────────────────────────────────────────────
+# All recognised escapes: \t \n \v \f \r \" \\
+# Any other byte after \ is error_illegal_escape_sequence.
+
+.tab_char    = "column1\tcolumn2";      # horizontal tab (0x09)
+.newline     = "line1\nline2";          # line feed (0x0A)
+.vtab        = "section\vsection";      # vertical tab (0x0B)
+.form_feed   = "page1\fpage2";          # form feed (0x0C)
+.cret        = "windows\rline";         # carriage return (0x0D)
+.dquote      = "she said \"hi\"";       # escaped double-quote
+.backslash   = "path\\to\\file";        # escaped backslash
+.all_escapes = "\t\n\v\f\r\"\\";        # one of each
+
+
+# ── 4. Raw whitespace inside string literals ──────────────────────────────────
+# HT, LF, VT, FF, CR are allowed as raw (unescaped) content bytes.
+
+.raw_tab     = "before	after";         # literal HT byte (tab character)
+.raw_newline = "first
+second";                                # literal LF byte (newline inside string)
+
+
+# ── 5. UTF-8 multi-byte content ───────────────────────────────────────────────
+
+.german      = "Müller";                # ü = U+00FC → 0xC3 0xBC
+.french      = "café";                  # é = U+00E9 → 0xC3 0xA9
+.japanese    = "日本語";                 # CJK ideographs (3 bytes each)
+.emoji       = "status: ✓";             # U+2713 CHECK MARK
+.greek       = "π ≈ 3.14159";           # Greek letter pi + math symbol
+.cyrillic    = "Привет";                # Russian greeting
+
+
+# ── 6. String concatenation ───────────────────────────────────────────────────
+# Adjacent string literals separated only by whitespace/comments are joined.
+# Combined byte length must not exceed max_string_length (default 65535).
+
+.joined      = "hello " "world";                # → "hello world"
+.multiline   = "first part "
+               "second part "                   # comment between parts is fine
+               "third part";                    # → "first part second part third part"
+.hex_split   = "DEADBEEF"
+               "CAFEBABE";                      # useful for long hex strings in <uint:_16>
+
+
+# ── 7. Strings as integer/float values (quoted numeric literals) ──────────────
+# uint and sint accept quoted strings whose content is a digit sequence.
+# float accepts quoted strings that look like float literals.
+# This is the only way to supply non-decimal (base != 10) values to uint/sint.
+
+.hex_as_str  = <uint:32,_16> "CAFEBABE";        # hex value via quoted string
+.oct_as_str  = <uint:16,_8>  "755";             # octal value via quoted string
+.bin_as_str  = <uint:8,_2>   "11010110";        # binary value via quoted string
+.float_str   = <float:64,_10> "3.14159265358979323846"; # float via quoted string
+.dec_str     = <float_dec:64> "1.2345678901234567";     # decimal float via string
+
+.sint_hex_str = <sint:32,_16> "-7FFFFFFF";      # signed hex via quoted string (minus prefix)
+
+.time_str    = <uint:32,_10,s> "3600";          # uint with unit, value as string
+
+
+# ── 8. <utf8> in arrays ───────────────────────────────────────────────────────
+# Type annotation applies to every element in the array.
+
+.endpoints   = <utf8> ["host-a", "host-b", "host-c"];  # typed string array
+.mixed_nulls = <utf8> [, "first", , "last", ];          # nulls allowed
+
+
+# ── 9. Null string values ─────────────────────────────────────────────────────
+
+.null_str    = <utf8> ;             # typed null string
+.null_plain  = ;                    # untyped null (any type)

@@ -1,0 +1,215 @@
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include "bovnar.h"
+
+static int failures = 0;
+static int tests = 0;
+
+#define ASSERT_TRUE(cond, msg) do {                                   \
+    tests++;                                                         \
+    if (!(cond)) {                                                   \
+        fprintf(stderr, "FAIL line %d: %s\n", __LINE__, (msg));  \
+        failures++;                                                  \
+    }                                                                \
+} while (0)
+
+#define ASSERT_EQ_INT(a, b, msg) do {                                 \
+    tests++;                                                         \
+    int64_t _a = (int64_t)(a);                                       \
+    int64_t _b = (int64_t)(b);                                       \
+    if (_a != _b) {                                                  \
+        fprintf(stderr, "FAIL line %d: %s\n  got %lld, expected %lld\n", \
+                __LINE__, (msg), (long long)_a, (long long)_b);      \
+        failures++;                                                  \
+    }                                                                \
+} while (0)
+
+#define ASSERT_EQ_UINT(a, b, msg) do {                                \
+    tests++;                                                         \
+    uint64_t _a = (uint64_t)(a);                                     \
+    uint64_t _b = (uint64_t)(b);                                     \
+    if (_a != _b) {                                                  \
+        fprintf(stderr, "FAIL line %d: %s\n  got %llu, expected %llu\n", \
+                __LINE__, (msg), (unsigned long long)_a, (unsigned long long)_b); \
+        failures++;                                                  \
+    }                                                                \
+} while (0)
+
+typedef struct {
+    uint32_t verified_events;
+    uint32_t unverified_events;
+    uint32_t error_callback_count;
+    bool     saw_second_assignment;
+    error_code_t last_error;
+} reader_ctx_t;
+
+static bool on_unverified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
+{
+    reader_ctx_t *ctx = userdata;
+    ctx->unverified_events++;
+    (void)ev;
+    (void)data;
+    return true;
+}
+
+static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
+{
+    reader_ctx_t *ctx = userdata;
+    ctx->verified_events++;
+
+    if (ev == ev_assignment_start && data && data->data && data->length > 0) {
+        if (data->length == 6 && memcmp(data->data, "second", 6) == 0)
+            ctx->saw_second_assignment = true;
+    }
+
+    return true;
+}
+
+static void on_error(void *userdata,
+                     error_code_t err,
+                     uint64_t line,
+                     uint64_t column,
+                     uint32_t byte_val,
+                     uint64_t offset)
+{
+    reader_ctx_t *ctx = userdata;
+    ctx->error_callback_count++;
+    ctx->last_error = err;
+    (void)line; (void)column; (void)byte_val; (void)offset;
+}
+
+static void run_reader(const char *payload,
+                       bool continue_on_error,
+                       error_code_t expected_error,
+                       bool expect_recovery,
+                       bool expect_second_assignment)
+{
+    reader_ctx_t ctx = {0};
+    bvnr_read_flags_t flags;
+    memset(&flags, 0, sizeof(flags));
+    flags.userdata = &ctx;
+    flags.on_unverified = on_unverified;
+    flags.on_verified = on_verified;
+    flags.on_error = on_error;
+    flags.continue_on_error = continue_on_error;
+
+    bvnr_reader_t *reader = bvnr_reader_create();
+    ASSERT_TRUE(reader != NULL, "bvnr_reader_create must succeed");
+    if (!reader) return;
+
+    bool opened = bvnr_open_read_mem(reader, payload,
+                                     (uint32_t)strlen(payload),
+                                     NULL, 0, &flags);
+    ASSERT_TRUE(opened, "bvnr_open_read_mem must open the payload");
+
+    bool ok = false;
+    if (opened)
+        ok = bvnr_read(reader);
+
+    error_code_t err = bvnr_reader_get_error(reader);
+    uint64_t recovery = bvnr_reader_get_recovery_count(reader);
+
+    if (expected_error == error_none) {
+        ASSERT_TRUE(ok, "bvnr_read must succeed when no parse error is expected");
+        ASSERT_EQ_INT(err, error_none, "reader must report error_none");
+    } else if (continue_on_error) {
+        ASSERT_TRUE(ok, "bvnr_read must succeed in continue_on_error mode even if errors are recovered");
+        ASSERT_EQ_INT(err, error_none, "reader must report error_none after recovery in continue_on_error mode");
+        ASSERT_TRUE(ctx.error_callback_count > 0, "error callback must fire for recovered parse errors");
+        ASSERT_EQ_INT(ctx.last_error, expected_error, "error callback must report the expected error code");
+    } else {
+        ASSERT_TRUE(!ok, "bvnr_read must fail when parse error is expected without resync");
+        ASSERT_EQ_INT(err, expected_error, "reader must report the expected error code");
+    }
+
+    if (expect_recovery)
+        ASSERT_TRUE(recovery > 0, "recovery_count must be greater than zero when resync is expected");
+    else
+        ASSERT_EQ_UINT(recovery, 0, "recovery_count must be zero when no resync is expected");
+
+    if (expect_second_assignment)
+        ASSERT_TRUE(ctx.saw_second_assignment, "second assignment must be reached after resync");
+
+    bvnr_reader_destroy(reader);
+}
+
+static void test_resync_on_error(void)
+{
+    const char *payload = ".first = 1; .broken = <float:64,_2> 1.0; .second = 2;";
+    run_reader(payload,
+               true,
+               error_illegal_value_type,
+               true,
+               true);
+}
+
+static void test_incomplete_stream(void)
+{
+    const char *payload = ".a = \"value";
+    run_reader(payload,
+               false,
+               error_got_incomplete_bvnr_stream,
+               false,
+               false);
+}
+
+static void test_comment_inside_array(void)
+{
+    const char *payload = ".arr = [1, # comment\n 2, 3];";
+    run_reader(payload,
+               false,
+               error_none,
+               false,
+               false);
+}
+
+static void test_bom_error_after_comment(void)
+{
+    const char *payload = "# comment\n\xEF\xBB\xBF.a = 1;";
+    reader_ctx_t ctx = {0};
+    bvnr_read_flags_t flags;
+    memset(&flags, 0, sizeof(flags));
+    flags.userdata = &ctx;
+    flags.on_unverified = on_unverified;
+    flags.on_verified = on_verified;
+    flags.on_error = on_error;
+    flags.continue_on_error = false;
+
+    bvnr_reader_t *reader = bvnr_reader_create();
+    ASSERT_TRUE(reader != NULL, "bvnr_reader_create must succeed");
+    if (!reader) return;
+
+    bool opened = bvnr_open_read_mem(reader, payload,
+                                     (uint32_t)strlen(payload),
+                                     NULL, 0, &flags);
+    ASSERT_TRUE(opened, "bvnr_open_read_mem must open the BOM payload");
+
+    bool ok = false;
+    if (opened)
+        ok = bvnr_read(reader);
+
+    error_code_t err = bvnr_reader_get_error(reader);
+    ASSERT_TRUE(!ok, "bvnr_read must fail for invalid BOM after comment");
+    ASSERT_TRUE(err != error_none, "invalid BOM after comment must produce a parse error");
+
+    bvnr_reader_destroy(reader);
+}
+
+int main(void)
+{
+    printf("Running bovnar_reader_test regression suite...\n");
+    test_resync_on_error();
+    test_incomplete_stream();
+    test_comment_inside_array();
+    test_bom_error_after_comment();
+
+    if (failures == 0) {
+        printf("PASSED %d tests\n", tests);
+        return 0;
+    }
+
+    fprintf(stderr, "FAILED %d of %d tests\n", failures, tests);
+    return 1;
+}

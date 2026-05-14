@@ -1,0 +1,24 @@
+{
+  "name": "bovnar-highlight",
+  "displayName": "Bovnar Syntax",
+  "description": "Syntax highlighting for Bovnar files",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.70.0" },
+  "contributes": {
+    "languages": [
+      {
+        "id": "bovnar",
+        "aliases": ["Bovnar"],
+        "extensions": [".bvnr"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bovnar",
+        "scopeName": "source.bovnar",
+        "path": "./syntaxes/Bovnar.tmLanguage.json"
+      }
+    ]
+  }
+}

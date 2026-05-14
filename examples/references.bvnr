@@ -1,0 +1,127 @@
+# references.bvnr — demonstrates every reference feature in BVNR
+#
+# A reference names another key in the document via a dotted path
+# introduced by &.
+#
+# Syntax:
+#   reference    = "&" ref-segment { ref-segment }
+#   ref-segment  = "." id-start { ref-body-char }
+#   ref-body-char = same as symbol body | "."
+#
+# The stored token text includes the leading dot and all intermediate dots.
+# References are a token type; the parser does NOT resolve them — resolution
+# is left to the application layer.
+#
+# Termination: ; at assignment level, , or ] inside arrays.
+
+
+# ── 1. Target values to be referenced ────────────────────────────────────────
+
+.hostname    = "db.internal";
+.port        = 5432;
+.max_conn    = 100;
+.timeout_s   = 30;
+.debug_flag  = false;
+.proto       = tcp;             # symbol target
+
+
+# ── 2. Simple (single-segment) references ────────────────────────────────────
+# Stored path: ".hostname" (one segment)
+
+.conn_host   = &.hostname;      # refers to .hostname above
+.conn_port   = &.port;          # refers to .port
+.conn_max    = &.max_conn;
+.conn_tmo    = &.timeout_s;
+.conn_dbg    = &.debug_flag;
+.conn_proto  = &.proto;
+
+
+# ── 3. Multi-segment (dotted path) references ────────────────────────────────
+# Each . introduces a new segment. Stored path includes all dots.
+
+.server = {
+    .address = "10.0.0.1";
+    .port    = 8080;
+    .tls     = {
+        .enabled = true;
+        .cert    = "/etc/ssl/certs/server.pem";
+    };
+};
+
+.proxy_addr  = &.server.address;        # path: ".server.address"
+.proxy_port  = &.server.port;           # path: ".server.port"
+.tls_cert    = &.server.tls.cert;       # three-segment path
+.tls_on      = &.server.tls.enabled;    # deep nested reference
+
+
+# ── 4. References to keys with hyphens and digits ────────────────────────────
+# ref-body-char follows the same rules as symbol body (+ - digits allowed).
+
+.my-key   = 42;
+.node-1   = "primary";
+.node-2   = "secondary";
+
+.ref_hyph  = &.my-key;         # hyphen in referenced key name
+.ref_node1 = &.node-1;
+.ref_node2 = &.node-2;
+
+
+# ── 5. References as array elements ──────────────────────────────────────────
+# References are terminated by , or ] inside arrays.
+
+.master    = "master-node";
+.replica-a = "replica-a";
+.replica-b = "replica-b";
+
+.cluster   = [&.master, &.replica-a, &.replica-b];  # array of references
+
+
+# ── 6. References mixed with other element types ──────────────────────────────
+
+.base_rate  = 9600;
+.base_unit  = baud;
+
+.uart_cfg = [
+    &.base_rate,            # reference as first element
+    8,                      # plain uint: data bits
+    none,                   # symbol: no parity
+    1                       # plain uint: stop bits
+];
+
+
+# ── 7. References inside structs ─────────────────────────────────────────────
+
+.defaults = {
+    .retries = 3;
+    .delay_s = 5;
+};
+
+.worker_a = {
+    .retries = &.defaults.retries;  # borrow default from another struct
+    .delay_s = &.defaults.delay_s;
+};
+
+.worker_b = {
+    .retries = &.defaults.retries;  # both workers share the same defaults
+    .delay_s = &.defaults.delay_s;
+};
+
+
+# ── 8. References in heterogeneous arrays ────────────────────────────────────
+
+.base_timeout = 60;
+
+.pipeline = [
+    &.base_timeout,         # reference to integer
+    &.server.address,       # reference to string in nested struct
+    enabled,                # symbol
+    "stage-1"               # string literal
+];
+
+
+# ── 9. Null reference slot ────────────────────────────────────────────────────
+# A null and a reference are distinct. The slot can be conditionally populated
+# by the application; the .bvnr file uses null to signal "no reference here".
+
+.optional_override = ;      # null — no reference; application uses default
+.active_override   = &.timeout_s;  # non-null — application follows this ref

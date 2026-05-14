@@ -1,0 +1,47 @@
+[build-system]
+requires      = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "bovnar"
+version         = "0.1.0"
+description     = "Python bindings for the Bovnar (BVNR) typed, unit-aware serialisation format"
+license         = { text = "MIT" }
+requires-python = ">=3.10"
+authors         = [
+    { name = "Janos Sonntag" },
+]
+keywords        = ["bovnar", "bvnr", "serialisation", "units", "ctypes"]
+classifiers     = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Programming Language :: C",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+]
+
+[project.urls]
+Source        = "https://github.com/bovnar/bovnar"
+Documentation = "https://github.com/bovnar/bovnar/tree/main/doc"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where   = ["."]
+include = ["bovnar*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,9 @@
+build/*
+__pycache__/*
+.claude/
+.cache/
+bovnar_merged.txt
+*.pyc
+bovnar_merged_conly.txt
+bovnar_merged_all.txt
+bovnar.zip

@@ -1,0 +1,164 @@
+# floats.bvnr — demonstrates every floating-point feature in BVNR
+#
+# Three float families:
+#   float      — IEEE 754 binary floating-point
+#   float_fix  — Q-format (fixed-point)
+#   float_dec  — IEEE 754-2008 decimal floating-point
+#
+# Default synthesis for float literals:  <float:64,_10,no_unit>
+
+
+# ── 1. Untyped float literals (default type synthesis) ────────────────────────
+
+.plain_float    = 3.14159;      # synthesised as <float:64,_10,no_unit>
+.dot_led        = .5;           # leading-dot form: 0.5
+.neg_dot_led    = -.5;          # negative leading-dot: -0.5
+.trailing_dot   = 123.;         # trailing dot without fraction digits; valid
+.scientific     = 1e6;          # 1 000 000 in scientific notation
+.sci_neg_exp    = 2.5e-3;       # 0.0025
+.sci_upper_e    = 6.022E23;     # Avogadro's number
+.neg_scientific = -1.6e-19;     # electron charge (sign on mantissa)
+
+
+# ── 2. Special number literals ────────────────────────────────────────────────
+# $nan$, $infinity$, $-infinity$ — both $ delimiters are mandatory.
+
+.not_a_number    = $nan$;       # IEEE 754 NaN
+.pos_infinity    = $infinity$;  # +∞
+.neg_infinity    = $-infinity$; # -∞
+
+
+# ── 3. Explicit binary float — all valid widths ───────────────────────────────
+# Valid widths: 0 (→64), 16, or any multiple of 32 up to 32768.
+# Width 8 and non-multiples-of-32 (except 16) are illegal.
+
+.float16   = <float:16>  3.14;          # half-precision (IEEE 754 binary16)
+.float32   = <float:32>  3.14159265;    # single-precision
+.float64   = <float:64>  3.14159265358979323846; # double-precision
+.float96   = <float:96>  1.23456789;    # 3× 32-bit extended
+.float128  = <float:128> 1.23456789012345678901234567890;  # quad-precision
+.float256  = <float:256> 1.23456789012345678901234567890;  # octuple-precision
+
+.float_default_width = <float:0>  2.71828; # width 0 → effective 64
+
+
+# ── 4. Binary float — base parameter ─────────────────────────────────────────
+# float accepts only base 10 (_10) or base 16 (_16). All other bases are errors.
+
+.float64_base10 = <float:64,_10>  5.7;           # explicit decimal base (default)
+.float64_base10_str = <float:64,_10> "5.7";       # quoted decimal string
+.float64_base10_sci = <float:64,_10>  5.7e112;    # large exponent
+.float64_base10_neg = <float:64,_10> -5.7e-112;   # negative with negative exponent
+
+
+# ── 5. Binary float — special values with explicit type ──────────────────────
+
+.nan32   = <float:32>  $nan$;
+.nan64   = <float:64>  $nan$;
+.inf32   = <float:32>  $infinity$;
+.neginf64 = <float:64> $-infinity$;
+
+
+# ── 6. Binary float with SI units ────────────────────────────────────────────
+
+.gravity      = <float:64,m/s²>    9.80665;   # standard gravity (m/s²)
+                                               # compound unit: meter per second squared
+.speed_of_light = <float:64,k-m/s> 299792.458; # c in km/s
+.boltzmann    = <float:64,J/K>     1.380649e-23; # Boltzmann constant
+.planck       = <float:64,J·s>     6.62607015e-34; # Planck's constant (J·s)
+.charge       = <float:64,m-A·s>   1.602176634e-19; # electron charge (milli-Ampere-second)
+.pressure_atm = <float:64,Pa>      101325.0;   # 1 atm in pascals
+.temp_kelvin  = <float:64,K>       273.15;     # 0 °C in kelvin
+.bitrate_gbps = <float:64,Gi-b>    10.0;       # 10 Gb/s (gibibits)
+.power_mw     = <float:32,m-W>     500.0;      # 500 milliwatts
+
+
+# ── 7. Binary float — inline unit suffix ─────────────────────────────────────
+# Inline unit appears after the literal, before ';'. Forbidden inside arrays.
+
+.distance  = 384400.0 k-m;     # Earth–Moon distance (km)
+.voltage   = 3.3 V;            # supply voltage
+.current   = 0.02 A;           # 20 mA
+.resistance = 4700.0 Ω;        # 4.7 kΩ in ohms (Ω = U+03A9)
+
+
+# ── 8. Annotation + inline unit ──────────────────────────────────────────────
+# Annotation unit and inline unit must match, or one must be absent.
+
+.speed_a = <float:64,m/s>  9.81;      # annotation unit only
+.speed_b = <float:64>      9.81 m/s;  # inline unit only
+.speed_c = <float:64,m/s>  9.81 m/s;  # both present and identical — valid
+
+
+# ── 9. Null float values ──────────────────────────────────────────────────────
+
+.null_float32 = <float:32> ;     # typed null
+.null_float64 = <float:64> ;     # typed null
+.null_plain   = ;                # untyped null
+
+
+# ── 10. float_fix — Q-format fixed-point ─────────────────────────────────────
+# Valid widths: 0 (→64), 16, 32, 64, 128, 256.
+# Q parameter (qN): number of fractional bits; 0 ≤ N < effective_width.
+# Base parameter (_N) is FORBIDDEN for float_fix.
+# Mathematical value = raw_integer × 2^(-Q)
+
+.fix16_q8   = <float_fix:16,q8>   3.14;    # Q8 in 16-bit: resolution 2^-8 ≈ 0.0039
+                                            # integer range [-128, 127], fractional .996
+.fix32_q16  = <float_fix:32,q16>  -1.5;    # Q16 in 32-bit: 16 integer + 16 fractional bits
+.fix32_q0   = <float_fix:32,q0>   42;      # Q0 = no fractional bits; pure integer storage
+.fix64_q32  = <float_fix:64,q32>  0.000001; # Q32: 32 fractional bits (very high resolution)
+.fix64_q0   = <float_fix:64,q0>   1000000; # wide integer range, no fraction
+
+.fix_with_unit = <float_fix:32,q8,m/s>  9.81; # fixed-point velocity
+
+.null_fix   = <float_fix:32,q16> ;  # typed null fixed-point
+
+
+# ── 11. float_dec — IEEE 754-2008 decimal floating-point ─────────────────────
+# Valid widths: 0 (→64), 16, 32, 64, 128, 256.
+# Base parameter (_N) is FORBIDDEN for float_dec (decimal base is implicit).
+# Useful when exact decimal representation is required (finance, metrology).
+
+.dec16      = <float_dec:16>   3.14;         # 2 significant decimal digits
+.dec32      = <float_dec:32>   3.1415927;    # 7 significant decimal digits
+.dec64      = <float_dec:64>   3.141592653589793; # 16 significant decimal digits
+.dec128     = <float_dec:128>  1.23456789012345678901234567890123456789; # 34 digits
+.dec256     = <float_dec:256>  1.23456789012345678901234567890123456789012345678901234567890; # 70 digits
+
+.dec_nan    = <float_dec:64>   $nan$;        # special values are valid for float_dec
+.dec_inf    = <float_dec:64>   $infinity$;
+
+.dec_unit   = <float_dec:64,Pa>  101325;     # with SI unit: pascals
+
+.null_dec   = <float_dec:64> ;              # typed null decimal float
+
+
+# ── 12. Wide binary floats (multiples of 32 up to 32768) ─────────────────────
+# Any positive multiple of 32 is accepted as width in addition to 16.
+# These are the arbitrary-precision extension widths.
+# The C API functions bvnr_write_bvnf_base / bvnr_write_bvnf_base_unit
+# generate and verify the string before writing.
+
+.float256  = <float:256>  1.23456789012345678901234567890123456789012345678901234567890123456789;
+.float512  = <float:512>  3.14159265358979323846264338327950288419716939937510582097494459230781640628620899;
+.float1024 = <float:1024> 2.71828182845904523536028747135266249775724709369995957496696762772407663035354759;
+.float32768 = <float:32768> 1.0;            # maximum allowed precision width
+
+
+# ── 13. Binary float — base 16 (hex mantissa with binary exponent) ────────────
+# <float:W,_16> values must be quoted strings.
+# Format: [−]D.DDDDp[+|−]EEE
+#   • D.DDDD  lowercase hex mantissa digits
+#   • p       exponent separator (not 'e')
+#   • EEE     decimal binary exponent
+# The C API generates this format via bvn_float_to_str(f, buf, bufsz, 16).
+
+.hex64_one         = <float:64,_16>  "1.0p+0";          # 1.0
+.hex64_pi          = <float:64,_16>  "1.921fb54442d18p+1";  # π (double precision)
+.hex64_neg         = <float:64,_16>  "-1.8p+4";         # -24.0 (−1.5 × 2^4)
+.hex64_small       = <float:64,_16>  "1.0p-1022";       # near double minimum normal
+.hex256_quarter    = <float:256,_16> "1.0p-2";          # 0.25
+.hex256_pi         = <float:256,_16> "1.921fb54442d18469898cc51701b839a252049c1114cf98e804177d4c76273644a29410f31c6809bbdf2a33679a748636604719930p+1";
+.hex1024_one       = <float:1024,_16> "1.0p+0";
+

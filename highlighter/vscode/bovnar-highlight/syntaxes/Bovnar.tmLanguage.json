@@ -1,0 +1,218 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Bovnar",
+  "scopeName": "source.bovnar",
+  "fileTypes": ["bvnr"],
+
+  "patterns": [
+    { "include": "#comment"          },
+    { "include": "#assignment"       },
+    { "include": "#type_annotation"  },
+    { "include": "#value"            }
+  ],
+
+  "repository": {
+
+    "comment": {
+      "match": "#[^\n\r]*",
+      "name": "comment.line.number-sign.bovnar"
+    },
+
+    "assignment": {
+      "comment": "Matches the leading '.key' sigil+identifier and the closing ';'. beginCaptures highlight the dot sigil and the key atomically, which works correctly even for multi-line values. The lookbehind anchor (^, {, ;) prevents matching '.path' segments inside reference literals.",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": {
+        "0": { "name": "punctuation.terminator.semicolon.bovnar" }
+      },
+      "patterns": [
+        { "include": "#comment"         },
+        { "match": "=", "name": "keyword.operator.assignment.bovnar" },
+        { "include": "#type_annotation" },
+        { "include": "#value"           },
+        { "match": "/", "name": "punctuation.separator.array-row.bovnar" }
+      ]
+    },
+
+    "type_annotation": {
+      "comment": "Matches <type-spec> blocks including the new float_fix / float_dec families (v1.3) and the q-param for fixed-point Q-format. float_fix and float_dec must precede float in the alternation so the longer names win.",
+      "begin": "<",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.type.begin.bovnar" }
+      },
+      "end": ">",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.type.end.bovnar" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+
+        { "comment": "Type-family keywords. Longer names (float_fix, float_dec) must appear before float.",
+          "match": "\\b(float_fix|float_dec|float|uint|sint|utf8)\\b",
+          "name": "storage.type.family.bovnar" },
+
+        { "comment": "Explicitly-dimensionless keyword.",
+          "match": "\\bno_unit\\b",
+          "name": "support.constant.no-unit.bovnar" },
+
+        { "comment": "Q-format fractional-bits: q0, q8, q16, q32 … (float_fix only).",
+          "match": "\\bq\\d+\\b",
+          "name": "constant.numeric.q-param.bovnar" },
+
+        { "comment": "Base parameter: _2 _8 _10 _16 _36 _62 _64 _85 …",
+          "match": "_\\d+",
+          "name": "constant.numeric.base-param.bovnar" },
+
+        { "comment": "Width parameter: bare decimal integer (16, 32, 64, 128 …).",
+          "match": "\\b\\d+\\b",
+          "name": "constant.numeric.width-param.bovnar" },
+
+        { "include": "#unit_expression" },
+
+        { "match": ":", "name": "punctuation.separator.colon.bovnar"  },
+        { "match": ",", "name": "punctuation.separator.comma.bovnar"  }
+      ]
+    },
+
+    "value": {
+      "comment": "All valid right-hand-side value forms. Ordering matters: special_number before plain number; inline_unit after any scalar so the lookbehind anchor is satisfied.",
+      "patterns": [
+        { "include": "#comment"        },
+        { "include": "#special_number" },
+        { "include": "#number"         },
+        { "include": "#string"         },
+        { "include": "#inline_unit"    },
+        { "include": "#symbol"         },
+        { "include": "#reference"      },
+        { "include": "#array"          },
+        { "include": "#struct"         }
+      ]
+    },
+
+    "special_number": {
+      "comment": "$nan$  $infinity$  $-infinity$ — both dollar delimiters are mandatory.",
+      "match": "\\$(?:nan|-infinity|infinity)\\$",
+      "name": "constant.language.special-float.bovnar"
+    },
+
+    "number": {
+      "patterns": [
+        { "comment": "Leading-dot float:  .5   -.5   .7e+3",
+          "match": "-?\\.\\d+(?:[eE][+\\-]?\\d+)?",
+          "name": "constant.numeric.float.bovnar" },
+
+        { "comment": "Integer-led float (trailing dot allowed):  3.14  1.  -8.  5.7e112",
+          "match": "-?\\d+\\.\\d*(?:[eE][+\\-]?\\d+)?",
+          "name": "constant.numeric.float.bovnar" },
+
+        { "comment": "Bare integer / scientific-notation integer:  511  -7  01010110  1e10",
+          "match": "-?\\d+(?:[eE][+\\-]?\\d+)?",
+          "name": "constant.numeric.integer.bovnar" }
+      ]
+    },
+
+    "string": {
+      "comment": "Double-quoted string. Only seven escape sequences are legal: \\t \\n \\v \\f \\r \\\" \\\\. Adjacent string literals separated only by whitespace/comments are concatenated by the lexer — each literal is its own match here.",
+      "begin": "\"",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.string.begin.bovnar" }
+      },
+      "end": "\"",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.bovnar" }
+      },
+      "name": "string.quoted.double.bovnar",
+      "patterns": [
+        { "match": "\\\\[tnvfr\"\\\\]",
+          "name": "constant.character.escape.bovnar" },
+        { "match": "\\\\.",
+          "name": "invalid.illegal.escape.bovnar" }
+      ]
+    },
+
+    "inline_unit": {
+      "comment": "Inline unit suffix (spec §6.5): mandatory whitespace separates the scalar value from the unit. Lookbehind anchors to the final byte of a scalar: digit (number), '$' (closing delimiter of $nan$ etc.), or '\"' (closing quote of string). Inline units are intentionally absent from the #array rule because they are forbidden inside array elements.",
+      "match": "(?<=[\\d$\"])(\\s+)([A-Za-z_µ°][A-Za-z0-9_\\.\\-/:\\^\\*µΩ°·⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
+      "captures": {
+        "1": { "name": "punctuation.separator.inline-unit.bovnar" },
+        "2": { "name": "support.type.unit.inline.bovnar"          }
+      }
+    },
+
+    "symbol": {
+      "comment": "Bare-word value (symbol / enum-like): same start/body rules as an identifier. Must not begin with a digit — numbers are matched first and take priority.",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_+\\-]*\\b",
+      "name": "variable.other.symbol.bovnar"
+    },
+
+    "reference": {
+      "comment": "Reference literal: '&' sigil followed by one or more '.segment' path components. '&' alone or '&.' without an id-start is a parse error.",
+      "begin": "&",
+      "beginCaptures": {
+        "0": { "name": "keyword.operator.reference.bovnar" }
+      },
+      "end": "(?=[\\s;,\\[\\]{}])",
+      "patterns": [
+        { "match": "\\.([A-Za-z_][A-Za-z0-9_+\\-]*)",
+          "captures": {
+            "0": { "name": "variable.other.reference-path.bovnar" }
+          }
+        }
+      ]
+    },
+
+    "array": {
+      "comment": "Array row: '[' … ']'. The '/' separator between multiple rows is matched at the enclosing (assignment / outer-array) level. Inline units are intentionally excluded here — they are forbidden inside array elements by the spec.",
+      "begin": "\\[",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.array.begin.bovnar" }
+      },
+      "end": "\\]",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.array.end.bovnar" }
+      },
+      "patterns": [
+        { "include": "#comment"         },
+        { "include": "#type_annotation" },
+        { "include": "#special_number"  },
+        { "include": "#number"          },
+        { "include": "#string"          },
+        { "include": "#symbol"          },
+        { "include": "#reference"       },
+        { "include": "#array"           },
+        { "include": "#struct"          },
+        { "match": ",",
+          "name": "punctuation.separator.comma.bovnar"     },
+        { "match": "/",
+          "name": "punctuation.separator.array-row.bovnar" }
+      ]
+    },
+
+    "struct": {
+      "comment": "Struct scope: '{' … '}'. Recursively includes #assignment so nested scopes are fully highlighted.",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.struct.begin.bovnar" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.struct.end.bovnar" }
+      },
+      "patterns": [
+        { "include": "#comment"    },
+        { "include": "#assignment" }
+      ]
+    },
+
+    "unit_expression": {
+      "comment": "Unit string inside a type annotation: SI/IEC prefix–unit pairs with product/division separators and Unicode superscript exponents. Examples: m-s  k-g·m/s²  Gi-B  m^-2  µ-eV. No semantic validation — purely visual scope tagging.",
+      "match": "[A-Za-zµΩ°][A-Za-z0-9]*(?:-[A-Za-zµΩ°][A-Za-z0-9]*)?(?:[·/*][A-Za-zµΩ°][A-Za-z0-9]*(?:-[A-Za-zµΩ°][A-Za-z0-9]*)?)*(?:[⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?",
+      "name": "support.type.unit.bovnar"
+    }
+
+  }
+}

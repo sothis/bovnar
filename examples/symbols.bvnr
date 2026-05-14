@@ -1,0 +1,112 @@
+# symbols.bvnr — demonstrates every symbol feature in BVNR
+#
+# A symbol is an unquoted bare-word token in value position.
+# It starts with an id-start character and continues with id-body characters.
+#
+# id-start : A–Z | a–z | _ | UTF-8 leader bytes 0xC3–0xF4
+# id-body  : id-start | + | - | 0–9 | UTF-8 continuation bytes
+#
+# Symbols are distinct from string values — they are not quoted and carry
+# no <utf8> type annotation. They are used for enumeration values, boolean-like
+# flags, status codes, and other named constants.
+#
+# Termination: inside an array, , and ] terminate a symbol;
+#              at assignment level, ; terminates it.
+
+
+# ── 1. Basic symbols ──────────────────────────────────────────────────────────
+
+.status   = ok;             # simple lowercase symbol
+.result   = error;          # another simple symbol
+.day      = Monday;         # capitalized symbol
+.month    = January;        # mixed case
+
+
+# ── 2. Boolean-like symbols ───────────────────────────────────────────────────
+# BVNR has no native boolean type; true/false are parsed as symbols.
+
+.debug    = false;          # symbol "false"
+.verbose  = true;           # symbol "true"
+.enabled  = yes;            # alternative truthy symbol
+.disabled = no;             # alternative falsy symbol
+
+
+# ── 3. Enumeration values ─────────────────────────────────────────────────────
+
+.color     = red;
+.direction = north;
+.level     = warning;
+.mode      = read_only;     # underscore in body is legal
+.state     = RUNNING;       # all caps is fine
+
+
+# ── 4. Symbols with hyphens and plus signs ────────────────────────────────────
+# + and - are legal in symbol bodies (not at the start, which would be a number).
+
+.option_a   = option-A;         # hyphen in body
+.option_b   = option-B;
+.key_type   = RSA-2048;         # digits in body are legal after id-start
+.variant    = type-plus+extra;  # both hyphen and plus in same symbol
+
+
+# ── 5. Symbols with digits ────────────────────────────────────────────────────
+# Digits are legal in the body but not as the first character.
+
+.code      = optionA42;         # alphanumeric
+.version   = v1;                # v-prefix with digit
+.build_id  = release2026;
+
+
+# ── 6. UTF-8 symbols ─────────────────────────────────────────────────────────
+# Leader bytes 0xC3–0xF4 are valid id-start; 0x80–0xBF are valid id-body.
+# Note: 0xC2 is rejected as id-start (U+0080–U+00BF cannot begin identifiers).
+
+.zustand   = aktiv;             # German ASCII-only
+.etat      = actif;             # French ASCII-only
+.symbol_de = Größe;             # ö = U+00F6 (0xC3 0xB6), ß = U+00DF (0xC3 0x9F)
+
+
+# ── 7. Symbols as array elements ─────────────────────────────────────────────
+# Symbols are terminated by ] or , inside arrays.
+# No inline unit suffix is allowed for symbols in arrays.
+
+.flags     = [red, green, blue];            # three color symbols
+.weekdays  = [Monday, Tuesday, Wednesday, Thursday, Friday];
+.bool_arr  = [true, false, true, false];    # boolean-like symbol array
+.mixed     = [ok, error, pending, unknown]; # status symbols
+
+
+# ── 8. Symbol vs. string distinction ─────────────────────────────────────────
+# A symbol has no quotes; a string has quotes and synthesises <utf8>.
+# The parser emits different token types for each.
+
+.sym_val   = active;            # token type: symbol
+.str_val   = "active";          # token type: string → <utf8>
+
+
+# ── 9. Symbols as struct field values ────────────────────────────────────────
+
+.device = {
+    .power    = on;
+    .mode     = auto;
+    .priority = high;
+    .alarm    = none;
+};
+
+
+# ── 10. Null vs. symbol ───────────────────────────────────────────────────────
+# A null is the absence of any value token. A symbol is a present, named value.
+
+.nothing  = ;               # null (no value)
+.null_sym = null;           # symbol "null" — NOT a language-level null
+.none_sym = none;           # symbol "none" — purely application-defined
+
+
+# ── 11. Symbols in heterogeneous arrays ───────────────────────────────────────
+
+.config_items = [
+    enabled,                # symbol
+    42,                     # uint
+    "label",                # string
+    active                  # symbol
+];

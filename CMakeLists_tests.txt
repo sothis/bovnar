@@ -1,0 +1,379 @@
+
+
+include(CTest)
+
+add_executable(bvnr_dom_test             tests/bovnar_dom_test.c)
+add_executable(bvnr_si_test              tests/bovnar_si_units_test.c)
+add_executable(bvnr_unit_ext_test        tests/bovnar_unit_ext_test.c)
+add_executable(bvnr_reader_test          tests/bovnar_reader_test.c)
+add_executable(bvnr_writer_test          tests/bovnar_writer_test.c)
+add_executable(bvnr_extended_reader_test tests/bovnar_extended_reader_test.c)
+add_executable(bvnr_utils_test           tests/bovnar_utils_test.c)
+add_executable(bvnr_socketpair_roundtrip_test tests/bovnar_socketpair_roundtrip_test.c)
+add_executable(bvnr_high_severity_test   tests/bovnar_high_severity_test.c)
+
+find_package(GMP QUIET)
+if(GMP_FOUND)
+    add_executable(bvnr_int_test          tests/bvn_int_test.c)
+else()
+    message(STATUS "GMP not found - skipping bvnr_int_test (requires libgmp).")
+endif()
+
+add_executable(bvnr_float_test           tests/bvn_float_test.c)
+
+target_compile_options(bvnr_dom_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_dom_test PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_si_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_si_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+target_link_libraries(bvnr_si_test PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_unit_ext_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_unit_ext_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+target_link_libraries(bvnr_unit_ext_test PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_reader_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_reader_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_writer_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_writer_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_extended_reader_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_extended_reader_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_utils_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_utils_test PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_socketpair_roundtrip_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_socketpair_roundtrip_test PRIVATE bvnr_static pthread)
+
+target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static m)
+
+if(GMP_FOUND)
+    target_compile_options(bvnr_int_test PRIVATE -DWITH_GMP ${BVNR_C_FLAGS})
+    target_link_libraries(bvnr_int_test PRIVATE bvnr_static m GMP::GMP)
+endif()
+
+target_compile_options(bvnr_float_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_float_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(bvnr_float_test PRIVATE bvnr_static m)
+
+add_executable(bvnr_float_fix_dec_test tests/bvn_float_fix_dec_test.c)
+target_compile_options(bvnr_float_fix_dec_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_float_fix_dec_test PRIVATE bvnr_static m)
+
+add_test(NAME bvnr_float_fix_dec_test COMMAND bvnr_float_fix_dec_test)
+set_tests_properties(bvnr_float_fix_dec_test PROPERTIES
+    LABELS "unit;float_fix;float_dec"
+    PASS_REGULAR_EXPRESSION "0 failed")
+
+add_test(NAME bvnr_dom_test COMMAND bvnr_dom_test)
+set_tests_properties(bvnr_dom_test PROPERTIES
+    LABELS "unit;dom"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_si_test COMMAND bvnr_si_test)
+set_tests_properties(bvnr_si_test PROPERTIES
+    LABELS "unit;si"
+    PASS_REGULAR_EXPRESSION "Results:.*0 failures")
+
+add_test(NAME bvnr_unit_ext_test COMMAND bvnr_unit_ext_test)
+set_tests_properties(bvnr_unit_ext_test PROPERTIES
+    LABELS "unit;si;units_ext"
+    PASS_REGULAR_EXPRESSION "Results:.*0 failures")
+
+add_test(NAME bvnr_reader_test COMMAND bvnr_reader_test)
+set_tests_properties(bvnr_reader_test PROPERTIES
+    LABELS "unit;reader"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_writer_test COMMAND bvnr_writer_test)
+set_tests_properties(bvnr_writer_test PROPERTIES
+    LABELS "unit;writer"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_extended_reader_test COMMAND bvnr_extended_reader_test)
+set_tests_properties(bvnr_extended_reader_test PROPERTIES
+    LABELS "unit;reader"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_utils_test COMMAND bvnr_utils_test)
+set_tests_properties(bvnr_utils_test PROPERTIES
+    LABELS "unit;utils"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_socketpair_roundtrip_test
+    COMMAND bvnr_socketpair_roundtrip_test)
+set_tests_properties(bvnr_socketpair_roundtrip_test PROPERTIES
+    LABELS "unit;roundtrip"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_high_severity_test COMMAND bvnr_high_severity_test)
+set_tests_properties(bvnr_high_severity_test PROPERTIES
+    LABELS "unit;high_severity"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+if(GMP_FOUND)
+    add_test(NAME bvnr_int_test COMMAND bvnr_int_test)
+    set_tests_properties(bvnr_int_test PROPERTIES
+        LABELS "unit;int"
+        PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
+        FAIL_REGULAR_EXPRESSION "FAIL")
+endif()
+
+add_test(NAME bvnr_float_test COMMAND bvnr_float_test)
+set_tests_properties(bvnr_float_test PROPERTIES
+    LABELS "unit;float"
+    PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
+    FAIL_REGULAR_EXPRESSION "FAIL")
+
+option(BVNR_FUZZ_TEST
+    "Build the self-contained fuzz test and register it as CTest tests"
+    ON)
+
+set(BVNR_FUZZ_SMOKE_ITER 5000
+    CACHE STRING "Mutation rounds for the fast CTest smoke fuzz tests")
+set(BVNR_FUZZ_DEEP_ITER 100000
+    CACHE STRING "Mutation rounds for the slow CTest deep fuzz tests")
+set(BVNR_FUZZ_THOROUGH_ITER 200000
+    CACHE STRING "Mutation rounds for the dedicated reader thorough fuzz test")
+
+if (BVNR_FUZZ_TEST)
+
+    add_executable(bvnr_fuzz_test tests/bovnar_fuzz_test.c)
+    target_include_directories(bvnr_fuzz_test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+    target_link_libraries(bvnr_fuzz_test PRIVATE bvnr_static m)
+
+    target_compile_options(bvnr_fuzz_test PRIVATE
+        -Wall -Wextra -Wno-override-init -g
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer>)
+
+    if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_link_options(bvnr_fuzz_test PRIVATE
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+                -fsanitize=address,undefined>)
+    endif()
+
+    macro(_bvnr_fuzz_test name harness iterations label timeout)
+        add_test(
+            NAME    ${name}
+            COMMAND bvnr_fuzz_test
+                        --harness    ${harness}
+                        --iterations ${iterations}
+                        --seed       42
+        )
+        set_tests_properties(${name} PROPERTIES
+            TIMEOUT ${timeout}
+            LABELS  "${label}"
+            PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz\\] PASS"
+            FAIL_REGULAR_EXPRESSION "CRASH"
+        )
+    endmacro()
+
+    _bvnr_fuzz_test(bvnr_fuzz_reader reader ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 60)
+    _bvnr_fuzz_test(bvnr_fuzz_dom    dom    ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 60)
+    _bvnr_fuzz_test(bvnr_fuzz_utils  utils  ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 60)
+
+    _bvnr_fuzz_test(bvnr_fuzz_reader_deep    reader ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     600)
+    _bvnr_fuzz_test(bvnr_fuzz_reader_thorough reader ${BVNR_FUZZ_THOROUGH_ITER} "fuzz_thorough" 300)
+    _bvnr_fuzz_test(bvnr_fuzz_dom_deep        dom    ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     600)
+    _bvnr_fuzz_test(bvnr_fuzz_utils_deep      utils  ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     600)
+
+    add_executable(bvnr_fuzz_writer_test tests/bovnar_fuzz_writer.c)
+    target_compile_definitions(bvnr_fuzz_writer_test PRIVATE FUZZ_STANDALONE)
+    target_include_directories(bvnr_fuzz_writer_test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+    target_link_libraries(bvnr_fuzz_writer_test PRIVATE bvnr_static m)
+
+    target_compile_options(bvnr_fuzz_writer_test PRIVATE
+        -Wall -Wextra -Wno-override-init -g
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer>)
+
+    if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_link_options(bvnr_fuzz_writer_test PRIVATE
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+                -fsanitize=address,undefined>)
+    endif()
+
+    set(_bvnr_writer_seed "${CMAKE_BINARY_DIR}/bvnr_fuzz_writer_seed_42.bin")
+    file(WRITE "${_bvnr_writer_seed}" "X")
+
+    add_test(NAME bvnr_fuzz_writer
+        COMMAND bvnr_fuzz_writer_test "${_bvnr_writer_seed}")
+    set_tests_properties(bvnr_fuzz_writer PROPERTIES
+        TIMEOUT 60
+        LABELS  "fuzz;fuzz_smoke")
+
+    add_test(NAME bvnr_fuzz_writer_deep
+        COMMAND bvnr_fuzz_writer_test "${_bvnr_writer_seed}")
+    set_tests_properties(bvnr_fuzz_writer_deep PROPERTIES
+        TIMEOUT 600
+        LABELS  "fuzz_deep")
+
+    add_test(NAME bvnr_fuzz_writer_thorough
+        COMMAND bvnr_fuzz_writer_test "${_bvnr_writer_seed}")
+    set_tests_properties(bvnr_fuzz_writer_thorough PROPERTIES
+        TIMEOUT 300
+        LABELS  "fuzz_thorough")
+
+endif()
+
+option(BVNR_FUZZ_EXTERNAL
+    "Build libFuzzer / AFL++ fuzz targets (requires clang or afl-clang-fast)"
+    OFF)
+
+if (BVNR_FUZZ_EXTERNAL)
+
+    set(BVNR_FUZZ_ENGINE "libfuzzer" CACHE STRING
+        "Fuzzing engine for external targets: libfuzzer | afl")
+    set_property(CACHE BVNR_FUZZ_ENGINE PROPERTY STRINGS libfuzzer afl)
+
+    set(BVNR_FUZZ_SANITIZERS "address;undefined" CACHE STRING
+        "Sanitizers for -fsanitize= on external fuzz targets")
+
+    if (BVNR_FUZZ_ENGINE STREQUAL "libfuzzer" AND
+        NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+        message(WARNING
+            "libFuzzer requires clang.  "
+            "Set CMAKE_C_COMPILER=clang or switch to BVNR_FUZZ_ENGINE=afl.")
+    endif()
+
+    string(JOIN "," _ext_san_str ${BVNR_FUZZ_SANITIZERS})
+
+    if (BVNR_FUZZ_ENGINE STREQUAL "libfuzzer")
+        set(_ext_cf "-fsanitize=fuzzer,${_ext_san_str}")
+        set(_ext_lf "-fsanitize=fuzzer,${_ext_san_str}")
+        set(_ext_def "")
+    else()
+        set(_ext_cf "-fsanitize=${_ext_san_str}")
+        set(_ext_lf "-fsanitize=${_ext_san_str}")
+        set(_ext_def "")
+    endif()
+
+    macro(_bvnr_ext_target _tgt _src)
+        add_executable(${_tgt} ${_src})
+        target_compile_options(${_tgt} PRIVATE
+            -std=c99 -Wall -Wextra -Wno-override-init -g "SHELL:${_ext_cf}")
+        target_compile_definitions(${_tgt} PRIVATE ${_ext_def})
+        target_include_directories(${_tgt} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+        target_link_libraries(${_tgt} PRIVATE bvnr_static ${ARGN})
+        if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.13")
+            target_link_options(${_tgt} PRIVATE "SHELL:${_ext_lf}")
+        else()
+            set_target_properties(${_tgt} PROPERTIES LINK_FLAGS "${_ext_lf}")
+        endif()
+    endmacro()
+
+    _bvnr_ext_target(fuzz_reader tests/bovnar_fuzz_reader.c)
+    _bvnr_ext_target(fuzz_dom    tests/bovnar_fuzz_dom.c    m)
+    _bvnr_ext_target(fuzz_utils  tests/bovnar_fuzz_utils.c  m)
+    _bvnr_ext_target(fuzz_writer tests/bovnar_fuzz_writer.c m)
+
+    add_executable(bvnr_fuzz_seed_gen tests/bovnar_fuzz_seed_gen.c)
+    target_compile_options(bvnr_fuzz_seed_gen PRIVATE -std=c99 -O2)
+
+    set(FUZZ_SECONDS 60 CACHE STRING
+        "Seconds per fuzzer for the fuzz_run_all target")
+
+    if (BVNR_FUZZ_ENGINE STREQUAL "libfuzzer")
+        add_custom_target(fuzz_run_all
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    corpus/reader corpus/dom corpus/utils
+            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
+            COMMAND $<TARGET_FILE:fuzz_reader> corpus/reader/
+                    -max_len=4096 -max_total_time=${FUZZ_SECONDS} &
+            COMMAND $<TARGET_FILE:fuzz_dom>    corpus/dom/
+                    -max_len=4096 -max_total_time=${FUZZ_SECONDS} &
+            COMMAND $<TARGET_FILE:fuzz_utils>  corpus/utils/
+                    -max_len=512  -max_total_time=${FUZZ_SECONDS}
+            DEPENDS fuzz_reader fuzz_dom fuzz_utils bvnr_fuzz_seed_gen
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            VERBATIM)
+
+        add_custom_target(fuzz_run_writer
+            COMMAND ${CMAKE_COMMAND} -E make_directory corpus/writer
+            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
+            COMMAND $<TARGET_FILE:fuzz_writer> corpus/writer/
+                    -max_len=2048 -max_total_time=${FUZZ_SECONDS}
+            DEPENDS fuzz_writer bvnr_fuzz_seed_gen
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            VERBATIM)
+    else()
+        add_custom_target(fuzz_run_all
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    corpus/reader corpus/dom corpus/utils
+                    findings/reader findings/dom findings/utils
+            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
+            COMMAND afl-fuzz -i corpus/reader -o findings/reader --
+                    $<TARGET_FILE:fuzz_reader> &
+            COMMAND afl-fuzz -i corpus/dom    -o findings/dom    --
+                    $<TARGET_FILE:fuzz_dom>    &
+            COMMAND afl-fuzz -i corpus/utils  -o findings/utils  --
+                    $<TARGET_FILE:fuzz_utils>
+            DEPENDS fuzz_reader fuzz_dom fuzz_utils bvnr_fuzz_seed_gen
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            VERBATIM)
+
+        add_custom_target(fuzz_run_writer
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    corpus/writer findings/writer
+            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
+            COMMAND afl-fuzz -i corpus/writer -o findings/writer --
+                    $<TARGET_FILE:fuzz_writer>
+            DEPENDS fuzz_writer bvnr_fuzz_seed_gen
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            VERBATIM)
+    endif()
+
+endif()
+
+option(BVNR_BUILD_BENCHMARK "Build the parsing throughput benchmark" ON)
+
+if(BVNR_BUILD_BENCHMARK)
+
+    add_executable(bvnr_benchmark tests/bvnr_benchmark.c)
+    target_compile_options(bvnr_benchmark PRIVATE
+        -Wall -Wextra -Wpedantic -Wno-override-init -D_GNU_SOURCE
+    )
+    target_include_directories(bvnr_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(bvnr_benchmark PRIVATE bvnr_static m pthread)
+
+    add_test(NAME bvnr_benchmark_smoke
+        COMMAND bvnr_benchmark --profile scalars,typed --size 4096 --iterations 20 --warmup 5
+    )
+    set_tests_properties(bvnr_benchmark_smoke PROPERTIES
+        TIMEOUT 30
+        LABELS "benchmark;smoke"
+    )
+
+    add_test(NAME bvnr_benchmark_json
+        COMMAND bvnr_benchmark --profile all --size 1024,4096 --iterations 10 --warmup 3 --json
+    )
+    set_tests_properties(bvnr_benchmark_json PROPERTIES
+        TIMEOUT 30
+        LABELS "benchmark;json"
+    )
+
+    add_test(NAME bvnr_benchmark_min_overhead
+        COMMAND bvnr_benchmark --min-overhead --profile scalars,units --size 4096 --iterations 20 --warmup 5
+    )
+    set_tests_properties(bvnr_benchmark_min_overhead PROPERTIES
+        TIMEOUT 30
+        LABELS "benchmark;min_overhead"
+    )
+
+endif()

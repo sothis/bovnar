@@ -1,0 +1,181 @@
+# structs.bvnr — demonstrates every struct feature in BVNR
+#
+# Syntax:  struct = "{" ws { assignment } ws "}"
+#
+# A struct groups zero or more assignments into a nested scope.
+# Every field inside a struct is itself a full assignment (.key = value ;).
+# Structs may be nested up to 255 levels deep.
+# The closing } must be followed by ; at the parent assignment level.
+
+
+# ── 1. Empty struct ───────────────────────────────────────────────────────────
+
+.empty = {};            # valid; produces ev_struct_begin + ev_struct_end
+
+
+# ── 2. Flat struct with various value types ───────────────────────────────────
+
+.person = {
+    .name      = "Alice";               # string field
+    .age       = 30;                    # integer field (uint)
+    .height_m  = 1.72;                  # float field
+    .active    = true;                  # symbol field
+    .score     = <sint:16> -5;          # typed integer
+    .rank      = <float:32> 9.8;        # typed float
+};
+
+
+# ── 3. Nested structs ────────────────────────────────────────────────────────
+# Any depth up to 255 levels is valid.
+
+.company = {
+    .name = "Acme Corp";
+    .address = {
+        .street  = "1 Infinite Loop";
+        .city    = "Springfield";
+        .country = "US";
+        .postal  = {
+            .code   = "99999";
+            .region = "OR";
+        };
+    };
+    .contact = {
+        .email = "info@acme.example";
+        .phone = "+1-555-0100";
+    };
+};
+
+
+# ── 4. Struct with typed fields and units ─────────────────────────────────────
+
+.sensor = {
+    .id           = <uint:16>  42;
+    .temperature  = <float:32, °C>   23.5;
+    .pressure     = <float:64, Pa>   101325.0;
+    .humidity     = <float:32>       58.2;          # percent (no_unit — dimensionless)
+    .sample_rate  = <uint:32, Hz>    1000;
+    .resolution   = <uint:8>         12;            # bits
+};
+
+
+# ── 5. Struct with null fields ────────────────────────────────────────────────
+
+.optional_config = {
+    .host     = "localhost";
+    .port     = 5432;
+    .password = ;               # null — no password set
+    .timeout  = <uint:32,s> ;   # typed null — application fills in later
+};
+
+
+# ── 6. Struct with reference fields ──────────────────────────────────────────
+
+.defaults = {
+    .retries  = 3;
+    .delay_s  = 5;
+    .loglevel = info;
+};
+
+.service_a = {
+    .endpoint = "https://api.example.com";
+    .retries  = &.defaults.retries;     # borrows from defaults struct
+    .delay_s  = &.defaults.delay_s;
+    .loglevel = &.defaults.loglevel;
+};
+
+
+# ── 7. Struct with array fields ───────────────────────────────────────────────
+
+.network = {
+    .interfaces = ["eth0", "eth1", "lo"];
+    .dns_servers = ["8.8.8.8", "1.1.1.1"];
+    .routes = [
+        {.dst = "0.0.0.0/0"; .gw = "192.168.1.1";},
+        {.dst = "10.0.0.0/8"; .gw = "10.0.0.1";}
+    ];
+    .mtu = <uint:16> 1500;
+};
+
+
+# ── 8. Struct with symbol fields ──────────────────────────────────────────────
+
+.job = {
+    .state     = pending;
+    .priority  = high;
+    .scheduler = round-robin;
+    .restart   = on-failure;
+};
+
+
+# ── 9. Structs as array elements ─────────────────────────────────────────────
+# An array whose elements are structs is the standard representation of
+# a list of records (analogous to a JSON array of objects).
+
+.users = [
+    {.id = <uint:32> 1; .name = "Alice"; .role = admin;},
+    {.id = <uint:32> 2; .name = "Bob";   .role = user;},
+    {.id = <uint:32> 3; .name = "Carol"; .role = user;}
+];
+
+
+# ── 10. Struct with mixed-type array field ────────────────────────────────────
+
+.pipeline = {
+    .name  = "build";
+    .steps = [
+        {.cmd = "cmake"; .args = ["-S", ".", "-B", "build"];},
+        {.cmd = "make";  .args = ["--jobs", "4"];}
+    ];
+    .timeout = <uint:32,s> 600;
+    .enabled = true;
+};
+
+
+# ── 11. Deeply nested struct (3+ levels) ─────────────────────────────────────
+
+.config = {
+    .database = {
+        .primary = {
+            .host = "db1.internal";
+            .port = <uint:16> 5432;
+            .tls  = {
+                .enabled  = true;
+                .verify   = true;
+                .cert     = "/etc/ssl/db.pem";
+            };
+        };
+        .replica = {
+            .host = "db2.internal";
+            .port = <uint:16> 5432;
+        };
+        .pool = {
+            .min = <uint:8>  2;
+            .max = <uint:8>  20;
+        };
+    };
+    .cache = {
+        .host    = "redis.internal";
+        .port    = <uint:16> 6379;
+        .ttl_s   = <uint:32,s> 300;
+    };
+};
+
+
+# ── 12. Struct inside struct inside array ──────────────────────────────────────
+# Demonstrates full composability: arrays ↔ structs at arbitrary depth.
+
+.cluster = {
+    .nodes = [
+        {
+            .id      = <uint:8>  1;
+            .role    = leader;
+            .address = {.host = "10.0.0.1"; .port = <uint:16> 2380;};
+        },
+        {
+            .id      = <uint:8>  2;
+            .role    = follower;
+            .address = {.host = "10.0.0.2"; .port = <uint:16> 2380;};
+        }
+    ];
+    .quorum = <uint:8> 2;
+};

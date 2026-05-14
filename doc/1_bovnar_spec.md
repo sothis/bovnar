@@ -1,0 +1,2503 @@
+# Bovnar Specification
+
+> **Version:** 1.3
+> **Status:** Working Draft
+> **Last updated:** 2026-05-12
+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [File Format at a Glance](#2-file-format-at-a-glance)
+3. [Character Encoding & BOM](#3-character-encoding--bom)
+4. [Lexical Structure](#4-lexical-structure)
+5. [Type Annotations](#5-type-annotations)
+6. [Value Tokens](#6-value-tokens)
+7. [Arrays](#7-arrays)
+8. [Structs (Scopes)](#8-structs-scopes)
+9. [Octet Streams (Binary Mode)](#9-octet-streams-binary-mode)
+10. [Default Type Synthesis](#10-default-type-synthesis)
+11. [Units System](#11-units-system)
+12. [Validation & Constraints](#12-validation--constraints)
+13. [Error Handling & Recovery](#13-error-handling--recovery)
+14. [Formal EBNF](#14-formal-ebnf)
+15. [Complete Examples](#15-complete-examples)
+16. [Reference API](#16-reference-api)
+
+---
+
+## 1. Overview
+
+**Bovnar** (BVNR) is a **typed, self-describing, text-binary hybrid** serialization format. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich type annotation system.
+
+### Design Goals
+
+- **Self-describing** – values carry explicit type metadata (family, bit-width, base, measurement unit)
+- **Human-readable** for common cases (numbers, strings, symbols, nested structures)
+- **Binary-friendly** via octet stream escape for opaque payloads
+- **Schema-free** but type-safe – the type annotation is per-value, optional, and validated
+- **Streamable** – parsed incrementally via a pull-based reader; events emitted to callbacks
+- **Error-recoverable** – optional resync mode for parsing through minor corruption
+
+### Architecture
+
+The reference implementation is a **two-phase** parser:
+
+| Phase | Callback | Purpose |
+|-------|----------|---------|
+| **Unverified** (`on_unverified`) | Raw token events before semantic validation | Inspection, logging, partial consumption |
+| **Verified** (`on_verified`) | Fully validated events | Actual data consumption |
+
+Both phases receive the same stream of events (`bvnr_event_t`). The validator sits between them.
+
+### Stream Model
+
+```
+stream_begin →
+  (assignment)* →
+  EOF
+```
+
+Each assignment is:
+
+```
+.identifier = value;
+```
+
+---
+
+## 2. File Format at a Glance
+
+```bovnar
+# This is a comment
+
+.my_first_value = 42;
+.my_next_value = 3.14159;
+.a_string = "hello world";
+.a_typed_value = <uint:32> 1000;
+.a_utf8_value = <utf8> "text";
+.an_array = [1, 2, 3]/[4, 5, 6];
+.a_struct = {
+    .nested = true;
+};
+```
+
+### Key Syntax Rules
+
+| Construct | Syntax | Example |
+|-----------|--------|---------|
+| Comment | `#` … newline | `# this is a comment` |
+| Assignment | `.key = value ;` | `.foo = 42;` |
+| Type annotation | `<type-spec>` placed after `=`, before the value | `.foo = <uint:32> 42;` |
+| Number | `[-]digits[.digits][e[+/-]digits]` | `42`, `-3.14`, `1e6` |
+| Special number | `$nan$`, `$infinity$`, `$-infinity$` | `.x = $infinity$;` |
+| String | `"…"` with escapes | `.s = "hello\nworld";` |
+| Symbol | bare identifier (no quotes) | `.s = true;`, `.day = Monday;` |
+| Reference | `&.path.to.key` | `.ref = &.config.host;` |
+| Array | `[ … ]` rows separated by `/` | `.a = [1,2,3]/[4,5,6];` |
+| Struct | `{ … }` | `.s = {.x = 1; .y = 2;};` |
+| Octet stream | `\x00` … binary … `\x00` | binary escape |
+| Null value | absent token | `.x = ;`, `[,1,]` |
+| Unit (type annotation) | inside `<…>` as a type param | `<float:64,m/s>` |
+| Unit (inline suffix) | after scalar value, before `;` | `.speed = 9.81 m/s;` |
+| Fixed-point type | `<float_fix:width,qN[,unit]>` | `<float_fix:32,q16>` |
+| Decimal float type | `<float_dec:width[,unit]>` | `<float_dec:64,Pa>` |
+| Unit (compound) | `unit[*·/unit…]` | `m/s²`, `k-g·m/s²`, `m*s` |
+
+---
+
+## 3. Character Encoding & BOM
+
+### 3.1 UTF-8
+
+All text-layer bytes (outside octet-stream regions) must form **valid UTF-8**. The parser runs a parallel UTF-8 validator (`bvn_utf8_feed`) alongside the state machine. Violations produce `error_invalid_utf8_byte`.
+
+Overlong sequences and surrogate halves (U+D800–U+DFFF) are rejected.
+
+### 3.2 Byte Order Mark (BOM)
+
+The UTF-8 BOM `EF BB BF` is only legal **at byte offset 0** of a stream.
+
+```bovnar
+# BOM at start: valid
+EF BB BF.foo = 1;
+
+# BOM after first comment line: error_invalid_byte_order_mark
+# NOTE: the first-line comment special state machine detects EF BB BF
+# inside the first comment and rejects it.
+```
+
+A BOM appearing **inside** any later comment or string is **valid UTF-8** and accepted (only the `first_comment_*` states guard against BOM).
+
+### 3.3 Byte Classes
+
+| Class | Bytes | Usage |
+|-------|-------|-------|
+| Whitespace | `0x09` (HT), `0x0A` (LF), `0x0B` (VT), `0x0C` (FF), `0x0D` (CR), `0x20` (SP) | Token separators |
+| Control (rejected) | `0x00–0x08`, `0x0E–0x1F`, `0x7F` (DEL) | Hard errors outside strings |
+| Safe ASCII | `0x20–0x7E` except reserved punctuation | Identifier/symbol/reference bodies |
+| High bytes | `0x80–0xFF` | UTF-8 multi-byte sequences |
+
+---
+
+## 4. Lexical Structure
+
+### 4.1 Whitespace & Comments
+
+Whitespace and comments are freely interleaved between all tokens.
+
+**Whitespace characters:**
+
+```
+HT (0x09), LF (0x0A), VT (0x0B), FF (0x0C), CR (0x0D), SP (0x20)
+```
+
+**Comments:**
+
+```
+# any bytes except 0x00–0x08, 0x0E–0x1F, 0x7F
+# terminated by LF or CR (or EOF)
+```
+
+```bovnar
+# A full-line comment
+.foo = 42;  # an inline comment
+```
+
+### 4.2 Identifiers (Keys)
+
+Every assignment begins with `.` followed by an identifier (the key).
+
+**Syntax:**
+
+```
+id-start  = A–Z | a–z | "_" | UTF-8 leader bytes 0xC3–0xF4
+id-body   = id-start | "+" | "-" | DIGIT | UTF-8 continuation bytes
+```
+
+**Constraints:**
+
+- At least one `id-start` character is required after `.` (`.=` is `error_empty_identifier`)
+- Byte `0xC2` is rejected at identifier start **and body** positions (U+0080–U+00BF are forbidden in identifiers everywhere)
+- The following ASCII punctuation characters are **hard errors** inside identifier bodies: `! " # $ % & ' ( ) * , . / : ; < = > ? @ [ \ ] ^ ` { | } ~`
+
+**Valid identifiers:**
+
+```bovnar
+.foo = 1;
+.FooBar = 2;
+._private = 3;
+.my-key = 4;           # hyphen allowed
+.my+key = 5;           # plus allowed
+.user_defined = 6;
+```
+
+**Invalid identifiers:**
+
+```bovnar
+. = 1;                 # error_empty_identifier
+.123 = 2;              # starts with digit
+.foo,bar = 3;          # comma inside identifier – error
+```
+
+### 4.3 String Literals
+
+**Syntax:**
+
+```
+string-literal = '"' { safe-byte | escape-seq } '"'
+string         = string-literal { ws string-literal }   # concatenation
+```
+
+**Safe bytes:** `0x09–0x0D` (HT, LF, VT, FF, CR), `0x20–0x7E` except `"` (0x22) and `\` (0x5C), and `0x80–0xFF`. `0x7F` (DEL) is rejected even inside strings.
+
+**Control bytes** `0x00–0x08`, `0x0E–0x1F`, and `0x7F` (DEL) are hard errors inside strings. The whitespace bytes HT (0x09), LF (0x0A), VT (0x0B), FF (0x0C), and CR (0x0D) are accepted as raw string content.
+
+#### Escape Sequences
+
+| Escape | Meaning | Byte |
+|--------|---------|------|
+| `\t` | Horizontal Tab | `0x09` |
+| `\n` | Line Feed | `0x0A` |
+| `\v` | Vertical Tab | `0x0B` |
+| `\f` | Form Feed | `0x0C` |
+| `\r` | Carriage Return | `0x0D` |
+| `\"` | Double Quote | `0x22` |
+| `\\` | Backslash | `0x5C` |
+
+Any byte other than `t`, `n`, `v`, `f`, `r`, `"`, `\` after `\` causes `error_illegal_escape_sequence`.
+
+**String concatenation:** Two or more adjacent string literals (separated only by whitespace/comments) are concatenated into a single token:
+
+```bovnar
+.long = "hello " "world";     # → "hello world"
+```
+
+The combined byte length must not exceed `max_string_length` (default 65535).
+
+#### Examples
+
+```bovnar
+.simple = "hello";
+.with_escapes = "tab:\there\nnewline";
+.unicode = "café";            # UTF-8 bytes for é = 0xC3 0xA9
+.empty = "";
+```
+
+### 4.4 Symbols
+
+A **symbol** is an unquoted bare-word token that appears in value position. It starts with an `id-start` character and continues with `id-body` characters.
+
+**Differences from identifier keys:**
+
+| Context | `,` | `]` | `;` | `=` |
+|---------|-----|-----|-----|-----|
+| Identifier body | hard error | hard error | hard error | transitions to value |
+| Symbol body | terminates → new array element | terminates → close array | terminates → end value | hard error |
+
+```bovnar
+.status = ok;              # symbol "ok"
+.day = Monday;             # symbol "Monday"
+.flags = [red, green, blue];  # symbols as array elements
+```
+
+### 4.5 References
+
+A **reference** is a dotted path to another key, introduced by `&`.
+
+**Syntax:**
+
+```
+reference     = "&" ref-segment { ref-segment }
+ref-segment   = "." id-start { ref-body-char }
+ref-body-char = same as symbol-body-char | "."
+```
+
+The stored text includes the leading dot and all intermediate dots:
+
+```bovnar
+.host = "localhost";
+.port = 8080;
+
+.connection = &.host;             # stored as ".host"
+.full = &.config.host;            # stored as ".config.host"
+```
+
+**Examples:**
+
+```bovnar
+.config.host = "example.com";     # dotted key
+.ref = &.config.host;             # reference → ".config.host"
+```
+
+### 4.6 Numbers
+
+#### Bare Number Literals
+
+```
+number = ["-"] ( int-led | dot-led ) [ dec-exponent ]
+
+int-led       = DIGIT { DIGIT } [ "." { DIGIT } ]
+dot-led       = "." DIGIT { DIGIT }
+dec-exponent  = ("e" | "E") [ "+" | "-" ] DIGIT { DIGIT }
+```
+
+- Only `e`/`E` accepted as exponent marker in bare literals
+- Leading zeros are valid (`007` is accepted)
+- A trailing dot without fractional digits is valid (`123.`)
+- `.` alone is a hard error
+
+```bovnar
+.i = 42;
+.neg = -17;
+.float = 3.14;
+.trailing = 123.;
+.dot_led = .5;
+.sci = 1e6;
+.neg_sci = -2.5e-3;
+```
+
+#### Special Number Literals
+
+```
+special-number = "$" ( "nan" | "infinity" | "-infinity" ) "$"
+```
+
+Both `$` delimiters are mandatory. The stored token text is the bare keyword without delimiters.
+
+```bovnar
+.not_a_number = $nan$;
+.infinite = $infinity$;
+.neg_infinite = $-infinity$;
+```
+
+### 4.7 Null Values
+
+A null value is the **absence** of a raw-value token. It occurs when:
+
+- At assignment level: `.key = ;` (nothing between `=` and `;`)
+- In array context: leading/trailing commas, or consecutive commas: `[,1,,2,]`
+
+```bovnar
+.null = ;                    # null value
+.items = [,1, ,2,];          # null, 1, null, 2, null
+```
+
+When a type annotation precedes a null value, the null carries the annotated type:
+
+```bovnar
+.null_typed = <uint:32> ;
+.nulls_in_array = [<uint:32>, <sint:64> , ];
+```
+
+---
+
+## 5. Type Annotations
+
+### 5.1 Syntax
+
+```
+type-annotation = "<" ws type-spec ws ">"
+```
+
+The type annotation **must** be placed immediately after the `=` sign (in an assignment) or after the `[` or a comma (in an array), and **before** the value it describes.
+
+**Correct placement:**
+
+```bovnar
+.key = <uint:32> 42;
+.key = <float:64> 3.14;
+.arr = [<uint:8> 1, <sint:16> -2];
+```
+
+**Incorrect placement (hard error):**
+
+```bovnar
+.key<uint:32> = 42;    # ERROR: type annotation must follow '=', not the key
+```
+
+Six type families are recognized:
+
+| Family | Keyword | Parameter syntax | Default Width |
+|--------|---------|-----------------|---------------|
+| Unsigned integer | `uint` | `:width,_base,unit` | 64 |
+| Signed integer | `sint` | `:width,_base,unit` | 64 |
+| Binary floating-point | `float` | `:width,_base,unit` (base `_10` or `_16` only) | 64 |
+| Fixed-point (Q-format) | `float_fix` | `:width,qN,unit` | 64 |
+| Decimal floating-point (IEEE 754-2008) | `float_dec` | `:width,unit` | 64 |
+| UTF-8 string | `utf8` | Lexer accepts params; stored but ignored | — |
+
+**Parameter syntax:**
+
+```
+type-spec = param-type [ ":" type-param-list ]
+
+param-type = "uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
+
+type-param-list = type-param { "," type-param }
+
+type-param = width-param    # decimal digits only, e.g. 32
+           | base-param     # "_" followed by digits, e.g. _16
+                            #   (forbidden for float_fix and float_dec)
+           | q-param        # "q" followed by digits, e.g. q8, q16
+                            #   (only valid for float_fix)
+           | unit-param     # unit string, e.g. m/s, k-g·m/s²
+```
+
+> **Lexer note on `float_fix` / `float_dec`:** The lexer keyword state machine
+> recognises `float` as the type-family prefix and then accumulates the remaining
+> annotation bytes (`_fix`, `_dec`, or the parameter separator `:` / closing `>`)
+> via `copy_type_byte` into `type_data`.  `bvn_parse_type_annotation` then
+> distinguishes `float`, `float_fix`, and `float_dec` from the fully accumulated
+> string.
+
+### 5.2 Parameters
+
+| Parameter | Syntax | Valid Values | Applies To |
+|-----------|--------|--------------|------------|
+| Width | `N` (decimal digits) | `0`, `16`, or any multiple of `32` up to `32768` for `float`; `0`,`16`,`32`,`64`,`128`,`256` for `float_fix`/`float_dec`; any for `uint`/`sint` | uint, sint, float, float_fix, float_dec |
+| Base | `_N` (underscore + decimal digits) | `2–62`, `64`, `85`; `float` accepts only `10` or `16`; **forbidden** for `float_fix` and `float_dec` | uint, sint, float |
+| Q (fractional bits) | `qN` (lowercase `q` + decimal digits) | `0 ≤ N < effective_width` | **float_fix only** |
+| Unit | unit-string | See [Units System](#11-units-system) — supports compound units | uint, sint, float, float_fix, float_dec |
+
+Width `0` means "default width" — `bvn_effective_width` returns `64`.
+
+For `float_fix`, the Q value (stored in `value_type_spec_t.base`) is the number of
+fractional bits.  `bvn_effective_q` returns this value; `bvn_effective_base` always
+returns `10` for `float_fix` and `float_dec`.
+
+For `float_dec`, the encoding is a custom binary-storage format (not DPD/BID wire
+format) parameterised by width:
+
+| Width | exp\_bits | coeff\_bits | bias | max decimal digits |
+|-------|-----------|-------------|------|--------------------|
+| 16 | 6 | 9 | 101 | 2 |
+| 32 | 8 | 23 | 101 | 7 |
+| 64 | 10 | 53 | 398 | 16 |
+| 128 | 14 | 113 | 6176 | 34 |
+| 256 | 20 | 235 | 611867 | 70 |
+
+For `float_fix`, the wire representation is a signed Q-format integer stored in
+`width` bits; the mathematical value is `raw_integer × 2^(-Q)`.
+
+### 5.3 Parameter Order
+
+Parameters are **identified by class** — each class is recognised by its syntactic form — and at most one of each class may appear. They can appear in any order:
+
+```bovnar
+# All of these are equivalent:
+.val = <uint:32,_10,no_unit> 42;
+.val = <uint:_10,no_unit,32> 42;
+.val = <uint:no_unit,_10,32> 42;
+```
+
+### 5.4 Examples
+
+```bovnar
+# Simple types
+.a = <uint:32> 1000;
+.b = <sint:16> -32768;
+.c = <float:64> 3.14159;
+.d = <utf8> "text";
+
+# Width only
+.g = <uint:8> 255;
+
+# Base (requires quoted string for non-decimal)
+.h = <uint:_16> "ff";
+.i = <sint:_2> "101010";
+
+# Unit
+.j = <uint:32,no_unit> 42;      # explicitly dimensionless
+.k = <float:64,m/s> 9.81;       # meters per second (compound)
+.l = <uint:64,Ki-B> 1024;       # kibibytes
+.m = <float:64,k-g·m/s²> 9.81;  # kilograms · meters per second squared
+.n = <float:64,m*s> 1.0;        # meter-seconds (product)
+
+# Type annotation with null value
+.o = <uint:32> ;                # null of type uint:32
+
+# Fixed-point (Q-format): 16-bit, 8 fractional bits → resolution 2^-8 ≈ 0.0039
+.fx1 = <float_fix:16,q8> 3.14;
+
+# Fixed-point: 32-bit, Q16 (16 fractional bits, 15 integer + 1 sign)
+.fx2 = <float_fix:32,q16> -1.5;
+
+# Fixed-point with unit
+.fx3 = <float_fix:32,q8,m/s> 9.81;
+
+# Fixed-point: width defaults to 64, Q=0 means pure integer fixed-point
+.fx4 = <float_fix:64,q0> 42;
+
+# Decimal float: 32-bit (7 significant decimal digits)
+.df1 = <float_dec:32> 3.14;
+
+# Decimal float: 64-bit (16 significant decimal digits) with unit
+.df2 = <float_dec:64,Pa> 101325;
+
+# Decimal float: 128-bit (34 significant decimal digits)
+.df3 = <float_dec:128> 1.2345678901234567890123456789012345;
+
+# float_fix and float_dec do NOT accept a base parameter:
+# .bad = <float_fix:32,q8,_10> 1.0;   # ERROR: base forbidden for float_fix
+# .bad = <float_dec:64,_10> 1.0;      # ERROR: base forbidden for float_dec
+```
+
+### 5.5 Non-decimal Base with Bare Numbers
+
+A non-decimal base with a bare number literal is not caught by the validator (no error is raised). In practice, a bare non-decimal value such as `ff` is parsed as a symbol token, not a number, so type/value compatibility validation will flag the mismatch instead. Use a quoted string for non-decimal values:
+
+```bovnar
+# CORRECT: quoted string
+.n = <uint:_16> "ff";     # hex value 255
+```
+
+---
+
+## 6. Value Tokens
+
+### 6.1 Type/Value Compatibility
+
+| Type Family | Accepts |
+|-------------|---------|
+| `vt_plain` (default) | Any value |
+| `vt_utf8` | String only |
+| `vt_uint` | Number or string (digits) |
+| `vt_sint` | Number or string (digits, may be negative) |
+| `vt_float` | Number or string (may have `.`, `e`/`E`) — only base 10 or 16 |
+| `vt_float_fix` | Number or string (may have `.`, `e`/`E`) — base 10 only |
+| `vt_float_dec` | Number or string (may have `.`, `e`/`E`) — base 10 only |
+
+### 6.2 Validation Rules per Numeric Type
+
+**uint (unsigned integer):**
+
+```bovnar
+.valid = <uint:8> 255;
+.valid = <uint:8> 0;
+
+.invalid = <uint:8> -1;       # error_value_out_of_range (negative)
+.invalid = <uint:8> 256;      # error_value_out_of_range (overflow)
+```
+
+**sint (signed integer):**
+
+```bovnar
+.valid = <sint:8> 127;
+.valid = <sint:8> -128;
+
+.invalid = <sint:8> 128;      # error_value_out_of_range
+.invalid = <sint:8> -129;     # error_value_out_of_range
+```
+
+**float (binary floating-point):**
+
+Valid widths: `0` (default 64), `16`, or any multiple of `32` up to `32768`.
+Base `10` (default) or `16` are accepted; all other bases are rejected.
+
+```bovnar
+.valid = <float:64> 3.14;
+.valid = <float:64> 1e100;
+.valid = <float:64> $nan$;
+.valid = <float:16> 3.14;      # half-precision
+.valid = <float:256> 3.14;     # 256-bit extended precision
+
+.invalid = <float:8> 3.14;     # width 8 → error_illegal_value_type
+.invalid = <float:12> 3.14;    # not 16 or a multiple of 32 → error_illegal_value_type
+.invalid = <float:64,_2> 3.14; # base 2 → error_illegal_value_type
+```
+
+**float_fix (fixed-point Q-format):**
+
+Valid widths: `0` (default 64), `16`, `32`, `64`, `128`, `256`.
+The Q parameter (`qN`) specifies fractional bits; `0 ≤ N < effective_width`.
+Base parameter (`_N`) is forbidden.
+The mathematical value of a fixed-point datum is `raw_integer × 2^(-Q)`.
+
+```bovnar
+.valid   = <float_fix:16,q8> 3.14;    # Q8 in 16-bit: range [-128, 127.996]
+.valid   = <float_fix:32,q16> -1.5;   # Q16 in 32-bit
+.valid   = <float_fix:64,q0> 42;      # Q0 = pure integer, no fractional part
+.valid   = <float_fix:32,q8,m/s> 9.81;
+
+.invalid = <float_fix:16,q16> 1.0;    # Q >= width → error_illegal_value_type
+.invalid = <float_fix:8> 1.0;         # width 8 not in {0,16,32,64,128,256}
+.invalid = <float_fix:32,q8,_10> 1.0; # base param forbidden → error_illegal_value_type
+```
+
+**float_dec (IEEE 754-2008 decimal floating-point):**
+
+Valid widths: `0` (default 64), `16`, `32`, `64`, `128`, `256`.
+Base parameter (`_N`) is forbidden (decimal base is implicit).
+Values are written as ordinary decimal literals or special numbers.
+
+```bovnar
+.valid   = <float_dec:32> 3.14;
+.valid   = <float_dec:64,Pa> 101325;
+.valid   = <float_dec:128> $nan$;
+
+.invalid = <float_dec:8> 1.0;         # width 8 not valid → error_illegal_value_type
+.invalid = <float_dec:64,_10> 1.0;    # base param forbidden → error_illegal_value_type
+```
+
+### 6.3 Digit Validation
+
+Digits in values are checked against the declared base:
+
+```bovnar
+.value = <uint:_16> "ff";      # OK: f and f are valid in base 16
+.value = <uint:_16> "fg";      # error_digit_not_in_base: 'g' > base 16
+.value = <uint:_2> "1010";     # OK: valid binary
+.value = <uint:_2> "210";      # error_digit_not_in_base
+```
+
+### 6.4 Special Number Semantics
+
+`$nan$`, `$infinity$`, `$-infinity$` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected only when the declared type is `utf8`, because the token type (`token_is_number`) is incompatible with a string-only family.
+
+```bovnar
+.okay_f64  = <float:64>  $infinity$;
+.okay_f32  = <float:32>  $nan$;
+.okay_u8   = <uint:8>    $nan$;         # accepted — range check bypassed
+.okay_s16  = <sint:16>   $-infinity$;   # accepted — range check bypassed
+
+# Fine in plain/untyped context too
+.untyped = $infinity$;       # defaults to float:64
+```
+
+### 6.5 Inline Unit Suffix
+
+A **scalar** number or string value may carry an optional unit suffix separated from the literal by **at least one whitespace character**. The suffix uses the same character set as the unit parameter inside a type annotation (`unit-param`).
+
+| Separator form | Example | Valid? |
+|---|---|---|
+| Space | `.a = 9.81 m/s;` | ✓ |
+| No separator | `.b = 9.81m;` | ✗ error |
+
+```bovnar
+.distance = 100 m;            # plain integer with inline unit: meter
+.speed    = 9.81 m/s;         # plain float with inline compound unit
+.mass     = 70.0 k-g;         # with SI prefix
+.storage  = 4 Gi-B;           # with IEC prefix
+.ratio    = 3.14 no_unit;     # explicitly dimensionless via inline suffix
+```
+
+The inline unit suffix is **forbidden inside arrays**; any letter or `_` character following a value inside `[ … ]` is a lexical error (`error_unexpected_input_byte`).
+
+**Interaction with type annotations:**
+
+| Situation | Outcome |
+|-----------|---------|
+| No annotation, inline unit present | Inline unit is used as the effective unit |
+| Annotation has no unit, inline unit present | Inline unit is used as the effective unit |
+| Annotation unit and inline unit **match** | Valid; the common unit is used |
+| Annotation unit and inline unit **differ** | `error_unit_mismatch` |
+
+```bovnar
+# Annotation unit with no inline unit — normal
+.dist = <float:64,m> 1.5;
+
+# No annotation unit, inline unit — unit from suffix
+.dist = <float:64> 1.5 m;
+
+# Both present and identical — valid, redundant but allowed
+.dist = <float:64,m> 1.5 m;
+
+# Both present and different — error_unit_mismatch
+.dist = <float:64,m> 1.5 s;     # ERROR: annotation says m, inline says s
+```
+
+An invalid inline unit string (unrecognised base unit, bad prefix, etc.) produces `error_unit_illegal`. The suffix may appear after `no_unit` checks as with any other unit string.
+
+---
+
+## 7. Arrays
+
+### 7.1 Row Syntax
+
+An array consists of one or more bracket-enclosed **rows** separated by `/`:
+
+```bovnar
+.array_2d = [1, 2, 3]/[4, 5, 6];
+```
+
+This produces the event sequence:
+
+```
+ev_array_row_start → 3× ev_data  → ev_array_row_end
+ev_array_dim_start → ev_array_row_start  → 3× ev_data  → ev_array_row_end
+```
+
+### 7.2 Null Elements
+
+Leading/trailing commas and consecutive commas produce null elements:
+
+```bovnar
+.items = [,1,,2,];   # 5 elements: null, 1, null, 2, null
+```
+
+### 7.3 Row-Size Consistency
+
+No cross-row element-count check is performed between `/`-separated dimension rows. Rows may have different element counts. Nested arrays that appear as element values are also unconstrained:
+
+```bovnar
+.ok1 = [[1,2],[3,4]];       # element values — valid
+.ok2 = [[1,2],[3,4,5]];     # different-sized element arrays — also valid
+.ok3 = [1,2,3]/[4,5];       # row 1: 3 elements; row 2: 2 elements — valid
+```
+
+> **Note on `error_array_row_size_mismatch`:** This error code is defined in `error_code_t` and the checking logic is present in the validator, but the per-bracket-pair context save/restore mechanism ensures `array_row_size` is always zero at the point the comparison executes, making the error unreachable in the current implementation.
+
+### 7.4 Nested Arrays
+
+Arrays nested as element values inside a row are independent of any row-size check. The row-size check is a structural constraint on the multi-dimensional `/`-dimension mechanism, not on arbitrary nesting:
+
+```bovnar
+.valid = [[1, 2], [3, 4, 5]];   # inner arrays are element values; any sizes allowed
+.also  = [[1, 2], [3, 4]];      # element counts happen to match — also valid
+```
+
+### 7.5 Array Elements with Type Annotations
+
+Individual elements may carry type annotations. The annotation appears **before** each element value, **after** the comma or opening bracket:
+
+```bovnar
+.mixed = [<uint:8> 1, <sint:8> -1, <float:64> 3.14];
+.nulls = [<uint:32> , <sint:64> ];    # null, null with types
+```
+
+### 7.6 Constraints
+
+| Constraint | Limit |
+|------------|-------|
+| Array nesting depth | 255 |
+| Total array items | `max_array_items` (configurable; 0 = unlimited) |
+
+---
+
+## 8. Structs (Scopes)
+
+### 8.1 Syntax
+
+```
+struct = "{" ws { assignment } ws "}"
+```
+
+Structs group related assignments into a nested scope:
+
+```bovnar
+.person = {
+    .name = "Alice";
+    .age = 30;
+    .address = {
+        .street = "123 Main St";
+        .city = "Springfield";
+    };
+};
+```
+
+### 8.2 Nesting
+
+Structs can be nested up to 255 levels. Exceeding this produces `error_struct_nesting_too_high`.
+
+### 8.3 Empty Structs
+
+```bovnar
+.empty = {};
+```
+
+### 8.4 Structs as Array Elements
+
+```bovnar
+.people = [
+    {.name = "Alice"; .age = 30;},
+    {.name = "Bob"; .age = 25;}
+];
+```
+
+### 8.5 Unmatched Braces
+
+A `}` seen with `struct_nesting_level == 0` is `error_illegal_struct_close`.
+
+---
+
+## 9. Octet Streams (Binary Mode)
+
+### 9.1 Overview
+
+A NUL byte (`0x00`) where a value is expected switches from text mode to binary chunk mode. The parallel UTF-8 validator is suspended for the duration.
+
+### 9.2 Wire Protocol
+
+```
+octet-stream = 0x00 { os-chunk } 0x00
+os-chunk     = 0x01 os-length os-data
+os-length    = uint16 (little-endian); 0x0000 encodes 65536 bytes
+os-data      = exactly os-length bytes
+```
+
+| Byte | Meaning |
+|------|---------|
+| `0x00` | End-of-stream marker (at binary level) |
+| `0x01` | Data chunk follows |
+| `0x01` + `LL LL` + `data` | Chunk of `L` bytes (0x0000 = 65536) |
+| Any other tag byte | `error_octet_stream_out_of_sync` |
+
+### 9.3 Events
+
+```
+ev_octet_stream_start  →  (emitted on the leading 0x00)
+ev_data                →  (emitted for each binary chunk)
+ev_octet_stream_end    →  (emitted on the trailing 0x00)
+```
+
+### 9.4 Example
+
+```bovnar
+.data = ;
+.binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;
+```
+
+This binary region encodes two chunks: `"hello"` (5 bytes) and `"bye"` (3 bytes), producing:
+
+```
+ev_octet_stream_start
+ev_data (type=octet_stream, data="hello",  length=5)
+ev_data (type=octet_stream, data="bye",    length=3)
+ev_octet_stream_end
+```
+
+### 9.5 Constraints
+
+- File size: `max_file_size` (default 0 = unlimited; set to `16777216` for the recommended 16 MiB cap)
+- Octet stream bytes contribute to the file size limit but not to `max_text_bytes`
+- EOF inside an octet stream region preserves the current error code instead of overwriting with `error_got_incomplete_bvnr_stream`
+
+---
+
+## 10. Default Type Synthesis
+
+When a number or string value carries **no explicit** type annotation (i.e. the validator's `value_type` is still `vt_plain`), the validator **synthesises** a default type annotation before emitting `ev_data`.
+
+### 10.1 Rules
+
+| Value Form | Synthesised Type |
+|------------|-----------------|
+| Quoted string | `<utf8>` |
+| Special number (`$nan$`, `$infinity$`, `$-infinity$`) | `<float:64,_10,no_unit>` |
+| Number with `.` or `e`/`E` (float literal) | `<float:64,_10,no_unit>` |
+| Negative integer | `<sint:64,_10,no_unit>` |
+| Plain integer | `<uint:64,_10,no_unit>` |
+
+> **`float_fix` and `float_dec` are never auto-synthesised.** `float_fix`
+> requires a Q parameter that cannot be inferred from the value literal;
+> `float_dec` requires an explicit choice of decimal encoding.  Both families
+> must be introduced by an explicit type annotation.
+
+### 10.2 Event Sequence
+
+The synthesised annotation produces the **same** event sequence as an explicit one. For numeric types (`uint`, `sint`, `float`) the sequence includes three parameter events; for `utf8` no parameter events are emitted:
+
+```
+# numeric (uint / sint / float)
+ev_type_annotation_start
+ev_type_annotation_type_family  → "uint" / "sint" / "float"
+ev_type_annotation_type_family_parameter  → width:64
+ev_type_annotation_type_family_parameter  → base:_10
+ev_type_annotation_type_family_parameter  → unit:no_unit
+ev_type_annotation_end
+ev_data
+
+# string
+ev_type_annotation_start
+ev_type_annotation_type_family  → "utf8"
+ev_type_annotation_end
+ev_data
+```
+
+### 10.3 Examples
+
+```bovnar
+# No annotation → synthesised <uint:64,_10,no_unit>
+.x = 42;
+
+# No annotation → synthesised <float:64,_10,no_unit>
+.y = 3.14;
+.z = $infinity$;
+
+# No annotation → synthesised <sint:64,_10,no_unit>
+.w = -7;
+
+# No annotation → synthesised <utf8>
+.s = "hello";
+```
+
+---
+
+## 11. Units System
+
+### 11.1 Base Units
+
+The unit system supports SI base units, derived SI units, and several commonly-used non-SI units.
+
+| Symbol | Unit | Enum |
+|--------|------|------|
+| `b` | bit | `bu_bit` |
+| `B` | byte | `bu_byte` |
+| `s` | second | `bu_second` |
+| `m` | meter | `bu_meter` |
+| `g` | gram | `bu_gram` |
+| `A` | ampere | `bu_ampere` |
+| `K` | kelvin | `bu_kelvin` |
+| `mol` | mole | `bu_mol` |
+| `cd` | candela | `bu_candela` |
+| `Hz` | hertz | `bu_hertz` |
+| `N` | newton | `bu_newton` |
+| `Pa` | pascal | `bu_pascal` |
+| `J` | joule | `bu_joule` |
+| `W` | watt | `bu_watt` |
+| `V` | volt | `bu_volt` |
+| `Ω` | ohm | `bu_ohm` |
+| `F` | farad | `bu_farad` |
+| `C` | coulomb | `bu_coulomb` |
+| `S` | siemens | `bu_siemens` |
+| `Wb` | weber | `bu_weber` |
+| `T` | tesla | `bu_tesla` |
+| `H` | henry | `bu_henry` |
+| `lm` | lumen | `bu_lumen` |
+| `lx` | lux | `bu_lux` |
+| `Bq` | becquerel | `bu_becquerel` |
+| `Gy` | gray | `bu_gray` |
+| `Sv` | sievert | `bu_sievert` |
+| `kat` | katal | `bu_katal` |
+| `L`, `l` | liter | `bu_liter` |
+| `min` | minute | `bu_minute` |
+| `h` | hour | `bu_hour` |
+| `d` | day | `bu_day` |
+| `wk` | week | `bu_week` |
+| `yr` | year | `bu_year` |
+| `°`, `deg`, `degr`, `degree`, `degrees` | degree (angle) | `bu_degree` |
+| `°C`, `degC`, `degrC` | degree Celsius | `bu_celsius` |
+| `rad` | radian | `bu_radian` |
+| `sr` | steradian | `bu_steradian` |
+| `t` | tonne | `bu_tonne` |
+| `bar` | bar | `bu_bar` |
+| `eV` | electronvolt | `bu_electronvolt` |
+| `Da` | dalton | `bu_dalton` |
+| `au` | astronomical unit | `bu_astronomical_unit` |
+| `ha` | hectare | `bu_hectare` |
+
+### 11.2 SI Prefixes
+
+| Prefix | Symbol | Factor | Enum |
+|--------|--------|--------|------|
+| quetta | `Q` | 10³⁰ | `si_quetta` |
+| ronna | `R` | 10²⁷ | `si_ronna` |
+| yotta | `Y` | 10²⁴ | `si_yotta` |
+| zetta | `Z` | 10²¹ | `si_zetta` |
+| exa | `E` | 10¹⁸ | `si_exa` |
+| peta | `P` | 10¹⁵ | `si_peta` |
+| tera | `T` | 10¹² | `si_tera` |
+| giga | `G` | 10⁹ | `si_giga` |
+| mega | `M` | 10⁶ | `si_mega` |
+| kilo | `k` | 10³ | `si_kilo` |
+| hecto | `h` | 10² | `si_hecto` |
+| deca | `da` | 10¹ | `si_deca` |
+| deci | `d` | 10⁻¹ | `si_deci` |
+| centi | `c` | 10⁻² | `si_centi` |
+| milli | `m` | 10⁻³ | `si_milli` |
+| micro | `µ` | 10⁻⁶ | `si_micro` |
+| nano | `n` | 10⁻⁹ | `si_nano` |
+| pico | `p` | 10⁻¹² | `si_pico` |
+| femto | `f` | 10⁻¹⁵ | `si_femto` |
+| atto | `a` | 10⁻¹⁸ | `si_atto` |
+| zepto | `z` | 10⁻²¹ | `si_zepto` |
+| yocto | `y` | 10⁻²⁴ | `si_yocto` |
+| ronto | `r` | 10⁻²⁷ | `si_ronto` |
+| quecto | `q` | 10⁻³⁰ | `si_quecto` |
+
+> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8.
+
+### 11.3 IEC Binary Prefixes
+
+| Prefix | Symbol | Factor | Enum |
+|--------|--------|--------|------|
+| kibi | `Ki` | 2¹⁰ | `iec_kibi` |
+| mebi | `Mi` | 2²⁰ | `iec_mebi` |
+| gibi | `Gi` | 2³⁰ | `iec_gibi` |
+| tebi | `Ti` | 2⁴⁰ | `iec_tebi` |
+| pebi | `Pi` | 2⁵⁰ | `iec_pebi` |
+| exbi | `Ei` | 2⁶⁰ | `iec_exbi` |
+| zebi | `Zi` | 2⁷⁰ | `iec_zebi` |
+| yobi | `Yi` | 2⁸⁰ | `iec_yobi` |
+| robi | `Ri` | 2⁹⁰ | `iec_robi` |
+| quebi | `Qi` | 2¹⁰⁰ | `iec_quebi` |
+
+### 11.4 Unit Notation
+
+The unit system supports **compound units** composed of multiple base-unit terms combined with product and division separators.
+
+```
+compound-unit  = "no_unit"
+               | unit-component { unit-sep unit-component }
+
+unit-sep       = "*" | "/" | "·"       (* "·" = U+00B7 MIDDLE DOT *)
+
+unit-component = [ prefix "-" ] base-unit [ unit-exponent ]
+```
+
+**Separators:**
+
+| Separator | Code Point | Meaning |
+|-----------|-----------|---------|
+| `*` | U+002A | Product (multiplication) |
+| `·` | U+00B7 | Product (multiplication) — visually preferred |
+| `/` | U+002F | Division — subsequent components are in the denominator |
+
+The `·` (middle dot, U+00B7, encoded as `0xC2 0xB7`) and `*` (asterisk) are semantically equivalent; both indicate multiplication of the adjacent unit components.
+
+The `/` separator divides the preceding components by the following ones. The first `/` switches all subsequent components into the denominator; additional `/` separators do not toggle back to the numerator. Every component after the first `/` is always in the denominator.
+
+**Within each `unit-component`:**
+
+- When a prefix is present, the separator `-` between the prefix and the base unit is **mandatory**.
+- A bare base unit with no prefix requires no separator.
+
+```bovnar
+# Simple (single-component) units — same as before
+.time = <float:64,s> 2.5;               # seconds
+.speed = <float:64,k-m> 1.5;            # kilometers (kilo-meter)
+
+# Compound units
+.velocity = <float:64,m/s> 9.81;        # meters per second
+.accel = <float:64,m/s²> 9.81;          # meters per second squared
+.force = <float:64,k-g·m/s²> 9.81;      # kilogram-meters per second squared
+.energy = <float:64,k-g·m²/s²> 1000;    # kilogram-square-meters per second squared
+.moment = <float:64,m*s> 1.0;           # meter-seconds
+.area_density = <float:64,k-g/m²> 5.0;  # kilograms per square meter
+.three_term = <float:64,k-g·m·s⁻²> 9.81;  # equivalent to k-g·m/s²
+
+# Explicitly dimensionless
+.no_unit_float = <float:64,no_unit> 3.14;
+```
+
+### 11.5 Unit Exponents
+
+Exponents can be written in two forms:
+
+| Form | Example | Meaning |
+|------|---------|---------|
+| Unicode superscript | `m²`, `m⁻³` | Using U+00B2/00B3 etc. |
+| ASCII caret | `m^2`, `m^-3`, `m^+2` | Using `^[+-]?[0-9]` |
+
+**Superscript mapping:**
+
+| Glyph | Code Point | Exponent |
+|-------|-----------|----------|
+| `¹` | U+00B9 | 1 |
+| `²` | U+00B2 | 2 |
+| `³` | U+00B3 | 3 |
+| `⁴` | U+2074 | 4 |
+| `⁵` | U+2075 | 5 |
+| `⁶` | U+2076 | 6 |
+| `⁷` | U+2077 | 7 |
+| `⁸` | U+2078 | 8 |
+| `⁹` | U+2079 | 9 |
+| `⁺` | U+207A | positive sign (no-op) |
+| `⁻` | U+207B | negate exponent |
+
+### 11.6 Examples
+
+```bovnar
+.distance = <float:64,k-m> 1.5;             # kilometers
+.mass = <float:64,g> 500;                   # grams
+.velocity = <float:64,m/s> 9.81;            # meters per second
+.acceleration = <float:64,m/s²> 9.81;       # meters per second squared
+.pressure = <float:64,Pa> 101325;           # pascals (= N/m² = k-g/(m·s²))
+.energy = <float:64,k-J> 1000;              # kilojoules
+.storage = <uint:64,Ti-B> 2;                # tebibytes
+.frequency = <float:64,k-Hz> 2.4;           # kilohertz
+.force = <float:64,k-g·m/s²> 9.81;         # kilogram-meters per second squared
+.momentum = <float:64,k-g·m/s> 0.5;        # kilogram-meters per second
+.density = <float:64,k-g/m³> 7800;          # kilograms per cubic meter
+```
+
+### 11.7 Compound Unit Constraints
+
+| Constraint | Limit |
+|------------|-------|
+| Maximum components per compound unit | 8 (`BVNR_MAX_UNIT_COMPONENTS`) |
+
+If a compound unit string contains more than `BVNR_MAX_UNIT_COMPONENTS` components after parsing, the validator raises `error_unit_illegal`.
+
+Empty components between separators (e.g., `m//s`, `m*·s`) produce `error_unit_illegal`.
+
+### 11.8 The `no_unit` Keyword
+
+The literal string `no_unit` in the unit parameter position means "explicitly dimensionless":
+
+```bovnar
+.dimensionless = <uint:32,no_unit> 42;
+```
+
+Omitting the unit parameter also defaults to dimensionless and produces a **different** internal representation: `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`.
+
+An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0`. Both forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` via `bvn_unit_to_string` — but they are structurally distinct internal states.
+
+---
+
+## 12. Validation & Constraints
+
+### 12.1 UTF-8 Validation
+
+| Constraint | Error |
+|------------|-------|
+| Non-UTF-8 byte sequence | `error_invalid_utf8_byte` |
+| Overlong encoding | Rejected (by UTF-8 rules) |
+| Surrogate halves (U+D800–U+DFFF) | Rejected |
+
+### 12.2 Size Limits
+
+| Quantity | Configurable | Default | Overflow Error |
+|----------|-------------|---------|----------------|
+| Identifier length | Yes (`max_identifier_length`) | 255 | `error_identifier_too_long` |
+| String length | Yes (`max_string_length`) | 65535 | `error_string_too_long` |
+| Number length | Yes (`max_number_length`) | 65535 | `error_number_too_long` |
+| Symbol length | Yes (`max_symbol_length`) | 255 | `error_symbol_too_long` |
+| Reference length | Yes (`max_reference_length`) | 65535 | `error_reference_too_long` |
+| Array items | Yes (`max_array_items`) | 0 (unlimited) | `error_too_many_array_items` |
+| Text bytes | Yes (`max_text_bytes`) | 0 (unlimited) | `error_text_data_too_long` |
+| File size | Yes (`max_file_size`) | 0 (unlimited) | `error_file_too_long` |
+| Struct nesting | Yes (`max_struct_nesting`) | 255 | `error_struct_nesting_too_high` |
+| Array nesting | Yes (`max_array_nesting`) | 255 | `error_array_nesting_too_high` |
+
+### 12.3 Value Validation
+
+| Check | Error |
+|-------|-------|
+| Number in base-N string contains out-of-base digit | `error_digit_not_in_base` |
+| Integer value exceeds declared width | `error_value_out_of_range` |
+| Negative number with `uint` type | `error_value_out_of_range` |
+| Mismatched type family for value token | `error_type_value_mismatch` |
+| Dot or exponent in integer-typed value | `error_type_value_mismatch` |
+| Invalid unit string | `error_unit_illegal` |
+| Empty type annotation body | `error_illegal_value_type` |
+| UTF-8 string / ISO 8601 / IP socket with number value | `error_type_value_mismatch` |
+| Non-decimal base for float type | `error_illegal_value_type` |
+| Base `_N` (N≠10, N≠16) for `float` | `error_illegal_value_type` |
+| Base param (`_N`) used with `float_fix` or `float_dec` | `error_illegal_value_type` |
+| Q param (`qN`) used with family other than `float_fix` | `error_illegal_value_type` |
+| Q value ≥ effective width for `float_fix` | `error_illegal_value_type` |
+| Invalid float width (not 0/16/multiple-of-32) for `float` | `error_illegal_value_type` |
+| Invalid float_fix/float_dec width (not 0/16/32/64/128/256) | `error_illegal_value_type` |
+
+### 12.4 Array Validation
+
+| Check | Error |
+|-------|-------|
+| `error_array_row_size_mismatch` | Defined in the error code enumeration; not currently reachable by any input |
+| Array nesting overflow (exceeds `max_array_nesting`) | `error_array_nesting_too_high` |
+| Comma outside array context | `error_unexpected_input_byte` |
+
+### 12.5 Struct Validation
+
+| Check | Error |
+|-------|-------|
+| Unmatched `}` | `error_illegal_struct_close` |
+| Nesting depth exceeded | `error_struct_nesting_too_high` |
+
+### 12.6 Identifier Validation
+
+| Check | Error |
+|-------|-------|
+| Empty key (`.=` or `.` + non-identifier char) | `error_empty_identifier` |
+| Invalid character in identifier | `error_unexpected_input_byte` |
+
+### 12.7 String Validation
+
+| Check | Error |
+|-------|-------|
+| Unknown escape sequence | `error_illegal_escape_sequence` |
+| Control byte in string | `error_unexpected_input_byte` |
+| String length exceeded | `error_string_too_long` |
+
+### 12.8 Unit Validation
+
+| Check | Error |
+|-------|-------|
+| Invalid unit string | `error_unit_illegal` |
+| Compound unit exceeds `BVNR_MAX_UNIT_COMPONENTS` | `error_unit_illegal` |
+| Empty component between separators | `error_unit_illegal` |
+| Unit string too long | `error_unit_too_long` |
+| Inline unit suffix differs from type-annotation unit | `error_unit_mismatch` |
+| Inline unit suffix inside an array element | `error_unexpected_input_byte` |
+
+### 12.9 Octet Stream Validation
+
+| Check | Error |
+|-------|-------|
+| Unknown tag byte in binary mode | `error_octet_stream_out_of_sync` |
+| Incomplete chunk read | `error_read_complete_chunk_failed` |
+| EOF in binary mode | Preserves current error |
+
+---
+
+## 13. Error Handling & Recovery
+
+### 13.1 Error Model
+
+Errors are reported through the `on_error` callback:
+
+```c
+typedef void (*bvnr_on_error_fn)(
+    void* userdata, error_code_t err,
+    uint64_t line, uint64_t column,
+    uint32_t byte, uint64_t offset);
+```
+
+### 13.2 Recovery Mode
+
+When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync mode** after any error:
+
+1. The `on_error` callback is invoked with error details
+2. A **resync state machine** (`state_t: resync, resync_string, resync_string_escape, resync_comment`) skips bytes
+3. Tracking bracket `[]` and brace `{}` nesting
+4. On encountering `;` at the saved nesting depth, parsing resumes
+5. `recovery_count` (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode
+
+**State machine behavior during resync:**
+
+| Byte(s) | Action |
+|---------|--------|
+| `0x00–0xFF` (most) | Skip (consume and continue) |
+| `"` | Enter `resync_string`: skip until matching `"` |
+| `#` | Enter `resync_comment`: skip until newline |
+| `[`, `{` | Increment `resync_depth` |
+| `]`, `}` | Decrement `resync_depth`; if 0, emit array/struct close |
+| `;` at depth 0 | Reset state, resume normal parsing |
+
+### 13.3 EOF in Resync
+
+If EOF is reached while in any resync state, the original error code is **preserved** rather than overwritten with `error_got_incomplete_bvnr_stream`.
+
+---
+
+## 14. Formal EBNF
+
+Below is the complete EBNF in ISO/IEC 14977:1996 notation, derived from and verified against the reference implementation.
+
+```ebnf
+(* ================================================================= *)
+(*  BOVNAR  –  EBNF  (ISO/IEC 14977:1996)                            *)
+(*  Version 1.1 – with compound unit support                         *)
+(* ================================================================= *)
+
+(* ── 1. Top-level stream ──────────────────────────────────────────── *)
+
+stream       = [ utf8-bom ] , ws , { assignment , ws } ;
+
+utf8-bom     = "\xEF\xBB\xBF" ;
+
+ws           = { ws-char | comment } ;
+
+ws-char      = "\x09" | "\x0A" | "\x0B" | "\x0C" | "\x0D" | "\x20" ;
+
+comment      = "#" , { comment-char } , ( "\x0D" | "\x0A" | (* eof *) ) ;
+comment-char = "\x09" | "\x0B" | "\x0C"
+             | printable-byte
+             | high-byte ;
+
+
+(* ── 2. Assignments ────────────────────────────────────────────────── *)
+
+assignment   = "." , key , ws , "=" , ws , value , ";" ;
+
+key          = id-start , { id-body-char } ;
+
+
+(* ── 3. Values ─────────────────────────────────────────────────────── *)
+
+value        = [ type-annotation , ws ] , raw-value ;
+
+raw-value    = null-value
+             | ( number | special-number | string ) , [ ws-mandatory , inline-unit ]
+             | symbol
+             | reference
+             | array
+             | struct
+             | octet-stream ;
+
+null-value   = (* empty *) ;
+
+
+(* ── 4. Type annotations ───────────────────────────────────────────── *)
+
+type-annotation = "<" , ws , type-spec , ws , ">" ;
+
+type-spec    = param-type ;
+
+param-type   = ( "uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8" )
+             , [ ws , ":" , ws , type-param-list ] ;
+
+type-param-list = type-param , { ws , "," , ws , type-param } ;
+
+type-param   = width-param | base-param | q-param | unit-param ;
+
+width-param  = DIGIT , { DIGIT } ;
+
+base-param   = "_" , DIGIT , { DIGIT } ;
+
+q-param      = "q" , DIGIT , { DIGIT } ;
+
+unit-param   = unit-char , { unit-char } ;
+
+unit-char    = ? byte in set { A-Z a-z 0-9 + . - : ^ _ * / }
+              | utf8-continuation
+              | type-utf8-leader ;
+
+
+(* ── 5. Numbers ────────────────────────────────────────────────────── *)
+
+number       = [ "-" ] , ( int-led | dot-led ) , [ dec-exponent ] ;
+
+int-led      = DIGIT , { DIGIT } , [ "." , { DIGIT } ] ;
+
+dot-led      = "." , DIGIT , { DIGIT } ;
+
+dec-exponent = ( "e" | "E" ) , [ "+" | "-" ] , DIGIT , { DIGIT } ;
+
+special-number = "$" , ( "nan" | "infinity" | "-infinity" ) , "$" ;
+
+
+(* ── 6. Strings ────────────────────────────────────────────────────── *)
+
+string          = string-literal , { ws , string-literal } ;
+
+string-literal  = '"' , { string-char } , '"' ;
+
+string-char  = safe-string-byte
+             | escape-seq ;
+
+safe-string-byte = ? byte in [0x09,0x0D] | [0x20,0x21] | [0x23,0x5B] | [0x5D,0x7E] | [0x80,0xFF] ? ;
+
+escape-seq   = "\" , ( "t" | "n" | "v" | "f" | "r" | '"' | "\" ) ;
+
+
+(* ── 6.5. Inline unit suffix ───────────────────────────────────────── *)
+
+(* Appears after a scalar number or string, before terminating ";".     *)
+(* Uses the same character set as unit-param in a type annotation,      *)
+(* but is delimited by whitespace or "#" instead of "," or ">".         *)
+(* Forbidden inside array elements (enforced at the action level).      *)
+
+inline-unit  = inline-unit-start , { inline-unit-char } ;
+
+inline-unit-start = ALPHA | "_" | utf8-leader ;
+
+inline-unit-char  = ALPHA | DIGIT | "_" | "+" | "-" | "." | "/" | ":" | "^" | "*"
+                  | utf8-leader | utf8-continuation ;
+
+
+(* ── 7. Symbols ────────────────────────────────────────────────────── *)
+
+symbol        = id-start , { sym-body-char } ;
+
+sym-body-char = id-body-char ;
+
+
+(* ── 8. References ─────────────────────────────────────────────────── *)
+
+reference    = "&" , ref-segment , { ref-segment } ;
+
+ref-segment  = "." , id-start , { ref-body-char } ;
+
+ref-body-char = sym-body-char | "." ;
+
+
+(* ── 9. Arrays ─────────────────────────────────────────────────────── *)
+
+array        = array-row , { ws , "/" , ws , array-row } ;
+
+array-row    = "[" , ws , [ row-content ] , ws , "]" ;
+
+row-content  = array-elem , { ws , "," , ws , array-elem } ;
+
+array-elem   = [ type-annotation , ws ] , raw-value ;
+
+
+(* ── 10. Structs ────────────────────────────────────────────────────── *)
+
+struct       = "{" , ws , { assignment , ws } , "}" ;
+
+
+(* ── 11. Octet streams ─────────────────────────────────────────────── *)
+
+octet-stream = "\x00" , { os-chunk } , os-end ;
+
+os-chunk     = "\x01" , os-length , os-data ;
+os-end       = "\x00" ;
+os-length    = byte , byte ;        (* little-endian uint16; 0x0000 → 65536 *)
+os-data      = { byte } ;
+
+
+(* ── 12. Lexical primitives ─────────────────────────────────────────── *)
+
+DIGIT        = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+id-start     = ALPHA | "_" | utf8-leader ;   (* note: excludes 0xC2 *)
+
+id-body-char = "+" | "-" | DIGIT | ALPHA | "_"
+             | utf8-leader
+             | utf8-continuation ;
+
+ALPHA        = ? A-Z a-z ? ;
+
+printable-byte = ? byte in [0x20, 0x7E] ? ;
+
+high-byte    = ? byte in [0x80, 0xFF] ? ;
+               (* Note: bytes 0xC0, 0xC1, and 0xF5–0xFF fall in this  *)
+               (* range but are rejected by the parallel UTF-8         *)
+               (* validator (error_invalid_utf8_byte).                 *)
+
+utf8-leader  = ? byte in [0xC3, 0xF4] ? ;
+               (* 0xC2 is the leader for U+0080–U+00BF and is          *)
+               (* explicitly rejected (ACT_NONE) at all identifier,    *)
+               (* symbol, and reference token-start/body positions.    *)
+
+type-utf8-leader = ? byte in [0xC2, 0xF4] ? ;
+               (* Unlike utf8-leader, 0xC2 IS accepted inside type     *)
+               (* parameter bodies (copy_type_byte / type_body_outro   *)
+               (* states).  Required for the µ (micro) SI prefix:      *)
+               (* U+00B5 = 0xC2 0xB5, and the · (middle dot)          *)
+               (* product separator: U+00B7 = 0xC2 0xB7.               *)
+
+utf8-continuation = ? byte in [0x80, 0xBF] ? ;
+
+byte         = ? any byte 0x00–0xFF ? ;
+
+
+(* ── 13. Unit sub-grammar (semantic, enforced by bvn_parse_unit) ─── *)
+
+(*
+  compound-unit  = "no_unit"
+                 | unit-component { unit-sep unit-component } ;
+
+  unit-sep       = "*" | "/" | "·" ;      (* "·" = U+00B7 MIDDLE DOT *)
+
+  unit-component = [ prefix "-" ] base-unit [ unit-exponent ] ;
+
+  When a prefix is present the separator "-" is mandatory.
+  A bare base-unit with no prefix requires no separator.
+
+  Semantic rule: the first "/" switches all subsequent components into
+  the denominator; their exponents are negated in the internal
+  representation.  Additional "/" separators do not toggle back to
+  the numerator.
+
+  Maximum number of unit-component terms per compound unit:
+  BVNR_MAX_UNIT_COMPONENTS = 8.
+  Exceeding this limit causes error_unit_illegal.
+
+  Empty components between separators (e.g. "m//s") are rejected
+  with error_unit_illegal.
+
+  si-prefix  = "Q"|"R"|"Y"|"Z"|"E"|"P"|"T"|"G"|"M"|"k"|"h"|"da"
+             | "d"|"c"|"m"|"µ"|"n"|"p"|"f"|"a"|"z"|"y"|"r"|"q" ;
+    (µ = U+00B5: 0xC2 0xB5)
+
+  iec-prefix = "Ki"|"Mi"|"Gi"|"Ti"|"Pi"|"Ei"|"Zi"|"Yi"|"Ri"|"Qi" ;
+
+  base-unit  = "b"|"B"|"s"|"m"|"g"|"A"|"K"|"mol"|"cd"|"Hz"|"N"
+             | "Pa"|"J"|"W"|"V"|"Ω"|"F"|"C"|"S"|"Wb"|"T"|"H"
+             | "lm"|"lx"|"Bq"|"Gy"|"Sv"|"kat"|"rad"|"sr"
+             | "L"|"l"|"min"|"h"|"d"|"wk"|"yr"
+             | "°C"|"°"|"degC"|"degrC"
+             | "degrees"|"degree"|"degr"|"deg"
+             | "t"|"bar"|"eV"|"Da"|"au"|"ha" ;
+    (Ω = U+2126: 0xE2 0x84 0xA6; ° = U+00B0: 0xC2 0xB0)
+
+  unit-exponent = [exp-sign] exp-digit
+                | "^" ["-"|"+"] ASCII-digit ;
+
+  exp-sign  = "⁺" (* U+207A: 0xE2 0x81 0xBA, positive / no-op *)
+            | "⁻" ; (* U+207B: 0xE2 0x81 0xBB, negate exponent *)
+
+  exp-digit = "¹"|"²"|"³"|"⁴"|"⁵"|"⁶"|"⁷"|"⁸"|"⁹" ;
+    (U+00B9 / 00B2 / 00B3 / 2074–2079)
+
+  "⁺" is accepted but has no effect (same as absent).
+  The ASCII form "^[+-]?[1-9]" maps to the same internal constants
+  as the Unicode superscript form. "^0" is not a valid exponent.
+*)
+
+
+(* ── 14. Constraints not expressible in context-free EBNF ──────────── *)
+
+(*
+  a) UTF-8 validity
+     Every byte in the text layer (outside octet-stream regions) must
+     form valid UTF-8 when fed through bvn_utf8_feed.  The UTF-8
+     validator runs in parallel with the action state machine; a
+     non-UTF-8 byte causes error_invalid_utf8_byte regardless of which
+     lexer state the parser is in.  Overlong encodings and surrogate
+     halves are rejected.
+
+  b) BOM uniqueness
+     The UTF-8 BOM (EF BB BF) is legal only at byte offset 0.
+     If the stream begins with "#" instead (a first-line comment), the
+     special first_comment_* state machine watches the comment body for
+     the exact byte sequence 0xEF 0xBB 0xBF and rejects it as
+     error_invalid_byte_order_mark.  This detection applies only while
+     the first_comment_* states are active (i.e. until the first
+     newline); subsequent regular comments (comment_intro state) have
+     no BOM detection, so U+FEFF encoded as 0xEF 0xBB 0xBF appearing
+     in any later comment body or string literal is valid UTF-8 and is
+     accepted.
+
+  c) 0xC2 at token boundaries
+     The byte 0xC2 (UTF-8 leader for U+0080–U+00BF) is mapped to
+     ACT_NONE at identifier, symbol, and reference token-start and
+     token-body positions, forbidding code points U+0080–U+00BF in
+     those tokens.  0xC2 is accepted inside quoted strings and in type
+     parameter bodies (copy_type_byte / type_body_outro).
+
+  d) Special-number delimiters
+     Both the leading and trailing "$" are mandatory.  sp_nan3 /
+     sp_inf8 / sp_neg9 require "$" as the next byte; any other byte is
+     a hard error.
+
+  e) String concatenation
+     Adjacent string literals with only whitespace/comments between
+     them are concatenated into a single token by the lexer.  The
+     combined byte length is bounded by max_string_length (default
+     UINT16_MAX = 65535 bytes).
+
+  f) Number exponent in bare literals vs. quoted strings
+     Bare number literals only accept "e"/"E" as exponent markers
+     (exp_intro state).
+
+  g) Array row-size consistency
+     The validator contains row-size tracking code and defines
+     error_array_row_size_mismatch, but the per-bracket-pair context
+     save/restore mechanism (arr_saved_curr/arr_saved_row) ensures that
+     array_row_size is always zero when bvn_val_on_array_outro and
+     bvn_val_on_new_array_value perform their comparisons.  As a result,
+     error_array_row_size_mismatch is not reachable by any input in the
+     current implementation.  All /‐separated rows and all nested element
+     arrays are accepted regardless of element count.
+
+  h) Array and struct nesting limits
+     Array nesting (bracket depth): max_array_nesting; default 255.
+     Struct nesting: max_struct_nesting; default 255.
+
+  i) Type-annotation / value compatibility (enforced by validator)
+     "utf8" requires a string value.
+     "uint", "sint", "float" accept a number or string value; a quoted
+       string allows non-decimal bases or special float notation.
+     "utf8" parameters are lexically accepted and stored but carry no
+       semantic meaning; no error is raised for a non-empty parameter list.
+     "uint" rejects negative number literals (error_value_out_of_range).
+     Digit characters in the value must be valid for the declared base
+       (error_digit_not_in_base).
+     The numeric value must fit in the declared bit-width
+       (error_value_out_of_range).
+     For "float": valid widths are 0 (default 64), 16, or any multiple of
+       32 up to 32768; only base 10 (or absent) or base 16 are accepted.
+
+  j) Identifier (key) non-empty
+     The grammar requires at least one id-start character after ".".
+     An empty key (".=") triggers error_empty_identifier.
+
+  k) Struct closing brace without matching open
+     A "}" seen when struct_nesting_level == 0 is
+     error_illegal_struct_close.
+
+  l) Comma in non-array context
+     "," triggers ACT_new_array_value, which checks
+     array_nesting_level > 0 and returns error_unexpected_input_byte
+     if the condition is not met.  A stray "," at the top level is
+     therefore an error.
+
+  m) Octet stream out-of-sync
+     Any byte other than 0x01 (chunk) or 0x00 (end) as the tag byte
+     inside an octet stream causes error_octet_stream_out_of_sync.
+
+  n) Compound unit constraints
+     A compound unit may contain at most BVNR_MAX_UNIT_COMPONENTS = 8
+     unit-component terms.  Exceeding this causes error_unit_illegal.
+     Empty components between separators (e.g. "m//s", "m*·s") cause
+     error_unit_illegal.
+
+  o) Error recovery (continue_on_error mode)
+     When bvnr_read_flags_t.continue_on_error is set, any parse error
+     invokes the on_error callback and then enters the resync state
+     machine (states: resync, resync_string, resync_string_escape,
+     resync_comment).  The resync machine skips bytes while tracking
+     bracket and brace nesting depths, and attempts to re-synchronise
+     at the next ";" at the current nesting depth.  Each successful
+     recovery_count (bvnr_reader_get_recovery_count) is incremented
+     when an error triggers entry into resync mode, not when the resync
+     completes.  EOF inside any resync state propagates the original
+     error code rather than overwriting it with error_got_incomplete_bvnr_stream.
+
+  p) Inline unit suffix
+     An inline-unit may appear after a scalar number or string (in
+     non-array context) before the terminating ";".  At least one
+     whitespace character must separate the value literal from the
+     unit.  It is parsed with the same semantic rules as a unit-param inside a
+     type annotation.  If the value also has an explicit type-annotation
+     unit, the inline unit must be identical to it (compared
+     component-by-component after parsing); a mismatch produces
+     error_unit_mismatch.  If no annotation unit is present, the inline
+     unit is adopted as the effective unit for the value.  The inline
+     suffix is forbidden inside array elements; any alphabetic or "_"
+     byte following an array-element value triggers
+     error_unexpected_input_byte.*)
+```
+
+---
+
+## 15. Complete Examples
+
+### 15.1 Simple Configuration
+
+```bovnar
+# Application configuration
+.app_name = "Bovnar Demo";
+.version = 1;
+.debug = false;
+.max_connections = 100;
+.timeout_s = 30;
+```
+
+### 15.2 Typed Scientific Data
+
+```bovnar
+# Physical measurements with units
+.measurements = [
+    {.name = "temperature";
+     .value = <float:32,°C> 23.5;
+     .precision = <float:32,°C> 0.1;},
+    {.name = "pressure";
+     .value = <float:64,Pa> 101325;
+     .precision = <float:64,Pa> 100;},
+    {.name = "humidity";
+     .value = <float:32> 0.45;
+     .unit = "%";},
+    {.name = "wind_speed";
+     .value = <float:32,m/s> 5.2;
+     .precision = <float:32,m/s> 0.1;}
+];
+
+.calibration = <float:64,no_unit> 1.00042;
+.density = <float:64,k-g/m³> 7800;
+.accel = <float:64,m/s²> 9.81;
+```
+
+### 15.3 Inline Unit Suffix
+
+The unit may be written directly after the value literal instead of — or redundantly alongside — the type annotation:
+
+```bovnar
+# No type annotation: inline unit supplies both type default and unit
+.distance   = 1500 m;           # uint:64, no_unit → unit overridden to m
+.speed      = 9.81 m/s;         # float:64, unit = m/s
+.mass       = 70.5 k-g;         # float:64, unit = k-g
+
+# Type annotation without unit: inline suffix supplies the unit
+.dist       = <float:32> 1.5 k-m;
+
+# Annotation and inline unit match: valid (redundant)
+.pressure   = <float:64,Pa> 101325 Pa;
+
+# Annotation and inline unit differ: error_unit_mismatch
+# .bad      = <float:64,m> 1.5 s;    # ERROR
+```
+
+### 15.4 Binary Data with Octet Stream
+
+```bovnar
+# An image file embedded as binary
+.image = \x00
+    \x01\x10\x00\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00
+    \x01\x00\x00\x00\xFF\xD9
+    \x00;
+
+# A checksum alongside
+.checksum = <uint:_16> "abcd";
+```
+
+### 15.5 Arrays with Mixed Dimensions
+
+```bovnar
+# 2D matrix
+.matrix = [1, 2, 3]/[4, 5, 6];
+
+# Jagged array (each element is a different-sized array)
+.jagged = [[1,2],[3,4,5],[6]];
+
+# Array with typed nulls
+.nullable = [<sint:16> 1, <sint:16> , <sint:16> 3];
+```
+
+### 15.6 Deeply Nested Struct
+
+```bovnar
+.api_response = {
+    .status = ok;
+    .code = 200;
+    .data = {
+        .users = [
+            {.id = 1; .name = "Alice"; .roles = ["admin", "user"];},
+            {.id = 2; .name = "Bob"; .roles = ["user"];}
+        ];
+        .pagination = {
+            .page = 1;
+            .per_page = 50;
+            .total = 2;
+        };
+    };
+};
+```
+
+### 15.7 References and Symbols
+
+```bovnar
+# Configuration with references
+.config = {
+    .host = "api.example.com";
+    .port = 443;
+    .tls = true;
+};
+
+.endpoint_defaults = {
+    .host = &.config.host;
+    .port = &.config.port;
+    .tls = &.config.tls;
+};
+
+# Using symbols as enum-like values
+.status = ok;
+.mode = readonly;
+.direction = north;
+```
+
+### 15.8 Compound Unit Examples
+
+```bovnar
+# Velocity
+.velocity = <float:64,m/s> 9.81;
+
+# Acceleration
+.acceleration = <float:64,m/s²> 9.81;
+
+# Force (Newton = kg·m/s²)
+.force = <float:64,k-g·m/s²> 9.81;
+
+# Energy (Joule = kg·m²/s²)
+.energy = <float:64,k-g·m²/s²> 100;
+
+# Momentum (kg·m/s)
+.momentum = <float:64,k-g·m/s> 5.0;
+
+# Pressure (Pa = kg/(m·s²))
+.pressure = <float:64,k-g/(m·s²)> 101325;
+
+# Area density (kg/m²)
+.area_density = <float:64,k-g/m²> 5.0;
+
+# Electric field (V/m)
+.electric_field = <float:64,V/m> 150;
+
+# Magnetic flux density (T = kg/(A·s²))
+.mag_flux_density = <float:64,k-g/(A·s²)> 0.5;
+
+# Product form with asterisk
+.moment = <float:64,m*s> 1.0;
+
+# Alternative superscript notation for compound units
+.force_alt = <float:64,k-g·m·s⁻²> 9.81;
+```
+
+### 15.9 Fixed-Point and Decimal Float Examples
+
+```bovnar
+# ── float_fix: fixed-point Q-format ────────────────────────────────
+
+# 16-bit Q8: 8 fractional bits, resolution 2^-8 ≈ 0.00390625
+# range: [-128.0, +127.99609375]
+.adc_reading   = <float_fix:16,q8> 3.14;
+
+# 32-bit Q16: 15 integer bits + sign + 16 fractional bits
+.fine_angle    = <float_fix:32,q16> -1.5;
+
+# 64-bit Q0: no fractional bits — pure integer in fixed-point shell
+.sample_count  = <float_fix:64,q0> 4096;
+
+# 32-bit Q8 with unit (meters/second at 1/256 resolution)
+.velocity_fx   = <float_fix:32,q8,m/s> 9.81;
+
+# null of a fixed-point type
+.missing_fx    = <float_fix:16,q8> ;
+
+# inline unit suffix also works with float_fix
+.temperature   = <float_fix:32,q8> 23.5 °C;
+
+
+# ── float_dec: IEEE 754-2008 decimal floating-point ─────────────────
+
+# 32-bit decimal float (7 significant decimal digits)
+.price         = <float_dec:32> 12.99;
+
+# 64-bit decimal float with unit (16 significant decimal digits)
+.pressure_dec  = <float_dec:64,Pa> 101325.0;
+
+# 128-bit decimal float (34 significant decimal digits)
+.pi_dec        = <float_dec:128> 3.14159265358979323846264338327950288;
+
+# 256-bit decimal float (70 significant decimal digits)
+.big_constant  = <float_dec:256> 1.4142135623730950488016887242096980785696718753769480731766797;
+
+# Special values are accepted
+.nan_dec       = <float_dec:64> $nan$;
+.inf_dec       = <float_dec:32> $infinity$;
+
+# null of a decimal float type
+.missing_dec   = <float_dec:64> ;
+
+
+# ── Contrast with binary float ───────────────────────────────────────
+
+# Binary IEEE float (existing)
+.val_bin       = <float:64> 3.14;
+
+# Decimal float — same text representation, different wire encoding
+.val_dec       = <float_dec:64> 3.14;
+
+# Fixed-point — same text representation, Q-format wire encoding
+.val_fix       = <float_fix:32,q16> 3.14;
+```
+
+### 15.10 Error Examples
+
+```bovnar
+# These will produce parse errors:
+
+# Empty identifier
+. = 42;                          # error_empty_identifier
+
+# Type violation (type annotation on the identifier, not the value)
+.x<utf8> = 42;                   # error (annotation must be after '=')
+
+# Correct: .x = <utf8> "text";
+
+# Type violation – value doesn't match type
+.x = <utf8> 42;                   # error_type_value_mismatch
+
+# Value out of range
+.y = <uint:8> 300;                # error_value_out_of_range
+
+# Negative unsigned
+.z = <uint:8> -1;                 # error_value_out_of_range
+
+# Unmatched struct close
+.struct = {;                     # error_illegal_struct_close
+
+# Unknown escape
+.string = "\x";                  # error_illegal_escape_sequence
+
+# Array row-size mismatch — the check applies to /‐dimension rows, not element-level nesting
+# [[1,2],[3,4,5]] is VALID (element values, not dimension rows)
+# A genuine mismatch occurs e.g. when the same number of elements is expected per dimension
+# and differs, but this is implementation-internal. The example below is the known valid form:
+.ok = [[1,2],[3,4,5]];      # valid — nested arrays are element values
+
+# Comma outside array
+.comma_outside = 42,;            # error_unexpected_input_byte
+
+# Non-decimal base — bare token is parsed as a symbol, causing type mismatch
+.hex = <uint:_16> ff;             # error: symbol value for numeric type
+
+# Empty component in compound unit
+.x = <float:64,m//s> 1.0;       # error_unit_illegal
+
+# Too many components (> 8)
+.y = <float:64,m*s*k-g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 components)
+
+# float_fix: Q >= effective width
+.bad_q = <float_fix:16,q16> 1.0;            # Q=16 >= width=16 → error_illegal_value_type
+
+# float_fix: invalid width
+.bad_fw = <float_fix:8,q4> 1.0;             # width 8 not in {0,16,32,64,128,256}
+
+# float_fix: base param forbidden
+.bad_fb = <float_fix:32,q8,_10> 1.0;        # error_illegal_value_type
+
+# float_dec: invalid width
+.bad_dw = <float_dec:24> 1.0;               # width 24 not in {0,16,32,64,128,256}
+
+# float_dec: base param forbidden
+.bad_db = <float_dec:64,_10> 1.0;           # error_illegal_value_type
+
+# q-param on non-float_fix type
+.bad_qu = <float:64,q8> 1.0;               # q-param only valid for float_fix
+```
+
+---
+
+## 16. Reference API
+
+### 16.1 Core Types
+
+```c
+typedef enum bvnr_event_e {
+    ev_stream_start,
+    ev_assignment_start,
+    ev_octet_stream_start,
+    ev_octet_stream_end,
+    ev_struct_start,
+    ev_struct_end,
+    ev_array_row_start,
+    ev_array_row_end,
+    ev_array_dim_start,
+    ev_data,
+    ev_type_annotation_start,
+    ev_type_annotation_end,
+    ev_type_annotation_type_family,
+    ev_type_annotation_type_family_parameter,
+    dimension_bvnr_event
+} bvnr_event_t;
+
+typedef enum value_type_family_e {
+    vt_plain,
+    vt_utf8,
+    vt_sint,
+    vt_uint,
+    vt_float,
+    vt_float_fix,  /* fixed-point binary, Q-format; Q stored in value_type_spec_t.base */
+    vt_float_dec,  /* IEEE 754-2008 decimal floating-point                               */
+    vt_illegal
+} value_type_family_t;
+
+typedef struct value_type_spec_s {
+    value_type_family_t family;
+    uint32_t            width; /* bit-width; 0 = default (64)                         */
+    uint32_t            base;  /* for uint/sint/float: numeral base; 0 = default (10) */
+                               /* for float_fix:        Q (fractional bits)           */
+                               /* for float_dec:        unused (always 0)             */
+} value_type_spec_t;
+
+#define BVNR_MAX_UNIT_COMPONENTS     8
+
+typedef struct value_unit_component_s {
+    value_base_unit_t    base;
+    unit_exponent_t      exponent;
+    struct {
+        prefix_system_t  system;
+        union {
+            si_prefix_id_t   si;
+            iec_prefix_id_t  iec;
+        } id;
+    } prefix;
+} value_unit_component_t;
+
+typedef struct value_unit_s {
+    uint32_t                num_components;
+    value_unit_component_t  components[BVNR_MAX_UNIT_COMPONENTS];
+} value_unit_t;
+
+typedef struct bvnr_data_s {
+    token_type_t      type;
+    value_type_spec_t value_type;
+    value_unit_t      value_unit;
+    const void*       data;
+    uint32_t          length;
+} bvnr_data_t;
+```
+
+### 16.2 Type Construction Macros
+
+```c
+/* Type-spec convenience constructors (from bovnar.h) */
+#define BVN_TYPE_PLAIN          ((value_type_spec_t){ .family = vt_plain })
+#define BVN_TYPE_UTF8           ((value_type_spec_t){ .family = vt_utf8  })
+#define BVN_TYPE_UINT(w)        ((value_type_spec_t){ .family = vt_uint,      .width = (w) })
+#define BVN_TYPE_SINT(w)        ((value_type_spec_t){ .family = vt_sint,      .width = (w) })
+#define BVN_TYPE_FLOAT(w)       ((value_type_spec_t){ .family = vt_float,     .width = (w) })
+/* float_fix: .base is repurposed to store Q (fractional bits). */
+#define BVN_TYPE_FLOAT_FIX(w,q) ((value_type_spec_t){ .family = vt_float_fix, .width = (w), .base = (q) })
+/* float_dec: base field is unused (always 0).                   */
+#define BVN_TYPE_FLOAT_DEC(w)   ((value_type_spec_t){ .family = vt_float_dec, .width = (w) })
+/* With explicit numeral base (uint/sint only):                   */
+#define BVN_TYPE_UINT_BASE(w,b) ((value_type_spec_t){ .family = vt_uint, .width = (w), .base = (b) })
+#define BVN_TYPE_SINT_BASE(w,b) ((value_type_spec_t){ .family = vt_sint, .width = (w), .base = (b) })
+```
+
+### 16.3 Unit Macros
+
+```c
+#define BVN_UNIT_NO_PREFIX(b) \
+    ((value_unit_t){ \
+        .num_components = 1, \
+        .components = {{ \
+            .base = (b), .exponent = exp_linear, \
+            .prefix.system = prefix_si, .prefix.id.si = si_none \
+        }} \
+    })
+
+#define BVN_UNIT_SI(b, p) \
+    ((value_unit_t){ \
+        .num_components = 1, \
+        .components = {{ \
+            .base = (b), .exponent = exp_linear, \
+            .prefix.system = prefix_si, .prefix.id.si = (p) \
+        }} \
+    })
+
+#define BVN_UNIT_IEC(b, p) \
+    ((value_unit_t){ \
+        .num_components = 1, \
+        .components = {{ \
+            .base = (b), .exponent = exp_linear, \
+            .prefix.system = prefix_iec, .prefix.id.iec = (p) \
+        }} \
+    })
+
+#define BVN_UNIT_SI_EXP(b, p, e) \
+    ((value_unit_t){ \
+        .num_components = 1, \
+        .components = {{ \
+            .base = (b), .exponent = (e), \
+            .prefix.system = prefix_si, .prefix.id.si = (p) \
+        }} \
+    })
+
+#define BVN_UNIT_NONE \
+    ((value_unit_t){ .num_components = 0 })
+
+/* Compound-unit helper: two SI-prefixed components */
+#define BVN_UNIT_COMPOUND2(b1, p1, e1, b2, p2, e2) \
+    ((value_unit_t){ \
+        .num_components = 2, \
+        .components = { \
+            { .base = (b1), .exponent = (e1), \
+              .prefix.system = prefix_si, .prefix.id.si = (p1) }, \
+            { .base = (b2), .exponent = (e2), \
+              .prefix.system = prefix_si, .prefix.id.si = (p2) } \
+        } \
+    })
+```
+
+### 16.4 Reader Setup
+
+```c
+typedef struct bvnr_read_flags_s {
+    uint16_t  max_identifier_length;  // default 255
+    uint16_t  max_string_length;      // default 65535
+    uint16_t  max_number_length;      // default 65535
+    uint16_t  max_symbol_length;      // default 255
+    uint16_t  max_reference_length;   // default 65535
+    uint64_t  max_array_items;        // default 0 (unlimited)
+    uint64_t  max_text_bytes;         // default 0 (unlimited)
+    uint64_t  max_file_size;          // default 0 (unlimited); set to 16777216 for 16 MiB cap
+    uint64_t  max_struct_nesting;     // default 255
+    uint64_t  max_array_nesting;      // default 255
+    void*     userdata;
+    bool    (*on_unverified)(void*, bvnr_event_t, bvnr_data_t*);
+    bool    (*on_verified)(void*, bvnr_event_t, bvnr_data_t*);
+    bool      continue_on_error;
+    bvnr_on_error_fn on_error;
+} bvnr_read_flags_t;
+```
+
+### 16.5 Source/Sink Creation
+
+```c
+void bvnr_source_from_fd(bvnr_source_t* s, int fd);
+void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint32_t len);
+void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
+void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
+uint32_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
+uint32_t bvnr_writer_bytes_written(const bvnr_writer_t* w);
+```
+
+`bvnr_sink_bytes_written` queries the byte count of an explicit `bvnr_sink_t` created with `bvnr_sink_to_mem`. `bvnr_writer_bytes_written` queries the byte count when the writer encapsulates the sink internally (i.e. after `bvnr_open_write_mem`).
+
+### 16.6 Reading
+
+```c
+bool bvnr_open_read_source(bvnr_reader_t* r, const bvnr_source_t* src,
+                        const bvnr_sink_t* dbg_sink,
+                        bvnr_read_flags_t* options);
+
+bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint32_t len,
+                        void* dbg_buf, uint32_t dbg_cap,
+                        bvnr_read_flags_t* options);
+
+bool bvnr_read(bvnr_reader_t* r);
+```
+
+### 16.7 Error Queries
+
+```c
+error_code_t bvnr_reader_get_error(const bvnr_reader_t* r);
+uint64_t     bvnr_reader_get_error_line  (const bvnr_reader_t* r);
+uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);
+uint32_t     bvnr_reader_get_error_byte  (const bvnr_reader_t* r);
+uint64_t     bvnr_reader_get_error_offset(const bvnr_reader_t* r);
+uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t* r);
+const char*  bvn_error_to_string(error_code_t code);
+```
+
+### 16.8 Utility Functions
+
+```c
+bool bvn_validate_identifier(const char* id);
+bool bvn_validate_symbol(const char* surr);
+bool bvn_validate_reference(const char* link);
+bool bvn_validate_number(const char* s);
+bool bvn_validate_string(const uint8_t* data, size_t len);
+
+bool bvn_is_special_number_string(const char* s);
+bool bvn_validate_digits_for_base(const char* s, uint32_t base);
+bool bvn_validate_number_in_base(const char* s, uint32_t base);
+
+bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base);
+bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base);
+
+uint32_t bvn_char_to_digit(uint32_t c, uint32_t base);
+uint32_t bvn_min_digits_for_type(value_type_spec_t vt);
+
+int32_t bvn_format_uint64(char* buf, size_t bufsize,
+                           uint64_t value, uint32_t base, uint32_t min_digits);
+int32_t bvn_format_int64(char* buf, size_t bufsize,
+                          int64_t value, uint32_t base, uint32_t min_digits);
+int32_t bvn_format_double(char* buf, size_t bufsize,
+                           double value, value_type_spec_t vt);
+
+bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out);
+bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out);
+bool bvn_parse_double(const char* s, value_type_spec_t vt, double* out);
+bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out);
+bool bvn_looks_like_double(const char* s);
+
+/* Parse a NUL-terminated unit string into a value_unit_t.
+   Sets *ok to false on error. */
+value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok);
+
+/* Length-bounded variant; does not require a NUL terminator. */
+value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok);
+
+/* Serialize a value_unit_t (possibly compound) back to a string.
+   Numerator components are joined by "·", followed by "/" and
+   denominator components joined by "·".  Returns bytes written,
+   or -1 on buffer overflow. */
+int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
+
+/* Compute the combined prefix factor across all components (ignoring
+   base-unit conversion factors).  Each component's prefix factor is
+   raised to |exponent| and multiplied together; denominator components
+   are inverted. */
+double bvn_unit_prefix_factor(value_unit_t u);
+
+/* Compute the combined prefix exponent (sum of prefix_base_exponent ×
+   |unit_exponent| across all components, negated for denominator
+   components). */
+int32_t bvn_unit_prefix_exponent(value_unit_t u);
+
+const uint8_t* bvn_get_escape_repl_table(void);
+```
+
+### 16.9 Typed Write Helpers
+
+Convenience functions that emit a type annotation + value in one call.
+All functions return `false` on serialisation error.
+
+```c
+/* ── Plain scalar writers ──────────────────────────────────────────── */
+bool bvnr_write_string(bvnr_writer_t* w, const char* key, const char* value);
+bool bvnr_write_plain (bvnr_writer_t* w, const char* key, const char* value);
+bool bvnr_write_null  (bvnr_writer_t* w, const char* key);
+bool bvnr_write_bool  (bvnr_writer_t* w, const char* key, bool value);
+
+/* ── Integer writers ───────────────────────────────────────────────── */
+bool bvnr_write_uint(bvnr_writer_t* w, const char* key,
+                     uint32_t width, uint64_t value);
+bool bvnr_write_sint(bvnr_writer_t* w, const char* key,
+                     uint32_t width, int64_t value);
+
+/* ── Binary float writers ─────────────────────────────────────────── */
+bool bvnr_write_float(bvnr_writer_t* w, const char* key,
+                      uint32_t width, double value);
+
+/* ── Fixed-point writers (float_fix) ─────────────────────────────── */
+/* q = number of fractional bits (Q parameter). */
+bool bvnr_write_float_fix(bvnr_writer_t* w, const char* key,
+                           uint32_t width, uint32_t q, double value);
+
+/* ── Decimal float writers (float_dec) ───────────────────────────── */
+bool bvnr_write_float_dec(bvnr_writer_t* w, const char* key,
+                           uint32_t width, double value);
+
+/* ── Writers with explicit unit ───────────────────────────────────── */
+bool bvnr_write_uint_unit     (bvnr_writer_t* w, const char* key,
+                                uint32_t width, uint64_t value, value_unit_t unit);
+bool bvnr_write_sint_unit     (bvnr_writer_t* w, const char* key,
+                                uint32_t width, int64_t value, value_unit_t unit);
+bool bvnr_write_float_unit    (bvnr_writer_t* w, const char* key,
+                                uint32_t width, double value, value_unit_t unit);
+bool bvnr_write_float_fix_unit(bvnr_writer_t* w, const char* key,
+                                uint32_t width, uint32_t q,
+                                double value, value_unit_t unit);
+bool bvnr_write_float_dec_unit(bvnr_writer_t* w, const char* key,
+                                uint32_t width, double value, value_unit_t unit);
+
+/* ── Wide-precision float writers (bvn_float_t) ─────────────────── */
+/* vt.width must match f->_prec or be 0 (auto).                      */
+bool bvnr_write_bvnf     (bvnr_writer_t* w, const char* key,
+                           const bvn_float_t* f, uint32_t width);
+bool bvnr_write_bvnf_unit(bvnr_writer_t* w, const char* key,
+                           const bvn_float_t* f, uint32_t width, value_unit_t unit);
+
+/* ── Struct helpers ───────────────────────────────────────────────── */
+bool bvnr_write_struct_start(bvnr_writer_t* w, const char* key);
+bool bvnr_write_struct_end  (bvnr_writer_t* w);
+```
+
+### 16.10 Error Codes
+
+```c
+typedef enum error_code_e {
+    error_none                          = 0,
+    error_unknown_token_type            = 1,
+    error_array_row_size_mismatch       = 2,
+    error_identifier_too_long           = 3,
+    error_empty_identifier              = 4,
+    error_struct_nesting_too_high       = 5,
+    error_array_nesting_too_high        = 6,
+    error_illegal_struct_close          = 7,
+    error_string_too_long               = 8,
+    error_illegal_escape_sequence       = 9,
+    error_number_too_long               = 10,
+    error_symbol_too_long               = 11,
+    error_reference_too_long            = 12,
+    error_read_complete_chunk_failed    = 13,
+    error_octet_stream_out_of_sync      = 14,
+    error_unexpected_input_byte         = 15,
+    error_text_data_too_long            = 16,
+    error_reading_from_source_fd        = 17,
+    error_got_incomplete_bvnr_stream    = 18,
+    error_invalid_utf8_byte             = 19,
+    error_invalid_byte_order_mark       = 20,
+    error_type_too_long                 = 21,
+    error_unit_too_long                 = 22,
+    error_expected_string_in_array      = 23,
+    error_expected_number_in_array      = 24,
+    error_illegal_value_type            = 25,
+    error_scanner_callback_failed       = 26,
+    error_file_too_long                 = 27,
+    error_invalid_argument              = 28,
+    error_too_many_array_items          = 29,
+    error_writing_to_sink               = 30,
+    error_sink_buffer_exhausted         = 31,
+    error_unit_illegal                  = 32,
+    error_base_requires_string_literal  = 33,
+    error_type_value_mismatch           = 34,
+    error_value_out_of_range            = 35,
+    error_digit_not_in_base             = 36,
+    error_recovered                     = 37,
+    error_unit_mismatch                 = 38,
+} error_code_t;
+```
+
+---
+
+## Appendix A: Event Sequence Reference
+
+### A.1 Simple Assignment (Untyped)
+
+Input: `.foo = 42;`
+
+```
+ev_stream_start
+ev_assignment_start            data="foo"
+ev_type_annotation_start       (synthesised)
+ev_type_annotation_type_family "uint"
+ev_type_annotation_type_family_parameter  (width:64)
+ev_type_annotation_type_family_parameter  (base:_10)
+ev_type_annotation_type_family_parameter  (unit:no_unit)
+ev_type_annotation_end
+ev_data                        data="42"
+```
+
+### A.2 Typed Assignment
+
+Input: `.bar = <float:32,m/s> 9.81;`
+
+```
+ev_assignment_start            data="bar"
+ev_type_annotation_start       data="float:32,m/s"
+ev_type_annotation_type_family "float"
+ev_type_annotation_type_family_parameter  (width:32)
+ev_type_annotation_type_family_parameter  (unit:m/s)
+ev_type_annotation_end
+ev_data                        data="9.81"
+```
+
+### A.3 Compound Unit Assignment
+
+Input: `.force = <float:64,k-g·m/s²> 9.81;`
+
+```
+ev_assignment_start            data="force"
+ev_type_annotation_start       data="float:64,k-g·m/s²"
+ev_type_annotation_type_family "float"
+ev_type_annotation_type_family_parameter  (width:64)
+ev_type_annotation_type_family_parameter  (unit:k-g·m/s²)
+  → value_unit = {
+      num_components = 3,
+      components = [
+        { base=bu_gram,   exponent=exp_linear,     prefix={prefix_si, si_kilo} },
+        { base=bu_meter,  exponent=exp_linear,     prefix={prefix_si, si_none} },
+        { base=bu_second, exponent=exp_neg_square, prefix={prefix_si, si_none} }
+      ]
+    }
+ev_type_annotation_end
+ev_data                        data="9.81"
+```
+
+### A.4 Array
+
+Input: `.arr = [1, 2]/[3, 4];`
+
+```
+ev_assignment_start            data="arr"
+ev_array_row_start
+ev_type_annotation_start       (synthesised for 1)
+ev_type_annotation_type_family "uint"
+...params...
+ev_type_annotation_end
+ev_data                        data="1"
+ev_type_annotation_start       (synthesised for 2)
+...params...
+ev_type_annotation_end
+ev_data                        data="2"
+ev_array_row_end
+ev_array_dim_start
+ev_array_row_start
+ev_type_annotation_start       (synthesised for 3)
+...params...
+ev_type_annotation_end
+ev_data                        data="3"
+... (4) ...
+ev_array_row_end
+```
+
+### A.5 Struct
+
+Input: `.s = {.x = 1; .y = 2;};`
+
+```
+ev_assignment_start            data="s"
+ev_struct_start
+ev_assignment_start            data="x"
+...ev_data for 1...
+ev_assignment_start            data="y"
+...ev_data for 2...
+ev_struct_end
+```
+
+### A.6 Octet Stream
+
+Input: `.bin = \x00\x01\x03\x00abc\x00;`
+
+```
+ev_assignment_start            data="bin"
+ev_octet_stream_start
+ev_data (octet_stream)         data="abc", length=3
+ev_octet_stream_end
+```
+
+---
+
+## Appendix B: Implementation Notes
+
+### B.1 Keyword State Machine
+
+Type family keywords are recognised through a dedicated state machine in the lexer.
+The lexer fires `ACT_tf_float_done` after the shared `f→l→o→a→t` path, storing
+`"float"` in `type_data` and transitioning to `type_body_outro`.  If the next bytes
+are `_fix` or `_dec`, they are accumulated via `copy_type_byte`, so the final string
+is `"float_fix"` or `"float_dec"`.  `bvn_parse_type_annotation` then dispatches on
+the full accumulated string.
+
+```
+u → i → n → t           → keyword "uint"
+u → t → f → 8           → keyword "utf8"
+s → i → n → t           → keyword "sint"
+f → l → o → a → t       → ACT_tf_float_done → type_body_outro
+                                              → accumulate "_fix" → "float_fix"
+                                              → accumulate "_dec" → "float_dec"
+                                              → (nothing)         → "float"
+```
+
+### B.2 Special Number State Machine
+
+```
+n → a → n → $  → "nan"
+i → n → f → i → n → i → t → y → $ → "infinity"
+- → i → n → f → i → n → i → t → y → $ → "-infinity"
+```
+
+### B.3 Default Width, Base, and Q
+
+```c
+static inline uint32_t bvn_effective_width(value_type_spec_t s) {
+    return s.width ? s.width : 64u;
+}
+
+/*
+ * For float_fix and float_dec the .base field has a different meaning
+ * (Q for float_fix, unused for float_dec); always report base 10 for those.
+ */
+static inline uint32_t bvn_effective_base(value_type_spec_t s) {
+    if (s.family == vt_float_fix || s.family == vt_float_dec)
+        return 10u;
+    return s.base ? s.base : 10u;
+}
+
+/*
+ * Returns the Q (fractional bits) for float_fix, 0 for all other families.
+ * Q is stored in the .base field of value_type_spec_t.
+ */
+static inline uint32_t bvn_effective_q(value_type_spec_t s) {
+    return (s.family == vt_float_fix) ? s.base : 0u;
+}
+```
+
+### B.4 Type Equality
+
+```c
+static inline bool bvn_type_spec_eq(value_type_spec_t a, value_type_spec_t b) {
+    return a.family == b.family && a.width == b.width && a.base == b.base;
+}
+```
+
+For `float_fix`, `.base` holds Q, so two `float_fix` specs are equal only if they
+share the same width **and** the same Q.
+
+### B.5 Numeric Type Check
+
+```c
+static inline bool bvn_type_is_numeric(value_type_spec_t s) {
+    return s.family == vt_sint      || s.family == vt_uint    ||
+           s.family == vt_float     ||
+           s.family == vt_float_fix || s.family == vt_float_dec;
+}
+```
+
+### B.6 Unit Component Access
+
+When iterating compound units, always check `num_components`:
+
+```c
+for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+    value_unit_component_t* c = &u.components[i];
+    /* c->base, c->exponent, c->prefix.system, c->prefix.id */
+}
+```
+
+### B.7 Fixed-point and Decimal Float Wire Representations
+
+`float_fix` and `float_dec` are both serialised as ordinary decimal number literals
+in the Bovnar text layer.  The type annotation is the sole indicator of wire encoding.
+At the C API level, the conversion path is:
+
+```
+float_fix:  text literal → bvn_float_t → bvn_float_to_fixNN(f, Q) → wire bits
+float_dec:  text literal → bvn_float_t → bvn_float_to_decNN(f)    → wire bits
+```
+
+The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
+`bvn_float.h`) and provides exact round-trip fidelity up to the declared precision.
+
+---
+
+## Appendix C: Limits Summary
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| max struct nesting | 255 | Maximum struct nesting depth (`max_struct_nesting`; 0 defaults to 255) |
+| max array nesting | 255 | Maximum array bracket nesting depth (`max_array_nesting`; 0 defaults to 255) |
+| recommended file size cap | 16777216 | Suggested value for `max_file_size` (16 MiB). `max_file_size = 0` is unlimited. |
+| `BVNR_MAX_UNIT_COMPONENTS` | 8 | Maximum number of unit components in a compound unit |
+| `BOVN_READ_BUFFER_SIZE` | 4096 | Internal read buffer size in bytes |
+
+---
+
+*End of Bovnar Specification v1.3*
+
+
+
+

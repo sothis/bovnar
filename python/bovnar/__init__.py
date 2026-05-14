@@ -1,5 +1,3 @@
-
-
 from .enums import (
     Event, ValueTypeFamily, PrefixSystem,
     SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
@@ -8,29 +6,41 @@ from .structs import (
     ValueTypeSpec, ValueUnit, ValueUnitComponent, BvnrData,
     BvnrReadFlags, BvnrWriteFlags,
     make_type_spec, make_unit_dimensionless, make_unit_none,
-    make_unit_si, make_unit_iec,
+    make_unit_si, make_unit_iec, make_unit_compound,
 )
 from .exceptions import (
     BovnarError, BovnarLibraryNotFound,
     BovnarParseError, BovnarWriteError, BovnarArgumentError,
 )
-from .reader import Reader, EventPayload, MAX_FILESIZE_BYTES
-from .writer import Writer
+from .reader  import Reader, EventPayload, MAX_FILESIZE_BYTES
+from .writer  import Writer
+from .dom     import DomDoc, DomNode, DomType
+from .units   import (
+    SIConversion, UnitConversion, ReducedUnit, SI_DIM_NAMES,
+    unit_to_si_factor, units_compatible, unit_convert_factor,
+    unit_dimension_vector, unit_reduce, convert_value,
+)
 
 __all__ = [
-
-    'loads', 'dumps', 'unit_factor', 'unit_to_str', 'parse_unit',
+    'loads', 'dumps', 'dom_parse',
+    'unit_factor', 'unit_to_str', 'parse_unit',
+    'unit_to_si_factor', 'units_compatible', 'unit_convert_factor',
+    'unit_dimension_vector', 'unit_reduce', 'convert_value',
+    'write_array',
 
     'Reader', 'Writer', 'EventPayload',
+    'DomDoc', 'DomNode', 'DomType',
 
     'ValueTypeSpec', 'ValueUnit', 'ValueUnitComponent', 'BvnrData',
     'BvnrReadFlags', 'BvnrWriteFlags',
 
     'make_type_spec', 'make_unit_dimensionless', 'make_unit_none',
-    'make_unit_si', 'make_unit_iec',
+    'make_unit_si', 'make_unit_iec', 'make_unit_compound',
 
     'Event', 'ValueTypeFamily', 'PrefixSystem',
     'SIPrefix', 'IECPrefix', 'BaseUnit', 'Exponent', 'ErrorCode',
+
+    'SIConversion', 'UnitConversion', 'ReducedUnit', 'SI_DIM_NAMES',
 
     'BovnarError', 'BovnarLibraryNotFound',
     'BovnarParseError', 'BovnarWriteError', 'BovnarArgumentError',
@@ -38,16 +48,15 @@ __all__ = [
     'MAX_FILESIZE_BYTES',
 ]
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
+
 
 def loads(data: bytes | bytearray | str | memoryview,
           *,
           max_file_size: int = 0,
           continue_on_error: bool = False) -> dict:
-
     if isinstance(data, str):
         data = data.encode('utf-8')
-
     parser = _DictParser()
     with Reader() as r:
         r.read_mem(
@@ -58,105 +67,204 @@ def loads(data: bytes | bytearray | str | memoryview,
         )
     return parser.result()
 
+
 def dumps(obj: dict,
           *,
           pretty: bool = True,
           cap: int = 256 * 1024) -> bytes:
-
     if not isinstance(obj, dict):
         raise BovnarArgumentError("dumps() requires a dict at the top level")
-
     with Writer.to_mem(cap=cap, pretty=pretty) as w:
         _emit_dict(w, obj)
     return w.get_output()
 
-def unit_factor(unit_str: str) -> float:
 
-    import ctypes
+def dom_parse(data: bytes | bytearray | str | memoryview) -> DomDoc:
+    """Parse BVNR bytes into a DOM tree (random-access, type-preserving)."""
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    return DomDoc.parse(bytes(data) if isinstance(data, memoryview) else data)
+
+
+def unit_factor(unit_str: str) -> float:
+    import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
-    ok  = ctypes.c_bool(True)
+    ok  = _ct.c_bool(True)
     raw = unit_str.encode('utf-8')
-    arr = (ctypes.c_uint8 * len(raw)).from_buffer_copy(raw)
-    vu  = lib.bvn_parse_unit_n(arr, ctypes.c_uint32(len(raw)), ctypes.byref(ok))
+    arr = (_ct.c_uint8 * len(raw)).from_buffer_copy(raw)
+    vu  = lib.bvn_parse_unit_n(arr, _ct.c_uint32(len(raw)), _ct.byref(ok))
     if not ok.value:
         raise BovnarArgumentError(f"Invalid unit string: {unit_str!r}")
     return lib.bvn_unit_prefix_factor(vu)
 
-def unit_to_str(unit: ValueUnit) -> str:
 
-    import ctypes
+def unit_to_str(unit: ValueUnit) -> str:
+    import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
-    buf = ctypes.create_string_buffer(256)
+    buf = _ct.create_string_buffer(256)
     n   = lib.bvn_unit_to_string(unit, buf, 256)
     if n < 0:
         raise BovnarArgumentError("unit_to_str: output buffer overflow")
     return buf.raw[:n].decode('utf-8')
 
-def parse_unit(unit_str: str) -> ValueUnit:
 
-    import ctypes
+def parse_unit(unit_str: str) -> ValueUnit:
+    import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
-    ok  = ctypes.c_bool(True)
+    ok  = _ct.c_bool(True)
     raw = unit_str.encode('utf-8')
-    arr = (ctypes.c_uint8 * len(raw)).from_buffer_copy(raw)
-    vu  = lib.bvn_parse_unit_n(arr, ctypes.c_uint32(len(raw)), ctypes.byref(ok))
+    arr = (_ct.c_uint8 * len(raw)).from_buffer_copy(raw)
+    vu  = lib.bvn_parse_unit_n(arr, _ct.c_uint32(len(raw)), _ct.byref(ok))
     if not ok.value:
         raise BovnarArgumentError(f"Invalid unit string: {unit_str!r}")
     return vu
 
-class _DictParser:
 
+def write_array(w: Writer,
+                key: str,
+                rows,
+                *,
+                vt: ValueTypeSpec | None = None,
+                vu: ValueUnit | None = None) -> None:
+    """
+    High-level typed array writer.
+
+    *rows* may be:
+      - a flat list  [1, 2, 3]            → single-row array
+      - a list-of-lists [[1,2],[3,4]]     → multi-row array (rows separated by /)
+
+    Elements may be: int, float, str, bool, None, dict (struct), or nested
+    list/tuple (nested array).
+
+    *vt* and *vu*, when provided, emit a type annotation before the opening [.
+    """
+    w.emit(Event.ASSIGNMENT_START, key=key)
+
+    if vt is not None:
+        fam_names = {
+            int(ValueTypeFamily.UINT):      'uint',
+            int(ValueTypeFamily.SINT):      'sint',
+            int(ValueTypeFamily.FLOAT):     'float',
+            int(ValueTypeFamily.FLOAT_FIX): 'float_fix',
+            int(ValueTypeFamily.FLOAT_DEC): 'float_dec',
+            int(ValueTypeFamily.UTF8):      'utf8',
+        }
+        name = fam_names.get(int(vt.family), 'uint')
+        w._emit_annotation(name, vt, vu if vu is not None else make_unit_none())
+
+    if rows and all(isinstance(r, (list, tuple)) for r in rows):
+        row_list = rows
+    else:
+        row_list = [rows]
+
+    first = True
+    for row in row_list:
+        if not first:
+            w.new_array_dim()
+        first = False
+        w.begin_array_row()
+        for elem in row:
+            _emit_array_element(w, elem)
+        w.end_array_row()
+
+
+class _ArrScope:
+    __slots__ = ('rows', 'cur_row', 'dim_continue', 'pending_seal', 'parent_key')
+
+    def __init__(self, parent_key: str | None = None) -> None:
+        self.rows:         list      = []
+        self.cur_row:      list      = []
+        self.dim_continue: bool      = False
+        self.pending_seal: bool      = False
+        self.parent_key:   str | None = parent_key
+
+
+class _DictParser:
+    """
+    SAX-style event consumer that builds a plain Python dict.
+
+    Array state machine design
+    ──────────────────────────
+    The scope stack entries are ('doc', dict), ('struct', dict), or
+    ('array', _ArrScope).  Array scopes are sealed lazily:
+
+    • ARRAY_ROW_START  – push a new _ArrScope *unless* dim_continue is set
+                         on the top _ArrScope, in which case we just reset
+                         cur_row and continue the existing scope.
+                         If the top scope is a *pending* _ArrScope (a
+                         completed inner array), seal it first and push its
+                         value to the new top scope.
+    • DATA / STRUCT    – append to the current scope's cur_row or dict.
+    • ARRAY_ROW_END    – first flush any pending inner _ArrScopes (sealing
+                         completed nested arrays), then finalize cur_row into
+                         the current scope's rows list and mark pending_seal.
+    • ARRAY_DIM_START  – clear pending_seal and set dim_continue on the top
+                         _ArrScope so the next ARRAY_ROW_START continues it.
+    • ASSIGNMENT_START / STRUCT_END / result() – call _maybe_seal_array()
+                         which walks the top of the stack sealing any
+                         pending _ArrScopes and pushing their values.
+    """
 
     def __init__(self) -> None:
-
-        self._stack: list[tuple[dict, str | None]] = [({}, None)]
+        self._doc:         dict = {}
+        self._scope_stack: list = [('doc', self._doc)]
         self._current_key: str | None = None
-
-        self._array_stack: list[list] = []
-        self._in_array  = False
-
-        self._in_octet  = False
-        self._octet_buf = bytearray()
+        self._in_octet:    bool = False
+        self._octet_buf:   bytearray = bytearray()
 
     def on_event(self, ev: Event, data) -> bool:
-        raw  = data.raw_bytes() if data else b''
-        vt   = data.value_type if data else None
-        fam  = ValueTypeFamily(vt.family) if vt else ValueTypeFamily.PLAIN
+        raw = data.raw_bytes() if data else b''
+        vt  = data.value_type if data else None
+        fam = ValueTypeFamily(vt.family) if vt else ValueTypeFamily.PLAIN
 
         if ev == Event.STREAM_START:
             pass
 
         elif ev == Event.ASSIGNMENT_START:
+            self._maybe_seal_array()
             self._current_key = raw.decode('utf-8')
 
         elif ev == Event.STRUCT_START:
             child: dict = {}
             self._push_value(child)
-            self._stack.append((child, self._current_key))
+            self._scope_stack.append(('struct', child))
             self._current_key = None
 
         elif ev == Event.STRUCT_END:
-            if len(self._stack) > 1:
-                self._stack.pop()
-
-        elif ev == Event.ARRAY_ROW_START:
-            self._in_array = True
-            self._array_stack.append([])
-
-        elif ev == Event.ARRAY_ROW_END:
-            row = self._array_stack.pop()
-            if self._array_stack:
-                self._array_stack[-1].append(row)
-            else:
-                self._push_value(row)
-                self._in_array = False
+            self._maybe_seal_array()
+            if len(self._scope_stack) > 1 and self._scope_stack[-1][0] == 'struct':
+                self._scope_stack.pop()
 
         elif ev == Event.ARRAY_DIM_START:
+            top = self._scope_stack[-1] if self._scope_stack else None
+            if top and top[0] == 'array':
+                top[1].pending_seal = False
+                top[1].dim_continue = True
 
-            self._array_stack.append([])
+        elif ev == Event.ARRAY_ROW_START:
+            top = self._scope_stack[-1] if self._scope_stack else None
+            if top and top[0] == 'array' and top[1].dim_continue:
+                top[1].cur_row      = []
+                top[1].dim_continue = False
+            else:
+                if top and top[0] == 'array' and top[1].pending_seal:
+                    arr = self._scope_stack.pop()[1]
+                    self._commit_sealed(arr, _seal_array(arr))
+                new_scope = _ArrScope(parent_key=self._current_key)
+                self._current_key = None
+                self._scope_stack.append(('array', new_scope))
+
+        elif ev == Event.ARRAY_ROW_END:
+            self._flush_pending_inner_arrays()
+            top = self._scope_stack[-1] if self._scope_stack else None
+            if top and top[0] == 'array':
+                arr = top[1]
+                arr.rows.append(list(arr.cur_row))
+                arr.cur_row      = []
+                arr.pending_seal = True
 
         elif ev == Event.OCTET_STREAM_START:
             self._in_octet  = True
@@ -171,53 +279,102 @@ class _DictParser:
             if self._in_octet:
                 self._octet_buf.extend(raw)
             else:
-                value = self._decode_value(raw, fam, vt)
-                if self._in_array and self._array_stack:
-                    self._array_stack[-1].append(value)
-                else:
-                    self._push_value(value)
+                value = _decode_value(raw, fam, vt)
+                self._push_value(value)
 
         return True
 
     def _push_value(self, value) -> None:
-        d, _ = self._stack[-1]
-        if self._current_key is not None:
-            d[self._current_key] = value
-            self._current_key = None
+        top = self._scope_stack[-1] if self._scope_stack else None
+        if top is None:
+            return
+        if top[0] in ('doc', 'struct'):
+            if self._current_key is not None:
+                top[1][self._current_key] = value
+                self._current_key = None
+        elif top[0] == 'array':
+            top[1].cur_row.append(value)
 
-    @staticmethod
-    def _decode_value(raw: bytes, fam: ValueTypeFamily, vt) -> object:
+    def _commit_sealed(self, arr: '_ArrScope', value) -> None:
+        """
+        Insert a sealed array value into the current top scope, using the
+        key saved at array-push time rather than self._current_key (which
+        may have been overwritten by intervening struct-start events).
+        """
+        top = self._scope_stack[-1] if self._scope_stack else None
+        if top is None:
+            return
+        if top[0] in ('doc', 'struct'):
+            if arr.parent_key is not None:
+                top[1][arr.parent_key] = value
+        elif top[0] == 'array':
+            top[1].cur_row.append(value)
 
-        if not raw:
-            return None
-        text = raw.decode('utf-8', errors='replace')
+    def _maybe_seal_array(self) -> None:
+        while (self._scope_stack and
+               self._scope_stack[-1][0] == 'array' and
+               self._scope_stack[-1][1].pending_seal):
+            arr = self._scope_stack.pop()[1]
+            self._commit_sealed(arr, _seal_array(arr))
 
-        if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
-            try:
-                return int(text, vt.base if vt and vt.base > 1 else 10)
-            except ValueError:
-                return text
-
-        if fam in (ValueTypeFamily.FLOAT,
-                   ValueTypeFamily.FLOAT_FIX,
-                   ValueTypeFamily.FLOAT_DEC):
-            if text in ('nan', 'infinity', '-infinity'):
-                return {'nan': float('nan'),
-                        'infinity': float('inf'),
-                        '-infinity': float('-inf')}[text]
-            try:
-                return float(text)
-            except ValueError:
-                return text
-
-        return text
+    def _flush_pending_inner_arrays(self) -> None:
+        """
+        Before finalising a row, collapse any completed inner _ArrScope
+        sitting on top of the stack into a value in the parent scope.
+        """
+        while (len(self._scope_stack) >= 2 and
+               self._scope_stack[-1][0] == 'array' and
+               self._scope_stack[-1][1].pending_seal):
+            arr = self._scope_stack.pop()[1]
+            self._commit_sealed(arr, _seal_array(arr))
 
     def result(self) -> dict:
-        return self._stack[0][0]
+        self._maybe_seal_array()
+        return self._doc
+
+
+def _seal_array(arr: _ArrScope):
+    """
+    Collapse an _ArrScope into a Python value.
+
+    A single-row array is unwrapped to a flat list.
+    A multi-row array becomes a list of lists.
+    """
+    if len(arr.rows) == 1:
+        return arr.rows[0]
+    return arr.rows
+
+
+def _decode_value(raw: bytes, fam: ValueTypeFamily, vt) -> object:
+    if not raw:
+        return None
+    text = raw.decode('utf-8', errors='replace')
+
+    if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
+        try:
+            return int(text, vt.base if vt and vt.base > 1 else 10)
+        except ValueError:
+            return text
+
+    if fam in (ValueTypeFamily.FLOAT,
+               ValueTypeFamily.FLOAT_FIX,
+               ValueTypeFamily.FLOAT_DEC):
+        if text in ('nan', 'infinity', '-infinity'):
+            return {'nan': float('nan'),
+                    'infinity': float('inf'),
+                    '-infinity': float('-inf')}[text]
+        try:
+            return float(text)
+        except ValueError:
+            return text
+
+    return text
+
 
 def _emit_dict(w: Writer, d: dict) -> None:
     for key, value in d.items():
         _emit_value(w, key, value)
+
 
 def _emit_value(w: Writer, key: str, value) -> None:
     if value is None:
@@ -238,35 +395,95 @@ def _emit_value(w: Writer, key: str, value) -> None:
         _emit_dict(w, value)
         w.end_struct()
     elif isinstance(value, (list, tuple)):
-
-        w.emit(Event.ASSIGNMENT_START, key=key)
-        w.begin_array_row()
-        for elem in value:
-            _emit_array_element(w, elem)
-        w.end_array_row()
+        write_array(w, key, value)
     else:
         raise BovnarArgumentError(
             f"Cannot serialise value of type {type(value).__name__!r} "
             f"for key {key!r}")
 
+
 def _emit_array_element(w: Writer, elem) -> None:
+    import ctypes as _ct
+
+    _TOKEN_IS_ARRAY_NUMBER = 5
+    _TOKEN_IS_ARRAY_STRING = 6
+    _TOKEN_IS_SYMBOL       = 3
+    _TOKEN_IS_NULL_VALUE   = 9
+
     if elem is None:
-        vt = make_type_spec(ValueTypeFamily.PLAIN)
-        w.emit(Event.DATA, vt=vt, vu=make_unit_none())
+        d = BvnrData()
+        d.type = _TOKEN_IS_NULL_VALUE
+        _write_event_data(w, d)
+
     elif isinstance(elem, bool):
-        vt = make_type_spec(ValueTypeFamily.PLAIN)
-        w.emit(Event.DATA, value='true' if elem else 'false',
-               vt=vt, vu=make_unit_none())
+        sym = b'true' if elem else b'false'
+        d = BvnrData()
+        d.type = _TOKEN_IS_SYMBOL
+        d.data   = _ct.cast(_ct.c_char_p(sym), _ct.c_void_p)
+        d.length = len(sym)
+        _write_event_data(w, d)
+
     elif isinstance(elem, int):
-        vt = make_type_spec(ValueTypeFamily.UINT if elem >= 0
-                            else ValueTypeFamily.SINT, 64, 10)
-        w.emit(Event.DATA, value=str(elem), vt=vt, vu=make_unit_dimensionless())
+        vt  = make_type_spec(ValueTypeFamily.UINT if elem >= 0
+                             else ValueTypeFamily.SINT, 64, 10)
+        raw = str(elem).encode('ascii')
+        d = BvnrData()
+        d.type       = _TOKEN_IS_ARRAY_NUMBER
+        d.value_type = vt
+        d.value_unit = make_unit_dimensionless()
+        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.length     = len(raw)
+        _write_event_data(w, d)
+
     elif isinstance(elem, float):
-        vt = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
-        w.emit(Event.DATA, value=repr(elem), vt=vt, vu=make_unit_dimensionless())
+        vt  = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
+        raw = repr(elem).encode('ascii')
+        d = BvnrData()
+        d.type       = _TOKEN_IS_ARRAY_NUMBER
+        d.value_type = vt
+        d.value_unit = make_unit_dimensionless()
+        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.length     = len(raw)
+        _write_event_data(w, d)
+
     elif isinstance(elem, str):
-        vt = make_type_spec(ValueTypeFamily.UTF8)
-        w.emit(Event.DATA, value=elem, vt=vt, vu=make_unit_none())
+        raw = elem.encode('utf-8')
+        d = BvnrData()
+        d.type   = _TOKEN_IS_ARRAY_STRING
+        d.data   = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.length = len(raw)
+        _write_event_data(w, d)
+
+    elif isinstance(elem, dict):
+        w.emit(Event.STRUCT_START)
+        for k, v in elem.items():
+            _emit_value(w, k, v)
+        w.emit(Event.STRUCT_END)
+
+    elif isinstance(elem, (list, tuple)):
+        if elem and all(isinstance(r, (list, tuple)) for r in elem):
+            inner_rows = elem
+        else:
+            inner_rows = [elem]
+        first = True
+        for row in inner_rows:
+            if not first:
+                w.new_array_dim()
+            first = False
+            w.begin_array_row()
+            for sub in row:
+                _emit_array_element(w, sub)
+            w.end_array_row()
+
     else:
         raise BovnarArgumentError(
             f"Cannot serialise array element of type {type(elem).__name__!r}")
+
+
+def _write_event_data(w: Writer, d: BvnrData) -> None:
+    from ._ffi import get_library
+    import ctypes as _ct
+    lib = get_library()
+    ok  = lib.bvnr_write_event(w._ptr, int(Event.DATA), _ct.byref(d))
+    if not ok:
+        w._raise_error()

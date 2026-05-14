@@ -252,3 +252,80 @@ class TestMakeDataTyped:
         d  = make_data_typed(vt, vu)
         assert isinstance(d, BvnrData)
         assert d.value_type.family == int(ValueTypeFamily.UINT)
+
+from bovnar.structs import make_unit_compound
+
+class TestMakeUnitCompound:
+    def test_single_component_si(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.METER},
+        ])
+        assert vu.num_components == 1
+        assert vu.components[0].base_unit   == BaseUnit.METER
+        assert vu.components[0].exp         == Exponent.LINEAR
+        assert vu.components[0].si_prefix   == SIPrefix.NONE
+
+    def test_single_component_with_prefix(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.METER, 'si_prefix': SIPrefix.KILO},
+        ])
+        assert vu.components[0].si_prefix == SIPrefix.KILO
+
+    def test_two_components_m_per_s(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_LINEAR},
+        ])
+        assert vu.num_components == 2
+        assert vu.components[0].base_unit == BaseUnit.METER
+        assert vu.components[1].base_unit == BaseUnit.SECOND
+        assert vu.components[1].exp       == Exponent.NEG_LINEAR
+
+    def test_three_components_force(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.GRAM,   'exp': Exponent.LINEAR,     'si_prefix': SIPrefix.KILO},
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_SQUARE},
+        ])
+        assert vu.num_components == 3
+        assert vu.components[0].si_prefix == SIPrefix.KILO
+        assert vu.components[2].exp       == Exponent.NEG_SQUARE
+
+    def test_iec_prefix_component(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.BYTE, 'iec_prefix': IECPrefix.GIBI},
+        ])
+        c = vu.components[0]
+        assert c.prefix_system == PrefixSystem.IEC
+        assert c.iec_prefix    == IECPrefix.GIBI
+
+    def test_default_exp_is_linear(self):
+        vu = make_unit_compound([{'base': BaseUnit.METER}])
+        assert vu.components[0].exp == Exponent.LINEAR
+
+    def test_default_si_prefix_is_none(self):
+        vu = make_unit_compound([{'base': BaseUnit.SECOND}])
+        assert vu.components[0].si_prefix == SIPrefix.NONE
+
+    def test_max_components(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.METER} for _ in range(MAX_UNIT_COMPONENTS)
+        ])
+        assert vu.num_components == MAX_UNIT_COMPONENTS
+
+    def test_too_many_components_raises(self):
+        with pytest.raises(ValueError):
+            make_unit_compound([
+                {'base': BaseUnit.METER} for _ in range(MAX_UNIT_COMPONENTS + 1)
+            ])
+
+    def test_empty_list(self):
+        vu = make_unit_compound([])
+        assert vu.num_components == 0
+
+    def test_active_components_matches_num(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.METER},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_LINEAR},
+        ])
+        assert len(vu.active_components()) == 2

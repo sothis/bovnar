@@ -1,6 +1,6 @@
-
-
 include(CTest)
+
+# ── C unit tests ────────────────────────────────────────────────────────────
 
 add_executable(bvnr_dom_test             tests/bovnar_dom_test.c)
 add_executable(bvnr_si_test              tests/bovnar_si_units_test.c)
@@ -129,6 +129,8 @@ set_tests_properties(bvnr_float_test PROPERTIES
     LABELS "unit;float"
     PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
     FAIL_REGULAR_EXPRESSION "FAIL")
+
+# ── Fuzz tests ───────────────────────────────────────────────────────────────
 
 option(BVNR_FUZZ_TEST
     "Build the self-contained fuzz test and register it as CTest tests"
@@ -262,118 +264,183 @@ if (BVNR_FUZZ_EXTERNAL)
         set(_ext_def "")
     endif()
 
-    macro(_bvnr_ext_target _tgt _src)
-        add_executable(${_tgt} ${_src})
-        target_compile_options(${_tgt} PRIVATE
-            -std=c99 -Wall -Wextra -Wno-override-init -g "SHELL:${_ext_cf}")
-        target_compile_definitions(${_tgt} PRIVATE ${_ext_def})
-        target_include_directories(${_tgt} PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
-        target_link_libraries(${_tgt} PRIVATE bvnr_static ${ARGN})
-        if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.13")
-            target_link_options(${_tgt} PRIVATE "SHELL:${_ext_lf}")
-        else()
-            set_target_properties(${_tgt} PROPERTIES LINK_FLAGS "${_ext_lf}")
-        endif()
-    endmacro()
-
-    _bvnr_ext_target(fuzz_reader tests/bovnar_fuzz_reader.c)
-    _bvnr_ext_target(fuzz_dom    tests/bovnar_fuzz_dom.c    m)
-    _bvnr_ext_target(fuzz_utils  tests/bovnar_fuzz_utils.c  m)
-    _bvnr_ext_target(fuzz_writer tests/bovnar_fuzz_writer.c m)
-
-    add_executable(bvnr_fuzz_seed_gen tests/bovnar_fuzz_seed_gen.c)
-    target_compile_options(bvnr_fuzz_seed_gen PRIVATE -std=c99 -O2)
-
-    set(FUZZ_SECONDS 60 CACHE STRING
-        "Seconds per fuzzer for the fuzz_run_all target")
-
-    if (BVNR_FUZZ_ENGINE STREQUAL "libfuzzer")
-        add_custom_target(fuzz_run_all
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                    corpus/reader corpus/dom corpus/utils
-            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
-            COMMAND $<TARGET_FILE:fuzz_reader> corpus/reader/
-                    -max_len=4096 -max_total_time=${FUZZ_SECONDS} &
-            COMMAND $<TARGET_FILE:fuzz_dom>    corpus/dom/
-                    -max_len=4096 -max_total_time=${FUZZ_SECONDS} &
-            COMMAND $<TARGET_FILE:fuzz_utils>  corpus/utils/
-                    -max_len=512  -max_total_time=${FUZZ_SECONDS}
-            DEPENDS fuzz_reader fuzz_dom fuzz_utils bvnr_fuzz_seed_gen
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            VERBATIM)
-
-        add_custom_target(fuzz_run_writer
-            COMMAND ${CMAKE_COMMAND} -E make_directory corpus/writer
-            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
-            COMMAND $<TARGET_FILE:fuzz_writer> corpus/writer/
-                    -max_len=2048 -max_total_time=${FUZZ_SECONDS}
-            DEPENDS fuzz_writer bvnr_fuzz_seed_gen
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            VERBATIM)
-    else()
-        add_custom_target(fuzz_run_all
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                    corpus/reader corpus/dom corpus/utils
-                    findings/reader findings/dom findings/utils
-            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
-            COMMAND afl-fuzz -i corpus/reader -o findings/reader --
-                    $<TARGET_FILE:fuzz_reader> &
-            COMMAND afl-fuzz -i corpus/dom    -o findings/dom    --
-                    $<TARGET_FILE:fuzz_dom>    &
-            COMMAND afl-fuzz -i corpus/utils  -o findings/utils  --
-                    $<TARGET_FILE:fuzz_utils>
-            DEPENDS fuzz_reader fuzz_dom fuzz_utils bvnr_fuzz_seed_gen
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            VERBATIM)
-
-        add_custom_target(fuzz_run_writer
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                    corpus/writer findings/writer
-            COMMAND $<TARGET_FILE:bvnr_fuzz_seed_gen>
-            COMMAND afl-fuzz -i corpus/writer -o findings/writer --
-                    $<TARGET_FILE:fuzz_writer>
-            DEPENDS fuzz_writer bvnr_fuzz_seed_gen
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            VERBATIM)
-    endif()
-
 endif()
 
-option(BVNR_BUILD_BENCHMARK "Build the parsing throughput benchmark" ON)
+# ── Python binding tests (requires Python3 and pytest) ───────────────────────
+#
+# Generator expressions in ENVIRONMENT require CMake >= 3.22.
+# Pure tests run without libbvnr_shared.so; integration tests inject the
+# library path via LIBBOVNAR_PATH.
+#
+# Label taxonomy
+#   python            – all Python tests
+#   python_pure       – no shared library required
+#   python_integration – requires libbvnr_shared.so
+#   python_arrays     – array parser / writer tests
+#   python_dom        – DOM layer tests
+#   python_physics    – SI unit physics API tests
+#
+# Useful ctest invocations:
+#   ctest -L python                  # all Python tests
+#   ctest -L python_pure             # only library-free tests
+#   ctest -L python_integration      # only integration tests
+#   ctest -R bvnr_py_all             # full suite in one pytest run
 
-if(BVNR_BUILD_BENCHMARK)
+find_package(Python3 COMPONENTS Interpreter QUIET)
 
-    add_executable(bvnr_benchmark tests/bvnr_benchmark.c)
-    target_compile_options(bvnr_benchmark PRIVATE
-        -Wall -Wextra -Wpedantic -Wno-override-init -D_GNU_SOURCE
-    )
-    target_include_directories(bvnr_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(bvnr_benchmark PRIVATE bvnr_static m pthread)
+if(Python3_FOUND)
 
-    add_test(NAME bvnr_benchmark_smoke
-        COMMAND bvnr_benchmark --profile scalars,typed --size 4096 --iterations 20 --warmup 5
+    set(_py_src   "${CMAKE_CURRENT_SOURCE_DIR}/python")
+    set(_py_tests "${CMAKE_CURRENT_SOURCE_DIR}/python/tests")
+
+    # Resolve the path to libbvnr_shared.so for injecting into LIBBOVNAR_PATH.
+    # The generator expression is evaluated at test time, so the target must
+    # exist when the tests are run (i.e. build bvnr_shared before ctest).
+    if(TARGET bvnr_shared)
+        set(_bvnr_lib_env
+            "LIBBOVNAR_PATH=$<TARGET_FILE:bvnr_shared>")
+    else()
+        # Fall back to whatever the caller has exported in the environment.
+        set(_bvnr_lib_env "")
+        message(STATUS
+            "bvnr_shared target not found; Python integration tests rely "
+            "on LIBBOVNAR_PATH set in the environment.")
+    endif()
+
+    # ── helper macros ────────────────────────────────────────────────────────
+    #
+    # pytest exit codes are authoritative and sufficient:
+    #   0  all collected tests passed or were skipped  → CTest PASS
+    #   1  at least one test failed                    → CTest FAIL
+    #   2  interrupted                                 → CTest FAIL
+    #   5  no tests collected (misconfigured path)     → CTest FAIL
+    #
+    # PASS_REGULAR_EXPRESSION is intentionally absent: it would require the
+    # summary line to contain "passed", but combining addopts=-q with an
+    # explicit -q flag gives -qq which suppresses that line entirely.
+
+    # _bvnr_pytest_pure: a test that needs only Python, no shared library.
+    macro(_bvnr_pytest_pure _name _file _labels _timeout)
+        add_test(
+            NAME    ${_name}
+            COMMAND ${Python3_EXECUTABLE} -m pytest
+                        "${_py_tests}/${_file}"
+                        --tb=short
+            WORKING_DIRECTORY "${_py_src}"
+        )
+        set_tests_properties(${_name} PROPERTIES
+            TIMEOUT ${_timeout}
+            LABELS  "python;python_pure;${_labels}"
+        )
+    endmacro()
+
+    # _bvnr_pytest_lib: a test that requires libbvnr_shared.so.
+    macro(_bvnr_pytest_lib _name _file _labels _timeout)
+        add_test(
+            NAME    ${_name}
+            COMMAND ${Python3_EXECUTABLE} -m pytest
+                        "${_py_tests}/${_file}"
+                        --tb=short
+            WORKING_DIRECTORY "${_py_src}"
+        )
+        set_tests_properties(${_name} PROPERTIES
+            TIMEOUT     ${_timeout}
+            LABELS      "python;python_integration;${_labels}"
+            ENVIRONMENT "${_bvnr_lib_env}"
+        )
+    endmacro()
+
+    # ── pure Python tests (no library required) ──────────────────────────────
+
+    _bvnr_pytest_pure(bvnr_py_enums
+        test_enums.py
+        "enums"
+        30)
+
+    _bvnr_pytest_pure(bvnr_py_structs
+        test_structs.py
+        "structs"
+        30)
+
+    # Array state-machine tests: exercises all six fixes in _DictParser
+    # (flat/multi-row/nested arrays, struct elements, seal timing, parent_key).
+    _bvnr_pytest_pure(bvnr_py_array_parser
+        test_array_parser.py
+        "python_arrays;parser"
+        30)
+
+    # ── integration tests (require libbvnr_shared.so) ────────────────────────
+
+    _bvnr_pytest_lib(bvnr_py_reader
+        test_reader.py
+        "reader"
+        60)
+
+    _bvnr_pytest_lib(bvnr_py_writer
+        test_writer.py
+        "writer"
+        60)
+
+    # Unit parsing, serialisation, compound construction, and roundtrips.
+    # Also covers make_unit_compound compatibility with parse_unit.
+    _bvnr_pytest_lib(bvnr_py_units
+        test_units.py
+        "units"
+        60)
+
+    # Physics unit API: unit_to_si_factor, units_compatible,
+    # unit_convert_factor, unit_dimension_vector, unit_reduce, convert_value.
+    _bvnr_pytest_lib(bvnr_py_unit_physics
+        test_unit_physics.py
+        "units;python_physics"
+        60)
+
+    # DOM layer: DomDoc.parse, DomNode typed accessors, struct/array traversal,
+    # dot-path lookup, to_python(), GC safety.
+    _bvnr_pytest_lib(bvnr_py_dom
+        test_dom.py
+        "python_dom;dom"
+        60)
+
+    # write_array high-level API and _emit_array_element token type regression.
+    _bvnr_pytest_lib(bvnr_py_write_array
+        test_write_array.py
+        "writer;python_arrays"
+        60)
+
+    # ── aggregate gates ──────────────────────────────────────────────────────
+
+    # Run the full Python suite in a single pytest invocation.
+    # Skipped-only tests (missing lib) still satisfy PASS_REGULAR_EXPRESSION
+    # because pytest prints "X passed, Y skipped".
+    add_test(
+        NAME    bvnr_py_all
+        COMMAND ${Python3_EXECUTABLE} -m pytest "${_py_tests}"
+                    --tb=short
+        WORKING_DIRECTORY "${_py_src}"
     )
-    set_tests_properties(bvnr_benchmark_smoke PROPERTIES
-        TIMEOUT 30
-        LABELS "benchmark;smoke"
+    set_tests_properties(bvnr_py_all PROPERTIES
+        TIMEOUT     120
+        LABELS      "python;python_all"
+        ENVIRONMENT "${_bvnr_lib_env}"
     )
 
-    add_test(NAME bvnr_benchmark_json
-        COMMAND bvnr_benchmark --profile all --size 1024,4096 --iterations 10 --warmup 3 --json
+    # Library-free gate: safe to run in environments without libbvnr_shared.so
+    # (e.g. documentation builds, pure static analysis CI jobs).
+    add_test(
+        NAME    bvnr_py_pure_all
+        COMMAND ${Python3_EXECUTABLE} -m pytest "${_py_tests}"
+                    -m "not needs_lib"
+                    --tb=short
+        WORKING_DIRECTORY "${_py_src}"
     )
-    set_tests_properties(bvnr_benchmark_json PROPERTIES
-        TIMEOUT 30
-        LABELS "benchmark;json"
-    )
-
-    add_test(NAME bvnr_benchmark_min_overhead
-        COMMAND bvnr_benchmark --min-overhead --profile scalars,units --size 4096 --iterations 20 --warmup 5
-    )
-    set_tests_properties(bvnr_benchmark_min_overhead PROPERTIES
-        TIMEOUT 30
-        LABELS "benchmark;min_overhead"
+    set_tests_properties(bvnr_py_pure_all PROPERTIES
+        TIMEOUT 60
+        LABELS  "python;python_pure"
     )
 
+else()
+    message(STATUS
+        "Python3 interpreter not found -- skipping Python binding tests. "
+        "Install Python 3.10+ and 'pip install pytest>=7' to enable them.")
 endif()

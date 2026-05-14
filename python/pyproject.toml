@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name            = "bovnar"
-version         = "0.1.0"
+version         = "0.2.0"
 description     = "Python bindings for the Bovnar (BVNR) typed, unit-aware serialisation format"
 license         = { text = "MIT" }
 requires-python = ">=3.10"
@@ -45,3 +45,6 @@ exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "needs_lib: integration test that requires libbvnr_shared.so (deselect with -m 'not needs_lib')",
+]

@@ -91,7 +91,7 @@ def unit_convert_factor(from_unit: ValueUnit,
     factor         = lib.bvn_unit_convert_factor(from_unit, to_unit,
                                                   ctypes.byref(ok),
                                                   ctypes.byref(requires_affine))
-    if not ok.value:
+    if not ok.value and not requires_affine.value:
         raise BovnarArgumentError(
             "unit_convert_factor: incompatible or invalid units")
     return UnitConversion(float(factor), bool(requires_affine.value))

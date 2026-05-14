@@ -309,3 +309,76 @@ class TestWriterUnitAnnotation:
         out = w.get_output()
         assert b'ram' in out
 
+
+from bovnar.structs import make_unit_compound
+
+class TestMakeUnitCompoundPhysics:
+    """Pure construction tests that don't need the library."""
+
+    def test_two_component_velocity_structure(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_LINEAR},
+        ])
+        assert vu.num_components == 2
+
+    def test_force_structure(self):
+        vu = make_unit_compound([
+            {'base': BaseUnit.GRAM,   'exp': Exponent.LINEAR,     'si_prefix': SIPrefix.KILO},
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_SQUARE},
+        ])
+        assert vu.num_components == 3
+
+@needs_lib
+class TestMakeUnitCompoundRoundtrip:
+    """Verify that compound units built with make_unit_compound survive a
+    string serialisation round-trip via unit_to_str / parse_unit."""
+
+    def test_velocity_roundtrip(self):
+        vu  = make_unit_compound([
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_LINEAR},
+        ])
+        s   = bovnar.unit_to_str(vu)
+        vu2 = bovnar.parse_unit(s)
+        assert vu2.num_components == 2
+
+    def test_force_roundtrip(self):
+        vu  = make_unit_compound([
+            {'base': BaseUnit.GRAM,   'exp': Exponent.LINEAR,     'si_prefix': SIPrefix.KILO},
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_SQUARE},
+        ])
+        s   = bovnar.unit_to_str(vu)
+        vu2 = bovnar.parse_unit(s)
+        assert vu2.num_components == vu.num_components
+
+    def test_gibibyte_roundtrip(self):
+        vu  = make_unit_compound([
+            {'base': BaseUnit.BYTE, 'iec_prefix': IECPrefix.GIBI},
+        ])
+        s   = bovnar.unit_to_str(vu)
+        vu2 = bovnar.parse_unit(s)
+        assert vu2.num_components == 1
+
+@needs_lib
+class TestMakeUnitCompoundCompatibility:
+    """Verify dimensional compatibility between make_unit_compound and parse_unit."""
+
+    def test_velocity_compatible_with_parsed(self):
+        vu_built  = make_unit_compound([
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_LINEAR},
+        ])
+        vu_parsed = bovnar.parse_unit("m/s")
+        assert bovnar.units_compatible(vu_built, vu_parsed)
+
+    def test_force_compatible_with_parsed(self):
+        vu_built  = make_unit_compound([
+            {'base': BaseUnit.GRAM,   'exp': Exponent.LINEAR,     'si_prefix': SIPrefix.KILO},
+            {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
+            {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_SQUARE},
+        ])
+        vu_parsed = bovnar.parse_unit("k-g\u00b7m/s\u00b2")
+        assert bovnar.units_compatible(vu_built, vu_parsed)

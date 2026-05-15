@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -8,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include "bovnar.h"
 #include "bovnar_dom.h"
@@ -684,326 +686,242 @@ static char *parse_json_string(const char **p)
 			case 'n':  *out++ = '\n'; break;
 			case 'r':  *out++ = '\r'; break;
 			case 't':  *out++ = '\t'; break;
-			case 'u': {
-				uint32_t cp = 0;
-				int k;
-				for (k = 0; k < 4; k++) {
-					in++;
-					if (in >= *p) { free(str); return NULL; }
-					unsigned char h = (unsigned char)*in;
-					uint32_t d;
-					if      (h >= '0' && h <= '9') d = h - '0';
-					else if (h >= 'a' && h <= 'f') d = 10u + (unsigned)(h - 'a');
-					else if (h >= 'A' && h <= 'F') d = 10u + (unsigned)(h - 'A');
-					else { free(str); return NULL; }
-					cp = (cp << 4) | d;
-				}
-				if (cp >= 0xD800u && cp <= 0xDBFFu) {
-					in++;
-					if (in >= *p || (unsigned char)*in != '\\') { free(str); return NULL; }
-					in++;
-					if (in >= *p || (unsigned char)*in != 'u')  { free(str); return NULL; }
-					uint32_t lo = 0;
-					for (k = 0; k < 4; k++) {
-						in++;
-						if (in >= *p) { free(str); return NULL; }
-						unsigned char h = (unsigned char)*in;
-						uint32_t d;
-						if      (h >= '0' && h <= '9') d = h - '0';
-						else if (h >= 'a' && h <= 'f') d = 10u + (unsigned)(h - 'a');
-						else if (h >= 'A' && h <= 'F') d = 10u + (unsigned)(h - 'A');
-						else { free(str); return NULL; }
-						lo = (lo << 4) | d;
-					}
-					if (lo < 0xDC00u || lo > 0xDFFFu) { free(str); return NULL; }
-					cp = 0x10000u + ((cp - 0xD800u) << 10) + (lo - 0xDC00u);
-				} else if (cp >= 0xDC00u && cp <= 0xDFFFu) {
-					free(str); return NULL;
-				}
-				if (cp <= 0x7Fu) {
-					*out++ = (char)cp;
-				} else if (cp <= 0x7FFu) {
-					*out++ = (char)(0xC0u | (cp >> 6));
-					*out++ = (char)(0x80u | (cp & 0x3Fu));
-				} else if (cp <= 0xFFFFu) {
-					*out++ = (char)(0xE0u | (cp >> 12));
-					*out++ = (char)(0x80u | ((cp >> 6) & 0x3Fu));
-					*out++ = (char)(0x80u | (cp & 0x3Fu));
-				} else {
-					*out++ = (char)(0xF0u | (cp >> 18));
-					*out++ = (char)(0x80u | ((cp >> 12) & 0x3Fu));
-					*out++ = (char)(0x80u | ((cp >> 6) & 0x3Fu));
-					*out++ = (char)(0x80u | (cp & 0x3Fu));
-				}
-				break;
+			default:   *out++ = *in;  break;
 			}
-			default:   *out++ = *in; break;
-			}
-			in++;
 		} else {
-			*out++ = *in++;
+			*out++ = *in;
 		}
+		in++;
 	}
 	*out = '\0';
 	(*p)++;
 	return str;
 }
 static JsonNode *json_parse_value(const char **p);
-static bool parse_json_array(const char **p, JsonNode *node)
+static JsonNode *json_parse_array(const char **p)
 {
-	if (**p != '[') return false;
 	(*p)++;
-	skip_ws(p);
+	JsonNode *node = calloc(1, sizeof(*node));
+	if (!node) return NULL;
 	node->type = BVN_JSON_ARRAY;
-	node->u.arr.count = 0;
-	node->u.arr.items = NULL;
-	if (**p == ']') { (*p)++; return true; }
-	while (**p) {
-		skip_ws(p);
-		JsonNode *item = json_parse_value(p);
-		if (!item) return false;
-		JsonNode **tmp_arr = realloc(node->u.arr.items,
-									 (node->u.arr.count + 1) * sizeof(JsonNode*));
-		if (!tmp_arr) { json_free_node(item); return false; }
-		node->u.arr.items = tmp_arr;
-		node->u.arr.items[node->u.arr.count++] = item;
-		skip_ws(p);
-		if (**p == ',') { (*p)++; continue; }
-		if (**p == ']') { (*p)++; return true; }
-		return false;
-	}
-	return false;
-}
-static bool parse_json_object(const char **p, JsonNode *node)
-{
-	if (**p != '{') return false;
-	(*p)++;
 	skip_ws(p);
-	node->type = BVN_JSON_OBJECT;
-	node->u.obj.count = 0;
-	node->u.obj.keys = NULL;
-	node->u.obj.values = NULL;
-	if (**p == '}') { (*p)++; return true; }
+	if (**p == ']') { (*p)++; return node; }
+	uint32_t cap = 8;
+	node->u.arr.items = malloc(cap * sizeof(*node->u.arr.items));
+	if (!node->u.arr.items) { free(node); return NULL; }
 	while (**p) {
+		JsonNode *elem = json_parse_value(p);
+		if (!elem) { json_free_node(node); return NULL; }
+		if (node->u.arr.count == cap) {
+			cap *= 2;
+			JsonNode **tmp = realloc(node->u.arr.items,
+									 cap * sizeof(*node->u.arr.items));
+			if (!tmp) { json_free_node(elem); json_free_node(node); return NULL; }
+			node->u.arr.items = tmp;
+		}
+		node->u.arr.items[node->u.arr.count++] = elem;
 		skip_ws(p);
-		if (**p != '"') return false;
+		if (**p == ',') { (*p)++; skip_ws(p); continue; }
+		if (**p == ']') { (*p)++; break; }
+		json_free_node(node); return NULL;
+	}
+	return node;
+}
+static JsonNode *json_parse_object(const char **p)
+{
+	(*p)++;
+	JsonNode *node = calloc(1, sizeof(*node));
+	if (!node) return NULL;
+	node->type = BVN_JSON_OBJECT;
+	skip_ws(p);
+	if (**p == '}') { (*p)++; return node; }
+	uint32_t cap = 8;
+	node->u.obj.keys   = malloc(cap * sizeof(*node->u.obj.keys));
+	node->u.obj.values = malloc(cap * sizeof(*node->u.obj.values));
+	if (!node->u.obj.keys || !node->u.obj.values) { json_free_node(node); return NULL; }
+	while (**p) {
 		char *key = parse_json_string(p);
-		if (!key) return false;
+		if (!key) { json_free_node(node); return NULL; }
 		skip_ws(p);
-		if (**p != ':') { free(key); return false; }
+		if (**p != ':') { free(key); json_free_node(node); return NULL; }
 		(*p)++;
 		skip_ws(p);
 		JsonNode *val = json_parse_value(p);
-		if (!val) { free(key); return false; }
-		char **tmp_keys = realloc(node->u.obj.keys,
-								   (node->u.obj.count + 1) * sizeof(char*));
-		if (!tmp_keys) { free(key); json_free_node(val); return false; }
-		node->u.obj.keys = tmp_keys;
-		JsonNode **tmp_vals = realloc(node->u.obj.values,
-									  (node->u.obj.count + 1) * sizeof(JsonNode*));
-		if (!tmp_vals) { free(key); json_free_node(val); return false; }
-		node->u.obj.values = tmp_vals;
-		node->u.obj.keys[node->u.obj.count] = key;
+		if (!val) { free(key); json_free_node(node); return NULL; }
+		if (node->u.obj.count == cap) {
+			cap *= 2;
+			char    **tk = realloc(node->u.obj.keys,   cap * sizeof(*node->u.obj.keys));
+			JsonNode **tv = realloc(node->u.obj.values, cap * sizeof(*node->u.obj.values));
+			if (!tk || !tv) { free(key); json_free_node(val); json_free_node(node); return NULL; }
+			node->u.obj.keys   = tk;
+			node->u.obj.values = tv;
+		}
+		node->u.obj.keys[node->u.obj.count]   = key;
 		node->u.obj.values[node->u.obj.count] = val;
 		node->u.obj.count++;
 		skip_ws(p);
-		if (**p == ',') { (*p)++; continue; }
-		if (**p == '}') { (*p)++; return true; }
-		return false;
+		if (**p == ',') { (*p)++; skip_ws(p); continue; }
+		if (**p == '}') { (*p)++; break; }
+		json_free_node(node); return NULL;
 	}
-	return false;
-}
-static bool parse_json_number(const char **p, JsonNode *node)
-{
-	char *end;
-	errno = 0;
-	int64_t ival = strtoll(*p, &end, 10);
-	if (end != *p && errno == 0) {
-		if (*end != '.' && *end != 'e' && *end != 'E') {
-			node->type = BVN_JSON_INT;
-			node->u.i = ival;
-			*p = end;
-			return true;
-		}
-	}
-	errno = 0;
-	double fval = strtod(*p, &end);
-	if (end != *p && errno == 0) {
-		node->type = BVN_JSON_FLOAT;
-		node->u.f = fval;
-		*p = end;
-		return true;
-	}
-	return false;
-}
-static bool parse_json_literal(const char **p, JsonNode *node)
-{
-	if (strncmp(*p, "true", 4) == 0) {
-		node->type = BVN_JSON_BOOL; node->u.b = true; *p += 4; return true;
-	}
-	if (strncmp(*p, "false", 5) == 0) {
-		node->type = BVN_JSON_BOOL; node->u.b = false; *p += 5; return true;
-	}
-	if (strncmp(*p, "null", 4) == 0) {
-		node->type = BVN_JSON_NULL; *p += 4; return true;
-	}
-	return false;
+	return node;
 }
 static JsonNode *json_parse_value(const char **p)
 {
 	skip_ws(p);
-	JsonNode *node = calloc(1, sizeof(JsonNode));
-	if (!node) return NULL;
-	if (**p == '{') {
-		if (parse_json_object(p, node)) return node;
-	} else if (**p == '[') {
-		if (parse_json_array(p, node)) return node;
-	} else if (**p == '"') {
+	if (!**p) return NULL;
+	if (**p == '"') {
 		char *s = parse_json_string(p);
-		if (s) { node->type = BVN_JSON_STRING; node->u.s = s; return node; }
-	} else if (**p == 't' || **p == 'f' || **p == 'n') {
-		if (parse_json_literal(p, node)) return node;
-	} else {
-		if (parse_json_number(p, node)) return node;
+		if (!s) return NULL;
+		JsonNode *n = calloc(1, sizeof(*n));
+		if (!n) { free(s); return NULL; }
+		n->type = BVN_JSON_STRING;
+		n->u.s = s;
+		return n;
 	}
-	json_free_node(node);
+	if (**p == '[') return json_parse_array(p);
+	if (**p == '{') return json_parse_object(p);
+	if (strncmp(*p, "null",  4) == 0) {
+		*p += 4;
+		JsonNode *n = calloc(1, sizeof(*n));
+		if (!n) return NULL;
+		n->type = BVN_JSON_NULL;
+		return n;
+	}
+	if (strncmp(*p, "true",  4) == 0) {
+		*p += 4;
+		JsonNode *n = calloc(1, sizeof(*n));
+		if (!n) return NULL;
+		n->type = BVN_JSON_BOOL; n->u.b = true;
+		return n;
+	}
+	if (strncmp(*p, "false", 5) == 0) {
+		*p += 5;
+		JsonNode *n = calloc(1, sizeof(*n));
+		if (!n) return NULL;
+		n->type = BVN_JSON_BOOL; n->u.b = false;
+		return n;
+	}
+	if (**p == '-' || isdigit((unsigned char)**p)) {
+		char *end;
+		bool is_float = false;
+		const char *scan = *p;
+		if (*scan == '-') scan++;
+		while (isdigit((unsigned char)*scan)) scan++;
+		if (*scan == '.' || *scan == 'e' || *scan == 'E') is_float = true;
+		JsonNode *n = calloc(1, sizeof(*n));
+		if (!n) return NULL;
+		if (is_float) {
+			n->type = BVN_JSON_FLOAT;
+			n->u.f = strtod(*p, &end);
+		} else {
+			n->type = BVN_JSON_INT;
+			n->u.i = (int64_t)strtoll(*p, &end, 10);
+		}
+		*p = end;
+		return n;
+	}
 	return NULL;
 }
-static char *sanitize_key(const char *key)
+static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *node);
+static bool write_bvn_array(bvnr_writer_t *w, const char *key, const JsonNode *node)
 {
-	size_t len = strlen(key);
-	char *out = malloc(len + 2);
-	if (!out) return NULL;
-	char *p = out;
-	if (len == 0 || !((*key >= 'a' && *key <= 'z') || (*key >= 'A' && *key <= 'Z') || *key == '_')) {
-		*p++ = '_';
+	bool all_strings = (node->u.arr.count > 0);
+	for (uint32_t i = 0; i < node->u.arr.count; i++) {
+		const JsonNode *e = node->u.arr.items[i];
+		if (!e || e->type != BVN_JSON_STRING) { all_strings = false; break; }
 	}
-	for (size_t i = 0; i < len; i++) {
-		char c = key[i];
-		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') || c == '_' || c == '+' || c == '-') {
-			*p++ = c;
-		} else {
-			*p++ = '_';
-		}
-	}
-	*p = '\0';
-	return out;
-}
-static bool write_bvn_type(bvnr_writer_t *w, value_type_spec_t vt)
-{
-	return bvnr_write_type_annotation(w, vt, BVN_UNIT_NONE);
-}
-static bool write_bvn_node(bvnr_writer_t *w, const char *key, const JsonNode *node)
-{
-	if (key) {
-		char *clean_key = sanitize_key(key);
-		if (!clean_key) return false;
+	{
 		bvnr_data_t d = {0};
 		d.type   = token_is_identifier;
-		d.data   = clean_key;
-		d.length = (uint32_t)strlen(clean_key);
-		bool ok = bvnr_write_event(w, ev_assignment_start, &d);
-		free(clean_key);
-		if (!ok) return false;
+		d.data   = key;
+		d.length = (uint32_t)strlen(key);
+		if (!bvnr_write_event(w, ev_assignment_start, &d)) return false;
 	}
-	switch (node->type) {
-	case BVN_JSON_NULL: {
+	{
 		bvnr_data_t d = {0};
-		d.type = token_is_null_value;
-		if (!bvnr_write_event(w, ev_data, &d)) return false;
-		break;
-	}
-	case BVN_JSON_BOOL: {
-		bvnr_data_t d = {0};
-		d.type = token_is_symbol;
-		char sym[6];
-		(void)strncpy(sym, node->u.b ? "true" : "false", sizeof(sym));
-		d.data   = sym;
-		d.length = (uint32_t)strlen(sym);
-		if (!bvnr_write_event(w, ev_data, &d)) return false;
-		break;
-	}
-	case BVN_JSON_INT: {
-		bool neg = node->u.i < 0;
-		value_type_spec_t vt = neg ? BVN_TYPE_SINT(64) : BVN_TYPE_UINT(64);
-		if (!write_bvn_type(w, vt)) return false;
-		char buf[32];
-		if (neg) snprintf(buf, sizeof(buf), "%" PRId64, node->u.i);
-		else     snprintf(buf, sizeof(buf), "%" PRIu64, (uint64_t)node->u.i);
-		bvnr_data_t d = {0};
-		d.type       = token_is_number;
-		d.value_type = vt;
-		d.data       = buf;
-		d.length     = (uint32_t)strlen(buf);
-		if (!bvnr_write_event(w, ev_data, &d)) return false;
-		break;
-	}
-	case BVN_JSON_FLOAT: {
-		value_type_spec_t vt = BVN_TYPE_FLOAT(64);
-		if (!write_bvn_type(w, vt)) return false;
-		char buf[64];
-		snprintf(buf, sizeof(buf), "%.17g", node->u.f);
-		bvnr_data_t d = {0};
-		d.type       = token_is_number;
-		d.value_type = vt;
-		d.data       = buf;
-		d.length     = (uint32_t)strlen(buf);
-		if (!bvnr_write_event(w, ev_data, &d)) return false;
-		break;
-	}
-	case BVN_JSON_STRING: {
-		bvnr_data_t d = {0};
-		d.type   = token_is_string;
-		d.data   = node->u.s;
-		d.length = (uint32_t)strlen(node->u.s);
-		if (!bvnr_write_event(w, ev_data, &d)) return false;
-		break;
-	}
-	case BVN_JSON_ARRAY: {
-		bvnr_data_t d = {0};
+		d.type = all_strings ? token_is_array_string : token_is_array_number;
 		if (!bvnr_write_event(w, ev_array_row_start, &d)) return false;
-		for (uint32_t i = 0; i < node->u.arr.count; i++) {
-			if (!write_bvn_node(w, NULL, node->u.arr.items[i])) return false;
-		}
-		if (!bvnr_write_event(w, ev_array_row_end, &d)) return false;
-		break;
 	}
-	case BVN_JSON_OBJECT: {
+	for (uint32_t i = 0; i < node->u.arr.count; i++) {
+		const JsonNode *e = node->u.arr.items[i];
 		bvnr_data_t d = {0};
-		if (!bvnr_write_event(w, ev_struct_start, &d)) return false;
-		for (uint32_t i = 0; i < node->u.obj.count; i++) {
-			if (!write_bvn_node(w, node->u.obj.keys[i], node->u.obj.values[i])) return false;
+		char nbuf[64];
+		int n;
+		if (!e || e->type == BVN_JSON_NULL) {
+			d.type   = token_is_array_number;
+			d.data   = "0";
+			d.length = 1;
+		} else if (e->type == BVN_JSON_BOOL) {
+			const char *s = e->u.b ? "true" : "false";
+			d.type   = token_is_array_number;
+			d.data   = s;
+			d.length = (uint32_t)strlen(s);
+		} else if (e->type == BVN_JSON_INT) {
+			n = snprintf(nbuf, sizeof(nbuf), "%" PRId64, e->u.i);
+			d.type   = token_is_array_number;
+			d.data   = nbuf;
+			d.length = (n > 0) ? (uint32_t)n : 1u;
+		} else if (e->type == BVN_JSON_FLOAT) {
+			n = snprintf(nbuf, sizeof(nbuf), "%.17g", e->u.f);
+			d.type   = token_is_array_number;
+			d.data   = nbuf;
+			d.length = (n > 0) ? (uint32_t)n : 1u;
+		} else if (e->type == BVN_JSON_STRING) {
+			d.type   = token_is_array_string;
+			d.data   = e->u.s;
+			d.length = (uint32_t)strlen(e->u.s);
+		} else {
+			fprintf(stderr, "warn: nested array/object inside JSON array ignored\n");
+			continue;
 		}
-		if (!bvnr_write_event(w, ev_struct_end, &d)) return false;
-		break;
+		if (!bvnr_write_event(w, ev_data, &d)) return false;
 	}
+	{
+		bvnr_data_t d = {0};
+		if (!bvnr_write_event(w, ev_array_row_end, &d)) return false;
 	}
 	return true;
 }
 static bool write_bvn_root(bvnr_writer_t *w, const JsonNode *root)
 {
-	if (root->type == BVN_JSON_OBJECT) {
-		for (uint32_t i = 0; i < root->u.obj.count; i++) {
-			if (!write_bvn_node(w, root->u.obj.keys[i], root->u.obj.values[i])) return false;
-		}
-	} else {
-		if (!write_bvn_node(w, "data", root)) return false;
+	if (!root || root->type != BVN_JSON_OBJECT) {
+		fprintf(stderr, "JSON root must be an object\n");
+		return false;
+	}
+	for (uint32_t i = 0; i < root->u.obj.count; i++) {
+		if (!write_bvn_value(w, root->u.obj.keys[i], root->u.obj.values[i]))
+			return false;
 	}
 	return true;
+}
+static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *node)
+{
+	if (!node) return bvnr_write_null(w, key);
+	switch (node->type) {
+	case BVN_JSON_NULL:   return bvnr_write_null(w, key);
+	case BVN_JSON_BOOL:   return bvnr_write_bool(w, key, node->u.b);
+	case BVN_JSON_INT:    return bvnr_write_sint(w, key, 0, node->u.i);
+	case BVN_JSON_FLOAT:  return bvnr_write_float(w, key, 0, node->u.f);
+	case BVN_JSON_STRING: return bvnr_write_string(w, key, node->u.s);
+	case BVN_JSON_ARRAY:  return write_bvn_array(w, key, node);
+	case BVN_JSON_OBJECT: {
+		if (!bvnr_write_struct_start(w, key)) return false;
+		for (uint32_t i = 0; i < node->u.obj.count; i++) {
+			if (!write_bvn_value(w, node->u.obj.keys[i], node->u.obj.values[i]))
+				return false;
+		}
+		return bvnr_write_struct_end(w);
+	}
+	}
+	return false;
 }
 static int cmd_convert_json_to_bvnr(const char *file)
 {
 	int fd = open(file, O_RDONLY);
 	if (fd < 0) { perror(file); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
-	if (sz < 0) { close(fd); return 1; }
-	if (sz >= (off_t)UINT32_MAX) {
-		fprintf(stderr, "convert: file exceeds 4 GiB limit\n");
-		close(fd);
-		return 1;
-	}
-	if (lseek(fd, 0, SEEK_SET) != 0) { close(fd); return 1; }
+	if (sz < 0 || lseek(fd, 0, SEEK_SET) != 0) { close(fd); return 1; }
 	size_t size = (size_t)sz;
 	char *buf = malloc(size + 1);
 	if (!buf) { close(fd); return 1; }
@@ -1214,10 +1132,580 @@ static int cmd_convert(const char *from, const char *to, const char *file)
 			from, to);
 	return 1;
 }
+typedef enum {
+	BMARK_PROFILE_SCALARS,
+	BMARK_PROFILE_TYPED,
+	BMARK_PROFILE_STRUCTS,
+	BMARK_PROFILE_ARRAYS,
+	BMARK_PROFILE_UNITS,
+	BMARK_PROFILE_MIXED,
+	BMARK_PROFILE_COUNT
+} bmark_profile_t;
+static const char *bmark_profile_names[BMARK_PROFILE_COUNT] = {
+	"scalars", "typed", "structs", "arrays", "units", "mixed"
+};
+typedef struct {
+	bmark_profile_t profile;
+	size_t          payload_size;
+	size_t          num_assignments;
+	size_t          num_events;
+	double          elapsed_sec;
+	double          cpu_sec;
+} bmark_result_t;
+typedef struct {
+	bool     profiles[BMARK_PROFILE_COUNT];
+	size_t   sizes[64];
+	uint32_t num_sizes;
+	uint32_t iterations;
+	uint32_t warmup;
+	bool     verbose;
+	bool     json;
+	bool     min_overhead;
+} bmark_cfg_t;
+static bmark_cfg_t bmark_cfg = {
+	.profiles   = {true, true, true, true, true, true},
+	.sizes      = {1024, 4096, 16384, 65536},
+	.num_sizes  = 4,
+	.iterations = 100,
+	.warmup     = 10,
+	.verbose    = false,
+	.json       = false,
+	.min_overhead = false,
+};
+typedef struct timespec bmark_wall_clock_t;
+static bmark_wall_clock_t bmark_timer_now(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts;
+}
+static double bmark_timer_sec(const bmark_wall_clock_t *start,
+                              const bmark_wall_clock_t *end)
+{
+	return (double)(end->tv_sec - start->tv_sec)
+	     + (double)(end->tv_nsec - start->tv_nsec) * 1e-9;
+}
+static double bmark_cpu_sec(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+	return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+typedef struct {
+	size_t      event_count;
+	size_t      assign_count;
+	const bool *min_mode;
+} bmark_counter_ctx_t;
+static bool bmark_event_counter(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	bmark_counter_ctx_t *ctx = ud;
+	ctx->event_count++;
+	if (ev == ev_assignment_start)
+		ctx->assign_count++;
+	(void)d;
+	return true;
+}
+static size_t bmark_gen_scalars(uint8_t *buf, size_t cap, size_t *out_assignments)
+{
+	static const char *templates[] = {
+		".k%u=%lld;\n",
+		".k%u=%lld;\n",
+		".k%u=\"%s\";\n",
+		".k%u=true;\n",
+	};
+	static const int64_t values[] = {0, 42, -17, 1000000, 255, 9999};
+	size_t pos   = 0;
+	size_t count = 0;
+	for (size_t i = 0; ; i++) {
+		int     tmpl_idx = (int)(i % 4);
+		int64_t val      = values[i % 6];
+		char    buf32[64];
+		int     n;
+		if (tmpl_idx == 2) {
+			static const char *strs[] = {"hello","world","test","value","key","data"};
+			n = snprintf(buf32, sizeof(buf32), ".k%u=\"%s\";\n",
+			             (unsigned)i, strs[i % 6]);
+		} else {
+			n = snprintf(buf32, sizeof(buf32), templates[tmpl_idx],
+			             (unsigned)i, (long long)val);
+		}
+		if (n < 0 || (size_t)n >= cap - pos - 1)
+			break;
+		memcpy(buf + pos, buf32, (size_t)n);
+		pos   += (size_t)n;
+		count++;
+	}
+	*out_assignments = count;
+	return pos;
+}
+static size_t bmark_gen_typed(uint8_t *buf, size_t cap, size_t *out_assignments)
+{
+	static const char *tmpls[] = {
+		".k%u=<uint:8>%u;\n",
+		".k%u=<uint:16>%u;\n",
+		".k%u=<uint:32>%u;\n",
+		".k%u=<sint:16>%d;\n",
+		".k%u=<float:32>%.17g;\n",
+		".k%u=<float:64>%.17g;\n",
+		".k%u=<utf8>\"%s\";\n",
+	};
+	static const unsigned  u8v[]  = {0, 1,  42, 127,       200,       255};
+	static const unsigned  u16v[] = {0, 1, 100, 1000,    32767,     65535};
+	static const unsigned  u32v[] = {0, 1, 999, 65536, 2147483648u, 4294967295u};
+	static const int       s16v[] = {-32768, -100, -1, 0,   100, 32767};
+	static const double    fltv[] = {3.14, -1.5, 2.71828, 1e10,  0.5,  -0.5};
+	static const char     *strv[] = {"text","data","value","name","label","x"};
+	size_t pos   = 0;
+	size_t count = 0;
+	for (size_t i = 0; ; i++) {
+		int    tmpl = (int)(i % 7);
+		size_t vi   = (i / 7) % 6;
+		char   tmp[128];
+		int    n;
+		switch (tmpl) {
+		case 0: n = snprintf(tmp, sizeof(tmp), tmpls[0], (unsigned)i, u8v[vi]);  break;
+		case 1: n = snprintf(tmp, sizeof(tmp), tmpls[1], (unsigned)i, u16v[vi]); break;
+		case 2: n = snprintf(tmp, sizeof(tmp), tmpls[2], (unsigned)i, u32v[vi]); break;
+		case 3: n = snprintf(tmp, sizeof(tmp), tmpls[3], (unsigned)i, s16v[vi]); break;
+		case 4: n = snprintf(tmp, sizeof(tmp), tmpls[4], (unsigned)i, fltv[vi]); break;
+		case 5: n = snprintf(tmp, sizeof(tmp), tmpls[5], (unsigned)i, fltv[vi]); break;
+		case 6: n = snprintf(tmp, sizeof(tmp), tmpls[6], (unsigned)i, strv[vi]); break;
+		default: n = -1; break;
+		}
+		if (n < 0 || (size_t)n >= cap - pos - 1)
+			break;
+		memcpy(buf + pos, tmp, (size_t)n);
+		pos   += (size_t)n;
+		count++;
+	}
+	*out_assignments = count;
+	return pos;
+}
+static size_t bmark_gen_structs(uint8_t *buf, size_t cap, size_t *out_assignments)
+{
+	static const size_t MAX_DEPTH = 16;
+	size_t pos    = 0;
+	size_t count  = 0;
+	size_t serial = 0;
+	bool   done   = false;
+	while (!done) {
+		size_t depth = 0;
+		while (depth < MAX_DEPTH) {
+			char tmp[64];
+			int n = snprintf(tmp, sizeof(tmp),
+			                 ".s%zu={.a=%zu;.b=%zu;.c=%zu;",
+			                 serial, serial, serial + 1, serial + 2);
+			if (n < 0) { done = true; break; }
+			size_t close_needed = (depth + 1) * 3;
+			if (pos + (size_t)n + close_needed > cap) { done = true; break; }
+			memcpy(buf + pos, tmp, (size_t)n);
+			pos    += (size_t)n;
+			count  += 4;
+			serial++;
+			depth++;
+		}
+		for (size_t i = 0; i < depth && pos + 3 <= cap; i++) {
+			memcpy(buf + pos, "};\n", 3);
+			pos += 3;
+		}
+		if (depth == 0) break;
+	}
+	*out_assignments = count;
+	return pos;
+}
+static size_t bmark_gen_arrays(uint8_t *buf, size_t cap, size_t *out_assignments)
+{
+	static const int ROW_LEN = 5;
+	static const int int_vals[] = {42, 0, -1, 999, 7};
+	size_t pos    = 0;
+	size_t elem   = 0;
+	bool   opened = false;
+	for (;;) {
+		char hdr[32];
+		int  hn;
+		if (!opened) {
+			hn = snprintf(hdr, sizeof(hdr), ".a%zu=[", elem);
+			opened = true;
+		} else {
+			hn = snprintf(hdr, sizeof(hdr), "]/[");
+		}
+		if (hn < 0) break;
+		if (pos + (size_t)hn + (size_t)(ROW_LEN * 6) + 4 > cap) break;
+		memcpy(buf + pos, hdr, (size_t)hn);
+		pos += (size_t)hn;
+		for (int col = 0; col < ROW_LEN; col++) {
+			if (col > 0) buf[pos++] = ',';
+			char val[16];
+			int n = snprintf(val, sizeof(val), "%d",
+			                 int_vals[elem % (size_t)(sizeof(int_vals)/sizeof(int_vals[0]))]);
+			size_t vl = (n > 0) ? (size_t)n : 1u;
+			memcpy(buf + pos, val, vl);
+			pos += vl;
+			elem++;
+		}
+	}
+	if (opened && pos + 4 <= cap) {
+		memcpy(buf + pos, "];\n", 3);
+		pos += 3;
+	}
+	*out_assignments = 1;
+	return pos;
+}
+static size_t bmark_gen_units(uint8_t *buf, size_t cap, size_t *out_assignments)
+{
+	static const char *unit_templates[] = {
+		".k%u=<float:64,m/s>%.17g;\n",
+		".k%u=<float:64,k-g\xc2\xb7m/s\xc2\xb2>%.17g;\n",
+		".k%u=<float:64,k-J>%.17g;\n",
+		".k%u=<uint:64,Gi-B>%llu;\n",
+		".k%u=<float:64,K>%.17g;\n",
+		".k%u=<uint:64,Mi-b>%llu;\n",
+		".k%u=<float:64,m/s\xc2\xb2>%.17g;\n",
+		".k%u=<float:64,k-Pa>%.17g;\n",
+		".k%u=<float:64,k-g/m\xc2\xb3>%.17g;\n",
+		".k%u=<float:64,m*s>%.17g;\n",
+		".k%u=<uint:32,no_unit>%llu;\n",
+		".k%u=<float:64,V/m>%.17g;\n",
+	};
+	static const double flt_vals[] = {
+		9.81, 9.81, 5400.0, 0, 300.0, 0, 9.81, 101.325, 7800.0, 9.81, 0, 150.0
+	};
+	static const uint64_t uint_vals[] = {0, 8, 256, 0, 0, 0, 0, 0, 0, 0, 42, 0};
+	size_t ntemplates = sizeof(unit_templates) / sizeof(unit_templates[0]);
+	size_t pos   = 0;
+	size_t count = 0;
+	for (size_t i = 0; ; i++) {
+		int  t_idx = (int)(i % ntemplates);
+		char buf128[256];
+		int  n;
+		if (t_idx == 3 || t_idx == 5 || t_idx == 10)
+			n = snprintf(buf128, sizeof(buf128), unit_templates[t_idx],
+			             (unsigned)i, (unsigned long long)uint_vals[i % 12]);
+		else
+			n = snprintf(buf128, sizeof(buf128), unit_templates[t_idx],
+			             (unsigned)i, flt_vals[i % 12]);
+		if (n < 0 || (size_t)n >= cap - pos - 1)
+			break;
+		memcpy(buf + pos, buf128, (size_t)n);
+		pos   += (size_t)n;
+		count++;
+	}
+	*out_assignments = count;
+	return pos;
+}
+static size_t bmark_gen_mixed(uint8_t *buf, size_t cap, size_t *out_assignments)
+{
+	static const char block1[] =
+		".system={\n"
+		".host=\"localhost\";\n"
+		".port=<uint:16>8080;\n"
+		".limits={\n"
+		".timeout=<float:64,s>30;\n"
+		".max_payload=<uint:64,Mi-B>16;\n"
+		"};\n"
+		"};\n"
+		".sensors=[\n"
+		"{.name=\"temp\";.value=<float:64,\xc2\xb0\x43>23.5;.precision=<float:32>0.1;},\n"
+		"{.name=\"pressure\";.value=<float:64,k-Pa>101.3;}\n"
+		"];\n";
+	static const char block2[] =
+		".matrix=[1,2,3,4]/[5,6,7,8]/[9,10,11,12];\n"
+		".count=<uint:32>42;\n"
+		".name=<utf8>\"test object\";\n"
+		".ratio=0.95;\n"
+		".flags=[true,false,true,false];\n";
+	size_t pos = 0;
+	size_t count = 0;
+	size_t block1_size    = sizeof(block1) - 1;
+	size_t block2_size    = sizeof(block2) - 1;
+	size_t block1_assigns = 8;
+	size_t block2_assigns = 5;
+	while (pos < cap) {
+		if (pos + block1_size < cap) {
+			memcpy(buf + pos, block1, block1_size);
+			pos   += block1_size;
+			count += block1_assigns;
+			if (pos + block2_size < cap) {
+				memcpy(buf + pos, block2, block2_size);
+				pos   += block2_size;
+				count += block2_assigns;
+			} else {
+				break;
+			}
+		} else {
+			break;
+		}
+	}
+	*out_assignments = count;
+	return pos;
+}
+typedef struct {
+	size_t (*gen)(uint8_t *, size_t, size_t *);
+	const char *name;
+} bmark_builder_t;
+static const bmark_builder_t bmark_builders[BMARK_PROFILE_COUNT] = {
+	{ bmark_gen_scalars, "scalars" },
+	{ bmark_gen_typed,   "typed"   },
+	{ bmark_gen_structs, "structs" },
+	{ bmark_gen_arrays,  "arrays"  },
+	{ bmark_gen_units,   "units"   },
+	{ bmark_gen_mixed,   "mixed"   },
+};
+static bmark_result_t bmark_run(bmark_profile_t profile,
+                                size_t target_size,
+                                uint32_t iterations)
+{
+	bmark_result_t result;
+	memset(&result, 0, sizeof(result));
+	result.profile = profile;
+	uint8_t *buf = malloc(target_size + 1024 + 256);
+	if (!buf) {
+		fprintf(stderr, "  ERROR: malloc(%zu) failed\n", target_size + 1280);
+		return result;
+	}
+	size_t assign_count = 0;
+	size_t actual_len = bmark_builders[profile].gen(buf, target_size + 1024,
+	                                                &assign_count);
+	if (actual_len == 0) {
+		free(buf);
+		return result;
+	}
+	result.num_assignments = assign_count;
+	bmark_counter_ctx_t count_ctx = {0, 0, &bmark_cfg.min_overhead};
+	bvnr_read_flags_t count_flags;
+	memset(&count_flags, 0, sizeof(count_flags));
+	count_flags.userdata      = &count_ctx;
+	count_flags.on_verified   = bmark_event_counter;
+	count_flags.on_unverified = bmark_cfg.min_overhead ? NULL : bmark_event_counter;
+	bvnr_reader_t *r_count = bvnr_reader_create();
+	if (!r_count) { free(buf); return result; }
+	bool ok = bvnr_open_read_mem(r_count, buf, (uint32_t)actual_len,
+	                             NULL, 0, &count_flags)
+	       && bvnr_read(r_count);
+	if (ok)
+		result.num_events = count_ctx.event_count;
+	bvnr_reader_destroy(r_count);
+	if (!ok) {
+		fprintf(stderr, "  ERROR: count-parse failed for profile=%s size=%zu\n",
+		        bmark_profile_names[profile], target_size);
+		result.payload_size = actual_len;
+		free(buf);
+		return result;
+	}
+	for (uint32_t w = 0; w < bmark_cfg.warmup; w++) {
+		bmark_counter_ctx_t warm_ctx = {0, 0, &bmark_cfg.min_overhead};
+		bvnr_read_flags_t warm_flags;
+		memset(&warm_flags, 0, sizeof(warm_flags));
+		warm_flags.userdata      = &warm_ctx;
+		warm_flags.on_verified   = bmark_event_counter;
+		warm_flags.on_unverified = bmark_cfg.min_overhead ? NULL : bmark_event_counter;
+		bvnr_reader_t *r_warm = bvnr_reader_create();
+		if (r_warm) {
+			bvnr_open_read_mem(r_warm, buf, (uint32_t)actual_len,
+			                   NULL, 0, &warm_flags);
+			bvnr_read(r_warm);
+			bvnr_reader_destroy(r_warm);
+		}
+	}
+	double            cpu_start  = bmark_cpu_sec();
+	bmark_wall_clock_t wall_start = bmark_timer_now();
+	for (uint32_t i = 0; i < iterations; i++) {
+		bmark_counter_ctx_t run_ctx = {0, 0, &bmark_cfg.min_overhead};
+		bvnr_read_flags_t run_flags;
+		memset(&run_flags, 0, sizeof(run_flags));
+		run_flags.userdata      = &run_ctx;
+		run_flags.on_verified   = bmark_event_counter;
+		run_flags.on_unverified = bmark_cfg.min_overhead ? NULL : bmark_event_counter;
+		bvnr_reader_t *r_run = bvnr_reader_create();
+		if (!r_run) { free(buf); return result; }
+		if (!bvnr_open_read_mem(r_run, buf, (uint32_t)actual_len,
+		                        NULL, 0, &run_flags)) {
+			bvnr_reader_destroy(r_run);
+			free(buf);
+			return result;
+		}
+		bvnr_read(r_run);
+		bvnr_reader_destroy(r_run);
+	}
+	bmark_wall_clock_t wall_end = bmark_timer_now();
+	double             cpu_end  = bmark_cpu_sec();
+	result.elapsed_sec  = bmark_timer_sec(&wall_start, &wall_end);
+	result.cpu_sec      = cpu_end - cpu_start;
+	result.payload_size = actual_len;
+	free(buf);
+	return result;
+}
+static void bmark_print_header(void)
+{
+	if (bmark_cfg.json) return;
+	printf("%-10s %8s %8s %12s %12s %12s %10s %10s\n",
+	       "Profile", "Bytes", "Assigns", "Wall (ms)", "CPU (ms)",
+	       "MB/s", "Ass/s", "Ev/s");
+	printf("────────── ──────── ──────── ──────────── "
+	       "──────────── ──────────── ────────── ──────────\n");
+}
+static void bmark_print_result(const bmark_result_t *r, uint32_t iterations)
+{
+	double wall_ms          = r->elapsed_sec * 1000.0;
+	double cpu_ms           = r->cpu_sec * 1000.0;
+	double wall_per_iter_ms = wall_ms / (double)iterations;
+	double mb_per_sec       = (double)r->payload_size * (double)iterations
+	                        / (1024.0 * 1024.0) / r->elapsed_sec;
+	double assign_per_sec   = (double)r->num_assignments * (double)iterations
+	                        / r->elapsed_sec;
+	double events_per_sec   = (double)r->num_events * (double)iterations
+	                        / r->elapsed_sec;
+	if (bmark_cfg.json) {
+		printf("{\"profile\":\"%s\",\"bytes\":%zu,\"assignments\":%zu,"
+		       "\"events\":%zu,\"iterations\":%u,\"wall_ms\":%.3f,"
+		       "\"cpu_ms\":%.3f,\"mb_per_sec\":%.3f,\"ass_per_sec\":%.0f,"
+		       "\"ev_per_sec\":%.0f,\"wall_per_iter_us\":%.1f}\n",
+		       bmark_profile_names[r->profile],
+		       r->payload_size, r->num_assignments, r->num_events,
+		       iterations,
+		       wall_ms, cpu_ms,
+		       mb_per_sec, assign_per_sec, events_per_sec,
+		       wall_per_iter_ms * 1000.0);
+	} else {
+		printf("%-10s %8zu %8zu %12.3f %12.3f %12.2f %10.0f %10.0f\n",
+		       bmark_profile_names[r->profile],
+		       r->payload_size, r->num_assignments,
+		       wall_ms, cpu_ms,
+		       mb_per_sec, assign_per_sec, events_per_sec);
+	}
+}
+static void bmark_parse_profile_list(const char *list)
+{
+	for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
+		bmark_cfg.profiles[i] = false;
+	if (strcmp(list, "all") == 0) {
+		for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
+			bmark_cfg.profiles[i] = true;
+		return;
+	}
+	char *copy = strdup(list);
+	if (!copy) return;
+	char *token = strtok(copy, ",");
+	while (token) {
+		for (int i = 0; i < BMARK_PROFILE_COUNT; i++) {
+			if (strcmp(token, bmark_profile_names[i]) == 0) {
+				bmark_cfg.profiles[i] = true;
+				break;
+			}
+		}
+		token = strtok(NULL, ",");
+	}
+	free(copy);
+}
+static void bmark_parse_size_list(const char *list)
+{
+	bmark_cfg.num_sizes = 0;
+	char *copy = strdup(list);
+	if (!copy) return;
+	char *token = strtok(copy, ",");
+	while (token && bmark_cfg.num_sizes < 64) {
+		bmark_cfg.sizes[bmark_cfg.num_sizes++] =
+		    (size_t)strtoul(token, NULL, 10);
+		token = strtok(NULL, ",");
+	}
+	free(copy);
+}
+static int cmd_bench(int argc, char **argv)
+{
+	for (int i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "--profile") == 0 && i + 1 < argc) {
+			bmark_parse_profile_list(argv[++i]);
+		} else if (strcmp(argv[i], "--size") == 0 && i + 1 < argc) {
+			bmark_parse_size_list(argv[++i]);
+		} else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
+			bmark_cfg.iterations = (uint32_t)strtoul(argv[++i], NULL, 10);
+			if (bmark_cfg.iterations < 1) bmark_cfg.iterations = 1;
+		} else if (strcmp(argv[i], "--warmup") == 0 && i + 1 < argc) {
+			bmark_cfg.warmup = (uint32_t)strtoul(argv[++i], NULL, 10);
+		} else if (strcmp(argv[i], "--verbose") == 0) {
+			bmark_cfg.verbose = true;
+		} else if (strcmp(argv[i], "--json") == 0) {
+			bmark_cfg.json = true;
+		} else if (strcmp(argv[i], "--min-overhead") == 0) {
+			bmark_cfg.min_overhead = true;
+		} else if (strcmp(argv[i], "-h") == 0 ||
+		           strcmp(argv[i], "--help") == 0) {
+			fprintf(stderr,
+			    "Usage: bovnar bench [options]\n"
+			    "\n"
+			    "Options:\n"
+			    "  --profile <list>   Comma-separated profile names:\n"
+			    "                     all,scalars,typed,structs,arrays,units,mixed\n"
+			    "                     (default: all)\n"
+			    "  --size <list>      Comma-separated payload sizes in bytes\n"
+			    "                     (default: 1024,4096,16384,65536)\n"
+			    "  --iterations <N>   Parse rounds per size×profile (default: 100)\n"
+			    "  --warmup <N>       Warm-up iterations (default: 10)\n"
+			    "  --verbose          Print per-run details\n"
+			    "  --json             Machine-readable JSON output\n"
+			    "  --min-overhead     Skip on_verified callback for pure lexer throughput\n"
+			    "  -h, --help         Show this help and exit\n"
+			    "\n"
+			    "Examples:\n"
+			    "  bovnar bench --profile scalars --size 4096\n"
+			    "  bovnar bench --profile all --size 1024,65536 --iterations 200 --json\n"
+			    "  bovnar bench --min-overhead --profile scalars,units --size 4096\n");
+			return 0;
+		} else {
+			fprintf(stderr, "bench: unknown option: %s\n", argv[i]);
+			return 1;
+		}
+	}
+	if (bmark_cfg.json) {
+		printf("{\n\"config\":{\"iterations\":%u,\"warmup\":%u,"
+		       "\"min_overhead\":%s},\n\"results\":[\n",
+		       bmark_cfg.iterations, bmark_cfg.warmup,
+		       bmark_cfg.min_overhead ? "true" : "false");
+	} else {
+		printf("═════════════════════════════════════════════════════════════\n");
+		printf("  Bovnar Parsing Throughput Benchmark\n");
+		printf("  Iterations: %u   Warmup: %u   Min-overhead: %s\n",
+		       bmark_cfg.iterations, bmark_cfg.warmup,
+		       bmark_cfg.min_overhead ? "yes" : "no");
+		printf("═════════════════════════════════════════════════════════════\n");
+		bmark_print_header();
+	}
+	bool first = true;
+	for (int p = 0; p < BMARK_PROFILE_COUNT; p++) {
+		if (!bmark_cfg.profiles[p]) continue;
+		for (uint32_t s = 0; s < bmark_cfg.num_sizes; s++) {
+			bmark_result_t r = bmark_run((bmark_profile_t)p,
+			                             bmark_cfg.sizes[s],
+			                             bmark_cfg.iterations);
+			if (r.payload_size == 0) {
+				fprintf(stderr, "  SKIP: %s/%zu (generation or parse failed)\n",
+				        bmark_profile_names[p], bmark_cfg.sizes[s]);
+				continue;
+			}
+			if (bmark_cfg.json && !first)
+				printf(",\n");
+			first = false;
+			bmark_print_result(&r, bmark_cfg.iterations);
+			if (bmark_cfg.verbose && !bmark_cfg.json) {
+				printf("  ── detail: profile=%s, size=%zu bytes, "
+				       "assignments=%zu, events=%zu, "
+				       "avg_cost=%.3f us/assign\n",
+				       bmark_profile_names[p], r.payload_size,
+				       r.num_assignments, r.num_events,
+				       (r.elapsed_sec * 1e6) /
+				           (double)(r.num_assignments * bmark_cfg.iterations));
+			}
+		}
+	}
+	if (bmark_cfg.json)
+		printf("\n]}\n");
+	printf("\n");
+	return 0;
+}
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s <command> [options] <file>\n"
+		"Usage: %s <command> [options] [file]\n"
 		"Commands:\n"
 		"  validate      Validate a .bvnr file\n"
 		"  query <path>  Query a value by path (e.g. .sensor.temperature)\n"
@@ -1231,6 +1719,16 @@ static void usage(const char *prog)
 		"                    -c  Continue parsing on errors (resync mode)\n"
 		"                    -d  Enable debug re-serialisation output to stderr\n"
 		"                    -p  Pretty-print debug output (requires -d)\n"
+		"  bench [opts]\n"
+		"                  Run parsing throughput benchmark.\n"
+		"                  Options:\n"
+		"                    --profile <list>   scalars,typed,structs,arrays,units,mixed\n"
+		"                    --size <list>      payload sizes in bytes\n"
+		"                    --iterations <N>   parse rounds per cell (default: 100)\n"
+		"                    --warmup <N>       warm-up rounds (default: 10)\n"
+		"                    --verbose          per-run detail\n"
+		"                    --json             machine-readable JSON output\n"
+		"                    --min-overhead     skip on_verified callback\n"
 		"\n"
 		"Examples:\n"
 		"  %s validate config.bvnr\n"
@@ -1240,8 +1738,11 @@ static void usage(const char *prog)
 		"  %s convert --from bvnr --to json data.bvnr\n"
 		"  %s events data.bvnr\n"
 		"  %s events -c -d data.bvnr\n"
-		"  cat data.bvnr | %s events -\n",
-		prog, prog, prog, prog, prog, prog, prog, prog, prog);
+		"  cat data.bvnr | %s events -\n"
+		"  %s bench --profile scalars --size 4096\n"
+		"  %s bench --profile all --size 1024,65536 --iterations 200 --json\n",
+		prog,
+		prog, prog, prog, prog, prog, prog, prog, prog, prog, prog);
 }
 int main(int argc, char **argv)
 {
@@ -1270,6 +1771,8 @@ int main(int argc, char **argv)
 		return cmd_convert(from, to, file);
 	} else if (strcmp(cmd, "events") == 0) {
 		return cmd_events(argc - 2, argv + 2);
+	} else if (strcmp(cmd, "bench") == 0) {
+		return cmd_bench(argc - 2, argv + 2);
 	} else if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {
 		usage(argv[0]);
 		return 0;

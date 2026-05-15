@@ -63,6 +63,7 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	p->val.has_annotation_unit = false;
 	l->resync_array_depth  = 0;
 	l->resync_struct_depth = 0;
+	l->array_items         = 0;
 	l->next_state          = resync;
 	++l->recovery_count;
 }
@@ -280,7 +281,7 @@ bool bvn_action_type_outro(bvnr_reader_t* p)
 bool bvn_action_copy_type_byte(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
-	if (l->type_len == (uint32_t)(sizeof(l->type_data) - 1u)) {
+	if (l->type_len == sizeof(l->type_data) - 1u) {
 		bvn_lexer_set_error(p, error_type_too_long);
 		return false;
 	}
@@ -461,7 +462,7 @@ static bool bvn_tf_family_done(bvnr_reader_t* p,
 	const char* name, uint32_t len, state_t after)
 {
 	memcpy(p->lex.type_data, name, len);
-	p->lex.type_len   = (uint8_t)len;
+	p->lex.type_len   = (uint16_t)len;
 	p->lex.next_state = after;
 	return true;
 }
@@ -635,7 +636,9 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			return true;
 		}
 		if (l->array_nesting_level > 0) {
-			if (!bvn_val_on_array_outro(p, l->curr_row_size,
+			uint64_t effective_row = l->array_row_size
+				? l->array_row_size : l->curr_row_size;
+			if (!bvn_val_on_array_outro(p, effective_row,
 						    &l->array_row_size))
 				return false;
 			--l->array_nesting_level;
@@ -686,6 +689,7 @@ static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	l->array_nesting_level  = 0;
 	l->resync_array_depth   = 0;
 	l->resync_struct_depth  = 0;
+	l->array_items          = 0;
 	l->curr_row_size        = 0;
 	l->array_row_size       = 0;
 	memset(l->arr_frames, 0,
@@ -768,7 +772,7 @@ bool bvn_action_inline_unit_intro(bvnr_reader_t* p)
 bool bvn_action_copy_inline_unit_byte(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
-	if (l->inline_unit_len == (uint8_t)(sizeof(l->inline_unit_data) - 1u)) {
+	if (l->inline_unit_len == sizeof(l->inline_unit_data) - 1u) {
 		bvn_lexer_set_error(p, error_unit_too_long);
 		return false;
 	}

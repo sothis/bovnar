@@ -204,13 +204,13 @@ typedef struct bvnr_lexer_s {
 	uint8_t			utf8_lo;
 	uint8_t			utf8_hi;
 	uint8_t			bom_len;
-	uint8_t			type_len;
+	uint16_t		type_len;
 	uint16_t		str_len;
 	uint8_t			bom[2];
 	uint8_t			type_data[UINT8_MAX+1];
 	uint8_t			str_data[UINT16_MAX+1];
 	uint8_t			inline_unit_data[UINT8_MAX+1];
-	uint8_t			inline_unit_len;
+	uint16_t		inline_unit_len;
 	uint64_t		line;
 	uint64_t		column;
 	uint8_t			prev_byte;

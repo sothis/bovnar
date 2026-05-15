@@ -109,8 +109,11 @@ bovnar/
 │       ├── __init__.py  # loads / dumps / Reader / Writer
 │       ├── reader.py
 │       ├── writer.py
+│       ├── dom.py
+│       ├── units.py
 │       ├── structs.py
 │       ├── enums.py
+│       ├── exceptions.py
 │       └── _ffi.py
 ├── examples/            # Annotated .bvnr example files
 ├── highlighter/
@@ -122,7 +125,8 @@ bovnar/
 │   ├── 2_bovnar_unit_system.md
 │   ├── 3_bovnar_readwrite_api.md
 │   ├── 4_bovnar_python_bindings.md
-│   └── 5_bovnar.ebnf               # Formal EBNF grammar
+│   ├── 5_bovnar.ebnf               # Formal EBNF grammar
+│   └── 6_bovnar_faq.md             # Frequently asked questions
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
 ```
@@ -192,13 +196,14 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_socketpair_roundtrip_test` | Full round-trip over a POSIX socketpair |
 | `bvnr_dom_test` | DOM builder and traversal |
 | `bvnr_si_test` | SI/IEC unit parsing and formatting |
+| `bvnr_unit_ext_test` | Extended unit symbols, long-name aliases, prefix enforcement |
 | `bvnr_utils_test` | Utility functions |
 | `bvnr_int_test` | Arbitrary-precision integer (optional; requires libgmp — auto-skipped if absent) |
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_benchmark` | Throughput measurement |
-| `bovnar_fuzz_*` | Fuzz harnesses (reader, writer, DOM, utils) |
+| `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
+| `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
 ### Python tests
 
@@ -241,7 +246,7 @@ int main(void)
     bvnr_read_flags_t opts = {0};
     opts.on_verified = on_event;
     bvnr_reader_t *r = bvnr_reader_create();
-    bvnr_open_read_mem(r, src, (uint32_t)strlen(src), NULL, 0, &opts);
+    bvnr_open_read_mem(r, src, (uint64_t)strlen(src), NULL, 0, &opts);
     bvnr_read(r);
     bvnr_reader_destroy(r);
 }
@@ -372,6 +377,7 @@ cd highlighter/geany && ./install.sh
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
+| [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
 
 ---
 

@@ -1925,8 +1925,7 @@ typedef enum bvnr_event_e {
     ev_type_annotation_start,
     ev_type_annotation_end,
     ev_type_annotation_type_family,
-    ev_type_annotation_type_family_parameter,
-    dimension_bvnr_event
+    ev_type_annotation_type_family_parameter
 } bvnr_event_t;
 
 typedef enum value_type_family_e {
@@ -2492,7 +2491,6 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 | max array nesting | 255 | Maximum array bracket nesting depth (`max_array_nesting`; 0 defaults to 255) |
 | recommended file size cap | 16777216 | Suggested value for `max_file_size` (16 MiB). `max_file_size = 0` is unlimited. |
 | `BVNR_MAX_UNIT_COMPONENTS` | 8 | Maximum number of unit components in a compound unit |
-| `BOVN_READ_BUFFER_SIZE` | 4096 | Internal read buffer size in bytes |
 
 ---
 

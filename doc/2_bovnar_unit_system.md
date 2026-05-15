@@ -487,8 +487,7 @@ The "no toggle back" rule for `/` means that constructs like `a/b/c` are parsed 
 ```c
 typedef enum prefix_system_e {
     prefix_si,                  /* SI decimal prefixes (or no prefix) */
-    prefix_iec,                 /* IEC binary prefixes                */
-    dimension_prefix_system     /* sentinel — do not use              */
+    prefix_iec                  /* IEC binary prefixes                */
 } prefix_system_t;
 ```
 
@@ -502,8 +501,7 @@ typedef enum si_prefix_id_e {
     si_centi,  si_deci,
     si_deca,   si_hecto, si_kilo,  si_mega,  si_giga,
     si_tera,   si_peta,  si_exa,   si_zetta, si_yotta,
-    si_ronna,  si_quetta,
-    dimension_si_prefix         /* sentinel                           */
+    si_ronna,  si_quetta
 } si_prefix_id_t;
 ```
 
@@ -515,8 +513,7 @@ Values are ordered from smallest (quecto) to largest (quetta). `si_none` is 0, s
 typedef enum iec_prefix_id_e {
     iec_none = 0,           /* no IEC prefix (×2⁰)           */
     iec_kibi, iec_mebi, iec_gibi, iec_tebi, iec_pebi,
-    iec_exbi, iec_zebi, iec_yobi, iec_robi, iec_quebi,
-    dimension_iec_prefix        /* sentinel                           */
+    iec_exbi, iec_zebi, iec_yobi, iec_robi, iec_quebi
 } iec_prefix_id_t;
 ```
 
@@ -537,8 +534,7 @@ typedef enum value_base_unit_e {
     bu_tonne, bu_bar,
     bu_electronvolt, bu_dalton, bu_astronomical_unit,
     bu_hectare,
-    bu_week, bu_year,
-    dimension_value_base_unit   /* sentinel                           */
+    bu_week, bu_year
 } value_base_unit_t;
 ```
 
@@ -933,7 +929,7 @@ value_unit_t r  = bvn_unit_reduce(u, &scale, &overflow);
 #### Prefix–unit validity
 
 ```c
-bool bvn_prefix_unit_valid(value_unit_t u, value_base_unit_t base);
+bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
 ```
 
 Returns `true` if the prefix carried by the first component of `u` is a legal modifier for `base`. The rules are:

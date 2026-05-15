@@ -484,15 +484,16 @@ ref-body-char = sym-body-char | "." ;
 (*   [,1,2,]  →  four elements: null, 1, 2, null.                   *)
 (*                                                                    *)
 (* Semantic constraints (enforced by the validator):                  *)
-(*   a) When arrays appear as element values within the same           *)
-(*      "/"-separated dimension row bracket pair they must have the    *)
-(*      same element count.  Nested arrays that are arbitrary element  *)
-(*      values of the enclosing array (i.e. not the result of the "/"  *)
-(*      dimension mechanism) are NOT subject to this check — e.g.      *)
-(*      [[1,2],[3,4,5]] is valid because [1,2] and [3,4,5] are element *)
-(*      values, not dimension rows.  Rows in different "/"-separated   *)
-(*      dimensions are each checked independently.                     *)
-(*   b) Array nesting depth ≤ max_array_nesting (default 255) (255).      *)
+(*   a) No element-count consistency check is performed between        *)
+(*      "/"-separated dimension rows or between arrays that appear as  *)
+(*      element values.  The validator defines                         *)
+(*      error_array_row_size_mismatch (code 2) and contains tracking   *)
+(*      code, but the per-bracket-pair context save/restore mechanism  *)
+(*      ensures array_row_size is always zero when the comparison      *)
+(*      executes, making the error unreachable by any input.           *)
+(*      [[1,2],[3,4,5]], [1,2,3]/[4,5], and all similar forms are      *)
+(*      accepted regardless of element count.                          *)
+(*   b) Array nesting depth ≤ max_array_nesting (default 255).      *)
 
 array        = array-row , {"/" , ws , array-row} ;
 
@@ -692,10 +693,10 @@ byte         = (* any single byte 0x00–0xFF *) ;
      machine (states: resync, resync_string, resync_string_escape,
      resync_comment).  The resync machine skips bytes while tracking
      bracket and brace nesting depths, and attempts to re-synchronise
-     at the next ";" at the current nesting depth.  Each successful
-     recovery increments recovery_count (bvnr_reader_get_recovery_count) is incremented
-     immediately when an error triggers entry into resync mode, not when
-     resync completes at ";".  EOF inside any resync state propagates
+     at the next ";" at the current nesting depth.  recovery_count
+     (bvnr_reader_get_recovery_count) is incremented immediately when
+     an error triggers entry into resync mode, not when resync
+     completes at ";".  EOF inside any resync state propagates
      the original error code rather than overwriting it with
      error_got_incomplete_bvnr_stream.
 

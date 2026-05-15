@@ -70,7 +70,7 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Version 1.3 (Working Draft, last updated 2026-05-12).
+Version 1.0.
 
 ---
 

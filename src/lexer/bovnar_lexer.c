@@ -358,7 +358,6 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
 	++p->lex.array_nesting_level;
-	++p->lex.array_items;
 	bvn_acc_reset(&p->val);
 	if (!bvn_val_on_array_intro(p))
 		return false;
@@ -403,7 +402,6 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_too_many_array_items);
 		return false;
 	}
-	++p->lex.array_items;
 	if (!bvn_val_on_new_array_value(p, p->lex.curr_row_size,
 									p->lex.array_row_size))
 		return false;

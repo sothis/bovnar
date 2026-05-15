@@ -355,7 +355,8 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	f->saved_vtype = p->val.value_type;
 	f->saved_vunit = p->val.parsed_unit;
 	p->lex.curr_row_size  = 0;
-	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : 0;
+	p->lex.array_row_size = (f->in_dim_seq || f->dim_row_size)
+	                        ? f->dim_row_size : 0;
 	++p->lex.curr_row_size;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
@@ -643,17 +644,12 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 				return false;
 			--l->array_nesting_level;
 			uint64_t level = l->array_nesting_level;
-			if (level < l->max_array_nesting) {
-				bvn_array_frame_t *f = &l->arr_frames[level];
-				f->dim_row_size    = l->array_row_size;
-				l->curr_row_size   = f->saved_curr + 1u;
-				l->array_row_size  = f->saved_row;
-				p->val.value_type  = f->saved_vtype;
-				p->val.parsed_unit = f->saved_vunit;
-			} else {
-				l->curr_row_size  = 0;
-				l->array_row_size = 0;
-			}
+			bvn_array_frame_t *f = &l->arr_frames[level];
+			f->dim_row_size    = l->array_row_size;
+			l->curr_row_size   = f->saved_curr + 1u;
+			l->array_row_size  = f->saved_row;
+			p->val.value_type  = f->saved_vtype;
+			p->val.parsed_unit = f->saved_vunit;
 			l->in_array_element = (l->array_nesting_level > 0);
 			l->next_state = array_outro;
 		} else {
@@ -974,7 +970,7 @@ static bool bvn_interpret_input_buffer(
 		++l->text_bytes;
 		l->byte = data[idx];
 		if (l->byte == 0x09)
-			l->column += 4;
+			l->column = ((l->column >> 2u) + 1u) << 2u;
 		else
 			++l->column;
 		uint8_t prev = l->prev_byte;

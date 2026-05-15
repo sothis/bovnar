@@ -571,8 +571,9 @@ bool bvn_val_on_value_intro(bvnr_reader_t* r)
 bool bvn_val_on_value_outro(bvnr_reader_t* r)
 {
 	bvnr_validator_t* v = &r->val;
-	v->value_type  = BVN_TYPE_PLAIN;
-	v->parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	v->value_type          = BVN_TYPE_PLAIN;
+	v->parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
+	v->has_annotation_unit = false;
 	bvn_acc_reset(v);
 	return true;
 }

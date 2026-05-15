@@ -1,6 +1,6 @@
 # Bovnar Unit System — Reference Documentation
 
-> **Applies to:** Bovnar (BVNR) specification version 1.3  
+> **Applies to:** Bovnar (BVNR) specification version 1.0  
 > **Scope:** This document covers the unit system exclusively — syntax, data model, C API, and validation rules.
 
 ---
@@ -1241,7 +1241,7 @@ In `continue_on_error` mode the parser invokes `on_error` with the error code an
 
 ---
 
-*End of Bovnar Unit System Reference Documentation.*
+*End of Bovnar Unit System Reference Documentation v1.0.*
 
 
 

@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Frequently Asked Questions
 
-> **Applies to:** Bovnar specification v1.3 Working Draft
+> **Applies to:** Bovnar specification v1.0
 
 ---
 
@@ -400,10 +400,10 @@ a mismatch is `error_unit_mismatch`.
 
 44 named units: the 7 SI base units, 21 named SI-derived units (hertz through
 katal, plus radian and steradian), and 16 non-SI units accepted for use with
-SI (liter, minute, hour, day, degree, arcminute, arcsecond, hectare, tonne,
-bar, electronvolt, dalton, astronomical unit, week, year, and the bit and byte
-for digital quantities). The `bu_gram` base unit is used for mass so that the
-`k-` prefix can carry the kilo: `k-g` = kilogram.
+SI (liter, minute, hour, day, week, year, degree (angle), degree Celsius,
+tonne, bar, electronvolt, dalton, astronomical unit, hectare, and the bit and
+byte for digital quantities). The `bu_gram` base unit is used for mass so that
+the `k-` prefix can carry the kilo: `k-g` = kilogram.
 
 ---
 
@@ -1137,4 +1137,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification v1.3 Working Draft*
+*End of Bovnar FAQ — Specification v1.0*

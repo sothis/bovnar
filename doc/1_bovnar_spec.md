@@ -1,8 +1,8 @@
 # Bovnar Specification
 
-> **Version:** 1.3
-> **Status:** Working Draft
-> **Last updated:** 2026-05-12
+> **Version:** 1.0
+> **Status:** Released
+> **Last updated:** 2026-05-15
 
 ---
 
@@ -1250,7 +1250,7 @@ Below is the complete EBNF in ISO/IEC 14977:1996 notation, derived from and veri
 ```ebnf
 (* ================================================================= *)
 (*  BOVNAR  –  EBNF  (ISO/IEC 14977:1996)                            *)
-(*  Version 1.1 – with compound unit support                         *)
+(*  Version 1.0                                                      *)
 (* ================================================================= *)
 
 (* ── 1. Top-level stream ──────────────────────────────────────────── *)
@@ -2078,8 +2078,8 @@ void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint32_t len);
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
-uint32_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
-uint32_t bvnr_writer_bytes_written(const bvnr_writer_t* w);
+uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
+uint64_t bvnr_writer_bytes_written(const bvnr_writer_t* w);
 ```
 
 `bvnr_sink_bytes_written` queries the byte count of an explicit `bvnr_sink_t` created with `bvnr_sink_to_mem`. `bvnr_writer_bytes_written` queries the byte count when the writer encapsulates the sink internally (i.e. after `bvnr_open_write_mem`).
@@ -2091,7 +2091,7 @@ bool bvnr_open_read_source(bvnr_reader_t* r, const bvnr_source_t* src,
                         const bvnr_sink_t* dbg_sink,
                         bvnr_read_flags_t* options);
 
-bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint32_t len,
+bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint64_t len,
                         void* dbg_buf, uint32_t dbg_cap,
                         bvnr_read_flags_t* options);
 
@@ -2496,7 +2496,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar Specification v1.3*
+*End of Bovnar Specification v1.0*
 
 
 

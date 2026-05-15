@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — A Practical Tutorial
 
-**Format version:** 1.3  
+**Format version:** 1.0  
 **Audience:** Developers already comfortable with JSON or similar text formats.
 
 ---
@@ -917,4 +917,4 @@ $nan$  $infinity$  $-infinity$
 
 ---
 
-*Bovnar Specification v1.3 — format by the Bovnar project.*
+*Bovnar Specification v1.0 — format by the Bovnar project.*

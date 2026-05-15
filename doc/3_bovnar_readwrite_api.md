@@ -1,7 +1,7 @@
 
 # Bovnar — Read & Write API
 
-> **Spec version:** 0.x — Working Draft
+> **Spec version:** 1.0
 
 This document covers every function you need to read and write Bovnar streams, in the order you call them. Nothing else is included.
 
@@ -1043,12 +1043,12 @@ int main(void)
     bvnr_writer_destroy(w);
     return ret;
 }
-/* Output: .velocity = <float:64,m/s> 9.81; */
+/* Output: .velocity = <float:64,m/s²> 9.81; */
 ```
 
 ---
 
-*End of Bovnar Read & Write API Reference*
+*End of Bovnar Read & Write API Reference v1.0*
 
 
 

@@ -66,6 +66,11 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	l->array_items         = 0;
 	l->next_state          = resync;
 	++l->recovery_count;
+	l->in_array_element    = false;
+	l->curr_row_size       = 0;
+	l->array_row_size      = 0;
+	memset(l->arr_frames, 0,
+	       (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
 }
 #define ESC_VALID 0x100u
 static const uint16_t bvn_escape_lut[256] = {
@@ -253,14 +258,16 @@ bool bvn_action_value_outro(bvnr_reader_t* p)
 		return false;
 	if (!bvn_val_on_value_outro(p))
 		return false;
+	uint64_t base  = p->lex.array_nesting_level;
+	uint64_t total = p->lex.max_array_nesting + 1u;
+	if (base < total)
+		memset(p->lex.arr_frames + base, 0,
+		       (total - base) * sizeof(bvn_array_frame_t));
 	if (!p->lex.struct_nesting_level) {
 		p->lex.in_array_element    = false;
 		p->lex.array_nesting_level = 0;
 		p->lex.curr_row_size       = 0;
 		p->lex.array_row_size      = 0;
-		memset(p->lex.arr_frames, 0,
-			   (p->lex.max_array_nesting + 1u)
-			   * sizeof(bvn_array_frame_t));
 	}
 	p->lex.next_state = value_outro;
 	return true;
@@ -360,10 +367,10 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	++p->lex.curr_row_size;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
-	++p->lex.array_nesting_level;
 	bvn_acc_reset(&p->val);
 	if (!bvn_val_on_array_intro(p))
 		return false;
+	++p->lex.array_nesting_level;
 	p->lex.next_state = array_intro;
 	return true;
 }
@@ -689,7 +696,7 @@ static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	l->curr_row_size        = 0;
 	l->array_row_size       = 0;
 	memset(l->arr_frames, 0,
-		   (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
+	       (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
 	p->val.value_type          = BVN_TYPE_PLAIN;
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
 	p->val.has_annotation_unit = false;
@@ -959,10 +966,14 @@ static bool bvn_interpret_input_buffer(
 	for (uint32_t idx = 0; idx < len; ++idx) {
 		if (l->max_text_bytes &&
 			l->text_bytes == l->max_text_bytes) {
-			p->val.last_error = error_text_data_too_long;
+			uint8_t offending = data[idx];
+			uint64_t col = (offending == 0x09u)
+				? ((l->column >> 2u) + 1u) << 2u
+				: l->column + 1u;
+			p->val.last_error   = error_text_data_too_long;
 			p->val.error_line   = l->line;
-			p->val.error_column = l->column + 1;
-			p->val.error_byte   = (uint32_t)data[idx] & 0xffu;
+			p->val.error_column = col;
+			p->val.error_byte   = (uint32_t)offending & 0xffu;
 			p->val.error_offset = l->text_bytes;
 			bvn_notify_error(p);
 			return false;

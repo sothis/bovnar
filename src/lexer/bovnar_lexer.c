@@ -247,10 +247,9 @@ bool bvn_action_value_outro(bvnr_reader_t* p)
 		p->lex.array_nesting_level = 0;
 		p->lex.curr_row_size       = 0;
 		p->lex.array_row_size      = 0;
-		memset(p->lex.arr_dim_row_size, 0,
-			   sizeof(p->lex.arr_dim_row_size));
-		memset(p->lex.arr_in_dim_seq,   0,
-			   sizeof(p->lex.arr_in_dim_seq));
+		memset(p->lex.arr_frames, 0,
+			   (p->lex.max_array_nesting + 1u)
+			   * sizeof(bvn_array_frame_t));
 	}
 	p->lex.next_state = value_outro;
 	return true;
@@ -339,15 +338,13 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_array_nesting_too_high);
 		return false;
 	}
-	if (level < p->lex.max_array_nesting) {
-		p->lex.arr_saved_curr [level] = p->lex.curr_row_size;
-		p->lex.arr_saved_row  [level] = p->lex.array_row_size;
-		p->lex.arr_saved_vtype[level] = p->val.value_type;
-		p->lex.arr_saved_vunit[level] = p->val.parsed_unit;
-	}
+	bvn_array_frame_t *f = &p->lex.arr_frames[level];
+	f->saved_curr  = p->lex.curr_row_size;
+	f->saved_row   = p->lex.array_row_size;
+	f->saved_vtype = p->val.value_type;
+	f->saved_vunit = p->val.parsed_unit;
 	p->lex.curr_row_size  = 0;
-	p->lex.array_row_size = p->lex.arr_in_dim_seq[level]
-		? p->lex.arr_dim_row_size[level] : 0;
+	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : 0;
 	++p->lex.curr_row_size;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
@@ -371,17 +368,12 @@ bool bvn_action_array_outro(bvnr_reader_t* p)
 		return false;
 	--p->lex.array_nesting_level;
 	uint64_t level = p->lex.array_nesting_level;
-	p->lex.arr_dim_row_size[level] = p->lex.array_row_size;
-	if (level < p->lex.max_array_nesting) {
-		p->lex.curr_row_size  = p->lex.arr_saved_curr[level]
-							  + 1u;
-		p->lex.array_row_size = p->lex.arr_saved_row[level];
-		p->val.value_type  = p->lex.arr_saved_vtype[level];
-		p->val.parsed_unit = p->lex.arr_saved_vunit[level];
-	} else {
-		p->lex.curr_row_size  = 0;
-		p->lex.array_row_size = 0;
-	}
+	bvn_array_frame_t *f = &p->lex.arr_frames[level];
+	f->dim_row_size       = p->lex.array_row_size;
+	p->lex.curr_row_size  = f->saved_curr + 1u;
+	p->lex.array_row_size = f->saved_row;
+	p->val.value_type     = f->saved_vtype;
+	p->val.parsed_unit    = f->saved_vunit;
 	p->lex.next_state = array_outro;
 	return true;
 }
@@ -404,12 +396,10 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 	if (!bvn_val_on_new_array_value(p, p->lex.curr_row_size,
 									p->lex.array_row_size))
 		return false;
-	p->lex.arr_in_dim_seq[p->lex.array_nesting_level] = false;
-	uint64_t slot = p->lex.array_nesting_level - 1u;
-	if (slot < p->lex.max_array_nesting) {
-		p->val.value_type  = p->lex.arr_saved_vtype[slot];
-		p->val.parsed_unit = p->lex.arr_saved_vunit[slot];
-	}
+	p->lex.arr_frames[p->lex.array_nesting_level].in_dim_seq = false;
+	bvn_array_frame_t *par = &p->lex.arr_frames[p->lex.array_nesting_level - 1u];
+	p->val.value_type  = par->saved_vtype;
+	p->val.parsed_unit = par->saved_vunit;
 	++p->lex.curr_row_size;
 	p->lex.token_type = token_is_null_value;
 	p->lex.next_state = new_array_value;
@@ -419,7 +409,7 @@ bool bvn_action_array_dim_sep(bvnr_reader_t* p)
 {
 	if (!bvn_val_receive_event(p, ev_array_dim_start))
 		return false;
-	p->lex.arr_in_dim_seq[p->lex.array_nesting_level] = true;
+	p->lex.arr_frames[p->lex.array_nesting_level].in_dim_seq = true;
 	p->lex.next_state = array_dim_sep;
 	return true;
 }
@@ -635,10 +625,11 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			--l->array_nesting_level;
 			uint64_t level = l->array_nesting_level;
 			if (level < l->max_array_nesting) {
-				l->curr_row_size  = l->arr_saved_curr[level] + 1u;
-				l->array_row_size = l->arr_saved_row[level];
-				p->val.value_type  = l->arr_saved_vtype[level];
-				p->val.parsed_unit = l->arr_saved_vunit[level];
+				bvn_array_frame_t *f = &l->arr_frames[level];
+				l->curr_row_size  = f->saved_curr + 1u;
+				l->array_row_size = f->saved_row;
+				p->val.value_type  = f->saved_vtype;
+				p->val.parsed_unit = f->saved_vunit;
 			} else {
 				l->curr_row_size  = 0;
 				l->array_row_size = 0;
@@ -680,8 +671,8 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 	l->array_nesting_level = 0;
 	l->curr_row_size       = 0;
 	l->array_row_size      = 0;
-	memset(l->arr_dim_row_size, 0, sizeof(l->arr_dim_row_size));
-	memset(l->arr_in_dim_seq,   0, sizeof(l->arr_in_dim_seq));
+	memset(l->arr_frames, 0,
+		   (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
 	p->val.value_type          = BVN_TYPE_PLAIN;
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
 	p->val.has_annotation_unit = false;
@@ -978,7 +969,7 @@ static inline void bvn_set_eof_error(bvnr_reader_t* p, error_code_t err)
 	p->val.last_error = err;
 	bvn_set_error_pos(p, 0, p->lex.processed_bytes);
 }
-void bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
+bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
 {
 	memset(l, 0, sizeof(*l));
@@ -1011,6 +1002,11 @@ void bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	if (!l->max_struct_nesting)    l->max_struct_nesting    = UINT8_MAX;
 	if (!l->max_array_nesting || l->max_array_nesting > UINT8_MAX)
 		l->max_array_nesting = UINT8_MAX;
+	l->arr_frames = calloc(l->max_array_nesting + 1u,
+	                       sizeof(bvn_array_frame_t));
+	if (!l->arr_frames)
+		return false;
+	return true;
 }
 bool bvn_lex_run(bvnr_reader_t* r)
 {

@@ -175,6 +175,14 @@ typedef struct bvnr_raw_token_s {
 } bvnr_raw_token_t;
 typedef bool (*bvn_lex_sink_fn)(
 	bvnr_reader_t* r, const bvnr_raw_token_t* tok);
+typedef struct bvn_array_frame_s {
+	uint64_t		saved_curr;
+	uint64_t		saved_row;
+	value_type_spec_t	saved_vtype;
+	value_unit_t		saved_vunit;
+	uint64_t		dim_row_size;
+	bool			in_dim_seq;
+} bvn_array_frame_t;
 typedef struct bvnr_lexer_s {
 	bvnr_source_t		src;
 	bvnr_sink_t		src_dbg;
@@ -189,12 +197,7 @@ typedef struct bvnr_lexer_s {
 	uint64_t		curr_row_size;
 	bool			in_array_element;
 	uint64_t		array_nesting_level;
-	uint64_t		arr_saved_curr[UINT8_MAX+1];
-	uint64_t		arr_saved_row[UINT8_MAX+1];
-	value_type_spec_t	arr_saved_vtype[UINT8_MAX+1];
-	value_unit_t		arr_saved_vunit[UINT8_MAX+1];
-	uint64_t		arr_dim_row_size[UINT8_MAX+1];
-	bool			arr_in_dim_seq[UINT8_MAX+1];
+	bvn_array_frame_t	*arr_frames;
 	uint64_t		processed_bytes;
 	uint64_t		text_bytes;
 	uint8_t			utf8_need;
@@ -230,7 +233,7 @@ extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];
 extern const state_t  bvn_action_target_state[ACT__count];
 extern const state_t  bvn_kw_advance_state[dimension_state];
-void bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
+bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
 bool bvn_lex_run(bvnr_reader_t* r);
 bool bvn_action_set_state                 (bvnr_reader_t* p);

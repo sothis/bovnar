@@ -13,6 +13,8 @@ bvnr_reader_t* bvnr_reader_create(void)
 }
 void bvnr_reader_destroy(bvnr_reader_t* r)
 {
+	if (!r) return;
+	free(r->lex.arr_frames);
 	free(r);
 }
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
@@ -662,7 +664,8 @@ bool bvnr_open_read_source(
 		r->val.last_error = error_invalid_argument;
 		return false;
 	}
-	bvn_lex_init(&r->lex, src, dbg_sink, options);
+	if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
+		return false;
 	bvn_val_init(&r->val, options);
 	return true;
 }

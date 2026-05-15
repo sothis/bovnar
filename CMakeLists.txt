@@ -22,7 +22,7 @@ set(BVNR_C_FLAGS
 )
 
 set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
-set(CMAKE_C_FLAGS_RELEASE        "-O2 -g0" CACHE STRING "C flags for Release"         FORCE)
+set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0" CACHE STRING "C flags for Release"         FORCE)
 set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
 

@@ -1480,7 +1480,7 @@ static bmark_result_t bmark_run(bmark_profile_t profile,
 	count_flags.on_unverified = bmark_cfg.min_overhead ? NULL : bmark_event_counter;
 	bvnr_reader_t *r_count = bvnr_reader_create();
 	if (!r_count) { free(buf); return result; }
-	bool ok = bvnr_open_read_mem(r_count, buf, (uint32_t)actual_len,
+	bool ok = bvnr_open_read_mem(r_count, buf, (uint64_t)actual_len,
 	                             NULL, 0, &count_flags)
 	       && bvnr_read(r_count);
 	if (ok)
@@ -1502,7 +1502,7 @@ static bmark_result_t bmark_run(bmark_profile_t profile,
 		warm_flags.on_unverified = bmark_cfg.min_overhead ? NULL : bmark_event_counter;
 		bvnr_reader_t *r_warm = bvnr_reader_create();
 		if (r_warm) {
-			bvnr_open_read_mem(r_warm, buf, (uint32_t)actual_len,
+			bvnr_open_read_mem(r_warm, buf, (uint64_t)actual_len,
 			                   NULL, 0, &warm_flags);
 			bvnr_read(r_warm);
 			bvnr_reader_destroy(r_warm);
@@ -1519,7 +1519,7 @@ static bmark_result_t bmark_run(bmark_profile_t profile,
 		run_flags.on_unverified = bmark_cfg.min_overhead ? NULL : bmark_event_counter;
 		bvnr_reader_t *r_run = bvnr_reader_create();
 		if (!r_run) { free(buf); return result; }
-		if (!bvnr_open_read_mem(r_run, buf, (uint32_t)actual_len,
+		if (!bvnr_open_read_mem(r_run, buf, (uint64_t)actual_len,
 		                        NULL, 0, &run_flags)) {
 			bvnr_reader_destroy(r_run);
 			free(buf);

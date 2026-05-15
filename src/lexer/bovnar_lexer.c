@@ -643,12 +643,16 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 				l->curr_row_size  = 0;
 				l->array_row_size = 0;
 			}
+			if (!bvn_val_receive_event(p, ev_array_row_end))
+				return false;
 		}
 		l->in_array_element = (l->array_nesting_level > 0);
 		l->next_state = array_outro;
 	} else if (l->byte == '}') {
 		if (l->struct_nesting_level > 0) {
 			--l->struct_nesting_level;
+			if (!bvn_val_receive_event(p, ev_struct_end))
+				return false;
 		}
 		l->next_state = struct_outro;
 	} else {
@@ -662,6 +666,11 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 	if (l->resync_depth > 0) {
 		l->next_state = resync;
 		return true;
+	}
+	while (l->array_nesting_level > 0) {
+		--l->array_nesting_level;
+		if (!bvn_val_receive_event(p, ev_array_row_end))
+			return false;
 	}
 	l->token_type          = token_is_unknown;
 	l->str_len             = 0;

@@ -191,8 +191,8 @@ typedef struct bvnr_read_flags_s {
 	uint64_t	max_array_items;
 	uint64_t	max_text_bytes;
 	uint64_t	max_file_size;
-	uint64_t	max_struct_nesting;
-	uint64_t	max_array_nesting;
+	uint8_t		max_struct_nesting;
+	uint8_t		max_array_nesting;
 	void*		userdata;
 	bool		(*on_unverified)
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
@@ -214,8 +214,8 @@ typedef struct bvnr_write_flags_s {
 	uint64_t	max_array_items;
 	uint64_t	max_text_bytes;
 	uint64_t	max_file_size;
-	uint64_t	max_struct_nesting;
-	uint64_t	max_array_nesting;
+	uint8_t		max_struct_nesting;
+	uint8_t		max_array_nesting;
 	void*		userdata;
 	bool		(*on_event)
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);

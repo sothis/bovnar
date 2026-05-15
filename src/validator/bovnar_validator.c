@@ -279,6 +279,8 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 	}
 	if (tt != token_is_number && tt != token_is_array_number)
 		return true;
+	if (bvn_is_special_number_string((const char*)str))
+		return true;
 	uint32_t start = is_neg ? 1u : 0u;
 	for (uint32_t i = start; i < len; i++) {
 		uint8_t b = str[i];
@@ -298,11 +300,8 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 		}
 		uint32_t dv = bvn_char_to_digit((uint32_t)b, base);
 		if (dv >= base) {
-			if (base < 10u) {
-				v->last_error = error_digit_not_in_base;
-				return false;
-			}
-			continue;
+			v->last_error = error_digit_not_in_base;
+			return false;
 		}
 		bvn_acc_digit(v, dv, base);
 	}
@@ -656,14 +655,6 @@ bool bvnr_open_read_source(
 {
 	if (!r || !src || !src->pull)
 		return false;
-	if (options && options->max_array_nesting > UINT8_MAX) {
-		r->val.last_error = error_invalid_argument;
-		return false;
-	}
-	if (options && options->max_struct_nesting > UINT8_MAX) {
-		r->val.last_error = error_invalid_argument;
-		return false;
-	}
 	if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
 		return false;
 	bvn_val_init(&r->val, options);

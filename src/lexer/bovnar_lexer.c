@@ -635,20 +635,22 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			return true;
 		}
 		if (l->array_nesting_level > 0) {
+			if (!bvn_val_on_array_outro(p, l->curr_row_size,
+						    &l->array_row_size))
+				return false;
 			--l->array_nesting_level;
 			uint64_t level = l->array_nesting_level;
 			if (level < l->max_array_nesting) {
 				bvn_array_frame_t *f = &l->arr_frames[level];
-				l->curr_row_size  = f->saved_curr + 1u;
-				l->array_row_size = f->saved_row;
+				f->dim_row_size    = l->array_row_size;
+				l->curr_row_size   = f->saved_curr + 1u;
+				l->array_row_size  = f->saved_row;
 				p->val.value_type  = f->saved_vtype;
 				p->val.parsed_unit = f->saved_vunit;
 			} else {
 				l->curr_row_size  = 0;
 				l->array_row_size = 0;
 			}
-			if (!bvn_val_receive_event(p, ev_array_row_end))
-				return false;
 			l->in_array_element = (l->array_nesting_level > 0);
 			l->next_state = array_outro;
 		} else {
@@ -1061,12 +1063,20 @@ bool bvn_lex_run(bvnr_reader_t* r)
 	for (;;) {
 		if (!bvn_source_pull(&l->src, data, BOVN_READ_BUFFER_SIZE, &nb)) {
 			bvn_set_eof_error(r, error_reading_from_source_fd);
+			bvn_notify_error(r);
 			return false;
 		}
 		if (!nb) {
 			if ((l->next_state == value_outro ||
 				 l->next_state == undefined   ||
 				 l->next_state == first_bom) &&
+				!l->struct_nesting_level) {
+				r->val.last_error = error_none;
+				break;
+			}
+			if ((l->next_state == comment_intro ||
+				 l->next_state == ignore_comment_byte) &&
+				l->last_state == value_outro &&
 				!l->struct_nesting_level) {
 				r->val.last_error = error_none;
 				break;
@@ -1079,12 +1089,14 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				return false;
 			}
 			bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
+			bvn_notify_error(r);
 			return false;
 		}
 		l->processed_bytes += (uint64_t)nb;
 		if (l->max_file_size &&
 			l->processed_bytes > l->max_file_size) {
 			bvn_set_eof_error(r, error_file_too_long);
+			bvn_notify_error(r);
 			return false;
 		}
 		off = 0;
@@ -1100,6 +1112,7 @@ bool bvn_lex_run(bvnr_reader_t* r)
 								  consumed)) {
 					bvn_set_eof_error(r,
 						error_writing_to_sink);
+					bvn_notify_error(r);
 					return false;
 				}
 			}

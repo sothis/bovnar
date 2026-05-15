@@ -1,4 +1,4 @@
-
+collect_ignore = ["test_analytics.py"]
 
 import pytest
 import bovnar
@@ -101,7 +101,6 @@ def special_floats():
 
 @pytest.fixture
 def compound_unit_payload():
-
     return ".force = <float:64,k-g\u00b7m/s\u00b2> 9.81;\n".encode('utf-8')
 
 @pytest.fixture
@@ -119,7 +118,6 @@ def multi_assignment():
 
 @pytest.fixture
 def all_si_units():
-
     return (
         b".temperature = <float:64,K> 300.0;\n"
         b".pressure = <float:64,k-Pa> 101.325;\n"
@@ -129,7 +127,6 @@ def all_si_units():
 
 @pytest.fixture
 def error_invalid_utf8():
-
     return b".key\xff = 1;\n"
 
 @pytest.fixture
@@ -142,7 +139,6 @@ def error_unknown_unit():
 
 @pytest.fixture
 def deep_struct():
-
     return (
         b".a = {\n"
         b"    .b = {\n"

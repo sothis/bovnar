@@ -13,6 +13,15 @@
 #ifndef BOVN_READ_BUFFER_SIZE
 #define BOVN_READ_BUFFER_SIZE	4096u
 #endif
+typedef enum bvn_limit_defaults_e {
+	max_identifier_length = UINT8_MAX,
+	max_number_length     = UINT16_MAX,
+	max_string_length     = UINT16_MAX,
+	max_symbol_length     = UINT8_MAX,
+	max_reference_length  = UINT16_MAX,
+	max_struct_nesting    = 64,
+	max_array_nesting     = 64,
+} bvn_limit_defaults_t;
 static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
 	uint64_t offset)
 {
@@ -349,6 +358,7 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
 	++p->lex.array_nesting_level;
+	++p->lex.array_items;
 	bvn_acc_reset(&p->val);
 	if (!bvn_val_on_array_intro(p))
 		return false;
@@ -393,6 +403,7 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_too_many_array_items);
 		return false;
 	}
+	++p->lex.array_items;
 	if (!bvn_val_on_new_array_value(p, p->lex.curr_row_size,
 									p->lex.array_row_size))
 		return false;
@@ -651,6 +662,25 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 	}
 	return true;
 }
+static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
+{
+	bvnr_lexer_t* l = &p->lex;
+	l->token_type           = token_is_unknown;
+	l->str_len              = 0;
+	l->type_len             = 0;
+	l->in_array_element     = false;
+	l->struct_nesting_level = l->resync_saved_struct_nesting;
+	l->array_nesting_level  = 0;
+	l->curr_row_size        = 0;
+	l->array_row_size       = 0;
+	memset(l->arr_frames, 0,
+		   (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
+	p->val.value_type          = BVN_TYPE_PLAIN;
+	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
+	p->val.has_annotation_unit = false;
+	bvn_acc_reset(&p->val);
+	l->next_state = value_outro;
+}
 bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
@@ -660,24 +690,12 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 	}
 	while (l->array_nesting_level > 0) {
 		--l->array_nesting_level;
-		if (!bvn_val_receive_event(p, ev_array_row_end))
+		if (!bvn_val_receive_event(p, ev_array_row_end)) {
+			bvn_resync_semicolon_reset(p);
 			return false;
+		}
 	}
-	l->token_type          = token_is_unknown;
-	l->str_len             = 0;
-	l->type_len            = 0;
-	l->in_array_element    = false;
-	l->struct_nesting_level = l->resync_saved_struct_nesting;
-	l->array_nesting_level = 0;
-	l->curr_row_size       = 0;
-	l->array_row_size      = 0;
-	memset(l->arr_frames, 0,
-		   (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
-	p->val.value_type          = BVN_TYPE_PLAIN;
-	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
-	p->val.has_annotation_unit = false;
-	bvn_acc_reset(&p->val);
-	l->next_state = value_outro;
+	bvn_resync_semicolon_reset(p);
 	return true;
 }
 bool bvn_action_resync_string_intro(bvnr_reader_t* p)
@@ -902,6 +920,16 @@ static inline bool bvn_call_action_for_new_byte(bvnr_reader_t* p)
 	}
 	return bvn_action_table[idx](p);
 }
+static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
+{
+	if (l->byte == 0x0d) {
+		++l->line;
+		l->column = 0;
+	} else if (l->byte == 0x0a && prev != 0x0d) {
+		++l->line;
+		l->column = 0;
+	}
+}
 static bool bvn_interpret_input_buffer(
 	bvnr_reader_t* p, const uint8_t* data, uint32_t len,
 	uint32_t* consumed)
@@ -920,25 +948,18 @@ static bool bvn_interpret_input_buffer(
 		}
 		++l->text_bytes;
 		l->byte = data[idx];
-		if (l->byte == 0x0d) {
-			++l->line;
-			l->column = 0;
-		} else if (l->byte == 0x0a) {
-			if (l->prev_byte != 0x0d) {
-				++l->line;
-				l->column = 0;
-			}
-		} else if (l->byte == 0x09) {
+		if (l->byte == 0x09)
 			l->column += 4;
-		} else {
+		else
 			++l->column;
-		}
+		uint8_t prev = l->prev_byte;
 		l->prev_byte = (uint8_t)l->byte;
 		if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
 			p->val.last_error = error_invalid_utf8_byte;
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
 				l->text_bytes - 1);
 			bvn_notify_error(p);
+			bvn_advance_line(l, prev);
 			if (l->continue_on_error) {
 				bvn_enter_resync(p);
 				continue;
@@ -950,11 +971,14 @@ static bool bvn_interpret_input_buffer(
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
 				l->text_bytes - 1);
 			bvn_notify_error(p);
+			bvn_advance_line(l, prev);
 			if (l->continue_on_error) {
 				bvn_enter_resync(p);
 			} else {
 				return false;
 			}
+		} else {
+			bvn_advance_line(l, prev);
 		}
 		if (l->next_state == octet_stream_intro) {
 			*consumed = idx + 1;
@@ -994,16 +1018,14 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 		l->max_array_nesting     = opts->max_array_nesting;
 		l->continue_on_error     = opts->continue_on_error;
 	}
-	if (!l->max_identifier_length) l->max_identifier_length = UINT8_MAX;
-	if (!l->max_number_length)     l->max_number_length     = UINT16_MAX;
-	if (!l->max_string_length)     l->max_string_length     = UINT16_MAX;
-	if (!l->max_symbol_length)     l->max_symbol_length     = UINT8_MAX;
-	if (!l->max_reference_length)  l->max_reference_length  = UINT16_MAX;
-	if (!l->max_struct_nesting)    l->max_struct_nesting    = UINT8_MAX;
-	if (!l->max_array_nesting || l->max_array_nesting > UINT8_MAX)
-		l->max_array_nesting = UINT8_MAX;
-	l->arr_frames = calloc(l->max_array_nesting + 1u,
-	                       sizeof(bvn_array_frame_t));
+	if (!l->max_identifier_length) l->max_identifier_length = max_identifier_length;
+	if (!l->max_number_length)     l->max_number_length     = max_number_length;
+	if (!l->max_string_length)     l->max_string_length     = max_string_length;
+	if (!l->max_symbol_length)     l->max_symbol_length     = max_symbol_length;
+	if (!l->max_reference_length)  l->max_reference_length  = max_reference_length;
+	if (!l->max_struct_nesting)    l->max_struct_nesting    = max_struct_nesting;
+	if (!l->max_array_nesting)     l->max_array_nesting     = max_array_nesting;
+	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
 	if (!l->arr_frames)
 		return false;
 	return true;

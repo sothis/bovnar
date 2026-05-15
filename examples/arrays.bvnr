@@ -90,7 +90,7 @@
 .nested_equal   = [[1, 2], [3, 4]];           # two 2-element sub-arrays: OK
 .nested_unequal = [[1, 2], [3, 4, 5]];        # different sizes in element pos: OK
                                                # (nested arrays are elements, not sub-rows)
-.tensor_2d = [[1, 2]/[3, 4], [5, 6]/[7, 8]]/[];  # nested 2D arrays as elements
+.tensor_2d = [[1, 2]/[3, 4], [5, 6]/[7, 8]];  # nested 2D arrays as elements
 
 
 # ── 11. Structs as array elements ────────────────────────────────────────────

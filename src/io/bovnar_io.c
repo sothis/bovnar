@@ -38,7 +38,7 @@ static bool push_fd(bvnr_sink_t* s, const void* buf, uint32_t len)
 			errno = ENOSPC;
 			return false;
 		}
-		s->mem_written += (uint32_t)n;
+		s->mem_written += (uint64_t)n;
 		buf = (const uint8_t*)buf + n;
 		len -= (uint32_t)n;
 	}

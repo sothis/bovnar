@@ -904,9 +904,8 @@ static inline bool bvn_call_action_for_new_byte(bvnr_reader_t* p)
 }
 static bool bvn_interpret_input_buffer(
 	bvnr_reader_t* p, const uint8_t* data, uint32_t len,
-	uint32_t* consumed, bvn_lex_sink_fn sink)
+	uint32_t* consumed)
 {
-	(void)sink;
 	bvnr_lexer_t* l = &p->lex;
 	for (uint32_t idx = 0; idx < len; ++idx) {
 		if (l->max_text_bytes &&
@@ -1004,7 +1003,7 @@ void bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	if (!l->max_array_nesting || l->max_array_nesting > UINT8_MAX)
 		l->max_array_nesting = UINT8_MAX;
 }
-bool bvn_lex_run(bvnr_reader_t* r, bvn_lex_sink_fn sink)
+bool bvn_lex_run(bvnr_reader_t* r)
 {
 	bvnr_lexer_t* l = &r->lex;
 	uint8_t data[BOVN_READ_BUFFER_SIZE];
@@ -1029,6 +1028,7 @@ bool bvn_lex_run(bvnr_reader_t* r, bvn_lex_sink_fn sink)
 				l->next_state == resync_string ||
 				l->next_state == resync_string_escape ||
 				l->next_state == resync_comment) {
+				bvn_notify_error(r);
 				return false;
 			}
 			bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
@@ -1044,7 +1044,7 @@ bool bvn_lex_run(bvnr_reader_t* r, bvn_lex_sink_fn sink)
 		while (off < nb) {
 			uint32_t text_start = off;
 			if (!bvn_interpret_input_buffer(r, data + off,
-											nb - off, &consumed, sink))
+											nb - off, &consumed))
 				return false;
 			off += consumed;
 			if (l->use_dbg && consumed) {

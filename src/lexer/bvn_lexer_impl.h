@@ -232,7 +232,7 @@ extern const state_t  bvn_action_target_state[ACT__count];
 extern const state_t  bvn_kw_advance_state[dimension_state];
 void bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
-bool bvn_lex_run(bvnr_reader_t* r, bvn_lex_sink_fn sink);
+bool bvn_lex_run(bvnr_reader_t* r);
 bool bvn_action_set_state                 (bvnr_reader_t* p);
 bool bvn_action_ignore_whitespace         (bvnr_reader_t* p);
 bool bvn_action_comment_intro             (bvnr_reader_t* p);

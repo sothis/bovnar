@@ -689,7 +689,7 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	long ndigits = (prec * 302L + 999L) / 1000L + 4L;
 	long k = ndigits - 1L - E10;
 	if (f->_nlimbs > (UINT32_MAX - 4u) / 2u) return -1;
-	bvnf_bn M = {0}; if (!bvnf_bn_init(&M, f->_nlimbs * 2u + 4u)) return -1;
+	bvnf_bn M = {0}; if (!bvnf_bn_init(&M, f->_nlimbs * 2u)) return -1;
 	if (!bvnf_bn_from_float_mant(&M, f)) { bvnf_bn_free(&M); return -1; }
 	long net2 = e2 + k;
 	if (k >= 0) {

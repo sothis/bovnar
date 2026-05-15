@@ -750,10 +750,11 @@ static JsonNode *json_parse_object(const char **p)
 		if (!val) { free(key); json_free_node(node); return NULL; }
 		if (node->u.obj.count == cap) {
 			cap *= 2;
-			char    **tk = realloc(node->u.obj.keys,   cap * sizeof(*node->u.obj.keys));
+			char **tk = realloc(node->u.obj.keys, cap * sizeof(*node->u.obj.keys));
+			if (!tk) { free(key); json_free_node(val); json_free_node(node); return NULL; }
+			node->u.obj.keys = tk;
 			JsonNode **tv = realloc(node->u.obj.values, cap * sizeof(*node->u.obj.values));
-			if (!tk || !tv) { free(key); json_free_node(val); json_free_node(node); return NULL; }
-			node->u.obj.keys   = tk;
+			if (!tv) { free(key); json_free_node(val); json_free_node(node); return NULL; }
 			node->u.obj.values = tv;
 		}
 		node->u.obj.keys[node->u.obj.count]   = key;

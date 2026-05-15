@@ -614,7 +614,7 @@ bool bvn_val_on_new_array_value(bvnr_reader_t* r,
 }
 bool bvnr_read(bvnr_reader_t* r)
 {
-	bool ok = bvn_lex_run(r, bvn_val_receive);
+	bool ok = bvn_lex_run(r);
 	if (ok && r->val.use_dbg && r->val.dbg_ser.need_semi) {
 		bvnr_sink_t* s = &r->val.dbg_ser.sink;
 		if (!bvn_sink_push(s, ";", 1)) return false;

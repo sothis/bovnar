@@ -608,14 +608,12 @@ static void test_validation_errors(void)
     err = read_error(".x = <float_fix:32,q8> 5;\n");
     CHECK(err == error_none, "float_fix: bare integer value ok");
 
-    /* String tokens: the validator accepts quoted strings for all numeric
-     * families (they are used for non-decimal bases and special values).
-     * Content validation happens at application level, not in bovnar. */
+    /* String tokens: the validator now enforces numeric content for float_fix and float_dec. */
     err = read_error(".x = <float_fix:32,q8> \"hello\";\n");
-    CHECK(err == error_none, "float_fix: quoted string accepted at validator level");
+    CHECK(err == error_digit_not_in_base, "float_fix: non-numeric string rejected");
 
     err = read_error(".x = <float_dec:64> \"hello\";\n");
-    CHECK(err == error_none, "float_dec: quoted string accepted at validator level");
+    CHECK(err == error_digit_not_in_base, "float_dec: non-numeric string rejected");
 
     /* float_dec and float_fix accept dot and exponent. */
     err = read_error(".x = <float_fix:32,q16> 1.5;\n");

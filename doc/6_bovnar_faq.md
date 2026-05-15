@@ -1,0 +1,1140 @@
+# Bovnar (BVNR) — Frequently Asked Questions
+
+> **Applies to:** Bovnar specification v1.3 Working Draft
+
+---
+
+## Table of Contents
+
+1. [General](#1-general)
+2. [File Format and Syntax](#2-file-format-and-syntax)
+3. [Type System and Annotations](#3-type-system-and-annotations)
+4. [Units](#4-units)
+5. [Numbers and Special Values](#5-numbers-and-special-values)
+6. [Strings](#6-strings)
+7. [Arrays](#7-arrays)
+8. [Structs](#8-structs)
+9. [Null, Symbols, and References](#9-null-symbols-and-references)
+10. [Octet Streams](#10-octet-streams)
+11. [Error Handling and Debugging](#11-error-handling-and-debugging)
+12. [C API](#12-c-api)
+13. [Python Bindings](#13-python-bindings)
+14. [Limits and Performance](#14-limits-and-performance)
+15. [Why C99 and Not C23?](#15-why-c99-and-not-c23)
+
+---
+
+## 1. General
+
+**What problem does Bovnar solve that JSON or Protobuf do not?**
+
+JSON loses type precision. `9.81` tells you nothing about whether the value is
+a float or an integer, 32-bit or 64-bit, and it carries no physical meaning.
+Protobuf recovers type precision but requires a `.proto` schema file and a
+code-generation step. YAML carries richer semantics but is notoriously
+error-prone to parse correctly.
+
+Bovnar is self-describing at the per-value level: every value in a `.bvnr`
+stream carries its type family, bit-width, numeric base, and physical unit
+inside the same byte stream. No external schema is required. You can hand a
+`.bvnr` file to anyone and they have everything they need to interpret it
+exactly as the author intended.
+
+---
+
+**Is Bovnar a binary or a text format?**
+
+It is primarily a text format. The syntax is UTF-8 prose that is readable and
+writable by hand. The one binary escape mechanism — the octet stream (`0x00`
+framing) — lets you embed opaque binary payloads without Base64 overhead.
+Outside of octet-stream regions the parser enforces strict UTF-8 validity.
+
+---
+
+**Does Bovnar perform unit conversion or dimensional analysis?**
+
+No. The unit annotation is parsed, validated, and delivered to the application
+through the event API, but Bovnar itself never converts between compatible
+units. That is deliberately left to the application. The Python bindings expose
+helper functions (`unit_convert_factor`, `convert_value`, `units_compatible`)
+that applications can use to implement dimensional checking and conversion on
+top of the parsed unit data.
+
+---
+
+**Is there an official file extension?**
+
+Yes. The canonical extension is `.bvnr`.
+
+---
+
+**Which version of the specification does the reference implementation target?**
+
+Version 1.3 (Working Draft, last updated 2026-05-12).
+
+---
+
+## 2. File Format and Syntax
+
+**What is the minimum valid Bovnar file?**
+
+An empty file (zero bytes) is valid. A file with a single assignment is the
+practical minimum:
+
+```bovnar
+.key = value;
+```
+
+---
+
+**Why do keys start with a dot?**
+
+The leading dot is a hard syntactic marker. It unambiguously separates key
+tokens from value tokens anywhere in the stream, including inside structs and
+arrays-of-structs. The parser uses it as the entry point for the identifier
+state machine.
+
+---
+
+**Can I use Unicode characters in key names?**
+
+Yes, with restrictions. UTF-8 leader bytes in the range `0xC3–0xF4` are valid
+at both the start and body of an identifier, covering most non-ASCII letters.
+The one excluded range is `0xC2` (U+0080–U+00BF), which is explicitly rejected
+everywhere in identifiers. The following ASCII punctuation characters are also
+hard errors inside identifier bodies:
+
+```
+! " # $ % & ' ( ) * , . / : ; < = > ? @ [ \ ] ^ ` { | } ~
+```
+
+The characters `+`, `-`, and `_` are allowed in identifier bodies (but not as
+the first character, except for `_`).
+
+---
+
+**Can a key start with a digit?**
+
+No. Identifiers must begin with a letter (`A–Z`, `a–z`), an underscore, or a
+valid UTF-8 leader byte. A leading digit is a hard parse error.
+
+---
+
+**Are comments supported?**
+
+Yes. A `#` character starts a comment that runs to the end of the line. Comments
+are legal anywhere whitespace is legal — before the first assignment, between
+tokens, and at the end of a value line:
+
+```bovnar
+# full-line comment
+.port = 5432;   # inline comment
+```
+
+---
+
+**Is whitespace significant?**
+
+No, except as a token separator and (required) separator between a scalar value
+and an inline unit suffix. Indentation and blank lines are purely cosmetic and
+are freely interleaved between all tokens.
+
+---
+
+**Is a UTF-8 BOM accepted?**
+
+A UTF-8 BOM (`EF BB BF`) is accepted only at byte offset 0 of the stream.
+A BOM appearing later in a comment or string is valid UTF-8 and passes through
+without error. A BOM in any non-zero, non-string position is
+`error_invalid_byte_order_mark`.
+
+---
+
+## 3. Type System and Annotations
+
+**What are the six type families?**
+
+| Keyword | Description |
+|---|---|
+| `uint` | Unsigned integer |
+| `sint` | Signed integer |
+| `float` | IEEE 754 binary floating-point |
+| `float_fix` | Q-format signed fixed-point |
+| `float_dec` | IEEE 754-2008 decimal floating-point |
+| `utf8` | UTF-8 string |
+
+---
+
+**What is default type synthesis?**
+
+When no explicit type annotation is present, the parser synthesises one based
+on the literal:
+
+- Positive integer literal → `uint:64`
+- Negative integer literal → `sint:64`
+- Literal containing `.` or `e` → `float:64`
+- Quoted string → `utf8`
+
+This is called default type synthesis and is convenient for configuration files
+and quick hand-authored data. For precision-sensitive use cases, always write an
+explicit annotation.
+
+---
+
+**Where exactly does the type annotation go?**
+
+Between `=` and the value — never on the key, and never after the value:
+
+```bovnar
+.port = <uint:16> 443;       # correct
+.port<uint:16> = 443;        # WRONG — hard error
+.port = 443 <uint:16>;       # WRONG — hard error
+```
+
+---
+
+**Can annotation parameters appear in any order?**
+
+Yes. Width, base, and unit are distinguished by their syntactic form, not by
+position. The following three are equivalent:
+
+```bovnar
+.x = <uint:32,_16,m> "1F4";
+.x = <uint:_16,m,32> "1F4";
+.x = <uint:m,32,_16> "1F4";
+```
+
+---
+
+**What widths are valid for each type family?**
+
+| Family | Valid widths |
+|---|---|
+| `uint`, `sint` | Any positive integer (e.g. `<uint:12>` is legal for a 12-bit ADC) |
+| `float` | `0` (→64), `16`, and any multiple of `32` up to `32768` |
+| `float_fix` | `0` (→64), `16`, `32`, `64`, `128`, `256` |
+| `float_dec` | `0` (→64), `16`, `32`, `64`, `128`, `256` |
+
+Width `0` always means "use the default," which is 64 bits for all families.
+Width `8` is legal for `uint`/`sint` but is a hard error for all float families.
+A non-multiple-of-32 (other than 16) width for `float` is `error_illegal_value_type`.
+
+---
+
+**What is the `float_fix` (Q-format) type and how is it annotated?**
+
+`float_fix` encodes a value as a signed integer with a declared number of
+fractional bits. The mathematical value is `raw_integer × 2⁻Q`. The annotation
+requires a `qN` parameter specifying fractional bits:
+
+```bovnar
+.pid = <float_fix:32,q16> -1.5;    # 32-bit, 16 fractional bits
+.adc = <float_fix:16,q8,°C> 25.0;  # 16-bit Q8 with a unit
+```
+
+Q must satisfy `0 ≤ Q < effective_width`. `<float_fix:16,q16>` is illegal.
+The base parameter (`_N`) is forbidden for `float_fix`.
+
+---
+
+**What is `float_dec` and when should I use it?**
+
+`float_dec` is IEEE 754-2008 decimal floating-point. Binary floats cannot
+represent `0.1` exactly; decimal floats can. Use `float_dec` in financial,
+metrological, or billing contexts where exact decimal representation matters.
+The base parameter is forbidden for `float_dec` as well.
+
+---
+
+**Can I annotate a string value with a type?**
+
+Yes, with `<utf8>`:
+
+```bovnar
+.label = <utf8> "hello";
+```
+
+This is redundant — a bare quoted literal is already synthesised as `utf8` — but
+it makes the type explicit, which is useful for documentation and tooling. A unit
+parameter inside a `<utf8>` annotation is lexically accepted and stored but
+semantically ignored; no error is raised.
+
+---
+
+## 4. Units
+
+**What is the purpose of the unit annotation?**
+
+Physical units are a first-class part of the type system, not a comment field.
+Attaching a unit to a value makes the data self-documenting and enables the
+consuming application to perform dimensional verification and conversion. The
+parser fully validates every unit expression and exposes the structured result
+through the `value_unit_t` field of the `ev_data` event.
+
+---
+
+**How do I write a simple unit?**
+
+Place the unit symbol inside the angle brackets after the other type parameters:
+
+```bovnar
+.distance  = <uint:64,m>      384400000;
+.voltage   = <float:32,V>     3.3;
+.frequency = <float:64,Hz>    2400000000;
+```
+
+---
+
+**How do SI prefixes work, and why is the hyphen mandatory?**
+
+An SI prefix is written before the unit symbol with a mandatory hyphen
+separator: `k-m` (kilometer), `m-V` (millivolt), `G-Hz` (gigahertz). The
+hyphen is required because without it there is no general way to distinguish
+a two-character unit symbol from a one-character prefix followed by a
+one-character unit — `mV` would be ambiguous. The hyphen resolves all such
+cases unambiguously:
+
+```bovnar
+.k_ohm = <float:32,k-Ω> 4.7;
+.micro = <float:32,µ-s> 50.0;
+.giga  = <float:64,G-Hz> 2.4;
+```
+
+IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, …) follow the same rule:
+
+```bovnar
+.ram  = <uint:64,Gi-B> 8;
+.disk = <uint:64,Ti-B> 2;
+```
+
+---
+
+**What is the difference between `M-B` (megabytes) and `Mi-B` (mebibytes)?**
+
+`M-` is the SI decimal prefix (mega = 10⁶). `Mi-` is the IEC binary prefix
+(mebi = 2²⁰ = 1,048,576). The difference matters for storage:
+
+```bovnar
+.link_rate = <uint:32,M-b>  1000;   # 1 000 × 10⁶ bits
+.cache     = <uint:64,Mi-B> 512;    # 512 × 2²⁰ bytes
+```
+
+---
+
+**How do I write compound units like m/s² or kg·m/s²?**
+
+Use `*` or the middle-dot `·` (U+00B7) for multiplication and `/` for division:
+
+```bovnar
+.velocity     = <float:64,m/s>          9.81;
+.acceleration = <float:64,m/s²>         9.81;
+.force        = <float:64,k-g·m/s²>     9.81;
+.energy       = <float:64,k-g·m²/s²>    1000.0;
+```
+
+The `/` separator is a one-way switch: once written, every subsequent component
+is in the denominator. To place a component back in the numerator after a
+divisor, use a negative exponent instead:
+
+```bovnar
+.force_alt = <float:64,k-g·m·s⁻²> 9.81;   # identical to k-g·m/s²
+```
+
+The maximum number of unit components in a compound unit is 8; exceeding that
+is `error_unit_illegal`.
+
+---
+
+**Can exponents be written in ASCII instead of Unicode superscripts?**
+
+Yes. Both forms are accepted and produce identical internal representations:
+
+```bovnar
+.area1 = <float:64,m²>   100.0;   # Unicode superscript
+.area2 = <float:64,m^2>  100.0;   # ASCII caret form — same result
+.inv1  = <float:64,s⁻¹>  50.0;
+.inv2  = <float:64,s^-1> 50.0;
+```
+
+Only a single ASCII digit is supported after `^`; multi-digit exponents are
+a parse error.
+
+---
+
+**What does `no_unit` mean, and how does it differ from omitting the unit?**
+
+Both mean "dimensionless," but they produce distinct internal states:
+
+- Omitting the unit parameter → `BVN_UNIT_NO_PREFIX(bu_none)`:
+  `num_components == 1`, `base == bu_none`.
+- Writing `no_unit` explicitly → `BVN_UNIT_NONE`:
+  `num_components == 0`.
+
+Both compare as compatible via `bvn_units_compatible` and both serialise to
+`"no_unit"` via `bvn_unit_to_string`. The distinction is expressive: explicit
+`no_unit` signals that the author actively chose dimensionless, whereas an
+omitted unit might mean the author simply did not think about units. For
+documentation-grade data, prefer the explicit form.
+
+---
+
+**Can I write a unit as an inline suffix instead of inside the annotation?**
+
+Yes, for scalar values in non-array context. Write the unit directly after the
+value literal, separated by at least one whitespace character:
+
+```bovnar
+.speed   = 9.81 m/s;       # no annotation; inline unit adopted
+.mass    = 70.0 k-g;
+.storage = 65536 B;
+```
+
+The inline unit is forbidden inside array elements — any letter or underscore
+following an array-element value is `error_unexpected_input_byte`. If both
+an annotation unit and an inline unit are present, they must be identical;
+a mismatch is `error_unit_mismatch`.
+
+---
+
+**How many base units does Bovnar support?**
+
+44 named units: the 7 SI base units, 21 named SI-derived units (hertz through
+katal, plus radian and steradian), and 16 non-SI units accepted for use with
+SI (liter, minute, hour, day, degree, arcminute, arcsecond, hectare, tonne,
+bar, electronvolt, dalton, astronomical unit, week, year, and the bit and byte
+for digital quantities). The `bu_gram` base unit is used for mass so that the
+`k-` prefix can carry the kilo: `k-g` = kilogram.
+
+---
+
+## 5. Numbers and Special Values
+
+**Do I need to quote non-decimal numbers?**
+
+Yes. Bovnar's lexer distinguishes bare words (symbols) from numbers by context.
+A bare `FF` in value position is a symbol, not a hex number, and will produce
+`error_type_value_mismatch`. Any non-decimal value must be a quoted string:
+
+```bovnar
+.hex = <uint:8,_16>  "FF";       # correct — 255
+.hex = <uint:8,_16>  FF;         # WRONG — FF is a symbol
+.bin = <uint:8,_2>   "11010110"; # correct
+```
+
+For signed non-decimal values, the minus sign goes inside the string:
+
+```bovnar
+.neg = <sint:32,_16> "-7FFFFFFF";
+```
+
+---
+
+**What base systems are supported?**
+
+`_2` (binary), `_8` (octal), `_10` (decimal, the default), `_16` (hexadecimal),
+`_36`, `_62`, `_64`, and `_85`. Only `float` accepts `_16` in addition to `_10`;
+all other float families reject the base parameter entirely.
+
+---
+
+**What are the special number literals?**
+
+Three special values bypass normal numeric parsing. Both dollar signs are
+mandatory:
+
+```bovnar
+.nan = $nan$;
+.inf = $infinity$;
+.neg = $-infinity$;
+```
+
+They are valid in both typed and untyped context and may be combined with any
+float type annotation.
+
+---
+
+**Are leading zeros legal in decimal integers?**
+
+Yes. `007` parses as the integer `7`. There is no octal interpretation — the
+leading zeros are ignored.
+
+---
+
+**Are there shorthand float forms like `-.5` or `123.`?**
+
+Yes. Both leading-dot (`.5` or `-.5`) and trailing-dot (`123.`) forms are valid
+for `float:64`:
+
+```bovnar
+.a = -.5;     # -0.5 as float:64
+.b = 123.;    # 123.0 as float:64
+```
+
+---
+
+## 6. Strings
+
+**What escape sequences are defined?**
+
+Exactly seven:
+
+| Escape | Meaning |
+|---|---|
+| `\t` | Horizontal tab |
+| `\n` | Line feed |
+| `\v` | Vertical tab |
+| `\f` | Form feed |
+| `\r` | Carriage return |
+| `\"` | Double quote |
+| `\\` | Backslash |
+
+Any other character after a backslash is `error_illegal_escape_sequence`. There
+is no `\uXXXX`, no `\xNN`, and no `\0`. If you need to embed arbitrary binary
+data, use an octet stream.
+
+---
+
+**Can strings span multiple lines?**
+
+Yes. Raw whitespace bytes (HT, LF, VT, FF, CR) are accepted unescaped inside
+string literals:
+
+```bovnar
+.poem = "roses are red
+violets are blue";
+```
+
+---
+
+**How does string concatenation work?**
+
+Adjacent string literals separated only by whitespace or comments are
+concatenated at lex time. This is the idiomatic way to split a long string
+across lines:
+
+```bovnar
+.url  = "https://" "api.example.com" "/v1";
+.guid = <uint:128,_16> "deadbeef"
+                       "cafebabe"
+                       "01234567"
+                       "89abcdef";
+```
+
+The combined byte length must not exceed `max_string_length` (default 65535).
+
+---
+
+**Is the `<utf8>` annotation ever required?**
+
+No. A bare quoted literal is always synthesised as `utf8`. The annotation is
+purely optional and expressive.
+
+---
+
+## 7. Arrays
+
+**What is the basic array syntax?**
+
+Comma-separated values inside square brackets:
+
+```bovnar
+.primes = [2, 3, 5, 7, 11];
+```
+
+---
+
+**How are multi-dimensional arrays written?**
+
+Rows are separated by `/`:
+
+```bovnar
+.matrix = [1, 2, 3]/[4, 5, 6]/[7, 8, 9];
+```
+
+Each `/[…]` is a new row dimension. The parser emits `ev_array_row_start` and
+`ev_array_row_end` events for each row and `ev_array_dim_start` for each `/`
+separator.
+
+---
+
+**Can array elements have different types?**
+
+Yes. Annotations can be per-element rather than per-array:
+
+```bovnar
+.mixed = [<uint:8> 1, <sint:8> -1, <float:32> 3.14];
+```
+
+A whole-array annotation (placed before `[`) is the default type for elements
+that do not carry their own annotation:
+
+```bovnar
+.ports = <uint:16> [80, 443, 8080];
+```
+
+---
+
+**How do null elements work inside arrays?**
+
+Leading, trailing, or consecutive commas produce null elements:
+
+```bovnar
+.sparse = [, 1, , 2, ];   # null, 1, null, 2, null — five elements
+```
+
+---
+
+**Can I nest arrays?**
+
+Yes, inner arrays are just element values:
+
+```bovnar
+.nested = [[1, 2], [3, 4, 5]];   # valid; inner arrays may have unequal lengths
+```
+
+Note: the `/` row-separator syntax applies at the outermost level. Each
+`/[…]` block is a row, not a nested array.
+
+---
+
+**Are inline unit suffixes allowed inside arrays?**
+
+No. The inline unit suffix is forbidden at the lexer level for all array
+elements. Any letter or underscore following an array-element value token is
+`error_unexpected_input_byte`.
+
+---
+
+## 8. Structs
+
+**What is the struct syntax?**
+
+A struct groups zero or more assignments inside `{…}`. Every field inside is a
+complete `.key = value;` assignment. The struct value at the parent level ends
+with `};`:
+
+```bovnar
+.server = {
+    .host = "db.internal";
+    .port = <uint:16> 5432;
+};
+```
+
+---
+
+**How deeply can structs nest?**
+
+Up to 255 levels (the enforced maximum). An empty struct (`{}`) is valid. An
+unmatched closing brace is `error_illegal_struct_close`.
+
+---
+
+**Are structs valid as array elements?**
+
+Yes:
+
+```bovnar
+.sensors = [
+    {.id = <uint:8> 0; .value = <float:32,°C> 27.3;},
+    {.id = <uint:8> 1; .value = <float:32,°C> 31.7;}
+];
+```
+
+---
+
+## 9. Null, Symbols, and References
+
+**What is a null value?**
+
+An explicit absence of value — nothing between `=` and `;`:
+
+```bovnar
+.nothing    = ;              # null, no type annotation
+.typed_null = <uint:32> ;    # null with an explicit type
+```
+
+---
+
+**What is a symbol?**
+
+A bare, unquoted word in value position. Bovnar has no native boolean type;
+`true` and `false` are simply symbols by convention:
+
+```bovnar
+.status  = ok;
+.enabled = true;    # symbol "true", not a boolean keyword
+.day     = Monday;
+```
+
+Symbol bodies follow the same character rules as identifier bodies. The key
+distinction from an identifier is context: identifiers appear after the leading
+dot, symbols appear as values.
+
+---
+
+**What is a reference?**
+
+A dotted path to another key in the document, introduced by `&`. The parser
+stores the path as a string token; it does not resolve it — resolution is left
+entirely to the application:
+
+```bovnar
+.host       = "db.internal";
+.conn_host  = &.host;             # stored as ".host"
+.deep       = &.config.db.host;   # multi-segment path
+```
+
+---
+
+## 10. Octet Streams
+
+**When should I use an octet stream?**
+
+When you need to embed raw binary data without Base64 overhead. A NUL byte
+(`0x00`) in value position switches the parser into binary chunk mode. The
+UTF-8 validator is suspended for the duration of the binary region.
+
+In practice you will not hand-author octet streams. Use the writer API, which
+generates the correct framing automatically:
+
+```
+0x00                     ← stream open
+  0x01 <LL> <LL> <data>  ← chunk: tag 0x01, length as little-endian uint16, data
+0x00                     ← stream close
+```
+
+A length value of `0x0000` means exactly 65536 bytes. Any tag byte other than
+`0x01` (chunk) or `0x00` (close) inside a stream is
+`error_octet_stream_out_of_sync`.
+
+---
+
+## 11. Error Handling and Debugging
+
+**What information does a parse error carry?**
+
+Every error includes:
+
+- `error_code_t` — a named code (e.g. `error_value_out_of_range`)
+- Line number and column number in the input stream
+- Byte offset from stream start
+- The raw byte value that triggered the error
+
+Retrieve these after a failed `bvnr_read`:
+
+```c
+fprintf(stderr, "%s at line %" PRIu64 " col %" PRIu64
+        " offset %" PRIu64 " byte 0x%02X\n",
+        bvn_error_to_string(bvnr_reader_get_error(r)),
+        bvnr_reader_get_error_line(r),
+        bvnr_reader_get_error_column(r),
+        bvnr_reader_get_error_offset(r),
+        bvnr_reader_get_error_byte(r));
+```
+
+---
+
+**What is `continue_on_error` mode and when should I use it?**
+
+When `continue_on_error` is set in `bvnr_read_flags_t`, a parse error invokes
+the `on_error` callback and enters a resync state machine that skips bytes while
+tracking bracket and brace nesting. Once the resync state machine finds a `;`
+at the original nesting depth, normal parsing resumes. The recovery count
+(accessible via `bvnr_reader_get_recovery_count`) is incremented at error entry,
+not on resync completion.
+
+Use this mode for log streams and unreliable transports where a single malformed
+assignment should not discard the rest of the file. For configuration and data
+serialization, disable it and fail fast.
+
+---
+
+**What does `error_type_value_mismatch` mean?**
+
+The value token is incompatible with the declared type annotation. The most
+common cause is a non-decimal number written as a bare word (symbol) instead of
+a quoted string:
+
+```bovnar
+.x = <uint:8,_16> FF;   # FF is a symbol → error_type_value_mismatch
+.x = <uint:8,_16> "FF"; # correct
+```
+
+---
+
+**What causes `error_unit_mismatch`?**
+
+An inline unit suffix and a type-annotation unit are both present but resolve
+to different `value_unit_t` values:
+
+```bovnar
+.bad = <float:64,m> 1.0 s;   # annotation says m, inline says s → error
+```
+
+Semantically equivalent notations that parse to the same internal representation
+(e.g. `m/s` and `m·s⁻¹`) compare as equal and do not trigger this error.
+
+---
+
+**What are the most common mistakes?**
+
+| Mistake | Error produced |
+|---|---|
+| Annotation on the key side of `=` | `error_unexpected_input_byte` |
+| Non-decimal value not quoted | `error_type_value_mismatch` |
+| Signed value in an unsigned type | `error_value_out_of_range` |
+| Integer overflow (e.g. `<uint:8> 256`) | `error_value_out_of_range` |
+| `<float:8>` or a non-16, non-multiple-of-32 width for `float` | `error_illegal_value_type` |
+| Base parameter on `float_fix` or `float_dec` | `error_illegal_value_type` |
+| `q ≥ width` in `float_fix` | `error_illegal_value_type` |
+| Empty unit component (`m//s`) | `error_unit_illegal` |
+| More than 8 unit components | `error_unit_illegal` |
+| Inline unit suffix inside an array | `error_unexpected_input_byte` |
+| Unknown escape sequence (`\x`, `\0`, `\uXXXX`) | `error_illegal_escape_sequence` |
+| Unmatched `}` | `error_illegal_struct_close` |
+| Empty key (`.= value;`) | `error_empty_identifier` |
+
+---
+
+## 12. C API
+
+**What is the overall reader lifecycle?**
+
+```
+bvnr_reader_create()
+  → bvnr_source_from_fd() or bvnr_source_from_mem()
+  → bvnr_open_read_source() or bvnr_open_read_mem()
+  → bvnr_read()
+  → bvnr_reader_destroy()
+```
+
+The reader does not allocate during `bvnr_read`; all buffering is internal to
+the reader struct. The `bvnr_read_flags_t` struct is read only during
+`bvnr_open_read_source` and may live on the stack.
+
+---
+
+**Which callback should I implement — `on_verified` or `on_unverified`?**
+
+Almost always `on_verified`. This callback receives fully validated events after
+semantic checking. `on_unverified` fires before validation and receives raw token
+events; use it only for diagnostics or partial pre-inspection.
+
+There is an important asymmetry for `ev_type_annotation_start`:
+- `on_unverified` receives it with raw annotation bytes but no `value_type` or
+  `value_unit` populated.
+- `on_verified` receives it with `value_type` and `value_unit` filled in.
+
+All other type-annotation events and `ev_data` are emitted to both callbacks
+simultaneously.
+
+---
+
+**Do callbacks need to return anything?**
+
+Yes. Both `on_verified` and `on_unverified` must return `bool`. Return `true`
+to continue parsing; return `false` to abort — the parser stops and
+`bvnr_read` returns `false` with `error_scanner_callback_failed`.
+
+---
+
+**How do I read a value from the `ev_data` event?**
+
+The `bvnr_data_t` struct provides the raw bytes in `data`/`length`. Use the
+`bvn_parse_*` helpers to convert them to native C types:
+
+```c
+uint64_t v;
+bvn_parse_uint64(vbuf, d->value_type, &v);
+
+double f;
+bvn_parse_double(vbuf, d->value_type, &f);
+```
+
+The `d->value_type` contains `family`, `width`, and `base_or_q`. Use
+`bvn_effective_width(d->value_type)` to get the resolved width (handles the
+`width == 0` → 64 default).
+
+---
+
+**How is the writer API structured?**
+
+It is symmetric with the reader. You construct events and push them through
+`bvnr_write_event`, then call `bvnr_write_finish`:
+
+```
+bvnr_writer_create()
+  → bvnr_sink_to_fd() or bvnr_sink_to_mem()
+  → bvnr_open_write_sink() or bvnr_open_write_mem()
+  → bvnr_write_event() × N
+  → bvnr_write_finish()
+  → bvnr_writer_destroy()
+```
+
+Use `bvnr_write_type_annotation(w, vt, vu)` as a convenience to emit the full
+annotation event sequence in one call. Use `bvnr_write_bvnf_base` and
+`bvnr_write_bvni` for the convenience integer/float helpers that generate the
+scalar key+value pair in a single call.
+
+---
+
+**Does the library close file descriptors for me?**
+
+No. Both `bvnr_source_from_fd` and `bvnr_sink_to_fd` leave ownership of the
+file descriptor with the caller. Close it yourself after the reader or writer
+is destroyed.
+
+---
+
+**What is the `max_array_nesting` limit and why is it capped at 255?**
+
+The lexer stores per-nesting-level state in a fixed array of 256 entries.
+Passing `max_array_nesting > 255` causes `bvnr_open_read_source` to return
+`false` with `error_invalid_argument`. Zero-initialising `bvnr_read_flags_t`
+is safe: zero means "no additional limit enforced by this field," which in
+practice allows nesting up to the internal maximum of 255. This cap does not
+apply to `max_struct_nesting`.
+
+---
+
+## 13. Python Bindings
+
+**Do the Python bindings require a compiled extension module?**
+
+No. The bindings are pure `ctypes` and load `libbvnr_shared.so` at import time
+via `ctypes.CDLL`. No compilation step beyond building the C library is needed.
+
+---
+
+**How does the library discovery order work?**
+
+1. `LIBBOVNAR_PATH` environment variable — absolute path to the `.so`.
+2. `LIBBOVNAR_DIR` environment variable — directory containing the `.so`.
+3. `ctypes.util.find_library('bovnar')` — standard `ldconfig`/`LD_LIBRARY_PATH` search.
+4. In-tree build paths relative to `_ffi.py` (`../../build/`, etc.).
+
+If none of these resolves the library, `BovnarLibraryNotFound` is raised with
+the list of searched paths.
+
+---
+
+**What is the difference between `loads`/`dumps`, the SAX reader, and the DOM?**
+
+| Interface | When to use |
+|---|---|
+| `bovnar.loads` / `bovnar.dumps` | Simple dict serialization — loses type and unit metadata |
+| `Reader` (SAX) | Streaming; low memory; full access to type and unit data via callbacks |
+| `bovnar.dom_parse` / `DomDoc` | Random-access queries on a fully parsed in-memory tree |
+
+---
+
+**How do I capture state in a SAX callback?**
+
+The Python `on_verified` callback receives exactly two positional arguments —
+the event code and the data payload — with no userdata parameter. Use a closure
+to capture external state:
+
+```python
+state = {"current_key": ""}
+
+def on_event(ev, data):
+    if ev == Event.ASSIGNMENT_START:
+        state["current_key"] = data.raw_str()
+    elif ev == Event.DATA:
+        print(state["current_key"], "→", data.raw_bytes())
+    return True
+```
+
+---
+
+**What happens when a callback raises a Python exception?**
+
+The exception is captured, the C callback returns `False` to stop parsing, the C
+call returns, and then the original Python exception is re-raised from
+`read_mem` / `read_fd`. The exception is not wrapped; it propagates as-is.
+
+---
+
+**How do I access unit information in Python?**
+
+The `data.value_unit` field of an `EVENT.DATA` payload is a `ValueUnit` ctypes
+struct. Use the helper functions to work with it:
+
+```python
+import bovnar
+
+vu = bovnar.parse_unit("k-g·m/s²")          # parse string → ValueUnit
+s  = bovnar.unit_to_str(vu)                   # → "k-g·m/s²"
+ok = bovnar.units_compatible(vu_a, vu_b)      # dimensional compatibility
+c  = bovnar.unit_convert_factor(vu_from, vu_to)
+kelvin = bovnar.convert_value(25.0, vu_celsius, vu_kelvin)
+```
+
+`unit_dimension_vector` returns a 7-element list of SI dimension exponents in
+the order `[m, kg, s, A, K, mol, cd]`.
+
+---
+
+**What exception classes exist?**
+
+| Exception | Trigger |
+|---|---|
+| `BovnarLibraryNotFound` | `libbvnr_shared.so` not found at import |
+| `BovnarParseError` | Parse error (carries `code`, `line`, `column`, `offset`, `byte`) |
+| `BovnarWriteError` | Write error (carries `code`, `offset`) |
+| `BovnarArgumentError` | Invalid argument to a helper function |
+
+All are subclasses of `BovnarError`.
+
+---
+
+**What Python version is required?**
+
+Python ≥ 3.10. The bindings use `dataclasses`, `enum.IntEnum`, and union-type
+annotations (`X | Y`).
+
+---
+
+## 14. Limits and Performance
+
+**What are the default size limits and what should I set in production?**
+
+All limits are configurable via `bvnr_read_flags_t`. Defaults are permissive.
+
+| Field | Default | Suggested production cap |
+|---|---|---|
+| `max_identifier_length` | 255 | 255 |
+| `max_string_length` | 65535 | application-defined |
+| `max_number_length` | 65535 | 65535 |
+| `max_symbol_length` | 255 | 255 |
+| `max_reference_length` | 65535 | 65535 |
+| `max_array_items` | 0 (unlimited) | application-defined |
+| `max_text_bytes` | 0 (unlimited) | application-defined |
+| `max_file_size` | 0 (unlimited) | `16777216` (16 MiB) |
+| `max_array_nesting` | 0 (→255 internal) | 32 or less |
+| `max_struct_nesting` | 255 | 32 or less |
+
+Zero means "no limit enforced by this field." Production deployments should
+set `max_file_size` at minimum. For untrusted input, set `max_array_items`,
+`max_text_bytes`, and the nesting limits as well.
+
+---
+
+**Does `bvnr_read` allocate heap memory?**
+
+No. The reader does not allocate during `bvnr_read`. All buffering is internal
+to the `bvnr_reader_t` struct, which is allocated once by `bvnr_reader_create`.
+Event data pointers (`d->data`) point into the reader's internal buffer and are
+valid only for the duration of the callback invocation.
+
+---
+
+**What throughput can I expect from the parser?**
+
+Performance depends heavily on the input profile (scalars, typed values, structs,
+arrays, units) and hardware. The included benchmark tool (`bvnr_benchmark`) can
+measure MB/s, assignments/s, and events/s across configurable profiles and
+payload sizes. Run it with `--profile all --size 1024,65536 --iterations 200`
+for a representative baseline. Use `--min-overhead` to isolate raw lexer
+throughput by skipping the `on_verified` callback.
+
+---
+
+**How many unit components can a compound unit have?**
+
+A maximum of 8 (`BVNR_MAX_UNIT_COMPONENTS`). Exceeding this limit during
+parsing is `error_unit_illegal`.
+
+---
+
+## 15. Why C99 and Not C23?
+
+**What is the stated language standard for the reference implementation?**
+
+Strict C99 (`-std=c99 -pedantic`). No C11, C17, or C23 extensions are used
+intentionally.
+
+---
+
+**Why not C23, given that it was finalised in 2024?**
+
+Several compilers that are still in active use on embedded and cross-compilation
+targets do not yet ship a complete C23 implementation, and some may never
+receive one for cost or lifecycle reasons:
+
+| Toolchain / target | C23 status (as of 2026) |
+|---|---|
+| GCC < 14 | Partial; `_BitInt`, `typeof`, `nullptr` missing or gated behind `-std=c2x` |
+| Clang < 17 | Partial; several C23 headers and attributes absent |
+| IAR Embedded Workbench | Trails the standard by several years; C11 support only on recent versions |
+| Arm Compiler 5 (armcc) | Frozen at C99/C11 subset; no C23 roadmap |
+| Green Hills MULTI | Embedded-safety toolchain; C23 not yet qualified |
+| SDCC (small-device C compiler) | C11 subset; no C23 |
+| Keil MDK (ARMCC legacy) | C99 only |
+
+C99 has essentially universal compiler support across every architecture Bovnar
+is expected to run on — x86-64, Arm Cortex-M/R/A, RISC-V, MIPS, PowerPC, and
+various DSP families. C23 does not.
+
+---
+
+**Which specific C23 features would have been attractive but were ruled out?**
+
+| Feature | C23 addition | Why skipped |
+|---|---|---|
+| `bool`, `true`, `false` keywords (no `<stdbool.h>`) | C23 | Requires C23-capable front-end; `<stdbool.h>` works everywhere |
+| `nullptr` | C23 | Cosmetic; `NULL` or `(void*)0` is unambiguous |
+| `typeof` / `typeof_unqual` | C23 | Useful for generic macros; GCC/Clang extensions exist but are non-standard pre-C23 |
+| `#embed` | C23 | Attractive for embedding binary tables at compile time; workaround via `xxd -i` is portable |
+| `[[attributes]]` | C23 | `__attribute__((…))` is already used where needed via compiler-specific guards |
+| `_BitInt(N)` | C23 | Would help for arbitrary-width integer types; current code uses `uint64_t` + masking |
+| Improved `constexpr` | C23 | Not applicable to a runtime library |
+
+None of these are blockers. Every C23 feature Bovnar would have used has a
+correct, readable C99 equivalent.
+
+---
+
+**What about C11? It has `_Atomic` and `_Static_assert`.**
+
+C11 adds atomics, `_Generic`, `_Static_assert`, and `<threads.h>`. `_Static_assert`
+is useful and is approximated in the codebase with a macro. The atomics and
+threading additions are irrelevant: the reader and writer objects are not
+thread-safe by design — the caller is expected to guard them with their own
+synchronisation primitive. Pulling in C11 just for `_Static_assert` is not
+worth fragmenting compiler compatibility.
+
+---
+
+**Does C99 impose any meaningful limitations on the implementation?**
+
+In practice, no. The limitations that do exist are handled cleanly:
+
+- **Variable-length arrays (VLAs):** Not used. All fixed-size buffers are
+  declared with compile-time constants. VLAs are optional in C11 and later and
+  are dangerous on stack-limited embedded targets regardless of standard version.
+- **`<stdint.h>` and `<stdbool.h>`:** Both are C99 additions and are available
+  everywhere the library targets.
+- **`//` comments:** C99. No issue.
+- **Designated initialisers:** C99. Used extensively for `bvnr_data_t` and flag
+  struct setup.
+- **Flexible array members:** C99. Not currently used.
+- **`restrict`:** C99. Used on internal buffer pointers where beneficial.
+
+The one area where C99 imposes a real discipline is the absence of `_Static_assert`
+— the implementation works around this with the classic `typedef char
+static_assert_failed[condition ? 1 : -1]` pattern.
+
+---
+
+**Is this likely to change in the future?**
+
+The minimum standard may be raised to C11 if a compelling use of `_Generic` or
+`_Static_assert` arises and the embedded toolchain matrix shifts accordingly.
+C23 as a baseline is not on the roadmap until the IAR, Keil, and Green Hills
+ecosystems ship production-qualified C23 front-ends, which historically lags the
+standard publication by three to five years.
+
+---
+
+*End of Bovnar FAQ — Specification v1.3 Working Draft*

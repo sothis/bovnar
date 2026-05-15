@@ -225,7 +225,8 @@ typedef struct bvnr_lexer_s {
 	uint64_t		max_struct_nesting;
 	uint64_t		max_array_nesting;
 	bool			continue_on_error;
-	uint32_t		resync_depth;
+	uint32_t		resync_array_depth;
+	uint32_t		resync_struct_depth;
 	uint64_t		resync_saved_struct_nesting;
 	uint64_t		recovery_count;
 } bvnr_lexer_t;

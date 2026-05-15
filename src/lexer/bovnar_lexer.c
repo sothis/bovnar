@@ -61,8 +61,9 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	p->val.value_type          = BVN_TYPE_PLAIN;
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
 	p->val.has_annotation_unit = false;
-	l->resync_depth = 0;
-	l->next_state   = resync;
+	l->resync_array_depth  = 0;
+	l->resync_struct_depth = 0;
+	l->next_state          = resync;
 	++l->recovery_count;
 }
 #define ESC_VALID 0x100u
@@ -617,19 +618,22 @@ bool bvn_action_resync_skip(bvnr_reader_t* p)
 }
 bool bvn_action_resync_open_bracket(bvnr_reader_t* p)
 {
-	++p->lex.resync_depth;
+	if (p->lex.byte == '[')
+		++p->lex.resync_array_depth;
+	else
+		++p->lex.resync_struct_depth;
 	p->lex.next_state = resync;
 	return true;
 }
 bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
-	if (l->resync_depth > 0) {
-		--l->resync_depth;
-		l->next_state = resync;
-		return true;
-	}
 	if (l->byte == ']') {
+		if (l->resync_array_depth > 0) {
+			--l->resync_array_depth;
+			l->next_state = resync;
+			return true;
+		}
 		if (l->array_nesting_level > 0) {
 			--l->array_nesting_level;
 			uint64_t level = l->array_nesting_level;
@@ -645,16 +649,25 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			}
 			if (!bvn_val_receive_event(p, ev_array_row_end))
 				return false;
+			l->in_array_element = (l->array_nesting_level > 0);
+			l->next_state = array_outro;
+		} else {
+			l->next_state = resync;
 		}
-		l->in_array_element = (l->array_nesting_level > 0);
-		l->next_state = array_outro;
 	} else if (l->byte == '}') {
+		if (l->resync_struct_depth > 0) {
+			--l->resync_struct_depth;
+			l->next_state = resync;
+			return true;
+		}
 		if (l->struct_nesting_level > 0) {
 			--l->struct_nesting_level;
 			if (!bvn_val_receive_event(p, ev_struct_end))
 				return false;
+			l->next_state = struct_outro;
+		} else {
+			l->next_state = resync;
 		}
-		l->next_state = struct_outro;
 	} else {
 		l->next_state = resync;
 	}
@@ -669,6 +682,8 @@ static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	l->in_array_element     = false;
 	l->struct_nesting_level = l->resync_saved_struct_nesting;
 	l->array_nesting_level  = 0;
+	l->resync_array_depth   = 0;
+	l->resync_struct_depth  = 0;
 	l->curr_row_size        = 0;
 	l->array_row_size       = 0;
 	memset(l->arr_frames, 0,
@@ -682,7 +697,7 @@ static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
-	if (l->resync_depth > 0) {
+	if (l->resync_array_depth > 0 || l->resync_struct_depth > 0) {
 		l->next_state = resync;
 		return true;
 	}
@@ -785,6 +800,7 @@ static bool bvn_os_read_exact(
 	uint8_t*        buf = (uint8_t*)output;
 	if (!length) {
 		bvn_capture_os_error(p, error_invalid_argument);
+		bvn_notify_error(p);
 		return false;
 	}
 	uint32_t from_resid = (src->resid_left < length)
@@ -795,6 +811,7 @@ static bool bvn_os_read_exact(
 			if (!bvn_sink_push(&p->lex.src_dbg, src->resid,
 							  from_resid)) {
 				bvn_capture_os_error(p, error_writing_to_sink);
+				bvn_notify_error(p);
 				return false;
 			}
 		}
@@ -809,18 +826,21 @@ static bool bvn_os_read_exact(
 						  need - total, &got) || !got) {
 			bvn_capture_os_error(p,
 				error_read_complete_chunk_failed);
+			bvn_notify_error(p);
 			return false;
 		}
 		p->lex.processed_bytes += (uint64_t)got;
 		if (p->lex.max_file_size &&
 			p->lex.processed_bytes > p->lex.max_file_size) {
 			bvn_capture_os_error(p, error_file_too_long);
+			bvn_notify_error(p);
 			return false;
 		}
 		if (p->lex.use_dbg) {
 			if (!bvn_sink_push(&p->lex.src_dbg,
 							  buf + from_resid + total, got)) {
 				bvn_capture_os_error(p, error_writing_to_sink);
+				bvn_notify_error(p);
 				return false;
 			}
 		}
@@ -846,6 +866,7 @@ static int32_t bvn_read_octet_stream(
 		}
 		if (tag != 0x01) {
 			bvn_capture_os_error(p, error_octet_stream_out_of_sync);
+			bvn_notify_error(p);
 			return -1;
 		}
 		if (!bvn_os_read_exact(&src, lenbuf, 2))
@@ -994,6 +1015,7 @@ static inline void bvn_set_eof_error(bvnr_reader_t* p, error_code_t err)
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
 {
+	free(l->arr_frames);
 	memset(l, 0, sizeof(*l));
 	l->next_state  = undefined;
 	l->line        = 1;

@@ -2,7 +2,7 @@
 
 **A typed, unit-aware, text–binary serialisation format — and its C99 reference implementation.**
 
-[![Spec version](https://img.shields.io/badge/spec-v1.3--draft-blue)](doc/1_bovnar_spec.md)
+[![Spec version](https://img.shields.io/badge/spec-v1.0-blue)](doc/1_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
 
@@ -121,7 +121,7 @@ bovnar/
 │   └── geany/           # Geany filetype definition
 ├── doc/
 │   ├── 0_bovnar_tutorial.md
-│   ├── 1_bovnar_spec.md            # Format specification v1.3 (working draft)
+│   ├── 1_bovnar_spec.md            # Format specification v1.0
 │   ├── 2_bovnar_unit_system.md
 │   ├── 3_bovnar_readwrite_api.md
 │   ├── 4_bovnar_python_bindings.md
@@ -371,7 +371,7 @@ cd highlighter/geany && ./install.sh
 
 | Document | Description |
 |---|---|
-| [Specification v1.3 (working draft)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
+| [Specification v1.0](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Tutorial](doc/0_bovnar_tutorial.md) | Practical introduction for developers familiar with JSON or similar formats. |
 | [Unit System Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |

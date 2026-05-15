@@ -40,19 +40,6 @@ from bovnar.analytics import (
     filter_by_dim_name,
 )
 
-_PANDAS_AVAILABLE = bool(pytest.importorskip.__module__) and True
-try:
-    import pandas as _pd_probe
-    _PANDAS_AVAILABLE = True
-    del _pd_probe
-except ModuleNotFoundError:
-    _PANDAS_AVAILABLE = False
-
-needs_pandas = pytest.mark.skipif(
-    not _PANDAS_AVAILABLE,
-    reason="pandas not installed — pip install pandas to enable these tests",
-)
-
 
 # ---------------------------------------------------------------------------
 # Mock infrastructure for library-free tests
@@ -152,11 +139,10 @@ class TestDimLabel:
 # filter_by_dim_name
 # ---------------------------------------------------------------------------
 
-@needs_pandas
 class TestFilterByDimName:
     @pytest.fixture
     def sample_df(self):
-        pd = pytest.importorskip('pandas')
+        import pandas as pd
         return pd.DataFrame([
             {'path': 'speed',    'dims': [1, 0, -1, 0, 0, 0, 0], 'value_si': 9.81},
             {'path': 'temp',     'dims': [0, 0, 0, 0, 1, 0, 0],  'value_si': 300.0},
@@ -192,7 +178,6 @@ class TestFilterByDimName:
 # benchmark_df
 # ---------------------------------------------------------------------------
 
-@needs_pandas
 class TestBenchmarkDf:
     @pytest.fixture
     def raw_records(self):
@@ -400,7 +385,6 @@ class TestCheckSchema:
 # dom_summary (mock DomDoc)
 # ---------------------------------------------------------------------------
 
-@needs_pandas
 class TestDomSummary:
     @pytest.fixture
     def doc(self):
@@ -451,11 +435,11 @@ except ImportError:
 SENSOR_DOC = (
     b".node_id   = <uint:8>         7;\n"
     b".frequency = <float:64,M-Hz>  868.1;\n"
-    b".tx_power  = <sint:8>         14;\n"
-    b".interval  = <uint:32,s>      60;\n"
-    b".voltage   = <float:32,V>     3.3;\n"
+    b".tx_power  = <sint:8,d-Bm>    14;\n"
+    b".interval  = <uint:32,s>       60;\n"
+    b".offset    = <float_fix:32,q8,\xc2\xb0\x43> -0.5;\n"
     b".config = {\n"
-    b'    .host    = "sensor.local";\n'
+    b"    .host    = \"sensor.local\";\n"
     b"    .timeout = <float:64,s>   2.5;\n"
     b"};\n"
 )
@@ -470,7 +454,6 @@ TEMP_DOC = (
 
 
 @needs_lib
-@needs_pandas
 class TestDocToDataframeIntegration:
     @pytest.fixture
     def df(self):
@@ -538,7 +521,6 @@ class TestAssertNodeIntegration:
 
 
 @needs_lib
-@needs_pandas
 class TestDomSummaryIntegration:
     @pytest.fixture
     def doc(self):

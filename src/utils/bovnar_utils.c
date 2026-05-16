@@ -1536,11 +1536,11 @@ bool bvn_validate_identifier(const char* id)
 	if (!id || !*id) return false;
 	if (!((*id >= 'a' && *id <= 'z') || (*id >= 'A' && *id <= 'Z') ||
 		  *id == '_' ||
-		  ((uint8_t)*id >= 0xc3 && (uint8_t)*id <= 0xf4)))
+		  ((uint8_t)*id >= 0xc2 && (uint8_t)*id <= 0xf4)))
 		return false;
 	for (const char* p = id + 1; *p; p++) {
 		unsigned char c = (unsigned char)*p;
-		if (c <= 0x20 || c == 0x7f || c == 0xc2) return false;
+		if (c <= 0x20 || c == 0x7f) return false;
 		if (c == '"' || c == '#' || c == ',' || c == '.' ||
 			c == '/' || c == ';' || c == '<' || c == '=' ||
 			c == '>' || c == '[' || c == ']' || c == '{' ||
@@ -1551,7 +1551,7 @@ bool bvn_validate_identifier(const char* id)
 			c == '~')
 			return false;
 	}
-	return true;
+	return bvn_validate_string((const uint8_t*)id, strlen(id));
 }
 bool bvn_validate_symbol(const char* surr)
 {
@@ -1566,12 +1566,12 @@ bool bvn_validate_reference(const char* link)
 	while (*p) {
 		if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
 			  *p == '_' ||
-			  ((uint8_t)*p >= 0xc3 && (uint8_t)*p <= 0xf4)))
+			  ((uint8_t)*p >= 0xc2 && (uint8_t)*p <= 0xf4)))
 			return false;
 		p++;
 		while (*p && *p != '.') {
 			unsigned char c = (unsigned char)*p;
-			if (c < 0x20 || c == 0x7f || c == 0xc2) return false;
+			if (c < 0x20 || c == 0x7f) return false;
 			if (c == '"' || c == '#' || c == ',' || c == '/' ||
 				c == ';' || c == '<' || c == '=' || c == '>' ||
 				c == '[' || c == ']' || c == '{' || c == '}' ||

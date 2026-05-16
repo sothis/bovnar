@@ -701,6 +701,10 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 	}
 	while (l->array_nesting_level > 0) {
 		--l->array_nesting_level;
+		if (!bvn_val_receive_event(p, ev_array_row_start)) {
+			bvn_resync_semicolon_reset(p);
+			return false;
+		}
 		if (!bvn_val_receive_event(p, ev_array_row_end)) {
 			bvn_resync_semicolon_reset(p);
 			return false;

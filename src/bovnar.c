@@ -395,11 +395,14 @@ static int cmd_events(int argc, char **argv)
 		if (fd < 0) { perror(filename); return 1; }
 	}
 	bvnr_reader_t *rd = bvnr_reader_create();
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-fd-leak"
 	if (!rd) {
 		fprintf(stderr, "error: failed to allocate reader\n");
-		if (!from_stdin) close(fd);
+		if (!from_stdin) { close(fd); fd = -1; }
 		return 1;
 	}
+#pragma GCC diagnostic pop
 	bvnr_source_t src;
 	bvnr_source_from_fd(&src, fd);
 	evt_ctx_t *ctx = calloc(1, sizeof(*ctx));

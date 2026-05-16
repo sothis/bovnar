@@ -91,7 +91,7 @@ static bool bvn_validate_string_content(bvnr_writer_t* w,
 	if (!data || length == 0) return true;
 	for (uint32_t i = 0; i < length; i++) {
 		uint8_t c = data[i];
-		if (c <= 0x08 || (c >= 0x0E && c <= 0x1F) || c == 0x7F) {
+		if (c <= 0x08 || (c >= 0x0B && c <= 0x0C) || (c >= 0x0E && c <= 0x1F) || c == 0x7F) {
 			return bvn_writer_set_error(w,
 				error_unexpected_input_byte);
 		}
@@ -746,7 +746,7 @@ static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 		w->ser.max_struct_nesting = opts->max_struct_nesting;
 		w->ser.unit_flags        = opts->unit_flags;
 	}
-	if (!w->ser.max_array_nesting || w->ser.max_array_nesting > UINT8_MAX)
+	if (!w->ser.max_array_nesting)
 		w->ser.max_array_nesting = UINT8_MAX;
 	if (!w->ser.max_struct_nesting)
 		w->ser.max_struct_nesting = UINT8_MAX;

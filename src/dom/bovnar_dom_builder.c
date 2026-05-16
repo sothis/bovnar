@@ -571,7 +571,10 @@ bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
 		do {
 			n = read(fd, buf + len, cap - len);
 		} while (n < 0 && errno == EINTR);
-		if (n < 0) { free(buf); return NULL; }
+		if (n < 0) {
+			if (len == 0) { free(buf); return NULL; }
+			break;
+		}
 		if (n == 0) break;
 		len += (size_t)n;
 		if (len == cap) {

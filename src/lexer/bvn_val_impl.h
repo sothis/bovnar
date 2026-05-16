@@ -23,7 +23,7 @@ typedef struct bvnr_serializer_s {
 	bool			finished;
 	bool			stream_begun;
 	uint32_t		array_depth;
-	uint64_t		max_array_nesting;
+	uint8_t			max_array_nesting;
 	uint8_t			max_struct_nesting;
 	bool			arr_need_comma[UINT8_MAX+1];
 	bool			in_octet_stream;

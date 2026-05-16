@@ -27,7 +27,7 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 	};
 	if (!bvnr_write_event(w, ev_type_annotation_start,       &d)) return false;
 	if (!bvnr_write_event(w, ev_type_annotation_type_family, &d)) return false;
-	if (bvn_type_is_numeric(vt) && vt.width != 0) {
+	if ((bvn_type_is_numeric(vt) || vt.family == vt_utf8) && vt.width != 0) {
 		d.type   = token_is_type_width;
 		d.data   = NULL;
 		d.length = 0;
@@ -309,16 +309,21 @@ bool bvnr_write_bvni_unit(bvnr_writer_t *w, const char *key,
 		vt = BVN_TYPE_SINT_BASE(width, effective_base == 10u ? 0u : effective_base);
 	else
 		vt = BVN_TYPE_UINT_BASE(width, effective_base == 10u ? 0u : effective_base);
-	uint32_t bits = width ? width : 64u;
+	uint32_t actual_bits = n->nused * 32u;
+	uint32_t bits = width ? width : (actual_bits ? actual_bits : 64u);
+	if (actual_bits > bits)
+		bits = actual_bits;
 	size_t bufsz = bvn_int_str_bufsize(bits, effective_base);
 	char *buf = malloc(bufsz);
-	if (!buf) return false;
+	if (!buf) return bvn_writer_set_error(w, error_invalid_argument);
 	int32_t nr = bvn_int_to_str(n, buf, bufsz, effective_base);
 	bool ok = false;
 	if (nr > 0) {
 		token_type_t tt = (effective_base == 10u)
 			? token_is_number : token_is_string;
 		ok = emit_numeric_tt(w, vt, unit, buf, tt);
+	} else {
+		bvn_writer_set_error(w, error_value_out_of_range);
 	}
 	free(buf);
 	return ok;

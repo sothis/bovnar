@@ -2,6 +2,21 @@
 #define BVN_VAL_IMPL_H_
 #include "bvn_lexer_impl.h"
 #define BVN_SER_WBUF_SIZE 65536u
+#define BOVN_READ_BUFFER_SIZE	4096u
+
+typedef enum bvn_limit_defaults_e {
+	max_identifier_length = UINT8_MAX,
+	max_number_length     = UINT16_MAX,
+	max_string_length     = UINT16_MAX,
+	max_symbol_length     = UINT8_MAX,
+	max_reference_length  = UINT16_MAX,
+	max_struct_nesting    = 64,
+	max_array_nesting     = 64,
+	max_array_items       = 2147483647,
+	max_text_bytes        = 2147483647,
+	max_file_size         = 2147483647,
+} bvn_limit_defaults_t;
+
 typedef struct bvnr_serializer_s {
 	bvnr_sink_t		sink;
 	bool			pretty;

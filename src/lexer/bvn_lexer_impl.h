@@ -234,8 +234,8 @@ extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];
 extern const state_t  bvn_action_target_state[ACT__count];
 extern const state_t  bvn_kw_advance_state[dimension_state];
-bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
-	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
+bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src, const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
+void bvn_lex_destroy(bvnr_lexer_t* l);
 bool bvn_lex_run(bvnr_reader_t* r);
 bool bvn_action_set_state                 (bvnr_reader_t* p);
 bool bvn_action_ignore_whitespace         (bvnr_reader_t* p);

@@ -573,7 +573,6 @@ bool bvn_val_on_array_intro(bvnr_reader_t* r)
     bvnr_data_t d = {0};
     d.value_type = r->val.value_type;
     d.value_unit = r->val.parsed_unit;
-    ++r->lex.array_items;
     bvn_acc_reset(&r->val);
     r->val.has_annotation_unit = false;
     return bvn_emit_unverified(r, ev_array_row_start, &d) &&
@@ -596,7 +595,6 @@ bool bvn_val_on_new_array_value(bvnr_reader_t* r,
     uint64_t curr_row_size, uint64_t array_row_size)
 {
     bvnr_validator_t* v = &r->val;
-    ++r->lex.array_items;
     if (array_row_size && (curr_row_size + 1) > array_row_size) {
         v->last_error = error_array_row_size_mismatch;
         return false;
@@ -647,6 +645,8 @@ bool bvnr_open_read_source(
 {
     if (!r || !src || !src->pull)
         return false;
+    bvn_lex_destroy(&r->lex);
+    memset(&r->lex, 0, sizeof(r->lex));
     if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
         return false;
     bvn_val_init(&r->val, options);

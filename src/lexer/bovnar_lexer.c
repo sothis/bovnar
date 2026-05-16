@@ -10,18 +10,6 @@
 #include "bovnar.h"
 #include "bvn_lexer_impl.h"
 #include "bvn_val_impl.h"
-#ifndef BOVN_READ_BUFFER_SIZE
-#define BOVN_READ_BUFFER_SIZE	4096u
-#endif
-typedef enum bvn_limit_defaults_e {
-	max_identifier_length = UINT8_MAX,
-	max_number_length     = UINT16_MAX,
-	max_string_length     = UINT16_MAX,
-	max_symbol_length     = UINT8_MAX,
-	max_reference_length  = UINT16_MAX,
-	max_struct_nesting    = 64,
-	max_array_nesting     = 64,
-} bvn_limit_defaults_t;
 static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
 	uint64_t offset)
 {
@@ -356,6 +344,7 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_array_nesting_too_high);
 		return false;
 	}
+	++p->lex.array_items;
 	bvn_array_frame_t *f = &p->lex.arr_frames[level];
 	f->saved_curr  = p->lex.curr_row_size;
 	f->saved_row   = p->lex.array_row_size;
@@ -404,14 +393,15 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 	}
 	if (!bvn_lex_finalize(p, bvn_val_receive))
 		return false;
-	p->lex.str_len          = 0;
-	p->lex.in_array_element = true;
-	bvn_acc_reset(&p->val);
 	if (p->lex.max_array_items &&
 		p->lex.array_items == p->lex.max_array_items) {
 		bvn_lexer_set_error(p, error_too_many_array_items);
 		return false;
 	}
+	++p->lex.array_items;
+	p->lex.str_len          = 0;
+	p->lex.in_array_element = true;
+	bvn_acc_reset(&p->val);
 	if (!bvn_val_on_new_array_value(p, p->lex.curr_row_size,
 									p->lex.array_row_size))
 		return false;
@@ -1025,10 +1015,16 @@ static inline void bvn_set_eof_error(bvnr_reader_t* p, error_code_t err)
 	p->val.last_error = err;
 	bvn_set_error_pos(p, 0, p->lex.processed_bytes);
 }
+void bvn_lex_destroy(bvnr_lexer_t* l)
+{
+	if (!l)
+		return;
+	free(l->arr_frames);
+	l->arr_frames = NULL;
+}
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
 {
-	free(l->arr_frames);
 	memset(l, 0, sizeof(*l));
 	l->next_state  = undefined;
 	l->line        = 1;
@@ -1051,13 +1047,17 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 		l->max_array_nesting     = opts->max_array_nesting;
 		l->continue_on_error     = opts->continue_on_error;
 	}
-	if (!l->max_identifier_length) l->max_identifier_length = max_identifier_length;
-	if (!l->max_number_length)     l->max_number_length     = max_number_length;
-	if (!l->max_string_length)     l->max_string_length     = max_string_length;
-	if (!l->max_symbol_length)     l->max_symbol_length     = max_symbol_length;
-	if (!l->max_reference_length)  l->max_reference_length  = max_reference_length;
-	if (!l->max_struct_nesting)    l->max_struct_nesting    = max_struct_nesting;
-	if (!l->max_array_nesting)     l->max_array_nesting     = max_array_nesting;
+	if (!l->max_identifier_length)	l->max_identifier_length	= max_identifier_length;
+	if (!l->max_number_length)		l->max_number_length		= max_number_length;
+	if (!l->max_string_length)		l->max_string_length		= max_string_length;
+	if (!l->max_symbol_length)		l->max_symbol_length		= max_symbol_length;
+	if (!l->max_reference_length)	l->max_reference_length		= max_reference_length;
+	if (!l->max_struct_nesting)		l->max_struct_nesting		= max_struct_nesting;
+	if (!l->max_array_nesting)		l->max_array_nesting		= max_array_nesting;
+	if (!l->max_array_items)		l->max_array_items			= max_array_items;
+	if (!l->max_text_bytes)			l->max_text_bytes			= max_text_bytes;
+	if (!l->max_file_size)			l->max_file_size			= max_file_size;
+
 	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
 	if (!l->arr_frames)
 		return false;

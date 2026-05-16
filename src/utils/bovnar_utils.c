@@ -11,7 +11,6 @@
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 #include "bvn_float.h"
-#include "bvn_float_impl.h"
 #include "bovnar_si_units.h"
 #include "bvn_unit_impl.h"
 #define BVN_DEC_SCRATCH_SIZE 10000u

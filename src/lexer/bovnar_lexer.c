@@ -1,12 +1,5 @@
-#include <fcntl.h>
-#include <inttypes.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include "bovnar.h"
 #include "bvn_lexer_impl.h"
 #include "bvn_val_impl.h"

@@ -1,4 +1,3 @@
-#include <stddef.h>
 #include "bvn_lexer_impl.h"
 #define BVN_EACH_256(a) \
 	[0x00]=(a),[0x01]=(a),[0x02]=(a),[0x03]=(a), \

@@ -18,7 +18,7 @@ void bvnr_writer_destroy(bvnr_writer_t* w)
 {
 	free(w);
 }
-static bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
+bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
 {
 	w->val.last_error   = err;
 	w->val.error_offset = bvnr_sink_bytes_written(&w->ser.sink)
@@ -415,6 +415,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (w->ser.struct_depth == 0)
 			return bvn_writer_set_error(w, error_illegal_struct_close);
 		break;
+	case ev_struct_start:
+		w->ser.stream_begun = true;
+		if (w->ser.struct_depth >= (uint32_t)w->ser.max_struct_nesting)
+			return bvn_writer_set_error(w, error_struct_nesting_too_high);
+		break;
 	default:
 		w->ser.stream_begun = true;
 		break;
@@ -738,10 +743,13 @@ static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 		w->ser.on_event          = opts->on_event;
 		w->val.on_error          = opts->on_error;
 		w->ser.max_array_nesting = opts->max_array_nesting;
+		w->ser.max_struct_nesting = opts->max_struct_nesting;
 		w->ser.unit_flags        = opts->unit_flags;
 	}
 	if (!w->ser.max_array_nesting || w->ser.max_array_nesting > UINT8_MAX)
 		w->ser.max_array_nesting = UINT8_MAX;
+	if (!w->ser.max_struct_nesting)
+		w->ser.max_struct_nesting = UINT8_MAX;
 }
 bool bvnr_open_write_sink(
 	bvnr_writer_t* w, const bvnr_sink_t* sink,

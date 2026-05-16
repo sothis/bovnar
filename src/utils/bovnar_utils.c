@@ -103,6 +103,7 @@ bool bvn_validate_number_in_base(const char* s, uint32_t base)
 }
 static int bvn_pow2m1_dec(uint32_t n, char* buf, size_t cap)
 {
+	if (!buf || cap < 2u) return -1;
 	if (n == 0) {
 		buf[0] = '0'; buf[1] = '\0';
 		return 1;

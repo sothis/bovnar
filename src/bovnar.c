@@ -838,13 +838,20 @@ static JsonNode *json_parse_object(const char **p)
 		JsonNode *val = json_parse_value(p);
 		if (!val) { free(key); json_free_node(node); return NULL; }
 		if (node->u.obj.count == cap) {
-			cap *= 2;
-			char **tk = realloc(node->u.obj.keys, cap * sizeof(*node->u.obj.keys));
-			if (!tk) { free(key); json_free_node(val); json_free_node(node); return NULL; }
-			node->u.obj.keys = tk;
-			JsonNode **tv = realloc(node->u.obj.values, cap * sizeof(*node->u.obj.values));
-			if (!tv) { free(key); json_free_node(val); json_free_node(node); return NULL; }
+			uint32_t nc = cap * 2;
+			char     **tk = malloc(nc * sizeof(*node->u.obj.keys));
+			JsonNode **tv = malloc(nc * sizeof(*node->u.obj.values));
+			if (!tk || !tv) {
+				free(tk); free(tv);
+				free(key); json_free_node(val); json_free_node(node); return NULL;
+			}
+			memcpy(tk, node->u.obj.keys,   cap * sizeof(*node->u.obj.keys));
+			memcpy(tv, node->u.obj.values, cap * sizeof(*node->u.obj.values));
+			free(node->u.obj.keys);
+			free(node->u.obj.values);
+			node->u.obj.keys   = tk;
 			node->u.obj.values = tv;
+			cap = nc;
 		}
 		node->u.obj.keys[node->u.obj.count]   = key;
 		node->u.obj.values[node->u.obj.count] = val;

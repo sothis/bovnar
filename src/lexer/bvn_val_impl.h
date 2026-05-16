@@ -24,6 +24,7 @@ typedef struct bvnr_serializer_s {
 	bool			stream_begun;
 	uint32_t		array_depth;
 	uint64_t		max_array_nesting;
+	uint8_t			max_struct_nesting;
 	bool			arr_need_comma[UINT8_MAX+1];
 	bool			in_octet_stream;
 	uint32_t		struct_depth;
@@ -89,4 +90,5 @@ bool bvn_ser_serialize_event(
 	bvnr_serializer_t* s, bvnr_event_t ev, bvnr_data_t* d);
 bool bvn_ser_flush_wbuf(bvnr_serializer_t* s);
 bool bvn_ser_finish_stream(bvnr_serializer_t* s);
+bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err);
 #endif

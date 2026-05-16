@@ -453,7 +453,7 @@ static bool bvn_tf_family_done(bvnr_reader_t* p,
 	const char* name, uint32_t len, state_t after)
 {
 	memcpy(p->lex.type_data, name, len);
-	p->lex.type_len   = (uint16_t)len;
+	p->lex.type_len   = (uint8_t)len;
 	p->lex.next_state = after;
 	return true;
 }

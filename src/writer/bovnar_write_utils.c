@@ -7,6 +7,8 @@
 #include "bvn_val_impl.h"
 static bool emit_key(bvnr_writer_t *w, const char *key)
 {
+	if (!key)
+		return bvn_writer_set_error(w, error_invalid_argument);
 	bvnr_data_t d = {
 		.type   = token_is_identifier,
 		.data   = (const void *)key,

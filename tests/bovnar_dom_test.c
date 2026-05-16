@@ -85,7 +85,7 @@ static void test_parse_basic_dom(void)
         "    .timeout = <uint:32,s> 30;\n"
         "};\n"
         ".accel = <float:64,m/s²> 9.81;\n"
-        ".storage = <uint:64,Ki-B> 1024;\n";
+        ".storage = <uint:64,Ki~B> 1024;\n";
 
     bvn_dom_doc_t *doc = parse_doc(bvn);
     if (!doc) return;
@@ -135,7 +135,7 @@ static void test_parse_basic_dom(void)
     ASSERT_NOT_NULL(storage, "lookup .storage must succeed");
     if (storage) {
         double base = bvn_dom_get_value_in_base_units(storage);
-        ASSERT_EQ_INT((int64_t)base, 1048576, "storage in bytes must equal 1048576 for Ki-B");
+        ASSERT_EQ_INT((int64_t)base, 1048576, "storage in bytes must equal 1048576 for Ki~B");
     }
 
     bvn_dom_node_t *cfg = bvn_dom_lookup(doc, ".config");

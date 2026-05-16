@@ -233,24 +233,24 @@ The unit goes inside the angle brackets, after the other parameters:
 
 ### SI Prefixes
 
-SI prefixes are written before the base unit symbol with a **mandatory hyphen** as separator:
+SI prefixes are written before the base unit symbol with a **mandatory `-`** separator:
 
 ```bovnar
 .k_ohm  = <float:32,k-Ω>   4.7;     # kilo-ohm
-.milli  = <float:32,m-V>   330.0;   # millivolt
-.micro  = <float:32,µ-s>   50.0;    # microsecond (µ = U+00B5)
-.giga   = <float:64,G-Hz>  2.4;     # gigahertz
-.kibi   = <uint:64,Ki-B>   1024;    # kibibytes (IEC binary prefix)
-.mebi   = <uint:64,Mi-B>   4096;    # mebibytes
+.milli  = <float:32,m~V>   330.0;   # millivolt
+.micro  = <float:32,µ~s>   50.0;    # microsecond (µ = U+00B5)
+.giga   = <float:64,G~Hz>  2.4;     # gigahertz
+.kibi   = <uint:64,Ki~B>   1024;    # kibibytes (IEC binary prefix)
+.mebi   = <uint:64,Mi~B>   4096;    # mebibytes
 ```
 
-The hyphen between prefix and unit is non-optional. `<float:32,kΩ>` (no hyphen) would either fail to parse or be interpreted differently. Every prefix listed in the SI table uses the same pattern: `prefix-unit`.
+The `~` between prefix and unit is non-optional. `<float:32,kΩ>` (no `~`) would either fail to parse or be interpreted differently. Every prefix listed in the SI table uses the same pattern: `prefix~unit`.
 
 IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`) follow the same rule:
 
 ```bovnar
-.ram  = <uint:64,Gi-B>  8;     # 8 gibibytes
-.disk = <uint:64,Ti-B>  2;     # 2 tebibytes
+.ram  = <uint:64,Gi~B>  8;     # 8 gibibytes
+.disk = <uint:64,Ti~B>  2;     # 2 tebibytes
 ```
 
 ### Compound Units
@@ -260,10 +260,10 @@ Compound units are built from multiple components joined by `*` (or the middle d
 ```bovnar
 .velocity     = <float:64,m/s>         9.81;   # meters per second
 .acceleration = <float:64,m/s²>        9.81;   # m·s⁻²
-.force        = <float:64,k-g·m/s²>    9.81;   # Newton (kilogram × meter / second²)
-.energy       = <float:64,k-g·m²/s²>   1000;   # Joule
-.pressure     = <float:64,k-g/(m·s²)>  101325; # Pascal
-.momentum     = <float:64,k-g·m/s>     0.5;
+.force        = <float:64,k~g·m/s²>    9.81;   # Newton (kilogram × meter / second²)
+.energy       = <float:64,k~g·m²/s²>   1000;   # Joule
+.pressure     = <float:64,k~g/(m·s²)>  101325; # Pascal
+.momentum     = <float:64,k~g·m/s>     0.5;
 .field        = <float:64,V/m>         150.0;
 .moment       = <float:64,m*s>         1.0;    # asterisk = middle dot
 ```
@@ -271,7 +271,7 @@ Compound units are built from multiple components joined by `*` (or the middle d
 The `/` separator is a **one-way switch**: once you write `/`, every subsequent component is in the denominator. Writing another `/` does not switch back to the numerator. If you need a component back in the numerator after a divisor, use a negative exponent:
 
 ```bovnar
-.force_alt = <float:64,k-g·m·s⁻²> 9.81;   # same as k-g·m/s²
+.force_alt = <float:64,k~g·m·s⁻²> 9.81;   # same as k~g·m/s²
 ```
 
 Exponents can be written as Unicode superscripts (`²`, `³`, `⁻¹`) or with an ASCII caret (`^2`, `^-2`). Both are valid:
@@ -302,7 +302,7 @@ For untyped or partially-typed values, you can append a unit suffix directly aft
 
 ```bovnar
 .speed  = 9.81 m/s;       # valid
-.mass   = 70.0 k-g;       # result: float:64, unit = k-g
+.mass   = 70.0 k~g;       # result: float:64, unit = k~g
 .heap   = 65536 B;         # result: uint:64, unit = B (bytes)
 ```
 
@@ -633,9 +633,9 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 .firmware_ver   = "2.4.1";
 
 .radio = {
-    .frequency  = <float:64,M-Hz>  868.1;
-    .tx_power   = <sint:8,d-Bm>    14;
-    .bandwidth  = <float:32,k-Hz>  125.0;
+    .frequency  = <float:64,M~Hz>  868.1;
+    .tx_power   = <sint:8,d~Bm>    14;
+    .bandwidth  = <float:32,k~Hz>  125.0;
     .sf         = <uint:8>         7;          # spreading factor
 };
 
@@ -688,7 +688,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 .packet = {
     .type      = data_frame;
     .sequence  = <uint:32>  42;
-    .timestamp = <uint:64,µ-s> 1715000000123456;
+    .timestamp = <uint:64,µ~s> 1715000000123456;
     .payload   = \x00\x01\x08\x00\xDE\xAD\xBE\xEF\xCA\xFE\xBA\xBE\x00;
     .crc32     = <uint:32,_16> "A1B2C3D4";
 };
@@ -744,7 +744,7 @@ Understanding the error codes is essential for debugging. The parser reports lin
 
 **Too many unit components:**
 ```bovnar
-.x = <float:64,m*s*k-g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 > 8 max)
+.x = <float:64,m*s*k~g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 > 8 max)
 ```
 
 **Inline unit suffix inside array:**
@@ -870,11 +870,11 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 
 # ── Units ──────────────────────────────────────────────────────────
 <float:64,s>           # seconds
-<float:64,k-m>         # kilometers (SI prefix-unit, hyphen mandatory)
+<float:64,k~m>         # kilometers (SI prefix~unit, `~` mandatory)
 <float:64,m/s>         # meters per second
 <float:64,m/s²>        # meters per second squared
-<float:64,k-g·m/s²>    # kilogram-meters per second squared
-<uint:64,Ki-B>         # kibibytes
+<float:64,k~g·m/s²>    # kilogram-meters per second squared
+<uint:64,Ki~B>         # kibibytes
 <float:64,no_unit>     # explicitly dimensionless
 
 # ── Special values ─────────────────────────────────────────────────

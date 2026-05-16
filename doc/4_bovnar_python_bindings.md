@@ -152,13 +152,13 @@ output: bytes = w.get_output()
 import bovnar
 
 # Parse a unit string into a ValueUnit struct
-vu = bovnar.parse_unit("k-g·m/s²")
+vu = bovnar.parse_unit("k~g·m/s²")
 
 # Convert a ValueUnit back to its canonical string
-s = bovnar.unit_to_str(vu)     # → "k-g·m/s²"
+s = bovnar.unit_to_str(vu)     # → "k~g·m/s²"
 
 # Scalar SI/IEC prefix factor for a unit string
-f = bovnar.unit_factor("M-Hz") # → 1_000_000.0
+f = bovnar.unit_factor("M~Hz") # → 1_000_000.0
 ```
 
 ### Extended unit functions
@@ -205,7 +205,7 @@ value, before the terminating `;`:
 
 ```bovnar
 .speed = 9.81 m/s;           # inline suffix, no annotation
-.mass  = <float:64> 70.5 k-g;# annotation without unit, inline adopted
+.mass  = <float:64> 70.5 k~g;# annotation without unit, inline adopted
 .dist  = <float:64,m> 1.5 m; # annotation and inline both say 'm' — valid
 ```
 

@@ -41,7 +41,7 @@ def _m_per_s():
 
 def _force():
     import bovnar
-    return bovnar.parse_unit("k-g\u00b7m/s\u00b2")
+    return bovnar.parse_unit("k~g\u00b7m/s\u00b2")
 
 
 class TestSIDimNames:
@@ -125,7 +125,7 @@ class TestUnitsCompatible:
     def test_m_per_s_and_km_per_h_compatible(self):
         import bovnar
         mps   = bovnar.parse_unit("m/s")
-        kmph  = bovnar.parse_unit("k-m/h")
+        kmph  = bovnar.parse_unit("k~m/h")
         assert units_compatible(mps, kmph)
 
     def test_force_and_meter_incompatible(self):

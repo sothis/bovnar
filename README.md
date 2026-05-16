@@ -19,10 +19,10 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
     .port      = <uint:16> 443;
     .limits    = {
         .timeout    = <float:64,s> 2.5;
-        .max_packet = <uint:64,Mi-B> 16;
+        .max_packet = <uint:64,Mi~B> 16;
     };
 };
-.acceleration = 70.5 k-m·s⁻²;
+.acceleration = 70.5 k~m·s⁻²;
 .velocity     = <float:64,m/s> 9.81;
 .payload      = \x00 … binary stream … \x00;
 .matrix       = [1, 2, 3]/[4, 5, 6];
@@ -33,7 +33,7 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
 ## Key Features
 
 - **Strong, optional typing** — `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8` with explicit bit-width (`8`, `16`, `32`, `64`, …) and numeric base (`_2`, `_16`, `_36`, `_85`, …).
-- **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k-g·m/s²`, and `Gi-B` are written inline; no external schema is needed.
+- **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k~g·m/s²`, and `Gi~B` are written inline; no external schema is needed.
 - **Inline unit suffix** — `9.81 m/s` is valid without a full type annotation.
 - **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead.
 - **Multi-dimensional arrays** — Rows separated by `/`; `[1,2,3]/[4,5,6]` is a native 2D structure.
@@ -52,7 +52,7 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
 |---|---|---|
 | Assignment | `.key = value ;` | `.x = 42;` |
 | Comment | `# … newline` | `# a remark` |
-| Type annotation | `<family:width,unit>` before value | `<uint:32,k-m> 1000` |
+| Type annotation | `<family:width,unit>` before value | `<uint:32,k~m> 1000` |
 | Integer | `[-]digits` | `42`, `-7` |
 | Float | `[-]digits[.digits][e[±]digits]` | `3.14`, `1e-6` |
 | Special float | `$nan$` `$infinity$` `$-infinity$` | `.x = $nan$;` |

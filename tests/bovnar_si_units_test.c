@@ -190,7 +190,7 @@ static void test_si_factor_compound(void)
 		}
 	};
 	ASSERT_EQ_DBL(bvn_unit_to_si_factor(kg_m_s2, &aff, &off, &si_ok),
-	              1.0, 1e-15, "k-g·m/s² → 1.0");
+	              1.0, 1e-15, "k~g·m/s² → 1.0");
 
 	value_unit_t km_per_s = {
 		.num_components = 2,
@@ -200,7 +200,7 @@ static void test_si_factor_compound(void)
 		}
 	};
 	ASSERT_EQ_DBL(bvn_unit_to_si_factor(km_per_s, &aff, &off, &si_ok),
-	              1e3, 1e-10, "k-m/s → 1e3");
+	              1e3, 1e-10, "k~m/s → 1e3");
 
 	value_unit_t kg_per_m3 = {
 		.num_components = 2,
@@ -210,7 +210,7 @@ static void test_si_factor_compound(void)
 		}
 	};
 	ASSERT_EQ_DBL(bvn_unit_to_si_factor(kg_per_m3, &aff, &off, &si_ok),
-	              1.0, 1e-15, "k-g/m³ → 1.0");
+	              1.0, 1e-15, "k~g/m³ → 1.0");
 
 	value_unit_t g_per_m3 = {
 		.num_components = 2,
@@ -231,7 +231,7 @@ static void test_si_factor_compound(void)
 		}
 	};
 	ASSERT_EQ_DBL(bvn_unit_to_si_factor(kg_m2_s2, &aff, &off, &si_ok),
-	              1.0, 1e-15, "k-g·m²/s² → 1.0");
+	              1.0, 1e-15, "k~g·m²/s² → 1.0");
 
 	value_unit_t L_per_min = {
 		.num_components = 2,
@@ -244,10 +244,10 @@ static void test_si_factor_compound(void)
 	              1e-3 / 60.0, 1e-18, "L/min → 1e-3/60");
 
 	ASSERT_EQ_DBL(bvn_unit_to_si_factor(BVN_UNIT_IEC(bu_byte, iec_kibi), &aff, &off, &si_ok),
-	              1024.0, 1e-10, "Ki-B → 1024");
+	              1024.0, 1e-10, "Ki~B → 1024");
 
 	ASSERT_EQ_DBL(bvn_unit_to_si_factor(BVN_UNIT_IEC(bu_byte, iec_tebi), &aff, &off, &si_ok),
-	              1099511627776.0, 1e5, "Ti-B → 2^40");
+	              1099511627776.0, 1e5, "Ti~B → 2^40");
 }
 
 static void test_dimension_vector(void)
@@ -316,9 +316,9 @@ static void test_dimension_vector(void)
 		}
 	};
 	bvn_unit_dimension_vector(kg_m_s2, dims);
-	ASSERT_EQ_INT(dims[bvn_si_dim_meter],    1,  "k-g·m/s² dim[m]=1");
-	ASSERT_EQ_INT(dims[bvn_si_dim_kilogram], 1,  "k-g·m/s² dim[kg]=1");
-	ASSERT_EQ_INT(dims[bvn_si_dim_second],  -2, "k-g·m/s² dim[s]=-2");
+	ASSERT_EQ_INT(dims[bvn_si_dim_meter],    1,  "k~g·m/s² dim[m]=1");
+	ASSERT_EQ_INT(dims[bvn_si_dim_kilogram], 1,  "k~g·m/s² dim[kg]=1");
+	ASSERT_EQ_INT(dims[bvn_si_dim_second],  -2, "k~g·m/s² dim[s]=-2");
 
 	bvn_unit_dimension_vector(BVN_UNIT_NO_PREFIX(bu_liter), dims);
 	ASSERT_EQ_INT(dims[bvn_si_dim_meter], 3, "L dim[m]=3");
@@ -344,7 +344,7 @@ static void test_units_compatible(void)
 		}
 	};
 	ASSERT_TRUE(bvn_units_compatible(newton, kg_m_s2),
-	            "N compatible with k-g·m/s²");
+	            "N compatible with k~g·m/s²");
 
 	value_unit_t pascal = BVN_UNIT_NO_PREFIX(bu_pascal);
 	value_unit_t N_per_m2 = {
@@ -417,8 +417,8 @@ static void test_convert_factor(void)
 			BVN_UNIT_NO_PREFIX(bu_newton),
 			kg_m_s2,
 			&ok, &req_aff),
-		1.0, 1e-15, "N → k-g·m/s² = 1.0");
-	ASSERT_TRUE(ok, "N → k-g·m/s² ok");
+		1.0, 1e-15, "N → k~g·m/s² = 1.0");
+	ASSERT_TRUE(ok, "N → k~g·m/s² ok");
 
 	ASSERT_EQ_DBL(
 		bvn_unit_convert_factor(
@@ -475,8 +475,8 @@ static void test_convert_factor(void)
 			BVN_UNIT_NO_PREFIX(bu_pascal),
 			kg_per_m_s2,
 			&ok, &req_aff),
-		1.0, 1e-15, "Pa → k-g/(m·s²) = 1.0");
-	ASSERT_TRUE(ok, "Pa → k-g/(m·s²) ok");
+		1.0, 1e-15, "Pa → k~g/(m·s²) = 1.0");
+	ASSERT_TRUE(ok, "Pa → k~g/(m·s²) ok");
 }
 
 static void test_unit_reduce(void)
@@ -513,10 +513,10 @@ static void test_unit_reduce(void)
 		}
 	};
 	value_unit_t r3 = bvn_unit_reduce(km_cm, &scale, &overflow);
-	ASSERT_EQ_INT((int64_t)r3.num_components, 1, "k-m·cm reduce → 1 component");
-	ASSERT_EQ_INT((int64_t)r3.components[0].base, (int64_t)bu_meter, "k-m·cm reduce → meter");
-	ASSERT_EQ_INT((int64_t)r3.components[0].exponent, (int64_t)exp_square, "k-m·cm reduce → exp_square");
-	ASSERT_EQ_DBL(scale, 10.0, 1e-10, "k-m·cm reduce → scale 10");
+	ASSERT_EQ_INT((int64_t)r3.num_components, 1, "k~m·cm reduce → 1 component");
+	ASSERT_EQ_INT((int64_t)r3.components[0].base, (int64_t)bu_meter, "k~m·cm reduce → meter");
+	ASSERT_EQ_INT((int64_t)r3.components[0].exponent, (int64_t)exp_square, "k~m·cm reduce → exp_square");
+	ASSERT_EQ_DBL(scale, 10.0, 1e-10, "k~m·cm reduce → scale 10");
 
 	value_unit_t m_s_s = {
 		.num_components = 3,
@@ -564,9 +564,9 @@ static void test_unit_reduce(void)
 		}
 	};
 	value_unit_t r7 = bvn_unit_reduce(kg_g, &scale, &overflow);
-	ASSERT_EQ_INT((int64_t)r7.num_components, 1, "k-g·g reduce → 1 component");
-	ASSERT_EQ_INT((int64_t)r7.components[0].exponent, (int64_t)exp_square, "k-g·g reduce → exp_square");
-	ASSERT_EQ_DBL(scale, 1e3, 1e-10, "k-g·g reduce → scale 1e3");
+	ASSERT_EQ_INT((int64_t)r7.num_components, 1, "k~g·g reduce → 1 component");
+	ASSERT_EQ_INT((int64_t)r7.components[0].exponent, (int64_t)exp_square, "k~g·g reduce → exp_square");
+	ASSERT_EQ_DBL(scale, 1e3, 1e-10, "k~g·g reduce → scale 1e3");
 
 	value_unit_t m_sinv_s = {
 		.num_components = 3,
@@ -621,7 +621,7 @@ static void test_value_conversion_examples(void)
 		}
 	};
 	double f_force = bvn_unit_to_si_factor(kg_m_s2, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(9.81 * f_force, 9.81, 1e-10, "9.81 k-g·m/s² = 9.81 N");
+	ASSERT_EQ_DBL(9.81 * f_force, 9.81, 1e-10, "9.81 k~g·m/s² = 9.81 N");
 
 	double f_min = bvn_unit_to_si_factor(BVN_UNIT_NO_PREFIX(bu_minute), &aff, &off, &si_ok);
 	ASSERT_EQ_DBL(30.0 * f_min, 1800.0, 1e-10, "30 min = 1800 s");
@@ -649,7 +649,7 @@ static void test_value_conversion_examples(void)
 
 	value_unit_t KiB = BVN_UNIT_IEC(bu_byte, iec_kibi);
 	double f_KiB = bvn_unit_to_si_factor(KiB, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(1024.0 * f_KiB, 1048576.0, 1e5, "1024 Ki-B in bytes");
+	ASSERT_EQ_DBL(1024.0 * f_KiB, 1048576.0, 1e5, "1024 Ki~B in bytes");
 
 	double f_day = bvn_unit_to_si_factor(BVN_UNIT_NO_PREFIX(bu_day), &aff, &off, &si_ok);
 	ASSERT_EQ_DBL(1.0 * f_day, 86400.0, 1e-10, "1 d = 86400 s");
@@ -669,35 +669,35 @@ static void test_parse_and_factor(void)
 	double f1 = bvn_unit_to_si_factor(u1, &aff, &off, &si_ok);
 	ASSERT_EQ_DBL(f1, 1.0, 1e-15, "m/s² → 1.0");
 
-	value_unit_t u2 = bvn_parse_unit((const uint8_t*)"k-m/s", &uok);
-	ASSERT_TRUE(uok, "k-m/s parses ok");
+	value_unit_t u2 = bvn_parse_unit((const uint8_t*)"k~m/s", &uok);
+	ASSERT_TRUE(uok, "k~m/s parses ok");
 	double f2 = bvn_unit_to_si_factor(u2, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(f2, 1e3, 1e-10, "k-m/s → 1e3");
+	ASSERT_EQ_DBL(f2, 1e3, 1e-10, "k~m/s → 1e3");
 
-	value_unit_t u3 = bvn_parse_unit((const uint8_t*)"k-g·m/s²", &uok);
-	ASSERT_TRUE(uok, "k-g·m/s² parses ok");
+	value_unit_t u3 = bvn_parse_unit((const uint8_t*)"k~g·m/s²", &uok);
+	ASSERT_TRUE(uok, "k~g·m/s² parses ok");
 	double f3 = bvn_unit_to_si_factor(u3, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(f3, 1.0, 1e-15, "k-g·m/s² → 1.0");
+	ASSERT_EQ_DBL(f3, 1.0, 1e-15, "k~g·m/s² → 1.0");
 
-	value_unit_t u4 = bvn_parse_unit((const uint8_t*)"k-g/m³", &uok);
-	ASSERT_TRUE(uok, "k-g/m³ parses ok");
+	value_unit_t u4 = bvn_parse_unit((const uint8_t*)"k~g/m³", &uok);
+	ASSERT_TRUE(uok, "k~g/m³ parses ok");
 	double f4 = bvn_unit_to_si_factor(u4, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(f4, 1.0, 1e-15, "k-g/m³ → 1.0");
+	ASSERT_EQ_DBL(f4, 1.0, 1e-15, "k~g/m³ → 1.0");
 
 	value_unit_t u5 = bvn_parse_unit((const uint8_t*)"L/min", &uok);
 	ASSERT_TRUE(uok, "L/min parses ok");
 	double f5 = bvn_unit_to_si_factor(u5, &aff, &off, &si_ok);
 	ASSERT_EQ_DBL(f5, 1e-3 / 60.0, 1e-18, "L/min → 1e-3/60");
 
-	value_unit_t u6 = bvn_parse_unit((const uint8_t*)"k-J", &uok);
-	ASSERT_TRUE(uok, "k-J parses ok");
+	value_unit_t u6 = bvn_parse_unit((const uint8_t*)"k~J", &uok);
+	ASSERT_TRUE(uok, "k~J parses ok");
 	double f6 = bvn_unit_to_si_factor(u6, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(f6, 1e3, 1e-10, "k-J → 1e3");
+	ASSERT_EQ_DBL(f6, 1e3, 1e-10, "k~J → 1e3");
 
-	value_unit_t u7 = bvn_parse_unit((const uint8_t*)"Ti-B", &uok);
-	ASSERT_TRUE(uok, "Ti-B parses ok");
+	value_unit_t u7 = bvn_parse_unit((const uint8_t*)"Ti~B", &uok);
+	ASSERT_TRUE(uok, "Ti~B parses ok");
 	double f7 = bvn_unit_to_si_factor(u7, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(f7, 1099511627776.0, 1e5, "Ti-B → 2^40");
+	ASSERT_EQ_DBL(f7, 1099511627776.0, 1e5, "Ti~B → 2^40");
 
 	value_unit_t u8 = bvn_parse_unit((const uint8_t*)"°C", &uok);
 	ASSERT_TRUE(uok, "°C parses ok");
@@ -711,10 +711,10 @@ static void test_parse_and_factor(void)
 	double f9 = bvn_unit_to_si_factor(u9, &aff, &off, &si_ok);
 	ASSERT_EQ_DBL(f9, 1.0, 1e-15, "Pa → 1.0");
 
-	value_unit_t u10 = bvn_parse_unit((const uint8_t*)"k-Pa", &uok);
-	ASSERT_TRUE(uok, "k-Pa parses ok");
+	value_unit_t u10 = bvn_parse_unit((const uint8_t*)"k~Pa", &uok);
+	ASSERT_TRUE(uok, "k~Pa parses ok");
 	double f10 = bvn_unit_to_si_factor(u10, &aff, &off, &si_ok);
-	ASSERT_EQ_DBL(f10, 1e3, 1e-10, "k-Pa → 1e3");
+	ASSERT_EQ_DBL(f10, 1e3, 1e-10, "k~Pa → 1e3");
 
 	value_unit_t u11 = bvn_parse_unit((const uint8_t*)"m*s", &uok);
 	ASSERT_TRUE(uok, "m*s parses ok");
@@ -831,9 +831,9 @@ static void test_unit_reduce_iec(void)
 	};
 	value_unit_t r1 = bvn_unit_reduce(KiB_KiB, &scale, &overflow);
 	ASSERT_EQ_INT((int64_t)r1.num_components, 0,
-	              "Ki-B/Ki-B reduces to 0 components (dimensionless cancellation)");
+	              "Ki~B/Ki~B reduces to 0 components (dimensionless cancellation)");
 	ASSERT_EQ_DBL(scale, 1.0, 1e-10,
-	              "Ki-B/Ki-B scale = 1.0");
+	              "Ki~B/Ki~B scale = 1.0");
 
 	value_unit_t MiB_per_KiB = {
 		.num_components = 2,
@@ -844,9 +844,9 @@ static void test_unit_reduce_iec(void)
 	};
 	value_unit_t r2 = bvn_unit_reduce(MiB_per_KiB, &scale, &overflow);
 	ASSERT_EQ_INT((int64_t)r2.num_components, 0,
-	              "Mi-B/Ki-B reduces to 0 components (byte dimension cancels)");
+	              "Mi~B/Ki~B reduces to 0 components (byte dimension cancels)");
 	ASSERT_EQ_DBL(scale, 1024.0, 1e-6,
-	              "Mi-B/Ki-B scale = 1024 (2^10), not 1e10");
+	              "Mi~B/Ki~B scale = 1024 (2^10), not 1e10");
 
 	value_unit_t TiB2_per_GiB = {
 		.num_components = 2,
@@ -857,9 +857,9 @@ static void test_unit_reduce_iec(void)
 	};
 	value_unit_t r3 = bvn_unit_reduce(TiB2_per_GiB, &scale, &overflow);
 	ASSERT_EQ_INT((int64_t)r3.num_components, 1,
-	              "Ti-B²/Gi-B reduces to 1 component");
+	              "Ti~B²/Gi~B reduces to 1 component");
 	ASSERT_EQ_DBL(scale, 1125899906842624.0, 1e6,
-	              "Ti-B²/Gi-B scale = 2^50");
+	              "Ti~B²/Gi~B scale = 2^50");
 
 	value_unit_t km_KiB = {
 		.num_components = 2,
@@ -870,9 +870,9 @@ static void test_unit_reduce_iec(void)
 	};
 	value_unit_t r4 = bvn_unit_reduce(km_KiB, &scale, &overflow);
 	ASSERT_EQ_INT((int64_t)r4.num_components, 2,
-	              "k-m · Ki-B reduces to 2 components");
+	              "k~m · Ki~B reduces to 2 components");
 	ASSERT_EQ_DBL(scale, 1000.0 * 1024.0, 1e-6,
-	              "k-m · Ki-B scale = 1e3 * 1024");
+	              "k~m · Ki~B scale = 1e3 * 1024");
 }
 
 static void test_si_factor_affine_nonlinear(void)
@@ -1057,12 +1057,12 @@ static void test_units_compatible_info(void)
 	ASSERT_TRUE(bvn_units_compatible(
 		BVN_UNIT_IEC(bu_byte, iec_kibi),
 		BVN_UNIT_IEC(bu_byte, iec_mebi)),
-		"Ki-B compatible with Mi-B (both byte, scale differs)");
+		"Ki~B compatible with Mi~B (both byte, scale differs)");
 
 	ASSERT_TRUE(!bvn_units_compatible(
 		BVN_UNIT_IEC(bu_bit, iec_kibi),
 		BVN_UNIT_IEC(bu_byte, iec_kibi)),
-		"Ki-b NOT compatible with Ki-B");
+		"Ki~b NOT compatible with Ki~B");
 }
 
 /* exp_invalid in an info-unit component must make the unit incompatible */
@@ -1232,9 +1232,9 @@ static void test_parse_unit_n(void)
 	printf("  bvn_parse_unit_n length-bounded...\n");
 	bool ok;
 
-	uint8_t buf[] = "k-m/s GARBAGE";
+	uint8_t buf[] = "k~m/s GARBAGE";
 	value_unit_t u = bvn_parse_unit_n(buf, 5, &ok);
-	ASSERT_TRUE(ok, "parse_unit_n 'k-m/s' (len=5) ok");
+	ASSERT_TRUE(ok, "parse_unit_n 'k~m/s' (len=5) ok");
 	ASSERT_EQ_INT((int64_t)u.num_components, 2, "parse_unit_n: 2 components");
 	ASSERT_EQ_INT((int64_t)u.components[0].base, (int64_t)bu_meter, "parse_unit_n: meter");
 	ASSERT_EQ_INT((int64_t)u.components[0].prefix.id.si, (int64_t)si_kilo, "parse_unit_n: kilo");
@@ -1321,12 +1321,12 @@ static void test_neg_exp_round_trip(void)
 		}
 	};
 	r = bvn_unit_to_string(kgs, buf, sizeof(buf));
-	ASSERT_TRUE(r > 0, "k-g/s to_string ok");
+	ASSERT_TRUE(r > 0, "k~g/s to_string ok");
 	reparsed = bvn_parse_unit((const uint8_t*)buf, &ok);
-	ASSERT_TRUE(ok, "k-g/s round-trip parse ok");
+	ASSERT_TRUE(ok, "k~g/s round-trip parse ok");
 	f = bvn_unit_to_si_factor(reparsed, &aff, &off, &si_ok);
-	ASSERT_TRUE(si_ok, "k-g/s round-trip si_factor ok");
-	ASSERT_EQ_DBL(f, 1.0, 1e-15, "k-g/s round-trip factor = 1.0");
+	ASSERT_TRUE(si_ok, "k~g/s round-trip si_factor ok");
+	ASSERT_EQ_DBL(f, 1.0, 1e-15, "k~g/s round-trip factor = 1.0");
 }
 
 static void test_si_prefix_info_unit_restrictions(void)

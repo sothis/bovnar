@@ -769,7 +769,7 @@ if (!bvnr_write_type_annotation(w, vt, vu)) return false;
 value_unit_t bvn_parse_unit(const uint8_t *unit, bool *ok);
 ```
 
-Parse a compound unit string (e.g. `"k-g·m/s²"`) into a `value_unit_t`. Sets `*ok` to `false` and returns a zeroed unit on any error. The string must be NUL-terminated.
+Parse a compound unit string (e.g. `"k~g·m/s²"`) into a `value_unit_t`. Sets `*ok` to `false` and returns a zeroed unit on any error. The string must be NUL-terminated.
 
 This is useful when reading: after `ev_type_annotation_type_family_parameter`, the unit is already parsed for you in `d->value_unit`. You only need `bvn_parse_unit` if you are constructing a unit from a string yourself (e.g. from a config or CLI argument).
 
@@ -777,7 +777,7 @@ The validator also calls `bvn_parse_unit` internally when processing an **inline
 
 ```c
 bool ok;
-value_unit_t u = bvn_parse_unit((const uint8_t *)"k-g·m/s²", &ok);
+value_unit_t u = bvn_parse_unit((const uint8_t *)"k~g·m/s²", &ok);
 if (!ok) {
     fprintf(stderr, "bad unit\n");
     return;
@@ -806,7 +806,7 @@ value_unit_t u = BVN_UNIT_COMPOUND2(
 
 char buf[64];
 int32_t n = bvn_unit_to_string(u, buf, sizeof(buf));
-/* buf = "k-g/s²", n = 7 */
+/* buf = "k~g/s²", n = 7 */
 ```
 
 ---
@@ -938,7 +938,7 @@ A scalar value may carry an **inline unit suffix** directly after the literal, b
 
 ```bovnar
 .speed = 9.81 m/s;            # no annotation; inline unit
-.mass  = <float:64> 70.5 k-g; # annotation without unit; inline unit adopted
+.mass  = <float:64> 70.5 k~g; # annotation without unit; inline unit adopted
 .dist  = <float:64,m> 1.5 m;  # annotation and inline agree — valid
 ```
 

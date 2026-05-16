@@ -1479,14 +1479,14 @@ static size_t bmark_gen_units(uint8_t *buf, size_t cap, size_t *out_assignments)
 {
 	static const char *unit_templates[] = {
 		".k%u=<float:64,m/s>%.17g;\n",
-		".k%u=<float:64,k-g\xc2\xb7m/s\xc2\xb2>%.17g;\n",
-		".k%u=<float:64,k-J>%.17g;\n",
-		".k%u=<uint:64,Gi-B>%llu;\n",
+		".k%u=<float:64,k~g\xc2\xb7m/s\xc2\xb2>%.17g;\n",
+		".k%u=<float:64,k~J>%.17g;\n",
+		".k%u=<uint:64,Gi~B>%llu;\n",
 		".k%u=<float:64,K>%.17g;\n",
-		".k%u=<uint:64,Mi-b>%llu;\n",
+		".k%u=<uint:64,Mi~b>%llu;\n",
 		".k%u=<float:64,m/s\xc2\xb2>%.17g;\n",
-		".k%u=<float:64,k-Pa>%.17g;\n",
-		".k%u=<float:64,k-g/m\xc2\xb3>%.17g;\n",
+		".k%u=<float:64,k~Pa>%.17g;\n",
+		".k%u=<float:64,k~g/m\xc2\xb3>%.17g;\n",
 		".k%u=<float:64,m*s>%.17g;\n",
 		".k%u=<uint:32,no_unit>%llu;\n",
 		".k%u=<float:64,V/m>%.17g;\n",
@@ -1525,12 +1525,12 @@ static size_t bmark_gen_mixed(uint8_t *buf, size_t cap, size_t *out_assignments)
 		".port=<uint:16>8080;\n"
 		".limits={\n"
 		".timeout=<float:64,s>30;\n"
-		".max_payload=<uint:64,Mi-B>16;\n"
+		".max_payload=<uint:64,Mi~B>16;\n"
 		"};\n"
 		"};\n"
 		".sensors=[\n"
 		"{.name=\"temp\";.value=<float:64,\xc2\xb0\x43>23.5;.precision=<float:32>0.1;},\n"
-		"{.name=\"pressure\";.value=<float:64,k-Pa>101.3;}\n"
+		"{.name=\"pressure\";.value=<float:64,k~Pa>101.3;}\n"
 		"];\n";
 	static const char block2[] =
 		".matrix=[1,2,3,4]/[5,6,7,8]/[9,10,11,12];\n"

@@ -160,7 +160,7 @@ class TestWriteArrayWithType:
         with Writer.to_mem() as w:
             write_array(w, 'distances', [1.0, 2.0], vt=vt, vu=vu)
         out = w.get_output()
-        assert b'k-m' in out or b'km' in out
+        assert b'k~m' in out or b'km' in out
 
     def test_no_annotation_still_valid(self):
         result = _roundtrip([5, 10, 15])

@@ -69,13 +69,13 @@ class TestUnitParsing:
         assert vu.components[0].base_unit == BaseUnit.METER
 
     def test_kilometer(self):
-        vu = self._parse("k-m")
+        vu = self._parse("k~m")
         c  = vu.components[0]
         assert c.base_unit == BaseUnit.METER
         assert c.si_prefix == SIPrefix.KILO
 
     def test_gibibytes(self):
-        vu = self._parse("Gi-B")
+        vu = self._parse("Gi~B")
         c  = vu.components[0]
         assert c.base_unit    == BaseUnit.BYTE
         assert c.prefix_system == PrefixSystem.IEC
@@ -102,7 +102,7 @@ class TestUnitParsing:
 
     def test_force_kgms2(self):
 
-        vu = self._parse("k-g\u00b7m/s\u00b2")
+        vu = self._parse("k~g\u00b7m/s\u00b2")
         assert vu.num_components == 3
         kg = vu.components[0]
         m  = vu.components[1]
@@ -122,13 +122,13 @@ class TestUnitParsing:
         assert vu.components[0].base_unit == BaseUnit.KELVIN
 
     def test_megahertz(self):
-        vu = self._parse("M-Hz")
+        vu = self._parse("M~Hz")
         c = vu.components[0]
         assert c.base_unit == BaseUnit.HERTZ
         assert c.si_prefix == SIPrefix.MEGA
 
     def test_tebibyte(self):
-        vu = self._parse("Ti-B")
+        vu = self._parse("Ti~B")
         c = vu.components[0]
         assert c.base_unit    == BaseUnit.BYTE
         assert c.prefix_system == PrefixSystem.IEC
@@ -152,7 +152,7 @@ class TestUnitParsing:
     def test_too_many_components(self):
 
         with pytest.raises(BovnarArgumentError):
-            self._parse("m*s*k-g*A*K*mol*cd*b*B")
+            self._parse("m*s*k~g*A*K*mol*cd*b*B")
 
     def test_celsius(self):
         vu = self._parse("\u00b0C")
@@ -168,12 +168,12 @@ class TestUnitSerialisation:
     def test_kilometer(self):
         vu = make_unit_si(BaseUnit.GRAM, SIPrefix.KILO)
         s  = bovnar.unit_to_str(vu)
-        assert s == "k-g"
+        assert s == "k~g"
 
     def test_gibibyte(self):
         vu = make_unit_iec(BaseUnit.BYTE, IECPrefix.GIBI)
         s  = bovnar.unit_to_str(vu)
-        assert s == "Gi-B"
+        assert s == "Gi~B"
 
     def test_roundtrip_simple(self):
         vu1 = bovnar.parse_unit("m/s")
@@ -182,7 +182,7 @@ class TestUnitSerialisation:
         assert vu2.num_components == vu1.num_components
 
     def test_roundtrip_compound(self):
-        orig = "k-g\u00b7m/s\u00b2"
+        orig = "k~g\u00b7m/s\u00b2"
         vu   = bovnar.parse_unit(orig)
         out  = bovnar.unit_to_str(vu)
 
@@ -196,25 +196,25 @@ class TestUnitFactor:
         assert math.isclose(f, 1.0)
 
     def test_kilo_factor(self):
-        f = bovnar.unit_factor("k-m")
+        f = bovnar.unit_factor("k~m")
         assert math.isclose(f, 1000.0)
 
     def test_milli_factor(self):
-        f = bovnar.unit_factor("m-s")
+        f = bovnar.unit_factor("m~s")
         assert math.isclose(f, 1e-3)
 
     def test_kilo_in_numerator(self):
 
-        f = bovnar.unit_factor("k-m/s")
+        f = bovnar.unit_factor("k~m/s")
         assert math.isclose(f, 1000.0)
 
     def test_denominator_inverts(self):
 
-        f = bovnar.unit_factor("m/k-s")
+        f = bovnar.unit_factor("m/k~s")
         assert math.isclose(f, 1e-3)
 
     def test_gibi_factor(self):
-        f = bovnar.unit_factor("Gi-B")
+        f = bovnar.unit_factor("Gi~B")
         assert math.isclose(f, 2**30)
 
     def test_dimensionless_factor(self):
@@ -222,7 +222,7 @@ class TestUnitFactor:
         assert math.isclose(f, 1.0)
 
     def test_micro_factor(self):
-        f = bovnar.unit_factor("\u00b5-m")
+        f = bovnar.unit_factor("\u00b5~m")
         assert math.isclose(f, 1e-6)
 
     def test_invalid_unit_raises(self):
@@ -380,5 +380,5 @@ class TestMakeUnitCompoundCompatibility:
             {'base': BaseUnit.METER,  'exp': Exponent.LINEAR},
             {'base': BaseUnit.SECOND, 'exp': Exponent.NEG_SQUARE},
         ])
-        vu_parsed = bovnar.parse_unit("k-g\u00b7m/s\u00b2")
+        vu_parsed = bovnar.parse_unit("k~g\u00b7m/s\u00b2")
         assert bovnar.units_compatible(vu_built, vu_parsed)

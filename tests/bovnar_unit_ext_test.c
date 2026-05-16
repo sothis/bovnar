@@ -55,11 +55,11 @@ static void test_radian_steradian_si_factor(void)
 
     double f_mrad = bvn_unit_to_si_factor(BVN_UNIT_SI(bu_radian, si_milli),
                                            &aff, &off, &ok);
-    ASSERT_EQ_DBL(f_mrad, 1e-3, 1e-15, "m-rad → 1e-3");
+    ASSERT_EQ_DBL(f_mrad, 1e-3, 1e-15, "m~rad → 1e-3");
 
     double f_ksr  = bvn_unit_to_si_factor(BVN_UNIT_SI(bu_steradian, si_kilo),
                                            &aff, &off, &ok);
-    ASSERT_EQ_DBL(f_ksr, 1e3, 1e-10, "k-sr → 1e3");
+    ASSERT_EQ_DBL(f_ksr, 1e3, 1e-10, "k~sr → 1e3");
 }
 
 static void test_radian_steradian_dim_vector(void)
@@ -93,10 +93,10 @@ static void test_parse_new_symbols(void)
     ASSERT_EQ_INT(u.num_components, 1, "sr 1 component");
     ASSERT_EQ_INT(u.components[0].base, bu_steradian, "sr → bu_steradian");
 
-    u = bvn_parse_unit((const uint8_t *)"m-rad", &ok);
-    ASSERT_TRUE(ok,  "parse 'm-rad' ok");
-    ASSERT_EQ_INT(u.components[0].base,        bu_radian, "m-rad base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli, "m-rad prefix");
+    u = bvn_parse_unit((const uint8_t *)"m~rad", &ok);
+    ASSERT_TRUE(ok,  "parse 'm~rad' ok");
+    ASSERT_EQ_INT(u.components[0].base,        bu_radian, "m~rad base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli, "m~rad prefix");
 
     u = bvn_parse_unit((const uint8_t *)"rad/s", &ok);
     ASSERT_TRUE(ok, "parse 'rad/s' ok");
@@ -270,50 +270,50 @@ static void test_prefix_enforcement_via_parse(void)
     printf("  prefix enforcement via bvn_parse_unit...\n");
     bool ok;
 
-    bvn_parse_unit((const uint8_t *)"Ki-B", &ok);
-    ASSERT_TRUE(ok, "Ki-B (iec on byte) accepted");
+    bvn_parse_unit((const uint8_t *)"Ki~B", &ok);
+    ASSERT_TRUE(ok, "Ki~B (iec on byte) accepted");
 
-    bvn_parse_unit((const uint8_t *)"Mi-b", &ok);
-    ASSERT_TRUE(ok, "Mi-b (iec on bit) accepted");
+    bvn_parse_unit((const uint8_t *)"Mi~b", &ok);
+    ASSERT_TRUE(ok, "Mi~b (iec on bit) accepted");
 
-    bvn_parse_unit((const uint8_t *)"Gi-B", &ok);
-    ASSERT_TRUE(ok, "Gi-B (iec on byte) accepted");
+    bvn_parse_unit((const uint8_t *)"Gi~B", &ok);
+    ASSERT_TRUE(ok, "Gi~B (iec on byte) accepted");
 
-    bvn_parse_unit((const uint8_t *)"k-m", &ok);
-    ASSERT_TRUE(ok, "k-m (si on meter) accepted");
+    bvn_parse_unit((const uint8_t *)"k~m", &ok);
+    ASSERT_TRUE(ok, "k~m (si on meter) accepted");
 
-    bvn_parse_unit((const uint8_t *)"M-Hz", &ok);
-    ASSERT_TRUE(ok, "M-Hz (si on hertz) accepted");
+    bvn_parse_unit((const uint8_t *)"M~Hz", &ok);
+    ASSERT_TRUE(ok, "M~Hz (si on hertz) accepted");
 
-    bvn_parse_unit((const uint8_t *)"k-B", &ok);
-    ASSERT_TRUE(ok, "k-B (si kilo on byte) accepted");
+    bvn_parse_unit((const uint8_t *)"k~B", &ok);
+    ASSERT_TRUE(ok, "k~B (si kilo on byte) accepted");
 
-    bvn_parse_unit((const uint8_t *)"M-b", &ok);
-    ASSERT_TRUE(ok, "M-b (si mega on bit) accepted");
+    bvn_parse_unit((const uint8_t *)"M~b", &ok);
+    ASSERT_TRUE(ok, "M~b (si mega on bit) accepted");
 
-    bvn_parse_unit((const uint8_t *)"G-B", &ok);
-    ASSERT_TRUE(ok, "G-B (si giga on byte) accepted");
+    bvn_parse_unit((const uint8_t *)"G~B", &ok);
+    ASSERT_TRUE(ok, "G~B (si giga on byte) accepted");
 
-    bvn_parse_unit((const uint8_t *)"k-bit", &ok);
-    ASSERT_TRUE(ok, "k-bit (si kilo on bit longform) accepted");
+    bvn_parse_unit((const uint8_t *)"k~bit", &ok);
+    ASSERT_TRUE(ok, "k~bit (si kilo on bit longform) accepted");
 
-    bvn_parse_unit((const uint8_t *)"M-Byte", &ok);
-    ASSERT_TRUE(ok, "M-Byte (si mega on Byte longform) accepted");
+    bvn_parse_unit((const uint8_t *)"M~Byte", &ok);
+    ASSERT_TRUE(ok, "M~Byte (si mega on Byte longform) accepted");
 
-    bvn_parse_unit((const uint8_t *)"G-Bytes", &ok);
-    ASSERT_TRUE(ok, "G-Bytes (si giga on Bytes longform) accepted");
+    bvn_parse_unit((const uint8_t *)"G~Bytes", &ok);
+    ASSERT_TRUE(ok, "G~Bytes (si giga on Bytes longform) accepted");
 
-    bvn_parse_unit((const uint8_t *)"Ki-m", &ok);
-    ASSERT_FALSE(ok, "Ki-m (iec on meter) rejected");
+    bvn_parse_unit((const uint8_t *)"Ki~m", &ok);
+    ASSERT_FALSE(ok, "Ki~m (iec on meter) rejected");
 
-    bvn_parse_unit((const uint8_t *)"Mi-s", &ok);
-    ASSERT_FALSE(ok, "Mi-s (iec on second) rejected");
+    bvn_parse_unit((const uint8_t *)"Mi~s", &ok);
+    ASSERT_FALSE(ok, "Mi~s (iec on second) rejected");
 
-    bvn_parse_unit((const uint8_t *)"Gi-J", &ok);
-    ASSERT_FALSE(ok, "Gi-J (iec on joule) rejected");
+    bvn_parse_unit((const uint8_t *)"Gi~J", &ok);
+    ASSERT_FALSE(ok, "Gi~J (iec on joule) rejected");
 
-    bvn_parse_unit((const uint8_t *)"Ki-kg", &ok);
-    ASSERT_FALSE(ok, "Ki-kg does not parse (no 'kg' symbol) → rejected");
+    bvn_parse_unit((const uint8_t *)"Ki~kg", &ok);
+    ASSERT_FALSE(ok, "Ki~kg does not parse (no 'kg' symbol) → rejected");
 
     bvn_parse_unit((const uint8_t *)"B", &ok);
     ASSERT_TRUE(ok, "bare B (no prefix) accepted");
@@ -321,29 +321,29 @@ static void test_prefix_enforcement_via_parse(void)
     bvn_parse_unit((const uint8_t *)"b", &ok);
     ASSERT_TRUE(ok, "bare b (no prefix) accepted");
 
-    bvn_parse_unit((const uint8_t *)"m-B", &ok);
-    ASSERT_FALSE(ok, "m-B (si milli on byte) rejected");
+    bvn_parse_unit((const uint8_t *)"m~B", &ok);
+    ASSERT_FALSE(ok, "m~B (si milli on byte) rejected");
 
-    bvn_parse_unit((const uint8_t *)"m-b", &ok);
-    ASSERT_FALSE(ok, "m-b (si milli on bit) rejected");
+    bvn_parse_unit((const uint8_t *)"m~b", &ok);
+    ASSERT_FALSE(ok, "m~b (si milli on bit) rejected");
 
-    bvn_parse_unit((const uint8_t *)"n-B", &ok);
-    ASSERT_FALSE(ok, "n-B (si nano on byte) rejected");
+    bvn_parse_unit((const uint8_t *)"n~B", &ok);
+    ASSERT_FALSE(ok, "n~B (si nano on byte) rejected");
 
-    bvn_parse_unit((const uint8_t *)"\xc2\xb5-b", &ok);
-    ASSERT_FALSE(ok, "\xc2\xb5-b (si micro on bit) rejected");
+    bvn_parse_unit((const uint8_t *)"\xc2\xb5~b", &ok);
+    ASSERT_FALSE(ok, "\xc2\xb5~b (si micro on bit) rejected");
 
-    bvn_parse_unit((const uint8_t *)"m-bit", &ok);
-    ASSERT_FALSE(ok, "m-bit (si milli on bit longform) rejected");
+    bvn_parse_unit((const uint8_t *)"m~bit", &ok);
+    ASSERT_FALSE(ok, "m~bit (si milli on bit longform) rejected");
 
-    bvn_parse_unit((const uint8_t *)"m-byte", &ok);
-    ASSERT_FALSE(ok, "m-byte (si milli on byte longform) rejected");
+    bvn_parse_unit((const uint8_t *)"m~byte", &ok);
+    ASSERT_FALSE(ok, "m~byte (si milli on byte longform) rejected");
 
-    bvn_parse_unit((const uint8_t *)"h-B", &ok);
-    ASSERT_FALSE(ok, "h-B (si hecto on byte) rejected (positive but below kilo)");
+    bvn_parse_unit((const uint8_t *)"h~B", &ok);
+    ASSERT_FALSE(ok, "h~B (si hecto on byte) rejected (positive but below kilo)");
 
-    bvn_parse_unit((const uint8_t *)"da-b", &ok);
-    ASSERT_FALSE(ok, "da-b (si deca on bit) rejected (positive but below kilo)");
+    bvn_parse_unit((const uint8_t *)"da~b", &ok);
+    ASSERT_FALSE(ok, "da~b (si deca on bit) rejected (positive but below kilo)");
 }
 
 static void test_alias_with_prefix(void)
@@ -352,57 +352,57 @@ static void test_alias_with_prefix(void)
     bool ok;
     value_unit_t u;
 
-    u = bvn_parse_unit((const uint8_t *)"k-seconds", &ok);
-    ASSERT_TRUE(ok, "k-seconds ok");
-    ASSERT_EQ_INT(u.components[0].base,         bu_second, "k-seconds base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,   "k-seconds prefix");
+    u = bvn_parse_unit((const uint8_t *)"k~seconds", &ok);
+    ASSERT_TRUE(ok, "k~seconds ok");
+    ASSERT_EQ_INT(u.components[0].base,         bu_second, "k~seconds base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,   "k~seconds prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"m-meters", &ok);
-    ASSERT_TRUE(ok, "m-meters ok");
-    ASSERT_EQ_INT(u.components[0].base,         bu_meter, "m-meters base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli, "m-meters prefix");
+    u = bvn_parse_unit((const uint8_t *)"m~meters", &ok);
+    ASSERT_TRUE(ok, "m~meters ok");
+    ASSERT_EQ_INT(u.components[0].base,         bu_meter, "m~meters base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli, "m~meters prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"k-joules", &ok);
-    ASSERT_TRUE(ok, "k-joules ok");
-    ASSERT_EQ_INT(u.components[0].base,         bu_joule, "k-joules base");
+    u = bvn_parse_unit((const uint8_t *)"k~joules", &ok);
+    ASSERT_TRUE(ok, "k~joules ok");
+    ASSERT_EQ_INT(u.components[0].base,         bu_joule, "k~joules base");
 
-    u = bvn_parse_unit((const uint8_t *)"m-radians", &ok);
-    ASSERT_TRUE(ok, "m-radians ok");
-    ASSERT_EQ_INT(u.components[0].base,         bu_radian, "m-radians base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli,  "m-radians prefix");
+    u = bvn_parse_unit((const uint8_t *)"m~radians", &ok);
+    ASSERT_TRUE(ok, "m~radians ok");
+    ASSERT_EQ_INT(u.components[0].base,         bu_radian, "m~radians base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli,  "m~radians prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"Ki-bytes", &ok);
-    ASSERT_TRUE(ok, "Ki-bytes ok");
-    ASSERT_EQ_INT(u.components[0].base,          bu_byte,   "Ki-bytes base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.iec, iec_kibi,  "Ki-bytes prefix");
+    u = bvn_parse_unit((const uint8_t *)"Ki~bytes", &ok);
+    ASSERT_TRUE(ok, "Ki~bytes ok");
+    ASSERT_EQ_INT(u.components[0].base,          bu_byte,   "Ki~bytes base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.iec, iec_kibi,  "Ki~bytes prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"k-bytes", &ok);
-    ASSERT_TRUE(ok, "k-bytes (si kilo on byte alias) accepted");
-    ASSERT_EQ_INT(u.components[0].base,         bu_byte,  "k-bytes base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k-bytes prefix");
+    u = bvn_parse_unit((const uint8_t *)"k~bytes", &ok);
+    ASSERT_TRUE(ok, "k~bytes (si kilo on byte alias) accepted");
+    ASSERT_EQ_INT(u.components[0].base,         bu_byte,  "k~bytes base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k~bytes prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"k-Bytes", &ok);
-    ASSERT_TRUE(ok, "k-Bytes (si kilo on Bytes alias) accepted");
-    ASSERT_EQ_INT(u.components[0].base,         bu_byte,  "k-Bytes base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k-Bytes prefix");
+    u = bvn_parse_unit((const uint8_t *)"k~Bytes", &ok);
+    ASSERT_TRUE(ok, "k~Bytes (si kilo on Bytes alias) accepted");
+    ASSERT_EQ_INT(u.components[0].base,         bu_byte,  "k~Bytes base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k~Bytes prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"M-Byte", &ok);
-    ASSERT_TRUE(ok, "M-Byte (si mega on Byte alias) accepted");
-    ASSERT_EQ_INT(u.components[0].base,         bu_byte,  "M-Byte base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_mega,  "M-Byte prefix");
+    u = bvn_parse_unit((const uint8_t *)"M~Byte", &ok);
+    ASSERT_TRUE(ok, "M~Byte (si mega on Byte alias) accepted");
+    ASSERT_EQ_INT(u.components[0].base,         bu_byte,  "M~Byte base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_mega,  "M~Byte prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"k-bit", &ok);
-    ASSERT_TRUE(ok, "k-bit (si kilo on bit alias) accepted");
-    ASSERT_EQ_INT(u.components[0].base,         bu_bit,   "k-bit base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k-bit prefix");
+    u = bvn_parse_unit((const uint8_t *)"k~bit", &ok);
+    ASSERT_TRUE(ok, "k~bit (si kilo on bit alias) accepted");
+    ASSERT_EQ_INT(u.components[0].base,         bu_bit,   "k~bit base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k~bit prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"G-bits", &ok);
-    ASSERT_TRUE(ok, "G-bits (si giga on bits alias) accepted");
-    ASSERT_EQ_INT(u.components[0].base,         bu_bit,   "G-bits base");
-    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_giga,  "G-bits prefix");
+    u = bvn_parse_unit((const uint8_t *)"G~bits", &ok);
+    ASSERT_TRUE(ok, "G~bits (si giga on bits alias) accepted");
+    ASSERT_EQ_INT(u.components[0].base,         bu_bit,   "G~bits base");
+    ASSERT_EQ_INT(u.components[0].prefix.id.si, si_giga,  "G~bits prefix");
 
-    u = bvn_parse_unit((const uint8_t *)"Ki-seconds", &ok);
-    ASSERT_FALSE(ok, "Ki-seconds (iec on second alias) rejected");
+    u = bvn_parse_unit((const uint8_t *)"Ki~seconds", &ok);
+    ASSERT_FALSE(ok, "Ki~seconds (iec on second alias) rejected");
 }
 
 static void test_unit_to_string_new_units(void)

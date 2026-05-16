@@ -99,11 +99,11 @@
 # ── 9. Integers with SI / IEC units ──────────────────────────────────────────
 
 .timeout_s    = <uint:32,s>       3600;       # 3600 seconds (1 hour)
-.timeout_ms   = <uint:32,m-s>     3600000;    # 3 600 000 milliseconds
+.timeout_ms   = <uint:32,m~s>     3600000;    # 3 600 000 milliseconds
 .distance_m   = <uint:64,m>       384400000;  # Earth–Moon distance in meters
-.file_size    = <uint:64,Ki-B>    1024;       # 1024 kibibytes = 1 MiB
-.ram_size     = <uint:64,Mi-B>    4096;       # 4096 MiB = 4 GiB
-.bitrate      = <uint:32,k-b>     9600;       # 9600 kilobits (UART speed)
+.file_size    = <uint:64,Ki~B>    1024;       # 1024 kibibytes = 1 MiB
+.ram_size     = <uint:64,Mi~B>    4096;       # 4096 MiB = 4 GiB
+.bitrate      = <uint:32,k~b>     9600;       # 9600 kilobits (UART speed)
 .frequency_hz = <uint:32,Hz>      48000;      # 48 kHz sample rate
 .temperature  = <sint:16,°C>      -40;        # minus 40 degrees Celsius
 .pressure_pa  = <uint:32,Pa>      101325;     # standard atmosphere in pascals
@@ -114,7 +114,7 @@
 .baud = 115200 b;               # inline unit: bits — no type annotation needed
 .heap = 65536 B;                # inline unit: bytes
 .uptime = 86400 s;              # inline unit: seconds
-.voltage = 3300 m-V;            # inline unit: millivolts (3.3 V)
+.voltage = 3300 m~V;            # inline unit: millivolts (3.3 V)
 
 
 # ── 11. Null integer values ───────────────────────────────────────────────────

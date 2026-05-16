@@ -5,7 +5,7 @@
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
-(*  Updated: 2026-05-12 — add float_fix, float_dec, q-param          *)
+(*  Updated: 2026-05-12 — add float_fix, float_dec, q~param          *)
 (* ================================================================== *)
 
 
@@ -212,8 +212,8 @@ type-param-list = type-param , {ws , "," , ws , type-param} ;
 
 type-param   = width-param           (* e.g. 32, 64                        *)
              | base-param            (* e.g. _16, _64, _85                 *)
-             | q-param               (* e.g. q8, q16  – float_fix only     *)
-             | unit-param ;          (* e.g. m-s, Gi-B, m^2                *)
+             | q~param               (* e.g. q8, q16  – float_fix only     *)
+             | unit-param ;          (* e.g. m~s, Gi~B, m^2                *)
 
 (* Width: one or more decimal digits.  0 means "no width restriction".*)
 (* float:      0, 16, or any multiple of 32 up to BVN_FLOAT_MAX_PREC.*)
@@ -232,7 +232,7 @@ width-param  = DIGIT , {DIGIT} ;
 (* as a symbol token, causing a type/value mismatch instead.          *)
 base-param   = "_" , DIGIT , {DIGIT} ;
 
-(* Q-parameter: lowercase "q" followed by one or more decimal digits. *)
+(* Q~parameter: lowercase "q" followed by one or more decimal digits. *)
 (* Specifies the number of fractional bits for the float_fix Q-format.*)
 (*   Value = raw_signed_integer × 2^(-Q).                             *)
 (* Valid only for "float_fix"; rejected for all other families.       *)
@@ -240,7 +240,7 @@ base-param   = "_" , DIGIT , {DIGIT} ;
 (* Q is stored in value_type_spec_t.base and retrieved via            *)
 (* bvn_effective_q; bvn_effective_base always returns 10 for          *)
 (* float_fix and float_dec.                                           *)
-q-param      = "q" , DIGIT , {DIGIT} ;
+q~param      = "q" , DIGIT , {DIGIT} ;
 
 (* Unit parameter: everything up to the next "," or ">".             *)
 (* Parsed against the unit table by bvn_parse_unit.              *)
@@ -272,9 +272,9 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* more than BVN_MAX_UNIT_COMPONENTS = 8 total components per unit    *)
 (* string both produce error_unit_illegal.                            *)
 (*                                                                     *)
-(* unit-component = [prefix "-"] base-unit [unit-exponent] ;          *)
+(* unit-component = [prefix "~"] base-unit [unit-exponent] ;          *)
 (*                                                                     *)
-(* When a prefix is present the separator "-" is mandatory.           *)
+(* When a prefix is present the separator "~" is mandatory.           *)
 (* A bare base-unit with no prefix requires no separator.             *)
 (*                                                                     *)
 (* si-prefix  = "Q"|"R"|"Y"|"Z"|"E"|"P"|"T"|"G"|"M"|"k"|"h"|"da"   *)
@@ -388,9 +388,9 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 (*                                                                     *)
 (* Examples:                                                           *)
 (*   .a = 9.81 m/s;          (* space separator *)                    *)
-(*   .b = <float:64> 1.5 k-m; (* with type annotation *)             *)
+(*   .b = <float:64> 1.5 k~m; (* with type annotation *)             *)
 (*   .c = $nan$ s;            (* special-number with unit *)           *)
-(*   .d = 1.5e3 k-J;          (* number with exponent *)              *)
+(*   .d = 1.5e3 k~J;          (* number with exponent *)              *)
 (*   .e = "FF" m;             (* string literal with unit *)          *)
 (*                                                                     *)
 (* State-machine flow:                                                 *)
@@ -420,7 +420,7 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 
 inline-unit-start = ALPHA | "_" | utf8-leader ;
 
-inline-unit-char  = ALPHA | DIGIT | "_" | "+" | "-" | "." | "/" | ":" | "^" | "*"
+inline-unit-char  = ALPHA | DIGIT | "_" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
                   | utf8-leader | utf8-continuation ;
 
 

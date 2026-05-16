@@ -17,7 +17,7 @@
 9. [Null, Symbols, and References](#9-null-symbols-and-references)
 10. [Octet Streams](#10-octet-streams)
 11. [Error Handling and Debugging](#11-error-handling-and-debugging)
-12. [C API](#12-c-api)
+12. [C API](#12-c~api)
 13. [Python Bindings](#13-python-bindings)
 14. [Limits and Performance](#14-limits-and-performance)
 15. [Why C99 and Not C23?](#15-why-c99-and-not-c23)
@@ -285,38 +285,38 @@ Place the unit symbol inside the angle brackets after the other type parameters:
 
 ---
 
-**How do SI prefixes work, and why is the hyphen mandatory?**
+**How do SI prefixes work, and why is the `~` separator mandatory?**
 
-An SI prefix is written before the unit symbol with a mandatory hyphen
-separator: `k-m` (kilometer), `m-V` (millivolt), `G-Hz` (gigahertz). The
-hyphen is required because without it there is no general way to distinguish
+An SI prefix is written before the unit symbol with a mandatory `~` separator
+separator: `k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz). The
+`~` is required because without it there is no general way to distinguish
 a two-character unit symbol from a one-character prefix followed by a
-one-character unit — `mV` would be ambiguous. The hyphen resolves all such
+one-character unit — `mV` would be ambiguous. The `~` resolves all such
 cases unambiguously:
 
 ```bovnar
 .k_ohm = <float:32,k-Ω> 4.7;
-.micro = <float:32,µ-s> 50.0;
-.giga  = <float:64,G-Hz> 2.4;
+.micro = <float:32,µ~s> 50.0;
+.giga  = <float:64,G~Hz> 2.4;
 ```
 
 IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, …) follow the same rule:
 
 ```bovnar
-.ram  = <uint:64,Gi-B> 8;
-.disk = <uint:64,Ti-B> 2;
+.ram  = <uint:64,Gi~B> 8;
+.disk = <uint:64,Ti~B> 2;
 ```
 
 ---
 
-**What is the difference between `M-B` (megabytes) and `Mi-B` (mebibytes)?**
+**What is the difference between `M~B` (megabytes) and `Mi~B` (mebibytes)?**
 
 `M-` is the SI decimal prefix (mega = 10⁶). `Mi-` is the IEC binary prefix
 (mebi = 2²⁰ = 1,048,576). The difference matters for storage:
 
 ```bovnar
-.link_rate = <uint:32,M-b>  1000;   # 1 000 × 10⁶ bits
-.cache     = <uint:64,Mi-B> 512;    # 512 × 2²⁰ bytes
+.link_rate = <uint:32,M~b>  1000;   # 1 000 × 10⁶ bits
+.cache     = <uint:64,Mi~B> 512;    # 512 × 2²⁰ bytes
 ```
 
 ---
@@ -328,8 +328,8 @@ Use `*` or the middle-dot `·` (U+00B7) for multiplication and `/` for division:
 ```bovnar
 .velocity     = <float:64,m/s>          9.81;
 .acceleration = <float:64,m/s²>         9.81;
-.force        = <float:64,k-g·m/s²>     9.81;
-.energy       = <float:64,k-g·m²/s²>    1000.0;
+.force        = <float:64,k~g·m/s²>     9.81;
+.energy       = <float:64,k~g·m²/s²>    1000.0;
 ```
 
 The `/` separator is a one-way switch: once written, every subsequent component
@@ -337,7 +337,7 @@ is in the denominator. To place a component back in the numerator after a
 divisor, use a negative exponent instead:
 
 ```bovnar
-.force_alt = <float:64,k-g·m·s⁻²> 9.81;   # identical to k-g·m/s²
+.force_alt = <float:64,k~g·m·s⁻²> 9.81;   # identical to k~g·m/s²
 ```
 
 The maximum number of unit components in a compound unit is 8; exceeding that
@@ -385,7 +385,7 @@ value literal, separated by at least one whitespace character:
 
 ```bovnar
 .speed   = 9.81 m/s;       # no annotation; inline unit adopted
-.mass    = 70.0 k-g;
+.mass    = 70.0 k~g;
 .storage = 65536 B;
 ```
 
@@ -403,7 +403,7 @@ katal, plus radian and steradian), and 16 non-SI units accepted for use with
 SI (liter, minute, hour, day, week, year, degree (angle), degree Celsius,
 tonne, bar, electronvolt, dalton, astronomical unit, hectare, and the bit and
 byte for digital quantities). The `bu_gram` base unit is used for mass so that
-the `k-` prefix can carry the kilo: `k-g` = kilogram.
+the `k-` prefix can carry the kilo: `k~g` = kilogram.
 
 ---
 
@@ -963,8 +963,8 @@ struct. Use the helper functions to work with it:
 ```python
 import bovnar
 
-vu = bovnar.parse_unit("k-g·m/s²")          # parse string → ValueUnit
-s  = bovnar.unit_to_str(vu)                   # → "k-g·m/s²"
+vu = bovnar.parse_unit("k~g·m/s²")          # parse string → ValueUnit
+s  = bovnar.unit_to_str(vu)                   # → "k~g·m/s²"
 ok = bovnar.units_compatible(vu_a, vu_b)      # dimensional compatibility
 c  = bovnar.unit_convert_factor(vu_from, vu_to)
 kelvin = bovnar.convert_value(25.0, vu_celsius, vu_kelvin)

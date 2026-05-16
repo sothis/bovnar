@@ -85,16 +85,16 @@ static const char *bvnr_seeds[] = {
     ".x = <float:64,m> 100.0;\n",
     ".x = <float:64,g> 500.0;\n",
     ".x = <uint:64,B> 1024;\n",
-    ".x = <uint:64,Ki-B> 1;\n",
-    ".x = <uint:64,Mi-B> 1;\n",
+    ".x = <uint:64,Ki~B> 1;\n",
+    ".x = <uint:64,Mi~B> 1;\n",
     ".x = <float:64,no_unit> 1.0;\n",
 
     ".x = <float:64,m/s> 9.81;\n",
     ".x = <float:64,m/s\xC2\xB2> 9.81;\n",
-    ".x = <float:64,k-g\xC2\xB7m/s\xC2\xB2> 9.81;\n",
-    ".x = <float:64,k-g\xC2\xB7m\xC2\xB2/s\xC2\xB2> 100.0;\n",
+    ".x = <float:64,k~g\xC2\xB7m/s\xC2\xB2> 9.81;\n",
+    ".x = <float:64,k~g\xC2\xB7m\xC2\xB2/s\xC2\xB2> 100.0;\n",
     ".x = <float:64,m*s> 1.0;\n",
-    ".x = <float:64,k-g/m\xC2\xB3> 7800.0;\n",
+    ".x = <float:64,k~g/m\xC2\xB3> 7800.0;\n",
 
     ".a = [1, 2, 3];\n",
     ".a = [1,2,3]/[4,5,6];\n",
@@ -148,9 +148,9 @@ static const char *bvnr_seeds[] = {
     ".m = [<float:32> 1.0, <float:32> 2.0]/[<float:32> 3.0, <float:32> 4.0];\n",
 
     ".velocity = <float:64,m/s> 9.81;\n"
-    ".force = <float:64,k-g\xC2\xB7m/s\xC2\xB2> 9.81;\n"
-    ".storage = <uint:64,Ti-B> 2;\n"
-    ".frequency = <float:64,k-Hz> 2.4;\n",
+    ".force = <float:64,k~g\xC2\xB7m/s\xC2\xB2> 9.81;\n"
+    ".storage = <uint:64,Ti~B> 2;\n"
+    ".frequency = <float:64,k~Hz> 2.4;\n",
 
     "",
 
@@ -248,12 +248,12 @@ static const utils_seed_t utils_seeds[] = {
     { 10, 0, 0, "m",                "meter" },
     { 10, 0, 0, "m/s",              "m per s" },
     { 10, 0, 0, "m/s\xC2\xB2",      "m/s²" },
-    { 10, 0, 0, "k-g\xC2\xB7m/s\xC2\xB2", "k-g·m/s²" },
-    { 10, 0, 0, "Ki-B",             "kibibyte" },
+    { 10, 0, 0, "k~g\xC2\xB7m/s\xC2\xB2", "k~g·m/s²" },
+    { 10, 0, 0, "Ki~B",             "kibibyte" },
     { 10, 0, 0, "no_unit",          "dimensionless" },
     { 10, 0, 0, "m//s",             "invalid: empty component" },
     { 10, 0, 0, "",                 "empty unit string" },
-    { 10, 0, 0, "m*s*k-g*A*K*mol*cd*b*Hz", "9 components (overflow)" },
+    { 10, 0, 0, "m*s*k~g*A*K*mol*cd*b*Hz", "9 components (overflow)" },
 
     { 11, 3, 8, "42",               "uint64 parse" },
     { 11, 3, 8, "-1",               "negative into uint" },
@@ -276,7 +276,7 @@ static const utils_seed_t utils_seeds[] = {
     { 20, 0, 0, "",                 "empty annotation" },
     { 20, 0, 0, "uint:",            "uint no params" },
     { 20, 0, 0, "uint:_16",         "uint base-16" },
-    { 20, 0, 0, "float:64,k-g\xC2\xB7m/s\xC2\xB2", "compound unit" },
+    { 20, 0, 0, "float:64,k~g\xC2\xB7m/s\xC2\xB2", "compound unit" },
 };
 
 static void write_utils_seeds(const char *dir)

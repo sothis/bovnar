@@ -296,7 +296,7 @@ class TestDomNodeUnit:
         assert math.isclose(v, 300.0, rel_tol=1e-6)
 
     def test_value_in_base_units_km(self):
-        doc = DomDoc.parse(b".d = <uint:32,k-m> 5;\n")
+        doc = DomDoc.parse(b".d = <uint:32,k~m> 5;\n")
         v   = doc['d'].value_in_base_units()
         assert math.isclose(v, 5000.0, rel_tol=1e-6)
 

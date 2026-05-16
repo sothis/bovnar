@@ -29,7 +29,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 2.  SI base units (bare, no prefix, no exponent)
 # ══════════════════════════════════════════════════════════════════════════════
-# All 7 SI base units.  The kilogram is represented as k-g so that the kilo
+# All 7 SI base units.  The kilogram is represented as k~g so that the kilo
 # prefix can be separated from the gram base symbol.
 
 .si_second   = <float:64,s>   1.0;         # second (time)
@@ -91,76 +91,76 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 6.  All 24 SI prefixes on a common base unit (meter)
 # ══════════════════════════════════════════════════════════════════════════════
-# Prefix–base unit pairs are written as "prefix-base" (mandatory hyphen).
+# Prefix–base unit pairs are written as "prefix~base" (mandatory tilde).
 # A bare "m" alone is the meter base unit, not a prefixed unit.
 
-.pfx_quetta = <float:64,Q-m>  1.0;     # quettameter  10³⁰ m
-.pfx_ronna  = <float:64,R-m>  1.0;     # ronnameter   10²⁷ m
-.pfx_yotta  = <float:64,Y-m>  1.0;     # yottameter   10²⁴ m
-.pfx_zetta  = <float:64,Z-m>  1.0;     # zettameter   10²¹ m
-.pfx_exa    = <float:64,E-m>  1.0;     # exameter     10¹⁸ m
-.pfx_peta   = <float:64,P-m>  1.0;     # petameter    10¹⁵ m
-.pfx_tera   = <float:64,T-m>  1.0;     # terameter    10¹² m
-.pfx_giga   = <float:64,G-m>  1.0;     # gigameter    10⁹  m
-.pfx_mega   = <float:64,M-m>  1.0;     # megameter    10⁶  m
-.pfx_kilo   = <float:64,k-m>  1.5;     # kilometer    10³  m  (k = kilo)
-.pfx_hecto  = <float:64,h-m>  1.0;     # hectometer   10²  m
-.pfx_deca   = <float:64,da-m> 1.0;     # decameter    10¹  m  (two-char prefix "da")
+.pfx_quetta = <float:64,Q~m>  1.0;     # quettameter  10³⁰ m
+.pfx_ronna  = <float:64,R~m>  1.0;     # ronnameter   10²⁷ m
+.pfx_yotta  = <float:64,Y~m>  1.0;     # yottameter   10²⁴ m
+.pfx_zetta  = <float:64,Z~m>  1.0;     # zettameter   10²¹ m
+.pfx_exa    = <float:64,E~m>  1.0;     # exameter     10¹⁸ m
+.pfx_peta   = <float:64,P~m>  1.0;     # petameter    10¹⁵ m
+.pfx_tera   = <float:64,T~m>  1.0;     # terameter    10¹² m
+.pfx_giga   = <float:64,G~m>  1.0;     # gigameter    10⁹  m
+.pfx_mega   = <float:64,M~m>  1.0;     # megameter    10⁶  m
+.pfx_kilo   = <float:64,k~m>  1.5;     # kilometer    10³  m  (k = kilo)
+.pfx_hecto  = <float:64,h~m>  1.0;     # hectometer   10²  m
+.pfx_deca   = <float:64,da~m> 1.0;     # decameter    10¹  m  (two-char prefix "da")
 # (no prefix)                           # bare meter   10⁰  m  → si_none
-.pfx_deci   = <float:64,d-m>  1.0;     # decimeter    10⁻¹ m
-.pfx_centi  = <float:64,c-m>  1.0;     # centimeter   10⁻² m
-.pfx_milli  = <float:64,m-m>  1.0;     # millimeter   10⁻³ m  (prefix m-, base m)
-.pfx_micro  = <float:64,µ-m>  1.0;     # micrometer   10⁻⁶ m  — µ = U+00B5 (0xC2 0xB5)
-.pfx_nano   = <float:64,n-m>  1.0;     # nanometer    10⁻⁹ m
-.pfx_pico   = <float:64,p-m>  1.0;     # picometer    10⁻¹² m
-.pfx_femto  = <float:64,f-m>  1.0;     # femtometer   10⁻¹⁵ m
-.pfx_atto   = <float:64,a-m>  1.0;     # attometer    10⁻¹⁸ m
-.pfx_zepto  = <float:64,z-m>  1.0;     # zeptometer   10⁻²¹ m
-.pfx_yocto  = <float:64,y-m>  1.0;     # yoctometer   10⁻²⁴ m
-.pfx_ronto  = <float:64,r-m>  1.0;     # rontometer   10⁻²⁷ m
-.pfx_quecto = <float:64,q-m>  1.0;     # quectometer  10⁻³⁰ m
+.pfx_deci   = <float:64,d~m>  1.0;     # decimeter    10⁻¹ m
+.pfx_centi  = <float:64,c~m>  1.0;     # centimeter   10⁻² m
+.pfx_milli  = <float:64,m~m>  1.0;     # millimeter   10⁻³ m  (prefix m~, base m)
+.pfx_micro  = <float:64,µ~m>  1.0;     # micrometer   10⁻⁶ m  — µ = U+00B5 (0xC2 0xB5)
+.pfx_nano   = <float:64,n~m>  1.0;     # nanometer    10⁻⁹ m
+.pfx_pico   = <float:64,p~m>  1.0;     # picometer    10⁻¹² m
+.pfx_femto  = <float:64,f~m>  1.0;     # femtometer   10⁻¹⁵ m
+.pfx_atto   = <float:64,a~m>  1.0;     # attometer    10⁻¹⁸ m
+.pfx_zepto  = <float:64,z~m>  1.0;     # zeptometer   10⁻²¹ m
+.pfx_yocto  = <float:64,y~m>  1.0;     # yoctometer   10⁻²⁴ m
+.pfx_ronto  = <float:64,r~m>  1.0;     # rontometer   10⁻²⁷ m
+.pfx_quecto = <float:64,q~m>  1.0;     # quectometer  10⁻³⁰ m
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 7.  All 10 IEC binary prefixes on byte (B)
 # ══════════════════════════════════════════════════════════════════════════════
-# IEC prefixes follow the same "prefix-base" hyphen convention.
+# IEC prefixes follow the same "prefix~base" tilde convention.
 # They are recognised by the two-character "Xi" pattern.
 
-.iec_kibi  = <uint:64,Ki-B>  1024;     # kibibyte  2¹⁰  B  = 1 024 B
-.iec_mebi  = <uint:64,Mi-B>  1;        # mebibyte  2²⁰  B  = 1 048 576 B
-.iec_gibi  = <uint:64,Gi-B>  8;        # gibibyte  2³⁰  B  = 1 073 741 824 B
-.iec_tebi  = <uint:64,Ti-B>  2;        # tebibyte  2⁴⁰  B
-.iec_pebi  = <uint:64,Pi-B>  1;        # pebibyte  2⁵⁰  B
-.iec_exbi  = <uint:64,Ei-B>  1;        # exbibyte  2⁶⁰  B
-.iec_zebi  = <uint:64,Zi-B>  1;        # zebibyte  2⁷⁰  B
-.iec_yobi  = <uint:64,Yi-B>  1;        # yobibyte  2⁸⁰  B
-.iec_robi  = <uint:64,Ri-B>  1;        # robibyte  2⁹⁰  B
-.iec_quebi = <uint:64,Qi-B>  1;        # quebibyte 2¹⁰⁰ B
+.iec_kibi  = <uint:64,Ki~B>  1024;     # kibibyte  2¹⁰  B  = 1 024 B
+.iec_mebi  = <uint:64,Mi~B>  1;        # mebibyte  2²⁰  B  = 1 048 576 B
+.iec_gibi  = <uint:64,Gi~B>  8;        # gibibyte  2³⁰  B  = 1 073 741 824 B
+.iec_tebi  = <uint:64,Ti~B>  2;        # tebibyte  2⁴⁰  B
+.iec_pebi  = <uint:64,Pi~B>  1;        # pebibyte  2⁵⁰  B
+.iec_exbi  = <uint:64,Ei~B>  1;        # exbibyte  2⁶⁰  B
+.iec_zebi  = <uint:64,Zi~B>  1;        # zebibyte  2⁷⁰  B
+.iec_yobi  = <uint:64,Yi~B>  1;        # yobibyte  2⁸⁰  B
+.iec_robi  = <uint:64,Ri~B>  1;        # robibyte  2⁹⁰  B
+.iec_quebi = <uint:64,Qi~B>  1;        # quebibyte 2¹⁰⁰ B
 
-.iec_bits  = <uint:64,Gi-b>  10;       # gibibit — IEC prefix on bit unit
+.iec_bits  = <uint:64,Gi~b>  10;       # gibibit — IEC prefix on bit unit
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 8.  Prefix–base ambiguities resolved by the hyphen
+# 8.  Prefix–base ambiguities resolved by the tilde
 # ══════════════════════════════════════════════════════════════════════════════
 # Several single-letter symbols are both a prefix and a base unit.
-# "prefix-" (with hyphen) → prefix; bare → base unit.
+# "prefix~" (with tilde) → prefix; bare → base unit.
 
 .ambig_m_meter  = <float:64,m>    1.0;   # m alone   → meter (bu_meter)
-.ambig_m_milli  = <float:64,m-s>  1.0;   # m-        → milli (millisecond)
+.ambig_m_milli  = <float:64,m~s>  1.0;   # m~        → milli (millisecond)
 
 .ambig_d_day    = <float:64,d>    1.0;   # d alone   → day   (bu_day)
-.ambig_d_deci   = <float:64,d-s>  1.0;   # d-        → deci  (decisecond)
+.ambig_d_deci   = <float:64,d~s>  1.0;   # d~        → deci  (decisecond)
 
 .ambig_h_hour   = <float:64,h>    1.0;   # h alone   → hour  (bu_hour)
-.ambig_h_hecto  = <float:64,h-m>  1.0;   # h-        → hecto (hectometer)
+.ambig_h_hecto  = <float:64,h~m>  1.0;   # h~        → hecto (hectometer)
 
 .ambig_T_tesla  = <float:64,T>    1.0;   # T alone   → tesla (bu_tesla)
-.ambig_T_tera   = <float:64,T-m>  1.0;   # T-        → tera  (terameter)
+.ambig_T_tera   = <float:64,T~m>  1.0;   # T~        → tera  (terameter)
 
 .ambig_f_farad  = <float:64,F>    1.0;   # F alone   → farad (bu_farad)
-.ambig_f_femto  = <float:64,f-m>  1.0;   # f-        → femto (femtometer)
+.ambig_f_femto  = <float:64,f~m>  1.0;   # f~        → femto (femtometer)
 
 .ambig_S_siem   = <float:64,S>    1.0;   # S alone   → siemens (bu_siemens)
 
@@ -207,15 +207,15 @@
 # Three separators: * (U+002A), · (U+00B7 MIDDLE DOT), / (U+002F division)
 # · and * are semantically identical (both mean multiplication).
 
-.sep_asterisk   = <float:64,k-g*m*s>   1.0;  # * separator: kg·m·s
-.sep_middledot  = <float:64,k-g·m·s>   1.0;  # · separator: identical to above
-.sep_mixed      = <float:64,k-g*m·s>   1.0;  # mixed: * and · interchangeable
+.sep_asterisk   = <float:64,k~g*m*s>   1.0;  # * separator: kg·m·s
+.sep_middledot  = <float:64,k~g·m·s>   1.0;  # · separator: identical to above
+.sep_mixed      = <float:64,k~g*m·s>   1.0;  # mixed: * and · interchangeable
 
 .sep_divide     = <float:64,m/s>        9.81; # / separator: m per second (velocity)
-.sep_divide2    = <float:64,k-g/m³>  7800.0;  # kg per cubic meter (density)
+.sep_divide2    = <float:64,k~g/m³>  7800.0;  # kg per cubic meter (density)
 
 # Mixed product and division
-.sep_mixed_div  = <float:64,k-g·m/s²>  9.81; # k-g·m in numerator, s² in denominator
+.sep_mixed_div  = <float:64,k~g·m/s²>  9.81; # k~g·m in numerator, s² in denominator
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -226,17 +226,17 @@
 # a/b/c → components [a, b⁻¹, c⁻¹]    (NOT (a/b)/c as separate operations)
 
 .denom_abc    = <float:64,m/s/K>  1.0; # m · s⁻¹ · K⁻¹  (both s and K are negated)
-.denom_4comp  = <float:64,k-g·m/s²/A> 1.0; # k-g and m numerator; s² and A denominator
+.denom_4comp  = <float:64,k~g·m/s²/A> 1.0; # k~g and m numerator; s² and A denominator
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 13. Negative exponents in numerator (alternative to / denominator)
 # ══════════════════════════════════════════════════════════════════════════════
-# k-g·m·s⁻² and k-g·m/s² produce identical value_unit_t representations.
+# k~g·m·s⁻² and k~g·m/s² produce identical value_unit_t representations.
 
-.neg_exp_unicode = <float:64,k-g·m·s⁻²> 9.81;  # ⁻² explicit negative exponent
-.neg_exp_caret   = <float:64,k-g·m·s^-2> 9.81; # caret form — identical
-.pos_neg_equiv   = <float:64,k-g·m/s²>   9.81;  # / form — identical internal structure
+.neg_exp_unicode = <float:64,k~g·m·s⁻²> 9.81;  # ⁻² explicit negative exponent
+.neg_exp_caret   = <float:64,k~g·m·s^-2> 9.81; # caret form — identical
+.pos_neg_equiv   = <float:64,k~g·m/s²>   9.81;  # / form — identical internal structure
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -248,12 +248,12 @@
 # Terminated by whitespace, #, or ;
 
 .inline_simple   = 9.81 m/s;       # float with inline compound unit
-.inline_si_pfx   = 70.5 k-g;       # inline SI-prefix unit (kilogram)
-.inline_iec_pfx  = 4 Gi-B;         # inline IEC-prefix unit (gibibytes)
+.inline_si_pfx   = 70.5 k~g;       # inline SI-prefix unit (kilogram)
+.inline_iec_pfx  = 4 Gi~B;         # inline IEC-prefix unit (gibibytes)
 .inline_no_unit  = 3.14 no_unit;   # inline explicit dimensionless
 .inline_uint     = 1500 B;         # inline unit on a plain integer
 .inline_sint     = -40 °C;         # inline unit on a signed integer
-.inline_compound = 6.674e-11 k-g^-1·m³·s^-2; # inline compound (gravitational constant)
+.inline_compound = 6.674e-11 k~g^-1·m³·s^-2; # inline compound (gravitational constant)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -305,27 +305,27 @@
 
 .velocity          = <float:64,m/s>         299792458.0;  # speed of light
 .acceleration      = <float:64,m/s²>        9.80665;       # std. gravity
-.force_newton      = <float:64,k-g·m/s²>    9.81;          # force (same as N)
-.energy_joule      = <float:64,k-g·m²/s²>   4184.0;        # 1 kcal in J
-.pressure_pa       = <float:64,k-g/m/s²>    101325.0;      # pressure (alt. Pa)
-.power_watt        = <float:64,k-g·m²/s³>   60.0;          # power (alt. W)
-.momentum          = <float:64,k-g·m/s>     10.0;          # linear momentum
+.force_newton      = <float:64,k~g·m/s²>    9.81;          # force (same as N)
+.energy_joule      = <float:64,k~g·m²/s²>   4184.0;        # 1 kcal in J
+.pressure_pa       = <float:64,k~g/m/s²>    101325.0;      # pressure (alt. Pa)
+.power_watt        = <float:64,k~g·m²/s³>   60.0;          # power (alt. W)
+.momentum          = <float:64,k~g·m/s>     10.0;          # linear momentum
 .angular_velocity  = <float:64,°/s>         360.0;          # rotation rate
-.electric_field    = <float:64,V/m>          1000.0;        # E-field strength
-.magnetic_flux_den = <float:64,m-T>          50.0;          # 50 millitesla
-.capacitance       = <float:64,µ-F>          100.0;         # 100 µF
-.inductance        = <float:64,m-H>          10.0;          # 10 mH
+.electric_field    = <float:64,V/m>          1000.0;        # E~field strength
+.magnetic_flux_den = <float:64,m~T>          50.0;          # 50 millitesla
+.capacitance       = <float:64,µ~F>          100.0;         # 100 µF
+.inductance        = <float:64,m~H>          10.0;          # 10 mH
 .flow_rate         = <float:64,L/min>        15.0;          # liters per minute
-.mass_density      = <float:64,k-g/m³>       7800.0;        # steel density
-.surface_density   = <float:64,k-g/m²>       200.0;         # area load
+.mass_density      = <float:64,k~g/m³>       7800.0;        # steel density
+.surface_density   = <float:64,k~g/m²>       200.0;         # area load
 .torque            = <float:64,N·m>           25.0;          # torque (N·m)
 .luminance         = <float:64,cd/m²>        500.0;          # luminance (nit)
 .dose_rate         = <float:64,Gy/s>          0.001;         # absorbed dose rate
-.catalytic_act     = <float:64,µ-kat>         1.5;           # catalytic activity
-.radioactivity     = <float:64,M-Bq>          1.0;           # MBq
+.catalytic_act     = <float:64,µ~kat>         1.5;           # catalytic activity
+.radioactivity     = <float:64,M~Bq>          1.0;           # MBq
 
 # Gravitational constant: G ≈ 6.674×10⁻¹¹ m³·kg⁻¹·s⁻²
-.gravitational_G   = <float:64,m³/k-g/s²>    6.674e-11;     # 3 components; / no-toggle
+.gravitational_G   = <float:64,m³/k~g/s²>    6.674e-11;     # 3 components; / no-toggle
 
 # Boltzmann constant: k_B = 1.380649×10⁻²³ J/K
 .boltzmann         = <float:64,J/K>           1.380649e-23;
@@ -340,13 +340,13 @@
 
 .packet_size  = <uint:16,B>      1500;      # Ethernet MTU in bytes
 .mtu_bits     = <uint:16,b>      12000;     # same MTU in bits
-.cache_ki     = <uint:32,Ki-B>   512;       # 512 KiB CPU cache
-.ram_mi       = <uint:64,Mi-B>   4096;      # 4 GiB RAM
-.ssd_gi       = <uint:64,Gi-B>   500;       # 500 GiB SSD
-.hdd_ti       = <uint:64,Ti-B>   2;         # 2 TiB HDD
-.tape_pi      = <uint:64,Pi-B>   1;         # 1 PiB tape
-.link_mb      = <uint:32,M-b>    1000;      # 1000 Mbit link (SI, not IEC)
-.nic_gb       = <float:64,G-b/s> 10.0;      # 10 Gbit/s NIC throughput
+.cache_ki     = <uint:32,Ki~B>   512;       # 512 KiB CPU cache
+.ram_mi       = <uint:64,Mi~B>   4096;      # 4 GiB RAM
+.ssd_gi       = <uint:64,Gi~B>   500;       # 500 GiB SSD
+.hdd_ti       = <uint:64,Ti~B>   2;         # 2 TiB HDD
+.tape_pi      = <uint:64,Pi~B>   1;         # 1 PiB tape
+.link_mb      = <uint:32,M~b>    1000;      # 1000 Mbit link (SI, not IEC)
+.nic_gb       = <float:64,G~b/s> 10.0;      # 10 Gbit/s NIC throughput
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -356,10 +356,10 @@
 # Inline unit suffix is FORBIDDEN inside [ … ] — only annotation form is valid.
 
 .timestamps  = <uint:32,s>     [0, 86400, 172800, 259200];    # 4 timestamps in seconds
-.voltages    = <float:32,m-V>  [3300.0, 5000.0, 1800.0];     # millivolts
-.adc_samples = <sint:16,m-V>   [-32768, 0, 32767];            # signed ADC with unit
+.voltages    = <float:32,m~V>  [3300.0, 5000.0, 1800.0];     # millivolts
+.adc_samples = <sint:16,m~V>   [-32768, 0, 32767];            # signed ADC with unit
 .temps_c     = <float:32,°C>   [-40.0, 0.0, 25.0, 85.0];     # temperatures
-.ram_sizes   = <uint:64,Gi-B>  [4, 8, 16, 32];               # memory options
+.ram_sizes   = <uint:64,Gi~B>  [4, 8, 16, 32];               # memory options
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -374,13 +374,13 @@
     .gyro_y    = <float:32,°/s>   -0.02;
     .gyro_z    = <float:32,°/s>    0.00;
     .temp      = <float:32,°C>    25.3;
-    .timestamp = <uint:32,µ-s>    1234567890;    # microseconds since epoch
+    .timestamp = <uint:32,µ~s>    1234567890;    # microseconds since epoch
 };
 
 .storage_block = {
-    .total   = <uint:64,Gi-B>  512;
-    .used    = <uint:64,Gi-B>  128;
-    .free    = <uint:64,Gi-B>  384;
+    .total   = <uint:64,Gi~B>  512;
+    .used    = <uint:64,Gi~B>  128;
+    .free    = <uint:64,Gi~B>  384;
     .inode_size = <uint:16,B>  256;
 };
 
@@ -390,7 +390,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # The maximum is 8 components.  Compound physical units rarely exceed 4–5.
 
-.seven_comp = <float:64,k-g·m·s/A·K·mol·cd>   1.0;  # 7 components — within limit
-.eight_comp = <float:64,m·s·k-g·A·K·mol·cd·b> 1.0;  # 8 components — at the limit
+.seven_comp = <float:64,k~g·m·s/A·K·mol·cd>   1.0;  # 7 components — within limit
+.eight_comp = <float:64,m·s·k~g·A·K·mol·cd·b> 1.0;  # 8 components — at the limit
 
 

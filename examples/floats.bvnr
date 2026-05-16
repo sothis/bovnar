@@ -63,20 +63,20 @@
 
 .gravity      = <float:64,m/s²>    9.80665;   # standard gravity (m/s²)
                                                # compound unit: meter per second squared
-.speed_of_light = <float:64,k-m/s> 299792.458; # c in km/s
+.speed_of_light = <float:64,k~m/s> 299792.458; # c in km/s
 .boltzmann    = <float:64,J/K>     1.380649e-23; # Boltzmann constant
 .planck       = <float:64,J·s>     6.62607015e-34; # Planck's constant (J·s)
-.charge       = <float:64,m-A·s>   1.602176634e-19; # electron charge (milli-Ampere-second)
+.charge       = <float:64,m~A·s>   1.602176634e-19; # electron charge (milli-Ampere-second)
 .pressure_atm = <float:64,Pa>      101325.0;   # 1 atm in pascals
 .temp_kelvin  = <float:64,K>       273.15;     # 0 °C in kelvin
-.bitrate_gbps = <float:64,Gi-b>    10.0;       # 10 Gb/s (gibibits)
-.power_mw     = <float:32,m-W>     500.0;      # 500 milliwatts
+.bitrate_gbps = <float:64,Gi~b>    10.0;       # 10 Gb/s (gibibits)
+.power_mw     = <float:32,m~W>     500.0;      # 500 milliwatts
 
 
 # ── 7. Binary float — inline unit suffix ─────────────────────────────────────
 # Inline unit appears after the literal, before ';'. Forbidden inside arrays.
 
-.distance  = 384400.0 k-m;     # Earth–Moon distance (km)
+.distance  = 384400.0 k~m;     # Earth–Moon distance (km)
 .voltage   = 3.3 V;            # supply voltage
 .current   = 0.02 A;           # 20 mA
 .resistance = 4700.0 Ω;        # 4.7 kΩ in ohms (Ω = U+03A9)

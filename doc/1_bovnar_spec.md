@@ -9,7 +9,7 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [File Format at a Glance](#2-file-format-at-a-glance)
+2. [File Format at a Glance](#2-file-format-at-a~glance)
 3. [Character Encoding & BOM](#3-character-encoding--bom)
 4. [Lexical Structure](#4-lexical-structure)
 5. [Type Annotations](#5-type-annotations)
@@ -103,7 +103,7 @@ Each assignment is:
 | Unit (inline suffix) | after scalar value, before `;` | `.speed = 9.81 m/s;` |
 | Fixed-point type | `<float_fix:width,qN[,unit]>` | `<float_fix:32,q16>` |
 | Decimal float type | `<float_dec:width[,unit]>` | `<float_dec:64,Pa>` |
-| Unit (compound) | `unit[*·/unit…]` | `m/s²`, `k-g·m/s²`, `m*s` |
+| Unit (compound) | `unit[*·/unit…]` | `m/s²`, `k~g·m/s²`, `m*s` |
 
 ---
 
@@ -400,9 +400,9 @@ type-param-list = type-param { "," type-param }
 type-param = width-param    # decimal digits only, e.g. 32
            | base-param     # "_" followed by digits, e.g. _16
                             #   (forbidden for float_fix and float_dec)
-           | q-param        # "q" followed by digits, e.g. q8, q16
+           | q~param        # "q" followed by digits, e.g. q8, q16
                             #   (only valid for float_fix)
-           | unit-param     # unit string, e.g. m/s, k-g·m/s²
+           | unit-param     # unit string, e.g. m/s, k~g·m/s²
 ```
 
 > **Lexer note on `float_fix` / `float_dec`:** The lexer keyword state machine
@@ -471,8 +471,8 @@ Parameters are **identified by class** — each class is recognised by its synta
 # Unit
 .j = <uint:32,no_unit> 42;      # explicitly dimensionless
 .k = <float:64,m/s> 9.81;       # meters per second (compound)
-.l = <uint:64,Ki-B> 1024;       # kibibytes
-.m = <float:64,k-g·m/s²> 9.81;  # kilograms · meters per second squared
+.l = <uint:64,Ki~B> 1024;       # kibibytes
+.m = <float:64,k~g·m/s²> 9.81;  # kilograms · meters per second squared
 .n = <float:64,m*s> 1.0;        # meter-seconds (product)
 
 # Type annotation with null value
@@ -638,8 +638,8 @@ A **scalar** number or string value may carry an optional unit suffix separated 
 ```bovnar
 .distance = 100 m;            # plain integer with inline unit: meter
 .speed    = 9.81 m/s;         # plain float with inline compound unit
-.mass     = 70.0 k-g;         # with SI prefix
-.storage  = 4 Gi-B;           # with IEC prefix
+.mass     = 70.0 k~g;         # with SI prefix
+.storage  = 4 Gi~B;           # with IEC prefix
 .ratio    = 3.14 no_unit;     # explicitly dimensionless via inline suffix
 ```
 
@@ -1004,7 +1004,7 @@ compound-unit  = "no_unit"
 
 unit-sep       = "*" | "/" | "·"       (* "·" = U+00B7 MIDDLE DOT *)
 
-unit-component = [ prefix "-" ] base-unit [ unit-exponent ]
+unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 ```
 
 **Separators:**
@@ -1021,22 +1021,22 @@ The `/` separator divides the preceding components by the following ones. The fi
 
 **Within each `unit-component`:**
 
-- When a prefix is present, the separator `-` between the prefix and the base unit is **mandatory**.
+- When a prefix is present, the separator `~` between the prefix and the base unit is **mandatory**.
 - A bare base unit with no prefix requires no separator.
 
 ```bovnar
 # Simple (single-component) units — same as before
 .time = <float:64,s> 2.5;               # seconds
-.speed = <float:64,k-m> 1.5;            # kilometers (kilo-meter)
+.speed = <float:64,k~m> 1.5;            # kilometers (kilo-meter)
 
 # Compound units
 .velocity = <float:64,m/s> 9.81;        # meters per second
 .accel = <float:64,m/s²> 9.81;          # meters per second squared
-.force = <float:64,k-g·m/s²> 9.81;      # kilogram-meters per second squared
-.energy = <float:64,k-g·m²/s²> 1000;    # kilogram-square-meters per second squared
+.force = <float:64,k~g·m/s²> 9.81;      # kilogram-meters per second squared
+.energy = <float:64,k~g·m²/s²> 1000;    # kilogram-square-meters per second squared
 .moment = <float:64,m*s> 1.0;           # meter-seconds
-.area_density = <float:64,k-g/m²> 5.0;  # kilograms per square meter
-.three_term = <float:64,k-g·m·s⁻²> 9.81;  # equivalent to k-g·m/s²
+.area_density = <float:64,k~g/m²> 5.0;  # kilograms per square meter
+.three_term = <float:64,k~g·m·s⁻²> 9.81;  # equivalent to k~g·m/s²
 
 # Explicitly dimensionless
 .no_unit_float = <float:64,no_unit> 3.14;
@@ -1070,17 +1070,17 @@ Exponents can be written in two forms:
 ### 11.6 Examples
 
 ```bovnar
-.distance = <float:64,k-m> 1.5;             # kilometers
+.distance = <float:64,k~m> 1.5;             # kilometers
 .mass = <float:64,g> 500;                   # grams
 .velocity = <float:64,m/s> 9.81;            # meters per second
 .acceleration = <float:64,m/s²> 9.81;       # meters per second squared
-.pressure = <float:64,Pa> 101325;           # pascals (= N/m² = k-g/(m·s²))
-.energy = <float:64,k-J> 1000;              # kilojoules
-.storage = <uint:64,Ti-B> 2;                # tebibytes
-.frequency = <float:64,k-Hz> 2.4;           # kilohertz
-.force = <float:64,k-g·m/s²> 9.81;         # kilogram-meters per second squared
-.momentum = <float:64,k-g·m/s> 0.5;        # kilogram-meters per second
-.density = <float:64,k-g/m³> 7800;          # kilograms per cubic meter
+.pressure = <float:64,Pa> 101325;           # pascals (= N/m² = k~g/(m·s²))
+.energy = <float:64,k~J> 1000;              # kilojoules
+.storage = <uint:64,Ti~B> 2;                # tebibytes
+.frequency = <float:64,k~Hz> 2.4;           # kilohertz
+.force = <float:64,k~g·m/s²> 9.81;         # kilogram-meters per second squared
+.momentum = <float:64,k~g·m/s> 0.5;        # kilogram-meters per second
+.density = <float:64,k~g/m³> 7800;          # kilograms per cubic meter
 ```
 
 ### 11.7 Compound Unit Constraints
@@ -1293,7 +1293,7 @@ The grammar uses ISO/IEC 14977:1996 notation and is derived from and verified ag
 ];
 
 .calibration = <float:64,no_unit> 1.00042;
-.density = <float:64,k-g/m³> 7800;
+.density = <float:64,k~g/m³> 7800;
 .accel = <float:64,m/s²> 9.81;
 ```
 
@@ -1305,10 +1305,10 @@ The unit may be written directly after the value literal instead of — or redun
 # No type annotation: inline unit supplies both type default and unit
 .distance   = 1500 m;           # uint:64, no_unit → unit overridden to m
 .speed      = 9.81 m/s;         # float:64, unit = m/s
-.mass       = 70.5 k-g;         # float:64, unit = k-g
+.mass       = 70.5 k~g;         # float:64, unit = k~g
 
 # Type annotation without unit: inline suffix supplies the unit
-.dist       = <float:32> 1.5 k-m;
+.dist       = <float:32> 1.5 k~m;
 
 # Annotation and inline unit match: valid (redundant)
 .pressure   = <float:64,Pa> 101325 Pa;
@@ -1395,31 +1395,31 @@ The unit may be written directly after the value literal instead of — or redun
 .acceleration = <float:64,m/s²> 9.81;
 
 # Force (Newton = kg·m/s²)
-.force = <float:64,k-g·m/s²> 9.81;
+.force = <float:64,k~g·m/s²> 9.81;
 
 # Energy (Joule = kg·m²/s²)
-.energy = <float:64,k-g·m²/s²> 100;
+.energy = <float:64,k~g·m²/s²> 100;
 
 # Momentum (kg·m/s)
-.momentum = <float:64,k-g·m/s> 5.0;
+.momentum = <float:64,k~g·m/s> 5.0;
 
 # Pressure (Pa = kg/(m·s²))
-.pressure = <float:64,k-g/(m·s²)> 101325;
+.pressure = <float:64,k~g/(m·s²)> 101325;
 
 # Area density (kg/m²)
-.area_density = <float:64,k-g/m²> 5.0;
+.area_density = <float:64,k~g/m²> 5.0;
 
 # Electric field (V/m)
 .electric_field = <float:64,V/m> 150;
 
 # Magnetic flux density (T = kg/(A·s²))
-.mag_flux_density = <float:64,k-g/(A·s²)> 0.5;
+.mag_flux_density = <float:64,k~g/(A·s²)> 0.5;
 
 # Product form with asterisk
 .moment = <float:64,m*s> 1.0;
 
 # Alternative superscript notation for compound units
-.force_alt = <float:64,k-g·m·s⁻²> 9.81;
+.force_alt = <float:64,k~g·m·s⁻²> 9.81;
 ```
 
 ### 15.9 Fixed-Point and Decimal Float Examples
@@ -1525,7 +1525,7 @@ The unit may be written directly after the value literal instead of — or redun
 .x = <float:64,m//s> 1.0;       # error_unit_illegal
 
 # Too many components (> 8)
-.y = <float:64,m*s*k-g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 components)
+.y = <float:64,m*s*k~g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 components)
 
 # float_fix: Q >= effective width
 .bad_q = <float_fix:16,q16> 1.0;            # Q=16 >= width=16 → error_illegal_value_type
@@ -1542,8 +1542,8 @@ The unit may be written directly after the value literal instead of — or redun
 # float_dec: base param forbidden
 .bad_db = <float_dec:64,_10> 1.0;           # error_illegal_value_type
 
-# q-param on non-float_fix type
-.bad_qu = <float:64,q8> 1.0;               # q-param only valid for float_fix
+# q~param on non-float_fix type
+.bad_qu = <float:64,q8> 1.0;               # q~param only valid for float_fix
 ```
 
 ---
@@ -1948,14 +1948,14 @@ ev_data                        data="9.81"
 
 ### A.3 Compound Unit Assignment
 
-Input: `.force = <float:64,k-g·m/s²> 9.81;`
+Input: `.force = <float:64,k~g·m/s²> 9.81;`
 
 ```
 ev_assignment_start            data="force"
-ev_type_annotation_start       data="float:64,k-g·m/s²"
+ev_type_annotation_start       data="float:64,k~g·m/s²"
 ev_type_annotation_type_family "float"
 ev_type_annotation_type_family_parameter  (width:64)
-ev_type_annotation_type_family_parameter  (unit:k-g·m/s²)
+ev_type_annotation_type_family_parameter  (unit:k~g·m/s²)
   → value_unit = {
       num_components = 3,
       components = [

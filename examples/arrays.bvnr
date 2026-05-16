@@ -80,7 +80,7 @@
 # ── 9. Arrays of typed integers with units ───────────────────────────────────
 
 .timestamps = <uint:32,s>    [0, 86400, 172800, 259200];   # times in seconds
-.voltages   = <float:32,m-V> [3300.0, 5000.0, 1800.0];    # millivolts
+.voltages   = <float:32,m~V> [3300.0, 5000.0, 1800.0];    # millivolts
 
 
 # ── 10. Nested arrays ─────────────────────────────────────────────────────────

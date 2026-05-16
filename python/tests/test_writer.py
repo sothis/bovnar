@@ -95,7 +95,7 @@ class TestWriteUint:
         out = self._write_and_read(
             lambda w: w.write_uint("storage", 2,
                                    width=64,
-                                   unit_str='Ti-B'))
+                                   unit_str='Ti~B'))
         assert b'storage' in out
 
 @needs_lib

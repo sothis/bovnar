@@ -347,15 +347,15 @@ static const seed_entry_t CORPUS[] = {
 
     S(".x = <float:64,s> 2.5;\n"),
     S(".x = <float:64,no_unit> 1.0;\n"),
-    S(".x = <uint:64,Ki-B> 1;\n"),
-    S(".x = <uint:64,Mi-B> 1;\n"),
+    S(".x = <uint:64,Ki~B> 1;\n"),
+    S(".x = <uint:64,Mi~B> 1;\n"),
 
     S(".x = <float:64,m/s> 9.81;\n"),
     S(".x = <float:64,m/s\xC2\xB2> 9.81;\n"),
-    S(".x = <float:64,k-g\xC2\xB7m/s\xC2\xB2> 9.81;\n"),
-    S(".x = <float:64,k-g/m\xC2\xB3> 7800.0;\n"),
+    S(".x = <float:64,k~g\xC2\xB7m/s\xC2\xB2> 9.81;\n"),
+    S(".x = <float:64,k~g/m\xC2\xB3> 7800.0;\n"),
     S(".x = <float:64,m*s> 1.0;\n"),
-    S(".x = <float:64,k-g\xC2\xB7m\xC2\xB2/s\xC2\xB2> 100.0;\n"),
+    S(".x = <float:64,k~g\xC2\xB7m\xC2\xB2/s\xC2\xB2> 100.0;\n"),
     S(".x = <float:64,V/m> 150.0;\n"),
 
     S(".a = [1, 2, 3];\n"),
@@ -398,7 +398,7 @@ static const seed_entry_t CORPUS[] = {
     S(".x = <float:64,m//s> 1.0;\n"),
     S(".x = };\n"),
 
-    S(".x = <float:64,m*s*k-g*A*K*mol*cd*b*Hz> 1.0;\n"),
+    S(".x = <float:64,m*s*k~g*A*K*mol*cd*b*Hz> 1.0;\n"),
 
     S(""),
     S("   \n\t  \n"),

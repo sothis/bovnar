@@ -434,8 +434,8 @@ except ImportError:
 
 SENSOR_DOC = (
     b".node_id   = <uint:8>         7;\n"
-    b".frequency = <float:64,M-Hz>  868.1;\n"
-    b".tx_power  = <sint:8,d-Bm>    14;\n"
+    b".frequency = <float:64,M~Hz>  868.1;\n"
+    b".tx_power  = <sint:8,d~Bm>    14;\n"
     b".interval  = <uint:32,s>       60;\n"
     b".offset    = <float_fix:32,q8,\xc2\xb0\x43> -0.5;\n"
     b".config = {\n"
@@ -446,9 +446,9 @@ SENSOR_DOC = (
 
 TEMP_DOC = (
     b".temperature = <float:64,K>     300.0;\n"
-    b".pressure    = <float:64,k-Pa>  101.325;\n"
+    b".pressure    = <float:64,k~Pa>  101.325;\n"
     b".velocity    = <float:64,m/s>   9.81;\n"
-    b".energy      = <float:64,k-J>   5400.0;\n"
+    b".energy      = <float:64,k~J>   5400.0;\n"
     b".label       = \"run-001\";\n"
 )
 
@@ -499,7 +499,7 @@ class TestAssertNodeIntegration:
 
     def test_frequency_type_and_unit(self, doc):
         node = doc['frequency']
-        assert_node(node, expected_type='float', expected_unit='M-Hz',
+        assert_node(node, expected_type='float', expected_unit='M~Hz',
                     path='frequency')
 
     def test_frequency_si_value(self, doc):

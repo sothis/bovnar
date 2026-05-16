@@ -101,11 +101,11 @@ def special_floats():
 
 @pytest.fixture
 def compound_unit_payload():
-    return ".force = <float:64,k-g\u00b7m/s\u00b2> 9.81;\n".encode('utf-8')
+    return ".force = <float:64,k~g\u00b7m/s\u00b2> 9.81;\n".encode('utf-8')
 
 @pytest.fixture
 def iec_unit_payload():
-    return b".ram = <uint:64,Gi-B> 8;\n"
+    return b".ram = <uint:64,Gi~B> 8;\n"
 
 @pytest.fixture
 def multi_assignment():
@@ -120,8 +120,8 @@ def multi_assignment():
 def all_si_units():
     return (
         b".temperature = <float:64,K> 300.0;\n"
-        b".pressure = <float:64,k-Pa> 101.325;\n"
-        b".energy = <float:64,k-J> 5400.0;\n"
+        b".pressure = <float:64,k~Pa> 101.325;\n"
+        b".energy = <float:64,k~J> 5400.0;\n"
         b".speed = <float:64,m/s> 12.5;\n"
     )
 

@@ -24,7 +24,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16
 a{color:inherit;text-decoration:none}
 
 /* NAV */
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:58px;background:rgba(9,9,12,.9);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+nav{position:fixed;top:0;left:0;right:0;z~index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:58px;background:rgba(9,9,12,.9);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
 .logo{font-family:var(--mono);font-size:.95rem;font-weight:600;display:flex;align-items:center;gap:.35rem}
 .la{color:var(--amber)}.ld{color:var(--dim)}
 .navlinks{display:flex;align-items:center;gap:2rem}
@@ -220,9 +220,9 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tk">.firmware</span>        <span class="tq">=</span>                              <span class="ts">"2.4.1"</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tk">.radio</span> <span class="tq">= {</span></span>
-<span class="l">    <span class="tk">.frequency</span>   <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">M-Hz</span>&gt;</span>         <span class="tn">868.1</span><span class="tq">;</span>  <span class="tc"># megahertz</span></span>
-<span class="l">    <span class="tk">.tx_power</span>    <span class="tq">=</span> <span class="ta">&lt;uint:8,<span class="tu">m-W</span>&gt;</span>               <span class="tn">25</span><span class="tq">;</span>     <span class="tc"># milliwatts</span></span>
-<span class="l">    <span class="tk">.bandwidth</span>   <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">k-Hz</span>&gt;</span>          <span class="tn">125.0</span><span class="tq">;</span></span>
+<span class="l">    <span class="tk">.frequency</span>   <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">M~Hz</span>&gt;</span>         <span class="tn">868.1</span><span class="tq">;</span>  <span class="tc"># megahertz</span></span>
+<span class="l">    <span class="tk">.tx_power</span>    <span class="tq">=</span> <span class="ta">&lt;uint:8,<span class="tu">m~W</span>&gt;</span>               <span class="tn">25</span><span class="tq">;</span>     <span class="tc"># milliwatts</span></span>
+<span class="l">    <span class="tk">.bandwidth</span>   <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">k~Hz</span>&gt;</span>          <span class="tn">125.0</span><span class="tq">;</span></span>
 <span class="l"><span class="tq">};</span></span>
 <span class="l"></span>
 <span class="l"><span class="tk">.calibration</span> <span class="tq">= {</span></span>
@@ -242,7 +242,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 
 <!-- STATS -->
 <div class="statsbar">
-  <div class="stat"><span class="sn">6</span><span class="sl">Type families incl.<br>decimal &amp; Q-format</span></div>
+  <div class="stat"><span class="sn">6</span><span class="sl">Type families incl.<br>decimal &amp; Q~format</span></div>
   <div class="stat"><span class="sn">46+</span><span class="sl">Built-in physical units<br>validated at parse time</span></div>
   <div class="stat"><span class="sn">0</span><span class="sl">External schema files<br>required. Ever.</span></div>
   <div class="stat"><span class="sn">C99</span><span class="sl">Reference implementation,<br>zero dependencies</span></div>
@@ -288,7 +288,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tc"># Bovnar — unit is part of the type</span></span>
 <span class="l"><span class="tk">.acceleration</span> <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">m/s²</span>&gt;</span>  <span class="tn">9.81</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.voltage</span>      <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">V</span>&gt;</span>       <span class="tn">3.3</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.storage</span>      <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">Gi-B</span>&gt;</span>     <span class="tn">8</span><span class="tq">;</span>    <span class="tc"># 8 GiB</span></span>
+<span class="l"><span class="tk">.storage</span>      <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">Gi~B</span>&gt;</span>     <span class="tn">8</span><span class="tq">;</span>    <span class="tc"># 8 GiB</span></span>
 <span class="l"><span class="tk">.temp_range</span>   <span class="tq">=</span> <span class="ta">&lt;sint:8,<span class="tu">°C</span>&gt;</span>       <span class="tn">-40</span><span class="tq">;</span></span>
             </div>
           </div>
@@ -311,7 +311,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tk">.adc_raw</span>   <span class="tq">=</span> <span class="ta">&lt;uint:12&gt;</span>      <span class="tn">3071</span><span class="tq">;</span>   <span class="tc"># 12-bit ADC</span></span>
 <span class="l"><span class="tk">.dac_out</span>   <span class="tq">=</span> <span class="ta">&lt;uint:10&gt;</span>       <span class="tn">512</span><span class="tq">;</span>   <span class="tc"># 10-bit DAC</span></span>
 <span class="l"><span class="tk">.port</span>      <span class="tq">=</span> <span class="ta">&lt;uint:16&gt;</span>       <span class="tn">443</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.timestamp</span> <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ-s</span>&gt;</span></span>
+<span class="l"><span class="tk">.timestamp</span> <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ~s</span>&gt;</span></span>
 <span class="l">             <span class="tn">1715000000123456</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tc"># Non-decimal: must be quoted strings</span></span>
@@ -370,7 +370,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tk">.frame</span> <span class="tq">= {</span></span>
 <span class="l">    <span class="tk">.type</span>    <span class="tq">=</span>              <span class="tsym">data_frame</span><span class="tq">;</span></span>
 <span class="l">    <span class="tk">.seq</span>     <span class="tq">=</span> <span class="ta">&lt;uint:32&gt;</span>    <span class="tn">42</span><span class="tq">;</span></span>
-<span class="l">    <span class="tk">.ts</span>      <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ-s</span>&gt;</span></span>
+<span class="l">    <span class="tk">.ts</span>      <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ~s</span>&gt;</span></span>
 <span class="l">               <span class="tn">1715000000123456</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l">    <span class="tc"># NUL opens chunk mode; 2nd NUL closes</span></span>
@@ -396,7 +396,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
           <div class="cb">
             <div class="ln" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span></div>
             <div class="cd">
-<span class="l"><span class="tc"># float_fix — Q-format (wire = raw × 2⁻Q)</span></span>
+<span class="l"><span class="tc"># float_fix — Q~format (wire = raw × 2⁻Q)</span></span>
 <span class="l"><span class="tk">.pid_gain</span>  <span class="tq">=</span> <span class="ta">&lt;float_fix:32,q16&gt;</span>      <span class="tn">1.002</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.adc_temp</span>  <span class="tq">=</span> <span class="ta">&lt;float_fix:16,q8,<span class="tu">°C</span>&gt;</span>    <span class="tn">23.5</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.vel_fx</span>    <span class="tq">=</span> <span class="ta">&lt;float_fix:32,q8,<span class="tu">m/s</span>&gt;</span>   <span class="tn">9.81</span><span class="tq">;</span></span>
@@ -459,8 +459,8 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
     <p class="sub reveal">Not bolt-ons. Not workarounds. Design decisions baked into the format from the start.</p>
     <div class="fgrid reveal">
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></div><h3>Self-describing values</h3><p>Type family, bit-width, numeral base, and physical unit travel in the same byte stream as the value. Interpretable in isolation — by anyone, forever.</p><span class="ftag">per-value annotation · no side channel</span></div>
-      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>SI &amp; IEC units, validated</h3><p>46+ base units, full SI prefix table (quecto→quetta), IEC binary prefixes (kibi→quebi). Compound expressions with exponents. Caught at parse time, not at runtime.</p><span class="ftag">&lt;float:64,k-g·m/s²&gt; · &lt;uint:64,Gi-B&gt;</span></div>
-      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><h3>Six numeric type families</h3><p>uint · sint at any bit-width. IEEE 754 binary float (16-bit half to 32768-bit extended). Q-format fixed-point. IEEE 754-2008 decimal float. UTF-8 strings.</p><span class="ftag">uint · sint · float · float_fix · float_dec · utf8</span></div>
+      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>SI &amp; IEC units, validated</h3><p>46+ base units, full SI prefix table (quecto→quetta), IEC binary prefixes (kibi→quebi). Compound expressions with exponents. Caught at parse time, not at runtime.</p><span class="ftag">&lt;float:64,k~g·m/s²&gt; · &lt;uint:64,Gi~B&gt;</span></div>
+      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><h3>Six numeric type families</h3><p>uint · sint at any bit-width. IEEE 754 binary float (16-bit half to 32768-bit extended). Q~format fixed-point. IEEE 754-2008 decimal float. UTF-8 strings.</p><span class="ftag">uint · sint · float · float_fix · float_dec · utf8</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><polyline points="4 6 4 2 20 2 20 6"/><path d="M4 6h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/><line x1="12" y1="10" x2="12" y2="18"/></svg></div><h3>Text-binary hybrid</h3><p>NUL-escape octet streams embed raw binary in-line. No Base64. No inflation. The UTF-8 validator suspends for the duration; the writer API handles the wire protocol.</p><span class="ftag">0x00-delimited · chunk protocol</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><h3>SAX-style streaming reader</h3><p>Two-phase callback architecture. <code>on_unverified</code> fires before semantic validation, <code>on_verified</code> after. Constant memory. Parse any file size without loading a DOM.</p><span class="ftag">pull-based · callback-driven · no DOM</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Fault-tolerant recovery</h3><p>Optional <code>continue_on_error</code> resyncs to the next <code>;</code> after any parse error. One bad record never silences the rest of a log stream or unreliable transport.</p><span class="ftag">resync state machine · recovery_count</span></div>
@@ -509,7 +509,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tc"># Explicit annotation</span></span>
 <span class="l"><span class="tk">.port</span>     <span class="tq">=</span> <span class="ta">&lt;uint:16&gt;</span>      <span class="tn">443</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.temp</span>     <span class="tq">=</span> <span class="ta">&lt;float:32&gt;</span>    <span class="tn">23.5</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.ts</span>       <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ-s</span>&gt;</span></span>
+<span class="l"><span class="tk">.ts</span>       <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ~s</span>&gt;</span></span>
 <span class="l">            <span class="tn">1715000000123456</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tc"># Non-power-of-two — ADC/DAC hardware</span></span>
@@ -534,8 +534,8 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
           <h3>Physical units built in</h3>
           <p>Units are a first-class annotation parameter, validated at parse time. The C API exposes them as structured <code>value_unit_t</code> data — prefix, base unit, and exponent per component.</p>
           <ul>
-            <li>SI prefix requires a <code>-</code> separator: <code>k-m</code>, <code>µ-s</code>, <code>G-Hz</code></li>
-            <li>IEC binary: <code>Ki-B</code>, <code>Gi-B</code>, <code>Ti-B</code> — same rule</li>
+            <li>SI prefix requires a <code>~</code> separator: <code>k~m</code>, <code>µ~s</code>, <code>G~Hz</code></li>
+            <li>IEC binary: <code>Ki~B</code>, <code>Gi~B</code>, <code>Ti~B</code> — same rule</li>
             <li>Compound: <code>·</code> or <code>*</code> for multiplication, <code>/</code> for division</li>
             <li>Exponents: <code>m²</code> or <code>m^2</code>; <code>s⁻¹</code> or <code>s^-1</code></li>
           </ul>
@@ -549,20 +549,20 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tk">.voltage</span>      <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">V</span>&gt;</span>         <span class="tn">3.3</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.distance</span>     <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">m</span>&gt;</span>   <span class="tn">384400000</span><span class="tq">;</span></span>
 <span class="l"></span>
-<span class="l"><span class="tc"># SI prefixes — mandatory hyphen</span></span>
-<span class="l"><span class="tk">.frequency</span>    <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">G-Hz</span>&gt;</span>     <span class="tn">2.4</span><span class="tq">;</span></span>
+<span class="l"><span class="tc"># SI prefixes — mandatory tilde</span></span>
+<span class="l"><span class="tk">.frequency</span>    <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">G~Hz</span>&gt;</span>     <span class="tn">2.4</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.resistance</span>   <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">k-Ω</span>&gt;</span>     <span class="tn">4.7</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.delay</span>        <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">µ-s</span>&gt;</span>    <span class="tn">50.0</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.delay</span>        <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">µ~s</span>&gt;</span>    <span class="tn">50.0</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tc"># IEC binary prefixes</span></span>
-<span class="l"><span class="tk">.ram</span>          <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">Gi-B</span>&gt;</span>       <span class="tn">8</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.disk</span>         <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">Ti-B</span>&gt;</span>       <span class="tn">2</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.ram</span>          <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">Gi~B</span>&gt;</span>       <span class="tn">8</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.disk</span>         <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">Ti~B</span>&gt;</span>       <span class="tn">2</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tc"># Compound units</span></span>
 <span class="l"><span class="tk">.velocity</span>     <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">m/s</span>&gt;</span>      <span class="tn">9.81</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.acceleration</span> <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">m/s²</span>&gt;</span>    <span class="tn">9.81</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.force</span>        <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k-g·m/s²</span>&gt;</span> <span class="tn">9.81</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.energy</span>       <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k-g·m²/s²</span>&gt;</span><span class="tn">1000</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.force</span>        <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k~g·m/s²</span>&gt;</span> <span class="tn">9.81</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.energy</span>       <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k~g·m²/s²</span>&gt;</span><span class="tn">1000</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tc"># Inline suffix (scalar context only)</span></span>
 <span class="l"><span class="tk">.speed</span>        <span class="tq">=</span>               <span class="tn">9.81</span> <span class="tu">m/s</span><span class="tq">;</span></span>
@@ -618,14 +618,14 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
       <div id="t-fd" class="tp">
         <div class="te">
           <h3>Fixed-point &amp; Decimal floats</h3>
-          <p><strong>float_fix</strong> (Q-format): wire value is a signed integer; mathematical value is <code>raw × 2⁻Q</code>. The Q parameter lives in the annotation — no out-of-band knowledge required.</p>
+          <p><strong>float_fix</strong> (Q~format): wire value is a signed integer; mathematical value is <code>raw × 2⁻Q</code>. The Q parameter lives in the annotation — no out-of-band knowledge required.</p>
           <p><strong>float_dec</strong> (IEEE 754-2008): exact decimal storage in 32 to 256 bits. Binary floats cannot represent <code>0.1</code> exactly. Decimal floats can. Essential for financial and metrological data.</p>
         </div>
         <div class="tcode">
           <div class="cb" style="min-height:360px">
             <div class="ln" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span></div>
             <div class="cd">
-<span class="l"><span class="tc"># float_fix — Q-format (wire = raw_int × 2⁻Q)</span></span>
+<span class="l"><span class="tc"># float_fix — Q~format (wire = raw_int × 2⁻Q)</span></span>
 <span class="l"><span class="tk">.adc</span>     <span class="tq">=</span> <span class="ta">&lt;float_fix:16,q8&gt;</span>       <span class="tn">3.14</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.pid</span>     <span class="tq">=</span> <span class="ta">&lt;float_fix:32,q16&gt;</span>      <span class="tn">-1.5</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.vel_fx</span>  <span class="tq">=</span> <span class="ta">&lt;float_fix:32,q8,<span class="tu">m/s</span>&gt;</span>   <span class="tn">9.81</span><span class="tq">;</span></span>
@@ -659,7 +659,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"><span class="tk">.frame</span> <span class="tq">= {</span></span>
 <span class="l">    <span class="tk">.type</span>     <span class="tq">=</span>              <span class="tsym">data_frame</span><span class="tq">;</span></span>
 <span class="l">    <span class="tk">.sequence</span> <span class="tq">=</span> <span class="ta">&lt;uint:32&gt;</span>    <span class="tn">42</span><span class="tq">;</span></span>
-<span class="l">    <span class="tk">.ts</span>       <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ-s</span>&gt;</span></span>
+<span class="l">    <span class="tk">.ts</span>       <span class="tq">=</span> <span class="ta">&lt;uint:64,<span class="tu">µ~s</span>&gt;</span></span>
 <span class="l">                <span class="tn">1715000000123456</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l">    <span class="tc"># NUL opens; 2nd NUL closes chunk stream</span></span>
@@ -694,7 +694,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
           <tr><td style="color:var(--text)">Unsigned integer</td><td><span class="tname">uint</span></td><td>Any positive integer</td><td>base (<code>_N</code>), unit</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;uint:32,_16,<span class="tu">B</span>&gt;</span></td></tr>
           <tr><td style="color:var(--text)">Signed integer</td><td><span class="tname">sint</span></td><td>Any positive integer</td><td>base (<code>_N</code>), unit</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;sint:16,<span class="tu">°C</span>&gt;</span></td></tr>
           <tr><td style="color:var(--text)">IEEE 754 binary float</td><td><span class="tname">float</span></td><td>0, 16, 32×N up to 32768</td><td>base _10/_16, unit</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;float:64,<span class="tu">m/s²</span>&gt;</span></td></tr>
-          <tr><td style="color:var(--text)">Q-format fixed-point</td><td><span class="tname">float_fix</span></td><td>16, 32, 64, 128, 256</td><td><code>qN</code> fractional bits, unit</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;float_fix:32,q16,<span class="tu">°C</span>&gt;</span></td></tr>
+          <tr><td style="color:var(--text)">Q~format fixed-point</td><td><span class="tname">float_fix</span></td><td>16, 32, 64, 128, 256</td><td><code>qN</code> fractional bits, unit</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;float_fix:32,q16,<span class="tu">°C</span>&gt;</span></td></tr>
           <tr><td style="color:var(--text)">IEEE 754-2008 decimal</td><td><span class="tname">float_dec</span></td><td>16, 32, 64, 128, 256</td><td>unit only (no base param)</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;float_dec:64,<span class="tu">Pa</span>&gt;</span></td></tr>
           <tr><td style="color:var(--text)">UTF-8 string</td><td><span class="tname">utf8</span></td><td>N/A</td><td>—</td><td style="font-family:var(--mono);font-size:.79rem"><span class="ta">&lt;utf8&gt;</span> <span class="ts">"hello"</span></td></tr>
         </tbody>

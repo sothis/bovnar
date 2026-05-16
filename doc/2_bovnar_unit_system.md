@@ -8,7 +8,7 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Syntax — Unit as a Type Parameter](#2-syntax--unit-as-a-type-parameter)
+2. [Syntax — Unit as a Type Parameter](#2-syntax--unit-as-a~type-parameter)
 3. [Base Units](#3-base-units)
 4. [Prefixes](#4-prefixes)
    - 4.1 [SI Prefixes](#41-si-prefixes)
@@ -24,13 +24,13 @@
    - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
 7. [The `no_unit` Keyword](#7-the-no_unit-keyword)
 8. [Constraints and Limits](#8-constraints-and-limits)
-9. [C Data Model](#9-c-data-model)
+9. [C Data Model](#9-c~data-model)
    - 9.1 [Enumerations](#91-enumerations)
    - 9.2 [Structures](#92-structures)
    - 9.3 [Convenience Macros](#93-convenience-macros)
-10. [C API Functions](#10-c-api-functions)
-    - 10.1 [Parsing a Unit String](#101-parsing-a-unit-string)
-    - 10.2 [Serializing a Unit](#102-serializing-a-unit)
+10. [C API Functions](#10-c~api-functions)
+    - 10.1 [Parsing a Unit String](#101-parsing-a~unit-string)
+    - 10.2 [Serializing a Unit](#102-serializing-a~unit)
     - 10.3 [Prefix Factor and Exponent Queries](#103-prefix-factor-and-exponent-queries)
     - 10.4 [SI Conversion API](#104-si-conversion-api)
 11. [Integration with the Parser Event Stream](#11-integration-with-the-parser-event-stream)
@@ -85,7 +85,7 @@ The unit participates alongside width and base:
 
 ```bovnar
 .speed     = <float:64,m/s>         9.81;    # 64-bit float, base 10 (default), m/s
-.storage   = <uint:64,Ti-B>         2;       # 64-bit uint, tebibytes
+.storage   = <uint:64,Ti~B>         2;       # 64-bit uint, tebibytes
 .hex_count = <uint:32,_16,no_unit>  "FF";    # 32-bit uint, hex, dimensionless
 ```
 
@@ -96,8 +96,8 @@ As an alternative (or redundant complement) to the type-annotation unit, a unit 
 ```bovnar
 .distance = 1500 m;            # no annotation; inline unit supplies m
 .speed    = 9.81 m/s;          # compound inline unit
-.mass     = 70.5 k-g;          # SI-prefix inline unit
-.storage  = 4 Gi-B;            # IEC-prefix inline unit
+.mass     = 70.5 k~g;          # SI-prefix inline unit
+.storage  = 4 Gi~B;            # IEC-prefix inline unit
 .ratio    = 3.14 no_unit;      # explicit dimensionless via inline suffix
 ```
 
@@ -157,7 +157,7 @@ Bovnar supports 44 named base units, covering SI base units, all named SI-derive
 | `mol`  | mole     | `bu_mol`     | SI base unit of amount of substance |
 | `cd`   | candela  | `bu_candela` | SI base unit of luminous intensity |
 
-> **Note on the kilogram:** The SI base unit of mass is the kilogram, but Bovnar uses `g` (gram) as the base unit symbol so that the `k-` (kilo) SI prefix can be attached explicitly: `k-g` = kilogram. This is consistent with how the SI formally defines kilogram as a prefixed gram.
+> **Note on the kilogram:** The SI base unit of mass is the kilogram, but Bovnar uses `g` (gram) as the base unit symbol so that the `k-` (kilo) SI prefix can be attached explicitly: `k~g` = kilogram. This is consistent with how the SI formally defines kilogram as a prefixed gram.
 
 ### Named SI-Derived Units
 
@@ -219,7 +219,7 @@ Bovnar supports 44 named base units, covering SI base units, all named SI-derive
 
 ## 4. Prefixes
 
-Prefixes are attached to a base unit symbol with a mandatory hyphen separator: `prefix-baseunit`. A bare base unit with no prefix requires no separator.
+Prefixes are attached to a base unit symbol with a mandatory `~` separator: `prefix~baseunit`. A bare base unit with no prefix requires no separator.
 
 ### 4.1 SI Prefixes
 
@@ -257,7 +257,7 @@ All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10
 
 #### Prefix–symbol ambiguities
 
-Several prefix symbols overlap with base unit symbols. The parser resolves the ambiguity by the required hyphen separator: `m-` introduces a prefix (milli), while `m` alone (or `m` followed by a separator such as `/`, `*`, `·`, or end-of-string) is the meter base unit.
+Several prefix symbols overlap with base unit symbols. The parser resolves the ambiguity by the required `~` separator: `m~` introduces a prefix (milli), while `m` alone (or `m` followed by a separator such as `/`, `*`, `·`, or end-of-string) is the meter base unit.
 
 | Symbol | As prefix | As base unit |
 |--------|-----------|--------------|
@@ -269,7 +269,7 @@ Several prefix symbols overlap with base unit symbols. The parser resolves the a
 | `a`    | atto      | *(none)*     |
 | `S`    | *(none)*  | siemens      |
 
-The hyphen is the disambiguator: `d-s` = decisecond; `d` alone = day.
+The `~` is the disambiguator: `d~s` = decisecond; `d` alone = day.
 
 ### 4.2 IEC Binary Prefixes
 
@@ -288,26 +288,26 @@ IEC 80000-13 binary prefixes are used for digital quantities (bits and bytes). A
 | robi   | `Ri`   | 2⁹⁰    | `iec_robi`   |
 | quebi  | `Qi`   | 2¹⁰⁰   | `iec_quebi`  |
 
-IEC prefixes are recognised by their two-character `Xi` suffix pattern and carry `iec_none` as the "no prefix" sentinel (value `0`). They follow the same hyphen convention as SI prefixes:
+IEC prefixes are recognised by their two-character `Xi` suffix pattern and carry `iec_none` as the "no prefix" sentinel (value `0`). They follow the same `~` convention as SI prefixes:
 
 ```bovnar
-.ram   = <uint:64,Gi-B> 8;       # gibibytes
-.cache = <uint:32,Mi-b> 256;     # mibibits
-.drive = <uint:64,Ti-B> 2;       # tebibytes
+.ram   = <uint:64,Gi~B> 8;       # gibibytes
+.cache = <uint:32,Mi~b> 256;     # mibibits
+.drive = <uint:64,Ti~B> 2;       # tebibytes
 ```
 
 #### Prefix–unit validity constraints
 
 Not every prefix may be combined with every base unit. The following rules are enforced by `bvn_prefix_unit_valid` and cause `error_unit_illegal` on violation:
 
-- **IEC prefixes** (`Ki`…`Qi`) are only permitted on `b` (bit) and `B` (byte). Any attempt to attach an IEC prefix to a physical unit (e.g. `Ki-m`) is rejected.
+- **IEC prefixes** (`Ki`…`Qi`) are only permitted on `b` (bit) and `B` (byte). Any attempt to attach an IEC prefix to a physical unit (e.g. `Ki~m`) is rejected.
 - **SI sub-kilo prefixes** (`da`, `h`, `d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`) are forbidden on `b` and `B`. This includes `da` (deca, ×10¹) and `h` (hecto, ×10²), which are positive but still below `k`. Bits and bytes may carry `si_none` or any SI prefix from `k` (kilo) upward.
 
 ```bovnar
-.valid1   = <uint:64,Ki-B>  8;     # OK: IEC prefix on byte
-.valid2   = <uint:32,M-b>   100;   # OK: SI mega on bit
-.invalid1 = <uint:64,Ki-m>  1;     # ERROR: IEC prefix on meter
-.invalid2 = <uint:32,m-B>   512;   # ERROR: SI milli on byte
+.valid1   = <uint:64,Ki~B>  8;     # OK: IEC prefix on byte
+.valid2   = <uint:32,M~b>   100;   # OK: SI mega on bit
+.invalid1 = <uint:64,Ki~m>  1;     # ERROR: IEC prefix on meter
+.invalid2 = <uint:32,m~B>   512;   # ERROR: SI milli on byte
 ```
 
 ---
@@ -316,17 +316,17 @@ Not every prefix may be combined with every base unit. The following rules are e
 
 ### 5.1 Simple Units
 
-A simple unit consists of an optional prefix, the base unit symbol, and an optional exponent. No separator is required between the prefix and the base unit — the hyphen **is** the separator:
+A simple unit consists of an optional prefix, the base unit symbol, and an optional exponent. No separator is required between the prefix and the base unit — the `~` **is** the separator:
 
 ```
-unit-component = [ prefix "-" ] base-unit [ unit-exponent ]
+unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 ```
 
 ```bovnar
 .temperature = <float:64,K>     300.0;  # kelvin (no prefix)
-.distance    = <float:64,k-m>   1.5;    # kilometer (kilo + meter)
-.frequency   = <float:64,M-Hz>  2400;   # megahertz
-.storage     = <uint:64,Ki-B>   1024;   # kibibytes
+.distance    = <float:64,k~m>   1.5;    # kilometer (kilo + meter)
+.frequency   = <float:64,M~Hz>  2400;   # megahertz
+.storage     = <uint:64,Ki~B>   1024;   # kibibytes
 ```
 
 ### 5.2 Compound Units
@@ -339,7 +339,7 @@ compound-unit  = "no_unit"
 
 unit-sep       = "*" | "/" | "·"        (* · = U+00B7 MIDDLE DOT *)
 
-unit-component = [ prefix "-" ] base-unit [ unit-exponent ]
+unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 
 unit-exponent  = [ exp-sign ] exp-digit
                | "^" [ "-" | "+" ] ASCII-digit
@@ -382,7 +382,7 @@ Three separator characters are defined:
 
 The division semantics are **non-reversing**: the first `/` flips a "in-denominator" flag to `true`, and that flag remains `true` for all subsequent components regardless of whether additional `/` separators appear. Every component after the first `/` is in the denominator; additional `/` separators do not toggle back to the numerator.
 
-When a component is placed in the denominator, `bvn_parse_unit` negates its exponent. So `k-g·m/s²` is stored as:
+When a component is placed in the denominator, `bvn_parse_unit` negates its exponent. So `k~g·m/s²` is stored as:
 
 ```
 component[0]: { base=bu_gram,   exponent=exp_linear,       prefix=si_kilo }   ← numerator
@@ -390,7 +390,7 @@ component[1]: { base=bu_meter,  exponent=exp_linear,     prefix=si_none }   ← 
 component[2]: { base=bu_second, exponent=exp_neg_square, prefix=si_none }   ← denominator (negated)
 ```
 
-This means the string form `k-g·m/s²` and the form `k-g·m·s⁻²` produce the **identical** `value_unit_t` representation; the second form uses an explicit negative exponent in the numerator instead of relying on the `/` switch.
+This means the string form `k~g·m/s²` and the form `k~g·m·s⁻²` produce the **identical** `value_unit_t` representation; the second form uses an explicit negative exponent in the numerator instead of relying on the `/` switch.
 
 ---
 
@@ -472,7 +472,7 @@ which expands to:
 | Maximum length of the raw unit string | Enforced by `max_type_length` / type-buffer limit | `error_unit_too_long` |
 | Null or empty unit string | Rejected by `bvn_parse_unit` | `ok = false` |
 
-The 8-component limit covers the most complex physically meaningful compound units. For reference, the SI unit for dynamic viscosity (Pa·s = kg/(m·s)) has 3 components after expansion. A unit such as `k-g·m²/(A²·s³)` (henry) has 4.
+The 8-component limit covers the most complex physically meaningful compound units. For reference, the SI unit for dynamic viscosity (Pa·s = kg/(m·s)) has 3 components after expansion. A unit such as `k~g·m²/(A²·s³)` (henry) has 4.
 
 The "no toggle back" rule for `/` means that constructs like `a/b/c` are parsed as `a / (b·c)`, not as `(a/b)/c`. Both produce the same mathematical result, but the internal representation is always "all post-`/` components negated", so `a/b/c` → components `[a, b⁻¹, c⁻¹]`.
 
@@ -694,10 +694,10 @@ Five macros cover the most common construction patterns:
 Usage examples:
 
 ```c
-/* kilogram: k-g */
+/* kilogram: k~g */
 value_unit_t kg = BVN_UNIT_SI(bu_gram, si_kilo);
 
-/* gibibytes: Gi-B */
+/* gibibytes: Gi~B */
 value_unit_t gib = BVN_UNIT_IEC(bu_byte, iec_gibi);
 
 /* square meter: m² */
@@ -731,7 +731,7 @@ Both functions implement the unit sub-grammar in a single pass:
 
 ```c
 bool ok;
-value_unit_t u = bvn_parse_unit((const uint8_t *)"k-g·m/s²", &ok);
+value_unit_t u = bvn_parse_unit((const uint8_t *)"k~g·m/s²", &ok);
 if (!ok) {
     /* invalid unit string */
 }
@@ -767,13 +767,13 @@ Both functions call `bvn_unit_valid` internally before writing. If `bvn_unit_val
 
 ```c
 char buf[64];
-value_unit_t u = /* k-g·m/s² */;
+value_unit_t u = /* k~g·m/s² */;
 int32_t n = bvn_unit_to_string(u, buf, sizeof(buf));
-/* buf == "k-g·m/s²", n == byte length */
+/* buf == "k~g·m/s²", n == byte length */
 
 /* ASCII exponent form */
 n = bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
-/* buf == "k-g*m/s^2" */
+/* buf == "k~g*m/s^2" */
 ```
 
 #### Validation predicate
@@ -802,12 +802,12 @@ Returns the sum of `(prefix_base_exponent × |unit_exponent|)` across all compon
 
 ```c
 bool ok;
-value_unit_t u = bvn_parse_unit((const uint8_t *)"k-m/s", &ok);
+value_unit_t u = bvn_parse_unit((const uint8_t *)"k~m/s", &ok);
 double value = 1.5;
 double factor = bvn_unit_prefix_factor(u);  /* == 1000.0 (kilo in numerator) */
 double si_value = value * factor;           /* == 1500.0 m/s */
 
-value_unit_t u2 = bvn_parse_unit((const uint8_t *)"k-g/m³", &ok);
+value_unit_t u2 = bvn_parse_unit((const uint8_t *)"k~g/m³", &ok);
 /* bvn_unit_prefix_factor(u2) == 1000.0:
    kilo in numerator contributes ×1000, m³ in denominator has si_none → ×1 */
 ```
@@ -834,7 +834,7 @@ double bvn_unit_to_si_factor(value_unit_t u,
                               bool        *ok);
 ```
 
-Returns the multiplicative factor that converts a value in unit `u` to the corresponding SI base unit (e.g. `k-g` → 1.0, since the gram-to-kilogram factor of 10⁻³ is absorbed by the `si_kilo` prefix contribution of 10³ giving a net factor of 1.0; `k-J` → 1000.0). Both the prefix factor and the base-unit-to-SI factor are applied.
+Returns the multiplicative factor that converts a value in unit `u` to the corresponding SI base unit (e.g. `k~g` → 1.0, since the gram-to-kilogram factor of 10⁻³ is absorbed by the `si_kilo` prefix contribution of 10³ giving a net factor of 1.0; `k~J` → 1000.0). Both the prefix factor and the base-unit-to-SI factor are applied.
 
 For affine units (`bu_celsius`), `*is_affine` is set to `true` and `*affine_offset` is set to the additive offset that must be applied **after** multiplying by the returned factor (273.15 for Celsius). An affine unit is valid at exponent 1 only. At exponent 1, `*is_affine` is set to `true` and `*affine_offset` is populated. Any other exponent (negative, or greater than 1) sets `*ok = false`. Only one affine component per compound unit is permitted; a second affine component at exponent 1 also sets `*ok = false`.
 
@@ -899,7 +899,7 @@ Returns the multiplicative factor `k` such that `value_in_b = value_in_a * k`, p
 
 ```c
 bool ok, needs_affine;
-value_unit_t km = bvn_parse_unit((const uint8_t *)"k-m",  &ok);
+value_unit_t km = bvn_parse_unit((const uint8_t *)"k~m",  &ok);
 value_unit_t m  = bvn_parse_unit((const uint8_t *)"m",    &ok);
 double k = bvn_unit_convert_factor(km, m, &ok, &needs_affine);
 /* k == 1000.0, ok == true, needs_affine == false */
@@ -920,7 +920,7 @@ The output components are sorted: positive-exponent components first, ordered by
 ```c
 double scale;
 bool overflow;
-value_unit_t u  = bvn_parse_unit((const uint8_t *)"k-m·k-m", &ok);
+value_unit_t u  = bvn_parse_unit((const uint8_t *)"k~m·k~m", &ok);
 value_unit_t r  = bvn_unit_reduce(u, &scale, &overflow);
 /* r: single component { bu_meter, exp_square, si_none }
    scale == 1e6  (two kilo prefixes → 10³ × 10³) */
@@ -953,13 +953,13 @@ In both cases the effective unit is reported in the `bvnr_data_t.value_unit` fie
 The full event sequence for an assignment with a compound unit annotation is:
 
 ```
-Input: .force = <float:64,k-g·m/s²> 9.81;
+Input: .force = <float:64,k~g·m/s²> 9.81;
 
 ev_assignment_start
     data = "force"
 
 ev_type_annotation_start
-    data = "float:64,k-g·m/s²"
+    data = "float:64,k~g·m/s²"
 
 ev_type_annotation_type_family
     data = "float"
@@ -1104,10 +1104,10 @@ In `continue_on_error` mode the parser invokes `on_error` with the error code an
 .gravity_asc  = <float:64,m/s^2>     9.80665;
 
 # Pressure in kilopascals
-.tire_pressure = <float:32,k-Pa>     250.0;
+.tire_pressure = <float:32,k~Pa>     250.0;
 
 # Energy in kilojoules
-.heat_energy  = <float:64,k-J>       5400.0;
+.heat_energy  = <float:64,k~J>       5400.0;
 
 # Flow rate (liters per minute)
 .pump_flow    = <float:32,L/min>     15.0;
@@ -1151,53 +1151,53 @@ In `continue_on_error` mode the parser invokes `on_error` with the error code an
 .packet_size = <uint:32,B>      1500;
 
 # Kibibytes (IEC binary)
-.cache_size  = <uint:64,Ki-B>   512;
+.cache_size  = <uint:64,Ki~B>   512;
 
 # Mebibytes
-.ram_size    = <uint:64,Mi-B>   4096;
+.ram_size    = <uint:64,Mi~B>   4096;
 
 # Gibibytes
-.disk_size   = <uint:64,Gi-B>   500;
+.disk_size   = <uint:64,Gi~B>   500;
 
 # Tebibytes
-.array_size  = <uint:64,Ti-B>   2;
+.array_size  = <uint:64,Ti~B>   2;
 
 # Megabits (SI decimal — different from Mebi!)
-.link_rate   = <uint:32,M-b>    1000;
+.link_rate   = <uint:32,M~b>    1000;
 
 # Gigabits per second (compound: data-rate)
-.nic_speed   = <float:64,G-b/s> 10.0;
+.nic_speed   = <float:64,G~b/s> 10.0;
 ```
 
 ### 13.3 Compound SI Quantities
 
 ```bovnar
-# Force: Newton = kg·m·s⁻² = k-g·m/s²
-.force          = <float:64,k-g·m/s²>    9.81;
+# Force: Newton = kg·m·s⁻² = k~g·m/s²
+.force          = <float:64,k~g·m/s²>    9.81;
 
 # Alternative: explicit negative exponent in numerator
-.force_alt      = <float:64,k-g·m·s⁻²>  9.81;   # identical internal form
+.force_alt      = <float:64,k~g·m·s⁻²>  9.81;   # identical internal form
 
-# Energy: Joule = kg·m²·s⁻² = k-g·m²/s²
-.kinetic_energy = <float:64,k-g·m²/s²>  1000.0;
+# Energy: Joule = kg·m²·s⁻² = k~g·m²/s²
+.kinetic_energy = <float:64,k~g·m²/s²>  1000.0;
 
 # Momentum: kg·m/s
-.momentum       = <float:64,k-g·m/s>    5.0;
+.momentum       = <float:64,k~g·m/s>    5.0;
 
 # Mass density: kg/m³
-.steel_density  = <float:64,k-g/m³>     7800.0;
+.steel_density  = <float:64,k~g/m³>     7800.0;
 
 # Area density: kg/m²
-.surface_load   = <float:64,k-g/m²>     200.0;
+.surface_load   = <float:64,k~g/m²>     200.0;
 
 # Pressure via explicit components: kg/(m·s²)
-.atm_pressure   = <float:64,k-g/(m·s²)> 101325.0;
+.atm_pressure   = <float:64,k~g/(m·s²)> 101325.0;
 
 # Electric field strength: V/m
 .field_strength = <float:64,V/m>         150.0;
 
 # Magnetic flux density: T (named SI unit, no compound needed)
-.b_field        = <float:64,m-T>         50.0;     # millitesla
+.b_field        = <float:64,m~T>         50.0;     # millitesla
 
 # Torque: N·m
 .torque         = <float:64,N·m>         25.0;
@@ -1216,7 +1216,7 @@ In `continue_on_error` mode the parser invokes `on_error` with the error code an
 .bad2 = <float:64,m*·s>      1.0;
 
 # Too many components (9 > BVNR_MAX_UNIT_COMPONENTS=8) → error_unit_illegal
-.bad3 = <float:64,m*s*k-g*A*K*mol*cd*b*B> 1.0;
+.bad3 = <float:64,m*s*k~g*A*K*mol*cd*b*B> 1.0;
 
 # Unknown prefix → error_unit_illegal
 # ('x' is not an SI or IEC prefix symbol)

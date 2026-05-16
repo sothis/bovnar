@@ -332,10 +332,10 @@ static void test_parse_units_variations(void)
     parse_payload(".distance = <uint:32,m> 100;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "simple unit must parse");
 
-    parse_payload(".length = <uint:32,k-m> 5;", false, &ctx);
+    parse_payload(".length = <uint:32,k~m> 5;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "unit with SI prefix must parse");
 
-    parse_payload(".size = <uint:64,Ki-B> 1024;", false, &ctx);
+    parse_payload(".size = <uint:64,Ki~B> 1024;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "unit with IEC prefix must parse");
 
     parse_payload(".speed = <float:64,m/s> 9.81;", false, &ctx);
@@ -353,12 +353,12 @@ static void test_parse_inline_unit_scalar(void)
     ASSERT_TRUE(!ctx.has_errors, "inline unit (space-only) on uint must parse");
 
     /* with type annotation, space separator */
-    parse_payload(".dist = <float:64> 1.5 k-m;", false, &ctx);
+    parse_payload(".dist = <float:64> 1.5 k~m;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors,
         "inline unit with annotation that has no unit must parse");
 
     /* compound unit */
-    parse_payload(".force = 9.81 k-g*m/s\xc2\xb2;", false, &ctx);
+    parse_payload(".force = 9.81 k~g*m/s\xc2\xb2;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "inline compound unit must parse");
 
     /* string literal with space separator */
@@ -375,11 +375,11 @@ static void test_parse_inline_unit_scalar(void)
     ASSERT_TRUE(!ctx.has_errors, "inline unit after special-number must parse");
 
     /* number with exponent */
-    parse_payload(".x = 1.5e3 k-J;", false, &ctx);
+    parse_payload(".x = 1.5e3 k~J;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "inline unit after exponent must parse");
 
     /* unit starting with E — space separator removes exponent ambiguity */
-    parse_payload(".x = 100 E-m;", false, &ctx);
+    parse_payload(".x = 100 E~m;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors,
         "unit starting with E is unambiguous after whitespace separator");
 
@@ -440,7 +440,7 @@ static void test_parse_inline_unit_annotation_match(void)
     ASSERT_TRUE(!ctx.has_errors,
         "matching inline and annotation compound unit must parse");
 
-    parse_payload(".mass = <float:32,k-g> 70.0 k-g;", false, &ctx);
+    parse_payload(".mass = <float:32,k~g> 70.0 k~g;", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors,
         "matching inline and annotation SI-prefix unit must parse");
 }
@@ -457,7 +457,7 @@ static void test_parse_inline_unit_annotation_mismatch(void)
     ASSERT_EQ_INT(ctx.last_error, error_unit_mismatch,
         "expected error_unit_mismatch for unit conflict");
 
-    parse_payload(".x = <float:64,m/s> 9.81 k-m/s;", true, &ctx);
+    parse_payload(".x = <float:64,m/s> 9.81 k~m/s;", true, &ctx);
     ASSERT_TRUE(ctx.has_errors,
         "mismatched compound inline vs annotation unit must error");
     ASSERT_EQ_INT(ctx.last_error, error_unit_mismatch,

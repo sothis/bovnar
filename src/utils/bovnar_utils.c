@@ -611,7 +611,7 @@ static value_unit_component_t bvn_parse_single_unit_component(
 		r.prefix.id.si  = si_none;
 		return r;
 	}
-	if (plen < 2 || s[plen - 1] != '-') {
+	if (plen < 2 || s[plen - 1] != '~') {
 		*ok = false;
 		return r;
 	}
@@ -1049,7 +1049,7 @@ static int32_t bvn_write_unit_component(
 	}
 	if (has_prefix) {
 		if (pos + 1 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '-';
+		buf[pos++] = '~';
 	}
 	{
 		const char* bu = base_unit_str(c->base);
@@ -1089,7 +1089,7 @@ static int32_t bvn_write_unit_component_ex(
 	}
 	if (has_prefix) {
 		if (pos + 1 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '-';
+		buf[pos++] = '~';
 	}
 	{
 		const char* bu = base_unit_str(c->base);

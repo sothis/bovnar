@@ -59,8 +59,6 @@ typedef struct bvnr_validator_s {
 	bool			(*on_verified)
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bvnr_on_error_fn	on_error;
-	bvnr_serializer_t	dbg_ser;
-	bool			use_dbg;
 } bvnr_validator_t;
 struct bvnr_reader_s {
 	bvnr_lexer_t		lex;
@@ -92,6 +90,5 @@ void bvn_acc_digit(bvnr_validator_t* v, uint32_t dv, uint32_t base);
 bool bvn_ser_serialize_event(
 	bvnr_serializer_t* s, bvnr_event_t ev, bvnr_data_t* d);
 bool bvn_ser_flush_wbuf(bvnr_serializer_t* s);
-void bvnr_validator_set_debug_sink(
-	bvnr_validator_t* v, const bvnr_sink_t* sink, bool pretty);
+bool bvn_ser_finish_stream(bvnr_serializer_t* s);
 #endif

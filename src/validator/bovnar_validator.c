@@ -29,37 +29,7 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
         v->on_error      = opts->on_error;
     }
 }
-static bool bvn_dbg_serialize(bvnr_validator_t* v,
-                              bvnr_event_t ev, bvnr_data_t* d)
-{
-    if (!v->use_dbg) return true;
-    if (!bvn_ser_serialize_event(&v->dbg_ser, ev, d)) {
-        v->last_error = error_writing_to_sink;
-        return false;
-    }
-    return true;
-}
-void bvnr_validator_set_debug_sink(
-    bvnr_validator_t* v, const bvnr_sink_t* sink, bool pretty)
-{
-    if (!v || !sink || !sink->push) {
-        if (v) v->use_dbg = false;
-        return;
-    }
-    memset(&v->dbg_ser, 0, sizeof(v->dbg_ser));
-    v->dbg_ser.max_array_nesting = UINT8_MAX;
-    v->dbg_ser.sink   = *sink;
-    v->dbg_ser.pretty = pretty;
-    v->use_dbg        = true;
-}
-void bvnr_reader_set_debug_fd(
-    bvnr_reader_t* r, int fd, bool pretty)
-{
-    if (!r) return;
-    bvnr_sink_t sink;
-    bvnr_sink_to_fd(&sink, fd);
-    bvnr_validator_set_debug_sink(&r->val, &sink, pretty);
-}
+
 static const uint8_t bvn_empty_sentinel[1] = { 0 };
 static inline void bvn_normalize_data_ptr(bvnr_data_t* d)
 {
@@ -71,8 +41,6 @@ static inline bool bvn_emit_unverified(bvnr_reader_t* r,
 {
     bvnr_validator_t* v = &r->val;
     bvn_normalize_data_ptr(d);
-    if (!bvn_dbg_serialize(v, ev, d))
-        return false;
     if (!v->on_unverified) return true;
     if (!v->on_unverified(v->userdata, ev, d)) {
         v->last_error = error_scanner_callback_failed;
@@ -605,15 +573,7 @@ bool bvn_val_on_new_array_value(bvnr_reader_t* r,
 }
 bool bvnr_read(bvnr_reader_t* r)
 {
-    bool ok = bvn_lex_run(r);
-    if (ok && r->val.use_dbg && r->val.dbg_ser.need_semi) {
-        bvnr_sink_t* s = &r->val.dbg_ser.sink;
-        if (!bvn_sink_push(s, ";", 1)) return false;
-        if (r->val.dbg_ser.pretty &&
-            !bvn_sink_push(s, "\n", 1)) return false;
-        r->val.dbg_ser.need_semi = false;
-    }
-    return ok;
+    return bvn_lex_run(r);
 }
 error_code_t bvnr_reader_get_error(const bvnr_reader_t* r)
 {

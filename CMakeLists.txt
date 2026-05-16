@@ -38,6 +38,7 @@ set(BVNR_SOURCES_VALIDATOR
 set(BVNR_SOURCES_WRITER
     src/writer/bovnar_writer.c
     src/writer/bovnar_write_utils.c
+    src/writer/bovnar_canon_observer.c
 )
 
 set(BVNR_SOURCES_IO

@@ -77,6 +77,14 @@ static bool bvn_ser_space(bvnr_serializer_t* s)
 	if (!s->pretty) return true;
 	return bvn_ser_push_byte(s, ' ');
 }
+bool bvn_ser_finish_stream(bvnr_serializer_t* s)
+{
+	if (!s->need_semi) return bvn_ser_flush_wbuf(s);
+	if (!bvn_ser_push_byte(s, ';')) return false;
+	if (s->pretty && !bvn_ser_push_byte(s, '\n')) return false;
+	s->need_semi = false;
+	return bvn_ser_flush_wbuf(s);
+}
 static bool bvn_validate_string_content(bvnr_writer_t* w,
 	const uint8_t* data, uint32_t length)
 {
@@ -772,18 +780,7 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	if (!w) return false;
 	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0)
 		return bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
-	if (w->ser.need_semi) {
-		if (!bvn_ser_push_byte(&w->ser, ';'))
-			return bvn_writer_set_error(w, w->ser.sink.is_mem
-				? error_sink_buffer_exhausted
-				: error_writing_to_sink);
-		if (w->ser.pretty && !bvn_ser_newline(&w->ser))
-			return bvn_writer_set_error(w, w->ser.sink.is_mem
-				? error_sink_buffer_exhausted
-				: error_writing_to_sink);
-		w->ser.need_semi = false;
-	}
-	if (!bvn_ser_flush_wbuf(&w->ser))
+	if (!bvn_ser_finish_stream(&w->ser))
 		return bvn_writer_set_error(w, w->ser.sink.is_mem
 			? error_sink_buffer_exhausted
 			: error_writing_to_sink);

@@ -359,14 +359,19 @@ bvnr_reader_t* bvnr_reader_create(void);
 void           bvnr_reader_destroy(bvnr_reader_t* r);
 bool bvnr_open_read_source(
 	bvnr_reader_t* r, const bvnr_source_t* src,
-	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* options);
+	const bvnr_sink_t* src_mirror, bvnr_read_flags_t* options);
 bool bvnr_open_read_mem(
 	bvnr_reader_t* r, const void* buf, uint64_t len,
-	void* dbg_buf, uint32_t dbg_cap,
+	void* mirror_buf, uint32_t mirror_cap,
 	bvnr_read_flags_t* options);
 bool bvnr_read(bvnr_reader_t* r);
-void bvnr_reader_set_debug_fd(
-	bvnr_reader_t* r, int fd, bool pretty);
+typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
+bvnr_canon_observer_t* bvnr_canon_observer_create(
+	const bvnr_sink_t* sink, bool pretty);
+void bvnr_canon_observer_destroy(bvnr_canon_observer_t* obs);
+bool bvnr_canon_observer_on_event(
+	void* obs, bvnr_event_t ev, bvnr_data_t* data);
+bool bvnr_canon_observer_finish(bvnr_canon_observer_t* obs);
 error_code_t bvnr_reader_get_error(const bvnr_reader_t* r);
 uint64_t     bvnr_reader_get_error_line  (const bvnr_reader_t* r);
 uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);

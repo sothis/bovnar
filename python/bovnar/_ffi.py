@@ -88,8 +88,17 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_reader_destroy.restype  = None
     lib.bvnr_reader_destroy.argtypes = [c_void_p]
 
-    lib.bvnr_reader_set_debug_fd.restype  = None
-    lib.bvnr_reader_set_debug_fd.argtypes = [c_void_p, c_int, c_bool]
+    lib.bvnr_canon_observer_create.restype  = c_void_p
+    lib.bvnr_canon_observer_create.argtypes = [P(BvnrSink), c_bool]
+
+    lib.bvnr_canon_observer_destroy.restype  = None
+    lib.bvnr_canon_observer_destroy.argtypes = [c_void_p]
+
+    lib.bvnr_canon_observer_on_event.restype  = c_bool
+    lib.bvnr_canon_observer_on_event.argtypes = [c_void_p, c_int, P(BvnrData)]
+
+    lib.bvnr_canon_observer_finish.restype  = c_bool
+    lib.bvnr_canon_observer_finish.argtypes = [c_void_p]
 
     lib.bvnr_source_from_fd.restype  = None
     lib.bvnr_source_from_fd.argtypes = [P(BvnrSource), c_int]

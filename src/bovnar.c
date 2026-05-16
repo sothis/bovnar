@@ -203,6 +203,7 @@ typedef struct {
 	uint64_t         next_seq;
 	evt_logged_tok_t log[EVT_LOG_CAP];
 	uint32_t         log_used;
+	bvnr_canon_observer_t *canon;
 } evt_ctx_t;
 static void evt_format_token(const bvnr_data_t *d, bvnr_event_t e,
 					  char *buf, size_t bufsize)
@@ -283,6 +284,13 @@ static void evt_format_token(const bvnr_data_t *d, bvnr_event_t e,
 	}
 	buf[pos] = '\0';
 #undef SCAT
+}
+static bool evt_on_unverified(void *ud, bvnr_event_t e, bvnr_data_t *d);
+static bool evt_on_unverified_tee(void *ud, bvnr_event_t e, bvnr_data_t *d)
+{
+	evt_ctx_t *ctx = (evt_ctx_t *)ud;
+	if (!bvnr_canon_observer_on_event(ctx->canon, e, d)) return false;
+	return evt_on_unverified(ud, e, d);
 }
 static bool evt_on_unverified(void *ud, bvnr_event_t e, bvnr_data_t *d)
 {
@@ -411,15 +419,31 @@ static int cmd_events(int argc, char **argv)
 	flags.on_verified        = evt_on_verified;
 	flags.continue_on_error  = continue_on_error;
 	flags.on_error           = evt_on_error;
+
+	bvnr_canon_observer_t *canon = NULL;
+	if (enable_debug) {
+		bvnr_sink_t dbg_sink;
+		bvnr_sink_to_fd(&dbg_sink, STDERR_FILENO);
+		canon = bvnr_canon_observer_create(&dbg_sink, debug_pretty);
+		if (!canon) {
+			fprintf(stderr, "error: failed to allocate canon observer\n");
+			free(ctx);
+			bvnr_reader_destroy(rd);
+			if (!from_stdin) close(fd);
+			return 1;
+		}
+		ctx->canon = canon;
+		flags.on_unverified = evt_on_unverified_tee;
+	}
+
 	if (!bvnr_open_read_source(rd, &src, NULL, &flags)) {
 		fprintf(stderr, "error: bvnr_open_read_source failed\n");
+		bvnr_canon_observer_destroy(canon);
 		free(ctx);
 		bvnr_reader_destroy(rd);
 		if (!from_stdin) close(fd);
 		return 1;
 	}
-	if (enable_debug)
-		bvnr_reader_set_debug_fd(rd, STDERR_FILENO, debug_pretty);
 	puts("═══════════════════════════════════════════════════════════════════"
 		 "════════════════════════════════════════════════════════════════");
 	printf("  Parsing: %s", from_stdin ? "<stdin>" : filename);
@@ -434,6 +458,12 @@ static int cmd_events(int argc, char **argv)
 		 "────────────────┼────────────────────────────────────────────────"
 		 "────────────────────────────────────");
 	bool ok = bvnr_read(rd);
+	if (canon) {
+		bvnr_canon_observer_finish(canon);
+		bvnr_canon_observer_destroy(canon);
+		canon = NULL;
+		ctx->canon = NULL;
+	}
 	for (uint32_t i = 0; i < ctx->log_used; i++)
 		printf("  %-*s │ —\n", EVT_COL_WIDTH, ctx->log[i].formatted);
 	puts("\n───────────────────────────────────────────────────────────────────"

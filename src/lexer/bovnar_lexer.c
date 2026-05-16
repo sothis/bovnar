@@ -629,6 +629,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 		if (l->array_nesting_level > 0) {
 			uint64_t effective_row = l->array_row_size
 				? l->array_row_size : l->curr_row_size;
+			l->array_row_size = 0;
 			if (!bvn_val_on_array_outro(p, effective_row,
 						    &l->array_row_size))
 				return false;
@@ -667,6 +668,10 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
+	while (l->struct_nesting_level > l->resync_saved_struct_nesting) {
+		--l->struct_nesting_level;
+		bvn_val_receive_event(p, ev_struct_end);
+	}
 	l->token_type           = token_is_unknown;
 	l->str_len              = 0;
 	l->type_len             = 0;
@@ -840,37 +845,39 @@ static bool bvn_os_read_exact(
 	}
 	return true;
 }
-static int32_t bvn_read_octet_stream(
-	bvnr_reader_t* p, const uint8_t* resid, uint32_t resid_len)
+static bool bvn_read_octet_stream(
+	bvnr_reader_t* p, const uint8_t* resid, uint32_t resid_len,
+	uint32_t* out_leftover)
 {
 	octet_source_t src = { .p = p, .resid = resid, .resid_left = resid_len };
 	uint8_t  tag, lenbuf[2];
 	uint32_t chunklen;
 	for (;;) {
 		if (!bvn_os_read_exact(&src, &tag, 1))
-			return -1;
+			return false;
 		if (tag == 0x00) {
 			p->lex.token_type = token_is_unknown;
 			if (!bvn_val_receive_event(p, ev_octet_stream_end))
-				return -1;
+				return false;
 			p->lex.next_state = octet_stream_outro;
-			return (int32_t)src.resid_left;
+			*out_leftover = src.resid_left;
+			return true;
 		}
 		if (tag != 0x01) {
 			bvn_capture_os_error(p, error_octet_stream_out_of_sync);
 			bvn_notify_error(p);
-			return -1;
+			return false;
 		}
 		if (!bvn_os_read_exact(&src, lenbuf, 2))
-			return -1;
+			return false;
 		chunklen = (uint32_t)lenbuf[0]
 				 | ((uint32_t)lenbuf[1] << 8);
 		if (!chunklen)
 			chunklen = 65536u;
 		if (!bvn_os_read_exact(&src, p->lex.str_data, chunklen))
-			return -1;
+			return false;
 		if (!bvn_val_receive_octet_chunk(p, p->lex.str_data, chunklen))
-			return -1;
+			return false;
 	}
 }
 bool bvn_utf8_classify_leader(
@@ -1061,7 +1068,7 @@ bool bvn_lex_run(bvnr_reader_t* r)
 	bvnr_lexer_t* l = &r->lex;
 	uint8_t data[BOVN_READ_BUFFER_SIZE];
 	uint32_t nb, off, consumed;
-	int32_t  os_leftover;
+	uint32_t os_leftover;
 	if (!bvn_val_receive_event(r, ev_stream_start))
 		return false;
 	for (;;) {
@@ -1122,11 +1129,10 @@ bool bvn_lex_run(bvnr_reader_t* r)
 			}
 			if (l->next_state != octet_stream_intro)
 				break;
-			os_leftover = bvn_read_octet_stream(r,
-				data + off, nb - off);
-			if (os_leftover < 0)
+			if (!bvn_read_octet_stream(r,
+				data + off, nb - off, &os_leftover))
 				return false;
-			off = nb - (uint32_t)os_leftover;
+			off = nb - os_leftover;
 		}
 	}
 	return true;

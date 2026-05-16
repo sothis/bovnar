@@ -413,6 +413,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	default:
 		w->ser.stream_begun = true;
 		break;
+	case ev_array_row_start:
+		w->ser.stream_begun = true;
+		if (w->ser.array_depth >= w->ser.max_array_nesting)
+			return bvn_writer_set_error(w, error_array_nesting_too_high);
+		break;
 	}
 	return true;
 }
@@ -600,11 +605,8 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				return false;
 		}
 		s->had_type_annotation = false;
-		if (s->array_depth < s->max_array_nesting) {
-			s->struct_depth_at_array_start[s->array_depth] =
-				s->struct_depth;
-			s->arr_need_comma[s->array_depth] = false;
-		}
+		s->struct_depth_at_array_start[s->array_depth] = s->struct_depth;
+		s->arr_need_comma[s->array_depth] = false;
 		if (!bvn_ser_push_byte(s, '[')) return false;
 		s->array_depth++;
 		break;

@@ -29,6 +29,7 @@ bvn_dom_doc_t *bvn_dom_doc_create(void);
 void           bvn_dom_doc_destroy(bvn_dom_doc_t *doc);
 bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len);
 bvn_dom_doc_t *bvn_dom_parse_fd(int fd);
+bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes);
 error_code_t   bvn_dom_doc_get_parse_error(const bvn_dom_doc_t *doc);
 bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc,
 							   const char *path);

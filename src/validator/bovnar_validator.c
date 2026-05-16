@@ -14,7 +14,7 @@ bvnr_reader_t* bvnr_reader_create(void)
 void bvnr_reader_destroy(bvnr_reader_t* r)
 {
     if (!r) return;
-    free(r->lex.arr_frames);
+    bvn_lex_destroy(&r->lex);
     free(r);
 }
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)

@@ -558,8 +558,10 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 	builder_cleanup(&b);
 	return doc;
 }
-bvn_dom_doc_t *bvn_dom_parse_fd(int fd)
+bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
 {
+	if (!max_bytes || max_bytes > (uint64_t)BVN_DOM_FD_MAX_BYTES)
+		max_bytes = BVN_DOM_FD_MAX_BYTES;
 	size_t cap = 65536;
 	size_t len = 0;
 	uint8_t *buf = malloc(cap);
@@ -573,13 +575,13 @@ bvn_dom_doc_t *bvn_dom_parse_fd(int fd)
 		if (n == 0) break;
 		len += (size_t)n;
 		if (len == cap) {
-			if (cap >= BVN_DOM_FD_MAX_BYTES) {
+			if ((uint64_t)cap >= max_bytes) {
 				free(buf); return NULL;
 			}
 			size_t ncap;
 			if (cap > SIZE_MAX / 2u) ncap = SIZE_MAX;
 			else                     ncap = cap * 2u;
-			if (ncap > BVN_DOM_FD_MAX_BYTES) ncap = BVN_DOM_FD_MAX_BYTES;
+			if ((uint64_t)ncap > max_bytes) ncap = (size_t)max_bytes;
 			if (ncap <= cap) { free(buf); return NULL; }
 			uint8_t *nb = realloc(buf, ncap);
 			if (!nb) { free(buf); return NULL; }
@@ -591,4 +593,8 @@ bvn_dom_doc_t *bvn_dom_parse_fd(int fd)
 	bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
 	free(buf);
 	return doc;
+}
+bvn_dom_doc_t *bvn_dom_parse_fd(int fd)
+{
+	return bvn_dom_parse_fd_ex(fd, BVN_DOM_FD_MAX_BYTES);
 }

@@ -225,6 +225,21 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 		return ok;
 	}
 }
+static bool bvn_dec_increment(char *s)
+{
+	int len = (int)strlen(s);
+	int carry = 1;
+	for (int i = len - 1; i >= 0 && carry; i--) {
+		int d = (s[i] - '0') + carry;
+		s[i] = (char)('0' + (d % 10));
+		carry = d / 10;
+	}
+	if (carry) {
+		memmove(s + 1, s, (size_t)len + 1);
+		s[0] = '1';
+	}
+	return true;
+}
 bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
@@ -273,17 +288,7 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 		if (!tmp) { free(maxs); return false; }
 		strncpy(tmp, maxs, BVN_DEC_SCRATCH_SIZE - 1u);
 		tmp[BVN_DEC_SCRATCH_SIZE - 1u] = '\0';
-		int len = (int)strlen(tmp);
-		int carry = 1;
-		for (int i = len - 1; i >= 0 && carry; i--) {
-			int d = (tmp[i] - '0') + carry;
-			tmp[i] = (char)('0' + (d % 10));
-			carry = d / 10;
-		}
-		if (carry) {
-			memmove(tmp + 1, tmp, (size_t)len + 1);
-			tmp[0] = '1';
-		}
+		bvn_dec_increment(tmp);
 		bool ok = bvn_cmp_dec(abs, tmp) <= 0;
 		free(maxs);
 		free(tmp);
@@ -308,17 +313,7 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 			if (!tmp) goto sint_bigint_done;
 			strncpy(tmp, maxs, BVN_DEC_SCRATCH_SIZE - 1u);
 			tmp[BVN_DEC_SCRATCH_SIZE - 1u] = '\0';
-			int len = (int)strlen(tmp);
-			int carry = 1;
-			for (int i = len - 1; i >= 0 && carry; i--) {
-				int d = (tmp[i] - '0') + carry;
-				tmp[i] = (char)('0' + (d % 10));
-				carry = d / 10;
-			}
-			if (carry) {
-				memmove(tmp + 1, tmp, (size_t)len + 1);
-				tmp[0] = '1';
-			}
+			bvn_dec_increment(tmp);
 			ok = bvn_cmp_dec(dec, tmp) <= 0;
 			free(tmp);
 		}

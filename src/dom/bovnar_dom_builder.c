@@ -572,19 +572,20 @@ bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
 			n = read(fd, buf + len, cap - len);
 		} while (n < 0 && errno == EINTR);
 		if (n < 0) {
-			if (len == 0) { free(buf); return NULL; }
-			break;
+			free(buf);
+			return NULL;
 		}
 		if (n == 0) break;
 		len += (size_t)n;
+		if ((uint64_t)len > max_bytes) {
+			free(buf);
+			return NULL;
+		}
 		if (len == cap) {
-			if ((uint64_t)cap >= max_bytes) {
-				free(buf); return NULL;
-			}
 			size_t ncap;
 			if (cap > SIZE_MAX / 2u) ncap = SIZE_MAX;
 			else                     ncap = cap * 2u;
-			if ((uint64_t)ncap > max_bytes) ncap = (size_t)max_bytes;
+			if ((uint64_t)ncap > max_bytes) ncap = (size_t)max_bytes + 1u;
 			if (ncap <= cap) { free(buf); return NULL; }
 			uint8_t *nb = realloc(buf, ncap);
 			if (!nb) { free(buf); return NULL; }

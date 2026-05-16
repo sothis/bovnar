@@ -794,8 +794,10 @@ static char *parse_json_string(const char **p)
 	(*p)++;
 	return str;
 }
+#define JSON_MAX_DEPTH 512
 static JsonNode *json_parse_value(const char **p);
-static JsonNode *json_parse_array(const char **p)
+static JsonNode *json_parse_value_depth(const char **p, int depth);
+static JsonNode *json_parse_array(const char **p, int depth)
 {
 	(*p)++;
 	JsonNode *node = calloc(1, sizeof(*node));
@@ -807,7 +809,7 @@ static JsonNode *json_parse_array(const char **p)
 	node->u.arr.items = malloc(cap * sizeof(*node->u.arr.items));
 	if (!node->u.arr.items) { free(node); return NULL; }
 	while (**p) {
-		JsonNode *elem = json_parse_value(p);
+		JsonNode *elem = json_parse_value_depth(p, depth);
 		if (!elem) { json_free_node(node); return NULL; }
 		if (node->u.arr.count == cap) {
 			cap *= 2;
@@ -824,7 +826,7 @@ static JsonNode *json_parse_array(const char **p)
 	}
 	return node;
 }
-static JsonNode *json_parse_object(const char **p)
+static JsonNode *json_parse_object(const char **p, int depth)
 {
 	(*p)++;
 	JsonNode *node = calloc(1, sizeof(*node));
@@ -843,7 +845,7 @@ static JsonNode *json_parse_object(const char **p)
 		if (**p != ':') { free(key); json_free_node(node); return NULL; }
 		(*p)++;
 		skip_ws(p);
-		JsonNode *val = json_parse_value(p);
+		JsonNode *val = json_parse_value_depth(p, depth);
 		if (!val) { free(key); json_free_node(node); return NULL; }
 		if (node->u.obj.count == cap) {
 			uint32_t nc = cap * 2;
@@ -871,10 +873,15 @@ static JsonNode *json_parse_object(const char **p)
 	}
 	return node;
 }
-static JsonNode *json_parse_value(const char **p)
+static JsonNode *json_parse_value_depth(const char **p, int depth)
 {
 	skip_ws(p);
 	if (!**p) return NULL;
+	if (depth > JSON_MAX_DEPTH) {
+		fprintf(stderr, "convert: JSON nesting exceeds limit (%d)\n",
+			JSON_MAX_DEPTH);
+		return NULL;
+	}
 	if (**p == '"') {
 		char *s = parse_json_string(p);
 		if (!s) return NULL;
@@ -884,8 +891,8 @@ static JsonNode *json_parse_value(const char **p)
 		n->u.s = s;
 		return n;
 	}
-	if (**p == '[') return json_parse_array(p);
-	if (**p == '{') return json_parse_object(p);
+	if (**p == '[') return json_parse_array(p, depth + 1);
+	if (**p == '{') return json_parse_object(p, depth + 1);
 	if (strncmp(*p, "null",  4) == 0) {
 		*p += 4;
 		JsonNode *n = calloc(1, sizeof(*n));
@@ -926,6 +933,11 @@ static JsonNode *json_parse_value(const char **p)
 		*p = end;
 		return n;
 	}
+	return NULL;
+}
+static JsonNode *json_parse_value(const char **p)
+{
+	return json_parse_value_depth(p, 0);
 	return NULL;
 }
 static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *node);

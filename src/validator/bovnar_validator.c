@@ -29,7 +29,6 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
         v->on_error      = opts->on_error;
     }
 }
-
 static const uint8_t bvn_empty_sentinel[1] = { 0 };
 static inline void bvn_normalize_data_ptr(bvnr_data_t* d)
 {
@@ -603,10 +602,12 @@ bool bvnr_open_read_source(
     bvnr_reader_t* r, const bvnr_source_t* src,
     const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* options)
 {
-    if (!r || !src || !src->pull)
+    if (!r)
         return false;
     bvn_lex_destroy(&r->lex);
     memset(&r->lex, 0, sizeof(r->lex));
+    if (!src || !src->pull)
+        return false;
     if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
         return false;
     bvn_val_init(&r->val, options);

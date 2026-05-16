@@ -670,7 +670,8 @@ static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	bvnr_lexer_t* l = &p->lex;
 	while (l->struct_nesting_level > l->resync_saved_struct_nesting) {
 		--l->struct_nesting_level;
-		bvn_val_receive_event(p, ev_struct_end);
+		if (!bvn_val_receive_event(p, ev_struct_end))
+			break;
 	}
 	l->token_type           = token_is_unknown;
 	l->str_len              = 0;
@@ -1057,7 +1058,6 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	if (!l->max_array_items)		l->max_array_items			= max_array_items;
 	if (!l->max_text_bytes)			l->max_text_bytes			= max_text_bytes;
 	if (!l->max_file_size)			l->max_file_size			= max_file_size;
-
 	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
 	if (!l->arr_frames)
 		return false;

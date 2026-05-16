@@ -222,7 +222,7 @@ typedef struct bvnr_lexer_s {
 	uint64_t		max_array_items;
 	uint64_t		max_text_bytes;
 	uint64_t		max_file_size;
-	uint8_t			max_struct_nesting;
+	uint64_t		max_struct_nesting;
 	uint8_t			max_array_nesting;
 	bool			continue_on_error;
 	uint32_t		resync_array_depth;

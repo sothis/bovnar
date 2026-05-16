@@ -268,7 +268,7 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 			free(maxs);
 			return ok;
 		}
-		char *tmp = malloc(BVN_DEC_SCRATCH_SIZE);
+		char *tmp = malloc(BVN_DEC_SCRATCH_SIZE + 1u);
 		if (!tmp) { free(maxs); return false; }
 		strncpy(tmp, maxs, BVN_DEC_SCRATCH_SIZE - 1u);
 		tmp[BVN_DEC_SCRATCH_SIZE - 1u] = '\0';
@@ -303,7 +303,7 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 			goto sint_bigint_done;
 		}
 		{
-			char *tmp = malloc(BVN_DEC_SCRATCH_SIZE);
+			char *tmp = malloc(BVN_DEC_SCRATCH_SIZE + 1u);
 			if (!tmp) goto sint_bigint_done;
 			strncpy(tmp, maxs, BVN_DEC_SCRATCH_SIZE - 1u);
 			tmp[BVN_DEC_SCRATCH_SIZE - 1u] = '\0';

@@ -419,7 +419,6 @@ static int cmd_events(int argc, char **argv)
 	flags.on_verified        = evt_on_verified;
 	flags.continue_on_error  = continue_on_error;
 	flags.on_error           = evt_on_error;
-
 	bvnr_canon_observer_t *canon = NULL;
 	if (enable_debug) {
 		bvnr_sink_t dbg_sink;
@@ -435,7 +434,6 @@ static int cmd_events(int argc, char **argv)
 		ctx->canon = canon;
 		flags.on_unverified = evt_on_unverified_tee;
 	}
-
 	if (!bvnr_open_read_source(rd, &src, NULL, &flags)) {
 		fprintf(stderr, "error: bvnr_open_read_source failed\n");
 		bvnr_canon_observer_destroy(canon);
@@ -585,6 +583,7 @@ static int cmd_pretty(const char *filename)
 		return 1;
 	}
 	if (lseek(fd, 0, SEEK_SET) != 0) { close(fd); return 1; }
+	if (sz == 0) { close(fd); return 0; }
 	size_t size = (size_t)sz;
 	uint8_t *buf = malloc(size);
 	if (!buf) { close(fd); return 1; }
@@ -683,30 +682,68 @@ static void skip_ws(const char **p)
 {
 	while (**p && isspace((unsigned char)**p)) (*p)++;
 }
+static int parse_hex4(const char *s)
+{
+	uint32_t v = 0;
+	for (int i = 0; i < 4; i++) {
+		uint32_t c = (uint8_t)s[i];
+		uint32_t d;
+		if      (c >= '0' && c <= '9') d = c - '0';
+		else if (c >= 'a' && c <= 'f') d = c - 'a' + 10u;
+		else if (c >= 'A' && c <= 'F') d = c - 'A' + 10u;
+		else return -1;
+		v = (v << 4) | d;
+	}
+	return (int)v;
+}
+static char *encode_utf8(char *out, uint32_t cp)
+{
+	if (cp <= 0x7fu) {
+		*out++ = (char)(uint8_t)cp;
+	} else if (cp <= 0x7ffu) {
+		*out++ = (char)(uint8_t)(0xc0u | (cp >> 6));
+		*out++ = (char)(uint8_t)(0x80u | (cp & 0x3fu));
+	} else if (cp <= 0xffffu) {
+		*out++ = (char)(uint8_t)(0xe0u | (cp >> 12));
+		*out++ = (char)(uint8_t)(0x80u | ((cp >> 6) & 0x3fu));
+		*out++ = (char)(uint8_t)(0x80u | (cp & 0x3fu));
+	} else if (cp <= 0x10ffffu) {
+		*out++ = (char)(uint8_t)(0xf0u | (cp >> 18));
+		*out++ = (char)(uint8_t)(0x80u | ((cp >> 12) & 0x3fu));
+		*out++ = (char)(uint8_t)(0x80u | ((cp >> 6)  & 0x3fu));
+		*out++ = (char)(uint8_t)(0x80u | (cp & 0x3fu));
+	}
+	return out;
+}
 static char *parse_json_string(const char **p)
 {
 	if (**p != '"') return NULL;
 	(*p)++;
 	const char *start = *p;
+	size_t raw_len = 0;
 	while (**p && **p != '"') {
 		if (**p == '\\') {
 			(*p)++;
 			if (!**p) return NULL;
+			if (**p == 'u') {
+				if (!(*p)[1] || !(*p)[2] || !(*p)[3] || !(*p)[4])
+					return NULL;
+				(*p) += 4;
+			}
 		}
 		(*p)++;
+		raw_len++;
 	}
 	if (**p != '"') return NULL;
-	ptrdiff_t diff = *p - start;
-	if (diff < 0) return NULL;
-	size_t len = (size_t)diff;
-	char *str = malloc(len + 1);
+	const char *end = *p;
+	char *str = malloc(raw_len * 4u + 1u);
 	if (!str) return NULL;
 	char *out = str;
 	const char *in = start;
-	while (in < *p) {
+	while (in < end) {
 		if (*in == '\\') {
 			in++;
-			if (in >= *p) { free(str); return NULL; }
+			if (in >= end) { free(str); return NULL; }
 			switch (*in) {
 			case '"':  *out++ = '"';  break;
 			case '\\': *out++ = '\\'; break;
@@ -716,6 +753,28 @@ static char *parse_json_string(const char **p)
 			case 'n':  *out++ = '\n'; break;
 			case 'r':  *out++ = '\r'; break;
 			case 't':  *out++ = '\t'; break;
+			case 'u': {
+				if (end - in < 5) { free(str); return NULL; }
+				int hi = parse_hex4(in + 1);
+				if (hi < 0) { free(str); return NULL; }
+				in += 4;
+				uint32_t cp = (uint32_t)hi;
+				if (cp >= 0xd800u && cp <= 0xdbffu) {
+					if (end - in < 7 || in[1] != '\\' || in[2] != 'u') {
+						free(str); return NULL;
+					}
+					int lo = parse_hex4(in + 3);
+					if (lo < 0 || (uint32_t)lo < 0xdc00u ||
+					    (uint32_t)lo > 0xdfffu) {
+						free(str); return NULL;
+					}
+					cp = 0x10000u + (((cp - 0xd800u) << 10) |
+					     ((uint32_t)lo - 0xdc00u));
+					in += 6;
+				}
+				out = encode_utf8(out, cp);
+				break;
+			}
 			default:   *out++ = *in;  break;
 			}
 		} else {
@@ -953,6 +1012,10 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	if (fd < 0) { perror(file); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
 	if (sz < 0 || lseek(fd, 0, SEEK_SET) != 0) { close(fd); return 1; }
+	if (sz > (off_t)UINT32_MAX) {
+		fprintf(stderr, "convert: file exceeds 4 GiB limit\n");
+		close(fd); return 1;
+	}
 	size_t size = (size_t)sz;
 	char *buf = malloc(size + 1);
 	if (!buf) { close(fd); return 1; }

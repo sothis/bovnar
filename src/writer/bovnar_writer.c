@@ -113,7 +113,7 @@ static bool bvn_validate_id_for_writer(bvnr_writer_t* w,
 	if (length >= sizeof(static_buf)) {
 		buf = malloc((size_t)length + 1u);
 		if (!buf)
-			return bvn_writer_set_error(w, error_identifier_too_long);
+			return bvn_writer_set_error(w, error_invalid_argument);
 		need_free = true;
 	}
 	memcpy(buf, data, length);
@@ -410,6 +410,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		}
 		break;
 	}
+	case ev_struct_end:
+		w->ser.stream_begun = true;
+		if (w->ser.struct_depth == 0)
+			return bvn_writer_set_error(w, error_illegal_struct_close);
+		break;
 	default:
 		w->ser.stream_begun = true;
 		break;

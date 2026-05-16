@@ -191,12 +191,12 @@ typedef struct bvnr_lexer_s {
 	token_type_t		token_type;
 	state_t			next_state;
 	state_t			last_state;
-	uint64_t		struct_nesting_level;
+	uint8_t			struct_nesting_level;
 	uint64_t		array_items;
 	uint64_t		array_row_size;
 	uint64_t		curr_row_size;
 	bool			in_array_element;
-	uint64_t		array_nesting_level;
+	uint8_t			array_nesting_level;
 	bvn_array_frame_t	*arr_frames;
 	uint64_t		processed_bytes;
 	uint64_t		text_bytes;
@@ -227,7 +227,7 @@ typedef struct bvnr_lexer_s {
 	bool			continue_on_error;
 	uint32_t		resync_array_depth;
 	uint32_t		resync_struct_depth;
-	uint64_t		resync_saved_struct_nesting;
+	uint8_t			resync_saved_struct_nesting;
 	uint64_t		recovery_count;
 } bvnr_lexer_t;
 extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];

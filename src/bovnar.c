@@ -576,13 +576,18 @@ static int cmd_pretty(const char *filename)
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
-	if (sz < 0) { close(fd); return 1; }
+	if (sz < 0) {
+		fprintf(stderr, "pretty-print: %s: cannot seek — not a regular file?\n",
+		        filename);
+		close(fd);
+		return 1;
+	}
 	if (sz > (off_t)UINT32_MAX) {
 		fprintf(stderr, "pretty-print: file exceeds 4 GiB limit\n");
 		close(fd);
 		return 1;
 	}
-	if (lseek(fd, 0, SEEK_SET) != 0) { close(fd); return 1; }
+	if (lseek(fd, 0, SEEK_SET) != 0) { perror(filename); close(fd); return 1; }
 	if (sz == 0) { close(fd); return 0; }
 	size_t size = (size_t)sz;
 	uint8_t *buf = malloc(size);
@@ -950,10 +955,9 @@ static bool write_bvn_array(bvnr_writer_t *w, const char *key, const JsonNode *n
 			d.data   = "0";
 			d.length = 1;
 		} else if (e->type == BVN_JSON_BOOL) {
-			const char *s = e->u.b ? "true" : "false";
 			d.type   = token_is_array_number;
-			d.data   = s;
-			d.length = (uint32_t)strlen(s);
+			d.data   = e->u.b ? "1" : "0";
+			d.length = 1;
 		} else if (e->type == BVN_JSON_INT) {
 			n = snprintf(nbuf, sizeof(nbuf), "%" PRId64, e->u.i);
 			d.type   = token_is_array_number;
@@ -1018,7 +1022,11 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	int fd = open(file, O_RDONLY);
 	if (fd < 0) { perror(file); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
-	if (sz < 0 || lseek(fd, 0, SEEK_SET) != 0) { close(fd); return 1; }
+	if (sz < 0) {
+		fprintf(stderr, "convert: %s: cannot seek — not a regular file?\n", file);
+		close(fd); return 1;
+	}
+	if (lseek(fd, 0, SEEK_SET) != 0) { perror(file); close(fd); return 1; }
 	if (sz > (off_t)UINT32_MAX) {
 		fprintf(stderr, "convert: file exceeds 4 GiB limit\n");
 		close(fd); return 1;

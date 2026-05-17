@@ -101,7 +101,7 @@ Each assignment is:
 | Null value | absent token | `.x = ;`, `[,1,]` |
 | Unit (type annotation) | inside `<…>` as a type param | `<float:64,m/s>` |
 | Unit (inline suffix) | after scalar value, before `;` | `.speed = 9.81 m/s;` |
-| Fixed-point type | `<float_fix:width,qN[,unit]>` | `<float_fix:32,q16>` |
+| Fixed-point type | `<float_fix:[width,]qN[,unit]>` | `<float_fix:32,q16>`, `<float_fix:q8>` |
 | Decimal float type | `<float_dec:width[,unit]>` | `<float_dec:64,Pa>` |
 | Unit (compound) | `unit[*·/unit…]` | `m/s²`, `k~g·m/s²`, `m*s` |
 
@@ -369,7 +369,14 @@ When a type annotation precedes a null value, the null carries the annotated typ
 type-annotation = "<" ws type-spec ws ">"
 ```
 
-The type annotation **must** be placed immediately after the `=` sign (in an assignment) or after the `[` or a comma (in an array), and **before** the value it describes.
+The type annotation **must** be placed in one of four positions:
+
+1. Immediately after the `=` sign of an assignment, before the value: `.key = <uint:32> 42;`
+2. Before the opening `[` of an array — a **whole-array annotation** that is inherited by every element that does not carry its own annotation: `.ports = <uint:16> [80, 443, 8080];`
+3. After the opening `[` of an array, before the first element.
+4. After a `,` inside an array, before the next element.
+
+In all cases the annotation comes **before** the value it describes.
 
 **Correct placement:**
 
@@ -377,6 +384,12 @@ The type annotation **must** be placed immediately after the `=` sign (in an ass
 .key = <uint:32> 42;
 .key = <float:64> 3.14;
 .arr = [<uint:8> 1, <sint:16> -2];
+
+# Whole-array annotation — applies to all elements that lack their own annotation
+.ports = <uint:16> [80, 443, 8080];
+
+# Per-element annotations override the whole-array annotation
+.mixed = <uint:8> [1, <sint:8> -1, 255];
 ```
 
 **Incorrect placement (hard error):**
@@ -1668,8 +1681,8 @@ typedef struct bvnr_data_s {
 
 ```c
 /* Type-spec convenience constructors (from bovnar.h) */
-#define BVN_TYPE_PLAIN          ((value_type_spec_t){ .family = vt_plain })
-#define BVN_TYPE_UTF8           ((value_type_spec_t){ .family = vt_utf8  })
+#define BVN_TYPE_PLAIN          ((value_type_spec_t){ .family = vt_plain, .width = 0,  .base = 0  })
+#define BVN_TYPE_UTF8           ((value_type_spec_t){ .family = vt_utf8,  .width = 0,  .base = 0  })
 #define BVN_TYPE_UINT(w)        ((value_type_spec_t){ .family = vt_uint,      .width = (w) })
 #define BVN_TYPE_SINT(w)        ((value_type_spec_t){ .family = vt_sint,      .width = (w) })
 #define BVN_TYPE_FLOAT(w)       ((value_type_spec_t){ .family = vt_float,     .width = (w) })
@@ -1967,7 +1980,7 @@ typedef enum error_code_e {
     error_type_value_mismatch           = 34,
     error_value_out_of_range            = 35,
     error_digit_not_in_base             = 36,
-    error_recovered                     = 37,
+    error_recovered                     = 37,  /* reserved; never set by the library */
     error_unit_mismatch                 = 38,
 } error_code_t;
 ```
@@ -2176,8 +2189,14 @@ in the Bovnar text layer.  The type annotation is the sole indicator of wire enc
 At the C API level, the conversion path is:
 
 ```
-float_fix:  text literal → bvn_float_t → bvn_float_to_fixNN(f, Q) → wire bits
-float_dec:  text literal → bvn_float_t → bvn_float_to_decNN(f)    → wire bits
+float_fix (width ≤ 64):
+    text literal → bvn_float_t → bvn_float_to_fixNN(f, frac_bits) → signed integer return value
+
+float_fix (width = 128, 256):
+    text literal → bvn_float_t → bvn_float_to_fixNN(f, frac_bits, out) → wire bits in out[]
+
+float_dec:
+    text literal → bvn_float_t → bvn_float_to_decNN(f, out) → wire bits in *out / out[]
 ```
 
 The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see

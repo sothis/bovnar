@@ -379,7 +379,7 @@ cd highlighter/geany && ./install.sh
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (159 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (156 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
 ---
 

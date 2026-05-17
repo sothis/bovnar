@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (159 cases) ──→ for each test case:                │
+│  Test corpus (118 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -176,7 +176,6 @@ Options:
 | `recovery` | Error-resync behaviour |
 | `comments` | Comment parsing |
 | `whitespace` | Whitespace tolerance |
-| `zero` | Zero-width / zero-value edge cases |
 
 ---
 
@@ -427,8 +426,8 @@ specifies:
 | `numbers` | 15 | Integer, float, scientific, special numbers |
 | `types` | 26 | All five type families, widths, bases, errors |
 | `default_synthesis` | 5 | Auto-type inference rules |
-| `symbols` | 6 | Bare-word values and limits |
-| `references` | 4 | Dotted paths and limits |
+| `symbols` | 5 | Bare-word values and limits |
+| `references` | 3 | Dotted paths and limits |
 | `null_values` | 5 | Null in all positions |
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 13 | 1D, 2D, nested, typed, null, limits |
@@ -439,7 +438,6 @@ specifies:
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 4 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
-| `zero` | 1 | Zero-width / zero-value edge cases |
 
 ---
 
@@ -450,7 +448,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..159
+1..156
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

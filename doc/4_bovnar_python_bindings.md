@@ -459,8 +459,7 @@ Write a null value (empty slot).
 
 #### `write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
 
-Arbitrary-width integer writer that supports all Bovnar numeral bases (2, 8,
-10, 16, 36, 62, 64, 85). Non-decimal values are formatted using Python's own
+Arbitrary-width integer writer that supports all Bovnar numeral bases (**2–62, 64, and 85**). Non-decimal values are formatted using Python's own
 big-integer arithmetic and emitted as quoted strings.  `signed` defaults to
 `True` when `value < 0`.
 
@@ -522,7 +521,12 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 |---|---|
 | `DomDoc.parse(data)` | Class method. Parse `bytes \| bytearray \| memoryview`. |
 | `DomDoc.parse_fd(fd)` | Class method. Parse from an open file descriptor. |
-| `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). |
+
+> **File-size limits:** `DomDoc.parse_fd` and `DomDoc.parse_file` apply an internal
+> ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB). This is 16× larger than
+> `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). Use `bvn_dom_parse_fd_ex`
+> directly if you need a different limit.
+| `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). Applies an internal hard cap of `BVN_DOM_FD_MAX_BYTES` (256 MiB) via the C function `bvn_dom_parse_fd`. This ceiling is distinct from `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). |
 | `doc.parse_error` | `ErrorCode` — `NONE` on success. |
 | `doc[key]` | Return top-level `DomNode` by key; raises `KeyError` when absent. |
 | `key in doc` | `True` when the top-level key exists. |

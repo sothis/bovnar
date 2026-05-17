@@ -162,7 +162,7 @@ bvnr_read_flags_t opts = {
     .on_verified   = on_event,
     .userdata      = &my_ctx,
     .max_file_size = 16777216,  /* 16 MiB cap */
-    /* max_array_nesting: leave at 0 (unlimited) or set to 1-255 */
+    /* max_array_nesting: 0 → 64 internal default; hard cap 255 */
 };
 
 if (!bvnr_open_read_source(r, &src, NULL, &opts)) {
@@ -388,23 +388,33 @@ Attach `sink` to the writer and configure it. Must be called before any `bvnr_wr
 
 ```c
 typedef struct bvnr_write_flags_s {
-    uint16_t max_identifier_length;   /* default 255        */
-    uint16_t max_string_length;       /* default 65535      */
-    uint16_t max_number_length;       /* default 65535      */
-    uint16_t max_symbol_length;       /* default 255        */
-    uint16_t max_reference_length;    /* default 65535      */
-    uint64_t max_array_items;         /* default 0 = unlimited */
-    uint64_t max_text_bytes;          /* default 0 = unlimited */
-    uint64_t max_file_size;           /* default 0 = unlimited */
-    uint8_t  max_struct_nesting;      /* default 0 (→255 internal) */
-    uint8_t  max_array_nesting;       /* default 0 (→255 internal) */
+    /* ── Writer enforces these ─────────────────────────────────── */
+    uint8_t  max_struct_nesting;      /* 0 → 255 (UINT8_MAX) internal default */
+    uint8_t  max_array_nesting;       /* 0 → 255 (UINT8_MAX) internal default */
     void    *userdata;
     bool   (*on_event)(void *userdata, bvnr_event_t, bvnr_data_t *);
-    bool     continue_on_error;
-    bvnr_on_error_fn on_error;
     bvn_unit_flags_t unit_flags;      /* controls unit annotation format */
+
+    /* ── Present for API symmetry with bvnr_read_flags_t;          ─
+       the writer does not read or enforce these fields. Set to 0. */
+    uint16_t max_identifier_length;
+    uint16_t max_string_length;
+    uint16_t max_number_length;
+    uint16_t max_symbol_length;
+    uint16_t max_reference_length;
+    uint64_t max_array_items;
+    uint64_t max_text_bytes;
+    uint64_t max_file_size;
+    bool     continue_on_error;       /* no-op in the writer */
+    bvnr_on_error_fn on_error;        /* no-op in the writer */
 } bvnr_write_flags_t;
 ```
+
+> **Writer limits.** Only `max_struct_nesting`, `max_array_nesting`, `on_event`, `userdata`,
+> and `unit_flags` have any effect on the writer. All other fields are present solely to keep
+> `bvnr_write_flags_t` structurally parallel to `bvnr_read_flags_t`; they are silently
+> ignored. In particular, `continue_on_error`, `on_error`, and all per-token-length fields
+> have no effect. The writer never internally limits array items, text bytes, or file size.
 
 `on_event` in the write flags fires for each event as it is serialised — useful for logging or auditing. Pass `NULL` if not needed.
 
@@ -416,7 +426,7 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
 
-These flags can be OR-combined: `BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP`. The writer retrieves the live flags at serialisation time via `bvnr_writer_unit_flags(w)`, so they can also be changed after `bvnr_open_write_sink` by updating the writer's internal state (see `bvnr_writer_unit_flags`).
+These flags can be OR-combined: `BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP`. The flags are fixed at open time. To change serialisation behaviour, destroy the writer and open a new one with the updated `unit_flags`. The getter `bvnr_writer_unit_flags(w)` is used internally by the Python FFI layer to retrieve the live flags before each unit serialisation call; there is no public setter.
 
 ```c
 bvnr_sink_t sink;
@@ -876,7 +886,7 @@ Return a short, static, human-readable description of an error code. The returne
 
 ```c
 fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
-/* e.g. "error: error_value_out_of_range" */
+/* e.g. "error: value_out_of_range" */
 ```
 
 **Unit-related error codes** (for reference):

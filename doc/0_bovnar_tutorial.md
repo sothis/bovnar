@@ -781,7 +781,7 @@ This mode is intended for log streams and unreliable transports — situations w
 
 ## Size Limits
 
-All limits are configurable via `bvnr_read_flags_t`. The defaults are intentionally permissive (unlimited for array items, text bytes, and file size). Production deployments should set explicit caps:
+All limits are configurable via `bvnr_read_flags_t`. The defaults are intentionally permissive — 2 147 483 647 for array items, text bytes, and file size. Production deployments should set explicit caps:
 
 | Field | Default | Suggested cap |
 |---|---|---|
@@ -836,13 +836,13 @@ The synthesised annotation always produces all three parameter events; explicit 
 
 The `bvnr_data_t` structure passed with `ev_data` carries:
 
-- `type` — the token type (`tt_number`, `tt_string`, `tt_symbol`, `tt_reference`, `tt_octet_stream`)
+- `type` — the token type (`token_is_number`, `token_is_string`, `token_is_symbol`, `token_is_reference`, `token_is_array_number`, `token_is_array_string`, `token_is_null_value`, `token_is_octet_stream`)
 - `value_type` — the `value_type_spec_t` (family, width, base/Q)
 - `value_unit` — the `value_unit_t` (up to 8 components)
 - `data` — pointer to the raw value bytes
 - `length` — byte count
 
-For an octet stream, `ev_octet_stream_start` and `ev_octet_stream_end` bracket one or more `ev_data` events with `type == tt_octet_stream`.
+For an octet stream, `ev_octet_stream_start` and `ev_octet_stream_end` bracket one or more `ev_data` events with `type == token_is_octet_stream`.
 
 For arrays, `ev_array_row_start` opens each row, `ev_array_row_end` closes it, and `ev_array_dim_start` separates dimensions (the `/` rows).
 

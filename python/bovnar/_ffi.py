@@ -6,7 +6,7 @@ from pathlib import Path
 from .structs import (
     BvnrSource, BvnrSink,
     BvnrReadFlags, BvnrWriteFlags,
-    BvnrData, ValueTypeSpec, ValueUnit,
+    BvnrData, ValueTypeSpec, ValueUnit, ValueUnitPrefix,
     BvnDomEntry,
     EVENT_CALLBACK_FUNC, ON_ERROR_FUNC,
 )
@@ -247,8 +247,11 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_exponent_to_int.restype  = c_int32
     lib.bvn_exponent_to_int.argtypes = [c_int]
 
+    lib.bvn_int_to_exponent.restype  = c_int
+    lib.bvn_int_to_exponent.argtypes = [c_int32]
+
     lib.bvn_prefix_unit_valid.restype  = c_bool
-    lib.bvn_prefix_unit_valid.argtypes = [ValueUnit, c_int]
+    lib.bvn_prefix_unit_valid.argtypes = [ValueUnitPrefix, c_int]
 
     lib.bvn_validate_identifier.restype  = c_bool
     lib.bvn_validate_identifier.argtypes = [c_char_p]

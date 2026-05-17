@@ -168,10 +168,30 @@ from the top-level `bovnar` namespace and from `bovnar.units`.
 
 ```python
 from bovnar import (
+    unit_valid, unit_prefix_factor, unit_prefix_exponent,
+    prefix_unit_valid,
     unit_to_si_factor, units_compatible,
     unit_convert_factor, unit_dimension_vector,
-    unit_reduce, convert_value,
+    unit_reduce, unit_to_str_ex,
+    exponent_to_int, int_to_exponent,
+    convert_value,
+    UnitFlags,
 )
+
+# Validate a ValueUnit struct
+ok = unit_valid(vu)                   # True when vu is structurally valid
+
+# Prefix scale factor (SI or IEC) for a ValueUnit
+f = unit_prefix_factor(vu)            # e.g. 1000.0 for k~m, 2**30 for Gi~B
+
+# Prefix exponent (base-10 for SI, base-2 for IEC)
+e = unit_prefix_exponent(vu)          # e.g. 3 for kilo, -3 for milli, 30 for gibi
+
+# Validate a prefix for a base unit (IEC prefixes are only valid on bit/byte)
+from bovnar import ValueUnitPrefix, IECPrefix, BaseUnit
+p = ValueUnitPrefix.make_iec(IECPrefix.GIBI)
+ok = prefix_unit_valid(p, BaseUnit.BYTE)   # True
+ok = prefix_unit_valid(p, BaseUnit.METER)  # False
 
 # Full SI conversion including affine terms (e.g. Celsius → Kelvin)
 conv = unit_to_si_factor(vu)
@@ -192,10 +212,51 @@ r = unit_reduce(vu)                   # r.unit, r.scale
 
 # Convert a scalar value between units (handles affine conversions)
 kelvin = convert_value(25.0, vu_celsius, vu_kelvin)
+
+# Serialise with formatting options (see UnitFlags below)
+s = unit_to_str_ex(vu, UnitFlags.ASCII_EXP)   # use ^N instead of Unicode superscripts
+s = unit_to_str_ex(vu, UnitFlags.REDUCE)      # reduce to canonical named unit first
+s = unit_to_str_ex(vu, UnitFlags.REDUCE | UnitFlags.ASCII_EXP)
+
+# Exponent enum ↔ integer conversions
+n   = exponent_to_int(Exponent.NEG_SQUARE)  # → -2
+exp = int_to_exponent(-2)                    # → Exponent.NEG_SQUARE
 ```
 
 `SI_DIM_NAMES` is the ordered tuple `('m', 'kg', 's', 'A', 'K', 'mol', 'cd')`
 — the index positions used by `unit_dimension_vector`.
+
+### `UnitFlags`
+
+```python
+from bovnar import UnitFlags   # also from bovnar.units
+
+UnitFlags.NONE      # 0 — no special formatting
+UnitFlags.REDUCE    # reduce to a canonical named SI unit before serialising
+UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
+```
+
+`UnitFlags` is an `IntFlag` and its values may be OR-combined:
+
+```python
+s = unit_to_str_ex(vu, UnitFlags.REDUCE | UnitFlags.ASCII_EXP)
+```
+
+### `ValueUnitPrefix`
+
+`ValueUnitPrefix` is the public mirror of the C `value_unit_prefix_t` struct.
+It can be constructed with class methods or extracted from a `ValueUnitComponent`:
+
+```python
+from bovnar import ValueUnitPrefix, SIPrefix, IECPrefix
+
+p_si  = ValueUnitPrefix.make_si(SIPrefix.KILO)
+p_iec = ValueUnitPrefix.make_iec(IECPrefix.GIBI)
+
+vu   = bovnar.parse_unit("Gi~B")
+comp = vu.components[0]
+p    = comp.prefix   # ValueUnitPrefix extracted from a component
+```
 
 ### Inline unit suffix
 
@@ -537,7 +598,7 @@ bovnar/
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
 ├── reader.py        # Reader class + EventPayload dataclass
-├── structs.py       # ctypes Structure/Union definitions + make_* helpers
+├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
 
@@ -566,6 +627,20 @@ All errors surface as subclasses of `BovnarError`:
 | `BovnarParseError` | Parse error in `Reader` (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error in `Writer` (carries `code`, `offset`) |
 | `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer) |
+
+**`unit_convert_factor` error semantics:** The C function uses the
+`(ok, requires_affine)` pair to signal three distinct outcomes:
+
+| ok | requires_affine | Meaning |
+|---|---|---|
+| `True` | `False` | Multiplicative conversion; `factor` is ready to use |
+| `False` | `True` | Affine conversion required (e.g. °C ↔ K); `factor` is still valid but a plain multiply is insufficient |
+| `False` | `False` | Units are dimensionally incompatible → `BovnarArgumentError` |
+
+`BovnarArgumentError` is raised **only** when both `ok=False` and
+`requires_affine=False`.  When `requires_affine=True`, call `convert_value`
+which handles the two-step affine path automatically, or call `unit_to_si_factor`
+on both units and perform the conversion manually.
 
 **Callbacks returning `False`:** When an `on_verified` or `on_unverified`
 callback returns `False`, the C parser stops and `bvnr_read` returns failure.

@@ -24,17 +24,49 @@ class _PrefixId(ctypes.Union):
         ('iec', ctypes.c_int),
     ]
 
-class _Prefix(ctypes.Structure):
+class ValueUnitPrefix(ctypes.Structure):
     _fields_ = [
         ('system', ctypes.c_int),
         ('id',     _PrefixId),
     ]
 
+    @classmethod
+    def make_si(cls, prefix: SIPrefix) -> 'ValueUnitPrefix':
+        p = cls()
+        p.system = int(PrefixSystem.SI)
+        p.id.si  = int(prefix)
+        return p
+
+    @classmethod
+    def make_iec(cls, prefix: IECPrefix) -> 'ValueUnitPrefix':
+        p = cls()
+        p.system = int(PrefixSystem.IEC)
+        p.id.iec = int(prefix)
+        return p
+
+    @property
+    def prefix_system(self) -> PrefixSystem:
+        return PrefixSystem(self.system)
+
+    @property
+    def si_prefix(self) -> SIPrefix:
+        return SIPrefix(self.id.si)
+
+    @property
+    def iec_prefix(self) -> IECPrefix:
+        return IECPrefix(self.id.iec)
+
+    def __repr__(self) -> str:
+        if self.prefix_system == PrefixSystem.SI:
+            return f"ValueUnitPrefix(si={self.si_prefix.name})"
+        return f"ValueUnitPrefix(iec={self.iec_prefix.name})"
+
+
 class ValueUnitComponent(ctypes.Structure):
     _fields_ = [
         ('base',     ctypes.c_int),
         ('exponent', ctypes.c_int),
-        ('prefix',   _Prefix),
+        ('prefix',   ValueUnitPrefix),
     ]
 
     @property

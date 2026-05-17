@@ -3,7 +3,7 @@ from .enums import (
     SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
 )
 from .structs import (
-    ValueTypeSpec, ValueUnit, ValueUnitComponent, BvnrData,
+    ValueTypeSpec, ValueUnit, ValueUnitComponent, ValueUnitPrefix, BvnrData,
     BvnrReadFlags, BvnrWriteFlags,
     make_type_spec, make_unit_dimensionless, make_unit_none,
     make_unit_si, make_unit_iec, make_unit_compound,
@@ -16,22 +16,27 @@ from .reader  import Reader, EventPayload, MAX_FILESIZE_BYTES
 from .writer  import Writer
 from .dom     import DomDoc, DomNode, DomType
 from .units   import (
+    UnitFlags,
     SIConversion, UnitConversion, ReducedUnit, SI_DIM_NAMES,
+    unit_valid,
+    unit_prefix_factor, unit_prefix_exponent,
+    prefix_unit_valid,
     unit_to_si_factor, units_compatible, unit_convert_factor,
-    unit_dimension_vector, unit_reduce, convert_value,
+    unit_dimension_vector, unit_reduce,
+    unit_to_str_ex,
+    exponent_to_int, int_to_exponent,
+    convert_value,
 )
 
 __all__ = [
     'loads', 'dumps', 'dom_parse',
     'unit_factor', 'unit_to_str', 'parse_unit',
-    'unit_to_si_factor', 'units_compatible', 'unit_convert_factor',
-    'unit_dimension_vector', 'unit_reduce', 'convert_value',
     'write_array',
 
     'Reader', 'Writer', 'EventPayload',
     'DomDoc', 'DomNode', 'DomType',
 
-    'ValueTypeSpec', 'ValueUnit', 'ValueUnitComponent', 'BvnrData',
+    'ValueTypeSpec', 'ValueUnit', 'ValueUnitComponent', 'ValueUnitPrefix', 'BvnrData',
     'BvnrReadFlags', 'BvnrWriteFlags',
 
     'make_type_spec', 'make_unit_dimensionless', 'make_unit_none',
@@ -40,7 +45,16 @@ __all__ = [
     'Event', 'ValueTypeFamily', 'PrefixSystem',
     'SIPrefix', 'IECPrefix', 'BaseUnit', 'Exponent', 'ErrorCode',
 
+    'UnitFlags',
     'SIConversion', 'UnitConversion', 'ReducedUnit', 'SI_DIM_NAMES',
+    'unit_valid',
+    'unit_prefix_factor', 'unit_prefix_exponent',
+    'prefix_unit_valid',
+    'unit_to_si_factor', 'units_compatible', 'unit_convert_factor',
+    'unit_dimension_vector', 'unit_reduce',
+    'unit_to_str_ex',
+    'exponent_to_int', 'int_to_exponent',
+    'convert_value',
 
     'BovnarError', 'BovnarLibraryNotFound',
     'BovnarParseError', 'BovnarWriteError', 'BovnarArgumentError',

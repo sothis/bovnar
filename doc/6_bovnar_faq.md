@@ -144,9 +144,13 @@ are freely interleaved between all tokens.
 **Is a UTF-8 BOM accepted?**
 
 A UTF-8 BOM (`EF BB BF`) is accepted only at byte offset 0 of the stream.
-A BOM appearing later in a comment or string is valid UTF-8 and passes through
-without error. A BOM in any non-zero, non-string position is
-`error_invalid_byte_order_mark`.
+A BOM appearing later in a string is valid UTF-8 and passes through without error.
+For BOMs in other positions the error code depends on where the BOM appears:
+
+- A BOM found **inside the first comment line** (the dedicated `first_comment_*` states) produces `error_invalid_byte_order_mark`.
+- A BOM byte (`0xEF`) found **after the first comment line** but before the first `.` identifier (the `first_bom` state) is not handled in the state table and produces `error_unexpected_input_byte`.
+
+A BOM appearing inside any *subsequent* comment is valid UTF-8 and accepted without error.
 
 ---
 
@@ -210,7 +214,7 @@ position. The following three are equivalent:
 
 | Family | Valid widths |
 |---|---|
-| `uint`, `sint` | Any positive integer (e.g. `<uint:12>` is legal for a 12-bit ADC) |
+| `uint`, `sint` | Any positive integer up to `BVN_MAX_INT_WIDTH` (32768), e.g. `<uint:12>` is legal for a 12-bit ADC |
 | `float` | `0` (→64), `16`, and any multiple of `32` up to `32768` |
 | `float_fix` | `0` (→64), `16`, `32`, `64`, `128`, `256` |
 | `float_dec` | `0` (→64), `16`, `32`, `64`, `128`, `256` |
@@ -610,11 +614,10 @@ Leading, trailing, or consecutive commas produce null elements:
 Yes, inner arrays are just element values:
 
 ```bovnar
-.nested = [[1, 2], [3, 4, 5]];   # valid; inner arrays may have unequal lengths
+.nested = [[1, 2], [3, 4]];   # valid; inner arrays at the same depth must have equal lengths
 ```
 
-Note: the `/` row-separator syntax applies at the outermost level. Each
-`/[…]` block is a row, not a nested array.
+Note: the row-size consistency rule applies to nested arrays too. All bracket pairs at the same nesting depth within a single assignment must have the same element count. `[[1, 2], [3, 4, 5]]` is **not** valid and produces `error_array_row_size_mismatch` because the two inner arrays have 2 and 3 elements respectively.
 
 ---
 
@@ -910,10 +913,10 @@ is destroyed.
 **What is the `max_array_nesting` limit and why is it capped at 255?**
 
 The lexer stores per-nesting-level state in a fixed array of 256 entries.
-Passing `max_array_nesting > 255` causes `bvnr_open_read_source` to return
-`false` with `error_invalid_argument`. Zero-initialising `bvnr_read_flags_t`
-is safe: zero means "no additional limit enforced by this field," which in
-practice allows nesting up to the internal maximum of 255. This cap does not
+`max_array_nesting` is a `uint8_t` field, so values above 255 cannot be
+represented; no runtime rejection is performed. Zero-initialising
+`bvnr_read_flags_t` is safe: a zero value causes the reader to substitute the
+internal default of **64**. The hard maximum is 255. The same default and cap
 apply to `max_struct_nesting`.
 
 ---
@@ -1029,14 +1032,16 @@ All limits are configurable via `bvnr_read_flags_t`. Defaults are permissive.
 | `max_number_length` | 65535 | 65535 |
 | `max_symbol_length` | 255 | 255 |
 | `max_reference_length` | 65535 | 65535 |
-| `max_array_items` | 0 (unlimited) | application-defined |
-| `max_text_bytes` | 0 (unlimited) | application-defined |
-| `max_file_size` | 0 (unlimited) | `16777216` (16 MiB) |
-| `max_array_nesting` | 0 (→255 internal) | 32 or less |
-| `max_struct_nesting` | 0 (→255 internal) | 32 or less |
+| `max_array_items` | 0 (→ 2 147 483 647 internal default) | application-defined |
+| `max_text_bytes` | 0 (→ 2 147 483 647 internal default) | application-defined |
+| `max_file_size` | 0 (→ 2 147 483 647 internal default) | `16777216` (16 MiB) |
+| `max_array_nesting` | 0 (→ 64 internal default; hard cap 255) | 32 or less |
+| `max_struct_nesting` | 0 (→ 64 internal default; hard cap 255) | 32 or less |
 
-Zero means "no limit enforced by this field." Production deployments should
-set `max_file_size` at minimum. For untrusted input, set `max_array_items`,
+Setting a field to `0` causes the reader to substitute a finite internal
+default — **2 147 483 647** for the three byte/item counters and **64** for
+both nesting depths. Production deployments should set `max_file_size`
+explicitly at minimum. For untrusted input, set `max_array_items`,
 `max_text_bytes`, and the nesting limits as well.
 
 ---

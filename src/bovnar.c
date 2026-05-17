@@ -938,7 +938,6 @@ static JsonNode *json_parse_value_depth(const char **p, int depth)
 static JsonNode *json_parse_value(const char **p)
 {
 	return json_parse_value_depth(p, 0);
-	return NULL;
 }
 static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *node);
 static bool write_bvn_array(bvnr_writer_t *w, const char *key, const JsonNode *node)

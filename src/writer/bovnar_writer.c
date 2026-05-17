@@ -289,6 +289,10 @@ static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 	value_type_spec_t vt)
 {
+	if (vt.family == vt_uint || vt.family == vt_sint) {
+		if (vt.width > BVN_MAX_INT_WIDTH)
+			return bvn_writer_set_error(w, error_illegal_value_type);
+	}
 	if (vt.family == vt_float) {
 		if (vt.base != 0 && vt.base != 10 && vt.base != 16) {
 			return bvn_writer_set_error(w,
@@ -420,13 +424,13 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (w->ser.struct_depth >= (uint32_t)w->ser.max_struct_nesting)
 			return bvn_writer_set_error(w, error_struct_nesting_too_high);
 		break;
-	default:
-		w->ser.stream_begun = true;
-		break;
 	case ev_array_row_start:
 		w->ser.stream_begun = true;
 		if (w->ser.array_depth >= w->ser.max_array_nesting)
 			return bvn_writer_set_error(w, error_array_nesting_too_high);
+		break;
+	default:
+		w->ser.stream_begun = true;
 		break;
 	}
 	return true;
@@ -810,16 +814,6 @@ error_code_t bvnr_writer_get_error(const bvnr_writer_t* w)
 {
 	if (!w) return error_invalid_argument;
 	return w->val.last_error;
-}
-uint64_t bvnr_writer_get_error_line(const bvnr_writer_t* w)
-{
-	if (!w) return 0;
-	return w->val.error_line;
-}
-uint64_t bvnr_writer_get_error_column(const bvnr_writer_t* w)
-{
-	if (!w) return 0;
-	return w->val.error_column;
 }
 uint64_t bvnr_writer_get_error_offset(const bvnr_writer_t* w)
 {

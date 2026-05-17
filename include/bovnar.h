@@ -437,8 +437,6 @@ bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data);
 bool bvnr_write_finish(bvnr_writer_t* w);
 error_code_t bvnr_writer_get_error(const bvnr_writer_t* w);
-uint64_t     bvnr_writer_get_error_line(const bvnr_writer_t* w);
-uint64_t     bvnr_writer_get_error_column(const bvnr_writer_t* w);
 uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t* w);
 uint64_t     bvnr_writer_bytes_written(const bvnr_writer_t* w);
 const char*  bvn_error_to_string(error_code_t code);

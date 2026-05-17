@@ -42,6 +42,10 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	p->val.value_type          = BVN_TYPE_PLAIN;
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
 	p->val.has_annotation_unit = false;
+	p->val.error_line          = 0;
+	p->val.error_column        = 0;
+	p->val.error_byte          = 0;
+	p->val.error_offset        = 0;
 	l->resync_array_depth  = 0;
 	l->resync_struct_depth = 0;
 	l->array_items         = 0;

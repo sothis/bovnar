@@ -733,7 +733,7 @@ Only a **single ASCII digit** is permitted after the caret; multi-digit exponent
 
 ### 6.3 Exponent Edge Cases
 
-- **`exp_invalid`:** The zero-initialized sentinel (value `0`). A component whose exponent field was never explicitly set will compare equal to `exp_invalid`. API functions that have an error output path (`bvn_unit_to_si_factor`, `bvn_unit_dimension_vector`, `bvn_unit_convert_factor`, `bvn_units_compatible`, and the serialization functions) reject `exp_invalid` and signal an error through their output parameter or return value. The two prefix query functions (`bvn_unit_prefix_factor` and `bvn_unit_prefix_exponent`) have no error output parameter; they silently skip components whose exponent is `exp_invalid` and return a result based on the remaining components only. Callers must never pass `exp_invalid` to `bvni_exp_abs` or `bvni_prefix_exp_int`.
+- **`exp_invalid`:** The zero-initialized sentinel (value `0`). A component whose exponent field was never explicitly set will compare equal to `exp_invalid`. API functions that have an error output path (`bvn_unit_to_si_factor`, `bvn_unit_dimension_vector`, `bvn_unit_convert_factor`, `bvn_units_compatible`, and the serialization functions) reject `exp_invalid` and signal an error through their output parameter or return value. The two prefix query functions (`bvn_unit_prefix_factor` and `bvn_unit_prefix_exponent`) have no error output parameter; they silently skip components whose exponent is `exp_invalid` and return a result based on the remaining components only. Callers must never pass a `value_unit_component_t` with `exp_invalid` to any API function that lacks an error output parameter.
 - **`exp_linear`:** Value `1`. Represents both an explicit `¹` / `^1` and any component written without an exponent suffix. The convenience macros (`BVN_UNIT_NO_PREFIX`, `BVN_UNIT_SI`, `BVN_UNIT_IEC`) store `exp_linear` for single-component units where no exponent is specified, consistent with parsed output.
 ---
 
@@ -840,12 +840,11 @@ typedef enum value_base_unit_e {
     /* Imperial/US customary — length */
     bu_inch, bu_foot, bu_yard, bu_mile, bu_nautical_mile,
     bu_angstrom, bu_light_year, bu_parsec, bu_furlong, bu_fathom,
-    bu_thou,
     /* Imperial/US customary — mass */
     bu_pound, bu_ounce, bu_grain, bu_stone, bu_short_ton,
-    bu_long_ton, bu_troy_ounce, bu_carat, bu_slug,
+    bu_long_ton, bu_troy_ounce, bu_carat,
     /* Temperature */
-    bu_fahrenheit, bu_rankine,
+    bu_fahrenheit,
     /* Pressure */
     bu_atmosphere, bu_mmhg, bu_torr, bu_psi,
     /* Energy */
@@ -859,8 +858,6 @@ typedef enum value_base_unit_e {
     /* Volume — US */
     bu_gallon, bu_gallon_uk, bu_quart, bu_pint, bu_cup,
     bu_fluid_ounce, bu_tablespoon, bu_teaspoon, bu_barrel,
-    /* Volume — UK imperial */
-    bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
     /* Area */
     bu_acre, bu_barn,
     /* Angle */
@@ -871,9 +868,43 @@ typedef enum value_base_unit_e {
     /* Radiation */
     bu_curie, bu_roentgen, bu_rem,
     /* Logarithmic */
-    bu_neper, bu_decibel,
+    bu_neper,
+    bu_decibel,
+    bu_rankine,             /* Temperature — absolute Fahrenheit scale */
+    bu_slug,                /* Imperial/US mass */
+    bu_thou,                /* Imperial/US length */
+    /* Volume — UK imperial */
+    bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
     /* Electrical power */
-    bu_var, bu_volt_ampere
+    bu_var, bu_volt_ampere,
+    /* Force (additional) */
+    bu_kilogram_force,
+    /* Pressure (additional) */
+    bu_inch_hg,
+    /* Rotational frequency */
+    bu_rpm,
+    /* Energy (additional) */
+    bu_foot_pound,
+    /* Mass (additional) */
+    bu_dram, bu_pennyweight,
+    /* Length (additional) */
+    bu_chain, bu_rod,
+    /* Volume (additional) */
+    bu_gill, bu_gill_uk,
+    /* Acceleration */
+    bu_standard_gravity,
+    /* Power (additional) */
+    bu_metric_horsepower,
+    /* Angle (additional) */
+    bu_revolution,
+    /* Time (additional) */
+    bu_month, bu_fortnight,
+    /* Pressure (additional) */
+    bu_atmosphere_technical,
+    /* Textile linear density */
+    bu_tex, bu_denier,
+    /* Apothecary / dry volume */
+    bu_fluid_dram, bu_minim, bu_peck, bu_bushel
 } value_base_unit_t;
 ```
 

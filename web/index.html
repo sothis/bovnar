@@ -351,7 +351,7 @@ nav {
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   divide: var(--border);
 }
 .stat-item {
@@ -850,6 +850,126 @@ section {
   opacity: 0.9;
 }
 
+/* ── CONFORMANCE BAR ── */
+.conformance-bar {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.conformance-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.conf-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.conf-icon {
+  font-size: 1.1rem;
+  color: var(--amber);
+  flex-shrink: 0;
+  width: 1.5rem;
+  text-align: center;
+}
+.conf-title {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.conf-sub {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+  margin-top: 0.1rem;
+}
+.conf-cta {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+  text-decoration: none;
+  border: 1px solid var(--amber3);
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.conf-cta:hover { background: rgba(212,137,10,0.1); border-color: var(--amber); }
+
+/* ── DOCS SECTION ── */
+#docs {
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin-top: 3.5rem;
+  border: 1px solid var(--border);
+}
+.doc-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1.75rem 1.5rem;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.doc-card:hover { background: var(--bg3); }
+.doc-card-num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--border2);
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+  letter-spacing: 0.05em;
+}
+.doc-card-title {
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+  transition: color 0.2s;
+}
+.doc-card:hover .doc-card-title { color: var(--amber); }
+.doc-card-desc {
+  font-size: 0.8rem;
+  color: var(--text3);
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+.doc-card-desc code {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  color: var(--teal);
+}
+.doc-card-tag {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal2);
+}
+
 /* ── FOOTER ── */
 footer {
   position: relative;
@@ -996,7 +1116,9 @@ footer {
   .features-grid { grid-template-columns: 1fr; }
   .qs-pane-inner { grid-template-columns: 1fr; }
   .usecases-grid { grid-template-columns: 1fr; }
-  .stat-inner { grid-template-columns: repeat(2, 1fr); }
+  .docs-grid { grid-template-columns: repeat(2, 1fr); }
+  .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+  .stat-inner { grid-template-columns: repeat(3, 1fr); }
   .footer-inner { grid-template-columns: 1fr 1fr; }
   .comparison-table { font-size: 0.78rem; }
 }
@@ -1358,7 +1480,7 @@ a[data-doc] {
     <li><a href="#features">Features</a></li>
     <li><a href="#quickstart">Quick Start</a></li>
     <li><a href="#usecases">Use Cases</a></li>
-    <li><a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial">Docs</a></li>
+    <li><a href="#docs">Docs</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>
 </nav>
@@ -1418,16 +1540,24 @@ a[data-doc] {
       <div class="stat-label">Type Families</div>
     </div>
     <div class="stat-item reveal reveal-delay-1">
-      <div class="stat-num">7</div>
-      <div class="stat-label">SI Base Units</div>
+      <div class="stat-num">22</div>
+      <div class="stat-label">Derived SI Units</div>
     </div>
     <div class="stat-item reveal reveal-delay-2">
+      <div class="stat-num">180+</div>
+      <div class="stat-label">Conformance Tests</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-3">
       <div class="stat-num">C99</div>
       <div class="stat-label">Reference Impl.</div>
     </div>
-    <div class="stat-item reveal reveal-delay-3">
+    <div class="stat-item reveal reveal-delay-4">
       <div class="stat-num">0</div>
       <div class="stat-label">External Schemas</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-5">
+      <div class="stat-num">MIT</div>
+      <div class="stat-label">License</div>
     </div>
   </div>
 </div>
@@ -2001,6 +2131,125 @@ cd python && pytest tests -v</div>
 </section>
 
 <!-- ══════════════════════════════════════════════
+     CONFORMANCE TRUST BAR
+══════════════════════════════════════════════ -->
+<div class="conformance-bar">
+  <div class="conformance-inner">
+    <div class="conf-badge reveal">
+      <div class="conf-icon">✓</div>
+      <div>
+        <div class="conf-title">Formally Specified</div>
+        <div class="conf-sub">Full EBNF grammar. Unambiguous.</div>
+      </div>
+    </div>
+    <div class="conf-badge reveal reveal-delay-1">
+      <div class="conf-icon">⚡</div>
+      <div>
+        <div class="conf-title">180+ Conformance Tests</div>
+        <div class="conf-sub">TAP output. CTest integrated.</div>
+      </div>
+    </div>
+    <div class="conf-badge reveal reveal-delay-2">
+      <div class="conf-icon">⊕</div>
+      <div>
+        <div class="conf-title">Verifiable by Any Impl.</div>
+        <div class="conf-sub">Open IUT protocol. Fork and test.</div>
+      </div>
+    </div>
+    <div class="conf-badge reveal reveal-delay-3">
+      <div class="conf-icon">⬡</div>
+      <div>
+        <div class="conf-title">14 Test Suites</div>
+        <div class="conf-sub">Unit, roundtrip, fuzz, benchmark.</div>
+      </div>
+    </div>
+    <a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool" class="conf-cta reveal reveal-delay-4">
+      Read the Conformance Spec →
+    </a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     DOCS
+══════════════════════════════════════════════ -->
+<section id="docs">
+  <div class="section-inner">
+    <div class="section-label reveal">Documentation</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Everything you need to <em>ship.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Eight documents covering every layer of the stack — from a five-minute tutorial
+      to the formal EBNF grammar and the independent conformance verification protocol.
+    </p>
+    <div class="docs-grid">
+      <a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial" class="doc-card reveal">
+        <div class="doc-card-num">00</div>
+        <div>
+          <div class="doc-card-title">Tutorial</div>
+          <div class="doc-card-desc">Practical introduction for developers familiar with JSON or similar formats. Get productive in minutes.</div>
+          <div class="doc-card-tag">Start here</div>
+        </div>
+      </a>
+      <a href="#" data-doc="1_bovnar_spec.md" data-doc-title="Specification v1.0" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">01</div>
+        <div>
+          <div class="doc-card-title">Specification v1.0</div>
+          <div class="doc-card-desc">Full lexical and syntactic grammar, type system, arrays, structs, octet streams, and validation rules.</div>
+          <div class="doc-card-tag">Format authority</div>
+        </div>
+      </a>
+      <a href="#" data-doc="2_bovnar_unit_system.md" data-doc-title="Unit System Reference" class="doc-card reveal reveal-delay-2">
+        <div class="doc-card-num">02</div>
+        <div>
+          <div class="doc-card-title">Unit System Reference</div>
+          <div class="doc-card-desc">SI base and derived units, IEC binary prefixes, compound expressions, exponents, and prefix enforcement.</div>
+          <div class="doc-card-tag">Physics layer</div>
+        </div>
+      </a>
+      <a href="#" data-doc="3_bovnar_readwrite_api.md" data-doc-title="Read &amp; Write API" class="doc-card reveal">
+        <div class="doc-card-num">03</div>
+        <div>
+          <div class="doc-card-title">Read &amp; Write API</div>
+          <div class="doc-card-desc">Complete C API for streaming readers and writers. Annotated examples for every typed write helper.</div>
+          <div class="doc-card-tag">C integration</div>
+        </div>
+      </a>
+      <a href="#" data-doc="4_bovnar_python_bindings.md" data-doc-title="Python Bindings" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">04</div>
+        <div>
+          <div class="doc-card-title">Python Bindings</div>
+          <div class="doc-card-desc">Pure-ctypes interface — no compiled extension. High-level <code>loads</code>/<code>dumps</code> and streaming <code>Reader</code>/<code>Writer</code>.</div>
+          <div class="doc-card-tag">Python integration</div>
+        </div>
+      </a>
+      <a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar" class="doc-card reveal reveal-delay-2">
+        <div class="doc-card-num">05</div>
+        <div>
+          <div class="doc-card-title">Formal EBNF Grammar</div>
+          <div class="doc-card-desc">Machine-readable grammar. The normative reference for parser implementors and toolchain authors.</div>
+          <div class="doc-card-tag">Parser reference</div>
+        </div>
+      </a>
+      <a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ" class="doc-card reveal">
+        <div class="doc-card-num">06</div>
+        <div>
+          <div class="doc-card-title">FAQ</div>
+          <div class="doc-card-desc">Common questions on the format, type system, units, C API, Python bindings, and operational limits.</div>
+          <div class="doc-card-tag">Common questions</div>
+        </div>
+      </a>
+      <a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">07</div>
+        <div>
+          <div class="doc-card-title">Conformance Test Tool</div>
+          <div class="doc-card-desc">180+ test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
+          <div class="doc-card-tag">Verification</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
      FOOTER
 ══════════════════════════════════════════════ -->
 <footer>
@@ -2029,21 +2278,21 @@ cd python && pytest tests -v</div>
     <div>
       <div class="footer-col-title">Repository</div>
       <ul class="footer-links">
-        <li><a href="https://github.com/sothis/bovnar">GitHub ↗</a></li>
-        <li><a href="#">Releases</a></li>
-        <li><a href="#">C Headers</a></li>
-        <li><a href="#">Python Package</a></li>
-        <li><a href="#">Examples (.bvnr)</a></li>
-        <li><a href="#">VS Code Highlighter</a></li>
-        <li><a href="#">Geany Highlighter</a></li>
+        <li><a href="https://github.com/sothis/bovnar" target="_blank" rel="noopener">GitHub ↗</a></li>
+        <li><a href="https://github.com/sothis/bovnar/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/include" target="_blank" rel="noopener">C Headers</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/python/bovnar" target="_blank" rel="noopener">Python Package</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/examples" target="_blank" rel="noopener">Examples (.bvnr)</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vscode" target="_blank" rel="noopener">VS Code Highlighter</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/geany" target="_blank" rel="noopener">Geany Highlighter</a></li>
       </ul>
     </div>
     <div>
       <div class="footer-col-title">Legal</div>
       <ul class="footer-links">
-        <li><a href="#">MIT License</a></li>
-        <li><a href="#">CC BY 4.0 (docs)</a></li>
-        <li><a href="#">CC0 1.0 (examples)</a></li>
+        <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
+        <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
       </ul>
       <div style="margin-top:2rem;">
         <div class="footer-col-title">Format</div>

@@ -119,13 +119,21 @@ Overlong sequences and surrogate halves (U+D800–U+DFFF) are rejected.
 
 The UTF-8 BOM `EF BB BF` is only legal **at byte offset 0** of a stream.
 
+The lexer runs a dedicated `first_comment_*` state machine over the first comment line to detect misplaced BOMs:
+
+- A BOM (`EF BB BF`) detected **inside the first-line comment** produces `error_invalid_byte_order_mark`.
+- A BOM byte (`EF`) seen **after** the first comment line (in the `first_bom` state, before the first `.` identifier) is unhandled and produces `error_unexpected_input_byte`.
+
 ```bovnar
-# BOM at start: valid
+# BOM at byte offset 0: valid
 EF BB BF.foo = 1;
 
-# BOM after first comment line: error_invalid_byte_order_mark
-# NOTE: the first-line comment special state machine detects EF BB BF
-# inside the first comment and rejects it.
+# BOM bytes inside the first comment → error_invalid_byte_order_mark
+# comment text: # EF BB BF text
+
+# BOM bytes after the first comment line → error_unexpected_input_byte
+# comment line
+EF BB BF.foo = 1;
 ```
 
 A BOM appearing **inside** any later comment or string is **valid UTF-8** and accepted (only the `first_comment_*` states guard against BOM).
@@ -416,7 +424,7 @@ type-param = width-param    # decimal digits only, e.g. 32
 
 | Parameter | Syntax | Valid Values | Applies To |
 |-----------|--------|--------------|------------|
-| Width | `N` (decimal digits) | `0`, `16`, or any multiple of `32` up to `32768` for `float`; `0`,`16`,`32`,`64`,`128`,`256` for `float_fix`/`float_dec`; any for `uint`/`sint` | uint, sint, float, float_fix, float_dec |
+| Width | `N` (decimal digits) | `0`, `16`, or any multiple of `32` up to `32768` for `float`; `0`,`16`,`32`,`64`,`128`,`256` for `float_fix`/`float_dec`; `0` to `BVN_MAX_INT_WIDTH` (32768) for `uint`/`sint` | uint, sint, float, float_fix, float_dec |
 | Base | `_N` (underscore + decimal digits) | `2–62`, `64`, `85`; `float` accepts only `10` or `16`; **forbidden** for `float_fix` and `float_dec` | uint, sint, float |
 | Q (fractional bits) | `qN` (lowercase `q` + decimal digits) | `0 ≤ N < effective_width` | **float_fix only** |
 | Unit | unit-string | See [Units System](#11-units-system) — supports compound units | uint, sint, float, float_fix, float_dec |
@@ -699,23 +707,35 @@ Leading/trailing commas and consecutive commas produce null elements:
 
 ### 7.3 Row-Size Consistency
 
-No cross-row element-count check is performed between `/`-separated dimension rows. Rows may have different element counts. Nested arrays that appear as element values are also unconstrained:
+The validator enforces a **consistent element count** across all bracket pairs that occur at the same nesting depth within a single assignment:
+
+- For **`/`-separated dimension rows** (e.g. `[1,2,3]/[4,5,6]`): all rows must have the same element count. A mismatch produces `error_array_row_size_mismatch`.
+- For **nested element arrays** at the same depth (e.g. `[[1,2],[3,4]]`): all inner arrays at the same nesting level must have the same element count. A mismatch at the inner level also produces `error_array_row_size_mismatch`.
 
 ```bovnar
-.ok1 = [[1,2],[3,4]];       # element values — valid
-.ok2 = [[1,2],[3,4,5]];     # different-sized element arrays — also valid
-.ok3 = [1,2,3]/[4,5];       # row 1: 3 elements; row 2: 2 elements — valid
+.ok1 = [1,2,3]/[4,5,6];      # valid: both rows have 3 elements
+.ok2 = [[1,2],[3,4]];         # valid: both inner arrays have 2 elements
+
+.bad1 = [1,2,3]/[4,5];        # error_array_row_size_mismatch: row 2 has 2 elements, row 1 had 3
+.bad2 = [[1,2],[3,4,5]];      # error_array_row_size_mismatch: second inner array has 3, first had 2
 ```
 
-> **Note on `error_array_row_size_mismatch`:** This error code is defined in `error_code_t` and the checking logic is present in the validator, but the per-bracket-pair context save/restore mechanism ensures `array_row_size` is always zero at the point the comparison executes, making the error unreachable in the current implementation.
+Arrays that are themselves elements at an outer nesting level are independent of their parent's row-size tracking; only arrays at the same nesting level are compared against each other.
+
+```bovnar
+.ok3 = [[1,2],[3,4]];         # element values — both inner arrays identical size: valid
+.ok4 = [[[1]],[[2]]];         # nested to depth 2 — each level uniform: valid
+```
 
 ### 7.4 Nested Arrays
 
-Arrays nested as element values inside a row are independent of any row-size check. The row-size check is a structural constraint on the multi-dimensional `/`-dimension mechanism, not on arbitrary nesting:
+Arrays nested as element values inside a row participate in the same row-size consistency check as other element-level arrays. The row-size check operates per nesting level: all bracket pairs at depth N must have the same element count, independently of depth N+1.
 
 ```bovnar
-.valid = [[1, 2], [3, 4, 5]];   # inner arrays are element values; any sizes allowed
-.also  = [[1, 2], [3, 4]];      # element counts happen to match — also valid
+.valid = [[1, 2], [3, 4]];     # inner arrays at depth 1: both 2 elements — valid
+.also  = [[[1,2],[3,4]],[[5,6],[7,8]]]; # uniform at every depth — valid
+
+.bad   = [[1, 2], [3, 4, 5]];  # inner arrays: 2 vs 3 elements — error_array_row_size_mismatch
 ```
 
 ### 7.5 Array Elements with Type Annotations
@@ -732,7 +752,7 @@ Individual elements may carry type annotations. The annotation appears **before*
 | Constraint | Limit |
 |------------|-------|
 | Array nesting depth | 255 |
-| Total array items | `max_array_items` (configurable; 0 = unlimited) |
+| Total array items | `max_array_items` (configurable; 0 → 2 147 483 647 internal default) |
 
 ---
 
@@ -830,7 +850,7 @@ ev_octet_stream_end
 
 ### 9.5 Constraints
 
-- File size: `max_file_size` (default 0 = unlimited; set to `16777216` for the recommended 16 MiB cap)
+- File size: `max_file_size` (0 → 2 147 483 647 internal default; set to `16777216` for the recommended 16 MiB cap)
 - Octet stream bytes contribute to the file size limit but not to `max_text_bytes`
 - EOF inside an octet stream region preserves the current error code instead of overwriting with `error_got_incomplete_bvnr_stream`
 
@@ -899,7 +919,9 @@ ev_data
 
 ### 11.1 Base Units
 
-The unit system supports SI base units, derived SI units, and several commonly-used non-SI units.
+The unit system supports **133 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 21 named SI-derived units, and the non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/2_bovnar_unit_system.md`](2_bovnar_unit_system.md)**.
+
+**SI base units and digital units**
 
 | Symbol | Unit | Enum |
 |--------|------|------|
@@ -912,6 +934,11 @@ The unit system supports SI base units, derived SI units, and several commonly-u
 | `K` | kelvin | `bu_kelvin` |
 | `mol` | mole | `bu_mol` |
 | `cd` | candela | `bu_candela` |
+
+**Named SI-derived units**
+
+| Symbol | Unit | Enum |
+|--------|------|------|
 | `Hz` | hertz | `bu_hertz` |
 | `N` | newton | `bu_newton` |
 | `Pa` | pascal | `bu_pascal` |
@@ -931,6 +958,13 @@ The unit system supports SI base units, derived SI units, and several commonly-u
 | `Gy` | gray | `bu_gray` |
 | `Sv` | sievert | `bu_sievert` |
 | `kat` | katal | `bu_katal` |
+| `rad` | radian | `bu_radian` |
+| `sr` | steradian | `bu_steradian` |
+
+**Non-SI units accepted for use with SI**
+
+| Symbol | Unit | Enum |
+|--------|------|------|
 | `L`, `l` | liter | `bu_liter` |
 | `min` | minute | `bu_minute` |
 | `h` | hour | `bu_hour` |
@@ -939,14 +973,14 @@ The unit system supports SI base units, derived SI units, and several commonly-u
 | `yr` | year | `bu_year` |
 | `°`, `deg`, `degr`, `degree`, `degrees` | degree (angle) | `bu_degree` |
 | `°C`, `degC`, `degrC` | degree Celsius | `bu_celsius` |
-| `rad` | radian | `bu_radian` |
-| `sr` | steradian | `bu_steradian` |
 | `t` | tonne | `bu_tonne` |
 | `bar` | bar | `bu_bar` |
 | `eV` | electronvolt | `bu_electronvolt` |
 | `Da` | dalton | `bu_dalton` |
 | `au` | astronomical unit | `bu_astronomical_unit` |
 | `ha` | hectare | `bu_hectare` |
+
+> For Imperial/US customary length (`in`, `ft`, `yd`, `mi`, `nmi`, `Å`, `ly`, `pc`, `fur`, `fath`, `ch`, `rd`, `thou`/`mil`), mass (`lb`, `oz`, `gr`, `st`, `tn_sh`, `tn_l`, `oz_t`, `ct`, `slug`, `dr`, `dwt`), temperature (`°F`, `Ra`), pressure (`atm`, `mmHg`, `Torr`, `psi`, `inHg`, `at`), energy (`cal`, `Btu`, `erg`, `thm`, `ft_lb`), power (`hp`, `PS`/`CV`), force (`lbf`, `dyn`, `kip`, `kgf`), speed/frequency/rotation (`kn`, `rpm`, `rev`), volume (US and UK gallons, pints, fluid ounces, and many more), area (`ac`, `barn`), angle (`arcmin`, `arcsec`, `grad`), CGS (`P`, `St`, `G`, `Mx`, `Oe`, `sb`, `ph`, `Gal`), radiation (`Ci`, `R`, `rem`), logarithmic (`Np`, `dB`), electrical power (`var`, `VA`), acceleration (`gn`), time (`mo`, `fn`), textile linear density (`tex`, `den`), and apothecary/dry volume (`fl_dr`, `minim`, `pk`, `bsh`) — see the [Unit System Reference](2_bovnar_unit_system.md).
 
 ### 11.2 SI Prefixes
 
@@ -1126,11 +1160,13 @@ An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0
 | Number length | Yes (`max_number_length`) | 65535 | `error_number_too_long` |
 | Symbol length | Yes (`max_symbol_length`) | 255 | `error_symbol_too_long` |
 | Reference length | Yes (`max_reference_length`) | 65535 | `error_reference_too_long` |
-| Array items | Yes (`max_array_items`) | 0 (unlimited) | `error_too_many_array_items` |
-| Text bytes | Yes (`max_text_bytes`) | 0 (unlimited) | `error_text_data_too_long` |
-| File size | Yes (`max_file_size`) | 0 (unlimited) | `error_file_too_long` |
-| Struct nesting | Yes (`max_struct_nesting`) | 0 (→255 internal) | `error_struct_nesting_too_high` |
-| Array nesting | Yes (`max_array_nesting`) | 0 (→255 internal) | `error_array_nesting_too_high` |
+| Array items | Yes (`max_array_items`) | 2 147 483 647 | `error_too_many_array_items` |
+| Text bytes | Yes (`max_text_bytes`) | 2 147 483 647 | `error_text_data_too_long` |
+| File size | Yes (`max_file_size`) | 2 147 483 647 | `error_file_too_long` |
+| Struct nesting | Yes (`max_struct_nesting`) | 0 (→64 internal) | `error_struct_nesting_too_high` |
+| Array nesting | Yes (`max_array_nesting`) | 0 (→64 internal, hard cap 255) | `error_array_nesting_too_high` |
+
+Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal reader default — **64** for both nesting depths, and **2 147 483 647** (2³¹ − 1) for the three byte/item counters. These defaults are permissive but finite. The **writer** uses different defaults when its corresponding fields are 0: both nesting limits default to **255** (`UINT8_MAX`); the writer does not internally limit array items, text bytes, or file size.
 
 ### 12.3 Value Validation
 
@@ -1156,7 +1192,7 @@ An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0
 
 | Check | Error |
 |-------|-------|
-| `error_array_row_size_mismatch` | Defined in the error code enumeration; not currently reachable by any input |
+| Element count mismatch across `/`-dimension rows or across element arrays at the same nesting depth | `error_array_row_size_mismatch` |
 | Array nesting overflow (exceeds `max_array_nesting`) | `error_array_nesting_too_high` |
 | Comma outside array context | `error_unexpected_input_byte` |
 
@@ -1333,14 +1369,21 @@ The unit may be written directly after the value literal instead of — or redun
 ### 15.5 Arrays with Mixed Dimensions
 
 ```bovnar
-# 2D matrix
+# 2D matrix (uniform rows)
 .matrix = [1, 2, 3]/[4, 5, 6];
 
-# Jagged array (each element is a different-sized array)
-.jagged = [[1,2],[3,4,5],[6]];
+# Uniform nested arrays (all inner arrays same size)
+.uniform_nested = [[1,2],[3,4]];
+
+# Multi-dimensional uniform array
+.cube = [[1,2],[3,4]]/[[5,6],[7,8]];
 
 # Array with typed nulls
 .nullable = [<sint:16> 1, <sint:16> , <sint:16> 3];
+
+# These produce error_array_row_size_mismatch:
+# .bad1 = [1,2,3]/[4,5];           # row sizes differ: 3 vs 2
+# .bad2 = [[1,2],[3,4,5]];         # inner array sizes differ: 2 vs 3
 ```
 
 ### 15.6 Deeply Nested Struct
@@ -1509,11 +1552,13 @@ The unit may be written directly after the value literal instead of — or redun
 # Unknown escape
 .string = "\x";                  # error_illegal_escape_sequence
 
-# Array row-size mismatch — the check applies to /‐dimension rows, not element-level nesting
-# [[1,2],[3,4,5]] is VALID (element values, not dimension rows)
-# A genuine mismatch occurs e.g. when the same number of elements is expected per dimension
-# and differs, but this is implementation-internal. The example below is the known valid form:
-.ok = [[1,2],[3,4,5]];      # valid — nested arrays are element values
+# Array row-size mismatch — applies to /‐dimension rows AND nested element arrays
+# at the same bracket depth. Both of these produce error_array_row_size_mismatch:
+# .bad1 = [1,2,3]/[4,5];           # row sizes differ: 3 vs 2
+# .bad2 = [[1,2],[3,4,5]];         # inner arrays differ: 2 vs 3
+# Uniform sizes are valid:
+.ok1 = [1,2,3]/[4,5,6];    # valid — both dimension rows have 3 elements
+.ok2 = [[1,2],[3,4]];       # valid — both inner arrays have 2 elements
 
 # Comma outside array
 .comma_outside = 42,;            # error_unexpected_input_byte
@@ -1591,16 +1636,18 @@ typedef struct value_type_spec_s {
 
 #define BVNR_MAX_UNIT_COMPONENTS     8
 
+typedef struct value_unit_prefix_s {
+    prefix_system_t system;
+    union {
+        si_prefix_id_t  si;
+        iec_prefix_id_t iec;
+    } id;
+} value_unit_prefix_t;
+
 typedef struct value_unit_component_s {
-    value_base_unit_t    base;
-    unit_exponent_t      exponent;
-    struct {
-        prefix_system_t  system;
-        union {
-            si_prefix_id_t   si;
-            iec_prefix_id_t  iec;
-        } id;
-    } prefix;
+    value_base_unit_t   base;
+    unit_exponent_t     exponent;
+    value_unit_prefix_t prefix;
 } value_unit_component_t;
 
 typedef struct value_unit_s {
@@ -1699,11 +1746,11 @@ typedef struct bvnr_read_flags_s {
     uint16_t  max_number_length;      // default 65535
     uint16_t  max_symbol_length;      // default 255
     uint16_t  max_reference_length;   // default 65535
-    uint64_t  max_array_items;        // default 0 (unlimited)
-    uint64_t  max_text_bytes;         // default 0 (unlimited)
-    uint64_t  max_file_size;          // default 0 (unlimited); set to 16777216 for 16 MiB cap
-    uint8_t   max_struct_nesting;     // default 0 (→255 internal)
-    uint8_t   max_array_nesting;      // default 0 (→255 internal, hard cap at 255)
+    uint64_t  max_array_items;        // 0 → 2 147 483 647 internal default
+    uint64_t  max_text_bytes;         // 0 → 2 147 483 647 internal default
+    uint64_t  max_file_size;          // 0 → 2 147 483 647 internal default; 16 777 216 recommended
+    uint8_t   max_struct_nesting;     // 0 → 64 internal default; hard cap 255
+    uint8_t   max_array_nesting;      // 0 → 64 internal default; hard cap 255
     void*     userdata;
     bool    (*on_unverified)(void*, bvnr_event_t, bvnr_data_t*);
     bool    (*on_verified)(void*, bvnr_event_t, bvnr_data_t*);
@@ -1720,20 +1767,19 @@ void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
-uint64_t bvnr_writer_bytes_written(const bvnr_writer_t* w);
 ```
 
-`bvnr_sink_bytes_written` queries the byte count of an explicit `bvnr_sink_t` created with `bvnr_sink_to_mem`. `bvnr_writer_bytes_written` queries the byte count when the writer encapsulates the sink internally (i.e. after `bvnr_open_write_mem`).
+`bvnr_sink_bytes_written` queries the total bytes written to a memory sink created with `bvnr_sink_to_mem`. For the writer-encapsulated variant, see `bvnr_writer_bytes_written` in §16.7.
 
 ### 16.6 Reading
 
 ```c
 bool bvnr_open_read_source(bvnr_reader_t* r, const bvnr_source_t* src,
-                        const bvnr_sink_t* dbg_sink,
+                        const bvnr_sink_t* src_mirror,
                         bvnr_read_flags_t* options);
 
 bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint64_t len,
-                        void* dbg_buf, uint32_t dbg_cap,
+                        void* mirror_buf, uint32_t mirror_cap,
                         bvnr_read_flags_t* options);
 
 bool bvnr_read(bvnr_reader_t* r);
@@ -1795,6 +1841,20 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok);
    denominator components joined by "·".  Returns bytes written,
    or -1 on buffer overflow. */
 int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
+
+/* Extended variant accepting bvn_unit_flags_t:
+     BVN_UNIT_FLAGS_NONE  (0)      – Unicode superscript exponents, no reduction
+     BVN_UNIT_ASCII_EXP  (1 << 1) – use ^N caret notation for exponents
+     BVN_UNIT_REDUCE     (1 << 0) – reduce compound unit before serialising
+   Flags may be OR-combined.  Returns bytes written, or -1 on overflow. */
+int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
+                               bvn_unit_flags_t flags);
+
+/* Returns true if every component in u has a valid exponent (not
+   exp_invalid), a known base unit, and a prefix legal for that base
+   unit per bvn_prefix_unit_valid.  Both serialisation functions call
+   this predicate internally before writing. */
+bool bvn_unit_valid(value_unit_t u);
 
 /* Compute the combined prefix factor across all components (ignoring
    base-unit conversion factors).  Each component's prefix factor is
@@ -2129,10 +2189,16 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| max struct nesting | 255 | Maximum struct nesting depth (`max_struct_nesting`; 0 defaults to 255) |
-| max array nesting | 255 | Maximum array bracket nesting depth (`max_array_nesting`; 0 defaults to 255) |
-| recommended file size cap | 16777216 | Suggested value for `max_file_size` (16 MiB). `max_file_size = 0` is unlimited. |
+| reader default struct nesting | 64 | Default applied by the reader when `max_struct_nesting` is 0; hard cap is 255 |
+| reader default array nesting | 64 | Default applied by the reader when `max_array_nesting` is 0; hard cap is 255 |
+| writer default struct nesting | 255 | Default applied by the writer when `max_struct_nesting` is 0 |
+| writer default array nesting | 255 | Default applied by the writer when `max_array_nesting` is 0 |
+| reader default max_array_items | 2 147 483 647 | Default applied by the reader when `max_array_items` is 0 |
+| reader default max_text_bytes | 2 147 483 647 | Default applied by the reader when `max_text_bytes` is 0 |
+| reader default max_file_size | 2 147 483 647 | Default applied by the reader when `max_file_size` is 0; set to 16 777 216 (16 MiB) in production |
+| recommended file size cap | 16 777 216 | Suggested explicit value for `max_file_size` (16 MiB) |
 | `BVNR_MAX_UNIT_COMPONENTS` | 8 | Maximum number of unit components in a compound unit |
+| `BVN_MAX_INT_WIDTH` | 32768 | Maximum bit-width for `uint` and `sint` types. The validator and writer reject any declared width exceeding this value with `error_illegal_value_type`. |
 
 ---
 

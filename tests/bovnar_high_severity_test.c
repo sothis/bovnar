@@ -167,12 +167,9 @@ static void test_writer_error_accessors(void)
     ASSERT_EQ_INT(ec, error_sink_buffer_exhausted,
                   "error code is error_sink_buffer_exhausted");
 
-    uint64_t line   = bvnr_writer_get_error_line(w);
-    uint64_t col    = bvnr_writer_get_error_column(w);
     uint64_t offset = bvnr_writer_get_error_offset(w);
     uint64_t bw     = bvnr_writer_bytes_written(w);
 
-    (void)line; (void)col;
     ASSERT_TRUE(offset <= (uint64_t)sizeof(small),
                 "error offset is within buffer size");
     ASSERT_TRUE(bw <= sizeof(small),

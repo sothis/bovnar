@@ -515,18 +515,14 @@ Multiple rows are separated by `/`. Each bracketed group is one row:
 
 The event stream reflects this: `ev_array_row_start`, elements, `ev_array_row_end`, then `ev_array_dim_start` before the second `ev_array_row_start`. Row-separator `/` and array nesting are independent concepts — do not confuse them. The `/` between `]` and `[` creates a new dimension in the *same* array, not a nested one.
 
-Different `/`-separated rows may have different element counts — no cross-row size check is performed:
+The validator enforces a **consistent element count** across all bracket pairs at the same nesting depth. This applies to both `/`-separated dimension rows and to nested element arrays at the same depth — all must have the same element count:
 
 ```bovnar
-.ok = [1, 2, 3]/[4, 5];   # three elements in row 1, two in row 2 — valid
-```
+.ok1 = [1, 2, 3]/[4, 5, 6];   # valid: both rows have 3 elements
+.ok2 = [[1, 2], [3, 4]];       # valid: both inner arrays have 2 elements
 
-Nested arrays that appear as element values are independent of any row-size check — their element counts may differ freely:
-
-```bovnar
-.ok1  = [[1, 2], [3, 4]];      # element values happen to have equal counts — valid
-.ok2  = [[1, 2], [3, 4, 5]];   # different-sized element arrays — also valid
-.ok3  = [1, 2, 3]/[4, 5];      # /‐separated rows — also valid
+.bad1 = [1, 2, 3]/[4, 5];      # error_array_row_size_mismatch: 3 vs 2
+.bad2 = [[1, 2], [3, 4, 5]];   # error_array_row_size_mismatch: 2 vs 3
 ```
 
 ### Per-Element Type Annotations
@@ -767,10 +763,10 @@ Understanding the error codes is essential for debugging. The parser reports lin
 .x = {;    # error_illegal_struct_close
 ```
 
-**Nested arrays with mismatched element counts are valid:**
+**Nested arrays enforce uniform element counts:**
 ```bovnar
-.x = [[1, 2], [3, 4, 5]];  # valid — inner arrays are element VALUES
-.x = [[1, 2], [3, 4]];     # also valid
+.ok  = [[1, 2], [3, 4]];         # valid — both inner arrays have 2 elements
+.bad = [[1, 2], [3, 4, 5]];      # error_array_row_size_mismatch — 2 vs 3
 ```
 
 ---
@@ -794,11 +790,13 @@ All limits are configurable via `bvnr_read_flags_t`. The defaults are intentiona
 | `max_number_length` | 65535 | 65535 |
 | `max_symbol_length` | 255 | 255 |
 | `max_reference_length` | 65535 | 65535 |
-| `max_array_items` | 0 (unlimited) | application-defined |
-| `max_text_bytes` | 0 (unlimited) | application-defined |
-| `max_file_size` | 0 (unlimited) | `16777216` (16 MiB) |
-| `max_array_nesting` | 0 (→255 internal) | 32 or less for most applications |
-| `max_struct_nesting` | 0 (→255 internal) | 32 or less for most applications |
+| `max_array_items` | 2 147 483 647 | application-defined |
+| `max_text_bytes` | 2 147 483 647 | application-defined |
+| `max_file_size` | 2 147 483 647 | `16777216` (16 MiB) |
+| `max_array_nesting` | 0 (→64 internal) | 32 or less for most applications |
+| `max_struct_nesting` | 0 (→64 internal) | 32 or less for most applications |
+
+Setting any field to `0` in `bvnr_read_flags_t` causes the reader to substitute an internal default — **64** for both nesting depths, and **2 147 483 647** for the three byte/item counters. These are permissive but finite. Explicitly setting `max_file_size = 16777216` (16 MiB) is the recommended practice for production deployments.
 
 ---
 

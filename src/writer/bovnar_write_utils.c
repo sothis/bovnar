@@ -62,10 +62,10 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 			return false;
 	}
 	if (vu.num_components > 0) {
-		char ubuf[128];
+		char ubuf[512];
 		bvn_unit_flags_t uflags = bvnr_writer_unit_flags(w);
 		int32_t ulen = bvn_unit_to_string_ex(vu, ubuf, sizeof(ubuf), uflags);
-		if (ulen < 0) return false;
+		if (ulen < 0) return bvn_writer_set_error(w, error_unit_too_long);
 		d.type   = token_is_unit;
 		d.data   = (const void *)ubuf;
 		d.length = (uint32_t)ulen;

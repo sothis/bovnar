@@ -120,7 +120,7 @@ bvnr_source_from_mem(&src, payload, sizeof(payload) - 1);
 ```c
 bool bvnr_open_read_source(bvnr_reader_t        *r,
                          const bvnr_source_t  *src,
-                         const bvnr_sink_t    *dbg_sink,
+                         const bvnr_sink_t    *src_mirror,
                          bvnr_read_flags_t    *options);
 ```
 
@@ -128,7 +128,7 @@ Attach the source to the reader and configure it. Must be called before `bvnr_re
 
 - `r` — reader obtained from `bvnr_reader_create`.
 - `src` — source initialised with one of the `bvnr_source_from_*` functions.
-- `dbg_sink` — optional sink for internal debug/trace output. Pass `NULL` in production.
+- `src_mirror` — optional sink that mirrors the raw input bytes as they are consumed (useful for debugging; pass `NULL` in production).
 - `options` — configuration struct. Zero-initialise to get all defaults. The most important fields are:
 
 ```c
@@ -138,9 +138,9 @@ typedef struct bvnr_read_flags_s {
     bool (*on_verified)  (void *userdata, bvnr_event_t, bvnr_data_t *);
     bool   continue_on_error;
     bvnr_on_error_fn on_error;
-    uint64_t max_file_size;        /* 0 = unlimited */
-    uint8_t  max_struct_nesting;   /* 0 = default 0 (→255 internal) */
-    uint8_t  max_array_nesting;    /* 0 = default 0 (→255 internal); hard-capped at 255 */
+    uint64_t max_file_size;        /* 0 → 2 147 483 647 internal default */
+    uint8_t  max_struct_nesting;   /* 0 → 64 internal default; hard cap 255 */
+    uint8_t  max_array_nesting;    /* 0 → 64 internal default; hard cap 255 */
     /* ... other size limits ... */
 } bvnr_read_flags_t;
 ```
@@ -149,7 +149,7 @@ typedef struct bvnr_read_flags_s {
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
-**`max_array_nesting` hard limit.** Both `max_array_nesting` and `max_struct_nesting` are typed `uint8_t`. Zero-initialising the struct (the recommended default) is safe: zero means "no additional limit enforced by this field," which in practice allows nesting up to the internal maximum of 255 for both fields. `max_array_nesting` has an additional hard cap: the lexer stores per-level state in a fixed array of 256 entries, so passing any value greater than 255 causes `bvnr_open_read_source` to return `false` with `error_invalid_argument`. Because the field is `uint8_t` this cap is never reachable in practice. `max_struct_nesting` has no analogous input-validation check.
+**Reader default limits.** When a `bvnr_read_flags_t` field is set to `0`, the reader substitutes an internal default. For the nesting fields, the default is **64** (not 255); the hard maximum is 255. For `max_array_items`, `max_text_bytes`, and `max_file_size`, the default is **2 147 483 647** — permissive but finite. Setting `max_file_size` explicitly to `16777216` (16 MiB) is recommended for production.
 
 ```c
 static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
@@ -179,12 +179,12 @@ if (!bvnr_open_read_source(r, &src, NULL, &opts)) {
 bool bvnr_open_read_mem(bvnr_reader_t     *r,
                          const void        *buf,
                          uint64_t           len,
-                         void              *dbg_buf,
-                         uint32_t           dbg_cap,
+                         void              *mirror_buf,
+                         uint32_t           mirror_cap,
                          bvnr_read_flags_t *options);
 ```
 
-Convenience wrapper that constructs a memory source (and optionally a memory debug sink) internally. Equivalent to calling `bvnr_source_from_mem` followed by `bvnr_open_read_source`. Pass `NULL` / `0` for `dbg_buf` / `dbg_cap` to skip tracing.
+Convenience wrapper that constructs a memory source (and optionally a memory mirror sink) internally. Equivalent to calling `bvnr_source_from_mem` followed by `bvnr_open_read_source`. Pass `NULL` / `0` for `mirror_buf` / `mirror_cap` to skip mirroring.
 
 ```c
 bvnr_read_flags_t opts = { .on_verified = on_event, .userdata = &ctx };
@@ -388,18 +388,35 @@ Attach `sink` to the writer and configure it. Must be called before any `bvnr_wr
 
 ```c
 typedef struct bvnr_write_flags_s {
-    void  *userdata;
-    bool (*on_event)(void *userdata, bvnr_event_t, bvnr_data_t *);
-    bool   continue_on_error;
+    uint16_t max_identifier_length;   /* default 255        */
+    uint16_t max_string_length;       /* default 65535      */
+    uint16_t max_number_length;       /* default 65535      */
+    uint16_t max_symbol_length;       /* default 255        */
+    uint16_t max_reference_length;    /* default 65535      */
+    uint64_t max_array_items;         /* default 0 = unlimited */
+    uint64_t max_text_bytes;          /* default 0 = unlimited */
+    uint64_t max_file_size;           /* default 0 = unlimited */
+    uint8_t  max_struct_nesting;      /* default 0 (→255 internal) */
+    uint8_t  max_array_nesting;       /* default 0 (→255 internal) */
+    void    *userdata;
+    bool   (*on_event)(void *userdata, bvnr_event_t, bvnr_data_t *);
+    bool     continue_on_error;
     bvnr_on_error_fn on_error;
-    uint64_t max_file_size;
-    uint8_t  max_struct_nesting;
-    uint8_t  max_array_nesting;
-    /* ... other size limits ... */
+    bvn_unit_flags_t unit_flags;      /* controls unit annotation format */
 } bvnr_write_flags_t;
 ```
 
 `on_event` in the write flags fires for each event as it is serialised — useful for logging or auditing. Pass `NULL` if not needed.
+
+`unit_flags` controls how unit annotations are serialised by the writer. The valid flags are:
+
+| Flag | Value | Effect |
+|------|-------|--------|
+| `BVN_UNIT_FLAGS_NONE` | `0` | Default: Unicode superscript exponents, no reduction |
+| `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
+| `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
+
+These flags can be OR-combined: `BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP`. The writer retrieves the live flags at serialisation time via `bvnr_writer_unit_flags(w)`, so they can also be changed after `bvnr_open_write_sink` by updating the writer's internal state (see `bvnr_writer_unit_flags`).
 
 ```c
 bvnr_sink_t sink;
@@ -457,14 +474,25 @@ ev_data                      (data->data = value string, data->value_type/value_
 The `BVN_TYPE_*` macros build `value_type_spec_t` literals conveniently:
 
 ```c
-#define BVN_TYPE_UINT(w)    ((value_type_spec_t){ vt_uint,  (w), 0 })
-#define BVN_TYPE_SINT(w)    ((value_type_spec_t){ vt_sint,  (w), 0 })
-#define BVN_TYPE_FLOAT(w)   ((value_type_spec_t){ vt_float, (w), 0 })
-#define BVN_TYPE_UTF8       ((value_type_spec_t){ vt_utf8,  0,   0 })
-#define BVN_TYPE_PLAIN      ((value_type_spec_t){ vt_plain, 0,   0 })
+#define BVN_TYPE_PLAIN          ((value_type_spec_t){ .family = vt_plain })
+#define BVN_TYPE_UTF8           ((value_type_spec_t){ .family = vt_utf8  })
+#define BVN_TYPE_UINT(w)        ((value_type_spec_t){ .family = vt_uint,      .width = (w) })
+#define BVN_TYPE_SINT(w)        ((value_type_spec_t){ .family = vt_sint,      .width = (w) })
+#define BVN_TYPE_FLOAT(w)       ((value_type_spec_t){ .family = vt_float,     .width = (w) })
+/* float_fix: .base is repurposed to store Q (fractional bits). */
+#define BVN_TYPE_FLOAT_FIX(w,q) ((value_type_spec_t){ .family = vt_float_fix, .width = (w), .base = (q) })
+/* float_dec: base field is unused (always 0).                   */
+#define BVN_TYPE_FLOAT_DEC(w)   ((value_type_spec_t){ .family = vt_float_dec, .width = (w) })
+/* float with explicit numeral base (for base-16 output):        */
+#define BVN_TYPE_FLOAT_BASE(w,b) ((value_type_spec_t){ .family = vt_float, .width = (w), .base = (b) })
+/* uint/sint with explicit numeral base:                         */
+#define BVN_TYPE_UINT_BASE(w,b) ((value_type_spec_t){ .family = vt_uint, .width = (w), .base = (b) })
+#define BVN_TYPE_SINT_BASE(w,b) ((value_type_spec_t){ .family = vt_sint, .width = (w), .base = (b) })
 ```
 
-> **Critical:** The writer dispatches `ev_type_annotation_type_family_parameter` events on `d->type`, not on `d->value_type`. For each parameter event, `d.type` must be set to the appropriate `token_type_t` value: `token_is_type_width` for the width parameter, `token_is_type_base` for the base parameter, `token_is_type_q` for the Q (fractional bits) parameter of `float_fix`, and `token_is_unit` for the unit parameter. An unrecognised `d.type` causes the writer to emit nothing for that event — the annotation will be silently incomplete. **Use `bvnr_write_type_annotation` (see §21) to avoid this complexity entirely.**
+The maximum bit-width accepted for `uint` and `sint` is `BVN_MAX_INT_WIDTH` (defined as `32768u` in `bovnar.h`). The validator and writer reject any declared `uint`/`sint` width exceeding this limit with `error_illegal_value_type`.
+
+> **Critical:** The writer dispatches `ev_type_annotation_type_family_parameter` events on `d->type`, not on `d->value_type`. For each parameter event, `d.type` must be set to the appropriate `token_type_t` value: `token_is_type_width` for the width parameter, `token_is_type_base` for the base parameter, `token_is_type_q` for the Q (fractional bits) parameter of `float_fix`, and `token_is_unit` for the unit parameter. An unrecognised `d.type` causes the writer to emit nothing for that event — the annotation will be silently incomplete. **Use `bvnr_write_type_annotation` (see §22) to avoid this complexity entirely.**
 
 **Example: write `.port = <uint:16> 8080;`**
 
@@ -568,14 +596,15 @@ bvnr_writer_destroy(w);
 ### 17. `bvnr_writer_get_error` and friends
 
 ```c
-error_code_t bvnr_writer_get_error       (const bvnr_writer_t *w);
-uint64_t     bvnr_writer_get_error_line  (const bvnr_writer_t *w);
-uint64_t     bvnr_writer_get_error_column(const bvnr_writer_t *w);
-uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t *w);
-uint64_t     bvnr_writer_bytes_written   (const bvnr_writer_t *w);
+error_code_t     bvnr_writer_get_error       (const bvnr_writer_t *w);
+uint64_t         bvnr_writer_get_error_offset(const bvnr_writer_t *w);
+uint64_t         bvnr_writer_bytes_written   (const bvnr_writer_t *w);
+bvn_unit_flags_t bvnr_writer_unit_flags      (const bvnr_writer_t *w);
 ```
 
-Mirrors the reader error API with one exception: `bvnr_writer_get_error_line` and `bvnr_writer_get_error_column` always return `0`. The writer has no lexer and therefore cannot track source positions. Use `bvnr_writer_get_error_offset` (byte count into the output stream) and `bvnr_writer_get_error` (error code) for diagnostics. `bvnr_writer_bytes_written` returns the total bytes emitted to the sink so far — available at any point, not only after errors.
+The writer error API is smaller than the reader's: there are **no** `bvnr_writer_get_error_line` or `bvnr_writer_get_error_column` functions. The writer has no lexer and therefore cannot track source positions. Use `bvnr_writer_get_error_offset` (byte count into the output stream) and `bvnr_writer_get_error` (error code) for diagnostics. `bvnr_writer_bytes_written` returns the total bytes emitted to the sink so far — available at any point, not only after errors.
+
+`bvnr_writer_unit_flags` returns the `bvn_unit_flags_t` bitmask currently stored in the writer object (set via `bvnr_write_flags_t.unit_flags` at open time). The writer uses these flags whenever it serialises a unit annotation string (via `bvn_unit_to_string_ex`). This function is primarily used by the Python bindings FFI layer to retrieve the live flags before each unit serialisation call.
 
 ```c
 if (!bvnr_write_event(w, ev_data, &d)) {
@@ -747,7 +776,7 @@ This is the **preferred** way to write type annotations. Using `bvnr_write_event
 
 The function emits parameters as follows:
 
-- **Width** — always emitted for numeric families, using `bvn_effective_width` (so width `0` is serialised as `64`).
+- **Width** — emitted for numeric families when `vt.width != 0`. A width of `0` is **not** written to the stream (the absence implies the default width of 64 on the reader side via `bvn_effective_width`). Also emitted for `utf8` when `vt.width != 0`, though width on `utf8` has no defined semantics.
 - **Base** — emitted for `float` when `vt.base` is non-zero and not `10`; emitted for `uint`/`sint` when `vt.base` is non-zero and not `10`.
 - **Q** — emitted for `float_fix` when `vt.base` (which stores Q) is non-zero. A Q value of `0` is therefore not written explicitly.
 - **Unit** — emitted when `vu.num_components > 0`. `BVN_UNIT_NONE` (num_components == 0) produces no unit parameter; `BVN_UNIT_NO_PREFIX(bu_none)` (num_components == 1) produces `no_unit` in the annotation.
@@ -764,17 +793,20 @@ if (!bvnr_write_type_annotation(w, vt, vu)) return false;
 
 ---
 
-### 23. `bvn_parse_unit`
+### 23. `bvn_parse_unit` / `bvn_parse_unit_n`
 
 ```c
-value_unit_t bvn_parse_unit(const uint8_t *unit, bool *ok);
+value_unit_t bvn_parse_unit  (const uint8_t *unit, bool *ok);
+value_unit_t bvn_parse_unit_n(const uint8_t *unit, uint32_t len, bool *ok);
 ```
 
-Parse a compound unit string (e.g. `"k~g·m/s²"`) into a `value_unit_t`. Sets `*ok` to `false` and returns a zeroed unit on any error. The string must be NUL-terminated.
+Parse a compound unit string (e.g. `"k~g·m/s²"`) into a `value_unit_t`. Both set `*ok` to `false` and return a zeroed unit on any error.
 
-This is useful when reading: after `ev_type_annotation_type_family_parameter`, the unit is already parsed for you in `d->value_unit`. You only need `bvn_parse_unit` if you are constructing a unit from a string yourself (e.g. from a config or CLI argument).
+`bvn_parse_unit` requires a NUL-terminated string. `bvn_parse_unit_n` accepts a length `len` and does **not** require a NUL terminator — use this variant when the unit string is a substring of a larger buffer (as is the case inside the parser itself).
 
-The validator also calls `bvn_parse_unit` internally when processing an **inline unit suffix** (the optional unit token that may follow a scalar value before its terminating `;`). You do not need to call this function yourself to consume inline units; the parsed result is automatically placed in `d->value_unit` of the `ev_data` event, exactly as for annotation-specified units.
+This is useful when reading: after `ev_type_annotation_type_family_parameter`, the unit is already parsed for you in `d->value_unit`. You only need `bvn_parse_unit` / `bvn_parse_unit_n` if you are constructing a unit from a string yourself (e.g. from a config or CLI argument).
+
+The validator also calls `bvn_parse_unit_n` internally when processing an **inline unit suffix** (the optional unit token that may follow a scalar value before its terminating `;`). You do not need to call either function yourself to consume inline units; the parsed result is automatically placed in `d->value_unit` of the `ev_data` event, exactly as for annotation-specified units.
 
 ```c
 bool ok;
@@ -786,19 +818,38 @@ if (!ok) {
 /* u now holds { num_components=3, [{bu_gram,exp_linear,si_kilo},
                                     {bu_meter,exp_linear,si_none},
                                     {bu_second,exp_neg_square,si_none}] } */
+
+/* Length-bounded variant — no NUL needed */
+const uint8_t *annotation = (const uint8_t *)"float:64,m/s";
+value_unit_t u2 = bvn_parse_unit_n(annotation + 9, 3, &ok); /* "m/s" */
 ```
 
 ---
 
-### 24. `bvn_unit_to_string`
+### 24. `bvn_unit_to_string` / `bvn_unit_to_string_ex`
 
 ```c
 int32_t bvn_unit_to_string(value_unit_t u, char *buf, size_t bufsize);
+
+int32_t bvn_unit_to_string_ex(value_unit_t u, char *buf, size_t bufsize,
+                               bvn_unit_flags_t flags);
 ```
 
 Serialise a `value_unit_t` back into its canonical string form. Numerator components are joined by `·`, followed by `/` and denominator components joined by `·`. Returns bytes written (excluding NUL), or `-1` on buffer overflow.
 
-Use this when writing: build a `value_unit_t` with the unit macros, then call `bvn_unit_to_string` to produce the annotation text that goes into `bvnr_data_t.data` for `ev_type_annotation_start`.
+`bvn_unit_to_string` is equivalent to calling `bvn_unit_to_string_ex` with `flags = BVN_UNIT_FLAGS_NONE`.
+
+`bvn_unit_to_string_ex` accepts a `bvn_unit_flags_t` bitmask that controls output format:
+
+| Flag | Effect |
+|------|--------|
+| `BVN_UNIT_FLAGS_NONE` | Default: Unicode superscript exponents, no reduction |
+| `BVN_UNIT_REDUCE` | Reduce compound unit to canonical named SI unit before serialising |
+| `BVN_UNIT_ASCII_EXP` | Use `^N` ASCII caret notation instead of Unicode superscripts |
+
+These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internally, passing the flags from `bvnr_writer_unit_flags(w)`.
+
+> **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§22) to emit a complete, correct type annotation in one call.
 
 ```c
 value_unit_t u = BVN_UNIT_COMPOUND2(
@@ -808,6 +859,9 @@ value_unit_t u = BVN_UNIT_COMPOUND2(
 char buf[64];
 int32_t n = bvn_unit_to_string(u, buf, sizeof(buf));
 /* buf = "k~g/s²", n = 7 */
+
+n = bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
+/* buf = "k~g/s^2", n = 7 */
 ```
 
 ---

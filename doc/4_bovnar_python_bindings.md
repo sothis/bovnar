@@ -604,6 +604,7 @@ bovnar/
 
 tests/
 ├── conftest.py          # shared fixtures, needs_lib marker
+├── test_analytics.py    # analytic / benchmarking tests (needs_lib)
 ├── test_array_parser.py # array parsing integration tests (needs_lib)
 ├── test_dom.py          # DOM API integration tests (needs_lib)
 ├── test_enums.py        # pure-Python enum tests
@@ -734,11 +735,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 1–2 | `BIT`, `BYTE` |
 | 3–9 | SI base units (`SECOND` … `CANDELA`) |
 | 10–28 | Named SI derived units (`HERTZ` … `KATAL`) |
-| 29–34 | Non-SI accepted units (`LITER` … `CELSIUS`) |
-| 35–36 | `RADIAN`, `STERADIAN` |
-| 37–38 | `TONNE`, `BAR` |
-| 39–41 | `ELECTRONVOLT`, `DALTON`, `ASTRONOMICAL_UNIT` |
-| 42–44 | `HECTARE`, `WEEK`, `YEAR` |
+| 29–44 | Non-SI accepted units (`LITER` … `YEAR`) |
 | 45–54 | Imperial/US length (`INCH` … `FATHOM`) |
 | 55–62 | Imperial/US mass (`POUND` … `CARAT`) |
 | 63 | `FAHRENHEIT` |
@@ -747,7 +744,8 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 72 | `HORSEPOWER` |
 | 73–75 | Force (`POUND_FORCE`, `DYNE`, `KIP`) |
 | 76 | `KNOT` |
-| 77–87 | US volume (`GALLON` … `BARN`) |
+| 77–85 | US volume (`GALLON` … `BARREL`) |
+| 86–87 | Area (`ACRE`, `BARN`) |
 | 88–90 | Angle (`ARCMINUTE`, `ARCSECOND`, `GRAD`) |
 | 91–98 | CGS units (`POISE` … `GALILEO`) |
 | 99–101 | Radiation (`CURIE`, `ROENTGEN`, `REM`) |
@@ -757,7 +755,21 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 106 | `THOU` |
 | 107–109 | UK imperial volume (`PINT_UK`, `FLUID_OUNCE_UK`, `QUART_UK`) |
 | 110–111 | Electrical power (`VAR`, `VOLT_AMPERE`) |
-| 112 | `_SENTINEL` (internal bound; do not use) |
+| 112 | `KILOGRAM_FORCE` |
+| 113 | `INCH_HG` |
+| 114 | `RPM` |
+| 115 | `FOOT_POUND` |
+| 116–117 | Mass additional (`DRAM`, `PENNYWEIGHT`) |
+| 118–119 | Length additional (`CHAIN`, `ROD`) |
+| 120–121 | Volume additional (`GILL`, `GILL_UK`) |
+| 122 | `STANDARD_GRAVITY` |
+| 123 | `METRIC_HORSEPOWER` |
+| 124 | `REVOLUTION` |
+| 125–126 | Time additional (`MONTH`, `FORTNIGHT`) |
+| 127 | `ATMOSPHERE_TECHNICAL` |
+| 128–129 | Textile linear density (`TEX`, `DENIER`) |
+| 130–133 | Apothecary/dry volume (`FLUID_DRAM`, `MINIM`, `PECK`, `BUSHEL`) |
+| 134 | `_SENTINEL` (internal bound; do not use) |
 
 ---
 

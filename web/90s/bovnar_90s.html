@@ -697,7 +697,7 @@ comment     ::= '#' .* newline</div>
 
 <span class="key">.radio</span> = {
     <span class="key">.frequency</span>  = <span class="ty">&lt;float:64,<span class="unit">M~Hz</span>&gt;</span>  <span class="num">868.1</span>;
-    <span class="key">.tx_power</span>   = <span class="ty">&lt;sint:8,<span class="unit">d~Bm</span>&gt;</span>    <span class="num">14</span>;
+    <span class="key">.tx_power</span>   = <span class="ty">&lt;sint:8&gt;</span>         <span class="num">14</span>;   <span class="cmt"># dBm — logarithmic, no Bovnar unit</span>
     <span class="key">.bandwidth</span>  = <span class="ty">&lt;float:32,<span class="unit">k~Hz</span>&gt;</span>  <span class="num">125.0</span>;
     <span class="key">.sf</span>         = <span class="ty">&lt;uint:8&gt;</span>         <span class="num">7</span>;   <span class="cmt"># spreading factor</span>
 };
@@ -752,7 +752,7 @@ comment     ::= '#' .* newline</div>
     <hr>
     <pre data-lang="bovnar"><span class="cmt"># Width: any positive integer for uint/sint</span>
 <span class="key">.adc</span>    = <span class="ty">&lt;uint:12&gt;</span> <span class="num">2048</span>;    <span class="cmt"># 12-bit ADC</span>
-<span class="key">.status</span> = <span class="ty">&lt;uint:4&gt;</span>  <span class="num">0b1101</span>;  <span class="cmt"># nybble, any positive width is valid</span>
+<span class="key">.status</span> = <span class="ty">&lt;uint:4,_2&gt;</span> <span class="str">"1101"</span>;   <span class="cmt"># nybble — non-decimal must be a quoted string</span>
 
 <span class="cmt"># Base: _2 _8 _10 _16 _36 _62 _64 _85 (non-decimal must be QUOTED)</span>
 <span class="key">.mac</span>   = <span class="ty">&lt;uint:48,_16&gt;</span>  <span class="str">"AABBCCDDEEFF"</span>;
@@ -765,7 +765,7 @@ comment     ::= '#' .* newline</div>
 
 <span class="cmt"># Decimal float — exact 0.1, useful for finance / metrology</span>
 <span class="key">.price</span>   = <span class="ty">&lt;float_dec:32&gt;</span>   <span class="num">12.99</span>;
-<span class="key">.voltage</span> = <span class="ty">&lt;float_dec:64&gt;</span>   <span class="num">101325.0</span>;</pre>
+<span class="key">.voltage</span> = <span class="ty">&lt;float_dec:64&gt;</span>   <span class="num">3.300000001</span>;</pre>
 
     <div class="note">
       <strong>Default type synthesis:</strong> bare <code>42</code> → <code>uint:64</code>,
@@ -800,7 +800,7 @@ comment     ::= '#' .* newline</div>
 <span class="key">.temp</span>     = <span class="ty">&lt;float:32,<span class="unit">°C</span>&gt;</span>   <span class="num">23.5</span>;     <span class="cmt"># UTF-8 units fine</span>
 
 <span class="cmt"># SI prefixes (tilde is mandatory)</span>
-<span class="key">.k_ohm</span> = <span class="ty">&lt;float:32,<span class="unit">k-Ω</span>&gt;</span>   <span class="num">4.7</span>;     <span class="cmt"># kilo-ohm</span>
+<span class="key">.k_ohm</span> = <span class="ty">&lt;float:32,<span class="unit">k~Ω</span>&gt;</span>   <span class="num">4.7</span>;     <span class="cmt"># kilo-ohm</span>
 <span class="key">.micro</span> = <span class="ty">&lt;float:32,<span class="unit">µ~s</span>&gt;</span>   <span class="num">50.0</span>;    <span class="cmt"># microsecond</span>
 <span class="key">.giga</span>  = <span class="ty">&lt;float:64,<span class="unit">G~Hz</span>&gt;</span>  <span class="num">2.4</span>;     <span class="cmt"># gigahertz</span>
 
@@ -1122,4 +1122,5 @@ bash install.sh</pre>
 </div><!-- #page -->
 </body>
 </html>
+
 

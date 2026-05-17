@@ -9,15 +9,19 @@
 # in any order and at most one of each class is allowed per annotation.
 #
 # The unit string is parsed by bvn_get_value_unit() after the lexer captures
-# the full annotation body.  Validation errors are: error_unit_illegal (31),
-# error_unit_too_long (21), error_unit_mismatch (38).
+# the full annotation body.  Validation errors are: error_unit_illegal (32),
+# error_unit_too_long (22), error_unit_mismatch (38).
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1.  no_unit — explicit dimensionless keyword
 # ══════════════════════════════════════════════════════════════════════════════
-# "no_unit" and an absent unit parameter both produce:
-#   BVN_UNIT_NO_PREFIX(bu_none)  →  num_components=1, base=bu_none
+# Explicit "no_unit" keyword produces:
+#   BVN_UNIT_NONE               →  num_components=0
+# An absent unit parameter produces:
+#   BVN_UNIT_NO_PREFIX(bu_none) →  num_components=1, base=bu_none
+# Both compare as compatible via bvn_units_compatible and both serialize to
+# "no_unit" via bvn_unit_to_string, but they are structurally distinct states.
 
 .explicit_no_unit = <uint:32,no_unit>    42;      # explicitly dimensionless
 .implicit_no_unit = <uint:32>            42;       # absent unit → same internal state
@@ -42,7 +46,7 @@
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3.  Named SI-derived units (22 named derived units)
+# 3.  Named SI-derived units (21 named SI-derived units)
 # ══════════════════════════════════════════════════════════════════════════════
 
 .u_hertz      = <float:64,Hz>  440.0;      # hertz     — s⁻¹
@@ -392,5 +396,6 @@
 
 .seven_comp = <float:64,k~g·m·s/A·K·mol·cd>   1.0;  # 7 components — within limit
 .eight_comp = <float:64,m·s·k~g·A·K·mol·cd·b> 1.0;  # 8 components — at the limit
+
 
 

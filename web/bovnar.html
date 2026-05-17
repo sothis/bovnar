@@ -1,4 +1,3 @@
-==> web/bovnar.html <==
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -244,7 +243,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <!-- STATS -->
 <div class="statsbar">
   <div class="stat"><span class="sn">6</span><span class="sl">Type families incl.<br>decimal &amp; Q~format</span></div>
-  <div class="stat"><span class="sn">46+</span><span class="sl">Built-in physical units<br>validated at parse time</span></div>
+  <div class="stat"><span class="sn">44</span><span class="sl">Built-in physical units<br>validated at parse time</span></div>
   <div class="stat"><span class="sn">0</span><span class="sl">External schema files<br>required. Ever.</span></div>
   <div class="stat"><span class="sn">C99</span><span class="sl">Reference implementation,<br>zero dependencies</span></div>
 </div>
@@ -460,7 +459,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
     <p class="sub reveal">Not bolt-ons. Not workarounds. Design decisions baked into the format from the start.</p>
     <div class="fgrid reveal">
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></div><h3>Self-describing values</h3><p>Type family, bit-width, numeral base, and physical unit travel in the same byte stream as the value. Interpretable in isolation — by anyone, forever.</p><span class="ftag">per-value annotation · no side channel</span></div>
-      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>SI &amp; IEC units, validated</h3><p>46+ base units, full SI prefix table (quecto→quetta), IEC binary prefixes (kibi→quebi). Compound expressions with exponents. Caught at parse time, not at runtime.</p><span class="ftag">&lt;float:64,k~g·m/s²&gt; · &lt;uint:64,Gi~B&gt;</span></div>
+      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>SI &amp; IEC units, validated</h3><p>44 base units, full SI prefix table (quecto→quetta), IEC binary prefixes (kibi→quebi). Compound expressions with exponents. Caught at parse time, not at runtime.</p><span class="ftag">&lt;float:64,k~g·m/s²&gt; · &lt;uint:64,Gi~B&gt;</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><h3>Six numeric type families</h3><p>uint · sint at any bit-width. IEEE 754 binary float (16-bit half to 32768-bit extended). Q~format fixed-point. IEEE 754-2008 decimal float. UTF-8 strings.</p><span class="ftag">uint · sint · float · float_fix · float_dec · utf8</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><polyline points="4 6 4 2 20 2 20 6"/><path d="M4 6h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/><line x1="12" y1="10" x2="12" y2="18"/></svg></div><h3>Text-binary hybrid</h3><p>NUL-escape octet streams embed raw binary in-line. No Base64. No inflation. The UTF-8 validator suspends for the duration; the writer API handles the wire protocol.</p><span class="ftag">0x00-delimited · chunk protocol</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><h3>SAX-style streaming reader</h3><p>Two-phase callback architecture. <code>on_unverified</code> fires before semantic validation, <code>on_verified</code> after. Constant memory. Parse any file size without loading a DOM.</p><span class="ftag">pull-based · callback-driven · no DOM</span></div>
@@ -765,4 +764,5 @@ document.querySelectorAll('.reveal').forEach(function(el){obs.observe(el)});
 </script>
 </body>
 </html>
+
 

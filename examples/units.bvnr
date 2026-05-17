@@ -399,3 +399,116 @@
 
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 23. Non-SI units — imperial, US customary, CGS, and legacy units
+# ══════════════════════════════════════════════════════════════════════════════
+# These units are recognised by the parser and converted to SI internally by
+# bvn_unit_to_si_factor().  They may NOT carry SI or IEC prefixes unless the
+# conversion is dimensionless (e.g. neper).  Affine units (°F) require special
+# treatment: bvn_unit_to_si_factor returns a scale factor and a non-zero
+# affine_offset; callers must apply both when converting to Kelvin.
+
+# --- length ---
+.len_inch          = <float:64,in>    25.4;        # inch        1 in  = 0.0254 m (exact)
+.len_foot          = <float:64,ft>    1.0;         # foot        1 ft  = 0.3048 m (exact)
+.len_yard          = <float:64,yd>    1.0;         # yard        1 yd  = 0.9144 m (exact)
+.len_mile          = <float:64,mi>    1.0;         # mile        1 mi  = 1609.344 m (exact)
+.len_nautical_mile = <float:64,nmi>   1.0;         # naut. mile  1 nmi = 1852 m (exact)
+.len_angstrom      = <float:64,Å>     1.5;         # ångström    1 Å   = 1e-10 m  (U+212B)
+.len_light_year    = <float:64,ly>    4.246;       # light-year  1 ly  = 9.4607×10¹⁵ m
+.len_parsec        = <float:64,pc>    1.0;         # parsec      1 pc  = 3.0857×10¹⁶ m
+.len_furlong       = <float:64,fur>   8.0;         # furlong     1 fur = 201.168 m
+.len_fathom        = <float:64,fath>  6.0;         # fathom      1 fth = 1.8288 m
+
+# --- mass ---
+.mass_pound        = <float:64,lb>    2.205;       # pound       1 lb    = 0.45359237 kg (exact)
+.mass_ounce        = <float:64,oz>    16.0;        # ounce       1 oz    = 0.02834952 kg
+.mass_grain        = <float:64,gr>    7000.0;      # grain       1 gr    = 6.479891e-5 kg
+.mass_stone        = <float:64,st>    1.0;         # stone       1 st    = 6.35029318 kg
+.mass_short_ton    = <float:64,tn_sh> 1.0;         # short ton   1 tn_sh = 907.18474 kg
+.mass_long_ton     = <float:64,tn_l>  1.0;         # long ton    1 tn_l  = 1016.046909 kg
+.mass_troy_ounce   = <float:64,oz_t>  1.0;         # troy ounce  1 oz_t  = 0.031103477 kg
+.mass_carat        = <float:64,ct>    5.0;         # carat       1 ct    = 2e-4 kg (exact)
+
+# --- temperature (affine) ---
+.temp_fahrenheit   = <float:64,°F>    72.0;        # °F (affine) K = (°F + 459.67) × 5/9
+                                                    # U+00B0 U+0046  (0xC2 0xB0 0x46)
+
+# --- pressure ---
+.pres_atm          = <float:64,atm>   1.0;         # atmosphere  1 atm   = 101325 Pa (exact)
+.pres_mmhg         = <float:64,mmHg>  760.0;       # mmHg        1 mmHg  = 133.322387 Pa
+.pres_torr         = <float:64,Torr>  760.0;       # torr        1 Torr  = 101325/760 Pa
+.pres_psi          = <float:64,psi>   14.696;      # psi         1 psi   = 6894.757 Pa
+
+# --- energy ---
+.energy_calorie    = <float:64,cal>   1000.0;      # calorie (thermo)  1 cal = 4.184 J (exact)
+.energy_btu        = <float:64,Btu>   1.0;         # Btu               1 Btu = 1055.056 J
+.energy_erg        = <float:64,erg>   1e7;         # erg               1 erg = 1e-7 J (exact)
+.energy_therm      = <float:64,thm>   1.0;         # therm (US)        1 thm = 1.05480×10⁸ J
+
+# --- power ---
+.power_hp          = <float:64,hp>    1.0;         # horsepower  1 hp   = 745.69987 W
+
+# --- force ---
+.force_lbf         = <float:64,lbf>   1.0;         # pound-force 1 lbf  = 4.448222 N
+.force_dyne        = <float:64,dyn>   1e5;         # dyne        1 dyn  = 1e-5 N (exact)
+.force_kip         = <float:64,kip>   1.0;         # kip         1 kip  = 4448.222 N
+
+# --- speed ---
+.speed_knot        = <float:64,kn>    1.0;         # knot        1 kn   = 1852/3600 m/s
+
+# --- volume (US customary) ---
+.vol_gallon        = <float:64,gal>   1.0;         # US gallon   1 gal  = 3.785412e-3 m³
+.vol_gallon_uk     = <float:64,gal_uk> 1.0;        # imp. gallon 1 gal  = 4.54609e-3 m³ (exact)
+.vol_quart         = <float:64,qt>    4.0;         # US quart    1 qt   = 9.463529e-4 m³
+.vol_pint          = <float:64,pt>    8.0;         # US pint     1 pt   = 4.731765e-4 m³
+.vol_cup           = <float:64,cup>   16.0;        # US cup      1 cup  = 2.365882e-4 m³
+.vol_fluid_ounce   = <float:64,fl_oz> 128.0;       # US fl oz    1 fl oz = 2.957353e-5 m³
+.vol_tablespoon    = <float:64,tbsp>  256.0;       # US tbsp     1 tbsp = 1.478676e-5 m³
+.vol_teaspoon      = <float:64,tsp>   768.0;       # US tsp      1 tsp  = 4.928922e-6 m³
+.vol_barrel        = <float:64,bbl>   1.0;         # oil barrel  1 bbl  = 0.158987 m³
+
+# --- area ---
+.area_acre         = <float:64,ac>    1.0;         # acre        1 ac   = 4046.8564224 m² (exact)
+.area_barn         = <float:64,barn>  1.0;         # barn        1 barn = 1e-28 m² (exact)
+
+# --- plane angle ---
+.ang_arcminute     = <float:64,arcmin>  60.0;      # arcminute   1 arcmin = π/10800 rad
+.ang_arcsecond     = <float:64,arcsec>  3600.0;    # arcsecond   1 arcsec = π/648000 rad
+.ang_grad          = <float:64,grad>    400.0;     # gradian     1 grad   = π/200 rad
+
+# --- CGS units ---
+.cgs_poise         = <float:64,P>     10.0;        # poise      1 P  = 0.1 Pa·s   (dynamic viscosity)
+.cgs_stokes        = <float:64,St>    1e4;         # stokes     1 St = 1e-4 m²/s  (kinematic viscosity)
+.cgs_gauss         = <float:64,G>     1e4;         # gauss      1 G  = 1e-4 T      (magnetic flux density)
+.cgs_maxwell       = <float:64,Mx>    1e8;         # maxwell    1 Mx = 1e-8 Wb     (magnetic flux)
+.cgs_oersted       = <float:64,Oe>    1.0;         # oersted    1 Oe = 1000/(4π) A/m
+.cgs_stilb         = <float:64,sb>    1.0;         # stilb      1 sb = 1e4 cd/m²  (luminance)
+.cgs_phot          = <float:64,ph>    1.0;         # phot       1 ph = 1e4 lx      (illuminance)
+.cgs_galileo       = <float:64,Gal>   1.0;         # galileo    1 Gal = 0.01 m/s²  (acceleration)
+
+# --- radiation (legacy) ---
+.rad_curie         = <float:64,Ci>    1.0;         # curie      1 Ci = 3.7×10¹⁰ Bq (activity)
+.rad_roentgen      = <float:64,R>     1.0;         # roentgen   1 R  = 2.58e-4 C/kg (exposure)
+.rad_rem           = <float:64,rem>   100.0;       # rem        1 rem = 0.01 Sv (dose equivalent)
+
+# --- logarithmic ---
+.log_neper         = <float:64,Np>    1.0;         # neper (dimensionless logarithmic ratio)
+
+# --- compound expressions using non-SI units ---
+.eng_lbf_per_in2   = <float:64,lbf/in²>  14.696;  # pressure in psi expressed as lbf/in²
+.eng_ft_per_s      = <float:64,ft/s>      88.0;    # velocity (60 mph → 88 ft/s)
+.eng_btu_per_hour  = <float:64,Btu/h>     3412.0;  # power (1 kW ≈ 3412 Btu/h)
+.eng_hp_hour       = <float:64,hp·h>      1.0;     # energy (1 hp·h ≈ 2.685 MJ)
+.eng_gal_per_min   = <float:64,gal/min>   1.0;     # volumetric flow rate
+.eng_lb_per_ft3    = <float:64,lb/ft³>    62.4;    # density (water ≈ 62.4 lb/ft³)
+
+# --- inline suffix form ---
+.inline_inch       = 6.0 in;                        # six inches (inline unit)
+.inline_mph        = 60.0 mi/h;                     # miles per hour
+.inline_degf       = 98.6 °F;                       # body temperature in Fahrenheit
+.inline_psi        = 32.0 psi;                      # tire pressure
+.inline_hp         = 250.0 hp;                      # engine power
+.inline_knots      = 15.0 kn;                       # ship speed in knots
+.inline_rem        = 0.1 rem;                       # radiation dose

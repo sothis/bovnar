@@ -143,7 +143,7 @@ When both are present, equality is checked **after parsing** via `memcmp` on the
 
 ## 3. Base Units
 
-Bovnar supports 44 named base units, covering SI base units, all named SI-derived units, and a set of commonly used non-SI units accepted for use with SI.
+Bovnar supports 102 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, and radiation units.
 
 ### SI Base Units
 
@@ -203,6 +203,134 @@ Bovnar supports 44 named base units, covering SI base units, all named SI-derive
 | `Da`   | dalton            | `bu_dalton`   | 1.66053906660×10⁻²⁷ kg (unified atomic mass unit) |
 | `au`   | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
 | `ha`   | hectare           | `bu_hectare`  | 10⁴ m² |
+
+### Imperial and US Customary Units — Length
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `in`   | `inch`, `inches` | inch | `bu_inch` | 0.0254 m (exact) |
+| `ft`   | `foot`, `feet`   | foot | `bu_foot` | 0.3048 m (exact) |
+| `yd`   | `yard`, `yards`  | yard | `bu_yard` | 0.9144 m (exact) |
+| `mi`   | `mile`, `miles`  | statute mile | `bu_mile` | 1609.344 m (exact) |
+| `nmi`  | `nautical_mile`, `nautical_miles` | nautical mile | `bu_nautical_mile` | 1852 m (exact) |
+| `Å` (U+212B) | `angstrom`, `angstroms`, Å (U+00C5) | ångström | `bu_angstrom` | 10⁻¹⁰ m |
+| `ly`   | `light_year`, `light_years` | light-year | `bu_light_year` | 9.4607304725808×10¹⁵ m |
+| `pc`   | `parsec`, `parsecs` | parsec | `bu_parsec` | 3.085677581491367×10¹⁶ m |
+| `fur`  | `furlong`, `furlongs` | furlong | `bu_furlong` | 201.168 m (exact) |
+| `fath` | `fathom`, `fathoms` | fathom | `bu_fathom` | 1.8288 m (exact) |
+
+### Imperial and US Customary Units — Mass
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `lb`   | `lbs`, `pound`, `pounds` | pound (avoirdupois) | `bu_pound` | 0.45359237 kg (exact) |
+| `oz`   | `ounce`, `ounces` | ounce (avoirdupois) | `bu_ounce` | 0.028349523125 kg (exact) |
+| `gr`   | `grain`, `grains` | grain | `bu_grain` | 6.479891×10⁻⁵ kg (exact) |
+| `st`   | `stone`, `stones` | stone | `bu_stone` | 6.35029318 kg (exact) |
+| `tn_sh`| `short_ton`, `short_tons` | short ton (US ton) | `bu_short_ton` | 907.18474 kg (exact) |
+| `tn_l` | `long_ton`, `long_tons` | long ton (UK ton) | `bu_long_ton` | 1016.0469088 kg (exact) |
+| `oz_t` | `troy_ounce`, `troy_ounces` | troy ounce | `bu_troy_ounce` | 0.0311034768 kg (exact) |
+| `ct`   | `carat`, `carats` | metric carat | `bu_carat` | 2×10⁻⁴ kg (exact) |
+
+### Imperial and US Customary Units — Temperature
+
+| Symbol | Long forms | Name | Enum value | Conversion |
+|--------|-----------|------|------------|------------|
+| `°F`, `degF`, `degrF` | `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | affine: K = (°F + 459.67) × 5/9 |
+
+### Pressure Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `atm`  | `atmosphere`, `atmospheres` | standard atmosphere | `bu_atmosphere` | 101325 Pa (exact) |
+| `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
+| `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa ≈ 133.322368 Pa |
+| `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168361 Pa |
+
+### Energy Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `cal`  | `calorie`, `calories` | thermochemical calorie | `bu_calorie` | 4.184 J (exact) |
+| `Btu`  | `BTU`, `btu` | International Table BTU | `bu_btu` | 1055.05585262 J |
+| `erg`  | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
+| `thm`  | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
+
+### Power Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `hp`   | `horsepower` | mechanical horsepower | `bu_horsepower` | 745.69987158227 W |
+
+### Force Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `lbf`  | `pound_force` | pound-force | `bu_pound_force` | 4.4482216152605 N |
+| `dyn`  | `dyne`, `dynes` | dyne | `bu_dyne` | 10⁻⁵ N (exact) |
+| `kip`  | `kips` | kip (kilopound-force) | `bu_kip` | 4448.2216152605 N |
+
+### Speed Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `kn`   | `knot`, `knots` | knot | `bu_knot` | 1852/3600 m/s ≈ 0.514444 m/s |
+
+### Volume Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `gal`  | `gallon`, `gallons` | US liquid gallon | `bu_gallon` | 3.785411784×10⁻³ m³ (exact) |
+| `gal_uk` | `gallon_uk`, `gallons_uk` | Imperial gallon | `bu_gallon_uk` | 4.54609×10⁻³ m³ (exact) |
+| `qt`   | `quart`, `quarts` | US liquid quart | `bu_quart` | 9.46352946×10⁻⁴ m³ |
+| `pt`   | `pint`, `pints` | US liquid pint | `bu_pint` | 4.73176473×10⁻⁴ m³ |
+| `cup`  | `cups` | US cup | `bu_cup` | 2.365882365×10⁻⁴ m³ |
+| `fl_oz`| `fluid_ounce`, `fluid_ounces` | US fluid ounce | `bu_fluid_ounce` | 2.95735296875×10⁻⁵ m³ |
+| `tbsp` | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.47867648×10⁻⁵ m³ |
+| `tsp`  | `teaspoon`, `teaspoons` | US teaspoon | `bu_teaspoon` | 4.92892159375×10⁻⁶ m³ |
+| `bbl`  | `barrel`, `barrels` | petroleum barrel (42 US gal) | `bu_barrel` | 0.158987294928 m³ |
+
+### Area Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `ac`   | `acre`, `acres` | acre | `bu_acre` | 4046.8564224 m² (exact) |
+| `barn` | `barns` | barn | `bu_barn` | 10⁻²⁸ m² (exact) |
+
+### Angle Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `arcmin` | `arcminute`, `arcminutes` | arcminute | `bu_arcminute` | π/10800 rad |
+| `arcsec` | `arcsecond`, `arcseconds` | arcsecond | `bu_arcsecond` | π/648000 rad |
+| `grad` | `gradian`, `gradians`, `gon` | gradian | `bu_grad` | π/200 rad |
+
+### CGS Units
+
+| Symbol | Long forms | Name | Enum value | SI equivalent |
+|--------|-----------|------|------------|---------------|
+| `P`    | `poise`, `poises` | poise (dynamic viscosity) | `bu_poise` | 0.1 Pa·s |
+| `St`   | `stokes`, `stoke` | stokes (kinematic viscosity) | `bu_stokes` | 10⁻⁴ m²·s⁻¹ |
+| `G`    | `gauss` | gauss (magnetic flux density) | `bu_gauss` | 10⁻⁴ T |
+| `Mx`   | `maxwell`, `maxwells` | maxwell (magnetic flux) | `bu_maxwell` | 10⁻⁸ Wb |
+| `Oe`   | `oersted`, `oersteds` | oersted (magnetic field strength) | `bu_oersted` | 1000/(4π) A/m ≈ 79.577 A/m |
+| `sb`   | `stilb`, `stilbs` | stilb (luminance) | `bu_stilb` | 10⁴ cd/m² |
+| `ph`   | `phot`, `phots` | phot (illuminance) | `bu_phot` | 10⁴ lx |
+| `Gal`  | `galileo`, `galileos` | galileo (acceleration) | `bu_galileo` | 10⁻² m/s² |
+
+### Radiation Units
+
+| Symbol | Long forms | Name | Enum value | SI equivalent |
+|--------|-----------|------|------------|---------------|
+| `Ci`   | `curie`, `curies` | curie (radioactivity) | `bu_curie` | 3.7×10¹⁰ Bq |
+| `R`    | `roentgen`, `roentgens` | röntgen (radiation exposure) | `bu_roentgen` | 2.58×10⁻⁴ C/kg |
+| `rem`  | `rems` | rem (dose equivalent) | `bu_rem` | 10⁻² Sv |
+
+### Logarithmic Units
+
+| Symbol | Long forms | Name | Enum value | Notes |
+|--------|-----------|------|------------|-------|
+| `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless logarithmic ratio; SI factor 1.0 |
 
 ### Digital Units
 

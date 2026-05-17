@@ -127,7 +127,25 @@ typedef enum value_base_unit_e {
 	bu_tonne, bu_bar,
 	bu_electronvolt, bu_dalton, bu_astronomical_unit,
 	bu_hectare,
-	bu_week, bu_year
+	bu_week, bu_year,
+	bu_inch, bu_foot, bu_yard, bu_mile, bu_nautical_mile,
+	bu_angstrom, bu_light_year, bu_parsec, bu_furlong, bu_fathom,
+	bu_pound, bu_ounce, bu_grain, bu_stone, bu_short_ton,
+	bu_long_ton, bu_troy_ounce, bu_carat,
+	bu_fahrenheit,
+	bu_atmosphere, bu_mmhg, bu_torr, bu_psi,
+	bu_calorie, bu_btu, bu_erg, bu_therm,
+	bu_horsepower,
+	bu_pound_force, bu_dyne, bu_kip,
+	bu_knot,
+	bu_gallon, bu_gallon_uk, bu_quart, bu_pint, bu_cup,
+	bu_fluid_ounce, bu_tablespoon, bu_teaspoon, bu_barrel,
+	bu_acre, bu_barn,
+	bu_arcminute, bu_arcsecond, bu_grad,
+	bu_poise, bu_stokes, bu_gauss, bu_maxwell, bu_oersted,
+	bu_stilb, bu_phot, bu_galileo,
+	bu_curie, bu_roentgen, bu_rem,
+	bu_neper
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

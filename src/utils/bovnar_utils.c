@@ -1351,6 +1351,74 @@ bool bvn_unit_valid(value_unit_t u)
 	}
 	return true;
 }
+static const value_base_unit_t bvni_si_named_derived[] = {
+	bu_newton, bu_pascal, bu_joule, bu_watt,
+	bu_volt, bu_ohm, bu_farad, bu_coulomb, bu_siemens,
+	bu_weber, bu_tesla, bu_henry, bu_lux, bu_lumen,
+	bu_hertz, bu_becquerel, bu_gray, bu_sievert, bu_katal,
+};
+#define BVNI_SI_NAMED_DERIVED_COUNT \
+	((uint32_t)(sizeof(bvni_si_named_derived)/sizeof(bvni_si_named_derived[0])))
+static int32_t bvni_pexp_to_si_prefix_id(int32_t pexp)
+{
+	for (uint32_t i = 0; i < BVN_SI_PREFIX_COUNT; i++) {
+		if (bvni_si_pfx_table[i].exp == pexp)
+			return (int32_t)i;
+	}
+	return -1;
+}
+static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
+{
+	bool aff, ok;
+	double off;
+	double base_si = bvn_unit_to_si_factor(u, &aff, &off, &ok);
+	if (!ok || aff)
+		return u;
+	double net_si = scale * base_si;
+	if (net_si <= 0.0 || !isfinite(net_si))
+		return u;
+	int32_t dim_r[bvn_si_dim_count];
+	if (!bvn_unit_dimension_vector(u, dim_r))
+		return u;
+	for (uint32_t n = 0; n < BVNI_SI_NAMED_DERIVED_COUNT; n++) {
+		value_base_unit_t nd = bvni_si_named_derived[n];
+		value_unit_t probe;
+		memset(&probe, 0, sizeof(probe));
+		probe.num_components = 1;
+		probe.components[0].base      = nd;
+		probe.components[0].exponent  = exp_linear;
+		probe.components[0].prefix.system   = prefix_si;
+		probe.components[0].prefix.id.si    = si_none;
+		int32_t dim_nd[bvn_si_dim_count];
+		if (!bvn_unit_dimension_vector(probe, dim_nd))
+			continue;
+		bool dim_match = true;
+		for (int d = 0; d < bvn_si_dim_count; d++) {
+			if (dim_r[d] != dim_nd[d]) {
+				dim_match = false;
+				break;
+			}
+		}
+		if (!dim_match)
+			continue;
+		double log_ratio = log10(net_si);
+		int32_t pexp = (int32_t)round(log_ratio);
+		if (fabs(log_ratio - (double)pexp) > 1e-6)
+			continue;
+		int32_t pfx_id = bvni_pexp_to_si_prefix_id(pexp);
+		if (pfx_id < 0)
+			continue;
+		value_unit_t result;
+		memset(&result, 0, sizeof(result));
+		result.num_components = 1;
+		result.components[0].base           = nd;
+		result.components[0].exponent       = exp_linear;
+		result.components[0].prefix.system  = prefix_si;
+		result.components[0].prefix.id.si   = (si_prefix_id_t)pfx_id;
+		return result;
+	}
+	return u;
+}
 int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                bvn_unit_flags_t flags)
 {
@@ -1362,6 +1430,8 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 		if (!bvn_unit_valid(u))
 			return -1;
 		u = bvn_unit_reduce(u, &scale, &overflow);
+		if (!overflow)
+			u = bvni_reduce_to_named_si(u, scale);
 	} else {
 		if (!bvn_unit_valid(u))
 			return -1;

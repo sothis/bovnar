@@ -496,7 +496,17 @@ static void test_nonsi_enum_order(void)
     ASSERT_TRUE((int)bu_quart_uk      == 109, "bu_quart_uk == 109");
     ASSERT_TRUE((int)bu_var           == 110, "bu_var == 110");
     ASSERT_TRUE((int)bu_volt_ampere   == 111, "bu_volt_ampere == 111");
-    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 112, "sentinel == 112");
+    ASSERT_TRUE((int)bu_kilogram_force == 112, "bu_kilogram_force == 112");
+    ASSERT_TRUE((int)bu_inch_hg       == 113, "bu_inch_hg == 113");
+    ASSERT_TRUE((int)bu_rpm           == 114, "bu_rpm == 114");
+    ASSERT_TRUE((int)bu_foot_pound    == 115, "bu_foot_pound == 115");
+    ASSERT_TRUE((int)bu_dram         == 116, "bu_dram == 116");
+    ASSERT_TRUE((int)bu_pennyweight   == 117, "bu_pennyweight == 117");
+    ASSERT_TRUE((int)bu_chain        == 118, "bu_chain == 118");
+    ASSERT_TRUE((int)bu_rod          == 119, "bu_rod == 119");
+    ASSERT_TRUE((int)bu_gill         == 120, "bu_gill == 120");
+    ASSERT_TRUE((int)bu_gill_uk      == 121, "bu_gill_uk == 121");
+    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 122, "sentinel == 122");
 }
 
 static void test_nonsi_si_factors(void)
@@ -580,6 +590,16 @@ static void test_nonsi_si_factors(void)
     CHK(bu_roentgen,      2.58e-4,                      1e-19);
     CHK(bu_rem,           1e-2,                         1e-17);
     CHK(bu_neper,         1.0,                          1e-15);
+    CHK(bu_kilogram_force, 9.80665,                     1e-12);
+    CHK(bu_inch_hg,       3386.388645,                  1e-6);
+    CHK(bu_rpm,           1.0/60.0,                     1e-18);
+    CHK(bu_foot_pound,    1.3558179483,                 1e-10);
+    CHK(bu_dram,          1.7718451953125e-3,            1e-18);
+    CHK(bu_pennyweight,   1.55517384e-3,                1e-14);
+    CHK(bu_chain,         20.1168,                      1e-12);
+    CHK(bu_rod,           5.0292,                       1e-13);
+    CHK(bu_gill,          1.18294118750e-4,             1e-19);
+    CHK(bu_gill_uk,       1.420653125e-4,               1e-18);
 #undef CHK
 #undef M_PI_LOCAL
 
@@ -638,6 +658,46 @@ static void test_nonsi_dim_vectors(void)
 
     DIM_OK(bu_arcminute);
     for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "arcmin dim[i]=0");
+
+    DIM_OK(bu_kilogram_force);
+    ASSERT_EQ_INT(d[0], 1, "kgf m=1"); ASSERT_EQ_INT(d[1], 1, "kgf kg=1");
+    ASSERT_EQ_INT(d[2], -2, "kgf s=-2");
+
+    DIM_OK(bu_inch_hg);
+    ASSERT_EQ_INT(d[0], -1, "inHg m=-1"); ASSERT_EQ_INT(d[1], 1, "inHg kg=1");
+    ASSERT_EQ_INT(d[2], -2, "inHg s=-2");
+
+    DIM_OK(bu_rpm);
+    ASSERT_EQ_INT(d[2], -1, "rpm s=-1");
+    ASSERT_EQ_INT(d[0], 0, "rpm m=0"); ASSERT_EQ_INT(d[1], 0, "rpm kg=0");
+
+    DIM_OK(bu_foot_pound);
+    ASSERT_EQ_INT(d[0], 2, "ft_lb m=2"); ASSERT_EQ_INT(d[1], 1, "ft_lb kg=1");
+    ASSERT_EQ_INT(d[2], -2, "ft_lb s=-2");
+
+    DIM_OK(bu_dram);
+    ASSERT_EQ_INT(d[1], 1, "dr kg=1");
+    ASSERT_EQ_INT(d[0], 0, "dr m=0"); ASSERT_EQ_INT(d[2], 0, "dr s=0");
+
+    DIM_OK(bu_pennyweight);
+    ASSERT_EQ_INT(d[1], 1, "dwt kg=1");
+    ASSERT_EQ_INT(d[0], 0, "dwt m=0"); ASSERT_EQ_INT(d[2], 0, "dwt s=0");
+
+    DIM_OK(bu_chain);
+    ASSERT_EQ_INT(d[0], 1, "ch m=1");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "ch dim[i]=0");
+
+    DIM_OK(bu_rod);
+    ASSERT_EQ_INT(d[0], 1, "rd m=1");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "rd dim[i]=0");
+
+    DIM_OK(bu_gill);
+    ASSERT_EQ_INT(d[0], 3, "gi m=3");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "gi dim[i]=0");
+
+    DIM_OK(bu_gill_uk);
+    ASSERT_EQ_INT(d[0], 3, "gi_uk m=3");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "gi_uk dim[i]=0");
 
     DIM_OK(bu_grad);
     for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "grad dim[i]=0");
@@ -744,6 +804,16 @@ static void test_nonsi_parse_canonical(void)
         { "R",           bu_roentgen      },
         { "rem",         bu_rem           },
         { "Np",          bu_neper         },
+        { "kgf",         bu_kilogram_force },
+        { "inHg",        bu_inch_hg       },
+        { "rpm",         bu_rpm           },
+        { "ft_lb",       bu_foot_pound    },
+        { "dr",          bu_dram          },
+        { "dwt",         bu_pennyweight   },
+        { "ch",          bu_chain         },
+        { "rd",          bu_rod           },
+        { "gi",          bu_gill          },
+        { "gi_uk",       bu_gill_uk       },
     };
     size_t n = sizeof(cases) / sizeof(cases[0]);
     for (size_t i = 0; i < n; i++) {
@@ -870,6 +940,23 @@ static void test_nonsi_parse_aliases(void)
         { "rems",          bu_rem           },
         { "neper",         bu_neper         },
         { "nepers",        bu_neper         },
+        { "kilogram_force", bu_kilogram_force },
+        { "inch_hg",       bu_inch_hg       },
+        { "inch_mercury",  bu_inch_hg       },
+        { "foot_pound",    bu_foot_pound    },
+        { "foot_pounds",   bu_foot_pound    },
+        { "dram",          bu_dram          },
+        { "drams",         bu_dram          },
+        { "pennyweight",   bu_pennyweight   },
+        { "pennyweights",  bu_pennyweight   },
+        { "chain",         bu_chain         },
+        { "chains",        bu_chain         },
+        { "rod",           bu_rod           },
+        { "rods",          bu_rod           },
+        { "gill",          bu_gill          },
+        { "gills",         bu_gill          },
+        { "gill_uk",       bu_gill_uk       },
+        { "gills_uk",      bu_gill_uk       },
     };
     size_t n = sizeof(cases) / sizeof(cases[0]);
     for (size_t i = 0; i < n; i++) {
@@ -907,6 +994,8 @@ static void test_nonsi_roundtrip(void)
         bu_poise, bu_stokes, bu_gauss, bu_maxwell, bu_oersted,
         bu_stilb, bu_phot, bu_galileo,
         bu_curie, bu_roentgen, bu_rem, bu_neper,
+        bu_kilogram_force, bu_inch_hg, bu_rpm, bu_foot_pound,
+        bu_dram, bu_pennyweight, bu_chain, bu_rod, bu_gill, bu_gill_uk,
     };
     size_t n = sizeof(units) / sizeof(units[0]);
     for (size_t i = 0; i < n; i++) {

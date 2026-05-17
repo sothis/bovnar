@@ -382,3 +382,183 @@ class TestMakeUnitCompoundCompatibility:
         ])
         vu_parsed = bovnar.parse_unit("k~g\u00b7m/s\u00b2")
         assert bovnar.units_compatible(vu_built, vu_parsed)
+
+
+@needs_lib
+class TestNewUnitParsing:
+    """Parsing tests for all 10 new base units."""
+
+    def _parse(self, s):
+        return bovnar.parse_unit(s)
+
+    def _base(self, s):
+        return self._parse(s).components[0].base_unit
+
+    # kilogram-force
+    def test_kgf_symbol(self):
+        assert self._base("kgf") == BaseUnit.KILOGRAM_FORCE
+
+    def test_kgf_long(self):
+        assert self._base("kilogram_force") == BaseUnit.KILOGRAM_FORCE
+
+    # inch of mercury
+    def test_inHg_symbol(self):
+        assert self._base("inHg") == BaseUnit.INCH_HG
+
+    def test_inHg_long(self):
+        assert self._base("inch_hg") == BaseUnit.INCH_HG
+
+    def test_inch_mercury_long(self):
+        assert self._base("inch_mercury") == BaseUnit.INCH_HG
+
+    # rpm
+    def test_rpm_symbol(self):
+        assert self._base("rpm") == BaseUnit.RPM
+
+    # foot-pound
+    def test_ft_lb_symbol(self):
+        assert self._base("ft_lb") == BaseUnit.FOOT_POUND
+
+    def test_foot_pound_long(self):
+        assert self._base("foot_pound") == BaseUnit.FOOT_POUND
+
+    def test_foot_pounds_plural(self):
+        assert self._base("foot_pounds") == BaseUnit.FOOT_POUND
+
+    # dram
+    def test_dr_symbol(self):
+        assert self._base("dr") == BaseUnit.DRAM
+
+    def test_dram_long(self):
+        assert self._base("dram") == BaseUnit.DRAM
+
+    def test_drams_plural(self):
+        assert self._base("drams") == BaseUnit.DRAM
+
+    # pennyweight
+    def test_dwt_symbol(self):
+        assert self._base("dwt") == BaseUnit.PENNYWEIGHT
+
+    def test_pennyweight_long(self):
+        assert self._base("pennyweight") == BaseUnit.PENNYWEIGHT
+
+    def test_pennyweights_plural(self):
+        assert self._base("pennyweights") == BaseUnit.PENNYWEIGHT
+
+    # chain
+    def test_ch_symbol(self):
+        assert self._base("ch") == BaseUnit.CHAIN
+
+    def test_chain_long(self):
+        assert self._base("chain") == BaseUnit.CHAIN
+
+    def test_chains_plural(self):
+        assert self._base("chains") == BaseUnit.CHAIN
+
+    # rod
+    def test_rd_symbol(self):
+        assert self._base("rd") == BaseUnit.ROD
+
+    def test_rod_long(self):
+        assert self._base("rod") == BaseUnit.ROD
+
+    def test_rods_plural(self):
+        assert self._base("rods") == BaseUnit.ROD
+
+    # US gill
+    def test_gi_symbol(self):
+        assert self._base("gi") == BaseUnit.GILL
+
+    def test_gill_long(self):
+        assert self._base("gill") == BaseUnit.GILL
+
+    def test_gills_plural(self):
+        assert self._base("gills") == BaseUnit.GILL
+
+    # UK gill
+    def test_gi_uk_symbol(self):
+        assert self._base("gi_uk") == BaseUnit.GILL_UK
+
+    def test_gill_uk_long(self):
+        assert self._base("gill_uk") == BaseUnit.GILL_UK
+
+    def test_gills_uk_plural(self):
+        assert self._base("gills_uk") == BaseUnit.GILL_UK
+
+
+@needs_lib
+class TestNewUnitSerialization:
+    """unit_to_str must round-trip through parse_unit for every new unit."""
+
+    def _roundtrip(self, sym):
+        vu1 = bovnar.parse_unit(sym)
+        s   = bovnar.unit_to_str(vu1)
+        vu2 = bovnar.parse_unit(s)
+        assert vu1.num_components == vu2.num_components
+        assert vu2.components[0].base_unit == vu1.components[0].base_unit
+
+    def test_roundtrip_kgf(self):         self._roundtrip("kgf")
+    def test_roundtrip_inHg(self):        self._roundtrip("inHg")
+    def test_roundtrip_rpm(self):         self._roundtrip("rpm")
+    def test_roundtrip_ft_lb(self):       self._roundtrip("ft_lb")
+    def test_roundtrip_dr(self):          self._roundtrip("dr")
+    def test_roundtrip_dwt(self):         self._roundtrip("dwt")
+    def test_roundtrip_ch(self):          self._roundtrip("ch")
+    def test_roundtrip_rd(self):          self._roundtrip("rd")
+    def test_roundtrip_gi(self):          self._roundtrip("gi")
+    def test_roundtrip_gi_uk(self):       self._roundtrip("gi_uk")
+
+
+@needs_lib
+class TestNewUnitCompatibility:
+    """Dimensional compatibility checks for new units against known equivalents."""
+
+    def _compat(self, a, b):
+        return bovnar.units_compatible(bovnar.parse_unit(a), bovnar.parse_unit(b))
+
+    # force family
+    def test_kgf_compatible_with_newton(self):    assert self._compat("kgf", "N")
+    def test_kgf_compatible_with_lbf(self):       assert self._compat("kgf", "lbf")
+    def test_kgf_compatible_with_dyn(self):       assert self._compat("kgf", "dyn")
+    def test_kgf_compatible_with_kip(self):       assert self._compat("kgf", "kip")
+
+    # pressure family
+    def test_inHg_compatible_with_pa(self):       assert self._compat("inHg", "Pa")
+    def test_inHg_compatible_with_atm(self):      assert self._compat("inHg", "atm")
+    def test_inHg_compatible_with_mmHg(self):     assert self._compat("inHg", "mmHg")
+    def test_inHg_compatible_with_psi(self):      assert self._compat("inHg", "psi")
+    def test_inHg_compatible_with_bar(self):      assert self._compat("inHg", "bar")
+
+    # frequency family
+    def test_rpm_compatible_with_hz(self):        assert self._compat("rpm", "Hz")
+    def test_rpm_compatible_with_bq(self):        assert self._compat("rpm", "Bq")
+
+    # energy family
+    def test_ft_lb_compatible_with_joule(self):   assert self._compat("ft_lb", "J")
+    def test_ft_lb_compatible_with_cal(self):     assert self._compat("ft_lb", "cal")
+    def test_ft_lb_compatible_with_btu(self):     assert self._compat("ft_lb", "Btu")
+    def test_ft_lb_compatible_with_erg(self):     assert self._compat("ft_lb", "erg")
+    def test_ft_lb_compatible_with_eV(self):      assert self._compat("ft_lb", "eV")
+
+    # mass family
+    def test_dr_compatible_with_oz(self):         assert self._compat("dr", "oz")
+    def test_dr_compatible_with_lb(self):         assert self._compat("dr", "lb")
+    def test_dr_compatible_with_gram(self):       assert self._compat("dr", "g")
+    def test_dwt_compatible_with_oz_t(self):      assert self._compat("dwt", "oz_t")
+    def test_dwt_compatible_with_lb(self):        assert self._compat("dwt", "lb")
+    def test_dwt_compatible_with_dr(self):        assert self._compat("dwt", "dr")
+
+    # length family
+    def test_ch_compatible_with_meter(self):      assert self._compat("ch", "m")
+    def test_ch_compatible_with_foot(self):       assert self._compat("ch", "ft")
+    def test_ch_compatible_with_mile(self):       assert self._compat("ch", "mi")
+    def test_rd_compatible_with_meter(self):      assert self._compat("rd", "m")
+    def test_rd_compatible_with_ch(self):         assert self._compat("rd", "ch")
+
+    # volume family
+    def test_gi_compatible_with_fl_oz(self):      assert self._compat("gi", "fl_oz")
+    def test_gi_compatible_with_pint(self):       assert self._compat("gi", "pt")
+    def test_gi_compatible_with_liter(self):      assert self._compat("gi", "L")
+    def test_gi_uk_compatible_with_pt_uk(self):   assert self._compat("gi_uk", "pt_uk")
+    def test_gi_uk_compatible_with_gi(self):      assert self._compat("gi_uk", "gi")
+    def test_gi_uk_compatible_with_gal_uk(self):  assert self._compat("gi_uk", "gal_uk")

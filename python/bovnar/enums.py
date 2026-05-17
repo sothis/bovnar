@@ -194,7 +194,17 @@ class BaseUnit(IntEnum):
     QUART_UK            = 109
     VAR                 = 110
     VOLT_AMPERE         = 111
-    _SENTINEL           = 112
+    KILOGRAM_FORCE      = 112
+    INCH_HG             = 113
+    RPM                 = 114
+    FOOT_POUND          = 115
+    DRAM                = 116
+    PENNYWEIGHT         = 117
+    CHAIN               = 118
+    ROD                 = 119
+    GILL                = 120
+    GILL_UK             = 121
+    _SENTINEL           = 122
 
 class Exponent(IntEnum):
 

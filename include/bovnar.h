@@ -152,7 +152,17 @@ typedef enum value_base_unit_e {
 	bu_thou,
 	bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
 	bu_var,
-	bu_volt_ampere
+	bu_volt_ampere,
+	bu_kilogram_force,
+	bu_inch_hg,
+	bu_rpm,
+	bu_foot_pound,
+	bu_dram,
+	bu_pennyweight,
+	bu_chain,
+	bu_rod,
+	bu_gill,
+	bu_gill_uk
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

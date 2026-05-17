@@ -143,7 +143,7 @@ When both are present, equality is checked **after parsing** via `memcmp` on the
 
 ## 3. Base Units
 
-Bovnar supports 111 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, and electrical power units.
+Bovnar supports 121 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, and surveying and culinary measure units.
 
 ### SI Base Units
 
@@ -373,6 +373,67 @@ Bovnar supports 111 named base units, covering SI base units, all named SI-deriv
 | `VA`   | `volt_ampere`, `volt_amperes` | volt-ampere | `bu_volt_ampere` | 1.0 W equivalent | apparent power; same dimensions as W |
 
 > **Watt, var, and VA:** All three units carry the same SI dimensional signature (kg·m²·s⁻³), so `bvn_units_compatible` returns `true` when comparing them. They are kept as distinct base units because they represent physically distinct interpretations of AC power: active power (W), reactive power (var), and apparent power (VA). A Bovnar-aware application can inspect `value_unit_t.components[0].base` to distinguish them after a compatibility check confirms the shared dimension.
+
+### Force Units (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `kgf`  | `kilogram_force` | kilogram-force | `bu_kilogram_force` | 9.80665 N (exact) |
+
+> **Kilogram-force:** 1 kgf is the force exerted by one kilogram of mass under standard gravity (g = 9.80665 m/s²). It is widely used in mechanical engineering, machine ratings, and spring constants. `bvn_units_compatible` treats `kgf` as compatible with `N`, `lbf`, `dyn`, and `kip`.
+
+### Pressure Units (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury (conventional, 0 °C) | `bu_inch_hg` | 3386.388645 Pa |
+
+> **Inch of mercury:** The conventional inch of mercury is defined at 0 °C (ice point) where mercury has density 13595.1 kg/m³ and g = 9.80665 m/s². It equals exactly 25.4 × 1 mmHg ≈ 3386.389 Pa. Used in US aviation barometric altimetry and weather reporting.
+
+### Rotational Frequency
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `rpm`  | `rpm` | revolutions per minute | `bu_rpm` | 1/60 s⁻¹ |
+
+> **rpm:** Revolutions per minute is the standard unit for rotational speed in engines, motors, and turbines. Since revolutions are dimensionless, rpm has SI dimension s⁻¹ (same as Hz and Bq). The SI conversion factor is 1/60: 1 rpm = 1/60 Hz. `bvn_units_compatible` returns `true` when comparing `rpm` with `Hz` or `Bq`.
+
+### Energy Units (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
+
+> **Foot-pound:** 1 ft·lbf = 0.3048 m × 4.4482216152605 N = 1.3558179483 J. Commonly used in US engineering for both mechanical energy and torque. Since joule and newton-metre share the same SI dimension vector (kg·m²·s⁻²), `bvn_units_compatible` returns `true` when comparing `ft_lb` with `J`, `cal`, `eV`, and similar energy units.
+
+### Imperial and US Customary Units — Mass (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `dr`   | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
+| `dwt`  | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
+
+> **Dram:** 1 dram = 1/16 ounce (avoirdupois) = 0.028349523125 / 16 kg. Used in pharmaceutical compounding and US culinary contexts.
+>
+> **Pennyweight:** 1 dwt = 1/20 troy ounce = 0.0311034768 / 20 kg. The troy mass system is used in precious metals trading (gold, silver, platinum).
+
+### Imperial and US Customary Units — Length (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `ch`   | `chain`, `chains` | chain (Gunter's) | `bu_chain` | 20.1168 m (exact) |
+| `rd`   | `rod`, `rods` | rod (pole, perch) | `bu_rod` | 5.0292 m (exact) |
+
+> **Chain and rod:** Gunter's chain (1 ch = 66 ft = 20.1168 m) and rod (1 rd = 16.5 ft = 5.0292 m) are the canonical land-survey units in the US public-lands system. One acre = 10 chains × 1 chain = 10 ch² and one chain = 4 rods. Both factors are exact under the international foot definition (1 ft = 0.3048 m exactly).
+
+### Volume Units (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `gi`      | `gill`, `gills` | US gill | `bu_gill` | 1.18294118750×10⁻⁴ m³ |
+| `gi_uk`   | `gill_uk`, `gills_uk` | imperial gill | `bu_gill_uk` | 1.420653125×10⁻⁴ m³ (exact) |
+
+> **Gill:** The US gill is 4 US fluid ounces (= 1/4 US liquid pint). The imperial gill is 5 imperial fluid ounces (= 1/4 imperial pint = gallon_uk / 32). Both are exact fractions of their respective gallon definitions. As with other US/UK pairs, `gi` and `gi_uk` are dimensionally compatible but numerically distinct.
 
 ### Digital Units
 

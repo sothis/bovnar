@@ -554,3 +554,152 @@
 .inline_thou       = 10.0 thou;                     # 10 thou = 0.254 mm
 .inline_pint_uk    = 1.0 pt_uk;                     # one UK pint
 .inline_kvar       = 2.5 k~var;                     # 2.5 kvar reactive power
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 24. Additional force, pressure, frequency, energy, mass, length, and volume
+# ══════════════════════════════════════════════════════════════════════════════
+
+# --- kilogram-force ---
+# 1 kgf = 9.80665 N (exact; defined by standard gravity)
+# Commonly used in machine ratings, spring constants, and load-cell specs.
+# Dimensionally identical to N, lbf, dyn, kip — bvn_units_compatible returns true.
+
+.force_kgf             = <float:64,kgf>     75.0;       # 75 kgf load-cell reading
+.force_kgf_long        = <float:64,kilogram_force> 1.0; # long-form spelling accepted
+.spring_constant       = <float:32,kgf/m~m> 12.5;       # spring rate in kgf/mm
+.bearing_load          = <float:64,kgf>     4200.0;     # radial bearing load
+# SI equivalent check: 75 kgf × 9.80665 = 735.499 N
+
+
+# --- inch of mercury ---
+# 1 inHg = 25.4 × 133.322387415 Pa ≈ 3386.389 Pa (conventional at 0 °C)
+# Standard in US aviation altimetry and surface weather observations.
+# Dimensionally identical to Pa, atm, bar, mmHg — bvn_units_compatible returns true.
+
+.baro_altimeter        = <float:32,inHg>    29.92;      # standard sea-level QNH
+.baro_low_pressure     = <float:32,inHg>    28.50;      # deep low-pressure system
+.baro_long_form        = <float:32,inch_hg> 30.15;      # long-form spelling
+# 29.92 inHg × 3386.389 = 101,325.2 Pa ≈ 1 atm — confirming round-trip
+
+
+# --- revolutions per minute ---
+# 1 rpm = 1/60 s⁻¹ (same SI dimension as Hz)
+# Standard for engine speed, motor speed, centrifuge speed, turbine speed.
+# bvn_units_compatible returns true when comparing rpm with Hz or Bq.
+
+.engine_idle           = <uint:16,rpm>      800;        # idle speed
+.engine_redline        = <uint:16,rpm>      7200;       # redline limit
+.motor_rated           = <float:32,rpm>     1450.0;     # 4-pole induction motor at 50 Hz
+.centrifuge_speed      = <uint:32,rpm>      12000;      # lab micro-centrifuge
+.turbine_rpm           = <uint:32,rpm>      3600;       # 2-pole generator at 60 Hz
+# 3600 rpm × (1/60) = 60 Hz — consistent with 60 Hz mains frequency
+
+
+# --- foot-pound (energy / torque) ---
+# 1 ft·lbf = 0.3048 m × 4.4482216152605 N = 1.3558179483 J (exact chain)
+# Standard US engineering unit for both energy and torque.
+# Dimensionally identical to J, cal, BTU, eV — bvn_units_compatible returns true.
+
+.torque_wrench         = <float:32,ft_lb>   120.0;      # 120 ft·lb lug-nut torque
+.engine_torque         = <float:64,ft_lb>   400.0;      # peak torque of a V8
+.impact_energy         = <float:64,ft_lb>   37.0;       # Charpy impact energy
+.ft_lb_long            = <float:64,foot_pound> 1.0;     # long-form spelling
+.ft_lb_plural          = <float:64,foot_pounds> 550.0;  # plural spelling accepted
+# 120 ft·lb × 1.3558179483 = 162.698 N·m
+
+
+# --- dram (avoirdupois mass) ---
+# 1 dr = 1/16 oz = 0.028349523125 / 16 = 1.7718451953125e-3 kg (exact)
+# Used in pharmaceutical compounding and traditional US apothecary systems.
+
+.compound_dose         = <float:32,dr>      2.0;        # 2 drams of a compound
+.dram_long             = <float:32,dram>    1.0;        # long-form spelling
+.drams_plural          = <float:32,drams>   8.0;        # 8 drams = 1 ounce
+# 8 dr × 1.7718451953125e-3 = 0.01417476156 kg = 0.028349523125 kg / 2 — wait: 8 dr = 0.5 oz ✓
+
+
+# --- pennyweight (troy mass) ---
+# 1 dwt = 1/20 troy ounce = 0.0311034768 / 20 = 1.55517384e-3 kg (exact)
+# The standard unit for precious-metals trading weights (gold, silver, platinum).
+
+.gold_bar_weight       = <float:64,dwt>     400.0;      # a standard 400-dwt gold bar
+.silver_coin           = <float:32,dwt>     17.5;       # silver coin weight
+.dwt_long              = <float:32,pennyweight>  1.0;   # long-form spelling
+.dwt_plural            = <float:32,pennyweights> 20.0;  # 20 dwt = 1 troy ounce
+# 20 dwt × 1.55517384e-3 = 0.031103477 kg = bu_troy_ounce ✓
+
+
+# --- chain and rod (surveying) ---
+# 1 ch (Gunter's chain) = 66 ft = 20.1168 m (exact)
+# 1 rd (rod, pole, perch) = 16.5 ft = 5.0292 m (exact)
+# Fundamental units of the US Public Land Survey System (PLSS).
+# 1 acre = 10 ch × 1 ch area; 1 ch = 4 rd.
+
+.survey_distance       = <float:64,ch>      80.0;       # 80 chains = 1 mile
+.survey_lot            = <float:64,ch>       5.0;       # 5-chain parcel width
+.survey_rod            = <float:64,rd>      20.0;       # 20 rods = 1 chain × 5
+.chain_long            = <float:64,chain>    1.0;       # long-form spelling
+.rod_long              = <float:64,rod>      1.0;       # long-form spelling
+.rod_plural            = <float:64,rods>     4.0;       # 4 rods = 1 chain
+.chain_plural          = <float:64,chains>  80.0;       # 80 chains = 1 mile ✓
+# 80 ch × 20.1168 m = 1609.344 m = 1 mile — exact
+
+
+# --- gill (US and UK) ---
+# 1 US gill (gi) = 4 US fluid ounces = 1.18294118750e-4 m³
+# 1 UK gill (gi_uk) = 5 imperial fluid ounces = 1.420653125e-4 m³ (exact)
+# Culinary and pub-measure unit; UK gill is the traditional pub serving measure.
+
+.us_gill               = <float:32,gi>      1.0;        # one US gill = 4 fl oz
+.uk_gill               = <float:32,gi_uk>   1.0;        # one UK gill = 5 imp. fl oz
+.cocktail_recipe       = <float:32,gi>      2.0;        # two US gills of spirit
+.pub_measure_uk        = <float:32,gi_uk>   1.0;        # traditional UK pub gill
+.gill_long             = <float:32,gill>    1.0;        # long-form spelling (US)
+.gill_uk_long          = <float:32,gill_uk> 1.0;        # long-form spelling (UK)
+.gills_plural          = <float:32,gills>   4.0;        # 4 US gills = 1 US pint
+.gills_uk_plural       = <float:32,gills_uk> 4.0;       # 4 UK gills = 1 UK pint
+
+# Relationship checks:
+# 1 pt = 2 cups = 4 gi → 4.73176473e-4 / 4 = 1.18294118750e-4 m³ (gi)
+# 1 pt_uk = 4 gi_uk → 5.6826125e-4 / 4 = 1.420653125e-4 m³ (gi_uk) ✓
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 25. Cross-unit compatibility demonstrations (new units)
+# ══════════════════════════════════════════════════════════════════════════════
+# Units with identical SI dimension vectors are compatible via bvn_units_compatible.
+# Applications that must distinguish physically different interpretations inspect
+# .components[0].base after the compatibility check passes.
+
+# Force family: N, kgf, lbf, dyn, kip — all {1,1,-2,0,0,0,0}
+.cmp_force_n           = <float:64,N>    9.80665;       # same force as 1 kgf
+.cmp_force_kgf         = <float:64,kgf>  1.0;           # compatible with N, lbf
+.cmp_force_lbf         = <float:64,lbf>  2.20462;       # 2.20462 lbf ≈ 1 kgf
+
+# Pressure family: Pa, inHg, atm, mmHg, Torr, psi, bar — all {-1,1,-2,0,0,0,0}
+.cmp_pres_pa           = <float:64,Pa>   101325.0;      # standard atmosphere
+.cmp_pres_inHg         = <float:64,inHg> 29.9212;       # same: 29.9212 inHg ≈ 1 atm
+
+# Frequency family: Hz, Bq, rpm — all {0,0,-1,0,0,0,0}
+.cmp_freq_hz           = <float:64,Hz>   60.0;          # mains frequency
+.cmp_freq_rpm          = <float:64,rpm>  3600.0;        # 3600 rpm = 60 Hz
+
+# Energy family: J, cal, Btu, eV, erg, ft_lb, thm — all {2,1,-2,0,0,0,0}
+.cmp_energy_j          = <float:64,J>    1.35582;       # 1 ft·lb in joules
+.cmp_energy_ft_lb      = <float:64,ft_lb> 1.0;          # compatible with J, cal
+
+# Volume family: m³, L, gal, pt, gi, gi_uk, bbl — all {3,0,0,0,0,0,0}
+.cmp_vol_gi            = <float:32,gi>   1.0;           # US gill
+.cmp_vol_gi_uk         = <float:32,gi_uk> 1.0;          # UK gill (≠ US gill numerically)
+
+# Mass family: kg, g, lb, oz, dr, dwt, slug — all {0,1,0,0,0,0,0}
+.cmp_mass_dwt          = <float:64,dwt>  20.0;          # 20 dwt = 1 troy oz
+.cmp_mass_oz_t         = <float:64,oz_t>  1.0;          # compatible: same dims
+.cmp_mass_dr           = <float:64,dr>   16.0;          # 16 dr = 1 oz (avoirdupois)
+.cmp_mass_oz           = <float:64,oz>    1.0;          # compatible: same dims
+
+# Length family: m, ft, in, ch, rd, thou — all {1,0,0,0,0,0,0}
+.cmp_len_ch            = <float:64,ch>    1.0;          # 1 chain = 20.1168 m
+.cmp_len_rd            = <float:64,rd>    4.0;          # 4 rods = 1 chain (20.1168 m)
+.cmp_len_ft            = <float:64,ft>   66.0;          # 66 feet = 1 chain ✓

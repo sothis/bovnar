@@ -180,6 +180,16 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_quart_uk]           = { bu_quart_uk,           1.1365225e-3,             {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 	[bu_var]                = { bu_var,                1.0,                      {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
 	[bu_volt_ampere]        = { bu_volt_ampere,        1.0,                      {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
+	[bu_kilogram_force]     = { bu_kilogram_force,     9.80665,                  {1, 1,-2, 0, 0, 0, 0}, false, 0.0    },
+	[bu_inch_hg]            = { bu_inch_hg,            3386.388645,              {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
+	[bu_rpm]                = { bu_rpm,                1.0/60.0,                 {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
+	[bu_foot_pound]         = { bu_foot_pound,         1.3558179483,             {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
+	[bu_dram]               = { bu_dram,               1.7718451953125e-3,       {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_pennyweight]        = { bu_pennyweight,        1.55517384e-3,            {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_chain]              = { bu_chain,              20.1168,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_rod]                = { bu_rod,                5.0292,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_gill]               = { bu_gill,               1.18294118750e-4,         {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_gill_uk]            = { bu_gill_uk,            1.420653125e-4,           {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))

@@ -162,7 +162,19 @@ typedef enum value_base_unit_e {
 	bu_chain,
 	bu_rod,
 	bu_gill,
-	bu_gill_uk
+	bu_gill_uk,
+	bu_standard_gravity,
+	bu_metric_horsepower,
+	bu_revolution,
+	bu_month,
+	bu_fortnight,
+	bu_atmosphere_technical,
+	bu_tex,
+	bu_denier,
+	bu_fluid_dram,
+	bu_minim,
+	bu_peck,
+	bu_bushel
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

@@ -315,7 +315,7 @@ class TestNewUnitSIFactors:
         assert math.isclose(self._factor("rd"), 5.0292, rel_tol=1e-9)
 
     def test_gill_factor(self):
-        assert math.isclose(self._factor("gi"), 1.18294118750e-4, rel_tol=1e-9)
+        assert math.isclose(self._factor("gi"), 1.18294118250e-4, rel_tol=1e-9)
 
     def test_gill_uk_factor(self):
         assert math.isclose(self._factor("gi_uk"), 1.420653125e-4, rel_tol=1e-9)
@@ -481,3 +481,519 @@ class TestNewUnitConversions:
     def test_gill_uk_to_ml(self):
         v = convert_value(1.0, self._p("gi_uk"), self._p("m~L"))
         assert math.isclose(v, 142.0653125, rel_tol=1e-7)
+
+
+@needs_lib
+class TestNewUnitsParsingRoundtrip:
+    def _p(self, s):
+        import bovnar
+        return bovnar.parse_unit(s)
+
+    def test_parse_gn(self):
+        vu = self._p("gn")
+        assert vu.components[0].base_unit == BaseUnit.STANDARD_GRAVITY
+
+    def test_parse_standard_gravity(self):
+        vu = self._p("standard_gravity")
+        assert vu.components[0].base_unit == BaseUnit.STANDARD_GRAVITY
+
+    def test_parse_PS(self):
+        vu = self._p("PS")
+        assert vu.components[0].base_unit == BaseUnit.METRIC_HORSEPOWER
+
+    def test_parse_CV(self):
+        vu = self._p("CV")
+        assert vu.components[0].base_unit == BaseUnit.METRIC_HORSEPOWER
+
+    def test_parse_metric_horsepower(self):
+        vu = self._p("metric_horsepower")
+        assert vu.components[0].base_unit == BaseUnit.METRIC_HORSEPOWER
+
+    def test_parse_rev(self):
+        vu = self._p("rev")
+        assert vu.components[0].base_unit == BaseUnit.REVOLUTION
+
+    def test_parse_turn(self):
+        vu = self._p("turn")
+        assert vu.components[0].base_unit == BaseUnit.REVOLUTION
+
+    def test_parse_revolution(self):
+        vu = self._p("revolution")
+        assert vu.components[0].base_unit == BaseUnit.REVOLUTION
+
+    def test_parse_revolutions(self):
+        vu = self._p("revolutions")
+        assert vu.components[0].base_unit == BaseUnit.REVOLUTION
+
+    def test_parse_turns(self):
+        vu = self._p("turns")
+        assert vu.components[0].base_unit == BaseUnit.REVOLUTION
+
+    def test_parse_mo(self):
+        vu = self._p("mo")
+        assert vu.components[0].base_unit == BaseUnit.MONTH
+
+    def test_parse_month(self):
+        vu = self._p("month")
+        assert vu.components[0].base_unit == BaseUnit.MONTH
+
+    def test_parse_months(self):
+        vu = self._p("months")
+        assert vu.components[0].base_unit == BaseUnit.MONTH
+
+    def test_parse_fn(self):
+        vu = self._p("fn")
+        assert vu.components[0].base_unit == BaseUnit.FORTNIGHT
+
+    def test_parse_fortnight(self):
+        vu = self._p("fortnight")
+        assert vu.components[0].base_unit == BaseUnit.FORTNIGHT
+
+    def test_parse_fortnights(self):
+        vu = self._p("fortnights")
+        assert vu.components[0].base_unit == BaseUnit.FORTNIGHT
+
+    def test_parse_at(self):
+        vu = self._p("at")
+        assert vu.components[0].base_unit == BaseUnit.ATMOSPHERE_TECHNICAL
+
+    def test_parse_atmosphere_technical(self):
+        vu = self._p("atmosphere_technical")
+        assert vu.components[0].base_unit == BaseUnit.ATMOSPHERE_TECHNICAL
+
+    def test_parse_tex(self):
+        vu = self._p("tex")
+        assert vu.components[0].base_unit == BaseUnit.TEX
+
+    def test_parse_den(self):
+        vu = self._p("den")
+        assert vu.components[0].base_unit == BaseUnit.DENIER
+
+    def test_parse_denier(self):
+        vu = self._p("denier")
+        assert vu.components[0].base_unit == BaseUnit.DENIER
+
+    def test_parse_deniers(self):
+        vu = self._p("deniers")
+        assert vu.components[0].base_unit == BaseUnit.DENIER
+
+    def test_parse_fl_dr(self):
+        vu = self._p("fl_dr")
+        assert vu.components[0].base_unit == BaseUnit.FLUID_DRAM
+
+    def test_parse_fluid_dram(self):
+        vu = self._p("fluid_dram")
+        assert vu.components[0].base_unit == BaseUnit.FLUID_DRAM
+
+    def test_parse_fluid_drams(self):
+        vu = self._p("fluid_drams")
+        assert vu.components[0].base_unit == BaseUnit.FLUID_DRAM
+
+    def test_parse_minim(self):
+        vu = self._p("minim")
+        assert vu.components[0].base_unit == BaseUnit.MINIM
+
+    def test_parse_minims(self):
+        vu = self._p("minims")
+        assert vu.components[0].base_unit == BaseUnit.MINIM
+
+    def test_parse_pk(self):
+        vu = self._p("pk")
+        assert vu.components[0].base_unit == BaseUnit.PECK
+
+    def test_parse_peck(self):
+        vu = self._p("peck")
+        assert vu.components[0].base_unit == BaseUnit.PECK
+
+    def test_parse_pecks(self):
+        vu = self._p("pecks")
+        assert vu.components[0].base_unit == BaseUnit.PECK
+
+    def test_parse_bsh(self):
+        vu = self._p("bsh")
+        assert vu.components[0].base_unit == BaseUnit.BUSHEL
+
+    def test_parse_bushel(self):
+        vu = self._p("bushel")
+        assert vu.components[0].base_unit == BaseUnit.BUSHEL
+
+    def test_parse_bushels(self):
+        vu = self._p("bushels")
+        assert vu.components[0].base_unit == BaseUnit.BUSHEL
+
+    def test_roundtrip_gn(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("gn")) == "gn"
+
+    def test_roundtrip_PS(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("PS")) == "PS"
+
+    def test_roundtrip_rev(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("rev")) == "rev"
+
+    def test_roundtrip_mo(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("mo")) == "mo"
+
+    def test_roundtrip_fn(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("fn")) == "fn"
+
+    def test_roundtrip_at(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("at")) == "at"
+
+    def test_roundtrip_tex(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("tex")) == "tex"
+
+    def test_roundtrip_den(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("den")) == "den"
+
+    def test_roundtrip_fl_dr(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("fl_dr")) == "fl_dr"
+
+    def test_roundtrip_minim(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("minim")) == "minim"
+
+    def test_roundtrip_pk(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("pk")) == "pk"
+
+    def test_roundtrip_bsh(self):
+        import bovnar
+        assert bovnar.unit_to_str(self._p("bsh")) == "bsh"
+
+
+@needs_lib
+class TestNewUnitsSIFactor:
+    def _p(self, s):
+        import bovnar
+        return bovnar.parse_unit(s)
+
+    def test_gn_factor(self):
+        conv = unit_to_si_factor(self._p("gn"))
+        assert math.isclose(conv.factor, 9.80665, rel_tol=1e-10)
+        assert not conv.is_affine
+
+    def test_PS_factor(self):
+        conv = unit_to_si_factor(self._p("PS"))
+        assert math.isclose(conv.factor, 735.49875, rel_tol=1e-10)
+        assert not conv.is_affine
+
+    def test_rev_factor_is_two_pi(self):
+        conv = unit_to_si_factor(self._p("rev"))
+        assert math.isclose(conv.factor, 2.0 * math.pi, rel_tol=1e-12)
+        assert not conv.is_affine
+
+    def test_mo_factor(self):
+        conv = unit_to_si_factor(self._p("mo"))
+        assert math.isclose(conv.factor, 2629800.0, rel_tol=1e-12)
+        assert not conv.is_affine
+
+    def test_fn_factor(self):
+        conv = unit_to_si_factor(self._p("fn"))
+        assert math.isclose(conv.factor, 1209600.0, rel_tol=1e-12)
+        assert not conv.is_affine
+
+    def test_at_factor(self):
+        conv = unit_to_si_factor(self._p("at"))
+        assert math.isclose(conv.factor, 98066.5, rel_tol=1e-10)
+        assert not conv.is_affine
+
+    def test_tex_factor(self):
+        conv = unit_to_si_factor(self._p("tex"))
+        assert math.isclose(conv.factor, 1e-6, rel_tol=1e-12)
+        assert not conv.is_affine
+
+    def test_den_factor(self):
+        conv = unit_to_si_factor(self._p("den"))
+        assert math.isclose(conv.factor, 1.0 / 9000000.0, rel_tol=1e-10)
+        assert not conv.is_affine
+
+    def test_fl_dr_factor(self):
+        conv = unit_to_si_factor(self._p("fl_dr"))
+        assert math.isclose(conv.factor, 3.6966911953125e-6, rel_tol=1e-12)
+        assert not conv.is_affine
+
+    def test_minim_factor(self):
+        conv = unit_to_si_factor(self._p("minim"))
+        assert math.isclose(conv.factor, 6.16115199218750e-8, rel_tol=1e-12)
+        assert not conv.is_affine
+
+    def test_pk_factor(self):
+        conv = unit_to_si_factor(self._p("pk"))
+        assert math.isclose(conv.factor, 8.80976754172e-3, rel_tol=1e-10)
+        assert not conv.is_affine
+
+    def test_bsh_factor(self):
+        conv = unit_to_si_factor(self._p("bsh"))
+        assert math.isclose(conv.factor, 3.523907016688e-2, rel_tol=1e-10)
+        assert not conv.is_affine
+
+
+@needs_lib
+class TestNewUnitsDimensions:
+    def _p(self, s):
+        import bovnar
+        return bovnar.parse_unit(s)
+
+    def test_gn_dims_acceleration(self):
+        dims = unit_dimension_vector(self._p("gn"))
+        assert dims == [1, 0, -2, 0, 0, 0, 0]
+
+    def test_PS_dims_power(self):
+        dims = unit_dimension_vector(self._p("PS"))
+        assert dims == [2, 1, -3, 0, 0, 0, 0]
+
+    def test_rev_dims_dimensionless(self):
+        dims = unit_dimension_vector(self._p("rev"))
+        assert dims == [0, 0, 0, 0, 0, 0, 0]
+
+    def test_mo_dims_time(self):
+        dims = unit_dimension_vector(self._p("mo"))
+        assert dims == [0, 0, 1, 0, 0, 0, 0]
+
+    def test_fn_dims_time(self):
+        dims = unit_dimension_vector(self._p("fn"))
+        assert dims == [0, 0, 1, 0, 0, 0, 0]
+
+    def test_at_dims_pressure(self):
+        dims = unit_dimension_vector(self._p("at"))
+        assert dims == [-1, 1, -2, 0, 0, 0, 0]
+
+    def test_tex_dims_linear_density(self):
+        dims = unit_dimension_vector(self._p("tex"))
+        assert dims == [-1, 1, 0, 0, 0, 0, 0]
+
+    def test_den_dims_linear_density(self):
+        dims = unit_dimension_vector(self._p("den"))
+        assert dims == [-1, 1, 0, 0, 0, 0, 0]
+
+    def test_fl_dr_dims_volume(self):
+        dims = unit_dimension_vector(self._p("fl_dr"))
+        assert dims == [3, 0, 0, 0, 0, 0, 0]
+
+    def test_minim_dims_volume(self):
+        dims = unit_dimension_vector(self._p("minim"))
+        assert dims == [3, 0, 0, 0, 0, 0, 0]
+
+    def test_pk_dims_volume(self):
+        dims = unit_dimension_vector(self._p("pk"))
+        assert dims == [3, 0, 0, 0, 0, 0, 0]
+
+    def test_bsh_dims_volume(self):
+        dims = unit_dimension_vector(self._p("bsh"))
+        assert dims == [3, 0, 0, 0, 0, 0, 0]
+
+
+@needs_lib
+class TestNewUnitsCompatibility:
+    def _compat(self, a, b):
+        import bovnar
+        return bovnar.units_compatible(bovnar.parse_unit(a), bovnar.parse_unit(b))
+
+    def test_gn_compatible_with_m_per_s2(self):
+        assert self._compat("gn", "m/s\u00b2")
+
+    def test_gn_compatible_with_Gal(self):
+        assert self._compat("gn", "Gal")
+
+    def test_PS_compatible_with_watt(self):
+        assert self._compat("PS", "W")
+
+    def test_PS_compatible_with_hp(self):
+        assert self._compat("PS", "hp")
+
+    def test_rev_compatible_with_rad(self):
+        assert self._compat("rev", "rad")
+
+    def test_rev_compatible_with_deg(self):
+        assert self._compat("rev", "deg")
+
+    def test_mo_compatible_with_second(self):
+        assert self._compat("mo", "s")
+
+    def test_mo_compatible_with_week(self):
+        assert self._compat("mo", "wk")
+
+    def test_mo_compatible_with_year(self):
+        assert self._compat("mo", "yr")
+
+    def test_fn_compatible_with_second(self):
+        assert self._compat("fn", "s")
+
+    def test_fn_compatible_with_week(self):
+        assert self._compat("fn", "wk")
+
+    def test_fn_compatible_with_month(self):
+        assert self._compat("fn", "mo")
+
+    def test_at_compatible_with_pa(self):
+        assert self._compat("at", "Pa")
+
+    def test_at_compatible_with_atm(self):
+        assert self._compat("at", "atm")
+
+    def test_at_compatible_with_psi(self):
+        assert self._compat("at", "psi")
+
+    def test_tex_compatible_with_denier(self):
+        assert self._compat("tex", "den")
+
+    def test_fl_dr_compatible_with_fl_oz(self):
+        assert self._compat("fl_dr", "fl_oz")
+
+    def test_fl_dr_compatible_with_liter(self):
+        assert self._compat("fl_dr", "L")
+
+    def test_minim_compatible_with_fl_dr(self):
+        assert self._compat("minim", "fl_dr")
+
+    def test_minim_compatible_with_liter(self):
+        assert self._compat("minim", "L")
+
+    def test_pk_compatible_with_liter(self):
+        assert self._compat("pk", "L")
+
+    def test_pk_compatible_with_bsh(self):
+        assert self._compat("pk", "bsh")
+
+    def test_pk_compatible_with_gallon(self):
+        assert self._compat("pk", "gal")
+
+    def test_bsh_compatible_with_liter(self):
+        assert self._compat("bsh", "L")
+
+    def test_bsh_compatible_with_barrel(self):
+        assert self._compat("bsh", "bbl")
+
+    def test_gn_incompatible_with_meter(self):
+        assert not self._compat("gn", "m")
+
+    def test_PS_incompatible_with_joule(self):
+        assert not self._compat("PS", "J")
+
+    def test_tex_incompatible_with_gram(self):
+        assert not self._compat("tex", "g")
+
+
+@needs_lib
+class TestNewUnitsConvertValue:
+    def _p(self, s):
+        import bovnar
+        return bovnar.parse_unit(s)
+
+    def test_gn_to_m_per_s2(self):
+        v = convert_value(1.0, self._p("gn"), self._p("m/s\u00b2"))
+        assert math.isclose(v, 9.80665, rel_tol=1e-10)
+
+    def test_gn_to_Gal(self):
+        v = convert_value(1.0, self._p("gn"), self._p("Gal"))
+        assert math.isclose(v, 980.665, rel_tol=1e-9)
+
+    def test_PS_to_watt(self):
+        v = convert_value(1.0, self._p("PS"), self._p("W"))
+        assert math.isclose(v, 735.49875, rel_tol=1e-10)
+
+    def test_PS_to_hp(self):
+        v = convert_value(1.0, self._p("PS"), self._p("hp"))
+        assert math.isclose(v, 735.49875 / 745.69987158227, rel_tol=1e-9)
+
+    def test_hp_to_PS(self):
+        v = convert_value(1.0, self._p("hp"), self._p("PS"))
+        assert math.isclose(v, 745.69987158227 / 735.49875, rel_tol=1e-9)
+
+    def test_1_rev_is_360_degrees(self):
+        v = convert_value(1.0, self._p("rev"), self._p("deg"))
+        assert math.isclose(v, 360.0, rel_tol=1e-10)
+
+    def test_1_rev_is_2pi_radians(self):
+        v = convert_value(1.0, self._p("rev"), self._p("rad"))
+        assert math.isclose(v, 2.0 * math.pi, rel_tol=1e-12)
+
+    def test_1_rev_is_400_grad(self):
+        v = convert_value(1.0, self._p("rev"), self._p("grad"))
+        assert math.isclose(v, 400.0, rel_tol=1e-10)
+
+    def test_12_months_equals_1_julian_year(self):
+        v = convert_value(12.0, self._p("mo"), self._p("yr"))
+        assert math.isclose(v, 1.0, rel_tol=1e-12)
+
+    def test_2_fortnights_equals_1_month_approx(self):
+        v = convert_value(2.0, self._p("fn"), self._p("mo"))
+        assert math.isclose(v, 2419200.0 / 2629800.0, rel_tol=1e-10)
+
+    def test_fortnight_to_days(self):
+        v = convert_value(1.0, self._p("fn"), self._p("d"))
+        assert math.isclose(v, 14.0, rel_tol=1e-12)
+
+    def test_2_weeks_equals_1_fortnight(self):
+        v = convert_value(2.0, self._p("wk"), self._p("fn"))
+        assert math.isclose(v, 1.0, rel_tol=1e-12)
+
+    def test_at_to_pa(self):
+        v = convert_value(1.0, self._p("at"), self._p("Pa"))
+        assert math.isclose(v, 98066.5, rel_tol=1e-10)
+
+    def test_at_vs_atm(self):
+        v = convert_value(1.0, self._p("at"), self._p("atm"))
+        assert math.isclose(v, 98066.5 / 101325.0, rel_tol=1e-10)
+
+    def test_9_den_equals_1_tex(self):
+        v = convert_value(9.0, self._p("den"), self._p("tex"))
+        assert math.isclose(v, 1.0, rel_tol=1e-9)
+
+    def test_tex_to_den(self):
+        v = convert_value(1.0, self._p("tex"), self._p("den"))
+        assert math.isclose(v, 9.0, rel_tol=1e-9)
+
+    def test_8_fl_dr_equals_1_fl_oz(self):
+        v = convert_value(8.0, self._p("fl_dr"), self._p("fl_oz"))
+        assert math.isclose(v, 1.0, rel_tol=1e-12)
+
+    def test_fl_dr_to_ml(self):
+        v = convert_value(1.0, self._p("fl_dr"), self._p("m~L"))
+        assert math.isclose(v, 3.6966911953125, rel_tol=1e-10)
+
+    def test_60_minims_equals_1_fl_dr(self):
+        v = convert_value(60.0, self._p("minim"), self._p("fl_dr"))
+        assert math.isclose(v, 1.0, rel_tol=1e-12)
+
+    def test_480_minims_equals_1_fl_oz(self):
+        v = convert_value(480.0, self._p("minim"), self._p("fl_oz"))
+        assert math.isclose(v, 1.0, rel_tol=1e-10)
+
+    def test_minim_to_ul(self):
+        v = convert_value(1.0, self._p("minim"), self._p("\u00b5~L"))
+        assert math.isclose(v, 61.6115199218750, rel_tol=1e-9)
+
+    def test_4_pecks_equals_1_bushel(self):
+        v = convert_value(4.0, self._p("pk"), self._p("bsh"))
+        assert math.isclose(v, 1.0, rel_tol=1e-10)
+
+    def test_peck_to_liter(self):
+        v = convert_value(1.0, self._p("pk"), self._p("L"))
+        assert math.isclose(v, 8.80976754172, rel_tol=1e-9)
+
+    def test_bushel_to_liter(self):
+        v = convert_value(1.0, self._p("bsh"), self._p("L"))
+        assert math.isclose(v, 35.23907016688, rel_tol=1e-9)
+
+    def test_bushel_to_peck(self):
+        v = convert_value(1.0, self._p("bsh"), self._p("pk"))
+        assert math.isclose(v, 4.0, rel_tol=1e-10)
+
+    def test_kPS_to_kW(self):
+        v = convert_value(1.0, self._p("k~PS"), self._p("k~W"))
+        assert math.isclose(v, 735.49875, rel_tol=1e-9)
+
+    def test_prefixed_gn_milli(self):
+        import bovnar
+        conv = unit_to_si_factor(bovnar.parse_unit("m~gn"))
+        assert math.isclose(conv.factor, 9.80665e-3, rel_tol=1e-10)

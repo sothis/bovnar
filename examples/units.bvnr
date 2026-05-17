@@ -647,7 +647,7 @@
 
 
 # --- gill (US and UK) ---
-# 1 US gill (gi) = 4 US fluid ounces = 1.18294118750e-4 m³
+# 1 US gill (gi) = 4 US fluid ounces = 1.18294118250e-4 m³
 # 1 UK gill (gi_uk) = 5 imperial fluid ounces = 1.420653125e-4 m³ (exact)
 # Culinary and pub-measure unit; UK gill is the traditional pub serving measure.
 
@@ -661,7 +661,7 @@
 .gills_uk_plural       = <float:32,gills_uk> 4.0;       # 4 UK gills = 1 UK pint
 
 # Relationship checks:
-# 1 pt = 2 cups = 4 gi → 4.73176473e-4 / 4 = 1.18294118750e-4 m³ (gi)
+# 1 pt = 2 cups = 4 gi → 4.73176473e-4 / 4 = 1.18294118250e-4 m³ (gi)
 # 1 pt_uk = 4 gi_uk → 5.6826125e-4 / 4 = 1.420653125e-4 m³ (gi_uk) ✓
 
 
@@ -703,3 +703,155 @@
 .cmp_len_ch            = <float:64,ch>    1.0;          # 1 chain = 20.1168 m
 .cmp_len_rd            = <float:64,rd>    4.0;          # 4 rods = 1 chain (20.1168 m)
 .cmp_len_ft            = <float:64,ft>   66.0;          # 66 feet = 1 chain ✓
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 26. New units — standard gravity, metric horsepower, revolution
+# ══════════════════════════════════════════════════════════════════════════════
+
+# --- standard gravity (gn) ---
+# 1 gn = 9.80665 m/s² (exact, BIPM/CIPM 1901)
+# Dimension: m·s⁻²  — same as Gal (galileo), compatible with accelerations.
+# Used in: specific impulse (Isp), g-force, accelerometer calibration.
+# Prefixes: m~gn (milli-g), etc.
+
+.g_force_load          = <float:64,gn>    1.0;           # 1 g = standard gravity
+.launch_acceleration   = <float:64,gn>    3.5;           # 3.5 g launch load
+.spacecraft_gn         = <float:64,gn>    9.5;           # peak g during re-entry
+.gn_long               = <float:64,standard_gravity> 1.0; # long-form spelling
+.sensor_threshold_mg   = <float:32,m~gn>  50.0;          # 50 milli-g threshold
+
+# --- metric horsepower (PS) ---
+# 1 PS = 75 kgf·m/s = 75 × 9.80665 W = 735.49875 W (exact)
+# Also written: CV (French/Spanish), pk (Norwegian/Danish).
+# Dimension: m²·kg·s⁻³  — same as W, hp, VA, var.
+# Commonly used for engine ratings in continental Europe.
+
+.car_engine_ps         = <float:32,PS>    150.0;         # 150 PS engine (≈ 148 hp)
+.motorcycle_ps         = <float:32,PS>     85.0;         # 85 PS motorcycle
+.engine_cv             = <float:32,CV>    150.0;         # French/Spanish alias
+.ps_long               = <float:32,metric_horsepower> 1.0; # long-form spelling
+
+# --- revolution (rev) ---
+# 1 rev = 2π rad = 360° (one full angular turn)
+# Dimension: dimensionless — same as rad, deg, grad (sr is treated separately).
+# Used for: shaft position, encoder counts, cam angle.
+# Do not confuse with rpm (rev/min) which is a frequency unit.
+
+.shaft_angle           = <float:64,rev>   1.0;           # one full rotation
+.cam_advance           = <float:32,rev>   0.25;          # 90° cam advance
+.rev_long              = <float:64,revolution>  1.0;     # long-form singular
+.rev_plural            = <float:64,revolutions> 4.0;     # long-form plural
+.rev_turn              = <float:32,turn>  1.0;           # "turn" alias
+.rev_turns             = <float:32,turns> 0.5;           # 180°
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 27. New units — time extensions (month, fortnight)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# --- month (mo) ---
+# 1 mo = 365.25 × 86400 / 12 = 2629800 s (Julian month, exact)
+# Dimension: s.  Compatible with s, min, h, d, wk, yr.
+# NOTE: the Julian month is a fixed-length approximation; calendar months vary.
+
+.billing_period        = <uint:8,mo>      1;             # one billing month
+.subscription_term     = <uint:16,mo>    12;             # 12-month subscription = 1 yr
+.treatment_duration    = <float:32,mo>    6.0;           # six-month treatment
+.mo_long               = <uint:8,month>   1;             # long-form spelling
+.mo_plural             = <uint:16,months> 18;            # 18 months
+
+# --- fortnight (fn) ---
+# 1 fn = 14 d = 1209600 s (exact)
+# Dimension: s.  1 fn = 2 wk.  Used in agriculture, legal, and British contexts.
+
+.pay_period            = <uint:8,fn>      1;             # one fortnightly pay period
+.quarantine_old        = <uint:8,fn>      2;             # historical 28-day quarantine
+.fn_long               = <uint:8,fortnight>  1;          # long-form spelling
+.fn_plural             = <uint:8,fortnights> 2;          # two fortnights = 4 weeks
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 28. New units — atmosphere technical (at)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# --- atmosphere technical (at) ---
+# 1 at = 1 kgf/cm² = 9.80665 × 10⁴ Pa = 98066.5 Pa (exact)
+# Dimension: kg·m⁻¹·s⁻²  — same as Pa, bar, atm, mmHg, psi.
+# Used in older European engineering literature; slightly below standard atm.
+# at ≠ atm:  1 at = 98066.5 Pa,  1 atm = 101325 Pa.
+
+.boiler_pressure_at    = <float:32,at>    6.0;           # 6 at steam pressure
+.gauge_pressure_at     = <float:32,at>   10.0;           # 10 at hydraulic
+.at_long               = <float:32,atmosphere_technical> 1.0; # long-form spelling
+.at_vs_atm             = <float:64,at>    1.0;           # 1 at ≈ 0.96784 atm
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 29. New units — textile linear density (tex, denier)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# --- tex (tex) ---
+# 1 tex = 1 g/km = 1×10⁻⁶ kg/m (ISO 1144)
+# Dimension: kg·m⁻¹.  Used for fiber and yarn linear mass density.
+# SI-compatible; multiply by 9 to convert to denier.
+
+# --- denier (den) ---
+# 1 den = 1 g / 9000 m ≈ 1.111×10⁻⁷ kg/m
+# Dimension: kg·m⁻¹.  Traditional textile unit; 9 den = 1 tex.
+# Used for silk, nylon, polyester fiber; lower denier = finer thread.
+
+.nylon_thread          = <float:32,den>   70.0;          # 70-denier nylon thread
+.silk_fiber            = <float:32,den>    1.0;          # 1-denier = very fine
+.polyester_yarn        = <float:32,tex>    8.0;          # 8 tex polyester
+.carbon_fiber_tex      = <float:32,tex>  200.0;          # 200 tex carbon fiber tow
+.den_long              = <float:32,denier>  70.0;        # long-form spelling
+.den_plural            = <float:32,deniers> 20.0;        # 20 deniers
+.tex_to_den_ratio      = <float:64,tex>    9.0;          # 9 tex = 9 × 9 den = 81 den? no:
+                                                         # 9 tex = 9×1e-6 kg/m
+                                                         # 9 den = 9/9e6 = 1e-6 kg/m
+                                                         # → 9 tex = 81 den
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 30. New units — US apothecary and dry volume (fl_dr, minim, peck, bushel)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# --- fluid dram (fl_dr) ---
+# 1 fl_dr = 1/8 US fl oz = 3.6966911953125×10⁻⁶ m³ ≈ 3.697 mL
+# Dimension: m³.  8 fl_dr = 1 fl_oz;  60 minim = 1 fl_dr.
+# Used in pharmacy and apothecary measures.
+
+.medicine_dose         = <float:32,fl_dr>  1.0;          # 1 fluid dram dose
+.syrup_volume          = <float:32,fl_dr>  4.0;          # 4 fl_dr = ½ fl_oz
+.fl_dr_long            = <float:32,fluid_dram>  1.0;     # long-form spelling
+.fl_dr_plural          = <float:32,fluid_drams> 8.0;     # 8 fl_dr = 1 fl_oz
+
+# --- minim (minim) ---
+# 1 minim = 1/60 fl_dr = 1/480 fl_oz ≈ 6.161×10⁻⁸ m³ ≈ 61.6 µL
+# Dimension: m³.  Smallest traditional apothecary measure.
+# 60 minim = 1 fl_dr;  480 minim = 1 fl_oz.
+
+.drop_size             = <float:32,minim>  1.0;          # 1 minim ≈ 1 medical drop
+.prescription_dose     = <float:32,minim> 15.0;          # 15 minim = ¼ fl_dr
+.minim_plural          = <float:32,minims> 60.0;         # 60 minim = 1 fl_dr
+
+# --- peck (pk) ---
+# 1 pk (US dry peck) = 8.80976754172×10⁻³ m³ ≈ 8.810 L
+# Dimension: m³.  4 pk = 1 bushel;  2 pk = 1 dry gallon (not the same as US gallon).
+# Used in US agriculture for dry commodities (apples, grain, etc.).
+
+.apple_basket          = <uint:8,pk>       1;            # one peck of apples
+.grain_sample          = <float:32,pk>     0.5;          # half-peck grain sample
+.pk_long               = <uint:8,peck>     1;            # long-form spelling
+.pk_plural             = <uint:8,pecks>    4;            # 4 pecks = 1 bushel
+
+# --- bushel (bsh) ---
+# 1 bsh (US bushel) = 4 pk = 3.523907016688×10⁻² m³ ≈ 35.24 L
+# Dimension: m³.  Fundamental US dry measure for grain, produce, livestock feed.
+# CBOT/CME commodity contracts for corn, wheat, soybeans are priced per bushel.
+
+.wheat_yield           = <float:32,bsh>  60.0;           # 60 bushels/acre yield
+.corn_contract         = <uint:32,bsh>   5000;            # CBOT corn futures contract
+.bsh_long              = <float:32,bushel>   1.0;         # long-form spelling
+.bsh_plural            = <float:32,bushels> 60.0;         # 60 bushels

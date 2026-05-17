@@ -204,7 +204,19 @@ class BaseUnit(IntEnum):
     ROD                 = 119
     GILL                = 120
     GILL_UK             = 121
-    _SENTINEL           = 122
+    STANDARD_GRAVITY    = 122
+    METRIC_HORSEPOWER   = 123
+    REVOLUTION          = 124
+    MONTH               = 125
+    FORTNIGHT           = 126
+    ATMOSPHERE_TECHNICAL = 127
+    TEX                 = 128
+    DENIER              = 129
+    FLUID_DRAM          = 130
+    MINIM               = 131
+    PECK                = 132
+    BUSHEL              = 133
+    _SENTINEL           = 134
 
 class Exponent(IntEnum):
 

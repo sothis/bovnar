@@ -506,7 +506,19 @@ static void test_nonsi_enum_order(void)
     ASSERT_TRUE((int)bu_rod          == 119, "bu_rod == 119");
     ASSERT_TRUE((int)bu_gill         == 120, "bu_gill == 120");
     ASSERT_TRUE((int)bu_gill_uk      == 121, "bu_gill_uk == 121");
-    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 122, "sentinel == 122");
+    ASSERT_TRUE((int)bu_standard_gravity    == 122, "bu_standard_gravity == 122");
+    ASSERT_TRUE((int)bu_metric_horsepower   == 123, "bu_metric_horsepower == 123");
+    ASSERT_TRUE((int)bu_revolution          == 124, "bu_revolution == 124");
+    ASSERT_TRUE((int)bu_month               == 125, "bu_month == 125");
+    ASSERT_TRUE((int)bu_fortnight           == 126, "bu_fortnight == 126");
+    ASSERT_TRUE((int)bu_atmosphere_technical == 127, "bu_atmosphere_technical == 127");
+    ASSERT_TRUE((int)bu_tex                 == 128, "bu_tex == 128");
+    ASSERT_TRUE((int)bu_denier              == 129, "bu_denier == 129");
+    ASSERT_TRUE((int)bu_fluid_dram          == 130, "bu_fluid_dram == 130");
+    ASSERT_TRUE((int)bu_minim               == 131, "bu_minim == 131");
+    ASSERT_TRUE((int)bu_peck                == 132, "bu_peck == 132");
+    ASSERT_TRUE((int)bu_bushel              == 133, "bu_bushel == 133");
+    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 134, "sentinel == 134");
 }
 
 static void test_nonsi_si_factors(void)
@@ -564,7 +576,7 @@ static void test_nonsi_si_factors(void)
     CHK(bu_quart,         9.46352946e-4,                1e-18);
     CHK(bu_pint,          4.73176473e-4,                1e-18);
     CHK(bu_cup,           2.365882365e-4,               1e-18);
-    CHK(bu_fluid_ounce,   2.95735296875e-5,             1e-20);
+    CHK(bu_fluid_ounce,   2.95735295625e-5,             1e-20);
     CHK(bu_tablespoon,    1.478676478125e-5,             1e-20);
     CHK(bu_teaspoon,      4.92892159375e-6,              1e-21);
     CHK(bu_barrel,        0.158987294928,               1e-15);
@@ -598,8 +610,20 @@ static void test_nonsi_si_factors(void)
     CHK(bu_pennyweight,   1.55517384e-3,                1e-14);
     CHK(bu_chain,         20.1168,                      1e-12);
     CHK(bu_rod,           5.0292,                       1e-13);
-    CHK(bu_gill,          1.18294118750e-4,             1e-19);
+    CHK(bu_gill,          1.18294118250e-4,             1e-19);
     CHK(bu_gill_uk,       1.420653125e-4,               1e-18);
+    CHK(bu_standard_gravity,   9.80665,                 1e-10);
+    CHK(bu_metric_horsepower,  735.49875,               1e-5);
+    CHK(bu_revolution,    6.283185307179586,             1e-15);
+    CHK(bu_month,         2629800.0,                    1e-5);
+    CHK(bu_fortnight,     1209600.0,                    1e-5);
+    CHK(bu_atmosphere_technical, 98066.5,               1e-1);
+    CHK(bu_tex,           1e-6,                         1e-21);
+    CHK(bu_denier,        1.0/9000000.0,                1e-22);
+    CHK(bu_fluid_dram,    3.6966911953125e-6,           1e-21);
+    CHK(bu_minim,         6.16115199218750e-8,          1e-23);
+    CHK(bu_peck,          8.80976754172e-3,             1e-18);
+    CHK(bu_bushel,        3.523907016688e-2,            1e-17);
 #undef CHK
 #undef M_PI_LOCAL
 
@@ -736,6 +760,53 @@ static void test_nonsi_dim_vectors(void)
     DIM_OK(bu_neper);
     for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "Np dim[i]=0");
 
+    DIM_OK(bu_standard_gravity);
+    ASSERT_EQ_INT(d[0], 1, "gn m=1"); ASSERT_EQ_INT(d[2], -2, "gn s=-2");
+    ASSERT_EQ_INT(d[1], 0, "gn kg=0");
+
+    DIM_OK(bu_metric_horsepower);
+    ASSERT_EQ_INT(d[0], 2, "PS m=2"); ASSERT_EQ_INT(d[1], 1, "PS kg=1");
+    ASSERT_EQ_INT(d[2], -3, "PS s=-3");
+
+    DIM_OK(bu_revolution);
+    for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "rev dim[i]=0");
+
+    DIM_OK(bu_month);
+    ASSERT_EQ_INT(d[2], 1, "mo s=1");
+    ASSERT_EQ_INT(d[0], 0, "mo m=0"); ASSERT_EQ_INT(d[1], 0, "mo kg=0");
+
+    DIM_OK(bu_fortnight);
+    ASSERT_EQ_INT(d[2], 1, "fn s=1");
+    ASSERT_EQ_INT(d[0], 0, "fn m=0"); ASSERT_EQ_INT(d[1], 0, "fn kg=0");
+
+    DIM_OK(bu_atmosphere_technical);
+    ASSERT_EQ_INT(d[0], -1, "at m=-1"); ASSERT_EQ_INT(d[1], 1, "at kg=1");
+    ASSERT_EQ_INT(d[2], -2, "at s=-2");
+
+    DIM_OK(bu_tex);
+    ASSERT_EQ_INT(d[0], -1, "tex m=-1"); ASSERT_EQ_INT(d[1], 1, "tex kg=1");
+    ASSERT_EQ_INT(d[2], 0, "tex s=0");
+
+    DIM_OK(bu_denier);
+    ASSERT_EQ_INT(d[0], -1, "den m=-1"); ASSERT_EQ_INT(d[1], 1, "den kg=1");
+    ASSERT_EQ_INT(d[2], 0, "den s=0");
+
+    DIM_OK(bu_fluid_dram);
+    ASSERT_EQ_INT(d[0], 3, "fl_dr m=3");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "fl_dr dim[i]=0");
+
+    DIM_OK(bu_minim);
+    ASSERT_EQ_INT(d[0], 3, "minim m=3");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "minim dim[i]=0");
+
+    DIM_OK(bu_peck);
+    ASSERT_EQ_INT(d[0], 3, "pk m=3");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "pk dim[i]=0");
+
+    DIM_OK(bu_bushel);
+    ASSERT_EQ_INT(d[0], 3, "bsh m=3");
+    for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "bsh dim[i]=0");
+
 #undef DIM_OK
 }
 
@@ -814,6 +885,18 @@ static void test_nonsi_parse_canonical(void)
         { "rd",          bu_rod           },
         { "gi",          bu_gill          },
         { "gi_uk",       bu_gill_uk       },
+        { "gn",          bu_standard_gravity      },
+        { "PS",          bu_metric_horsepower     },
+        { "rev",         bu_revolution            },
+        { "mo",          bu_month                 },
+        { "fn",          bu_fortnight             },
+        { "at",          bu_atmosphere_technical  },
+        { "tex",         bu_tex                   },
+        { "den",         bu_denier                },
+        { "fl_dr",       bu_fluid_dram            },
+        { "minim",       bu_minim                 },
+        { "pk",          bu_peck                  },
+        { "bsh",         bu_bushel                },
     };
     size_t n = sizeof(cases) / sizeof(cases[0]);
     for (size_t i = 0; i < n; i++) {
@@ -957,6 +1040,27 @@ static void test_nonsi_parse_aliases(void)
         { "gills",         bu_gill          },
         { "gill_uk",       bu_gill_uk       },
         { "gills_uk",      bu_gill_uk       },
+        { "standard_gravity",      bu_standard_gravity     },
+        { "CV",                    bu_metric_horsepower    },
+        { "metric_horsepower",     bu_metric_horsepower    },
+        { "revolution",            bu_revolution           },
+        { "revolutions",           bu_revolution           },
+        { "turn",                  bu_revolution           },
+        { "turns",                 bu_revolution           },
+        { "month",                 bu_month                },
+        { "months",                bu_month                },
+        { "fortnight",             bu_fortnight            },
+        { "fortnights",            bu_fortnight            },
+        { "atmosphere_technical",  bu_atmosphere_technical },
+        { "denier",                bu_denier               },
+        { "deniers",               bu_denier               },
+        { "fluid_dram",            bu_fluid_dram           },
+        { "fluid_drams",           bu_fluid_dram           },
+        { "minims",                bu_minim                },
+        { "peck",                  bu_peck                 },
+        { "pecks",                 bu_peck                 },
+        { "bushel",                bu_bushel               },
+        { "bushels",               bu_bushel               },
     };
     size_t n = sizeof(cases) / sizeof(cases[0]);
     for (size_t i = 0; i < n; i++) {
@@ -996,6 +1100,9 @@ static void test_nonsi_roundtrip(void)
         bu_curie, bu_roentgen, bu_rem, bu_neper,
         bu_kilogram_force, bu_inch_hg, bu_rpm, bu_foot_pound,
         bu_dram, bu_pennyweight, bu_chain, bu_rod, bu_gill, bu_gill_uk,
+        bu_standard_gravity, bu_metric_horsepower, bu_revolution,
+        bu_month, bu_fortnight, bu_atmosphere_technical,
+        bu_tex, bu_denier, bu_fluid_dram, bu_minim, bu_peck, bu_bushel,
     };
     size_t n = sizeof(units) / sizeof(units[0]);
     for (size_t i = 0; i < n; i++) {

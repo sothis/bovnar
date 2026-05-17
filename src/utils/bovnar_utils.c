@@ -372,6 +372,9 @@ typedef struct { const char* a; uint32_t len; value_base_unit_t u; } bu_entry_t;
 typedef struct { const char* a; uint32_t len; si_prefix_id_t   p; } si_entry_t;
 typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
 static const bu_entry_t bu_table[] = {
+	{"atmosphere_technical", 20, bu_atmosphere_technical},
+	{"metric_horsepower",    17, bu_metric_horsepower},
+	{"standard_gravity",     16, bu_standard_gravity},
 	{"fluid_ounces_uk", 15, bu_fluid_ounce_uk},
 	{"nautical_miles",  14, bu_nautical_mile},
 	{"foot_pounds",     11, bu_foot_pound},    {"fluid_ounce_uk",  13, bu_fluid_ounce_uk},
@@ -393,12 +396,16 @@ static const bu_entry_t bu_table[] = {
 	{"fahrenheit",      10, bu_fahrenheit},    {"atmosphere",     10, bu_atmosphere},
 	{"troy_ounce",      10, bu_troy_ounce},    {"light_year",     10, bu_light_year},
 	{"arcminutes",      10, bu_arcminute},     {"arcseconds",     10, bu_arcsecond},
+	{"revolutions",     11, bu_revolution},    {"fluid_drams",    11, bu_fluid_dram},
+	{"fortnights",      10, bu_fortnight},     {"revolution",     10, bu_revolution},
+	{"fluid_dram",      10, bu_fluid_dram},
 	{"inch_hg",          7, bu_inch_hg},       {"teaspoons",       9, bu_teaspoon},
 	{"short_ton",        9, bu_short_ton},     {"gallon_uk",       9, bu_gallon_uk},
 	{"angstroms",        9, bu_angstrom},      {"arcminute",       9, bu_arcminute},
 	{"arcsecond",        9, bu_arcsecond},     {"long_tons",       9, bu_long_ton},
 	{"roentgens",        9, bu_roentgen},      {"steradian",       9, bu_steradian},
 	{"becquerel",        9, bu_becquerel},     {"quarts_uk",       9, bu_quart_uk},
+	{"fortnight",        9, bu_fortnight},
 	{"gill_uk",          7, bu_gill_uk},       {"gills_uk",        8, bu_gill_uk},
 	{"decibels",         8, bu_decibel},       {"teaspoon",        8, bu_teaspoon},
 	{"angstrom",         8, bu_angstrom},      {"furlongs",        8, bu_furlong},
@@ -409,6 +416,7 @@ static const bu_entry_t bu_table[] = {
 	{"candelas",         8, bu_candela},       {"coulombs",        8, bu_coulomb},
 	{"sieverts",         8, bu_sievert},       {"pints_uk",        8, bu_pint_uk},
 	{"quart_uk",         8, bu_quart_uk},      {"fl_oz_uk",        8, bu_fluid_ounce_uk},
+	{"bushels",          7, bu_bushel},        {"deniers",         7, bu_denier},
 	{"rankine",          7, bu_rankine},       {"decibel",         7, bu_decibel},
 	{"gallons",          7, bu_gallon},        {"parsecs",         7, bu_parsec},
 	{"furlong",          7, bu_furlong},       {"maxwell",         7, bu_maxwell},
@@ -423,7 +431,9 @@ static const bu_entry_t bu_table[] = {
 	{"henries",          7, bu_henry},         {"celsius",         7, bu_celsius},
 	{"minutes",          7, bu_minute},        {"hectare",         7, bu_hectare},
 	{"sievert",          7, bu_sievert},       {"degrees",         7, bu_degree},
-	{"pint_uk",          7, bu_pint_uk},       {"chains",          6, bu_chain},
+	{"pint_uk",          7, bu_pint_uk},       {"bushel",          6, bu_bushel},
+	{"denier",           6, bu_denier},        {"months",          6, bu_month},
+	{"minims",           6, bu_minim},         {"chains",          6, bu_chain},
 	{"nepers",           6, bu_neper},         {"barrel",          6, bu_barrel},
 	{"arcmin",           6, bu_arcminute},     {"arcsec",          6, bu_arcsecond},
 	{"parsec",           6, bu_parsec},        {"gallon",          6, bu_gallon},
@@ -445,6 +455,9 @@ static const bu_entry_t bu_table[] = {
 	{"litres",           6, bu_liter},         {"liters",          6, bu_liter},
 	{"minute",           6, bu_minute},        {"degree",          6, bu_degree},
 	{"inches",           6, bu_inch},          {"gi_uk",           5, bu_gill_uk},
+	{"pecks",            5, bu_peck},          {"turns",           5, bu_revolution},
+	{"minim",            5, bu_minim},         {"month",           5, bu_month},
+	{"fl_dr",            5, bu_fluid_dram},
 	{"drams",            5, bu_dram},          {"slugs",           5, bu_slug},
 	{"chain",            5, bu_chain},         {"gills",           5, bu_gill},
 	{"neper",            5, bu_neper},         {"gauss",           5, bu_gauss},
@@ -496,6 +509,7 @@ static const bu_entry_t bu_table[] = {
 	{"yard",             4, bu_yard},          {"mile",            4, bu_mile},
 	{"fath",             4, bu_fathom},        {"ergs",            4, bu_erg},
 	{"vars",             4, bu_var},           {"dram",            4, bu_dram},
+	{"peck",             4, bu_peck},          {"turn",            4, bu_revolution},
 	{"dwt",              3, bu_pennyweight},   {"rpm",             3, bu_rpm},
 	{"kgf",              3, bu_kilogram_force},{"var",             3, bu_var},
 	{"gal",              3, bu_gallon},        {"Gal",             3, bu_galileo},
@@ -509,6 +523,8 @@ static const bu_entry_t bu_table[] = {
 	{"bbl",              3, bu_barrel},        {"fur",             3, bu_furlong},
 	{"dyn",              3, bu_dyne},          {"nmi",             3, bu_nautical_mile},
 	{"mil",              3, bu_thou},          {"rod",             3, bu_rod},
+	{"tex",              3, bu_tex},           {"den",             3, bu_denier},
+	{"bsh",              3, bu_bushel},        {"rev",             3, bu_revolution},
 	{"ch",               2, bu_chain},         {"rd",              2, bu_rod},
 	{"gi",               2, bu_gill},          {"dr",              2, bu_dram},
 	{"\xc2\xb0""C",     3, bu_celsius},
@@ -545,6 +561,13 @@ static const bu_entry_t bu_table[] = {
 	{"ha",               2, bu_hectare},       {"wk",              2, bu_week},
 	{"yr",               2, bu_year},          {"au",              2, bu_astronomical_unit},
 	{"Da",               2, bu_dalton},        {"eV",              2, bu_electronvolt},
+	{"gn",               2, bu_standard_gravity},
+	{"PS",               2, bu_metric_horsepower},
+	{"CV",               2, bu_metric_horsepower},
+	{"mo",               2, bu_month},
+	{"fn",               2, bu_fortnight},
+	{"pk",               2, bu_peck},
+	{"at",               2, bu_atmosphere_technical},
 	{"\xc3\x85",         2, bu_angstrom},
 	{"\xc2\xb0",         2, bu_degree},
 	{"G",                1, bu_gauss},         {"P",               1, bu_poise},
@@ -996,6 +1019,18 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_rod:               return "rd";
 	case bu_gill:              return "gi";
 	case bu_gill_uk:           return "gi_uk";
+	case bu_standard_gravity:  return "gn";
+	case bu_metric_horsepower: return "PS";
+	case bu_revolution:        return "rev";
+	case bu_month:             return "mo";
+	case bu_fortnight:         return "fn";
+	case bu_atmosphere_technical: return "at";
+	case bu_tex:               return "tex";
+	case bu_denier:            return "den";
+	case bu_fluid_dram:        return "fl_dr";
+	case bu_minim:             return "minim";
+	case bu_peck:              return "pk";
+	case bu_bushel:            return "bsh";
 	default:           return "";
 	}
 }

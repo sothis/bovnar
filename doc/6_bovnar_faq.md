@@ -398,7 +398,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-121 named base units across the following categories:
+133 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -407,21 +407,24 @@ a mismatch is `error_unit_mismatch`.
 - **12 Imperial/US customary length units** — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom, **chain** (`ch`), **rod** (`rd`); plus **thou** (thousandth of an inch, alias `mil`).
 - **11 Imperial/US customary mass units** — pound, ounce, grain, stone, short ton, long ton, troy ounce, carat, **slug**, **dram** (`dr`), **pennyweight** (`dwt`).
 - **2 temperature scales** — degree Fahrenheit (affine), **degree Rankine** (linear, absolute).
-- **5 pressure units** — atmosphere, mmHg, Torr, psi, **inch of mercury** (`inHg`).
+- **5 pressure units** — atmosphere, mmHg, Torr, psi, **inch of mercury** (`inHg`); plus **atmosphere technical** (`at`, = 1 kgf/cm² = 98 066.5 Pa).
 - **5 energy units** — calorie, BTU, erg, therm, **foot-pound** (`ft_lb`).
-- **1 power unit** — horsepower.
+- **2 power units** — horsepower (`hp`), **metric horsepower** (`PS`, also `CV`; = 735.49875 W).
 - **4 force units** — pound-force, dyne, kip, **kilogram-force** (`kgf`).
-- **2 speed/frequency units** — knot, **revolutions per minute** (`rpm`).
-- **11 US and UK volume units** — gallon, gallon (UK), quart, pint, cup, fluid ounce, tablespoon, teaspoon, barrel, **US gill** (`gi`), **imperial gill** (`gi_uk`).
+- **1 acceleration unit** — **standard gravity** (`gn`, = 9.80665 m/s², exact).
+- **3 speed/frequency/rotation units** — knot, **revolutions per minute** (`rpm`), **revolution** (`rev`, full angular turn = 2π rad).
+- **15 US and UK volume units** — gallon, gallon (UK), quart, pint, cup, fluid ounce, tablespoon, teaspoon, barrel, **US gill** (`gi`), **imperial gill** (`gi_uk`), **fluid dram** (`fl_dr`), **minim**, **peck** (`pk`), **bushel** (`bsh`).
 - **3 UK imperial volume units** — **pint_uk**, **fluid_ounce_uk**, **quart_uk**.
 - **2 area units** — acre, barn.
-- **3 angle units** — arcminute, arcsecond, gradian.
+- **3 angle units** — arcminute, arcsecond, gradian; plus **revolution** (see rotation above).
 - **8 CGS units** — poise, stokes, gauss, maxwell, oersted, stilb, phot, galileo.
 - **3 radiation units** — curie, röntgen, rem.
 - **2 logarithmic units** — neper, **decibel** (`dB`).
 - **2 electrical power units** — **var** (reactive power), **volt-ampere** (`VA`, apparent power).
+- **2 time extensions** — **month** (`mo`, Julian month = 2 629 800 s), **fortnight** (`fn` = 14 d = 1 209 600 s).
+- **2 textile linear density units** — **tex** (1 g/km = 10⁻⁶ kg/m, ISO 1144), **denier** (`den`, 1 g/9 000 m; 9 den = 1 tex).
 
-The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `Ra` (not `R`, which is reserved for röntgen). Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts.
+The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `Ra` (not `R`, which is reserved for röntgen). Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
 ---
 

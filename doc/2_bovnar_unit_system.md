@@ -143,7 +143,7 @@ When both are present, equality is checked **after parsing** via `memcmp` on the
 
 ## 3. Base Units
 
-Bovnar supports 121 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, and surveying and culinary measure units.
+Bovnar supports 133 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, and surveying and culinary measure units.
 
 ### SI Base Units
 
@@ -430,10 +430,81 @@ Bovnar supports 121 named base units, covering SI base units, all named SI-deriv
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `gi`      | `gill`, `gills` | US gill | `bu_gill` | 1.18294118750×10⁻⁴ m³ |
+| `gi`      | `gill`, `gills` | US gill | `bu_gill` | 1.18294118250×10⁻⁴ m³ |
 | `gi_uk`   | `gill_uk`, `gills_uk` | imperial gill | `bu_gill_uk` | 1.420653125×10⁻⁴ m³ (exact) |
 
 > **Gill:** The US gill is 4 US fluid ounces (= 1/4 US liquid pint). The imperial gill is 5 imperial fluid ounces (= 1/4 imperial pint = gallon_uk / 32). Both are exact fractions of their respective gallon definitions. As with other US/UK pairs, `gi` and `gi_uk` are dimensionally compatible but numerically distinct.
+
+### Acceleration
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `gn`   | `standard_gravity` | standard gravity | `bu_standard_gravity` | 9.80665 m·s⁻² (exact, BIPM 1901) |
+
+> **Standard gravity** (`gn`): The conventional standard acceleration of free fall, g₀ = 9.80665 m/s² (exact by BIPM/CIPM definition 1901). Dimension vector: m¹·s⁻². Used for g-force notation, specific impulse (Isp), and accelerometer calibration. Dimensionally compatible with the galileo (`Gal`). Prefixes are valid (e.g. `m~gn` = milli-g = 9.80665×10⁻³ m/s²).
+
+### Power
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `PS`   | `CV`, `metric_horsepower` | metric horsepower | `bu_metric_horsepower` | 735.49875 W (exact) |
+
+> **Metric horsepower** (`PS`): Defined as 75 kgf·m/s = 75 × 9.80665 W = 735.49875 W. Also spelled CV (French/Spanish *cheval vapeur*) and pk (Norwegian/Danish). Distinct from the mechanical/imperial horsepower (`hp` = 745.69987… W). Dimensionally compatible with `W`, `hp`, `VA`, and `var`.
+
+### Angle (additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `rev`  | `turn`, `revolution`, `revolutions`, `turns` | revolution | `bu_revolution` | 2π rad ≈ 6.28318530718 |
+
+> **Revolution** (`rev`): One full angular turn = 2π radians = 360° = 400 grad. Dimensionless. Used in shaft-angle notation, encoder counts, and rotational kinematics. Dimensionally compatible with `rad`, `deg`, `grad`. Do not confuse with `rpm`, which is a frequency unit (revolutions per minute = s⁻¹/60).
+
+### Time (additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `mo`   | `month`, `months` | month (Julian) | `bu_month` | 2 629 800 s (= 365.25 d / 12, exact) |
+| `fn`   | `fortnight`, `fortnights` | fortnight | `bu_fortnight` | 1 209 600 s (= 14 d, exact) |
+
+> **Month** (`mo`): The Julian month, defined as 365.25 × 86 400 / 12 = 2 629 800 s. This is a fixed-length approximation; calendar months vary between 28 and 31 days. Compatible with `s`, `min`, `h`, `d`, `wk`, `yr`. Note that 12 `mo` equals exactly 1 `yr` by this definition.
+>
+> **Fortnight** (`fn`): Exactly 14 days = 2 weeks = 1 209 600 s. Common in British English for pay periods, agricultural cycles, and some legal contexts.
+
+### Pressure (additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `at`   | `atmosphere_technical` | atmosphere technical | `bu_atmosphere_technical` | 98 066.5 Pa (= 1 kgf/cm², exact) |
+
+> **Atmosphere technical** (`at`): Defined as the pressure exerted by 1 kilogram-force per square centimetre: 1 kgf/cm² = 9.80665 × 10⁴ Pa = 98 066.5 Pa. Distinct from the standard atmosphere (`atm` = 101 325 Pa). Found in older European engineering literature and legacy pressure gauges. Dimensionally compatible with `Pa`, `bar`, `atm`, `mmHg`, `psi`.
+
+### Textile Linear Density
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `tex`  | — | tex | `bu_tex` | 1×10⁻⁶ kg/m (= 1 g/km, ISO 1144) |
+| `den`  | `denier`, `deniers` | denier | `bu_denier` | 1/9 000 000 kg/m (= 1 g/9 000 m) |
+
+> **Tex** (`tex`): The SI-coherent unit of linear mass density for fibres and yarns, defined as 1 gram per kilometre = 10⁻⁶ kg/m (ISO 1144:2021). Dimension vector: m⁻¹·kg. SI prefixes are valid (e.g. `m~tex` = millitex = 10⁻⁹ kg/m).
+>
+> **Denier** (`den`): Traditional unit defined as 1 gram per 9 000 metres ≈ 1.111×10⁻⁷ kg/m. The conversion is exactly 9 den = 1 tex. Smaller denier values indicate finer fibres. Dimensionally compatible with `tex`.
+
+### US Apothecary / Dry Volume (additional)
+
+| Symbol   | Long forms | Name | Enum value | Factor |
+|----------|-----------|------|------------|--------|
+| `fl_dr`  | `fluid_dram`, `fluid_drams`, `fl_drams` | US fluid dram | `bu_fluid_dram` | 3.6966911953125×10⁻⁶ m³ |
+| `minim`  | `minims` | US minim | `bu_minim` | 6.16115199218750×10⁻⁸ m³ |
+| `pk`     | `peck`, `pecks` | US dry peck | `bu_peck` | 8.80976754172×10⁻³ m³ |
+| `bsh`    | `bushel`, `bushels` | US bushel | `bu_bushel` | 3.523907016688×10⁻² m³ |
+
+> **Fluid dram** (`fl_dr`): Exactly 1/8 US fluid ounce = 3.6966911953125 mL. Used in pharmacy and apothecary measures. Relationships: 60 minim = 1 fl_dr; 8 fl_dr = 1 fl_oz; 256 fl_dr = 1 US pint.
+>
+> **Minim** (`minim`): The smallest traditional apothecary volume, exactly 1/60 fluid dram ≈ 61.6 µL. Note the symbol `minim` (not `min`, which is the minute) avoids ambiguity.
+>
+> **Peck** (`pk`): US dry peck = 8.80976754172 L. Used for dry agricultural commodities (apples, grain). 4 pecks = 1 bushel.
+>
+> **Bushel** (`bsh`): US bushel = 4 pecks ≈ 35.24 L. The fundamental US dry measure for grain; CBOT/CME futures contracts for corn, wheat, and soybeans are denominated in bushels.
 
 ### Digital Units
 

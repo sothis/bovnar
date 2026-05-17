@@ -243,7 +243,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <!-- STATS -->
 <div class="statsbar">
   <div class="stat"><span class="sn">6</span><span class="sl">Type families incl.<br>decimal &amp; Q~format</span></div>
-  <div class="stat"><span class="sn">44</span><span class="sl">Built-in physical units<br>validated at parse time</span></div>
+  <div class="stat"><span class="sn">111</span><span class="sl">Built-in physical units<br>validated at parse time</span></div>
   <div class="stat"><span class="sn">0</span><span class="sl">External schema files<br>required. Ever.</span></div>
   <div class="stat"><span class="sn">C99</span><span class="sl">Reference implementation,<br>zero dependencies</span></div>
 </div>
@@ -459,7 +459,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
     <p class="sub reveal">Not bolt-ons. Not workarounds. Design decisions baked into the format from the start.</p>
     <div class="fgrid reveal">
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></div><h3>Self-describing values</h3><p>Type family, bit-width, numeral base, and physical unit travel in the same byte stream as the value. Interpretable in isolation — by anyone, forever.</p><span class="ftag">per-value annotation · no side channel</span></div>
-      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>SI &amp; IEC units, validated</h3><p>44 base units, full SI prefix table (quecto→quetta), IEC binary prefixes (kibi→quebi). Compound expressions with exponents. Caught at parse time, not at runtime.</p><span class="ftag">&lt;float:64,k~g·m/s²&gt; · &lt;uint:64,Gi~B&gt;</span></div>
+      <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>SI &amp; IEC units, validated</h3><p>111 base units — SI, Imperial/US customary, CGS, radiation, UK imperial volume, and electrical power units (W / var / VA). Full SI prefix table (quecto→quetta), IEC binary prefixes (kibi→quebi). Compound expressions with exponents. Caught at parse time, not at runtime.</p><span class="ftag">&lt;float:64,k~g·m/s²&gt; · &lt;uint:64,Gi~B&gt; · &lt;float:64,dB&gt;</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><h3>Six numeric type families</h3><p>uint · sint at any bit-width. IEEE 754 binary float (16-bit half to 32768-bit extended). Q~format fixed-point. IEEE 754-2008 decimal float. UTF-8 strings.</p><span class="ftag">uint · sint · float · float_fix · float_dec · utf8</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><polyline points="4 6 4 2 20 2 20 6"/><path d="M4 6h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/><line x1="12" y1="10" x2="12" y2="18"/></svg></div><h3>Text-binary hybrid</h3><p>NUL-escape octet streams embed raw binary in-line. No Base64. No inflation. The UTF-8 validator suspends for the duration; the writer API handles the wire protocol.</p><span class="ftag">0x00-delimited · chunk protocol</span></div>
       <div class="fc"><div class="fi"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><h3>SAX-style streaming reader</h3><p>Two-phase callback architecture. <code>on_unverified</code> fires before semantic validation, <code>on_verified</code> after. Constant memory. Parse any file size without loading a DOM.</p><span class="ftag">pull-based · callback-driven · no DOM</span></div>
@@ -531,18 +531,19 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
       <!-- Physical Units -->
       <div id="t-unit" class="tp">
         <div class="te">
-          <h3>Physical units built in</h3>
-          <p>Units are a first-class annotation parameter, validated at parse time. The C API exposes them as structured <code>value_unit_t</code> data — prefix, base unit, and exponent per component.</p>
+          <h3>111 physical units built in</h3>
+          <p>Units are a first-class annotation parameter, validated at parse time. The C API exposes them as structured <code>value_unit_t</code> data — prefix, base unit, and exponent per component. 111 base units span SI, Imperial/US customary, CGS, UK imperial, radiation, logarithmic, and electrical power domains.</p>
           <ul>
             <li>SI prefix requires a <code>~</code> separator: <code>k~m</code>, <code>µ~s</code>, <code>G~Hz</code></li>
             <li>IEC binary: <code>Ki~B</code>, <code>Gi~B</code>, <code>Ti~B</code> — same rule</li>
             <li>Compound: <code>·</code> or <code>*</code> for multiplication, <code>/</code> for division</li>
             <li>Exponents: <code>m²</code> or <code>m^2</code>; <code>s⁻¹</code> or <code>s^-1</code></li>
+            <li>New: <code>dB</code> decibel, <code>Ra</code> rankine, <code>slug</code>, <code>thou</code>/<code>mil</code>, <code>pt_uk</code>/<code>fl_oz_uk</code>/<code>qt_uk</code>, <code>var</code>, <code>VA</code></li>
           </ul>
         </div>
         <div class="tcode">
           <div class="cb" style="min-height:360px">
-            <div class="ln" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span></div>
+            <div class="ln" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span></div>
             <div class="cd">
 <span class="l"><span class="tc"># Simple units</span></span>
 <span class="l"><span class="tk">.timeout</span>      <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">s</span>&gt;</span>         <span class="tn">2.5</span><span class="tq">;</span></span>
@@ -551,7 +552,7 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"></span>
 <span class="l"><span class="tc"># SI prefixes — mandatory tilde</span></span>
 <span class="l"><span class="tk">.frequency</span>    <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">G~Hz</span>&gt;</span>     <span class="tn">2.4</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.resistance</span>   <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">k-Ω</span>&gt;</span>     <span class="tn">4.7</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.resistance</span>   <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">k~Ω</span>&gt;</span>     <span class="tn">4.7</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.delay</span>        <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">µ~s</span>&gt;</span>    <span class="tn">50.0</span><span class="tq">;</span></span>
 <span class="l"></span>
 <span class="l"><span class="tc"># IEC binary prefixes</span></span>
@@ -560,12 +561,15 @@ footer{padding:2.5rem;border-top:1px solid var(--border);display:flex;align-item
 <span class="l"></span>
 <span class="l"><span class="tc"># Compound units</span></span>
 <span class="l"><span class="tk">.velocity</span>     <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">m/s</span>&gt;</span>      <span class="tn">9.81</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.acceleration</span> <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">m/s²</span>&gt;</span>    <span class="tn">9.81</span><span class="tq">;</span></span>
 <span class="l"><span class="tk">.force</span>        <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k~g·m/s²</span>&gt;</span> <span class="tn">9.81</span><span class="tq">;</span></span>
-<span class="l"><span class="tk">.energy</span>       <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k~g·m²/s²</span>&gt;</span><span class="tn">1000</span><span class="tq">;</span></span>
 <span class="l"></span>
-<span class="l"><span class="tc"># Inline suffix (scalar context only)</span></span>
-<span class="l"><span class="tk">.speed</span>        <span class="tq">=</span>               <span class="tn">9.81</span> <span class="tu">m/s</span><span class="tq">;</span></span>
+<span class="l"><span class="tc"># New units — logarithmic, absolute temp, power</span></span>
+<span class="l"><span class="tk">.gain</span>         <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">dB</span>&gt;</span>      <span class="tn">-3.0</span><span class="tq">;</span></span>
+<span class="l"><span class="tk">.temp_abs</span>     <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">Ra</span>&gt;</span>    <span class="tn">491.67</span><span class="tq">;</span>  <span class="tc"># Rankine = 32°F</span></span>
+<span class="l"><span class="tk">.reactive</span>     <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k~var</span>&gt;</span>   <span class="tn">1.5</span><span class="tq">;</span>  <span class="tc"># kvar</span></span>
+<span class="l"><span class="tk">.apparent</span>     <span class="tq">=</span> <span class="ta">&lt;float:64,<span class="tu">k~VA</span>&gt;</span>    <span class="tn">2.0</span><span class="tq">;</span>  <span class="tc"># kVA transformer</span></span>
+<span class="l"><span class="tk">.trace_width</span>  <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">thou</span>&gt;</span>   <span class="tn">5.0</span><span class="tq">;</span>  <span class="tc"># PCB trace (mil)</span></span>
+<span class="l"><span class="tk">.pint_uk</span>      <span class="tq">=</span> <span class="ta">&lt;float:32,<span class="tu">pt_uk</span>&gt;</span>  <span class="tn">0.5</span><span class="tq">;</span>  <span class="tc"># half UK pint</span></span>
             </div>
           </div>
         </div>

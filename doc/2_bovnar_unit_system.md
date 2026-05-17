@@ -143,7 +143,7 @@ When both are present, equality is checked **after parsing** via `memcmp` on the
 
 ## 3. Base Units
 
-Bovnar supports 102 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, and radiation units.
+Bovnar supports 111 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, and electrical power units.
 
 ### SI Base Units
 
@@ -331,6 +331,48 @@ Bovnar supports 102 named base units, covering SI base units, all named SI-deriv
 | Symbol | Long forms | Name | Enum value | Notes |
 |--------|-----------|------|------------|-------|
 | `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless logarithmic ratio; SI factor 1.0 |
+| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | dimensionless logarithmic ratio; SI factor 1.0; 1 Np = 20/ln(10) dB ≈ 8.686 dB |
+
+### Imperial Temperature — Absolute Scale
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `Ra`   | `rankine` | degree Rankine | `bu_rankine` | 5/9 K per °Ra — absolute, no affine offset |
+
+> **Rankine vs Fahrenheit:** Rankine is the absolute temperature scale corresponding to Fahrenheit, analogous to how Kelvin relates to Celsius. 0 °Ra = 0 K; 459.67 °Ra = 0 °F = 273.15 K. Rankine is a **linear** unit (not affine): `K = °Ra × 5/9`. Note that the canonical symbol `Ra` is used because the natural symbol `R` is reserved for the röntgen (`bu_roentgen`).
+
+### Imperial and US Customary Units — Mass (Additional)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `slug` | `slug`, `slugs` | slug | `bu_slug` | 14.593902937 kg — defined as lbf·s²/ft |
+
+### Length — Precision Engineering
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `thou` | `thou`, `mil`, `mils` | thou (thousandth of an inch) | `bu_thou` | 25.4×10⁻⁶ m (exact) |
+
+> **Thou vs mil:** Both `thou` and `mil` are accepted spellings for 1/1000 of an inch (25.4 µm). The term "thou" is standard in UK engineering; "mil" is common in US manufacturing and PCB layout. The canonical output form is `thou`. Note that `mil` does **not** mean milliradian here; milliradians are written `m~rad`.
+
+### Imperial Volume Units (UK)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `pt_uk`    | `pint_uk`, `pints_uk` | imperial pint | `bu_pint_uk` | 568.26125×10⁻⁶ m³ (= gallon_uk / 8, exact) |
+| `fl_oz_uk` | `fluid_ounce_uk`, `fluid_ounces_uk` | imperial fluid ounce | `bu_fluid_ounce_uk` | 28.4130625×10⁻⁶ m³ (= gallon_uk / 160, exact) |
+| `qt_uk`    | `quart_uk`, `quarts_uk` | imperial quart | `bu_quart_uk` | 1136.5225×10⁻⁶ m³ (= gallon_uk / 4, exact) |
+
+> **US vs UK volume units:** The existing `pt` (US liquid pint, 473.2 mL), `fl_oz` (US fluid ounce, 29.57 mL), and `qt` (US liquid quart, 946.4 mL) differ substantially from their UK imperial counterparts. The `_uk` suffix variants are added for unambiguous use in UK and Commonwealth contexts.
+
+### Electrical Power Units
+
+| Symbol | Long forms | Name | Enum value | Factor | Notes |
+|--------|-----------|------|------------|--------|-------|
+| `var`  | `var`, `vars` | var (volt-ampere reactive) | `bu_var` | 1.0 W equivalent | reactive power; same dimensions as W |
+| `VA`   | `volt_ampere`, `volt_amperes` | volt-ampere | `bu_volt_ampere` | 1.0 W equivalent | apparent power; same dimensions as W |
+
+> **Watt, var, and VA:** All three units carry the same SI dimensional signature (kg·m²·s⁻³), so `bvn_units_compatible` returns `true` when comparing them. They are kept as distinct base units because they represent physically distinct interpretations of AC power: active power (W), reactive power (var), and apparent power (VA). A Bovnar-aware application can inspect `value_unit_t.components[0].base` to distinguish them after a compatibility check confirms the shared dimension.
 
 ### Digital Units
 
@@ -662,7 +704,44 @@ typedef enum value_base_unit_e {
     bu_tonne, bu_bar,
     bu_electronvolt, bu_dalton, bu_astronomical_unit,
     bu_hectare,
-    bu_week, bu_year
+    bu_week, bu_year,
+    /* Imperial/US customary — length */
+    bu_inch, bu_foot, bu_yard, bu_mile, bu_nautical_mile,
+    bu_angstrom, bu_light_year, bu_parsec, bu_furlong, bu_fathom,
+    bu_thou,
+    /* Imperial/US customary — mass */
+    bu_pound, bu_ounce, bu_grain, bu_stone, bu_short_ton,
+    bu_long_ton, bu_troy_ounce, bu_carat, bu_slug,
+    /* Temperature */
+    bu_fahrenheit, bu_rankine,
+    /* Pressure */
+    bu_atmosphere, bu_mmhg, bu_torr, bu_psi,
+    /* Energy */
+    bu_calorie, bu_btu, bu_erg, bu_therm,
+    /* Power */
+    bu_horsepower,
+    /* Force */
+    bu_pound_force, bu_dyne, bu_kip,
+    /* Speed */
+    bu_knot,
+    /* Volume — US */
+    bu_gallon, bu_gallon_uk, bu_quart, bu_pint, bu_cup,
+    bu_fluid_ounce, bu_tablespoon, bu_teaspoon, bu_barrel,
+    /* Volume — UK imperial */
+    bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
+    /* Area */
+    bu_acre, bu_barn,
+    /* Angle */
+    bu_arcminute, bu_arcsecond, bu_grad,
+    /* CGS */
+    bu_poise, bu_stokes, bu_gauss, bu_maxwell, bu_oersted,
+    bu_stilb, bu_phot, bu_galileo,
+    /* Radiation */
+    bu_curie, bu_roentgen, bu_rem,
+    /* Logarithmic */
+    bu_neper, bu_decibel,
+    /* Electrical power */
+    bu_var, bu_volt_ampere
 } value_base_unit_t;
 ```
 

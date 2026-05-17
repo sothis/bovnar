@@ -664,7 +664,25 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 37–38 | `TONNE`, `BAR` |
 | 39–41 | `ELECTRONVOLT`, `DALTON`, `ASTRONOMICAL_UNIT` |
 | 42–44 | `HECTARE`, `WEEK`, `YEAR` |
-| 45 | `_SENTINEL` (internal bound; do not use) |
+| 45–54 | Imperial/US length (`INCH` … `FATHOM`) |
+| 55–62 | Imperial/US mass (`POUND` … `CARAT`) |
+| 63 | `FAHRENHEIT` |
+| 64–67 | Pressure (`ATMOSPHERE` … `PSI`) |
+| 68–71 | Energy (`CALORIE` … `THERM`) |
+| 72 | `HORSEPOWER` |
+| 73–75 | Force (`POUND_FORCE`, `DYNE`, `KIP`) |
+| 76 | `KNOT` |
+| 77–87 | US volume (`GALLON` … `BARN`) |
+| 88–90 | Angle (`ARCMINUTE`, `ARCSECOND`, `GRAD`) |
+| 91–98 | CGS units (`POISE` … `GALILEO`) |
+| 99–101 | Radiation (`CURIE`, `ROENTGEN`, `REM`) |
+| 102–103 | Logarithmic (`NEPER`, `DECIBEL`) |
+| 104 | `RANKINE` |
+| 105 | `SLUG` |
+| 106 | `THOU` |
+| 107–109 | UK imperial volume (`PINT_UK`, `FLUID_OUNCE_UK`, `QUART_UK`) |
+| 110–111 | Electrical power (`VAR`, `VOLT_AMPERE`) |
+| 112 | `_SENTINEL` (internal bound; do not use) |
 
 ---
 

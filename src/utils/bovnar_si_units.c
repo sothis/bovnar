@@ -171,6 +171,15 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_roentgen]           = { bu_roentgen,           2.58e-4,                  {0,-1, 1, 1, 0, 0, 0}, false, 0.0    },
 	[bu_rem]                = { bu_rem,                1e-2,                     {2, 0,-2, 0, 0, 0, 0}, false, 0.0    },
 	[bu_neper]              = { bu_neper,              1.0,                      {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_decibel]            = { bu_decibel,            1.0,                      {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_rankine]            = { bu_rankine,            5.0/9.0,                  {0, 0, 0, 0, 1, 0, 0}, false, 0.0    },
+	[bu_slug]               = { bu_slug,               14.593902937,             {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_thou]               = { bu_thou,               2.54e-5,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_pint_uk]            = { bu_pint_uk,            5.6826125e-4,             {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_fluid_ounce_uk]     = { bu_fluid_ounce_uk,     2.84130625e-5,            {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_quart_uk]           = { bu_quart_uk,           1.1365225e-3,             {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_var]                = { bu_var,                1.0,                      {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
+	[bu_volt_ampere]        = { bu_volt_ampere,        1.0,                      {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))

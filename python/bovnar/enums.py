@@ -185,7 +185,16 @@ class BaseUnit(IntEnum):
     ROENTGEN            = 100
     REM                 = 101
     NEPER               = 102
-    _SENTINEL           = 103
+    DECIBEL             = 103
+    RANKINE             = 104
+    SLUG                = 105
+    THOU                = 106
+    PINT_UK             = 107
+    FLUID_OUNCE_UK      = 108
+    QUART_UK            = 109
+    VAR                 = 110
+    VOLT_AMPERE         = 111
+    _SENTINEL           = 112
 
 class Exponent(IntEnum):
 

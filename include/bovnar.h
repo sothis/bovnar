@@ -145,7 +145,14 @@ typedef enum value_base_unit_e {
 	bu_poise, bu_stokes, bu_gauss, bu_maxwell, bu_oersted,
 	bu_stilb, bu_phot, bu_galileo,
 	bu_curie, bu_roentgen, bu_rem,
-	bu_neper
+	bu_neper,
+	bu_decibel,
+	bu_rankine,
+	bu_slug,
+	bu_thou,
+	bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
+	bu_var,
+	bu_volt_ampere
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

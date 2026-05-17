@@ -487,7 +487,16 @@ static void test_nonsi_enum_order(void)
     ASSERT_TRUE((int)bu_roentgen      == 100, "bu_roentgen == 100");
     ASSERT_TRUE((int)bu_rem           == 101, "bu_rem == 101");
     ASSERT_TRUE((int)bu_neper         == 102, "bu_neper == 102");
-    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 103, "sentinel == 103");
+    ASSERT_TRUE((int)bu_decibel       == 103, "bu_decibel == 103");
+    ASSERT_TRUE((int)bu_rankine       == 104, "bu_rankine == 104");
+    ASSERT_TRUE((int)bu_slug          == 105, "bu_slug == 105");
+    ASSERT_TRUE((int)bu_thou          == 106, "bu_thou == 106");
+    ASSERT_TRUE((int)bu_pint_uk       == 107, "bu_pint_uk == 107");
+    ASSERT_TRUE((int)bu_fluid_ounce_uk == 108, "bu_fluid_ounce_uk == 108");
+    ASSERT_TRUE((int)bu_quart_uk      == 109, "bu_quart_uk == 109");
+    ASSERT_TRUE((int)bu_var           == 110, "bu_var == 110");
+    ASSERT_TRUE((int)bu_volt_ampere   == 111, "bu_volt_ampere == 111");
+    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 112, "sentinel == 112");
 }
 
 static void test_nonsi_si_factors(void)

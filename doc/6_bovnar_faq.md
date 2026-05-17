@@ -398,12 +398,30 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-44 named units: the 7 SI base units, 21 named SI-derived units (hertz through
-katal, plus radian and steradian), and 16 non-SI units accepted for use with
-SI (liter, minute, hour, day, week, year, degree (angle), degree Celsius,
-tonne, bar, electronvolt, dalton, astronomical unit, hectare, and the bit and
-byte for digital quantities). The `bu_gram` base unit is used for mass so that
-the `k~` prefix can carry the kilo: `k~g` = kilogram.
+111 named base units across the following categories:
+
+- **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
+- **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
+- **14 non-SI units accepted for use with SI** — liter, minute, hour, day, week, year, degree (angle), degree Celsius, tonne, bar, electronvolt, dalton, astronomical unit, hectare.
+- **2 digital units** — bit (`b`), byte (`B`), with IEC binary prefixes (kibi through quebi).
+- **10 Imperial/US customary length units** — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom; plus **thou** (thousandth of an inch, alias `mil`).
+- **9 Imperial/US customary mass units** — pound, ounce, grain, stone, short ton, long ton, troy ounce, carat, **slug**.
+- **2 temperature scales** — degree Fahrenheit (affine), **degree Rankine** (linear, absolute).
+- **4 pressure units** — atmosphere, mmHg, Torr, psi.
+- **4 energy units** — calorie, BTU, erg, therm.
+- **1 power unit** — horsepower.
+- **3 force units** — pound-force, dyne, kip.
+- **1 speed unit** — knot.
+- **9 US volume units** — gallon, gallon (UK), quart, pint, cup, fluid ounce, tablespoon, teaspoon, barrel.
+- **3 UK imperial volume units** — **pint_uk**, **fluid_ounce_uk**, **quart_uk**.
+- **2 area units** — acre, barn.
+- **3 angle units** — arcminute, arcsecond, gradian.
+- **8 CGS units** — poise, stokes, gauss, maxwell, oersted, stilb, phot, galileo.
+- **3 radiation units** — curie, röntgen, rem.
+- **2 logarithmic units** — neper, **decibel** (`dB`).
+- **2 electrical power units** — **var** (reactive power), **volt-ampere** (`VA`, apparent power).
+
+The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `Ra` (not `R`, which is reserved for röntgen). Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity.
 
 ---
 

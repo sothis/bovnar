@@ -495,6 +495,9 @@
 
 # --- logarithmic ---
 .log_neper         = <float:64,Np>    1.0;         # neper (dimensionless logarithmic ratio)
+.log_decibel       = <float:64,dB>    -3.0;        # decibel — 1 Np = 20/ln(10) dB ≈ 8.686 dB
+.log_dB_gain       = <float:64,dB>    20.0;        # gain expressed in dB
+.log_dB_loss       = <float:32,dB>    -6.0;        # insertion loss in dB
 
 # --- compound expressions using non-SI units ---
 .eng_lbf_per_in2   = <float:64,lbf/in²>  14.696;  # pressure in psi expressed as lbf/in²
@@ -504,6 +507,39 @@
 .eng_gal_per_min   = <float:64,gal/min>   1.0;     # volumetric flow rate
 .eng_lb_per_ft3    = <float:64,lb/ft³>    62.4;    # density (water ≈ 62.4 lb/ft³)
 
+# --- rankine (absolute Fahrenheit-degree temperature scale) ---
+.temp_rankine_abs  = <float:64,Ra>    491.67;      # 491.67 °Ra = 32 °F = 273.15 K = 0 °C
+.temp_rankine_room = <float:64,Ra>    527.67;      # room temperature (68 °F) in Rankine
+# K = °Ra × (5/9) — linear (no affine offset)
+
+# --- slug (imperial mass unit) ---
+.mass_slug         = <float:64,slug>  1.0;         # 1 slug = 14.5939 kg
+.dynamics_accel    = <float:64,ft/s²> 32.174;      # 1 slug × 32.174 ft/s² = 1 lbf
+.mass_slugs_multi  = <float:64,slug>  3.5;         # 3.5 slugs ≈ 51.08 kg
+
+# --- thou / mil (precision engineering length) ---
+.pcb_trace_thou    = <float:64,thou>  5.0;         # 5 thou = 5 mil = 0.127 mm
+.pcb_clearance_mil = <float:64,thou>  3.0;         # 3 mil clearance (mil accepted synonym)
+.mfg_tolerance     = <float:32,thou>  0.5;         # ±0.5 thou tolerance
+
+# --- UK imperial volume units ---
+.vol_pint_uk       = <float:64,pt_uk>     1.0;     # 1 UK pint = 568.26 mL (≠ US pint 473.2 mL)
+.vol_pint_uk2      = <float:32,pint_uk>   0.5;     # half UK pint
+.vol_fl_oz_uk      = <float:64,fl_oz_uk>  20.0;    # 20 UK fl oz = 1 UK pint
+.vol_quart_uk      = <float:64,qt_uk>     1.0;     # 1 UK quart = 1136.52 mL
+.vol_quart_uk2     = <float:64,quart_uk>  4.0;     # 4 UK quarts = 1 UK gallon
+# Relationship: 1 gal_uk = 4 qt_uk = 8 pt_uk = 160 fl_oz_uk
+
+# --- electrical power units (reactive and apparent power) ---
+.power_reactive    = <float:64,var>   500.0;       # 500 var reactive power
+.power_reactive_k  = <float:64,k~var> 1.5;         # 1.5 kvar — prefixes apply
+.power_apparent    = <float:64,VA>    750.0;        # 750 VA apparent power
+.power_apparent_k  = <float:64,k~VA>  2.0;          # 2 kVA transformer rating
+.power_pf          = <float:64,no_unit> 0.85;       # power factor = W/VA (dimensionless)
+# Note: W, var, and VA are dimensionally identical (m²·kg·s⁻³).
+# bvn_units_compatible returns true across them.  Applications use
+# .components[0].base to distinguish the physical interpretation.
+
 # --- inline suffix form ---
 .inline_inch       = 6.0 in;                        # six inches (inline unit)
 .inline_mph        = 60.0 mi/h;                     # miles per hour
@@ -512,3 +548,9 @@
 .inline_hp         = 250.0 hp;                      # engine power
 .inline_knots      = 15.0 kn;                       # ship speed in knots
 .inline_rem        = 0.1 rem;                       # radiation dose
+.inline_dB         = -3.0 dB;                       # 3 dB attenuation (inline)
+.inline_rankine    = 491.67 Ra;                     # 0 °C expressed in Rankine
+.inline_slug       = 1.0 slug;                      # one slug of mass
+.inline_thou       = 10.0 thou;                     # 10 thou = 0.254 mm
+.inline_pint_uk    = 1.0 pt_uk;                     # one UK pint
+.inline_kvar       = 2.5 k~var;                     # 2.5 kvar reactive power

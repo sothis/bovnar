@@ -435,7 +435,7 @@ except ImportError:
 SENSOR_DOC = (
     b".node_id   = <uint:8>         7;\n"
     b".frequency = <float:64,M~Hz>  868.1;\n"
-    b".tx_power  = <sint:8,d~Bm>    14;\n"
+    b".tx_power  = <sint:8,dBm>    14;\n"
     b".interval  = <uint:32,s>       60;\n"
     b".offset    = <float_fix:32,q8,\xc2\xb0\x43> -0.5;\n"
     b".config = {\n"

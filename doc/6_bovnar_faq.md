@@ -17,7 +17,7 @@
 9. [Null, Symbols, and References](#9-null-symbols-and-references)
 10. [Octet Streams](#10-octet-streams)
 11. [Error Handling and Debugging](#11-error-handling-and-debugging)
-12. [C API](#12-c~api)
+12. [C API](#12-c-api)
 13. [Python Bindings](#13-python-bindings)
 14. [Limits and Performance](#14-limits-and-performance)
 15. [Why C99 and Not C23?](#15-why-c99-and-not-c23)
@@ -287,15 +287,15 @@ Place the unit symbol inside the angle brackets after the other type parameters:
 
 **How do SI prefixes work, and why is the `~` separator mandatory?**
 
-An SI prefix is written before the unit symbol with a mandatory `~` separator
-separator: `k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz). The
+An SI prefix is written before the unit symbol with a mandatory `~` separator:
+`k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz). The
 `~` is required because without it there is no general way to distinguish
 a two-character unit symbol from a one-character prefix followed by a
 one-character unit — `mV` would be ambiguous. The `~` resolves all such
 cases unambiguously:
 
 ```bovnar
-.k_ohm = <float:32,k-Ω> 4.7;
+.k_ohm = <float:32,k~Ω> 4.7;
 .micro = <float:32,µ~s> 50.0;
 .giga  = <float:64,G~Hz> 2.4;
 ```
@@ -311,7 +311,7 @@ IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, …) follow the same rule:
 
 **What is the difference between `M~B` (megabytes) and `Mi~B` (mebibytes)?**
 
-`M-` is the SI decimal prefix (mega = 10⁶). `Mi-` is the IEC binary prefix
+`M~` is the SI decimal prefix (mega = 10⁶). `Mi~` is the IEC binary prefix
 (mebi = 2²⁰ = 1,048,576). The difference matters for storage:
 
 ```bovnar
@@ -403,7 +403,7 @@ katal, plus radian and steradian), and 16 non-SI units accepted for use with
 SI (liter, minute, hour, day, week, year, degree (angle), degree Celsius,
 tonne, bar, electronvolt, dalton, astronomical unit, hectare, and the bit and
 byte for digital quantities). The `bu_gram` base unit is used for mass so that
-the `k-` prefix can carry the kilo: `k~g` = kilogram.
+the `k~` prefix can carry the kilo: `k~g` = kilogram.
 
 ---
 
@@ -1012,7 +1012,7 @@ All limits are configurable via `bvnr_read_flags_t`. Defaults are permissive.
 | `max_text_bytes` | 0 (unlimited) | application-defined |
 | `max_file_size` | 0 (unlimited) | `16777216` (16 MiB) |
 | `max_array_nesting` | 0 (→255 internal) | 32 or less |
-| `max_struct_nesting` | 255 | 32 or less |
+| `max_struct_nesting` | 0 (→255 internal) | 32 or less |
 
 Zero means "no limit enforced by this field." Production deployments should
 set `max_file_size` at minimum. For untrusted input, set `max_array_items`,
@@ -1138,3 +1138,5 @@ standard publication by three to five years.
 ---
 
 *End of Bovnar FAQ — Specification v1.0*
+
+==> build/merged/bvnr_py_src_exmpl.txt <==

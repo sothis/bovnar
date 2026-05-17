@@ -9,7 +9,7 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [File Format at a Glance](#2-file-format-at-a~glance)
+2. [File Format at a Glance](#2-file-format-at-a-glance)
 3. [Character Encoding & BOM](#3-character-encoding--bom)
 4. [Lexical Structure](#4-lexical-structure)
 5. [Type Annotations](#5-type-annotations)
@@ -1129,8 +1129,8 @@ An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0
 | Array items | Yes (`max_array_items`) | 0 (unlimited) | `error_too_many_array_items` |
 | Text bytes | Yes (`max_text_bytes`) | 0 (unlimited) | `error_text_data_too_long` |
 | File size | Yes (`max_file_size`) | 0 (unlimited) | `error_file_too_long` |
-| Struct nesting | Yes (`max_struct_nesting`) | 255 | `error_struct_nesting_too_high` |
-| Array nesting | Yes (`max_array_nesting`) | 255 | `error_array_nesting_too_high` |
+| Struct nesting | Yes (`max_struct_nesting`) | 0 (→255 internal) | `error_struct_nesting_too_high` |
+| Array nesting | Yes (`max_array_nesting`) | 0 (→255 internal) | `error_array_nesting_too_high` |
 
 ### 12.3 Value Validation
 
@@ -1702,8 +1702,8 @@ typedef struct bvnr_read_flags_s {
     uint64_t  max_array_items;        // default 0 (unlimited)
     uint64_t  max_text_bytes;         // default 0 (unlimited)
     uint64_t  max_file_size;          // default 0 (unlimited); set to 16777216 for 16 MiB cap
-    uint64_t  max_struct_nesting;     // default 255
-    uint64_t  max_array_nesting;      // default 255
+    uint8_t   max_struct_nesting;     // default 0 (→255 internal)
+    uint8_t   max_array_nesting;      // default 0 (→255 internal, hard cap at 255)
     void*     userdata;
     bool    (*on_unverified)(void*, bvnr_event_t, bvnr_data_t*);
     bool    (*on_verified)(void*, bvnr_event_t, bvnr_data_t*);
@@ -1716,7 +1716,7 @@ typedef struct bvnr_read_flags_s {
 
 ```c
 void bvnr_source_from_fd(bvnr_source_t* s, int fd);
-void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint32_t len);
+void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
@@ -2137,6 +2137,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 ---
 
 *End of Bovnar Specification v1.0*
+
 
 
 

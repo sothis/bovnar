@@ -233,10 +233,10 @@ The unit goes inside the angle brackets, after the other parameters:
 
 ### SI Prefixes
 
-SI prefixes are written before the base unit symbol with a **mandatory `-`** separator:
+SI prefixes are written before the base unit symbol with a **mandatory `~`** separator:
 
 ```bovnar
-.k_ohm  = <float:32,k-Ω>   4.7;     # kilo-ohm
+.k_ohm  = <float:32,k~Ω>   4.7;     # kilo-ohm
 .milli  = <float:32,m~V>   330.0;   # millivolt
 .micro  = <float:32,µ~s>   50.0;    # microsecond (µ = U+00B5)
 .giga   = <float:64,G~Hz>  2.4;     # gigahertz
@@ -634,7 +634,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 .radio = {
     .frequency  = <float:64,M~Hz>  868.1;
-    .tx_power   = <sint:8,d~Bm>    14;
+    .tx_power   = <sint:8,dBm>    14;
     .bandwidth  = <float:32,k~Hz>  125.0;
     .sf         = <uint:8>         7;          # spreading factor
 };
@@ -797,8 +797,8 @@ All limits are configurable via `bvnr_read_flags_t`. The defaults are intentiona
 | `max_array_items` | 0 (unlimited) | application-defined |
 | `max_text_bytes` | 0 (unlimited) | application-defined |
 | `max_file_size` | 0 (unlimited) | `16777216` (16 MiB) |
-| `max_array_nesting` | 255 | 32 or less for most applications |
-| `max_struct_nesting` | 255 | 32 or less for most applications |
+| `max_array_nesting` | 0 (→255 internal) | 32 or less for most applications |
+| `max_struct_nesting` | 0 (→255 internal) | 32 or less for most applications |
 
 ---
 
@@ -918,3 +918,4 @@ $nan$  $infinity$  $-infinity$
 ---
 
 *Bovnar Specification v1.0 — format by the Bovnar project.*
+

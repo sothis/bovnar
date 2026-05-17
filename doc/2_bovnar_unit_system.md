@@ -8,7 +8,7 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Syntax — Unit as a Type Parameter](#2-syntax--unit-as-a~type-parameter)
+2. [Syntax — Unit as a Type Parameter](#2-syntax--unit-as-a-type-parameter)
 3. [Base Units](#3-base-units)
 4. [Prefixes](#4-prefixes)
    - 4.1 [SI Prefixes](#41-si-prefixes)
@@ -24,12 +24,12 @@
    - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
 7. [The `no_unit` Keyword](#7-the-no_unit-keyword)
 8. [Constraints and Limits](#8-constraints-and-limits)
-9. [C Data Model](#9-c~data-model)
+9. [C Data Model](#9-c-data-model)
    - 9.1 [Enumerations](#91-enumerations)
    - 9.2 [Structures](#92-structures)
    - 9.3 [Convenience Macros](#93-convenience-macros)
-10. [C API Functions](#10-c~api-functions)
-    - 10.1 [Parsing a Unit String](#101-parsing-a~unit-string)
+10. [C API Functions](#10-c-api-functions)
+    - 10.1 [Parsing a Unit String](#101-parsing-a-unit-string)
     - 10.2 [Serializing a Unit](#102-serializing-a~unit)
     - 10.3 [Prefix Factor and Exponent Queries](#103-prefix-factor-and-exponent-queries)
     - 10.4 [SI Conversion API](#104-si-conversion-api)
@@ -157,7 +157,7 @@ Bovnar supports 44 named base units, covering SI base units, all named SI-derive
 | `mol`  | mole     | `bu_mol`     | SI base unit of amount of substance |
 | `cd`   | candela  | `bu_candela` | SI base unit of luminous intensity |
 
-> **Note on the kilogram:** The SI base unit of mass is the kilogram, but Bovnar uses `g` (gram) as the base unit symbol so that the `k-` (kilo) SI prefix can be attached explicitly: `k~g` = kilogram. This is consistent with how the SI formally defines kilogram as a prefixed gram.
+> **Note on the kilogram:** The SI base unit of mass is the kilogram, but Bovnar uses `g` (gram) as the base unit symbol so that the `k~` (kilo) SI prefix can be attached explicitly: `k~g` = kilogram. This is consistent with how the SI formally defines kilogram as a prefixed gram.
 
 ### Named SI-Derived Units
 
@@ -1238,6 +1238,7 @@ In `continue_on_error` mode the parser invokes `on_error` with the error code an
 ---
 
 *End of Bovnar Unit System Reference Documentation v1.0.*
+
 
 
 

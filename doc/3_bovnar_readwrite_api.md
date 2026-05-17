@@ -139,7 +139,8 @@ typedef struct bvnr_read_flags_s {
     bool   continue_on_error;
     bvnr_on_error_fn on_error;
     uint64_t max_file_size;        /* 0 = unlimited */
-    uint64_t max_struct_nesting;   /* 0 = default 255 */
+    uint8_t  max_struct_nesting;   /* 0 = default 0 (→255 internal) */
+    uint8_t  max_array_nesting;    /* 0 = default 0 (→255 internal); hard-capped at 255 */
     /* ... other size limits ... */
 } bvnr_read_flags_t;
 ```
@@ -148,7 +149,7 @@ typedef struct bvnr_read_flags_s {
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
-**`max_array_nesting` hard limit.** Although the field is typed `uint64_t`, the lexer stores per-level state in a fixed array of 256 entries, so `max_array_nesting` is capped at **255**. Passing a value greater than 255 causes `bvnr_open_read_source` to return `false` with `error_invalid_argument`. Zero-initialising the struct (the recommended default) is safe: zero is interpreted as "no limit enforced by this field", which in practice allows nesting up to the internal maximum of 255. `max_struct_nesting` carries no such restriction and accepts any `uint64_t` value.
+**`max_array_nesting` hard limit.** Both `max_array_nesting` and `max_struct_nesting` are typed `uint8_t`. Zero-initialising the struct (the recommended default) is safe: zero means "no additional limit enforced by this field," which in practice allows nesting up to the internal maximum of 255 for both fields. `max_array_nesting` has an additional hard cap: the lexer stores per-level state in a fixed array of 256 entries, so passing any value greater than 255 causes `bvnr_open_read_source` to return `false` with `error_invalid_argument`. Because the field is `uint8_t` this cap is never reachable in practice. `max_struct_nesting` has no analogous input-validation check.
 
 ```c
 static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
@@ -392,8 +393,8 @@ typedef struct bvnr_write_flags_s {
     bool   continue_on_error;
     bvnr_on_error_fn on_error;
     uint64_t max_file_size;
-    uint64_t max_struct_nesting;
-    uint64_t max_array_nesting;
+    uint8_t  max_struct_nesting;
+    uint8_t  max_array_nesting;
     /* ... other size limits ... */
 } bvnr_write_flags_t;
 ```

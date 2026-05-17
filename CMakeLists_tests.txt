@@ -132,6 +132,48 @@ set_tests_properties(bvnr_float_test PROPERTIES
     PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
     FAIL_REGULAR_EXPRESSION "FAIL")
 
+# ── Conformance tests ────────────────────────────────────────────────────────
+#
+# bvnr_conformance: self-contained conformance test driver.
+#   Self-test mode  : tests the reference implementation directly.
+#   IUT mode        : invokes an external binary and compares its event-log
+#                     output to the reference (--iut <path>).
+#
+# bvnr_conformance_iut: reference IUT adapter binary.
+#   Reads Bovnar text from stdin, emits the conformance event log to stdout.
+#   Used both for self-testing and as a template for third-party adapters.
+#
+# See doc/7_bovnar_conformance.md for the full protocol specification.
+
+add_executable(bvnr_conformance     tests/bvnr_conformance.c)
+add_executable(bvnr_conformance_iut tests/bvnr_conformance_iut.c)
+
+target_compile_options(bvnr_conformance PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_conformance PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_conformance_iut PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_conformance_iut PRIVATE bvnr_static m)
+
+# Self-test: conformance suite exercised against the built-in reference impl.
+add_test(NAME bvnr_conformance_self
+    COMMAND bvnr_conformance)
+set_tests_properties(bvnr_conformance_self PROPERTIES
+    LABELS   "conformance;self"
+    TIMEOUT  60
+    PASS_REGULAR_EXPRESSION "# All [0-9]+ conformance tests passed"
+    FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
+
+# IUT self-test: conformance suite driven through the reference IUT adapter.
+# This validates both the IUT protocol layer and the adapter binary itself.
+add_test(NAME bvnr_conformance_iut_self
+    COMMAND bvnr_conformance --iut $<TARGET_FILE:bvnr_conformance_iut>)
+set_tests_properties(bvnr_conformance_iut_self PROPERTIES
+    LABELS   "conformance;iut;self"
+    TIMEOUT  60
+    DEPENDS  bvnr_conformance_iut
+    PASS_REGULAR_EXPRESSION "# All [0-9]+ conformance tests passed"
+    FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
+
 # ── Fuzz tests ───────────────────────────────────────────────────────────────
 
 option(BVNR_FUZZ_TEST

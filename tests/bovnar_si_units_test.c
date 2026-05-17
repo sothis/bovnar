@@ -846,7 +846,7 @@ static void test_unit_reduce_iec(void)
 	ASSERT_EQ_INT((int64_t)r2.num_components, 0,
 	              "Mi~B/Ki~B reduces to 0 components (byte dimension cancels)");
 	ASSERT_EQ_DBL(scale, 1024.0, 1e-6,
-	              "Mi~B/Ki~B scale = 1024 (2^10), not 1e10");
+	              "Mi~B/Ki~B scale = 1024 (2^10), not 1000 (SI)");
 
 	value_unit_t TiB2_per_GiB = {
 		.num_components = 2,

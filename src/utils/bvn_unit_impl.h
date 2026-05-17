@@ -57,6 +57,7 @@ static inline int32_t bvni_exp_abs(unit_exponent_t e)
 {
 	assert(e != exp_invalid);
 	int32_t v = bvn_exponent_to_int(e);
+	assert(v != 0);
 	return v < 0 ? -v : v;
 }
 static inline int32_t bvni_prefix_exp_int(value_unit_component_t c)

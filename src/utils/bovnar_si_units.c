@@ -239,7 +239,11 @@ double bvn_unit_to_si_factor(value_unit_t u,
 			*ok = false;
 			return f;
 		}
-		int32_t uexp    = bvn_exponent_to_int(c->exponent);
+		int32_t uexp = bvn_exponent_to_int(c->exponent);
+		if (uexp == 0) {
+			*ok = false;
+			return f;
+		}
 		int32_t abs_exp = bvni_exp_abs(c->exponent);
 		double prefix_contrib = pow(bvni_prefix_factor(*c), (double)abs_exp);
 		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
@@ -253,16 +257,16 @@ double bvn_unit_to_si_factor(value_unit_t u,
 			comp_total = 1.0 / comp_total;
 		f *= comp_total;
 		if (conv->is_affine) {
-			if (uexp == 0) {
-			} else if (uexp == 1) {
+			if (uexp == 1) {
 				if (*is_affine) {
 					*ok = false;
-				} else {
-					*is_affine     = true;
-					*affine_offset = conv->affine_offset;
+					return f;
 				}
+				*is_affine     = true;
+				*affine_offset = conv->affine_offset;
 			} else {
 				*ok = false;
+				return f;
 			}
 		}
 	}

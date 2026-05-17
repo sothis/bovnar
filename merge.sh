@@ -5,4 +5,4 @@ tail -n +1 CMake* src/dom/* src/io/* src/lexer/* src/utils/* src/validator/* src
 tail -n +1 python/bovnar/*.py python/tests/*.py python/*.toml build/merged/bvnr_src.txt > build/merged/bvnr_py_src.txt
 tail -n +1 examples/* build/merged/bvnr_py_src.txt > build/merged/bvnr_py_src_exmpl.txt
 tail -n +1 doc/* build/merged/bvnr_py_src_exmpl.txt > build/merged/bvnr_py_src_exmpl_doc.txt
-tail -n +1 web/*.html web/90s/* build/merged/bvnr_py_src_exmpl_doc.txt > build/merged/bvnr_py_src_exmpl_doc_web.txt
+tail -n +1 web/*.html build/merged/bvnr_py_src_exmpl_doc.txt > build/merged/bvnr_py_src_exmpl_doc_web.txt

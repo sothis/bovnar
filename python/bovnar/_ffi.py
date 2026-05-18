@@ -171,12 +171,6 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_writer_get_error.restype  = c_int
     lib.bvnr_writer_get_error.argtypes = [c_void_p]
 
-    lib.bvnr_writer_get_error_line.restype  = c_uint64
-    lib.bvnr_writer_get_error_line.argtypes = [c_void_p]
-
-    lib.bvnr_writer_get_error_column.restype  = c_uint64
-    lib.bvnr_writer_get_error_column.argtypes = [c_void_p]
-
     lib.bvnr_writer_get_error_offset.restype  = c_uint64
     lib.bvnr_writer_get_error_offset.argtypes = [c_void_p]
 

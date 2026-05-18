@@ -450,8 +450,15 @@ def _emit_array_element(w: Writer, elem) -> None:
         _write_event_data(w, d)
 
     elif isinstance(elem, float):
+        import math as _math
         vt  = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
-        raw = repr(elem).encode('ascii')
+        if _math.isinf(elem):
+            _s = '-infinity' if elem < 0 else 'infinity'
+        elif _math.isnan(elem):
+            _s = 'nan'
+        else:
+            _s = repr(elem)
+        raw = _s.encode('ascii')
         d = BvnrData()
         d.type       = _TOKEN_IS_ARRAY_NUMBER
         d.value_type = vt

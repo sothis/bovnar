@@ -361,3 +361,32 @@ class TestInvalidArguments:
             with pytest.raises(BovnarArgumentError):
                 r.read_fd(-1)
 
+
+
+class TestFfiDeclarations:
+    """Regression test for Bug 1: _declare_functions must not reference
+    writer symbols that do not exist in the C library.  A missing symbol
+    causes AttributeError inside _declare_functions, which makes every
+    candidate path fail and raises BovnarLibraryNotFound, hiding all
+    integration tests."""
+
+    def test_library_loads_without_attribute_error(self):
+        from bovnar._ffi import _candidate_paths, _declare_functions
+        import ctypes, re
+        loaded = False
+        for p in _candidate_paths():
+            try:
+                lib = ctypes.CDLL(p, use_errno=True)
+                _declare_functions(lib)
+                loaded = True
+                break
+            except AttributeError as e:
+                raise AssertionError(
+                    f"_declare_functions raised AttributeError: {e}\n"
+                    "A non-existent symbol is declared in _ffi.py"
+                ) from e
+            except OSError:
+                continue
+        if not loaded:
+            import pytest
+            pytest.skip("shared library not found on this system")

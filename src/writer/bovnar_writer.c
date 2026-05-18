@@ -91,7 +91,7 @@ static bool bvn_validate_string_content(bvnr_writer_t* w,
 	if (!data || length == 0) return true;
 	for (uint32_t i = 0; i < length; i++) {
 		uint8_t c = data[i];
-		if (c <= 0x08 || (c >= 0x0B && c <= 0x0C) || (c >= 0x0E && c <= 0x1F) || c == 0x7F) {
+		if (c <= 0x08 || (c >= 0x0E && c <= 0x1F) || c == 0x7F) {
 			return bvn_writer_set_error(w,
 				error_unexpected_input_byte);
 		}
@@ -408,7 +408,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 					data->data, data->length))
 				return false;
 		} else if (tt == token_is_octet_stream) {
-			if (data->length > 65536u)
+			if (data->length == 0 || data->length > 65536u)
 				return bvn_writer_set_error(w,
 					error_invalid_argument);
 		}

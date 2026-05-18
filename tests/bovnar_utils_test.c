@@ -49,6 +49,8 @@ static int tests = 0;
     }                                                                \
 } while (0)
 
+#define ASSERT_FALSE(cond, msg) ASSERT_TRUE(!(cond), (msg))
+
 static void test_type_spec_constructors(void)
 {
     printf("  test_type_spec_constructors...\n");
@@ -322,6 +324,96 @@ static void test_unit_edge_cases(void)
                   "unit must support maximum components");
 }
 
+static void test_format_double_base_out_of_range(void)
+{
+    printf("  test_format_double_base_out_of_range...\n");
+
+    char buf[64];
+    value_type_spec_t vt37 = BVN_TYPE_FLOAT_BASE(64, 37);
+    ASSERT_EQ_INT(bvn_format_double(buf, sizeof(buf), 3.14, vt37), -1,
+                  "bvn_format_double with base=37 must return -1");
+
+    value_type_spec_t vt62 = BVN_TYPE_FLOAT_BASE(64, 62);
+    ASSERT_EQ_INT(bvn_format_double(buf, sizeof(buf), 1.0, vt62), -1,
+                  "bvn_format_double with base=62 must return -1");
+
+    value_type_spec_t vt10 = BVN_TYPE_FLOAT(64);
+    ASSERT_TRUE(bvn_format_double(buf, sizeof(buf), 1.5, vt10) > 0,
+                "bvn_format_double with base=10 must succeed");
+
+    value_type_spec_t vt16 = BVN_TYPE_FLOAT_BASE(64, 16);
+    ASSERT_TRUE(bvn_format_double(buf, sizeof(buf), 1.5, vt16) > 0,
+                "bvn_format_double with base=16 must succeed");
+}
+
+static void test_validate_number_in_base_e_digit(void)
+{
+    printf("  test_validate_number_in_base_e_digit...\n");
+
+    ASSERT_TRUE(bvn_validate_number_in_base("ae", 16),
+                "\"ae\" is a valid base-16 integer (a=10, e=14)");
+    ASSERT_TRUE(bvn_validate_number_in_base("1e1", 16),
+                "\"1e1\" is a valid base-16 integer (1,14,1)");
+    ASSERT_TRUE(bvn_validate_number_in_base("ffee", 16),
+                "\"ffee\" is a valid base-16 integer");
+    ASSERT_TRUE(bvn_validate_number_in_base("e", 15),
+                "\"e\" is the digit 14 in base 15");
+    ASSERT_TRUE(bvn_validate_number_in_base("EF", 16),
+                "\"EF\" is valid base-16 (E=14, F=15)");
+
+    ASSERT_TRUE(bvn_validate_number_in_base("1e2", 10),
+                "\"1e2\" is a valid base-10 scientific float");
+    ASSERT_FALSE(bvn_validate_number_in_base("e", 10),
+                 "bare \"e\" is not a valid base-10 number");
+    ASSERT_FALSE(bvn_validate_number_in_base("1e", 10),
+                 "\"1e\" with no exponent digits is invalid base-10");
+
+    ASSERT_TRUE(bvn_validate_number_in_base("1p2", 16),
+                "\"1p2\" is valid base-16 hex float (p-exponent)");
+    ASSERT_FALSE(bvn_validate_number_in_base("1p2", 10),
+                 "\"1p2\" is invalid in base-10 (p not a decimal exponent)");
+    ASSERT_TRUE(bvn_validate_number_in_base("1p2", 62),
+                "\"1p2\" is valid in base-62 ('p' is digit 25, not an exponent)");
+}
+
+static void test_unit_equal(void)
+{
+    printf("  test_unit_equal...\n");
+
+    value_unit_t m1 = BVN_UNIT_NO_PREFIX(bu_meter);
+    value_unit_t m2 = BVN_UNIT_NO_PREFIX(bu_meter);
+    ASSERT_TRUE(bvn_unit_equal(m1, m2), "identical meter units must be equal");
+
+    value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo);
+    ASSERT_FALSE(bvn_unit_equal(m1, km),
+                 "meter and kilometer must not be equal");
+
+    value_unit_t none1 = BVN_UNIT_NONE;
+    value_unit_t none2 = BVN_UNIT_NONE;
+    ASSERT_TRUE(bvn_unit_equal(none1, none2), "two UNIT_NONE must be equal");
+
+    ASSERT_FALSE(bvn_unit_equal(none1, m1),
+                 "UNIT_NONE and meter must not be equal");
+
+    value_unit_t kib = BVN_UNIT_IEC(bu_byte, iec_kibi);
+    value_unit_t kib2 = BVN_UNIT_IEC(bu_byte, iec_kibi);
+    ASSERT_TRUE(bvn_unit_equal(kib, kib2), "two KiB units must be equal");
+
+    value_unit_t mib = BVN_UNIT_IEC(bu_byte, iec_mebi);
+    ASSERT_FALSE(bvn_unit_equal(kib, mib), "KiB and MiB must not be equal");
+
+    value_unit_t ms_sq = BVN_UNIT_COMPOUND2(
+        bu_meter, si_none, exp_linear,
+        bu_second, si_none, exp_neg_square);
+    value_unit_t ms_sq2 = BVN_UNIT_COMPOUND2(
+        bu_meter, si_none, exp_linear,
+        bu_second, si_none, exp_neg_square);
+    ASSERT_TRUE(bvn_unit_equal(ms_sq, ms_sq2),
+                "compound m/s^2 units must be equal");
+    ASSERT_FALSE(bvn_unit_equal(ms_sq, m1),
+                 "compound m/s^2 vs plain meter must not be equal");
+}
+
 int main(void)
 {
     printf("Running bovnar_utils_test regression suite...\n");
@@ -340,6 +432,9 @@ int main(void)
     test_token_type_boundaries();
     test_unit_math_compound_units();
     test_unit_edge_cases();
+    test_format_double_base_out_of_range();
+    test_validate_number_in_base_e_digit();
+    test_unit_equal();
 
     if (failures == 0) {
         printf("PASSED %d tests\n", tests);

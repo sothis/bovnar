@@ -50,6 +50,8 @@ static int tests    = 0;
     }                                                                   \
 } while (0)
 
+#define ASSERT_FALSE(cond, msg) ASSERT_TRUE(!(cond), (msg))
+
 static bvnr_writer_t *make_writer(uint8_t *buf, uint32_t cap, bvnr_sink_t *sink)
 {
     bvnr_sink_to_mem(sink, buf, cap);
@@ -183,6 +185,50 @@ static void test_write_float_values(void)
                 "round-trip must succeed");
     ASSERT_TRUE(le.vt.family == vt_float, "last type is float");
 
+    bvnr_writer_destroy(w);
+}
+
+static void test_write_float_width_over_64_rejected(void)
+{
+    printf("  test_write_float_width_over_64_rejected...\n");
+
+    uint8_t output[256];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    ASSERT_FALSE(bvnr_write_float(w, "x", 128, 3.14),
+                 "bvnr_write_float with width=128 must fail");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
+                  "error must be error_illegal_value_type for width=128");
+    bvnr_writer_destroy(w);
+
+    w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer (fix) must succeed");
+    if (!w) return;
+    ASSERT_FALSE(bvnr_write_float_fix(w, "x", 128, 10, 1.5),
+                 "bvnr_write_float_fix with width=128 must fail");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
+                  "float_fix width=128 error must be error_illegal_value_type");
+    bvnr_writer_destroy(w);
+
+    w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer (dec) must succeed");
+    if (!w) return;
+    ASSERT_FALSE(bvnr_write_float_dec(w, "x", 128, 2.5),
+                 "bvnr_write_float_dec with width=128 must fail");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
+                  "float_dec width=128 error must be error_illegal_value_type");
+    bvnr_writer_destroy(w);
+
+    w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer (w64) must succeed");
+    if (!w) return;
+    ASSERT_TRUE(bvnr_write_float(w, "x", 64, 3.14),
+                "bvnr_write_float with width=64 must still succeed");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+                  "no error for width=64");
     bvnr_writer_destroy(w);
 }
 
@@ -602,6 +648,7 @@ int main(void)
     test_write_simple_strings();
     test_write_typed_integers();
     test_write_float_values();
+    test_write_float_width_over_64_rejected();
     test_write_bool_and_null();
     test_write_with_units();
     test_write_struct();

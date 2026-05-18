@@ -123,30 +123,24 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
         if (is_special || has_dot || has_exp) {
             default_type.family = vt_float;
             default_type.width  = 64;
-            default_type.base   = 10;
+            default_type.base   = 0;
             family_name     = "float";
             family_name_len = 5;
             emit_width = true;
-            emit_base  = true;
-            emit_unit  = true;
         } else if (is_neg) {
             default_type.family = vt_sint;
             default_type.width  = 64;
-            default_type.base   = 10;
+            default_type.base   = 0;
             family_name     = "sint";
             family_name_len = 4;
             emit_width = true;
-            emit_base  = true;
-            emit_unit  = true;
         } else {
             default_type.family = vt_uint;
             default_type.width  = 64;
-            default_type.base   = 10;
+            default_type.base   = 0;
             family_name     = "uint";
             family_name_len = 4;
             emit_width = true;
-            emit_base  = true;
-            emit_unit  = true;
         }
     } else {
         return true;
@@ -252,7 +246,7 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
     for (uint32_t i = start; i < len; i++) {
         uint8_t b = str[i];
         if (b == '.' ) { v->acc_has_dot = true; continue; }
-        if (b == 'e' || b == 'E') {
+        if ((b == 'e' || b == 'E') && base <= 14u) {
             v->acc_has_exp = true;
             v->acc_exp_state = 1;
             continue;
@@ -483,7 +477,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
             return false;
         }
         if (v->has_annotation_unit &&
-            memcmp(&v->parsed_unit, &inline_unit, sizeof(value_unit_t)) != 0) {
+            !bvn_unit_equal(v->parsed_unit, inline_unit)) {
             v->last_error = error_unit_mismatch;
             return false;
         }

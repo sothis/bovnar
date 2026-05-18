@@ -318,7 +318,8 @@ static bool write_dec32(bvnr_writer_t *w)
 {
     return bvnr_write_float_dec(w, "pi", 32, 3.14159);
 }
-static bool write_dec256(bvnr_writer_t *w)
+
+static bool write_dec256_double(bvnr_writer_t *w)
 {
     return bvnr_write_float_dec(w, "big", 256, 1.0);
 }
@@ -362,9 +363,17 @@ static void test_writer_float_dec(void)
     CHECK(strstr((char *)g_wbuf, "float_dec") && strstr((char *)g_wbuf, ":32"),
           "float_dec:32 output");
 
-    n = write_to_buf(&flags, write_dec256);
-    CHECK(strstr((char *)g_wbuf, "float_dec") && strstr((char *)g_wbuf, ":256"),
-          "float_dec:256 output");
+    /* width > 64 via the double API must be rejected (Bug 6 fix). */
+    memset(g_wbuf, 0, sizeof g_wbuf);
+    {
+        bvnr_writer_t *w = bvnr_writer_create();
+        bvnr_open_write_mem(w, g_wbuf, sizeof g_wbuf, false, NULL);
+        bool ok = write_dec256_double(w);
+        error_code_t err = bvnr_writer_get_error(w);
+        bvnr_writer_destroy(w);
+        CHECK(!ok && err == error_illegal_value_type,
+              "float_dec:256 via double API must return error_illegal_value_type");
+    }
 }
 
 /* ── Write→read round-trip ─────────────────────────────────────────── */

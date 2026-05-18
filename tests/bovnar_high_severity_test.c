@@ -765,6 +765,103 @@ static void test_octet_stream_reader_events(void)
     bvnr_reader_destroy(r);
 }
 
+static void test_string_vt_vf_escape_write(void)
+{
+    printf("  test_string_vt_vf_escape_write...\n");
+
+    uint8_t outbuf[256];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = bvnr_writer_create();
+    ASSERT_TRUE(w != NULL, "writer create");
+    if (!w) return;
+    bvnr_sink_to_mem(&sink, outbuf, sizeof(outbuf));
+    ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL),
+                "open_write_sink for \\v/\\f test");
+
+    bvnr_data_t ev = {0};
+    ASSERT_TRUE(bvnr_write_event(w, ev_stream_start, &ev), "stream_start");
+
+    ev.type = token_is_identifier;
+    ev.data = "vt_key"; ev.length = 6;
+    ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &ev),
+                "assignment_start for \\v key");
+
+    static const uint8_t vt_payload[] = { 'a', '\v', 'b' };
+    ev.type   = token_is_string;
+    ev.data   = vt_payload;
+    ev.length = sizeof(vt_payload);
+    ASSERT_TRUE(bvnr_write_event(w, ev_data, &ev),
+                "ev_data with \\v byte must succeed after Bug 1 fix");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+                  "no error after writing \\v in string");
+
+    ev.type = token_is_identifier;
+    ev.data = "ff_key"; ev.length = 6;
+    ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &ev),
+                "assignment_start for \\f key");
+
+    static const uint8_t ff_payload[] = { 'x', '\f', 'y' };
+    ev.type   = token_is_string;
+    ev.data   = ff_payload;
+    ev.length = sizeof(ff_payload);
+    ASSERT_TRUE(bvnr_write_event(w, ev_data, &ev),
+                "ev_data with \\f byte must succeed after Bug 1 fix");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+                  "no error after writing \\f in string");
+
+    ASSERT_TRUE(bvnr_write_finish(w), "finish");
+
+    uint64_t n = bvnr_writer_bytes_written(w);
+    bvnr_writer_destroy(w);
+    ASSERT_TRUE(n > 0, "bytes written > 0");
+
+    bvnr_reader_t *r = NULL;
+    capture_t ctx = {0};
+    bvnr_read_flags_t flags = {
+        .on_verified = capture_verified,
+        .on_error    = capture_error,
+        .userdata    = &ctx,
+    };
+    ASSERT_TRUE(do_parse(outbuf, (uint32_t)n, &flags, &r),
+                "written \\v/\\f document roundtrips cleanly");
+    ASSERT_EQ_INT((int)ctx.ev_data_count, 2, "two string values roundtripped");
+    bvnr_reader_destroy(r);
+}
+
+static void test_octet_zero_length_chunk_rejected(void)
+{
+    printf("  test_octet_zero_length_chunk_rejected...\n");
+
+    uint8_t outbuf[128];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = bvnr_writer_create();
+    ASSERT_TRUE(w != NULL, "writer create");
+    if (!w) return;
+    bvnr_sink_to_mem(&sink, outbuf, sizeof(outbuf));
+    ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL),
+                "open_write_sink");
+
+    bvnr_data_t ev = {0};
+    ASSERT_TRUE(bvnr_write_event(w, ev_stream_start, &ev), "stream_start");
+
+    ev.type = token_is_identifier;
+    ev.data = "b"; ev.length = 1;
+    ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &ev),
+                "assignment_start");
+    ASSERT_TRUE(bvnr_write_event(w, ev_octet_stream_start, &ev),
+                "octet_stream_start");
+
+    ev.type   = token_is_octet_stream;
+    ev.data   = outbuf;
+    ev.length = 0;
+    ASSERT_FALSE(bvnr_write_event(w, ev_data, &ev),
+                 "zero-length octet chunk must be rejected");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
+                  "error must be error_invalid_argument for zero-length chunk");
+
+    bvnr_writer_destroy(w);
+}
+
 static void test_special_float_write(void)
 {
     printf("  test_special_float_write...\n");
@@ -933,8 +1030,12 @@ int main(void)
 
     printf("\nGap 10: octet-stream events\n");
     test_octet_stream_reader_events();
+    test_octet_zero_length_chunk_rejected();
 
-    printf("\nGap 11: special float write\n");
+    printf("\nGap 11: string escape write roundtrip\n");
+    test_string_vt_vf_escape_write();
+
+    printf("\nGap 12: special float write\n");
     test_special_float_write();
 
     printf("\nGap 12: open_write_mem / bytes_written\n");

@@ -446,6 +446,7 @@ int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
 int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
 bool         bvn_unit_valid(value_unit_t u);
+bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
 double       bvn_unit_prefix_factor(value_unit_t u);
 int32_t      bvn_unit_prefix_exponent(value_unit_t u);
 bvn_unit_flags_t bvnr_writer_unit_flags(const bvnr_writer_t* w);

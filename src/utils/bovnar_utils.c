@@ -85,8 +85,8 @@ bool bvn_validate_number_in_base(const char* s, uint32_t base)
 			has_dot = true;
 			continue;
 		}
-		if (c == 'e' || c == 'E' ||
-		    ((base & (base - 1u)) == 0u && (c == 'p' || c == 'P'))) {
+		if (((c == 'e' || c == 'E') && base <= 14u) ||
+		    ((c == 'p' || c == 'P') && (base & (base - 1u)) == 0u && base <= 16u)) {
 			if (has_exp || !has_mant_digit) return false;
 			has_exp = true;
 			if (s[i + 1] == '+' || s[i + 1] == '-') i++;
@@ -1337,6 +1337,26 @@ static int32_t bvn_write_unit_component_ex(
 	pos += w;
 	return pos;
 }
+bool bvn_unit_equal(value_unit_t a, value_unit_t b)
+{
+	if (a.num_components != b.num_components)
+		return false;
+	uint32_t n = a.num_components < BVNR_MAX_UNIT_COMPONENTS
+	           ? a.num_components : BVNR_MAX_UNIT_COMPONENTS;
+	for (uint32_t i = 0; i < n; i++) {
+		const value_unit_component_t *ca = &a.components[i];
+		const value_unit_component_t *cb = &b.components[i];
+		if (ca->base     != cb->base)     return false;
+		if (ca->exponent != cb->exponent) return false;
+		if (ca->prefix.system != cb->prefix.system) return false;
+		if (ca->prefix.system == prefix_si) {
+			if (ca->prefix.id.si != cb->prefix.id.si) return false;
+		} else {
+			if (ca->prefix.id.iec != cb->prefix.id.iec) return false;
+		}
+	}
+	return true;
+}
 bool bvn_unit_valid(value_unit_t u)
 {
 	if (u.num_components > BVNR_MAX_UNIT_COMPONENTS)
@@ -2052,7 +2072,8 @@ int32_t bvn_format_double(char* buf, size_t bufsize, double value,
 	bvn_float_init_buf(&f, prec, _dlimbs, BVN_FLOAT_NLIMBS(64u));
 	if (!bvn_float_from_double(&f, value)) return -1;
 	uint32_t base = bvn_effective_base(vt);
-	if (!base || base > 36u) base = 10u;
+	if (!base) base = 10u;
+	if (base > 36u) return -1;
 	return bvn_float_to_str(&f, buf, bufsize, base);
 }
 bool bvn_parse_double(const char* s, value_type_spec_t vt, double* out)

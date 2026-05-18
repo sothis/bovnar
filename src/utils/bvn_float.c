@@ -527,74 +527,71 @@ static int32_t bvnf_to_str_pow2(const bvn_float_t *f, char *buf,
 								  size_t bufsize, uint32_t log2b)
 {
 	static const char DIGS[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-	uint32_t base = 1u << log2b;
-	long prec     = f->_prec;
-	long exp2     = f->_exp;
-	uint32_t ndigits = ((uint32_t)prec + log2b - 1u) / log2b;
-	long bexp;
-	{
-		long ep = exp2 - 1L;
-		if (ep >= 0)
-			bexp = ep / (long)log2b;
-		else
-			bexp = -((-ep + (long)log2b - 1L) / (long)log2b);
-	}
-	size_t pos = 0;
-#define PUTC(c) do { if (pos + 1 >= bufsize) return -1; buf[pos++] = (char)(c); } while(0)
-	if (f->_sign < 0) PUTC('-');
-	bool first = true;
-	long bit_pos = (long)prec - 1L;
-	uint32_t cur_digit = 0;
-	for (uint32_t d = 0; d < ndigits; d++) {
-		cur_digit = 0;
+	long prec = (long)f->_prec;
+	long frac_bits = prec - 1L;
+	long nfrac = (frac_bits + (long)log2b - 1L) / (long)log2b;
+	char *fdigs = calloc((size_t)(nfrac + 1), 1u);
+	if (!fdigs) return -1;
+	for (long d = 0; d < nfrac; d++) {
+		long bit_pos = prec - 2L - d * (long)log2b;
+		uint32_t digit = 0;
 		for (uint32_t b = 0; b < log2b; b++) {
-			cur_digit <<= 1;
-			if (bit_pos >= 0) {
+			digit <<= 1;
+			long bp = bit_pos - (long)b;
+			if (bp >= 0) {
 #if BVN_LIMB_BITS == 64
-				uint32_t limb_idx  = (uint32_t)bit_pos / 64u;
-				uint32_t limb_bit  = (uint32_t)bit_pos % 64u;
-				uint32_t bit_val   = (limb_idx < f->_nlimbs)
-					? (uint32_t)((f->_d[limb_idx] >> limb_bit) & 1u) : 0u;
+				uint32_t li = (uint32_t)bp / 64u;
+				uint32_t lb = (uint32_t)bp % 64u;
+				digit |= (li < f->_nlimbs)
+				       ? (uint32_t)((f->_d[li] >> lb) & 1u) : 0u;
 #else
-				uint32_t limb_idx  = (uint32_t)bit_pos / 32u;
-				uint32_t limb_bit  = (uint32_t)bit_pos % 32u;
-				uint32_t bit_val   = (limb_idx < f->_nlimbs)
-					? ((f->_d[limb_idx] >> limb_bit) & 1u) : 0u;
+				uint32_t li = (uint32_t)bp / 32u;
+				uint32_t lb = (uint32_t)bp % 32u;
+				digit |= (li < f->_nlimbs)
+				       ? ((f->_d[li] >> lb) & 1u) : 0u;
 #endif
-				cur_digit |= bit_val;
 			}
-			bit_pos--;
 		}
-		if (first) {
-			PUTC(DIGS[cur_digit < ((uint32_t)sizeof(DIGS) - 1u)
-					   ? cur_digit : 0u]);
-			PUTC('.');
-			first = false;
+		fdigs[d] = DIGS[digit < 37u ? digit : 0u];
+	}
+	long last_nz = nfrac - 1L;
+	while (last_nz >= 0 && fdigs[last_nz] == '0') last_nz--;
+	size_t pos = 0;
+	int32_t ret = -1;
+#define PUTC(c) do { if (pos + 1 >= bufsize) goto p2_done; buf[pos++] = (char)(c); } while (0)
+	if (f->_sign < 0) PUTC('-');
+	PUTC('1');
+	if (last_nz >= 0) {
+		PUTC('.');
+		for (long d = 0; d <= last_nz; d++) PUTC(fdigs[d]);
+	}
+	{
+		long bin_exp = f->_exp - 1L;
+		PUTC('p');
+		if (bin_exp >= 0) {
+			PUTC('+');
 		} else {
-			PUTC(DIGS[cur_digit < ((uint32_t)sizeof(DIGS) - 1u)
-					   ? cur_digit : 0u]);
+			PUTC('-');
+			bin_exp = -bin_exp;
 		}
-	}
-	while (pos > 2 && buf[pos - 1] == '0') pos--;
-	if (pos >= 2 && buf[pos - 1] == '.') pos--;
-	long p_exp = bexp * (long)log2b;
-	PUTC('p');
-	if (p_exp >= 0) { PUTC('+'); } else { PUTC('-'); p_exp = -p_exp; }
-	char ebuf[32];
-	int en = 0;
-	if (bexp == 0) { ebuf[en++] = '0'; }
-	else {
-		long ev = (bexp < 0) ? -bexp : bexp;
-		while (ev > 0) { ebuf[en++] = (char)('0' + ev % 10); ev /= 10; }
-		for (int i = 0, j = en-1; i < j; i++, j--) {
-			char t = ebuf[i]; ebuf[i] = ebuf[j]; ebuf[j] = t;
+		char ebuf[32]; int en = 0;
+		if (bin_exp == 0) {
+			ebuf[en++] = '0';
+		} else {
+			long ev = bin_exp;
+			while (ev > 0) { ebuf[en++] = (char)('0' + ev % 10); ev /= 10; }
+			for (int i = 0, j = en - 1; i < j; i++, j--) {
+				char t = ebuf[i]; ebuf[i] = ebuf[j]; ebuf[j] = t;
+			}
 		}
+		for (int i = 0; i < en; i++) PUTC(ebuf[i]);
 	}
-	for (int i = 0; i < en; i++) PUTC(ebuf[i]);
-	(void)base; (void)p_exp;
-#undef PUTC
 	buf[pos] = '\0';
-	return (int32_t)pos;
+	ret = (int32_t)pos;
+p2_done:
+#undef PUTC
+	free(fdigs);
+	return ret;
 }
 static int32_t bvnf_to_str_arb(const bvn_float_t *f, char *buf,
 								 size_t bufsize, uint32_t base)

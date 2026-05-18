@@ -85,7 +85,8 @@ bool bvn_validate_number_in_base(const char* s, uint32_t base)
 			has_dot = true;
 			continue;
 		}
-		if (c == 'e' || c == 'E' || (base == 16u && (c == 'p' || c == 'P'))) {
+		if (c == 'e' || c == 'E' ||
+		    ((base & (base - 1u)) == 0u && (c == 'p' || c == 'P'))) {
 			if (has_exp || !has_mant_digit) return false;
 			has_exp = true;
 			if (s[i + 1] == '+' || s[i + 1] == '-') i++;
@@ -1659,7 +1660,7 @@ value_type_spec_t bvn_parse_type_annotation(
 	*unit_ok      = true;
 	*unit_too_long = false;
 	*unit_buf_len = 0;
-	*out_unit     = BVN_UNIT_NO_PREFIX(bu_none);
+	*out_unit     = BVN_UNIT_NONE;
 	if (!str || !len) { *type_ok = false; return r; }
 	uint32_t pos = 0;
 	if (pos + 9 <= len && memcmp(str + pos, "float_fix", 9) == 0) {
@@ -1949,7 +1950,7 @@ uint32_t bvn_min_digits_for_type(value_type_spec_t vt)
 	uint32_t w = vt.width;
 	uint32_t base = bvn_effective_base(vt);
 	uint32_t digits = 1;
-	if (w > 64u) w = 64u;
+	if (w > 64u) return 0u;
 	uint64_t maxv = (vt.family == vt_sint)
 		? ((uint64_t)1u << (w - 1u)) - 1u
 		: (w >= 64u) ? UINT64_MAX : ((uint64_t)1u << w) - 1u;

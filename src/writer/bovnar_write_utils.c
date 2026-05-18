@@ -20,6 +20,8 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 				value_type_spec_t vt,
 				value_unit_t vu)
 {
+	if (vu.num_components == 1u && vu.components[0].base == bu_none)
+		vu = BVN_UNIT_NONE;
 	bvnr_data_t d = {
 		.type       = token_is_type,
 		.value_type = vt,
@@ -209,8 +211,7 @@ bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
 	value_type_spec_t vt = BVN_TYPE_FLOAT_FIX(width, q);
 	if (width != 0u && width <= 32u) value = (double)(float)value;
 	char buf[64];
-	if (bvn_format_double(buf, sizeof(buf), value,
-				BVN_TYPE_FLOAT(width)) < 0)
+	if (bvn_format_double(buf, sizeof(buf), value, vt) < 0)
 	{
 		w->val.last_error   = error_number_too_long;
 		w->val.error_offset = bvnr_sink_bytes_written(&w->ser.sink)
@@ -232,8 +233,7 @@ bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
 	value_type_spec_t vt = BVN_TYPE_FLOAT_DEC(width);
 	if (width != 0u && width <= 32u) value = (double)(float)value;
 	char buf[64];
-	if (bvn_format_double(buf, sizeof(buf), value,
-				BVN_TYPE_FLOAT(width)) < 0)
+	if (bvn_format_double(buf, sizeof(buf), value, vt) < 0)
 	{
 		w->val.last_error   = error_number_too_long;
 		w->val.error_offset = bvnr_sink_bytes_written(&w->ser.sink)

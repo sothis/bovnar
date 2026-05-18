@@ -19,7 +19,7 @@
 .empty_typed = <uint:32> [];    # typed empty array
 
 
-# ── 2. Single-row arrays ──────────────────────────────────────────────────────
+# ── 2. Single-row arrays (i.e. a list) ────────────────────────────────────────
 
 .ints    = [1, 2, 3, 4, 5];            # five unsigned integers
 .floats  = [1.0, 2.5, 3.14, -0.5];    # four floats

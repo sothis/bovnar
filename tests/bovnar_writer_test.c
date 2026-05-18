@@ -74,6 +74,7 @@ typedef struct {
     char    value[256];
     uint32_t value_len;
     value_type_spec_t vt;
+    token_type_t value_tok;
 } last_event_t;
 
 static bool on_rt(void *ud, bvnr_event_t ev, bvnr_data_t *d)
@@ -90,6 +91,7 @@ static bool on_rt(void *ud, bvnr_event_t ev, bvnr_data_t *d)
         memcpy(le->value, d->data, d->length);
         le->value_len = d->length;
         le->value[d->length] = '\0';
+        le->value_tok = d->type;
 
         if (le->vt.family == vt_plain)
             le->vt = d->value_type;
@@ -653,6 +655,63 @@ static void test_write_streaming_flush(void)
     free(output);
 }
 
+static void test_write_float_fix_roundtrip(void)
+{
+    printf("  test_write_float_fix_roundtrip...\n");
+
+    uint8_t output[256];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    ASSERT_TRUE(bvnr_write_float_fix(w, "ff", 32, 16, 1.5),
+                "write float_fix:32,q16 must succeed");
+    ASSERT_TRUE(bvnr_write_float_fix(w, "neg", 64, 8, -0.25),
+                "write float_fix:64,q8 negative must succeed");
+    ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no error");
+
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+                "float_fix roundtrip must parse cleanly");
+    ASSERT_TRUE(le.vt.family == vt_float_fix, "last type family = float_fix");
+    ASSERT_EQ_UINT(le.vt.width, 64, "last width = 64");
+    ASSERT_EQ_UINT(le.vt.base, 8, "last Q = 8 (stored in base)");
+    ASSERT_TRUE(le.value_tok == token_is_number,
+                "float_fix data token is token_is_number");
+
+    bvnr_writer_destroy(w);
+}
+
+static void test_write_float_dec_roundtrip(void)
+{
+    printf("  test_write_float_dec_roundtrip...\n");
+
+    uint8_t output[256];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    ASSERT_TRUE(bvnr_write_float_dec(w, "fd", 64, 3.14),
+                "write float_dec:64 must succeed");
+    ASSERT_TRUE(bvnr_write_float_dec(w, "small", 32, -1.5e-3f),
+                "write float_dec:32 negative must succeed");
+    ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no error");
+
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+                "float_dec roundtrip must parse cleanly");
+    ASSERT_TRUE(le.vt.family == vt_float_dec, "last type family = float_dec");
+    ASSERT_EQ_UINT(le.vt.width, 32, "last width = 32");
+    ASSERT_TRUE(le.value_tok == token_is_number,
+                "float_dec data token is token_is_number");
+
+    bvnr_writer_destroy(w);
+}
+
 int main(void)
 {
     printf("Running bovnar_writer_test regression suite...\n");
@@ -661,6 +720,8 @@ int main(void)
     test_write_typed_integers();
     test_write_float_values();
     test_write_float_width_over_64_rejected();
+    test_write_float_fix_roundtrip();
+    test_write_float_dec_roundtrip();
     test_write_bool_and_null();
     test_write_with_units();
     test_write_struct();

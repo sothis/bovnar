@@ -422,3 +422,113 @@ class TestWriteStreamingFlush:
                 w.write_uint(f"k{i}", i, width=64)
         out = w.get_output()
         assert len(out) > 65536
+
+
+@needs_lib
+class TestWriteFloatFix:
+    def test_basic_write_float_fix(self):
+        with Writer.to_mem() as w:
+            w.write_float_fix('ff', 1.5, width=32, q=16)
+        out = w.get_output()
+        assert b'float_fix' in out
+        assert b'q16' in out
+
+    def test_float_fix_q_zero_produces_annotation(self):
+        with Writer.to_mem() as w:
+            w.write_float_fix('ff', 1.5, width=32, q=0)
+        out = w.get_output()
+        assert b'float_fix' in out
+        assert b'32' in out
+
+    def test_float_fix_uses_number_token_not_string(self):
+        with Writer.to_mem() as w:
+            w.write_float_fix('ff', 1.5, width=32, q=16)
+        out = w.get_output()
+        assert b'"' not in out.split(b'>')[1], \
+            "float_fix value must not be wrapped in double quotes (must be NUMBER token)"
+
+    def test_float_fix_roundtrip(self):
+        with Writer.to_mem() as w:
+            w.write_float_fix('a', 1.5, width=32, q=16)
+            w.write_float_fix('b', -0.25, width=64, q=8)
+        out = w.get_output()
+        data_events = []
+        def cb(ev, d):
+            if ev == Event.DATA:
+                data_events.append(d.type)
+            return True
+        with Reader() as r:
+            r.read_mem(out, on_verified=cb)
+        assert len(data_events) == 2
+
+    def test_float_fix_parses_without_error(self):
+        with Writer.to_mem() as w:
+            w.write_float_fix('x', 3.14, width=64, q=32)
+        out = w.get_output()
+        with Reader() as r:
+            r.read_mem(out)
+
+    def test_float_fix_various_q_values_are_number_tokens(self):
+        for q in (4, 8, 16, 24, 32):
+            with Writer.to_mem() as w:
+                w.write_float_fix('v', 1.0, width=64, q=q)
+            out = w.get_output()
+            assert b'>"' not in out, \
+                f"float_fix q={q}: annotation must not be followed by quoted value"
+
+    def test_float_fix_nan_roundtrip(self):
+        import math
+        with Writer.to_mem() as w:
+            w.write_float_fix('nan_val', float('nan'), width=64, q=16)
+        out = w.get_output()
+        assert b'$nan$' in out
+
+
+@needs_lib
+class TestWriteFloatDec:
+    def test_basic_write_float_dec(self):
+        with Writer.to_mem() as w:
+            w.write_float_dec('fd', 3.14, width=64)
+        out = w.get_output()
+        assert b'float_dec' in out
+
+    def test_float_dec_uses_number_token_not_string(self):
+        with Writer.to_mem() as w:
+            w.write_float_dec('fd', 3.14, width=64)
+        out = w.get_output()
+        assert b'"' not in out.split(b'>')[1], \
+            "float_dec value must not be wrapped in quotes (must be NUMBER token)"
+
+    def test_float_dec_parses_without_error(self):
+        with Writer.to_mem() as w:
+            w.write_float_dec('x', -1.5e3, width=32)
+        out = w.get_output()
+        with Reader() as r:
+            r.read_mem(out)
+
+    def test_float_dec_roundtrip_multiple(self):
+        with Writer.to_mem() as w:
+            w.write_float_dec('a', 1.0, width=64)
+            w.write_float_dec('b', -2.5, width=32)
+        out = w.get_output()
+        events = []
+        def cb(ev, d):
+            if ev == Event.DATA:
+                events.append(True)
+            return True
+        with Reader() as r:
+            r.read_mem(out, on_verified=cb)
+        assert len(events) == 2
+
+    def test_float_dec_nan_is_special_literal(self):
+        import math
+        with Writer.to_mem() as w:
+            w.write_float_dec('v', float('nan'), width=64)
+        out = w.get_output()
+        assert b'$nan$' in out
+
+    def test_float_dec_infinity_is_special_literal(self):
+        with Writer.to_mem() as w:
+            w.write_float_dec('v', float('inf'), width=64)
+        out = w.get_output()
+        assert b'$infinity$' in out

@@ -682,11 +682,11 @@ static const cf_case_t g_cases[] = {
 	VALID_KEY("NUM-008", "numbers", "float with positive exponent marker",
 	          ".x = 1e+3;", "x", "1e+3"),
 	VALID_KEY("NUM-009", "numbers", "special number $nan$",
-	          ".x = $nan$;", "x", "$nan$"),
+	          ".x = $nan$;", "x", "nan"),
 	VALID_KEY("NUM-010", "numbers", "special number $infinity$",
-	          ".x = $infinity$;", "x", "$infinity$"),
+	          ".x = $infinity$;", "x", "infinity"),
 	VALID_KEY("NUM-011", "numbers", "special number $-infinity$",
-	          ".x = $-infinity$;", "x", "$-infinity$"),
+	          ".x = $-infinity$;", "x", "-infinity"),
 	VALID("NUM-012", "numbers", "large uint64 at boundary",
 	      ".x = <uint:64> 18446744073709551615;"),
 	VALID("NUM-013", "numbers", "sint64 at negative boundary",
@@ -1011,6 +1011,54 @@ static bool check_key_in_log(const evlog_t *log, const char *key)
 	return evlog_contains(log, needle);
 }
 
+static void evlog_escape_str(const char *in, char *out, size_t outsz)
+{
+	size_t pos = 0;
+	for (const uint8_t *p = (const uint8_t *)in; *p; p++) {
+		uint8_t b = *p;
+		if (b >= 0x20u && b <= 0x7Eu && b != '\\') {
+			if (pos + 1 >= outsz) break;
+			out[pos++] = (char)b;
+		} else {
+			if (pos + 5 >= outsz) break;
+			snprintf(out + pos, 5, "\\x%02x", b);
+			pos += 4;
+		}
+	}
+	out[pos] = '\0';
+}
+
+static bool check_data_in_log(const evlog_t *log, const char *data)
+{
+	if (!data) return true;
+	if (!log->buf || !log->used) return false;
+
+	char esc[512];
+	evlog_escape_str(data, esc, sizeof(esc));
+
+	char *term = malloc(log->used + 1);
+	if (!term) return false;
+	memcpy(term, log->buf, log->used);
+	term[log->used] = '\0';
+
+	bool found = false;
+	char *line = term;
+	while (line && *line) {
+		char *nl = strchr(line, '\n');
+		if (nl) *nl = '\0';
+		if (strncmp(line, "DATA ", 5) == 0) {
+			char *sp = strchr(line + 5, ' ');
+			if (sp && strcmp(sp + 1, esc) == 0) {
+				found = true;
+				break;
+			}
+		}
+		line = nl ? nl + 1 : NULL;
+	}
+	free(term);
+	return found;
+}
+
 /* =========================================================================
  * Self-test runner (no IUT)
  * ========================================================================= */
@@ -1057,10 +1105,15 @@ static void run_self_test(const cf_case_t *tc)
 			         "event log OOM during capture");
 		} else {
 			bool key_ok  = check_key_in_log(&r.log, tc->expect_key);
+			bool data_ok = check_data_in_log(&r.log, tc->expect_data);
 			if (!key_ok) {
 				snprintf(detail, sizeof(detail),
 				         "expected ASSIGNMENT_START %s not found in log",
 				         tc->expect_key ? tc->expect_key : "?");
+				tap_fail(tc->id, tc->description, detail);
+			} else if (!data_ok) {
+				snprintf(detail, sizeof(detail),
+				         "expected DATA value not found in log");
 				tap_fail(tc->id, tc->description, detail);
 			} else {
 				tap_ok(tc->id, tc->description);

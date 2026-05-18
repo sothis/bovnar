@@ -469,7 +469,12 @@ class Writer:
         self._emit_annotation(family_name, vt, vu)
 
         _SPECIAL = frozenset(('nan', 'infinity', '-infinity'))
-        if vt.base not in (0, 10) and val not in _SPECIAL:
+        _decimal_float_families = frozenset((
+            int(ValueTypeFamily.FLOAT_FIX),
+            int(ValueTypeFamily.FLOAT_DEC),
+        ))
+        if (vt.base not in (0, 10) and val not in _SPECIAL
+                and int(vt.family) not in _decimal_float_families):
             data_token_type = self._TOKEN_IS_STRING
         else:
             data_token_type = self._TOKEN_IS_NUMBER

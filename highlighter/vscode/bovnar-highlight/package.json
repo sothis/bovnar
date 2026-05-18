@@ -2,7 +2,7 @@
   "name": "bovnar-highlight",
   "displayName": "Bovnar Syntax",
   "description": "Syntax highlighting for Bovnar files",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "engines": { "vscode": "^1.70.0" },
   "contributes": {
     "languages": [
@@ -19,6 +19,125 @@
         "scopeName": "source.bovnar",
         "path": "./syntaxes/Bovnar.tmLanguage.json"
       }
+    ],
+    "themes": [
+      {
+        "label": "Bovnar Cyberpunk",
+        "uiTheme": "vs-dark",
+        "path": "./themes/bovnar-cyberpunk-color-theme.json"
+      }
     ]
+  },
+  "configurationDefaults": {
+    "editor.tokenColorCustomizations": {
+      "textMateRules": [
+        {
+          "scope": "comment.line.number-sign.bovnar",
+          "settings": { "foreground": "#4a4e69" }
+        },
+        {
+          "scope": "punctuation.separator.key-sigil.bovnar",
+          "settings": { "foreground": "#c695dc" }
+        },
+        {
+          "scope": "entity.name.key.bovnar",
+          "settings": { "foreground": "#5b9bd5" }
+        },
+        {
+          "scope": "punctuation.terminator.semicolon.bovnar",
+          "settings": { "foreground": "#3e4462" }
+        },
+        {
+          "scope": "keyword.operator.assignment.bovnar",
+          "settings": { "foreground": "#ff6a8c" }
+        },
+        {
+          "scope": "storage.type.family.bovnar",
+          "settings": { "foreground": "#ffb3d9", "fontStyle": "bold" }
+        },
+        {
+          "scope": "support.constant.no-unit.bovnar",
+          "settings": { "foreground": "#5eead4" }
+        },
+        {
+          "scope": [
+            "constant.numeric.q~param.bovnar",
+            "constant.numeric.base-param.bovnar",
+            "constant.numeric.width-param.bovnar"
+          ],
+          "settings": { "foreground": "#ffa500" }
+        },
+        {
+          "scope": [
+            "punctuation.separator.colon.bovnar",
+            "punctuation.separator.comma.bovnar"
+          ],
+          "settings": { "foreground": "#3e4462" }
+        },
+        {
+          "scope": "support.type.unit.bovnar",
+          "settings": { "foreground": "#5eead4" }
+        },
+        {
+          "scope": [
+            "punctuation.definition.type.begin.bovnar",
+            "punctuation.definition.type.end.bovnar",
+            "punctuation.section.array.begin.bovnar",
+            "punctuation.section.array.end.bovnar",
+            "punctuation.section.struct.begin.bovnar",
+            "punctuation.section.struct.end.bovnar"
+          ],
+          "settings": { "foreground": "#00b4d8" }
+        },
+        {
+          "scope": "constant.language.special-float.bovnar",
+          "settings": { "foreground": "#c084fc" }
+        },
+        {
+          "scope": "constant.numeric.float.bovnar",
+          "settings": { "foreground": "#ffe700" }
+        },
+        {
+          "scope": "constant.numeric.integer.bovnar",
+          "settings": { "foreground": "#ffe700" }
+        },
+        {
+          "scope": "string.quoted.double.bovnar",
+          "settings": { "foreground": "#7dd3fc" }
+        },
+        {
+          "scope": "constant.character.escape.bovnar",
+          "settings": { "foreground": "#93c5fd", "fontStyle": "bold" }
+        },
+        {
+          "scope": "invalid.illegal.escape.bovnar",
+          "settings": { "foreground": "#fb923c", "fontStyle": "underline" }
+        },
+        {
+          "scope": "punctuation.separator.inline-unit.bovnar",
+          "settings": { "foreground": "#3e4462" }
+        },
+        {
+          "scope": "support.type.unit.inline.bovnar",
+          "settings": { "foreground": "#5eead4" }
+        },
+        {
+          "scope": "variable.other.symbol.bovnar",
+          "settings": { "foreground": "#5b9bd5" }
+        },
+        {
+          "scope": "keyword.operator.reference.bovnar",
+          "settings": { "foreground": "#ff2a7d", "fontStyle": "bold" }
+        },
+        {
+          "scope": "variable.other.reference-path.bovnar",
+          "settings": { "foreground": "#ffa500" }
+        },
+        {
+          "scope": "punctuation.separator.array-row.bovnar",
+          "settings": { "foreground": "#3e4462" }
+        }
+      ]
+    }
   }
 }

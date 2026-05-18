@@ -6,6 +6,7 @@
 #include <string.h>
 #include "bovnar.h"
 #include "bovnar_si_units.h"
+#include "bvn_float.h"
 
 static int g_tests    = 0;
 static int g_failures = 0;
@@ -990,6 +991,72 @@ static void test_open_write_mem_and_bytes_written(void)
     bvnr_reader_destroy(r);
 }
 
+static void test_bvnf_base16_special_roundtrip(void)
+{
+    printf("  test_bvnf_base16_special_roundtrip...\n");
+
+    uint8_t outbuf[2048];
+    bvnr_writer_t *w = bvnr_writer_create();
+    ASSERT_TRUE(w != NULL, "writer create");
+    if (!w) return;
+    ASSERT_TRUE(bvnr_open_write_mem(w, outbuf, sizeof(outbuf), false, NULL),
+                "open_write_mem");
+
+    bvnr_data_t hdr = {0};
+    ASSERT_TRUE(bvnr_write_event(w, ev_stream_start, &hdr), "stream_start");
+
+    bvn_float_t *f = bvn_float_alloc(256u);
+    ASSERT_TRUE(f != NULL, "bvn_float_alloc");
+    if (!f) { bvnr_writer_destroy(w); return; }
+
+    bvn_float_set_nan(f);
+    ASSERT_TRUE(bvnr_write_bvnf_base(w, "nan_val", f, 256u, 16u),
+                "write NaN base16");
+
+    bvn_float_set_inf(f, false);
+    ASSERT_TRUE(bvnr_write_bvnf_base(w, "pos_inf", f, 256u, 16u),
+                "write +Inf base16");
+
+    bvn_float_set_inf(f, true);
+    ASSERT_TRUE(bvnr_write_bvnf_base(w, "neg_inf", f, 256u, 16u),
+                "write -Inf base16");
+
+    bvn_float_from_double(f, 1.5);
+    ASSERT_TRUE(bvnr_write_bvnf_base(w, "normal", f, 256u, 16u),
+                "write 1.5 base16");
+
+    ASSERT_TRUE(bvnr_write_finish(w), "finish");
+    uint64_t n = bvnr_writer_bytes_written(w);
+    bvn_float_free(f);
+    bvnr_writer_destroy(w);
+
+    ASSERT_TRUE(n > 0u, "bytes written > 0");
+
+    capture_t ctx = {0};
+    bvnr_read_flags_t flags = {
+        .on_verified = capture_verified,
+        .on_error    = capture_error,
+        .userdata    = &ctx,
+    };
+    bvnr_reader_t *r = NULL;
+    ASSERT_TRUE(do_parse(outbuf, n, &flags, &r),
+                "base16 bvnf with NaN/+Inf/-Inf/normal must roundtrip");
+    ASSERT_EQ_INT((int)ctx.ev_data_count, 4,
+                  "four ev_data events in roundtripped document");
+
+    if (ctx.ev_data_count >= 1)
+        ASSERT_TRUE(strstr(ctx.val[0], "nan") != NULL ||
+                    strstr(ctx.val[0], "NaN") != NULL,
+                    "NaN: value token contains 'nan'");
+
+    if (ctx.ev_data_count >= 2)
+        ASSERT_TRUE(strstr(ctx.val[1], "inf") != NULL ||
+                    strstr(ctx.val[1], "Inf") != NULL,
+                    "+Inf: value token contains 'inf'");
+
+    bvnr_reader_destroy(r);
+}
+
 int main(void)
 {
     printf("Running bovnar_high_severity_test suite...\n\n");
@@ -1040,6 +1107,9 @@ int main(void)
 
     printf("\nGap 12: open_write_mem / bytes_written\n");
     test_open_write_mem_and_bytes_written();
+
+    printf("\nGap 13: bvnf base-16 special float roundtrip\n");
+    test_bvnf_base16_special_roundtrip();
 
     printf("\n");
     if (g_failures == 0) {

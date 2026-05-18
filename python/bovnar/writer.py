@@ -468,7 +468,8 @@ class Writer:
         self.emit(Event.ASSIGNMENT_START, key=key)
         self._emit_annotation(family_name, vt, vu)
 
-        if vt.base not in (0, 10):
+        _SPECIAL = frozenset(('nan', 'infinity', '-infinity'))
+        if vt.base not in (0, 10) and val not in _SPECIAL:
             data_token_type = self._TOKEN_IS_STRING
         else:
             data_token_type = self._TOKEN_IS_NUMBER

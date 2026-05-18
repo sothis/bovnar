@@ -1,1 +1,2513 @@
-web/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bovnar — The Format That Knows What It Means</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+:root {
+  --bg:       #070A0D;
+  --bg2:      #0C1216;
+  --bg3:      #121A1F;
+  --border:   #1C262D;
+  --border2:  #253038;
+  --amber:    #D4890A;
+  --amber2:   #F0A830;
+  --amber3:   #8A5500;
+  --teal:     #2DBFB0;
+  --teal2:    #1A8A80;
+  --teal-dim: #0D4540;
+  --text:     #DDD8CF;
+  --text2:    #9AABAF;
+  --text3:    #566870;
+  --red:      #C44A3A;
+  --green:    #3DA87A;
+  --serif: 'Cormorant Garamond', serif;
+  --sans: 'Barlow', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--amber3); color: var(--amber2); }
+
+/* ── Grid Overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 60px 60px;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3rem;
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(7, 10, 13, 0.92);
+  backdrop-filter: blur(12px);
+}
+
+.nav-brand {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nav-brand .ext {
+  color: var(--text3);
+  font-weight: 300;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  list-style: none;
+}
+.nav-links a {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--amber); }
+
+.nav-cta {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--bg) !important;
+  background: var(--amber);
+  padding: 0.35rem 1rem;
+  text-transform: none !important;
+  transition: background 0.2s !important;
+}
+.nav-cta:hover { background: var(--amber2) !important; color: var(--bg) !important; }
+
+/* ── HERO ── */
+#hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8rem 3rem 5rem;
+  overflow: hidden;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: center;
+}
+
+.hero-left { position: relative; z-index: 1; }
+
+.hero-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.hero-label::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  background: var(--amber);
+}
+
+.hero-h1 {
+  font-family: var(--serif);
+  font-size: clamp(3rem, 5.5vw, 5.5rem);
+  font-weight: 300;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 1.5rem;
+}
+.hero-h1 em {
+  font-style: italic;
+  color: var(--amber2);
+}
+
+.hero-sub {
+  font-size: 1.05rem;
+  color: var(--text2);
+  line-height: 1.7;
+  max-width: 480px;
+  margin-bottom: 2.5rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--bg);
+  background: var(--amber);
+  border: none;
+  padding: 0.75rem 1.75rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-primary:hover { background: var(--amber2); transform: translateY(-1px); }
+
+.btn-ghost {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--border2);
+  padding: 0.75rem 1.75rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-ghost:hover { border-color: var(--amber); color: var(--amber); }
+
+/* ── Animated Code Panel ── */
+.hero-right { position: relative; z-index: 1; }
+
+.code-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.code-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--amber), var(--teal), transparent);
+}
+.code-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.code-dots { display: flex; gap: 6px; }
+.code-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+}
+.d1 { background: #3A3A3A; }
+.d2 { background: #3A3A3A; }
+.d3 { background: #3A3A3A; }
+.code-filename {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text3);
+}
+.code-badge {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--teal);
+  border: 1px solid var(--teal2);
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.code-body {
+  padding: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 2;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.c-comment { color: var(--text3); }
+.c-key     { color: var(--text); }
+.c-eq      { color: var(--text3); }
+.c-ann     { color: var(--teal); }
+.c-val     { color: var(--amber2); }
+.c-unit    { color: var(--green); }
+.c-str     { color: #B5936B; }
+.c-semi    { color: var(--text3); }
+.c-struct  { color: var(--text2); }
+
+/* Hero annotation that animates in */
+.ann-appear {
+  display: inline-block;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  white-space: nowrap;
+  vertical-align: middle;
+  animation: ann-unfold 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.ann-appear:nth-child(1)  { animation-delay: 0.8s; }
+.ann-appear:nth-child(2)  { animation-delay: 1.4s; }
+.ann-appear:nth-child(3)  { animation-delay: 2.0s; }
+.ann-appear:nth-child(4)  { animation-delay: 2.6s; }
+.ann-appear:nth-child(5)  { animation-delay: 3.2s; }
+
+@keyframes ann-unfold {
+  from { max-width: 0; opacity: 0; }
+  to   { max-width: 300px; opacity: 1; }
+}
+
+/* ── SCROLL HINT ── */
+.scroll-hint {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  animation: float 2s ease-in-out infinite;
+}
+.scroll-hint::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(var(--amber), transparent);
+}
+@keyframes float {
+  0%,100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(6px); }
+}
+
+/* ── STAT BAR ── */
+.stat-bar {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.stat-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  divide: var(--border);
+}
+.stat-item {
+  padding: 1.75rem 2.5rem;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.stat-item:last-child { border-right: none; }
+.stat-num {
+  font-family: var(--serif);
+  font-size: 2.2rem;
+  font-weight: 300;
+  color: var(--amber2);
+  line-height: 1;
+}
+.stat-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+/* ── SECTIONS ── */
+section {
+  position: relative;
+  z-index: 1;
+}
+
+.section-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 6rem 3rem;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.section-label::before {
+  content: '';
+  display: block;
+  width: 16px;
+  height: 1px;
+  background: var(--amber);
+}
+
+.section-h2 {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 3.5vw, 3.2rem);
+  font-weight: 300;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 1.25rem;
+}
+.section-h2 em { font-style: italic; color: var(--amber2); }
+
+.section-p {
+  font-size: 1.05rem;
+  color: var(--text2);
+  line-height: 1.75;
+  max-width: 640px;
+}
+
+/* ── PHILOSOPHY ── */
+#philosophy .section-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: start;
+}
+.philosophy-left {}
+.philosophy-right {
+  padding-top: 3rem;
+}
+
+.philosophy-quote {
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text2);
+  line-height: 1.55;
+  border-left: 2px solid var(--amber);
+  padding-left: 1.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.philosophy-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.phil-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  transition: border-color 0.2s;
+}
+.phil-card:hover { border-color: var(--border2); }
+
+.phil-icon {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--teal);
+  border: 1px solid var(--teal2);
+  padding: 0.2rem 0.5rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  letter-spacing: 0.05em;
+}
+
+.phil-title {
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.02em;
+}
+.phil-desc {
+  font-size: 0.85rem;
+  color: var(--text3);
+  line-height: 1.6;
+}
+
+/* ── COMPARISON ── */
+#comparison {
+  border-top: 1px solid var(--border);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 3rem;
+  font-size: 0.88rem;
+}
+
+.comparison-table th {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  text-align: left;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+.comparison-table th.col-bvn {
+  color: var(--amber);
+  border-bottom-color: var(--amber3);
+}
+
+.comparison-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: middle;
+}
+
+.comparison-table td:first-child {
+  font-family: var(--mono);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.comparison-table td.col-bvn {
+  background: rgba(212, 137, 10, 0.04);
+}
+
+.comparison-table tr:hover td { background: rgba(255,255,255,0.02); }
+.comparison-table tr:hover td.col-bvn { background: rgba(212, 137, 10, 0.07); }
+
+.check { color: var(--green); font-weight: 500; }
+.cross { color: var(--red); }
+.partial { color: var(--text3); }
+
+/* ── SYNTAX ── */
+#syntax {
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.syntax-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  margin-top: 3.5rem;
+}
+
+.syntax-card {
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.syntax-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.syntax-card-title {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+.syntax-card-tag {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--amber);
+  letter-spacing: 0.05em;
+}
+
+.syntax-card-body {
+  padding: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 2.1;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.syntax-desc {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+}
+
+.syntax-def {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+}
+.syntax-def-key {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--teal);
+  margin-bottom: 0.5rem;
+}
+.syntax-def-val {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text3);
+  margin-bottom: 0.75rem;
+}
+.syntax-def-text {
+  font-size: 0.82rem;
+  color: var(--text2);
+  line-height: 1.55;
+}
+
+/* ── FEATURES ── */
+#features {
+  border-top: 1px solid var(--border);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 3.5rem;
+  border: 1px solid var(--border);
+}
+
+.feature-card {
+  background: var(--bg);
+  padding: 2rem 1.75rem;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card:hover { background: var(--bg2); }
+.feature-card::before {
+  content: attr(data-n);
+  position: absolute;
+  bottom: -0.5rem;
+  right: 1rem;
+  font-family: var(--serif);
+  font-size: 7rem;
+  font-weight: 300;
+  color: var(--border);
+  line-height: 1;
+  pointer-events: none;
+  transition: color 0.3s;
+}
+.feature-card:hover::before { color: var(--bg3); }
+
+.feature-tag {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 1rem;
+}
+
+.feature-title {
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 0.75rem;
+}
+
+.feature-desc {
+  font-size: 0.85rem;
+  color: var(--text3);
+  line-height: 1.65;
+}
+
+.feature-example {
+  margin-top: 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--amber2);
+  padding: 0.6rem 0.75rem;
+  background: rgba(212, 137, 10, 0.06);
+  border-left: 2px solid var(--amber3);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  line-height: 1.8;
+  overflow: hidden;
+}
+
+/* ── QUICKSTART ── */
+#quickstart {
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.quickstart-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.qs-tab {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  padding: 0.75rem 1.75rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -1px;
+  position: relative;
+}
+.qs-tab.active {
+  color: var(--amber);
+  background: var(--bg2);
+  border-color: var(--border);
+  border-bottom-color: var(--bg2);
+}
+.qs-tab:not(.active):hover { color: var(--text2); }
+
+.qs-pane {
+  display: none;
+  border: 1px solid var(--border);
+  border-top: none;
+}
+.qs-pane.active { display: block; }
+
+.qs-pane-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.qs-step {
+  padding: 2rem;
+  border-right: 1px solid var(--border);
+}
+.qs-step:last-child { border-right: none; }
+
+.qs-step-num {
+  font-family: var(--serif);
+  font-size: 3rem;
+  font-weight: 300;
+  color: var(--border2);
+  line-height: 1;
+  margin-bottom: 0.75rem;
+}
+
+.qs-step-title {
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.02em;
+}
+
+.qs-step-desc {
+  font-size: 0.82rem;
+  color: var(--text3);
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.code-block {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  line-height: 1.9;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ── USE CASES ── */
+#usecases {
+  border-top: 1px solid var(--border);
+}
+
+.usecases-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-top: 3.5rem;
+}
+
+.usecase-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 2rem;
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  transition: border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.usecase-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(212,137,10,0.04));
+  pointer-events: none;
+}
+.usecase-card:hover { border-color: var(--border2); }
+
+.usecase-num {
+  font-family: var(--serif);
+  font-size: 2.8rem;
+  font-weight: 300;
+  color: var(--border2);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.usecase-title {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 300;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+.usecase-desc {
+  font-size: 0.85rem;
+  color: var(--text3);
+  line-height: 1.65;
+}
+.usecase-example {
+  margin-top: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--teal);
+  opacity: 0.9;
+}
+
+/* ── CONFORMANCE BAR ── */
+.conformance-bar {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.conformance-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.conf-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.conf-icon {
+  font-size: 1.1rem;
+  color: var(--amber);
+  flex-shrink: 0;
+  width: 1.5rem;
+  text-align: center;
+}
+.conf-title {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.conf-sub {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+  margin-top: 0.1rem;
+}
+.conf-cta {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+  text-decoration: none;
+  border: 1px solid var(--amber3);
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.conf-cta:hover { background: rgba(212,137,10,0.1); border-color: var(--amber); }
+
+/* ── DOCS SECTION ── */
+#docs {
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin-top: 3.5rem;
+  border: 1px solid var(--border);
+}
+.doc-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1.75rem 1.5rem;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.doc-card:hover { background: var(--bg3); }
+.doc-card-num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--border2);
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+  letter-spacing: 0.05em;
+}
+.doc-card-title {
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+  transition: color 0.2s;
+}
+.doc-card:hover .doc-card-title { color: var(--amber); }
+.doc-card-desc {
+  font-size: 0.8rem;
+  color: var(--text3);
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+.doc-card-desc code {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  color: var(--teal);
+}
+.doc-card-tag {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal2);
+}
+
+/* ── FOOTER ── */
+footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 3rem;
+}
+
+.footer-brand-name {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  color: var(--amber);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+.footer-brand-sub {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text3);
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.05em;
+}
+.footer-desc {
+  font-size: 0.85rem;
+  color: var(--text3);
+  line-height: 1.65;
+  max-width: 300px;
+}
+
+.footer-col-title {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.footer-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.footer-links a {
+  font-size: 0.85rem;
+  color: var(--text3);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--amber); }
+
+.footer-bottom {
+  border-top: 1px solid var(--border);
+  padding: 1.25rem 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-copy {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+}
+.footer-spec {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--border2);
+  letter-spacing: 0.05em;
+}
+
+/* ── ANIMATED COUNTER ── */
+.count-up { display: inline-block; }
+
+/* ── SCROLL REVEAL ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+
+/* ── AMBER LINE DECORATION ── */
+.amber-line {
+  display: block;
+  width: 48px;
+  height: 2px;
+  background: var(--amber);
+  margin-bottom: 2rem;
+}
+
+/* ── DIVIDER ── */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+}
+.section-divider::before, .section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { padding: 0 1.5rem; }
+  .nav-links { gap: 1.5rem; }
+
+  .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .hero-right { display: none; }
+  .section-inner { padding: 4rem 1.5rem; }
+  #philosophy .section-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+  .syntax-grid { grid-template-columns: 1fr; }
+  .syntax-desc { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .qs-pane-inner { grid-template-columns: 1fr; }
+  .usecases-grid { grid-template-columns: 1fr; }
+  .docs-grid { grid-template-columns: repeat(2, 1fr); }
+  .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+  .stat-inner { grid-template-columns: repeat(3, 1fr); }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+  .comparison-table { font-size: 0.78rem; }
+}
+
+/* ══════════════════════════════════════════════
+   DOC OVERLAY
+══════════════════════════════════════════════ */
+
+#doc-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 9, 0.72);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+#doc-scrim.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#doc-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: min(82vw, 1020px);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+#doc-drawer.open {
+  transform: translateX(0);
+}
+
+/* drawer top bar */
+#doc-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.75rem;
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  position: relative;
+}
+#doc-topbar::before {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  width: 60px; height: 2px;
+  background: linear-gradient(90deg, var(--amber), transparent);
+}
+.doc-brand {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--amber);
+  flex-shrink: 0;
+}
+.doc-sep {
+  width: 1px; height: 16px;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+#doc-title {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text2);
+  letter-spacing: 0.04em;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#doc-close {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition: border-color 0.2s, color 0.2s;
+  font-family: var(--mono);
+  line-height: 1;
+}
+#doc-close:hover { border-color: var(--amber); color: var(--amber); }
+
+/* drawer body */
+#doc-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* loading state */
+#doc-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.doc-spinner {
+  width: 20px; height: 20px;
+  border: 1px solid var(--border2);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* error state */
+#doc-error {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 4rem;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-align: center;
+}
+#doc-error a {
+  color: var(--amber);
+  text-decoration: none;
+}
+#doc-error a:hover { text-decoration: underline; }
+
+/* main content area */
+#doc-content-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2.5rem 3rem 4rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+#doc-content-wrap::-webkit-scrollbar { width: 5px; }
+#doc-content-wrap::-webkit-scrollbar-thumb { background: var(--border2); }
+
+/* markdown rendered styles */
+#doc-content {
+  max-width: 760px;
+  color: var(--text2);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 300;
+  line-height: 1.75;
+}
+
+#doc-content h1 {
+  font-family: var(--serif);
+  font-size: 2.4rem;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.1;
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+#doc-content h2 {
+  font-family: var(--serif);
+  font-size: 1.55rem;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.2;
+  margin: 2.5rem 0 0.75rem;
+  padding-top: 0.5rem;
+  scroll-margin-top: 1rem;
+}
+#doc-content h2::before {
+  content: '##';
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--amber);
+  letter-spacing: 0.1em;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+#doc-content h3 {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.03em;
+  margin: 1.75rem 0 0.5rem;
+  scroll-margin-top: 1rem;
+}
+#doc-content h3::before {
+  content: '###';
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--teal);
+  letter-spacing: 0.1em;
+  margin-right: 0.5rem;
+}
+
+#doc-content h4 {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text2);
+  margin: 1.5rem 0 0.4rem;
+}
+
+#doc-content p { margin: 0 0 1rem; }
+
+#doc-content a {
+  color: var(--amber);
+  text-decoration: none;
+  border-bottom: 1px solid var(--amber3);
+  transition: border-color 0.2s;
+}
+#doc-content a:hover { border-bottom-color: var(--amber); }
+
+#doc-content strong { color: var(--text); font-weight: 500; }
+#doc-content em { color: var(--text2); font-style: italic; }
+
+#doc-content code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--teal);
+  background: rgba(45, 191, 176, 0.07);
+  padding: 0.1em 0.4em;
+  border-radius: 0;
+  border: 1px solid rgba(45, 191, 176, 0.15);
+}
+
+#doc-content pre {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--amber3);
+  padding: 1.25rem 1.5rem;
+  margin: 1.25rem 0 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+#doc-content pre::-webkit-scrollbar { height: 4px; }
+#doc-content pre::-webkit-scrollbar-thumb { background: var(--border2); }
+
+#doc-content pre code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text2);
+  background: none;
+  padding: 0;
+  border: none;
+  line-height: 1.85;
+  white-space: pre;
+}
+
+/* hljs overrides — keep site palette */
+.hljs-keyword    { color: var(--teal); }
+.hljs-built_in   { color: var(--teal2); }
+.hljs-string     { color: #B5936B; }
+.hljs-number     { color: var(--amber2); }
+.hljs-comment    { color: var(--text3); font-style: italic; }
+.hljs-title      { color: var(--text); }
+.hljs-type       { color: var(--teal); }
+.hljs-literal    { color: var(--amber); }
+.hljs-meta       { color: var(--text3); }
+.hljs-variable   { color: var(--text2); }
+.hljs-attr       { color: var(--amber2); }
+.hljs-symbol     { color: var(--green); }
+
+#doc-content ul, #doc-content ol {
+  padding-left: 1.5rem;
+  margin: 0 0 1rem;
+}
+#doc-content li { margin-bottom: 0.3rem; }
+#doc-content li > p { margin-bottom: 0.3rem; }
+#doc-content li::marker { color: var(--amber); font-family: var(--mono); }
+
+#doc-content blockquote {
+  border-left: 2px solid var(--amber);
+  margin: 1.25rem 0;
+  padding: 0.75rem 1.25rem;
+  background: rgba(212, 137, 10, 0.04);
+  font-style: italic;
+  color: var(--text2);
+}
+#doc-content blockquote p { margin: 0; }
+
+#doc-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+#doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0 1.5rem;
+  font-size: 0.85rem;
+}
+#doc-content th {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  font-weight: 400;
+  text-align: left;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+#doc-content td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: top;
+}
+#doc-content td code { font-size: 0.78em; }
+#doc-content tr:hover td { background: rgba(255,255,255,0.015); }
+
+/* doc link styling on main page */
+a[data-doc] {
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  #doc-drawer { width: 100vw; }
+  #doc-content-wrap { padding: 1.5rem 1.25rem 3rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     NAVIGATION
+══════════════════════════════════════════════ -->
+<nav>
+  <a class="nav-brand" href="#">BOVNAR<span class="ext">.bvnr</span></a>
+  <ul class="nav-links">
+    <li><a href="#philosophy">Philosophy</a></li>
+    <li><a href="#syntax">Syntax</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="#usecases">Use Cases</a></li>
+    <li><a href="#docs">Docs</a></li>
+    <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
+  </ul>
+</nav>
+
+<!-- ══════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-grid">
+    <div class="hero-left">
+      <div class="hero-label">Spec v1.0 &mdash; MIT License &mdash; C99</div>
+      <h1 class="hero-h1">The format that<br>knows <em>what it means.</em></h1>
+      <p class="hero-sub">
+        Every value in a Bovnar document carries its own type family,
+        bit-width, numeric base, and physical unit — inline, without any
+        external schema. Hand the file to anyone; they have everything needed
+        to interpret it exactly as intended.
+      </p>
+      <div class="hero-actions">
+        <a href="#quickstart" class="btn-primary">Get Started</a>
+        <a href="#philosophy" class="btn-ghost">Read the Philosophy</a>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="code-panel">
+        <div class="code-panel-header">
+          <div class="code-dots">
+            <div class="code-dot d1"></div>
+            <div class="code-dot d2"></div>
+            <div class="code-dot d3"></div>
+          </div>
+          <div class="code-filename">telemetry.bvnr</div>
+          <div class="code-badge">self-describing</div>
+        </div>
+        <div class="code-body" id="hero-code">
+<span class="c-comment"># Every value carries its own meaning</span>
+<span class="c-key">.host</span>     <span class="c-eq">=</span> <span class="c-str">"api.sensors.io"</span><span class="c-semi">;</span>
+<span class="c-key">.port</span>     <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;uint:16&gt;</span> </span><span class="c-val">443</span><span class="c-semi">;</span>
+<span class="c-key">.timeout</span>  <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;float:64,</span><span class="c-unit">s</span><span class="c-ann">&gt;</span> </span><span class="c-val">2.5</span><span class="c-semi">;</span>
+<span class="c-key">.pressure</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;float:32,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> </span><span class="c-val">101.325</span><span class="c-semi">;</span>
+<span class="c-key">.velocity</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;float:64,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> </span><span class="c-val">9.81</span><span class="c-semi">;</span>
+<span class="c-key">.buffer</span>   <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;uint:64,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> </span><span class="c-val">16</span><span class="c-semi">;</span>
+<span class="c-key">.matrix</span>   <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]/[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">scroll</div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     STAT BAR
+══════════════════════════════════════════════ -->
+<div class="stat-bar">
+  <div class="stat-inner">
+    <div class="stat-item reveal">
+      <div class="stat-num">6</div>
+      <div class="stat-label">Type Families</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-1">
+      <div class="stat-num">22</div>
+      <div class="stat-label">Derived SI Units</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-2">
+      <div class="stat-num">180+</div>
+      <div class="stat-label">Conformance Tests</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-3">
+      <div class="stat-num">C99</div>
+      <div class="stat-label">Reference Impl.</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-4">
+      <div class="stat-num">0</div>
+      <div class="stat-label">External Schemas</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-5">
+      <div class="stat-num">MIT</div>
+      <div class="stat-label">License</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PHILOSOPHY
+══════════════════════════════════════════════ -->
+<section id="philosophy">
+  <div class="section-inner">
+    <div class="philosophy-left">
+      <div class="section-label reveal">Design Philosophy</div>
+      <h2 class="section-h2 reveal reveal-delay-1"><em>Data that carries</em><br>its own interpretation.</h2>
+      <p class="section-p reveal reveal-delay-2" style="margin-bottom:2rem;">
+        The serialization landscape is defined by a quiet trade-off: ease of human reading, or
+        precision of machine semantics — rarely both.
+      </p>
+      <blockquote class="philosophy-quote reveal reveal-delay-3">
+        "A bare <code style="font-size:1rem;color:var(--amber2)">9.81</code> could be meters per second, volts, or a dimensionless ratio. Bovnar makes that difference explicit."
+      </blockquote>
+      <p class="section-p reveal reveal-delay-4">
+        Bovnar is not a replacement for JSON in simple REST APIs, nor for Protobuf in
+        performance-critical RPC. It fills the space where the data itself must carry
+        its own meaning: scientific instrumentation, IoT telemetry, typed configuration,
+        long-term archival, and mixed text-binary log streams.
+      </p>
+    </div>
+    <div class="philosophy-right">
+      <div class="philosophy-cards">
+        <div class="phil-card reveal">
+          <div class="phil-icon">01</div>
+          <div>
+            <div class="phil-title">Self-describing at the value level</div>
+            <div class="phil-desc">
+              Type family, bit-width, numeric base, and physical unit all travel with the value,
+              in the same byte stream. No schema file. No code generation step.
+            </div>
+          </div>
+        </div>
+        <div class="phil-card reveal reveal-delay-1">
+          <div class="phil-icon">02</div>
+          <div>
+            <div class="phil-title">Human-readable, machine-precise</div>
+            <div class="phil-desc">
+              A <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">.bvnr</code> file
+              is UTF-8 prose you can read in any editor. The parser validates type annotations
+              on the fly, with no external toolchain required.
+            </div>
+          </div>
+        </div>
+        <div class="phil-card reveal reveal-delay-2">
+          <div class="phil-icon">03</div>
+          <div>
+            <div class="phil-title">Optional typing with well-defined defaults</div>
+            <div class="phil-desc">
+              Omit annotations and get sensible defaults (<code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">uint:64</code>, <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">float:64</code>).
+              Add them and the parser validates on the fly. Both modes produce correct, unambiguous output.
+            </div>
+          </div>
+        </div>
+        <div class="phil-card reveal reveal-delay-3">
+          <div class="phil-icon">04</div>
+          <div>
+            <div class="phil-title">Precision is a requirement, not a feature</div>
+            <div class="phil-desc">
+              Physical units are a first-class citizen of the format. Compound units like
+              <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">k~g·m/s²</code> and
+              <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">Gi~B</code> are
+              written inline. The format enforces dimensional correctness.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     COMPARISON
+══════════════════════════════════════════════ -->
+<section id="comparison">
+  <div class="section-inner">
+    <div class="section-label reveal">Landscape</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Where Bovnar <em>fits.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Every format is a set of trade-offs. Bovnar's are deliberate.
+    </p>
+    <table class="comparison-table reveal reveal-delay-2">
+      <thead>
+        <tr>
+          <th>Format</th>
+          <th>Human readable</th>
+          <th>Type-precise</th>
+          <th>Physical units</th>
+          <th>Schema-free</th>
+          <th>Binary embed</th>
+          <th>Multi-dim arrays</th>
+          <th class="col-bvn">Bovnar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>JSON</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="col-bvn"></td>
+        </tr>
+        <tr>
+          <td>YAML</td>
+          <td class="check">✓</td>
+          <td class="partial">partial</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="col-bvn"></td>
+        </tr>
+        <tr>
+          <td>TOML</td>
+          <td class="check">✓</td>
+          <td class="partial">partial</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="col-bvn"></td>
+        </tr>
+        <tr>
+          <td>CBOR</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="col-bvn"></td>
+        </tr>
+        <tr>
+          <td>Protobuf</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="col-bvn"></td>
+        </tr>
+        <tr>
+          <td style="color:var(--amber);font-weight:500">BOVNAR</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="col-bvn" style="background:rgba(212,137,10,0.1);">
+            <span style="color:var(--amber);font-family:var(--mono);font-size:0.75rem;">all six</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     SYNTAX
+══════════════════════════════════════════════ -->
+<section id="syntax">
+  <div class="section-inner">
+    <div class="section-label reveal">Syntax</div>
+    <h2 class="section-h2 reveal reveal-delay-1">The grammar of <em>precision.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Every assignment is a declaration. The type annotation is not metadata —
+      it is part of the value itself.
+    </p>
+
+    <div class="syntax-grid">
+      <div class="syntax-card reveal">
+        <div class="syntax-card-header">
+          <div class="syntax-card-title">Typed Values</div>
+          <div class="syntax-card-tag">type · width · unit</div>
+        </div>
+        <div class="syntax-card-body"><span class="c-comment"># Integers</span>
+<span class="c-key">.port</span>   = <span class="c-ann">&lt;uint:16&gt;</span> <span class="c-val">443</span>;
+<span class="c-key">.offset</span> = <span class="c-ann">&lt;sint:64&gt;</span> <span class="c-val">-2147483648</span>;
+<span class="c-key">.flags</span>  = <span class="c-ann">&lt;uint:32,_2&gt;</span> <span class="c-val">11001010</span>;
+
+<span class="c-comment"># Floats with SI units</span>
+<span class="c-key">.temp</span>    = <span class="c-ann">&lt;float:32,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span>  <span class="c-val">36.6</span>;
+<span class="c-key">.speed</span>   = <span class="c-ann">&lt;float:64,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> <span class="c-val">9.81</span>;
+<span class="c-key">.force</span>   = <span class="c-ann">&lt;float:64,</span><span class="c-unit">k~g·m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span>;
+<span class="c-key">.buffer</span>  = <span class="c-ann">&lt;uint:64,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> <span class="c-val">16</span>;</div>
+      </div>
+      <div class="syntax-card reveal reveal-delay-1">
+        <div class="syntax-card-header">
+          <div class="syntax-card-title">Structures &amp; Arrays</div>
+          <div class="syntax-card-tag">nested · multidimensional</div>
+        </div>
+        <div class="syntax-card-body"><span class="c-comment"># Nested struct</span>
+<span class="c-key">.sensor</span> = {
+  <span class="c-key">.id</span>   = <span class="c-ann">&lt;uint:16&gt;</span> <span class="c-val">7</span>;
+  <span class="c-key">.name</span> = <span class="c-str">"pressure_01"</span>;
+  <span class="c-key">.val</span>  = <span class="c-ann">&lt;float:32,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> <span class="c-val">101.325</span>;
+};
+
+<span class="c-comment"># 3×3 rotation matrix (rows separated by /)</span>
+<span class="c-key">.rotation</span> = <span class="c-struct">[</span><span class="c-val">1.0, 0.0, 0.0</span><span class="c-struct">]</span>/
+             <span class="c-struct">[</span><span class="c-val">0.0, 1.0, 0.0</span><span class="c-struct">]</span>/
+             <span class="c-struct">[</span><span class="c-val">0.0, 0.0, 1.0</span><span class="c-struct">]</span>;</div>
+      </div>
+    </div>
+
+    <div class="syntax-desc">
+      <div class="syntax-def reveal">
+        <div class="syntax-def-key">&lt;family:width,unit&gt;</div>
+        <div class="syntax-def-val">Type Annotation</div>
+        <div class="syntax-def-text">
+          Six families: <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">uint sint float float_fix float_dec utf8</code>. Width in bits. Unit in SI notation. All are optional.
+        </div>
+      </div>
+      <div class="syntax-def reveal reveal-delay-1">
+        <div class="syntax-def-key">k~g·m·s⁻²</div>
+        <div class="syntax-def-val">Compound Units</div>
+        <div class="syntax-def-text">
+          SI base and derived units, IEC binary prefixes, compound expressions.
+          Units are validated by the parser. No external schema needed.
+        </div>
+      </div>
+      <div class="syntax-def reveal reveal-delay-2">
+        <div class="syntax-def-key">\x00 … \x00</div>
+        <div class="syntax-def-val">Octet Streams</div>
+        <div class="syntax-def-text">
+          Raw binary embedding without Base64 overhead. Framed by null bytes.
+          Text and binary payloads coexist in the same document.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     FEATURES
+══════════════════════════════════════════════ -->
+<section id="features">
+  <div class="section-inner">
+    <div class="section-label reveal">Capabilities</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Built for <em>exactness.</em></h2>
+
+    <div class="features-grid">
+      <div class="feature-card reveal" data-n="1">
+        <div class="feature-tag">Type System</div>
+        <div class="feature-title">Strong, optional typing</div>
+        <div class="feature-desc">
+          Six type families with explicit bit-width and numeric base. Defaults are defined,
+          not guessed. Annotate when precision matters; omit when it doesn't.
+        </div>
+        <div class="feature-example"><span class="c-ann">&lt;uint:16&gt;</span> 443
+<span class="c-ann">&lt;float:32,_16&gt;</span> FF.3A
+<span class="c-ann">&lt;sint:64&gt;</span> -9223372036</div>
+      </div>
+
+      <div class="feature-card reveal reveal-delay-1" data-n="2">
+        <div class="feature-tag">SI Units</div>
+        <div class="feature-title">First-class physical units</div>
+        <div class="feature-desc">
+          All seven SI base units, 22 derived SI units, and IEC binary prefixes.
+          Compound units, exponents, and prefix enforcement are built into the grammar.
+        </div>
+        <div class="feature-example">&lt;float:64,<span class="c-unit">k~g·m·s⁻²</span>&gt; 1.0
+&lt;uint:64,<span class="c-unit">Gi~B</span>&gt; 16
+&lt;float:32,<span class="c-unit">m/s²</span>&gt; 9.807</div>
+      </div>
+
+      <div class="feature-card reveal reveal-delay-2" data-n="3">
+        <div class="feature-tag">Streaming</div>
+        <div class="feature-title">SAX-style incremental reader</div>
+        <div class="feature-desc">
+          Parse from memory, file descriptor, or socket via a symmetric
+          <code style="font-family:var(--mono);font-size:0.85em;color:var(--teal)">on_unverified / on_verified</code> callback pair.
+          No heap required for the lexer itself.
+        </div>
+        <div class="feature-example">bvnr_open_read_source(
+  r, &amp;src, NULL, &amp;opts);
+bvnr_read(r);</div>
+      </div>
+
+      <div class="feature-card reveal" data-n="4">
+        <div class="feature-tag">Resilience</div>
+        <div class="feature-title">Error recovery &amp; resync</div>
+        <div class="feature-desc">
+          Optional resync mode skips broken assignments and continues parsing.
+          Suitable for log streams, unreliable transports, and long-running telemetry.
+        </div>
+        <div class="feature-example">opts.resync_on_error = true;
+<span class="c-comment">/* parser skips broken record,</span>
+<span class="c-comment">   continues with the next */</span></div>
+      </div>
+
+      <div class="feature-card reveal reveal-delay-1" data-n="5">
+        <div class="feature-tag">DOM API</div>
+        <div class="feature-title">Tree-based access</div>
+        <div class="feature-desc">
+          Build a navigable DOM from any Bovnar stream, then traverse, query,
+          and mutate it with a clean C API. Or use the Python dict-like interface.
+        </div>
+        <div class="feature-example">bvnr_dom_get(dom, ".sensor.val");
+doc["sensor"]["val"] <span class="c-comment"># Python</span></div>
+      </div>
+
+      <div class="feature-card reveal reveal-delay-2" data-n="6">
+        <div class="feature-tag">Python</div>
+        <div class="feature-title">Pure-ctypes bindings</div>
+        <div class="feature-desc">
+          No compiled extension. No Cython. Load the shared library and use
+          a full-featured high-level API or a low-level streaming interface.
+        </div>
+        <div class="feature-example">bovnar.loads(raw)["pressure"]
+<span class="c-comment"># → 101.325  unit: k~Pa</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     QUICK START
+══════════════════════════════════════════════ -->
+<section id="quickstart">
+  <div class="section-inner">
+    <div class="section-label reveal">Quick Start</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Up in <em>minutes.</em></h2>
+
+    <div style="margin-top:2.5rem;" class="reveal reveal-delay-2">
+      <div class="quickstart-tabs">
+        <button class="qs-tab active" onclick="showTab('c')">C99 API</button>
+        <button class="qs-tab" onclick="showTab('python')">Python</button>
+        <button class="qs-tab" onclick="showTab('build')">Build</button>
+      </div>
+
+      <div class="qs-pane active" id="tab-c">
+        <div class="qs-pane-inner">
+          <div class="qs-step">
+            <div class="qs-step-num">01</div>
+            <div class="qs-step-title">Read from memory</div>
+            <div class="qs-step-desc">Register callbacks through <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">bvnr_read_flags_t</code>. Both callbacks receive the event type and parsed data.</div>
+            <div class="code-block"><span class="c-comment">#include "bovnar.h"</span>
+
+static bool on_event(void *ud, bvnr_event_t ev,
+                     bvnr_data_t *d)
+{
+    if (ev == ev_data)
+        printf("key=%.*s\n",
+               (int)d->length,
+               (const char *)d->data);
+    return true;
+}
+
+int main(void)
+{
+    const char *src =
+        ".velocity = &lt;float:64,m/s&gt; 9.81;";
+    bvnr_read_flags_t opts = {0};
+    opts.on_verified = on_event;
+    bvnr_reader_t *r = bvnr_reader_create();
+    bvnr_open_read_mem(r, src,
+                       strlen(src), NULL,
+                       0, &opts);
+    bvnr_read(r);
+    bvnr_reader_destroy(r);
+}</div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">02</div>
+            <div class="qs-step-title">Write typed values</div>
+            <div class="qs-step-desc">High-level write helpers accept a key string and a typed value directly. The format is emitted with correct annotations.</div>
+            <div class="code-block"><span class="c-comment">#include "bovnar.h"</span>
+
+int main(void)
+{
+    char buf[256];
+    bvnr_writer_t *w = bvnr_writer_create();
+    bvnr_sink_t sink;
+    bvnr_sink_to_mem(&sink,
+                     (uint8_t *)buf,
+                     sizeof(buf));
+    bvnr_open_write_sink(w, &sink,
+                         true, NULL);
+
+    bvnr_write_float_unit(
+        w, "velocity", 64,
+        9.81, "m/s");
+
+    bvnr_write_finish(w);
+    bvnr_writer_destroy(w);
+    puts(buf);
+    <span class="c-comment">// → .velocity = &lt;float:64,m/s&gt; 9.81;</span>
+}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qs-pane" id="tab-python">
+        <div class="qs-pane-inner">
+          <div class="qs-step">
+            <div class="qs-step-num">01</div>
+            <div class="qs-step-title">High-level API</div>
+            <div class="qs-step-desc">Dict-like <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">loads / dumps</code> interface. Pure-ctypes — no compiled extension required.</div>
+            <div class="code-block">import bovnar
+
+data = {
+    "sensor_id":   42,
+    "temperature": 36.6,
+    "unit":        "celsius",
+}
+raw = bovnar.dumps(data)
+
+doc = bovnar.loads(raw)
+print(doc["sensor_id"])    <span class="c-comment"># 42</span>
+print(doc["temperature"])  <span class="c-comment"># 36.6</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">02</div>
+            <div class="qs-step-title">Streaming event API</div>
+            <div class="qs-step-desc">Full control over parse events. Inspect units, type annotations, and raw string representations as they arrive.</div>
+            <div class="code-block">from bovnar import Reader, Event
+
+def on_event(ev, data):
+    if ev == Event.DATA:
+        u = data.value_unit
+        if u.num_components:
+            print(data.raw_str(),
+                  bovnar.unit_to_str(u))
+
+src = b".velocity = &lt;float:64,m/s&gt; 9.81;"
+Reader().read_mem(
+    src, on_verified=on_event
+)
+<span class="c-comment"># → 9.81  m/s</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qs-pane" id="tab-build">
+        <div class="qs-pane-inner">
+          <div class="qs-step">
+            <div class="qs-step-num">01</div>
+            <div class="qs-step-title">Build the library</div>
+            <div class="qs-step-desc">Requires CMake ≥ 3.21 and a C99-conforming compiler. <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">libm</code> is the only mandatory dependency.</div>
+            <div class="code-block"><span class="c-comment"># Clone and build</span>
+cmake -B build .
+cmake --build build
+
+<span class="c-comment"># Release build</span>
+cmake -B build \
+  -DCMAKE_BUILD_TYPE=Release .
+cmake --build build
+
+<span class="c-comment"># Outputs:</span>
+<span class="c-comment"># build/libbvnr_static.a</span>
+<span class="c-comment"># build/libbvnr_shared.so</span>
+<span class="c-comment"># build/bovnar  (CLI)</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">02</div>
+            <div class="qs-step-title">Link &amp; test</div>
+            <div class="qs-step-desc">The test suite includes unit tests, socket-pair round-trip tests, fuzz harnesses, and a benchmark binary.</div>
+            <div class="code-block"><span class="c-comment"># Link your app</span>
+gcc my_app.c \
+  -I include \
+  -L build \
+  -lbvnr_static -lm \
+  -o my_app
+
+<span class="c-comment"># Run tests</span>
+cd build && ctest \
+  --output-on-failure
+
+<span class="c-comment"># Python tests</span>
+export LIBBOVNAR_PATH=\
+  $(pwd)/build/libbvnr_shared.so
+cd python && pytest tests -v</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     USE CASES
+══════════════════════════════════════════════ -->
+<section id="usecases">
+  <div class="section-inner">
+    <div class="section-label reveal">Applications</div>
+    <h2 class="section-h2 reveal reveal-delay-1">When precision is a <em>requirement.</em></h2>
+
+    <div class="usecases-grid">
+      <div class="usecase-card reveal">
+        <div class="usecase-num">01</div>
+        <div>
+          <div class="usecase-title">Scientific &amp; Measurement Data</div>
+          <div class="usecase-desc">
+            Numbers with explicit physical units travel with the payload. No schema, no
+            naming convention, no documentation is needed to interpret the unit correctly.
+          </div>
+          <div class="usecase-example">.acceleration = &lt;float:64,m/s²&gt; 9.807;</div>
+        </div>
+      </div>
+      <div class="usecase-card reveal reveal-delay-1">
+        <div class="usecase-num">02</div>
+        <div>
+          <div class="usecase-title">Embedded Systems &amp; IoT Telemetry</div>
+          <div class="usecase-desc">
+            The streaming parser has a small, allocation-friendly footprint. No heap required
+            for the lexer. Resync mode handles unreliable transports gracefully.
+          </div>
+          <div class="usecase-example">.temp = &lt;float:32,°C&gt; 23.5; .vcc = &lt;float:32,V&gt; 3.31;</div>
+        </div>
+      </div>
+      <div class="usecase-card reveal">
+        <div class="usecase-num">03</div>
+        <div>
+          <div class="usecase-title">Typed Configuration Files</div>
+          <div class="usecase-desc">
+            Typed values eliminate range ambiguity. A <code style="font-family:var(--mono);font-size:0.85em;color:var(--teal)">&lt;uint:16&gt;</code> port number
+            cannot accidentally become a 64-bit float. Optional annotations; sensible defaults.
+          </div>
+          <div class="usecase-example">.port = &lt;uint:16&gt; 5432; .timeout = &lt;float:64,s&gt; 2.5;</div>
+        </div>
+      </div>
+      <div class="usecase-card reveal reveal-delay-1">
+        <div class="usecase-num">04</div>
+        <div>
+          <div class="usecase-title">Mixed Text + Binary Payloads</div>
+          <div class="usecase-desc">
+            Log entries with attached raw memory dumps, firmware images, or sensor frames
+            coexist in the same document. No Base64 overhead; octet streams are native.
+          </div>
+          <div class="usecase-example">.frame_data = \x00 … raw bytes … \x00;</div>
+        </div>
+      </div>
+      <div class="usecase-card reveal">
+        <div class="usecase-num">05</div>
+        <div>
+          <div class="usecase-title">Multi-dimensional &amp; Tabular Data</div>
+          <div class="usecase-desc">
+            Matrices, image frames, time-series batches, any tabular structure where rows
+            are a natural unit. The <code style="font-family:var(--mono);font-size:0.85em;color:var(--teal)">/</code> separator
+            creates new rows; the result is a 3×3 matrix, a 3D rotation matrix, or any
+            rectangular array — expressed without nested lists.
+          </div>
+          <div class="usecase-example">.matrix   = [1,2,3]/[4,5,6]/[7,8,9];
+.rotation = [1,0,0]/[0,1,0]/[0,0,1];</div>
+        </div>
+      </div>
+      <div class="usecase-card reveal reveal-delay-1">
+        <div class="usecase-num">06</div>
+        <div>
+          <div class="usecase-title">Long-term Archival</div>
+          <div class="usecase-desc">
+            Self-describing data stays interpretable without an out-of-band schema, even years
+            after the original application is gone. The file itself is the documentation.
+          </div>
+          <div class="usecase-example">.spec_version = "bovnar-1.0"; <span style="color:var(--text3)"># always readable</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CONFORMANCE TRUST BAR
+══════════════════════════════════════════════ -->
+<div class="conformance-bar">
+  <div class="conformance-inner">
+    <div class="conf-badge reveal">
+      <div class="conf-icon">✓</div>
+      <div>
+        <div class="conf-title">Formally Specified</div>
+        <div class="conf-sub">Full EBNF grammar. Unambiguous.</div>
+      </div>
+    </div>
+    <div class="conf-badge reveal reveal-delay-1">
+      <div class="conf-icon">⚡</div>
+      <div>
+        <div class="conf-title">180+ Conformance Tests</div>
+        <div class="conf-sub">TAP output. CTest integrated.</div>
+      </div>
+    </div>
+    <div class="conf-badge reveal reveal-delay-2">
+      <div class="conf-icon">⊕</div>
+      <div>
+        <div class="conf-title">Verifiable by Any Impl.</div>
+        <div class="conf-sub">Open IUT protocol. Fork and test.</div>
+      </div>
+    </div>
+    <div class="conf-badge reveal reveal-delay-3">
+      <div class="conf-icon">⬡</div>
+      <div>
+        <div class="conf-title">14 Test Suites</div>
+        <div class="conf-sub">Unit, roundtrip, fuzz, benchmark.</div>
+      </div>
+    </div>
+    <a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool" class="conf-cta reveal reveal-delay-4">
+      Read the Conformance Spec →
+    </a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     DOCS
+══════════════════════════════════════════════ -->
+<section id="docs">
+  <div class="section-inner">
+    <div class="section-label reveal">Documentation</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Everything you need to <em>ship.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Eight documents covering every layer of the stack — from a five-minute tutorial
+      to the formal EBNF grammar and the independent conformance verification protocol.
+    </p>
+    <div class="docs-grid">
+      <a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial" class="doc-card reveal">
+        <div class="doc-card-num">00</div>
+        <div>
+          <div class="doc-card-title">Tutorial</div>
+          <div class="doc-card-desc">Practical introduction for developers familiar with JSON or similar formats. Get productive in minutes.</div>
+          <div class="doc-card-tag">Start here</div>
+        </div>
+      </a>
+      <a href="#" data-doc="1_bovnar_spec.md" data-doc-title="Specification v1.0" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">01</div>
+        <div>
+          <div class="doc-card-title">Specification v1.0</div>
+          <div class="doc-card-desc">Full lexical and syntactic grammar, type system, arrays, structs, octet streams, and validation rules.</div>
+          <div class="doc-card-tag">Format authority</div>
+        </div>
+      </a>
+      <a href="#" data-doc="2_bovnar_unit_system.md" data-doc-title="Unit System Reference" class="doc-card reveal reveal-delay-2">
+        <div class="doc-card-num">02</div>
+        <div>
+          <div class="doc-card-title">Unit System Reference</div>
+          <div class="doc-card-desc">SI base and derived units, IEC binary prefixes, compound expressions, exponents, and prefix enforcement.</div>
+          <div class="doc-card-tag">Physics layer</div>
+        </div>
+      </a>
+      <a href="#" data-doc="3_bovnar_readwrite_api.md" data-doc-title="Read &amp; Write API" class="doc-card reveal">
+        <div class="doc-card-num">03</div>
+        <div>
+          <div class="doc-card-title">Read &amp; Write API</div>
+          <div class="doc-card-desc">Complete C API for streaming readers and writers. Annotated examples for every typed write helper.</div>
+          <div class="doc-card-tag">C integration</div>
+        </div>
+      </a>
+      <a href="#" data-doc="4_bovnar_python_bindings.md" data-doc-title="Python Bindings" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">04</div>
+        <div>
+          <div class="doc-card-title">Python Bindings</div>
+          <div class="doc-card-desc">Pure-ctypes interface — no compiled extension. High-level <code>loads</code>/<code>dumps</code> and streaming <code>Reader</code>/<code>Writer</code>.</div>
+          <div class="doc-card-tag">Python integration</div>
+        </div>
+      </a>
+      <a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar" class="doc-card reveal reveal-delay-2">
+        <div class="doc-card-num">05</div>
+        <div>
+          <div class="doc-card-title">Formal EBNF Grammar</div>
+          <div class="doc-card-desc">Machine-readable grammar. The normative reference for parser implementors and toolchain authors.</div>
+          <div class="doc-card-tag">Parser reference</div>
+        </div>
+      </a>
+      <a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ" class="doc-card reveal">
+        <div class="doc-card-num">06</div>
+        <div>
+          <div class="doc-card-title">FAQ</div>
+          <div class="doc-card-desc">Common questions on the format, type system, units, C API, Python bindings, and operational limits.</div>
+          <div class="doc-card-tag">Common questions</div>
+        </div>
+      </a>
+      <a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">07</div>
+        <div>
+          <div class="doc-card-title">Conformance Test Tool</div>
+          <div class="doc-card-desc">180+ test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
+          <div class="doc-card-tag">Verification</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-brand-name">BOVNAR</div>
+      <div class="footer-brand-sub">Spec v1.0 · MIT License · C99</div>
+      <p class="footer-desc">
+        A typed, unit-aware, text-binary serialisation format and its C99 reference implementation.
+        The format that knows what it means.
+      </p>
+    </div>
+    <div>
+      <div class="footer-col-title">Documentation</div>
+      <ul class="footer-links">
+        <li><a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial">Tutorial</a></li>
+        <li><a href="#" data-doc="1_bovnar_spec.md" data-doc-title="Specification v1.0">Specification v1.0</a></li>
+        <li><a href="#" data-doc="2_bovnar_unit_system.md" data-doc-title="Unit System Reference">Unit System Reference</a></li>
+        <li><a href="#" data-doc="3_bovnar_readwrite_api.md" data-doc-title="Read &amp; Write API">Read &amp; Write API</a></li>
+        <li><a href="#" data-doc="4_bovnar_python_bindings.md" data-doc-title="Python Bindings">Python Bindings</a></li>
+        <li><a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar">Formal EBNF Grammar</a></li>
+        <li><a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ">FAQ</a></li>
+        <li><a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool">Conformance Test Tool</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">Repository</div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/sothis/bovnar" target="_blank" rel="noopener">GitHub ↗</a></li>
+        <li><a href="https://github.com/sothis/bovnar/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/include" target="_blank" rel="noopener">C Headers</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/python/bovnar" target="_blank" rel="noopener">Python Package</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/examples" target="_blank" rel="noopener">Examples (.bvnr)</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vscode" target="_blank" rel="noopener">VS Code Highlighter</a></li>
+        <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/geany" target="_blank" rel="noopener">Geany Highlighter</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">Legal</div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
+        <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
+      </ul>
+      <div style="margin-top:2rem;">
+        <div class="footer-col-title">Format</div>
+        <ul class="footer-links">
+          <li><a href="#">Extension: .bvnr</a></li>
+          <li><a href="#">Encoding: UTF-8</a></li>
+          <li><a href="#">MIME: text/x-bovnar</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2026 Janos Sonntag. All rights reserved.</div>
+    <div class="footer-spec">BOVNAR SPEC v1.0 · REFERENCE IMPL C99</div>
+  </div>
+</footer>
+
+<!-- ══════════════════════════════════════════════
+     DOC OVERLAY  (must precede the script)
+══════════════════════════════════════════════ -->
+<div id="doc-scrim"></div>
+<div id="doc-drawer" role="dialog" aria-modal="true" aria-label="Documentation">
+  <div id="doc-topbar">
+    <span class="doc-brand">BOVNAR DOCS</span>
+    <div class="doc-sep"></div>
+    <span id="doc-title">—</span>
+    <button id="doc-close" aria-label="Close documentation">✕</button>
+  </div>
+  <div id="doc-body">
+    <div id="doc-content-wrap">
+      <div id="doc-loading">
+        <div class="doc-spinner"></div>
+        <span>Fetching document…</span>
+      </div>
+      <div id="doc-error">
+        <span style="color:var(--red);font-size:1.2rem;">⚠</span>
+        <span id="doc-error-msg">Could not load document.</span>
+        <a id="doc-error-link" href="#" target="_blank" rel="noopener">Open on GitHub ↗</a>
+      </div>
+      <article id="doc-content"></article>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Tab switcher ── */
+function showTab(id) {
+  document.querySelectorAll('.qs-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.qs-pane').forEach(p => p.classList.remove('active'));
+  document.querySelector('#tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+/* ── Scroll reveal ── */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+  });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* ── Smooth-scroll anchor links (exclude data-doc links; guard bare #) ── */
+document.querySelectorAll('a[href^="#"]:not([data-doc])').forEach(a => {
+  a.addEventListener('click', e => {
+    const href = a.getAttribute('href');
+    if (!href || href === '#') return;
+    const target = document.querySelector(href);
+    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+  });
+});
+
+/* ════════════════════════════════════════════
+   DOC OVERLAY
+════════════════════════════════════════════ */
+const LOCAL_BASE = '../doc/';
+const GH_BASE    = 'https://github.com/sothis/bovnar/blob/main/doc/';
+
+const scrim    = document.getElementById('doc-scrim');
+const drawer   = document.getElementById('doc-drawer');
+const titleEl  = document.getElementById('doc-title');
+const closeBtn = document.getElementById('doc-close');
+const loading  = document.getElementById('doc-loading');
+const errBox   = document.getElementById('doc-error');
+const errMsg   = document.getElementById('doc-error-msg');
+const errLink  = document.getElementById('doc-error-link');
+const content  = document.getElementById('doc-content');
+const wrap     = document.getElementById('doc-content-wrap');
+
+/* configure marked */
+marked.use({ gfm: true, breaks: false });
+
+let currentFile = null;
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showState(state) {
+  loading.style.display = state === 'loading' ? 'flex' : 'none';
+  errBox.style.display  = state === 'error'   ? 'flex' : 'none';
+  content.style.display = state === 'done'    ? 'block': 'none';
+}
+
+
+function renderDoc(file, text) {
+  if (!file.endsWith('.md')) {
+    /* EBNF and other plain-text files: display verbatim, no hljs.
+       hljs auto-detection on unknown grammars produces garbled output. */
+    const _pre = document.createElement('pre');
+    const _code = document.createElement('code');
+    _code.textContent = text;
+    _pre.appendChild(_code);
+    content.innerHTML = '';
+    content.appendChild(_pre);
+  } else {
+    content.innerHTML = marked.parse(text);
+
+    /* Assign heading IDs using GitHub's slug algorithm so in-doc anchor
+       links resolve correctly: lowercase, strip non-word/non-space/non-hyphen,
+       spaces → hyphens. No hyphen-collapsing — "& BOM" must become "--bom". */
+    content.querySelectorAll('h1, h2, h3, h4').forEach((h, i) => {
+      if (!h.id) {
+        const slug = h.textContent.toLowerCase()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-') ||
+          ('h-' + i);
+        h.id = slug;
+      }
+    });
+
+    /* Syntax-highlight fenced code blocks; guard against hljs failures */
+    content.querySelectorAll('pre code').forEach(el => {
+      try { hljs.highlightElement(el); } catch (_) {}
+    });
+
+    /* Intercept all links: external → new tab, anchors → scroll in wrap, relative → openDoc */
+    content.querySelectorAll('a[href]').forEach(a => {
+      const href = a.getAttribute('href');
+      if (/^https?:\/\//.test(href)) {
+        a.target = '_blank';
+        a.rel = 'noopener';
+      } else if (href.startsWith('#')) {
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          const target = document.getElementById(href.slice(1));
+          if (target) {
+            const top = target.getBoundingClientRect().top
+                      - wrap.getBoundingClientRect().top
+                      + wrap.scrollTop - 16;
+            wrap.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+          }
+        });
+      } else {
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          openDoc(href, a.textContent.trim() || href);
+        });
+      }
+    });
+  }
+
+  showState('done');
+}
+
+function openDoc(file, title) {
+  if (currentFile === file && drawer.classList.contains('open')) return;
+  currentFile = file;
+  titleEl.textContent = title;
+  errLink.href = GH_BASE + file;
+
+  scrim.classList.add('open');
+  drawer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  wrap.scrollTop = 0;
+  showState('loading');
+
+  /* XMLHttpRequest works for file:// local paths; fetch is blocked by
+     Chrome's same-origin policy when opening HTML directly from disk. */
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', LOCAL_BASE + file, true);
+  xhr.onload = function () {
+    if (xhr.status === 0 || xhr.status === 200) {
+      renderDoc(file, xhr.responseText);
+    } else {
+      errMsg.textContent = 'Could not load "' + file + '" — HTTP ' + xhr.status;
+      showState('error');
+    }
+  };
+  xhr.onerror = function () {
+    errMsg.textContent = 'Could not load "' + file + '". ' +
+      'If using Chrome, start it with --allow-file-access-from-files, ' +
+      'or open the page through a local server (e.g. python3 -m http.server).';
+    showState('error');
+  };
+  xhr.send();
+}
+
+function closeDoc() {
+  scrim.classList.remove('open');
+  drawer.classList.remove('open');
+  document.body.style.overflow = '';
+  currentFile = null;
+}
+
+closeBtn.addEventListener('click', closeDoc);
+scrim.addEventListener('click', closeDoc);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDoc(); });
+
+document.querySelectorAll('a[data-doc]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    openDoc(a.dataset.doc, a.dataset.docTitle || a.textContent.trim());
+  });
+});
+</script>
+
+</body>
+</html>

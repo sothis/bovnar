@@ -288,8 +288,11 @@ bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 	int32_t n = bvn_float_to_str(f, buf, bufsz, effective_base);
 	bool ok = false;
 	if (n > 0) {
-		token_type_t tt = (effective_base == 10u)
-			? token_is_number : token_is_string;
+		token_type_t tt;
+		if (effective_base == 10u || bvn_is_special_number_string(buf))
+			tt = token_is_number;
+		else
+			tt = token_is_string;
 		ok = emit_numeric_tt(w, vt, unit, buf, tt);
 	}
 	free(buf);

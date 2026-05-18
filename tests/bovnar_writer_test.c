@@ -515,11 +515,23 @@ static void test_write_bvnf_base16(void)
     ASSERT_TRUE(bvnr_write_bvnf_base(w, "nan_256", f, 256u, 16u),
                 "bvnr_write_bvnf_base base16 NaN must succeed");
 
+    bvn_float_set_inf(f, false);
+    ASSERT_TRUE(bvnr_write_bvnf_base(w, "pos_inf", f, 256u, 16u),
+                "bvnr_write_bvnf_base base16 +Inf must succeed");
+
+    bvn_float_set_inf(f, true);
+    ASSERT_TRUE(bvnr_write_bvnf_base(w, "neg_inf", f, 256u, 16u),
+                "bvnr_write_bvnf_base base16 -Inf must succeed");
+
     ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
     ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no error");
 
-    uint8_t *out = output;
-    ASSERT_TRUE(out != NULL, "output non-null");
+    uint64_t n = bvnr_writer_bytes_written(w);
+    ASSERT_TRUE(n > 0u, "bytes_written > 0");
+
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, n, &le),
+                "base16 bvnf document with NaN and Inf must round-trip");
 
     bvn_float_free(f);
     bvnr_writer_destroy(w);

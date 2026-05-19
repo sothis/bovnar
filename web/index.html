@@ -5,133 +5,150 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bovnar — The Format That Knows What It Means</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <style>
+/* ── Variables ── */
 :root {
-  --bg:       #070A0D;
-  --bg2:      #0C1216;
-  --bg3:      #121A1F;
-  --border:   #1C262D;
-  --border2:  #253038;
-  --amber:    #D4890A;
-  --amber2:   #F0A830;
-  --amber3:   #8A5500;
-  --teal:     #2DBFB0;
-  --teal2:    #1A8A80;
-  --teal-dim: #0D4540;
-  --text:     #DDD8CF;
-  --text2:    #9AABAF;
-  --text3:    #566870;
-  --red:      #C44A3A;
-  --green:    #3DA87A;
-  --serif: 'Cormorant Garamond', serif;
-  --sans: 'Barlow', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --editor-bg:   #1e1e1e;
+  --sidebar-bg:  #252526;
+  --panel-bg:    #2d2d2d;
+  --titlebar-bg: #3c3c3c;
+  --tabbar-bg:   #2d2d2d;
+  --statusbar:   #007acc;
+  --border:      #3e3e42;
+  --border-hi:   #007acc;
+  --select-bg:   #264f78;
+
+  --text:   #d4d4d4;
+  --text2:  #9e9e9e;
+  --text3:  #5a5a5a;
+
+  --blue:    #569cd6;
+  --blue2:   #007acc;
+  --teal:    #4ec9b0;
+  --green:   #6a9955;
+  --green2:  #b5cea8;
+  --yellow:  #dcdcaa;
+  --orange:  #ce9178;
+  --cyan:    #9cdcfe;
+  --red:     #f44747;
+  --purple:  #c695dc;
+  --pink:    #ff6a8c;
+
+  /* Bovnar token colors (from the VSCode theme JSON) */
+  --c-comment:  #4a4e69;
+  --c-sigil:    #c695dc;
+  --c-key:      #5b9bd5;
+  --c-eq:       #ff6a8c;
+  --c-ann:      #00b4d8;
+  --c-type:     #ffb3d9;
+  --c-param:    #ffa500;
+  --c-val:      #ffe700;
+  --c-unit:     #5eead4;
+  --c-str:      #7dd3fc;
+  --c-semi:     #3e4462;
+  --c-struct:   #00b4d8;
+
+  --mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
 
 body {
-  background: var(--bg);
+  background: var(--editor-bg);
   color: var(--text);
   font-family: var(--sans);
-  font-weight: 300;
+  font-weight: 400;
   font-size: 16px;
   line-height: 1.65;
   overflow-x: hidden;
 }
 
-::selection { background: var(--amber3); color: var(--amber2); }
+::selection { background: var(--select-bg); color: var(--cyan); }
 
-/* ── Grid Overlay ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 60px 60px;
-  opacity: 0.35;
-  pointer-events: none;
-  z-index: 0;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--editor-bg); }
+::-webkit-scrollbar-thumb { background: #4e4e4e; }
+::-webkit-scrollbar-thumb:hover { background: #6e6e6e; }
+* { scrollbar-width: thin; scrollbar-color: #4e4e4e var(--editor-bg); }
 
 /* ── NAV ── */
 nav {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
+  height: 48px;
+  background: var(--titlebar-bg);
+  border-bottom: 1px solid #252525;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 3rem;
-  height: 60px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(7, 10, 13, 0.92);
-  backdrop-filter: blur(12px);
+  padding: 0 1.5rem;
+  gap: 0;
 }
 
 .nav-brand {
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 500;
-  letter-spacing: 0.12em;
-  color: var(--amber);
+  letter-spacing: 0.1em;
+  color: var(--blue2);
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0;
+  margin-right: 2.5rem;
+  white-space: nowrap;
 }
-.nav-brand .ext {
-  color: var(--text3);
-  font-weight: 300;
-}
+.nav-brand .ext { color: var(--text3); font-weight: 300; }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 2.5rem;
+  gap: 0;
   list-style: none;
+  flex: 1;
 }
-.nav-links a {
+.nav-links li a {
   font-family: var(--sans);
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.8rem;
+  font-weight: 400;
   color: var(--text2);
   text-decoration: none;
-  transition: color 0.2s;
+  padding: 0 0.85rem;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+  letter-spacing: 0.01em;
 }
-.nav-links a:hover { color: var(--amber); }
+.nav-links li a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
 
 .nav-cta {
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 400;
-  letter-spacing: 0.05em;
-  color: var(--bg) !important;
-  background: var(--amber);
-  padding: 0.35rem 1rem;
-  text-transform: none !important;
-  transition: background 0.2s !important;
+  letter-spacing: 0.04em;
+  color: #fff !important;
+  background: var(--blue2) !important;
+  padding: 0.35rem 0.9rem !important;
+  height: auto !important;
+  transition: background 0.15s !important;
 }
-.nav-cta:hover { background: var(--amber2) !important; color: var(--bg) !important; }
+.nav-cta:hover { background: #0086d8 !important; }
 
 /* ── HERO ── */
 #hero {
-  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 8rem 3rem 5rem;
-  overflow: hidden;
+  position: relative;
 }
 
 .hero-grid {
@@ -148,148 +165,244 @@ nav {
 .hero-label {
   font-family: var(--mono);
   font-size: 0.72rem;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--amber);
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  color: var(--text3);
   margin-bottom: 1.5rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 .hero-label::before {
-  content: '';
-  display: block;
-  width: 24px;
-  height: 1px;
-  background: var(--amber);
+  content: '>';
+  color: var(--blue2);
+  font-weight: 500;
 }
+.hero-label .hl-sep { color: var(--border); }
 
 .hero-h1 {
-  font-family: var(--serif);
-  font-size: clamp(3rem, 5.5vw, 5.5rem);
-  font-weight: 300;
-  line-height: 1.05;
-  letter-spacing: -0.01em;
+  font-family: var(--mono);
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   color: var(--text);
   margin-bottom: 1.5rem;
 }
 .hero-h1 em {
-  font-style: italic;
-  color: var(--amber2);
+  font-style: normal;
+  color: var(--blue);
 }
 
 .hero-sub {
-  font-size: 1.05rem;
+  font-size: 1rem;
+  font-weight: 300;
   color: var(--text2);
-  line-height: 1.7;
+  line-height: 1.75;
   max-width: 480px;
   margin-bottom: 2.5rem;
 }
 
 .hero-actions {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
 .btn-primary {
   font-family: var(--mono);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 400;
-  letter-spacing: 0.05em;
-  color: var(--bg);
-  background: var(--amber);
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: var(--blue2);
   border: none;
-  padding: 0.75rem 1.75rem;
+  padding: 0.65rem 1.5rem;
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
-  transition: background 0.2s, transform 0.15s;
+  transition: background 0.15s, transform 0.1s;
 }
-.btn-primary:hover { background: var(--amber2); transform: translateY(-1px); }
+.btn-primary:hover { background: #0086d8; transform: translateY(-1px); }
 
 .btn-ghost {
   font-family: var(--mono);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 400;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: var(--text2);
   background: transparent;
-  border: 1px solid var(--border2);
-  padding: 0.75rem 1.75rem;
+  border: 1px solid var(--border);
+  padding: 0.65rem 1.5rem;
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
-  transition: border-color 0.2s, color 0.2s;
+  transition: border-color 0.15s, color 0.15s;
 }
-.btn-ghost:hover { border-color: var(--amber); color: var(--amber); }
+.btn-ghost:hover { border-color: var(--blue2); color: var(--blue); }
 
-/* ── Animated Code Panel ── */
+/* ── Editor Window (Hero) ── */
 .hero-right { position: relative; z-index: 1; }
 
-.code-panel {
-  background: var(--bg2);
+.editor-window {
   border: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-.code-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--amber), var(--teal), transparent);
-}
-.code-panel-header {
+  background: var(--editor-bg);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg3);
-}
-.code-dots { display: flex; gap: 6px; }
-.code-dot {
-  width: 9px; height: 9px; border-radius: 50%;
-}
-.d1 { background: #3A3A3A; }
-.d2 { background: #3A3A3A; }
-.d3 { background: #3A3A3A; }
-.code-filename {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--text3);
-}
-.code-badge {
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  color: var(--teal);
-  border: 1px solid var(--teal2);
-  padding: 0.1rem 0.5rem;
-  letter-spacing: 0.05em;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
 }
 
-.code-body {
-  padding: 1.5rem;
+.editor-titlebar {
+  height: 30px;
+  background: var(--titlebar-bg);
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid #252525;
+}
+.editor-dots { display: flex; gap: 6px; }
+.editor-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.ed1 { background: #ff5f57; }
+.ed2 { background: #ffbd2e; }
+.ed3 { background: #28c840; }
+.editor-titlename {
   font-family: var(--mono);
-  font-size: 0.82rem;
+  font-size: 0.68rem;
+  color: var(--text3);
+  margin: 0 auto;
+  letter-spacing: 0.04em;
+}
+
+.editor-tabbar {
+  background: var(--tabbar-bg);
+  display: flex;
+  align-items: flex-end;
+  height: 35px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.editor-tab {
+  height: 35px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.85rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  cursor: default;
+}
+.editor-tab.active {
+  background: var(--editor-bg);
+  color: var(--text);
+  border-top: 1px solid var(--blue2);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  margin-top: 1px;
+  position: relative;
+  bottom: -1px;
+}
+.editor-tab:not(.active) {
+  background: var(--tabbar-bg);
+  color: var(--text3);
+  border-top: 1px solid transparent;
+}
+.tab-icon { color: var(--blue); font-size: 0.65rem; }
+.tab-x {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); font-size: 0.8rem; line-height: 1;
+  padding: 0; opacity: 0.6;
+}
+
+.editor-breadcrumb {
+  background: var(--editor-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.2rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.bc-sep { color: var(--border); opacity: 0.7; }
+.bc-current { color: var(--text2); }
+
+.editor-pane {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ln-gutter {
+  background: var(--editor-bg);
+  padding: 1.25rem 0.75rem 1.25rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 2;
+  color: var(--text3);
+  text-align: right;
+  user-select: none;
+  min-width: 2.75rem;
+  border-right: 1px solid rgba(62,62,66,0.5);
+  flex-shrink: 0;
+}
+.ln { display: block; }
+
+.code-body {
+  padding: 1.25rem 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
   line-height: 2;
   overflow-x: auto;
   white-space: pre;
+  flex: 1;
 }
 
-.c-comment { color: var(--text3); }
-.c-key     { color: var(--text); }
-.c-eq      { color: var(--text3); }
-.c-ann     { color: var(--teal); }
-.c-val     { color: var(--amber2); }
-.c-unit    { color: var(--green); }
-.c-str     { color: #B5936B; }
-.c-semi    { color: var(--text3); }
-.c-struct  { color: var(--text2); }
+.editor-statusline {
+  height: 22px;
+  background: var(--blue2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.9);
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+  gap: 1rem;
+}
+.esl-left, .esl-right { display: flex; align-items: center; gap: 0.75rem; }
+.esl-badge {
+  background: rgba(0,0,0,0.2);
+  padding: 0 0.4rem;
+  height: 22px;
+  display: flex;
+  align-items: center;
+}
 
-/* Hero annotation that animates in */
+/* Bovnar code token colors */
+.c-comment { color: var(--c-comment); font-style: italic; }
+.c-key     { color: var(--c-key); }
+.c-eq      { color: var(--c-eq); }
+.c-ann     { color: var(--c-ann); }
+.c-val     { color: var(--c-val); }
+.c-unit    { color: var(--c-unit); }
+.c-str     { color: var(--c-str); }
+.c-semi    { color: var(--c-semi); }
+.c-struct  { color: var(--c-struct); }
+.c-sigil   { color: var(--c-sigil); }
+.c-type    { color: var(--c-type); font-weight: 500; }
+.c-param   { color: var(--c-param); }
+
+/* Hero annotation unfold animation */
 .ann-appear {
   display: inline-block;
   overflow: hidden;
@@ -297,13 +410,13 @@ nav {
   opacity: 0;
   white-space: nowrap;
   vertical-align: middle;
-  animation: ann-unfold 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: ann-unfold 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 .ann-appear:nth-child(1)  { animation-delay: 0.8s; }
-.ann-appear:nth-child(2)  { animation-delay: 1.4s; }
-.ann-appear:nth-child(3)  { animation-delay: 2.0s; }
-.ann-appear:nth-child(4)  { animation-delay: 2.6s; }
-.ann-appear:nth-child(5)  { animation-delay: 3.2s; }
+.ann-appear:nth-child(2)  { animation-delay: 1.5s; }
+.ann-appear:nth-child(3)  { animation-delay: 2.2s; }
+.ann-appear:nth-child(4)  { animation-delay: 2.9s; }
+.ann-appear:nth-child(5)  { animation-delay: 3.6s; }
 
 @keyframes ann-unfold {
   from { max-width: 0; opacity: 0; }
@@ -319,20 +432,20 @@ nav {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   color: var(--text3);
   font-family: var(--mono);
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  animation: float 2s ease-in-out infinite;
+  animation: float 2.2s ease-in-out infinite;
 }
 .scroll-hint::after {
   content: '';
   display: block;
   width: 1px;
-  height: 40px;
-  background: linear-gradient(var(--amber), transparent);
+  height: 36px;
+  background: linear-gradient(var(--blue2), transparent);
 }
 @keyframes float {
   0%,100% { transform: translateX(-50%) translateY(0); }
@@ -341,87 +454,80 @@ nav {
 
 /* ── STAT BAR ── */
 .stat-bar {
-  position: relative;
-  z-index: 1;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  background: var(--bg2);
+  background: var(--sidebar-bg);
+  position: relative; z-index: 1;
 }
 .stat-inner {
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  divide: var(--border);
 }
 .stat-item {
-  padding: 1.75rem 2.5rem;
+  padding: 1.5rem 2rem;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
 .stat-item:last-child { border-right: none; }
 .stat-num {
-  font-family: var(--serif);
-  font-size: 2.2rem;
-  font-weight: 300;
-  color: var(--amber2);
+  font-family: var(--mono);
+  font-size: 1.9rem;
+  font-weight: 400;
+  color: var(--blue);
   line-height: 1;
 }
 .stat-label {
   font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text3);
 }
 
 /* ── SECTIONS ── */
-section {
-  position: relative;
-  z-index: 1;
-}
+section { position: relative; z-index: 1; }
 
 .section-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 6rem 3rem;
+  padding: 5.5rem 3rem;
 }
 
 .section-label {
   font-family: var(--mono);
   font-size: 0.68rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--amber);
+  letter-spacing: 0.04em;
+  color: var(--text3);
   margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.4rem;
 }
-.section-label::before {
-  content: '';
-  display: block;
-  width: 16px;
-  height: 1px;
-  background: var(--amber);
-}
+.section-label::before { content: '>_'; color: var(--blue2); }
 
 .section-h2 {
-  font-family: var(--serif);
-  font-size: clamp(2rem, 3.5vw, 3.2rem);
-  font-weight: 300;
-  line-height: 1.1;
+  font-family: var(--mono);
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.15;
   color: var(--text);
   margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
 }
-.section-h2 em { font-style: italic; color: var(--amber2); }
+.section-h2 em {
+  font-style: normal;
+  color: var(--blue);
+}
 
 .section-p {
-  font-size: 1.05rem;
+  font-size: 1rem;
+  font-weight: 300;
   color: var(--text2);
-  line-height: 1.75;
+  line-height: 1.8;
   max-width: 640px;
 }
 
@@ -432,44 +538,41 @@ section {
   gap: 5rem;
   align-items: start;
 }
-.philosophy-left {}
-.philosophy-right {
-  padding-top: 3rem;
-}
+.philosophy-right { padding-top: 2.5rem; }
 
 .philosophy-quote {
-  font-family: var(--serif);
-  font-size: 1.45rem;
+  font-family: var(--sans);
+  font-size: 1.1rem;
   font-weight: 300;
   font-style: italic;
   color: var(--text2);
-  line-height: 1.55;
-  border-left: 2px solid var(--amber);
-  padding-left: 1.75rem;
+  line-height: 1.65;
+  border-left: 2px solid var(--blue2);
+  padding-left: 1.5rem;
   margin-bottom: 2.5rem;
+  background: rgba(0,122,204,0.03);
+  padding: 1rem 1.5rem;
 }
 
-.philosophy-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
+.philosophy-cards { display: flex; flex-direction: column; gap: 1px; }
+
 .phil-card {
-  background: var(--bg2);
+  background: var(--sidebar-bg);
   border: 1px solid var(--border);
-  padding: 1.5rem 1.75rem;
+  padding: 1.25rem 1.5rem;
   display: flex;
   gap: 1.25rem;
   align-items: flex-start;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s, background 0.15s;
 }
-.phil-card:hover { border-color: var(--border2); }
+.phil-card:hover { border-color: var(--border-hi); background: #2a2a2b; }
 
 .phil-icon {
   font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--teal);
-  border: 1px solid var(--teal2);
+  font-size: 0.68rem;
+  color: var(--blue);
+  border: 1px solid rgba(0,122,204,0.4);
+  background: rgba(0,122,204,0.06);
   padding: 0.2rem 0.5rem;
   flex-shrink: 0;
   margin-top: 0.1rem;
@@ -481,19 +584,22 @@ section {
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--text);
-  margin-bottom: 0.35rem;
-  letter-spacing: 0.02em;
+  margin-bottom: 0.3rem;
 }
 .phil-desc {
   font-size: 0.85rem;
+  font-weight: 300;
   color: var(--text3);
   line-height: 1.6;
 }
+.phil-desc code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--cyan);
+}
 
 /* ── COMPARISON ── */
-#comparison {
-  border-top: 1px solid var(--border);
-}
+#comparison { border-top: 1px solid var(--border); }
 
 .comparison-table {
   width: 100%;
@@ -501,244 +607,258 @@ section {
   margin-top: 3rem;
   font-size: 0.88rem;
 }
-
 .comparison-table th {
   font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   text-align: left;
-  padding: 0.75rem 1.25rem;
+  padding: 0.65rem 1.25rem;
   border-bottom: 1px solid var(--border);
   font-weight: 400;
+  background: var(--sidebar-bg);
 }
 .comparison-table th.col-bvn {
-  color: var(--amber);
-  border-bottom-color: var(--amber3);
+  color: var(--blue);
+  border-bottom-color: var(--blue2);
 }
-
 .comparison-table td {
-  padding: 1rem 1.25rem;
+  padding: 0.85rem 1.25rem;
   border-bottom: 1px solid var(--border);
   color: var(--text2);
   vertical-align: middle;
 }
-
 .comparison-table td:first-child {
   font-family: var(--mono);
   color: var(--text);
   font-size: 0.82rem;
 }
+.comparison-table td.col-bvn { background: rgba(0,122,204,0.03); }
+.comparison-table tr:hover td { background: rgba(255,255,255,0.018); }
+.comparison-table tr:hover td.col-bvn { background: rgba(0,122,204,0.06); }
 
-.comparison-table td.col-bvn {
-  background: rgba(212, 137, 10, 0.04);
-}
-
-.comparison-table tr:hover td { background: rgba(255,255,255,0.02); }
-.comparison-table tr:hover td.col-bvn { background: rgba(212, 137, 10, 0.07); }
-
-.check { color: var(--green); font-weight: 500; }
-.cross { color: var(--red); }
-.partial { color: var(--text3); }
+.check   { color: var(--teal); font-weight: 500; }
+.cross   { color: var(--red); }
+.partial { color: var(--text3); font-style: italic; }
 
 /* ── SYNTAX ── */
 #syntax {
   border-top: 1px solid var(--border);
-  background: var(--bg2);
+  background: var(--sidebar-bg);
 }
 
 .syntax-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  margin-top: 3.5rem;
+  gap: 2px;
+  margin-top: 3rem;
 }
 
 .syntax-card {
   border: 1px solid var(--border);
   overflow: hidden;
+  background: var(--editor-bg);
 }
 
 .syntax-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1.25rem;
-  background: var(--bg3);
+  padding: 0.6rem 1rem;
+  background: var(--panel-bg);
   border-bottom: 1px solid var(--border);
 }
 .syntax-card-title {
   font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text2);
 }
 .syntax-card-tag {
   font-family: var(--mono);
-  font-size: 0.65rem;
-  color: var(--amber);
-  letter-spacing: 0.05em;
+  font-size: 0.62rem;
+  color: var(--teal);
+  letter-spacing: 0.04em;
 }
 
 .syntax-card-body {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   font-family: var(--mono);
-  font-size: 0.8rem;
-  line-height: 2.1;
+  font-size: 0.78rem;
+  line-height: 2;
   white-space: pre;
   overflow-x: auto;
 }
 
 .syntax-desc {
-  margin-top: 3rem;
+  margin-top: 2px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
+  gap: 2px;
 }
 
 .syntax-def {
-  background: var(--bg3);
+  background: var(--editor-bg);
   border: 1px solid var(--border);
-  padding: 1.5rem;
+  padding: 1.25rem;
 }
 .syntax-def-key {
   font-family: var(--mono);
-  font-size: 0.8rem;
-  color: var(--teal);
-  margin-bottom: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--c-ann);
+  margin-bottom: 0.35rem;
 }
 .syntax-def-val {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   color: var(--text3);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .syntax-def-text {
   font-size: 0.82rem;
+  font-weight: 300;
   color: var(--text2);
   line-height: 1.55;
 }
 
 /* ── FEATURES ── */
-#features {
-  border-top: 1px solid var(--border);
-}
+#features { border-top: 1px solid var(--border); }
 
 .features-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  margin-top: 3.5rem;
-  border: 1px solid var(--border);
+  margin-top: 3rem;
+  background: var(--border);
 }
 
 .feature-card {
-  background: var(--bg);
-  padding: 2rem 1.75rem;
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  transition: background 0.2s;
+  background: var(--editor-bg);
+  padding: 1.75rem;
+  transition: background 0.15s;
   position: relative;
   overflow: hidden;
 }
-.feature-card:hover { background: var(--bg2); }
+.feature-card:hover { background: #232323; }
 .feature-card::before {
   content: attr(data-n);
   position: absolute;
-  bottom: -0.5rem;
-  right: 1rem;
-  font-family: var(--serif);
-  font-size: 7rem;
-  font-weight: 300;
-  color: var(--border);
+  bottom: -0.75rem;
+  right: 0.75rem;
+  font-family: var(--mono);
+  font-size: 6rem;
+  font-weight: 500;
+  color: rgba(62,62,66,0.45);
   line-height: 1;
   pointer-events: none;
-  transition: color 0.3s;
+  transition: color 0.2s;
 }
-.feature-card:hover::before { color: var(--bg3); }
+.feature-card:hover::before { color: rgba(86,156,214,0.08); }
 
 .feature-tag {
   font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--teal);
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .feature-title {
-  font-family: var(--serif);
-  font-size: 1.45rem;
-  font-weight: 300;
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  font-weight: 500;
   color: var(--text);
-  line-height: 1.2;
-  margin-bottom: 0.75rem;
+  line-height: 1.25;
+  margin-bottom: 0.65rem;
 }
 
 .feature-desc {
   font-size: 0.85rem;
+  font-weight: 300;
   color: var(--text3);
   line-height: 1.65;
 }
+.feature-desc code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--cyan);
+}
 
 .feature-example {
-  margin-top: 1.25rem;
+  margin-top: 1.1rem;
   font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--amber2);
-  padding: 0.6rem 0.75rem;
-  background: rgba(212, 137, 10, 0.06);
-  border-left: 2px solid var(--amber3);
+  font-size: 0.73rem;
+  color: var(--text);
+  padding: 0.6rem 0.85rem;
+  background: rgba(0,0,0,0.18);
+  border-left: 2px solid var(--border);
   white-space: pre-wrap;
-  overflow-wrap: break-word;
   word-break: break-all;
   line-height: 1.8;
   overflow: hidden;
 }
 
+/* C language token colors */
+.cl-kw   { color: #569cd6; }
+.cl-type { color: #4ec9b0; }
+.cl-fn   { color: #dcdcaa; }
+.cl-str  { color: #ce9178; }
+.cl-num  { color: #b5cea8; }
+.cl-inc  { color: #c695dc; font-style: italic; }
+.cl-var  { color: #9cdcfe; }
+.cl-pp   { color: #c695dc; }
+.cl-op   { color: #d4d4d4; }
+/* Python token colors */
+.py-kw   { color: #569cd6; }
+.py-fn   { color: #dcdcaa; }
+.py-str  { color: #ce9178; }
+.py-num  { color: #b5cea8; }
+.py-bi   { color: #4ec9b0; }
+/* Shell token colors */
+.sh-cmd  { color: #dcdcaa; }
+.sh-flag { color: #9cdcfe; }
+.sh-var  { color: #9cdcfe; }
+
 /* ── QUICKSTART ── */
 #quickstart {
   border-top: 1px solid var(--border);
-  background: var(--bg2);
+  background: var(--sidebar-bg);
 }
 
 .quickstart-tabs {
   display: flex;
-  gap: 0;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0;
+  background: var(--tabbar-bg);
 }
 
 .qs-tab {
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 400;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   color: var(--text3);
-  padding: 0.75rem 1.75rem;
-  border: 1px solid transparent;
-  border-bottom: none;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-bottom: 2px solid transparent;
   background: transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
   margin-bottom: -1px;
-  position: relative;
 }
 .qs-tab.active {
-  color: var(--amber);
-  background: var(--bg2);
-  border-color: var(--border);
-  border-bottom-color: var(--bg2);
+  color: var(--text);
+  border-bottom-color: var(--blue2);
+  background: var(--sidebar-bg);
 }
-.qs-tab:not(.active):hover { color: var(--text2); }
+.qs-tab:not(.active):hover { color: var(--text2); background: rgba(255,255,255,0.03); }
 
-.qs-pane {
-  display: none;
-  border: 1px solid var(--border);
-  border-top: none;
-}
+.qs-pane { display: none; border: 1px solid var(--border); border-top: none; }
 .qs-pane.active { display: block; }
 
 .qs-pane-inner {
@@ -754,109 +874,116 @@ section {
 .qs-step:last-child { border-right: none; }
 
 .qs-step-num {
-  font-family: var(--serif);
-  font-size: 3rem;
+  font-family: var(--mono);
+  font-size: 2rem;
   font-weight: 300;
-  color: var(--border2);
+  color: var(--border);
   line-height: 1;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 
 .qs-step-title {
   font-family: var(--sans);
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 500;
   color: var(--text);
-  margin-bottom: 0.5rem;
-  letter-spacing: 0.02em;
+  margin-bottom: 0.45rem;
 }
 
 .qs-step-desc {
   font-size: 0.82rem;
+  font-weight: 300;
   color: var(--text3);
   margin-bottom: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
+}
+.qs-step-desc code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  color: var(--cyan);
 }
 
 .code-block {
   font-family: var(--mono);
-  font-size: 0.78rem;
-  background: var(--bg);
+  font-size: 0.76rem;
+  background: var(--editor-bg);
   border: 1px solid var(--border);
-  padding: 1.25rem;
+  border-left: 2px solid var(--blue2);
+  padding: 1.1rem 1.25rem;
   line-height: 1.9;
   overflow-x: auto;
   white-space: pre;
 }
 
 /* ── USE CASES ── */
-#usecases {
-  border-top: 1px solid var(--border);
-}
+#usecases { border-top: 1px solid var(--border); }
 
 .usecases-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  margin-top: 3.5rem;
+  gap: 1px;
+  margin-top: 3rem;
+  background: var(--border);
 }
 
 .usecase-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  padding: 2rem;
+  background: var(--editor-bg);
+  padding: 1.75rem;
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
   align-items: flex-start;
-  transition: border-color 0.2s;
-  position: relative;
-  overflow: hidden;
+  transition: background 0.15s;
 }
-.usecase-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, transparent 60%, rgba(212,137,10,0.04));
-  pointer-events: none;
-}
-.usecase-card:hover { border-color: var(--border2); }
+.usecase-card:hover { background: #232323; }
 
 .usecase-num {
-  font-family: var(--serif);
-  font-size: 2.8rem;
-  font-weight: 300;
-  color: var(--border2);
-  line-height: 1;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--blue2);
+  border: 1px solid rgba(0,122,204,0.3);
+  padding: 0.15rem 0.4rem;
   flex-shrink: 0;
+  margin-top: 0.15rem;
+  background: rgba(0,122,204,0.05);
 }
 
 .usecase-title {
-  font-family: var(--serif);
-  font-size: 1.2rem;
-  font-weight: 300;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 500;
   color: var(--text);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 .usecase-desc {
   font-size: 0.85rem;
+  font-weight: 300;
   color: var(--text3);
   line-height: 1.65;
 }
-.usecase-example {
-  margin-top: 0.75rem;
+.usecase-desc code {
   font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--teal);
-  opacity: 0.9;
+  font-size: 0.82em;
+  color: var(--cyan);
+}
+.usecase-example {
+  margin-top: 0.65rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  background: rgba(0,0,0,0.18);
+  border-left: 2px solid var(--border);
+  white-space: pre-wrap;
+  line-height: 1.8;
 }
 
 /* ── CONFORMANCE BAR ── */
 .conformance-bar {
-  position: relative;
-  z-index: 1;
+  position: relative; z-index: 1;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  background: var(--bg3);
+  background: var(--panel-bg);
 }
 .conformance-inner {
   max-width: 1200px;
@@ -874,110 +1001,111 @@ section {
   gap: 0.75rem;
 }
 .conf-icon {
-  font-size: 1.1rem;
-  color: var(--amber);
+  font-size: 1rem;
+  color: var(--teal);
   flex-shrink: 0;
   width: 1.5rem;
   text-align: center;
+  font-family: var(--mono);
 }
 .conf-title {
   font-family: var(--sans);
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text);
-  letter-spacing: 0.01em;
 }
 .conf-sub {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--text3);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   margin-top: 0.1rem;
 }
 .conf-cta {
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 400;
-  letter-spacing: 0.04em;
-  color: var(--amber);
+  letter-spacing: 0.03em;
+  color: var(--blue);
   text-decoration: none;
-  border: 1px solid var(--amber3);
-  padding: 0.5rem 1rem;
+  border: 1px solid rgba(0,122,204,0.35);
+  padding: 0.45rem 1rem;
   white-space: nowrap;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.15s, border-color 0.15s;
   flex-shrink: 0;
 }
-.conf-cta:hover { background: rgba(212,137,10,0.1); border-color: var(--amber); }
+.conf-cta:hover { background: rgba(0,122,204,0.1); border-color: var(--blue2); color: var(--blue2); }
 
-/* ── DOCS SECTION ── */
+/* ── DOCS ── */
 #docs {
   border-top: 1px solid var(--border);
-  background: var(--bg2);
+  background: var(--sidebar-bg);
 }
 .docs-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
-  margin-top: 3.5rem;
-  border: 1px solid var(--border);
+  margin-top: 3rem;
+  background: var(--border);
 }
 .doc-card {
   display: flex;
-  gap: 1rem;
-  padding: 1.75rem 1.5rem;
-  background: var(--bg2);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  gap: 0.85rem;
+  padding: 1.5rem;
+  background: var(--sidebar-bg);
   text-decoration: none;
-  transition: background 0.2s;
+  transition: background 0.15s;
   cursor: pointer;
+  border-top: 2px solid transparent;
 }
-.doc-card:hover { background: var(--bg3); }
+.doc-card:hover {
+  background: var(--panel-bg);
+  border-top-color: var(--blue2);
+}
 .doc-card-num {
   font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--border2);
+  font-size: 0.68rem;
+  color: var(--text3);
   flex-shrink: 0;
-  padding-top: 0.1rem;
-  letter-spacing: 0.05em;
+  padding-top: 0.15rem;
+  letter-spacing: 0.04em;
 }
 .doc-card-title {
   font-family: var(--sans);
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--text);
-  margin-bottom: 0.5rem;
-  letter-spacing: 0.01em;
-  transition: color 0.2s;
+  margin-bottom: 0.4rem;
+  transition: color 0.15s;
 }
-.doc-card:hover .doc-card-title { color: var(--amber); }
+.doc-card:hover .doc-card-title { color: var(--blue); }
 .doc-card-desc {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 300;
   color: var(--text3);
   line-height: 1.6;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 .doc-card-desc code {
   font-family: var(--mono);
-  font-size: 0.78em;
-  color: var(--teal);
+  font-size: 0.82em;
+  color: var(--cyan);
 }
 .doc-card-tag {
   font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--teal2);
+  color: var(--teal);
 }
 
 /* ── FOOTER ── */
-footer {
-  position: relative;
-  z-index: 1;
-  border-top: 1px solid var(--border);
-  background: var(--bg2);
-}
+footer { position: relative; z-index: 1; }
 
+.footer-main {
+  background: var(--sidebar-bg);
+  border-top: 1px solid var(--border);
+}
 .footer-inner {
   max-width: 1200px;
   margin: 0 auto;
@@ -989,21 +1117,22 @@ footer {
 
 .footer-brand-name {
   font-family: var(--mono);
-  font-size: 1.1rem;
-  color: var(--amber);
+  font-size: 1rem;
+  color: var(--blue);
   font-weight: 500;
   letter-spacing: 0.08em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
 }
 .footer-brand-sub {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text3);
-  margin-bottom: 1.25rem;
-  letter-spacing: 0.05em;
+  margin-bottom: 1.1rem;
+  letter-spacing: 0.04em;
 }
 .footer-desc {
   font-size: 0.85rem;
+  font-weight: 300;
   color: var(--text3);
   line-height: 1.65;
   max-width: 300px;
@@ -1011,80 +1140,57 @@ footer {
 
 .footer-col-title {
   font-family: var(--mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.15em;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text3);
   margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--border);
 }
-
-.footer-links {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
 .footer-links a {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 300;
   color: var(--text3);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.15s;
 }
-.footer-links a:hover { color: var(--amber); }
+.footer-links a:hover { color: var(--blue); }
 
-.footer-bottom {
-  border-top: 1px solid var(--border);
-  padding: 1.25rem 3rem;
-  max-width: 1200px;
-  margin: 0 auto;
+/* VSCode status bar footer strip */
+.vs-statusbar {
+  height: 22px;
+  background: var(--statusbar);
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.footer-copy {
+  padding: 0 1rem;
   font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--text3);
-  letter-spacing: 0.05em;
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: 0.04em;
 }
-.footer-spec {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--border2);
-  letter-spacing: 0.05em;
-}
-
-/* ── ANIMATED COUNTER ── */
-.count-up { display: inline-block; }
+.vsb-left, .vsb-right { display: flex; align-items: center; gap: 0.5rem; }
+.vsb-item { padding: 0 0.35rem; height: 22px; display: flex; align-items: center; }
+.vsb-item:hover { background: rgba(255,255,255,0.12); cursor: default; }
+.vsb-source { background: rgba(0,0,0,0.15); }
+.vsb-divider { width: 1px; height: 14px; background: rgba(255,255,255,0.2); }
 
 /* ── SCROLL REVEAL ── */
 .reveal {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
 }
-.reveal.visible {
-  opacity: 1;
-  transform: none;
-}
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
-.reveal-delay-4 { transition-delay: 0.4s; }
-.reveal-delay-5 { transition-delay: 0.5s; }
+.reveal.visible { opacity: 1; transform: none; }
+.reveal-delay-1 { transition-delay: 0.08s; }
+.reveal-delay-2 { transition-delay: 0.16s; }
+.reveal-delay-3 { transition-delay: 0.24s; }
+.reveal-delay-4 { transition-delay: 0.32s; }
+.reveal-delay-5 { transition-delay: 0.40s; }
 
-/* ── AMBER LINE DECORATION ── */
-.amber-line {
-  display: block;
-  width: 48px;
-  height: 2px;
-  background: var(--amber);
-  margin-bottom: 2rem;
-}
-
-/* ── DIVIDER ── */
+/* ── SECTION DIVIDER ── */
 .section-divider {
   display: flex;
   align-items: center;
@@ -1092,8 +1198,8 @@ footer {
   margin: 2rem 0;
   color: var(--text3);
   font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
 }
 .section-divider::before, .section-divider::after {
   content: '';
@@ -1102,45 +1208,19 @@ footer {
   background: var(--border);
 }
 
-/* ── RESPONSIVE ── */
-@media (max-width: 900px) {
-  nav { padding: 0 1.5rem; }
-  .nav-links { gap: 1.5rem; }
-
-  .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-  .hero-right { display: none; }
-  .section-inner { padding: 4rem 1.5rem; }
-  #philosophy .section-inner { grid-template-columns: 1fr; gap: 2.5rem; }
-  .syntax-grid { grid-template-columns: 1fr; }
-  .syntax-desc { grid-template-columns: 1fr; }
-  .features-grid { grid-template-columns: 1fr; }
-  .qs-pane-inner { grid-template-columns: 1fr; }
-  .usecases-grid { grid-template-columns: 1fr; }
-  .docs-grid { grid-template-columns: repeat(2, 1fr); }
-  .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
-  .stat-inner { grid-template-columns: repeat(3, 1fr); }
-  .footer-inner { grid-template-columns: 1fr 1fr; }
-  .comparison-table { font-size: 0.78rem; }
-}
-
 /* ══════════════════════════════════════════════
    DOC OVERLAY
 ══════════════════════════════════════════════ */
-
 #doc-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(4, 7, 9, 0.72);
-  backdrop-filter: blur(4px);
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(3px);
   z-index: 200;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.3s ease;
 }
-#doc-scrim.open {
-  opacity: 1;
-  pointer-events: all;
-}
+#doc-scrim.open { opacity: 1; pointer-events: all; }
 
 #doc-drawer {
   position: fixed;
@@ -1149,83 +1229,67 @@ footer {
   z-index: 201;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--editor-bg);
   border-left: 1px solid var(--border);
   transform: translateX(100%);
-  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
-#doc-drawer.open {
-  transform: translateX(0);
-}
+#doc-drawer.open { transform: translateX(0); }
 
-/* drawer top bar */
 #doc-topbar {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0 1.75rem;
-  height: 56px;
+  gap: 0.75rem;
+  padding: 0 1.25rem;
+  height: 48px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
-  background: var(--bg2);
-  position: relative;
+  background: var(--sidebar-bg);
 }
-#doc-topbar::before {
+#doc-topbar::after {
   content: '';
   position: absolute;
   bottom: -1px; left: 0;
-  width: 60px; height: 2px;
-  background: linear-gradient(90deg, var(--amber), transparent);
+  width: 48px; height: 2px;
+  background: var(--blue2);
 }
 .doc-brand {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
-  color: var(--amber);
+  letter-spacing: 0.12em;
+  color: var(--blue);
   flex-shrink: 0;
 }
-.doc-sep {
-  width: 1px; height: 16px;
-  background: var(--border2);
-  flex-shrink: 0;
-}
+.doc-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
 #doc-title {
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--text2);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 #doc-close {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text3);
   cursor: pointer;
-  font-size: 1rem;
-  flex-shrink: 0;
-  transition: border-color 0.2s, color 0.2s;
   font-family: var(--mono);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
   line-height: 1;
 }
-#doc-close:hover { border-color: var(--amber); color: var(--amber); }
+#doc-close:hover { border-color: var(--red); color: var(--red); background: rgba(244,71,71,0.06); }
 
-/* drawer body */
-#doc-body {
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
+#doc-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
 
-/* loading state */
 #doc-loading {
   display: flex;
   flex-direction: column;
@@ -1235,18 +1299,17 @@ footer {
   padding: 4rem;
   color: var(--text3);
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 .doc-spinner {
-  width: 20px; height: 20px;
-  border: 1px solid var(--border2);
-  border-top-color: var(--amber);
+  width: 18px; height: 18px;
+  border: 1px solid var(--border);
+  border-top-color: var(--blue2);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.75s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* error state */
 #doc-error {
   display: none;
   flex-direction: column;
@@ -1256,66 +1319,59 @@ footer {
   padding: 4rem;
   color: var(--text3);
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   text-align: center;
 }
-#doc-error a {
-  color: var(--amber);
-  text-decoration: none;
-}
+#doc-error a { color: var(--blue); text-decoration: none; }
 #doc-error a:hover { text-decoration: underline; }
 
-/* main content area */
 #doc-content-wrap {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 2.5rem 3rem 4rem;
   scrollbar-width: thin;
-  scrollbar-color: var(--border2) transparent;
+  scrollbar-color: #4e4e4e var(--editor-bg);
 }
-#doc-content-wrap::-webkit-scrollbar { width: 5px; }
-#doc-content-wrap::-webkit-scrollbar-thumb { background: var(--border2); }
 
-/* markdown rendered styles */
 #doc-content {
   max-width: 760px;
   color: var(--text2);
   font-family: var(--sans);
   font-size: 0.95rem;
   font-weight: 300;
-  line-height: 1.75;
+  line-height: 1.78;
 }
 
 #doc-content h1 {
-  font-family: var(--serif);
-  font-size: 2.4rem;
-  font-weight: 300;
+  font-family: var(--mono);
+  font-size: 1.8rem;
+  font-weight: 400;
   color: var(--text);
-  line-height: 1.1;
+  line-height: 1.15;
   margin: 0 0 0.5rem;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
   border-bottom: 1px solid var(--border);
+  letter-spacing: -0.01em;
 }
 
 #doc-content h2 {
-  font-family: var(--serif);
-  font-size: 1.55rem;
-  font-weight: 300;
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  font-weight: 400;
   color: var(--text);
-  line-height: 1.2;
-  margin: 2.5rem 0 0.75rem;
-  padding-top: 0.5rem;
+  margin: 2.25rem 0 0.65rem;
   scroll-margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 #doc-content h2::before {
   content: '##';
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  color: var(--amber);
-  letter-spacing: 0.1em;
-  display: block;
-  margin-bottom: 0.25rem;
+  font-size: 0.62rem;
+  color: var(--blue2);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
 }
 
 #doc-content h3 {
@@ -1323,17 +1379,16 @@ footer {
   font-size: 0.92rem;
   font-weight: 500;
   color: var(--text);
-  letter-spacing: 0.03em;
-  margin: 1.75rem 0 0.5rem;
+  margin: 1.65rem 0 0.45rem;
   scroll-margin-top: 1rem;
 }
 #doc-content h3::before {
   content: '###';
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   color: var(--teal);
-  letter-spacing: 0.1em;
-  margin-right: 0.5rem;
+  letter-spacing: 0.08em;
+  margin-right: 0.4rem;
 }
 
 #doc-content h4 {
@@ -1341,18 +1396,18 @@ footer {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text2);
-  margin: 1.5rem 0 0.4rem;
+  margin: 1.4rem 0 0.35rem;
 }
 
 #doc-content p { margin: 0 0 1rem; }
 
 #doc-content a {
-  color: var(--amber);
+  color: var(--blue);
   text-decoration: none;
-  border-bottom: 1px solid var(--amber3);
-  transition: border-color 0.2s;
+  border-bottom: 1px solid rgba(86,156,214,0.35);
+  transition: border-color 0.15s;
 }
-#doc-content a:hover { border-bottom-color: var(--amber); }
+#doc-content a:hover { border-bottom-color: var(--blue); }
 
 #doc-content strong { color: var(--text); font-weight: 500; }
 #doc-content em { color: var(--text2); font-style: italic; }
@@ -1360,25 +1415,22 @@ footer {
 #doc-content code {
   font-family: var(--mono);
   font-size: 0.82em;
-  color: var(--teal);
-  background: rgba(45, 191, 176, 0.07);
+  color: var(--cyan);
+  background: rgba(156,220,254,0.06);
   padding: 0.1em 0.4em;
-  border-radius: 0;
-  border: 1px solid rgba(45, 191, 176, 0.15);
+  border: 1px solid rgba(156,220,254,0.12);
 }
 
 #doc-content pre {
-  background: var(--bg2);
+  background: var(--sidebar-bg);
   border: 1px solid var(--border);
-  border-left: 2px solid var(--amber3);
-  padding: 1.25rem 1.5rem;
-  margin: 1.25rem 0 1.5rem;
+  border-left: 2px solid var(--blue2);
+  padding: 1.1rem 1.5rem;
+  margin: 1.1rem 0 1.35rem;
   overflow-x: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--border2) transparent;
+  scrollbar-color: #4e4e4e transparent;
 }
-#doc-content pre::-webkit-scrollbar { height: 4px; }
-#doc-content pre::-webkit-scrollbar-thumb { background: var(--border2); }
 
 #doc-content pre code {
   font-family: var(--mono);
@@ -1391,35 +1443,42 @@ footer {
   white-space: pre;
 }
 
-/* hljs overrides — keep site palette */
-.hljs-keyword    { color: var(--teal); }
-.hljs-built_in   { color: var(--teal2); }
-.hljs-string     { color: #B5936B; }
-.hljs-number     { color: var(--amber2); }
-.hljs-comment    { color: var(--text3); font-style: italic; }
-.hljs-title      { color: var(--text); }
-.hljs-type       { color: var(--teal); }
-.hljs-literal    { color: var(--amber); }
-.hljs-meta       { color: var(--text3); }
-.hljs-variable   { color: var(--text2); }
-.hljs-attr       { color: var(--amber2); }
-.hljs-symbol     { color: var(--green); }
+/* highlight.js VSCode Dark+ overrides */
+.hljs-keyword    { color: #569cd6; }
+.hljs-built_in   { color: #4ec9b0; }
+.hljs-string     { color: #ce9178; }
+.hljs-number     { color: #b5cea8; }
+.hljs-comment    { color: #6a9955; font-style: italic; }
+.hljs-title      { color: #dcdcaa; }
+.hljs-type       { color: #4ec9b0; }
+.hljs-literal    { color: #569cd6; }
+.hljs-meta       { color: #9e9e9e; }
+.hljs-variable   { color: #9cdcfe; }
+.hljs-attr       { color: #9cdcfe; }
+.hljs-symbol     { color: #b5cea8; }
+.hljs-function   { color: #dcdcaa; }
+.hljs-params     { color: #9cdcfe; }
+.hljs-operator   { color: #d4d4d4; }
+.hljs-property   { color: #9cdcfe; }
+.hljs-punctuation { color: #808080; }
+.hljs-subst      { color: #d4d4d4; }
+.hljs-section    { color: #569cd6; font-weight: 500; }
+.hljs-name       { color: #4ec9b0; }
 
 #doc-content ul, #doc-content ol {
-  padding-left: 1.5rem;
+  padding-left: 1.4rem;
   margin: 0 0 1rem;
 }
-#doc-content li { margin-bottom: 0.3rem; }
-#doc-content li > p { margin-bottom: 0.3rem; }
-#doc-content li::marker { color: var(--amber); font-family: var(--mono); }
+#doc-content li { margin-bottom: 0.25rem; }
+#doc-content li::marker { color: var(--blue); font-family: var(--mono); }
 
 #doc-content blockquote {
-  border-left: 2px solid var(--amber);
-  margin: 1.25rem 0;
-  padding: 0.75rem 1.25rem;
-  background: rgba(212, 137, 10, 0.04);
-  font-style: italic;
+  border-left: 2px solid var(--blue2);
+  margin: 1.1rem 0;
+  padding: 0.65rem 1.25rem;
+  background: rgba(0,122,204,0.04);
   color: var(--text2);
+  font-style: italic;
 }
 #doc-content blockquote p { margin: 0; }
 
@@ -1432,23 +1491,23 @@ footer {
 #doc-content table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1.25rem 0 1.5rem;
+  margin: 1.1rem 0 1.35rem;
   font-size: 0.85rem;
 }
 #doc-content th {
   font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   font-weight: 400;
   text-align: left;
-  padding: 0.6rem 1rem;
+  padding: 0.55rem 1rem;
   border-bottom: 1px solid var(--border);
-  background: var(--bg2);
+  background: var(--sidebar-bg);
 }
 #doc-content td {
-  padding: 0.7rem 1rem;
+  padding: 0.65rem 1rem;
   border-bottom: 1px solid var(--border);
   color: var(--text2);
   vertical-align: top;
@@ -1456,12 +1515,30 @@ footer {
 #doc-content td code { font-size: 0.78em; }
 #doc-content tr:hover td { background: rgba(255,255,255,0.015); }
 
-/* doc link styling on main page */
-a[data-doc] {
-  cursor: pointer;
-}
+a[data-doc] { cursor: pointer; }
 
+/* ── RESPONSIVE ── */
 @media (max-width: 900px) {
+  nav { padding: 0 1rem; }
+  .nav-links { gap: 0; }
+  .nav-links li:nth-child(n+4):not(:last-child) { display: none; }
+
+  .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .hero-right { display: none; }
+
+  .section-inner { padding: 4rem 1.5rem; }
+  #philosophy .section-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+  .syntax-grid { grid-template-columns: 1fr; }
+  .syntax-desc { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .qs-pane-inner { grid-template-columns: 1fr; }
+  .usecases-grid { grid-template-columns: 1fr; }
+  .docs-grid { grid-template-columns: repeat(2, 1fr); }
+  .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+  .stat-inner { grid-template-columns: repeat(3, 1fr); }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+  .comparison-table { font-size: 0.78rem; }
+
   #doc-drawer { width: 100vw; }
   #doc-content-wrap { padding: 1.5rem 1.25rem 3rem; }
 }
@@ -1491,7 +1568,13 @@ a[data-doc] {
 <section id="hero">
   <div class="hero-grid">
     <div class="hero-left">
-      <div class="hero-label">Spec v1.0 &mdash; MIT License &mdash; C99</div>
+      <div class="hero-label">
+        <span>spec-v1.0</span>
+        <span class="hl-sep">/</span>
+        <span>mit-license</span>
+        <span class="hl-sep">/</span>
+        <span>c99</span>
+      </div>
       <h1 class="hero-h1">The format that<br>knows <em>what it means.</em></h1>
       <p class="hero-sub">
         Every value in a Bovnar document carries its own type family,
@@ -1504,26 +1587,59 @@ a[data-doc] {
         <a href="#philosophy" class="btn-ghost">Read the Philosophy</a>
       </div>
     </div>
+
     <div class="hero-right">
-      <div class="code-panel">
-        <div class="code-panel-header">
-          <div class="code-dots">
-            <div class="code-dot d1"></div>
-            <div class="code-dot d2"></div>
-            <div class="code-dot d3"></div>
+      <div class="editor-window">
+        <div class="editor-titlebar">
+          <div class="editor-dots">
+            <div class="editor-dot ed1"></div>
+            <div class="editor-dot ed2"></div>
+            <div class="editor-dot ed3"></div>
           </div>
-          <div class="code-filename">telemetry.bvnr</div>
-          <div class="code-badge">self-describing</div>
+          <div class="editor-titlename">bovnar — telemetry.bvnr</div>
         </div>
-        <div class="code-body" id="hero-code">
-<span class="c-comment"># Every value carries its own meaning</span>
-<span class="c-key">.host</span>     <span class="c-eq">=</span> <span class="c-str">"api.sensors.io"</span><span class="c-semi">;</span>
-<span class="c-key">.port</span>     <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;uint:16&gt;</span> </span><span class="c-val">443</span><span class="c-semi">;</span>
-<span class="c-key">.timeout</span>  <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;float:64,</span><span class="c-unit">s</span><span class="c-ann">&gt;</span> </span><span class="c-val">2.5</span><span class="c-semi">;</span>
-<span class="c-key">.pressure</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;float:32,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> </span><span class="c-val">101.325</span><span class="c-semi">;</span>
-<span class="c-key">.velocity</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;float:64,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> </span><span class="c-val">9.81</span><span class="c-semi">;</span>
-<span class="c-key">.buffer</span>   <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;uint:64,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> </span><span class="c-val">16</span><span class="c-semi">;</span>
-<span class="c-key">.matrix</span>   <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]/[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
+        <div class="editor-tabbar">
+          <div class="editor-tab active">
+            <span class="tab-icon">◆</span>
+            <span>telemetry.bvnr</span>
+            <button class="tab-x" aria-label="close">×</button>
+          </div>
+        </div>
+        <div class="editor-breadcrumb">
+          <span>examples</span>
+          <span class="bc-sep">›</span>
+          <span class="bc-current">telemetry.bvnr</span>
+        </div>
+        <div class="editor-pane">
+          <div class="ln-gutter">
+            <div class="ln">1</div>
+            <div class="ln">2</div>
+            <div class="ln">3</div>
+            <div class="ln">4</div>
+            <div class="ln">5</div>
+            <div class="ln">6</div>
+            <div class="ln">7</div>
+            <div class="ln">8</div>
+          </div>
+          <div class="code-body" id="hero-code"><span class="c-comment"># Every value carries its own meaning</span>
+<span class="c-sigil">.</span><span class="c-key">host</span>     <span class="c-eq">=</span> <span class="c-str">"api.sensors.io"</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">port</span>     <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> </span><span class="c-val">443</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">timeout</span>  <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">s</span><span class="c-ann">&gt;</span> </span><span class="c-val">2.5</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">pressure</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> </span><span class="c-val">101.325</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">velocity</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> </span><span class="c-val">9.81</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">buffer</span>   <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> </span><span class="c-val">16</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">matrix</span>   <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
+        </div>
+        <div class="editor-statusline">
+          <div class="esl-left">
+            <span class="esl-badge">◈ BOVNAR</span>
+          </div>
+          <div class="esl-right">
+            <span>UTF-8</span>
+            <span>Ln 8, Col 1</span>
+            <span>self-describing</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1568,14 +1684,14 @@ a[data-doc] {
 <section id="philosophy">
   <div class="section-inner">
     <div class="philosophy-left">
-      <div class="section-label reveal">Design Philosophy</div>
+      <div class="section-label reveal">design-philosophy</div>
       <h2 class="section-h2 reveal reveal-delay-1"><em>Data that carries</em><br>its own interpretation.</h2>
       <p class="section-p reveal reveal-delay-2" style="margin-bottom:2rem;">
         The serialization landscape is defined by a quiet trade-off: ease of human reading, or
         precision of machine semantics — rarely both.
       </p>
       <blockquote class="philosophy-quote reveal reveal-delay-3">
-        "A bare <code style="font-size:1rem;color:var(--amber2)">9.81</code> could be meters per second, volts, or a dimensionless ratio. Bovnar makes that difference explicit."
+        "A bare <code style="font-family:var(--mono);color:var(--c-val)">9.81</code> could be meters per second, volts, or a dimensionless ratio. Bovnar makes that difference explicit."
       </blockquote>
       <p class="section-p reveal reveal-delay-4">
         Bovnar is not a replacement for JSON in simple REST APIs, nor for Protobuf in
@@ -1601,9 +1717,8 @@ a[data-doc] {
           <div>
             <div class="phil-title">Human-readable, machine-precise</div>
             <div class="phil-desc">
-              A <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">.bvnr</code> file
-              is UTF-8 prose you can read in any editor. The parser validates type annotations
-              on the fly, with no external toolchain required.
+              A <code>.bvnr</code> file is UTF-8 prose you can read in any editor. The parser validates
+              type annotations on the fly, with no external toolchain required.
             </div>
           </div>
         </div>
@@ -1612,7 +1727,7 @@ a[data-doc] {
           <div>
             <div class="phil-title">Optional typing with well-defined defaults</div>
             <div class="phil-desc">
-              Omit annotations and get sensible defaults (<code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">uint:64</code>, <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">float:64</code>).
+              Omit annotations and get sensible defaults (<code>uint:64</code>, <code>float:64</code>).
               Add them and the parser validates on the fly. Both modes produce correct, unambiguous output.
             </div>
           </div>
@@ -1623,8 +1738,7 @@ a[data-doc] {
             <div class="phil-title">Precision is a requirement, not a feature</div>
             <div class="phil-desc">
               Physical units are a first-class citizen of the format. Compound units like
-              <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">k~g·m/s²</code> and
-              <code style="font-family:var(--mono);font-size:0.82em;color:var(--teal)">Gi~B</code> are
+              <code>k~g·m/s²</code> and <code>Gi~B</code> are
               written inline. The format enforces dimensional correctness.
             </div>
           </div>
@@ -1639,7 +1753,7 @@ a[data-doc] {
 ══════════════════════════════════════════════ -->
 <section id="comparison">
   <div class="section-inner">
-    <div class="section-label reveal">Landscape</div>
+    <div class="section-label reveal">landscape</div>
     <h2 class="section-h2 reveal reveal-delay-1">Where Bovnar <em>fits.</em></h2>
     <p class="section-p reveal reveal-delay-2">
       Every format is a set of trade-offs. Bovnar's are deliberate.
@@ -1709,15 +1823,15 @@ a[data-doc] {
           <td class="col-bvn"></td>
         </tr>
         <tr>
-          <td style="color:var(--amber);font-weight:500">BOVNAR</td>
+          <td style="color:var(--blue);font-family:var(--mono);font-size:0.82rem;">BOVNAR</td>
           <td class="check">✓</td>
           <td class="check">✓</td>
           <td class="check">✓</td>
           <td class="check">✓</td>
           <td class="check">✓</td>
           <td class="check">✓</td>
-          <td class="col-bvn" style="background:rgba(212,137,10,0.1);">
-            <span style="color:var(--amber);font-family:var(--mono);font-size:0.75rem;">all six</span>
+          <td class="col-bvn" style="background:rgba(0,122,204,0.1);">
+            <span style="color:var(--blue);font-family:var(--mono);font-size:0.72rem;">all six</span>
           </td>
         </tr>
       </tbody>
@@ -1730,7 +1844,7 @@ a[data-doc] {
 ══════════════════════════════════════════════ -->
 <section id="syntax">
   <div class="section-inner">
-    <div class="section-label reveal">Syntax</div>
+    <div class="section-label reveal">syntax</div>
     <h2 class="section-h2 reveal reveal-delay-1">The grammar of <em>precision.</em></h2>
     <p class="section-p reveal reveal-delay-2">
       Every assignment is a declaration. The type annotation is not metadata —
@@ -1744,15 +1858,15 @@ a[data-doc] {
           <div class="syntax-card-tag">type · width · unit</div>
         </div>
         <div class="syntax-card-body"><span class="c-comment"># Integers</span>
-<span class="c-key">.port</span>   = <span class="c-ann">&lt;uint:16&gt;</span> <span class="c-val">443</span>;
-<span class="c-key">.offset</span> = <span class="c-ann">&lt;sint:64&gt;</span> <span class="c-val">-2147483648</span>;
-<span class="c-key">.flags</span>  = <span class="c-ann">&lt;uint:32,_2&gt;</span> <span class="c-val">11001010</span>;
+<span class="c-sigil">.</span><span class="c-key">port</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">offset</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">sint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-ann">&gt;</span> <span class="c-val">-2147483648</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">flags</span>  <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_2</span><span class="c-ann">&gt;</span> <span class="c-val">11001010</span><span class="c-semi">;</span>
 
 <span class="c-comment"># Floats with SI units</span>
-<span class="c-key">.temp</span>    = <span class="c-ann">&lt;float:32,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span>  <span class="c-val">36.6</span>;
-<span class="c-key">.speed</span>   = <span class="c-ann">&lt;float:64,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> <span class="c-val">9.81</span>;
-<span class="c-key">.force</span>   = <span class="c-ann">&lt;float:64,</span><span class="c-unit">k~g·m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span>;
-<span class="c-key">.buffer</span>  = <span class="c-ann">&lt;uint:64,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> <span class="c-val">16</span>;</div>
+<span class="c-sigil">.</span><span class="c-key">temp</span>    <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span>  <span class="c-val">36.6</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">speed</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> <span class="c-val">9.81</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">force</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g·m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">buffer</span>  <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> <span class="c-val">16</span><span class="c-semi">;</span></div>
       </div>
       <div class="syntax-card reveal reveal-delay-1">
         <div class="syntax-card-header">
@@ -1760,16 +1874,16 @@ a[data-doc] {
           <div class="syntax-card-tag">nested · multidimensional</div>
         </div>
         <div class="syntax-card-body"><span class="c-comment"># Nested struct</span>
-<span class="c-key">.sensor</span> = {
-  <span class="c-key">.id</span>   = <span class="c-ann">&lt;uint:16&gt;</span> <span class="c-val">7</span>;
-  <span class="c-key">.name</span> = <span class="c-str">"pressure_01"</span>;
-  <span class="c-key">.val</span>  = <span class="c-ann">&lt;float:32,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> <span class="c-val">101.325</span>;
-};
+<span class="c-sigil">.</span><span class="c-key">sensor</span> <span class="c-eq">=</span> <span class="c-struct">{</span>
+  <span class="c-sigil">.</span><span class="c-key">id</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">7</span><span class="c-semi">;</span>
+  <span class="c-sigil">.</span><span class="c-key">name</span> <span class="c-eq">=</span> <span class="c-str">"pressure_01"</span><span class="c-semi">;</span>
+  <span class="c-sigil">.</span><span class="c-key">val</span>  <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> <span class="c-val">101.325</span><span class="c-semi">;</span>
+<span class="c-struct">}</span><span class="c-semi">;</span>
 
 <span class="c-comment"># 3×3 rotation matrix (rows separated by /)</span>
-<span class="c-key">.rotation</span> = <span class="c-struct">[</span><span class="c-val">1.0, 0.0, 0.0</span><span class="c-struct">]</span>/
-             <span class="c-struct">[</span><span class="c-val">0.0, 1.0, 0.0</span><span class="c-struct">]</span>/
-             <span class="c-struct">[</span><span class="c-val">0.0, 0.0, 1.0</span><span class="c-struct">]</span>;</div>
+<span class="c-sigil">.</span><span class="c-key">rotation</span> <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1.0, 0.0, 0.0</span><span class="c-struct">]</span><span class="c-semi">/</span>
+             <span class="c-struct">[</span><span class="c-val">0.0, 1.0, 0.0</span><span class="c-struct">]</span><span class="c-semi">/</span>
+             <span class="c-struct">[</span><span class="c-val">0.0, 0.0, 1.0</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
       </div>
     </div>
 
@@ -1778,7 +1892,7 @@ a[data-doc] {
         <div class="syntax-def-key">&lt;family:width,unit&gt;</div>
         <div class="syntax-def-val">Type Annotation</div>
         <div class="syntax-def-text">
-          Six families: <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">uint sint float float_fix float_dec utf8</code>. Width in bits. Unit in SI notation. All are optional.
+          Six families: <span style="font-family:var(--mono);color:var(--cyan);font-size:0.85em">uint sint float float_fix float_dec utf8</span>. Width in bits. Unit in SI notation. All are optional.
         </div>
       </div>
       <div class="syntax-def reveal reveal-delay-1">
@@ -1806,7 +1920,7 @@ a[data-doc] {
 ══════════════════════════════════════════════ -->
 <section id="features">
   <div class="section-inner">
-    <div class="section-label reveal">Capabilities</div>
+    <div class="section-label reveal">capabilities</div>
     <h2 class="section-h2 reveal reveal-delay-1">Built for <em>exactness.</em></h2>
 
     <div class="features-grid">
@@ -1817,9 +1931,9 @@ a[data-doc] {
           Six type families with explicit bit-width and numeric base. Defaults are defined,
           not guessed. Annotate when precision matters; omit when it doesn't.
         </div>
-        <div class="feature-example"><span class="c-ann">&lt;uint:16&gt;</span> 443
-<span class="c-ann">&lt;float:32,_16&gt;</span> FF.3A
-<span class="c-ann">&lt;sint:64&gt;</span> -9223372036</div>
+        <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span>
+<span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_16</span><span class="c-ann">&gt;</span> <span class="c-val">FF.3A</span>
+<span class="c-ann">&lt;</span><span class="c-type">sint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-ann">&gt;</span> <span class="c-val">-9223372036</span></div>
       </div>
 
       <div class="feature-card reveal reveal-delay-1" data-n="2">
@@ -1829,9 +1943,9 @@ a[data-doc] {
           All seven SI base units, 22 derived SI units, and IEC binary prefixes.
           Compound units, exponents, and prefix enforcement are built into the grammar.
         </div>
-        <div class="feature-example">&lt;float:64,<span class="c-unit">k~g·m·s⁻²</span>&gt; 1.0
-&lt;uint:64,<span class="c-unit">Gi~B</span>&gt; 16
-&lt;float:32,<span class="c-unit">m/s²</span>&gt; 9.807</div>
+        <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g·m·s⁻²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span>
+<span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">Gi~B</span><span class="c-ann">&gt;</span> <span class="c-val">16</span>
+<span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">9.807</span></div>
       </div>
 
       <div class="feature-card reveal reveal-delay-2" data-n="3">
@@ -1839,12 +1953,12 @@ a[data-doc] {
         <div class="feature-title">SAX-style incremental reader</div>
         <div class="feature-desc">
           Parse from memory, file descriptor, or socket via a symmetric
-          <code style="font-family:var(--mono);font-size:0.85em;color:var(--teal)">on_unverified / on_verified</code> callback pair.
+          <code>on_unverified / on_verified</code> callback pair.
           No heap required for the lexer itself.
         </div>
-        <div class="feature-example">bvnr_open_read_source(
-  r, &amp;src, NULL, &amp;opts);
-bvnr_read(r);</div>
+        <div class="feature-example"><span class="cl-fn">bvnr_open_read_source</span>(
+  r, &amp;src, <span class="cl-kw">NULL</span>, &amp;opts);
+<span class="cl-fn">bvnr_read</span>(r);</div>
       </div>
 
       <div class="feature-card reveal" data-n="4">
@@ -1854,9 +1968,9 @@ bvnr_read(r);</div>
           Optional resync mode skips broken assignments and continues parsing.
           Suitable for log streams, unreliable transports, and long-running telemetry.
         </div>
-        <div class="feature-example">opts.resync_on_error = true;
-<span class="c-comment">/* parser skips broken record,</span>
-<span class="c-comment">   continues with the next */</span></div>
+        <div class="feature-example">opts.<span class="cl-var">resync_on_error</span> = <span class="cl-kw">true</span>;
+<span class="c-comment">/* parser skips broken record,
+   continues with the next */</span></div>
       </div>
 
       <div class="feature-card reveal reveal-delay-1" data-n="5">
@@ -1866,8 +1980,8 @@ bvnr_read(r);</div>
           Build a navigable DOM from any Bovnar stream, then traverse, query,
           and mutate it with a clean C API. Or use the Python dict-like interface.
         </div>
-        <div class="feature-example">bvnr_dom_get(dom, ".sensor.val");
-doc["sensor"]["val"] <span class="c-comment"># Python</span></div>
+        <div class="feature-example"><span class="cl-fn">bvnr_dom_get</span>(dom, <span class="cl-str">".sensor.val"</span>);
+doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <span class="c-comment"># Python</span></div>
       </div>
 
       <div class="feature-card reveal reveal-delay-2" data-n="6">
@@ -1877,7 +1991,7 @@ doc["sensor"]["val"] <span class="c-comment"># Python</span></div>
           No compiled extension. No Cython. Load the shared library and use
           a full-featured high-level API or a low-level streaming interface.
         </div>
-        <div class="feature-example">bovnar.loads(raw)["pressure"]
+        <div class="feature-example">bovnar.<span class="py-fn">loads</span>(raw)[<span class="py-str">"pressure"</span>]
 <span class="c-comment"># → 101.325  unit: k~Pa</span></div>
       </div>
     </div>
@@ -1889,7 +2003,7 @@ doc["sensor"]["val"] <span class="c-comment"># Python</span></div>
 ══════════════════════════════════════════════ -->
 <section id="quickstart">
   <div class="section-inner">
-    <div class="section-label reveal">Quick Start</div>
+    <div class="section-label reveal">quick-start</div>
     <h2 class="section-h2 reveal reveal-delay-1">Up in <em>minutes.</em></h2>
 
     <div style="margin-top:2.5rem;" class="reveal reveal-delay-2">
@@ -1904,57 +2018,57 @@ doc["sensor"]["val"] <span class="c-comment"># Python</span></div>
           <div class="qs-step">
             <div class="qs-step-num">01</div>
             <div class="qs-step-title">Read from memory</div>
-            <div class="qs-step-desc">Register callbacks through <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">bvnr_read_flags_t</code>. Both callbacks receive the event type and parsed data.</div>
-            <div class="code-block"><span class="c-comment">#include "bovnar.h"</span>
+            <div class="qs-step-desc">Register callbacks through <code>bvnr_read_flags_t</code>. Both callbacks receive the event type and parsed data.</div>
+            <div class="code-block"><span class="cl-inc">#include "bovnar.h"</span>
 
-static bool on_event(void *ud, bvnr_event_t ev,
-                     bvnr_data_t *d)
+<span class="cl-kw">static</span> <span class="cl-type">bool</span> <span class="cl-fn">on_event</span>(<span class="cl-type">void</span> *ud, <span class="cl-type">bvnr_event_t</span> ev,
+                     <span class="cl-type">bvnr_data_t</span> *d)
 {
-    if (ev == ev_data)
-        printf("key=%.*s\n",
-               (int)d->length,
-               (const char *)d->data);
-    return true;
+    <span class="cl-kw">if</span> (ev == ev_data)
+        <span class="cl-fn">printf</span>(<span class="cl-str">"key=%.*s\n"</span>,
+               (<span class="cl-type">int</span>)d-&gt;length,
+               (<span class="cl-kw">const</span> <span class="cl-type">char</span> *)d-&gt;data);
+    <span class="cl-kw">return</span> <span class="cl-kw">true</span>;
 }
 
-int main(void)
+<span class="cl-type">int</span> <span class="cl-fn">main</span>(<span class="cl-type">void</span>)
 {
-    const char *src =
-        ".velocity = &lt;float:64,m/s&gt; 9.81;";
-    bvnr_read_flags_t opts = {0};
-    opts.on_verified = on_event;
-    bvnr_reader_t *r = bvnr_reader_create();
-    bvnr_open_read_mem(r, src,
-                       strlen(src), NULL,
-                       0, &opts);
-    bvnr_read(r);
-    bvnr_reader_destroy(r);
+    <span class="cl-kw">const</span> <span class="cl-type">char</span> *src =
+        <span class="cl-str">".velocity = &lt;float:64,m/s&gt; 9.81;"</span>;
+    <span class="cl-type">bvnr_read_flags_t</span> opts = {<span class="cl-num">0</span>};
+    opts.<span class="cl-var">on_verified</span> = on_event;
+    <span class="cl-type">bvnr_reader_t</span> *r = <span class="cl-fn">bvnr_reader_create</span>();
+    <span class="cl-fn">bvnr_open_read_mem</span>(r, src,
+                       <span class="cl-fn">strlen</span>(src), <span class="cl-kw">NULL</span>,
+                       <span class="cl-num">0</span>, &amp;opts);
+    <span class="cl-fn">bvnr_read</span>(r);
+    <span class="cl-fn">bvnr_reader_destroy</span>(r);
 }</div>
           </div>
           <div class="qs-step">
             <div class="qs-step-num">02</div>
             <div class="qs-step-title">Write typed values</div>
             <div class="qs-step-desc">High-level write helpers accept a key string and a typed value directly. The format is emitted with correct annotations.</div>
-            <div class="code-block"><span class="c-comment">#include "bovnar.h"</span>
+            <div class="code-block"><span class="cl-inc">#include "bovnar.h"</span>
 
-int main(void)
+<span class="cl-type">int</span> <span class="cl-fn">main</span>(<span class="cl-type">void</span>)
 {
-    char buf[256];
-    bvnr_writer_t *w = bvnr_writer_create();
-    bvnr_sink_t sink;
-    bvnr_sink_to_mem(&sink,
-                     (uint8_t *)buf,
-                     sizeof(buf));
-    bvnr_open_write_sink(w, &sink,
-                         true, NULL);
+    <span class="cl-type">char</span> buf[<span class="cl-num">256</span>];
+    <span class="cl-type">bvnr_writer_t</span> *w = <span class="cl-fn">bvnr_writer_create</span>();
+    <span class="cl-type">bvnr_sink_t</span> sink;
+    <span class="cl-fn">bvnr_sink_to_mem</span>(&amp;sink,
+                     (<span class="cl-type">uint8_t</span> *)buf,
+                     <span class="cl-kw">sizeof</span>(buf));
+    <span class="cl-fn">bvnr_open_write_sink</span>(w, &amp;sink,
+                         <span class="cl-kw">true</span>, <span class="cl-kw">NULL</span>);
 
-    bvnr_write_float_unit(
-        w, "velocity", 64,
-        9.81, "m/s");
+    <span class="cl-fn">bvnr_write_float_unit</span>(
+        w, <span class="cl-str">"velocity"</span>, <span class="cl-num">64</span>,
+        <span class="cl-num">9.81</span>, <span class="cl-str">"m/s"</span>);
 
-    bvnr_write_finish(w);
-    bvnr_writer_destroy(w);
-    puts(buf);
+    <span class="cl-fn">bvnr_write_finish</span>(w);
+    <span class="cl-fn">bvnr_writer_destroy</span>(w);
+    <span class="cl-fn">puts</span>(buf);
     <span class="c-comment">// → .velocity = &lt;float:64,m/s&gt; 9.81;</span>
 }</div>
           </div>
@@ -1966,35 +2080,35 @@ int main(void)
           <div class="qs-step">
             <div class="qs-step-num">01</div>
             <div class="qs-step-title">High-level API</div>
-            <div class="qs-step-desc">Dict-like <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">loads / dumps</code> interface. Pure-ctypes — no compiled extension required.</div>
-            <div class="code-block">import bovnar
+            <div class="qs-step-desc">Dict-like <code>loads / dumps</code> interface. Pure-ctypes — no compiled extension required.</div>
+            <div class="code-block"><span class="py-kw">import</span> bovnar
 
 data = {
-    "sensor_id":   42,
-    "temperature": 36.6,
-    "unit":        "celsius",
+    <span class="py-str">"sensor_id"</span>:   <span class="py-num">42</span>,
+    <span class="py-str">"temperature"</span>: <span class="py-num">36.6</span>,
+    <span class="py-str">"unit"</span>:        <span class="py-str">"celsius"</span>,
 }
-raw = bovnar.dumps(data)
+raw = bovnar.<span class="py-fn">dumps</span>(data)
 
-doc = bovnar.loads(raw)
-print(doc["sensor_id"])    <span class="c-comment"># 42</span>
-print(doc["temperature"])  <span class="c-comment"># 36.6</span></div>
+doc = bovnar.<span class="py-fn">loads</span>(raw)
+<span class="py-bi">print</span>(doc[<span class="py-str">"sensor_id"</span>])    <span class="c-comment"># 42</span>
+<span class="py-bi">print</span>(doc[<span class="py-str">"temperature"</span>])  <span class="c-comment"># 36.6</span></div>
           </div>
           <div class="qs-step">
             <div class="qs-step-num">02</div>
             <div class="qs-step-title">Streaming event API</div>
             <div class="qs-step-desc">Full control over parse events. Inspect units, type annotations, and raw string representations as they arrive.</div>
-            <div class="code-block">from bovnar import Reader, Event
+            <div class="code-block"><span class="py-kw">from</span> bovnar <span class="py-kw">import</span> Reader, Event
 
-def on_event(ev, data):
-    if ev == Event.DATA:
+<span class="py-kw">def</span> <span class="py-fn">on_event</span>(ev, data):
+    <span class="py-kw">if</span> ev == Event.DATA:
         u = data.value_unit
-        if u.num_components:
-            print(data.raw_str(),
-                  bovnar.unit_to_str(u))
+        <span class="py-kw">if</span> u.num_components:
+            <span class="py-bi">print</span>(data.<span class="py-fn">raw_str</span>(),
+                  bovnar.<span class="py-fn">unit_to_str</span>(u))
 
-src = b".velocity = &lt;float:64,m/s&gt; 9.81;"
-Reader().read_mem(
+src = <span class="py-str">b".velocity = &lt;float:64,m/s&gt; 9.81;"</span>
+Reader().<span class="py-fn">read_mem</span>(
     src, on_verified=on_event
 )
 <span class="c-comment"># → 9.81  m/s</span></div>
@@ -2007,15 +2121,15 @@ Reader().read_mem(
           <div class="qs-step">
             <div class="qs-step-num">01</div>
             <div class="qs-step-title">Build the library</div>
-            <div class="qs-step-desc">Requires CMake ≥ 3.21 and a C99-conforming compiler. <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">libm</code> is the only mandatory dependency.</div>
+            <div class="qs-step-desc">Requires CMake ≥ 3.21 and a C99-conforming compiler. <code>libm</code> is the only mandatory dependency.</div>
             <div class="code-block"><span class="c-comment"># Clone and build</span>
-cmake -B build .
-cmake --build build
+<span class="sh-cmd">cmake</span> <span class="sh-flag">-B</span> build .
+<span class="sh-cmd">cmake</span> <span class="sh-flag">--build</span> build
 
 <span class="c-comment"># Release build</span>
-cmake -B build \
-  -DCMAKE_BUILD_TYPE=Release .
-cmake --build build
+<span class="sh-cmd">cmake</span> <span class="sh-flag">-B</span> build \
+  <span class="sh-flag">-DCMAKE_BUILD_TYPE</span>=Release .
+<span class="sh-cmd">cmake</span> <span class="sh-flag">--build</span> build
 
 <span class="c-comment"># Outputs:</span>
 <span class="c-comment"># build/libbvnr_static.a</span>
@@ -2027,20 +2141,20 @@ cmake --build build
             <div class="qs-step-title">Link &amp; test</div>
             <div class="qs-step-desc">The test suite includes unit tests, socket-pair round-trip tests, fuzz harnesses, and a benchmark binary.</div>
             <div class="code-block"><span class="c-comment"># Link your app</span>
-gcc my_app.c \
-  -I include \
-  -L build \
-  -lbvnr_static -lm \
-  -o my_app
+<span class="sh-cmd">gcc</span> my_app.c \
+  <span class="sh-flag">-I</span> include \
+  <span class="sh-flag">-L</span> build \
+  <span class="sh-flag">-lbvnr_static</span> <span class="sh-flag">-lm</span> \
+  <span class="sh-flag">-o</span> my_app
 
 <span class="c-comment"># Run tests</span>
-cd build && ctest \
-  --output-on-failure
+<span class="sh-cmd">cd</span> build &amp;&amp; <span class="sh-cmd">ctest</span> \
+  <span class="sh-flag">--output-on-failure</span>
 
 <span class="c-comment"># Python tests</span>
-export LIBBOVNAR_PATH=\
-  $(pwd)/build/libbvnr_shared.so
-cd python && pytest tests -v</div>
+<span class="sh-cmd">export</span> <span class="sh-var">LIBBOVNAR_PATH</span>=\
+  $(<span class="sh-cmd">pwd</span>)/build/libbvnr_shared.so
+<span class="sh-cmd">cd</span> python &amp;&amp; <span class="sh-cmd">pytest</span> tests <span class="sh-flag">-v</span></div>
           </div>
         </div>
       </div>
@@ -2053,7 +2167,7 @@ cd python && pytest tests -v</div>
 ══════════════════════════════════════════════ -->
 <section id="usecases">
   <div class="section-inner">
-    <div class="section-label reveal">Applications</div>
+    <div class="section-label reveal">applications</div>
     <h2 class="section-h2 reveal reveal-delay-1">When precision is a <em>requirement.</em></h2>
 
     <div class="usecases-grid">
@@ -2065,7 +2179,7 @@ cd python && pytest tests -v</div>
             Numbers with explicit physical units travel with the payload. No schema, no
             naming convention, no documentation is needed to interpret the unit correctly.
           </div>
-          <div class="usecase-example">.acceleration = &lt;float:64,m/s²&gt; 9.807;</div>
+          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">acceleration</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">9.807</span><span class="c-semi">;</span></div>
         </div>
       </div>
       <div class="usecase-card reveal reveal-delay-1">
@@ -2076,7 +2190,7 @@ cd python && pytest tests -v</div>
             The streaming parser has a small, allocation-friendly footprint. No heap required
             for the lexer. Resync mode handles unreliable transports gracefully.
           </div>
-          <div class="usecase-example">.temp = &lt;float:32,°C&gt; 23.5; .vcc = &lt;float:32,V&gt; 3.31;</div>
+          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">temp</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span> <span class="c-val">23.5</span><span class="c-semi">;</span> <span class="c-sigil">.</span><span class="c-key">vcc</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">V</span><span class="c-ann">&gt;</span> <span class="c-val">3.31</span><span class="c-semi">;</span></div>
         </div>
       </div>
       <div class="usecase-card reveal">
@@ -2084,10 +2198,10 @@ cd python && pytest tests -v</div>
         <div>
           <div class="usecase-title">Typed Configuration Files</div>
           <div class="usecase-desc">
-            Typed values eliminate range ambiguity. A <code style="font-family:var(--mono);font-size:0.85em;color:var(--teal)">&lt;uint:16&gt;</code> port number
+            Typed values eliminate range ambiguity. A <code>&lt;uint:16&gt;</code> port number
             cannot accidentally become a 64-bit float. Optional annotations; sensible defaults.
           </div>
-          <div class="usecase-example">.port = &lt;uint:16&gt; 5432; .timeout = &lt;float:64,s&gt; 2.5;</div>
+          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">port</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">5432</span><span class="c-semi">;</span> <span class="c-sigil">.</span><span class="c-key">timeout</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">s</span><span class="c-ann">&gt;</span> <span class="c-val">2.5</span><span class="c-semi">;</span></div>
         </div>
       </div>
       <div class="usecase-card reveal reveal-delay-1">
@@ -2098,7 +2212,7 @@ cd python && pytest tests -v</div>
             Log entries with attached raw memory dumps, firmware images, or sensor frames
             coexist in the same document. No Base64 overhead; octet streams are native.
           </div>
-          <div class="usecase-example">.frame_data = \x00 … raw bytes … \x00;</div>
+          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">frame_data</span> <span class="c-eq">=</span> <span class="c-str">\x00 … raw bytes … \x00</span><span class="c-semi">;</span></div>
         </div>
       </div>
       <div class="usecase-card reveal">
@@ -2106,13 +2220,12 @@ cd python && pytest tests -v</div>
         <div>
           <div class="usecase-title">Multi-dimensional &amp; Tabular Data</div>
           <div class="usecase-desc">
-            Matrices, image frames, time-series batches, any tabular structure where rows
-            are a natural unit. The <code style="font-family:var(--mono);font-size:0.85em;color:var(--teal)">/</code> separator
-            creates new rows; the result is a 3×3 matrix, a 3D rotation matrix, or any
-            rectangular array — expressed without nested lists.
+            Matrices, image frames, time-series batches — any tabular structure where rows
+            are a natural unit. The <code>/</code> separator
+            creates new rows; the result is a 3×3 matrix or any rectangular array.
           </div>
-          <div class="usecase-example">.matrix   = [1,2,3]/[4,5,6]/[7,8,9];
-.rotation = [1,0,0]/[0,1,0]/[0,0,1];</div>
+          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">matrix</span>   <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">7,8,9</span><span class="c-struct">]</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">rotation</span> <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,0,0</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">0,1,0</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">0,0,1</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
         </div>
       </div>
       <div class="usecase-card reveal reveal-delay-1">
@@ -2123,7 +2236,7 @@ cd python && pytest tests -v</div>
             Self-describing data stays interpretable without an out-of-band schema, even years
             after the original application is gone. The file itself is the documentation.
           </div>
-          <div class="usecase-example">.spec_version = "bovnar-1.0"; <span style="color:var(--text3)"># always readable</span></div>
+          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">spec_version</span> <span class="c-eq">=</span> <span class="c-str">"bovnar-1.0"</span><span class="c-semi">;</span> <span class="c-comment"># always readable</span></div>
         </div>
       </div>
     </div>
@@ -2174,7 +2287,7 @@ cd python && pytest tests -v</div>
 ══════════════════════════════════════════════ -->
 <section id="docs">
   <div class="section-inner">
-    <div class="section-label reveal">Documentation</div>
+    <div class="section-label reveal">documentation</div>
     <h2 class="section-h2 reveal reveal-delay-1">Everything you need to <em>ship.</em></h2>
     <p class="section-p reveal reveal-delay-2">
       Eight documents covering every layer of the stack — from a five-minute tutorial
@@ -2253,65 +2366,78 @@ cd python && pytest tests -v</div>
      FOOTER
 ══════════════════════════════════════════════ -->
 <footer>
-  <div class="footer-inner">
-    <div>
-      <div class="footer-brand-name">BOVNAR</div>
-      <div class="footer-brand-sub">Spec v1.0 · MIT License · C99</div>
-      <p class="footer-desc">
-        A typed, unit-aware, text-binary serialisation format and its C99 reference implementation.
-        The format that knows what it means.
-      </p>
-    </div>
-    <div>
-      <div class="footer-col-title">Documentation</div>
-      <ul class="footer-links">
-        <li><a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial">Tutorial</a></li>
-        <li><a href="#" data-doc="1_bovnar_spec.md" data-doc-title="Specification v1.0">Specification v1.0</a></li>
-        <li><a href="#" data-doc="2_bovnar_unit_system.md" data-doc-title="Unit System Reference">Unit System Reference</a></li>
-        <li><a href="#" data-doc="3_bovnar_readwrite_api.md" data-doc-title="Read &amp; Write API">Read &amp; Write API</a></li>
-        <li><a href="#" data-doc="4_bovnar_python_bindings.md" data-doc-title="Python Bindings">Python Bindings</a></li>
-        <li><a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar">Formal EBNF Grammar</a></li>
-        <li><a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ">FAQ</a></li>
-        <li><a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool">Conformance Test Tool</a></li>
-      </ul>
-    </div>
-    <div>
-      <div class="footer-col-title">Repository</div>
-      <ul class="footer-links">
-        <li><a href="https://github.com/sothis/bovnar" target="_blank" rel="noopener">GitHub ↗</a></li>
-        <li><a href="https://github.com/sothis/bovnar/releases" target="_blank" rel="noopener">Releases</a></li>
-        <li><a href="https://github.com/sothis/bovnar/tree/main/include" target="_blank" rel="noopener">C Headers</a></li>
-        <li><a href="https://github.com/sothis/bovnar/tree/main/python/bovnar" target="_blank" rel="noopener">Python Package</a></li>
-        <li><a href="https://github.com/sothis/bovnar/tree/main/examples" target="_blank" rel="noopener">Examples (.bvnr)</a></li>
-        <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vscode" target="_blank" rel="noopener">VS Code Highlighter</a></li>
-        <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/geany" target="_blank" rel="noopener">Geany Highlighter</a></li>
-      </ul>
-    </div>
-    <div>
-      <div class="footer-col-title">Legal</div>
-      <ul class="footer-links">
-        <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
-        <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
-        <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
-      </ul>
-      <div style="margin-top:2rem;">
-        <div class="footer-col-title">Format</div>
+  <div class="footer-main">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand-name">BOVNAR</div>
+        <div class="footer-brand-sub">Spec v1.0 · MIT License · C99</div>
+        <p class="footer-desc">
+          A typed, unit-aware, text-binary serialisation format and its C99 reference implementation.
+          The format that knows what it means.
+        </p>
+      </div>
+      <div>
+        <div class="footer-col-title">Documentation</div>
         <ul class="footer-links">
-          <li><a href="#">Extension: .bvnr</a></li>
-          <li><a href="#">Encoding: UTF-8</a></li>
-          <li><a href="#">MIME: text/x-bovnar</a></li>
+          <li><a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial">Tutorial</a></li>
+          <li><a href="#" data-doc="1_bovnar_spec.md" data-doc-title="Specification v1.0">Specification v1.0</a></li>
+          <li><a href="#" data-doc="2_bovnar_unit_system.md" data-doc-title="Unit System Reference">Unit System Reference</a></li>
+          <li><a href="#" data-doc="3_bovnar_readwrite_api.md" data-doc-title="Read &amp; Write API">Read &amp; Write API</a></li>
+          <li><a href="#" data-doc="4_bovnar_python_bindings.md" data-doc-title="Python Bindings">Python Bindings</a></li>
+          <li><a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar">Formal EBNF Grammar</a></li>
+          <li><a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ">FAQ</a></li>
+          <li><a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool">Conformance Test Tool</a></li>
         </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Repository</div>
+        <ul class="footer-links">
+          <li><a href="https://github.com/sothis/bovnar" target="_blank" rel="noopener">GitHub ↗</a></li>
+          <li><a href="https://github.com/sothis/bovnar/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/include" target="_blank" rel="noopener">C Headers</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/python/bovnar" target="_blank" rel="noopener">Python Package</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/examples" target="_blank" rel="noopener">Examples (.bvnr)</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vscode" target="_blank" rel="noopener">VS Code Highlighter</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/geany" target="_blank" rel="noopener">Geany Highlighter</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Legal</div>
+        <ul class="footer-links">
+          <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+          <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
+          <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
+        </ul>
+        <div style="margin-top:2rem;">
+          <div class="footer-col-title">Format</div>
+          <ul class="footer-links">
+            <li><a href="#">Extension: .bvnr</a></li>
+            <li><a href="#">Encoding: UTF-8</a></li>
+            <li><a href="#">MIME: text/x-bovnar</a></li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
-  <div class="footer-bottom">
-    <div class="footer-copy">© 2026 Janos Sonntag. All rights reserved.</div>
-    <div class="footer-spec">BOVNAR SPEC v1.0 · REFERENCE IMPL C99</div>
+  <div class="vs-statusbar">
+    <div class="vsb-left">
+      <span class="vsb-item vsb-source">⎇ main</span>
+      <span class="vsb-item">◷ bovnar spec v1.0</span>
+    </div>
+    <div class="vsb-right">
+      <span class="vsb-item">© 2026 Janos Sonntag</span>
+      <span class="vsb-divider"></span>
+      <span class="vsb-item">MIT License</span>
+      <span class="vsb-divider"></span>
+      <span class="vsb-item">C99</span>
+      <span class="vsb-divider"></span>
+      <span class="vsb-item">UTF-8</span>
+    </div>
   </div>
 </footer>
 
 <!-- ══════════════════════════════════════════════
-     DOC OVERLAY  (must precede the script)
+     DOC OVERLAY
 ══════════════════════════════════════════════ -->
 <div id="doc-scrim"></div>
 <div id="doc-drawer" role="dialog" aria-modal="true" aria-label="Documentation">
@@ -2328,7 +2454,7 @@ cd python && pytest tests -v</div>
         <span>Fetching document…</span>
       </div>
       <div id="doc-error">
-        <span style="color:var(--red);font-size:1.2rem;">⚠</span>
+        <span style="color:var(--red);font-size:1.1rem;">⚠</span>
         <span id="doc-error-msg">Could not load document.</span>
         <a id="doc-error-link" href="#" target="_blank" rel="noopener">Open on GitHub ↗</a>
       </div>
@@ -2338,7 +2464,6 @@ cd python && pytest tests -v</div>
 </div>
 
 <script>
-/* ── Tab switcher ── */
 function showTab(id) {
   document.querySelectorAll('.qs-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.qs-pane').forEach(p => p.classList.remove('active'));
@@ -2346,15 +2471,13 @@ function showTab(id) {
   event.target.classList.add('active');
 }
 
-/* ── Scroll reveal ── */
 const io = new IntersectionObserver(entries => {
   entries.forEach(e => {
     if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
   });
-}, { threshold: 0.12 });
+}, { threshold: 0.1 });
 document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
-/* ── Smooth-scroll anchor links (exclude data-doc links; guard bare #) ── */
 document.querySelectorAll('a[href^="#"]:not([data-doc])').forEach(a => {
   a.addEventListener('click', e => {
     const href = a.getAttribute('href');
@@ -2364,9 +2487,7 @@ document.querySelectorAll('a[href^="#"]:not([data-doc])').forEach(a => {
   });
 });
 
-/* ════════════════════════════════════════════
-   DOC OVERLAY
-════════════════════════════════════════════ */
+/* ══ DOC OVERLAY ══ */
 const LOCAL_BASE = '../doc/';
 const GH_BASE    = 'https://github.com/sothis/bovnar/blob/main/doc/';
 
@@ -2381,14 +2502,9 @@ const errLink  = document.getElementById('doc-error-link');
 const content  = document.getElementById('doc-content');
 const wrap     = document.getElementById('doc-content-wrap');
 
-/* configure marked */
 marked.use({ gfm: true, breaks: false });
 
 let currentFile = null;
-
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
 
 function showState(state) {
   loading.style.display = state === 'loading' ? 'flex' : 'none';
@@ -2396,11 +2512,8 @@ function showState(state) {
   content.style.display = state === 'done'    ? 'block': 'none';
 }
 
-
 function renderDoc(file, text) {
   if (!file.endsWith('.md')) {
-    /* EBNF and other plain-text files: display verbatim, no hljs.
-       hljs auto-detection on unknown grammars produces garbled output. */
     const _pre = document.createElement('pre');
     const _code = document.createElement('code');
     _code.textContent = text;
@@ -2410,9 +2523,6 @@ function renderDoc(file, text) {
   } else {
     content.innerHTML = marked.parse(text);
 
-    /* Assign heading IDs using GitHub's slug algorithm so in-doc anchor
-       links resolve correctly: lowercase, strip non-word/non-space/non-hyphen,
-       spaces → hyphens. No hyphen-collapsing — "& BOM" must become "--bom". */
     content.querySelectorAll('h1, h2, h3, h4').forEach((h, i) => {
       if (!h.id) {
         const slug = h.textContent.toLowerCase()
@@ -2423,12 +2533,10 @@ function renderDoc(file, text) {
       }
     });
 
-    /* Syntax-highlight fenced code blocks; guard against hljs failures */
     content.querySelectorAll('pre code').forEach(el => {
       try { hljs.highlightElement(el); } catch (_) {}
     });
 
-    /* Intercept all links: external → new tab, anchors → scroll in wrap, relative → openDoc */
     content.querySelectorAll('a[href]').forEach(a => {
       const href = a.getAttribute('href');
       if (/^https?:\/\//.test(href)) {
@@ -2453,7 +2561,6 @@ function renderDoc(file, text) {
       }
     });
   }
-
   showState('done');
 }
 
@@ -2469,8 +2576,6 @@ function openDoc(file, title) {
   wrap.scrollTop = 0;
   showState('loading');
 
-  /* XMLHttpRequest works for file:// local paths; fetch is blocked by
-     Chrome's same-origin policy when opening HTML directly from disk. */
   const xhr = new XMLHttpRequest();
   xhr.open('GET', LOCAL_BASE + file, true);
   xhr.onload = function () {

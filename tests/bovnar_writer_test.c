@@ -489,6 +489,14 @@ static void test_write_bvnf_base10(void)
     uint64_t bw = bvnr_writer_bytes_written(w);
     ASSERT_TRUE(bw > 0, "bytes_written > 0");
 
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, bw, &le),
+                "bvnf base10 pi document must round-trip");
+    ASSERT_TRUE(strstr(le.value, "3.14") != NULL,
+                "pi_1024 value must begin with 3.14 (value preserved through write/read)");
+    ASSERT_EQ_INT(le.value_tok, token_is_number,
+                  "base10 bvnf token must be token_is_number");
+
     bvn_float_free(f);
     bvnr_writer_destroy(w);
 }
@@ -537,6 +545,35 @@ static void test_write_bvnf_base16(void)
 
     bvn_float_free(f);
     bvnr_writer_destroy(w);
+
+    {
+        uint8_t out2[1024];
+        bvnr_sink_t sink2;
+        bvnr_writer_t *w2 = make_writer(out2, sizeof(out2), &sink2);
+        ASSERT_NOT_NULL(w2, "value-check writer must succeed");
+        if (!w2) return;
+
+        bvn_float_t *f2 = bvn_float_alloc(256u);
+        ASSERT_NOT_NULL(f2, "value-check bvn_float_alloc must succeed");
+        if (!f2) { bvnr_writer_destroy(w2); return; }
+
+        ASSERT_TRUE(bvn_float_from_double(f2, 1.5),
+                    "bvn_float_from_double(1.5) value-check");
+        ASSERT_TRUE(bvnr_write_bvnf_base(w2, "v", f2, 256u, 16u),
+                    "write 1.5 base16 value-check");
+        ASSERT_TRUE(bvnr_write_finish(w2), "finish value-check writer");
+
+        last_event_t le2 = {0};
+        ASSERT_TRUE(roundtrip(out2, bvnr_writer_bytes_written(w2), &le2),
+                    "1.5 base16 bvnf must round-trip");
+        ASSERT_TRUE(strstr(le2.value, "1.8") != NULL,
+                    "base16 repr of 1.5 must contain '1.8' (value preserved)");
+        ASSERT_EQ_INT(le2.value_tok, token_is_string,
+                      "base16 non-special bvnf token must be token_is_string");
+
+        bvn_float_free(f2);
+        bvnr_writer_destroy(w2);
+    }
 }
 
 static void test_write_bvni_decimal(void)
@@ -571,6 +608,18 @@ static void test_write_bvni_decimal(void)
     ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
     ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no error");
 
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+                "bvni decimal roundtrip must succeed");
+    ASSERT_TRUE(le.vt.family == vt_sint,
+                "last entry (neg_one) must be sint");
+    ASSERT_EQ_UINT(le.vt.width, 64,
+                   "neg_one width must be 64");
+    ASSERT_TRUE(strcmp(le.value, "-1") == 0,
+                "neg_one value must round-trip as \"-1\"");
+    ASSERT_EQ_INT(le.value_tok, token_is_number,
+                  "base10 bvni token must be token_is_number");
+
     bvn_int_free(n);
     bvnr_writer_destroy(w);
 }
@@ -602,8 +651,19 @@ static void test_write_bvni_hex(void)
     ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
     ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no error");
 
-    const char *out = (const char *)output;
-    (void)out;
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+                "bvni hex roundtrip must succeed");
+    ASSERT_TRUE(le.vt.family == vt_sint,
+                "last entry (neg_hex) must be sint");
+    ASSERT_EQ_UINT(le.vt.width, 32,
+                   "neg_hex width must be 32");
+    ASSERT_EQ_UINT(le.vt.base, 16,
+                   "neg_hex base must be 16");
+    ASSERT_TRUE(strcmp(le.value, "-7fffffff") == 0,
+                "neg_hex value must round-trip as \"-7fffffff\"");
+    ASSERT_EQ_INT(le.value_tok, token_is_string,
+                  "base16 bvni token must be token_is_string");
 
     bvn_int_free(n);
     bvnr_writer_destroy(w);

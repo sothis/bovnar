@@ -810,15 +810,16 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 	long prec = f->_prec;
 	int shift = (int)prec - 53;
 #if BVN_LIMB_BITS == 64
-	if (shift >= 0 && shift < 64) {
-		uint64_t scaled = full_man << (unsigned)shift;
-		uint32_t limb_idx = (uint32_t)(prec - 1) / 64u;
-		if (limb_idx < f->_nlimbs)
-			f->_d[limb_idx] = scaled;
-	} else if (shift < 0) {
+	if (shift >= 0) {
+		uint32_t lo_limb = (uint32_t)shift / 64u;
+		uint32_t lo_off  = (uint32_t)shift % 64u;
+		if (lo_limb < f->_nlimbs)
+			f->_d[lo_limb] = full_man << lo_off;
+		if (lo_off > 0u && lo_limb + 1u < f->_nlimbs)
+			f->_d[lo_limb + 1u] = full_man >> (64u - lo_off);
+	} else {
 		uint64_t scaled = full_man >> (unsigned)(-shift);
-		uint32_t limb_idx = 0;
-		if (limb_idx < f->_nlimbs) f->_d[limb_idx] = scaled;
+		if (f->_nlimbs > 0u) f->_d[0] = scaled;
 	}
 #else
 	if (shift >= 0) {

@@ -1873,8 +1873,9 @@ bool bvn_validate_reference(const char* link)
 {
 	if (!link || !*link) return false;
 	const char* p = link;
-	if (*p == '.') p++;
-	while (*p) {
+	if (*p != '.') return false;
+	do {
+		p++;
 		if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
 			  *p == '_' ||
 			  ((uint8_t)*p >= 0xc2 && (uint8_t)*p <= 0xf4)))
@@ -1893,8 +1894,7 @@ bool bvn_validate_reference(const char* link)
 				return false;
 			p++;
 		}
-		if (*p == '.') p++;
-	}
+	} while (*p == '.');
 	return true;
 }
 bool bvn_validate_number(const char* s)

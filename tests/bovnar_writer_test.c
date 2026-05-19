@@ -772,6 +772,165 @@ static void test_write_float_dec_roundtrip(void)
     bvnr_writer_destroy(w);
 }
 
+static void test_validate_reference(void)
+{
+    printf("  test_validate_reference...\n");
+
+    ASSERT_TRUE(bvn_validate_reference(".host"),
+                "'.host' is a valid reference");
+    ASSERT_TRUE(bvn_validate_reference(".config.host"),
+                "'.config.host' is a valid multi-segment reference");
+    ASSERT_TRUE(bvn_validate_reference(".a.b.c"),
+                "'.a.b.c' is a valid three-segment reference");
+    ASSERT_TRUE(bvn_validate_reference("._under_score"),
+                "'._under_score' is valid");
+
+    ASSERT_FALSE(bvn_validate_reference("host"),
+                 "'host' without leading dot must be rejected");
+    ASSERT_FALSE(bvn_validate_reference(""),
+                 "empty string must be rejected");
+    ASSERT_FALSE(bvn_validate_reference(NULL),
+                 "NULL must be rejected");
+    ASSERT_FALSE(bvn_validate_reference("."),
+                 "'.' (dot only, no id-start) must be rejected");
+    ASSERT_FALSE(bvn_validate_reference("..host"),
+                 "'..host' (double dot at start) must be rejected");
+    ASSERT_FALSE(bvn_validate_reference(".host."),
+                 "'.host.' (trailing dot, no id-start) must be rejected");
+}
+
+static void test_write_reference_roundtrip(void)
+{
+    printf("  test_write_reference_roundtrip...\n");
+
+    uint8_t output[4096];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    bvnr_data_t ka = {
+        .type   = token_is_identifier,
+        .data   = "x",
+        .length = 1,
+    };
+    ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &ka),
+                "assignment_start must succeed");
+
+    bvnr_data_t kd = {
+        .type   = token_is_reference,
+        .data   = ".host",
+        .length = 5,
+    };
+    ASSERT_TRUE(bvnr_write_event(w, ev_data, &kd),
+                "writing valid reference '.host' must succeed");
+
+    ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+
+    uint64_t n = bvnr_writer_bytes_written(w);
+    ASSERT_TRUE(n > 0, "bytes_written > 0");
+
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, n, &le),
+                "reference roundtrip must parse cleanly");
+    ASSERT_TRUE(strcmp(le.key, "x") == 0, "last key == x");
+    ASSERT_TRUE(strcmp(le.value, ".host") == 0,
+                "last value == .host (with leading dot)");
+    ASSERT_EQ_INT(le.value_tok, token_is_reference,
+                  "token type must be token_is_reference");
+
+    bvnr_writer_destroy(w);
+}
+
+static void test_write_reference_without_dot_rejected(void)
+{
+    printf("  test_write_reference_without_dot_rejected...\n");
+
+    uint8_t output[256];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    bvnr_data_t ka = {
+        .type   = token_is_identifier,
+        .data   = "x",
+        .length = 1,
+    };
+    bvnr_write_event(w, ev_assignment_start, &ka);
+
+    bvnr_data_t kd = {
+        .type   = token_is_reference,
+        .data   = "host",
+        .length = 4,
+    };
+    ASSERT_FALSE(bvnr_write_event(w, ev_data, &kd),
+                 "writing reference without leading dot must be rejected");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_type_value_mismatch,
+                  "error must be type_value_mismatch");
+
+    bvnr_writer_destroy(w);
+}
+
+static void test_write_reference_dot_only_rejected(void)
+{
+    printf("  test_write_reference_dot_only_rejected...\n");
+
+    uint8_t output[256];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    bvnr_data_t ka = {
+        .type   = token_is_identifier,
+        .data   = "x",
+        .length = 1,
+    };
+    bvnr_write_event(w, ev_assignment_start, &ka);
+
+    bvnr_data_t kd = {
+        .type   = token_is_reference,
+        .data   = ".",
+        .length = 1,
+    };
+    ASSERT_FALSE(bvnr_write_event(w, ev_data, &kd),
+                 "writing reference '.' (dot only) must be rejected");
+    ASSERT_EQ_INT(bvnr_writer_get_error(w), error_type_value_mismatch,
+                  "error must be type_value_mismatch");
+
+    bvnr_writer_destroy(w);
+}
+
+static void test_write_string_vf_escapes(void)
+{
+    printf("  test_write_string_vf_escapes...\n");
+
+    uint8_t output[4096];
+    bvnr_sink_t sink;
+    bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+    ASSERT_NOT_NULL(w, "make_writer must succeed");
+    if (!w) return;
+
+    char vf_str[] = {'v', 't', '\x0b', 'f', 'f', '\x0c', '\0'};
+    ASSERT_TRUE(bvnr_write_string(w, "s", vf_str),
+                "write string with \\v and \\f must succeed");
+    ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+
+    uint64_t n = bvnr_writer_bytes_written(w);
+    ASSERT_TRUE(n > 0, "bytes_written > 0");
+
+    last_event_t le = {0};
+    ASSERT_TRUE(roundtrip(output, n, &le),
+                "string with \\v and \\f must roundtrip cleanly");
+    ASSERT_EQ_INT(le.value_len, (int64_t)strlen(vf_str),
+                  "roundtripped string length matches");
+    ASSERT_TRUE(memcmp(le.value, vf_str, le.value_len) == 0,
+                "roundtripped string content matches (\\v and \\f preserved)");
+
+    bvnr_writer_destroy(w);
+}
+
 int main(void)
 {
     printf("Running bovnar_writer_test regression suite...\n");
@@ -795,6 +954,11 @@ int main(void)
     test_write_bvni_decimal();
     test_write_bvni_hex();
     test_write_streaming_flush();
+    test_validate_reference();
+    test_write_reference_roundtrip();
+    test_write_reference_without_dot_rejected();
+    test_write_reference_dot_only_rejected();
+    test_write_string_vf_escapes();
 
     if (failures == 0) {
         printf("PASSED %d tests\n", tests);

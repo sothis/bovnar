@@ -293,7 +293,8 @@ class _DictParser:
             if self._in_octet:
                 self._octet_buf.extend(raw)
             else:
-                value = _decode_value(raw, fam, vt)
+                tok_type = getattr(data, 'type', 0) if data is not None else 0
+                value = _decode_value(raw, fam, vt, tok_type)
                 self._push_value(value)
 
         return True
@@ -359,10 +360,20 @@ def _seal_array(arr: _ArrScope):
     return arr.rows
 
 
-def _decode_value(raw: bytes, fam: ValueTypeFamily, vt) -> object:
+_TOKEN_IS_SYMBOL = 3
+
+
+def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> object:
     if not raw:
         return None
     text = raw.decode('utf-8', errors='replace')
+
+    if tok_type == _TOKEN_IS_SYMBOL:
+        if text == 'true':
+            return True
+        if text == 'false':
+            return False
+        return text
 
     if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
         try:

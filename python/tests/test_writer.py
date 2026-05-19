@@ -258,14 +258,13 @@ class TestEmit:
         vu = make_unit_dimensionless()
         with Writer.to_mem() as w:
             w.emit(Event.ASSIGNMENT_START, key="x")
-            w.emit(Event.TYPE_ANNOTATION_START,              vt=vt, vu=vu)
-            w.emit(Event.TYPE_ANNOTATION_TYPE_FAMILY,        key='uint')
-            w.emit(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM,  vt=vt, vu=vu)
-            w.emit(Event.TYPE_ANNOTATION_END)
+            w._emit_annotation('uint', vt, vu)
             w.emit(Event.DATA, value="42", vt=vt, vu=vu)
         out = w.get_output()
-        assert b'x'  in out
-        assert b'42' in out
+        assert b'x'    in out
+        assert b'42'   in out
+        assert b'uint' in out
+        assert b'32'   in out
 
     def test_emit_invalid_event_raises(self):
         with Writer.to_mem() as w:
@@ -532,3 +531,321 @@ class TestWriteFloatDec:
             w.write_float_dec('v', float('inf'), width=64)
         out = w.get_output()
         assert b'$infinity$' in out
+
+
+@needs_lib
+class TestAnnotationRegressions:
+    """Regression tests for annotation roundtrip bugs.
+
+    Bug 1 – UTF8 width was never emitted in the annotation.
+    Bug 2 – width was emitted even when vt.width == 0 (emitting :64 via
+             bvn_effective_width(0)=64 instead of no width at all).
+    Bug 3 – base/Q emission was nested inside the width block so a type with
+             width=0 and a non-decimal base lost the base annotation entirely.
+    Bug 4 – emit() picked TOKEN_IS_NUMBER for every non-UTF8 family regardless
+             of base, causing hex values to be written unquoted (invalid BVNR).
+    """
+
+    def test_utf8_typed_width_appears_in_annotation(self):
+        from bovnar.enums import ValueTypeFamily
+        from bovnar.structs import make_type_spec, make_unit_none
+        vt = make_type_spec(ValueTypeFamily.UTF8, 8, 0)
+        with Writer.to_mem() as w:
+            w._emit_annotation('utf8', vt, make_unit_none())
+        out = w.get_output()
+        assert b'utf8:8' in out, \
+            "UTF8 annotation with width=8 must contain 'utf8:8'"
+
+    def test_utf8_typed_width_zero_omitted_from_annotation(self):
+        from bovnar.enums import ValueTypeFamily
+        from bovnar.structs import make_type_spec, make_unit_none
+        vt = make_type_spec(ValueTypeFamily.UTF8, 0, 0)
+        with Writer.to_mem() as w:
+            w._emit_annotation('utf8', vt, make_unit_none())
+        out = w.get_output()
+        assert b'utf8:0' not in out, \
+            "UTF8 annotation with width=0 must not contain a width spec"
+
+    def test_float_width_zero_produces_no_width_in_annotation(self):
+        with Writer.to_mem() as w:
+            w.write_bvnf_base("pi", "3.14", width=0, base=10)
+        out = w.get_output()
+        assert b'float:64' not in out, \
+            "width=0 must not emit ':64' via bvn_effective_width fallback"
+        assert b'<float>' in out or b'<float,' in out, \
+            "width=0 float annotation must be '<float>' (no width spec)"
+
+    def test_uint_width_zero_base16_emits_base_in_annotation(self):
+        from bovnar.enums import ValueTypeFamily
+        from bovnar.structs import make_type_spec, make_unit_none
+        vt = make_type_spec(ValueTypeFamily.UINT, 0, 16)
+        with Writer.to_mem() as w:
+            w._emit_annotation('uint', vt, make_unit_none())
+        out = w.get_output()
+        assert b'_16' in out, \
+            "base=16 must appear in annotation even when width=0"
+        assert b'uint:0' not in out, \
+            "width=0 must not emit a spurious ':0' width spec"
+
+    def test_emit_hex_uint_uses_string_token(self):
+        from bovnar.enums import ValueTypeFamily, Event
+        from bovnar.structs import make_type_spec, make_unit_none
+        vt = make_type_spec(ValueTypeFamily.UINT, 8, 16)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='flags')
+            w._emit_annotation('uint', vt, vu)
+            w.emit(Event.DATA, value='ff', vt=vt, vu=vu)
+        out = w.get_output()
+        assert b'"ff"' in out, \
+            "hex uint written via emit() must be quoted (TOKEN_IS_STRING)"
+
+    def test_emit_decimal_uint_uses_number_token(self):
+        from bovnar.enums import ValueTypeFamily, Event
+        from bovnar.structs import make_type_spec, make_unit_none
+        vt = make_type_spec(ValueTypeFamily.UINT, 8, 10)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='val')
+            w._emit_annotation('uint', vt, vu)
+            w.emit(Event.DATA, value='42', vt=vt, vu=vu)
+        out = w.get_output()
+        assert b'"42"' not in out, \
+            "decimal uint written via emit() must not be quoted (TOKEN_IS_NUMBER)"
+        assert b'42' in out
+
+
+@needs_lib
+class TestReferenceRoundtrip:
+    """Regression tests for the reference validator and writer roundtrip.
+
+    BVNR reference tokens are stored with a mandatory leading '.' (the
+    grammar is: reference = '&' , ref-segment ; ref-segment = '.' , id-start ,
+    {ref-body-char}).  The validator must reject strings without that leading
+    '.' and strings that are just '.' with no following id-start, so that the
+    writer can never produce '&foo' or '&.' — both of which the parser rejects.
+    """
+
+    def _write_reference(self, ref_data: bytes) -> bool:
+        import ctypes
+        from bovnar.structs import BvnrData
+        w = Writer.to_mem()
+        w.emit(Event.ASSIGNMENT_START, key='x')
+        d = BvnrData()
+        d.type = w._TOKEN_IS_REFERENCE
+        d.data = ctypes.cast(ctypes.c_char_p(ref_data), ctypes.c_void_p)
+        d.length = len(ref_data)
+        ok = w._lib.bvnr_write_event(w._ptr, int(Event.DATA), ctypes.byref(d))
+        w.destroy()
+        return ok
+
+    def test_valid_reference_accepted(self):
+        assert self._write_reference(b'.host'), \
+            "'.host' (valid reference) must be accepted by the writer"
+
+    def test_valid_multi_segment_reference_accepted(self):
+        assert self._write_reference(b'.config.host'), \
+            "'.config.host' must be accepted"
+
+    def test_reference_without_leading_dot_rejected(self):
+        from bovnar.exceptions import BovnarWriteError
+        assert not self._write_reference(b'host'), \
+            "'host' (no leading dot) must be rejected — would produce invalid BVNR"
+
+    def test_reference_dot_only_rejected(self):
+        assert not self._write_reference(b'.'), \
+            "'.' (dot only, no id-start) must be rejected"
+
+    def test_reference_double_dot_rejected(self):
+        assert not self._write_reference(b'..host'), \
+            "'..host' (double leading dot) must be rejected"
+
+    def test_valid_reference_roundtrips(self):
+        import ctypes
+        from bovnar.structs import BvnrData
+        from bovnar import loads
+
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='x')
+            d = BvnrData()
+            d.type = w._TOKEN_IS_REFERENCE
+            ref = b'.some.path'
+            d.data = ctypes.cast(ctypes.c_char_p(ref), ctypes.c_void_p)
+            d.length = len(ref)
+            ok = w._lib.bvnr_write_event(w._ptr, int(Event.DATA), ctypes.byref(d))
+            assert ok
+
+        out = w.get_output()
+        assert b'&.some.path' in out, "writer must emit '&.some.path'"
+        result = loads(out)
+        assert result['x'] == '.some.path', \
+            "parsed reference must be the path string including leading dot"
+
+    def test_reference_output_is_parseable(self):
+        import ctypes
+        from bovnar.structs import BvnrData
+        from bovnar import loads
+        from bovnar.reader import Reader
+
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='r')
+            d = BvnrData()
+            d.type = w._TOKEN_IS_REFERENCE
+            ref = b'.host'
+            d.data = ctypes.cast(ctypes.c_char_p(ref), ctypes.c_void_p)
+            d.length = len(ref)
+            w._lib.bvnr_write_event(w._ptr, int(Event.DATA), ctypes.byref(d))
+
+        out = w.get_output()
+        with Reader() as r:
+            r.read_mem(out)
+
+
+@needs_lib
+class TestEmitFloatFixTokenType:
+    """Regression tests for the emit() float_fix/float_dec token-type bug.
+
+    For float_fix, vt.base stores the Q (fractional-bits) parameter, not a
+    numeric base.  The old emit() checked 'vt.base not in (0, 10)' without
+    excluding float_fix/float_dec, so Q=16 produced TOKEN_IS_STRING ("1.5")
+    instead of TOKEN_IS_NUMBER (1.5).
+
+    The corrected emit() adds the same _decimal_float_families guard that
+    _write_scalar() already had, so all four of the families that always use
+    decimal encoding (FLOAT, FLOAT_FIX, FLOAT_DEC, and UTF8 is separate)
+    always produce NUMBER tokens regardless of vt.base.
+    """
+
+    def test_emit_float_fix_q16_uses_number_token(self):
+        vt = make_type_spec(ValueTypeFamily.FLOAT_FIX, 32, 16)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='ff')
+            w._emit_annotation('float_fix', vt, vu)
+            w.emit(Event.DATA, value='1.5', vt=vt, vu=vu)
+        out = w.get_output()
+        after_bracket = out.split(b'>')[1] if b'>' in out else out
+        assert b'"' not in after_bracket, \
+            "float_fix with Q=16 via emit() must not produce a quoted value"
+
+    def test_emit_float_fix_q8_uses_number_token(self):
+        vt = make_type_spec(ValueTypeFamily.FLOAT_FIX, 64, 8)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='ff')
+            w._emit_annotation('float_fix', vt, vu)
+            w.emit(Event.DATA, value='3.14', vt=vt, vu=vu)
+        out = w.get_output()
+        after_bracket = out.split(b'>')[1] if b'>' in out else out
+        assert b'"' not in after_bracket, \
+            "float_fix with Q=8 via emit() must not produce a quoted value"
+
+    def test_emit_float_dec_uses_number_token(self):
+        vt = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='fd')
+            w._emit_annotation('float_dec', vt, vu)
+            w.emit(Event.DATA, value='2.718', vt=vt, vu=vu)
+        out = w.get_output()
+        after_bracket = out.split(b'>')[1] if b'>' in out else out
+        assert b'"' not in after_bracket, \
+            "float_dec via emit() must not produce a quoted value"
+
+    def test_emit_float_fix_q16_roundtrips(self):
+        from bovnar import loads
+        from bovnar.reader import Reader
+        vt = make_type_spec(ValueTypeFamily.FLOAT_FIX, 32, 16)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='ff')
+            w._emit_annotation('float_fix', vt, vu)
+            w.emit(Event.DATA, value='1.5', vt=vt, vu=vu)
+        out = w.get_output()
+        with Reader() as r:
+            r.read_mem(out)
+        result = loads(out)
+        assert abs(result['ff'] - 1.5) < 1e-9, \
+            "float_fix Q=16 written via emit() must roundtrip to 1.5"
+
+    def test_emit_hex_uint_still_uses_string_token(self):
+        """The guard must not suppress STRING for genuinely hex uint."""
+        vt = make_type_spec(ValueTypeFamily.UINT, 8, 16)
+        vu = make_unit_none()
+        with Writer.to_mem() as w:
+            w.emit(Event.ASSIGNMENT_START, key='flags')
+            w._emit_annotation('uint', vt, vu)
+            w.emit(Event.DATA, value='ff', vt=vt, vu=vu)
+        out = w.get_output()
+        assert b'"ff"' in out, \
+            "hex uint via emit() must still be quoted (TOKEN_IS_STRING)"
+
+    def test_emit_float_fix_all_q_values_use_number_token(self):
+        from bovnar.reader import Reader
+        for q in (2, 4, 8, 11, 16, 24, 32):
+            vt = make_type_spec(ValueTypeFamily.FLOAT_FIX, 64, q)
+            vu = make_unit_none()
+            with Writer.to_mem() as w:
+                w.emit(Event.ASSIGNMENT_START, key='ff')
+                w._emit_annotation('float_fix', vt, vu)
+                w.emit(Event.DATA, value='1.0', vt=vt, vu=vu)
+            out = w.get_output()
+            after_bracket = out.split(b'>')[1] if b'>' in out else out
+            assert b'"' not in after_bracket, \
+                f"float_fix Q={q} via emit() must not produce a quoted value"
+            with Reader() as r:
+                r.read_mem(out)
+
+
+@needs_lib
+class TestStringEscapeRoundtrip:
+    """Roundtrip coverage for all supported BVNR string escape sequences.
+
+    The C writer escapes \\t, \\n, \\v, \\f, \\r, \\\" and \\\\ in strings.
+    The parser unescapes all seven.  This class verifies each one survives
+    a complete write → parse cycle.
+    """
+
+    def _roundtrip_str(self, value: str) -> str:
+        from bovnar import loads, dumps
+        return loads(dumps({'s': value}))['s']
+
+    def test_tab_roundtrips(self):
+        assert self._roundtrip_str("a\tb") == "a\tb"
+
+    def test_newline_roundtrips(self):
+        assert self._roundtrip_str("a\nb") == "a\nb"
+
+    def test_carriage_return_roundtrips(self):
+        assert self._roundtrip_str("a\rb") == "a\rb"
+
+    def test_vertical_tab_roundtrips(self):
+        assert self._roundtrip_str("a\x0bb") == "a\x0bb", \
+            "vertical tab (\\v, 0x0B) must survive write-parse roundtrip"
+
+    def test_form_feed_roundtrips(self):
+        assert self._roundtrip_str("a\x0cb") == "a\x0cb", \
+            "form feed (\\f, 0x0C) must survive write-parse roundtrip"
+
+    def test_double_quote_roundtrips(self):
+        assert self._roundtrip_str('say "hello"') == 'say "hello"'
+
+    def test_backslash_roundtrips(self):
+        assert self._roundtrip_str("a\\b") == "a\\b"
+
+    def test_all_escapes_together(self):
+        s = "\t\n\x0b\x0c\r\"\\"
+        assert self._roundtrip_str(s) == s, \
+            "all seven escape sequences must survive roundtrip together"
+
+    def test_vertical_tab_appears_escaped_in_output(self):
+        from bovnar import dumps
+        out = dumps({'s': '\x0b'})
+        assert b'\\v' in out, \
+            "vertical tab (0x0B) must be escaped as \\\\v in the serialised output"
+
+    def test_form_feed_appears_escaped_in_output(self):
+        from bovnar import dumps
+        out = dumps({'s': '\x0c'})
+        assert b'\\f' in out, \
+            "form feed (0x0C) must be escaped as \\\\f in the serialised output"

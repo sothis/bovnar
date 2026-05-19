@@ -169,6 +169,12 @@ static void test_parse_string_escapes(void)
 
     parse_payload(".crlf = \"dos\\rline\";", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "string with CR escape must parse");
+
+    parse_payload(".vt = \"vt\\vhere\";", false, &ctx);
+    ASSERT_TRUE(!ctx.has_errors, "string with vertical-tab escape must parse");
+
+    parse_payload(".ff = \"ff\\fhere\";", false, &ctx);
+    ASSERT_TRUE(!ctx.has_errors, "string with form-feed escape must parse");
 }
 
 static void test_parse_negative_numbers(void)

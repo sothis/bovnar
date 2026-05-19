@@ -278,3 +278,81 @@ class TestWriteArraySpecialFloats:
         assert b'$infinity$' in out
         assert b'$-infinity$' in out
         assert b'1.5' in out
+
+
+@needs_lib
+class TestBoolRoundtrip:
+    """Regression tests for the bool symbol roundtrip bug.
+
+    BVNR booleans are written as the bare symbols ``true`` / ``false``.
+    The parser delivers them as ``token_is_symbol`` (type field == 3) with
+    ``value_type.family == vt_plain``.  _decode_value must inspect the token
+    type, not only the type family, so that these symbols are decoded back to
+    Python ``True`` / ``False`` rather than the strings ``'true'`` / ``'false'``.
+    """
+
+    def test_true_roundtrips_to_python_bool(self):
+        result = bovnar.loads(bovnar.dumps({'flag': True}))
+        assert result['flag'] is True
+
+    def test_false_roundtrips_to_python_bool(self):
+        result = bovnar.loads(bovnar.dumps({'flag': False}))
+        assert result['flag'] is False
+
+    def test_bool_type_not_string(self):
+        result = bovnar.loads(bovnar.dumps({'flag': True}))
+        assert isinstance(result['flag'], bool), (
+            f"Expected bool, got {type(result['flag']).__name__}")
+
+    def test_bool_in_nested_struct(self):
+        result = bovnar.loads(bovnar.dumps({'cfg': {'enabled': True, 'debug': False}}))
+        assert result['cfg']['enabled'] is True
+        assert result['cfg']['debug'] is False
+
+    def test_bool_with_sibling_int(self):
+        result = bovnar.loads(bovnar.dumps({'active': True, 'count': 5}))
+        assert result['active'] is True
+        assert result['count'] == 5
+
+    def test_bool_array_elements_roundtrip(self):
+        result = _roundtrip([True, False, True])
+        assert result == [True, False, True]
+
+    def test_bool_array_element_type(self):
+        result = _roundtrip([True, False])
+        assert isinstance(result[0], bool)
+        assert isinstance(result[1], bool)
+
+    def test_bool_in_struct_in_array(self):
+        result = _roundtrip([{'enabled': True}, {'enabled': False}])
+        assert result[0]['enabled'] is True
+        assert result[1]['enabled'] is False
+
+    def test_bool_via_write_array_helper(self):
+        with Writer.to_mem() as w:
+            write_array(w, 'flags', [True, False, True])
+        out = w.get_output()
+        result = bovnar.loads(out)
+        assert result['flags'] == [True, False, True]
+
+    def test_bool_dumps_loads_cycle(self):
+        doc = {'x': True, 'y': False, 'z': 42, 's': 'hello'}
+        result = bovnar.loads(bovnar.dumps(doc))
+        assert result['x'] is True
+        assert result['y'] is False
+        assert result['z'] == 42
+        assert result['s'] == 'hello'
+
+    def test_raw_bvnr_true_symbol(self):
+        result = bovnar.loads(b'.flag = true;\n')
+        assert result['flag'] is True
+
+    def test_raw_bvnr_false_symbol(self):
+        result = bovnar.loads(b'.flag = false;\n')
+        assert result['flag'] is False
+
+    def test_other_symbols_remain_strings(self):
+        result = bovnar.loads(b'.status = ok;\n')
+        assert result['status'] == 'ok'
+        assert not isinstance(result['status'], bool)
+

@@ -198,9 +198,16 @@ class Writer:
             d.data   = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)
             d.length = len(raw)
 
+            _decimal_float_families = frozenset((
+                int(ValueTypeFamily.FLOAT_FIX),
+                int(ValueTypeFamily.FLOAT_DEC),
+            ))
             if vt is not None:
                 fam = int(vt.family)
                 if fam == int(ValueTypeFamily.UTF8):
+                    d.type = self._TOKEN_IS_STRING
+                elif (vt.base not in (0, 10)
+                      and fam not in _decimal_float_families):
                     d.type = self._TOKEN_IS_STRING
                 else:
                     d.type = self._TOKEN_IS_NUMBER
@@ -250,14 +257,17 @@ class Writer:
         if not ok:
             self._raise_error()
 
-        numeric_families = {
+        _width_families = {
             int(ValueTypeFamily.UINT),
             int(ValueTypeFamily.SINT),
             int(ValueTypeFamily.FLOAT),
             int(ValueTypeFamily.FLOAT_FIX),
             int(ValueTypeFamily.FLOAT_DEC),
+            int(ValueTypeFamily.UTF8),
         }
-        if int(vt.family) in numeric_families:
+        fam = int(vt.family)
+
+        if fam in _width_families and vt.width != 0:
             d_width = BvnrData()
             d_width.type = self._TOKEN_IS_TYPE_WIDTH
             d_width.value_type = vt
@@ -267,9 +277,10 @@ class Writer:
             if not ok:
                 self._raise_error()
 
-            if vt.base not in (0, 10) and int(vt.family) not in (
-                    int(ValueTypeFamily.FLOAT_FIX),
-                    int(ValueTypeFamily.FLOAT_DEC)):
+        if fam in (int(ValueTypeFamily.FLOAT),
+                   int(ValueTypeFamily.SINT),
+                   int(ValueTypeFamily.UINT)):
+            if vt.base not in (0, 10):
                 d_base = BvnrData()
                 d_base.type = self._TOKEN_IS_TYPE_BASE
                 d_base.value_type = vt
@@ -279,15 +290,15 @@ class Writer:
                 if not ok:
                     self._raise_error()
 
-            if int(vt.family) == int(ValueTypeFamily.FLOAT_FIX) and vt.base != 0:
-                d_q = BvnrData()
-                d_q.type = self._TOKEN_IS_TYPE_Q
-                d_q.value_type = vt
-                ok = self._lib.bvnr_write_event(
-                    self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
-                    ctypes.byref(d_q))
-                if not ok:
-                    self._raise_error()
+        if fam == int(ValueTypeFamily.FLOAT_FIX) and vt.base != 0:
+            d_q = BvnrData()
+            d_q.type = self._TOKEN_IS_TYPE_Q
+            d_q.value_type = vt
+            ok = self._lib.bvnr_write_event(
+                self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
+                ctypes.byref(d_q))
+            if not ok:
+                self._raise_error()
 
         if vu.num_components > 0:
             lib = self._lib

@@ -761,6 +761,7 @@ static char *parse_json_string(const char **p)
 			case 'n':  *out++ = '\n'; break;
 			case 'r':  *out++ = '\r'; break;
 			case 't':  *out++ = '\t'; break;
+			case 'v':  *out++ = '\v'; break;
 			case 'u': {
 				if (end - in < 5) { free(str); return NULL; }
 				int hi = parse_hex4(in + 1);
@@ -965,15 +966,19 @@ static bool write_bvn_array(bvnr_writer_t *w, const char *key, const JsonNode *n
 		char nbuf[64];
 		int n;
 		if (!e || e->type == BVN_JSON_NULL) {
-			d.type   = token_is_array_number;
-			d.data   = "0";
-			d.length = 1;
+			d.type = token_is_null_value;
 		} else if (e->type == BVN_JSON_BOOL) {
-			d.type   = token_is_array_number;
-			d.data   = e->u.b ? "1" : "0";
-			d.length = 1;
+			const char *sym = e->u.b ? "true" : "false";
+			d.type   = token_is_symbol;
+			d.data   = sym;
+			d.length = (uint32_t)strlen(sym);
 		} else if (e->type == BVN_JSON_INT) {
-			n = snprintf(nbuf, sizeof(nbuf), "%" PRId64, e->u.i);
+			if (e->u.i >= 0) {
+				n = snprintf(nbuf, sizeof(nbuf), "%" PRIu64,
+					     (uint64_t)e->u.i);
+			} else {
+				n = snprintf(nbuf, sizeof(nbuf), "%" PRId64, e->u.i);
+			}
 			d.type   = token_is_array_number;
 			d.data   = nbuf;
 			d.length = (n > 0) ? (uint32_t)n : 1u;
@@ -1016,7 +1021,10 @@ static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *n
 	switch (node->type) {
 	case BVN_JSON_NULL:   return bvnr_write_null(w, key);
 	case BVN_JSON_BOOL:   return bvnr_write_bool(w, key, node->u.b);
-	case BVN_JSON_INT:    return bvnr_write_sint(w, key, 0, node->u.i);
+	case BVN_JSON_INT:
+		if (node->u.i >= 0)
+			return bvnr_write_uint(w, key, 0, (uint64_t)node->u.i);
+		return bvnr_write_sint(w, key, 0, node->u.i);
 	case BVN_JSON_FLOAT:  return bvnr_write_float(w, key, 0, node->u.f);
 	case BVN_JSON_STRING: return bvnr_write_string(w, key, node->u.s);
 	case BVN_JSON_ARRAY:  return write_bvn_array(w, key, node);

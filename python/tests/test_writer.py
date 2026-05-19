@@ -849,3 +849,69 @@ class TestStringEscapeRoundtrip:
         out = dumps({'s': '\x0c'})
         assert b'\\f' in out, \
             "form feed (0x0C) must be escaped as \\\\f in the serialised output"
+
+
+@needs_lib
+class TestEmptyStringRoundtrip:
+    """Regression tests for the empty-string/null confusion in _decode_value.
+
+    Bug – _decode_value returned None unconditionally when raw bytes were
+    empty, which made both null values AND empty strings ("") decode to None.
+    The fix checks tok_type: TOKEN_IS_STRING (1) or TOKEN_IS_ARRAY_STRING (6)
+    with empty raw → empty string; tok_type TOKEN_IS_NULL_VALUE (9) → None.
+    """
+
+    def _rt(self, d: dict) -> dict:
+        from bovnar import loads, dumps
+        return loads(dumps(d))
+
+    def test_empty_string_scalar_roundtrips(self):
+        result = self._rt({'k': ''})
+        assert result['k'] == '', \
+            "empty string must roundtrip as '' not None"
+
+    def test_empty_string_is_not_none(self):
+        result = self._rt({'k': ''})
+        assert result['k'] is not None, \
+            "empty string must not decode to None"
+
+    def test_null_still_roundtrips_as_none(self):
+        result = self._rt({'k': None})
+        assert result['k'] is None, \
+            "null must still decode to None after the fix"
+
+    def test_empty_string_in_array_roundtrips(self):
+        result = self._rt({'a': ['', 'x', '']})
+        assert result['a'] == ['', 'x', ''], \
+            "empty strings inside arrays must roundtrip as ''"
+
+    def test_null_in_array_still_decodes_as_none(self):
+        from bovnar import loads
+        raw = b'.a = [,];'
+        result = loads(raw)
+        assert result['a'] == [None, None], \
+            "null array elements must still decode to None"
+
+    def test_mixed_empty_and_null_in_array(self):
+        from bovnar import loads, dumps
+        out = dumps({'a': ['', 'hello', '']})
+        assert b'""' in out, "serialised output must contain quoted empty strings"
+        result = loads(out)
+        assert result['a'] == ['', 'hello', ''], \
+            "empty strings must survive write-parse through array"
+
+    def test_empty_string_roundtrip_via_write_string(self):
+        from bovnar import loads
+        with Writer.to_mem() as w:
+            w.write_string('s', '')
+        out = w.get_output()
+        result = loads(out)
+        assert result['s'] == '', \
+            "write_string('s', '') must parse back as empty string"
+
+    def test_typed_empty_string_roundtrips(self):
+        from bovnar import loads
+        raw = b'.k = <utf8> "";'
+        result = loads(raw)
+        assert result['k'] == '', \
+            "typed empty string <utf8> \"\" must decode as ''"

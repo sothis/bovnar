@@ -365,6 +365,8 @@ _TOKEN_IS_SYMBOL = 3
 
 def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> object:
     if not raw:
+        if tok_type in (1, 6):
+            return ''
         return None
     text = raw.decode('utf-8', errors='replace')
 

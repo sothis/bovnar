@@ -348,8 +348,7 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	f->saved_vtype = p->val.value_type;
 	f->saved_vunit = p->val.parsed_unit;
 	p->lex.curr_row_size  = 0;
-	p->lex.array_row_size = (f->in_dim_seq || f->dim_row_size)
-	                        ? f->dim_row_size : 0;
+	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : 0;
 	++p->lex.curr_row_size;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;

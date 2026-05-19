@@ -1465,6 +1465,26 @@ footer { position: relative; z-index: 1; }
 .hljs-section    { color: #569cd6; font-weight: 500; }
 .hljs-name       { color: #4ec9b0; }
 
+/* Bovnar language token colors — keyed to the CSS variables in :root */
+.hljs-bvn-comment { color: var(--c-comment); font-style: italic; }
+.hljs-bvn-sigil   { color: var(--c-sigil); }
+.hljs-bvn-key     { color: var(--c-key); }
+.hljs-bvn-eq      { color: var(--c-eq); }
+.hljs-bvn-ann     { color: var(--c-ann); }
+.hljs-bvn-type    { color: var(--c-type); font-weight: 600; }
+.hljs-bvn-unit    { color: var(--c-unit); }
+.hljs-bvn-param   { color: var(--c-param); }
+.hljs-bvn-special { color: #c084fc; }
+.hljs-bvn-val     { color: var(--c-val); }
+.hljs-bvn-str     { color: var(--c-str); }
+.hljs-bvn-esc     { color: #93c5fd; font-weight: 600; }
+.hljs-bvn-semi    { color: var(--c-semi); }
+.hljs-bvn-refop   { color: #ff2a7d; font-weight: 600; }
+.hljs-bvn-refpath { color: var(--c-param); }
+.hljs-bvn-sym     { color: var(--c-key); }
+.hljs-bvn-sep     { color: var(--c-semi); }
+.hljs-invalid     { color: #fb923c; text-decoration: underline; }
+
 #doc-content ul, #doc-content ol {
   padding-left: 1.4rem;
   margin: 0 0 1rem;
@@ -2503,6 +2523,121 @@ const content  = document.getElementById('doc-content');
 const wrap     = document.getElementById('doc-content-wrap');
 
 marked.use({ gfm: true, breaks: false });
+
+hljs.registerLanguage('bovnar', function() {
+
+  const COMMENT = {
+    scope: 'bvn-comment',
+    begin: /#/,
+    end: /$/
+  };
+
+  const SPECIAL_FLOAT = {
+    scope: 'bvn-special',
+    match: /\$(?:-infinity|infinity|nan)\$/
+  };
+
+  /* Matches leading-dot floats (.5, -.5), integer-led floats (3.14, 1.),
+     bare integers (42, -7), and scientific notation (1e6, 2.5e-3). */
+  const NUMBER = {
+    scope: 'bvn-val',
+    match: /-?(?:\d+\.?\d*(?:[eE][+\-]?\d+)?|\.\d+(?:[eE][+\-]?\d+)?)/
+  };
+
+  const STRING = {
+    scope: 'bvn-str',
+    begin: /"/,
+    end: /"/,
+    contains: [
+      { scope: 'bvn-esc', match: /\\[tnvfr"\\]/ },
+      { scope: 'invalid',  match: /\\./ }
+    ]
+  };
+
+  /* Inline unit suffix: mandatory whitespace after a scalar (digit, $, or
+     closing "), then unit chars including SI/IEC prefix~base notation,
+     Unicode superscript exponents, and compound separators. */
+  const INLINE_UNIT = {
+    match: [
+      /(?<=[\d$"])\s+/,
+      /[A-Za-z_µΩ°][A-Za-z0-9_~·µΩ°¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*/
+    ],
+    scope: { 2: 'bvn-unit' }
+  };
+
+  /* Unit expression inside a type annotation: SI/IEC prefix~unit with
+     optional exponent and product/division operators. */
+  const UNIT_EXPR = {
+    scope: 'bvn-unit',
+    match: /[A-Za-zµΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?(?:[·\/*][A-Za-zµΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?)*/
+  };
+
+  /* Type annotation <...>: brackets get bvn-ann; inside, type-family
+     keywords, no_unit, params (width/base/q-format), unit expressions,
+     and colon/comma separators are each scoped independently. */
+  const TYPE_ANN = {
+    begin: /</,
+    end: />/,
+    beginScope: 'bvn-ann',
+    endScope: 'bvn-ann',
+    contains: [
+      COMMENT,
+      {
+        scope: 'bvn-type',
+        match: /\b(?:float_fix|float_dec|float|uint|sint|utf8)\b/
+      },
+      { scope: 'bvn-unit',  match: /\bno_unit\b/ },
+      { scope: 'bvn-param', match: /\bq\d+\b/ },
+      { scope: 'bvn-param', match: /_\d+/ },
+      { scope: 'bvn-param', match: /\b\d+\b/ },
+      UNIT_EXPR,
+      { scope: 'bvn-sep', match: /[:,]/ }
+    ]
+  };
+
+  /* Reference literal: & sigil followed by one or more .segment paths.
+     The mode ends at any whitespace or structural punctuation (zero-width
+     lookahead so the terminator is available to its own pattern). */
+  const REFERENCE = {
+    begin: /&/,
+    end: /(?=[,;\s\[\]{}#]|$)/,
+    beginScope: 'bvn-refop',
+    contains: [
+      { scope: 'bvn-refpath', match: /\.[A-Za-z_][A-Za-z0-9_+\-]*/ }
+    ]
+  };
+
+  /* Key assignment sigil + name: dot immediately followed by an identifier.
+     Group 1 (the dot) gets bvn-sigil; group 2 (the name) gets bvn-key.
+     Dots in numeric literals (.5) are consumed by NUMBER first; dots inside
+     type annotations are inside TYPE_ANN scope; dots in references are
+     inside REFERENCE scope — so no false positives in practice. */
+  const KEY_SIGIL = {
+    match: [/\./, /[A-Za-z_][A-Za-z0-9_+\-]*/],
+    scope: { 1: 'bvn-sigil', 2: 'bvn-key' }
+  };
+
+  return {
+    name: 'Bovnar',
+    aliases: ['bvnr'],
+    case_insensitive: false,
+    contains: [
+      COMMENT,
+      TYPE_ANN,
+      SPECIAL_FLOAT,
+      STRING,
+      REFERENCE,
+      KEY_SIGIL,
+      NUMBER,
+      INLINE_UNIT,
+      { scope: 'bvn-eq',   match: /=/ },
+      { scope: 'bvn-semi', match: /;/ },
+      { scope: 'bvn-ann',  match: /[\[\]{}]/ },
+      { scope: 'bvn-sep',  match: /[,\/]/ },
+      { scope: 'bvn-sym',  match: /\b[A-Za-z_][A-Za-z0-9_+\-]*\b/ }
+    ]
+  };
+});
 
 let currentFile = null;
 

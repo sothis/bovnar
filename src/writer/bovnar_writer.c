@@ -225,6 +225,14 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 					error_digit_not_in_base);
 				goto out;
 			}
+		} else if (vt.family == vt_float ||
+			   vt.family == vt_float_fix ||
+			   vt.family == vt_float_dec) {
+			if (!bvn_validate_number_in_base(buf, base)) {
+				ok = bvn_writer_set_error(w,
+					error_digit_not_in_base);
+				goto out;
+			}
 		}
 		if (vt.family == vt_uint && vt.width) {
 			if (!bvn_validate_uint_range(buf, width, base)) {
@@ -394,7 +402,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			if (!bvn_validate_string_content(w,
 					(const uint8_t*)data->data, data->length))
 				return false;
-			if (vt.family == vt_uint || vt.family == vt_sint) {
+			if (bvn_type_is_numeric(vt)) {
 				if (!bvn_validate_string_as_number(w,
 						data->data, data->length, vt))
 					return false;

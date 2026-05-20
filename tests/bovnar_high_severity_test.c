@@ -1870,6 +1870,184 @@ static void test_bug_b_single_notification_on_semicolon_recovery(void)
     bvnr_reader_destroy(r);
 }
 
+typedef struct {
+    unsigned struct_start_count;
+    unsigned struct_end_count;
+    unsigned ev_data_count;
+    unsigned error_count;
+    bool     reject_struct_start;
+} svt_ctx_t;
+
+static bool svt_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+    svt_ctx_t *c = ud;
+    (void)d;
+    if (ev == ev_struct_start) {
+        c->struct_start_count++;
+        if (c->reject_struct_start)
+            return false;
+    } else if (ev == ev_struct_end) {
+        c->struct_end_count++;
+    } else if (ev == ev_data) {
+        c->ev_data_count++;
+    }
+    return true;
+}
+
+static void svt_error(void *ud, error_code_t err,
+                       uint64_t line, uint64_t col,
+                       uint32_t byte, uint64_t off)
+{
+    svt_ctx_t *c = ud;
+    c->error_count++;
+    (void)err; (void)line; (void)col; (void)byte; (void)off;
+}
+
+static void test_bug_c_inline_unit_comment_no_concat(void)
+{
+    printf("  test_bug_c_inline_unit_comment_no_concat...\n");
+
+    /*
+     * Before fix: bvn_action_comment_outro restored last_state =
+     * inline_unit_body without translation, so the byte immediately
+     * after a comment that appeared inside an inline-unit body was
+     * silently appended to the unit string.
+     *
+     * Input:  ".x = 1.5 kg#comment\nm;\n"
+     * Before: unit = "kgm"   (silent wrong result)
+     * After:  'm' is illegal in inline_unit_outro => error + recovery
+     *
+     * Sub-test A: comment followed immediately by ';' — must succeed
+     * cleanly (the comment is the terminator for the unit body).
+     *
+     * Sub-test B: with continue_on_error, a non-unit byte after the
+     * comment must trigger at least one recovery rather than silently
+     * producing a wrong unit string.
+     */
+
+    capture_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified = capture_verified,
+        .on_error    = capture_error,
+        .userdata    = &ctx,
+    };
+
+    bvnr_reader_t *r = NULL;
+    ASSERT_TRUE(do_parse_str(".x = 1.5 m#comment\n;\n", &f, &r),
+                "bug_c A: unit + comment + semicolon must parse cleanly");
+    ASSERT_EQ_UINT((uint64_t)ctx.ev_data_count, 1,
+                   "bug_c A: exactly one data event");
+    bvnr_reader_destroy(r);
+
+    resync_ctx_t rctx = {0};
+    bvnr_read_flags_t fc = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &rctx,
+        .continue_on_error = true,
+    };
+    r = NULL;
+    (void)do_parse_str(".x = 1.5 m#comment\n!;\n", &fc, &r);
+    ASSERT_GE_UINT(bvnr_reader_get_recovery_count(r), 1,
+                   "bug_c B: non-unit byte after unit comment must trigger recovery");
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug_d_struct_intro_no_phantom_end(void)
+{
+    printf("  test_bug_d_struct_intro_no_phantom_end...\n");
+
+    /*
+     * Before fix: bvn_action_struct_intro incremented struct_nesting_level
+     * before calling bvn_val_receive_event(ev_struct_start). With
+     * continue_on_error, if on_verified rejected ev_struct_start,
+     * bvn_enter_resync captured the inflated level (1 instead of 0).
+     * The subsequent '}' in resync then decremented it back to 0 while
+     * emitting ev_struct_end — a phantom event with no matching start.
+     *
+     * After fix: the level is incremented only on success, so resync
+     * captures the correct level (0) and the resync '}' handler never
+     * fires the closing event.
+     */
+    svt_ctx_t ctx = { .reject_struct_start = true };
+    bvnr_read_flags_t f = {
+        .on_verified       = svt_verified,
+        .on_error          = svt_error,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug_d: reader create");
+    if (!r) return;
+
+    const char *src = ".x = {};\n";
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 1,
+                   "bug_d: exactly one error (the rejected ev_struct_start)");
+    ASSERT_EQ_UINT((uint64_t)ctx.struct_start_count, 1,
+                   "bug_d: ev_struct_start delivered once (then rejected)");
+    ASSERT_EQ_UINT((uint64_t)ctx.struct_end_count, 0,
+                   "bug_d: no phantom ev_struct_end without matching start");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug_f_bad_continuation_retried_in_resync(void)
+{
+    printf("  test_bug_f_bad_continuation_retried_in_resync...\n");
+
+    /*
+     * Before fix: when an invalid UTF-8 continuation byte was detected
+     * inside resync mode the offending byte was silently consumed via
+     * `continue`, never reaching the resync state machine. Structural
+     * bytes like ';' (0x3B) that appeared where a continuation was
+     * expected were therefore lost, preventing resync from terminating.
+     *
+     * The stream ".x = !!\xc2;\n":
+     *   - '!!' in value_intro => error_unexpected_input_byte, recovery #1.
+     *   - '\xc2' in resync => valid 2-byte leader, utf8_need = 1.
+     *   - ';' (0x3B) arrives: not a valid continuation (not in [0x80,0xBF])
+     *     => error_invalid_utf8_byte, recovery #2.
+     *     Before fix: ';' dropped, parser stays in resync, hits EOF =>
+     *       error_got_incomplete_bvnr_stream, bvnr_read returns false.
+     *     After fix: ';' re-offered to resync scanner =>
+     *       bvn_action_resync_semicolon fires, recovery exits cleanly,
+     *       bvnr_read returns true.
+     */
+    static const uint8_t src[] = {
+        '.','x',' ','=',' ','!','!', (uint8_t)0xc2, ';','\n'
+    };
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug_f: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, sizeof(src), NULL, 0, &f)
+           && bvnr_read(r);
+
+    ASSERT_TRUE(ok,
+                "bug_f: parse must succeed when ';' is retried after bad continuation");
+    ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 2,
+                   "bug_f: exactly two recoveries ('!!' error and bad-continuation ';')");
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 2,
+                   "bug_f: exactly two on_error callbacks");
+
+    bvnr_reader_destroy(r);
+}
+
 int main(void)
 {
     printf("Running bovnar_high_severity_test suite...\n\n");
@@ -1945,6 +2123,11 @@ int main(void)
     printf("\nRegression: two additional release-blocking lexer bugs (Bug A, Bug B)\n");
     test_bug_a_no_phantom_struct_after_bracket_semicolon();
     test_bug_b_single_notification_on_semicolon_recovery();
+
+    printf("\nFix: three further release-blocking lexer bugs (Bug C, D, F)\n");
+    test_bug_c_inline_unit_comment_no_concat();
+    test_bug_d_struct_intro_no_phantom_end();
+    test_bug_f_bad_continuation_retried_in_resync();
 
     printf("\n");
     if (g_failures == 0) {

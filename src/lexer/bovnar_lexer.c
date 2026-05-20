@@ -187,8 +187,9 @@ bool bvn_action_comment_intro(bvnr_reader_t* p)
 bool bvn_action_comment_outro(bvnr_reader_t* p)
 {
 	state_t s = p->lex.last_state;
-	if (s == number_outro_nosp) s = number_outro;
+	if      (s == number_outro_nosp) s = number_outro;
 	else if (s == string_outro_nosp) s = string_outro;
+	else if (s == inline_unit_body)  s = inline_unit_outro;
 	p->lex.next_state = s;
 	return true;
 }
@@ -529,9 +530,9 @@ bool bvn_action_struct_intro(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_struct_nesting_too_high);
 		return false;
 	}
-	++l->struct_nesting_level;
 	if (!bvn_val_receive_event(p, ev_struct_start))
 		return false;
+	++l->struct_nesting_level;
 	l->token_type = token_is_structure;
 	l->next_state = struct_intro;
 	return true;
@@ -1003,8 +1004,16 @@ static bool bvn_interpret_input_buffer(
 			bvn_notify_error(p);
 			bvn_advance_line(l, prev);
 			if (l->continue_on_error) {
+				bool was_continuation = (saved_need > 0);
 				bvn_enter_resync(p);
-				continue;
+				if (!was_continuation || l->byte == 0x09 ||
+					l->byte == 0x0a || l->byte == 0x0d) {
+					continue;
+				}
+				if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
+					continue;
+				}
+				++l->column;
 			} else {
 				return false;
 			}

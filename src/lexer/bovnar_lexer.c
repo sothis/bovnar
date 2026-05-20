@@ -34,7 +34,6 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	l->utf8_need = 0;
 	l->utf8_lo = 0;
 	l->utf8_hi = 0;
-	l->prev_byte  = 0;
 	l->bom_len    = 0;
 	l->str_len    = 0;
 	l->type_len   = 0;
@@ -146,8 +145,7 @@ static bool bvn_lex_finalize(bvnr_reader_t* p, bvn_lex_sink_fn sink)
 	}
 	if (tt == token_is_unknown)
 		return true;
-	if (tt != token_is_type)
-		l->str_data[l->str_len] = 0;
+	l->str_data[l->str_len] = 0;
 	l->type_data[l->type_len] = 0;
 	l->inline_unit_data[l->inline_unit_len] = 0;
 	if (tt == token_is_identifier && !l->str_len) {
@@ -632,22 +630,18 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			return true;
 		}
 		if (l->array_nesting_level > 0) {
-			uint64_t effective_row = l->array_row_size
-				? l->array_row_size : l->curr_row_size;
-			l->array_row_size = 0;
-			if (!bvn_val_on_array_outro(p, effective_row,
-						    &l->array_row_size))
+			if (!bvn_val_receive_event(p, ev_array_row_end))
 				return false;
 			--l->array_nesting_level;
 			uint64_t level = l->array_nesting_level;
 			bvn_array_frame_t *f = &l->arr_frames[level];
-			f->dim_row_size    = l->array_row_size;
-			l->curr_row_size   = f->saved_curr + 1u;
-			l->array_row_size  = f->saved_row;
-			p->val.value_type  = f->saved_vtype;
-			p->val.parsed_unit = f->saved_vunit;
-			l->in_array_element = (l->array_nesting_level > 0);
-			l->next_state = array_outro;
+			f->dim_row_size      = l->curr_row_size;
+			l->curr_row_size     = f->saved_curr + 1u;
+			l->array_row_size    = f->saved_row;
+			p->val.value_type    = f->saved_vtype;
+			p->val.parsed_unit   = f->saved_vunit;
+			l->in_array_element  = (l->array_nesting_level > 0);
+			l->next_state        = resync;
 		} else {
 			l->next_state = resync;
 		}
@@ -658,10 +652,21 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			return true;
 		}
 		if (l->struct_nesting_level > 0) {
+			while (l->array_nesting_level > 0) {
+				if (!bvn_val_receive_event(p, ev_array_row_end))
+					return false;
+				--l->array_nesting_level;
+			}
+			l->curr_row_size    = 0;
+			l->array_row_size   = 0;
+			l->in_array_element = false;
+			memset(l->arr_frames, 0,
+			       (l->max_array_nesting + 1u) *
+			       sizeof(bvn_array_frame_t));
 			--l->struct_nesting_level;
 			if (!bvn_val_receive_event(p, ev_struct_end))
 				return false;
-			l->next_state = struct_outro;
+			l->next_state = resync;
 		} else {
 			l->next_state = resync;
 		}
@@ -681,6 +686,8 @@ static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
 			break;
 		}
 	}
+	if (l->struct_nesting_level < l->resync_saved_struct_nesting)
+		l->resync_saved_struct_nesting = l->struct_nesting_level;
 	l->token_type           = token_is_unknown;
 	l->str_len              = 0;
 	l->type_len             = 0;
@@ -709,20 +716,14 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 		return true;
 	}
 	while (l->array_nesting_level > 0) {
-		--l->array_nesting_level;
-		if (!bvn_val_receive_event(p, ev_array_row_start)) {
-			(void)bvn_resync_semicolon_reset(p);
-			return false;
-		}
 		if (!bvn_val_receive_event(p, ev_array_row_end)) {
 			(void)bvn_resync_semicolon_reset(p);
 			return false;
 		}
+		--l->array_nesting_level;
 	}
-	if (!bvn_resync_semicolon_reset(p)) {
-		bvn_notify_error(p);
+	if (!bvn_resync_semicolon_reset(p))
 		return false;
-	}
 	return true;
 }
 bool bvn_action_resync_string_intro(bvnr_reader_t* p)
@@ -869,6 +870,7 @@ static bool bvn_read_octet_stream(
 			return false;
 		if (tag == 0x00) {
 			p->lex.token_type = token_is_unknown;
+			p->lex.str_len    = 0;
 			if (!bvn_val_receive_event(p, ev_octet_stream_end))
 				return false;
 			p->lex.next_state = octet_stream_outro;
@@ -955,8 +957,9 @@ static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
 	if (l->byte == 0x0d) {
 		++l->line;
 		l->column = 0;
-	} else if (l->byte == 0x0a && prev != 0x0d) {
-		++l->line;
+	} else if (l->byte == 0x0a) {
+		if (prev != 0x0d)
+			++l->line;
 		l->column = 0;
 	}
 }
@@ -1116,7 +1119,7 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				l->next_state == resync_string ||
 				l->next_state == resync_string_escape ||
 				l->next_state == resync_comment) {
-				bvn_notify_error(r);
+				bvn_set_eof_error(r, r->val.last_error);
 				return false;
 			}
 			bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);

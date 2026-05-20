@@ -282,6 +282,11 @@ static void test_parse_whitespace_variations(void)
 
     parse_payload(".a\t=\t1\t;\n.b\n=\n2\n;\n", false, &ctx);
     ASSERT_TRUE(!ctx.has_errors, "assignments with tabs and newlines must parse");
+
+    /* CRLF line endings: the second assignment must parse cleanly and
+     * column tracking must not be thrown off by the CR+LF pair. */
+    parse_payload(".a = 1;\r\n.b = 2;\r\n", false, &ctx);
+    ASSERT_TRUE(!ctx.has_errors, "assignments with CRLF line endings must parse");
 }
 
 static void test_parse_null_values_multiple(void)

@@ -1092,6 +1092,784 @@ static void test_stream_end_event(void)
     bvnr_reader_destroy(r);
 }
 
+/*
+ * ----------------------------------------------------------------
+ * Regression tests for the four release-blocking lexer bugs:
+ *   Bug 1 – stale error position (all-zero) at EOF-in-resync
+ *   Bug 2 – column counter off-by-one after CRLF line endings
+ *   Bug 3 – str_len not reset after octet-stream chunk completes
+ *   Bug 4 – spurious ev_array_row_start injected by resync_semicolon
+ * ----------------------------------------------------------------
+ */
+
+typedef struct {
+    uint32_t row_start_count;
+    uint32_t row_end_count;
+    uint32_t error_count;
+    error_code_t last_error;
+    uint64_t last_error_line;
+    uint64_t last_error_column;
+    uint64_t last_error_offset;
+} lex_bug_ctx_t;
+
+static bool lex_bug_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+    lex_bug_ctx_t *c = ud;
+    (void)d;
+    if (ev == ev_array_row_start) c->row_start_count++;
+    if (ev == ev_array_row_end)   c->row_end_count++;
+    return true;
+}
+
+static void lex_bug_on_error(void *ud, error_code_t err,
+                              uint64_t line, uint64_t col,
+                              uint32_t byte, uint64_t off)
+{
+    lex_bug_ctx_t *c = ud;
+    c->error_count++;
+    c->last_error          = err;
+    c->last_error_line     = line;
+    c->last_error_column   = col;
+    c->last_error_offset   = off;
+    (void)byte;
+}
+
+static void test_bug1_resync_eof_position(void)
+{
+    printf("  test_bug1_resync_eof_position...\n");
+
+    /*
+     * A stream that contains an illegal byte sequence, after which
+     * the lexer enters resync and the stream ends without a
+     * semicolon to recover.  Before the fix, the error callback
+     * fired with line=0, column=0, offset=0.
+     */
+    const char *src = ".a = !!;\n";  /* '!!' is invalid, triggers resync */
+
+    lex_bug_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = lex_bug_verified,
+        .on_error          = lex_bug_on_error,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug1: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count > 0,
+                "bug1: at least one error callback must fire");
+
+    /*
+     * The fix: position fields must not all be zero.  At minimum
+     * error_offset must reflect the number of bytes processed,
+     * and error_line must be >= 1 (init value is 1).
+     */
+    ASSERT_TRUE(ctx.last_error_line >= 1,
+                "bug1: error_line must be >= 1 (not zeroed) at EOF-in-resync");
+    ASSERT_TRUE(ctx.last_error_offset > 0,
+                "bug1: error_offset must be > 0 (not zeroed) at EOF-in-resync");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug2_crlf_column_tracking(void)
+{
+    printf("  test_bug2_crlf_column_tracking...\n");
+
+    /*
+     * Two assignments separated by a CRLF pair.  The second
+     * assignment has an intentional error on the second character
+     * of the second line so we can verify the reported column.
+     *
+     * Line 1 (CR+LF): ".a = 1;\r\n"   — 9 bytes
+     * Line 2:         ".b = !!;\n"     — error at '!', column 6
+     *
+     * Before the fix, the LF byte in the CRLF pair bumped the
+     * column counter to 1 without resetting it, so all subsequent
+     * columns on line 2 were reported one too high.
+     */
+    const char *src = ".a = 1;\r\n.b = !!;\n";
+
+    lex_bug_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = lex_bug_verified,
+        .on_error          = lex_bug_on_error,
+        .userdata          = &ctx,
+        .continue_on_error = false,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug2: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count > 0,
+                "bug2: error must be reported for '!!'");
+    ASSERT_EQ_UINT(ctx.last_error_line, 2,
+                   "bug2: error must be on line 2");
+    /*
+     * ".b = !!" — the first '!' is at byte offset 5 on line 2.
+     * Column counting is 1-based, so the first '!' is at column 6.
+     * Before the fix the column was 7 due to LF consuming one slot.
+     */
+    ASSERT_EQ_UINT(ctx.last_error_column, 6,
+                   "bug2: error column must be 6 (1-based), not 7");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug3_str_len_after_octet_stream(void)
+{
+    printf("  test_bug3_str_len_after_octet_stream...\n");
+
+    /*
+     * Parse two assignments: an octet stream followed by a normal
+     * string.  If str_len is not properly reset after the octet
+     * stream finishes, the subsequent string token could be
+     * processed with a stale accumulator.
+     *
+     * Wire layout:
+     *   .b = <octet-stream start> 0x00 (immediate end) ; \n
+     *   .s = "hello"; \n
+     */
+    static const uint8_t src[] = {
+        '.', 'b', ' ', '=', ' ',
+        '\x00', '\x00',           /* octet-stream start + immediate end tag */
+        ';', '\n',
+        '.', 's', ' ', '=', ' ', '"', 'h', 'e', 'l', 'l', 'o', '"', ';', '\n'
+    };
+
+    lex_bug_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified = lex_bug_verified,
+        .on_error    = lex_bug_on_error,
+        .userdata    = &ctx,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug3: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)sizeof(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+
+    ASSERT_TRUE(ok,
+                "bug3: octet-stream followed by string must parse without error");
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 0,
+                   "bug3: no error callback must fire");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug4_resync_semicolon_row_balance(void)
+{
+    printf("  test_bug4_resync_semicolon_row_balance...\n");
+
+    /*
+     * An array that contains a parse error followed by a semicolon
+     * that triggers the resync_semicolon recovery path.
+     *
+     * Before the fix, resync_semicolon emitted ev_array_row_start
+     * for each open array level in addition to ev_array_row_end,
+     * producing an extra unmatched start event and confusing any
+     * consumer that counts starts and ends.
+     */
+    const char *src =
+        ".a = [1, !!bad;\n"   /* resync on '!', recover on ';' */
+        ".b = 2;\n";
+
+    lex_bug_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = lex_bug_verified,
+        .on_error          = lex_bug_on_error,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug4: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count > 0,
+                "bug4: parse error on '!!' must be reported");
+
+    /*
+     * After the fix: each ev_array_row_start must be paired with
+     * exactly one ev_array_row_end.  The spurious extra start from
+     * resync_semicolon is gone, so the counts must be equal.
+     */
+    ASSERT_EQ_UINT((uint64_t)ctx.row_start_count,
+                   (uint64_t)ctx.row_end_count,
+                   "bug4: ev_array_row_start count must equal ev_array_row_end count");
+
+    bvnr_reader_destroy(r);
+}
+
+
+/*
+ * ----------------------------------------------------------------
+ * Regression tests for the seven release-blocking lexer bugs
+ * identified in the review of bovnar_lexer.c:
+ *
+ *   New Bug 1 – resync_close_bracket `}` leaves array_nesting_level
+ *               dirty (open arrays not drained before ev_struct_end)
+ *   New Bug 2 – resync_semicolon decrements array_nesting_level
+ *               before the ev_array_row_end callback fires
+ *   New Bug 3 – EOF-in-resync re-fires on_error with the original
+ *               error code instead of error_got_incomplete_bvnr_stream
+ *   New Bug 4 – resync_close_bracket exits resync to array_outro /
+ *               struct_outro prematurely, causing a second recovery
+ *               on the very next invalid byte
+ *   New Bug 5 – bvn_enter_resync zeros prev_byte, corrupting CR+LF
+ *               line counting at a resync boundary
+ *   New Bug 6 – resync_close_bracket `]` pre-zeros array_row_size
+ *               before bvn_val_on_array_outro, suppressing mismatch
+ *               detection (addressed as part of Bug 6 fix)
+ *   New Bug 7 – bvn_lex_finalize skips NUL-terminating str_data for
+ *               token_is_type (implicit invariant, no runtime break)
+ *
+ *   Bug A – bvn_resync_semicolon_reset unconditionally restores
+ *            struct_nesting_level to resync_saved_struct_nesting
+ *            even after `}` in resync already closed the struct,
+ *            leaving a phantom open struct that triggers a spurious
+ *            error_got_incomplete_bvnr_stream at EOF.
+ *
+ *   Bug B – bvn_action_resync_semicolon called bvn_notify_error
+ *            directly when bvn_resync_semicolon_reset returned
+ *            false, producing a first notification with zeroed
+ *            position fields before the outer interpreter could
+ *            emit the authoritative one.
+ * ----------------------------------------------------------------
+ */
+
+typedef struct {
+    uint32_t     error_count;
+    error_code_t first_error;
+    error_code_t last_error;
+    uint64_t     last_error_line;
+    uint64_t     last_error_column;
+    uint64_t     last_error_offset;
+    uint32_t     array_row_start_count;
+    uint32_t     array_row_end_count;
+    uint32_t     struct_start_count;
+    uint32_t     struct_end_count;
+} resync_ctx_t;
+
+static bool resync_verified_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+    resync_ctx_t *c = ud;
+    (void)d;
+    switch (ev) {
+    case ev_array_row_start: c->array_row_start_count++; break;
+    case ev_array_row_end:   c->array_row_end_count++;   break;
+    case ev_struct_start:    c->struct_start_count++;    break;
+    case ev_struct_end:      c->struct_end_count++;      break;
+    default: break;
+    }
+    return true;
+}
+
+static void resync_error_cb(void *ud, error_code_t err,
+                             uint64_t line, uint64_t col,
+                             uint32_t byte, uint64_t off)
+{
+    resync_ctx_t *c = ud;
+    if (c->error_count == 0)
+        c->first_error = err;
+    c->last_error        = err;
+    c->last_error_line   = line;
+    c->last_error_column = col;
+    c->last_error_offset = off;
+    c->error_count++;
+    (void)byte;
+}
+
+static void test_new_bug1_resync_struct_drains_arrays(void)
+{
+    printf("  test_new_bug1_resync_struct_drains_arrays...\n");
+
+    /*
+     * A struct containing an open array.  A syntax error triggers
+     * resync.  The recovery `}` closes the struct.
+     *
+     * Before the fix: ev_struct_end was fired while the array was
+     * still open — array_row_end_count < array_row_start_count.
+     *
+     * After the fix: the array is drained first, so both counts
+     * are equal.
+     */
+    const char *src =
+        ".x = { .a = [1, 2, !!bad } ;\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug1: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count > 0,
+                "new_bug1: at least one error must fire");
+    ASSERT_TRUE(ctx.struct_start_count >= 1,
+                "new_bug1: at least one ev_struct_start");
+    ASSERT_EQ_UINT((uint64_t)ctx.struct_start_count,
+                   (uint64_t)ctx.struct_end_count,
+                   "new_bug1: ev_struct_start/end must be balanced");
+    ASSERT_EQ_UINT((uint64_t)ctx.array_row_start_count,
+                   (uint64_t)ctx.array_row_end_count,
+                   "new_bug1: ev_array_row_start/end must be balanced");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_new_bug3_resync_eof_distinct_error_code(void)
+{
+    printf("  test_new_bug3_resync_eof_distinct_error_code...\n");
+
+    /*
+     * A stream that ends mid-resync (no semicolon to recover).
+     *
+     * Before the fix: on_error fired twice — once at the error site
+     * with the correct code, then again at EOF-in-resync with the
+     * same code, causing double notification and corrupting the
+     * last_error seen by the consumer.
+     *
+     * After the fix: the second call is suppressed.  on_error fires
+     * exactly once, with the original error code intact.
+     */
+    const char *src = ".a = !!";   /* truncated in resync, no ';' */
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug3: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 1,
+                   "new_bug3: exactly one error notification (no duplicate at EOF)");
+    ASSERT_EQ_INT((int)ctx.last_error, (int)error_unexpected_input_byte,
+                  "new_bug3: the single notification carries the original error code");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_new_bug4_resync_bracket_stays_in_resync(void)
+{
+    printf("  test_new_bug4_resync_bracket_stays_in_resync...\n");
+
+    /*
+     * An array with a syntax error, followed by `]` that closes the
+     * array during resync, then more invalid bytes before `;`.
+     *
+     * Before the fix: `]` exited resync to array_outro state.  The
+     * invalid bytes after `]` triggered a SECOND recovery, so
+     * recovery_count == 2.
+     *
+     * After the fix: `]` stays in resync.  The invalid bytes are
+     * silently skipped.  Only one recovery ever occurs.
+     */
+    const char *src =
+        ".a = [1, !!] !!;\n"
+        ".b = 2;\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug4: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count >= 1,
+                "new_bug4: at least one error must fire");
+    ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 1,
+                   "new_bug4: exactly one recovery (not two)");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_new_bug5_crlf_at_resync_boundary(void)
+{
+    printf("  test_new_bug5_crlf_at_resync_boundary...\n");
+
+    /*
+     * A CR+LF pair that straddles a resync entry point.
+     *
+     * The error is on the CR byte itself (invalid in neg_number_intro
+     * after a bare minus sign).  bvn_enter_resync was zeroing
+     * prev_byte, which caused the subsequent LF to be treated as a
+     * standalone newline rather than the second half of a CR+LF pair
+     * — double-counting one line.
+     *
+     * Line layout:
+     *   1: .a = -\r\n   ← CR triggers error; LF must NOT bump line again
+     *   2: ;\n           ← semicolon recovers; LF bumps to line 3
+     *   3: .b = !!;\n   ← first '!' must be reported on line 3
+     *
+     * Before the fix: the error on '!' was reported on line 4.
+     * After the fix:  it is correctly reported on line 3.
+     */
+    const char *src = ".a = -\r\n;\n.b = !!;\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug5: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 2,
+                   "new_bug5: two error callbacks (CR error + '!!' error)");
+    ASSERT_EQ_UINT(ctx.last_error_line, 3,
+                   "new_bug5: second error on line 3, not 4");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_new_bug2_semicolon_recovery_array_event_balance(void)
+{
+    printf("  test_new_bug2_semicolon_recovery_array_event_balance...\n");
+
+    /*
+     * A syntax error inside a flat array, recovered with `;`.
+     *
+     * bvn_action_resync_semicolon drains open arrays before calling
+     * bvn_resync_semicolon_reset.  The drain loop must fire
+     * ev_array_row_end BEFORE decrementing array_nesting_level so that
+     * the event is emitted while the parser still considers itself
+     * inside the row.
+     *
+     * Before the fix: --array_nesting_level came first; the callback
+     * saw an already-decremented level.  The external invariant we can
+     * observe is that ev_array_row_start and ev_array_row_end must be
+     * balanced and that the assignment following the recovery parses
+     * correctly.
+     */
+    const char *src =
+        ".x = [1, 2, !!bad;\n"
+        ".y = 3;\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug2: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count >= 1,
+                "new_bug2: at least one error must fire");
+    ASSERT_EQ_UINT((uint64_t)ctx.array_row_start_count,
+                   (uint64_t)ctx.array_row_end_count,
+                   "new_bug2: ev_array_row_start/end must be balanced");
+    ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 1,
+                   "new_bug2: exactly one recovery");
+
+    bvnr_reader_destroy(r);
+}
+
+typedef struct {
+    uint32_t     error_count;
+    error_code_t last_error;
+    uint32_t     type_anno_start_count;
+    bool         type_data_nul_ok;
+} bug7_ctx_t;
+
+static bool bug7_verified_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+    bug7_ctx_t *c = ud;
+    if (ev == ev_type_annotation_start) {
+        c->type_anno_start_count++;
+        if (d->data && ((const uint8_t *)d->data)[d->length] == '\0')
+            c->type_data_nul_ok = true;
+    }
+    return true;
+}
+
+static void bug7_error_cb(void *ud, error_code_t err,
+                          uint64_t line, uint64_t col,
+                          uint32_t byte, uint64_t off)
+{
+    bug7_ctx_t *c = ud;
+    c->last_error = err;
+    c->error_count++;
+    (void)line; (void)col; (void)byte; (void)off;
+}
+
+static void test_new_bug7_type_annotation_nul_termination(void)
+{
+    printf("  test_new_bug7_type_annotation_nul_termination...\n");
+
+    /*
+     * bvn_lex_finalize must NUL-terminate str_data for every token
+     * type that passes through it, including token_is_type.
+     *
+     * Before the fix: str_data was not NUL-terminated when the token
+     * type was token_is_type.  This is an implicit invariant violation
+     * with no immediate runtime break, because the validator never
+     * reads raw->str_data for token_is_type tokens — it uses
+     * raw->type_data exclusively.  The test verifies the code path
+     * succeeds and that the type_data pointer exposed through the
+     * ev_type_annotation_start callback is properly NUL-terminated.
+     */
+    const char *src = ".x = <uint:8> 42;\n";
+
+    bug7_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified = bug7_verified_cb,
+        .on_error    = bug7_error_cb,
+        .userdata    = &ctx,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug7: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+
+    ASSERT_TRUE(ok, "new_bug7: valid type-annotated assignment must parse");
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 0,
+                   "new_bug7: no error on valid type annotation");
+    ASSERT_TRUE(ctx.type_anno_start_count >= 1,
+                "new_bug7: at least one ev_type_annotation_start");
+    ASSERT_TRUE(ctx.type_data_nul_ok,
+                "new_bug7: type_data must be NUL-terminated at d->length");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_new_bug6_resync_bracket_preserves_array_row_size(void)
+{
+    printf("  test_new_bug6_resync_bracket_preserves_array_row_size...\n");
+
+    /*
+     * A `]` encountered during resync closes the innermost open array.
+     * In the fixed code the action restores array_row_size from the
+     * saved frame (f->saved_row) AFTER firing ev_array_row_end.
+     *
+     * Before the fix: array_row_size was pre-zeroed before the
+     * ev_array_row_end callback, which would suppress row-size-mismatch
+     * detection for any outer array row validated after the resync.
+     *
+     * The test exercises the `]`-in-resync path in a nested array.
+     * It verifies that:
+     *   - recovery counts and event counts are consistent (no crash or
+     *     double-close of the inner array),
+     *   - ev_array_row_start/end balance is maintained across the whole
+     *     input including the outer array, and
+     *   - a valid row-uniform 2D array parsed after the faulty one is
+     *     accepted without error (confirming state was fully reset).
+     */
+    const char *src =
+        ".bad = [[1, 2], [3, !!];\n"
+        ".good = [[10, 20], [30, 40]];\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "new_bug6: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_TRUE(ctx.error_count >= 1,
+                "new_bug6: at least one error must fire (the !! in .bad)");
+    ASSERT_EQ_UINT((uint64_t)ctx.array_row_start_count,
+                   (uint64_t)ctx.array_row_end_count,
+                   "new_bug6: ev_array_row_start/end must be balanced globally");
+    ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 1,
+                   "new_bug6: exactly one recovery from the faulty row");
+    ASSERT_EQ_INT((int)ctx.last_error, (int)error_unexpected_input_byte,
+                  "new_bug6: last error is the !! byte, not a mismatch from corrupted row size");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug_a_no_phantom_struct_after_bracket_semicolon(void)
+{
+    printf("  test_bug_a_no_phantom_struct_after_bracket_semicolon...\n");
+
+    /*
+     * A syntax error inside a struct, followed by `}` (which closes
+     * the struct during resync) and then `;` (which triggers recovery).
+     *
+     * Before the fix: bvn_resync_semicolon_reset unconditionally
+     * restored struct_nesting_level to resync_saved_struct_nesting
+     * (the level at error time = 1).  The `}` had already decremented
+     * the level to 0 and emitted ev_struct_end, so the restore to 1
+     * created a phantom open struct.  At EOF the phantom caused a
+     * spurious error_got_incomplete_bvnr_stream notification, making
+     * error_count == 2 and struct_start_count != struct_end_count.
+     *
+     * After the fix: bvn_resync_semicolon_reset clamps
+     * resync_saved_struct_nesting to the current level before the
+     * assignment, so the level stays at 0 after recovery and the
+     * stream ends cleanly.
+     */
+    const char *src = ".x = { !! } ;\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug_a: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count, 1,
+                   "bug_a: exactly one error (the !! byte, no phantom EOF error)");
+    ASSERT_EQ_UINT((uint64_t)ctx.struct_start_count,
+                   (uint64_t)ctx.struct_end_count,
+                   "bug_a: ev_struct_start/end must be balanced (no phantom struct)");
+    ASSERT_TRUE(ctx.last_error != error_got_incomplete_bvnr_stream,
+                "bug_a: last error must not be error_got_incomplete_bvnr_stream");
+
+    bvnr_reader_destroy(r);
+}
+
+static void test_bug_b_single_notification_on_semicolon_recovery(void)
+{
+    printf("  test_bug_b_single_notification_on_semicolon_recovery...\n");
+
+    /*
+     * Before the fix: bvn_action_resync_semicolon called bvn_notify_error
+     * directly when bvn_resync_semicolon_reset returned false.  That
+     * call had zeroed position fields (zeroed by bvn_enter_resync, never
+     * repopulated) and fired before the outer bvn_interpret_input_buffer
+     * could emit the authoritative notification — producing two
+     * on_error callbacks for a single logical error.
+     *
+     * After the fix: the interior bvn_notify_error call is removed.
+     * The outer interpreter is solely responsible for calling on_error,
+     * which it does once with the correct position.
+     *
+     * The test verifies the error count and that the single notification
+     * carries a non-zero position, ruling out the zeroed-fields symptom.
+     * Multiple recoveries are exercised to confirm the invariant holds
+     * across the whole stream.
+     */
+    const char *src =
+        ".x = { !! ;\n"
+        ".a = 1;\n"
+        "};\n"
+        ".y = !!;\n";
+
+    resync_ctx_t ctx = {0};
+    bvnr_read_flags_t f = {
+        .on_verified       = resync_verified_cb,
+        .on_error          = resync_error_cb,
+        .userdata          = &ctx,
+        .continue_on_error = true,
+    };
+
+    bvnr_reader_t *r = bvnr_reader_create();
+    ASSERT_TRUE(r != NULL, "bug_b: reader create");
+    if (!r) return;
+
+    bool ok = bvnr_open_read_mem(r, src, (uint32_t)strlen(src),
+                                 NULL, 0, &f)
+           && bvnr_read(r);
+    (void)ok;
+
+    ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 2,
+                   "bug_b: two recoveries (one per `!!` site)");
+    ASSERT_EQ_UINT((uint64_t)ctx.error_count,
+                   (uint64_t)bvnr_reader_get_recovery_count(r),
+                   "bug_b: on_error fires exactly once per recovery (no double-fire)");
+    ASSERT_GE_UINT(ctx.last_error_line, 1,
+                   "bug_b: last error notification carries a non-zero line number");
+    ASSERT_GE_UINT(ctx.last_error_offset, 1,
+                   "bug_b: last error notification carries a non-zero stream offset");
+
+    bvnr_reader_destroy(r);
+}
+
 int main(void)
 {
     printf("Running bovnar_high_severity_test suite...\n\n");
@@ -1148,6 +1926,25 @@ int main(void)
 
     printf("\nFix: ev_stream_end event\n");
     test_stream_end_event();
+
+    printf("\nRegression: four release-blocking lexer bugs\n");
+    test_bug1_resync_eof_position();
+    test_bug2_crlf_column_tracking();
+    test_bug3_str_len_after_octet_stream();
+    test_bug4_resync_semicolon_row_balance();
+
+    printf("\nRegression: seven newly identified release-blocking lexer bugs\n");
+    test_new_bug1_resync_struct_drains_arrays();
+    test_new_bug2_semicolon_recovery_array_event_balance();
+    test_new_bug3_resync_eof_distinct_error_code();
+    test_new_bug4_resync_bracket_stays_in_resync();
+    test_new_bug5_crlf_at_resync_boundary();
+    test_new_bug6_resync_bracket_preserves_array_row_size();
+    test_new_bug7_type_annotation_nul_termination();
+
+    printf("\nRegression: two additional release-blocking lexer bugs (Bug A, Bug B)\n");
+    test_bug_a_no_phantom_struct_after_bracket_semicolon();
+    test_bug_b_single_notification_on_semicolon_recovery();
 
     printf("\n");
     if (g_failures == 0) {

@@ -28,7 +28,7 @@ class TestEvent:
 
     def test_count(self):
 
-        assert len(Event) == 14
+        assert len(Event) == 15
 
 class TestValueTypeFamily:
     def test_plain_is_zero(self):

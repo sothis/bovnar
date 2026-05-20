@@ -34,6 +34,8 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	l->utf8_need = 0;
 	l->utf8_lo = 0;
 	l->utf8_hi = 0;
+	l->prev_byte  = 0;
+	l->bom_len    = 0;
 	l->str_len    = 0;
 	l->type_len   = 0;
 	l->inline_unit_len = 0;
@@ -668,13 +670,16 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 	}
 	return true;
 }
-static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
+static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
+	bool ok = true;
 	while (l->struct_nesting_level > l->resync_saved_struct_nesting) {
 		--l->struct_nesting_level;
-		if (!bvn_val_receive_event(p, ev_struct_end))
+		if (!bvn_val_receive_event(p, ev_struct_end)) {
+			ok = false;
 			break;
+		}
 	}
 	l->token_type           = token_is_unknown;
 	l->str_len              = 0;
@@ -694,6 +699,7 @@ static void bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	p->val.has_annotation_unit = false;
 	bvn_acc_reset(&p->val);
 	l->next_state = value_outro;
+	return ok;
 }
 bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 {
@@ -705,15 +711,18 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 	while (l->array_nesting_level > 0) {
 		--l->array_nesting_level;
 		if (!bvn_val_receive_event(p, ev_array_row_start)) {
-			bvn_resync_semicolon_reset(p);
+			(void)bvn_resync_semicolon_reset(p);
 			return false;
 		}
 		if (!bvn_val_receive_event(p, ev_array_row_end)) {
-			bvn_resync_semicolon_reset(p);
+			(void)bvn_resync_semicolon_reset(p);
 			return false;
 		}
 	}
-	bvn_resync_semicolon_reset(p);
+	if (!bvn_resync_semicolon_reset(p)) {
+		bvn_notify_error(p);
+		return false;
+	}
 	return true;
 }
 bool bvn_action_resync_string_intro(bvnr_reader_t* p)
@@ -803,11 +812,6 @@ static bool bvn_os_read_exact(
 {
 	bvnr_reader_t* p   = src->p;
 	uint8_t*        buf = (uint8_t*)output;
-	if (!length) {
-		bvn_capture_os_error(p, error_invalid_argument);
-		bvn_notify_error(p);
-		return false;
-	}
 	uint32_t from_resid = (src->resid_left < length)
 		? src->resid_left : length;
 	if (from_resid) {
@@ -898,8 +902,8 @@ bool bvn_utf8_classify_leader(
 	if (b == 0xed) { *need = 2; *lo = 0x80; *hi = 0x9f; return true;  }
 	if (b <= 0xef) { *need = 2; *lo = 0x80; *hi = 0xbf; return true;  }
 	if (b == 0xf0) { *need = 3; *lo = 0x90; *hi = 0xbf; return true;  }
-	if (b == 0xf4) { *need = 3; *lo = 0x80; *hi = 0x8f; return true;  }
 	if (b <= 0xf3) { *need = 3; *lo = 0x80; *hi = 0xbf; return true;  }
+	if (b == 0xf4) { *need = 3; *lo = 0x80; *hi = 0x8f; return true;  }
 	return false;
 }
 typedef struct {
@@ -965,9 +969,13 @@ static bool bvn_interpret_input_buffer(
 		if (l->max_text_bytes &&
 			l->text_bytes == l->max_text_bytes) {
 			uint8_t offending = data[idx];
-			uint64_t col = (offending == 0x09u)
-				? ((l->column >> 2u) + 1u) << 2u
-				: l->column + 1u;
+			uint64_t col;
+			if (offending == 0x09u)
+				col = ((l->column >> 2u) + 1u) << 2u;
+			else if (l->utf8_need == 0)
+				col = l->column + 1u;
+			else
+				col = l->column;
 			p->val.last_error   = error_text_data_too_long;
 			p->val.error_line   = l->line;
 			p->val.error_column = col;
@@ -978,13 +986,14 @@ static bool bvn_interpret_input_buffer(
 		}
 		++l->text_bytes;
 		l->byte = data[idx];
-		if (l->byte == 0x09)
-			l->column = ((l->column >> 2u) + 1u) << 2u;
-		else
-			++l->column;
 		uint8_t prev = l->prev_byte;
 		l->prev_byte = (uint8_t)l->byte;
+		uint8_t saved_need = l->utf8_need;
 		if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
+			if (l->byte == 0x09)
+				l->column = ((l->column >> 2u) + 1u) << 2u;
+			else if (saved_need == 0)
+				++l->column;
 			p->val.last_error = error_invalid_utf8_byte;
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
 				l->text_bytes - 1);
@@ -997,6 +1006,10 @@ static bool bvn_interpret_input_buffer(
 				return false;
 			}
 		}
+		if (l->byte == 0x09)
+			l->column = ((l->column >> 2u) + 1u) << 2u;
+		else if (saved_need == 0)
+			++l->column;
 		if (!bvn_call_action_for_new_byte(p)) {
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
 				l->text_bytes - 1);
@@ -1134,13 +1147,15 @@ bool bvn_lex_run(bvnr_reader_t* r)
 					return false;
 				}
 			}
-			if (l->next_state != octet_stream_intro)
-				break;
-			if (!bvn_read_octet_stream(r,
-				data + off, nb - off, &os_leftover))
-				return false;
-			off = nb - os_leftover;
+			if (l->next_state == octet_stream_intro) {
+				if (!bvn_read_octet_stream(r,
+					data + off, nb - off, &os_leftover))
+					return false;
+				off = nb - os_leftover;
+			}
 		}
 	}
+	if (!bvn_val_receive_event(r, ev_stream_end))
+		return false;
 	return true;
 }

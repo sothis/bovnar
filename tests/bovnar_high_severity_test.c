@@ -59,6 +59,7 @@ typedef struct {
     unsigned octet_end_count;
     unsigned struct_start_count;
     unsigned struct_end_count;
+    unsigned stream_end_count;
     unsigned token_array_num_count;
     unsigned token_array_str_count;
 
@@ -88,6 +89,7 @@ static bool capture_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
     case ev_octet_stream_end:   c->octet_end_count++;   break;
     case ev_struct_start:    c->struct_start_count++;   break;
     case ev_struct_end:      c->struct_end_count++;     break;
+    case ev_stream_end:      c->stream_end_count++;     break;
     default: break;
     }
     return true;
@@ -1057,6 +1059,39 @@ static void test_bvnf_base16_special_roundtrip(void)
     bvnr_reader_destroy(r);
 }
 
+static void test_stream_end_event(void)
+{
+    printf("  test_stream_end_event...\n");
+
+    capture_t ctx = {0};
+    bvnr_read_flags_t flags = {
+        .on_verified = capture_verified,
+        .on_error    = capture_error,
+        .userdata    = &ctx,
+    };
+    bvnr_reader_t *r = NULL;
+
+    ASSERT_TRUE(do_parse_str(".a = 1;\n", &flags, &r),
+                "simple parse succeeds");
+    ASSERT_EQ_INT((int)ctx.stream_end_count, 1,
+                  "ev_stream_end fires exactly once on clean parse");
+    bvnr_reader_destroy(r);
+
+    ctx = (capture_t){0};
+    ASSERT_TRUE(do_parse_str(".x = \"hello\";\n.y = 42;\n", &flags, &r),
+                "multi-statement parse succeeds");
+    ASSERT_EQ_INT((int)ctx.stream_end_count, 1,
+                  "ev_stream_end fires exactly once for multi-statement stream");
+    bvnr_reader_destroy(r);
+
+    ctx = (capture_t){0};
+    ASSERT_FALSE(do_parse_str(".a = !!invalid;\n", &flags, &r),
+                 "invalid input fails");
+    ASSERT_EQ_INT((int)ctx.stream_end_count, 0,
+                  "ev_stream_end not fired on parse error");
+    bvnr_reader_destroy(r);
+}
+
 int main(void)
 {
     printf("Running bovnar_high_severity_test suite...\n\n");
@@ -1110,6 +1145,9 @@ int main(void)
 
     printf("\nGap 13: bvnf base-16 special float roundtrip\n");
     test_bvnf_base16_special_roundtrip();
+
+    printf("\nFix: ev_stream_end event\n");
+    test_stream_end_event();
 
     printf("\n");
     if (g_failures == 0) {

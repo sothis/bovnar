@@ -368,6 +368,8 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (w->ser.stream_begun)
 			return bvn_writer_set_error(w, error_invalid_argument);
 		return true;
+	case ev_stream_end:
+		return true;
 	case ev_assignment_start:
 		w->ser.stream_begun = true;
 		return bvn_validate_id_for_writer(w,
@@ -510,6 +512,8 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 {
 	switch (ev) {
 	case ev_stream_start:
+		break;
+	case ev_stream_end:
 		break;
 	case ev_assignment_start:
 		if (s->need_semi) {

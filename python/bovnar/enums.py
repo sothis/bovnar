@@ -18,6 +18,7 @@ class Event(IntEnum):
     TYPE_ANNOTATION_END                 = 11
     TYPE_ANNOTATION_TYPE_FAMILY         = 12
     TYPE_ANNOTATION_TYPE_FAMILY_PARAM   = 13
+    STREAM_END                          = 14
 
 class ValueTypeFamily(IntEnum):
 

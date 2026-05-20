@@ -24,7 +24,8 @@ typedef enum bvnr_event_e {
 	ev_type_annotation_start,
 	ev_type_annotation_end,
 	ev_type_annotation_type_family,
-	ev_type_annotation_type_family_parameter
+	ev_type_annotation_type_family_parameter,
+	ev_stream_end
 } bvnr_event_t;
 typedef enum value_type_family_e {
 	vt_plain,

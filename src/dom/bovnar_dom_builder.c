@@ -366,6 +366,8 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 	switch (ev) {
 	case ev_stream_start:
 		break;
+	case ev_stream_end:
+		break;
 	case ev_assignment_start: {
 		builder_do_deferred_pop(b);
 		if (d->data && d->length) {

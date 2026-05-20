@@ -224,6 +224,9 @@ static bool on_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 	case ev_octet_stream_end:
 		out_puts("OCTET_STREAM_END\n");
 		break;
+
+	case ev_stream_end:
+		break;
 	}
 
 	return true;

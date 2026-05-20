@@ -161,6 +161,7 @@ static const char *evt_event_str(bvnr_event_t e)
 	case ev_type_annotation_end:                   return "type_end";
 	case ev_type_annotation_type_family:           return "type_family";
 	case ev_type_annotation_type_family_parameter: return "type_param";
+	case ev_stream_end:                            return "stream_end";
 	default:                                       return "?";
 	}
 }

@@ -196,6 +196,8 @@ static void evlog_append_event(evlog_t *l, bvnr_event_t ev, bvnr_data_t *d)
 	case ev_octet_stream_end:
 		evlog_puts(l, "OCTET_STREAM_END\n");
 		break;
+	case ev_stream_end:
+		break;
 	}
 }
 

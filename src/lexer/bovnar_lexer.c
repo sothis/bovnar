@@ -31,6 +31,10 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
 	l->resync_saved_struct_nesting = l->struct_nesting_level;
+	while (l->array_nesting_level > 0) {
+		(void)bvn_val_receive_event(p, ev_array_row_end);
+		--l->array_nesting_level;
+	}
 	l->utf8_need = 0;
 	l->utf8_lo = 0;
 	l->utf8_hi = 0;
@@ -441,6 +445,10 @@ bool bvn_action_kw_advance(bvnr_reader_t* p)
 static bool bvn_special_keyword_outro(bvnr_reader_t* p,
 	const char* s, uint32_t len)
 {
+	if (len > (uint32_t)p->lex.max_number_length) {
+		bvn_lexer_set_error(p, error_number_too_long);
+		return false;
+	}
 	memcpy(p->lex.str_data, s, len);
 	p->lex.str_data[len] = '\0';
 	p->lex.str_len = (uint16_t)len;
@@ -692,6 +700,10 @@ static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	l->token_type           = token_is_unknown;
 	l->str_len              = 0;
 	l->type_len             = 0;
+	l->inline_unit_len      = 0;
+	l->utf8_need            = 0;
+	l->utf8_lo              = 0;
+	l->utf8_hi              = 0;
 	l->in_array_element     = false;
 	l->struct_nesting_level = l->resync_saved_struct_nesting;
 	l->array_nesting_level  = 0;
@@ -993,6 +1005,7 @@ static bool bvn_interpret_input_buffer(
 		uint8_t prev = l->prev_byte;
 		l->prev_byte = (uint8_t)l->byte;
 		uint8_t saved_need = l->utf8_need;
+		bool line_advanced = false;
 		if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
 			if (l->byte == 0x09)
 				l->column = ((l->column >> 2u) + 1u) << 2u;
@@ -1003,6 +1016,7 @@ static bool bvn_interpret_input_buffer(
 				l->text_bytes - 1);
 			bvn_notify_error(p);
 			bvn_advance_line(l, prev);
+			line_advanced = true;
 			if (l->continue_on_error) {
 				bool was_continuation = (saved_need > 0);
 				bvn_enter_resync(p);
@@ -1026,14 +1040,16 @@ static bool bvn_interpret_input_buffer(
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
 				l->text_bytes - 1);
 			bvn_notify_error(p);
-			bvn_advance_line(l, prev);
+			if (!line_advanced)
+				bvn_advance_line(l, prev);
 			if (l->continue_on_error) {
 				bvn_enter_resync(p);
 			} else {
 				return false;
 			}
 		} else {
-			bvn_advance_line(l, prev);
+			if (!line_advanced)
+				bvn_advance_line(l, prev);
 		}
 		if (l->next_state == octet_stream_intro) {
 			*consumed = idx + 1;
@@ -1129,6 +1145,7 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				l->next_state == resync_string_escape ||
 				l->next_state == resync_comment) {
 				bvn_set_eof_error(r, r->val.last_error);
+				bvn_notify_error(r);
 				return false;
 			}
 			bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);

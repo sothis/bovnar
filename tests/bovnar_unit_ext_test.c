@@ -1147,6 +1147,7 @@ static void test_nonsi_parse_aliases(void)
 		{ "deniers",               bu_denier               },
 		{ "fluid_dram",            bu_fluid_dram           },
 		{ "fluid_drams",           bu_fluid_dram           },
+		{ "fl_drams",              bu_fluid_dram           },
 		{ "minims",                bu_minim                },
 		{ "peck",                  bu_peck                 },
 		{ "pecks",                 bu_peck                 },

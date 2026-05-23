@@ -434,7 +434,7 @@ static const bu_entry_t bu_table[] = {
 	{"candelas",         8, bu_candela},       {"coulombs",        8, bu_coulomb},
 	{"sieverts",         8, bu_sievert},       {"pints_uk",        8, bu_pint_uk},
 	{"quart_uk",         8, bu_quart_uk},      {"fl_oz_uk",        8, bu_fluid_ounce_uk},
-	{"scheffel",         8, bu_scheffel},
+	{"fl_drams",         8, bu_fluid_dram},    {"scheffel",        8, bu_scheffel},
 	{"bushels",          7, bu_bushel},        {"deniers",         7, bu_denier},
 	{"zentner",          7, bu_zentner},       {"klafter",         7, bu_klafter},
 	{"rankine",          7, bu_rankine},       {"decibel",         7, bu_decibel},

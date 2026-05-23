@@ -143,7 +143,7 @@ When both are present, equality is checked **after parsing** via `memcmp` on the
 
 ## 3. Base Units
 
-Bovnar supports 133 named base units (as implemented), covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, and surveying and culinary measure units. A block of 13 Old German units is specified in the final subsection of this section and is planned for a future implementation revision.
+Bovnar supports 146 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, surveying and culinary measure units, and a block of 13 Old German units described in the final subsection of this section.
 
 ### SI Base Units
 
@@ -285,7 +285,7 @@ Bovnar supports 133 named base units (as implemented), covering SI base units, a
 | `qt`   | `quart`, `quarts` | US liquid quart | `bu_quart` | 9.46352946×10⁻⁴ m³ |
 | `pt`   | `pint`, `pints` | US liquid pint | `bu_pint` | 4.73176473×10⁻⁴ m³ |
 | `cup`  | `cups` | US cup | `bu_cup` | 2.365882365×10⁻⁴ m³ |
-| `fl_oz`| `fluid_ounce`, `fluid_ounces` | US fluid ounce | `bu_fluid_ounce` | 2.95735296875×10⁻⁵ m³ |
+| `fl_oz`| `fluid_ounce`, `fluid_ounces` | US fluid ounce | `bu_fluid_ounce` | 2.95735295625×10⁻⁵ m³ |
 | `tbsp` | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.47867648×10⁻⁵ m³ |
 | `tsp`  | `teaspoon`, `teaspoons` | US teaspoon | `bu_teaspoon` | 4.92892159375×10⁻⁶ m³ |
 | `bbl`  | `barrel`, `barrels` | petroleum barrel (42 US gal) | `bu_barrel` | 0.158987294928 m³ |
@@ -515,8 +515,6 @@ Bovnar supports 133 named base units (as implemented), covering SI base units, a
 
 ### Old German Units
 
-> **Implementation status:** The units in this section are **not yet implemented**. They are specified here as a planned extension. Symbols, enum names, and conversion factors are normative once the implementation is added.
-
 Old German units fall into two categories: metric-compatible units that were formally standardized and remain in everyday use in the DACH region, and historical pre-metric units that appear in historical documents, land registers, and surveying maps. Bovnar targets the Prussian variant as the canonical source where regional variation exists, because it was the most widely codified German measurement system prior to metrication.
 
 #### Metric-Compatible German Units — Mass
@@ -568,7 +566,7 @@ Old German units fall into two categories: metric-compatible units that were for
 
 > **Scheffel** (`schffl`): The Prussian Scheffel was metrologically fixed in 1816 at 54.961 L (exact under the Prussian Maß- und Gewichtsordnung). It served as the primary dry measure for grain, and CBOT-predecessor contracts for Prussian wheat were denominated in Scheffel. The symbol `schffl` is used to avoid collision with `bsh` (US bushel). Dimensionally compatible with `L`, `bsh`, `pk`, `bbl`. Note that regional Scheffel values differ (e.g. the Saxon Scheffel = 103.826 L); only the Prussian value is defined here.
 
-> **Implementation note for the German unit block:** All symbols above are lower-case or use the shortest unambiguous form. The prefix `pr` is reserved for Prussian units to avoid collision with existing SI-prefix+unit combinations. None of the historical Prussian units accept SI or IEC prefixes; `bvn_prefix_unit_valid` must reject any non-`si_none` prefix for `bu_prussian_fuss`, `bu_prussian_zoll`, `bu_prussian_line`, `bu_prussian_elle`, `bu_prussian_rute`, `bu_klafter`, `bu_german_mile`, `bu_morgen`, and `bu_scheffel`. The metric German mass units (`bu_pfund`, `bu_zentner`, `bu_doppelzentner`, `bu_lot`) do accept SI prefixes at `si_none` only; multiplier prefixes such as `k~Pfd` would produce dimensional nonsense and must be rejected. The enum values for the entire German block must be appended after `bu_bushel` in `value_base_unit_t`, and `BVN_VALUE_BASE_UNIT_COUNT` must be updated accordingly. The `si_conv_table` in `bovnar_si_units.c` requires a matching entry for each new enum value.
+> **Implementation note for the German unit block:** All symbols above are lower-case or use the shortest unambiguous form. The prefix `pr` is reserved for Prussian units to avoid collision with existing SI-prefix+unit combinations. No German unit — historical or metric-compatible — accepts any non-trivial SI or IEC prefix; `bvn_prefix_unit_valid` rejects any non-`si_none`/`iec_none` prefix for every unit from `bu_pfund` through `bu_scheffel`. The enum values occupy positions 134–146 immediately after `bu_bushel` in `value_base_unit_t`; `BVN_VALUE_BASE_UNIT_COUNT` is 147.
 
 ---
 
@@ -653,7 +651,7 @@ IEC prefixes are recognised by their two-character `Xi` suffix pattern and carry
 
 ```bovnar
 .ram   = <uint:64,Gi~B> 8;       # gibibytes
-.cache = <uint:32,Mi~b> 256;     # mibibits
+.cache = <uint:32,Mi~b> 256;     # mebibits
 .drive = <uint:64,Ti~B> 2;       # tebibytes
 ```
 
@@ -1361,9 +1359,10 @@ value_unit_t r  = bvn_unit_reduce(u, &scale, &overflow);
 bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
 ```
 
-Returns `true` if the prefix carried by the first component of `u` is a legal modifier for `base`. The rules are:
+Returns `true` if `prefix` is a legal modifier for `base`. The rules are:
 - IEC prefixes (other than `iec_none`) are only valid on `bu_bit` and `bu_byte`.
 - SI prefixes below `si_kilo` are invalid on `bu_bit` and `bu_byte`.
+- German units (`bu_pfund` through `bu_scheffel`) accept only `si_none` and `iec_none`; any non-trivial prefix is rejected.
 - Out-of-range `prefix.system` or `base` values return `false`.
 
 All higher-level parsing and conversion functions call `bvn_prefix_unit_valid` internally and propagate the error via their `ok` output.

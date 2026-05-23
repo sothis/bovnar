@@ -302,9 +302,9 @@ class Writer:
 
         if vu.num_components > 0:
             lib = self._lib
-            ubuf = ctypes.create_string_buffer(128)
+            ubuf = ctypes.create_string_buffer(256)
             unit_flags = lib.bvnr_writer_unit_flags(self._ptr)
-            ulen = lib.bvn_unit_to_string_ex(vu, ubuf, 128, unit_flags)
+            ulen = lib.bvn_unit_to_string_ex(vu, ubuf, 256, unit_flags)
             if ulen > 0:
                 raw_unit = ubuf.raw[:ulen]
                 _keep_unit = raw_unit

@@ -186,7 +186,8 @@ bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
 			    uint32_t width, double value, value_unit_t unit)
 {
 	if (!emit_key(w, key)) return false;
-	if (width > 64u)
+	if (width != 0u && width != 16u && width != 32u && width != 64u
+	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT(width);
 	if (width != 0u && width <= 32u) value = (double)(float)value;
@@ -210,7 +211,8 @@ bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
 			        double value, value_unit_t unit)
 {
 	if (!emit_key(w, key)) return false;
-	if (width > 64u)
+	if (width != 0u && width != 16u && width != 32u && width != 64u
+	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT_FIX(width, q);
 	if (width != 0u && width <= 32u) value = (double)(float)value;
@@ -234,7 +236,8 @@ bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
 			        double value, value_unit_t unit)
 {
 	if (!emit_key(w, key)) return false;
-	if (width > 64u)
+	if (width != 0u && width != 16u && width != 32u && width != 64u
+	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT_DEC(width);
 	if (width != 0u && width <= 32u) value = (double)(float)value;

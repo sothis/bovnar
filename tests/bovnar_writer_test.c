@@ -194,43 +194,68 @@ static void test_write_float_width_over_64_rejected(void)
 {
 	printf("  test_write_float_width_over_64_rejected...\n");
 
-	uint8_t output[256];
+	uint8_t output[512];
 	bvnr_sink_t sink;
-	bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+	bvnr_writer_t *w;
+
+	/* Valid widths 0, 16, 32, 64, 128, 256 must all succeed */
+	static const uint32_t valid_widths[] = { 0, 16, 32, 64, 128, 256 };
+	for (size_t i = 0; i < sizeof(valid_widths)/sizeof(valid_widths[0]); i++) {
+		uint32_t wd = valid_widths[i];
+		w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed for valid float width");
+		if (!w) return;
+		ASSERT_TRUE(bvnr_write_float(w, "x", wd, 3.14),
+					"bvnr_write_float must succeed for valid width");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+					  "no error for valid float width");
+		bvnr_writer_destroy(w);
+
+		w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed for valid float_fix width");
+		if (!w) return;
+		ASSERT_TRUE(bvnr_write_float_fix(w, "x", wd, 10, 1.5),
+					"bvnr_write_float_fix must succeed for valid width");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+					  "no error for valid float_fix width");
+		bvnr_writer_destroy(w);
+
+		w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed for valid float_dec width");
+		if (!w) return;
+		ASSERT_TRUE(bvnr_write_float_dec(w, "x", wd, 2.5),
+					"bvnr_write_float_dec must succeed for valid width");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+					  "no error for valid float_dec width");
+		bvnr_writer_destroy(w);
+	}
+
+	/* Invalid width (not in {0,16,32,64,128,256}) must be rejected */
+	w = make_writer(output, sizeof(output), &sink);
 	ASSERT_NOT_NULL(w, "make_writer must succeed");
 	if (!w) return;
-
-	ASSERT_FALSE(bvnr_write_float(w, "x", 128, 3.14),
-				 "bvnr_write_float with width=128 must fail");
+	ASSERT_FALSE(bvnr_write_float(w, "x", 100, 3.14),
+				 "bvnr_write_float with width=100 must fail");
 	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
-				  "error must be error_invalid_argument for width=128");
+				  "error must be error_invalid_argument for width=100");
 	bvnr_writer_destroy(w);
 
 	w = make_writer(output, sizeof(output), &sink);
 	ASSERT_NOT_NULL(w, "make_writer (fix) must succeed");
 	if (!w) return;
-	ASSERT_FALSE(bvnr_write_float_fix(w, "x", 128, 10, 1.5),
-				 "bvnr_write_float_fix with width=128 must fail");
+	ASSERT_FALSE(bvnr_write_float_fix(w, "x", 100, 10, 1.5),
+				 "bvnr_write_float_fix with width=100 must fail");
 	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
-				  "float_fix width=128 error must be error_invalid_argument");
+				  "float_fix width=100 error must be error_invalid_argument");
 	bvnr_writer_destroy(w);
 
 	w = make_writer(output, sizeof(output), &sink);
 	ASSERT_NOT_NULL(w, "make_writer (dec) must succeed");
 	if (!w) return;
-	ASSERT_FALSE(bvnr_write_float_dec(w, "x", 128, 2.5),
-				 "bvnr_write_float_dec with width=128 must fail");
+	ASSERT_FALSE(bvnr_write_float_dec(w, "x", 100, 2.5),
+				 "bvnr_write_float_dec with width=100 must fail");
 	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
-				  "float_dec width=128 error must be error_invalid_argument");
-	bvnr_writer_destroy(w);
-
-	w = make_writer(output, sizeof(output), &sink);
-	ASSERT_NOT_NULL(w, "make_writer (w64) must succeed");
-	if (!w) return;
-	ASSERT_TRUE(bvnr_write_float(w, "x", 64, 3.14),
-				"bvnr_write_float with width=64 must still succeed");
-	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
-				  "no error for width=64");
+				  "float_dec width=100 error must be error_invalid_argument");
 	bvnr_writer_destroy(w);
 }
 

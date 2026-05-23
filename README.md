@@ -391,4 +391,4 @@ cd highlighter/geany && ./install.sh
 | Documentation (`doc/`) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | Examples (`examples/`) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
-Copyright © 2026 Janos Sonntag (born Laube).
+Copyright © 2026 Janos Sonntag.

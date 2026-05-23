@@ -638,22 +638,8 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			l->next_state = resync;
 			return true;
 		}
-		if (l->array_nesting_level > 0) {
-			if (!bvn_val_receive_event(p, ev_array_row_end))
-				return false;
-			--l->array_nesting_level;
-			uint64_t level = l->array_nesting_level;
-			bvn_array_frame_t *f = &l->arr_frames[level];
-			f->dim_row_size      = l->curr_row_size;
-			l->curr_row_size     = f->saved_curr + 1u;
-			l->array_row_size    = f->saved_row;
-			p->val.value_type    = f->saved_vtype;
-			p->val.parsed_unit   = f->saved_vunit;
-			l->in_array_element  = (l->array_nesting_level > 0);
-			l->next_state        = resync;
-		} else {
-			l->next_state = resync;
-		}
+		/* bvn_enter_resync already drained array_nesting_level to 0 */
+		l->next_state = resync;
 	} else if (l->byte == '}') {
 		if (l->resync_struct_depth > 0) {
 			--l->resync_struct_depth;
@@ -661,11 +647,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			return true;
 		}
 		if (l->struct_nesting_level > 0) {
-			while (l->array_nesting_level > 0) {
-				if (!bvn_val_receive_event(p, ev_array_row_end))
-					return false;
-				--l->array_nesting_level;
-			}
+			/* array_nesting_level is already 0: drained by bvn_enter_resync */
 			l->curr_row_size    = 0;
 			l->array_row_size   = 0;
 			l->in_array_element = false;
@@ -728,16 +710,8 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 		l->next_state = resync;
 		return true;
 	}
-	while (l->array_nesting_level > 0) {
-		if (!bvn_val_receive_event(p, ev_array_row_end)) {
-			(void)bvn_resync_semicolon_reset(p);
-			return false;
-		}
-		--l->array_nesting_level;
-	}
-	if (!bvn_resync_semicolon_reset(p))
-		return false;
-	return true;
+	/* array_nesting_level is already 0: drained by bvn_enter_resync */
+	return bvn_resync_semicolon_reset(p);
 }
 bool bvn_action_resync_string_intro(bvnr_reader_t* p)
 {

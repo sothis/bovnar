@@ -1518,5 +1518,3 @@ int main(void)
 
 	return failures ? 1 : 0;
 }
-
-

@@ -127,6 +127,8 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 			family_name     = "float";
 			family_name_len = 5;
 			emit_width = true;
+			emit_base  = true;
+			emit_unit  = true;
 		} else if (is_neg) {
 			default_type.family = vt_sint;
 			default_type.width  = 64;
@@ -134,6 +136,8 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 			family_name     = "sint";
 			family_name_len = 4;
 			emit_width = true;
+			emit_base  = true;
+			emit_unit  = true;
 		} else {
 			default_type.family = vt_uint;
 			default_type.width  = 64;
@@ -141,6 +145,8 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 			family_name     = "uint";
 			family_name_len = 4;
 			emit_width = true;
+			emit_base  = true;
+			emit_unit  = true;
 		}
 	} else {
 		return true;

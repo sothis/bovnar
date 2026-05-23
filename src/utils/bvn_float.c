@@ -236,7 +236,7 @@ static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 	bvn_int_t R = { r_limbs, r_cap, 0, false, true };
 	memset(Q, 0, (size_t)q_words * sizeof(uint32_t));
 	bool sticky = false;
-	for (int i = total - 1; i >= 0 && !sticky; i--) {
+	for (int i = total - 1; i >= 0; i--) {
 		bvn_int_shl(&R, 1);
 		int src = i - shift;
 		if (src >= 0 && bvn_int_getbit(num, src))
@@ -251,7 +251,7 @@ static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 			}
 		}
 	}
-	if (!sticky && !bvn_int_is_zero(&R)) sticky = true;
+	if (!bvn_int_is_zero(&R)) sticky = true;
 	free(r_limbs);
 	*sticky_out = sticky;
 	return true;
@@ -823,12 +823,13 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 	}
 #else
 	if (shift >= 0) {
-		uint64_t scaled = full_man << (unsigned)(shift % 64);
-		uint32_t lo = (uint32_t)(scaled & 0xffffffffu);
-		uint32_t hi = (uint32_t)(scaled >> 32);
-		uint32_t base_limb = (uint32_t)(prec - 1) / 32u;
-		if (base_limb > 0 && (base_limb - 1) < f->_nlimbs) f->_d[base_limb - 1] = lo;
-		if (base_limb < f->_nlimbs)                         f->_d[base_limb]     = hi;
+		uint32_t lo_limb = (uint32_t)shift / 32u;
+		uint32_t lo_off  = (uint32_t)shift % 32u;
+		uint64_t shifted = full_man << lo_off;
+		if (lo_limb     < f->_nlimbs) f->_d[lo_limb]     = (uint32_t)(shifted & 0xffffffffu);
+		if (lo_limb + 1 < f->_nlimbs) f->_d[lo_limb + 1] = (uint32_t)(shifted >> 32);
+		if (lo_off > 0u && lo_limb + 2 < f->_nlimbs)
+			f->_d[lo_limb + 2] = (uint32_t)(full_man >> (32u - lo_off));
 	} else {
 		uint64_t scaled = full_man >> (unsigned)(-shift);
 		if (f->_nlimbs > 0) f->_d[0] = (uint32_t)(scaled & 0xffffffffu);

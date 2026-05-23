@@ -311,7 +311,7 @@ dot-led       = "." DIGIT { DIGIT }
 dec-exponent  = ("e" | "E") [ "+" | "-" ] DIGIT { DIGIT }
 ```
 
-- Only `e`/`E` accepted as exponent marker in bare literals
+- Only `e`/`E` accepted as exponent marker in bare literals (quoted string literals use `p`/`P` for power-of-2 bases — see §6.3)
 - Leading zeros are valid (`007` is accepted)
 - A trailing dot without fractional digits is valid (`123.`)
 - `.` alone is a hard error
@@ -546,7 +546,7 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 | `vt_utf8` | String only |
 | `vt_uint` | Number or string (digits) |
 | `vt_sint` | Number or string (digits, may be negative) |
-| `vt_float` | Number or string (may have `.`, `e`/`E`) — only base 10 or 16 |
+| `vt_float` | Number or string (may have `.`, `e`/`E`; base 16 strings use `p`/`P`) — only base 10 or 16 |
 | `vt_float_fix` | Number or string (may have `.`, `e`/`E`) — base 10 only |
 | `vt_float_dec` | Number or string (may have `.`, `e`/`E`) — base 10 only |
 
@@ -632,6 +632,18 @@ Digits in values are checked against the declared base:
 .value = <uint:_2> "1010";     # OK: valid binary
 .value = <uint:_2> "210";      # error_digit_not_in_base
 ```
+
+#### Exponent Markers in Quoted String Literals
+
+Bare number literals always use `e`/`E` as the exponent separator (§4.6). Quoted string number literals follow the same rule **except** for base 16 (`_16`) float values, where `p`/`P` must be used instead of `e`/`E`. This is required because `e` and `E` are valid hexadecimal digits: in `"1.8e+2"` with base 16, `e` is a mantissa digit, not an exponent marker. The `p`/`P` exponent separator is accepted for any power-of-2 base (`_2`, `_4`, `_8`, `_16`) in quoted string literals.
+
+```bovnar
+.hex_float  = <float:64,_16> "1.8p+2";   # OK: 1.8₁₆ × 2² = 6.0
+.hex_float2 = <float:64,_16> "1.8e+2";   # OK: mantissa is 1.8e₁₆ (no exponent)
+.bin_float  = <float:64,_2>  "1.1p+3";   # OK: 1.1₂ × 2³ = 12.0
+```
+
+The `p`/`P` exponent value is always interpreted as a decimal integer (the binary exponent bias), matching the C99 hexadecimal floating-point literal convention.
 
 ### 6.4 Special Number Semantics
 

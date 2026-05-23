@@ -518,20 +518,20 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_minim               == 131, "bu_minim == 131");
 	ASSERT_TRUE((int)bu_peck                == 132, "bu_peck == 132");
 	ASSERT_TRUE((int)bu_bushel              == 133, "bu_bushel == 133");
-	ASSERT_TRUE((int)bu_pfund              == 134, "bu_pfund == 134");
-	ASSERT_TRUE((int)bu_zentner            == 135, "bu_zentner == 135");
-	ASSERT_TRUE((int)bu_doppelzentner      == 136, "bu_doppelzentner == 136");
-	ASSERT_TRUE((int)bu_lot               == 137, "bu_lot == 137");
-	ASSERT_TRUE((int)bu_prussian_line      == 138, "bu_prussian_line == 138");
-	ASSERT_TRUE((int)bu_prussian_zoll      == 139, "bu_prussian_zoll == 139");
-	ASSERT_TRUE((int)bu_prussian_fuss      == 140, "bu_prussian_fuss == 140");
-	ASSERT_TRUE((int)bu_prussian_elle      == 141, "bu_prussian_elle == 141");
-	ASSERT_TRUE((int)bu_prussian_rute      == 142, "bu_prussian_rute == 142");
-	ASSERT_TRUE((int)bu_klafter            == 143, "bu_klafter == 143");
-	ASSERT_TRUE((int)bu_german_mile        == 144, "bu_german_mile == 144");
-	ASSERT_TRUE((int)bu_morgen             == 145, "bu_morgen == 145");
-	ASSERT_TRUE((int)bu_scheffel           == 146, "bu_scheffel == 146");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 147, "sentinel == 147");
+	ASSERT_TRUE((int)bu_pfund              == 329, "bu_pfund == 329");
+	ASSERT_TRUE((int)bu_zentner            == 330, "bu_zentner == 330");
+	ASSERT_TRUE((int)bu_doppelzentner      == 331, "bu_doppelzentner == 331");
+	ASSERT_TRUE((int)bu_lot               == 332, "bu_lot == 332");
+	ASSERT_TRUE((int)bu_prussian_line      == 333, "bu_prussian_line == 333");
+	ASSERT_TRUE((int)bu_prussian_zoll      == 334, "bu_prussian_zoll == 334");
+	ASSERT_TRUE((int)bu_prussian_fuss      == 335, "bu_prussian_fuss == 335");
+	ASSERT_TRUE((int)bu_prussian_elle      == 336, "bu_prussian_elle == 336");
+	ASSERT_TRUE((int)bu_prussian_rute      == 337, "bu_prussian_rute == 337");
+	ASSERT_TRUE((int)bu_klafter            == 338, "bu_klafter == 338");
+	ASSERT_TRUE((int)bu_german_mile        == 339, "bu_german_mile == 339");
+	ASSERT_TRUE((int)bu_morgen             == 340, "bu_morgen == 340");
+	ASSERT_TRUE((int)bu_scheffel           == 341, "bu_scheffel == 341");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 342, "sentinel == 342");
 }
 
 static void test_nonsi_si_factors(void)

@@ -8,6 +8,7 @@
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 #include "bovnar_si_units.h"
+#include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
 int32_t bvn_exponent_to_int(unit_exponent_t e)
 {
@@ -221,14 +222,19 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 static void bvn_verify_conv_table(void)
 {
 #ifndef NDEBUG
-	for (uint32_t i = 0; i < SI_CONV_TABLE_SIZE; i++)
+	for (uint32_t i = 0; i < SI_CONV_TABLE_SIZE; i++) {
+		if (bvn_unit_is_currency((int)i))
+			continue;
 		assert((uint32_t)si_conv_table[i].base == i &&
 		       "si_conv_table: .base mismatch at index i");
+	}
 #endif
 }
 static const bvn_si_conv_entry_t *bvn_find_si_conv(value_base_unit_t bu)
 {
 	if ((uint32_t)bu >= SI_CONV_TABLE_SIZE)
+		return NULL;
+	if (bvn_unit_is_currency((int)bu))
 		return NULL;
 	return &si_conv_table[bu];
 }
@@ -493,6 +499,8 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 		return false;
 	if ((uint32_t)base >= BVN_VALUE_BASE_UNIT_COUNT)
 		return false;
+	if (bvn_unit_is_currency((int)base))
+		return bvn_currency_prefix_valid((int)base, (int)prefix.system);
 	bool is_info = (base == bu_bit || base == bu_byte);
 	bool is_german = ((uint32_t)base >= (uint32_t)bu_pfund &&
 	                  (uint32_t)base <= (uint32_t)bu_scheffel);

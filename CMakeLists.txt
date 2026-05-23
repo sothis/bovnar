@@ -53,6 +53,7 @@ set(BVNR_SOURCES_DOM
 set(BVNR_SOURCES_UTILS
     src/utils/bovnar_utils.c
     src/utils/bovnar_si_units.c
+    src/utils/bovnar_currency.c
     src/utils/bvn_int.c
     src/utils/bvn_float.c
 )

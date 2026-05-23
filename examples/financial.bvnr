@@ -1,0 +1,123 @@
+# financial.bvnr — Bovnar currency unit extension: comprehensive financial examples
+#
+# Demonstrates all recommended type/unit pairings from the currency addendum.
+# This file is CC0-1.0 (public domain).
+
+# ── Scalar monetary amounts ────────────────────────────────────────────────
+
+.product_price      = <float_dec:64,USD>    19.99;
+.commission_rate    = <float_dec:64,EUR>     0.50;
+.account_balance    = <float_dec:128,GBP>  3421.78;
+
+# JPY has no minor unit — integer is the only correct type
+.ticket_price       = <uint:64,JPY>        2500;
+
+# KWD has 3 minor units (fils = 1/1000 KWD)
+# Store as integer minor units: 3500 fils = 3.500 KWD
+.gold_premium_fils  = <uint:64,KWD>        3500;
+
+# CLF (Unidad de Fomento, Chile) has 4 decimal places
+.clf_amount         = <float_dec:64,CLF>   1234.5678;
+
+# ── Integer minor-unit storage ─────────────────────────────────────────────
+# Convention: application documents that the value is in minor units.
+
+.price_cents_usd    = <sint:64,USD>        1999;   # $19.99
+.balance_cents_eur  = <sint:64,EUR>       -4999;   # -€49.99 (overdraft)
+
+# ── Reporting-scale amounts (SI prefix) ───────────────────────────────────
+# k~USD: value expressed in thousands of USD.
+# M~EUR: value expressed in millions of EUR.
+
+.fund_nav_kusd      = <float_dec:64,k~USD>   250.0;   # $250,000
+.gdp_meur           = <float_dec:64,M~EUR> 42800.0;   # €42.8 billion
+
+# ── Commodity prices (currency / physical unit) ────────────────────────────
+
+.gold_spot_usd      = <float_dec:64,USD/oz_t>   2351.40;  # $/troy oz
+.silver_spot_gbp    = <float_dec:64,GBP/oz_t>     22.85;
+.oil_price_usd_bbl  = <float_dec:64,USD/bbl>      78.20;  # crude oil
+.wheat_usd_bsh      = <float_dec:64,USD/bsh>       5.82;  # CBOT wheat
+.corn_usd_bsh       = <float_dec:64,USD/bsh>       4.43;
+
+# ── Rate amounts (currency / time) ────────────────────────────────────────
+
+.consulting_rate    = <float_dec:64,EUR/h>    150.00;   # hourly billing
+.annual_salary      = <float_dec:64,k~USD/yr>  95.0;   # $95,000 / year
+.daily_allowance    = <float_dec:64,CHF/d>     80.00;
+
+# ── Density (currency / area) ─────────────────────────────────────────────
+
+.rent_per_sqm       = <float_dec:64,EUR/m²>    12.50;   # €/m²/month
+.land_price         = <float_dec:64,k~USD/ac>  15.00;   # k$/acre
+
+# ── Exchange rates (currency / currency) ──────────────────────────────────
+
+.eur_usd_rate       = <float_dec:64,USD/EUR>    1.0842;  # EUR→USD
+.gbp_usd_rate       = <float_dec:64,USD/GBP>    1.2718;
+.usd_jpy_rate       = <float_dec:64,JPY/USD>  149.32;
+
+# ── Precious metals as units ───────────────────────────────────────────────
+
+.gold_holding_oz    = <float_dec:64,XAU>    10.0;   # 10 troy oz gold
+.silver_holding_oz  = <float_dec:64,XAG>   500.0;  # 500 troy oz silver
+
+# ── Inline unit suffix form ────────────────────────────────────────────────
+# Unit follows the value literal after whitespace (outside arrays).
+
+.inline_price        = 29.95 USD;
+.inline_eur_amount   = 149.00 EUR;
+
+# ── Array of monetary amounts (whole-array annotation) ────────────────────
+
+.monthly_revenues   = <float_dec:64,k~USD> [
+    312.5,
+    289.0,
+    341.8,
+    295.2
+];
+
+.price_list_eur     = <float_dec:64,EUR> [
+     9.99,
+    14.99,
+    24.99,
+    49.99
+];
+
+# ── Portfolio struct with typed monetary fields ────────────────────────────
+
+.portfolio = {
+    .name          = "Core Equity";
+    .base_currency = EUR;
+
+    .nav            = <float_dec:128,EUR>     4812345.67;
+    .nav_per_unit   = <float_dec:64,EUR>          123.45;
+    .units_issued   = <float_dec:64,no_unit>    38979.12;
+
+    .positions = [
+        {
+            .isin     = "US0378331005";
+            .ticker   = "AAPL";
+            .qty      = <uint:32,no_unit>  150;
+            .price    = <float_dec:64,USD>  182.50;
+            .notional = <float_dec:64,USD> 27375.00;
+        },
+        {
+            .isin     = "DE0007164600";
+            .ticker   = "SAP";
+            .qty      = <uint:32,no_unit>  200;
+            .price    = <float_dec:64,EUR>  178.90;
+            .notional = <float_dec:64,EUR> 35780.00;
+        }
+    ];
+};
+
+# ── Multi-currency cash ledger ────────────────────────────────────────────
+
+.cash_positions = [
+    {.currency = USD; .balance = <float_dec:64,USD>  42500.00;},
+    {.currency = EUR; .balance = <float_dec:64,EUR>  19800.00;},
+    {.currency = GBP; .balance = <float_dec:64,GBP>   8200.00;},
+    {.currency = JPY; .balance = <uint:64,JPY>     2450000;   },
+    {.currency = CHF; .balance = <float_dec:64,CHF>   5100.00;}
+];

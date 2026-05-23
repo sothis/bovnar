@@ -13,6 +13,7 @@ add_executable(bvnr_extended_reader_test tests/bovnar_extended_reader_test.c)
 add_executable(bvnr_utils_test           tests/bovnar_utils_test.c)
 add_executable(bvnr_socketpair_roundtrip_test tests/bovnar_socketpair_roundtrip_test.c)
 add_executable(bvnr_high_severity_test   tests/bovnar_high_severity_test.c)
+add_executable(bvnr_currency_test        tests/bovnar_currency_test.c)
 
 find_package(GMP QUIET)
 if(GMP_FOUND)
@@ -51,6 +52,9 @@ target_link_libraries(bvnr_socketpair_roundtrip_test PRIVATE bvnr_static pthread
 
 target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_currency_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_currency_test PRIVATE bvnr_static)
 
 if(GMP_FOUND)
     target_compile_options(bvnr_int_test PRIVATE -DWITH_GMP ${BVNR_C_FLAGS})
@@ -117,6 +121,11 @@ add_test(NAME bvnr_high_severity_test COMMAND bvnr_high_severity_test)
 set_tests_properties(bvnr_high_severity_test PROPERTIES
     LABELS "unit;high_severity"
     PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_currency_test COMMAND bvnr_currency_test)
+set_tests_properties(bvnr_currency_test PROPERTIES
+    LABELS "unit;currency"
+    PASS_REGULAR_EXPRESSION "Results:.*0 failures")
 
 if(GMP_FOUND)
     add_test(NAME bvnr_int_test COMMAND bvnr_int_test)
@@ -413,6 +422,12 @@ if(Python3_FOUND)
         "python_arrays;parser"
         30)
 
+    # Currency module: pure-Python enums + currency.py API contract.
+    _bvnr_pytest_pure(bvnr_py_currency
+        test_currency_units.py
+        "currency"
+        30)
+
     # ── integration tests (require libbvnr_shared.so) ────────────────────────
 
     _bvnr_pytest_lib(bvnr_py_reader
@@ -533,3 +548,5 @@ _bvnr_cli_example(structs)
 _bvnr_cli_example(symbols)
 _bvnr_cli_example(test)
 _bvnr_cli_example(units)
+_bvnr_cli_example(financial)
+_bvnr_cli_example(crypto_portfolio)

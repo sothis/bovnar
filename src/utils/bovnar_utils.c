@@ -12,6 +12,7 @@
 #include "bvn_internal_dims.h"
 #include "bvn_float.h"
 #include "bovnar_si_units.h"
+#include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
 #define BVN_DEC_SCRATCH_SIZE 10000u
 uint32_t bvn_char_to_digit(uint32_t c, uint32_t base)
@@ -761,6 +762,44 @@ static value_unit_component_t bvn_parse_single_unit_component(
 	uint32_t suf = parse_unit_exponent_suffix(s, len, &r.exponent);
 	len -= suf;
 	if (len == 0) { *ok = false; return r; }
+	{
+		int cid = bvn_parse_currency_str((const uint8_t*)s, len);
+		if (cid > 0) {
+			r.base = (value_base_unit_t)cid;
+			return r;
+		}
+		for (uint32_t ti = 1; ti + 1 < len; ti++) {
+			if (s[ti] != '~') continue;
+			uint32_t pfx_len  = ti;
+			uint32_t curr_off = ti + 1;
+			uint32_t curr_len = len - curr_off;
+			cid = bvn_parse_currency_str((const uint8_t*)s + curr_off, curr_len);
+			if (cid > 0) {
+				r.base = (value_base_unit_t)cid;
+				for (const iec_entry_t* e = iec_table; e->a; e++) {
+					if (e->len == pfx_len && memcmp(s, e->a, pfx_len) == 0) {
+						r.prefix.system = prefix_iec;
+						r.prefix.id.iec = e->p;
+						if (!bvn_prefix_unit_valid(r.prefix, r.base))
+							*ok = false;
+						return r;
+					}
+				}
+				for (const si_entry_t* e = si_table; e->a; e++) {
+					if (e->len == pfx_len && memcmp(s, e->a, pfx_len) == 0) {
+						r.prefix.system = prefix_si;
+						r.prefix.id.si  = e->p;
+						if (!bvn_prefix_unit_valid(r.prefix, r.base))
+							*ok = false;
+						return r;
+					}
+				}
+				*ok = false;
+				return r;
+			}
+			break;
+		}
+	}
 	const bu_entry_t* best = NULL;
 	for (const bu_entry_t* e = bu_table; e->a; e++) {
 		if (e->len > len)
@@ -1075,7 +1114,12 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_german_mile:       return "dt_mi";
 	case bu_morgen:            return "morgen";
 	case bu_scheffel:          return "schffl";
-	default:           return "";
+	default:
+		if (bvn_unit_is_currency((int)b)) {
+			const bvn_currency_info_t *info = bvn_currency_info((int)b);
+			if (info) return info->code;
+		}
+		return "";
 	}
 }
 static int32_t bvn_write_exponent_suffix(

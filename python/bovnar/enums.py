@@ -1,6 +1,5 @@
-
-
 from enum import IntEnum
+
 
 class Event(IntEnum):
 
@@ -20,6 +19,7 @@ class Event(IntEnum):
     TYPE_ANNOTATION_TYPE_FAMILY_PARAM   = 13
     STREAM_END                          = 14
 
+
 class ValueTypeFamily(IntEnum):
 
     PLAIN       = 0
@@ -31,11 +31,13 @@ class ValueTypeFamily(IntEnum):
     FLOAT_DEC   = 6
     ILLEGAL     = 7
 
+
 class PrefixSystem(IntEnum):
 
     SI          = 0
     IEC         = 1
     _SENTINEL   = 2
+
 
 class SIPrefix(IntEnum):
 
@@ -66,6 +68,7 @@ class SIPrefix(IntEnum):
     QUETTA  = 24
     _SENTINEL = 25
 
+
 class IECPrefix(IntEnum):
 
     NONE    = 0
@@ -81,7 +84,10 @@ class IECPrefix(IntEnum):
     QUEBI   = 10
     _SENTINEL = 11
 
+
 class BaseUnit(IntEnum):
+
+    # ── Physical units (original set, 0–133) ──────────────────────────────
 
     NONE                = 0
     BIT                 = 1
@@ -217,7 +223,221 @@ class BaseUnit(IntEnum):
     MINIM               = 131
     PECK                = 132
     BUSHEL              = 133
-    _SENTINEL           = 134
+
+    # ── ISO 4217 fiat currencies (134–294) ────────────────────────────────
+    # Values are assigned alphabetically by ISO 4217 alphabetic code.
+
+    AED = 134   # UAE Dirham              — minor unit: 2
+    AFN = 135   # Afghan Afghani          — minor unit: 2
+    ALL = 136   # Albanian Lek            — minor unit: 2
+    AMD = 137   # Armenian Dram           — minor unit: 2
+    ANG = 138   # NL Antillean Guilder    — minor unit: 2
+    AOA = 139   # Angolan Kwanza          — minor unit: 2
+    ARS = 140   # Argentine Peso          — minor unit: 2
+    AUD = 141   # Australian Dollar       — minor unit: 2
+    AWG = 142   # Aruban Florin           — minor unit: 2
+    AZN = 143   # Azerbaijani Manat       — minor unit: 2
+    BAM = 144   # BH Convertible Mark     — minor unit: 2
+    BBD = 145   # Barbados Dollar         — minor unit: 2
+    BDT = 146   # Bangladeshi Taka        — minor unit: 2
+    BGN = 147   # Bulgarian Lev           — minor unit: 2
+    BHD = 148   # Bahraini Dinar          — minor unit: 3
+    BMD = 149   # Bermudian Dollar        — minor unit: 2
+    BND = 150   # Brunei Dollar           — minor unit: 2
+    BOB = 151   # Boliviano               — minor unit: 2
+    BRL = 152   # Brazilian Real          — minor unit: 2
+    BSD = 153   # Bahamian Dollar         — minor unit: 2
+    BTN = 154   # Bhutanese Ngultrum      — minor unit: 2
+    BWP = 155   # Botswana Pula           — minor unit: 2
+    BYN = 156   # Belarusian Ruble        — minor unit: 2
+    BZD = 157   # Belize Dollar           — minor unit: 2
+    CAD = 158   # Canadian Dollar         — minor unit: 2
+    CDF = 159   # Congolese Franc         — minor unit: 2
+    CHF = 160   # Swiss Franc             — minor unit: 2
+    CLF = 161   # Unidad de Fomento       — minor unit: 4
+    CLP = 162   # Chilean Peso            — minor unit: 0
+    CNY = 163   # Chinese Yuan            — minor unit: 2
+    COP = 164   # Colombian Peso          — minor unit: 2
+    CRC = 165   # Costa Rican Colon       — minor unit: 2
+    CUP_ = 166  # Cuban Peso              — minor unit: 2  (CUP_ avoids collision with physical CUP=81)
+    CVE = 167   # Cape Verdean Escudo     — minor unit: 2
+    CZK = 168   # Czech Koruna            — minor unit: 2
+    DJF = 169   # Djiboutian Franc        — minor unit: 0
+    DKK = 170   # Danish Krone            — minor unit: 2
+    DOP = 171   # Dominican Peso          — minor unit: 2
+    DZD = 172   # Algerian Dinar          — minor unit: 2
+    EGP = 173   # Egyptian Pound          — minor unit: 2
+    ERN = 174   # Eritrean Nakfa          — minor unit: 2
+    ETB = 175   # Ethiopian Birr          — minor unit: 2
+    EUR = 176   # Euro                    — minor unit: 2
+    FJD = 177   # Fijian Dollar           — minor unit: 2
+    FKP = 178   # Falkland Islands Pound  — minor unit: 2
+    GBP = 179   # Pound Sterling          — minor unit: 2
+    GEL = 180   # Georgian Lari           — minor unit: 2
+    GHS = 181   # Ghanaian Cedi           — minor unit: 2
+    GIP = 182   # Gibraltar Pound         — minor unit: 2
+    GMD = 183   # Gambian Dalasi          — minor unit: 2
+    GNF = 184   # Guinean Franc           — minor unit: 0
+    GTQ = 185   # Guatemalan Quetzal      — minor unit: 2
+    GYD = 186   # Guyanese Dollar         — minor unit: 2
+    HKD = 187   # Hong Kong Dollar        — minor unit: 2
+    HNL = 188   # Honduran Lempira        — minor unit: 2
+    HRK = 189   # Croatian Kuna           — minor unit: 2
+    HTG = 190   # Haitian Gourde          — minor unit: 2
+    HUF = 191   # Hungarian Forint        — minor unit: 2
+    IDR = 192   # Indonesian Rupiah       — minor unit: 2
+    ILS = 193   # Israeli New Shekel      — minor unit: 2
+    INR = 194   # Indian Rupee            — minor unit: 2
+    IQD = 195   # Iraqi Dinar             — minor unit: 3
+    IRR = 196   # Iranian Rial            — minor unit: 2
+    ISK = 197   # Icelandic Krona         — minor unit: 0
+    JMD = 198   # Jamaican Dollar         — minor unit: 2
+    JOD = 199   # Jordanian Dinar         — minor unit: 3
+    JPY = 200   # Japanese Yen            — minor unit: 0
+    KES = 201   # Kenyan Shilling         — minor unit: 2
+    KGS = 202   # Kyrgystani Som          — minor unit: 2
+    KHR = 203   # Cambodian Riel          — minor unit: 2
+    KMF = 204   # Comorian Franc          — minor unit: 0
+    KPW = 205   # North Korean Won        — minor unit: 2
+    KRW = 206   # South Korean Won        — minor unit: 0
+    KWD = 207   # Kuwaiti Dinar           — minor unit: 3
+    KYD = 208   # Cayman Islands Dollar   — minor unit: 2
+    KZT = 209   # Kazakhstani Tenge       — minor unit: 2
+    LAK = 210   # Laotian Kip             — minor unit: 2
+    LBP = 211   # Lebanese Pound          — minor unit: 2
+    LKR = 212   # Sri Lankan Rupee        — minor unit: 2
+    LRD = 213   # Liberian Dollar         — minor unit: 2
+    LSL = 214   # Lesotho Loti            — minor unit: 2
+    LYD = 215   # Libyan Dinar            — minor unit: 3
+    MAD = 216   # Moroccan Dirham         — minor unit: 2
+    MDL = 217   # Moldovan Leu            — minor unit: 2
+    MGA = 218   # Malagasy Ariary         — minor unit: 2
+    MKD = 219   # Macedonian Denar        — minor unit: 2
+    MMK = 220   # Myanmar Kyat            — minor unit: 2
+    MNT = 221   # Mongolian Togrog        — minor unit: 2
+    MOP = 222   # Macanese Pataca         — minor unit: 2
+    MRU = 223   # Mauritanian Ouguiya     — minor unit: 2
+    MUR = 224   # Mauritian Rupee         — minor unit: 2
+    MVR = 225   # Maldivian Rufiyaa       — minor unit: 2
+    MWK = 226   # Malawian Kwacha         — minor unit: 2
+    MXN = 227   # Mexican Peso            — minor unit: 2
+    MYR = 228   # Malaysian Ringgit       — minor unit: 2
+    MZN = 229   # Mozambican Metical      — minor unit: 2
+    NAD = 230   # Namibian Dollar         — minor unit: 2
+    NGN = 231   # Nigerian Naira          — minor unit: 2
+    NIO = 232   # Nicaraguan Cordoba      — minor unit: 2
+    NOK = 233   # Norwegian Krone         — minor unit: 2
+    NPR = 234   # Nepalese Rupee          — minor unit: 2
+    NZD = 235   # New Zealand Dollar      — minor unit: 2
+    OMR = 236   # Omani Rial              — minor unit: 3
+    PAB = 237   # Panamanian Balboa       — minor unit: 2
+    PEN = 238   # Peruvian Sol            — minor unit: 2
+    PGK = 239   # Papua New Guinean Kina  — minor unit: 2
+    PHP = 240   # Philippine Peso         — minor unit: 2
+    PKR = 241   # Pakistani Rupee         — minor unit: 2
+    PLN = 242   # Polish Zloty            — minor unit: 2
+    PYG = 243   # Paraguayan Guarani      — minor unit: 0
+    QAR = 244   # Qatari Riyal            — minor unit: 2
+    RON = 245   # Romanian Leu            — minor unit: 2
+    RSD = 246   # Serbian Dinar           — minor unit: 2
+    RUB = 247   # Russian Ruble           — minor unit: 2
+    RWF = 248   # Rwandan Franc           — minor unit: 0
+    SAR = 249   # Saudi Riyal             — minor unit: 2
+    SBD = 250   # Solomon Islands Dollar  — minor unit: 2
+    SCR = 251   # Seychellois Rupee       — minor unit: 2
+    SDG = 252   # Sudanese Pound          — minor unit: 2
+    SEK = 253   # Swedish Krona           — minor unit: 2
+    SGD = 254   # Singapore Dollar        — minor unit: 2
+    SHP = 255   # Saint Helena Pound      — minor unit: 2
+    SLL = 256   # Sierra Leonean Leone    — minor unit: 2
+    SOS = 257   # Somali Shilling         — minor unit: 2
+    SRD = 258   # Surinamese Dollar       — minor unit: 2
+    STN = 259   # Sao Tome Dobra          — minor unit: 2
+    SVC = 260   # Salvadoran Colon        — minor unit: 2
+    SYP = 261   # Syrian Pound            — minor unit: 2
+    SZL = 262   # Swazi Lilangeni         — minor unit: 2
+    THB = 263   # Thai Baht               — minor unit: 2
+    TJS = 264   # Tajikistani Somoni      — minor unit: 2
+    TMT = 265   # Turkmenistan Manat      — minor unit: 2
+    TND = 266   # Tunisian Dinar          — minor unit: 3
+    TOP = 267   # Tongan Pa'anga          — minor unit: 2
+    TRY = 268   # Turkish Lira            — minor unit: 2  (enum name: TRY_)
+    TTD = 269   # Trinidad/Tobago Dollar  — minor unit: 2
+    TWD = 270   # New Taiwan Dollar       — minor unit: 2
+    TZS = 271   # Tanzanian Shilling      — minor unit: 2
+    UAH = 272   # Ukrainian Hryvnia       — minor unit: 2
+    UGX = 273   # Ugandan Shilling        — minor unit: 0
+    USD = 274   # US Dollar               — minor unit: 2
+    UYU = 275   # Uruguayan Peso          — minor unit: 2
+    UZS = 276   # Uzbekistani Som         — minor unit: 2
+    VES = 277   # Venezuelan Bolivar      — minor unit: 2
+    VND = 278   # Vietnamese Dong         — minor unit: 0
+    VUV = 279   # Vanuatu Vatu            — minor unit: 0
+    WST = 280   # Samoan Tala             — minor unit: 2
+    XAF = 281   # CFA Franc BEAC          — minor unit: 0
+    XAG = 282   # Silver                  — minor unit: 0
+    XAU = 283   # Gold                    — minor unit: 0
+    XCD = 284   # East Caribbean Dollar   — minor unit: 2
+    XDR = 285   # Special Drawing Rights  — minor unit: 0
+    XOF = 286   # CFA Franc BCEAO         — minor unit: 0
+    XPD = 287   # Palladium               — minor unit: 0
+    XPF = 288   # CFP Franc               — minor unit: 0
+    XPT = 289   # Platinum                — minor unit: 0
+    XTS = 290   # Test                    — minor unit: 0
+    YER = 291   # Yemeni Rial             — minor unit: 2
+    ZAR = 292   # South African Rand      — minor unit: 2
+    ZMW = 293   # Zambian Kwacha          — minor unit: 2
+    ZWL = 294   # Zimbabwean Dollar       — minor unit: 2
+
+    # ── Cryptocurrencies (295–328) ────────────────────────────────────────
+    # minor_unit = on-chain canonical decimal places.
+    # numeric_code = 0 (not ISO 4217).
+
+    BTC  = 295  # Bitcoin             — minor unit: 8  (satoshi)
+    ETH  = 296  # Ethereum            — minor unit: 18 (wei)
+    SOL  = 297  # Solana              — minor unit: 9  (lamport)
+    XRP  = 298  # XRP                 — minor unit: 6  (drop)
+    BNB  = 299  # BNB                 — minor unit: 18
+    ADA  = 300  # Cardano             — minor unit: 6  (lovelace)
+    LTC  = 301  # Litecoin            — minor unit: 8  (litoshi)
+    DOT  = 302  # Polkadot            — minor unit: 10 (planck)
+    XMR  = 303  # Monero              — minor unit: 12 (piconero)
+    ETC  = 304  # Ethereum Classic    — minor unit: 18
+    BCH  = 305  # Bitcoin Cash        — minor unit: 8
+    XLM  = 306  # Stellar             — minor unit: 7  (stroop)
+    FIL  = 307  # Filecoin            — minor unit: 18
+    ICP  = 308  # Internet Computer   — minor unit: 8
+    TRX  = 309  # TRON                — minor unit: 6
+    EOS  = 310  # EOS                 — minor unit: 4
+    VET  = 311  # VeChain             — minor unit: 18
+    NEO  = 312  # Neo                 — minor unit: 8
+    ZEC  = 313  # Zcash               — minor unit: 8
+    UNI  = 314  # Uniswap             — minor unit: 18
+    ARB  = 315  # Arbitrum            — minor unit: 18
+    SUI  = 316  # Sui                 — minor unit: 9
+    TON  = 317  # Toncoin             — minor unit: 9
+    INJ  = 318  # Injective           — minor unit: 18
+    SEI  = 319  # Sei                 — minor unit: 6
+    APT  = 320  # Aptos               — minor unit: 8
+    TAO  = 321  # Bittensor           — minor unit: 9
+    WIF  = 322  # dogwifhat           — minor unit: 6
+    DOGE = 323  # Dogecoin            — minor unit: 8  (koinu)
+    LINK = 324  # Chainlink           — minor unit: 18
+    USDT = 325  # Tether              — minor unit: 6
+    USDC = 326  # USD Coin            — minor unit: 6
+    AVAX = 327  # Avalanche           — minor unit: 18
+    ATOM = 328  # Cosmos              — minor unit: 6
+
+    _SENTINEL = 329
+
+
+# ── Currency-range sentinels (mirrors C #defines) ─────────────────────────
+
+CURRENCY_FIAT_FIRST   = BaseUnit.AED
+CURRENCY_FIAT_LAST    = BaseUnit.ZWL
+CURRENCY_CRYPTO_FIRST = BaseUnit.BTC
+CURRENCY_CRYPTO_LAST  = BaseUnit.ATOM
+
 
 class Exponent(IntEnum):
 
@@ -240,6 +460,7 @@ class Exponent(IntEnum):
     NEG_SEPTIC  = -7
     NEG_OCTIC   = -8
     NEG_NONIC   = -9
+
 
 class ErrorCode(IntEnum):
 

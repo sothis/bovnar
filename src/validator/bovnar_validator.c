@@ -4,6 +4,7 @@
 #include <string.h>
 #include "bovnar.h"
 #include "bvn_val_impl.h"
+#include "bovnar_currency.h"
 bvnr_reader_t* bvnr_reader_create(void)
 {
 	bvnr_reader_t* r = malloc(sizeof(*r));
@@ -92,7 +93,8 @@ static inline uint32_t bvn_effective_base_or_10(value_type_spec_t vt)
 	return vt.base ? vt.base : 10u;
 }
 static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
-	token_type_t tt, const uint8_t* str, uint32_t str_len)
+	token_type_t tt, const uint8_t* str, uint32_t str_len,
+	bool is_currency_unit)
 {
 	bvnr_validator_t* v = &r->val;
 	value_type_spec_t default_type;
@@ -120,7 +122,16 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 					has_exp = true;
 			}
 		}
-		if (is_special || has_dot || has_exp) {
+		if (is_currency_unit) {
+			default_type.family = vt_float_dec;
+			default_type.width  = 64;
+			default_type.base   = 0;
+			family_name     = "float_dec";
+			family_name_len = 9;
+			emit_width = true;
+			emit_base  = true;
+			emit_unit  = true;
+		} else if (is_special || has_dot || has_exp) {
 			default_type.family = vt_float;
 			default_type.width  = 64;
 			default_type.base   = 0;
@@ -460,8 +471,17 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	if (bvn_type_is_plain(v->value_type) &&
 		(tt == token_is_number || tt == token_is_array_number ||
 		 tt == token_is_string || tt == token_is_array_string)) {
+		bool is_currency_unit = false;
+		if (raw->inline_unit_len > 0 &&
+		    (tt == token_is_number || tt == token_is_array_number)) {
+			bool u_ok = true;
+			value_unit_t iu = bvn_parse_unit(raw->inline_unit_data, &u_ok);
+			if (u_ok && iu.num_components == 1 &&
+			    bvn_unit_is_currency((int)iu.components[0].base))
+				is_currency_unit = true;
+		}
 		if (!bvn_emit_default_type_annotation(r, tt,
-				raw->str_data, raw->str_len))
+				raw->str_data, raw->str_len, is_currency_unit))
 			return false;
 	}
 	if (tt == token_is_number || tt == token_is_array_number ||

@@ -175,7 +175,12 @@ typedef enum value_base_unit_e {
 	bu_fluid_dram,
 	bu_minim,
 	bu_peck,
-	bu_bushel
+	bu_bushel,
+	bu_pfund, bu_zentner, bu_doppelzentner, bu_lot,
+	bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss, bu_prussian_elle,
+	bu_prussian_rute, bu_klafter, bu_german_mile,
+	bu_morgen,
+	bu_scheffel
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

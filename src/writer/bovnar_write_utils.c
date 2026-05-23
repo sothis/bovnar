@@ -103,6 +103,7 @@ static bool emit_numeric(bvnr_writer_t *w,
 bool bvnr_write_string(bvnr_writer_t *w, const char *key, const char *value)
 {
 	if (!emit_key(w, key)) return false;
+	if (!value) return bvn_writer_set_error(w, error_invalid_argument);
 	bvnr_data_t d = {
 		.type   = token_is_string,
 		.data   = (const void *)value,
@@ -113,6 +114,7 @@ bool bvnr_write_string(bvnr_writer_t *w, const char *key, const char *value)
 bool bvnr_write_plain(bvnr_writer_t *w, const char *key, const char *value)
 {
 	if (!emit_key(w, key)) return false;
+	if (!value) return bvn_writer_set_error(w, error_invalid_argument);
 	bvnr_data_t d = {
 		.type   = token_is_symbol,
 		.data   = (const void *)value,

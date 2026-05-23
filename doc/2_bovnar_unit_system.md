@@ -143,53 +143,53 @@ When both are present, equality is checked **after parsing** via `memcmp` on the
 
 ## 3. Base Units
 
-Bovnar supports 133 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, and surveying and culinary measure units.
+Bovnar supports 133 named base units (as implemented), covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, and surveying and culinary measure units. A block of 13 Old German units is specified in the final subsection of this section and is planned for a future implementation revision.
 
 ### SI Base Units
 
-| Symbol | Name     | Enum value   | Notes |
-|--------|----------|--------------|-------|
-| `s`    | second   | `bu_second`  | SI base unit of time |
-| `m`    | meter    | `bu_meter`   | SI base unit of length |
-| `g`    | gram     | `bu_gram`    | SI base unit of mass is kg; `g` allows the prefix to carry the `k` |
-| `A`    | ampere   | `bu_ampere`  | SI base unit of electric current |
-| `K`    | kelvin   | `bu_kelvin`  | SI base unit of thermodynamic temperature |
-| `mol`  | mole     | `bu_mol`     | SI base unit of amount of substance |
-| `cd`   | candela  | `bu_candela` | SI base unit of luminous intensity |
+| Symbol | Long forms | Name     | Enum value   | Notes |
+|--------|-----------|----------|--------------|-------|
+| `s`    | `sec`, `second`, `seconds` | second   | `bu_second`  | SI base unit of time |
+| `m`    | `meter`, `metre`, `meters`, `metres` | meter    | `bu_meter`   | SI base unit of length |
+| `g`    | `gram`, `grams` | gram     | `bu_gram`    | SI base unit of mass is kg; `g` allows the prefix to carry the `k` |
+| `A`    | `amp`, `amps`, `ampere`, `amperes` | ampere   | `bu_ampere`  | SI base unit of electric current |
+| `K`    | `kelvin`, `kelvins` | kelvin   | `bu_kelvin`  | SI base unit of thermodynamic temperature |
+| `mol`  | `mole`, `moles` | mole     | `bu_mol`     | SI base unit of amount of substance |
+| `cd`   | `candela`, `candelas` | candela  | `bu_candela` | SI base unit of luminous intensity |
 
 > **Note on the kilogram:** The SI base unit of mass is the kilogram, but Bovnar uses `g` (gram) as the base unit symbol so that the `k~` (kilo) SI prefix can be attached explicitly: `k~g` = kilogram. This is consistent with how the SI formally defines kilogram as a prefixed gram.
 
 ### Named SI-Derived Units
 
-| Symbol | Name       | Enum value      | SI Definition |
-|--------|------------|-----------------|---------------|
-| `Hz`   | hertz      | `bu_hertz`      | s⁻¹ |
-| `N`    | newton     | `bu_newton`     | kg·m·s⁻² |
-| `Pa`   | pascal     | `bu_pascal`     | kg·m⁻¹·s⁻² |
-| `J`    | joule      | `bu_joule`      | kg·m²·s⁻² |
-| `W`    | watt       | `bu_watt`       | kg·m²·s⁻³ |
-| `V`    | volt       | `bu_volt`       | kg·m²·A⁻¹·s⁻³ |
-| `Ω`    | ohm        | `bu_ohm`        | kg·m²·A⁻²·s⁻³ — U+2126, UTF-8: `0xE2 0x84 0xA6` |
-| `F`    | farad      | `bu_farad`      | kg⁻¹·m⁻²·A²·s⁴ |
-| `C`    | coulomb    | `bu_coulomb`    | A·s |
-| `S`    | siemens    | `bu_siemens`    | kg⁻¹·m⁻²·A²·s³ |
-| `Wb`   | weber      | `bu_weber`      | kg·m²·A⁻¹·s⁻² |
-| `T`    | tesla      | `bu_tesla`      | kg·A⁻¹·s⁻² |
-| `H`    | henry      | `bu_henry`      | kg·m²·A⁻²·s⁻² |
-| `lm`   | lumen      | `bu_lumen`      | cd·sr |
-| `lx`   | lux        | `bu_lux`        | cd·sr·m⁻² |
-| `Bq`   | becquerel  | `bu_becquerel`  | s⁻¹ |
-| `Gy`   | gray       | `bu_gray`       | m²·s⁻² |
-| `Sv`   | sievert    | `bu_sievert`    | m²·s⁻² |
-| `kat`  | katal      | `bu_katal`      | mol·s⁻¹ |
-| `rad`  | radian     | `bu_radian`     | dimensionless (plane angle; m/m) |
-| `sr`   | steradian  | `bu_steradian`  | dimensionless (solid angle; m²/m²) |
+| Symbol | Long forms | Name       | Enum value      | SI Definition |
+|--------|-----------|------------|-----------------|---------------|
+| `Hz`   | `hertz` | hertz      | `bu_hertz`      | s⁻¹ |
+| `N`    | `newton`, `newtons` | newton     | `bu_newton`     | kg·m·s⁻² |
+| `Pa`   | `pascal`, `pascals` | pascal     | `bu_pascal`     | kg·m⁻¹·s⁻² |
+| `J`    | `joule`, `joules` | joule      | `bu_joule`      | kg·m²·s⁻² |
+| `W`    | `watt`, `watts` | watt       | `bu_watt`       | kg·m²·s⁻³ |
+| `V`    | `volt`, `volts` | volt       | `bu_volt`       | kg·m²·A⁻¹·s⁻³ |
+| `Ω`    | `ohm`, `ohms` | ohm        | `bu_ohm`        | kg·m²·A⁻²·s⁻³ — U+2126, UTF-8: `0xE2 0x84 0xA6` |
+| `F`    | `farad`, `farads` | farad      | `bu_farad`      | kg⁻¹·m⁻²·A²·s⁴ |
+| `C`    | `coulomb`, `coulombs` | coulomb    | `bu_coulomb`    | A·s |
+| `S`    | `siemens` | siemens    | `bu_siemens`    | kg⁻¹·m⁻²·A²·s³ |
+| `Wb`   | `weber`, `webers` | weber      | `bu_weber`      | kg·m²·A⁻¹·s⁻² |
+| `T`    | `tesla`, `teslas` | tesla      | `bu_tesla`      | kg·A⁻¹·s⁻² |
+| `H`    | `henry`, `henrys`, `henries` | henry      | `bu_henry`      | kg·m²·A⁻²·s⁻² |
+| `lm`   | `lumen`, `lumens` | lumen      | `bu_lumen`      | cd·sr |
+| `lx`   | `lux` | lux        | `bu_lux`        | cd·sr·m⁻² |
+| `Bq`   | `becquerel`, `becquerels` | becquerel  | `bu_becquerel`  | s⁻¹ |
+| `Gy`   | `gray`, `grays` | gray       | `bu_gray`       | m²·s⁻² |
+| `Sv`   | `sievert`, `sieverts` | sievert    | `bu_sievert`    | m²·s⁻² |
+| `kat`  | `katal`, `katals` | katal      | `bu_katal`      | mol·s⁻¹ |
+| `rad`  | `radian`, `radians` | radian     | `bu_radian`     | dimensionless (plane angle; m/m) |
+| `sr`   | `steradian`, `steradians` | steradian  | `bu_steradian`  | dimensionless (solid angle; m²/m²) |
 
 ### Non-SI Units Accepted for Use with SI
 
 | Symbol | Name              | Enum value    | Notes |
 |--------|-------------------|---------------|-------|
-| `L`, `l` | liter           | `bu_liter`    | 10⁻³ m³ |
+| `L`, `l` | `liter`, `litre`, `liters`, `litres` | liter           | `bu_liter`    | 10⁻³ m³ |
 | `min`  | minute            | `bu_minute`   | 60 s |
 | `h`    | hour              | `bu_hour`     | 3600 s |
 | `d`    | day               | `bu_day`      | 86400 s |
@@ -508,10 +508,69 @@ Bovnar supports 133 named base units, covering SI base units, all named SI-deriv
 
 ### Digital Units
 
-| Symbol | Name | Enum value  |
-|--------|------|-------------|
-| `b`    | bit  | `bu_bit`    |
-| `B`    | byte | `bu_byte`   |
+| Symbol | Long forms | Name | Enum value  |
+|--------|-----------|------|-------------|
+| `b`    | `bit`, `bits` | bit  | `bu_bit`    |
+| `B`    | `byte`, `bytes`, `Byte`, `Bytes` | byte | `bu_byte`   |
+
+### Old German Units
+
+> **Implementation status:** The units in this section are **not yet implemented**. They are specified here as a planned extension. Symbols, enum names, and conversion factors are normative once the implementation is added.
+
+Old German units fall into two categories: metric-compatible units that were formally standardized and remain in everyday use in the DACH region, and historical pre-metric units that appear in historical documents, land registers, and surveying maps. Bovnar targets the Prussian variant as the canonical source where regional variation exists, because it was the most widely codified German measurement system prior to metrication.
+
+#### Metric-Compatible German Units — Mass
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `Pfd`  | `pfund`, `pfunds` | Pfund (metric German pound) | `bu_pfund` | 0.5 kg (exact) |
+| `Ztr`  | `zentner` | Zentner | `bu_zentner` | 50 kg (exact) |
+| `dz`   | `doppelzentner` | Doppelzentner (metric quintal) | `bu_doppelzentner` | 100 kg (exact) |
+| `lot`  | `lots` | Lot | `bu_lot` | 15.625×10⁻³ kg (= 1/32 Pfund, exact) |
+
+> **Pfund** (`Pfd`): The metric German pound, standardized in Germany in 1856 as exactly 500 g. Still in everyday use in German-speaking countries for market quantities (e.g. butter, flour). Dimensionally compatible with `g`, `lb`, `oz`, `kg`. Note that 1 Pfund = 500 g ≠ 1 pound avoirdupois (≈ 453.59 g).
+>
+> **Zentner** (`Ztr`): Defined as 100 Pfund = 50 kg under the German metric system (Maß- und Gewichtsordnung 1884). Used in German and Swiss agriculture, freight, and trade. Not to be confused with the Austrian Zentner (100 alte Pfund ≈ 56 kg) or the US/UK hundredweight. The symbol `Ztr` follows the convention of DIN 1301.
+>
+> **Doppelzentner** (`dz`): Exactly 200 Pfund = 100 kg. The Doppelzentner is numerically identical to the metric quintal (symbol `q` in some European countries) and the deciton. It is the standard unit for bulk agricultural produce in DACH statistics.
+>
+> **Lot** (`lot`): Exactly 1/32 Pfund = 500/32 g = 15.625 g. A traditional apothecary and trade subdivision of the Pfund, used in German pharmacy and cooking well into the 20th century. Distinct from the Quent (= 1/4 Lot = ~3.906 g), which is below the current specification threshold.
+
+#### Historical German Units — Length (Prussian)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `prln` | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.18054×10⁻³ m |
+| `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll (inch) | `bu_prussian_zoll` | 2.61644×10⁻² m |
+| `prf`  | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß (foot) | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
+| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle (ell) | `bu_prussian_elle` | 6.67160×10⁻¹ m (= 2 Fuß + 1 Zoll) |
+| `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute (rod) | `bu_prussian_rute` | 3.76624 m (= 12 Fuß) |
+| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m (= 6 Fuß) |
+| `dt_mi` | `deutsche_meile`, `german_mile` | Geographische Meile (geographical mile) | `bu_german_mile` | 7420.44 m (= 1/15 degree of latitude) |
+
+> **Prussian linear units** form a coherent hierarchy: 1 Fuß = 12 Zoll = 144 Linien. The Prussian foot was defined in 1816 by comparison with the French toise and equals 313.853 mm (±0.001 mm from modern remeasurement of original standards). The Rute (12 Fuß) and Klafter (6 Fuß) are the primary survey units for land registers (Urmesstischblätter) covering the former Prussian state. All factors are given to six significant figures; sub-millimetre precision requires the historical primary-standard value 0.31385327 m for 1 Fuß.
+>
+> **Geographische Meile** (`dt_mi`): 1/15 of one degree of latitude on the Earth's surface = 7420.44 m. This is the standard German geographical mile (not the Prussian statute mile of 7532.5 m). It is the unit used in historical German atlases and nautical charts predating adoption of the nautical mile. Dimensionally compatible with `m`, `mi`, `nmi`, `prf`, `ft`.
+
+#### Historical German Units — Area (Prussian)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.22 m² (= 180 □ Ruten) |
+
+> **Morgen** (`morgen`): The Prussian Morgen equals 180 square Ruten = 180 × (3.76624 m)² = 2553.22 m². It is the dominant unit of cultivated land area in 19th-century Prussian cadastral records, land-tax rolls (Grundsteuerkataster), and post-unification German land registers up to the introduction of the hectare. One Morgen ≈ 0.255322 ha. Regional Morgen values differ significantly (e.g. the Hessian Morgen = 2500 m², the Bavarian Tagwerk ≈ 3408 m²); the Prussian value is used here as canonical. Dimensionally compatible with `m²`, `ha`, `ac`.
+
+#### Historical German Units — Volume (Prussian)
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ (= 54.961 L) |
+
+> **Scheffel** (`schffl`): The Prussian Scheffel was metrologically fixed in 1816 at 54.961 L (exact under the Prussian Maß- und Gewichtsordnung). It served as the primary dry measure for grain, and CBOT-predecessor contracts for Prussian wheat were denominated in Scheffel. The symbol `schffl` is used to avoid collision with `bsh` (US bushel). Dimensionally compatible with `L`, `bsh`, `pk`, `bbl`. Note that regional Scheffel values differ (e.g. the Saxon Scheffel = 103.826 L); only the Prussian value is defined here.
+
+> **Implementation note for the German unit block:** All symbols above are lower-case or use the shortest unambiguous form. The prefix `pr` is reserved for Prussian units to avoid collision with existing SI-prefix+unit combinations. None of the historical Prussian units accept SI or IEC prefixes; `bvn_prefix_unit_valid` must reject any non-`si_none` prefix for `bu_prussian_fuss`, `bu_prussian_zoll`, `bu_prussian_line`, `bu_prussian_elle`, `bu_prussian_rute`, `bu_klafter`, `bu_german_mile`, `bu_morgen`, and `bu_scheffel`. The metric German mass units (`bu_pfund`, `bu_zentner`, `bu_doppelzentner`, `bu_lot`) do accept SI prefixes at `si_none` only; multiplier prefixes such as `k~Pfd` would produce dimensional nonsense and must be rejected. The enum values for the entire German block must be appended after `bu_bushel` in `value_base_unit_t`, and `BVN_VALUE_BASE_UNIT_COUNT` must be updated accordingly. The `si_conv_table` in `bovnar_si_units.c` requires a matching entry for each new enum value.
+
+---
 
 ### Sentinel Value
 

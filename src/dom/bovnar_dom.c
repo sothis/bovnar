@@ -101,7 +101,7 @@ bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem)
 		uint32_t nc = a->arr.cap ? a->arr.cap * 2u : 8u;
 		bvn_dom_node_t **ni = realloc(a->arr.items,
 									  nc * sizeof(*ni));
-		if (!ni) return false;
+		if (!ni) { bvn_dom_node_destroy(elem); return false; }
 		a->arr.items = ni;
 		a->arr.cap   = nc;
 	}

@@ -202,6 +202,19 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_minim]              = { bu_minim,              6.16115199218750e-8,      {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 	[bu_peck]               = { bu_peck,               8.80976754172e-3,         {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 	[bu_bushel]             = { bu_bushel,             3.523907016688e-2,        {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_pfund]              = { bu_pfund,              0.5,                      {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_zentner]            = { bu_zentner,            50.0,                     {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_doppelzentner]      = { bu_doppelzentner,      100.0,                    {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_lot]                = { bu_lot,                15.625e-3,                {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_prussian_line]      = { bu_prussian_line,      2.18054e-3,               {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_prussian_zoll]      = { bu_prussian_zoll,      2.61644e-2,               {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_prussian_fuss]      = { bu_prussian_fuss,      3.13853e-1,               {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_prussian_elle]      = { bu_prussian_elle,      6.67160e-1,               {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_prussian_rute]      = { bu_prussian_rute,      3.76624,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_klafter]            = { bu_klafter,            1.88312,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_german_mile]        = { bu_german_mile,        7420.44,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_morgen]             = { bu_morgen,             2553.22,                  {2, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_scheffel]           = { bu_scheffel,           54.961e-3,                {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))
@@ -481,6 +494,13 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 	if ((uint32_t)base >= BVN_VALUE_BASE_UNIT_COUNT)
 		return false;
 	bool is_info = (base == bu_bit || base == bu_byte);
+	bool is_german = ((uint32_t)base >= (uint32_t)bu_pfund &&
+	                  (uint32_t)base <= (uint32_t)bu_scheffel);
+	if (is_german) {
+		if (prefix.system == prefix_iec)
+			return prefix.id.iec == iec_none;
+		return prefix.id.si == si_none;
+	}
 	if (prefix.system == prefix_iec)
 		return (prefix.id.iec == iec_none) || is_info;
 	if (is_info && prefix.system == prefix_si)

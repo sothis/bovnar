@@ -378,13 +378,27 @@ typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
 static const bu_entry_t bu_table[] = {
 	{"atmosphere_technical", 20, bu_atmosphere_technical},
 	{"metric_horsepower",    17, bu_metric_horsepower},
+	{"preussischer_fuss",    17, bu_prussian_fuss},
+	{"prussian_scheffel",    17, bu_scheffel},
 	{"standard_gravity",     16, bu_standard_gravity},
+	{"prussian_klafter",     16, bu_klafter},
+	{"preussische_rute",     16, bu_prussian_rute},
+	{"preussische_elle",     16, bu_prussian_elle},
 	{"fluid_ounces_uk", 15, bu_fluid_ounce_uk},
+	{"prussian_morgen",      15, bu_morgen},
 	{"nautical_miles",  14, bu_nautical_mile},
 	{"foot_pounds",     11, bu_foot_pound},    {"fluid_ounce_uk",  13, bu_fluid_ounce_uk},
+	{"german_mile",     11, bu_german_mile},
 	{"nautical_mile",   13, bu_nautical_mile},
 	{"kilogram_force",  14, bu_kilogram_force},
+	{"deutsche_meile",  14, bu_german_mile},
 	{"electronvolts",   13, bu_electronvolt},
+	{"doppelzentner",   13, bu_doppelzentner},
+	{"prussian_zoll",   13, bu_prussian_zoll},
+	{"prussian_rute",   13, bu_prussian_rute},
+	{"prussian_line",   13, bu_prussian_line},
+	{"prussian_fuss",   13, bu_prussian_fuss},
+	{"prussian_elle",   13, bu_prussian_elle},
 	{"pennyweights",    12, bu_pennyweight},   {"fluid_ounces",    12, bu_fluid_ounce},
 	{"electronvolt",    12, bu_electronvolt},
 	{"volt_amperes",    12, bu_volt_ampere},
@@ -420,7 +434,9 @@ static const bu_entry_t bu_table[] = {
 	{"candelas",         8, bu_candela},       {"coulombs",        8, bu_coulomb},
 	{"sieverts",         8, bu_sievert},       {"pints_uk",        8, bu_pint_uk},
 	{"quart_uk",         8, bu_quart_uk},      {"fl_oz_uk",        8, bu_fluid_ounce_uk},
+	{"scheffel",         8, bu_scheffel},
 	{"bushels",          7, bu_bushel},        {"deniers",         7, bu_denier},
+	{"zentner",          7, bu_zentner},       {"klafter",         7, bu_klafter},
 	{"rankine",          7, bu_rankine},       {"decibel",         7, bu_decibel},
 	{"gallons",          7, bu_gallon},        {"parsecs",         7, bu_parsec},
 	{"furlong",          7, bu_furlong},       {"maxwell",         7, bu_maxwell},
@@ -437,6 +453,8 @@ static const bu_entry_t bu_table[] = {
 	{"sievert",          7, bu_sievert},       {"degrees",         7, bu_degree},
 	{"pint_uk",          7, bu_pint_uk},       {"bushel",          6, bu_bushel},
 	{"denier",           6, bu_denier},        {"months",          6, bu_month},
+	{"pfunds",           6, bu_pfund},         {"schffl",          6, bu_scheffel},
+	{"morgen",           6, bu_morgen},
 	{"minims",           6, bu_minim},         {"chains",          6, bu_chain},
 	{"nepers",           6, bu_neper},         {"barrel",          6, bu_barrel},
 	{"arcmin",           6, bu_arcminute},     {"arcsec",          6, bu_arcsecond},
@@ -462,6 +480,8 @@ static const bu_entry_t bu_table[] = {
 	{"pecks",            5, bu_peck},          {"turns",           5, bu_revolution},
 	{"minim",            5, bu_minim},         {"month",           5, bu_month},
 	{"fl_dr",            5, bu_fluid_dram},
+	{"linie",            5, bu_prussian_line}, {"pfund",           5, bu_pfund},
+	{"dt_mi",            5, bu_german_mile},
 	{"drams",            5, bu_dram},          {"slugs",           5, bu_slug},
 	{"chain",            5, bu_chain},         {"gills",           5, bu_gill},
 	{"neper",            5, bu_neper},         {"gauss",           5, bu_gauss},
@@ -492,6 +512,9 @@ static const bu_entry_t bu_table[] = {
 	{"rods",             4, bu_rod},           {"slug",            4, bu_slug},
 	{"gill",             4, bu_gill},          {"cups",            4, bu_cup},
 	{"kips",             4, bu_kip},
+	{"prln",             4, bu_prussian_line}, {"lots",            4, bu_lot},
+	{"rute",             4, bu_prussian_rute}, {"elle",            4, bu_prussian_elle},
+	{"zoll",             4, bu_prussian_zoll},
 	{"knot",             4, bu_knot},          {"rems",            4, bu_rem},
 	{"pint",             4, bu_pint},          {"barn",            4, bu_barn},
 	{"acre",             4, bu_acre},          {"dyne",            4, bu_dyne},
@@ -529,6 +552,9 @@ static const bu_entry_t bu_table[] = {
 	{"mil",              3, bu_thou},          {"rod",             3, bu_rod},
 	{"tex",              3, bu_tex},           {"den",             3, bu_denier},
 	{"bsh",              3, bu_bushel},        {"rev",             3, bu_revolution},
+	{"Pfd",              3, bu_pfund},         {"prz",             3, bu_prussian_zoll},
+	{"prf",              3, bu_prussian_fuss}, {"Ztr",             3, bu_zentner},
+	{"lot",              3, bu_lot},
 	{"ch",               2, bu_chain},         {"rd",              2, bu_rod},
 	{"gi",               2, bu_gill},          {"dr",              2, bu_dram},
 	{"\xc2\xb0""C",     3, bu_celsius},
@@ -572,6 +598,7 @@ static const bu_entry_t bu_table[] = {
 	{"fn",               2, bu_fortnight},
 	{"pk",               2, bu_peck},
 	{"at",               2, bu_atmosphere_technical},
+	{"dz",               2, bu_doppelzentner},
 	{"\xc3\x85",         2, bu_angstrom},
 	{"\xc2\xb0",         2, bu_degree},
 	{"G",                1, bu_gauss},         {"P",               1, bu_poise},
@@ -1035,6 +1062,19 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_minim:             return "minim";
 	case bu_peck:              return "pk";
 	case bu_bushel:            return "bsh";
+	case bu_pfund:             return "Pfd";
+	case bu_zentner:           return "Ztr";
+	case bu_doppelzentner:     return "dz";
+	case bu_lot:               return "lot";
+	case bu_prussian_line:     return "prln";
+	case bu_prussian_zoll:     return "prz";
+	case bu_prussian_fuss:     return "prf";
+	case bu_prussian_elle:     return "elle";
+	case bu_prussian_rute:     return "rute";
+	case bu_klafter:           return "klafter";
+	case bu_german_mile:       return "dt_mi";
+	case bu_morgen:            return "morgen";
+	case bu_scheffel:          return "schffl";
 	default:           return "";
 	}
 }

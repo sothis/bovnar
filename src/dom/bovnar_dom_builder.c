@@ -384,10 +384,8 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		builder_do_deferred_pop(b);
 		bvn_dom_node_t *s = make_struct(d->value_type, d->value_unit);
 		if (!s) return false;
-		if (!builder_attach(b, s)) {
-			bvn_dom_node_destroy(s);
+		if (!builder_attach(b, s))
 			return false;
-		}
 		if (!builder_push(b, BVN_SCOPE_STRUCT, s)) return false;
 		builder_clear_key(b);
 		break;
@@ -409,10 +407,8 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		builder_do_deferred_pop(b);
 		bvn_dom_node_t *a = make_array(d->value_type, d->value_unit);
 		if (!a) return false;
-		if (!builder_attach(b, a)) {
-			bvn_dom_node_destroy(a);
+		if (!builder_attach(b, a))
 			return false;
-		}
 		if (!builder_push(b, BVN_SCOPE_ARRAY, a)) return false;
 		builder_clear_key(b);
 		b->row_start_count = 0;
@@ -448,10 +444,8 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		bvn_dom_node_t *o = make_octets(b->oct_buf, b->oct_len,
 										d->value_type, d->value_unit);
 		if (!o) return false;
-		if (!builder_attach(b, o)) {
-			bvn_dom_node_destroy(o);
+		if (!builder_attach(b, o))
 			return false;
-		}
 		b->in_octet_stream = false;
 		b->oct_len = 0;
 		break;
@@ -501,10 +495,8 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			break;
 		}
 		if (!nd) return false;
-		if (!builder_attach(b, nd)) {
-			bvn_dom_node_destroy(nd);
+		if (!builder_attach(b, nd))
 			return false;
-		}
 		break;
 	}
 	default:

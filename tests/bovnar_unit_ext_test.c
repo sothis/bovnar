@@ -518,7 +518,20 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_minim               == 131, "bu_minim == 131");
 	ASSERT_TRUE((int)bu_peck                == 132, "bu_peck == 132");
 	ASSERT_TRUE((int)bu_bushel              == 133, "bu_bushel == 133");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 134, "sentinel == 134");
+	ASSERT_TRUE((int)bu_pfund              == 134, "bu_pfund == 134");
+	ASSERT_TRUE((int)bu_zentner            == 135, "bu_zentner == 135");
+	ASSERT_TRUE((int)bu_doppelzentner      == 136, "bu_doppelzentner == 136");
+	ASSERT_TRUE((int)bu_lot               == 137, "bu_lot == 137");
+	ASSERT_TRUE((int)bu_prussian_line      == 138, "bu_prussian_line == 138");
+	ASSERT_TRUE((int)bu_prussian_zoll      == 139, "bu_prussian_zoll == 139");
+	ASSERT_TRUE((int)bu_prussian_fuss      == 140, "bu_prussian_fuss == 140");
+	ASSERT_TRUE((int)bu_prussian_elle      == 141, "bu_prussian_elle == 141");
+	ASSERT_TRUE((int)bu_prussian_rute      == 142, "bu_prussian_rute == 142");
+	ASSERT_TRUE((int)bu_klafter            == 143, "bu_klafter == 143");
+	ASSERT_TRUE((int)bu_german_mile        == 144, "bu_german_mile == 144");
+	ASSERT_TRUE((int)bu_morgen             == 145, "bu_morgen == 145");
+	ASSERT_TRUE((int)bu_scheffel           == 146, "bu_scheffel == 146");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 147, "sentinel == 147");
 }
 
 static void test_nonsi_si_factors(void)
@@ -624,6 +637,19 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_minim,         6.16115199218750e-8,          1e-23);
 	CHK(bu_peck,          8.80976754172e-3,             1e-18);
 	CHK(bu_bushel,        3.523907016688e-2,            1e-17);
+	CHK(bu_pfund,         0.5,                          1e-16);
+	CHK(bu_zentner,       50.0,                         1e-14);
+	CHK(bu_doppelzentner, 100.0,                        1e-13);
+	CHK(bu_lot,           15.625e-3,                    1e-18);
+	CHK(bu_prussian_line, 2.18054e-3,                   1e-19);
+	CHK(bu_prussian_zoll, 2.61644e-2,                   1e-18);
+	CHK(bu_prussian_fuss, 3.13853e-1,                   1e-16);
+	CHK(bu_prussian_elle, 6.67160e-1,                   1e-16);
+	CHK(bu_prussian_rute, 3.76624,                      1e-15);
+	CHK(bu_klafter,       1.88312,                      1e-15);
+	CHK(bu_german_mile,   7420.44,                      1e-12);
+	CHK(bu_morgen,        2553.22,                      1e-12);
+	CHK(bu_scheffel,      54.961e-3,                    1e-18);
 #undef CHK
 #undef M_PI_LOCAL
 
@@ -807,6 +833,58 @@ static void test_nonsi_dim_vectors(void)
 	ASSERT_EQ_INT(d[0], 3, "bsh m=3");
 	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "bsh dim[i]=0");
 
+	DIM_OK(bu_pfund);
+	ASSERT_EQ_INT(d[1], 1, "Pfd kg=1");
+	ASSERT_EQ_INT(d[0], 0, "Pfd m=0"); ASSERT_EQ_INT(d[2], 0, "Pfd s=0");
+
+	DIM_OK(bu_zentner);
+	ASSERT_EQ_INT(d[1], 1, "Ztr kg=1");
+	ASSERT_EQ_INT(d[0], 0, "Ztr m=0"); ASSERT_EQ_INT(d[2], 0, "Ztr s=0");
+
+	DIM_OK(bu_doppelzentner);
+	ASSERT_EQ_INT(d[1], 1, "dz kg=1");
+	ASSERT_EQ_INT(d[0], 0, "dz m=0"); ASSERT_EQ_INT(d[2], 0, "dz s=0");
+
+	DIM_OK(bu_lot);
+	ASSERT_EQ_INT(d[1], 1, "lot kg=1");
+	ASSERT_EQ_INT(d[0], 0, "lot m=0"); ASSERT_EQ_INT(d[2], 0, "lot s=0");
+
+	DIM_OK(bu_prussian_line);
+	ASSERT_EQ_INT(d[0], 1, "prln m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "prln dim[i]=0");
+
+	DIM_OK(bu_prussian_zoll);
+	ASSERT_EQ_INT(d[0], 1, "prz m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "prz dim[i]=0");
+
+	DIM_OK(bu_prussian_fuss);
+	ASSERT_EQ_INT(d[0], 1, "prf m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "prf dim[i]=0");
+
+	DIM_OK(bu_prussian_elle);
+	ASSERT_EQ_INT(d[0], 1, "elle m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "elle dim[i]=0");
+
+	DIM_OK(bu_prussian_rute);
+	ASSERT_EQ_INT(d[0], 1, "rute m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "rute dim[i]=0");
+
+	DIM_OK(bu_klafter);
+	ASSERT_EQ_INT(d[0], 1, "klafter m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "klafter dim[i]=0");
+
+	DIM_OK(bu_german_mile);
+	ASSERT_EQ_INT(d[0], 1, "dt_mi m=1");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "dt_mi dim[i]=0");
+
+	DIM_OK(bu_morgen);
+	ASSERT_EQ_INT(d[0], 2, "morgen m=2");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "morgen dim[i]=0");
+
+	DIM_OK(bu_scheffel);
+	ASSERT_EQ_INT(d[0], 3, "schffl m=3");
+	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "schffl dim[i]=0");
+
 #undef DIM_OK
 }
 
@@ -897,6 +975,19 @@ static void test_nonsi_parse_canonical(void)
 		{ "minim",       bu_minim                 },
 		{ "pk",          bu_peck                  },
 		{ "bsh",         bu_bushel                },
+		{ "Pfd",         bu_pfund                 },
+		{ "Ztr",         bu_zentner               },
+		{ "dz",          bu_doppelzentner         },
+		{ "lot",         bu_lot                   },
+		{ "prln",        bu_prussian_line         },
+		{ "prz",         bu_prussian_zoll         },
+		{ "prf",         bu_prussian_fuss         },
+		{ "elle",        bu_prussian_elle         },
+		{ "rute",        bu_prussian_rute         },
+		{ "klafter",     bu_klafter               },
+		{ "dt_mi",       bu_german_mile           },
+		{ "morgen",      bu_morgen                },
+		{ "schffl",      bu_scheffel              },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1061,6 +1152,27 @@ static void test_nonsi_parse_aliases(void)
 		{ "pecks",                 bu_peck                 },
 		{ "bushel",                bu_bushel               },
 		{ "bushels",               bu_bushel               },
+		{ "pfund",                 bu_pfund                },
+		{ "pfunds",                bu_pfund                },
+		{ "zentner",               bu_zentner              },
+		{ "doppelzentner",         bu_doppelzentner        },
+		{ "lots",                  bu_lot                  },
+		{ "prussian_line",         bu_prussian_line        },
+		{ "linie",                 bu_prussian_line        },
+		{ "prussian_zoll",         bu_prussian_zoll        },
+		{ "zoll",                  bu_prussian_zoll        },
+		{ "prussian_fuss",         bu_prussian_fuss        },
+		{ "preussischer_fuss",     bu_prussian_fuss        },
+		{ "prussian_elle",         bu_prussian_elle        },
+		{ "preussische_elle",      bu_prussian_elle        },
+		{ "prussian_rute",         bu_prussian_rute        },
+		{ "preussische_rute",      bu_prussian_rute        },
+		{ "prussian_klafter",      bu_klafter              },
+		{ "deutsche_meile",        bu_german_mile          },
+		{ "german_mile",           bu_german_mile          },
+		{ "prussian_morgen",       bu_morgen               },
+		{ "scheffel",              bu_scheffel             },
+		{ "prussian_scheffel",     bu_scheffel             },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1103,6 +1215,9 @@ static void test_nonsi_roundtrip(void)
 		bu_standard_gravity, bu_metric_horsepower, bu_revolution,
 		bu_month, bu_fortnight, bu_atmosphere_technical,
 		bu_tex, bu_denier, bu_fluid_dram, bu_minim, bu_peck, bu_bushel,
+		bu_pfund, bu_zentner, bu_doppelzentner, bu_lot,
+		bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss, bu_prussian_elle,
+		bu_prussian_rute, bu_klafter, bu_german_mile, bu_morgen, bu_scheffel,
 	};
 	size_t n = sizeof(units) / sizeof(units[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1185,6 +1300,33 @@ static void test_nonsi_compound_units(void)
 	ASSERT_EQ_INT(u.components[1].base, bu_hour,       "hp·h[1] → hour");
 }
 
+static void test_german_unit_prefix_restriction(void)
+{
+	printf("  German unit prefix restrictions...\n");
+#define PFX_SI_G(p)  ((value_unit_prefix_t){prefix_si,  .id.si  = (p)})
+#define PFX_IEC_G(p) ((value_unit_prefix_t){prefix_iec, .id.iec = (p)})
+	value_base_unit_t german_units[] = {
+		bu_pfund, bu_zentner, bu_doppelzentner, bu_lot,
+		bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss, bu_prussian_elle,
+		bu_prussian_rute, bu_klafter, bu_german_mile, bu_morgen, bu_scheffel,
+	};
+	size_t n = sizeof(german_units) / sizeof(german_units[0]);
+	for (size_t i = 0; i < n; i++) {
+		value_base_unit_t bu = german_units[i];
+		char msg[128];
+		snprintf(msg, sizeof(msg), "german unit %d accepts si_none", (int)bu);
+		ASSERT_TRUE(bvn_prefix_unit_valid(PFX_SI_G(si_none), bu), msg);
+		snprintf(msg, sizeof(msg), "german unit %d accepts iec_none", (int)bu);
+		ASSERT_TRUE(bvn_prefix_unit_valid(PFX_IEC_G(iec_none), bu), msg);
+		snprintf(msg, sizeof(msg), "german unit %d rejects si_kilo", (int)bu);
+		ASSERT_FALSE(bvn_prefix_unit_valid(PFX_SI_G(si_kilo), bu), msg);
+		snprintf(msg, sizeof(msg), "german unit %d rejects iec_mebi", (int)bu);
+		ASSERT_FALSE(bvn_prefix_unit_valid(PFX_IEC_G(iec_mebi), bu), msg);
+	}
+#undef PFX_SI_G
+#undef PFX_IEC_G
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -1210,6 +1352,7 @@ int main(void)
 	test_nonsi_roundtrip();
 	test_nonsi_prefix_tilde_disambiguation();
 	test_nonsi_compound_units();
+	test_german_unit_prefix_restriction();
 
 	printf("\n──────────────────────────────────────\n");
 	printf("  Results: %d tests, %d failures\n", tests, failures);

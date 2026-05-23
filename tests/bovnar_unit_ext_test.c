@@ -641,8 +641,8 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_zentner,       50.0,                         1e-14);
 	CHK(bu_doppelzentner, 100.0,                        1e-13);
 	CHK(bu_lot,           15.625e-3,                    1e-18);
-	CHK(bu_prussian_line, 2.18054e-3,                   1e-19);
-	CHK(bu_prussian_zoll, 2.61644e-2,                   1e-18);
+	CHK(bu_prussian_line, 3.13853e-1/144.0,              1e-19);
+	CHK(bu_prussian_zoll, 3.13853e-1/12.0,              1e-18);
 	CHK(bu_prussian_fuss, 3.13853e-1,                   1e-16);
 	CHK(bu_prussian_elle, 6.67160e-1,                   1e-16);
 	CHK(bu_prussian_rute, 3.76624,                      1e-15);

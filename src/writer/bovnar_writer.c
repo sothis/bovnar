@@ -88,7 +88,8 @@ bool bvn_ser_finish_stream(bvnr_serializer_t* s)
 static bool bvn_validate_string_content(bvnr_writer_t* w,
 	const uint8_t* data, uint32_t length)
 {
-	if (!data || length == 0) return true;
+	if (length == 0) return true;
+	if (!data) return bvn_writer_set_error(w, error_invalid_argument);
 	for (uint32_t i = 0; i < length; i++) {
 		uint8_t c = data[i];
 		if (c <= 0x08 || (c >= 0x0E && c <= 0x1F) || c == 0x7F) {
@@ -255,7 +256,8 @@ out:
 static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 	const void* data, uint32_t length)
 {
-	if (!data || length == 0) return true;
+	if (length == 0 || !data)
+		return bvn_writer_set_error(w, error_empty_identifier);
 	char  static_buf[256];
 	char *buf = static_buf;
 	bool  need_free = false;
@@ -276,7 +278,8 @@ static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 	const void* data, uint32_t length)
 {
-	if (!data || length == 0) return true;
+	if (length == 0 || !data)
+		return bvn_writer_set_error(w, error_invalid_argument);
 	char static_buf[256];
 	char *buf = static_buf;
 	bool need_free = false;
@@ -367,6 +370,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	case ev_stream_start:
 		if (w->ser.stream_begun)
 			return bvn_writer_set_error(w, error_invalid_argument);
+		w->ser.stream_begun = true;
 		return true;
 	case ev_stream_end:
 		return true;

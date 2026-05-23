@@ -418,7 +418,11 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 		}
 		if (a->exp_sum == 0)
 			continue;
-		assert(result.num_components < BVNR_MAX_UNIT_COMPONENTS);
+		if (result.num_components >= BVNR_MAX_UNIT_COMPONENTS) {
+			if (overflow)
+				*overflow = true;
+			continue;
+		}
 		int32_t abs_sum = (a->exp_sum < 0) ? -a->exp_sum : a->exp_sum;
 		if (abs_sum > 9) {
 			if (overflow)

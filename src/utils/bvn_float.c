@@ -829,7 +829,7 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 		if (lo_limb     < f->_nlimbs) f->_d[lo_limb]     = (uint32_t)(shifted & 0xffffffffu);
 		if (lo_limb + 1 < f->_nlimbs) f->_d[lo_limb + 1] = (uint32_t)(shifted >> 32);
 		if (lo_off > 0u && lo_limb + 2 < f->_nlimbs)
-			f->_d[lo_limb + 2] = (uint32_t)(full_man >> (32u - lo_off));
+			f->_d[lo_limb + 2] = (uint32_t)(full_man >> (64u - lo_off));
 	} else {
 		uint64_t scaled = full_man >> (unsigned)(-shift);
 		if (f->_nlimbs > 0) f->_d[0] = (uint32_t)(scaled & 0xffffffffu);

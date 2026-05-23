@@ -93,12 +93,15 @@ bool bvn_validate_number_in_base(const char* s, uint32_t base)
 			continue;
 		}
 		if (c == '+' || c == '-') return false;
-		if (bvn_char_to_digit((uint8_t)c, base) >= base)
-			return false;
-		if (has_exp)
+		if (has_exp) {
+			if (bvn_char_to_digit((uint8_t)c, 10u) >= 10u)
+				return false;
 			has_exp_digit = true;
-		else
+		} else {
+			if (bvn_char_to_digit((uint8_t)c, base) >= base)
+				return false;
 			has_mant_digit = true;
+		}
 	}
 	return has_mant_digit && (!has_exp || has_exp_digit);
 }

@@ -27,12 +27,13 @@ static inline void bvn_notify_error(bvnr_reader_t* p)
 					v->error_byte, v->error_offset);
 	}
 }
-static void bvn_enter_resync(bvnr_reader_t* p)
+static bool bvn_enter_resync(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
 	l->resync_saved_struct_nesting = l->struct_nesting_level;
 	while (l->array_nesting_level > 0) {
-		(void)bvn_val_receive_event(p, ev_array_row_end);
+		if (!bvn_val_receive_event(p, ev_array_row_end))
+			return false;
 		--l->array_nesting_level;
 	}
 	l->utf8_need = 0;
@@ -61,6 +62,7 @@ static void bvn_enter_resync(bvnr_reader_t* p)
 	l->array_row_size      = 0;
 	memset(l->arr_frames, 0,
 	       (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
+	return true;
 }
 #define ESC_VALID 0x100u
 static const uint16_t bvn_escape_lut[256] = {
@@ -193,7 +195,6 @@ bool bvn_action_comment_outro(bvnr_reader_t* p)
 	state_t s = p->lex.last_state;
 	if      (s == number_outro_nosp) s = number_outro;
 	else if (s == string_outro_nosp) s = string_outro;
-	else if (s == inline_unit_body)  s = inline_unit_outro;
 	p->lex.next_state = s;
 	return true;
 }
@@ -1019,12 +1020,14 @@ static bool bvn_interpret_input_buffer(
 			line_advanced = true;
 			if (l->continue_on_error) {
 				bool was_continuation = (saved_need > 0);
-				bvn_enter_resync(p);
+				if (!bvn_enter_resync(p))
+					return false;
 				if (!was_continuation || l->byte == 0x09 ||
 					l->byte == 0x0a || l->byte == 0x0d) {
 					continue;
 				}
 				if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
+					++l->column;
 					continue;
 				}
 				++l->column;
@@ -1043,7 +1046,8 @@ static bool bvn_interpret_input_buffer(
 			if (!line_advanced)
 				bvn_advance_line(l, prev);
 			if (l->continue_on_error) {
-				bvn_enter_resync(p);
+				if (!bvn_enter_resync(p))
+					return false;
 			} else {
 				return false;
 			}
@@ -1144,7 +1148,7 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				l->next_state == resync_string ||
 				l->next_state == resync_string_escape ||
 				l->next_state == resync_comment) {
-				bvn_set_eof_error(r, r->val.last_error);
+				bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
 				bvn_notify_error(r);
 				return false;
 			}

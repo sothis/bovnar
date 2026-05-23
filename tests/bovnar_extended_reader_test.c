@@ -121,7 +121,7 @@ static void test_parse_various_integer_bases(void)
 	parse_payload(".a = <sint:8,_16> \"-7F\";", false, &ctx);
 	ASSERT_TRUE(!ctx.has_errors, "signed hex <sint:8,_16> \"-7F\" must parse");
 
-	parse_payload(".a = <uint:8> 256;", true, &ctx);
+	parse_payload(".a = <uint:8> 256;", false, &ctx);
 	ASSERT_TRUE(ctx.has_errors, "uint:8 value 256 must be rejected");
 	ASSERT_EQ_INT(ctx.last_error, error_value_out_of_range,
 		"expected error_value_out_of_range for uint:8 = 256");
@@ -142,7 +142,7 @@ static void test_parse_various_integer_bases(void)
 		"signed hex integers in array must parse");
 
 	parse_payload(".a = [<uint:8,_16> \"FF\", <uint:8,_16> \"100\"];",
-				  true, &ctx);
+				  false, &ctx);
 	ASSERT_TRUE(ctx.has_errors,
 		"hex overflow inside array must be rejected");
 	ASSERT_EQ_INT(ctx.last_error, error_value_out_of_range,
@@ -462,19 +462,19 @@ static void test_parse_inline_unit_annotation_mismatch(void)
 
 	parse_ctx_t ctx;
 
-	parse_payload(".x = <float:64,m> 1.0 s;", true, &ctx);
+	parse_payload(".x = <float:64,m> 1.0 s;", false, &ctx);
 	ASSERT_TRUE(ctx.has_errors,
 		"mismatched inline vs annotation unit must produce an error");
 	ASSERT_EQ_INT(ctx.last_error, error_unit_mismatch,
 		"expected error_unit_mismatch for unit conflict");
 
-	parse_payload(".x = <float:64,m/s> 9.81 k~m/s;", true, &ctx);
+	parse_payload(".x = <float:64,m/s> 9.81 k~m/s;", false, &ctx);
 	ASSERT_TRUE(ctx.has_errors,
 		"mismatched compound inline vs annotation unit must error");
 	ASSERT_EQ_INT(ctx.last_error, error_unit_mismatch,
 		"expected error_unit_mismatch for compound unit conflict");
 
-	parse_payload(".x = <float:64,no_unit> 1.0 m;", true, &ctx);
+	parse_payload(".x = <float:64,no_unit> 1.0 m;", false, &ctx);
 	ASSERT_TRUE(ctx.has_errors,
 		"inline unit conflicting with explicit no_unit annotation must error");
 	ASSERT_EQ_INT(ctx.last_error, error_unit_mismatch,

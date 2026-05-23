@@ -1487,8 +1487,8 @@ static void test_new_bug3_resync_eof_distinct_error_code(void)
 
 	ASSERT_EQ_UINT((uint64_t)ctx.error_count, 2,
 				   "new_bug3: two notifications — initial error + EOF-in-resync");
-	ASSERT_EQ_INT((int)ctx.last_error, (int)error_unexpected_input_byte,
-				  "new_bug3: the original error code is preserved across both notifications");
+	ASSERT_EQ_INT((int)ctx.last_error, (int)error_got_incomplete_bvnr_stream,
+				  "new_bug3: EOF-in-resync fires error_got_incomplete_bvnr_stream, not the stale original code");
 
 	bvnr_reader_destroy(r);
 }

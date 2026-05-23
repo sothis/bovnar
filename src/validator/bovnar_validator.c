@@ -556,7 +556,7 @@ bool bvn_val_on_new_array_value(bvnr_reader_t* r,
 	uint64_t curr_row_size, uint64_t array_row_size)
 {
 	bvnr_validator_t* v = &r->val;
-	if (array_row_size && (curr_row_size + 1) > array_row_size) {
+	if (array_row_size && curr_row_size >= array_row_size) {
 		v->last_error = error_array_row_size_mismatch;
 		return false;
 	}

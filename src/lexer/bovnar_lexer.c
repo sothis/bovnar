@@ -32,9 +32,17 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	bvnr_lexer_t* l = &p->lex;
 	l->resync_saved_struct_nesting = l->struct_nesting_level;
 	while (l->array_nesting_level > 0) {
-		if (!bvn_val_receive_event(p, ev_array_row_end))
+		if (!bvn_val_receive_event(p, ev_array_row_end)) {
+			p->val.value_type  = BVN_TYPE_PLAIN;
+			p->val.parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
 			return false;
+		}
 		--l->array_nesting_level;
+		if (l->array_nesting_level > 0) {
+			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
+			p->val.value_type  = f->saved_vtype;
+			p->val.parsed_unit = f->saved_vunit;
+		}
 	}
 	l->utf8_need = 0;
 	l->utf8_lo = 0;
@@ -666,6 +674,11 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 				if (!bvn_val_receive_event(p, ev_array_row_end))
 					return false;
 				--l->array_nesting_level;
+				if (l->array_nesting_level > 0) {
+					bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
+					p->val.value_type  = f->saved_vtype;
+					p->val.parsed_unit = f->saved_vunit;
+				}
 			}
 			l->curr_row_size    = 0;
 			l->array_row_size   = 0;
@@ -735,6 +748,11 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 			return false;
 		}
 		--l->array_nesting_level;
+		if (l->array_nesting_level > 0) {
+			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
+			p->val.value_type  = f->saved_vtype;
+			p->val.parsed_unit = f->saved_vunit;
+		}
 	}
 	if (!bvn_resync_semicolon_reset(p))
 		return false;

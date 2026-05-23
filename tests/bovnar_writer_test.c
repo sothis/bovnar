@@ -202,8 +202,8 @@ static void test_write_float_width_over_64_rejected(void)
 
 	ASSERT_FALSE(bvnr_write_float(w, "x", 128, 3.14),
 				 "bvnr_write_float with width=128 must fail");
-	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
-				  "error must be error_illegal_value_type for width=128");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
+				  "error must be error_invalid_argument for width=128");
 	bvnr_writer_destroy(w);
 
 	w = make_writer(output, sizeof(output), &sink);
@@ -211,8 +211,8 @@ static void test_write_float_width_over_64_rejected(void)
 	if (!w) return;
 	ASSERT_FALSE(bvnr_write_float_fix(w, "x", 128, 10, 1.5),
 				 "bvnr_write_float_fix with width=128 must fail");
-	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
-				  "float_fix width=128 error must be error_illegal_value_type");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
+				  "float_fix width=128 error must be error_invalid_argument");
 	bvnr_writer_destroy(w);
 
 	w = make_writer(output, sizeof(output), &sink);
@@ -220,8 +220,8 @@ static void test_write_float_width_over_64_rejected(void)
 	if (!w) return;
 	ASSERT_FALSE(bvnr_write_float_dec(w, "x", 128, 2.5),
 				 "bvnr_write_float_dec with width=128 must fail");
-	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
-				  "float_dec width=128 error must be error_illegal_value_type");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
+				  "float_dec width=128 error must be error_invalid_argument");
 	bvnr_writer_destroy(w);
 
 	w = make_writer(output, sizeof(output), &sink);

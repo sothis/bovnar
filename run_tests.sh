@@ -99,6 +99,41 @@ else
     echo
 fi
 
+_bold "=== CLI example smoke tests ==="
+
+BOVNAR_BIN="${BUILD_DIR}/bovnar"
+EXAMPLES_DIR="./examples"
+
+run_cli_test() {
+    local label="$1"; shift
+
+    if [[ ! -x "${BOVNAR_BIN}" ]]; then
+        _yellow "  SKIP  $label  (not built: ${BOVNAR_BIN})"
+        (( SKIP++ )) || true
+        return
+    fi
+
+    printf '  %-52s ' "$label"
+    if "$@" > /dev/null 2>&1; then
+        _green "PASS"
+        (( PASS++ )) || true
+    else
+        _red "FAIL"
+        (( FAIL++ )) || true
+        FAILED_TESTS+=("$label")
+    fi
+}
+
+for bvnr_file in "${EXAMPLES_DIR}"/*.bvnr; do
+    stem=$(basename "${bvnr_file}" .bvnr)
+    run_cli_test "bovnar events   ${stem}.bvnr" \
+        "${BOVNAR_BIN}" events "${bvnr_file}"
+    run_cli_test "bovnar validate ${stem}.bvnr" \
+        "${BOVNAR_BIN}" validate "${bvnr_file}"
+done
+
+echo
+
 _bold "=== Results ==="
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"

@@ -365,6 +365,7 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 	[zero_intro] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
 		[0x2e] = ACT_fraction_intro,
+		BVN_DIGITS(ACT_copy_number_byte),
 		[0x2c] = ACT_new_array_value,
 		[0x3b] = ACT_value_outro,
 		[0x5d] = ACT_array_outro,

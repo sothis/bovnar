@@ -488,3 +488,48 @@ else()
         "Python3 interpreter not found -- skipping Python binding tests. "
         "Install Python 3.10+ and 'pip install pytest>=7' to enable them.")
 endif()
+
+# ── CLI example-file smoke tests ─────────────────────────────────────────────
+#
+# For every .bvnr file under examples/ run two commands against the built
+# bovnar binary:
+#
+#   bovnar events  <file>   – must exit 0 and print the validated-ok line
+#   bovnar validate <file>  – must exit 0
+#
+# The macro _bvnr_cli_example(stem) derives the file path from the stem name
+# and registers both tests.  Each test depends on the bovnar target so that
+# CTest knows to build it first when run in isolation.
+
+macro(_bvnr_cli_example stem)
+    set(_bvnr_ex_file "${CMAKE_CURRENT_SOURCE_DIR}/examples/${stem}.bvnr")
+
+    add_test(
+        NAME    bvnr_cli_events_${stem}
+        COMMAND bovnar events "${_bvnr_ex_file}"
+    )
+    set_tests_properties(bvnr_cli_events_${stem} PROPERTIES
+        LABELS                "cli;examples;events"
+        TIMEOUT               30
+        PASS_REGULAR_EXPRESSION "All tokens validated successfully"
+    )
+
+    add_test(
+        NAME    bvnr_cli_validate_${stem}
+        COMMAND bovnar validate "${_bvnr_ex_file}"
+    )
+    set_tests_properties(bvnr_cli_validate_${stem} PROPERTIES
+        LABELS  "cli;examples;validate"
+        TIMEOUT 30
+    )
+endmacro()
+
+_bvnr_cli_example(arrays)
+_bvnr_cli_example(floats)
+_bvnr_cli_example(integers)
+_bvnr_cli_example(references)
+_bvnr_cli_example(strings)
+_bvnr_cli_example(structs)
+_bvnr_cli_example(symbols)
+_bvnr_cli_example(test)
+_bvnr_cli_example(units)

@@ -698,6 +698,8 @@ static const cf_case_t g_cases[] = {
 	ERROR_LIM("NUM-015", "numbers", "number too long",
 	          ".x = 12345678901234;",
 	          error_number_too_long, 0, 0, 5, 0, 0, 0),
+	VALID_KEY("NUM-016", "numbers", "leading zeros are valid",
+	          ".x = 007;", "x", "007"),
 
 	/* ── TYPE ANNOTATIONS ────────────────────────────────────────── */
 	VALID("TYP-001", "types", "uint:8",

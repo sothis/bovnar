@@ -1300,7 +1300,7 @@ When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync
 
 ### 13.3 EOF in Resync
 
-If EOF is reached while in any resync state, the original error code is **preserved** rather than overwritten with `error_got_incomplete_bvnr_stream`.
+If EOF is reached while in any resync state, `error_got_incomplete_bvnr_stream` is fired as a **second** `on_error` notification in addition to the original error that triggered resync entry. Both error codes are delivered to the caller's `on_error` callback in order: the original error first, then `error_got_incomplete_bvnr_stream` when EOF is detected.
 
 ---
 

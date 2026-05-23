@@ -371,8 +371,8 @@ static void test_writer_float_dec(void)
 		bool ok = write_dec256_double(w);
 		error_code_t err = bvnr_writer_get_error(w);
 		bvnr_writer_destroy(w);
-		CHECK(!ok && err == error_illegal_value_type,
-			  "float_dec:256 via double API must return error_illegal_value_type");
+		CHECK(!ok && err == error_invalid_argument,
+			  "float_dec:256 via double API must return error_invalid_argument");
 	}
 }
 

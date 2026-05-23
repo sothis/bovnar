@@ -93,11 +93,8 @@ class Reader:
 
         flags.max_file_size = max_file_size
 
-        _need_noop = (on_verified is None and on_unverified is None)
-
-        if on_verified is not None or _need_noop:
-            fn = on_verified if on_verified is not None else (lambda ev, d: True)
-            cb = self._wrap_callback(fn)
+        if on_verified is not None:
+            cb = self._wrap_callback(on_verified)
             cb_refs.append(cb)
             flags.on_verified = cb
 

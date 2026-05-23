@@ -256,7 +256,8 @@ out:
 static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 	const void* data, uint32_t length)
 {
-	if (length == 0 || !data) return true;
+	if (length == 0 || !data)
+		return bvn_writer_set_error(w, error_empty_identifier);
 	char  static_buf[256];
 	char *buf = static_buf;
 	bool  need_free = false;
@@ -766,9 +767,9 @@ static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 		w->ser.unit_flags        = opts->unit_flags;
 	}
 	if (!w->ser.max_array_nesting)
-		w->ser.max_array_nesting = UINT8_MAX;
+		w->ser.max_array_nesting = max_array_nesting;
 	if (!w->ser.max_struct_nesting)
-		w->ser.max_struct_nesting = UINT8_MAX;
+		w->ser.max_struct_nesting = max_struct_nesting;
 }
 bool bvnr_open_write_sink(
 	bvnr_writer_t* w, const bvnr_sink_t* sink,

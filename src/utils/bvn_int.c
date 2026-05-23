@@ -475,7 +475,7 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 {
 	bvn_int_zero(q);
 	bvn_int_zero(r);
-	if (bvn_int_is_zero(b)) return true;
+	if (bvn_int_is_zero(b)) return false;
 	uint32_t na = a->nused;
 	uint32_t nb = b->nused;
 	while (na > 0u && a->limbs[na - 1u] == 0u) na--;
@@ -483,7 +483,6 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 	if (na == 0u) return true;
 	if (na < nb) {
 		if (!bvn_int_copy(r, a)) return false;
-		r->negative = false;
 		return true;
 	}
 	if (na == nb) {
@@ -494,7 +493,6 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 		}
 		if (mag < 0) {
 			if (!bvn_int_copy(r, a)) return false;
-			r->negative = false;
 			return true;
 		}
 		if (mag == 0) {
@@ -514,7 +512,7 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 			if (!bigint_ensure_cap(r, 1u)) return false;
 			r->limbs[0u] = rem;
 			r->nused     = 1u;
-			r->negative  = false;
+			r->negative  = a->negative;
 		}
 		return true;
 	}
@@ -614,7 +612,7 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 		}
 	}
 	r->nused    = n;
-	r->negative = false;
+	r->negative = a->negative;
 	bvn_int_norm(r);
 	free(u);
 	free(v);

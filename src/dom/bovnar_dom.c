@@ -66,12 +66,12 @@ bool bvn_dom_struct_add(bvn_dom_node_t *s,
 		uint32_t nc = s->members.cap ? s->members.cap * 2u : 8u;
 		bvn_dom_entry_t *ne = realloc(s->members.entries,
 									  nc * sizeof(*ne));
-		if (!ne) return false;
+		if (!ne) { bvn_dom_node_destroy(val); return false; }
 		s->members.entries = ne;
 		s->members.cap     = nc;
 	}
 	char *ks = bvn_dom_strdup(key, klen);
-	if (!ks) return false;
+	if (!ks) { bvn_dom_node_destroy(val); return false; }
 	s->members.entries[s->members.count].key   = ks;
 	s->members.entries[s->members.count].value = val;
 	s->members.count++;
@@ -84,12 +84,12 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 	if (d->count == d->cap) {
 		uint32_t nc = d->cap ? d->cap * 2u : 8u;
 		bvn_dom_entry_t *ne = realloc(d->entries, nc * sizeof(*ne));
-		if (!ne) return false;
+		if (!ne) { bvn_dom_node_destroy(val); return false; }
 		d->entries = ne;
 		d->cap     = nc;
 	}
 	char *ks = bvn_dom_strdup(key, klen);
-	if (!ks) return false;
+	if (!ks) { bvn_dom_node_destroy(val); return false; }
 	d->entries[d->count].key   = ks;
 	d->entries[d->count].value = val;
 	d->count++;

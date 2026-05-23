@@ -59,7 +59,6 @@ static const token_type_t TOKENS[] = {
 #define N_TOKENS (sizeof(TOKENS) / sizeof(TOKENS[0]))
 
 static const bvnr_event_t EVENTS[] = {
-	ev_stream_start,
 	ev_assignment_start,
 	ev_type_annotation_start,
 	ev_type_annotation_type_family,
@@ -117,6 +116,11 @@ static void harness_random_events(const uint8_t *data, size_t len)
 
 	if (!bvnr_open_write_mem(w, outbuf, cap, pretty, NULL))
 		goto done;
+
+	{
+		bvnr_data_t hdr; memset(&hdr, 0, sizeof(hdr));
+		(void)bvnr_write_event(w, ev_stream_start, &hdr);
+	}
 
 	for (uint8_t i = 0; i < n_events; i++) {
 		uint8_t ev_idx = cur_u8(&cur) % N_EVENTS;

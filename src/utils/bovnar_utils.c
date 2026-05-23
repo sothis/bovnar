@@ -1886,7 +1886,7 @@ bool bvn_validate_reference(const char* link)
 		p++;
 		while (*p && *p != '.') {
 			unsigned char c = (unsigned char)*p;
-			if (c < 0x20 || c == 0x7f || c == 0xc2) return false;
+			if (c <= 0x20 || c == 0x7f || c == 0xc2) return false;
 			if (c == '"' || c == '#' || c == ',' || c == '/' ||
 				c == ';' || c == '<' || c == '=' || c == '>' ||
 				c == '[' || c == ']' || c == '{' || c == '}' ||

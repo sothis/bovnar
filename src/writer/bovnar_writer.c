@@ -256,8 +256,7 @@ out:
 static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 	const void* data, uint32_t length)
 {
-	if (length == 0 || !data)
-		return bvn_writer_set_error(w, error_empty_identifier);
+	if (length == 0 || !data) return true;
 	char  static_buf[256];
 	char *buf = static_buf;
 	bool  need_free = false;

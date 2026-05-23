@@ -3,6 +3,7 @@
 #include "bvn_int.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #define BVN_FLOAT_INT_WORDS 64u
 static inline bvn_int_t bvni_local_init(uint32_t *buf, uint32_t words)
@@ -284,14 +285,18 @@ static inline void to_ieee_binary(bvn_float_ctx_t *ctx, const PNum *p, const Bin
 		if (!bvn_int_sub_inplace(&rem, &den))   { ctx->overflow = true; return; }
 		bvni_copy(ctx, &scale, &den);
 	}
-	uint8_t mb[260];
-	int mb_count = pbits + 2;
-	if (mb_count > 260) mb_count = 260;
+	const int mb_total = pbits + 2;
+	uint8_t *mb = (uint8_t *)malloc((size_t)mb_total);
+	if (!mb) { ctx->overflow = true; return; }
+	memset(mb, 0, (size_t)mb_total);
+	int mb_count = mb_total;
 	for (int i = 0; i < mb_count; i++) {
 		bvni_shl(ctx, &rem, 1);
 		if (bvn_int_cmp(&rem, &scale) >= 0) {
 			mb[i] = 1;
-			if (!bvn_int_sub_inplace(&rem, &scale)) { ctx->overflow = true; return; }
+			if (!bvn_int_sub_inplace(&rem, &scale)) {
+				ctx->overflow = true; free(mb); return;
+			}
 		} else {
 			mb[i] = 0;
 		}
@@ -300,17 +305,20 @@ static inline void to_ieee_binary(bvn_float_ctx_t *ctx, const PNum *p, const Bin
 	if (be <= 0) {
 		int sub_shift = 1 - be;
 		be = 0;
-		uint8_t mb2[260]; memset(mb2, 0, sizeof(mb2));
-		if (sub_shift - 1 < 260) mb2[sub_shift - 1] = 1;
-		for (int i = 0; i < mb_count && i + sub_shift < 260; i++)
-			mb2[i + sub_shift] = mb[i];
+		uint8_t *mb2 = (uint8_t *)malloc((size_t)mb_total);
+		if (!mb2) { ctx->overflow = true; free(mb); return; }
+		memset(mb2, 0, (size_t)mb_total);
+		if (sub_shift - 1 < mb_total) mb2[sub_shift - 1] = 1;
 		bool new_sticky = sticky;
-		for (int i = 0; i < mb_count; i++)
-			if (i + sub_shift >= 260 && mb[i]) new_sticky = true;
-		memcpy(mb, mb2, sizeof(mb));
-		mb_count = 260;
-		for (int i = pbits + 2; i < mb_count; i++)
-			if (mb[i]) new_sticky = true;
+		for (int i = 0; i < mb_count; i++) {
+			if (i + sub_shift < mb_total)
+				mb2[i + sub_shift] = mb[i];
+			else if (mb[i])
+				new_sticky = true;
+		}
+		memcpy(mb, mb2, (size_t)mb_total);
+		free(mb2);
+		mb_count = mb_total;
 		sticky = new_sticky;
 	}
 	bool guard    = (pbits     < mb_count) ? (bool)mb[pbits]     : false;
@@ -320,6 +328,8 @@ static inline void to_ieee_binary(bvn_float_ctx_t *ctx, const PNum *p, const Bin
 	BVN_INT_LOCAL(mant);
 	for (int i = 0; i < pbits; i++)
 		if (mb[i]) bvni_setbit(ctx, &mant, pbits - 1 - i);
+	free(mb);
+	mb = NULL;
 	if (round_up2) {
 		bvni_add_u32(ctx, &mant, 1u);
 		if (bvn_int_bitlen(&mant) > pbits) {

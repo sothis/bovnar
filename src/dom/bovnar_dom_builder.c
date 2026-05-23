@@ -167,7 +167,6 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 		memcpy(wbuf, str, (size_t)len);
 		wbuf[len] = '\0';
 		bool ok = bvn_int_from_str(bi, wbuf, base);
-		if (!ok) ok = bvn_int_from_str(bi, wbuf, 10u);
 		free(wbuf);
 		if (!ok) {
 			bvn_int_free(bi);

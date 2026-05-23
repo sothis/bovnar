@@ -844,12 +844,16 @@ bool bvn_float_to_double(const bvn_float_t *f, double *out)
 	if (bvn_float_is_nan(f))  { *out = (f->_sign < 0) ? -NAN  : NAN;      return true; }
 	if (bvn_float_is_inf(f))  { *out = (f->_sign < 0) ? -INFINITY : INFINITY; return true; }
 	if (bvn_float_is_zero(f)) { *out = (f->_sign < 0) ? -0.0 : 0.0;       return true; }
-	char buf[64];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) return false;
+	size_t bufsz = bvn_float_str_bufsize(f->_prec, 10u);
+	char  *buf   = malloc(bufsz);
+	if (!buf) return false;
+	int n = bvn_float_to_str(f, buf, bufsz, 10);
+	if (n <= 0) { free(buf); return false; }
 	char *end = NULL;
 	double v = strtod(buf, &end);
-	if (end == buf || end == NULL || *end != '\0') return false;
+	bool ok = (end != buf && end != NULL && *end == '\0');
+	free(buf);
+	if (!ok) return false;
 	*out = v;
 	return true;
 }
@@ -890,12 +894,15 @@ void bvn_float_to_ieee_bin(const bvn_float_t *f,
 		}
 		return;
 	}
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) return;
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) return;
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); return; }
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p);
 	bvn_float_parse(&ctx, buf, &p);
+	free(buf);
 	BinFmt fmt = { (int)exp_bits, (int)man_bits, (int)bias };
 	to_ieee_binary(&ctx, &p, &fmt, bits, bits32);
 }
@@ -904,6 +911,7 @@ bool bvn_float_from_ieee_bin(bvn_float_t *f,
 							  const uint32_t *bits, int bits32)
 {
 	if (!f || !bits) return false;
+	(void)bits32;
 	int total     = 1 + (int)exp_bits + (int)man_bits;
 	uint32_t eall = (1u << exp_bits) - 1u;
 	uint32_t raw_exp = 0;
@@ -930,29 +938,6 @@ bool bvn_float_from_ieee_bin(bvn_float_t *f,
 		}
 		if (mant_zero) { bvn_float_set_zero(f, neg); return true; }
 	}
-	uint32_t tmp_words[8] = {0};
-	int w32 = (total + 31) / 32;
-	if (w32 > 8) w32 = 8;
-	for (int i = 0; i < w32 && i < bits32; i++) tmp_words[i] = bits[i];
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	{
-		long unbiased = (long)raw_exp - (long)bias;
-		bvn_int_zero(&p.coeff);
-		if (raw_exp == 0) {
-		} else {
-			bvn_int_from_uint64(&p.coeff, 1u);
-			bvn_int_shl(&p.coeff, (int)man_bits);
-		}
-		for (uint32_t i = 0; i < man_bits; i++) {
-			if ((bits[i / 32] >> (i % 32)) & 1u)
-				bvn_int_setbit(&p.coeff, (int)i);
-		}
-		p.neg = neg;
-		p.dex = (int)(unbiased - (long)man_bits);
-		p.nan = false; p.inf = false;
-	}
-	(void)tmp_words; (void)ctx; (void)p;
 	f->_sign = neg ? -1 : 1;
 	long unbiased = (long)raw_exp - (long)bias;
 	uint32_t _mb[BVN_INT_MAX_BITS / 32];
@@ -1100,12 +1085,15 @@ static bool from_ieee_decimal(bvn_float_t *f,
 void bvn_float_to_dec16(const bvn_float_t *f, uint16_t *out)
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { *out = 0; return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { *out = 0; return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); *out = 0; return; }
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p);
 	bvn_float_parse(&ctx, buf, &p);
+	free(buf);
 	uint32_t b[1] = {0};
 	DecFmt fmt = {16, 6, 9, 101, 2};
 	to_ieee_decimal(&ctx, &p, &fmt, b, 1);
@@ -1114,24 +1102,30 @@ void bvn_float_to_dec16(const bvn_float_t *f, uint16_t *out)
 void bvn_float_to_dec32(const bvn_float_t *f, uint32_t *out)
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { *out = 0; return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { *out = 0; return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); *out = 0; return; }
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p);
 	bvn_float_parse(&ctx, buf, &p);
+	free(buf);
 	DecFmt fmt = {32, 8, 23, 101, 7};
 	to_ieee_decimal(&ctx, &p, &fmt, out, 1);
 }
 void bvn_float_to_dec64(const bvn_float_t *f, uint64_t *out)
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { *out = 0; return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { *out = 0; return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); *out = 0; return; }
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p);
 	bvn_float_parse(&ctx, buf, &p);
+	free(buf);
 	uint32_t b[2] = {0, 0};
 	DecFmt fmt = {64, 10, 53, 398, 16};
 	to_ieee_decimal(&ctx, &p, &fmt, b, 2);
@@ -1140,24 +1134,30 @@ void bvn_float_to_dec64(const bvn_float_t *f, uint64_t *out)
 void bvn_float_to_dec128(const bvn_float_t *f, uint32_t out[4])
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { memset(out, 0, 16); return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { memset(out, 0, 16); return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); memset(out, 0, 16); return; }
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p);
 	bvn_float_parse(&ctx, buf, &p);
+	free(buf);
 	DecFmt fmt = {128, 14, 113, 6176, 34};
 	to_ieee_decimal(&ctx, &p, &fmt, out, 4);
 }
 void bvn_float_to_dec256(const bvn_float_t *f, uint32_t out[8])
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { memset(out, 0, 32); return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { memset(out, 0, 32); return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); memset(out, 0, 32); return; }
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p);
 	bvn_float_parse(&ctx, buf, &p);
+	free(buf);
 	DecFmt fmt = {256, 20, 235, 611867, 70};
 	to_ieee_decimal(&ctx, &p, &fmt, out, 8);
 }
@@ -1186,42 +1186,60 @@ bool bvn_float_from_dec256(bvn_float_t *f, const uint32_t bits[8])
 int16_t bvn_float_to_fix16(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) return 0;
-	return bvn_float_parse_fix16(buf, (int)frac_bits);
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) return 0;
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); return 0; }
+	int16_t r = bvn_float_parse_fix16(buf, (int)frac_bits);
+	free(buf);
+	return r;
 }
 int32_t bvn_float_to_fix32(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) return 0;
-	return bvn_float_parse_fix32(buf, (int)frac_bits);
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) return 0;
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); return 0; }
+	int32_t r = bvn_float_parse_fix32(buf, (int)frac_bits);
+	free(buf);
+	return r;
 }
 int64_t bvn_float_to_fix64(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) return 0;
-	return bvn_float_parse_fix64(buf, (int)frac_bits);
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) return 0;
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); return 0; }
+	int64_t r = bvn_float_parse_fix64(buf, (int)frac_bits);
+	free(buf);
+	return r;
 }
 void bvn_float_to_fix128(const bvn_float_t *f, uint32_t frac_bits, uint32_t out[4])
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { memset(out, 0, 16); return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { memset(out, 0, 16); return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); memset(out, 0, 16); return; }
 	bvn_float_parse_fix128(buf, (int)frac_bits, out);
+	free(buf);
 }
 void bvn_float_to_fix256(const bvn_float_t *f, uint32_t frac_bits, uint32_t out[8])
 {
 	if (!f || !out) return;
-	char buf[bvn_float_str_bufsize((uint32_t)f->_prec, 10)];
-	int n = bvn_float_to_str(f, buf, sizeof buf, 10);
-	if (n <= 0) { memset(out, 0, 32); return; }
+	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+	char  *buf  = malloc(_bsz);
+	if (!buf) { memset(out, 0, 32); return; }
+	int n = bvn_float_to_str(f, buf, _bsz, 10);
+	if (n <= 0) { free(buf); memset(out, 0, 32); return; }
 	bvn_float_parse_fix256(buf, (int)frac_bits, out);
+	free(buf);
 }
 static bool from_fix_common(bvn_float_t *f, bool neg,
 							 const uint32_t *abs_words, int nwords,

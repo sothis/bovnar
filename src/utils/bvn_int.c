@@ -476,22 +476,141 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 	bvn_int_zero(q);
 	bvn_int_zero(r);
 	if (bvn_int_is_zero(b)) return true;
-	int n = bvn_int_bitlen(a);
-	for (int i = n - 1; i >= 0; i--) {
-		if (!bvn_int_shl(r, 1)) return false;
-		if (bvn_int_getbit(a, i)) {
-			if (r->nused == 0) {
-				if (!bigint_ensure_cap(r, 1u)) return false;
-				r->limbs[0] = 1u;
-				r->nused    = 1u;
-			} else {
-				r->limbs[0] |= 1u;
-			}
+	uint32_t na = a->nused;
+	uint32_t nb = b->nused;
+	while (na > 0u && a->limbs[na - 1u] == 0u) na--;
+	while (nb > 0u && b->limbs[nb - 1u] == 0u) nb--;
+	if (na == 0u) return true;
+	if (na < nb) {
+		return bvn_int_copy(r, a);
+	}
+	if (na == nb) {
+		int mag = 0;
+		for (int32_t i = (int32_t)na - 1; i >= 0 && mag == 0; i--) {
+			if      (a->limbs[(uint32_t)i] > b->limbs[(uint32_t)i]) mag =  1;
+			else if (a->limbs[(uint32_t)i] < b->limbs[(uint32_t)i]) mag = -1;
 		}
-		if (bvn_int_cmp(r, b) >= 0) {
-			if (!bvn_int_sub_inplace(r, b)) return false;
-			if (!bvn_int_setbit(q, i)) return false;
+		if (mag < 0) return bvn_int_copy(r, a);
+		if (mag == 0) {
+			if (!bigint_ensure_cap(q, 1u)) return false;
+			q->limbs[0u] = 1u;
+			q->nused     = 1u;
+			q->negative  = a->negative != b->negative;
+			return true;
 		}
 	}
+	if (nb == 1u) {
+		if (!bvn_int_copy(q, a)) return false;
+		q->negative = false;
+		uint32_t rem = bvn_int_div_u32(q, b->limbs[0u]);
+		q->negative = a->negative != b->negative;
+		if (rem != 0u) {
+			if (!bigint_ensure_cap(r, 1u)) return false;
+			r->limbs[0u] = rem;
+			r->nused     = 1u;
+			r->negative  = a->negative;
+		}
+		return true;
+	}
+	uint32_t n = nb;
+	uint32_t m = na - nb;
+	uint32_t *u = calloc((size_t)(m + n + 1u), sizeof(uint32_t));
+	uint32_t *v = calloc((size_t)n, sizeof(uint32_t));
+	if (!u || !v) { free(u); free(v); return false; }
+	uint32_t s = 0u;
+	{ uint32_t t = b->limbs[n - 1u]; while (t < 0x80000000u) { s++; t <<= 1u; } }
+	{
+		uint64_t carry = 0u;
+		for (uint32_t i = 0u; i < na; i++) {
+			uint64_t x = ((uint64_t)a->limbs[i] << s) | carry;
+			u[i]       = (uint32_t)x;
+			carry      = x >> 32u;
+		}
+		u[na] = (uint32_t)carry;
+	}
+	{
+		uint64_t carry = 0u;
+		for (uint32_t i = 0u; i < n; i++) {
+			uint64_t x = ((uint64_t)b->limbs[i] << s) | carry;
+			v[i]       = (uint32_t)x;
+			carry      = x >> 32u;
+		}
+	}
+	if (!bigint_ensure_cap(q, m + 1u)) { free(u); free(v); return false; }
+	memset(q->limbs, 0, (size_t)(m + 1u) * sizeof(uint32_t));
+	const uint64_t B = (uint64_t)1u << 32u;
+	const uint32_t vn1 = v[n - 1u];
+	const uint32_t vn2 = (n >= 2u) ? v[n - 2u] : 0u;
+	for (int32_t j = (int32_t)m; j >= 0; j--) {
+		const uint32_t uj = (uint32_t)j;
+		uint64_t u_hi  = (uint64_t)u[uj + n];
+		uint64_t u_lo  = (uint64_t)u[uj + n - 1u];
+		uint64_t u_lo2 = (n >= 2u) ? (uint64_t)u[uj + n - 2u] : 0u;
+		uint64_t q_hat, r_hat;
+		if (u_hi >= (uint64_t)vn1) {
+			q_hat = B - 1u;
+			r_hat = u_lo + (uint64_t)vn1;
+		} else {
+			const uint64_t numer = (u_hi << 32u) | u_lo;
+			q_hat = numer / (uint64_t)vn1;
+			r_hat = numer % (uint64_t)vn1;
+		}
+		while (r_hat < B &&
+			   q_hat * (uint64_t)vn2 > ((r_hat << 32u) | u_lo2)) {
+			q_hat--;
+			r_hat += (uint64_t)vn1;
+		}
+		uint64_t mc = 0u;
+		uint64_t sb = 0u;
+		for (uint32_t i = 0u; i <= n; i++) {
+			uint64_t p;
+			if (i < n) {
+				const uint64_t prod = q_hat * (uint64_t)v[i] + mc;
+				mc = prod >> 32u;
+				p  = prod & 0xFFFFFFFFull;
+			} else {
+				p  = mc;
+				mc = 0u;
+			}
+			p += sb;
+			const uint64_t ui = (uint64_t)u[uj + i];
+			if (ui >= p) {
+				u[uj + i] = (uint32_t)(ui - p);
+				sb = 0u;
+			} else {
+				u[uj + i] = (uint32_t)(ui + B - p);
+				sb = 1u;
+			}
+		}
+		q->limbs[uj] = (uint32_t)q_hat;
+		if (sb) {
+			q->limbs[uj]--;
+			uint64_t carry = 0u;
+			for (uint32_t i = 0u; i <= n; i++) {
+				const uint64_t s_val = (uint64_t)u[uj + i]
+									 + (i < n ? (uint64_t)v[i] : 0u)
+									 + carry;
+				u[uj + i] = (uint32_t)s_val;
+				carry      = s_val >> 32u;
+			}
+		}
+	}
+	q->nused    = m + 1u;
+	q->negative = a->negative != b->negative;
+	bvn_int_norm(q);
+	if (!bigint_ensure_cap(r, n)) { free(u); free(v); return false; }
+	if (s == 0u) {
+		for (uint32_t i = 0u; i < n; i++) r->limbs[i] = u[i];
+	} else {
+		for (uint32_t i = 0u; i < n; i++) {
+			r->limbs[i] = (u[i] >> s)
+						| (i + 1u < n ? u[i + 1u] << (32u - s) : 0u);
+		}
+	}
+	r->nused    = n;
+	r->negative = a->negative;
+	bvn_int_norm(r);
+	free(u);
+	free(v);
 	return true;
 }

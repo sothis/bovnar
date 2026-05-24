@@ -454,8 +454,8 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `prln` | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.18054×10⁻³ m |
-| `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61644×10⁻² m |
+| `prln` | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.17953×10⁻³ m |
+| `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61544×10⁻² m |
 | `prf`  | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
 | `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.67160×10⁻¹ m |
 | `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.76624 m |
@@ -558,7 +558,7 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 - **IEC prefixes** (`Ki`…`Qi`) are only permitted on `b` and `B`. `Ki~m` → `error_unit_illegal`.
 - **SI sub-kilo prefixes** (`d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`, `da`, `h`) are forbidden on `b` and `B`.
 - **German units** (`bu_pfund` through `bu_scheffel`) accept only `si_none`/`iec_none`.
-- **Currency units** accept SI prefixes at `si_kilo` and above (see §9.4). IEC prefixes are forbidden on all currency codes.
+- **Currency units** accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.
 
 ```bovnar
 .valid1   = <uint:64,Ki~B>  8;     # OK: IEC prefix on byte
@@ -713,7 +713,7 @@ Currency amounts are dimensional quantities in financial computing. `$19.99 USD`
 
 ### 9.1 Namespace Rule
 
-Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4** is permanently reserved for currency codes. No physical base unit uses such a symbol — all existing physical units are either single-letter (`m`, `K`, `A`…), mixed-case (`Hz`, `Pa`, `Wb`…), or lowercase-dominated (`mol`, `min`, `bar`…).
+Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4** is dispatched to the currency table first. With the sole exception of `BTU` (a registered alias for `bu_btu`), no physical base unit symbol matches this pattern — all others are either single-letter (`m`, `K`, `A`…), mixed-case (`Hz`, `Pa`, `Wb`…), or lowercase-dominated (`mol`, `min`, `bar`…).
 
 Classification happens at the lookup stage:
 
@@ -768,7 +768,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 
 ### 9.4 Prefix Rules for Currency Units
 
-**SI prefixes from `si_kilo` upward** are permitted on all currency units. `k~USD` denotes "values in thousands of USD" — a common scale annotation in financial reporting.
+**All SI prefixes** are permitted on all currency units. `k~USD` denotes "values in thousands of USD" — a common scale annotation in financial reporting.
 
 ```bovnar
 .fund_nav   = <float_dec:64,k~USD>    250.0;   # $250,000
@@ -776,7 +776,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 .eth_gwei   = <float_dec:64,G~ETH>    35.0;    # 35 Gwei gas price
 ```
 
-**IEC binary prefixes** (`Ki~`, `Mi~`, …) are **forbidden** on all currency units. `bvn_currency_prefix_valid()` returns `false` for any IEC prefix; the parser raises `error_unit_illegal`. SI prefixes of any magnitude are permitted by the validation function.
+**IEC binary prefixes** (`Ki~`, `Mi~`, …) are **forbidden** on all currency units. `bvn_currency_prefix_valid()` returns `false` for any IEC prefix; the parser raises `error_unit_illegal`.
 
 ### 9.5 Compound Currency Expressions
 
@@ -839,9 +839,9 @@ The rule from §9.1 produces a strict partition:
 
 | Token class | Criteria | Examples |
 |---|---|---|
-| Physical unit | Any symbol that does **not** consist exclusively of 3–4 uppercase ASCII letters | `m`, `Hz`, `cup`, `Btu`, `mol`, `rad`, `k~g` |
+| Physical unit | Any symbol that does **not** consist exclusively of 3–4 uppercase ASCII letters, **or** is an all-uppercase alias registered in the physical unit table | `m`, `Hz`, `cup`, `Btu`, `BTU`, `mol`, `rad`, `k~g` |
 | Currency code | Exclusively 3–4 uppercase ASCII letters, found in the currency table | `USD`, `EUR`, `CUP`, `BTC`, `DOGE` |
-| Error | Exclusively 3–4 uppercase ASCII letters, **not** in the currency table | `XYZ`, `BTU`, `ABC` |
+| Error | Exclusively 3–4 uppercase ASCII letters, found in neither table | `XYZ`, `ABC` |
 
 The classification is performed at the token level, before any prefix or compound parsing. A token that fails both the physical-unit table and the currency table lookup raises `error_unit_illegal` regardless of whether it looks meaningful to a human reader.
 
@@ -982,7 +982,7 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Physical units occupy positions 1–146. Currency codes begin immediately after the last physical unit. `bvn_unit_is_currency(base)` returns `true` for any enum value in the currency range.
+Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–328 (`bu_aed` … `bu_atom`). German physical units are appended after the entire currency range at positions 329–341 (`bu_pfund` … `bu_scheffel`). `bvn_unit_is_currency(base)` returns `true` for any enum value in the range 134–328.
 
 ```c
 typedef enum value_base_unit_e {
@@ -1390,11 +1390,11 @@ The `bvn_currency_info_t` structure:
 
 ```c
 typedef struct {
-    const char *code;           /* "USD", "BTC", etc.                  */
-    uint16_t    numeric_code;   /* ISO 4217 numeric code (0 for crypto) */
-    uint8_t     minor_unit;     /* decimal places                       */
-    bool        is_crypto;      /* true for cryptocurrencies            */
-    const char *name;           /* "US Dollar", "Bitcoin", etc.         */
+    char     code[5];           /* "USD", "BTC", etc.                  */
+    uint16_t numeric_code;      /* ISO 4217 numeric code (0 for crypto) */
+    uint8_t  minor_unit;        /* decimal places                       */
+    bool     is_crypto;         /* true for cryptocurrencies            */
+    char     name[48];          /* "US Dollar", "Bitcoin", etc.         */
 } bvn_currency_info_t;
 ```
 
@@ -1681,27 +1681,26 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 # Unknown base unit → error_unit_illegal
 .bad3 = <float:64,foobar>    1.0;
 
-# All-uppercase 3-char token not in currency table → error_unit_illegal
-# (BTU is not an ISO 4217 code; use Btu or btu for the energy unit)
-.bad4 = <float:64,BTU>       1.0;
-
 # IEC prefix on a currency → error_unit_illegal
-.bad5 = <float_dec:64,Ki~USD> 1.0;
-
-# Sub-kilo SI prefix on a currency → error_unit_illegal
-.bad6 = <float_dec:64,m~USD>  1.0;
+.bad4 = <float_dec:64,Ki~USD> 1.0;
 
 # Annotation unit differs from inline unit → error_unit_mismatch
-.bad7 = <float:64,m> 1.0 s;
+.bad5 = <float:64,m> 1.0 s;
 
 # Inline unit inside an array → error_unexpected_input_byte
-.bad8 = <float:64,m> [1.0 m, 2.0 m];   # ERROR: suffix inside array
+.bad6 = <float:64,m> [1.0 m, 2.0 m];   # ERROR: suffix inside array
 
 # Correct: dimensionless explicit
 .ok1  = <uint:32,no_unit>    42;
 
 # Correct: omitted unit (same behaviour as no_unit)
 .ok2  = <uint:32>            42;
+
+# Correct: BTU is a valid alias for bu_btu (currency lookup returns 0, physical table matches)
+.ok3  = <float:64,BTU>      1.0;    # valid: same as Btu or btu
+
+# Correct: sub-kilo SI prefix on currency is accepted
+.ok4  = <float_dec:64,m~USD> 0.001; # valid: milli-dollar (one tenth of a cent)
 
 # Correct: cup (volume) vs CUP (currency) — both valid, different meaning
 .vol  = <float_dec:32,cup>  2.0;    # US cup (236.6 mL)

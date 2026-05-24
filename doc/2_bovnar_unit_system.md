@@ -1,15 +1,37 @@
-# Bovnar Unit System — Reference Documentation
+# Bovnar Quantity Annotation System — Unit and Currency Reference
 
-> **Applies to:** Bovnar (BVNR) specification version 1.0  
-> **Scope:** This document covers the unit system exclusively — syntax, data model, C API, and validation rules.
+> **Applies to:** Bovnar (BVNR) specification version 1.1
+> **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
+> **Supersedes:** `doc/currency_unit_extension.md` (addendum merged here).
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Syntax — Unit as a Type Parameter](#2-syntax--unit-as-a-type-parameter)
-3. [Base Units](#3-base-units)
+2. [Syntax — Annotation as a Type Parameter](#2-syntax--annotation-as-a-type-parameter)
+3. [Physical Base Units](#3-physical-base-units)
+   - 3.1 [SI Base Units](#31-si-base-units)
+   - 3.2 [Named SI-Derived Units](#32-named-si-derived-units)
+   - 3.3 [Non-SI Units Accepted for Use with SI](#33-non-si-units-accepted-for-use-with-si)
+   - 3.4 [Imperial and US Customary Units](#34-imperial-and-us-customary-units)
+   - 3.5 [Pressure Units](#35-pressure-units)
+   - 3.6 [Energy Units](#36-energy-units)
+   - 3.7 [Power Units](#37-power-units)
+   - 3.8 [Force Units](#38-force-units)
+   - 3.9 [Speed Units](#39-speed-units)
+   - 3.10 [Volume Units](#310-volume-units)
+   - 3.11 [Area Units](#311-area-units)
+   - 3.12 [Angle Units](#312-angle-units)
+   - 3.13 [CGS Units](#313-cgs-units)
+   - 3.14 [Radiation Units](#314-radiation-units)
+   - 3.15 [Logarithmic Units](#315-logarithmic-units)
+   - 3.16 [Electrical Power Units](#316-electrical-power-units)
+   - 3.17 [Digital Units](#317-digital-units)
+   - 3.18 [Textile Linear Density](#318-textile-linear-density)
+   - 3.19 [US Apothecary / Dry Volume](#319-us-apothecary--dry-volume)
+   - 3.20 [Old German Units](#320-old-german-units)
+   - 3.21 [Sentinel Value](#321-sentinel-value)
 4. [Prefixes](#4-prefixes)
    - 4.1 [SI Prefixes](#41-si-prefixes)
    - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
@@ -24,42 +46,68 @@
    - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
 7. [The `no_unit` Keyword](#7-the-no_unit-keyword)
 8. [Constraints and Limits](#8-constraints-and-limits)
-9. [C Data Model](#9-c-data-model)
-   - 9.1 [Enumerations](#91-enumerations)
-   - 9.2 [Structures](#92-structures)
-   - 9.3 [Convenience Macros](#93-convenience-macros)
-10. [C API Functions](#10-c-api-functions)
-    - 10.1 [Parsing a Unit String](#101-parsing-a-unit-string)
-    - 10.2 [Serializing a Unit](#102-serializing-a~unit)
-    - 10.3 [Prefix Factor and Exponent Queries](#103-prefix-factor-and-exponent-queries)
-    - 10.4 [SI Conversion API](#104-si-conversion-api)
-11. [Integration with the Parser Event Stream](#11-integration-with-the-parser-event-stream)
-12. [Validation Errors](#12-validation-errors)
-13. [Annotated Examples](#13-annotated-examples)
-    - 13.1 [Physical Quantities](#131-physical-quantities)
-    - 13.2 [Digital Storage](#132-digital-storage)
-    - 13.3 [Compound SI Quantities](#133-compound-si-quantities)
-    - 13.4 [Error Cases](#134-error-cases)
+9. [Currency Codes](#9-currency-codes)
+   - 9.1 [Namespace Rule](#91-namespace-rule)
+   - 9.2 [ISO 4217 Fiat Currencies and Precious Metals](#92-iso-4217-fiat-currencies-and-precious-metals)
+   - 9.3 [Cryptocurrencies](#93-cryptocurrencies)
+   - 9.4 [Prefix Rules for Currency Units](#94-prefix-rules-for-currency-units)
+   - 9.5 [Compound Currency Expressions](#95-compound-currency-expressions)
+   - 9.6 [Compatibility Rules](#96-compatibility-rules)
+   - 9.7 [Type Pairing Recommendations](#97-type-pairing-recommendations)
+10. [Symbol Disambiguation](#10-symbol-disambiguation)
+    - 10.1 [The Namespace Rule as Disambiguator](#101-the-namespace-rule-as-disambiguator)
+    - 10.2 [Exhaustive Conflict Table](#102-exhaustive-conflict-table)
+    - 10.3 [The CUP Case in Detail](#103-the-cup-case-in-detail)
+    - 10.4 [Disambiguation Proposals](#104-disambiguation-proposals)
+11. [C Data Model](#11-c-data-model)
+    - 11.1 [Enumerations](#111-enumerations)
+    - 11.2 [Structures](#112-structures)
+    - 11.3 [Convenience Macros](#113-convenience-macros)
+12. [C API Functions](#12-c-api-functions)
+    - 12.1 [Parsing a Unit String](#121-parsing-a-unit-string)
+    - 12.2 [Serializing a Unit](#122-serializing-a-unit)
+    - 12.3 [Prefix Factor and Exponent Queries](#123-prefix-factor-and-exponent-queries)
+    - 12.4 [SI Conversion API](#124-si-conversion-api)
+    - 12.5 [Currency API](#125-currency-api)
+    - 12.6 [Python API](#126-python-api)
+13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
+14. [Validation Errors](#14-validation-errors)
+15. [Annotated Examples](#15-annotated-examples)
+    - 15.1 [Physical Quantities](#151-physical-quantities)
+    - 15.2 [Digital Storage](#152-digital-storage)
+    - 15.3 [Compound SI Quantities](#153-compound-si-quantities)
+    - 15.4 [Currency Amounts and Rates](#154-currency-amounts-and-rates)
+    - 15.5 [Error Cases](#155-error-cases)
 
 ---
 
 ## 1. Overview
 
-The Bovnar unit system is an **optional, per-value annotation** that attaches a physical or digital unit to any numeric field. It is part of the broader type annotation (`<family:width,_base,unit>`) and applies to the `uint`, `sint`, and `float` type families. The unit is purely descriptive from the serialization standpoint — Bovnar does not perform dimensional analysis or unit conversion — but it is fully parsed, validated, and made available to the consuming application through a structured C API.
+The Bovnar quantity annotation system is an **optional, per-value annotation** that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (`<family:width,_base,unit>`) and applies to the `uint`, `sint`, `float`, `float_fix`, and `float_dec` type families.
+
+Two distinct namespaces share the annotation slot:
+
+- **Physical units** — 146 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Currency codes** — 195 monetary denominations: all 161 active ISO 4217 alphabetic codes (including precious-metal X-codes) and 34 cryptocurrency tickers.
+
+Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
+
+Annotations are **descriptive**, not prescriptive. Bovnar validates form and type; it does not perform dimensional analysis, unit conversion, or exchange-rate arithmetic. That responsibility belongs to the consuming application.
 
 ### Design Principles
 
-- **SI-first.** All standard SI base units, all 21 SI-named derived units listed in section 3 (BIPM 2019, excluding °C which is treated as a non-SI unit accepted for use with SI), and all current SI prefixes (quecto … quetta) are supported.
-- **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … quebi) are supported for digital storage and data-rate quantities.
-- **Compound units.** Derived quantities such as velocity (m/s), force (kg·m/s²), or energy (kg·m²/s²) are expressed inline without separate schema definitions, using product and division separators.
-- **Two exponent notations.** Both the visually concise Unicode superscript form (`m²`, `s⁻²`) and the ASCII-safe caret form (`m^2`, `s^-2`) are accepted equivalently.
-- **Dimensionless values.** The keyword `no_unit` is the canonical representation of a dimensionless quantity; omitting the unit parameter produces the same internal state.
+- **SI-first.** All SI base units, all 21 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.
+- **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … quebi) are supported for digital storage quantities.
+- **Compound units.** Derived quantities (m/s, kg·m/s², USD/oz_t) are expressed inline without separate schema definitions.
+- **Two exponent notations.** Unicode superscript (`m²`, `s⁻²`) and ASCII caret (`m^2`, `s^-2`) are accepted equivalently.
+- **Currency as a first-class unit.** ISO 4217 and cryptocurrency codes participate in all unit composition rules — prefixes, compound expressions, and the `value_unit_t` representation — with no special-case parsing.
+- **Dimensionless values.** The keyword `no_unit` is the canonical representation of a dimensionless quantity.
 
 ---
 
-## 2. Syntax — Unit as a Type Parameter
+## 2. Syntax — Annotation as a Type Parameter
 
-The unit occupies the **third positional parameter class** of a type annotation, after the optional bit-width and optional base. The three parameter classes are identified by their content, not by position, and at most one of each class may appear:
+The unit or currency code occupies the **third positional parameter class** of a type annotation, after the optional bit-width and optional base. Parameter classes are identified by their content, not by position:
 
 ```
 type-spec       = param-type [ ":" type-param-list ]
@@ -69,39 +117,27 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
                 | unit-param    (* everything else,        e.g. m/s  *)
 ```
 
-The parser classifies each comma-separated token: if it begins with `_` and is followed by digits it is a base parameter; if it is all decimal digits it is a width parameter; otherwise it is treated as a unit string and handed to `bvn_parse_unit` for semantic validation.
-
-### 2.1 Examples of parameter ordering flexibility
-
-All three of the following annotations are equivalent:
+### 2.1 Parameter Ordering Flexibility
 
 ```bovnar
 .val = <uint:32,_10,no_unit> 42;
-.val = <uint:_10,no_unit,32> 42;
-.val = <uint:no_unit,_10,32> 42;
-```
-
-The unit participates alongside width and base:
-
-```bovnar
-.speed     = <float:64,m/s>         9.81;    # 64-bit float, base 10 (default), m/s
-.storage   = <uint:64,Ti~B>         2;       # 64-bit uint, tebibytes
-.hex_count = <uint:32,_16,no_unit>  "FF";    # 32-bit uint, hex, dimensionless
+.val = <uint:_10,no_unit,32> 42;   # identical
+.val = <uint:no_unit,_10,32> 42;   # identical
 ```
 
 ### 2.2 Inline Unit Suffix
 
-As an alternative (or redundant complement) to the type-annotation unit, a unit may be written **directly after a scalar value**, between the value literal and the terminating `;`.  This is called the **inline unit suffix**.
+A unit may be written directly after a scalar value literal, between the value and the terminating `;`:
 
 ```bovnar
-.distance = 1500 m;            # no annotation; inline unit supplies m
-.speed    = 9.81 m/s;          # compound inline unit
-.mass     = 70.5 k~g;          # SI-prefix inline unit
-.storage  = 4 Gi~B;            # IEC-prefix inline unit
-.ratio    = 3.14 no_unit;      # explicit dimensionless via inline suffix
+.distance  = 1500 m;            # inline physical unit
+.speed     = 9.81 m/s;          # compound inline unit
+.price     = 19.99 USD;         # inline currency code
+.gold_rate = 2351.40 USD/oz_t;  # inline compound currency/unit
+.ratio     = 3.14 no_unit;      # explicit dimensionless
 ```
 
-The inline unit uses the **same character set** and the **same semantic parser** (`bvn_parse_unit`) as the type-annotation unit parameter.  The only syntactic difference is the delimiter: an inline unit is terminated by ASCII whitespace, `#` (comment), or `;`, whereas an annotation unit is terminated by `,` or `>`.
+The inline unit uses the **same character set** and **same semantic parser** (`bvn_parse_unit`) as the type-annotation unit parameter. It is terminated by ASCII whitespace, `#` (comment), or `;`.
 
 #### Constraints
 
@@ -114,112 +150,116 @@ The inline unit uses the **same character set** and the **same semantic parser**
 | Annotation unit **differs** from inline unit | `error_unit_mismatch` |
 | Inline unit inside an array element | `error_unexpected_input_byte` |
 
-The inline unit suffix is forbidden inside `[ … ]` array elements.  The lexer detects alphabetic characters or `_` immediately following an array-element value and reports `error_unexpected_input_byte`.
-
-#### Interaction with the type-annotation unit
-
-When both are present, equality is checked **after parsing** via `memcmp` on the complete `value_unit_t` structure (`memcmp(&annotation_unit, &inline_unit, sizeof(value_unit_t))`).  Two unit strings match if and only if `bvn_parse_unit` produces bit-for-bit identical `value_unit_t` values for both.  In practice this means that logically equivalent strings written in different but semantically identical notations (e.g. `m·s⁻¹` vs `m/s`) compare as equal, because both parse to the same internal representation and `bvn_parse_unit` fully initialises every field of every component it writes.
+When both are present, equality is checked after parsing via `memcmp` on the complete `value_unit_t` structure. Two strings match if and only if `bvn_parse_unit` produces bit-for-bit identical `value_unit_t` values — so logically equivalent notations (e.g. `m·s⁻¹` vs `m/s`) compare as equal.
 
 ```bovnar
-# Annotation and inline agree (different notation, same unit)
 .v = <float:64,m/s> 9.81 m·s⁻¹;   # OK: both parse to m/s
-
-# Annotation and inline disagree
 .v = <float:64,m> 1.0 s;           # ERROR: error_unit_mismatch
 ```
 
-### Applicable type families
+### Applicable Type Families
 
-| Type family | Unit parameter |
-|-------------|---------------|
-| `uint`       | Supported      |
-| `sint`       | Supported      |
-| `float`      | Supported      |
-| `float_fix`  | Supported      |
-| `float_dec`  | Supported      |
-| `utf8`       | Lexically accepted and stored, but semantically ignored (no error raised) |
+| Type family | Unit / currency parameter |
+|-------------|--------------------------|
+| `uint`      | Supported |
+| `sint`      | Supported |
+| `float`     | Supported (binary floating-point; discouraged for monetary amounts — see §9.7) |
+| `float_fix` | Supported (wrong for monetary values — see §9.7) |
+| `float_dec` | Supported; **recommended** for monetary amounts |
+| `utf8`      | Lexically accepted and stored, but semantically ignored (no error raised) |
 
 ---
 
-## 3. Base Units
+## 3. Physical Base Units
 
-Bovnar supports 146 named base units, covering SI base units, all named SI-derived units, non-SI units accepted for use with SI (BIPM Table 8/9/10), Imperial and US customary units, CGS electromagnetic and mechanical units, radiation units, electrical power units, surveying and culinary measure units, and a block of 13 Old German units described in the final subsection of this section.
+Bovnar supports 146 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
-### SI Base Units
+> **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
-| Symbol | Long forms | Name     | Enum value   | Notes |
-|--------|-----------|----------|--------------|-------|
-| `s`    | `sec`, `second`, `seconds` | second   | `bu_second`  | SI base unit of time |
-| `m`    | `meter`, `metre`, `meters`, `metres` | meter    | `bu_meter`   | SI base unit of length |
-| `g`    | `gram`, `grams` | gram     | `bu_gram`    | SI base unit of mass is kg; `g` allows the prefix to carry the `k` |
-| `A`    | `amp`, `amps`, `ampere`, `amperes` | ampere   | `bu_ampere`  | SI base unit of electric current |
-| `K`    | `kelvin`, `kelvins` | kelvin   | `bu_kelvin`  | SI base unit of thermodynamic temperature |
-| `mol`  | `mole`, `moles` | mole     | `bu_mol`     | SI base unit of amount of substance |
-| `cd`   | `candela`, `candelas` | candela  | `bu_candela` | SI base unit of luminous intensity |
+### 3.1 SI Base Units
 
-> **Note on the kilogram:** The SI base unit of mass is the kilogram, but Bovnar uses `g` (gram) as the base unit symbol so that the `k~` (kilo) SI prefix can be attached explicitly: `k~g` = kilogram. This is consistent with how the SI formally defines kilogram as a prefixed gram.
+| Symbol | Long forms | Name | Enum value | Notes |
+|--------|-----------|------|------------|-------|
+| `s`    | `sec`, `second`, `seconds` | second | `bu_second` | SI base unit of time |
+| `m`    | `meter`, `metre`, `meters`, `metres` | meter | `bu_meter` | SI base unit of length |
+| `g`    | `gram`, `grams` | gram | `bu_gram` | SI base unit of mass is kg; `g` carries the prefix |
+| `A`    | `amp`, `amps`, `ampere`, `amperes` | ampere | `bu_ampere` | SI base unit of electric current |
+| `K`    | `kelvin`, `kelvins` | kelvin | `bu_kelvin` | SI base unit of thermodynamic temperature |
+| `mol`  | `mole`, `moles` | mole | `bu_mol` | SI base unit of amount of substance |
+| `cd`   | `candela`, `candelas` | candela | `bu_candela` | SI base unit of luminous intensity |
 
-### Named SI-Derived Units
+> **Note on the kilogram:** Bovnar uses `g` (gram) as the base unit symbol so that the `k~` (kilo) prefix can be attached explicitly: `k~g` = kilogram. This is consistent with how the SI formally defines the kilogram as a prefixed gram.
 
-| Symbol | Long forms | Name       | Enum value      | SI Definition |
-|--------|-----------|------------|-----------------|---------------|
-| `Hz`   | `hertz` | hertz      | `bu_hertz`      | s⁻¹ |
-| `N`    | `newton`, `newtons` | newton     | `bu_newton`     | kg·m·s⁻² |
-| `Pa`   | `pascal`, `pascals` | pascal     | `bu_pascal`     | kg·m⁻¹·s⁻² |
-| `J`    | `joule`, `joules` | joule      | `bu_joule`      | kg·m²·s⁻² |
-| `W`    | `watt`, `watts` | watt       | `bu_watt`       | kg·m²·s⁻³ |
-| `V`    | `volt`, `volts` | volt       | `bu_volt`       | kg·m²·A⁻¹·s⁻³ |
-| `Ω`    | `ohm`, `ohms` | ohm        | `bu_ohm`        | kg·m²·A⁻²·s⁻³ — U+2126, UTF-8: `0xE2 0x84 0xA6` |
-| `F`    | `farad`, `farads` | farad      | `bu_farad`      | kg⁻¹·m⁻²·A²·s⁴ |
-| `C`    | `coulomb`, `coulombs` | coulomb    | `bu_coulomb`    | A·s |
-| `S`    | `siemens` | siemens    | `bu_siemens`    | kg⁻¹·m⁻²·A²·s³ |
-| `Wb`   | `weber`, `webers` | weber      | `bu_weber`      | kg·m²·A⁻¹·s⁻² |
-| `T`    | `tesla`, `teslas` | tesla      | `bu_tesla`      | kg·A⁻¹·s⁻² |
-| `H`    | `henry`, `henrys`, `henries` | henry      | `bu_henry`      | kg·m²·A⁻²·s⁻² |
-| `lm`   | `lumen`, `lumens` | lumen      | `bu_lumen`      | cd·sr |
-| `lx`   | `lux` | lux        | `bu_lux`        | cd·sr·m⁻² |
-| `Bq`   | `becquerel`, `becquerels` | becquerel  | `bu_becquerel`  | s⁻¹ |
-| `Gy`   | `gray`, `grays` | gray       | `bu_gray`       | m²·s⁻² |
-| `Sv`   | `sievert`, `sieverts` | sievert    | `bu_sievert`    | m²·s⁻² |
-| `kat`  | `katal`, `katals` | katal      | `bu_katal`      | mol·s⁻¹ |
-| `rad`  | `radian`, `radians` | radian     | `bu_radian`     | dimensionless (plane angle; m/m) |
-| `sr`   | `steradian`, `steradians` | steradian  | `bu_steradian`  | dimensionless (solid angle; m²/m²) |
+### 3.2 Named SI-Derived Units
 
-### Non-SI Units Accepted for Use with SI
+| Symbol | Long forms | Name | Enum value | SI Definition |
+|--------|-----------|------|------------|---------------|
+| `Hz`   | `hertz` | hertz | `bu_hertz` | s⁻¹ |
+| `N`    | `newton`, `newtons` | newton | `bu_newton` | kg·m·s⁻² |
+| `Pa`   | `pascal`, `pascals` | pascal | `bu_pascal` | kg·m⁻¹·s⁻² |
+| `J`    | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
+| `W`    | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
+| `V`    | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
+| `Ω`    | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126, UTF-8: `0xE2 0x84 0xA6` |
+| `F`    | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
+| `C`    | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
+| `S`    | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
+| `Wb`   | `weber`, `webers` | weber | `bu_weber` | kg·m²·A⁻¹·s⁻² |
+| `T`    | `tesla`, `teslas` | tesla | `bu_tesla` | kg·A⁻¹·s⁻² |
+| `H`    | `henry`, `henrys`, `henries` | henry | `bu_henry` | kg·m²·A⁻²·s⁻² |
+| `lm`   | `lumen`, `lumens` | lumen | `bu_lumen` | cd·sr |
+| `lx`   | `lux` | lux | `bu_lux` | cd·sr·m⁻² |
+| `Bq`   | `becquerel`, `becquerels` | becquerel | `bu_becquerel` | s⁻¹ |
+| `Gy`   | `gray`, `grays` | gray | `bu_gray` | m²·s⁻² |
+| `Sv`   | `sievert`, `sieverts` | sievert | `bu_sievert` | m²·s⁻² |
+| `kat`  | `katal`, `katals` | katal | `bu_katal` | mol·s⁻¹ |
+| `rad`  | `radian`, `radians` | radian | `bu_radian` | dimensionless (plane angle; m/m) |
+| `sr`   | `steradian`, `steradians` | steradian | `bu_steradian` | dimensionless (solid angle; m²/m²) |
 
-| Symbol | Name              | Enum value    | Notes |
-|--------|-------------------|---------------|-------|
-| `L`, `l` | `liter`, `litre`, `liters`, `litres` | liter           | `bu_liter`    | 10⁻³ m³ |
-| `min`  | minute            | `bu_minute`   | 60 s |
-| `h`    | hour              | `bu_hour`     | 3600 s |
-| `d`    | day               | `bu_day`      | 86400 s |
-| `wk`   | week              | `bu_week`     | 604800 s |
-| `yr`   | year              | `bu_year`     | 31557600 s (Julian year) |
-| `°`, `deg`, `degr`, `degree`, `degrees` | degree (angle) | `bu_degree` | π/180 rad — U+00B0, UTF-8: `0xC2 0xB0` |
-| `°C`, `degC`, `degrC` | degree Celsius | `bu_celsius` | affine offset to kelvin: K = °C + 273.15 |
-| `t`    | tonne             | `bu_tonne`    | 10³ kg |
-| `bar`  | bar               | `bu_bar`      | 10⁵ Pa |
-| `eV`   | electronvolt      | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
-| `Da`   | dalton            | `bu_dalton`   | 1.66053906660×10⁻²⁷ kg (unified atomic mass unit) |
-| `au`   | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
-| `ha`   | hectare           | `bu_hectare`  | 10⁴ m² |
+### 3.3 Non-SI Units Accepted for Use with SI
 
-### Imperial and US Customary Units — Length
+| Symbol | Long forms | Name | Enum value | Notes |
+|--------|-----------|------|------------|-------|
+| `L`, `l` | `liter`, `litre`, `liters`, `litres` | liter | `bu_liter` | 10⁻³ m³ |
+| `min`  | `minute`, `minutes` | minute | `bu_minute` | 60 s |
+| `h`    | `hour`, `hours` | hour | `bu_hour` | 3600 s |
+| `d`    | `day`, `days` | day | `bu_day` | 86400 s |
+| `wk`   | `week`, `weeks` | week | `bu_week` | 604800 s |
+| `yr`   | `year`, `years` | year | `bu_year` | 31557600 s (Julian year) |
+| `mo`   | `month`, `months` | month (Julian) | `bu_month` | 2629800 s (= 365.25 d / 12) |
+| `fn`   | `fortnight`, `fortnights` | fortnight | `bu_fortnight` | 1209600 s (= 14 d) |
+| `°`, `deg`, `degr`, `degree`, `degrees` | — | degree (angle) | `bu_degree` | π/180 rad — U+00B0 |
+| `°C`, `degC`, `degrC` | — | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine) |
+| `t`    | `tonne` | tonne | `bu_tonne` | 10³ kg |
+| `bar`  | — | bar | `bu_bar` | 10⁵ Pa |
+| `eV`   | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
+| `Da`   | `dalton` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
+| `au`   | `astronomical_unit` | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
+| `ha`   | `hectare` | hectare | `bu_hectare` | 10⁴ m² |
+
+### 3.4 Imperial and US Customary Units
+
+#### Length
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `in`   | `inch`, `inches` | inch | `bu_inch` | 0.0254 m (exact) |
-| `ft`   | `foot`, `feet`   | foot | `bu_foot` | 0.3048 m (exact) |
-| `yd`   | `yard`, `yards`  | yard | `bu_yard` | 0.9144 m (exact) |
-| `mi`   | `mile`, `miles`  | statute mile | `bu_mile` | 1609.344 m (exact) |
+| `ft`   | `foot`, `feet` | foot | `bu_foot` | 0.3048 m (exact) |
+| `yd`   | `yard`, `yards` | yard | `bu_yard` | 0.9144 m (exact) |
+| `mi`   | `mile`, `miles` | statute mile | `bu_mile` | 1609.344 m (exact) |
 | `nmi`  | `nautical_mile`, `nautical_miles` | nautical mile | `bu_nautical_mile` | 1852 m (exact) |
 | `Å` (U+212B) | `angstrom`, `angstroms`, Å (U+00C5) | ångström | `bu_angstrom` | 10⁻¹⁰ m |
 | `ly`   | `light_year`, `light_years` | light-year | `bu_light_year` | 9.4607304725808×10¹⁵ m |
 | `pc`   | `parsec`, `parsecs` | parsec | `bu_parsec` | 3.085677581491367×10¹⁶ m |
 | `fur`  | `furlong`, `furlongs` | furlong | `bu_furlong` | 201.168 m (exact) |
 | `fath` | `fathom`, `fathoms` | fathom | `bu_fathom` | 1.8288 m (exact) |
+| `thou` | `thou`, `mil`, `mils` | thou | `bu_thou` | 25.4×10⁻⁶ m (exact) |
+| `ch`   | `chain`, `chains` | chain (Gunter's) | `bu_chain` | 20.1168 m (exact) |
+| `rd`   | `rod`, `rods` | rod (pole, perch) | `bu_rod` | 5.0292 m (exact) |
 
-### Imperial and US Customary Units — Mass
+> **Thou vs mil:** Both `thou` and `mil` are accepted for 1/1000 of an inch (25.4 µm). The canonical output form is `thou`. Note that `mil` does **not** mean milliradian; milliradians are written `m~rad`.
+
+#### Mass
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
@@ -231,81 +271,110 @@ Bovnar supports 146 named base units, covering SI base units, all named SI-deriv
 | `tn_l` | `long_ton`, `long_tons` | long ton (UK ton) | `bu_long_ton` | 1016.0469088 kg (exact) |
 | `oz_t` | `troy_ounce`, `troy_ounces` | troy ounce | `bu_troy_ounce` | 0.0311034768 kg (exact) |
 | `ct`   | `carat`, `carats` | metric carat | `bu_carat` | 2×10⁻⁴ kg (exact) |
+| `slug` | `slugs` | slug | `bu_slug` | 14.593902937 kg |
+| `dr`   | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
+| `dwt`  | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
 
-### Imperial and US Customary Units — Temperature
+#### Temperature
 
 | Symbol | Long forms | Name | Enum value | Conversion |
 |--------|-----------|------|------------|------------|
-| `°F`, `degF`, `degrF` | `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | affine: K = (°F + 459.67) × 5/9 |
+| `°F`, `degF`, `degrF` | `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 (affine) |
+| `Ra`   | `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
 
-### Pressure Units
+> **Rankine vs Fahrenheit:** Rankine is the absolute scale corresponding to Fahrenheit. The symbol `Ra` is used because `R` is reserved for the röntgen (`bu_roentgen`).
+
+### 3.5 Pressure Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `atm`  | `atmosphere`, `atmospheres` | standard atmosphere | `bu_atmosphere` | 101325 Pa (exact) |
+| `at`   | `atmosphere_technical` | atmosphere technical | `bu_atmosphere_technical` | 98066.5 Pa (= 1 kgf/cm²) |
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
-| `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa ≈ 133.322368 Pa |
+| `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168361 Pa |
+| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
 
-### Energy Units
+### 3.6 Energy Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `cal`  | `calorie`, `calories` | thermochemical calorie | `bu_calorie` | 4.184 J (exact) |
-| `Btu`  | `BTU`, `btu` | International Table BTU | `bu_btu` | 1055.05585262 J |
+| `Btu`  | `btu` | International Table BTU | `bu_btu` | 1055.05585262 J |
 | `erg`  | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
 | `thm`  | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
+| `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
 
-### Power Units
+> **`BTU` alias note:** `BTU` (all uppercase, three characters) is a valid alias for `bu_btu`. Although it matches the currency namespace pattern, the currency lookup fails first (no ISO 4217 entry for `BTU`), and the parser then finds it in the physical unit table. `Btu` and `btu` are also accepted. See §10.2 for the complete conflict table.
+
+### 3.7 Power Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `hp`   | `horsepower` | mechanical horsepower | `bu_horsepower` | 745.69987158227 W |
+| `PS`   | `CV`, `metric_horsepower` | metric horsepower | `bu_metric_horsepower` | 735.49875 W (exact) |
 
-### Force Units
+### 3.8 Force Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `lbf`  | `pound_force` | pound-force | `bu_pound_force` | 4.4482216152605 N |
 | `dyn`  | `dyne`, `dynes` | dyne | `bu_dyne` | 10⁻⁵ N (exact) |
 | `kip`  | `kips` | kip (kilopound-force) | `bu_kip` | 4448.2216152605 N |
+| `kgf`  | `kilogram_force` | kilogram-force | `bu_kilogram_force` | 9.80665 N (exact) |
 
-### Speed Units
+### 3.9 Speed Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `kn`   | `knot`, `knots` | knot | `bu_knot` | 1852/3600 m/s ≈ 0.514444 m/s |
+| `kn`   | `knot`, `knots` | knot | `bu_knot` | 1852/3600 m/s |
+| `rpm`  | — | revolutions per minute | `bu_rpm` | 1/60 s⁻¹ |
 
-### Volume Units
+### 3.10 Volume Units
+
+#### US Liquid Volume
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `gal`  | `gallon`, `gallons` | US liquid gallon | `bu_gallon` | 3.785411784×10⁻³ m³ (exact) |
-| `gal_uk` | `gallon_uk`, `gallons_uk` | Imperial gallon | `bu_gallon_uk` | 4.54609×10⁻³ m³ (exact) |
 | `qt`   | `quart`, `quarts` | US liquid quart | `bu_quart` | 9.46352946×10⁻⁴ m³ |
 | `pt`   | `pint`, `pints` | US liquid pint | `bu_pint` | 4.73176473×10⁻⁴ m³ |
 | `cup`  | `cups` | US cup | `bu_cup` | 2.365882365×10⁻⁴ m³ |
+| `gi`   | `gill`, `gills` | US gill | `bu_gill` | 1.18294118250×10⁻⁴ m³ |
 | `fl_oz`| `fluid_ounce`, `fluid_ounces` | US fluid ounce | `bu_fluid_ounce` | 2.95735295625×10⁻⁵ m³ |
 | `tbsp` | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.47867648×10⁻⁵ m³ |
 | `tsp`  | `teaspoon`, `teaspoons` | US teaspoon | `bu_teaspoon` | 4.92892159375×10⁻⁶ m³ |
-| `bbl`  | `barrel`, `barrels` | petroleum barrel (42 US gal) | `bu_barrel` | 0.158987294928 m³ |
+| `bbl`  | `barrel`, `barrels` | petroleum barrel | `bu_barrel` | 0.158987294928 m³ |
 
-### Area Units
+> **`cup` disambiguation:** The canonical symbol for the US cup volume unit is `cup` (all lowercase). The all-uppercase token `CUP` refers exclusively to the Cuban Peso (ISO 4217 code 192). The two tokens are parsed by different lookup tables and cannot be confused. See §10.3 for full details.
+
+#### UK Imperial Volume
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `gal_uk` | `gallon_uk`, `gallons_uk` | imperial gallon | `bu_gallon_uk` | 4.54609×10⁻³ m³ (exact) |
+| `qt_uk`  | `quart_uk`, `quarts_uk` | imperial quart | `bu_quart_uk` | 1136.5225×10⁻⁶ m³ |
+| `pt_uk`  | `pint_uk`, `pints_uk` | imperial pint | `bu_pint_uk` | 568.26125×10⁻⁶ m³ |
+| `gi_uk`  | `gill_uk`, `gills_uk` | imperial gill | `bu_gill_uk` | 1.420653125×10⁻⁴ m³ (exact) |
+| `fl_oz_uk` | `fluid_ounce_uk`, `fluid_ounces_uk` | imperial fluid ounce | `bu_fluid_ounce_uk` | 28.4130625×10⁻⁶ m³ |
+
+### 3.11 Area Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `ac`   | `acre`, `acres` | acre | `bu_acre` | 4046.8564224 m² (exact) |
 | `barn` | `barns` | barn | `bu_barn` | 10⁻²⁸ m² (exact) |
 
-### Angle Units
+### 3.12 Angle Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `arcmin` | `arcminute`, `arcminutes` | arcminute | `bu_arcminute` | π/10800 rad |
 | `arcsec` | `arcsecond`, `arcseconds` | arcsecond | `bu_arcsecond` | π/648000 rad |
-| `grad` | `gradian`, `gradians`, `gon` | gradian | `bu_grad` | π/200 rad |
+| `grad`   | `gradian`, `gradians`, `gon` | gradian | `bu_grad` | π/200 rad |
+| `rev`    | `turn`, `revolution`, `revolutions`, `turns` | revolution | `bu_revolution` | 2π rad |
 
-### CGS Units
+### 3.13 CGS Units
 
 | Symbol | Long forms | Name | Enum value | SI equivalent |
 |--------|-----------|------|------------|---------------|
@@ -313,12 +382,12 @@ Bovnar supports 146 named base units, covering SI base units, all named SI-deriv
 | `St`   | `stokes`, `stoke` | stokes (kinematic viscosity) | `bu_stokes` | 10⁻⁴ m²·s⁻¹ |
 | `G`    | `gauss` | gauss (magnetic flux density) | `bu_gauss` | 10⁻⁴ T |
 | `Mx`   | `maxwell`, `maxwells` | maxwell (magnetic flux) | `bu_maxwell` | 10⁻⁸ Wb |
-| `Oe`   | `oersted`, `oersteds` | oersted (magnetic field strength) | `bu_oersted` | 1000/(4π) A/m ≈ 79.577 A/m |
+| `Oe`   | `oersted`, `oersteds` | oersted (magnetic field strength) | `bu_oersted` | 1000/(4π) A/m |
 | `sb`   | `stilb`, `stilbs` | stilb (luminance) | `bu_stilb` | 10⁴ cd/m² |
 | `ph`   | `phot`, `phots` | phot (illuminance) | `bu_phot` | 10⁴ lx |
 | `Gal`  | `galileo`, `galileos` | galileo (acceleration) | `bu_galileo` | 10⁻² m/s² |
 
-### Radiation Units
+### 3.14 Radiation Units
 
 | Symbol | Long forms | Name | Enum value | SI equivalent |
 |--------|-----------|------|------------|---------------|
@@ -326,251 +395,88 @@ Bovnar supports 146 named base units, covering SI base units, all named SI-deriv
 | `R`    | `roentgen`, `roentgens` | röntgen (radiation exposure) | `bu_roentgen` | 2.58×10⁻⁴ C/kg |
 | `rem`  | `rems` | rem (dose equivalent) | `bu_rem` | 10⁻² Sv |
 
-### Logarithmic Units
+### 3.15 Logarithmic Units
 
 | Symbol | Long forms | Name | Enum value | Notes |
 |--------|-----------|------|------------|-------|
-| `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless logarithmic ratio; SI factor 1.0 |
-| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | dimensionless logarithmic ratio; SI factor 1.0; 1 Np = 20/ln(10) dB ≈ 8.686 dB |
+| `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless logarithmic ratio |
+| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | 1 Np = 20/ln(10) dB ≈ 8.686 dB |
 
-### Imperial Temperature — Absolute Scale
+### 3.16 Electrical Power Units
 
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `Ra`   | `rankine` | degree Rankine | `bu_rankine` | 5/9 K per °Ra — absolute, no affine offset |
+| Symbol | Long forms | Name | Enum value | Notes |
+|--------|-----------|------|------------|-------|
+| `var`  | `vars` | var (volt-ampere reactive) | `bu_var` | reactive power; same SI dimension as W |
+| `VA`   | `volt_ampere`, `volt_amperes` | volt-ampere | `bu_volt_ampere` | apparent power; same SI dimension as W |
+| `gn`   | `standard_gravity` | standard gravity | `bu_standard_gravity` | 9.80665 m·s⁻² (exact) |
 
-> **Rankine vs Fahrenheit:** Rankine is the absolute temperature scale corresponding to Fahrenheit, analogous to how Kelvin relates to Celsius. 0 °Ra = 0 K; 459.67 °Ra = 0 °F = 273.15 K. Rankine is a **linear** unit (not affine): `K = °Ra × 5/9`. Note that the canonical symbol `Ra` is used because the natural symbol `R` is reserved for the röntgen (`bu_roentgen`).
+> **Watt, var, and VA:** All three carry the same SI dimensional signature (kg·m²·s⁻³). `bvn_units_compatible` returns `true` when comparing them. They are kept as distinct base units because they represent distinct AC power interpretations.
 
-### Imperial and US Customary Units — Mass (Additional)
+### 3.17 Digital Units
 
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `slug` | `slug`, `slugs` | slug | `bu_slug` | 14.593902937 kg — defined as lbf·s²/ft |
+| Symbol | Long forms | Name | Enum value |
+|--------|-----------|------|------------|
+| `b`    | `bit`, `bits` | bit | `bu_bit` |
+| `B`    | `byte`, `bytes`, `Byte`, `Bytes` | byte | `bu_byte` |
 
-### Length — Precision Engineering
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `thou` | `thou`, `mil`, `mils` | thou (thousandth of an inch) | `bu_thou` | 25.4×10⁻⁶ m (exact) |
-
-> **Thou vs mil:** Both `thou` and `mil` are accepted spellings for 1/1000 of an inch (25.4 µm). The term "thou" is standard in UK engineering; "mil" is common in US manufacturing and PCB layout. The canonical output form is `thou`. Note that `mil` does **not** mean milliradian here; milliradians are written `m~rad`.
-
-### Imperial Volume Units (UK)
+### 3.18 Textile Linear Density
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `pt_uk`    | `pint_uk`, `pints_uk` | imperial pint | `bu_pint_uk` | 568.26125×10⁻⁶ m³ (= gallon_uk / 8, exact) |
-| `fl_oz_uk` | `fluid_ounce_uk`, `fluid_ounces_uk` | imperial fluid ounce | `bu_fluid_ounce_uk` | 28.4130625×10⁻⁶ m³ (= gallon_uk / 160, exact) |
-| `qt_uk`    | `quart_uk`, `quarts_uk` | imperial quart | `bu_quart_uk` | 1136.5225×10⁻⁶ m³ (= gallon_uk / 4, exact) |
+| `tex`  | — | tex | `bu_tex` | 1×10⁻⁶ kg/m (ISO 1144) |
+| `den`  | `denier`, `deniers` | denier | `bu_denier` | 1/9000000 kg/m |
 
-> **US vs UK volume units:** The existing `pt` (US liquid pint, 473.2 mL), `fl_oz` (US fluid ounce, 29.57 mL), and `qt` (US liquid quart, 946.4 mL) differ substantially from their UK imperial counterparts. The `_uk` suffix variants are added for unambiguous use in UK and Commonwealth contexts.
-
-### Electrical Power Units
-
-| Symbol | Long forms | Name | Enum value | Factor | Notes |
-|--------|-----------|------|------------|--------|-------|
-| `var`  | `var`, `vars` | var (volt-ampere reactive) | `bu_var` | 1.0 W equivalent | reactive power; same dimensions as W |
-| `VA`   | `volt_ampere`, `volt_amperes` | volt-ampere | `bu_volt_ampere` | 1.0 W equivalent | apparent power; same dimensions as W |
-
-> **Watt, var, and VA:** All three units carry the same SI dimensional signature (kg·m²·s⁻³), so `bvn_units_compatible` returns `true` when comparing them. They are kept as distinct base units because they represent physically distinct interpretations of AC power: active power (W), reactive power (var), and apparent power (VA). A Bovnar-aware application can inspect `value_unit_t.components[0].base` to distinguish them after a compatibility check confirms the shared dimension.
-
-### Force Units (Additional)
+### 3.19 US Apothecary / Dry Volume
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `kgf`  | `kilogram_force` | kilogram-force | `bu_kilogram_force` | 9.80665 N (exact) |
-
-> **Kilogram-force:** 1 kgf is the force exerted by one kilogram of mass under standard gravity (g = 9.80665 m/s²). It is widely used in mechanical engineering, machine ratings, and spring constants. `bvn_units_compatible` treats `kgf` as compatible with `N`, `lbf`, `dyn`, and `kip`.
-
-### Pressure Units (Additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury (conventional, 0 °C) | `bu_inch_hg` | 3386.388645 Pa |
-
-> **Inch of mercury:** The conventional inch of mercury is defined at 0 °C (ice point) where mercury has density 13595.1 kg/m³ and g = 9.80665 m/s². It equals exactly 25.4 × 1 mmHg ≈ 3386.389 Pa. Used in US aviation barometric altimetry and weather reporting.
-
-### Rotational Frequency
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `rpm`  | `rpm` | revolutions per minute | `bu_rpm` | 1/60 s⁻¹ |
-
-> **rpm:** Revolutions per minute is the standard unit for rotational speed in engines, motors, and turbines. Since revolutions are dimensionless, rpm has SI dimension s⁻¹ (same as Hz and Bq). The SI conversion factor is 1/60: 1 rpm = 1/60 Hz. `bvn_units_compatible` returns `true` when comparing `rpm` with `Hz` or `Bq`.
-
-### Energy Units (Additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
-
-> **Foot-pound:** 1 ft·lbf = 0.3048 m × 4.4482216152605 N = 1.3558179483 J. Commonly used in US engineering for both mechanical energy and torque. Since joule and newton-metre share the same SI dimension vector (kg·m²·s⁻²), `bvn_units_compatible` returns `true` when comparing `ft_lb` with `J`, `cal`, `eV`, and similar energy units.
-
-### Imperial and US Customary Units — Mass (Additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `dr`   | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
-| `dwt`  | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
-
-> **Dram:** 1 dram = 1/16 ounce (avoirdupois) = 0.028349523125 / 16 kg. Used in pharmaceutical compounding and US culinary contexts.
->
-> **Pennyweight:** 1 dwt = 1/20 troy ounce = 0.0311034768 / 20 kg. The troy mass system is used in precious metals trading (gold, silver, platinum).
-
-### Imperial and US Customary Units — Length (Additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `ch`   | `chain`, `chains` | chain (Gunter's) | `bu_chain` | 20.1168 m (exact) |
-| `rd`   | `rod`, `rods` | rod (pole, perch) | `bu_rod` | 5.0292 m (exact) |
-
-> **Chain and rod:** Gunter's chain (1 ch = 66 ft = 20.1168 m) and rod (1 rd = 16.5 ft = 5.0292 m) are the canonical land-survey units in the US public-lands system. One acre = 10 chains × 1 chain = 10 ch² and one chain = 4 rods. Both factors are exact under the international foot definition (1 ft = 0.3048 m exactly).
-
-### Volume Units (Additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `gi`      | `gill`, `gills` | US gill | `bu_gill` | 1.18294118250×10⁻⁴ m³ |
-| `gi_uk`   | `gill_uk`, `gills_uk` | imperial gill | `bu_gill_uk` | 1.420653125×10⁻⁴ m³ (exact) |
-
-> **Gill:** The US gill is 4 US fluid ounces (= 1/4 US liquid pint). The imperial gill is 5 imperial fluid ounces (= 1/4 imperial pint = gallon_uk / 32). Both are exact fractions of their respective gallon definitions. As with other US/UK pairs, `gi` and `gi_uk` are dimensionally compatible but numerically distinct.
-
-### Acceleration
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `gn`   | `standard_gravity` | standard gravity | `bu_standard_gravity` | 9.80665 m·s⁻² (exact, BIPM 1901) |
-
-> **Standard gravity** (`gn`): The conventional standard acceleration of free fall, g₀ = 9.80665 m/s² (exact by BIPM/CIPM definition 1901). Dimension vector: m¹·s⁻². Used for g-force notation, specific impulse (Isp), and accelerometer calibration. Dimensionally compatible with the galileo (`Gal`). Prefixes are valid (e.g. `m~gn` = milli-g = 9.80665×10⁻³ m/s²).
-
-### Power
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `PS`   | `CV`, `metric_horsepower` | metric horsepower | `bu_metric_horsepower` | 735.49875 W (exact) |
-
-> **Metric horsepower** (`PS`): Defined as 75 kgf·m/s = 75 × 9.80665 W = 735.49875 W. Also spelled CV (French/Spanish *cheval vapeur*) and pk (Norwegian/Danish). Distinct from the mechanical/imperial horsepower (`hp` = 745.69987… W). Dimensionally compatible with `W`, `hp`, `VA`, and `var`.
-
-### Angle (additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `rev`  | `turn`, `revolution`, `revolutions`, `turns` | revolution | `bu_revolution` | 2π rad ≈ 6.28318530718 |
-
-> **Revolution** (`rev`): One full angular turn = 2π radians = 360° = 400 grad. Dimensionless. Used in shaft-angle notation, encoder counts, and rotational kinematics. Dimensionally compatible with `rad`, `deg`, `grad`. Do not confuse with `rpm`, which is a frequency unit (revolutions per minute = s⁻¹/60).
-
-### Time (additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `mo`   | `month`, `months` | month (Julian) | `bu_month` | 2 629 800 s (= 365.25 d / 12, exact) |
-| `fn`   | `fortnight`, `fortnights` | fortnight | `bu_fortnight` | 1 209 600 s (= 14 d, exact) |
-
-> **Month** (`mo`): The Julian month, defined as 365.25 × 86 400 / 12 = 2 629 800 s. This is a fixed-length approximation; calendar months vary between 28 and 31 days. Compatible with `s`, `min`, `h`, `d`, `wk`, `yr`. Note that 12 `mo` equals exactly 1 `yr` by this definition.
->
-> **Fortnight** (`fn`): Exactly 14 days = 2 weeks = 1 209 600 s. Common in British English for pay periods, agricultural cycles, and some legal contexts.
-
-### Pressure (additional)
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `at`   | `atmosphere_technical` | atmosphere technical | `bu_atmosphere_technical` | 98 066.5 Pa (= 1 kgf/cm², exact) |
-
-> **Atmosphere technical** (`at`): Defined as the pressure exerted by 1 kilogram-force per square centimetre: 1 kgf/cm² = 9.80665 × 10⁴ Pa = 98 066.5 Pa. Distinct from the standard atmosphere (`atm` = 101 325 Pa). Found in older European engineering literature and legacy pressure gauges. Dimensionally compatible with `Pa`, `bar`, `atm`, `mmHg`, `psi`.
-
-### Textile Linear Density
-
-| Symbol | Long forms | Name | Enum value | Factor |
-|--------|-----------|------|------------|--------|
-| `tex`  | — | tex | `bu_tex` | 1×10⁻⁶ kg/m (= 1 g/km, ISO 1144) |
-| `den`  | `denier`, `deniers` | denier | `bu_denier` | 1/9 000 000 kg/m (= 1 g/9 000 m) |
-
-> **Tex** (`tex`): The SI-coherent unit of linear mass density for fibres and yarns, defined as 1 gram per kilometre = 10⁻⁶ kg/m (ISO 1144:2021). Dimension vector: m⁻¹·kg. SI prefixes are valid (e.g. `m~tex` = millitex = 10⁻⁹ kg/m).
->
-> **Denier** (`den`): Traditional unit defined as 1 gram per 9 000 metres ≈ 1.111×10⁻⁷ kg/m. The conversion is exactly 9 den = 1 tex. Smaller denier values indicate finer fibres. Dimensionally compatible with `tex`.
-
-### US Apothecary / Dry Volume (additional)
-
-| Symbol   | Long forms | Name | Enum value | Factor |
-|----------|-----------|------|------------|--------|
-| `fl_dr`  | `fluid_dram`, `fluid_drams`, `fl_drams` | US fluid dram | `bu_fluid_dram` | 3.6966911953125×10⁻⁶ m³ |
+| `fl_dr`  | `fluid_dram`, `fluid_drams` | US fluid dram | `bu_fluid_dram` | 3.6966911953125×10⁻⁶ m³ |
 | `minim`  | `minims` | US minim | `bu_minim` | 6.16115199218750×10⁻⁸ m³ |
 | `pk`     | `peck`, `pecks` | US dry peck | `bu_peck` | 8.80976754172×10⁻³ m³ |
 | `bsh`    | `bushel`, `bushels` | US bushel | `bu_bushel` | 3.523907016688×10⁻² m³ |
 
-> **Fluid dram** (`fl_dr`): Exactly 1/8 US fluid ounce = 3.6966911953125 mL. Used in pharmacy and apothecary measures. Relationships: 60 minim = 1 fl_dr; 8 fl_dr = 1 fl_oz; 256 fl_dr = 1 US pint.
->
-> **Minim** (`minim`): The smallest traditional apothecary volume, exactly 1/60 fluid dram ≈ 61.6 µL. Note the symbol `minim` (not `min`, which is the minute) avoids ambiguity.
->
-> **Peck** (`pk`): US dry peck = 8.80976754172 L. Used for dry agricultural commodities (apples, grain). 4 pecks = 1 bushel.
->
-> **Bushel** (`bsh`): US bushel = 4 pecks ≈ 35.24 L. The fundamental US dry measure for grain; CBOT/CME futures contracts for corn, wheat, and soybeans are denominated in bushels.
+> `minim` (not `min`, which is the minute) avoids ambiguity.
 
-### Digital Units
+### 3.20 Old German Units
 
-| Symbol | Long forms | Name | Enum value  |
-|--------|-----------|------|-------------|
-| `b`    | `bit`, `bits` | bit  | `bu_bit`    |
-| `B`    | `byte`, `bytes`, `Byte`, `Bytes` | byte | `bu_byte`   |
-
-### Old German Units
-
-Old German units fall into two categories: metric-compatible units that were formally standardized and remain in everyday use in the DACH region, and historical pre-metric units that appear in historical documents, land registers, and surveying maps. Bovnar targets the Prussian variant as the canonical source where regional variation exists, because it was the most widely codified German measurement system prior to metrication.
+Old German units fall into metric-compatible units (still in use in DACH regions) and historical pre-metric Prussian units. The prefix `pr` is reserved for Prussian symbols. No German unit accepts any non-trivial SI or IEC prefix; `bvn_prefix_unit_valid` rejects any non-`si_none`/`iec_none` prefix for every unit from `bu_pfund` through `bu_scheffel`.
 
 #### Metric-Compatible German Units — Mass
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `Pfd`  | `pfund`, `pfunds` | Pfund (metric German pound) | `bu_pfund` | 0.5 kg (exact) |
+| `Pfd`  | `pfund`, `pfunds` | Pfund | `bu_pfund` | 0.5 kg (exact) |
 | `Ztr`  | `zentner` | Zentner | `bu_zentner` | 50 kg (exact) |
-| `dz`   | `doppelzentner` | Doppelzentner (metric quintal) | `bu_doppelzentner` | 100 kg (exact) |
-| `lot`  | `lots` | Lot | `bu_lot` | 15.625×10⁻³ kg (= 1/32 Pfund, exact) |
-
-> **Pfund** (`Pfd`): The metric German pound, standardized in Germany in 1856 as exactly 500 g. Still in everyday use in German-speaking countries for market quantities (e.g. butter, flour). Dimensionally compatible with `g`, `lb`, `oz`, `kg`. Note that 1 Pfund = 500 g ≠ 1 pound avoirdupois (≈ 453.59 g).
->
-> **Zentner** (`Ztr`): Defined as 100 Pfund = 50 kg under the German metric system (Maß- und Gewichtsordnung 1884). Used in German and Swiss agriculture, freight, and trade. Not to be confused with the Austrian Zentner (100 alte Pfund ≈ 56 kg) or the US/UK hundredweight. The symbol `Ztr` follows the convention of DIN 1301.
->
-> **Doppelzentner** (`dz`): Exactly 200 Pfund = 100 kg. The Doppelzentner is numerically identical to the metric quintal (symbol `q` in some European countries) and the deciton. It is the standard unit for bulk agricultural produce in DACH statistics.
->
-> **Lot** (`lot`): Exactly 1/32 Pfund = 500/32 g = 15.625 g. A traditional apothecary and trade subdivision of the Pfund, used in German pharmacy and cooking well into the 20th century. Distinct from the Quent (= 1/4 Lot = ~3.906 g), which is below the current specification threshold.
+| `dz`   | `doppelzentner` | Doppelzentner | `bu_doppelzentner` | 100 kg (exact) |
+| `lot`  | `lots` | Lot | `bu_lot` | 15.625×10⁻³ kg (exact) |
 
 #### Historical German Units — Length (Prussian)
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `prln` | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.18054×10⁻³ m |
-| `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll (inch) | `bu_prussian_zoll` | 2.61644×10⁻² m |
-| `prf`  | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß (foot) | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
-| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle (ell) | `bu_prussian_elle` | 6.67160×10⁻¹ m (= 2 Fuß + 1 Zoll) |
-| `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute (rod) | `bu_prussian_rute` | 3.76624 m (= 12 Fuß) |
-| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m (= 6 Fuß) |
-| `dt_mi` | `deutsche_meile`, `german_mile` | Geographische Meile (geographical mile) | `bu_german_mile` | 7420.44 m (= 1/15 degree of latitude) |
-
-> **Prussian linear units** form a coherent hierarchy: 1 Fuß = 12 Zoll = 144 Linien. The Prussian foot was defined in 1816 by comparison with the French toise and equals 313.853 mm (±0.001 mm from modern remeasurement of original standards). The Rute (12 Fuß) and Klafter (6 Fuß) are the primary survey units for land registers (Urmesstischblätter) covering the former Prussian state. All factors are given to six significant figures; sub-millimetre precision requires the historical primary-standard value 0.31385327 m for 1 Fuß.
->
-> **Geographische Meile** (`dt_mi`): 1/15 of one degree of latitude on the Earth's surface = 7420.44 m. This is the standard German geographical mile (not the Prussian statute mile of 7532.5 m). It is the unit used in historical German atlases and nautical charts predating adoption of the nautical mile. Dimensionally compatible with `m`, `mi`, `nmi`, `prf`, `ft`.
+| `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61644×10⁻² m |
+| `prf`  | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
+| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.67160×10⁻¹ m |
+| `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.76624 m |
+| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m |
+| `dt_mi` | `deutsche_meile`, `german_mile` | Geographische Meile | `bu_german_mile` | 7420.44 m |
 
 #### Historical German Units — Area (Prussian)
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.22 m² (= 180 □ Ruten) |
-
-> **Morgen** (`morgen`): The Prussian Morgen equals 180 square Ruten = 180 × (3.76624 m)² = 2553.22 m². It is the dominant unit of cultivated land area in 19th-century Prussian cadastral records, land-tax rolls (Grundsteuerkataster), and post-unification German land registers up to the introduction of the hectare. One Morgen ≈ 0.255322 ha. Regional Morgen values differ significantly (e.g. the Hessian Morgen = 2500 m², the Bavarian Tagwerk ≈ 3408 m²); the Prussian value is used here as canonical. Dimensionally compatible with `m²`, `ha`, `ac`.
+| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.22 m² |
 
 #### Historical German Units — Volume (Prussian)
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ (= 54.961 L) |
+| `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> **Scheffel** (`schffl`): The Prussian Scheffel was metrologically fixed in 1816 at 54.961 L (exact under the Prussian Maß- und Gewichtsordnung). It served as the primary dry measure for grain, and CBOT-predecessor contracts for Prussian wheat were denominated in Scheffel. The symbol `schffl` is used to avoid collision with `bsh` (US bushel). Dimensionally compatible with `L`, `bsh`, `pk`, `bbl`. Note that regional Scheffel values differ (e.g. the Saxon Scheffel = 103.826 L); only the Prussian value is defined here.
+> The enum values for German units occupy positions **329–341**, placed after the entire currency range (134–328). `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **342** (verified by static assert `bu_scheffel + 1 == 342`). Currencies begin at 134, immediately after the last non-German physical unit.
 
-> **Implementation note for the German unit block:** All symbols above are lower-case or use the shortest unambiguous form. The prefix `pr` is reserved for Prussian units to avoid collision with existing SI-prefix+unit combinations. No German unit — historical or metric-compatible — accepts any non-trivial SI or IEC prefix; `bvn_prefix_unit_valid` rejects any non-`si_none`/`iec_none` prefix for every unit from `bu_pfund` through `bu_scheffel`. The enum values occupy positions 134–146 immediately after `bu_bushel` in `value_base_unit_t`; `BVN_VALUE_BASE_UNIT_COUNT` is 147.
-
----
-
-### Sentinel Value
+### 3.21 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
 
@@ -578,45 +484,45 @@ Old German units fall into two categories: metric-compatible units that were for
 
 ## 4. Prefixes
 
-Prefixes are attached to a base unit symbol with a mandatory `~` separator: `prefix~baseunit`. A bare base unit with no prefix requires no separator.
+Prefixes are attached to a base unit symbol with a mandatory `~` separator: `prefix~baseunit`.
 
 ### 4.1 SI Prefixes
 
 All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10³⁰).
 
-| Prefix | Symbol | Factor  | Enum value   |
-|--------|--------|---------|--------------|
-| quetta | `Q`    | 10³⁰    | `si_quetta`  |
-| ronna  | `R`    | 10²⁷    | `si_ronna`   |
-| yotta  | `Y`    | 10²⁴    | `si_yotta`   |
-| zetta  | `Z`    | 10²¹    | `si_zetta`   |
-| exa    | `E`    | 10¹⁸    | `si_exa`     |
-| peta   | `P`    | 10¹⁵    | `si_peta`    |
-| tera   | `T`    | 10¹²    | `si_tera`    |
-| giga   | `G`    | 10⁹     | `si_giga`    |
-| mega   | `M`    | 10⁶     | `si_mega`    |
-| kilo   | `k`    | 10³     | `si_kilo`    |
-| hecto  | `h`    | 10²     | `si_hecto`   |
-| deca   | `da`   | 10¹     | `si_deca`    |
-| *(no prefix)* | — | 10⁰ | `si_none` |
-| deci   | `d`    | 10⁻¹    | `si_deci`    |
-| centi  | `c`    | 10⁻²    | `si_centi`   |
-| milli  | `m`    | 10⁻³    | `si_milli`   |
-| micro  | `µ`    | 10⁻⁶    | `si_micro`   |
-| nano   | `n`    | 10⁻⁹    | `si_nano`    |
-| pico   | `p`    | 10⁻¹²   | `si_pico`    |
-| femto  | `f`    | 10⁻¹⁵   | `si_femto`   |
-| atto   | `a`    | 10⁻¹⁸   | `si_atto`    |
-| zepto  | `z`    | 10⁻²¹   | `si_zepto`   |
-| yocto  | `y`    | 10⁻²⁴   | `si_yocto`   |
-| ronto  | `r`    | 10⁻²⁷   | `si_ronto`   |
-| quecto | `q`    | 10⁻³⁰   | `si_quecto`  |
+| Prefix | Symbol | Factor | Enum value |
+|--------|--------|--------|------------|
+| quetta | `Q`    | 10³⁰   | `si_quetta` |
+| ronna  | `R`    | 10²⁷   | `si_ronna`  |
+| yotta  | `Y`    | 10²⁴   | `si_yotta`  |
+| zetta  | `Z`    | 10²¹   | `si_zetta`  |
+| exa    | `E`    | 10¹⁸   | `si_exa`    |
+| peta   | `P`    | 10¹⁵   | `si_peta`   |
+| tera   | `T`    | 10¹²   | `si_tera`   |
+| giga   | `G`    | 10⁹    | `si_giga`   |
+| mega   | `M`    | 10⁶    | `si_mega`   |
+| kilo   | `k`    | 10³    | `si_kilo`   |
+| hecto  | `h`    | 10²    | `si_hecto`  |
+| deca   | `da`   | 10¹    | `si_deca`   |
+| *(none)* | —    | 10⁰    | `si_none`   |
+| deci   | `d`    | 10⁻¹   | `si_deci`   |
+| centi  | `c`    | 10⁻²   | `si_centi`  |
+| milli  | `m`    | 10⁻³   | `si_milli`  |
+| micro  | `µ`    | 10⁻⁶   | `si_micro`  |
+| nano   | `n`    | 10⁻⁹   | `si_nano`   |
+| pico   | `p`    | 10⁻¹²  | `si_pico`   |
+| femto  | `f`    | 10⁻¹⁵  | `si_femto`  |
+| atto   | `a`    | 10⁻¹⁸  | `si_atto`   |
+| zepto  | `z`    | 10⁻²¹  | `si_zepto`  |
+| yocto  | `y`    | 10⁻²⁴  | `si_yocto`  |
+| ronto  | `r`    | 10⁻²⁷  | `si_ronto`  |
+| quecto | `q`    | 10⁻³⁰  | `si_quecto` |
 
-> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. Note that U+03BC (GREEK SMALL LETTER MU) is a distinct code point and is **not** accepted as an SI micro prefix.
+> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point and is **not** accepted.
 
-#### Prefix–symbol ambiguities
+#### Prefix–Symbol Ambiguities
 
-Several prefix symbols overlap with base unit symbols. The parser resolves the ambiguity by the required `~` separator: `m~` introduces a prefix (milli), while `m` alone (or `m` followed by a separator such as `/`, `*`, `·`, or end-of-string) is the meter base unit.
+Several prefix symbols overlap with base unit symbols. The `~` separator is the disambiguator: `m~` introduces the milli prefix; bare `m` is the meter.
 
 | Symbol | As prefix | As base unit |
 |--------|-----------|--------------|
@@ -628,45 +534,39 @@ Several prefix symbols overlap with base unit symbols. The parser resolves the a
 | `a`    | atto      | *(none)*     |
 | `S`    | *(none)*  | siemens      |
 
-The `~` is the disambiguator: `d~s` = decisecond; `d` alone = day.
+`d~s` = decisecond; `d` alone = day.
 
 ### 4.2 IEC Binary Prefixes
 
-IEC 80000-13 binary prefixes are used for digital quantities (bits and bytes). All 10 current IEC binary prefixes are supported.
+IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 
-| Prefix | Symbol | Factor | Enum value   |
-|--------|--------|--------|--------------|
-| kibi   | `Ki`   | 2¹⁰    | `iec_kibi`   |
-| mebi   | `Mi`   | 2²⁰    | `iec_mebi`   |
-| gibi   | `Gi`   | 2³⁰    | `iec_gibi`   |
-| tebi   | `Ti`   | 2⁴⁰    | `iec_tebi`   |
-| pebi   | `Pi`   | 2⁵⁰    | `iec_pebi`   |
-| exbi   | `Ei`   | 2⁶⁰    | `iec_exbi`   |
-| zebi   | `Zi`   | 2⁷⁰    | `iec_zebi`   |
-| yobi   | `Yi`   | 2⁸⁰    | `iec_yobi`   |
-| robi   | `Ri`   | 2⁹⁰    | `iec_robi`   |
-| quebi  | `Qi`   | 2¹⁰⁰   | `iec_quebi`  |
+| Prefix | Symbol | Factor | Enum value |
+|--------|--------|--------|------------|
+| kibi   | `Ki`   | 2¹⁰    | `iec_kibi` |
+| mebi   | `Mi`   | 2²⁰    | `iec_mebi` |
+| gibi   | `Gi`   | 2³⁰    | `iec_gibi` |
+| tebi   | `Ti`   | 2⁴⁰    | `iec_tebi` |
+| pebi   | `Pi`   | 2⁵⁰    | `iec_pebi` |
+| exbi   | `Ei`   | 2⁶⁰    | `iec_exbi` |
+| zebi   | `Zi`   | 2⁷⁰    | `iec_zebi` |
+| yobi   | `Yi`   | 2⁸⁰    | `iec_yobi` |
+| robi   | `Ri`   | 2⁹⁰    | `iec_robi` |
+| quebi  | `Qi`   | 2¹⁰⁰   | `iec_quebi` |
 
-IEC prefixes are recognised by their two-character `Xi` suffix pattern and carry `iec_none` as the "no prefix" sentinel (value `0`). They follow the same `~` convention as SI prefixes:
+#### Prefix–Unit Validity Constraints
 
-```bovnar
-.ram   = <uint:64,Gi~B> 8;       # gibibytes
-.cache = <uint:32,Mi~b> 256;     # mebibits
-.drive = <uint:64,Ti~B> 2;       # tebibytes
-```
-
-#### Prefix–unit validity constraints
-
-Not every prefix may be combined with every base unit. The following rules are enforced by `bvn_prefix_unit_valid` and cause `error_unit_illegal` on violation:
-
-- **IEC prefixes** (`Ki`…`Qi`) are only permitted on `b` (bit) and `B` (byte). Any attempt to attach an IEC prefix to a physical unit (e.g. `Ki~m`) is rejected.
-- **SI sub-kilo prefixes** (`da`, `h`, `d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`) are forbidden on `b` and `B`. This includes `da` (deca, ×10¹) and `h` (hecto, ×10²), which are positive but still below `k`. Bits and bytes may carry `si_none` or any SI prefix from `k` (kilo) upward.
+- **IEC prefixes** (`Ki`…`Qi`) are only permitted on `b` and `B`. `Ki~m` → `error_unit_illegal`.
+- **SI sub-kilo prefixes** (`d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`, `da`, `h`) are forbidden on `b` and `B`.
+- **German units** (`bu_pfund` through `bu_scheffel`) accept only `si_none`/`iec_none`.
+- **Currency units** accept SI prefixes at `si_kilo` and above (see §9.4). IEC prefixes are forbidden on all currency codes.
 
 ```bovnar
 .valid1   = <uint:64,Ki~B>  8;     # OK: IEC prefix on byte
 .valid2   = <uint:32,M~b>   100;   # OK: SI mega on bit
+.valid3   = <float_dec:64,k~USD> 250.0;  # OK: kilo on currency
 .invalid1 = <uint:64,Ki~m>  1;     # ERROR: IEC prefix on meter
 .invalid2 = <uint:32,m~B>   512;   # ERROR: SI milli on byte
+.invalid3 = <float_dec:64,Ki~USD> 1;     # ERROR: IEC prefix on currency
 ```
 
 ---
@@ -675,150 +575,122 @@ Not every prefix may be combined with every base unit. The following rules are e
 
 ### 5.1 Simple Units
 
-A simple unit consists of an optional prefix, the base unit symbol, and an optional exponent. No separator is required between the prefix and the base unit — the `~` **is** the separator:
-
 ```
 unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 ```
 
 ```bovnar
-.temperature = <float:64,K>     300.0;  # kelvin (no prefix)
-.distance    = <float:64,k~m>   1.5;    # kilometer (kilo + meter)
-.frequency   = <float:64,M~Hz>  2400;   # megahertz
-.storage     = <uint:64,Ki~B>   1024;   # kibibytes
+.temperature = <float:64,K>      300.0;   # kelvin
+.distance    = <float:64,k~m>    1.5;     # kilometer
+.frequency   = <float:64,M~Hz>   2400;    # megahertz
+.storage     = <uint:64,Ki~B>    1024;    # kibibytes
+.fund_nav    = <float_dec:64,k~USD> 250.0; # $250,000
 ```
 
 ### 5.2 Compound Units
-
-A compound unit is a sequence of unit-components joined by separator characters. The full grammar of a unit string (the **unit sub-grammar**, enforced semantically by `bvn_parse_unit`) is:
 
 ```ebnf
 compound-unit  = "no_unit"
                | unit-component { unit-sep unit-component }
 
-unit-sep       = "*" | "/" | "·"        (* · = U+00B7 MIDDLE DOT *)
+unit-sep       = "*" | "/" | "·"           (* · = U+00B7 MIDDLE DOT *)
 
 unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 
 unit-exponent  = [ exp-sign ] exp-digit
                | "^" [ "-" | "+" ] ASCII-digit
 
-exp-sign       = "⁺"   (* U+207A, positive, no-op *)
-               | "⁻"   (* U+207B, negate exponent *)
+exp-sign       = "⁺" | "⁻"
 
 exp-digit      = "¹" | "²" | "³" | "⁴" | "⁵"
                | "⁶" | "⁷" | "⁸" | "⁹"
-
-si-prefix      = "Q"|"R"|"Y"|"Z"|"E"|"P"|"T"|"G"|"M"|"k"|"h"|"da"
-               | "d"|"c"|"m"|"µ"|"n"|"p"|"f"|"a"|"z"|"y"|"r"|"q"
-
-iec-prefix     = "Ki"|"Mi"|"Gi"|"Ti"|"Pi"|"Ei"|"Zi"|"Yi"|"Ri"|"Qi"
-
-base-unit      = "b"|"B"|"s"|"m"|"g"|"A"|"K"|"mol"|"cd"|"Hz"|"N"
-               | "Pa"|"J"|"W"|"V"|"Ω"|"F"|"C"|"S"|"Wb"|"T"|"H"
-               | "lm"|"lx"|"Bq"|"Gy"|"Sv"|"kat"|"rad"|"sr"
-               | "L"|"l"|"min"|"h"|"d"|"wk"|"yr"
-               | "°C"|"°"|"degC"|"degrC"
-               | "degrees"|"degree"|"degr"|"deg"
-               | "t"|"bar"|"eV"|"Da"|"au"|"ha"
 ```
 
-> This sub-grammar is **semantic**, not lexical. The outer lexer captures the entire type annotation body as a raw byte sequence; `bvn_parse_unit` parses the unit string portion after the lexer has finished.
+Currency codes participate in compound expressions using the same separators:
+
+```bovnar
+.gold_spot    = <float_dec:64,USD/oz_t>   2351.40;  # $/troy oz
+.rent         = <float_dec:64,EUR/m²>       12.50;  # €/m²
+.billing_rate = <float_dec:64,EUR/h>       150.00;  # €/h
+.eur_usd      = <float_dec:64,USD/EUR>      1.0842; # exchange rate
+```
+
+> The sub-grammar is **semantic**, not lexical. The outer lexer captures the type-annotation body as a raw byte sequence; `bvn_parse_unit` parses the unit string portion after the lexer finishes.
 
 ### 5.3 Separators
 
-Three separator characters are defined:
-
 | Character | Code point | UTF-8 bytes | Meaning |
 |-----------|-----------|-------------|---------|
-| `*`       | U+002A    | `0x2A`      | Multiplication — numerator stays numerator |
-| `·`       | U+00B7    | `0xC2 0xB7` | Multiplication — visually preferred form of `*` |
-| `/`       | U+002F    | `0x2F`      | Division — all components after the first `/` are denominator |
+| `*`       | U+002A    | `0x2A`      | Multiplication |
+| `·`       | U+00B7    | `0xC2 0xB7` | Multiplication (preferred visual form) |
+| `/`       | U+002F    | `0x2F`      | Division |
 
-`·` (MIDDLE DOT) and `*` (ASTERISK) are **semantically identical**. They can be mixed freely within the same unit string.
+`·` and `*` are semantically identical and may be mixed freely.
 
 ### 5.4 Denominator Semantics
 
-The division semantics are **non-reversing**: the first `/` flips a "in-denominator" flag to `true`, and that flag remains `true` for all subsequent components regardless of whether additional `/` separators appear. Every component after the first `/` is in the denominator; additional `/` separators do not toggle back to the numerator.
-
-When a component is placed in the denominator, `bvn_parse_unit` negates its exponent. So `k~g·m/s²` is stored as:
+The first `/` sets a latching "in-denominator" flag to `true` for all subsequent components. Additional `/` separators do not toggle back to the numerator. `k~g·m/s²` stores:
 
 ```
-component[0]: { base=bu_gram,   exponent=exp_linear,       prefix=si_kilo }   ← numerator
-component[1]: { base=bu_meter,  exponent=exp_linear,     prefix=si_none }   ← numerator
-component[2]: { base=bu_second, exponent=exp_neg_square, prefix=si_none }   ← denominator (negated)
+[0]: gram,   exp_linear,     si_kilo  ← numerator
+[1]: meter,  exp_linear,     si_none  ← numerator
+[2]: second, exp_neg_square, si_none  ← denominator (exponent negated)
 ```
 
-This means the string form `k~g·m/s²` and the form `k~g·m·s⁻²` produce the **identical** `value_unit_t` representation; the second form uses an explicit negative exponent in the numerator instead of relying on the `/` switch.
+Both `k~g·m/s²` and `k~g·m·s⁻²` parse to identical `value_unit_t` representations.
 
 ---
 
 ## 6. Exponents
 
-Exponents can appear on any `unit-component` and are limited to integer values in the range **−9 … +9**. Two syntactic forms are accepted and map to the same internal `unit_exponent_t` enumeration.
+Exponents are limited to integer values in the range **−9 … +9**.
 
 ### 6.1 Unicode Superscript Form
 
-| Glyph | Code point | UTF-8 bytes             | Maps to         |
-|-------|-----------|-------------------------|-----------------|
-| `¹`   | U+00B9    | `0xC2 0xB9`             | `exp_linear`    |
-| `²`   | U+00B2    | `0xC2 0xB2`             | `exp_square`    |
-| `³`   | U+00B3    | `0xC2 0xB3`             | `exp_cubic`     |
-| `⁴`   | U+2074    | `0xE2 0x81 0xB4`        | `exp_quartic`   |
-| `⁵`   | U+2075    | `0xE2 0x81 0xB5`        | `exp_quintic`   |
-| `⁶`   | U+2076    | `0xE2 0x81 0xB6`        | `exp_sextic`    |
-| `⁷`   | U+2077    | `0xE2 0x81 0xB7`        | `exp_septic`    |
-| `⁸`   | U+2078    | `0xE2 0x81 0xB8`        | `exp_octic`     |
-| `⁹`   | U+2079    | `0xE2 0x81 0xB9`        | `exp_nonic`     |
-| `⁺`   | U+207A    | `0xE2 0x81 0xBA`        | positive sign (no-op) |
-| `⁻`   | U+207B    | `0xE2 0x81 0xBB`        | negate exponent |
-
-The sign glyphs (`⁺`, `⁻`) immediately precede the digit glyph: `s⁻²` means s to the power of −2. `⁺` is accepted but has no effect (positive exponent is the default).
+| Glyph | Code point | UTF-8 bytes      | Maps to |
+|-------|-----------|------------------|---------|
+| `¹`   | U+00B9    | `0xC2 0xB9`      | `exp_linear` |
+| `²`   | U+00B2    | `0xC2 0xB2`      | `exp_square` |
+| `³`   | U+00B3    | `0xC2 0xB3`      | `exp_cubic` |
+| `⁴`   | U+2074    | `0xE2 0x81 0xB4` | `exp_quartic` |
+| `⁵`   | U+2075    | `0xE2 0x81 0xB5` | `exp_quintic` |
+| `⁶`   | U+2076    | `0xE2 0x81 0xB6` | `exp_sextic` |
+| `⁷`   | U+2077    | `0xE2 0x81 0xB7` | `exp_septic` |
+| `⁸`   | U+2078    | `0xE2 0x81 0xB8` | `exp_octic` |
+| `⁹`   | U+2079    | `0xE2 0x81 0xB9` | `exp_nonic` |
+| `⁺`   | U+207A    | `0xE2 0x81 0xBA` | positive sign (no-op) |
+| `⁻`   | U+207B    | `0xE2 0x81 0xBB` | negate exponent |
 
 ### 6.2 ASCII Caret Form
 
-The caret form `^[+-]?[0-9]` is accepted as an equivalent alternative:
-
 | ASCII form | Equivalent Unicode | Parsed as |
-|------------|---------------------|-----------|
-| `m^2`      | `m²`                | `exp_square` |
-| `s^-2`     | `s⁻²`               | `exp_neg_square` |
-| `m^+2`     | `m⁺²` (= `m²`)      | `exp_square` |
-| `kg^1`     | `kg¹`               | `exp_linear` |
+|------------|--------------------|-----------|
+| `m^2`      | `m²`               | `exp_square` |
+| `s^-2`     | `s⁻²`              | `exp_neg_square` |
+| `m^+2`     | `m²`               | `exp_square` |
+| `kg^1`     | `kg¹`              | `exp_linear` |
 
-Only a **single ASCII digit** is permitted after the caret; multi-digit exponents (e.g. `m^10`) are not supported.
+Only a **single ASCII digit** is permitted after the caret.
 
 ### 6.3 Exponent Edge Cases
 
-- **`exp_invalid`:** The zero-initialized sentinel (value `0`). A component whose exponent field was never explicitly set will compare equal to `exp_invalid`. API functions that have an error output path (`bvn_unit_to_si_factor`, `bvn_unit_dimension_vector`, `bvn_unit_convert_factor`, `bvn_units_compatible`, and the serialization functions) reject `exp_invalid` and signal an error through their output parameter or return value. The two prefix query functions (`bvn_unit_prefix_factor` and `bvn_unit_prefix_exponent`) have no error output parameter; they silently skip components whose exponent is `exp_invalid` and return a result based on the remaining components only. Callers must never pass a `value_unit_component_t` with `exp_invalid` to any API function that lacks an error output parameter.
-- **`exp_linear`:** Value `1`. Represents both an explicit `¹` / `^1` and any component written without an exponent suffix. The convenience macros (`BVN_UNIT_NO_PREFIX`, `BVN_UNIT_SI`, `BVN_UNIT_IEC`) store `exp_linear` for single-component units where no exponent is specified, consistent with parsed output.
+- **`exp_invalid` (value 0):** Zero-initialized sentinel. API functions that have an error output path reject it and signal an error. The two prefix query functions (`bvn_unit_prefix_factor`, `bvn_unit_prefix_exponent`) silently skip components with `exp_invalid`.
+- **`exp_linear` (value 1):** Stored for both an explicit `¹`/`^1` and any component written without an exponent suffix.
+
 ---
 
 ## 7. The `no_unit` Keyword
 
-The literal string `no_unit` in the unit parameter position declares a value as **explicitly dimensionless**:
+The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 ```bovnar
 .ratio       = <float:64,no_unit> 0.95;
 .count       = <uint:32,no_unit>  1000;
-.phase_angle = <sint:16,no_unit>  -90;
 ```
 
-`no_unit` is handled as a special case by `bvn_parse_unit`: it is detected by a `memcmp` before any component parsing begins, and it returns the value:
+`bvn_parse_unit` detects `no_unit` via `memcmp` and returns `BVN_UNIT_NONE` (`num_components = 0`).
 
-```c
-BVN_UNIT_NONE
-```
-
-which expands to:
-
-```c
-(value_unit_t){ .num_components = 0 }
-```
-
-**Omitting the unit parameter** (writing `<float:64>` or `<uint:32>`) produces a different internal representation: `bvn_parse_type_annotation` initialises its output unit to `BVN_UNIT_NO_PREFIX(bu_none)` and leaves it unchanged when no unit parameter is present, yielding `num_components = 1` with `base == bu_none`. Both forms are semantically equivalent — they compare as compatible via `bvn_units_compatible`, both serialize to `"no_unit"` via `bvn_unit_to_string`, and both are treated as dimensionless — but they are structurally distinct internal states.
-
-> **Implementation note:** `bvn_parse_unit("no_unit")` and an explicit `no_unit` parameter in a type annotation both yield `BVN_UNIT_NONE` (`num_components = 0`). An absent unit parameter in an explicit type annotation (e.g. `<float:64>`) yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components = 1`, `base == bu_none`). The `BVN_UNIT_NONE` macro is used wherever the unit has been explicitly declared dimensionless; `BVN_UNIT_NO_PREFIX(bu_none)` is the default for absent-annotation or synthesised contexts.
+**Omitting the unit parameter** (e.g. `<float:64>`) yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components = 1`, `base == bu_none`). Both forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` — but they are structurally distinct internal states.
 
 ---
 
@@ -827,34 +699,268 @@ which expands to:
 | Constraint | Value | Error on violation |
 |------------|-------|--------------------|
 | Maximum components per compound unit | 8 (`BVNR_MAX_UNIT_COMPONENTS`) | `error_unit_illegal` |
-| Empty component between separators (e.g. `m//s`, `m*·s`) | Not allowed | `error_unit_illegal` |
-| Maximum length of the raw unit string | Enforced by `max_type_length` / type-buffer limit | `error_unit_too_long` |
+| Empty component between separators (e.g. `m//s`) | Not allowed | `error_unit_illegal` |
+| Maximum raw unit string length | Enforced by type-buffer limit | `error_unit_too_long` |
 | Null or empty unit string | Rejected by `bvn_parse_unit` | `ok = false` |
 
-The 8-component limit covers the most complex physically meaningful compound units. For reference, the SI unit for dynamic viscosity (Pa·s = kg/(m·s)) has 3 components after expansion. A unit such as `k~g·m²/(A²·s³)` (henry) has 4.
-
-The "no toggle back" rule for `/` means that constructs like `a/b/c` are parsed as `a / (b·c)`, not as `(a/b)/c`. Both produce the same mathematical result, but the internal representation is always "all post-`/` components negated", so `a/b/c` → components `[a, b⁻¹, c⁻¹]`.
+`a/b/c` parses as `a / (b·c)` → components `[a, b⁻¹, c⁻¹]`. The "no toggle back" rule means `/` always adds to the denominator; it never re-enters the numerator.
 
 ---
 
-## 9. C Data Model
+## 9. Currency Codes
 
-### 9.1 Enumerations
+Currency amounts are dimensional quantities in financial computing. `$19.99 USD` carries a denomination dimension just as `9.81 m/s²` carries an acceleration dimension. Bovnar extends the unit system with 195 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.
 
-#### `prefix_system_t` — Which prefix family applies
+### 9.1 Namespace Rule
+
+Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4** is permanently reserved for currency codes. No physical base unit uses such a symbol — all existing physical units are either single-letter (`m`, `K`, `A`…), mixed-case (`Hz`, `Pa`, `Wb`…), or lowercase-dominated (`mol`, `min`, `bar`…).
+
+Classification happens at the lookup stage:
+
+1. If the token is all-uppercase 3–4 ASCII characters, the currency table is consulted first.
+2. If not found in the currency table (or the token does not match the all-uppercase 3–4 char pattern), the physical unit table is consulted.
+3. If not found in either table, `error_unit_illegal` is raised.
+
+This reservation requires no new sigil character and no change to the unit grammar character set. The full implications for ambiguous cases are analysed in §10.
+
+### 9.2 ISO 4217 Fiat Currencies and Precious Metals
+
+All 161 active ISO 4217 alphabetic codes are supported. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 294`.
+
+Key representative codes (showing range of minor-unit values):
+
+| Code | Name | Minor unit |
+|------|------|-----------|
+| `JPY` | Japanese Yen | 0 |
+| `KRW` | South Korean Won | 0 |
+| `USD` | US Dollar | 2 |
+| `EUR` | Euro | 2 |
+| `GBP` | Pound Sterling | 2 |
+| `CUP` | Cuban Peso | 2 |
+| `BHD` | Bahraini Dinar | 3 |
+| `KWD` | Kuwaiti Dinar | 3 |
+| `CLF` | Unidad de Fomento | 4 |
+| `XAU` | Gold | 0 |
+| `XAG` | Silver | 0 |
+| `XDR` | Special Drawing Rights | 0 |
+
+The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units. Applications reading integer-annotated values (e.g. `<uint:64,KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift.
+
+### 9.3 Cryptocurrencies
+
+34 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. Base enum values begin at `bu_btc = 295`. The `minor_unit` field holds the canonical on-chain decimal places.
+
+| Code | Name | Minor unit | Subunit |
+|------|------|-----------|---------|
+| `BTC`  | Bitcoin | 8 | satoshi |
+| `ETH`  | Ethereum | 18 | wei |
+| `SOL`  | Solana | 9 | lamport |
+| `XRP`  | XRP | 6 | drop |
+| `ADA`  | Cardano | 6 | lovelace |
+| `DOT`  | Polkadot | 10 | planck |
+| `XMR`  | Monero | 12 | piconero |
+| `XLM`  | Stellar | 7 | stroop |
+| `DOGE` | Dogecoin | 8 | koinu |
+| `USDT` | Tether | 6 | — |
+| `USDC` | USD Coin | 6 | — |
+| `AVAX` | Avalanche | 18 | — |
+| `ATOM` | Cosmos | 6 | — |
+
+### 9.4 Prefix Rules for Currency Units
+
+**SI prefixes from `si_kilo` upward** are permitted on all currency units. `k~USD` denotes "values in thousands of USD" — a common scale annotation in financial reporting.
+
+```bovnar
+.fund_nav   = <float_dec:64,k~USD>    250.0;   # $250,000
+.gdp        = <float_dec:64,M~EUR> 42800.0;    # €42.8 billion
+.eth_gwei   = <float_dec:64,G~ETH>    35.0;    # 35 Gwei gas price
+```
+
+**IEC binary prefixes** (`Ki~`, `Mi~`, …) are **forbidden** on all currency units. `bvn_currency_prefix_valid()` returns `false` for any IEC prefix; the parser raises `error_unit_illegal`. SI prefixes of any magnitude are permitted by the validation function.
+
+### 9.5 Compound Currency Expressions
+
+Currency codes participate in compound unit expressions using the existing separators:
+
+```bovnar
+.gold_spot    = <float_dec:64,USD/oz_t>    2351.40;  # $/troy oz
+.wheat        = <float_dec:64,USD/bsh>        5.82;  # $/bushel
+.rent         = <float_dec:64,EUR/m²>        12.50;  # €/m²
+.billing_rate = <float_dec:64,EUR/h>         150.00; # €/h
+.eur_usd      = <float_dec:64,USD/EUR>        1.0842; # exchange rate
+.eth_btc      = <float_dec:64,BTC/ETH>       0.05610; # cross-crypto rate
+```
+
+Currency × currency compounds (`USD·EUR`) are syntactically valid and produce no error. Their financial interpretation is the application's responsibility.
+
+#### Exchange Rate Timestamps
+
+Bovnar annotates denomination; it does not store exchange rates or timestamps. The timestamp belongs in a separate field:
+
+```bovnar
+.snapshot = {
+    .epoch    = <uint:64,s>              1716400000;
+    .eur_usd  = <float_dec:64,USD/EUR>        1.0842;
+};
+```
+
+### 9.6 Compatibility Rules
+
+`bvn_units_compatible()` requires no modification for currencies. Two currency expressions are structurally compatible only if they have identical component sequences including base enum values. Since `bu_usd ≠ bu_eur`, `USD` and `EUR` are already structurally incompatible under the existing comparison logic.
+
+### 9.7 Type Pairing Recommendations
+
+| Use case | Recommended annotation | Rationale |
+|----------|----------------------|-----------|
+| Decimal monetary amount | `<float_dec:64,USD>` | Exact decimal; 16 significant digits |
+| High-precision / actuarial | `<float_dec:128,USD>` | 34 significant digits |
+| Integer minor-unit storage | `<uint:64,USD>` | Value in cents; app reads `minor_unit()` |
+| Negative balances in minor units | `<sint:64,USD>` | |
+| Zero-minor-unit currency | `<uint:64,JPY>` | Integer is the only correct representation |
+| 3-minor-unit currency | `<uint:64,KWD>` | Value in fils |
+| Commodity price | `<float_dec:64,USD/oz_t>` | $/troy oz |
+| Exchange rate | `<float_dec:64,USD/EUR>` | USD per EUR |
+| On-chain satoshi balance | `<uint:64,BTC>` | Integer satoshis |
+| Human-readable BTC amount | `<float_dec:64,BTC>` | |
+
+> **`float` (binary floating-point) is discouraged** for monetary amounts. Binary fractions cannot represent 0.10 USD exactly. Use `float_dec` for decimal-exact storage.
+>
+> **`float_fix` is wrong** for monetary values. Q-format stores values as `integer × 2^(-N)` — a binary fractional resolution. No power of 2 equals a power of 10 (except 2⁰ = 10⁰ = 1), so no Q value exactly represents cents.
+
+---
+
+## 10. Symbol Disambiguation
+
+This section exhaustively documents every case where a physical-unit token and a currency token could be confused, explains how the namespace rule resolves each case, and proposes options for tightening the separation further.
+
+### 10.1 The Namespace Rule as Disambiguator
+
+The rule from §9.1 produces a strict partition:
+
+| Token class | Criteria | Examples |
+|---|---|---|
+| Physical unit | Any symbol that does **not** consist exclusively of 3–4 uppercase ASCII letters | `m`, `Hz`, `cup`, `Btu`, `mol`, `rad`, `k~g` |
+| Currency code | Exclusively 3–4 uppercase ASCII letters, found in the currency table | `USD`, `EUR`, `CUP`, `BTC`, `DOGE` |
+| Error | Exclusively 3–4 uppercase ASCII letters, **not** in the currency table | `XYZ`, `BTU`, `ABC` |
+
+The classification is performed at the token level, before any prefix or compound parsing. A token that fails both the physical-unit table and the currency table lookup raises `error_unit_illegal` regardless of whether it looks meaningful to a human reader.
+
+**Case sensitivity is therefore load-bearing.** `cup` and `CUP` are distinct tokens that dispatch to entirely different lookup tables.
+
+### 10.2 Exhaustive Conflict Table
+
+The following table lists every case where a physical-unit symbol or alias coincides with or could be confused with a valid or plausible currency token.
+
+| Token | Physical meaning | Currency meaning | Resolution |
+|-------|-----------------|-----------------|------------|
+| `cup` | US cup (236.6 mL, `bu_cup`) | — | Unambiguous: no currency uses lowercase |
+| `CUP` | — | Cuban Peso (ISO 4217:192) | Unambiguous: dispatches to currency table |
+| `BTU` | International Table BTU (`bu_btu`) | *(not ISO 4217)* | Currency lookup fails; physical table matches `bu_btu` |
+| `Btu` | International Table BTU (`bu_btu`) | — | Unambiguous: mixed-case, not in currency table |
+| `btu` | International Table BTU (`bu_btu`) | — | Unambiguous: all-lowercase |
+| `SOL` | — | Solana (cryptocurrency) | Unambiguous: no physical unit named `SOL` |
+| `sol` | *(not a defined unit)* | — | `error_unit_illegal` |
+| `BAR` | *(not a valid alias for bar)* | *(not ISO 4217)* | `error_unit_illegal`; use `bar` (lowercase) |
+| `ERG` | *(not a valid alias for erg)* | *(not ISO 4217)* | `error_unit_illegal`; use `erg` (lowercase) |
+| `CAD` | *(not a valid alias)* | Canadian Dollar (ISO 4217) | Unambiguous: dispatches to currency table |
+| `AUD` | *(not a valid alias)* | Australian Dollar | Unambiguous |
+| `GBP` | *(not a valid alias)* | Pound Sterling | Unambiguous |
+| `XAU` | *(not a valid alias)* | Gold (ISO 4217 X-code) | Unambiguous |
+
+**Key finding:** There are no cases where the same token is simultaneously a valid physical unit symbol and a valid ISO 4217 / cryptocurrency code. All conflicts involve either a token that was never a valid physical unit symbol (the uppercase-only form of an alias that is defined only in lowercase or mixed-case), or a token that is not in the currency table either.
+
+### 10.3 The CUP Case in Detail
+
+`CUP` is the single most likely source of user confusion because the ISO 4217 currency code for the Cuban Peso shares its letter sequence with the English word for the culinary measure.
+
+**Behavior by token:**
+
+| Written in BVNR | Resolved as | Enum value | SI factor |
+|-----------------|-------------|------------|-----------|
+| `cup`           | US cup      | `bu_cup`   | 2.365882365×10⁻⁴ m³ |
+| `cups`          | US cup (long form) | `bu_cup` | 2.365882365×10⁻⁴ m³ |
+| `CUP`           | Cuban Peso  | `bu_cup` *(currency enum)* | — (monetary, no SI factor) |
+
+```bovnar
+.recipe_volume = <float_dec:32,cup>  2.0;   # 2 US cups (volume)
+.balance       = <float_dec:64,CUP>  15.00; # 15 Cuban Pesos (currency)
+```
+
+Calling `bvn_unit_to_si_factor` on a `CUP` unit returns `*ok = false` because `bvn_find_si_conv` skips currency enum values. Calling `bvn_unit_is_currency` on a `cup` unit returns `false`. The two are completely disjoint in both parsing and the conversion API.
+
+**A user who writes `CUP` intending the culinary cup will receive `error_unit_illegal`** only if `CUP` is then used in a context where a physical unit is expected but a currency is found — for example, as the denominator of a physical calculation. In practice, the annotation is accepted as the Cuban Peso; the error surfaces only at the application layer when the value is treated as a volume. This is a semantic error, not a parse error, and it is the same class of error as any mismatched-denomination annotation.
+
+### 10.4 Disambiguation Proposals
+
+Three approaches are available, in increasing order of invasiveness:
+
+---
+
+**Proposal A — Enforce case discipline (current implementation; recommended)**
+
+The namespace rule already produces an unambiguous grammar. No parser changes are needed. The action items are editorial and tooling:
+
+1. **Document `BTU` as a valid alias.** The alias `BTU` (all-uppercase) is looked up in the currency table first; when not found there, the physical unit table matches it as `bu_btu`. `Btu` and `btu` are also accepted. This document has already noted this in §3.6.
+2. **Document the case rule explicitly** (done above in §10.1–10.3).
+3. **Add a linter rule** that warns when a 3–4 uppercase-letter physical unit *alias* is written in all-caps where the canonical symbol is mixed-case or lowercase (e.g. warn on `BTU`, `ERG`, `BAR`).
+
+Trade-off: The rule is invisible — users who do not read this section may be surprised by `CUP` routing to Cuban Peso. Tooling (IDE tooltips, error messages) must surface the distinction.
+
+---
+
+**Proposal B — Currency sigil prefix**
+
+Introduce an optional `$` prefix for currency codes: `$USD`, `$CUP`, `$BTC`. Physical units remain unchanged. The currency table lookup accepts tokens with or without the sigil.
+
+```bovnar
+# Sigil form — explicit and unambiguous:
+.price  = <float_dec:64,$USD>   19.99;
+.volume = <float_dec:32,cup>     2.0;
+
+# Sigil-free form — backward-compatible, still works:
+.price  = <float_dec:64,USD>    19.99;
+```
+
+Trade-off: Requires a parser change. The `$` character must be added to the unit token character set and handled in `bvn_parse_unit`. Because the sigil is optional, the ambiguity between `CUP` (currency) and a hypothetical future physical unit `CUP` is not fully eliminated — only the sigil form is truly unambiguous. The sigil form is however immediately readable as "this is a currency" for human readers, which reduces the cognitive burden.
+
+---
+
+**Proposal C — Mandatory namespace delimiter**
+
+Require a namespace qualifier for currency codes: `fx:USD`, `crypto:BTC`, `fx:CUP`. Physical units have no prefix. This makes the taxonomy explicit and extensible.
+
+```bovnar
+.price  = <float_dec:64,fx:USD>     19.99;
+.btc    = <uint:64,crypto:BTC>   54782000;
+.volume = <float_dec:32,cup>          2.0;
+```
+
+Trade-off: The most invasive option. It requires grammar changes, breaks all existing currency-annotated files, and increases verbosity. It does eliminate every present and future namespace collision at the cost of backward compatibility. Appropriate if the currency feature is still in a pre-stable phase and breaking changes are acceptable.
+
+---
+
+**Recommendation:** Ship Proposal A with the linter rule. The `CUP`/`cup` split is logically clean and already implemented. The linter rule catches the highest-risk failure mode (user writes `BTU` or similar all-caps aliases). Revisit Proposal B if the currency feature gains a BVNR 1.2 stable revision, since the optional sigil can be introduced without breaking existing files.
+
+---
+
+## 11. C Data Model
+
+### 11.1 Enumerations
+
+#### `prefix_system_t`
 
 ```c
 typedef enum prefix_system_e {
-    prefix_si,                  /* SI decimal prefixes (or no prefix) */
-    prefix_iec                  /* IEC binary prefixes                */
+    prefix_si,      /* SI decimal prefixes (or no prefix) */
+    prefix_iec      /* IEC binary prefixes                */
 } prefix_system_t;
 ```
 
-#### `si_prefix_id_t` — SI prefix identity
+#### `si_prefix_id_t`
 
 ```c
 typedef enum si_prefix_id_e {
-    si_none = 0,            /* no SI prefix (×10⁰)          */
+    si_none = 0,
     si_quecto, si_ronto, si_yocto, si_zepto, si_atto,
     si_femto,  si_pico,  si_nano,  si_micro, si_milli,
     si_centi,  si_deci,
@@ -864,26 +970,32 @@ typedef enum si_prefix_id_e {
 } si_prefix_id_t;
 ```
 
-Values are ordered from smallest (quecto) to largest (quetta). `si_none` is 0, so a zero-initialized component has no prefix.
-
-#### `iec_prefix_id_t` — IEC binary prefix identity
+#### `iec_prefix_id_t`
 
 ```c
 typedef enum iec_prefix_id_e {
-    iec_none = 0,           /* no IEC prefix (×2⁰)           */
+    iec_none = 0,
     iec_kibi, iec_mebi, iec_gibi, iec_tebi, iec_pebi,
     iec_exbi, iec_zebi, iec_yobi, iec_robi, iec_quebi
 } iec_prefix_id_t;
 ```
 
-#### `value_base_unit_t` — Base unit identity
+#### `value_base_unit_t`
+
+Physical units occupy positions 1–146. Currency codes begin immediately after the last physical unit. `bvn_unit_is_currency(base)` returns `true` for any enum value in the currency range.
 
 ```c
 typedef enum value_base_unit_e {
     bu_none = 0,            /* dimensionless / no unit        */
+
+    /* Digital */
     bu_bit, bu_byte,
+
+    /* SI base */
     bu_second, bu_meter, bu_gram, bu_ampere, bu_kelvin,
     bu_mol, bu_candela,
+
+    /* Named SI-derived */
     bu_hertz, bu_newton, bu_pascal, bu_joule, bu_watt,
     bu_volt,  bu_ohm,   bu_farad,  bu_coulomb, bu_siemens,
     bu_weber, bu_tesla, bu_henry,  bu_lumen,   bu_lux,
@@ -892,136 +1004,168 @@ typedef enum value_base_unit_e {
     bu_radian, bu_steradian,
     bu_tonne, bu_bar,
     bu_electronvolt, bu_dalton, bu_astronomical_unit,
-    bu_hectare,
-    bu_week, bu_year,
-    /* Imperial/US customary — length */
+    bu_hectare, bu_week, bu_year,
+
+    /* Imperial/US — length */
     bu_inch, bu_foot, bu_yard, bu_mile, bu_nautical_mile,
     bu_angstrom, bu_light_year, bu_parsec, bu_furlong, bu_fathom,
-    /* Imperial/US customary — mass */
+
+    /* Imperial/US — mass */
     bu_pound, bu_ounce, bu_grain, bu_stone, bu_short_ton,
     bu_long_ton, bu_troy_ounce, bu_carat,
+
     /* Temperature */
     bu_fahrenheit,
+
     /* Pressure */
     bu_atmosphere, bu_mmhg, bu_torr, bu_psi,
+
     /* Energy */
     bu_calorie, bu_btu, bu_erg, bu_therm,
+
     /* Power */
     bu_horsepower,
+
     /* Force */
     bu_pound_force, bu_dyne, bu_kip,
+
     /* Speed */
     bu_knot,
+
     /* Volume — US */
     bu_gallon, bu_gallon_uk, bu_quart, bu_pint, bu_cup,
     bu_fluid_ounce, bu_tablespoon, bu_teaspoon, bu_barrel,
+
     /* Area */
     bu_acre, bu_barn,
+
     /* Angle */
     bu_arcminute, bu_arcsecond, bu_grad,
+
     /* CGS */
     bu_poise, bu_stokes, bu_gauss, bu_maxwell, bu_oersted,
     bu_stilb, bu_phot, bu_galileo,
+
     /* Radiation */
     bu_curie, bu_roentgen, bu_rem,
+
     /* Logarithmic */
-    bu_neper,
-    bu_decibel,
+    bu_neper, bu_decibel,
+
     bu_rankine,             /* Temperature — absolute Fahrenheit scale */
-    bu_slug,                /* Imperial/US mass */
-    bu_thou,                /* Imperial/US length */
+    bu_slug,                /* Imperial mass */
+    bu_thou,                /* Imperial length */
+
     /* Volume — UK imperial */
     bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
+
     /* Electrical power */
     bu_var, bu_volt_ampere,
+
     /* Force (additional) */
     bu_kilogram_force,
+
     /* Pressure (additional) */
     bu_inch_hg,
+
     /* Rotational frequency */
     bu_rpm,
+
     /* Energy (additional) */
     bu_foot_pound,
+
     /* Mass (additional) */
     bu_dram, bu_pennyweight,
+
     /* Length (additional) */
     bu_chain, bu_rod,
+
     /* Volume (additional) */
     bu_gill, bu_gill_uk,
-    /* Acceleration */
+
+    /* Acceleration / gravity */
     bu_standard_gravity,
+
     /* Power (additional) */
     bu_metric_horsepower,
+
     /* Angle (additional) */
     bu_revolution,
+
     /* Time (additional) */
     bu_month, bu_fortnight,
+
     /* Pressure (additional) */
     bu_atmosphere_technical,
-    /* Textile linear density */
+
+    /* Textile */
     bu_tex, bu_denier,
+
     /* Apothecary / dry volume */
-    bu_fluid_dram, bu_minim, bu_peck, bu_bushel
+    bu_fluid_dram, bu_minim, bu_peck, bu_bushel,
+
+    /* ISO 4217 fiat currencies — alphabetical, AED…ZWL */
+    bu_aed = 134,
+    /* ... 161 fiat entries ... */
+    bu_zwl = 294,
+
+    /* Cryptocurrencies */
+    bu_btc = 295,
+    /* ... 34 crypto entries ... */
+    bu_atom = 328,
+
+    /* Old German — placed after the currency range */
+    bu_pfund = 329, bu_zentner, bu_doppelzentner, bu_lot,
+    bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss,
+    bu_prussian_elle, bu_prussian_rute, bu_klafter,
+    bu_german_mile, bu_morgen, bu_scheffel,  /* = 341 */
 } value_base_unit_t;
+
+/* Total slot count — defined separately, not an enum member: */
+/* #define BVN_VALUE_BASE_UNIT_COUNT 342  (bu_scheffel + 1) */
 ```
 
-#### `unit_exponent_t` — Exponent of a unit component
+#### `unit_exponent_t`
 
 ```c
 typedef enum unit_exponent_e {
-    exp_invalid    =   0,   /* sentinel — invalid / uninitialized    */
-    exp_linear     =   1,   /* ¹                                     */
-    exp_square     =   2,   /* ²                                     */
-    exp_cubic      =   3,   /* ³                                     */
-    exp_quartic    =   4,   /* ⁴                                     */
-    exp_quintic    =   5,   /* ⁵                                     */
-    exp_sextic     =   6,   /* ⁶                                     */
-    exp_septic     =   7,   /* ⁷                                     */
-    exp_octic      =   8,   /* ⁸                                     */
-    exp_nonic      =   9,   /* ⁹                                     */
-    exp_neg_linear =  -1,   /* ⁻¹                                    */
-    exp_neg_square =  -2,   /* ⁻²                                    */
-    exp_neg_cubic  =  -3,   /* ⁻³                                    */
-    exp_neg_quartic=  -4,   /* ⁻⁴                                    */
-    exp_neg_quintic=  -5,   /* ⁻⁵                                    */
-    exp_neg_sextic =  -6,   /* ⁻⁶                                    */
-    exp_neg_septic =  -7,   /* ⁻⁷                                    */
-    exp_neg_octic  =  -8,   /* ⁻⁸                                    */
-    exp_neg_nonic  =  -9,   /* ⁻⁹                                    */
+    exp_invalid    =   0,
+    exp_linear     =   1,  exp_square    =  2,  exp_cubic     =  3,
+    exp_quartic    =   4,  exp_quintic   =  5,  exp_sextic    =  6,
+    exp_septic     =   7,  exp_octic     =  8,  exp_nonic     =  9,
+    exp_neg_linear =  -1,  exp_neg_square= -2,  exp_neg_cubic = -3,
+    exp_neg_quartic=  -4,  exp_neg_quintic=-5,  exp_neg_sextic= -6,
+    exp_neg_septic =  -7,  exp_neg_octic = -8,  exp_neg_nonic = -9,
 } unit_exponent_t;
 ```
 
-`exp_invalid` (value `0`) is the zero-initialization sentinel; a component whose exponent field has not been explicitly set will read as `exp_invalid` and is treated as malformed by all API functions. Always initialize components before use.
+`exp_invalid` (value `0`) is the zero-initialization sentinel. Always initialize components before use.
 
-`exp_linear` (value `1`) is the stored representation for both an explicit `¹` / `^1` and any component written without an exponent suffix.
+### 11.2 Structures
 
-### 9.2 Structures
-
-#### `value_unit_component_t` — A single factor in a compound unit
+#### `value_unit_component_t`
 
 ```c
 typedef struct value_unit_component_s {
-    value_base_unit_t   base;        /* which physical quantity         */
-    unit_exponent_t     exponent;    /* power to which this unit is raised */
-    value_unit_prefix_t prefix;      /* prefix system and id            */
+    value_base_unit_t   base;
+    unit_exponent_t     exponent;
+    value_unit_prefix_t prefix;
 } value_unit_component_t;
 ```
 
-where `value_unit_prefix_t` is:
+where:
 
 ```c
 typedef struct value_unit_prefix_s {
-    prefix_system_t system;    /* prefix_si or prefix_iec         */
+    prefix_system_t system;
     union {
-        si_prefix_id_t   si;   /* used when system == prefix_si   */
-        iec_prefix_id_t  iec;  /* used when system == prefix_iec  */
+        si_prefix_id_t   si;
+        iec_prefix_id_t  iec;
     } id;
 } value_unit_prefix_t;
 ```
 
-Access the prefix as `component.prefix.id.si` (for SI) or `component.prefix.id.iec` (for IEC), guarded by a check on `component.prefix.system`.
-
-#### `value_unit_t` — A complete unit (simple or compound)
+#### `value_unit_t`
 
 ```c
 #define BVNR_MAX_UNIT_COMPONENTS  8
@@ -1032,240 +1176,184 @@ typedef struct value_unit_s {
 } value_unit_t;
 ```
 
-`num_components` is the number of valid entries in `components`. For an explicit `no_unit` annotation or when `bvn_parse_unit` is called with the string `"no_unit"`, `num_components == 0` (= `BVN_UNIT_NONE`). For an absent unit parameter in an explicit type annotation (e.g. `<float:64>`), `num_components == 1` with `base == bu_none` (= `BVN_UNIT_NO_PREFIX(bu_none)`). `BVN_UNIT_NONE` is also used as an internal sentinel where no unit has yet been set.
+For an explicit `no_unit` annotation, `num_components == 0` (`BVN_UNIT_NONE`). For an absent unit parameter in an explicit annotation (e.g. `<float:64>`), `num_components == 1` with `base == bu_none`.
 
-#### `bvnr_data_t` — Parser event payload (unit field)
-
-The unit is delivered to the application as part of the `bvnr_data_t` structure emitted by `ev_type_annotation_type_family_parameter` events:
+#### `bvnr_data_t` (unit field)
 
 ```c
 typedef struct bvnr_data_s {
-    token_type_t       type;        /* token classification            */
-    value_type_spec_t  value_type;  /* family, width, base             */
-    value_unit_t       value_unit;  /* parsed unit — focus of this doc */
-    const void*        data;        /* raw bytes of the token          */
-    uint32_t           length;      /* byte length of data             */
+    token_type_t       type;
+    value_type_spec_t  value_type;
+    value_unit_t       value_unit;   /* parsed physical unit or currency */
+    const void*        data;
+    uint32_t           length;
 } bvnr_data_t;
 ```
 
-### 9.3 Convenience Macros
-
-Five macros cover the most common construction patterns:
+### 11.3 Convenience Macros
 
 ```c
 /* Dimensionless or single-component without prefix */
 #define BVN_UNIT_NO_PREFIX(b)          \
-    ((value_unit_t){                   \
-        .num_components = 1,           \
-        .components = {{               \
-            .base           = (b),     \
-            .exponent       = exp_linear,\
-            .prefix.system  = prefix_si,\
-            .prefix.id.si   = si_none  \
-        }}                             \
-    })
+    ((value_unit_t){ .num_components = 1, .components = {{  \
+        .base=(b), .exponent=exp_linear,                    \
+        .prefix.system=prefix_si, .prefix.id.si=si_none }}})
 
 /* Single-component with SI prefix */
-#define BVN_UNIT_SI(b, p)              \
-    ((value_unit_t){                   \
-        .num_components = 1,           \
-        .components = {{               \
-            .base           = (b),     \
-            .exponent       = exp_linear,\
-            .prefix.system  = prefix_si,\
-            .prefix.id.si   = (p)      \
-        }}                             \
-    })
+#define BVN_UNIT_SI(b, p)  \
+    ((value_unit_t){ .num_components = 1, .components = {{  \
+        .base=(b), .exponent=exp_linear,                    \
+        .prefix.system=prefix_si, .prefix.id.si=(p) }}})
 
 /* Single-component with IEC prefix */
-#define BVN_UNIT_IEC(b, p)             \
-    ((value_unit_t){                   \
-        .num_components = 1,           \
-        .components = {{               \
-            .base           = (b),     \
-            .exponent       = exp_linear,\
-            .prefix.system  = prefix_iec,\
-            .prefix.id.iec  = (p)      \
-        }}                             \
-    })
+#define BVN_UNIT_IEC(b, p) \
+    ((value_unit_t){ .num_components = 1, .components = {{  \
+        .base=(b), .exponent=exp_linear,                    \
+        .prefix.system=prefix_iec, .prefix.id.iec=(p) }}})
 
 /* Single-component with SI prefix and explicit exponent */
-#define BVN_UNIT_SI_EXP(b, p, e)      \
-    ((value_unit_t){                   \
-        .num_components = 1,           \
-        .components = {{               \
-            .base           = (b),     \
-            .exponent       = (e),     \
-            .prefix.system  = prefix_si,\
-            .prefix.id.si   = (p)      \
-        }}                             \
-    })
+#define BVN_UNIT_SI_EXP(b, p, e) \
+    ((value_unit_t){ .num_components = 1, .components = {{  \
+        .base=(b), .exponent=(e),                           \
+        .prefix.system=prefix_si, .prefix.id.si=(p) }}})
 
-/* Empty unit (num_components == 0) — internal sentinel */
-#define BVN_UNIT_NONE                  \
-    ((value_unit_t){ .num_components = 0 })
+/* Empty unit — explicit no_unit / internal sentinel */
+#define BVN_UNIT_NONE  ((value_unit_t){ .num_components = 0 })
 
 /* Two-component compound unit, both SI-prefixed */
-#define BVN_UNIT_COMPOUND2(b1,p1,e1, b2,p2,e2) \
-    ((value_unit_t){                             \
-        .num_components = 2,                     \
-        .components = {                          \
-            { .base=(b1), .exponent=(e1),        \
-              .prefix.system=prefix_si, .prefix.id.si=(p1) }, \
-            { .base=(b2), .exponent=(e2),        \
-              .prefix.system=prefix_si, .prefix.id.si=(p2) }  \
-        }                                        \
-    })
+#define BVN_UNIT_COMPOUND2(b1,p1,e1, b2,p2,e2)                        \
+    ((value_unit_t){ .num_components = 2, .components = {              \
+        { .base=(b1), .exponent=(e1),                                  \
+          .prefix.system=prefix_si, .prefix.id.si=(p1) },              \
+        { .base=(b2), .exponent=(e2),                                  \
+          .prefix.system=prefix_si, .prefix.id.si=(p2) }}})
 ```
 
-Usage examples:
+Usage:
 
 ```c
-/* kilogram: k~g */
-value_unit_t kg = BVN_UNIT_SI(bu_gram, si_kilo);
-
-/* gibibytes: Gi~B */
+value_unit_t kg  = BVN_UNIT_SI(bu_gram, si_kilo);
 value_unit_t gib = BVN_UNIT_IEC(bu_byte, iec_gibi);
-
-/* square meter: m² */
-value_unit_t m2 = BVN_UNIT_SI_EXP(bu_meter, si_none, exp_square);
-
-/* dimensionless */
-value_unit_t none = BVN_UNIT_NO_PREFIX(bu_none);
+value_unit_t m2  = BVN_UNIT_SI_EXP(bu_meter, si_none, exp_square);
+value_unit_t usd = BVN_UNIT_NO_PREFIX(bu_usd);    /* single currency unit */
+value_unit_t none = BVN_UNIT_NONE;
 ```
 
 ---
 
-## 10. C API Functions
+## 12. C API Functions
 
-### 10.1 Parsing a Unit String
+### 12.1 Parsing a Unit String
 
 ```c
-value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok);
+value_unit_t bvn_parse_unit  (const uint8_t* unit, bool* ok);
 value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok);
 ```
 
-`bvn_parse_unit` parses the NUL-terminated UTF-8 unit string `unit` and returns a `value_unit_t`. Sets `*ok = false` on any parse error (unknown prefix, unknown base unit, too many components, empty component, empty or NULL input).
+`bvn_parse_unit` parses a NUL-terminated UTF-8 unit string. `bvn_parse_unit_n` is the length-bounded variant used internally when the unit string is a slice of a larger type-annotation buffer. Both set `*ok = false` on any parse error (unknown prefix, unknown base unit, unknown currency code, too many components, empty component, or NULL input).
 
-`bvn_parse_unit_n` is a length-bounded variant that reads exactly `len` bytes; it does not require a NUL terminator and is used internally when the unit string is a slice of a larger type-annotation buffer.
+Single-pass parsing algorithm:
 
-Both functions implement the unit sub-grammar in a single pass:
-
-1. Checks for the literal `"no_unit"` via `memcmp` and returns `BVN_UNIT_NONE` (num_components = 0) immediately.
-2. Scans for the presence of any separator character to decide between simple and compound parsing paths.
-3. For compound units, splits on separator bytes (`0x2A` for `*`, `0x2F` for `/`, `0xC2 0xB7` for `·`), parses each slice as a `unit-component`, negates the exponent of any denominator component, and appends it to `result.components`.
-4. Returns an empty `value_unit_t` (with `num_components = 0`) and `*ok = false` for any error.
+1. `memcmp` against `"no_unit"` → return `BVN_UNIT_NONE` immediately on match.
+2. Scan for separator characters to distinguish simple vs. compound paths.
+3. For compound units, split on `0x2A` (`*`), `0x2F` (`/`), `0xC2 0xB7` (`·`); parse each slice as a component; negate denominator exponents.
+4. For each component, if the token is all-uppercase 3–4 ASCII characters, dispatch to the currency table first; fall back to the physical unit table if not found there.
 
 ```c
 bool ok;
 value_unit_t u = bvn_parse_unit((const uint8_t *)"k~g·m/s²", &ok);
-if (!ok) {
-    /* invalid unit string */
-}
 /* u.num_components == 3:
-   [0]: gram,   exp_linear,     si_kilo
-   [1]: meter,  exp_linear,     si_none
-   [2]: second, exp_neg_square, si_none  ← negated by '/' */
+   [0]: bu_gram,   exp_linear,     si_kilo
+   [1]: bu_meter,  exp_linear,     si_none
+   [2]: bu_second, exp_neg_square, si_none */
+
+value_unit_t c = bvn_parse_unit((const uint8_t *)"USD/oz_t", &ok);
+/* c.num_components == 2:
+   [0]: bu_usd,       exp_linear,     si_none  (currency)
+   [1]: bu_troy_ounce, exp_neg_linear, si_none */
 ```
 
-### 10.2 Serializing a Unit
+### 12.2 Serializing a Unit
 
 ```c
-int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
+int32_t bvn_unit_to_string   (value_unit_t u, char* buf, size_t bufsize);
 int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                bvn_unit_flags_t flags);
 ```
 
-Both functions serialize `u` to a canonical UTF-8 string in `buf`. They return the number of bytes written (excluding the NUL terminator), or `-1` on buffer overflow or if any component carries `exp_invalid`.
-
-`bvn_unit_to_string` is equivalent to `bvn_unit_to_string_ex(u, buf, bufsize, BVN_UNIT_FLAGS_NONE)`.
-
-`bvn_unit_to_string_ex` accepts a bitmask of `bvn_unit_flags_t` flags:
+Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written (excluding NUL) or `-1` on buffer overflow or invalid component.
 
 | Flag | Effect |
 |------|--------|
-| `BVN_UNIT_FLAGS_NONE` | Default: Unicode superscript exponents, no reduction |
-| `BVN_UNIT_ASCII_EXP` | Use ASCII caret form (`^N`) for all exponents instead of Unicode superscripts |
-| `BVN_UNIT_REDUCE` | Reduce the unit via `bvn_unit_reduce` before serializing (folds repeated base units and prefix exponents) |
-
-The canonical form places numerator components first, joined by `·` (U+00B7), followed by `/` and denominator components (those with negative exponents) joined by `·`. `exp_linear` is suppressed in output (the base unit symbol is written with no exponent suffix).
-
-Both functions call `bvn_unit_valid` internally before writing. If `bvn_unit_valid` returns `false` they return `-1` immediately without modifying `buf`.
+| `BVN_UNIT_FLAGS_NONE` | Unicode superscript exponents, no reduction |
+| `BVN_UNIT_ASCII_EXP` | ASCII caret form (`^N`) for all exponents |
+| `BVN_UNIT_REDUCE` | Reduce via `bvn_unit_reduce` before serializing |
 
 ```c
 char buf[64];
 value_unit_t u = /* k~g·m/s² */;
-int32_t n = bvn_unit_to_string(u, buf, sizeof(buf));
-/* buf == "k~g·m/s²", n == byte length */
+bvn_unit_to_string(u, buf, sizeof(buf));
+/* buf == "k~g·m/s²" */
 
-/* ASCII exponent form */
-n = bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
+bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
 /* buf == "k~g*m/s^2" */
 ```
 
-#### Validation predicate
+#### Validation Predicate
 
 ```c
 bool bvn_unit_valid(value_unit_t u);
 ```
 
-Returns `true` if every component in `u` has a valid exponent (not `exp_invalid`), a known base unit (within the `value_base_unit_t` range), and a prefix that is legal for that base unit per `bvn_prefix_unit_valid`. Returns `false` on the first violated condition. Both serialization functions call this predicate before writing; callers may also use it directly to validate hand-constructed `value_unit_t` values before passing them to any other API.
+Returns `true` if every component has a valid exponent, known base unit (physical or currency), and a legal prefix for that base. Both serialization functions call this before writing.
 
-### 10.3 Prefix Factor and Exponent Queries
-
-These functions compute the multiplicative scale factor contributed by the unit's **prefixes**, ignoring the dimensional identity of the base units themselves. They are useful for normalizing values to un-prefixed base units.
+### 12.3 Prefix Factor and Exponent Queries
 
 ```c
-double  bvn_unit_prefix_factor(value_unit_t u);
-```
-Iterates over all components, computes `prefix_factor ^ |exponent|` for each, inverts the result if the exponent is negative, and multiplies all results together. For `si_none`/`iec_none` prefixes the factor is 1.0. This function does **not** apply the base-unit conversion factor (e.g. gram → kilogram); use `bvn_unit_to_si_factor` when full SI normalization is needed.
-
-```c
+double  bvn_unit_prefix_factor  (value_unit_t u);
 int32_t bvn_unit_prefix_exponent(value_unit_t u);
 ```
-Returns the sum of `(prefix_base_exponent × |unit_exponent|)` across all components (negated for denominator components). For SI prefixes the base exponent is the power of ten (e.g. `si_kilo` → 3). For IEC prefixes the base exponent is the power of two (e.g. `iec_kibi` → 10, `iec_mebi` → 20). This gives the net prefix offset relative to un-prefixed base units.
 
-#### Normalization example
+`bvn_unit_prefix_factor` returns the multiplicative scale contributed by the prefixes, ignoring base-unit identity. For `si_none`/`iec_none` prefixes the factor is 1.0.
 
-```c
-bool ok;
-value_unit_t u = bvn_parse_unit((const uint8_t *)"k~m/s", &ok);
-double value = 1.5;
-double factor = bvn_unit_prefix_factor(u);  /* == 1000.0 (kilo in numerator) */
-double si_value = value * factor;           /* == 1500.0 m/s */
+`bvn_unit_prefix_exponent` returns the sum of `(prefix_base_exponent × |unit_exponent|)` across all components.
 
-value_unit_t u2 = bvn_parse_unit((const uint8_t *)"k~g/m³", &ok);
-/* bvn_unit_prefix_factor(u2) == 1000.0:
-   kilo in numerator contributes ×1000, m³ in denominator has si_none → ×1 */
-```
+### 12.4 SI Conversion API
 
-### 10.4 SI Conversion API
-
-These functions live in `bovnar_si_units.h` and provide dimensional analysis, unit compatibility checking, and value conversion between compatible units.
-
-#### Exponent integer conversion
+Functions in `bovnar_si_units.h` provide dimensional analysis, compatibility checking, and value conversion between compatible physical units. **These functions reject currency units** — `bvn_find_si_conv` returns `NULL` for any `value_base_unit_t` for which `bvn_unit_is_currency` is true, causing `*ok = false`.
 
 ```c
-int32_t        bvn_exponent_to_int(unit_exponent_t e);
+/* Full SI factor (physical units only) */
+double bvn_unit_to_si_factor(value_unit_t u,
+                              bool   *is_affine,
+                              double *affine_offset,
+                              bool   *ok);
+
+/* SI dimension vector */
+bool bvn_unit_dimension_vector(value_unit_t u,
+                                int32_t dims[bvn_si_dim_count]);
+
+/* Dimensional compatibility check */
+bool bvn_units_compatible(value_unit_t a, value_unit_t b);
+
+/* Conversion factor: value_in_b = value_in_a × k */
+double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
+                                bool *ok, bool *requires_affine);
+
+/* Unit reduction */
+value_unit_t bvn_unit_reduce(value_unit_t u,
+                              double *scale, bool *overflow);
+
+/* Prefix validity */
+bool bvn_prefix_unit_valid(value_unit_prefix_t prefix,
+                            value_base_unit_t base);
+
+/* Exponent integer conversion */
+int32_t        bvn_exponent_to_int (unit_exponent_t e);
 unit_exponent_t bvn_int_to_exponent(int32_t n);
 ```
 
-`bvn_exponent_to_int` maps a `unit_exponent_t` enum value to its integer equivalent: `exp_linear` → 1, `exp_neg_square` → −2, `exp_invalid` → 0. `bvn_int_to_exponent` is a partial inverse: it returns `exp_invalid` for integers outside −9…+9 and for input 0.
-
-#### Full SI factor
-
-```c
-double bvn_unit_to_si_factor(value_unit_t u,
-                              bool        *is_affine,
-                              double      *affine_offset,
-                              bool        *ok);
-```
-
-Returns the multiplicative factor that converts a value in unit `u` to the corresponding SI base unit (e.g. `k~g` → 1.0, since the gram-to-kilogram factor of 10⁻³ is absorbed by the `si_kilo` prefix contribution of 10³ giving a net factor of 1.0; `k~J` → 1000.0). Both the prefix factor and the base-unit-to-SI factor are applied.
-
-For affine units (`bu_celsius`), `*is_affine` is set to `true` and `*affine_offset` is set to the additive offset that must be applied **after** multiplying by the returned factor (273.15 for Celsius). An affine unit is valid at exponent 1 only. At exponent 1, `*is_affine` is set to `true` and `*affine_offset` is populated. Any other exponent (negative, or greater than 1) sets `*ok = false`. Only one affine component per compound unit is permitted; a second affine component at exponent 1 also sets `*ok = false`.
-
-`*ok` is set to `false` for invalid prefixes, unknown base units, or `exp_invalid` exponents.
+For affine units (`bu_celsius`, `bu_fahrenheit`), `*is_affine` is set to `true` and `*affine_offset` receives the additive offset applied after multiplying by the returned factor. An affine unit is valid at exponent 1 only.
 
 ```c
 bool ok, affine;
@@ -1273,197 +1361,166 @@ double offset;
 value_unit_t u = bvn_parse_unit((const uint8_t *)"°C", &ok);
 double f = bvn_unit_to_si_factor(u, &affine, &offset, &ok);
 /* f == 1.0, affine == true, offset == 273.15 */
-/* kelvin = celsius * f + offset */
 ```
 
-#### Dimension vector
+### 12.5 Currency API
 
 ```c
-bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count]);
+#include "bovnar_currency.h"
+
+/* Classification */
+bool bvn_unit_is_currency(int base);
+bool bvn_unit_is_fiat    (int base);
+bool bvn_unit_is_crypto  (int base);
+
+/* Minor-unit exponent: 1 major unit = 10^N minor units */
+uint8_t bvn_currency_minor_unit(int base, bool *ok);
+
+/* Full currency metadata */
+const bvn_currency_info_t *bvn_currency_info(int base);
+
+/* Look up by 3–4 char code string; returns 0 (bu_none) on failure */
+int bvn_parse_currency_str(const uint8_t *s, uint32_t len);
+
+/* Prefix validity for a specific currency */
+bool bvn_currency_prefix_valid(int base, int prefix_system);
 ```
 
-Fills `dims` with the SI dimension exponents for unit `u`. The indices correspond to the `bvn_si_dim_idx_t` enumeration:
+The `bvn_currency_info_t` structure:
 
 ```c
-typedef enum bvn_si_dim_idx_e {
-    bvn_si_dim_meter    = 0,
-    bvn_si_dim_kilogram = 1,
-    bvn_si_dim_second   = 2,
-    bvn_si_dim_ampere   = 3,
-    bvn_si_dim_kelvin   = 4,
-    bvn_si_dim_mol      = 5,
-    bvn_si_dim_candela  = 6,
-    bvn_si_dim_count    = 7
-} bvn_si_dim_idx_t;
+typedef struct {
+    const char *code;           /* "USD", "BTC", etc.                  */
+    uint16_t    numeric_code;   /* ISO 4217 numeric code (0 for crypto) */
+    uint8_t     minor_unit;     /* decimal places                       */
+    bool        is_crypto;      /* true for cryptocurrencies            */
+    const char *name;           /* "US Dollar", "Bitcoin", etc.         */
+} bvn_currency_info_t;
 ```
 
-Returns `false` if any component carries `exp_invalid` or an invalid prefix, `true` otherwise. Digital units (`bu_bit`, `bu_byte`) have all-zero dimension vectors and are tracked separately by `bvn_units_compatible`.
-
-#### Unit compatibility
+Examples:
 
 ```c
-bool bvn_units_compatible(value_unit_t a, value_unit_t b);
+bool ok;
+uint8_t n = bvn_currency_minor_unit(bu_kwd, &ok);  /* n=3, ok=true  */
+uint8_t m = bvn_currency_minor_unit(bu_jpy, &ok);  /* m=0, ok=true  */
+uint8_t x = bvn_currency_minor_unit(bu_meter, &ok);/* x=0, ok=false */
+
+const bvn_currency_info_t *ci = bvn_currency_info(bu_usd);
+/* ci->code="USD", ci->numeric_code=840, ci->minor_unit=2,
+   ci->is_crypto=false, ci->name="US Dollar" */
+
+int cv = bvn_parse_currency_str((const uint8_t *)"EUR", 3);  /* cv=176 */
+int cc = bvn_parse_currency_str((const uint8_t *)"DOGE", 4); /* cc=323 */
+int cx = bvn_parse_currency_str((const uint8_t *)"xyz", 3);  /* cx=0   */
+
+/* Distinguishing cup (volume) from CUP (currency) in code: */
+value_unit_t volume   = bvn_parse_unit((const uint8_t *)"cup", &ok);
+value_unit_t currency = bvn_parse_unit((const uint8_t *)"CUP", &ok);
+assert(!bvn_unit_is_currency(volume.components[0].base));   /* true */
+assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 ```
 
-Returns `true` if units `a` and `b` are dimensionally compatible (i.e. measure the same physical quantity and can be converted into each other by a scalar factor). Compatibility is determined by comparing:
+### 12.6 Python API
 
-1. The net exponent of `bu_bit` components in `a` and `b`.
-2. The net exponent of `bu_byte` components in `a` and `b`.
-3. The full SI dimension vector of `a` and `b`.
+```python
+from bovnar.enums import BaseUnit
+from bovnar.currency import (
+    is_currency, is_fiat, is_crypto,
+    minor_unit, currency_info, currency_name, from_code,
+    all_fiat, all_crypto,
+)
 
-All three must match. Returns `false` on any parse error in either unit.
+assert is_currency(BaseUnit.USD)        # True
+assert is_fiat(BaseUnit.XAU)            # True (gold is ISO 4217 X-code)
+assert is_crypto(BaseUnit.ETH)          # True
+assert not is_fiat(BaseUnit.BTC)        # True (BTC is crypto, not fiat)
 
-#### Conversion factor
+assert minor_unit(BaseUnit.USD)  == 2   # cents
+assert minor_unit(BaseUnit.JPY)  == 0   # indivisible
+assert minor_unit(BaseUnit.KWD)  == 3   # fils
+assert minor_unit(BaseUnit.BTC)  == 8   # satoshis
+assert minor_unit(BaseUnit.ETH)  == 18  # wei
 
-```c
-double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
-                                bool *ok, bool *requires_affine);
+info = currency_info(BaseUnit.EUR)
+assert info.code == "EUR"
+assert info.numeric_code == 978
+assert info.minor_unit == 2
+
+btc = from_code("BTC")
+assert btc == BaseUnit.BTC
+
+fiat_count   = sum(1 for _ in all_fiat())    # 161
+crypto_count = sum(1 for _ in all_crypto())  # 34
 ```
-
-Returns the multiplicative factor `k` such that `value_in_b = value_in_a * k`, provided units `a` and `b` are compatible and neither is affine. Sets `*ok = false` and returns 0.0 if the units are incompatible or the conversion cannot be expressed as a pure scale factor.
-
-`*requires_affine` is set to `true` whenever at least one of the units is affine (e.g. `bu_celsius`). If both units are affine with the same offset (converting `°C` to `°C`), the function returns the ratio of their scale factors and leaves `*ok = true`. For mixed affine/non-affine conversions (e.g. `°C` to `K`) it sets `*ok = false` to signal that the caller must apply the offset manually using `bvn_unit_to_si_factor`.
-
-```c
-bool ok, needs_affine;
-value_unit_t km = bvn_parse_unit((const uint8_t *)"k~m",  &ok);
-value_unit_t m  = bvn_parse_unit((const uint8_t *)"m",    &ok);
-double k = bvn_unit_convert_factor(km, m, &ok, &needs_affine);
-/* k == 1000.0, ok == true, needs_affine == false */
-```
-
-#### Unit reduction
-
-```c
-value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow);
-```
-
-Reduces a compound unit by accumulating the net exponent and net prefix contribution for each distinct base unit across all components. Returns a canonical `value_unit_t` where each base unit appears at most once, with `si_none` prefix and the accumulated net exponent. All prefix contributions are folded into `*scale`.
-
-Components with a net exponent of zero are dropped. Components whose net exponent magnitude exceeds 9 (outside the expressible range of `unit_exponent_t`) are also dropped; their base-unit-to-SI contribution is folded into `*scale` and `*overflow` is set to `true`.
-
-The output components are sorted: positive-exponent components first, ordered by absolute exponent descending, then by `value_base_unit_t` enum value ascending; negative-exponent components follow in the same order.
-
-```c
-double scale;
-bool overflow;
-value_unit_t u  = bvn_parse_unit((const uint8_t *)"k~m·k~m", &ok);
-value_unit_t r  = bvn_unit_reduce(u, &scale, &overflow);
-/* r: single component { bu_meter, exp_square, si_none }
-   scale == 1e6  (two kilo prefixes → 10³ × 10³) */
-```
-
-#### Prefix–unit validity
-
-```c
-bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
-```
-
-Returns `true` if `prefix` is a legal modifier for `base`. The rules are:
-- IEC prefixes (other than `iec_none`) are only valid on `bu_bit` and `bu_byte`.
-- SI prefixes below `si_kilo` are invalid on `bu_bit` and `bu_byte`.
-- German units (`bu_pfund` through `bu_scheffel`) accept only `si_none` and `iec_none`; any non-trivial prefix is rejected.
-- Out-of-range `prefix.system` or `base` values return `false`.
-
-All higher-level parsing and conversion functions call `bvn_prefix_unit_valid` internally and propagate the error via their `ok` output.
 
 ---
 
-## 11. Integration with the Parser Event Stream
+## 13. Integration with the Parser Event Stream
 
-Unit information flows into the application through the `ev_type_annotation_type_family_parameter` event and through `ev_data`. There are two paths by which a unit reaches the event stream:
+Unit information flows into the application through two paths:
 
-1. **Type-annotation unit** — parsed from `<family:…,unit-param>` by the lexer, validated by the validator, and delivered in the `ev_type_annotation_type_family_parameter` unit event.
-2. **Inline unit suffix** — parsed from the suffix that follows a scalar value literal (number or string) before the terminating `;`, validated by the validator after the value is checked for type compatibility.
+1. **Type-annotation unit** — parsed from `<family:…,unit-param>` by the lexer, validated by the validator, delivered in the `ev_type_annotation_type_family_parameter` unit event.
+2. **Inline unit suffix** — parsed from the suffix following a scalar value literal before the terminating `;`.
 
-In both cases the effective unit is reported in the `bvnr_data_t.value_unit` field of the `ev_data` event for the value.
+In both cases the effective unit is reported in the `bvnr_data_t.value_unit` field of the `ev_data` event.
 
-The full event sequence for an assignment with a compound unit annotation is:
+#### Full event sequence — physical unit
 
 ```
 Input: .force = <float:64,k~g·m/s²> 9.81;
 
-ev_assignment_start
-    data = "force"
-
-ev_type_annotation_start
-    data = "float:64,k~g·m/s²"
-
-ev_type_annotation_type_family
-    data = "float"
-
-ev_type_annotation_type_family_parameter    ← width
-    value_type.width = 64
-
-ev_type_annotation_type_family_parameter    ← unit
-    value_unit = {
-        num_components = 3,
-        components = [
-            { base=bu_gram,   exponent=exp_linear,       prefix={prefix_si, si_kilo} },
-            { base=bu_meter,  exponent=exp_linear,     prefix={prefix_si, si_none} },
-            { base=bu_second, exponent=exp_neg_square, prefix={prefix_si, si_none} }
-        ]
-    }
-
+ev_assignment_start          data = "force"
+ev_type_annotation_start     data = "float:64,k~g·m/s²"
+ev_type_annotation_type_family  data = "float"
+ev_type_annotation_type_family_parameter   ← width=64
+ev_type_annotation_type_family_parameter   ← unit:
+    value_unit = { num_components=3,
+      [0] bu_gram,   exp_linear,     {prefix_si, si_kilo}
+      [1] bu_meter,  exp_linear,     {prefix_si, si_none}
+      [2] bu_second, exp_neg_square, {prefix_si, si_none} }
 ev_type_annotation_end
-
-ev_data
-    data = "9.81"
+ev_data   data="9.81"
 ```
 
-Both `on_unverified` and `on_verified` callbacks receive this event stream. The validator confirms that the unit string is valid before emitting `on_verified`; invalid units are reported via `on_error` and produce `error_unit_illegal` or `error_unit_too_long`.
+#### Full event sequence — currency unit
 
-For events with an explicit type annotation but no unit parameter (e.g. `<float:64>`), the `ev_type_annotation_type_family_parameter` event for the unit position is **not emitted** — the validator skips the unit event when `ulen == 0`. For events with an explicit `no_unit` parameter, the unit event IS emitted with:
+```
+Input: .price = <float_dec:64,USD> 19.99;
 
-```c
-value_unit = BVN_UNIT_NONE
-/* i.e. num_components=0 */
+ev_assignment_start          data = "price"
+ev_type_annotation_start     data = "float_dec:64,USD"
+ev_type_annotation_type_family  data = "float_dec"
+ev_type_annotation_type_family_parameter   ← width=64
+ev_type_annotation_type_family_parameter   ← unit:
+    value_unit = { num_components=1,
+      [0] bu_usd, exp_linear, {prefix_si, si_none} }
+ev_type_annotation_end
+ev_data   data="19.99"
 ```
 
-For synthesised (default) type annotations generated for plain values with no explicit annotation, the unit event IS emitted with:
+For events with an explicit type annotation but no unit parameter, the unit event is **not emitted**. For `no_unit`, the unit event IS emitted with `BVN_UNIT_NONE` (`num_components=0`). For synthesised (default) type annotations, the unit event IS emitted with `BVN_UNIT_NO_PREFIX(bu_none)`.
 
-```c
-value_unit = BVN_UNIT_NO_PREFIX(bu_none)
-/* i.e. num_components=1, components[0].base=bu_none */
-```
-
-### Inline unit suffix — event stream view
-
-When a value carries an **inline unit suffix** (and no explicit type-annotation unit), the validator synthesises a default type annotation, then applies the inline unit.  The effective unit is always reflected in the `value_unit` field of the final `ev_data` event:
+#### Inline unit suffix — event stream view
 
 ```
 Input: .distance = 1500 m;
 
-ev_assignment_start
-    data = "distance"
-
-ev_type_annotation_start      ← synthesised for plain integer
-    data = "uint"
-
-ev_type_annotation_type_family
-    data = "uint"
-
-ev_type_annotation_type_family_parameter    ← width (synthesised: 64)
-    value_type.width = 64
-
-ev_type_annotation_type_family_parameter    ← base (synthesised: 10)
-    value_type.base = 10
-
-ev_type_annotation_type_family_parameter    ← unit (synthesised: no_unit)
-    value_unit = BVN_UNIT_NO_PREFIX(bu_none)
-
+ev_assignment_start      data = "distance"
+ev_type_annotation_start data = "uint"      ← synthesised
+ev_type_annotation_type_family  data = "uint"
+ev_type_annotation_type_family_parameter  ← width=64  (synthesised)
+ev_type_annotation_type_family_parameter  ← base=10   (synthesised)
+ev_type_annotation_type_family_parameter  ← unit: BVN_UNIT_NO_PREFIX(bu_none)
 ev_type_annotation_end
-
-ev_data                                     ← inline unit applied here
-    data   = "1500"
+ev_data   data="1500"
     value_unit = { num_components=1,
-                   components[0] = { base=bu_meter, prefix.si=si_none,
-                                     exponent=exp_linear } }
+      [0] bu_meter, exp_linear, {prefix_si, si_none} }
 ```
 
-The `value_unit` field of `ev_data` always reflects the final, reconciled unit — whether it came from the annotation, from synthesis, or from an inline suffix.
+The `value_unit` field of `ev_data` always reflects the final, reconciled unit.
 
-A practical callback for inspecting unit data:
+#### Practical callback
 
 ```c
 bool my_verified_handler(void* userdata, bvnr_event_t ev, bvnr_data_t* d)
@@ -1474,200 +1531,183 @@ bool my_verified_handler(void* userdata, bvnr_event_t ev, bvnr_data_t* d)
     value_unit_t u = d->value_unit;
     if (u.num_components == 0 ||
         (u.num_components == 1 && u.components[0].base == bu_none))
-        return true;  /* dimensionless, nothing to do */
+        return true;
+
+    if (bvn_unit_is_currency(u.components[0].base)) {
+        const bvn_currency_info_t *ci =
+            bvn_currency_info(u.components[0].base);
+        printf("currency: %s  minor_unit=%u\n",
+               ci->code, ci->minor_unit);
+        return true;
+    }
 
     char unit_str[128];
     bvn_unit_to_string(u, unit_str, sizeof(unit_str));
-    printf("unit: %s  (factor: %g)\n", unit_str, bvn_unit_prefix_factor(u));
-
-    for (uint32_t i = 0; i < u.num_components; i++) {
-        value_unit_component_t *c = &u.components[i];
-        printf("  [%u] base=%d  exp=%d  prefix_sys=%s\n",
-               i, c->base, c->exponent,
-               c->prefix.system == prefix_si ? "SI" : "IEC");
-    }
+    printf("unit: %s  (prefix_factor: %g)\n",
+           unit_str, bvn_unit_prefix_factor(u));
     return true;
 }
 ```
 
 ---
 
-## 12. Validation Errors
+## 14. Validation Errors
 
 The validator raises the following unit-specific errors:
 
 | Error code | Value | Trigger condition |
 |------------|-------|-------------------|
-| `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, invalid prefix–unit combination, empty component between separators (e.g. `m//s`), or more than `BVNR_MAX_UNIT_COMPONENTS` (8) components |
+| `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, unknown currency code, all-uppercase 3–4 char token not found in either table (e.g. `XYZ`), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. `m//s`), or more than 8 components |
 | `error_unit_too_long` | 22 | Unit string exceeds the internal type-buffer size limit |
-| `error_unit_mismatch` | 38 | An inline unit suffix is present and an explicit type-annotation unit is also present, but the two do not parse to the same `value_unit_t` representation |
-| `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element (only scalar context is permitted) |
+| `error_unit_mismatch` | 38 | An inline unit suffix and an explicit type-annotation unit are both present, but parse to different `value_unit_t` representations |
+| `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element |
 
-All four errors are raised during the `on_unverified` → validator phase and cause the validated (`on_verified`) callback to not be invoked for that event.
-
-In `continue_on_error` mode the parser invokes `on_error` with the error code and then enters the resync state machine, which skips to the next `;` at the current nesting depth. The `recovery_count` (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode.
-
-`bvnr_reader_get_error`, `bvnr_reader_get_error_line`, `bvnr_reader_get_error_column`, `bvnr_reader_get_error_byte`, and `bvnr_reader_get_error_offset` all report the location of the offending unit string within the stream.
+All four errors are raised during the `on_unverified` → validator phase. In `continue_on_error` mode the parser invokes `on_error` and enters the resync state machine, which skips to the next `;` at the current nesting depth. `bvnr_reader_get_error`, `…_line`, `…_column`, `…_byte`, and `…_offset` all report the location of the offending token.
 
 ---
 
-## 13. Annotated Examples
+## 15. Annotated Examples
 
-### 13.1 Physical Quantities
+### 15.1 Physical Quantities
 
 ```bovnar
 # Thermodynamic temperature
-.ambient_temp = <float:64,K>         293.15;    # kelvin
+.ambient_temp  = <float:64,K>          293.15;
 
 # Temperature in Celsius (affine: K = °C + 273.15)
-.room_temp    = <float:32,°C>        20.0;
+.room_temp     = <float:32,°C>          20.0;
 
-# Velocity
-.wind_speed   = <float:64,m/s>       12.5;
+# Velocity and acceleration
+.wind_speed    = <float:64,m/s>         12.5;
+.gravity       = <float:64,m/s²>         9.80665;
+.gravity_asc   = <float:64,m/s^2>        9.80665;  # ASCII caret — identical
 
-# Acceleration (using Unicode exponent)
-.gravity      = <float:64,m/s²>      9.80665;
-
-# Acceleration (using ASCII caret — identical result)
-.gravity_asc  = <float:64,m/s^2>     9.80665;
-
-# Pressure in kilopascals
-.tire_pressure = <float:32,k~Pa>     250.0;
-
-# Energy in kilojoules
-.heat_energy  = <float:64,k~J>       5400.0;
+# Pressure and energy
+.tire_pressure = <float:32,k~Pa>       250.0;
+.heat_energy   = <float:64,k~J>       5400.0;
 
 # Flow rate (liters per minute)
-.pump_flow    = <float:32,L/min>     15.0;
+.pump_flow     = <float:32,L/min>       15.0;
 
-# Angle
-.bearing      = <float:64,°>         270.0;
+# Angles
+.bearing       = <float:64,°>          270.0;
+.phase         = <float:64,rad>          1.5708;
 
-# Plane angle in radians
-.phase        = <float:64,rad>        1.5708;
+# Volume — US culinary
+.recipe_water  = <float_dec:32,cup>      2.0;   # "cup" (lowercase) = US cup
+.recipe_flour  = <float_dec:32,tbsp>     3.0;
 
-# Solid angle
-.beam_solid   = <float:64,sr>         0.05;
-
-# Mass in tonnes
-.cargo_mass   = <float:64,t>          14.5;
-
-# Pressure in bar
-.tank_pressure = <float:32,bar>       2.5;
-
-# Energy in electronvolts
-.photon_energy = <float:64,eV>        2.4;
-
-# Mass in daltons (unified atomic mass)
-.atomic_mass  = <float:64,Da>         12.0;
-
-# Distance in astronomical units
-.orbit_radius = <float:64,au>         1.524;
-
-# Area in hectares
-.field_area   = <float:64,ha>         3.7;
-
-# Duration in weeks and years
-.shelf_life   = <uint:32,wk>          52;
-.service_life = <float:64,yr>         10.0;
+# Duration
+.shelf_life    = <uint:32,wk>           52;
+.service_life  = <float:64,yr>          10.0;
 ```
 
-### 13.2 Digital Storage
+### 15.2 Digital Storage
 
 ```bovnar
-# Plain bytes
 .packet_size = <uint:32,B>      1500;
-
-# Kibibytes (IEC binary)
-.cache_size  = <uint:64,Ki~B>   512;
-
-# Mebibytes
+.cache_size  = <uint:64,Ki~B>    512;
 .ram_size    = <uint:64,Mi~B>   4096;
-
-# Gibibytes
-.disk_size   = <uint:64,Gi~B>   500;
-
-# Tebibytes
-.array_size  = <uint:64,Ti~B>   2;
-
-# Megabits (SI decimal — different from Mebi!)
+.disk_size   = <uint:64,Gi~B>    500;
 .link_rate   = <uint:32,M~b>    1000;
-
-# Gigabits per second (compound: data-rate)
-.nic_speed   = <float:64,G~b/s> 10.0;
+.nic_speed   = <float:64,G~b/s>   10.0;
 ```
 
-### 13.3 Compound SI Quantities
+### 15.3 Compound SI Quantities
 
 ```bovnar
-# Force: Newton = kg·m·s⁻² = k~g·m/s²
+# Force: Newton = k~g·m/s²
 .force          = <float:64,k~g·m/s²>    9.81;
-
-# Alternative: explicit negative exponent in numerator
 .force_alt      = <float:64,k~g·m·s⁻²>  9.81;   # identical internal form
 
-# Energy: Joule = kg·m²·s⁻² = k~g·m²/s²
-.kinetic_energy = <float:64,k~g·m²/s²>  1000.0;
+# Energy: Joule = k~g·m²/s²
+.kinetic_energy = <float:64,k~g·m²/s²> 1000.0;
 
-# Momentum: kg·m/s
-.momentum       = <float:64,k~g·m/s>    5.0;
-
-# Mass density: kg/m³
-.steel_density  = <float:64,k~g/m³>     7800.0;
-
-# Area density: kg/m²
-.surface_load   = <float:64,k~g/m²>     200.0;
-
-# Pressure via explicit components: kg/(m·s²)
-.atm_pressure   = <float:64,k~g/(m·s²)> 101325.0;
-
-# Electric field strength: V/m
+# Electric field
 .field_strength = <float:64,V/m>         150.0;
 
-# Magnetic flux density: T (named SI unit, no compound needed)
-.b_field        = <float:64,m~T>         50.0;     # millitesla
-
-# Torque: N·m
-.torque         = <float:64,N·m>         25.0;
-
-# Product form using asterisk separator (same as ·)
-.moment         = <float:64,m*s>         1.0;
+# Torque
+.torque         = <float:64,N·m>          25.0;
 ```
 
-### 13.4 Error Cases
+### 15.4 Currency Amounts and Rates
 
 ```bovnar
-# Empty component between two slashes → error_unit_illegal
+# ── Fiat scalar amounts ────────────────────────────────────────────────────
+.price_usd     = <float_dec:64,USD>   19.99;
+.balance_eur   = <float_dec:64,EUR>  342.00;
+.yen_fee       = <uint:64,JPY>           500;    # zero minor unit — integer only
+.kwd_invoice   = <uint:64,KWD>          3500;    # 3.500 KWD in fils
+
+# "CUP" (uppercase) is the Cuban Peso, NOT the US cup volume unit:
+.cup_balance   = <float_dec:64,CUP>    25.00;   # 25 Cuban Pesos
+
+# ── Crypto scalar amounts ──────────────────────────────────────────────────
+.btc_sat       = <uint:64,BTC>   54782000;       # on-chain satoshis
+.eth_readable  = <float_dec:64,ETH>    2.5;
+.doge_bag      = <float_dec:64,DOGE> 42000.0;
+.usdt_stable   = <float_dec:64,USDT>  5000.00;
+
+# ── Compound units ─────────────────────────────────────────────────────────
+.gold_price    = <float_dec:64,USD/oz_t>   2351.40;  # $/troy oz
+.wheat         = <float_dec:64,USD/bsh>       5.82;  # $/bushel
+.rent          = <float_dec:64,EUR/m²>       12.50;  # €/m²
+.billing_rate  = <float_dec:64,EUR/h>        150.00; # €/h
+.eur_usd       = <float_dec:64,USD/EUR>       1.0842; # exchange rate
+
+# ── Reporting scale ────────────────────────────────────────────────────────
+.fund_nav      = <float_dec:64,k~USD>    250.0;     # $250,000
+.gdp           = <float_dec:64,M~EUR> 42800.0;      # €42.8 billion
+
+# ── Exchange rate with timestamp ───────────────────────────────────────────
+.snapshot = {
+    .epoch    = <uint:64,s>              1716400000;
+    .eur_usd  = <float_dec:64,USD/EUR>        1.0842;
+};
+
+# ── Array of prices ────────────────────────────────────────────────────────
+.tier_prices   = <float_dec:64,USD> [9.99, 19.99, 49.99, 99.99];
+```
+
+### 15.5 Error Cases
+
+```bovnar
+# Empty component → error_unit_illegal
 .bad1 = <float:64,m//s>      1.0;
 
-# Two middle-dots with nothing between → error_unit_illegal
-.bad2 = <float:64,m*·s>      1.0;
+# Too many components (9 > 8) → error_unit_illegal
+.bad2 = <float:64,m*s*k~g*A*K*mol*cd*b*B> 1.0;
 
-# Too many components (9 > BVNR_MAX_UNIT_COMPONENTS=8) → error_unit_illegal
-.bad3 = <float:64,m*s*k~g*A*K*mol*cd*b*B> 1.0;
+# Unknown base unit → error_unit_illegal
+.bad3 = <float:64,foobar>    1.0;
 
-# Unknown prefix → error_unit_illegal
-# ('x' is not an SI or IEC prefix symbol)
-.bad4 = <float:64,x-m>       1.0;
+# All-uppercase 3-char token not in currency table → error_unit_illegal
+# (BTU is not an ISO 4217 code; use Btu or btu for the energy unit)
+.bad4 = <float:64,BTU>       1.0;
 
-# Unknown base unit symbol → error_unit_illegal
-.bad5 = <float:64,XYZ>       1.0;
+# IEC prefix on a currency → error_unit_illegal
+.bad5 = <float_dec:64,Ki~USD> 1.0;
 
-# Exponent digit out of supported range (multi-digit not allowed)
-.bad6 = <float:64,m^10>      1.0;    # only single ASCII digit after ^
+# Sub-kilo SI prefix on a currency → error_unit_illegal
+.bad6 = <float_dec:64,m~USD>  1.0;
+
+# Annotation unit differs from inline unit → error_unit_mismatch
+.bad7 = <float:64,m> 1.0 s;
+
+# Inline unit inside an array → error_unexpected_input_byte
+.bad8 = <float:64,m> [1.0 m, 2.0 m];   # ERROR: suffix inside array
 
 # Correct: dimensionless explicit
 .ok1  = <uint:32,no_unit>    42;
 
-# Correct: omitted unit (same internal state as no_unit)
+# Correct: omitted unit (same behaviour as no_unit)
 .ok2  = <uint:32>            42;
+
+# Correct: cup (volume) vs CUP (currency) — both valid, different meaning
+.vol  = <float_dec:32,cup>  2.0;    # US cup (236.6 mL)
+.bal  = <float_dec:64,CUP> 25.00;   # Cuban Peso
 ```
 
 ---
 
-*End of Bovnar Unit System Reference Documentation v1.0.*
-
-
-
-
-
+*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1.*

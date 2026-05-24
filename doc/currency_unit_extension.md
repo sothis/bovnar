@@ -1,7 +1,8 @@
 # Bovnar Currency Unit Extension
 
-> **Status:** Addendum to `doc/2_bovnar_unit_system.md` — insert as a new
-> top-level section after the existing content.
+> **Status:** SUPERSEDED — all content has been merged into
+> `doc/2_bovnar_unit_system.md` (§9, §10, §12.5, §12.6, §14, §15.4).
+> This file is retained for git history only and should not be edited.
 > **Spec version:** 1.1 (currency extension)
 
 ---

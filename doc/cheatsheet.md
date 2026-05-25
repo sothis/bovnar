@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 1.1 · 153 physical units · 164 fiat currencies · 50 cryptocurrencies
+> Spec version 1.1 · 157 physical units · 164 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -87,6 +87,9 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 | `d`  | day (`bu_day`)        | deci   |
 | `h`  | hour (`bu_hour`)      | hecto  |
 | `T`  | tesla (`bu_tesla`)    | tera   |
+| `G`  | gauss (`bu_gauss`)    | giga   |
+| `P`  | poise (`bu_poise`)    | peta   |
+| `R`  | röntgen (`bu_roentgen`) | ronna |
 | `f`  | farad (`bu_farad`)    | femto  |
 | `S`  | siemens (`bu_siemens`) | *(not a prefix — `S` has no prefix role)* |
 
@@ -250,7 +253,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
 | `Torr` | `torr` | torr | `bu_torr` | 101 325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168361 Pa |
-| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
+| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640 Pa |
 
 > `at ≠ atm`: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
@@ -462,7 +465,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 |--------|-----------|------|------|--------------|
 | `Bd`   | `baud`, `bauds` | Baud (symbol/s) | `bu_baud` | s⁻¹ |
 
-SI prefixes are accepted on all new units except none are restricted; IEC prefixes are rejected for non-info units.
+SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.
 
 ---
 
@@ -474,7 +477,7 @@ Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4
 
 ### 5.2 ISO 4217 Fiat Currencies
 
-161 codes. Enum values `bu_aed` (134) … `bu_zwl` (294).
+164 codes. Enum values `bu_aed` (134) … `bu_zwl` (297).
 
 > **Min** = minor unit exponent N: 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2).
 > Minor units are **bold** when they differ from 2. `numeric_code` is the ISO 4217 numeric identifier.

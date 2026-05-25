@@ -280,7 +280,11 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 |--------|-----------|------|------------|------------|
 | `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine) |
 | `°F`, `degF` | `degrF`, `degreeF`, `degreesF`, `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 (affine) |
-| `Ra`   | `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
+| `°Ra`, `degRa` | `degrRa`, `degreeRa`, `degreesRa`, `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
+| `°De`, `degDe` | `degrDe`, `degreeDe`, `degreesDe`, `delisle` | degree Delisle | `bu_delisle` | K = 373.15 − °De × 2/3 (affine) |
+| `°N`, `degN` | `degrN`, `degreeN`, `degreesN`, `newton_temperature` | degree Newton | `bu_newton_temp` | K = °N × 100/33 + 273.15 (affine) |
+| `°Re`, `degRe` | `degrRe`, `degreeRe`, `degreesRe`, `reaumur` | degree Réaumur | `bu_reaumur` | K = °Re × 5/4 + 273.15 (affine) |
+| `°Ro`, `degRo` | `degrRo`, `degreeRo`, `degreesRo`, `romer` | degree Rømer | `bu_romer` | K = (°Ro − 7.5) × 40/21 + 273.15 (affine) |
 
 > Kelvin (`K`) is the SI base unit (§3.1). `Ra` not `R` — `R` is reserved for the röntgen (`bu_roentgen`).
 
@@ -474,7 +478,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **368** (verified by static assert `bu_baud + 1 == 368`). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **372** (verified by static assert `bu_romer + 1 == 372`). Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Sentinel Value
 
@@ -1123,10 +1127,13 @@ typedef enum value_base_unit_e {
     /* Additional physical units */
     bu_survey_foot, bu_league, bu_cable, bu_hand,
     bu_quintal, bu_scruple, bu_baud,  /* = 367 */
+
+    /* Historical temperature scales */
+    bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,  /* = 371 */
 } value_base_unit_t;
 
 /* Total slot count — defined separately, not an enum member: */
-/* #define BVN_VALUE_BASE_UNIT_COUNT 368  (bu_baud + 1) */
+/* #define BVN_VALUE_BASE_UNIT_COUNT 372  (bu_romer + 1) */
 ```
 
 #### `unit_exponent_t`

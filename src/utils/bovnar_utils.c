@@ -409,7 +409,7 @@ static const bu_entry_t bu_table[] = {
 	{"atmospheres",     11, bu_atmosphere},    {"tablespoons",    11, bu_tablespoon},
 	{"troy_ounces",     11, bu_troy_ounce},    {"fluid_ounce",    11, bu_fluid_ounce},
 	{"pound_force",     11, bu_pound_force},   {"light_years",    11, bu_light_year},
-	{"pennyweight",     11, bu_pennyweight},
+	{"pennyweight",     11, bu_pennyweight},     {"newton_temperature", 18, bu_newton_temp},
 	{"steradians",      10, bu_steradian},     {"becquerels",     10, bu_becquerel},
 	{"short_tons",      10, bu_short_ton},     {"gallons_uk",     10, bu_gallon_uk},
 	{"tablespoon",      10, bu_tablespoon},    {"horsepower",     10, bu_horsepower},
@@ -425,7 +425,9 @@ static const bu_entry_t bu_table[] = {
 	{"arcsecond",        9, bu_arcsecond},     {"long_tons",       9, bu_long_ton},
 	{"roentgens",        9, bu_roentgen},      {"steradian",       9, bu_steradian},
 	{"becquerel",        9, bu_becquerel},     {"quarts_uk",       9, bu_quart_uk},
-	{"fortnight",        9, bu_fortnight},
+	{"fortnight",        9, bu_fortnight},     {"degreesRa",       9, bu_rankine},
+	{"degreesDe",        9, bu_delisle},       {"degreesRe",       9, bu_reaumur},
+	{"degreesRo",        9, bu_romer},
 	{"gill_uk",          7, bu_gill_uk},       {"gills_uk",        8, bu_gill_uk},
 	{"quintals",         8, bu_quintal},        {"scruples",        8, bu_scruple},
 	{"decibels",         8, bu_decibel},       {"teaspoon",        8, bu_teaspoon},
@@ -439,11 +441,16 @@ static const bu_entry_t bu_table[] = {
 	{"quart_uk",         8, bu_quart_uk},      {"fl_oz_uk",        8, bu_fluid_ounce_uk},
 	{"fl_drams",         8, bu_fluid_dram},    {"scheffel",        8, bu_scheffel},
 	{"degreesF",         8, bu_fahrenheit},    {"degreesC",        8, bu_celsius},
+	{"degreeRa",         8, bu_rankine},       {"degreeDe",        8, bu_delisle},
+	{"degreeRe",         8, bu_reaumur},       {"degreeRo",        8, bu_romer},
+	{"degreesN",         8, bu_newton_temp},
 	{"leagues",          7, bu_league},        {"quintal",         7, bu_quintal},
 	{"scruple",          7, bu_scruple},
 	{"bushels",          7, bu_bushel},        {"deniers",         7, bu_denier},
 	{"zentner",          7, bu_zentner},       {"klafter",         7, bu_klafter},
 	{"rankine",          7, bu_rankine},       {"decibel",         7, bu_decibel},
+	{"delisle",          7, bu_delisle},       {"reaumur",         7, bu_reaumur},
+	{"degreeN",          7, bu_newton_temp},
 	{"gallons",          7, bu_gallon},        {"parsecs",         7, bu_parsec},
 	{"furlong",          7, bu_furlong},       {"maxwell",         7, bu_maxwell},
 	{"oersted",          7, bu_oersted},       {"galileo",         7, bu_galileo},
@@ -484,6 +491,8 @@ static const bu_entry_t bu_table[] = {
 	{"lumens",           6, bu_lumen},         {"katals",          6, bu_katal},
 	{"litres",           6, bu_liter},         {"liters",          6, bu_liter},
 	{"minute",           6, bu_minute},        {"degree",          6, bu_degree},
+	{"degrRa",           6, bu_rankine},       {"degrDe",          6, bu_delisle},
+	{"degrRe",           6, bu_reaumur},       {"degrRo",          6, bu_romer},
 	{"inches",           6, bu_inch},          {"gi_uk",           5, bu_gill_uk},
 	{"bauds",            5, bu_baud},           {"cable",           5, bu_cable},
 	{"hands",            5, bu_hand},
@@ -505,6 +514,9 @@ static const bu_entry_t bu_table[] = {
 	{"barns",            5, bu_barn},          {"dynes",           5, bu_dyne},
 	{"phots",            5, bu_phot},          {"knots",           5, bu_knot},
 	{"pints",            5, bu_pint},          {"degrF",           5, bu_fahrenheit},
+	{"degRa",            5, bu_rankine},       {"degrN",           5, bu_newton_temp},
+	{"degDe",            5, bu_delisle},       {"degRe",           5, bu_reaumur},
+	{"degRo",            5, bu_romer},         {"romer",           5, bu_romer},
 	{"tonne",            5, bu_tonne},         {"metre",           5, bu_meter},
 	{"meter",            5, bu_meter},         {"grams",           5, bu_gram},
 	{"joule",            5, bu_joule},         {"farad",           5, bu_farad},
@@ -543,7 +555,11 @@ static const bu_entry_t bu_table[] = {
 	{"Byte",             4, bu_byte},          {"byte",            4, bu_byte},
 	{"thou",             4, bu_thou},          {"bits",            4, bu_bit},
 	{"gray",             4, bu_gray},          {"degC",            4, bu_celsius},
-	{"degr",             4, bu_degree},        {"inch",            4, bu_inch},
+	{"degN",             4, bu_newton_temp},
+	{"\xc2\xb0""Ra",     4, bu_rankine},       {"\xc2\xb0""De",    4, bu_delisle},
+	{"\xc2\xb0""Re",     4, bu_reaumur},       {"\xc2\xb0""Ro",    4, bu_romer},
+	{"degr",             4, bu_degree},
+	{"inch",             4, bu_inch},
 	{"foot",             4, bu_foot},          {"feet",            4, bu_foot},
 	{"yard",             4, bu_yard},          {"mile",            4, bu_mile},
 	{"fath",             4, bu_fathom},        {"ergs",            4, bu_erg},
@@ -570,6 +586,7 @@ static const bu_entry_t bu_table[] = {
 	{"lot",              3, bu_lot},
 	{"ch",               2, bu_chain},         {"rd",              2, bu_rod},
 	{"gi",               2, bu_gill},          {"dr",              2, bu_dram},
+	{"\xc2\xb0""N",     3, bu_newton_temp},
 	{"\xc2\xb0""C",     3, bu_celsius},
 	{"\xe2\x84\xab",    3, bu_angstrom},
 	{"\xe2\x84\xa6",    3, bu_ohm},
@@ -583,8 +600,9 @@ static const bu_entry_t bu_table[] = {
 	{"ft_lb",            5, bu_foot_pound},    {"inHg",            4, bu_inch_hg},
 	{"\xc2\xb0""F",     3, bu_fahrenheit},
 	{"Bd",               2, bu_baud},           {"sc",              2, bu_scruple},
+	{"Ra",               2, bu_rankine},
 	{"VA",               2, bu_volt_ampere},
-	{"Ra",               2, bu_rankine},       {"dB",              2, bu_decibel},
+	{"dB",               2, bu_decibel},
 	{"Oe",               2, bu_oersted},       {"Mx",              2, bu_maxwell},
 	{"Ci",               2, bu_curie},         {"Np",              2, bu_neper},
 	{"sb",               2, bu_stilb},         {"ph",              2, bu_phot},
@@ -1084,7 +1102,11 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_rem:               return "rem";
 	case bu_neper:             return "Np";
 	case bu_decibel:           return "dB";
-	case bu_rankine:           return "Ra";
+	case bu_rankine:           return "\xc2\xb0Ra";
+	case bu_delisle:           return "\xc2\xb0""De";
+	case bu_newton_temp:       return "\xc2\xb0""N";
+	case bu_reaumur:           return "\xc2\xb0""Re";
+	case bu_romer:             return "\xc2\xb0""Ro";
 	case bu_slug:              return "slug";
 	case bu_thou:              return "thou";
 	case bu_pint_uk:           return "pt_uk";

@@ -233,9 +233,13 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 |--------|-----------|------|------|------------|
 | `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 **(affine)** |
 | `°F`, `degF` | `degrF`, `degreeF`, `degreesF`, `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 **(affine)** |
-| `Ra`   | `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
+| `°Ra`, `degRa` | `degrRa`, `degreeRa`, `degreesRa`, `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
+| `°De`, `degDe` | `degrDe`, `degreeDe`, `degreesDe`, `delisle` | degree Delisle | `bu_delisle` | K = 373.15 − °De × 2/3 **(affine)** |
+| `°N`, `degN` | `degrN`, `degreeN`, `degreesN`, `newton_temperature` | degree Newton | `bu_newton_temp` | K = °N × 100/33 + 273.15 **(affine)** |
+| `°Re`, `degRe` | `degrRe`, `degreeRe`, `degreesRe`, `reaumur` | degree Réaumur | `bu_reaumur` | K = °Re × 5/4 + 273.15 **(affine)** |
+| `°Ro`, `degRo` | `degrRo`, `degreeRo`, `degreesRo`, `romer` | degree Rømer | `bu_romer` | K = (°Ro − 7.5) × 40/21 + 273.15 **(affine)** |
 
-> Kelvin (`K`) is in §4.1. `Ra` not `R` — `R` is reserved for röntgen (§4.20).
+> Kelvin (`K`) is in §4.1. `R` is reserved for röntgen (§4.20). `N` alone is newton (§4.2); use `°N` or `degN` for Newton temperature.
 
 ### 4.7 Pressure
 
@@ -738,5 +742,5 @@ No token is simultaneously a valid physical unit symbol and a valid currency cod
 
 ---
 
-*Physical unit enum range: 1–133 and 348–367 (153 total) · Fiat: 134–297 (164) · Crypto: 298–347 (50)*
-*`BVN_VALUE_BASE_UNIT_COUNT` = 368 (`bu_baud + 1`)*
+*Physical unit enum range: 1–133, 348–367, and 368–371 (157 total) · Fiat: 134–297 (164) · Crypto: 298–347 (50)*
+*`BVN_VALUE_BASE_UNIT_COUNT` = 372 (`bu_romer + 1`)*

@@ -538,7 +538,11 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_quintal            == 365, "bu_quintal == 365");
 	ASSERT_TRUE((int)bu_scruple            == 366, "bu_scruple == 366");
 	ASSERT_TRUE((int)bu_baud               == 367, "bu_baud == 367");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 368, "sentinel == 368");
+	ASSERT_TRUE((int)bu_delisle            == 368, "bu_delisle == 368");
+	ASSERT_TRUE((int)bu_newton_temp        == 369, "bu_newton_temp == 369");
+	ASSERT_TRUE((int)bu_reaumur            == 370, "bu_reaumur == 370");
+	ASSERT_TRUE((int)bu_romer              == 371, "bu_romer == 371");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 372, "sentinel == 372");
 }
 
 static void test_nonsi_si_factors(void)
@@ -672,6 +676,30 @@ static void test_nonsi_si_factors(void)
 	ASSERT_TRUE(aff,  "fahrenheit is affine");
 	ASSERT_EQ_DBL(f,   5.0/9.0,              1e-15, "fahrenheit factor = 5/9");
 	ASSERT_EQ_DBL(off, 459.67*(5.0/9.0),     1e-12, "fahrenheit offset");
+
+	f = bvn_unit_to_si_factor(BVN_UNIT_NO_PREFIX(bu_delisle), &aff, &off, &ok);
+	ASSERT_TRUE(ok,   "delisle factor ok");
+	ASSERT_TRUE(aff,  "delisle is affine");
+	ASSERT_EQ_DBL(f,   -2.0/3.0,             1e-15, "delisle factor = -2/3");
+	ASSERT_EQ_DBL(off, 373.15,               1e-12, "delisle offset = 373.15");
+
+	f = bvn_unit_to_si_factor(BVN_UNIT_NO_PREFIX(bu_newton_temp), &aff, &off, &ok);
+	ASSERT_TRUE(ok,   "newton_temp factor ok");
+	ASSERT_TRUE(aff,  "newton_temp is affine");
+	ASSERT_EQ_DBL(f,   100.0/33.0,           1e-13, "newton_temp factor = 100/33");
+	ASSERT_EQ_DBL(off, 273.15,               1e-12, "newton_temp offset = 273.15");
+
+	f = bvn_unit_to_si_factor(BVN_UNIT_NO_PREFIX(bu_reaumur), &aff, &off, &ok);
+	ASSERT_TRUE(ok,   "reaumur factor ok");
+	ASSERT_TRUE(aff,  "reaumur is affine");
+	ASSERT_EQ_DBL(f,   5.0/4.0,              1e-15, "reaumur factor = 5/4");
+	ASSERT_EQ_DBL(off, 273.15,               1e-12, "reaumur offset = 273.15");
+
+	f = bvn_unit_to_si_factor(BVN_UNIT_NO_PREFIX(bu_romer), &aff, &off, &ok);
+	ASSERT_TRUE(ok,   "romer factor ok");
+	ASSERT_TRUE(aff,  "romer is affine");
+	ASSERT_EQ_DBL(f,   40.0/21.0,            1e-14, "romer factor = 40/21");
+	ASSERT_EQ_DBL(off, 273.15 - 100.0/7.0,  1e-12, "romer offset = 273.15 - 100/7");
 }
 
 static void test_nonsi_dim_vectors(void)
@@ -899,6 +927,22 @@ static void test_nonsi_dim_vectors(void)
 	ASSERT_EQ_INT(d[0], 3, "schffl m=3");
 	for (int i = 1; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "schffl dim[i]=0");
 
+	DIM_OK(bu_delisle);
+	ASSERT_EQ_INT(d[4], 1, "De K=1");
+	ASSERT_EQ_INT(d[0], 0, "De m=0"); ASSERT_EQ_INT(d[1], 0, "De kg=0");
+
+	DIM_OK(bu_newton_temp);
+	ASSERT_EQ_INT(d[4], 1, "degN K=1");
+	ASSERT_EQ_INT(d[0], 0, "degN m=0"); ASSERT_EQ_INT(d[1], 0, "degN kg=0");
+
+	DIM_OK(bu_reaumur);
+	ASSERT_EQ_INT(d[4], 1, "Re K=1");
+	ASSERT_EQ_INT(d[0], 0, "Re m=0"); ASSERT_EQ_INT(d[1], 0, "Re kg=0");
+
+	DIM_OK(bu_romer);
+	ASSERT_EQ_INT(d[4], 1, "Ro K=1");
+	ASSERT_EQ_INT(d[0], 0, "Ro m=0"); ASSERT_EQ_INT(d[1], 0, "Ro kg=0");
+
 #undef DIM_OK
 }
 
@@ -1002,6 +1046,10 @@ static void test_nonsi_parse_canonical(void)
 		{ "dt_mi",       bu_german_mile           },
 		{ "morgen",      bu_morgen                },
 		{ "schffl",      bu_scheffel              },
+		{ "\xc2\xb0""De", bu_delisle             },
+		{ "\xc2\xb0""N",  bu_newton_temp         },
+		{ "\xc2\xb0""Re", bu_reaumur             },
+		{ "\xc2\xb0""Ro", bu_romer               },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1188,6 +1236,18 @@ static void test_nonsi_parse_aliases(void)
 		{ "prussian_morgen",       bu_morgen               },
 		{ "scheffel",              bu_scheffel             },
 		{ "prussian_scheffel",     bu_scheffel             },
+		{ "delisle",               bu_delisle              },
+		{ "degDe",                 bu_delisle              },
+		{ "degreeDe",              bu_delisle              },
+		{ "newton_temperature",    bu_newton_temp          },
+		{ "degN",                  bu_newton_temp          },
+		{ "degreeN",               bu_newton_temp          },
+		{ "reaumur",               bu_reaumur              },
+		{ "degRe",                 bu_reaumur              },
+		{ "degreeRe",              bu_reaumur              },
+		{ "romer",                 bu_romer                },
+		{ "degRo",                 bu_romer                },
+		{ "degreeRo",              bu_romer                },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1233,6 +1293,7 @@ static void test_nonsi_roundtrip(void)
 		bu_pfund, bu_zentner, bu_doppelzentner, bu_lot,
 		bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss, bu_prussian_elle,
 		bu_prussian_rute, bu_klafter, bu_german_mile, bu_morgen, bu_scheffel,
+		bu_rankine, bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
 	};
 	size_t n = sizeof(units) / sizeof(units[0]);
 	for (size_t i = 0; i < n; i++) {

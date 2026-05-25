@@ -16,7 +16,7 @@ from .structs import (
     make_data_key, make_data_typed, make_data_value,
 )
 
-DEFAULT_MEM_CAP = 256 * 1024
+DEFAULT_MEM_CAP = 4 * 1024 * 1024
 
 class Writer:
 

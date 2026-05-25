@@ -12,9 +12,10 @@ from .exceptions import (
     BovnarError, BovnarLibraryNotFound,
     BovnarParseError, BovnarWriteError, BovnarArgumentError,
 )
-from .reader  import Reader, EventPayload, MAX_FILESIZE_BYTES
-from .writer  import Writer
-from .dom     import DomDoc, DomNode, DomType
+from .reader   import Reader, EventPayload, MAX_FILESIZE_BYTES
+from .writer   import Writer
+from .dom      import DomDoc, DomNode, DomType
+from .quantity import Quantity
 from .units   import (
     UnitFlags,
     SIConversion, UnitConversion, ReducedUnit, SI_DIM_NAMES,
@@ -32,6 +33,7 @@ __all__ = [
     'loads', 'dumps', 'dom_parse',
     'unit_factor', 'unit_to_str', 'parse_unit',
     'write_array',
+    'Quantity',
 
     'Reader', 'Writer', 'EventPayload',
     'DomDoc', 'DomNode', 'DomType',
@@ -67,11 +69,12 @@ __version__ = '0.2.0'
 
 def loads(data: bytes | bytearray | str | memoryview,
           *,
+          typed: bool = False,
           max_file_size: int = 0,
           continue_on_error: bool = False) -> dict:
     if isinstance(data, str):
         data = data.encode('utf-8')
-    parser = _DictParser()
+    parser = _TypedDictParser() if typed else _DictParser()
     with Reader() as r:
         r.read_mem(
             data,
@@ -82,15 +85,20 @@ def loads(data: bytes | bytearray | str | memoryview,
     return parser.result()
 
 
-def dumps(obj: dict,
-          *,
-          pretty: bool = True,
-          cap: int = 256 * 1024) -> bytes:
+def dumps(obj: dict, *, pretty: bool = True) -> bytes:
     if not isinstance(obj, dict):
         raise BovnarArgumentError("dumps() requires a dict at the top level")
-    with Writer.to_mem(cap=cap, pretty=pretty) as w:
-        _emit_dict(w, obj)
-    return w.get_output()
+    cap = 4 * 1024 * 1024
+    while True:
+        try:
+            with Writer.to_mem(cap=cap, pretty=pretty) as w:
+                _emit_dict(w, obj)
+            return w.get_output()
+        except BovnarWriteError as e:
+            if e.code == ErrorCode.SINK_BUFFER_EXHAUSTED and cap < 256 * 1024 * 1024:
+                cap *= 2
+            else:
+                raise
 
 
 def dom_parse(data: bytes | bytearray | str | memoryview) -> DomDoc:
@@ -294,7 +302,7 @@ class _DictParser:
                 self._octet_buf.extend(raw)
             else:
                 tok_type = getattr(data, 'type', 0) if data is not None else 0
-                value = _decode_value(raw, fam, vt, tok_type)
+                value = self._decode_data(raw, fam, vt, tok_type, data)
                 self._push_value(value)
 
         return True
@@ -343,9 +351,25 @@ class _DictParser:
             arr = self._scope_stack.pop()[1]
             self._commit_sealed(arr, _seal_array(arr))
 
+    def _decode_data(self, raw: bytes, fam: ValueTypeFamily, vt,
+                     tok_type: int, data) -> object:
+        return _decode_value(raw, fam, vt, tok_type)
+
     def result(self) -> dict:
         self._maybe_seal_array()
         return self._doc
+
+
+class _TypedDictParser(_DictParser):
+    """Like _DictParser but wraps typed values in Quantity for lossless round-trips."""
+
+    def _decode_data(self, raw: bytes, fam: ValueTypeFamily, vt,
+                     tok_type: int, data) -> object:
+        if fam == ValueTypeFamily.PLAIN:
+            return _decode_value(raw, fam, vt, tok_type)
+        text = raw.decode('utf-8', errors='replace') if raw else None
+        vu   = data.value_unit if data is not None else make_unit_none()
+        return Quantity(text, vt, vu, tok_type)
 
 
 def _seal_array(arr: _ArrScope):
@@ -403,11 +427,60 @@ def _emit_dict(w: Writer, d: dict) -> None:
         _emit_value(w, key, value)
 
 
+_FAM_NAMES = {
+    int(ValueTypeFamily.UTF8):      'utf8',
+    int(ValueTypeFamily.SINT):      'sint',
+    int(ValueTypeFamily.UINT):      'uint',
+    int(ValueTypeFamily.FLOAT):     'float',
+    int(ValueTypeFamily.FLOAT_FIX): 'float_fix',
+    int(ValueTypeFamily.FLOAT_DEC): 'float_dec',
+}
+
+
+def _has_real_unit(vu: ValueUnit) -> bool:
+    return any(vu.components[i].base != 0 for i in range(vu.num_components))
+
+
+def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit) -> bool:
+    """Return True only when the type annotation carries non-default information."""
+    fam = int(vt.family)
+    if fam == int(ValueTypeFamily.PLAIN):
+        return False
+    if fam in (int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.FLOAT_DEC)):
+        return True
+    if _has_real_unit(vu):
+        return True
+    if vt.base not in (0, 10):
+        return True
+    if vt.width == 0:
+        return False
+    return vt.width != 64
+
+
+def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
+    import ctypes as _ct
+    fam = int(q.vtype.family)
+    w.emit(Event.ASSIGNMENT_START, key=key)
+    fam_name = _FAM_NAMES.get(fam)
+    if fam_name is not None and _needs_annotation(q.vtype, q.unit):
+        w._emit_annotation(fam_name, q.vtype, q.unit)
+    raw_bytes = q.raw.encode('utf-8') if q.raw else b''
+    d = BvnrData()
+    d.type       = q._tok_type
+    d.value_type = q.vtype
+    d.value_unit = q.unit
+    d.data       = _ct.cast(_ct.c_char_p(raw_bytes), _ct.c_void_p)
+    d.length     = len(raw_bytes)
+    _write_event_data(w, d)
+
+
 def _emit_value(w: Writer, key: str, value) -> None:
     if value is None:
         w.write_null(key)
     elif isinstance(value, bool):
         w.write_bool(key, value)
+    elif isinstance(value, Quantity):
+        _emit_quantity(w, key, value)
     elif isinstance(value, int):
         if value >= 0:
             w.write_uint(key, value)

@@ -1191,7 +1191,7 @@ An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0
 | Struct nesting | Yes (`max_struct_nesting`) | 0 (→64 internal) | `error_struct_nesting_too_high` |
 | Array nesting | Yes (`max_array_nesting`) | 0 (→64 internal, hard cap 255) | `error_array_nesting_too_high` |
 
-Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal reader default — **64** for both nesting depths, and **2 147 483 647** (2³¹ − 1) for the three byte/item counters. These defaults are permissive but finite. The **writer** uses different defaults when its corresponding fields are 0: both nesting limits default to **255** (`UINT8_MAX`); the writer does not internally limit array items, text bytes, or file size.
+Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default — **64** for both nesting depths, and **2 147 483 647** (2³¹ − 1) for the three byte/item counters. These defaults apply to both the reader and the writer. The writer does not internally limit array items, text bytes, or file size.
 
 ### 12.3 Value Validation
 
@@ -2222,8 +2222,8 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 |----------|-------|-------------|
 | reader default struct nesting | 64 | Default applied by the reader when `max_struct_nesting` is 0; hard cap is 255 |
 | reader default array nesting | 64 | Default applied by the reader when `max_array_nesting` is 0; hard cap is 255 |
-| writer default struct nesting | 255 | Default applied by the writer when `max_struct_nesting` is 0 |
-| writer default array nesting | 255 | Default applied by the writer when `max_array_nesting` is 0 |
+| writer default struct nesting | 64 | Default applied by the writer when `max_struct_nesting` is 0; hard cap is 255 |
+| writer default array nesting | 64 | Default applied by the writer when `max_array_nesting` is 0; hard cap is 255 |
 | reader default max_array_items | 2 147 483 647 | Default applied by the reader when `max_array_items` is 0 |
 | reader default max_text_bytes | 2 147 483 647 | Default applied by the reader when `max_text_bytes` is 0 |
 | reader default max_file_size | 2 147 483 647 | Default applied by the reader when `max_file_size` is 0; set to 16 777 216 (16 MiB) in production |

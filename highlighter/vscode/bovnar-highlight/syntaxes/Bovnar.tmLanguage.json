@@ -136,7 +136,7 @@
 
     "inline_unit": {
       "comment": "Inline unit suffix (spec §6.5): mandatory whitespace separates the scalar value from the unit. Lookbehind anchors to the final byte of a scalar: digit (number), '$' (closing delimiter of $nan$ etc.), or '\"' (closing quote of string). Inline units are intentionally absent from the #array rule because they are forbidden inside array elements.",
-      "match": "(?<=[\\d$\"])(\\s+)([A-Za-z_µ°][A-Za-z0-9_\\.\\-/:\\^\\*µΩ°·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
+      "match": "(?<=[\\d$\"])(\\s+)([A-Za-z_µ°Å][A-Za-z0-9_+~\\.\\-/:\\^\\*µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
       "captures": {
         "1": { "name": "punctuation.separator.inline-unit.bovnar" },
         "2": { "name": "support.type.unit.inline.bovnar"          }
@@ -209,8 +209,8 @@
     },
 
     "unit_expression": {
-      "comment": "Unit string inside a type annotation: SI/IEC prefix–unit pairs with product/division separators and Unicode superscript exponents. Examples: m~s  k~g·m/s²  Gi~B  m^-2  µ~eV  fl_dr  gi_uk  atmosphere_technical. No semantic validation — purely visual scope tagging.",
-      "match": "[A-Za-zµΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?(?:[·/*][A-Za-zµΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?)*",
+      "comment": "Unit string inside a type annotation: SI/IEC prefix–unit pairs with product/division separators and Unicode superscript exponents. Examples: m~s  k~g·m/s²  Gi~B  m^-2  µ~eV  fl_dr  gi_uk  atmosphere_technical  Å. No semantic validation — purely visual scope tagging.",
+      "match": "[A-Za-zµΩ°Å][A-Za-z0-9_]*(?:~[A-Za-zµΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?(?:[·/*][A-Za-zµΩ°Å][A-Za-z0-9_]*(?:~[A-Za-zµΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?)*",
       "name": "support.type.unit.bovnar"
     }
 

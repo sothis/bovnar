@@ -3,6 +3,16 @@
   "name": "Bovnar Cyberpunk",
   "type": "dark",
   "colors": {
+    "editor.background": "#1a1b2e",
+    "editor.foreground": "#f8f8f2",
+    "editor.selectionBackground": "#44475a80",
+    "editor.lineHighlightBackground": "#2d2f4f40",
+    "editorCursor.foreground": "#ff79c6",
+    "editorLineNumber.foreground": "#4a4e69",
+    "editorLineNumber.activeForeground": "#f8f8f2",
+    "editorWhitespace.foreground": "#3d3f4e",
+    "editorIndentGuide.background1": "#3d3f4e",
+    "editorIndentGuide.activeBackground1": "#6272a4",
     "editorBracketHighlight.foreground1": "#ff79c6",
     "editorBracketHighlight.foreground2": "#ffb86c",
     "editorBracketHighlight.foreground3": "#8be9fd",
@@ -24,6 +34,141 @@
     "editorBracketPairGuide.activeBackground6": "#00cec950"
   },
   "tokenColors": [
+
+    // ── General-purpose rules (all languages) ────────────────────────────────
+    // These use broad parent scopes; Bovnar-specific scopes below are more
+    // precise and therefore take precedence under TextMate scope-scoring rules.
+
+    {
+      "name": "General – Comments",
+      "scope": ["comment", "punctuation.definition.comment"],
+      "settings": { "foreground": "#6272a4", "fontStyle": "italic" }
+    },
+    {
+      "name": "General – Keywords and Control Flow",
+      "scope": [
+        "keyword", "keyword.control", "keyword.control.flow",
+        "keyword.other", "keyword.declaration"
+      ],
+      "settings": { "foreground": "#ff79c6" }
+    },
+    {
+      "name": "General – Storage (type / modifier)",
+      "scope": ["storage", "storage.type", "storage.modifier"],
+      "settings": { "foreground": "#ff79c6" }
+    },
+    {
+      "name": "General – Strings",
+      "scope": [
+        "string", "string.quoted", "string.quoted.single",
+        "string.quoted.double", "string.quoted.triple",
+        "string.template", "string.regexp",
+        "punctuation.definition.string.begin",
+        "punctuation.definition.string.end"
+      ],
+      "settings": { "foreground": "#f1fa8c" }
+    },
+    {
+      "name": "General – Numbers",
+      "scope": ["constant.numeric"],
+      "settings": { "foreground": "#bd93f9" }
+    },
+    {
+      "name": "General – Constants and Language Keywords",
+      "scope": ["constant", "constant.language", "constant.other"],
+      "settings": { "foreground": "#bd93f9" }
+    },
+    {
+      "name": "General – Function / Method Names",
+      "scope": [
+        "entity.name.function", "entity.name.method",
+        "support.function", "support.function.builtin",
+        "meta.function-call entity.name.function"
+      ],
+      "settings": { "foreground": "#50fa7b" }
+    },
+    {
+      "name": "General – Class / Type Names",
+      "scope": [
+        "entity.name.type", "entity.name.class",
+        "entity.name.namespace", "entity.name.struct",
+        "entity.name.enum", "entity.name.union",
+        "support.class", "support.type"
+      ],
+      "settings": { "foreground": "#8be9fd" }
+    },
+    {
+      "name": "General – Variables and Parameters",
+      "scope": [
+        "variable", "variable.other", "variable.other.readwrite",
+        "variable.parameter", "variable.other.object",
+        "variable.other.property"
+      ],
+      "settings": { "foreground": "#f8f8f2" }
+    },
+    {
+      "name": "General – Operators",
+      "scope": ["keyword.operator"],
+      "settings": { "foreground": "#ff79c6" }
+    },
+    {
+      "name": "General – Preprocessor / Import / Include",
+      "scope": [
+        "meta.preprocessor",
+        "keyword.control.directive",
+        "keyword.control.import",
+        "keyword.import",
+        "keyword.other.import",
+        "entity.name.function.preprocessor",
+        "meta.preprocessor.macro"
+      ],
+      "settings": { "foreground": "#ffb86c" }
+    },
+    {
+      "name": "General – Escape Sequences",
+      "scope": ["constant.character.escape"],
+      "settings": { "foreground": "#ff79c6" }
+    },
+    {
+      "name": "General – Markup / HTML Tags",
+      "scope": ["entity.name.tag"],
+      "settings": { "foreground": "#ff79c6" }
+    },
+    {
+      "name": "General – HTML / XML Attributes",
+      "scope": ["entity.other.attribute-name"],
+      "settings": { "foreground": "#50fa7b" }
+    },
+    {
+      "name": "General – Decorators / Annotations",
+      "scope": [
+        "entity.name.function.decorator",
+        "meta.decorator entity.name.function",
+        "punctuation.definition.annotation"
+      ],
+      "settings": { "foreground": "#ffb86c", "fontStyle": "italic" }
+    },
+    {
+      "name": "General – Invalid / Error",
+      "scope": ["invalid", "invalid.illegal"],
+      "settings": { "foreground": "#ff5555", "fontStyle": "underline" }
+    },
+    {
+      "name": "General – Deprecated",
+      "scope": ["invalid.deprecated"],
+      "settings": { "foreground": "#ffb86c", "fontStyle": "strikethrough" }
+    },
+    {
+      "name": "General – Punctuation",
+      "scope": [
+        "punctuation.separator", "punctuation.terminator",
+        "punctuation.accessor", "punctuation.definition.parameters"
+      ],
+      "settings": { "foreground": "#f8f8f2" }
+    },
+
+    // ── Bovnar-specific rules (override general rules above) ─────────────────
+
     {
       "name": "Bovnar Comment",
       "scope": "comment.line.number-sign.bovnar",

@@ -183,8 +183,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `mo`  | `month`, `months` | month (Julian) | `bu_month` | 2 629 800 s (= 365.25 d / 12) |
 | `fn`  | `fortnight`, `fortnights` | fortnight | `bu_fortnight` | 1 209 600 s (= 14 d) |
 | `yr`  | `year`, `years` | year (Julian) | `bu_year` | 31 557 600 s |
-| `°`, `deg`, `degr`, `degree`, `degrees` | — | degree (angle) | `bu_degree` | π/180 rad — U+00B0 |
-| `°C`, `degC`, `degrC` | — | degree Celsius | `bu_celsius` | K = °C + 273.15 **(affine)** |
+| `°`, `deg` | `degr`, `degree`, `degrees` | degree (angle) | `bu_degree` | π/180 rad — U+00B0 |
 | `t`   | `tonne` | tonne | `bu_tonne` | 10³ kg |
 | `bar` | — | bar | `bu_bar` | 10⁵ Pa |
 | `eV`  | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
@@ -232,10 +231,11 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 
 | Symbol | Long forms | Name | Enum | Conversion |
 |--------|-----------|------|------|------------|
-| `°F`, `degF`, `degrF` | `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 **(affine)** |
+| `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 **(affine)** |
+| `°F`, `degF` | `degrF`, `degreeF`, `degreesF`, `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 **(affine)** |
 | `Ra`   | `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
 
-> Celsius (`°C`) is in §4.3; Kelvin (`K`) is in §4.1. `Ra` not `R` — `R` is reserved for röntgen (§4.20).
+> Kelvin (`K`) is in §4.1. `Ra` not `R` — `R` is reserved for röntgen (§4.20).
 
 ### 4.7 Pressure
 

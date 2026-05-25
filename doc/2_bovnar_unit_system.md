@@ -228,8 +228,7 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 | `yr`   | `year`, `years` | year | `bu_year` | 31557600 s (Julian year) |
 | `mo`   | `month`, `months` | month (Julian) | `bu_month` | 2629800 s (= 365.25 d / 12) |
 | `fn`   | `fortnight`, `fortnights` | fortnight | `bu_fortnight` | 1209600 s (= 14 d) |
-| `°`, `deg`, `degr`, `degree`, `degrees` | — | degree (angle) | `bu_degree` | π/180 rad — U+00B0 |
-| `°C`, `degC`, `degrC` | — | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine) |
+| `°`, `deg` | `degr`, `degree`, `degrees` | degree (angle) | `bu_degree` | π/180 rad — U+00B0 |
 | `t`    | `tonne` | tonne | `bu_tonne` | 10³ kg |
 | `bar`  | — | bar | `bu_bar` | 10⁵ Pa |
 | `eV`   | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
@@ -279,10 +278,11 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 
 | Symbol | Long forms | Name | Enum value | Conversion |
 |--------|-----------|------|------------|------------|
-| `°F`, `degF`, `degrF` | `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 (affine) |
+| `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine) |
+| `°F`, `degF` | `degrF`, `degreeF`, `degreesF`, `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 (affine) |
 | `Ra`   | `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
 
-> **Rankine vs Fahrenheit:** Rankine is the absolute scale corresponding to Fahrenheit. The symbol `Ra` is used because `R` is reserved for the röntgen (`bu_roentgen`).
+> Kelvin (`K`) is the SI base unit (§3.1). `Ra` not `R` — `R` is reserved for the röntgen (`bu_roentgen`).
 
 ### 3.5 Pressure Units
 

@@ -87,8 +87,8 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 153 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
-- **Currency codes** — 214 monetary denominations: all 164 active ISO 4217 alphabetic codes (including precious-metal X-codes) and 50 cryptocurrency tickers.
+- **Physical units** — 157 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Currency codes** — 214 monetary denominations: 164 ISO 4217 alphabetic codes (including precious-metal X-codes; 2 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
 
@@ -96,7 +96,7 @@ Annotations are **descriptive**, not prescriptive. Bovnar validates form and typ
 
 ### Design Principles
 
-- **SI-first.** All SI base units, all 21 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.
+- **SI-first.** All SI base units, all 22 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.
 - **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … quebi) are supported for digital storage quantities.
 - **Compound units.** Derived quantities (m/s, kg·m/s², USD/oz_t) are expressed inline without separate schema definitions.
 - **Two exponent notations.** Unicode superscript (`m²`, `s⁻²`) and ASCII caret (`m^2`, `s^-2`) are accepted equivalently.
@@ -172,7 +172,7 @@ When both are present, equality is checked after parsing via `memcmp` on the com
 
 ## 3. Physical Base Units
 
-Bovnar supports 153 named physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 157 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -207,6 +207,7 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 | `Wb`   | `weber`, `webers` | weber | `bu_weber` | kg·m²·A⁻¹·s⁻² |
 | `T`    | `tesla`, `teslas` | tesla | `bu_tesla` | kg·A⁻¹·s⁻² |
 | `H`    | `henry`, `henrys`, `henries` | henry | `bu_henry` | kg·m²·A⁻²·s⁻² |
+| `°C`   | `degC`, `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine); BIPM Table 4 entry 14 |
 | `lm`   | `lumen`, `lumens` | lumen | `bu_lumen` | cd·sr |
 | `lx`   | `lux` | lux | `bu_lux` | cd·sr·m⁻² |
 | `Bq`   | `becquerel`, `becquerels` | becquerel | `bu_becquerel` | s⁻¹ |
@@ -278,7 +279,7 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 
 | Symbol | Long forms | Name | Enum value | Conversion |
 |--------|-----------|------|------------|------------|
-| `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine) |
+| `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 (affine) — also §3.2 (BIPM named derived unit) |
 | `°F`, `degF` | `degrF`, `degreeF`, `degreesF`, `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 (affine) |
 | `°Ra`, `degRa` | `degrRa`, `degreeRa`, `degreesRa`, `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
 | `°De`, `degDe` | `degrDe`, `degreeDe`, `degreesDe`, `delisle` | degree Delisle | `bu_delisle` | K = 373.15 − °De × 2/3 (affine) |
@@ -327,12 +328,14 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 | `kip`  | `kips` | kip (kilopound-force) | `bu_kip` | 4448.2216152605 N |
 | `kgf`  | `kilogram_force` | kilogram-force | `bu_kilogram_force` | 9.80665 N (exact) |
 
-### 3.9 Speed Units
+### 3.9 Speed and Rotational Frequency Units
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
 | `kn`   | `knot`, `knots` | knot | `bu_knot` | 1852/3600 m/s |
 | `rpm`  | — | revolutions per minute | `bu_rpm` | 1/60 s⁻¹ |
+
+> `kn` has dimension m·s⁻¹. `rpm` has dimension s⁻¹ (rotational frequency, not linear speed); it is grouped here by convention.
 
 ### 3.10 Volume Units
 
@@ -412,7 +415,6 @@ Bovnar supports 153 named physical base units. Currency codes are a separate nam
 |--------|-----------|------|------------|-------|
 | `var`  | `vars` | var (volt-ampere reactive) | `bu_var` | reactive power; same SI dimension as W |
 | `VA`   | `volt_ampere`, `volt_amperes` | volt-ampere | `bu_volt_ampere` | apparent power; same SI dimension as W |
-| `gn`   | `standard_gravity` | standard gravity | `bu_standard_gravity` | 9.80665 m·s⁻² (exact) |
 
 > **Watt, var, and VA:** All three carry the same SI dimensional signature (kg·m²·s⁻³). `bvn_units_compatible` returns `true` when comparing them. They are kept as distinct base units because they represent distinct AC power interpretations.
 
@@ -480,7 +482,37 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 
 > The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **372** (verified by static assert `bu_romer + 1 == 372`). Currencies begin at 134, immediately after the last non-German physical unit.
 
-### 3.21 Sentinel Value
+### 3.21 Additional Length Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `ftUS` | `survey_foot` | US survey foot | `bu_survey_foot` | 1200/3937 m ≈ 0.304800609… m |
+| `lea`  | `league`, `leagues` | statute league | `bu_league` | 4828.032 m (= 3 statute miles) |
+| `cbl`  | `cable`, `cables` | cable length | `bu_cable` | 185.2 m |
+| `hand` | `hands` | hand | `bu_hand` | 0.1016 m (= 4 in, exact) |
+
+> `ftUS` (US survey foot) differs from `ft` (international foot, 0.3048 m exactly) by about 2 ppm. Used in US geodetic surveying.
+
+### 3.22 Additional Mass Units
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `qntl` | `quintal`, `quintals` | quintal | `bu_quintal` | 100 kg (exact) |
+| `sc`   | `scruple`, `scruples` | apothecary scruple | `bu_scruple` | 1.2959782×10⁻³ kg (= 20 grains) |
+
+### 3.23 Acceleration
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `gn`   | `standard_gravity` | standard gravity | `bu_standard_gravity` | 9.80665 m·s⁻² (exact, CGPM 1901) |
+
+### 3.24 Signal Rate
+
+| Symbol | Long forms | Name | Enum value | Notes |
+|--------|-----------|------|------------|-------|
+| `Bd`   | `baud`, `bauds` | baud | `bu_baud` | 1 symbol/s = 1 s⁻¹ (ITU-T V.662) |
+
+### 3.25 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
 
@@ -729,7 +761,7 @@ This reservation requires no new sigil character and no change to the unit gramm
 
 ### 9.2 ISO 4217 Fiat Currencies and Precious Metals
 
-All 164 active ISO 4217 alphabetic codes are supported. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 297`.
+164 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 297`. Two codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro) and `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022).
 
 Key representative codes (showing range of minor-unit values):
 

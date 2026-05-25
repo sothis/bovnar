@@ -216,6 +216,13 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_german_mile]        = { bu_german_mile,        7420.44,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 	[bu_morgen]             = { bu_morgen,             2553.22,                  {2, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 	[bu_scheffel]           = { bu_scheffel,           54.961e-3,                {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_survey_foot]        = { bu_survey_foot,        1200.0/3937.0,            {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_league]             = { bu_league,             4828.032,                 {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_cable]              = { bu_cable,              185.2,                    {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_hand]               = { bu_hand,               0.1016,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_quintal]            = { bu_quintal,            100.0,                    {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_scruple]            = { bu_scruple,            1.2959782e-3,             {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_baud]               = { bu_baud,               1.0,                     {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))

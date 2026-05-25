@@ -518,20 +518,27 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_minim               == 131, "bu_minim == 131");
 	ASSERT_TRUE((int)bu_peck                == 132, "bu_peck == 132");
 	ASSERT_TRUE((int)bu_bushel              == 133, "bu_bushel == 133");
-	ASSERT_TRUE((int)bu_pfund              == 329, "bu_pfund == 329");
-	ASSERT_TRUE((int)bu_zentner            == 330, "bu_zentner == 330");
-	ASSERT_TRUE((int)bu_doppelzentner      == 331, "bu_doppelzentner == 331");
-	ASSERT_TRUE((int)bu_lot               == 332, "bu_lot == 332");
-	ASSERT_TRUE((int)bu_prussian_line      == 333, "bu_prussian_line == 333");
-	ASSERT_TRUE((int)bu_prussian_zoll      == 334, "bu_prussian_zoll == 334");
-	ASSERT_TRUE((int)bu_prussian_fuss      == 335, "bu_prussian_fuss == 335");
-	ASSERT_TRUE((int)bu_prussian_elle      == 336, "bu_prussian_elle == 336");
-	ASSERT_TRUE((int)bu_prussian_rute      == 337, "bu_prussian_rute == 337");
-	ASSERT_TRUE((int)bu_klafter            == 338, "bu_klafter == 338");
-	ASSERT_TRUE((int)bu_german_mile        == 339, "bu_german_mile == 339");
-	ASSERT_TRUE((int)bu_morgen             == 340, "bu_morgen == 340");
-	ASSERT_TRUE((int)bu_scheffel           == 341, "bu_scheffel == 341");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 342, "sentinel == 342");
+	ASSERT_TRUE((int)bu_pfund              == 348, "bu_pfund == 348");
+	ASSERT_TRUE((int)bu_zentner            == 349, "bu_zentner == 349");
+	ASSERT_TRUE((int)bu_doppelzentner      == 350, "bu_doppelzentner == 350");
+	ASSERT_TRUE((int)bu_lot               == 351, "bu_lot == 351");
+	ASSERT_TRUE((int)bu_prussian_line      == 352, "bu_prussian_line == 352");
+	ASSERT_TRUE((int)bu_prussian_zoll      == 353, "bu_prussian_zoll == 353");
+	ASSERT_TRUE((int)bu_prussian_fuss      == 354, "bu_prussian_fuss == 354");
+	ASSERT_TRUE((int)bu_prussian_elle      == 355, "bu_prussian_elle == 355");
+	ASSERT_TRUE((int)bu_prussian_rute      == 356, "bu_prussian_rute == 356");
+	ASSERT_TRUE((int)bu_klafter            == 357, "bu_klafter == 357");
+	ASSERT_TRUE((int)bu_german_mile        == 358, "bu_german_mile == 358");
+	ASSERT_TRUE((int)bu_morgen             == 359, "bu_morgen == 359");
+	ASSERT_TRUE((int)bu_scheffel           == 360, "bu_scheffel == 360");
+	ASSERT_TRUE((int)bu_survey_foot        == 361, "bu_survey_foot == 361");
+	ASSERT_TRUE((int)bu_league             == 362, "bu_league == 362");
+	ASSERT_TRUE((int)bu_cable              == 363, "bu_cable == 363");
+	ASSERT_TRUE((int)bu_hand               == 364, "bu_hand == 364");
+	ASSERT_TRUE((int)bu_quintal            == 365, "bu_quintal == 365");
+	ASSERT_TRUE((int)bu_scruple            == 366, "bu_scruple == 366");
+	ASSERT_TRUE((int)bu_baud               == 367, "bu_baud == 367");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 368, "sentinel == 368");
 }
 
 static void test_nonsi_si_factors(void)
@@ -650,6 +657,13 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_german_mile,   7420.44,                      1e-12);
 	CHK(bu_morgen,        2553.22,                      1e-12);
 	CHK(bu_scheffel,      54.961e-3,                    1e-18);
+	CHK(bu_survey_foot,   1200.0/3937.0,               1e-16);
+	CHK(bu_league,        4828.032,                    1e-12);
+	CHK(bu_cable,         185.2,                       1e-12);
+	CHK(bu_hand,          0.1016,                      1e-18);
+	CHK(bu_quintal,       100.0,                       1e-13);
+	CHK(bu_scruple,       1.2959782e-3,                1e-18);
+	CHK(bu_baud,          1.0,                         1e-15);
 #undef CHK
 #undef M_PI_LOCAL
 

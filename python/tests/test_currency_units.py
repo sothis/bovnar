@@ -74,25 +74,25 @@ class TestEnumContiguity:
         assert int(CURRENCY_FIAT_FIRST) == 134
 
     def test_fiat_last_value(self):
-        assert int(CURRENCY_FIAT_LAST) == 294
+        assert int(CURRENCY_FIAT_LAST) == 297
 
     def test_crypto_first_value(self):
-        assert int(CURRENCY_CRYPTO_FIRST) == 295
+        assert int(CURRENCY_CRYPTO_FIRST) == 298
 
     def test_crypto_last_value(self):
-        assert int(CURRENCY_CRYPTO_LAST) == 328
+        assert int(CURRENCY_CRYPTO_LAST) == 347
 
     def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 329
+        assert int(BaseUnit._SENTINEL) == 368
 
     def test_fiat_range_size(self):
-        assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 161
+        assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 164
 
     def test_crypto_range_size(self):
-        assert int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_CRYPTO_FIRST) + 1 == 34
+        assert int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_CRYPTO_FIRST) + 1 == 50
 
     def test_total_currency_count(self):
-        assert len(_all_currency_bases()) == 195
+        assert len(_all_currency_bases()) == 214
 
     def test_no_gap_between_fiat_and_crypto(self):
         assert int(CURRENCY_CRYPTO_FIRST) == int(CURRENCY_FIAT_LAST) + 1
@@ -141,16 +141,16 @@ class TestFiatMetadata:
         assert int(BaseUnit.AED) == 134
 
     def test_zwl_enum_value(self):
-        assert int(BaseUnit.ZWL) == 294
+        assert int(BaseUnit.ZWL) == 297
 
     def test_usd_enum_value(self):
-        assert int(BaseUnit.USD) == 274
+        assert int(BaseUnit.USD) == 277
 
     def test_eur_enum_value(self):
-        assert int(BaseUnit.EUR) == 176
+        assert int(BaseUnit.EUR) == 177
 
     def test_jpy_enum_value(self):
-        assert int(BaseUnit.JPY) == 200
+        assert int(BaseUnit.JPY) == 201
 
 
 # ── TestCryptoMetadata ─────────────────────────────────────────────────────
@@ -187,13 +187,13 @@ class TestCryptoMetadata:
         assert name_fragment.lower() in info.name.lower()
 
     def test_btc_enum_value(self):
-        assert int(BaseUnit.BTC) == 295
+        assert int(BaseUnit.BTC) == 298
 
     def test_eth_enum_value(self):
-        assert int(BaseUnit.ETH) == 296
+        assert int(BaseUnit.ETH) == 299
 
     def test_atom_enum_value(self):
-        assert int(BaseUnit.ATOM) == 328
+        assert int(BaseUnit.ATOM) == 331
 
     def test_doge_is_4_char(self):
         assert len(BaseUnit.DOGE.name) == 4
@@ -282,13 +282,13 @@ class TestReverseCodeLookup:
 
 class TestIterators:
     def test_all_fiat_count(self):
-        assert sum(1 for _ in all_fiat()) == 161
+        assert sum(1 for _ in all_fiat()) == 164
 
     def test_all_crypto_count(self):
-        assert sum(1 for _ in all_crypto()) == 34
+        assert sum(1 for _ in all_crypto()) == 50
 
     def test_all_currencies_count(self):
-        assert sum(1 for _ in all_currencies()) == 195
+        assert sum(1 for _ in all_currencies()) == 214
 
     def test_all_fiat_are_not_crypto(self):
         for info in all_fiat():
@@ -461,7 +461,7 @@ class TestEnumCoverageComplete:
         assert not missing, f"Missing table entries: {missing}"
 
     def test_table_size_matches_enum_range(self):
-        n_enum = int(BaseUnit._SENTINEL) - int(CURRENCY_FIAT_FIRST)
+        n_enum = int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_FIAT_FIRST) + 1
         n_table = sum(1 for _ in all_currencies())
         assert n_table == n_enum
 
@@ -490,7 +490,7 @@ class TestPhysicalUnitCollisions:
         assert BaseUnit.CUP == 81
 
     def test_cup_cuban_peso_is_cup_underscore(self):
-        assert int(BaseUnit.CUP_) == 166
+        assert int(BaseUnit.CUP_) == 167
 
     def test_cup_wire_code_is_still_cup(self):
         info = currency_info(BaseUnit.CUP_)
@@ -529,11 +529,11 @@ class TestPhysicalUnitCollisions:
 
 
 class TestBaseUnitSentinel:
-    def test_sentinel_is_329(self):
-        assert int(BaseUnit._SENTINEL) == 329
+    def test_sentinel_is_368(self):
+        assert int(BaseUnit._SENTINEL) == 368
 
-    def test_sentinel_is_one_past_atom(self):
-        assert int(BaseUnit._SENTINEL) == int(BaseUnit.ATOM) + 1
+    def test_sentinel_is_one_past_baud(self):
+        assert int(BaseUnit._SENTINEL) == int(BaseUnit.BAUD) + 1
 
 
 # ── TestPrefixRulesC ───────────────────────────────────────────────────────

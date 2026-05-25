@@ -44,12 +44,12 @@ static void test_enum_range_sentinels(void)
 {
     printf("  enum range sentinels...\n");
     ASSERT_EQ_INT(BVN_CURRENCY_FIAT_FIRST,    134, "FIAT_FIRST == 134");
-    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_LAST,     294, "FIAT_LAST  == 294");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_FIRST,  295, "CRYPTO_FIRST == 295");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_LAST,   328, "CRYPTO_LAST == 328");
-    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT_CURRENCY, 329, "TOTAL == 329");
-    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_LAST - BVN_CURRENCY_FIAT_FIRST + 1, 161, "161 fiat entries");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_LAST - BVN_CURRENCY_CRYPTO_FIRST + 1, 34, "34 crypto entries");
+    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_LAST,     297, "FIAT_LAST  == 297");
+    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_FIRST,  298, "CRYPTO_FIRST == 298");
+    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_LAST,   347, "CRYPTO_LAST == 347");
+    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT_CURRENCY, 348, "TOTAL == 348");
+    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_LAST - BVN_CURRENCY_FIAT_FIRST + 1, 164, "164 fiat entries");
+    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_LAST - BVN_CURRENCY_CRYPTO_FIRST + 1, 50, "50 crypto entries");
     ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_FIRST, BVN_CURRENCY_FIAT_LAST + 1, "no gap fiat/crypto");
 }
 
@@ -79,41 +79,47 @@ static void test_parse_fiat(void)
 {
     printf("  bvn_parse_currency_str: fiat...\n");
     ASSERT_EQ_INT(parse("AED"), 134, "AED==134");
-    ASSERT_EQ_INT(parse("ZWL"), 294, "ZWL==294");
-    ASSERT_EQ_INT(parse("USD"), 274, "USD==274");
-    ASSERT_EQ_INT(parse("EUR"), 176, "EUR==176");
-    ASSERT_EQ_INT(parse("GBP"), 179, "GBP==179");
-    ASSERT_EQ_INT(parse("JPY"), 200, "JPY==200");
-    ASSERT_EQ_INT(parse("CHF"), 160, "CHF==160");
-    ASSERT_EQ_INT(parse("KWD"), 207, "KWD==207");
+    ASSERT_EQ_INT(parse("ZWL"), 297, "ZWL==297");
+    ASSERT_EQ_INT(parse("USD"), 277, "USD==277");
+    ASSERT_EQ_INT(parse("EUR"), 177, "EUR==177");
+    ASSERT_EQ_INT(parse("GBP"), 180, "GBP==180");
+    ASSERT_EQ_INT(parse("JPY"), 201, "JPY==201");
+    ASSERT_EQ_INT(parse("CHF"), 161, "CHF==161");
+    ASSERT_EQ_INT(parse("KWD"), 208, "KWD==208");
     ASSERT_EQ_INT(parse("BHD"), 148, "BHD==148");
-    ASSERT_EQ_INT(parse("OMR"), 236, "OMR==236");
-    ASSERT_EQ_INT(parse("JOD"), 199, "JOD==199");
-    ASSERT_EQ_INT(parse("TND"), 266, "TND==266");
-    ASSERT_EQ_INT(parse("CLF"), 161, "CLF==161");
-    ASSERT_EQ_INT(parse("XAU"), 283, "XAU==283");
-    ASSERT_EQ_INT(parse("XDR"), 285, "XDR==285");
-    ASSERT_EQ_INT(parse("CUP"), 166, "CUP (Cuban Peso)==166");
-    ASSERT_EQ_INT(parse("VND"), 278, "VND==278");
-    ASSERT_EQ_INT(parse("CLP"), 162, "CLP==162");
+    ASSERT_EQ_INT(parse("BIF"), 149, "BIF==149");
+    ASSERT_EQ_INT(parse("OMR"), 237, "OMR==237");
+    ASSERT_EQ_INT(parse("JOD"), 200, "JOD==200");
+    ASSERT_EQ_INT(parse("TND"), 269, "TND==269");
+    ASSERT_EQ_INT(parse("CLF"), 162, "CLF==162");
+    ASSERT_EQ_INT(parse("XAU"), 286, "XAU==286");
+    ASSERT_EQ_INT(parse("XDR"), 288, "XDR==288");
+    ASSERT_EQ_INT(parse("CUP"), 167, "CUP (Cuban Peso)==167");
+    ASSERT_EQ_INT(parse("VND"), 281, "VND==281");
+    ASSERT_EQ_INT(parse("CLP"), 163, "CLP==163");
+    ASSERT_EQ_INT(parse("SLE"), 257, "SLE==257");
+    ASSERT_EQ_INT(parse("SSP"), 260, "SSP==260");
 }
 
 static void test_parse_crypto(void)
 {
     printf("  bvn_parse_currency_str: crypto...\n");
-    ASSERT_EQ_INT(parse("BTC"),  295, "BTC==295");
-    ASSERT_EQ_INT(parse("ETH"),  296, "ETH==296");
-    ASSERT_EQ_INT(parse("SOL"),  297, "SOL==297");
-    ASSERT_EQ_INT(parse("XRP"),  298, "XRP==298");
-    ASSERT_EQ_INT(parse("DOT"),  302, "DOT==302");
-    ASSERT_EQ_INT(parse("XMR"),  303, "XMR==303");
-    ASSERT_EQ_INT(parse("XLM"),  306, "XLM==306");
-    ASSERT_EQ_INT(parse("DOGE"), 323, "DOGE==323");
-    ASSERT_EQ_INT(parse("LINK"), 324, "LINK==324");
-    ASSERT_EQ_INT(parse("USDT"), 325, "USDT==325");
-    ASSERT_EQ_INT(parse("USDC"), 326, "USDC==326");
-    ASSERT_EQ_INT(parse("AVAX"), 327, "AVAX==327");
-    ASSERT_EQ_INT(parse("ATOM"), 328, "ATOM==328");
+    ASSERT_EQ_INT(parse("BTC"),  298, "BTC==298");
+    ASSERT_EQ_INT(parse("ETH"),  299, "ETH==299");
+    ASSERT_EQ_INT(parse("SOL"),  300, "SOL==300");
+    ASSERT_EQ_INT(parse("XRP"),  301, "XRP==301");
+    ASSERT_EQ_INT(parse("DOT"),  305, "DOT==305");
+    ASSERT_EQ_INT(parse("XMR"),  306, "XMR==306");
+    ASSERT_EQ_INT(parse("XLM"),  309, "XLM==309");
+    ASSERT_EQ_INT(parse("DOGE"), 326, "DOGE==326");
+    ASSERT_EQ_INT(parse("LINK"), 327, "LINK==327");
+    ASSERT_EQ_INT(parse("USDT"), 328, "USDT==328");
+    ASSERT_EQ_INT(parse("USDC"), 329, "USDC==329");
+    ASSERT_EQ_INT(parse("AVAX"), 330, "AVAX==330");
+    ASSERT_EQ_INT(parse("ATOM"), 331, "ATOM==331");
+    ASSERT_EQ_INT(parse("POL"),  332, "POL==332");
+    ASSERT_EQ_INT(parse("NEAR"), 333, "NEAR==333");
+    ASSERT_EQ_INT(parse("RUNE"), 347, "RUNE==347");
 }
 
 static void test_parse_rejects(void)
@@ -206,7 +212,7 @@ static void test_info_records(void)
     ASSERT_STR(ci->code, "DOGE", "DOGE 4-char code");
     ASSERT_TRUE(ci->is_crypto,    "DOGE is_crypto");
 
-    ASSERT_EQ_INT((int)parse("ATOM"), BVN_CURRENCY_CRYPTO_LAST, "ATOM==CRYPTO_LAST");
+    ASSERT_EQ_INT((int)parse("RUNE"), BVN_CURRENCY_CRYPTO_LAST, "RUNE==CRYPTO_LAST");
 
     ASSERT_TRUE(bvn_currency_info((int)bu_meter) == NULL, "bu_meter info NULL");
     ASSERT_TRUE(bvn_currency_info(0)             == NULL, "bu_none info NULL");
@@ -257,7 +263,7 @@ static void test_cup_collision(void)
     printf("  CUP collision guard: physical bu_cup != Cuban Peso...\n");
     ASSERT_TRUE((int)bu_cup == 81,        "bu_cup (volume) == 81");
     ASSERT_TRUE(!bvn_unit_is_currency((int)bu_cup), "bu_cup (volume) not currency");
-    ASSERT_EQ_INT(parse("CUP"), 166,      "CUP string -> Cuban Peso (166)");
+    ASSERT_EQ_INT(parse("CUP"), 167,      "CUP string -> Cuban Peso (167)");
     ASSERT_TRUE(parse("CUP") != (int)bu_cup, "CUP currency != bu_cup physical");
 }
 

@@ -388,6 +388,7 @@ static const bu_entry_t bu_table[] = {
 	{"fluid_ounces_uk", 15, bu_fluid_ounce_uk},
 	{"prussian_morgen",      15, bu_morgen},
 	{"nautical_miles",  14, bu_nautical_mile},
+	{"survey_foot",     11, bu_survey_foot},
 	{"foot_pounds",     11, bu_foot_pound},    {"fluid_ounce_uk",  13, bu_fluid_ounce_uk},
 	{"german_mile",     11, bu_german_mile},
 	{"nautical_mile",   13, bu_nautical_mile},
@@ -426,6 +427,7 @@ static const bu_entry_t bu_table[] = {
 	{"becquerel",        9, bu_becquerel},     {"quarts_uk",       9, bu_quart_uk},
 	{"fortnight",        9, bu_fortnight},
 	{"gill_uk",          7, bu_gill_uk},       {"gills_uk",        8, bu_gill_uk},
+	{"quintals",         8, bu_quintal},        {"scruples",        8, bu_scruple},
 	{"decibels",         8, bu_decibel},       {"teaspoon",        8, bu_teaspoon},
 	{"angstrom",         8, bu_angstrom},      {"furlongs",        8, bu_furlong},
 	{"maxwells",         8, bu_maxwell},       {"oersteds",        8, bu_oersted},
@@ -436,6 +438,8 @@ static const bu_entry_t bu_table[] = {
 	{"sieverts",         8, bu_sievert},       {"pints_uk",        8, bu_pint_uk},
 	{"quart_uk",         8, bu_quart_uk},      {"fl_oz_uk",        8, bu_fluid_ounce_uk},
 	{"fl_drams",         8, bu_fluid_dram},    {"scheffel",        8, bu_scheffel},
+	{"leagues",          7, bu_league},        {"quintal",         7, bu_quintal},
+	{"scruple",          7, bu_scruple},
 	{"bushels",          7, bu_bushel},        {"deniers",         7, bu_denier},
 	{"zentner",          7, bu_zentner},       {"klafter",         7, bu_klafter},
 	{"rankine",          7, bu_rankine},       {"decibel",         7, bu_decibel},
@@ -453,6 +457,7 @@ static const bu_entry_t bu_table[] = {
 	{"minutes",          7, bu_minute},        {"hectare",         7, bu_hectare},
 	{"sievert",          7, bu_sievert},       {"degrees",         7, bu_degree},
 	{"pint_uk",          7, bu_pint_uk},       {"bushel",          6, bu_bushel},
+	{"cables",           6, bu_cable},         {"league",          6, bu_league},
 	{"denier",           6, bu_denier},        {"months",          6, bu_month},
 	{"pfunds",           6, bu_pfund},         {"schffl",          6, bu_scheffel},
 	{"morgen",           6, bu_morgen},
@@ -478,6 +483,8 @@ static const bu_entry_t bu_table[] = {
 	{"litres",           6, bu_liter},         {"liters",          6, bu_liter},
 	{"minute",           6, bu_minute},        {"degree",          6, bu_degree},
 	{"inches",           6, bu_inch},          {"gi_uk",           5, bu_gill_uk},
+	{"bauds",            5, bu_baud},           {"cable",           5, bu_cable},
+	{"hands",            5, bu_hand},
 	{"pecks",            5, bu_peck},          {"turns",           5, bu_revolution},
 	{"minim",            5, bu_minim},         {"month",           5, bu_month},
 	{"fl_dr",            5, bu_fluid_dram},
@@ -510,6 +517,8 @@ static const bu_entry_t bu_table[] = {
 	{"bytes",            5, bu_byte},          {"degrC",           5, bu_celsius},
 	{"tn_sh",            5, bu_short_ton},     {"fl_oz",           5, bu_fluid_ounce},
 	{"pt_uk",            5, bu_pint_uk},       {"qt_uk",           5, bu_quart_uk},
+	{"ftUS",             4, bu_survey_foot},   {"qntl",            4, bu_quintal},
+	{"baud",             4, bu_baud},          {"hand",            4, bu_hand},
 	{"rods",             4, bu_rod},           {"slug",            4, bu_slug},
 	{"gill",             4, bu_gill},          {"cups",            4, bu_cup},
 	{"kips",             4, bu_kip},
@@ -538,6 +547,7 @@ static const bu_entry_t bu_table[] = {
 	{"fath",             4, bu_fathom},        {"ergs",            4, bu_erg},
 	{"vars",             4, bu_var},           {"dram",            4, bu_dram},
 	{"peck",             4, bu_peck},          {"turn",            4, bu_revolution},
+	{"lea",              3, bu_league},        {"cbl",             3, bu_cable},
 	{"dwt",              3, bu_pennyweight},   {"rpm",             3, bu_rpm},
 	{"kgf",              3, bu_kilogram_force},{"var",             3, bu_var},
 	{"gal",              3, bu_gallon},        {"Gal",             3, bu_galileo},
@@ -570,6 +580,7 @@ static const bu_entry_t bu_table[] = {
 	{"tsp",              3, bu_teaspoon},
 	{"ft_lb",            5, bu_foot_pound},    {"inHg",            4, bu_inch_hg},
 	{"\xc2\xb0""F",     3, bu_fahrenheit},
+	{"Bd",               2, bu_baud},           {"sc",              2, bu_scruple},
 	{"VA",               2, bu_volt_ampere},
 	{"Ra",               2, bu_rankine},       {"dB",              2, bu_decibel},
 	{"Oe",               2, bu_oersted},       {"Mx",              2, bu_maxwell},
@@ -1114,6 +1125,13 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_german_mile:       return "dt_mi";
 	case bu_morgen:            return "morgen";
 	case bu_scheffel:          return "schffl";
+	case bu_survey_foot:       return "ftUS";
+	case bu_league:            return "lea";
+	case bu_cable:             return "cbl";
+	case bu_hand:              return "hand";
+	case bu_quintal:           return "qntl";
+	case bu_scruple:           return "sc";
+	case bu_baud:              return "Bd";
 	default:
 		if (bvn_unit_is_currency((int)b)) {
 			const bvn_currency_info_t *info = bvn_currency_info((int)b);

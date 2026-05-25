@@ -87,8 +87,8 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 146 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
-- **Currency codes** — 195 monetary denominations: all 161 active ISO 4217 alphabetic codes (including precious-metal X-codes) and 34 cryptocurrency tickers.
+- **Physical units** — 153 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Currency codes** — 214 monetary denominations: all 164 active ISO 4217 alphabetic codes (including precious-metal X-codes) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
 
@@ -172,7 +172,7 @@ When both are present, equality is checked after parsing via `memcmp` on the com
 
 ## 3. Physical Base Units
 
-Bovnar supports 146 named physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 153 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -474,7 +474,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> The enum values for German units occupy positions **329–341**, placed after the entire currency range (134–328). `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **342** (verified by static assert `bu_scheffel + 1 == 342`). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **368** (verified by static assert `bu_baud + 1 == 368`). Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Sentinel Value
 
@@ -709,7 +709,7 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 ## 9. Currency Codes
 
-Currency amounts are dimensional quantities in financial computing. `$19.99 USD` carries a denomination dimension just as `9.81 m/s²` carries an acceleration dimension. Bovnar extends the unit system with 195 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.
+Currency amounts are dimensional quantities in financial computing. `$19.99 USD` carries a denomination dimension just as `9.81 m/s²` carries an acceleration dimension. Bovnar extends the unit system with 214 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.
 
 ### 9.1 Namespace Rule
 
@@ -725,7 +725,7 @@ This reservation requires no new sigil character and no change to the unit gramm
 
 ### 9.2 ISO 4217 Fiat Currencies and Precious Metals
 
-All 161 active ISO 4217 alphabetic codes are supported. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 294`.
+All 164 active ISO 4217 alphabetic codes are supported. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 297`.
 
 Key representative codes (showing range of minor-unit values):
 
@@ -748,7 +748,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 
 ### 9.3 Cryptocurrencies
 
-34 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. Base enum values begin at `bu_btc = 295`. The `minor_unit` field holds the canonical on-chain decimal places.
+50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. Base enum values begin at `bu_btc = 298`. The `minor_unit` field holds the canonical on-chain decimal places.
 
 | Code | Name | Minor unit | Subunit |
 |------|------|-----------|---------|
@@ -982,7 +982,7 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–328 (`bu_aed` … `bu_atom`). German physical units are appended after the entire currency range at positions 329–341 (`bu_pfund` … `bu_scheffel`). `bvn_unit_is_currency(base)` returns `true` for any enum value in the range 134–328.
+Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 (`bu_aed` … `bu_rune`). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`). `bvn_unit_is_currency(base)` returns `true` for any enum value in the range 134–347.
 
 ```c
 typedef enum value_base_unit_e {
@@ -1106,23 +1106,27 @@ typedef enum value_base_unit_e {
 
     /* ISO 4217 fiat currencies — alphabetical, AED…ZWL */
     bu_aed = 134,
-    /* ... 161 fiat entries ... */
-    bu_zwl = 294,
+    /* ... 164 fiat entries ... */
+    bu_zwl = 297,
 
     /* Cryptocurrencies */
-    bu_btc = 295,
-    /* ... 34 crypto entries ... */
-    bu_atom = 328,
+    bu_btc = 298,
+    /* ... 50 crypto entries ... */
+    bu_rune = 347,
 
     /* Old German — placed after the currency range */
-    bu_pfund = 329, bu_zentner, bu_doppelzentner, bu_lot,
+    bu_pfund = 348, bu_zentner, bu_doppelzentner, bu_lot,
     bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss,
     bu_prussian_elle, bu_prussian_rute, bu_klafter,
-    bu_german_mile, bu_morgen, bu_scheffel,  /* = 341 */
+    bu_german_mile, bu_morgen, bu_scheffel,  /* = 360 */
+
+    /* Additional physical units */
+    bu_survey_foot, bu_league, bu_cable, bu_hand,
+    bu_quintal, bu_scruple, bu_baud,  /* = 367 */
 } value_base_unit_t;
 
 /* Total slot count — defined separately, not an enum member: */
-/* #define BVN_VALUE_BASE_UNIT_COUNT 342  (bu_scheffel + 1) */
+/* #define BVN_VALUE_BASE_UNIT_COUNT 368  (bu_baud + 1) */
 ```
 
 #### `unit_exponent_t`
@@ -1450,8 +1454,8 @@ assert info.minor_unit == 2
 btc = from_code("BTC")
 assert btc == BaseUnit.BTC
 
-fiat_count   = sum(1 for _ in all_fiat())    # 161
-crypto_count = sum(1 for _ in all_crypto())  # 34
+fiat_count   = sum(1 for _ in all_fiat())    # 164
+crypto_count = sum(1 for _ in all_crypto())  # 50
 ```
 
 ---

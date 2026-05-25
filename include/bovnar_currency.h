@@ -6,10 +6,10 @@
 extern "C" {
 #endif
 #define BVN_CURRENCY_FIAT_FIRST    134
-#define BVN_CURRENCY_FIAT_LAST     294
-#define BVN_CURRENCY_CRYPTO_FIRST  295
-#define BVN_CURRENCY_CRYPTO_LAST   328
-#define BVN_VALUE_BASE_UNIT_COUNT_CURRENCY  329
+#define BVN_CURRENCY_FIAT_LAST     297
+#define BVN_CURRENCY_CRYPTO_FIRST  298
+#define BVN_CURRENCY_CRYPTO_LAST   347
+#define BVN_VALUE_BASE_UNIT_COUNT_CURRENCY  348
 typedef struct {
     char     code[5];
     uint16_t numeric_code;

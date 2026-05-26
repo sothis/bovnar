@@ -642,7 +642,7 @@ int32_t bvn_format_double(char *buf, size_t bufsize,
 
 Produce the value string that goes into `bvnr_data_t.data` when writing numeric values. All three return the number of bytes written (excluding NUL terminator), or `-1` on buffer overflow.
 
-- `base` — numeric base (2–64, 85). Use `10` for the common case.
+- `base` — numeric base (2–62, 64, 85). Use `10` for the common case.
 - `min_digits` — zero-pad to at least this many digits. Pass `0` for no padding.
 - For `bvn_format_double`, the type spec `vt` controls the output precision according to `vt.width` (16/32/64/128 bits).
 

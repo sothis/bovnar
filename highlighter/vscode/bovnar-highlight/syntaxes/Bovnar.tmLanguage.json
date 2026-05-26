@@ -19,7 +19,7 @@
     },
 
     "assignment": {
-      "comment": "Matches the leading '.key' sigil+identifier and the closing ';'. beginCaptures highlight the dot sigil and the key atomically, which works correctly even for multi-line values. The lookbehind anchor (^, {, ;) prevents matching '.path' segments inside reference literals.",
+      "comment": "Top-level .key = value ; — uses struct1/array1 as entry points for depth coloring.",
       "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
@@ -30,11 +30,138 @@
         "0": { "name": "punctuation.terminator.semicolon.bovnar" }
       },
       "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct1"           }
+      ]
+    },
+
+    "assignment_values": {
+      "comment": "Shared value patterns used inside every assignment variant. Includes array1 so arrays always enter the depth chain at level 1.",
+      "patterns": [
         { "include": "#comment"         },
         { "match": "=", "name": "keyword.operator.assignment.bovnar" },
         { "include": "#type_annotation" },
-        { "include": "#value"           },
+        { "include": "#special_number"  },
+        { "include": "#number"          },
+        { "include": "#string"          },
+        { "include": "#inline_unit"     },
+        { "include": "#symbol"          },
+        { "include": "#reference"       },
+        { "include": "#array1"          },
         { "match": "/", "name": "punctuation.separator.array-row.bovnar" }
+      ]
+    },
+
+    "assignment_in_struct1": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct2"           }
+      ]
+    },
+
+    "assignment_in_struct2": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct3"           }
+      ]
+    },
+
+    "assignment_in_struct3": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct4"           }
+      ]
+    },
+
+    "assignment_in_struct4": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct5"           }
+      ]
+    },
+
+    "assignment_in_struct5": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct6"           }
+      ]
+    },
+
+    "assignment_in_struct6": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct7"           }
+      ]
+    },
+
+    "assignment_in_struct7": {
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct8"           }
+      ]
+    },
+
+    "assignment_in_struct8": {
+      "comment": "Depth 8 cycles back to struct1.",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "beginCaptures": {
+        "1": { "name": "punctuation.separator.key-sigil.bovnar" },
+        "2": { "name": "entity.name.key.bovnar"                 }
+      },
+      "end": ";",
+      "endCaptures": { "0": { "name": "punctuation.terminator.semicolon.bovnar" } },
+      "patterns": [
+        { "include": "#assignment_values" },
+        { "include": "#struct1"           }
       ]
     },
 
@@ -79,7 +206,7 @@
     },
 
     "value": {
-      "comment": "All valid right-hand-side value forms. Ordering matters: special_number before plain number; inline_unit after any scalar so the lookbehind anchor is satisfied.",
+      "comment": "Top-level value forms; uses array1/struct1 as entry points for the depth chain.",
       "patterns": [
         { "include": "#comment"        },
         { "include": "#special_number" },
@@ -88,8 +215,8 @@
         { "include": "#inline_unit"    },
         { "include": "#symbol"         },
         { "include": "#reference"      },
-        { "include": "#array"          },
-        { "include": "#struct"         }
+        { "include": "#array1"         },
+        { "include": "#struct1"        }
       ]
     },
 
@@ -116,7 +243,7 @@
     },
 
     "string": {
-      "comment": "Double-quoted string. Only seven escape sequences are legal: \\t \\n \\v \\f \\r \\\" \\\\. Adjacent string literals separated only by whitespace/comments are concatenated by the lexer — each literal is its own match here.",
+      "comment": "Double-quoted string. Only seven escape sequences are legal: \\t \\n \\v \\f \\r \\\" \\\\.",
       "begin": "\"",
       "beginCaptures": {
         "0": { "name": "punctuation.definition.string.begin.bovnar" }
@@ -135,7 +262,7 @@
     },
 
     "inline_unit": {
-      "comment": "Inline unit suffix (spec §6.5): mandatory whitespace separates the scalar value from the unit. Lookbehind anchors to the final byte of a scalar: digit (number), '$' (closing delimiter of $nan$ etc.), or '\"' (closing quote of string). Inline units are intentionally absent from the #array rule because they are forbidden inside array elements.",
+      "comment": "Inline unit suffix: mandatory whitespace separates the scalar from the unit.",
       "match": "(?<=[\\d$\"])(\\s+)([A-Za-z_µ°Å][A-Za-z0-9_+~\\.\\-/:\\^\\*µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
       "captures": {
         "1": { "name": "punctuation.separator.inline-unit.bovnar" },
@@ -144,13 +271,13 @@
     },
 
     "symbol": {
-      "comment": "Bare-word value (symbol / enum-like): same start/body rules as an identifier. Must not begin with a digit — numbers are matched first and take priority.",
+      "comment": "Bare-word value (symbol / enum-like).",
       "match": "\\b[A-Za-z_][A-Za-z0-9_+\\-]*",
       "name": "variable.other.symbol.bovnar"
     },
 
     "reference": {
-      "comment": "Reference literal: '&' sigil followed by one or more '.segment' path components. '&' alone or '&.' without an id-start is a parse error.",
+      "comment": "Reference literal: '&' sigil followed by one or more '.segment' path components.",
       "begin": "&",
       "beginCaptures": {
         "0": { "name": "keyword.operator.reference.bovnar" }
@@ -165,16 +292,8 @@
       ]
     },
 
-    "array": {
-      "comment": "Array row: '[' … ']'. The '/' separator between multiple rows is matched at the enclosing (assignment / outer-array) level. Inline units are intentionally excluded here — they are forbidden inside array elements by the spec.",
-      "begin": "\\[",
-      "beginCaptures": {
-        "0": { "name": "punctuation.section.array.begin.bovnar" }
-      },
-      "end": "\\]",
-      "endCaptures": {
-        "0": { "name": "punctuation.section.array.end.bovnar" }
-      },
+    "array_body": {
+      "comment": "Scalar content shared by all array depth levels (no nested arrays or structs).",
       "patterns": [
         { "include": "#comment"         },
         { "include": "#type_annotation" },
@@ -183,33 +302,165 @@
         { "include": "#string"          },
         { "include": "#symbol"          },
         { "include": "#reference"       },
-        { "include": "#array"           },
-        { "include": "#struct"          },
-        { "match": ",",
-          "name": "punctuation.separator.comma.bovnar"     },
-        { "match": "/",
-          "name": "punctuation.separator.array-row.bovnar" }
+        { "match": ",", "name": "punctuation.separator.comma.bovnar"     },
+        { "match": "/", "name": "punctuation.separator.array-row.bovnar" }
       ]
     },
 
-    "struct": {
-      "comment": "Struct scope: '{' … '}'. Recursively includes #assignment so nested scopes are fully highlighted.",
-      "begin": "\\{",
-      "beginCaptures": {
-        "0": { "name": "punctuation.section.struct.begin.bovnar" }
-      },
-      "end": "\\}",
-      "endCaptures": {
-        "0": { "name": "punctuation.section.struct.end.bovnar" }
-      },
+    "array1": {
+      "comment": "Array depth 1 — entry point, not nested inside another array rule.",
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.section.array.depth1.bovnar" } },
+      "end": "\\]",
+      "endCaptures":   { "0": { "name": "punctuation.section.array.depth1.bovnar" } },
       "patterns": [
-        { "include": "#comment"    },
-        { "include": "#assignment" }
+        { "include": "#array_body" },
+        { "include": "#array2"     },
+        { "include": "#struct1"    }
+      ]
+    },
+
+    "array2": {
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.section.array.depth2.bovnar" } },
+      "end": "\\]",
+      "endCaptures":   { "0": { "name": "punctuation.section.array.depth2.bovnar" } },
+      "patterns": [
+        { "include": "#array_body" },
+        { "include": "#array3"     },
+        { "include": "#struct1"    }
+      ]
+    },
+
+    "array3": {
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.section.array.depth3.bovnar" } },
+      "end": "\\]",
+      "endCaptures":   { "0": { "name": "punctuation.section.array.depth3.bovnar" } },
+      "patterns": [
+        { "include": "#array_body" },
+        { "include": "#array4"     },
+        { "include": "#struct1"    }
+      ]
+    },
+
+    "array4": {
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.section.array.depth4.bovnar" } },
+      "end": "\\]",
+      "endCaptures":   { "0": { "name": "punctuation.section.array.depth4.bovnar" } },
+      "patterns": [
+        { "include": "#array_body" },
+        { "include": "#array5"     },
+        { "include": "#struct1"    }
+      ]
+    },
+
+    "array5": {
+      "comment": "Depth 5 cycles back to array1.",
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.section.array.depth5.bovnar" } },
+      "end": "\\]",
+      "endCaptures":   { "0": { "name": "punctuation.section.array.depth5.bovnar" } },
+      "patterns": [
+        { "include": "#array_body" },
+        { "include": "#array1"     },
+        { "include": "#struct1"    }
+      ]
+    },
+
+    "struct1": {
+      "comment": "Struct depth 1 — entry point.",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth1.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth1.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct1"}
+      ]
+    },
+
+    "struct2": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth2.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth2.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct2"}
+      ]
+    },
+
+    "struct3": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth3.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth3.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct3"}
+      ]
+    },
+
+    "struct4": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth4.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth4.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct4"}
+      ]
+    },
+
+    "struct5": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth5.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth5.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct5"}
+      ]
+    },
+
+    "struct6": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth6.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth6.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct6"}
+      ]
+    },
+
+    "struct7": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth7.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth7.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct7"}
+      ]
+    },
+
+    "struct8": {
+      "comment": "Depth 8 cycles back to struct1.",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.struct.depth8.bovnar" } },
+      "end": "\\}",
+      "endCaptures":   { "0": { "name": "punctuation.section.struct.depth8.bovnar" } },
+      "patterns": [
+        { "include": "#comment"              },
+        { "include": "#assignment_in_struct8"}
       ]
     },
 
     "unit_expression": {
-      "comment": "Unit string inside a type annotation: SI/IEC prefix–unit pairs with product/division separators and Unicode superscript exponents. Examples: m~s  k~g·m/s²  Gi~B  m^-2  µ~eV  fl_dr  gi_uk  atmosphere_technical  Å. No semantic validation — purely visual scope tagging.",
+      "comment": "Unit string inside a type annotation.",
       "match": "[A-Za-zµΩ°Å][A-Za-z0-9_]*(?:~[A-Za-zµΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?(?:[·/*][A-Za-zµΩ°Å][A-Za-z0-9_]*(?:~[A-Za-zµΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?)*",
       "name": "support.type.unit.bovnar"
     }

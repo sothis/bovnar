@@ -73,6 +73,27 @@ recovered = bovnar.loads(bvnr_bytes)
 assert recovered["sensor_id"] == 42
 ```
 
+`loads` accepts an optional `typed` flag that wraps typed values in `Quantity`
+objects instead of decoding them to native Python scalars.  This preserves the
+original text representation, exact type width, numeral base, and physical unit
+for lossless round-trips:
+
+```python
+bvnr = b".pressure = <float:32,Pa> 101325.0;"
+doc  = bovnar.loads(bvnr, typed=True)
+q    = doc["pressure"]     # Quantity('101325.0', FLOAT [Pa])
+print(q.raw)               # '101325.0'
+print(q.unit_str())        # 'Pa'
+
+# dumps() accepts Quantity values — annotation and raw text are re-emitted as-is
+out = bovnar.dumps(doc)
+assert bovnar.loads(out, typed=True) == doc
+```
+
+`dumps()` starts with a 4 MiB write buffer and doubles it automatically on
+overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
+versions is no longer accepted.
+
 ### SAX-style streaming reader
 
 The verified callback receives exactly **two** positional arguments: the event
@@ -278,6 +299,60 @@ The validator raises `ErrorCode.UNIT_MISMATCH` (38 / `BovnarParseError`) when
 an inline suffix is present and a type-annotation unit is also present but the
 two do not resolve to the same `value_unit_t`. Inline unit suffixes inside
 array elements always raise `ErrorCode.UNEXPECTED_INPUT_BYTE`.
+
+---
+
+## `Quantity`
+
+`Quantity` is a typed, unit-annotated scalar value that preserves the original
+text representation, type width, numeral base, and physical unit across a
+`loads` / `dumps` round-trip.
+
+```python
+from bovnar import Quantity, ValueTypeSpec, ValueUnit
+from bovnar.enums import ValueTypeFamily
+```
+
+### Construction
+
+`Quantity` is normally produced by `loads(..., typed=True)` rather than
+constructed by hand, but direct construction is supported:
+
+```python
+from bovnar.structs import make_type_spec
+from bovnar.enums   import ValueTypeFamily
+
+vt = make_type_spec(ValueTypeFamily.FLOAT, 32)
+q  = Quantity('101325.0', vt)          # dimensionless
+q2 = Quantity('9.81',     vt, vu)      # vu is a ValueUnit, e.g. from parse_unit
+```
+
+### Properties and methods
+
+| Name | Type | Description |
+|---|---|---|
+| `q.raw` | `str \| None` | Original text token as it appeared in the BVNR stream |
+| `q.vtype` | `ValueTypeSpec` | Type family, bit width, and numeral base |
+| `q.unit` | `ValueUnit` | Physical unit (`BVN_UNIT_NONE` when dimensionless) |
+| `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) |
+| `q.unit_str()` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
+
+### `dumps()` integration
+
+`_emit_value` dispatches on `Quantity` before the plain `int` / `float` path,
+so any dict that came from `loads(..., typed=True)` can be passed directly to
+`dumps()` and will produce identical output:
+
+```python
+bvnr  = b".speed = <float:32,m/s> 9.81;"
+doc   = bovnar.loads(bvnr, typed=True)
+out   = bovnar.dumps(doc)
+assert out.strip() == bvnr.strip()
+```
+
+The annotation is suppressed when `_needs_annotation` returns `False` — i.e.
+when the type is `FLOAT:64` with no unit and no non-decimal base (matching the
+C library's own default-annotation omission rules).
 
 ---
 
@@ -601,23 +676,25 @@ bovnar/
 ├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
+├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader class + EventPayload dataclass
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
 
 tests/
-├── conftest.py          # shared fixtures, needs_lib marker
-├── test_analytics.py    # analytic / benchmarking tests (needs_lib)
-├── test_array_parser.py # array parsing integration tests (needs_lib)
-├── test_dom.py          # DOM API integration tests (needs_lib)
-├── test_enums.py        # pure-Python enum tests
-├── test_reader.py       # integration: Reader (needs_lib)
-├── test_structs.py      # pure-Python struct / helper tests
-├── test_unit_physics.py # unit physics / conversion tests (needs_lib)
-├── test_units.py        # mixed: unit parsing / serialisation (needs_lib for FFI)
-├── test_write_array.py  # write_array integration tests (needs_lib)
-└── test_writer.py       # integration: Writer (needs_lib)
+├── conftest.py           # shared fixtures, needs_lib marker
+├── test_analytics.py     # analytic / benchmarking tests (needs_lib)
+├── test_array_parser.py  # array parsing integration tests (needs_lib)
+├── test_currency_units.py# currency unit round-trip tests (needs_lib)
+├── test_dom.py           # DOM API integration tests (needs_lib)
+├── test_enums.py         # pure-Python enum tests
+├── test_reader.py        # integration: Reader (needs_lib)
+├── test_structs.py       # pure-Python struct / helper tests
+├── test_unit_physics.py  # unit physics / conversion tests (needs_lib)
+├── test_units.py         # mixed: unit parsing / serialisation (needs_lib for FFI)
+├── test_write_array.py   # write_array integration tests (needs_lib)
+└── test_writer.py        # integration: Writer (needs_lib)
 ```
 
 ---
@@ -773,7 +850,10 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 127 | `ATMOSPHERE_TECHNICAL` |
 | 128–129 | Textile linear density (`TEX`, `DENIER`) |
 | 130–133 | Apothecary/dry volume (`FLUID_DRAM`, `MINIM`, `PECK`, `BUSHEL`) |
-| 134 | `_SENTINEL` (internal bound; do not use) |
+| 134–297 | ISO 4217 fiat currencies (`AED` … `ZWL`) — see `CURRENCY_FIAT_FIRST` / `CURRENCY_FIAT_LAST` |
+| 298–347 | Cryptocurrencies (`BTC` … `RUNE`) — see `CURRENCY_CRYPTO_FIRST` / `CURRENCY_CRYPTO_LAST` |
+| 348–367 | Additional physical units (old German units, survey foot, league, cable, hand, quintal, scruple, baud) |
+| 368 | `_SENTINEL` (internal bound; do not use) |
 
 ---
 

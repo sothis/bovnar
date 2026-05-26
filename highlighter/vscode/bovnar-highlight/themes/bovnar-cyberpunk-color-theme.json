@@ -172,46 +172,52 @@
     {
       "name": "Bovnar Comment",
       "scope": "comment.line.number-sign.bovnar",
-      "settings": { "foreground": "#4a4e69" }
+      "settings": { "foreground": "#6e7a86" }
     },
     {
       "name": "Bovnar Key Sigil",
       "scope": "punctuation.separator.key-sigil.bovnar",
-      "settings": { "foreground": "#c695dc" }
+      "settings": { "foreground": "#c084fc" }
     },
     {
       "name": "Bovnar Key Name",
       "scope": "entity.name.key.bovnar",
-      "settings": { "foreground": "#5b9bd5" }
+      "settings": { "foreground": "#67d1f4" }
     },
     {
       "name": "Bovnar Semicolon",
       "scope": "punctuation.terminator.semicolon.bovnar",
-      "settings": { "foreground": "#3e4462" }
+      "settings": { "foreground": "#5a6270" }
     },
     {
       "name": "Bovnar Assignment Operator",
       "scope": "keyword.operator.assignment.bovnar",
-      "settings": { "foreground": "#ff6a8c" }
+      "settings": { "foreground": "#f47067" }
     },
     {
       "name": "Bovnar Type Keywords",
       "scope": "storage.type.family.bovnar",
-      "settings": { "foreground": "#ffb3d9", "fontStyle": "bold" }
+      "settings": { "foreground": "#e8e8e8", "fontStyle": "bold" }
     },
     {
       "name": "Bovnar no_unit Keyword",
       "scope": "support.constant.no-unit.bovnar",
-      "settings": { "foreground": "#5eead4" }
+      "settings": { "foreground": "#87d88c" }
     },
     {
-      "name": "Bovnar Type Parameters",
-      "scope": [
-        "constant.numeric.q~param.bovnar",
-        "constant.numeric.base-param.bovnar",
-        "constant.numeric.width-param.bovnar"
-      ],
-      "settings": { "foreground": "#ffa500" }
+      "name": "Bovnar Type Q~Param",
+      "scope": "constant.numeric.q~param.bovnar",
+      "settings": { "foreground": "#da844c" }
+    },
+    {
+      "name": "Bovnar Type Bit Width",
+      "scope": "constant.numeric.width-param.bovnar",
+      "settings": { "foreground": "#ff5faf" }
+    },
+    {
+      "name": "Bovnar Type Base",
+      "scope": "constant.numeric.base-param.bovnar",
+      "settings": { "foreground": "#afffd7" }
     },
     {
       "name": "Bovnar Type Separators",
@@ -219,7 +225,7 @@
         "punctuation.separator.colon.bovnar",
         "punctuation.separator.comma.bovnar"
       ],
-      "settings": { "foreground": "#3e4462" }
+      "settings": { "foreground": "#6e7a86" }
     },
     {
       "name": "Bovnar Unit Expression (type annotation)",
@@ -227,17 +233,28 @@
       "settings": { "foreground": "#5eead4" }
     },
     {
-      "name": "Bovnar Bracket Fallback (overridden by bracket-pair colorizer)",
+      "name": "Bovnar Type Annotation Brackets",
       "scope": [
         "punctuation.definition.type.begin.bovnar",
-        "punctuation.definition.type.end.bovnar",
-        "punctuation.section.array.begin.bovnar",
-        "punctuation.section.array.end.bovnar",
-        "punctuation.section.struct.begin.bovnar",
-        "punctuation.section.struct.end.bovnar"
+        "punctuation.definition.type.end.bovnar"
       ],
-      "settings": { "foreground": "#00b4d8" }
+      "settings": { "foreground": "#a09040" }
     },
+
+    { "name": "Bovnar Array Depth 1",  "scope": "punctuation.section.array.depth1.bovnar", "settings": { "foreground": "#da844c" } },
+    { "name": "Bovnar Array Depth 2",  "scope": "punctuation.section.array.depth2.bovnar", "settings": { "foreground": "#c084fc" } },
+    { "name": "Bovnar Array Depth 3",  "scope": "punctuation.section.array.depth3.bovnar", "settings": { "foreground": "#ff2a7d" } },
+    { "name": "Bovnar Array Depth 4",  "scope": "punctuation.section.array.depth4.bovnar", "settings": { "foreground": "#ffa500" } },
+    { "name": "Bovnar Array Depth 5",  "scope": "punctuation.section.array.depth5.bovnar", "settings": { "foreground": "#87d88c" } },
+
+    { "name": "Bovnar Struct Depth 1", "scope": "punctuation.section.struct.depth1.bovnar", "settings": { "foreground": "#da844c" } },
+    { "name": "Bovnar Struct Depth 2", "scope": "punctuation.section.struct.depth2.bovnar", "settings": { "foreground": "#c084fc" } },
+    { "name": "Bovnar Struct Depth 3", "scope": "punctuation.section.struct.depth3.bovnar", "settings": { "foreground": "#ff2a7d" } },
+    { "name": "Bovnar Struct Depth 4", "scope": "punctuation.section.struct.depth4.bovnar", "settings": { "foreground": "#ffa500" } },
+    { "name": "Bovnar Struct Depth 5", "scope": "punctuation.section.struct.depth5.bovnar", "settings": { "foreground": "#87d88c" } },
+    { "name": "Bovnar Struct Depth 6", "scope": "punctuation.section.struct.depth6.bovnar", "settings": { "foreground": "#5eead4" } },
+    { "name": "Bovnar Struct Depth 7", "scope": "punctuation.section.struct.depth7.bovnar", "settings": { "foreground": "#f0c64e" } },
+    { "name": "Bovnar Struct Depth 8", "scope": "punctuation.section.struct.depth8.bovnar", "settings": { "foreground": "#67d1f4" } },
     {
       "name": "Bovnar Special Float",
       "scope": "constant.language.special-float.bovnar",
@@ -246,32 +263,32 @@
     {
       "name": "Bovnar Float",
       "scope": "constant.numeric.float.bovnar",
-      "settings": { "foreground": "#ffe700" }
+      "settings": { "foreground": "#f0c64e" }
     },
     {
       "name": "Bovnar Integer",
       "scope": "constant.numeric.integer.bovnar",
-      "settings": { "foreground": "#ffe700" }
+      "settings": { "foreground": "#f0c64e" }
     },
     {
       "name": "Bovnar String",
       "scope": "string.quoted.double.bovnar",
-      "settings": { "foreground": "#7dd3fc" }
+      "settings": { "foreground": "#87d88c" }
     },
     {
       "name": "Bovnar Valid Escape",
       "scope": "constant.character.escape.bovnar",
-      "settings": { "foreground": "#93c5fd", "fontStyle": "bold" }
+      "settings": { "foreground": "#5ab06e", "fontStyle": "bold" }
     },
     {
       "name": "Bovnar Invalid Escape",
       "scope": "invalid.illegal.escape.bovnar",
-      "settings": { "foreground": "#fb923c", "fontStyle": "underline" }
+      "settings": { "foreground": "#f47067", "fontStyle": "underline" }
     },
     {
       "name": "Bovnar Inline Unit Separator Whitespace",
       "scope": "punctuation.separator.inline-unit.bovnar",
-      "settings": { "foreground": "#3e4462" }
+      "settings": { "foreground": "#6e7a86" }
     },
     {
       "name": "Bovnar Inline Unit",
@@ -281,22 +298,22 @@
     {
       "name": "Bovnar Symbol",
       "scope": "variable.other.symbol.bovnar",
-      "settings": { "foreground": "#5b9bd5" }
+      "settings": { "foreground": "#67d1f4" }
     },
     {
       "name": "Bovnar Reference Operator",
       "scope": "keyword.operator.reference.bovnar",
-      "settings": { "foreground": "#ff2a7d", "fontStyle": "bold" }
+      "settings": { "foreground": "#f47067", "fontStyle": "bold" }
     },
     {
       "name": "Bovnar Reference Path",
       "scope": "variable.other.reference-path.bovnar",
-      "settings": { "foreground": "#ffa500" }
+      "settings": { "foreground": "#d06070" }
     },
     {
       "name": "Bovnar Array/Row Separators",
       "scope": "punctuation.separator.array-row.bovnar",
-      "settings": { "foreground": "#3e4462" }
+      "settings": { "foreground": "#6e7a86" }
     }
   ]
 }

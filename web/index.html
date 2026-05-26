@@ -37,19 +37,19 @@
   --purple:  #c695dc;
   --pink:    #ff6a8c;
 
-  /* Bovnar token colors (from the VSCode theme JSON) */
-  --c-comment:  #4a4e69;
-  --c-sigil:    #c695dc;
-  --c-key:      #5b9bd5;
-  --c-eq:       #ff6a8c;
-  --c-ann:      #00b4d8;
-  --c-type:     #ffb3d9;
-  --c-param:    #ffa500;
-  --c-val:      #ffe700;
-  --c-unit:     #5eead4;
-  --c-str:      #7dd3fc;
-  --c-semi:     #3e4462;
-  --c-struct:   #00b4d8;
+  /* Bovnar token colors (Vim default dark) */
+  --c-comment:  #80a0ff;
+  --c-sigil:    #ff80ff;
+  --c-key:      #40ffff;
+  --c-eq:       #ffff60;
+  --c-ann:      #60ff60;
+  --c-type:     #60ff60;
+  --c-param:    #ff80ff;
+  --c-val:      #ffa0a0;
+  --c-unit:     #40ffff;
+  --c-str:      #ffa0a0;
+  --c-semi:     #4a4a5a;
+  --c-struct:   #60ff60;
 
   --mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
   --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -452,42 +452,6 @@ nav {
   50%      { transform: translateX(-50%) translateY(6px); }
 }
 
-/* ── STAT BAR ── */
-.stat-bar {
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--sidebar-bg);
-  position: relative; z-index: 1;
-}
-.stat-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-}
-.stat-item {
-  padding: 1.5rem 2rem;
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-.stat-item:last-child { border-right: none; }
-.stat-num {
-  font-family: var(--mono);
-  font-size: 1.9rem;
-  font-weight: 400;
-  color: var(--blue);
-  line-height: 1;
-}
-.stat-label {
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text3);
-}
-
 /* ── SECTIONS ── */
 section { position: relative; z-index: 1; }
 
@@ -804,25 +768,25 @@ section { position: relative; z-index: 1; }
 }
 
 /* C language token colors */
-.cl-kw   { color: #569cd6; }
-.cl-type { color: #4ec9b0; }
-.cl-fn   { color: #dcdcaa; }
-.cl-str  { color: #ce9178; }
-.cl-num  { color: #b5cea8; }
-.cl-inc  { color: #c695dc; font-style: italic; }
-.cl-var  { color: #9cdcfe; }
-.cl-pp   { color: #c695dc; }
-.cl-op   { color: #d4d4d4; }
+.cl-kw   { color: #ffff60; }
+.cl-type { color: #60ff60; }
+.cl-fn   { color: #40ffff; }
+.cl-str  { color: #ffa0a0; }
+.cl-num  { color: #ffa0a0; }
+.cl-inc  { color: #ff80ff; font-style: italic; }
+.cl-var  { color: #40ffff; }
+.cl-pp   { color: #ff80ff; }
+.cl-op   { color: #ffff60; }
 /* Python token colors */
-.py-kw   { color: #569cd6; }
-.py-fn   { color: #dcdcaa; }
-.py-str  { color: #ce9178; }
-.py-num  { color: #b5cea8; }
-.py-bi   { color: #4ec9b0; }
+.py-kw   { color: #ffff60; }
+.py-fn   { color: #40ffff; }
+.py-str  { color: #ffa0a0; }
+.py-num  { color: #ffa0a0; }
+.py-bi   { color: #40ffff; }
 /* Shell token colors */
-.sh-cmd  { color: #dcdcaa; }
-.sh-flag { color: #9cdcfe; }
-.sh-var  { color: #9cdcfe; }
+.sh-cmd  { color: #40ffff; }
+.sh-flag { color: #ffa0a0; }
+.sh-var  { color: #40ffff; }
 
 /* ── QUICKSTART ── */
 #quickstart {
@@ -1043,7 +1007,7 @@ section { position: relative; z-index: 1; }
 }
 .docs-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1px;
   margin-top: 3rem;
   background: var(--border);
@@ -1443,27 +1407,27 @@ footer { position: relative; z-index: 1; }
   white-space: pre;
 }
 
-/* highlight.js VSCode Dark+ overrides */
-.hljs-keyword    { color: #569cd6; }
-.hljs-built_in   { color: #4ec9b0; }
-.hljs-string     { color: #ce9178; }
-.hljs-number     { color: #b5cea8; }
-.hljs-comment    { color: #6a9955; font-style: italic; }
-.hljs-title      { color: #dcdcaa; }
-.hljs-type       { color: #4ec9b0; }
-.hljs-literal    { color: #569cd6; }
-.hljs-meta       { color: #9e9e9e; }
-.hljs-variable   { color: #9cdcfe; }
-.hljs-attr       { color: #9cdcfe; }
-.hljs-symbol     { color: #b5cea8; }
-.hljs-function   { color: #dcdcaa; }
-.hljs-params     { color: #9cdcfe; }
-.hljs-operator   { color: #d4d4d4; }
-.hljs-property   { color: #9cdcfe; }
-.hljs-punctuation { color: #808080; }
-.hljs-subst      { color: #d4d4d4; }
-.hljs-section    { color: #569cd6; font-weight: 500; }
-.hljs-name       { color: #4ec9b0; }
+/* highlight.js Vim default dark overrides */
+.hljs-keyword    { color: #ffff60; }
+.hljs-built_in   { color: #40ffff; }
+.hljs-string     { color: #ffa0a0; }
+.hljs-number     { color: #ffa0a0; }
+.hljs-comment    { color: #80a0ff; font-style: italic; }
+.hljs-title      { color: #40ffff; }
+.hljs-type       { color: #60ff60; }
+.hljs-literal    { color: #ffff60; }
+.hljs-meta       { color: #ff80ff; }
+.hljs-variable   { color: #40ffff; }
+.hljs-attr       { color: #40ffff; }
+.hljs-symbol     { color: #ffa0a0; }
+.hljs-function   { color: #40ffff; }
+.hljs-params     { color: #40ffff; }
+.hljs-operator   { color: #ffff60; }
+.hljs-property   { color: #40ffff; }
+.hljs-punctuation { color: #6a6a7a; }
+.hljs-subst      { color: #40ffff; }
+.hljs-section    { color: #ffff60; font-weight: 500; }
+.hljs-name       { color: #60ff60; }
 
 /* Bovnar language token colors — keyed to the CSS variables in :root */
 .hljs-bvn-comment { color: var(--c-comment); font-style: italic; }
@@ -1474,12 +1438,12 @@ footer { position: relative; z-index: 1; }
 .hljs-bvn-type    { color: var(--c-type); font-weight: 600; }
 .hljs-bvn-unit    { color: var(--c-unit); }
 .hljs-bvn-param   { color: var(--c-param); }
-.hljs-bvn-special { color: #c084fc; }
+.hljs-bvn-special { color: #ffa0a0; }
 .hljs-bvn-val     { color: var(--c-val); }
 .hljs-bvn-str     { color: var(--c-str); }
-.hljs-bvn-esc     { color: #93c5fd; font-weight: 600; }
+.hljs-bvn-esc     { color: #ff6060; font-weight: 600; }
 .hljs-bvn-semi    { color: var(--c-semi); }
-.hljs-bvn-refop   { color: #ff2a7d; font-weight: 600; }
+.hljs-bvn-refop   { color: #ff6060; font-weight: 600; }
 .hljs-bvn-refpath { color: var(--c-param); }
 .hljs-bvn-sym     { color: var(--c-key); }
 .hljs-bvn-sep     { color: var(--c-semi); }
@@ -1555,8 +1519,7 @@ a[data-doc] { cursor: pointer; }
   .usecases-grid { grid-template-columns: 1fr; }
   .docs-grid { grid-template-columns: repeat(2, 1fr); }
   .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
-  .stat-inner { grid-template-columns: repeat(3, 1fr); }
-  .footer-inner { grid-template-columns: 1fr 1fr; }
+.footer-inner { grid-template-columns: 1fr 1fr; }
   .comparison-table { font-size: 0.78rem; }
 
   #doc-drawer { width: 100vw; }
@@ -1665,38 +1628,6 @@ a[data-doc] { cursor: pointer; }
   </div>
   <div class="scroll-hint">scroll</div>
 </section>
-
-<!-- ══════════════════════════════════════════════
-     STAT BAR
-══════════════════════════════════════════════ -->
-<div class="stat-bar">
-  <div class="stat-inner">
-    <div class="stat-item reveal">
-      <div class="stat-num">6</div>
-      <div class="stat-label">Type Families</div>
-    </div>
-    <div class="stat-item reveal reveal-delay-1">
-      <div class="stat-num">22</div>
-      <div class="stat-label">Derived SI Units</div>
-    </div>
-    <div class="stat-item reveal reveal-delay-2">
-      <div class="stat-num">180+</div>
-      <div class="stat-label">Conformance Tests</div>
-    </div>
-    <div class="stat-item reveal reveal-delay-3">
-      <div class="stat-num">C99</div>
-      <div class="stat-label">Reference Impl.</div>
-    </div>
-    <div class="stat-item reveal reveal-delay-4">
-      <div class="stat-num">0</div>
-      <div class="stat-label">External Schemas</div>
-    </div>
-    <div class="stat-item reveal reveal-delay-5">
-      <div class="stat-num">MIT</div>
-      <div class="stat-label">License</div>
-    </div>
-  </div>
-</div>
 
 <!-- ══════════════════════════════════════════════
      PHILOSOPHY
@@ -1952,7 +1883,7 @@ a[data-doc] { cursor: pointer; }
           not guessed. Annotate when precision matters; omit when it doesn't.
         </div>
         <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span>
-<span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_16</span><span class="c-ann">&gt;</span> <span class="c-val">FF.3A</span>
+<span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_16</span><span class="c-ann">&gt;</span> <span class="c-str">"1.0p+0"</span>
 <span class="c-ann">&lt;</span><span class="c-type">sint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-ann">&gt;</span> <span class="c-val">-9223372036</span></div>
       </div>
 
@@ -1988,7 +1919,7 @@ a[data-doc] { cursor: pointer; }
           Optional resync mode skips broken assignments and continues parsing.
           Suitable for log streams, unreliable transports, and long-running telemetry.
         </div>
-        <div class="feature-example">opts.<span class="cl-var">resync_on_error</span> = <span class="cl-kw">true</span>;
+        <div class="feature-example">opts.<span class="cl-var">continue_on_error</span> = <span class="cl-kw">true</span>;
 <span class="c-comment">/* parser skips broken record,
    continues with the next */</span></div>
       </div>
@@ -2000,7 +1931,7 @@ a[data-doc] { cursor: pointer; }
           Build a navigable DOM from any Bovnar stream, then traverse, query,
           and mutate it with a clean C API. Or use the Python dict-like interface.
         </div>
-        <div class="feature-example"><span class="cl-fn">bvnr_dom_get</span>(dom, <span class="cl-str">".sensor.val"</span>);
+        <div class="feature-example"><span class="cl-fn">bvn_dom_lookup</span>(doc, <span class="cl-str">".sensor.val"</span>);
 doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <span class="c-comment"># Python</span></div>
       </div>
 
@@ -2012,7 +1943,7 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
           a full-featured high-level API or a low-level streaming interface.
         </div>
         <div class="feature-example">bovnar.<span class="py-fn">loads</span>(raw)[<span class="py-str">"pressure"</span>]
-<span class="c-comment"># → 101.325  unit: k~Pa</span></div>
+<span class="c-comment"># → 101.325</span></div>
       </div>
     </div>
   </div>
@@ -2045,7 +1976,7 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
                      <span class="cl-type">bvnr_data_t</span> *d)
 {
     <span class="cl-kw">if</span> (ev == ev_data)
-        <span class="cl-fn">printf</span>(<span class="cl-str">"key=%.*s\n"</span>,
+        <span class="cl-fn">printf</span>(<span class="cl-str">"val=%.*s\n"</span>,
                (<span class="cl-type">int</span>)d-&gt;length,
                (<span class="cl-kw">const</span> <span class="cl-type">char</span> *)d-&gt;data);
     <span class="cl-kw">return</span> <span class="cl-kw">true</span>;
@@ -2082,13 +2013,17 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
     <span class="cl-fn">bvnr_open_write_sink</span>(w, &amp;sink,
                          <span class="cl-kw">true</span>, <span class="cl-kw">NULL</span>);
 
+    <span class="cl-type">bool</span> ok;
+    <span class="cl-type">value_unit_t</span> u = <span class="cl-fn">bvn_parse_unit</span>(
+        (<span class="cl-kw">const</span> <span class="cl-type">uint8_t</span> *)<span class="cl-str">"m/s"</span>, &amp;ok);
     <span class="cl-fn">bvnr_write_float_unit</span>(
-        w, <span class="cl-str">"velocity"</span>, <span class="cl-num">64</span>,
-        <span class="cl-num">9.81</span>, <span class="cl-str">"m/s"</span>);
+        w, <span class="cl-str">"velocity"</span>, <span class="cl-num">64</span>, <span class="cl-num">9.81</span>, u);
 
     <span class="cl-fn">bvnr_write_finish</span>(w);
     <span class="cl-fn">bvnr_writer_destroy</span>(w);
-    <span class="cl-fn">puts</span>(buf);
+    <span class="cl-fn">fwrite</span>(buf, <span class="cl-num">1</span>,
+        (<span class="cl-type">size_t</span>)<span class="cl-fn">bvnr_sink_bytes_written</span>(&amp;sink),
+        stdout);
     <span class="c-comment">// → .velocity = &lt;float:64,m/s&gt; 9.81;</span>
 }</div>
           </div>
@@ -2118,20 +2053,38 @@ doc = bovnar.<span class="py-fn">loads</span>(raw)
             <div class="qs-step-num">02</div>
             <div class="qs-step-title">Streaming event API</div>
             <div class="qs-step-desc">Full control over parse events. Inspect units, type annotations, and raw string representations as they arrive.</div>
-            <div class="code-block"><span class="py-kw">from</span> bovnar <span class="py-kw">import</span> Reader, Event
+            <div class="code-block"><span class="py-kw">from</span> bovnar <span class="py-kw">import</span> Reader, Event, unit_to_str
 
 <span class="py-kw">def</span> <span class="py-fn">on_event</span>(ev, data):
     <span class="py-kw">if</span> ev == Event.DATA:
         u = data.value_unit
         <span class="py-kw">if</span> u.num_components:
             <span class="py-bi">print</span>(data.<span class="py-fn">raw_str</span>(),
-                  bovnar.<span class="py-fn">unit_to_str</span>(u))
+                  <span class="py-fn">unit_to_str</span>(u))
 
 src = <span class="py-str">b".velocity = &lt;float:64,m/s&gt; 9.81;"</span>
 Reader().<span class="py-fn">read_mem</span>(
     src, on_verified=on_event
 )
-<span class="c-comment"># → 9.81  m/s</span></div>
+<span class="c-comment"># → 9.81 m/s</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">03</div>
+            <div class="qs-step-title">Typed round-trips with Quantity</div>
+            <div class="qs-step-desc"><code>loads(typed=True)</code> wraps each typed value in a <code>Quantity</code> that preserves its exact text, bit width, and unit. Pass the dict directly back to <code>dumps()</code> for a lossless round-trip.</div>
+            <div class="code-block"><span class="py-kw">import</span> bovnar
+
+src = <span class="py-str">b".pressure = &lt;float:32,Pa&gt; 101325.0;"</span>
+doc = bovnar.<span class="py-fn">loads</span>(src, typed=<span class="py-kw">True</span>)
+
+q = doc[<span class="py-str">"pressure"</span>]
+<span class="c-comment"># Quantity('101325.0', FLOAT [Pa])</span>
+<span class="py-bi">print</span>(q.raw)         <span class="c-comment"># '101325.0'</span>
+<span class="py-bi">print</span>(q.<span class="py-fn">unit_str</span>()) <span class="c-comment"># 'Pa'</span>
+
+<span class="c-comment"># dumps() re-emits annotation + raw text unchanged</span>
+out = bovnar.<span class="py-fn">dumps</span>(doc)
+<span class="py-bi">assert</span> bovnar.<span class="py-fn">loads</span>(out, typed=<span class="py-kw">True</span>) == doc</div>
           </div>
         </div>
       </div>
@@ -2378,6 +2331,14 @@ Reader().<span class="py-fn">read_mem</span>(
           <div class="doc-card-tag">Verification</div>
         </div>
       </a>
+      <a href="#" data-doc="8_unit_cheatsheet.md" data-doc-title="Units &amp; Currencies Reference" class="doc-card reveal reveal-delay-2">
+        <div class="doc-card-num">08</div>
+        <div>
+          <div class="doc-card-title">Units &amp; Currencies Reference</div>
+          <div class="doc-card-desc">All 157 physical units, 164 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
+          <div class="doc-card-tag">Quick reference</div>
+        </div>
+      </a>
     </div>
   </div>
 </section>
@@ -2407,6 +2368,7 @@ Reader().<span class="py-fn">read_mem</span>(
           <li><a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar">Formal EBNF Grammar</a></li>
           <li><a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ">FAQ</a></li>
           <li><a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool">Conformance Test Tool</a></li>
+          <li><a href="#" data-doc="8_unit_cheatsheet.md" data-doc-title="Units &amp; Currencies Reference">Units &amp; Currencies Reference</a></li>
         </ul>
       </div>
       <div>

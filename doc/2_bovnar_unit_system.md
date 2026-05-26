@@ -2,7 +2,6 @@
 
 > **Applies to:** Bovnar (BVNR) specification version 1.1
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
-> **Supersedes:** `doc/currency_unit_extension.md` (addendum merged here).
 
 ---
 
@@ -31,7 +30,11 @@
    - 3.18 [Textile Linear Density](#318-textile-linear-density)
    - 3.19 [US Apothecary / Dry Volume](#319-us-apothecary--dry-volume)
    - 3.20 [Old German Units](#320-old-german-units)
-   - 3.21 [Sentinel Value](#321-sentinel-value)
+   - 3.21 [Additional Length Units](#321-additional-length-units)
+   - 3.22 [Additional Mass Units](#322-additional-mass-units)
+   - 3.23 [Acceleration](#323-acceleration)
+   - 3.24 [Signal Rate](#324-signal-rate)
+   - 3.25 [Sentinel Value](#325-sentinel-value)
 4. [Prefixes](#4-prefixes)
    - 4.1 [SI Prefixes](#41-si-prefixes)
    - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
@@ -763,44 +766,235 @@ This reservation requires no new sigil character and no change to the unit gramm
 
 164 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 297`. Two codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro) and `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022).
 
-Key representative codes (showing range of minor-unit values):
+The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. `<uint:64,KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift. Minor units are **bold** below when they differ from 2. `Num` is the ISO 4217 numeric identifier.
 
-| Code | Name | Minor unit |
-|------|------|-----------|
-| `JPY` | Japanese Yen | 0 |
-| `KRW` | South Korean Won | 0 |
-| `USD` | US Dollar | 2 |
-| `EUR` | Euro | 2 |
-| `GBP` | Pound Sterling | 2 |
-| `CUP` | Cuban Peso | 2 |
-| `BHD` | Bahraini Dinar | 3 |
-| `KWD` | Kuwaiti Dinar | 3 |
-| `CLF` | Unidad de Fomento | 4 |
-| `XAU` | Gold | 0 |
-| `XAG` | Silver | 0 |
-| `XDR` | Special Drawing Rights | 0 |
+| Code | Num | Min | Name |
+|------|----:|----:|------|
+| `AED` |  784 |   2 | UAE Dirham |
+| `AFN` |  971 |   2 | Afghan Afghani |
+| `ALL` |    8 |   2 | Albanian Lek |
+| `AMD` |   51 |   2 | Armenian Dram |
+| `ANG` |  532 |   2 | Netherlands Antillean Guilder |
+| `AOA` |  973 |   2 | Angolan Kwanza |
+| `ARS` |   32 |   2 | Argentine Peso |
+| `AUD` |   36 |   2 | Australian Dollar |
+| `AWG` |  533 |   2 | Aruban Florin |
+| `AZN` |  944 |   2 | Azerbaijani Manat |
+| `BAM` |  977 |   2 | Bosnia-Herzegovina Convertible Mark |
+| `BBD` |   52 |   2 | Barbados Dollar |
+| `BDT` |   50 |   2 | Bangladeshi Taka |
+| `BGN` |  975 |   2 | Bulgarian Lev |
+| `BHD` |   48 | **3** | Bahraini Dinar |
+| `BIF` |  108 | **0** | Burundian Franc |
+| `BMD` |   60 |   2 | Bermudian Dollar |
+| `BND` |   96 |   2 | Brunei Dollar |
+| `BOB` |   68 |   2 | Boliviano |
+| `BRL` |  986 |   2 | Brazilian Real |
+| `BSD` |   44 |   2 | Bahamian Dollar |
+| `BTN` |   64 |   2 | Bhutanese Ngultrum |
+| `BWP` |   72 |   2 | Botswana Pula |
+| `BYN` |  933 |   2 | Belarusian Ruble |
+| `BZD` |   84 |   2 | Belize Dollar |
+| `CAD` |  124 |   2 | Canadian Dollar |
+| `CDF` |  976 |   2 | Congolese Franc |
+| `CHF` |  756 |   2 | Swiss Franc |
+| `CLF` |  990 | **4** | Unidad de Fomento |
+| `CLP` |  152 | **0** | Chilean Peso |
+| `CNY` |  156 |   2 | Chinese Yuan |
+| `COP` |  170 |   2 | Colombian Peso |
+| `CRC` |  188 |   2 | Costa Rican Colon |
+| `CUP` |  192 |   2 | Cuban Peso |
+| `CVE` |  132 |   2 | Cape Verdean Escudo |
+| `CZK` |  203 |   2 | Czech Koruna |
+| `DJF` |  262 | **0** | Djiboutian Franc |
+| `DKK` |  208 |   2 | Danish Krone |
+| `DOP` |  214 |   2 | Dominican Peso |
+| `DZD` |   12 |   2 | Algerian Dinar |
+| `EGP` |  818 |   2 | Egyptian Pound |
+| `ERN` |  232 |   2 | Eritrean Nakfa |
+| `ETB` |  230 |   2 | Ethiopian Birr |
+| `EUR` |  978 |   2 | Euro |
+| `FJD` |  242 |   2 | Fijian Dollar |
+| `FKP` |  238 |   2 | Falkland Islands Pound |
+| `GBP` |  826 |   2 | Pound Sterling |
+| `GEL` |  981 |   2 | Georgian Lari |
+| `GHS` |  936 |   2 | Ghanaian Cedi |
+| `GIP` |  292 |   2 | Gibraltar Pound |
+| `GMD` |  270 |   2 | Gambian Dalasi |
+| `GNF` |  324 | **0** | Guinean Franc |
+| `GTQ` |  320 |   2 | Guatemalan Quetzal |
+| `GYD` |  328 |   2 | Guyanese Dollar |
+| `HKD` |  344 |   2 | Hong Kong Dollar |
+| `HNL` |  340 |   2 | Honduran Lempira |
+| `HRK` |  191 |   2 | Croatian Kuna *(historical; retired 2023-01-01)* |
+| `HTG` |  332 |   2 | Haitian Gourde |
+| `HUF` |  348 |   2 | Hungarian Forint |
+| `IDR` |  360 |   2 | Indonesian Rupiah |
+| `ILS` |  376 |   2 | Israeli New Shekel |
+| `INR` |  356 |   2 | Indian Rupee |
+| `IQD` |  368 | **3** | Iraqi Dinar |
+| `IRR` |  364 |   2 | Iranian Rial |
+| `ISK` |  352 | **0** | Icelandic Krona |
+| `JMD` |  388 |   2 | Jamaican Dollar |
+| `JOD` |  400 | **3** | Jordanian Dinar |
+| `JPY` |  392 | **0** | Japanese Yen |
+| `KES` |  404 |   2 | Kenyan Shilling |
+| `KGS` |  417 |   2 | Kyrgyzstani Som |
+| `KHR` |  116 |   2 | Cambodian Riel |
+| `KMF` |  174 | **0** | Comorian Franc |
+| `KPW` |  408 |   2 | North Korean Won |
+| `KRW` |  410 | **0** | South Korean Won |
+| `KWD` |  414 | **3** | Kuwaiti Dinar |
+| `KYD` |  136 |   2 | Cayman Islands Dollar |
+| `KZT` |  398 |   2 | Kazakhstani Tenge |
+| `LAK` |  418 |   2 | Laotian Kip |
+| `LBP` |  422 |   2 | Lebanese Pound |
+| `LKR` |  144 |   2 | Sri Lankan Rupee |
+| `LRD` |  430 |   2 | Liberian Dollar |
+| `LSL` |  426 |   2 | Lesotho Loti |
+| `LYD` |  434 | **3** | Libyan Dinar |
+| `MAD` |  504 |   2 | Moroccan Dirham |
+| `MDL` |  498 |   2 | Moldovan Leu |
+| `MGA` |  969 |   2 | Malagasy Ariary |
+| `MKD` |  807 |   2 | Macedonian Denar |
+| `MMK` |  104 |   2 | Myanmar Kyat |
+| `MNT` |  496 |   2 | Mongolian Togrog |
+| `MOP` |  446 |   2 | Macanese Pataca |
+| `MRU` |  929 |   2 | Mauritanian Ouguiya |
+| `MUR` |  480 |   2 | Mauritian Rupee |
+| `MVR` |  462 |   2 | Maldivian Rufiyaa |
+| `MWK` |  454 |   2 | Malawian Kwacha |
+| `MXN` |  484 |   2 | Mexican Peso |
+| `MYR` |  458 |   2 | Malaysian Ringgit |
+| `MZN` |  943 |   2 | Mozambican Metical |
+| `NAD` |  516 |   2 | Namibian Dollar |
+| `NGN` |  566 |   2 | Nigerian Naira |
+| `NIO` |  558 |   2 | Nicaraguan Cordoba |
+| `NOK` |  578 |   2 | Norwegian Krone |
+| `NPR` |  524 |   2 | Nepalese Rupee |
+| `NZD` |  554 |   2 | New Zealand Dollar |
+| `OMR` |  512 | **3** | Omani Rial |
+| `PAB` |  590 |   2 | Panamanian Balboa |
+| `PEN` |  604 |   2 | Peruvian Sol |
+| `PGK` |  598 |   2 | Papua New Guinean Kina |
+| `PHP` |  608 |   2 | Philippine Peso |
+| `PKR` |  586 |   2 | Pakistani Rupee |
+| `PLN` |  985 |   2 | Polish Zloty |
+| `PYG` |  600 | **0** | Paraguayan Guarani |
+| `QAR` |  634 |   2 | Qatari Riyal |
+| `RON` |  946 |   2 | Romanian Leu |
+| `RSD` |  941 |   2 | Serbian Dinar |
+| `RUB` |  643 |   2 | Russian Ruble |
+| `RWF` |  646 | **0** | Rwandan Franc |
+| `SAR` |  682 |   2 | Saudi Riyal |
+| `SBD` |   90 |   2 | Solomon Islands Dollar |
+| `SCR` |  690 |   2 | Seychellois Rupee |
+| `SDG` |  938 |   2 | Sudanese Pound |
+| `SEK` |  752 |   2 | Swedish Krona |
+| `SGD` |  702 |   2 | Singapore Dollar |
+| `SHP` |  654 |   2 | Saint Helena Pound |
+| `SLE` |  925 |   2 | Sierra Leonean Leone |
+| `SLL` |  694 |   2 | Sierra Leonean Leone (old) *(historical; replaced by SLE 2022)* |
+| `SOS` |  706 |   2 | Somali Shilling |
+| `SSP` |  728 |   2 | South Sudanese Pound |
+| `SRD` |  968 |   2 | Surinamese Dollar |
+| `STN` |  930 |   2 | Sao Tome and Principe Dobra |
+| `SVC` |  222 |   2 | Salvadoran Colon |
+| `SYP` |  760 |   2 | Syrian Pound |
+| `SZL` |  748 |   2 | Swazi Lilangeni |
+| `THB` |  764 |   2 | Thai Baht |
+| `TJS` |  972 |   2 | Tajikistani Somoni |
+| `TMT` |  934 |   2 | Turkmenistan Manat |
+| `TND` |  788 | **3** | Tunisian Dinar |
+| `TOP` |  776 |   2 | Tongan Pa'anga |
+| `TRY` |  949 |   2 | Turkish Lira |
+| `TTD` |  780 |   2 | Trinidad and Tobago Dollar |
+| `TWD` |  901 |   2 | New Taiwan Dollar |
+| `TZS` |  834 |   2 | Tanzanian Shilling |
+| `UAH` |  980 |   2 | Ukrainian Hryvnia |
+| `UGX` |  800 | **0** | Ugandan Shilling |
+| `USD` |  840 |   2 | US Dollar |
+| `UYU` |  858 |   2 | Uruguayan Peso |
+| `UZS` |  860 |   2 | Uzbekistani Som |
+| `VES` |  928 |   2 | Venezuelan Bolivar Soberano |
+| `VND` |  704 | **0** | Vietnamese Dong |
+| `VUV` |  548 | **0** | Vanuatu Vatu |
+| `WST` |  882 |   2 | Samoan Tala |
+| `XAF` |  950 | **0** | CFA Franc BEAC |
+| `XAG` |  961 | **0** | Silver |
+| `XAU` |  959 | **0** | Gold |
+| `XCD` |  951 |   2 | East Caribbean Dollar |
+| `XDR` |  960 | **0** | Special Drawing Rights |
+| `XOF` |  952 | **0** | CFA Franc BCEAO |
+| `XPD` |  964 | **0** | Palladium |
+| `XPF` |  953 | **0** | CFP Franc |
+| `XPT` |  962 | **0** | Platinum |
+| `XTS` |  963 | **0** | Test currency (ISO 4217 reserved; do not use in production) |
+| `YER` |  886 |   2 | Yemeni Rial |
+| `ZAR` |  710 |   2 | South African Rand |
+| `ZMW` |  967 |   2 | Zambian Kwacha |
+| `ZWL` |  932 |   2 | Zimbabwean Dollar |
 
-The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units. Applications reading integer-annotated values (e.g. `<uint:64,KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift.
+> `CLF` (Unidad de Fomento) is the only currency with 4 minor units. The two historical codes `HRK` and `SLL` are retained for compatibility but should not be used for new data.
 
 ### 9.3 Cryptocurrencies
 
-50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. Base enum values begin at `bu_btc = 298`. The `minor_unit` field holds the canonical on-chain decimal places.
+50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. Base enum values begin at `bu_btc = 298` and end at `bu_rune = 347`. The `minor_unit` field holds the canonical on-chain decimal places. `numeric_code = 0` for all cryptocurrencies.
 
-| Code | Name | Minor unit | Subunit |
-|------|------|-----------|---------|
-| `BTC`  | Bitcoin | 8 | satoshi |
-| `ETH`  | Ethereum | 18 | wei |
-| `SOL`  | Solana | 9 | lamport |
-| `XRP`  | XRP | 6 | drop |
-| `ADA`  | Cardano | 6 | lovelace |
-| `DOT`  | Polkadot | 10 | planck |
-| `XMR`  | Monero | 12 | piconero |
-| `XLM`  | Stellar | 7 | stroop |
-| `DOGE` | Dogecoin | 8 | koinu |
-| `USDT` | Tether | 6 | — |
-| `USDC` | USD Coin | 6 | — |
-| `AVAX` | Avalanche | 18 | — |
-| `ATOM` | Cosmos | 6 | — |
+> **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,BTC>` stores satoshis; divide by 10⁸ to obtain whole BTC.
+
+| Code   | Min | Subunit | Name |
+|--------|----:|---------|------|
+| `BTC`  |   8 | satoshi | Bitcoin |
+| `ETH`  |  18 | wei | Ethereum |
+| `SOL`  |   9 | lamport | Solana |
+| `XRP`  |   6 | drop | XRP |
+| `BNB`  |  18 | — | BNB |
+| `ADA`  |   6 | lovelace | Cardano |
+| `LTC`  |   8 | — | Litecoin |
+| `DOT`  |  10 | planck | Polkadot |
+| `XMR`  |  12 | piconero | Monero |
+| `ETC`  |  18 | — | Ethereum Classic |
+| `BCH`  |   8 | — | Bitcoin Cash |
+| `XLM`  |   7 | stroop | Stellar |
+| `FIL`  |  18 | — | Filecoin |
+| `ICP`  |   8 | — | Internet Computer |
+| `TRX`  |   6 | — | TRON |
+| `EOS`  |   4 | — | EOS |
+| `VET`  |  18 | — | VeChain |
+| `NEO`  |   8 | — | Neo |
+| `ZEC`  |   8 | — | Zcash |
+| `UNI`  |  18 | — | Uniswap |
+| `ARB`  |  18 | — | Arbitrum |
+| `SUI`  |   9 | — | Sui |
+| `TON`  |   9 | — | Toncoin |
+| `INJ`  |  18 | — | Injective |
+| `SEI`  |   6 | — | Sei |
+| `APT`  |   8 | — | Aptos |
+| `TAO`  |   9 | — | Bittensor |
+| `WIF`  |   6 | — | dogwifhat |
+| `DOGE` |   8 | koinu | Dogecoin |
+| `LINK` |  18 | — | Chainlink |
+| `USDT` |   6 | — | Tether |
+| `USDC` |   6 | — | USD Coin |
+| `AVAX` |  18 | — | Avalanche |
+| `ATOM` |   6 | — | Cosmos |
+| `POL`  |  18 | — | Polygon |
+| `NEAR` |  24 | — | NEAR Protocol |
+| `ALGO` |   6 | — | Algorand |
+| `HBAR` |   8 | — | Hedera |
+| `AAVE` |  18 | — | Aave |
+| `MKR`  |  18 | — | Maker |
+| `DAI`  |  18 | — | Dai |
+| `STX`  |   6 | — | Stacks |
+| `GRT`  |  18 | — | The Graph |
+| `LDO`  |  18 | — | Lido DAO |
+| `BONK` |   5 | — | Bonk |
+| `PEPE` |  18 | — | Pepe |
+| `SHIB` |  18 | — | Shiba Inu |
+| `JUP`  |   6 | — | Jupiter |
+| `PYTH` |   6 | — | Pyth Network |
+| `RUNE` |   8 | — | THORChain |
 
 ### 9.4 Prefix Rules for Currency Units
 

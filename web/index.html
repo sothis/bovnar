@@ -1637,7 +1637,7 @@ a[data-doc] { cursor: pointer; }
 .hl-dim          { color: var(--text2); }
 
 #pg-event-log {
-  flex: 1;
+  height: 41rem; /* ~25 event rows */
   overflow-y: auto;
   padding: 0.6rem 0;
   font-family: var(--mono);
@@ -3032,22 +3032,28 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
     log.innerHTML = '';
     evCount = 0;
     hasErrors = false;
-    const frag = document.createDocumentFragment();
 
+    /* Collect all events so we can render newest-first. */
+    const evList = [];
     parse(text, function (ev) {
       evCount++;
+      if (ev.type === EV.ERROR) hasErrors = true;
+      evList.push(ev);
+    });
+
+    const frag = document.createDocumentFragment();
+    for (let i = evList.length - 1; i >= 0; i--) {
+      const ev = evList[i];
       const row = document.createElement('div');
       const cls = EV_CLASS[ev.type] || '';
       const isErr = ev.type === EV.ERROR;
       row.className = 'pg-ev' + (isErr ? ' is-error' : '');
-      if (isErr) hasErrors = true;
-
       row.innerHTML =
         `<span class="pg-ev-pos">${ev.line}:${ev.col}</span>` +
         `<span class="pg-ev-type ${cls}">${esc(typeLabel(ev.type))}</span>` +
         `<span class="pg-ev-detail">${detail(ev)}</span>`;
       frag.appendChild(row);
-    });
+    }
 
     log.appendChild(frag);
     empty.style.display = 'none';

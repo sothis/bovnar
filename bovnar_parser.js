@@ -62,14 +62,21 @@
       }
     }
 
-    /* Read an identifier body (letters, digits, +, -, _, high bytes). */
+    /* Read an identifier.
+       id-start = A–Z | a–z | _ | codepoint ≥ 0xC0 (UTF-8 leader ≥ 0xC3)
+       id-body  = id-start | + | - | digit | continuation bytes (> 0x7F) */
     function readIdent() {
       let s = '';
       while (!eof()) {
         const c = cur();
         const code = c.charCodeAt(0);
-        if (/[A-Za-z0-9_+\-]/.test(c) || code > 0x7F) { s += c; advance(); }
-        else break;
+        if (s.length === 0) {
+          if (/[A-Za-z_]/.test(c) || code >= 0xC0) { s += c; advance(); }
+          else break;
+        } else {
+          if (/[A-Za-z0-9_+\-]/.test(c) || code > 0x7F) { s += c; advance(); }
+          else break;
+        }
       }
       return s;
     }
@@ -189,7 +196,7 @@
             paramData = { kind: 'width', value: parseInt(raw, 10), text: raw };
           } else if (/^_\d+$/.test(raw)) {
             paramData = { kind: 'base', value: parseInt(raw.slice(1), 10), text: raw };
-          } else if (/^q\d+$/i.test(raw)) {
+          } else if (/^q\d+$/.test(raw)) {
             paramData = { kind: 'q', value: parseInt(raw.slice(1), 10), text: raw };
           } else {
             paramData = { kind: 'unit', text: raw };
@@ -327,18 +334,17 @@
       else emit(EV.ERROR, { msg: 'Unclosed array (expected \']\')' });
       emit(EV.ARRAY_ROW_END, {});
 
-      /* Additional dimension rows separated by '/' */
+      /* Additional dimension rows separated by '/'.
+         Tentatively consume '/' then skip ws+comments; backtrack fully
+         if the next non-whitespace token is not '['. */
       const sp = pos, sl = line, sc = col;
       skipWsComments();
       if (!eof() && cur() === '/') {
-        /* Peek: is the next non-ws char a '[' ? */
-        let ahead = pos + 1;
-        while (ahead < text.length && /[ \t\r\n\v\f]/.test(text[ahead])) ahead++;
-        if (ahead < text.length && text[ahead] === '[') {
-          advance(); // skip '/'
+        advance(); // tentatively skip '/'
+        skipWsComments();
+        if (!eof() && cur() === '[') {
           emit(EV.ARRAY_DIM_START, {});
-          skipWsComments();
-          if (!eof() && cur() === '[') readArray();
+          readArray();
         } else {
           pos = sp; line = sl; col = sc; // not a dimension separator
         }
@@ -372,7 +378,16 @@
         while (!eof()) {
           const c = cur();
           if (c === '[' || c === '{') depth++;
-          else if (c === ']' || c === '}') { if (depth === 0) break; depth--; }
+          else if (c === ']' || c === '}') {
+            if (depth === 0) {
+              /* Leave '}' unconsumed only when we are inside a struct so the
+                 struct handler's closing-brace check can see it.  ']' has no
+                 such handler and must be consumed to prevent an infinite loop. */
+              if (c !== '}' || !inStruct) advance();
+              break;
+            }
+            depth--;
+          }
           else if (c === ';' && depth === 0) { advance(); break; }
           advance();
         }

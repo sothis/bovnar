@@ -1501,6 +1501,243 @@ footer { position: relative; z-index: 1; }
 
 a[data-doc] { cursor: pointer; }
 
+/* ── PLAYGROUND ── */
+#playground {
+  border-top: 1px solid var(--border);
+  background: var(--editor-bg);
+}
+
+.playground-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 2.5rem;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.pg-editor-col {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  min-height: 560px;
+}
+
+.pg-events-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 560px;
+  background: var(--sidebar-bg);
+}
+
+.pg-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 1rem;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.pg-col-title {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.pg-col-badge {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--teal);
+  letter-spacing: 0.04em;
+}
+
+.pg-clear-btn {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--text3);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  letter-spacing: 0.04em;
+}
+.pg-clear-btn:hover { border-color: var(--blue2); color: var(--blue); }
+
+.pg-editor-wrap {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: var(--editor-bg);
+}
+
+#pg-highlight {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  margin: 0;
+  padding: 1.1rem 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  pointer-events: none;
+  tab-size: 4;
+  -moz-tab-size: 4;
+  box-sizing: border-box;
+  color: var(--text);
+}
+
+#pg-editor {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--blue2);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.85;
+  border: none;
+  outline: none;
+  padding: 1.1rem 1.25rem;
+  tab-size: 4;
+  scrollbar-width: thin;
+  scrollbar-color: #4e4e4e transparent;
+  box-sizing: border-box;
+  z-index: 1;
+  overflow: auto;
+}
+#pg-editor::placeholder { color: var(--text3); }
+
+/* Bovnar syntax highlight token colors */
+.hl-comment      { color: var(--c-comment); font-style: italic; }
+.hl-str          { color: var(--c-str); }
+.hl-special      { color: var(--c-val); }
+.hl-ann          { color: var(--c-ann); }
+.hl-type         { color: var(--c-type); font-weight: 600; }
+.hl-param        { color: var(--c-param); }
+.hl-ref          { color: var(--c-param); }
+.hl-sigil        { color: var(--c-sigil); }
+.hl-key          { color: var(--c-key); }
+.hl-num          { color: var(--c-val); }
+.hl-sym          { color: var(--c-unit); }
+.hl-eq           { color: var(--c-eq); }
+.hl-semi         { color: var(--c-semi); }
+.hl-bracket      { color: var(--yellow); }
+.hl-struct-brace { color: var(--c-struct); }
+.hl-dim          { color: var(--text2); }
+
+#pg-event-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0;
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  scrollbar-width: thin;
+  scrollbar-color: #4e4e4e var(--sidebar-bg);
+}
+
+.pg-ev {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.2rem 1rem;
+  line-height: 1.65;
+  border-left: 2px solid transparent;
+  transition: background 0.1s;
+  cursor: default;
+}
+.pg-ev:hover { background: rgba(255,255,255,0.025); }
+
+.pg-ev-pos {
+  color: var(--text3);
+  font-size: 0.62rem;
+  flex-shrink: 0;
+  min-width: 5.5rem;
+  letter-spacing: 0.02em;
+}
+
+.pg-ev-type {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  min-width: 13rem;
+}
+
+.pg-ev-detail {
+  color: var(--text2);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* event-type color classes */
+.ev-stream      { color: var(--text3); }
+.ev-assignment  { color: var(--c-key); }
+.ev-typeann     { color: var(--c-ann); }
+.ev-struct      { color: var(--teal); }
+.ev-array       { color: var(--yellow); }
+.ev-data        { color: var(--c-val); }
+.ev-error       { color: var(--red); }
+
+.pg-ev.is-error { border-left-color: var(--red); background: rgba(244,71,71,0.04); }
+.pg-ev.is-error .pg-ev-type { color: var(--red); }
+
+.pg-ev-key  { color: var(--c-key); }
+.pg-ev-str  { color: var(--c-str); }
+.pg-ev-num  { color: var(--c-val); }
+.pg-ev-sym  { color: var(--c-unit); }
+.pg-ev-ref  { color: var(--c-param); }
+.pg-ev-null { color: var(--text3); }
+.pg-ev-fam  { color: var(--c-type); font-weight: 500; }
+.pg-ev-unit { color: var(--c-unit); }
+
+.pg-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  gap: 0.5rem;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.pg-examples {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.pg-example-btn {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.65rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.pg-example-btn:hover { border-color: var(--blue2); color: var(--blue); }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
   nav { padding: 0 1rem; }
@@ -1524,6 +1761,10 @@ a[data-doc] { cursor: pointer; }
 
   #doc-drawer { width: 100vw; }
   #doc-content-wrap { padding: 1.5rem 1.25rem 3rem; }
+
+  .playground-layout { grid-template-columns: 1fr; }
+  .pg-editor-col { border-right: none; border-bottom: 1px solid var(--border); min-height: 320px; }
+  .pg-events-col { min-height: 320px; }
 }
 </style>
 </head>
@@ -1541,6 +1782,7 @@ a[data-doc] { cursor: pointer; }
     <li><a href="#quickstart">Quick Start</a></li>
     <li><a href="#usecases">Use Cases</a></li>
     <li><a href="#docs">Docs</a></li>
+    <li><a href="#playground">Playground</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>
 </nav>
@@ -2344,6 +2586,61 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
 </section>
 
 <!-- ══════════════════════════════════════════════
+     PLAYGROUND
+══════════════════════════════════════════════ -->
+<section id="playground">
+  <div class="section-inner" style="padding-bottom:3rem;">
+    <div class="section-label reveal">live parser</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Parse events, <em>as you type.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Type any valid (or invalid) Bovnar below. The parser emits events in real time —
+      every token, type annotation, and error is shown as it is recognised.
+    </p>
+
+    <div class="playground-layout reveal reveal-delay-3">
+      <!-- ── editor ── -->
+      <div class="pg-editor-col">
+        <div class="pg-col-header">
+          <span class="pg-col-title">Editor</span>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
+            <span class="pg-col-badge" id="pg-status">ready</span>
+          </div>
+        </div>
+        <div class="pg-editor-wrap">
+          <div id="pg-highlight" aria-hidden="true"></div>
+          <textarea id="pg-editor" spellcheck="false" autocomplete="off" autocorrect="off"
+            placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
+          ></textarea>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;padding:0.55rem 0.85rem;background:var(--panel-bg);border-top:1px solid var(--border);">
+          <button class="pg-example-btn" data-example="typed">Typed values</button>
+          <button class="pg-example-btn" data-example="units">SI units</button>
+          <button class="pg-example-btn" data-example="struct">Nested struct</button>
+          <button class="pg-example-btn" data-example="array">Array</button>
+          <button class="pg-example-btn" data-example="strings">Strings</button>
+          <button class="pg-example-btn" data-example="errors">Parse errors</button>
+        </div>
+      </div>
+
+      <!-- ── event log ── -->
+      <div class="pg-events-col">
+        <div class="pg-col-header">
+          <span class="pg-col-title">Event Stream</span>
+          <span class="pg-col-badge" id="pg-ev-count">0 events</span>
+          <button class="pg-clear-btn" id="pg-clear">clear</button>
+        </div>
+        <div id="pg-event-log">
+          <div class="pg-empty-state" id="pg-empty">
+            <span style="color:var(--text3);font-size:0.9rem;">◈</span>
+            <span>Events appear here as you type.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
      FOOTER
 ══════════════════════════════════════════════ -->
 <footer>
@@ -2445,7 +2742,378 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
   </div>
 </div>
 
+<script src="../bovnar_parser.js"></script>
 <script>
+/* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
+(function () {
+  const EV = BovnarParser.EV;
+  const parse = BovnarParser.parseBovnar;
+
+  const editor   = document.getElementById('pg-editor');
+  const hlDiv    = document.getElementById('pg-highlight');
+  const log      = document.getElementById('pg-event-log');
+  const empty    = document.getElementById('pg-empty');
+  const countEl  = document.getElementById('pg-ev-count');
+  const statusEl = document.getElementById('pg-status');
+  const clearBtn = document.getElementById('pg-clear');
+
+  /* ── Syntax highlighter ──────────────────────────────────────────── */
+  function highlightBovnar(src) {
+    let i = 0;
+    const n = src.length;
+    let out = '';
+
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function sp(cls, raw) {
+      return '<span class="hl-' + cls + '">' + raw + '</span>';
+    }
+
+    function hlTypeAnn() {
+      let r = sp('ann', '&lt;');
+      i++;
+      while (i < n && /[ \t\r\n]/.test(src[i])) { r += esc(src[i]); i++; }
+      let fam = '';
+      while (i < n && /[a-z_0-9]/.test(src[i])) { fam += src[i++]; }
+      if (fam) r += sp('type', esc(fam));
+      while (i < n && /[ \t]/.test(src[i])) { r += src[i++]; }
+      if (i < n && src[i] === ':') {
+        r += sp('ann', ':');
+        i++;
+        let buf = '';
+        while (i < n && src[i] !== '>' && src[i] !== '\n') {
+          if (src[i] === ',') {
+            const t = buf.trim(); if (t) r += sp('param', esc(t)); buf = '';
+            r += sp('ann', ','); i++;
+          } else { buf += src[i++]; }
+        }
+        const t = buf.trim(); if (t) r += sp('param', esc(t));
+      }
+      while (i < n && /[ \t\r\n]/.test(src[i])) { r += esc(src[i]); i++; }
+      if (i < n && src[i] === '>') { r += sp('ann', '&gt;'); i++; }
+      return r;
+    }
+
+    while (i < n) {
+      const c = src[i];
+
+      if (c === '\r' || c === '\n') { out += c; i++; continue; }
+
+      if (c === '#') {
+        let j = i;
+        while (j < n && src[j] !== '\n' && src[j] !== '\r') j++;
+        out += sp('comment', esc(src.slice(i, j))); i = j; continue;
+      }
+
+      if (c === '"') {
+        let raw = '"'; i++;
+        while (i < n) {
+          if (src[i] === '\\' && i + 1 < n) { raw += src[i] + src[i + 1]; i += 2; continue; }
+          if (src[i] === '"') { raw += '"'; i++; break; }
+          raw += src[i++];
+        }
+        out += sp('str', esc(raw)); continue;
+      }
+
+      if (c === '$') {
+        let j = i + 1;
+        while (j < n && src[j] !== '$' && src[j] !== '\n') j++;
+        if (j < n && src[j] === '$') j++;
+        out += sp('special', esc(src.slice(i, j))); i = j; continue;
+      }
+
+      if (c === '<') { out += hlTypeAnn(); continue; }
+
+      if (c === '&') {
+        let j = i + 1;
+        while (j < n && !/[ \t\r\n;,\[\]{}#]/.test(src[j])) j++;
+        out += sp('ref', esc(src.slice(i, j))); i = j; continue;
+      }
+
+      if (c === '.') {
+        let j = i + 1;
+        while (j < n) {
+          const cc = src[j];
+          if (/[A-Za-z0-9_+\-]/.test(cc) || cc.charCodeAt(0) > 0x7F) j++; else break;
+        }
+        out += j > i + 1
+          ? sp('sigil', '.') + sp('key', esc(src.slice(i + 1, j)))
+          : sp('sigil', '.');
+        i = j; continue;
+      }
+
+      if (c === '-' && i + 1 < n && /\d/.test(src[i + 1])) {
+        let j = i + 1;
+        while (j < n && /\d/.test(src[j])) j++;
+        if (j < n && src[j] === '.') { j++; while (j < n && /\d/.test(src[j])) j++; }
+        if (j < n && (src[j] === 'e' || src[j] === 'E')) {
+          j++;
+          if (j < n && (src[j] === '+' || src[j] === '-')) j++;
+          while (j < n && /\d/.test(src[j])) j++;
+        }
+        out += sp('num', esc(src.slice(i, j))); i = j; continue;
+      }
+
+      if (/\d/.test(c) || (c === '.' && i + 1 < n && /\d/.test(src[i + 1]))) {
+        let j = i;
+        if (src[j] === '.') { j++; while (j < n && /\d/.test(src[j])) j++; }
+        else {
+          while (j < n && /\d/.test(src[j])) j++;
+          if (j < n && src[j] === '.') { j++; while (j < n && /\d/.test(src[j])) j++; }
+        }
+        if (j < n && (src[j] === 'e' || src[j] === 'E')) {
+          j++;
+          if (j < n && (src[j] === '+' || src[j] === '-')) j++;
+          while (j < n && /\d/.test(src[j])) j++;
+        }
+        out += sp('num', esc(src.slice(i, j))); i = j; continue;
+      }
+
+      if (/[A-Za-z_]/.test(c) || c.charCodeAt(0) > 0x7F) {
+        let j = i;
+        while (j < n) {
+          const cc = src[j];
+          if (/[A-Za-z0-9_+\-]/.test(cc) || cc.charCodeAt(0) > 0x7F) j++; else break;
+        }
+        out += sp('sym', esc(src.slice(i, j))); i = j; continue;
+      }
+
+      if (c === '=') { out += sp('eq', '='); i++; continue; }
+      if (c === ';') { out += sp('semi', ';'); i++; continue; }
+      if (c === '[' || c === ']') { out += sp('bracket', esc(c)); i++; continue; }
+      if (c === '{' || c === '}') { out += sp('struct-brace', esc(c)); i++; continue; }
+      if (c === '/') { out += sp('dim', '/'); i++; continue; }
+
+      out += esc(c); i++;
+    }
+    return out;
+  }
+
+  function syncHighlight() {
+    hlDiv.innerHTML = highlightBovnar(editor.value) + '\n';
+    hlDiv.scrollTop = editor.scrollTop;
+  }
+
+  /* ── Example presets ─────────────────────────────────────────────── */
+  const EXAMPLES = {
+    typed: `# Typed scalar values
+.port     = <uint:16> 443;
+.offset   = <sint:64> -2147483648;
+.ratio    = <float:64> 3.14159;
+.label    = <utf8> "hello world";
+.enabled  = true;
+.timeout  = <float:64,s> 2.5;`,
+
+    units: `# SI units and compound expressions
+.velocity     = <float:64,m/s> 9.81;
+.acceleration = <float:64,m/s²> 9.807;
+.force        = <float:64,k~g·m/s²> 1.0;
+.storage      = <uint:64,Gi~B> 16;
+.temperature  = <float:32,°C> 23.5;
+.inline_speed = 120 k~m/h;`,
+
+    struct: `# Nested struct
+.sensor = {
+    .id          = <uint:16> 7;
+    .name        = "pressure_01";
+    .value       = <float:32,k~Pa> 101.325;
+    .active      = true;
+    .calibration = {
+        .offset = <float:32> -0.02;
+        .gain   = <float:32> 1.001;
+    };
+};`,
+
+    array: `# Multi-dimensional arrays and typed elements
+.matrix   = [1.0, 0.0, 0.0]/[0.0, 1.0, 0.0]/[0.0, 0.0, 1.0];
+.ports    = <uint:16> [80, 443, 8080, 8443];
+.mixed    = [<uint:8> 255, <sint:8> -1, <float:64> 3.14];
+.with_nulls = [,1,,2,];`,
+
+    strings: `# String literals and concatenation
+.simple   = "hello world";
+.escaped  = "tab:\\there\\nnewline";
+.concat   = "hello " "world";
+.ref      = &.sensor.name;
+.special  = $nan$;
+.neg_inf  = $-infinity$;`,
+
+    errors: `# These trigger parser errors (shown in red)
+.valid = 42;
+. = 100;
+.bad_escape = "\\x";
+.ok_after   = "recovered";
+.missing_gt = <uint:32 99;
+.fine_again = true;`,
+  };
+
+  /* ── Rendering helpers ───────────────────────────────────────────── */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  const EV_CLASS = {
+    [EV.STREAM_START]:     'ev-stream',
+    [EV.STREAM_END]:       'ev-stream',
+    [EV.ASSIGNMENT_START]: 'ev-assignment',
+    [EV.ASSIGNMENT_END]:   'ev-assignment',
+    [EV.TYPE_ANN_START]:   'ev-typeann',
+    [EV.TYPE_ANN_FAMILY]:  'ev-typeann',
+    [EV.TYPE_ANN_PARAM]:   'ev-typeann',
+    [EV.TYPE_ANN_END]:     'ev-typeann',
+    [EV.STRUCT_START]:     'ev-struct',
+    [EV.STRUCT_END]:       'ev-struct',
+    [EV.ARRAY_ROW_START]:  'ev-array',
+    [EV.ARRAY_ROW_END]:    'ev-array',
+    [EV.ARRAY_DIM_START]:  'ev-array',
+    [EV.DATA]:             'ev-data',
+    [EV.OCTET_STREAM_START]: 'ev-array',
+    [EV.OCTET_STREAM_END]:   'ev-array',
+    [EV.ERROR]:            'ev-error',
+  };
+
+  function detail(ev) {
+    const d = ev.data;
+    switch (ev.type) {
+      case EV.ASSIGNMENT_START:
+      case EV.ASSIGNMENT_END:
+        return `<span class="pg-ev-key">.${esc(d.key)}</span>`;
+
+      case EV.TYPE_ANN_FAMILY:
+        return `<span class="pg-ev-fam">${esc(d.family)}</span>`;
+
+      case EV.TYPE_ANN_PARAM: {
+        const kindColor = d.kind === 'unit' ? 'pg-ev-unit' : 'pg-ev-num';
+        return `<span class="pg-ev-sym">${esc(d.kind)}</span>`
+             + `<span class="pg-ev-null"> → </span>`
+             + `<span class="${kindColor}">${esc(d.text)}</span>`;
+      }
+
+      case EV.DATA: {
+        if (d.kind === 'null') return `<span class="pg-ev-null">null</span>`;
+        if (d.kind === 'string') {
+          const val = `<span class="pg-ev-str">"${esc(d.value.length > 40 ? d.value.slice(0,40)+'…' : d.value)}"</span>`;
+          return val + (d.unit ? ` <span class="pg-ev-unit">${esc(d.unit)}</span>` : '');
+        }
+        if (d.kind === 'number') {
+          return `<span class="pg-ev-num">${esc(d.value)}</span>`
+               + (d.unit ? ` <span class="pg-ev-unit">${esc(d.unit)}</span>` : '');
+        }
+        if (d.kind === 'special')
+          return `<span class="pg-ev-num">$${esc(d.value)}$</span>`;
+        if (d.kind === 'symbol')
+          return `<span class="pg-ev-sym">${esc(d.value)}</span>`;
+        if (d.kind === 'reference')
+          return `<span class="pg-ev-ref">&amp;${esc(d.value)}</span>`;
+        return '';
+      }
+
+      case EV.ERROR:
+        return `<span style="color:var(--red)">${esc(d.msg)}</span>`;
+
+      default:
+        return '';
+    }
+  }
+
+  function typeLabel(type) {
+    return type.replace(/^ev_/, '').replace(/_/g, '_');
+  }
+
+  /* ── Parse & render ──────────────────────────────────────────────── */
+  let evCount = 0;
+  let hasErrors = false;
+
+  function runParse(text) {
+    log.innerHTML = '';
+    evCount = 0;
+    hasErrors = false;
+    const frag = document.createDocumentFragment();
+
+    parse(text, function (ev) {
+      evCount++;
+      const row = document.createElement('div');
+      const cls = EV_CLASS[ev.type] || '';
+      const isErr = ev.type === EV.ERROR;
+      row.className = 'pg-ev' + (isErr ? ' is-error' : '');
+      if (isErr) hasErrors = true;
+
+      row.innerHTML =
+        `<span class="pg-ev-pos">${ev.line}:${ev.col}</span>` +
+        `<span class="pg-ev-type ${cls}">${esc(typeLabel(ev.type))}</span>` +
+        `<span class="pg-ev-detail">${detail(ev)}</span>`;
+      frag.appendChild(row);
+    });
+
+    log.appendChild(frag);
+    empty.style.display = 'none';
+    countEl.textContent = evCount + ' event' + (evCount !== 1 ? 's' : '');
+    statusEl.textContent = hasErrors ? 'errors' : 'ok';
+    statusEl.style.color = hasErrors ? 'var(--red)' : 'var(--teal)';
+  }
+
+  /* ── Debounce ────────────────────────────────────────────────────── */
+  let timer = null;
+  function schedParse() {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      const text = editor.value;
+      if (!text.trim()) {
+        log.innerHTML = '';
+        log.appendChild(empty);
+        empty.style.display = 'flex';
+        countEl.textContent = '0 events';
+        statusEl.textContent = 'ready';
+        statusEl.style.color = '';
+        return;
+      }
+      runParse(text);
+    }, 80);
+  }
+
+  editor.addEventListener('input', function () { syncHighlight(); schedParse(); });
+  editor.addEventListener('scroll', function () { hlDiv.scrollTop = editor.scrollTop; });
+  editor.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = editor.selectionStart, en = editor.selectionEnd;
+      editor.value = editor.value.slice(0, s) + '    ' + editor.value.slice(en);
+      editor.selectionStart = editor.selectionEnd = s + 4;
+      syncHighlight();
+      schedParse();
+    }
+  });
+
+  clearBtn.addEventListener('click', function () {
+    editor.value = '';
+    syncHighlight();
+    schedParse();
+    editor.focus();
+  });
+
+  /* ── Example buttons ─────────────────────────────────────────────── */
+  document.querySelectorAll('.pg-example-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const key = btn.dataset.example;
+      if (EXAMPLES[key]) {
+        editor.value = EXAMPLES[key];
+        syncHighlight();
+        schedParse();
+        editor.focus();
+      }
+    });
+  });
+
+  /* ── Load default example ────────────────────────────────────────── */
+  editor.value = EXAMPLES.typed;
+  syncHighlight();
+  schedParse();
+}());
+
 function showTab(id) {
   document.querySelectorAll('.qs-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.qs-pane').forEach(p => p.classList.remove('active'));

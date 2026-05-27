@@ -376,12 +376,14 @@ bool bvn_action_fraction_intro(bvnr_reader_t* p)
 {
 	bool is_arr = p->lex.in_array_element;
 	if (!bvn_lex_number_begin(p, is_arr)) return false;
+	p->val.acc_has_dot = true;
 	return bvn_push_number_byte(p, fraction_intro);
 }
 bool bvn_action_fraction_no_int(bvnr_reader_t* p)
 {
 	bool is_arr = p->lex.in_array_element;
 	if (!bvn_lex_number_begin(p, is_arr)) return false;
+	p->val.acc_has_dot = true;
 	return bvn_push_number_byte(p, fraction_no_int);
 }
 bool bvn_action_copy_fraction_byte(bvnr_reader_t* p)
@@ -497,6 +499,7 @@ bool bvn_action_exp_intro(bvnr_reader_t* p)
 {
 	bool is_arr = p->lex.in_array_element;
 	if (!bvn_lex_number_begin(p, is_arr)) return false;
+	p->val.acc_has_exp = true;
 	return bvn_push_number_byte(p, exp_intro);
 }
 bool bvn_action_exp_sign_intro(bvnr_reader_t* p)

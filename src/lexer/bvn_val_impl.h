@@ -62,6 +62,7 @@ typedef struct bvn_iu_cache_slot_s {
 typedef struct bvnr_validator_s {
 	value_type_spec_t	value_type;
 	value_unit_t		parsed_unit;
+	value_type_spec_t	inferred_default_vtype;
 	uint64_t		acc_value;
 	bool			acc_overflow;
 	bool			acc_has_dot;

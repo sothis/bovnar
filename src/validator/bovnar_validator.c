@@ -21,8 +21,9 @@ void bvnr_reader_destroy(bvnr_reader_t* r)
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 {
 	memset(v, 0, sizeof(*v));
-	v->value_type  = BVN_TYPE_PLAIN;
-	v->parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	v->value_type             = BVN_TYPE_PLAIN;
+	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
+	v->inferred_default_vtype = BVN_TYPE_PLAIN;
 	if (opts) {
 		v->userdata      = opts->userdata;
 		v->on_unverified = opts->on_unverified;
@@ -112,18 +113,11 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		family_name     = "utf8";
 		family_name_len = 4;
 	} else if (tt == token_is_number || tt == token_is_array_number) {
-		bool has_dot = false, has_exp = false, is_neg = false;
+		bool has_dot = v->acc_has_dot;
+		bool has_exp = v->acc_has_exp;
+		bool is_neg = (str_len > 0 && str[0] == '-');
 		bool is_special = bvn_is_special_number_string(
 			(const char*)str);
-		if (str_len > 0 && str[0] == '-')
-			is_neg = true;
-		if (!is_special) {
-			for (uint32_t i = 0; i < str_len; i++) {
-				if (str[i] == '.') has_dot = true;
-				if (str[i] == 'e' || str[i] == 'E')
-					has_exp = true;
-			}
-		}
 		if (is_currency_unit) {
 			default_type.family = vt_float_dec;
 			default_type.width  = 64;
@@ -164,6 +158,14 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	} else {
 		return true;
 	}
+	if (!bvn_type_is_plain(v->inferred_default_vtype) &&
+	    bvn_type_spec_eq(default_type, v->inferred_default_vtype)) {
+		v->value_type    = default_type;
+		v->parsed_unit   = default_unit;
+		v->unit_data_len = emit_unit ? 7u : 0u;
+		return true;
+	}
+	v->inferred_default_vtype = default_type;
 	v->value_type    = default_type;
 	v->parsed_unit   = default_unit;
 	v->unit_data_len = emit_unit ? 7u : 0u;
@@ -585,18 +587,20 @@ bool bvn_val_receive_octet_chunk(
 bool bvn_val_on_value_intro(bvnr_reader_t* r)
 {
 	bvnr_validator_t* v = &r->val;
-	v->value_type          = BVN_TYPE_PLAIN;
-	v->parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
-	v->has_annotation_unit = false;
+	v->value_type             = BVN_TYPE_PLAIN;
+	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
+	v->inferred_default_vtype = BVN_TYPE_PLAIN;
+	v->has_annotation_unit    = false;
 	bvn_acc_reset(v);
 	return true;
 }
 bool bvn_val_on_value_outro(bvnr_reader_t* r)
 {
 	bvnr_validator_t* v = &r->val;
-	v->value_type          = BVN_TYPE_PLAIN;
-	v->parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
-	v->has_annotation_unit = false;
+	v->value_type             = BVN_TYPE_PLAIN;
+	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
+	v->inferred_default_vtype = BVN_TYPE_PLAIN;
+	v->has_annotation_unit    = false;
 	bvn_acc_reset(v);
 	return true;
 }

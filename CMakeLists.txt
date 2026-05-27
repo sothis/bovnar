@@ -19,6 +19,7 @@ set(BVNR_C_FLAGS
     -pedantic
     $<$<C_COMPILER_ID:GNU>:-fanalyzer>
     -fPIC
+    -fvisibility=hidden
 )
 
 set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)

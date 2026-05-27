@@ -16,19 +16,19 @@ typedef enum bvn_si_dim_idx_e {
 	bvn_si_dim_candela  = 6,
 	bvn_si_dim_count    = 7
 } bvn_si_dim_idx_t;
-int32_t bvn_exponent_to_int(unit_exponent_t e);
-unit_exponent_t bvn_int_to_exponent(int32_t n);
-double bvn_unit_to_si_factor(value_unit_t u,
+BVN_API int32_t bvn_exponent_to_int(unit_exponent_t e);
+BVN_API unit_exponent_t bvn_int_to_exponent(int32_t n);
+BVN_API double bvn_unit_to_si_factor(value_unit_t u,
                               bool *is_affine,
                               double *affine_offset,
                               bool *ok);
-value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow);
-bool bvn_unit_dimension_vector(value_unit_t u,
+BVN_API value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow);
+BVN_API bool bvn_unit_dimension_vector(value_unit_t u,
                                 int32_t dims[bvn_si_dim_count]);
-bool bvn_units_compatible(value_unit_t a, value_unit_t b);
-double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
+BVN_API bool bvn_units_compatible(value_unit_t a, value_unit_t b);
+BVN_API double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
                                 bool *ok, bool *requires_affine);
-bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
+BVN_API bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
 #ifdef __cplusplus
 }
 #endif

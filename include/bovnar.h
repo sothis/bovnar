@@ -5,6 +5,15 @@
 #include <stdint.h>
 #include "bvn_float.h"
 #include "bvn_int.h"
+#ifndef BVN_API
+#  if defined(_WIN32) || defined(__CYGWIN__)
+#    define BVN_API __declspec(dllexport)
+#  elif defined(__GNUC__) || defined(__clang__)
+#    define BVN_API __attribute__((visibility("default")))
+#  else
+#    define BVN_API
+#  endif
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -406,140 +415,140 @@ static inline bool bvn_type_is_plain(value_type_spec_t s)
 {
 	return s.family == vt_plain;
 }
-void bvnr_source_from_fd(bvnr_source_t* s, int fd);
-void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
-void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
-void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
-uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
-bvnr_reader_t* bvnr_reader_create(void);
-void           bvnr_reader_destroy(bvnr_reader_t* r);
-bool bvnr_open_read_source(
+BVN_API void bvnr_source_from_fd(bvnr_source_t* s, int fd);
+BVN_API void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
+BVN_API void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
+BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
+BVN_API uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
+BVN_API bvnr_reader_t* bvnr_reader_create(void);
+BVN_API void           bvnr_reader_destroy(bvnr_reader_t* r);
+BVN_API bool bvnr_open_read_source(
 	bvnr_reader_t* r, const bvnr_source_t* src,
 	const bvnr_sink_t* src_mirror, bvnr_read_flags_t* options);
-bool bvnr_open_read_mem(
+BVN_API bool bvnr_open_read_mem(
 	bvnr_reader_t* r, const void* buf, uint64_t len,
 	void* mirror_buf, uint32_t mirror_cap,
 	bvnr_read_flags_t* options);
-bool bvnr_read(bvnr_reader_t* r);
+BVN_API bool bvnr_read(bvnr_reader_t* r);
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
-bvnr_canon_observer_t* bvnr_canon_observer_create(
+BVN_API bvnr_canon_observer_t* bvnr_canon_observer_create(
 	const bvnr_sink_t* sink, bool pretty);
-void bvnr_canon_observer_destroy(bvnr_canon_observer_t* obs);
-bool bvnr_canon_observer_on_event(
+BVN_API void bvnr_canon_observer_destroy(bvnr_canon_observer_t* obs);
+BVN_API bool bvnr_canon_observer_on_event(
 	void* obs, bvnr_event_t ev, bvnr_data_t* data);
-bool bvnr_canon_observer_finish(bvnr_canon_observer_t* obs);
-error_code_t bvnr_reader_get_error(const bvnr_reader_t* r);
-uint64_t     bvnr_reader_get_error_line  (const bvnr_reader_t* r);
-uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);
-uint32_t     bvnr_reader_get_error_byte  (const bvnr_reader_t* r);
-uint64_t     bvnr_reader_get_error_offset(const bvnr_reader_t* r);
-uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t* r);
-bvnr_writer_t* bvnr_writer_create(void);
-void           bvnr_writer_destroy(bvnr_writer_t* w);
-bool bvnr_open_write_sink(
+BVN_API bool bvnr_canon_observer_finish(bvnr_canon_observer_t* obs);
+BVN_API error_code_t bvnr_reader_get_error(const bvnr_reader_t* r);
+BVN_API uint64_t     bvnr_reader_get_error_line  (const bvnr_reader_t* r);
+BVN_API uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);
+BVN_API uint32_t     bvnr_reader_get_error_byte  (const bvnr_reader_t* r);
+BVN_API uint64_t     bvnr_reader_get_error_offset(const bvnr_reader_t* r);
+BVN_API uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t* r);
+BVN_API bvnr_writer_t* bvnr_writer_create(void);
+BVN_API void           bvnr_writer_destroy(bvnr_writer_t* w);
+BVN_API bool bvnr_open_write_sink(
 	bvnr_writer_t* w, const bvnr_sink_t* sink,
 	bool pretty, bvnr_write_flags_t* options);
-bool bvnr_open_write_mem(
+BVN_API bool bvnr_open_write_mem(
 	bvnr_writer_t* w, void* buf, uint32_t cap,
 	bool pretty, bvnr_write_flags_t* options);
-bool bvnr_write_event(
+BVN_API bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data);
-bool bvnr_write_finish(bvnr_writer_t* w);
-error_code_t bvnr_writer_get_error(const bvnr_writer_t* w);
-uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t* w);
-uint64_t     bvnr_writer_bytes_written(const bvnr_writer_t* w);
-const char*  bvn_error_to_string(error_code_t code);
-value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok);
-value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok);
-int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
-int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
+BVN_API bool bvnr_write_finish(bvnr_writer_t* w);
+BVN_API error_code_t bvnr_writer_get_error(const bvnr_writer_t* w);
+BVN_API uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t* w);
+BVN_API uint64_t     bvnr_writer_bytes_written(const bvnr_writer_t* w);
+BVN_API const char*  bvn_error_to_string(error_code_t code);
+BVN_API value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok);
+BVN_API value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok);
+BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
+BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
-bool         bvn_unit_valid(value_unit_t u);
-bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
-double       bvn_unit_prefix_factor(value_unit_t u);
-int32_t      bvn_unit_prefix_exponent(value_unit_t u);
-bvn_unit_flags_t bvnr_writer_unit_flags(const bvnr_writer_t* w);
-value_type_spec_t bvn_parse_type_annotation(
+BVN_API bool         bvn_unit_valid(value_unit_t u);
+BVN_API bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
+BVN_API double       bvn_unit_prefix_factor(value_unit_t u);
+BVN_API int32_t      bvn_unit_prefix_exponent(value_unit_t u);
+BVN_API bvn_unit_flags_t bvnr_writer_unit_flags(const bvnr_writer_t* w);
+BVN_API value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,
 	value_unit_t* out_unit,
 	uint8_t* unit_buf, uint8_t* unit_buf_len);
-bool bvn_validate_identifier(const char* id);
-bool bvn_validate_symbol(const char* surr);
-bool bvn_validate_reference(const char* link);
-bool bvn_validate_number(const char* s);
-bool bvn_is_special_number_string(const char* s);
-bool bvn_validate_digits_for_base(const char* s, uint32_t base);
-bool bvn_validate_number_in_base(const char* s, uint32_t base);
-bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base);
-bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base);
-bool bvn_validate_string(const uint8_t* data, size_t len);
-uint32_t bvn_char_to_digit(uint32_t c, uint32_t base);
-uint32_t bvn_min_digits_for_type(value_type_spec_t vt);
-int32_t bvn_format_uint64(
+BVN_API bool bvn_validate_identifier(const char* id);
+BVN_API bool bvn_validate_symbol(const char* surr);
+BVN_API bool bvn_validate_reference(const char* link);
+BVN_API bool bvn_validate_number(const char* s);
+BVN_API bool bvn_is_special_number_string(const char* s);
+BVN_API bool bvn_validate_digits_for_base(const char* s, uint32_t base);
+BVN_API bool bvn_validate_number_in_base(const char* s, uint32_t base);
+BVN_API bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base);
+BVN_API bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base);
+BVN_API bool bvn_validate_string(const uint8_t* data, size_t len);
+BVN_API uint32_t bvn_char_to_digit(uint32_t c, uint32_t base);
+BVN_API uint32_t bvn_min_digits_for_type(value_type_spec_t vt);
+BVN_API int32_t bvn_format_uint64(
 	char* buf, size_t bufsize, uint64_t value,
 	uint32_t base, uint32_t min_digits);
-int32_t bvn_format_int64(
+BVN_API int32_t bvn_format_int64(
 	char* buf, size_t bufsize, int64_t value,
 	uint32_t base, uint32_t min_digits);
-int32_t bvn_format_double(
+BVN_API int32_t bvn_format_double(
 	char* buf, size_t bufsize, double value, value_type_spec_t vt);
-bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out);
-bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out);
-bool bvn_parse_double(const char* s, value_type_spec_t vt, double* out);
-bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out);
-bool bvn_looks_like_double(const char* s);
-const uint8_t* bvn_get_escape_repl_table(void);
-bool bvnr_write_type_annotation(bvnr_writer_t* w,
+BVN_API bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out);
+BVN_API bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out);
+BVN_API bool bvn_parse_double(const char* s, value_type_spec_t vt, double* out);
+BVN_API bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out);
+BVN_API bool bvn_looks_like_double(const char* s);
+BVN_API const uint8_t* bvn_get_escape_repl_table(void);
+BVN_API bool bvnr_write_type_annotation(bvnr_writer_t* w,
 				value_type_spec_t vt,
 				value_unit_t vu);
-bool bvnr_write_string(bvnr_writer_t* w, const char* key, const char* value);
-bool bvnr_write_plain (bvnr_writer_t* w, const char* key, const char* value);
-bool bvnr_write_null  (bvnr_writer_t* w, const char* key);
-bool bvnr_write_bool  (bvnr_writer_t* w, const char* key, bool value);
-bool bvnr_write_uint(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_string(bvnr_writer_t* w, const char* key, const char* value);
+BVN_API bool bvnr_write_plain (bvnr_writer_t* w, const char* key, const char* value);
+BVN_API bool bvnr_write_null  (bvnr_writer_t* w, const char* key);
+BVN_API bool bvnr_write_bool  (bvnr_writer_t* w, const char* key, bool value);
+BVN_API bool bvnr_write_uint(bvnr_writer_t* w, const char* key,
 			 uint32_t width, uint64_t value);
-bool bvnr_write_sint(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_sint(bvnr_writer_t* w, const char* key,
 			 uint32_t width, int64_t value);
-bool bvnr_write_float(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_float(bvnr_writer_t* w, const char* key,
 			  uint32_t width, double value);
-bool bvnr_write_float_fix(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_float_fix(bvnr_writer_t* w, const char* key,
 			   uint32_t width, uint32_t q, double value);
-bool bvnr_write_float_dec(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_float_dec(bvnr_writer_t* w, const char* key,
 			   uint32_t width, double value);
-bool bvnr_write_uint_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_uint_unit(bvnr_writer_t* w, const char* key,
 			   uint32_t width, uint64_t value, value_unit_t unit);
-bool bvnr_write_sint_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_sint_unit(bvnr_writer_t* w, const char* key,
 			   uint32_t width, int64_t value, value_unit_t unit);
-bool bvnr_write_float_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_float_unit(bvnr_writer_t* w, const char* key,
 				uint32_t width, double value, value_unit_t unit);
-bool bvnr_write_float_fix_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_float_fix_unit(bvnr_writer_t* w, const char* key,
 				uint32_t width, uint32_t q,
 				double value, value_unit_t unit);
-bool bvnr_write_float_dec_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_float_dec_unit(bvnr_writer_t* w, const char* key,
 				uint32_t width,
 				double value, value_unit_t unit);
-bool bvnr_write_bvnf(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_bvnf(bvnr_writer_t* w, const char* key,
 			 const bvn_float_t* f, uint32_t width);
-bool bvnr_write_bvnf_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_bvnf_unit(bvnr_writer_t* w, const char* key,
 			   const bvn_float_t* f,
 			   uint32_t width, value_unit_t unit);
-bool bvnr_write_bvnf_base(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_bvnf_base(bvnr_writer_t* w, const char* key,
 			   const bvn_float_t* f,
 			   uint32_t width, uint32_t base);
-bool bvnr_write_bvnf_base_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_bvnf_base_unit(bvnr_writer_t* w, const char* key,
 				const bvn_float_t* f,
 				uint32_t width, uint32_t base,
 				value_unit_t unit);
-bool bvnr_write_bvni(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_bvni(bvnr_writer_t* w, const char* key,
 		     const bvn_int_t* n,
 		     uint32_t width, uint32_t base);
-bool bvnr_write_bvni_unit(bvnr_writer_t* w, const char* key,
+BVN_API bool bvnr_write_bvni_unit(bvnr_writer_t* w, const char* key,
 			   const bvn_int_t* n,
 			   uint32_t width, uint32_t base,
 			   value_unit_t unit);
-bool bvnr_write_struct_start(bvnr_writer_t* w, const char* key);
-bool bvnr_write_struct_end  (bvnr_writer_t* w);
+BVN_API bool bvnr_write_struct_start(bvnr_writer_t* w, const char* key);
+BVN_API bool bvnr_write_struct_end  (bvnr_writer_t* w);
 #ifdef __cplusplus
 }
 #endif

@@ -13,6 +13,7 @@ static uint8_t bvn_run_lut_inline_unit[256];
 static uint8_t bvn_run_lut_reference[256];
 static uint8_t bvn_run_lut_type[256];
 static uint8_t bvn_run_lut_ws[256];
+static uint8_t bvn_ws_accepting_state[dimension_state];
 static bool    bvn_run_luts_inited = false;
 static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 {
@@ -50,6 +51,11 @@ static void bvn_init_run_luts(void)
 	bvn_run_lut_ws[0x0c] = 1;
 	bvn_run_lut_ws[0x0d] = 1;
 	bvn_run_lut_ws[0x20] = 1;
+	for (int s = 0; s < (int)dimension_state; ++s)
+		bvn_ws_accepting_state[s] = (
+			bvn_after_state_idx_table[s][0x20] == ACT_ignore_whitespace &&
+			bvn_after_state_idx_table[s][0x0a] == ACT_ignore_whitespace
+		) ? 1u : 0u;
 	bvn_run_luts_inited = true;
 }
 static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
@@ -1061,20 +1067,78 @@ static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
 		l->column = 0;
 	}
 }
+/*
+ * Scan forward through string content that does not need per-byte dispatch,
+ * covering both ASCII printable bytes and UTF-8 multi-byte sequences.
+ * Returns the exclusive end position such that every byte in [start, end) is:
+ *   - not a control character (< 0x20), not '"' (0x22), not '\' (0x5C), and
+ *   - part of a complete, valid UTF-8 sequence.
+ * The caller is guaranteed to enter with utf8_need == 0; this function never
+ * leaves it non-zero — it truncates the run to the last complete sequence.
+ * On any UTF-8 error the run is truncated to the last complete sequence before
+ * the bad byte, so the bad byte is left for per-byte dispatch which will report
+ * the exact error with correct line/column.
+ */
+static inline uint32_t bvn_string_ext_end(
+	const uint8_t* data, uint32_t start, uint32_t len)
+{
+	uint8_t  need = 0, lo = 0, hi = 0;
+	uint32_t last_complete = start;
+	uint32_t i = start;
+	while (i < len) {
+		uint8_t b = data[i];
+		if (b < 0x20u || b == 0x22u || b == 0x5cu)
+			break;
+		if (b < 0x80u) {
+			if (need) return last_complete;
+			last_complete = i + 1u;
+		} else if (need) {
+			if (b < lo || b > hi) return last_complete;
+			--need;
+			lo = 0x80u; hi = 0xbfu;
+			if (!need) last_complete = i + 1u;
+		} else {
+			if (!bvn_utf8_classify_leader(b, &need, &lo, &hi))
+				return last_complete;
+		}
+		++i;
+	}
+	return need ? last_complete : i;
+}
+
 static inline uint32_t bvn_try_bulk_run(
 	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
 {
 	state_t st = l->next_state;
+
+	/* Extended string bulk run: covers ASCII + UTF-8 high bytes in one pass */
+	if (st == copy_string_byte) {
+		uint32_t end = bvn_string_ext_end(data, start, len);
+		uint32_t n   = end - start;
+		if (!n) return 0;
+		uint32_t avail = (uint32_t)l->max_string_length - (uint32_t)l->str_len;
+		if (!avail) return 0;
+		if (n > avail) n = avail;
+		if (l->max_text_bytes) {
+			uint64_t tb = l->max_text_bytes - l->text_bytes;
+			if (!tb) return 0;
+			if ((uint64_t)n > tb) n = (uint32_t)tb;
+		}
+		memcpy(l->str_data + l->str_len, data + start, n);
+		l->str_len     = (uint16_t)(l->str_len + n);
+		l->text_bytes += n;
+		l->column     += n;
+		l->byte        = data[start + n - 1u];
+		l->prev_byte   = data[start + n - 1u];
+		return n;
+	}
+
 	const uint8_t* lut;
 	uint8_t* dst;
 	uint32_t dst_len;
 	uint32_t dst_cap;
 	bool is_str_buf = true;
 	switch (st) {
-	case copy_string_byte:
-		lut = bvn_run_lut_string;
-		dst_cap = l->max_string_length;
-		break;
 	case identifier_body:
 		lut = bvn_run_lut_ident;
 		dst_cap = l->max_identifier_length;
@@ -1125,11 +1189,16 @@ static inline uint32_t bvn_try_bulk_run(
 	uint32_t end = start + 1u;
 	while (end < len && lut[data[end]]) ++end;
 	uint32_t n = end - start;
-	if ((uint64_t)dst_len + n > (uint64_t)dst_cap)
-		return 0;
-	if (l->max_text_bytes &&
-		l->text_bytes + (uint64_t)n > l->max_text_bytes)
-		return 0;
+	/* Clamp to remaining capacity rather than bailing out; the byte that would
+	   overflow is left for per-byte dispatch which reports the precise error. */
+	uint32_t avail = dst_cap - dst_len;
+	if (!avail) return 0;
+	if (n > avail) n = avail;
+	if (l->max_text_bytes) {
+		uint64_t tb = l->max_text_bytes - l->text_bytes;
+		if (!tb) return 0;
+		if ((uint64_t)n > tb) n = (uint32_t)tb;
+	}
 	memcpy(dst + dst_len, data + start, n);
 	if (is_str_buf) {
 		l->str_len = (uint16_t)(dst_len + n);
@@ -1140,16 +1209,15 @@ static inline uint32_t bvn_try_bulk_run(
 	}
 	l->text_bytes += n;
 	l->column     += n;
-	l->byte        = data[end - 1u];
-	l->prev_byte   = data[end - 1u];
+	l->byte        = data[start + n - 1u];
+	l->prev_byte   = data[start + n - 1u];
 	return n;
 }
 static inline uint32_t bvn_try_bulk_ws(
 	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
 {
 	state_t st = l->next_state;
-	if (bvn_after_state_idx_table[st][0x20] != ACT_ignore_whitespace ||
-	    bvn_after_state_idx_table[st][0x0a] != ACT_ignore_whitespace)
+	if (!bvn_ws_accepting_state[st])
 		return 0;
 	uint64_t col  = l->column;
 	uint64_t line = l->line;

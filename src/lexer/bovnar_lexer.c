@@ -1070,18 +1070,6 @@ static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
 		l->column = 0;
 	}
 }
-/*
- * Scan forward through string content that does not need per-byte dispatch,
- * covering both ASCII printable bytes and UTF-8 multi-byte sequences.
- * Returns the exclusive end position such that every byte in [start, end) is:
- *   - not a control character (< 0x20), not '"' (0x22), not '\' (0x5C), and
- *   - part of a complete, valid UTF-8 sequence.
- * The caller is guaranteed to enter with utf8_need == 0; this function never
- * leaves it non-zero — it truncates the run to the last complete sequence.
- * On any UTF-8 error the run is truncated to the last complete sequence before
- * the bad byte, so the bad byte is left for per-byte dispatch which will report
- * the exact error with correct line/column.
- */
 static inline uint32_t bvn_string_ext_end(
 	const uint8_t* data, uint32_t start, uint32_t len)
 {
@@ -1108,13 +1096,10 @@ static inline uint32_t bvn_string_ext_end(
 	}
 	return need ? last_complete : i;
 }
-
 static inline uint32_t bvn_try_bulk_run(
 	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
 {
 	state_t st = l->next_state;
-
-	/* Extended string bulk run: covers ASCII + UTF-8 high bytes in one pass */
 	if (st == copy_string_byte) {
 		uint32_t end = bvn_string_ext_end(data, start, len);
 		uint32_t n   = end - start;
@@ -1135,7 +1120,6 @@ static inline uint32_t bvn_try_bulk_run(
 		l->prev_byte   = data[start + n - 1u];
 		return n;
 	}
-
 	const uint8_t* lut;
 	uint8_t* dst;
 	uint32_t dst_len;
@@ -1192,8 +1176,6 @@ static inline uint32_t bvn_try_bulk_run(
 	uint32_t end = start + 1u;
 	while (end < len && lut[data[end]]) ++end;
 	uint32_t n = end - start;
-	/* Clamp to remaining capacity rather than bailing out; the byte that would
-	   overflow is left for per-byte dispatch which reports the precise error. */
 	uint32_t avail = dst_cap - dst_len;
 	if (!avail) return 0;
 	if (n > avail) n = avail;

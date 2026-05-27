@@ -281,9 +281,6 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 		return true;
 	uint32_t start = is_neg ? 1u : 0u;
 	if (base == 10u) {
-		/* Fast path for the common case: base-10, no exp/dot (plain integers).
-		 * Avoids bvn_char_to_digit branches and the 64-bit division in
-		 * bvn_acc_digit by using a compile-time overflow threshold. */
 		for (uint32_t i = start; i < len; i++) {
 			uint8_t b = str[i];
 			if (b == '.') { v->acc_has_dot = true; continue; }
@@ -305,7 +302,6 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 				return false;
 			}
 			if (!v->acc_overflow && !v->acc_has_dot) {
-				/* UINT64_MAX = 18446744073709551615; threshold = UINT64_MAX/10 = 1844674407370955161 */
 				if (v->acc_value > (uint64_t)1844674407370955161ULL ||
 				    (v->acc_value == (uint64_t)1844674407370955161ULL && dv > 5u))
 					v->acc_overflow = true;

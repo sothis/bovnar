@@ -1449,7 +1449,6 @@ static size_t bmark_gen_arrays(uint8_t *buf, size_t cap, size_t *out_assignments
 {
 	static const int ROW_LEN       = 5;
 	static const int ROWS_PER_ASGN = 8;
-	/* all non-negative so inferred_default_vtype cache hits after the first element */
 	static const int int_vals[] = {42, 0, 100, 999, 7};
 	static const int NVALS = (int)(sizeof(int_vals) / sizeof(int_vals[0]));
 	size_t pos  = 0;
@@ -1459,8 +1458,6 @@ static size_t bmark_gen_arrays(uint8_t *buf, size_t cap, size_t *out_assignments
 		char hdr[32];
 		int  hn = snprintf(hdr, sizeof(hdr), ".a%zu=[", asgn);
 		if (hn < 0) break;
-		/* conservative: header + ROWS_PER_ASGN rows (ROW_LEN values up to 4 digits + commas)
-		 * + row separators (]/[) + footer */
 		size_t max_per_asgn = (size_t)hn
 			+ (size_t)ROWS_PER_ASGN * ((size_t)ROW_LEN * 5u + 4u)
 			+ 8u;

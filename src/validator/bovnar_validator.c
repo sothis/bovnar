@@ -749,7 +749,7 @@ bool bvnr_open_read_source(
 }
 bool bvnr_open_read_mem(
 	bvnr_reader_t* r, const void* buf, uint64_t len,
-	void* dbg_buf, uint32_t dbg_cap,
+	void* dbg_buf, uint64_t dbg_cap,
 	bvnr_read_flags_t* options)
 {
 	bvnr_source_t src;

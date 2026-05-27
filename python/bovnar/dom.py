@@ -7,10 +7,6 @@ from .enums import ErrorCode, ValueTypeFamily
 from .structs import ValueTypeSpec, ValueUnit, BvnDomEntry
 from .exceptions import BovnarArgumentError, BovnarParseError
 
-_libc = ctypes.CDLL(None)
-_libc.free.restype  = None
-_libc.free.argtypes = [ctypes.c_void_p]
-
 class DomType(IntEnum):
     NULL         = 0
     INT          = 1
@@ -173,7 +169,7 @@ class DomNode:
         try:
             s = ctypes.cast(raw_ptr, ctypes.c_char_p).value.decode('ascii')
         finally:
-            _libc.free(ctypes.c_void_p(raw_ptr))
+            lib.bvn_dom_free_string(ctypes.c_void_p(raw_ptr))
         return s
 
     def __len__(self) -> int:

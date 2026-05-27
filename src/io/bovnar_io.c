@@ -75,7 +75,7 @@ void bvnr_sink_to_fd(bvnr_sink_t* s, int fd)
 	s->flush = flush_fd;
 	s->fd    = fd;
 }
-void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap)
+void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap)
 {
 	memset(s, 0, sizeof(*s));
 	s->push        = push_mem;

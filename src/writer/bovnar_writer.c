@@ -718,8 +718,12 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			}
 		} else if (d->type == token_is_octet_stream) {
 			if (d->data && d->length) {
+				/* validate_event already rejects length==0 and
+				 * length>65536; the special wire encoding clen=0
+				 * unambiguously means 65536 because empty chunks
+				 * are not emitted. The check below is defensive. */
 				if (d->length > 65536u)
-					return false;
+					return false;  /* unreachable */
 				uint8_t hdr[3];
 				uint32_t clen = d->length;
 				hdr[0] = 0x01;
@@ -782,7 +786,7 @@ bool bvnr_open_write_sink(
 	return true;
 }
 bool bvnr_open_write_mem(
-	bvnr_writer_t* w, void* buf, uint32_t cap,
+	bvnr_writer_t* w, void* buf, uint64_t cap,
 	bool pretty, bvnr_write_flags_t* options)
 {
 	if (!w || !buf) return false;
@@ -793,7 +797,8 @@ bool bvnr_open_write_mem(
 bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data)
 {
-	if (!w || !data) return false;
+	if (!w) return false;
+	if (!data) return bvn_writer_set_error(w, error_invalid_argument);
 	if (w->val.last_error != error_none)
 		return false;
 	if (w->ser.finished)

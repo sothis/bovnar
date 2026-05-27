@@ -71,6 +71,7 @@ BVN_API bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem);
 BVN_API char *bvn_dom_strdup(const char *s, uint32_t len);
 BVN_API const bvn_int_t *bvn_dom_get_bigint(const bvn_dom_node_t *node);
 BVN_API char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base);
+BVN_API void  bvn_dom_free_string(char *s);
 BVN_API bool bvn_dom_get_i64(const bvn_dom_node_t *node, int64_t  *out);
 BVN_API bool bvn_dom_get_u64(const bvn_dom_node_t *node, uint64_t *out);
 BVN_API bool bvn_dom_get_i32(const bvn_dom_node_t *node, int32_t  *out);

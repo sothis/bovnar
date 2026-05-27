@@ -24,6 +24,7 @@ static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 			lut[b] = 1;
 	}
 }
+__attribute__((constructor))
 static void bvn_init_run_luts(void)
 {
 	if (bvn_run_luts_inited) return;

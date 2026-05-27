@@ -213,9 +213,16 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 			errno = 0;
 			unsigned long long ull = strtoull(buf, &end, 10);
 			if (errno == 0 && end && *end == '\0') {
-				n->val.int_val = (int64_t)ull;
+				v = (uint64_t)ull;
+				n->val.int_val = (int64_t)v;
 				parse_ok = true;
 			}
+		}
+		/* For a bare (untyped) literal that exceeds INT64_MAX,
+		 * promote the node's type to uint:64 so consumers using
+		 * the unsigned accessor read the correct value. */
+		if (parse_ok && vt.family == vt_plain && v > (uint64_t)INT64_MAX) {
+			n->value_type = BVN_TYPE_UINT_BASE(64u, 0u);
 		}
 	}
 	if (buf_on_heap) free(buf);
@@ -255,8 +262,12 @@ static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 		bvn_float_t f;
 		bvn_float_init_buf(&f, prec, limb_buf, nlimbs);
 		double v = 0.0;
-		if (bvn_float_from_str(&f, buf, base))
-			bvn_float_to_double(&f, &v);
+		if (!bvn_float_from_str(&f, buf, base)) {
+			if (buf_on_heap) free(buf);
+			bvn_dom_node_destroy(n);
+			return NULL;
+		}
+		bvn_float_to_double(&f, &v);
 		n->val.float_val = v;
 	}
 	if (buf_on_heap) free(buf);

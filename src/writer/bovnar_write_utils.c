@@ -280,16 +280,17 @@ bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 				uint32_t width, uint32_t base,
 				value_unit_t unit)
 {
-	if (!f) return false;
+	if (!f) return bvn_writer_set_error(w, error_invalid_argument);
 	uint32_t effective_base = base ? base : 10u;
-	if (effective_base != 10u && effective_base != 16u) return false;
+	if (effective_base != 10u && effective_base != 16u)
+		return bvn_writer_set_error(w, error_invalid_argument);
 	if (!emit_key(w, key)) return false;
 	uint32_t prec = width ? width : (uint32_t)f->_prec;
 	value_type_spec_t vt = BVN_TYPE_FLOAT_BASE(prec,
 		effective_base == 10u ? 0u : 16u);
 	size_t bufsz = bvn_float_str_bufsize(prec, effective_base);
 	char *buf = malloc(bufsz);
-	if (!buf) return false;
+	if (!buf) return bvn_writer_set_error(w, error_invalid_argument);
 	int32_t n = bvn_float_to_str(f, buf, bufsz, effective_base);
 	bool ok = false;
 	if (n > 0) {
@@ -299,6 +300,8 @@ bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 		else
 			tt = token_is_string;
 		ok = emit_numeric_tt(w, vt, unit, buf, tt);
+	} else {
+		bvn_writer_set_error(w, error_value_out_of_range);
 	}
 	free(buf);
 	return ok;
@@ -314,7 +317,7 @@ bool bvnr_write_bvni_unit(bvnr_writer_t *w, const char *key,
 			   uint32_t width, uint32_t base,
 			   value_unit_t unit)
 {
-	if (!n) return false;
+	if (!n) return bvn_writer_set_error(w, error_invalid_argument);
 	uint32_t effective_base = base ? base : 10u;
 	if (!emit_key(w, key)) return false;
 	value_type_family_t fam = n->negative ? vt_sint : vt_uint;

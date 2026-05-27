@@ -308,7 +308,7 @@ struct bvnr_sink_s {
 	int		fd;
 	bool		is_mem;
 	uint8_t*	mem_ptr;
-	uint32_t	mem_left;
+	uint64_t	mem_left;
 	uint64_t	mem_written;
 };
 static inline bool bvn_source_pull(
@@ -418,7 +418,7 @@ static inline bool bvn_type_is_plain(value_type_spec_t s)
 BVN_API void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 BVN_API void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 BVN_API void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
-BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
+BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
 BVN_API uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
 BVN_API bvnr_reader_t* bvnr_reader_create(void);
 BVN_API void           bvnr_reader_destroy(bvnr_reader_t* r);
@@ -427,7 +427,7 @@ BVN_API bool bvnr_open_read_source(
 	const bvnr_sink_t* src_mirror, bvnr_read_flags_t* options);
 BVN_API bool bvnr_open_read_mem(
 	bvnr_reader_t* r, const void* buf, uint64_t len,
-	void* mirror_buf, uint32_t mirror_cap,
+	void* mirror_buf, uint64_t mirror_cap,
 	bvnr_read_flags_t* options);
 BVN_API bool bvnr_read(bvnr_reader_t* r);
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
@@ -449,7 +449,7 @@ BVN_API bool bvnr_open_write_sink(
 	bvnr_writer_t* w, const bvnr_sink_t* sink,
 	bool pretty, bvnr_write_flags_t* options);
 BVN_API bool bvnr_open_write_mem(
-	bvnr_writer_t* w, void* buf, uint32_t cap,
+	bvnr_writer_t* w, void* buf, uint64_t cap,
 	bool pretty, bvnr_write_flags_t* options);
 BVN_API bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data);

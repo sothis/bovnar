@@ -674,6 +674,12 @@ arb_overflow:
 }
 static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 {
+	/* Clamp inputs that would overflow signed long during the
+	 * subsequent exponent arithmetic.  Valid bvn_float values stay
+	 * well within these bounds; hostile inputs (eg. directly-poked
+	 * _exp) are refused. */
+	if (f->_prec > 4194304L) return -1;
+	if (f->_exp  >  1000000000L || f->_exp < -1000000000L) return -1;
 	long prec = f->_prec;
 	long exp2 = f->_exp;
 	long e2   = exp2 - prec;

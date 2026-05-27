@@ -25,38 +25,82 @@ bvn_dom_node_t *bvn_dom_node_alloc(bvn_dom_type_t t)
 	n->value_unit = BVN_UNIT_NO_PREFIX(bu_none);
 	return n;
 }
+static bool bvn_dom_stack_reserve(bvn_dom_node_t ***stack,
+								  size_t *cap, size_t need)
+{
+	if (need <= *cap) return true;
+	size_t nc = *cap ? *cap : 16u;
+	while (nc < need) {
+		if (nc > SIZE_MAX / (2u * sizeof(**stack))) return false;
+		nc *= 2u;
+	}
+	bvn_dom_node_t **ns = realloc(*stack, nc * sizeof(**stack));
+	if (!ns) return false;
+	*stack = ns;
+	*cap   = nc;
+	return true;
+}
 void bvn_dom_node_destroy(bvn_dom_node_t *n)
 {
 	if (!n) return;
-	switch (n->type) {
-	case BVN_DOM_INT:
-		if (n->value_type.width > 64u && n->val.bigint)
-			bvn_int_free(n->val.bigint);
-		break;
-	case BVN_DOM_STRING:
-	case BVN_DOM_SYMBOL:
-	case BVN_DOM_REFERENCE:
-		free(n->val.str.data);
-		break;
-	case BVN_DOM_OCTET_STREAM:
-		free(n->val.octets.data);
-		break;
-	default:
-		break;
+	bvn_dom_node_t **stack = NULL;
+	size_t sc  = 0;
+	size_t cap = 0;
+	if (!bvn_dom_stack_reserve(&stack, &cap, 1u)) {
+		/* Allocation failed: fall back to a single-node free without
+		 * descending. The children leak rather than risk a stack
+		 * overflow on deeply nested input. */
+		free(n);
+		return;
 	}
-	if (n->members.entries) {
-		for (uint32_t i = 0; i < n->members.count; i++) {
-			free(n->members.entries[i].key);
-			bvn_dom_node_destroy(n->members.entries[i].value);
+	stack[sc++] = n;
+	while (sc > 0u) {
+		bvn_dom_node_t *cur = stack[--sc];
+		if (!cur) continue;
+		switch (cur->type) {
+		case BVN_DOM_INT:
+			if (cur->value_type.width > 64u && cur->val.bigint)
+				bvn_int_free(cur->val.bigint);
+			break;
+		case BVN_DOM_STRING:
+		case BVN_DOM_SYMBOL:
+		case BVN_DOM_REFERENCE:
+			free(cur->val.str.data);
+			break;
+		case BVN_DOM_OCTET_STREAM:
+			free(cur->val.octets.data);
+			break;
+		default:
+			break;
 		}
-		free(n->members.entries);
+		if (cur->members.entries) {
+			uint32_t mc = cur->members.count;
+			if (!bvn_dom_stack_reserve(&stack, &cap, sc + mc)) {
+				/* Leak remaining subtree on OOM rather than recursing. */
+				free(cur);
+				free(stack);
+				return;
+			}
+			for (uint32_t i = 0; i < mc; i++) {
+				free(cur->members.entries[i].key);
+				stack[sc++] = cur->members.entries[i].value;
+			}
+			free(cur->members.entries);
+		}
+		if (cur->arr.items) {
+			uint32_t ac = cur->arr.count;
+			if (!bvn_dom_stack_reserve(&stack, &cap, sc + ac)) {
+				free(cur);
+				free(stack);
+				return;
+			}
+			for (uint32_t i = 0; i < ac; i++)
+				stack[sc++] = cur->arr.items[i];
+			free(cur->arr.items);
+		}
+		free(cur);
 	}
-	if (n->arr.items) {
-		for (uint32_t i = 0; i < n->arr.count; i++)
-			bvn_dom_node_destroy(n->arr.items[i]);
-		free(n->arr.items);
-	}
-	free(n);
+	free(stack);
 }
 bool bvn_dom_struct_add(bvn_dom_node_t *s,
 						const char *key, uint32_t klen,
@@ -348,6 +392,10 @@ char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base)
 	if (!out) return NULL;
 	memcpy(out, tmp, (size_t)slen + 1u);
 	return out;
+}
+void bvn_dom_free_string(char *s)
+{
+	free(s);
 }
 static bool dom_raw_i64(const bvn_dom_node_t *node, int64_t *out)
 {

@@ -113,7 +113,7 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvnr_open_read_mem.restype  = c_bool
     lib.bvnr_open_read_mem.argtypes = [
-        c_void_p, c_void_p, c_uint64, c_void_p, c_uint32, P(BvnrReadFlags),
+        c_void_p, c_void_p, c_uint64, c_void_p, c_uint64, P(BvnrReadFlags),
     ]
 
     lib.bvnr_read.restype  = c_bool
@@ -147,7 +147,7 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_sink_to_fd.argtypes = [P(BvnrSink), c_int]
 
     lib.bvnr_sink_to_mem.restype  = None
-    lib.bvnr_sink_to_mem.argtypes = [P(BvnrSink), c_void_p, c_uint32]
+    lib.bvnr_sink_to_mem.argtypes = [P(BvnrSink), c_void_p, c_uint64]
 
     lib.bvnr_sink_bytes_written.restype  = c_uint64
     lib.bvnr_sink_bytes_written.argtypes = [P(BvnrSink)]
@@ -159,7 +159,7 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvnr_open_write_mem.restype  = c_bool
     lib.bvnr_open_write_mem.argtypes = [
-        c_void_p, c_void_p, c_uint32, c_bool, P(BvnrWriteFlags),
+        c_void_p, c_void_p, c_uint64, c_bool, P(BvnrWriteFlags),
     ]
 
     lib.bvnr_write_event.restype  = c_bool
@@ -369,3 +369,6 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvn_dom_int_to_str.restype  = c_void_p
     lib.bvn_dom_int_to_str.argtypes = [c_void_p, c_uint32]
+
+    lib.bvn_dom_free_string.restype  = None
+    lib.bvn_dom_free_string.argtypes = [c_void_p]

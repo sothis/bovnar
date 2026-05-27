@@ -1,6 +1,7 @@
 #ifndef BVN_FLOAT_IMPL_H_
 #define BVN_FLOAT_IMPL_H_
 #include "bvn_int.h"
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -134,12 +135,23 @@ static inline bool bvn_float_parse(bvn_float_ctx_t *ctx, const char *s, PNum *r)
 		bool eneg = false;
 		if      (*s == '+') s++;
 		else if (*s == '-') { eneg = true; s++; }
-		int eabs = 0; bool has_e = false;
+		int eabs = 0; bool has_e = false; bool eabs_ovf = false;
 		while (*s >= '0' && *s <= '9') {
-			if (eabs < 1000000) eabs = eabs * 10 + (*s - '0');
+			if (!eabs_ovf) {
+				if (eabs > (INT_MAX - (*s - '0')) / 10) eabs_ovf = true;
+				else eabs = eabs * 10 + (*s - '0');
+			}
 			has_e = true; s++;
 		}
 		if (!has_e) return false;
+		if (eabs_ovf) {
+			/* Exponent magnitude saturates: signal inf or zero rather
+			 * than silently using a clamped value. */
+			r->inf = !eneg;
+			bvn_int_zero(&r->coeff);
+			r->dex = 0;
+			return true;
+		}
 		r->dex += eneg ? -eabs : eabs;
 	}
 	while (!bvn_int_is_zero(&r->coeff) && !bvn_float_has_overflow(ctx)) {

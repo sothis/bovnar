@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 #include "bovnar_currency.h"
 bvnr_reader_t* bvnr_reader_create(void)
@@ -740,7 +741,7 @@ bool bvnr_open_read_source(
 		return false;
 	bvn_lex_destroy(&r->lex);
 	memset(&r->lex, 0, sizeof(r->lex));
-	if (!src || !src->pull)
+	if (!src || !bvn_source_impl_c(src)->pull)
 		return false;
 	if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
 		return false;

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_io_impl.h"
 #include "bvn_lexer_impl.h"
 #include "bvn_val_impl.h"
 static uint8_t bvn_run_lut_string[256];
@@ -20,6 +21,10 @@ static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 	for (int b = 0x20; b <= 0x7e; ++b) {
 		if (b == 0x09 || b == 0x0a || b == 0x0d)
 			continue;
+		if (bvn_after_state_idx_table[st][b] == self_action)
+			lut[b] = 1;
+	}
+	for (int b = 0x80; b <= 0xff; ++b) {
 		if (bvn_after_state_idx_table[st][b] == self_action)
 			lut[b] = 1;
 	}
@@ -1174,8 +1179,27 @@ static inline uint32_t bvn_try_bulk_run(
 	}
 	if (!lut[data[start]])
 		return 0;
-	uint32_t end = start + 1u;
-	while (end < len && lut[data[end]]) ++end;
+	uint32_t end = start;
+	uint32_t last_complete = start;
+	uint8_t need = 0, lo = 0, hi = 0;
+	while (end < len) {
+		uint8_t b = data[end];
+		if (need) {
+			if (b < lo || b > hi) break;
+			--need;
+			lo = 0x80u; hi = 0xbfu;
+			if (!need) last_complete = end + 1u;
+		} else if (b < 0x80u) {
+			if (!lut[b]) break;
+			last_complete = end + 1u;
+		} else {
+			if (!lut[b]) break;
+			if (!bvn_utf8_classify_leader(b, &need, &lo, &hi)) break;
+		}
+		++end;
+	}
+	end = last_complete;
+	if (end == start) return 0;
 	uint32_t n = end - start;
 	uint32_t avail = dst_cap - dst_len;
 	if (!avail) return 0;
@@ -1352,6 +1376,8 @@ void bvn_lex_destroy(bvnr_lexer_t* l)
 	l->str_data         = NULL;
 	l->type_data        = NULL;
 	l->inline_unit_data = NULL;
+	free(l->read_buf);
+	l->read_buf = NULL;
 }
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
@@ -1362,7 +1388,7 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	l->line        = 1;
 	if (src)
 		l->src = *src;
-	if (dbg_sink && dbg_sink->push) {
+	if (dbg_sink && bvn_sink_impl_c(dbg_sink)->push) {
 		l->src_dbg = *dbg_sink;
 		l->use_dbg = true;
 	}
@@ -1402,31 +1428,40 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	l->str_data         = bufs;
 	l->type_data        = bufs + BVN_STR_BUF_CAP;
 	l->inline_unit_data = bufs + BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP;
+	l->read_buf = malloc(BOVN_READ_BUFFER_SIZE);
+	if (!l->read_buf) {
+		free(bufs);
+		l->str_data = l->type_data = l->inline_unit_data = NULL;
+		free(l->arr_frames);
+		l->arr_frames = NULL;
+		return false;
+	}
 	return true;
 }
 #define BVN_MEM_CHUNK_MAX (1u << 20)
 bool bvn_lex_run(bvnr_reader_t* r)
 {
 	bvnr_lexer_t* l = &r->lex;
-	uint8_t stack_data[BOVN_READ_BUFFER_SIZE];
+	uint8_t* stack_data = l->read_buf;
 	const uint8_t* data;
 	uint32_t nb, off, consumed;
 	uint32_t os_leftover;
-	bool is_mem_src = (l->src.pull == bvn_pull_mem);
+	bvn_source_impl_t* src_impl = bvn_source_impl(&l->src);
+	bool is_mem_src = (src_impl->pull == bvn_pull_mem);
 	if (!bvn_val_receive_event(r, ev_stream_start))
 		return false;
 	for (;;) {
 		if (is_mem_src) {
-			uint64_t avail = l->src.mem_left;
+			uint64_t avail = src_impl->mem_left;
 			if (!avail) {
 				nb = 0;
 				data = NULL;
 			} else {
 				nb = (avail > (uint64_t)BVN_MEM_CHUNK_MAX)
 					? BVN_MEM_CHUNK_MAX : (uint32_t)avail;
-				data = l->src.mem_ptr;
-				l->src.mem_ptr  += nb;
-				l->src.mem_left -= nb;
+				data = src_impl->mem_ptr;
+				src_impl->mem_ptr  += nb;
+				src_impl->mem_left -= nb;
 			}
 		} else if (!bvn_source_pull(&l->src, stack_data,
 		                            BOVN_READ_BUFFER_SIZE, &nb)) {

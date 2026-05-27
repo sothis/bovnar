@@ -1,5 +1,3 @@
-collect_ignore = ["test_analytics.py"]
-
 import pytest
 import bovnar
 from bovnar.exceptions import BovnarLibraryNotFound

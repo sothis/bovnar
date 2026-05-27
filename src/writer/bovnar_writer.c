@@ -6,16 +6,21 @@
 #include <string.h>
 #include "bovnar.h"
 #include "bvn_float.h"
+#include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 bvnr_writer_t* bvnr_writer_create(void)
 {
 	bvnr_writer_t* w = malloc(sizeof(*w));
 	if (!w) return NULL;
 	memset(w, 0, sizeof(*w));
+	w->ser.wbuf = malloc(BVN_SER_WBUF_SIZE);
+	if (!w->ser.wbuf) { free(w); return NULL; }
 	return w;
 }
 void bvnr_writer_destroy(bvnr_writer_t* w)
 {
+	if (!w) return;
+	free(w->ser.wbuf);
 	free(w);
 }
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
@@ -35,7 +40,7 @@ bool bvn_ser_flush_wbuf(bvnr_serializer_t* s)
 static bool bvn_ser_push(bvnr_serializer_t* s,
 	const void* data, uint32_t len)
 {
-	if (s->sink.is_mem)
+	if (bvn_sink_impl(&s->sink)->is_mem)
 		return bvn_sink_push(&s->sink, data, len);
 	const uint8_t* src = (const uint8_t*)data;
 	uint32_t pos = 0;
@@ -61,9 +66,15 @@ static bool bvn_ser_push_str(bvnr_serializer_t* s, const char* str)
 }
 static bool bvn_ser_indent(bvnr_serializer_t* s)
 {
-	if (!s->pretty) return true;
-	for (uint32_t i = 0; i < s->indent; i++) {
-		if (!bvn_ser_push(s, "\t", 1)) return false;
+	if (!s->pretty || !s->indent) return true;
+	uint8_t tabs[64];
+	uint32_t fill = s->indent > 64u ? 64u : s->indent;
+	memset(tabs, '\t', fill);
+	uint32_t remaining = s->indent;
+	while (remaining > 0) {
+		uint32_t chunk = remaining > 64u ? 64u : remaining;
+		if (!bvn_ser_push(s, tabs, chunk)) return false;
+		remaining -= chunk;
 	}
 	return true;
 }
@@ -453,6 +464,7 @@ static bool bvn_ser_serialize_string(bvnr_serializer_t* s,
 	const uint8_t* data, uint32_t len)
 {
 	if (!bvn_ser_push_byte(s, '"')) return false;
+	uint32_t run_start = 0;
 	for (uint32_t i = 0; i < len; i++) {
 		uint8_t c = data[i];
 		const char* esc = NULL;
@@ -464,13 +476,18 @@ static bool bvn_ser_serialize_string(bvnr_serializer_t* s,
 		case '\r': esc = "\\r";  break;
 		case '"':  esc = "\\\""; break;
 		case '\\': esc = "\\\\"; break;
-		default:   break;
+		default:   continue;
 		}
-		if (esc) {
-			if (!bvn_ser_push_str(s, esc)) return false;
-		} else {
-			if (!bvn_ser_push(s, &c, 1)) return false;
+		if (i > run_start) {
+			if (!bvn_ser_push(s, data + run_start, i - run_start))
+				return false;
 		}
+		if (!bvn_ser_push(s, esc, 2)) return false;
+		run_start = i + 1u;
+	}
+	if (len > run_start) {
+		if (!bvn_ser_push(s, data + run_start, len - run_start))
+			return false;
 	}
 	return bvn_ser_push_byte(s, '"');
 }
@@ -562,31 +579,31 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 	case ev_type_annotation_type_family_parameter: {
 		bool use_colon = !s->emitted_type_param;
 		if (d->type == token_is_type_width) {
-			char buf[16];
-			int n = snprintf(buf, sizeof(buf),
-				":%" PRIu32,
-				bvn_effective_width(d->value_type));
-			if (n < 0 || (size_t)n >= sizeof(buf)) return false;
+			char buf[12];
+			if (!bvn_ser_push_byte(s, ':')) return false;
+			int32_t n = bvn_format_uint64(buf, sizeof(buf),
+				bvn_effective_width(d->value_type), 10u, 0u);
+			if (n < 0) return false;
 			if (!bvn_ser_push(s, buf, (uint32_t)n))
 				return false;
 			s->emitted_type_param = true;
 		} else if (d->type == token_is_type_base) {
-			char buf[16];
-			int n = snprintf(buf, sizeof(buf),
-				"%s_%" PRIu32,
-				use_colon ? ":" : ",",
-				bvn_effective_base(d->value_type));
-			if (n < 0 || (size_t)n >= sizeof(buf)) return false;
+			char buf[12];
+			if (!bvn_ser_push_byte(s, use_colon ? ':' : ',')) return false;
+			if (!bvn_ser_push_byte(s, '_')) return false;
+			int32_t n = bvn_format_uint64(buf, sizeof(buf),
+				bvn_effective_base(d->value_type), 10u, 0u);
+			if (n < 0) return false;
 			if (!bvn_ser_push(s, buf, (uint32_t)n))
 				return false;
 			s->emitted_type_param = true;
 		} else if (d->type == token_is_type_q) {
-			char buf[16];
-			int n = snprintf(buf, sizeof(buf),
-				"%sq%" PRIu32,
-				use_colon ? ":" : ",",
-				bvn_effective_q(d->value_type));
-			if (n < 0 || (size_t)n >= sizeof(buf)) return false;
+			char buf[12];
+			if (!bvn_ser_push_byte(s, use_colon ? ':' : ',')) return false;
+			if (!bvn_ser_push_byte(s, 'q')) return false;
+			int32_t n = bvn_format_uint64(buf, sizeof(buf),
+				bvn_effective_q(d->value_type), 10u, 0u);
+			if (n < 0) return false;
 			if (!bvn_ser_push(s, buf, (uint32_t)n))
 				return false;
 			s->emitted_type_param = true;
@@ -718,12 +735,8 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			}
 		} else if (d->type == token_is_octet_stream) {
 			if (d->data && d->length) {
-				/* validate_event already rejects length==0 and
-				 * length>65536; the special wire encoding clen=0
-				 * unambiguously means 65536 because empty chunks
-				 * are not emitted. The check below is defensive. */
 				if (d->length > 65536u)
-					return false;  /* unreachable */
+					return false;
 				uint8_t hdr[3];
 				uint32_t clen = d->length;
 				hdr[0] = 0x01;
@@ -746,7 +759,9 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 }
 static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 {
+	uint8_t* saved_wbuf = w->ser.wbuf;
 	memset(w, 0, sizeof(*w));
+	w->ser.wbuf = saved_wbuf;
 	w->ser.pretty = false;
 	w->ser.indent = 0;
 	w->ser.need_semi = false;
@@ -779,7 +794,7 @@ bool bvnr_open_write_sink(
 	bvnr_writer_t* w, const bvnr_sink_t* sink,
 	bool pretty, bvnr_write_flags_t* options)
 {
-	if (!w || !sink || !sink->push) return false;
+	if (!w || !sink || !bvn_sink_impl_c(sink)->push) return false;
 	bvn_writer_init(w, options);
 	w->ser.sink   = *sink;
 	w->ser.pretty = pretty;
@@ -806,7 +821,7 @@ bool bvnr_write_event(
 	if (!bvn_writer_validate_event(w, ev, data))
 		return false;
 	if (!bvn_ser_serialize_event(&w->ser, ev, data))
-		return bvn_writer_set_error(w, w->ser.sink.is_mem
+		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
 			? error_sink_buffer_exhausted
 			: error_writing_to_sink);
 	if (w->ser.on_event) {
@@ -821,12 +836,15 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0)
 		return bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
 	if (!bvn_ser_finish_stream(&w->ser))
-		return bvn_writer_set_error(w, w->ser.sink.is_mem
+		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
 			? error_sink_buffer_exhausted
 			: error_writing_to_sink);
-	if (w->ser.sink.flush) {
-		if (!w->ser.sink.flush(&w->ser.sink))
-			return false;
+	{
+		bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
+		if (si->flush) {
+			if (!si->flush(&w->ser.sink))
+				return false;
+		}
 	}
 	w->ser.finished = true;
 	return true;

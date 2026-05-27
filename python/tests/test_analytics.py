@@ -27,18 +27,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bovnar.analytics import (
-    SI_DIM_NAMES,
-    ALL_PROFILES,
-    NodeAssertionError,
-    _human_bytes,
-    assert_node,
-    benchmark_df,
-    check_schema,
-    dim_label,
-    dom_summary,
-    filter_by_dim_name,
-)
+# bovnar.analytics is an optional module that may not ship in every build.
+# Skip the whole file rather than failing collection when it's absent.
+analytics = pytest.importorskip("bovnar.analytics")
+
+SI_DIM_NAMES        = analytics.SI_DIM_NAMES
+ALL_PROFILES        = analytics.ALL_PROFILES
+NodeAssertionError  = analytics.NodeAssertionError
+_human_bytes        = analytics._human_bytes
+assert_node         = analytics.assert_node
+benchmark_df        = analytics.benchmark_df
+check_schema        = analytics.check_schema
+dim_label           = analytics.dim_label
+dom_summary         = analytics.dom_summary
+filter_by_dim_name  = analytics.filter_by_dim_name
 
 
 # ---------------------------------------------------------------------------

@@ -4,11 +4,13 @@
 #include <string.h>
 #include <unistd.h>
 #include "bovnar.h"
+#include "bvn_io_impl.h"
 static bool pull_fd(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
+	bvn_source_impl_t* impl = bvn_source_impl(s);
 	ssize_t n;
 	do {
-		n = read(s->fd, buf, want);
+		n = read(impl->fd, buf, want);
 	} while (n < 0 && errno == EINTR);
 	if (n < 0) { *got = 0; return false; }
 	*got = (uint32_t)n;
@@ -16,20 +18,22 @@ static bool pull_fd(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 }
 bool bvn_pull_mem(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
-	uint64_t avail = s->mem_left;
+	bvn_source_impl_t* impl = bvn_source_impl(s);
+	uint64_t avail = impl->mem_left;
 	uint32_t n = avail < (uint64_t)want ? (uint32_t)avail : want;
 	if (n) {
-		memcpy(buf, s->mem_ptr, n);
-		s->mem_ptr  += n;
-		s->mem_left -= n;
+		memcpy(buf, impl->mem_ptr, n);
+		impl->mem_ptr  += n;
+		impl->mem_left -= n;
 	}
 	*got = n;
 	return true;
 }
 static bool push_fd(bvnr_sink_t* s, const void* buf, uint32_t len)
 {
+	bvn_sink_impl_t* impl = bvn_sink_impl(s);
 	while (len) {
-		ssize_t n = write(s->fd, buf, len);
+		ssize_t n = write(impl->fd, buf, len);
 		if (n < 0) {
 			if (errno == EINTR) continue;
 			return false;
@@ -38,7 +42,7 @@ static bool push_fd(bvnr_sink_t* s, const void* buf, uint32_t len)
 			errno = ENOSPC;
 			return false;
 		}
-		s->mem_written += (uint64_t)n;
+		impl->mem_written += (uint64_t)n;
 		buf = (const uint8_t*)buf + n;
 		len -= (uint32_t)n;
 	}
@@ -48,44 +52,49 @@ static bool flush_fd (bvnr_sink_t* s) { (void)s; return true; }
 static bool flush_mem(bvnr_sink_t* s) { (void)s; return true; }
 static bool push_mem(bvnr_sink_t* s, const void* buf, uint32_t len)
 {
-	if (len > s->mem_left) return false;
-	memcpy(s->mem_ptr, buf, len);
-	s->mem_ptr    += len;
-	s->mem_left   -= len;
-	s->mem_written += len;
+	bvn_sink_impl_t* impl = bvn_sink_impl(s);
+	if (len > impl->mem_left) return false;
+	memcpy(impl->mem_ptr, buf, len);
+	impl->mem_ptr    += len;
+	impl->mem_left   -= len;
+	impl->mem_written += len;
 	return true;
 }
 void bvnr_source_from_fd(bvnr_source_t* s, int fd)
 {
 	memset(s, 0, sizeof(*s));
-	s->pull = pull_fd;
-	s->fd   = fd;
+	bvn_source_impl_t* impl = bvn_source_impl(s);
+	impl->pull = pull_fd;
+	impl->fd   = fd;
 }
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len)
 {
 	memset(s, 0, sizeof(*s));
-	s->pull     = bvn_pull_mem;
-	s->mem_ptr  = (const uint8_t*)buf;
-	s->mem_left = len;
+	bvn_source_impl_t* impl = bvn_source_impl(s);
+	impl->pull     = bvn_pull_mem;
+	impl->mem_ptr  = (const uint8_t*)buf;
+	impl->mem_left = len;
 }
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd)
 {
 	memset(s, 0, sizeof(*s));
-	s->push  = push_fd;
-	s->flush = flush_fd;
-	s->fd    = fd;
+	bvn_sink_impl_t* impl = bvn_sink_impl(s);
+	impl->push  = push_fd;
+	impl->flush = flush_fd;
+	impl->fd    = fd;
 }
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap)
 {
 	memset(s, 0, sizeof(*s));
-	s->push        = push_mem;
-	s->flush       = flush_mem;
-	s->is_mem      = true;
-	s->mem_ptr     = (uint8_t*)buf;
-	s->mem_left    = cap;
-	s->mem_written = 0;
+	bvn_sink_impl_t* impl = bvn_sink_impl(s);
+	impl->push        = push_mem;
+	impl->flush       = flush_mem;
+	impl->is_mem      = true;
+	impl->mem_ptr     = (uint8_t*)buf;
+	impl->mem_left    = cap;
+	impl->mem_written = 0;
 }
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s)
 {
-	return s->mem_written;
+	return bvn_sink_impl_c(s)->mem_written;
 }

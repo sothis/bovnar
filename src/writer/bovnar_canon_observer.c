@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 bool bvn_ser_finish_stream(bvnr_serializer_t *s);
 struct bvnr_canon_observer_s {
@@ -9,10 +10,12 @@ struct bvnr_canon_observer_s {
 bvnr_canon_observer_t *bvnr_canon_observer_create(
 	const bvnr_sink_t *sink, bool pretty)
 {
-	if (!sink || !sink->push) return NULL;
+	if (!sink || !bvn_sink_impl_c(sink)->push) return NULL;
 	bvnr_canon_observer_t *obs = malloc(sizeof(*obs));
 	if (!obs) return NULL;
 	memset(obs, 0, sizeof(*obs));
+	obs->ser.wbuf = malloc(BVN_SER_WBUF_SIZE);
+	if (!obs->ser.wbuf) { free(obs); return NULL; }
 	obs->ser.sink              = *sink;
 	obs->ser.pretty            = pretty;
 	obs->ser.max_array_nesting = UINT8_MAX;
@@ -20,6 +23,8 @@ bvnr_canon_observer_t *bvnr_canon_observer_create(
 }
 void bvnr_canon_observer_destroy(bvnr_canon_observer_t *obs)
 {
+	if (!obs) return;
+	free(obs->ser.wbuf);
 	free(obs);
 }
 bool bvnr_canon_observer_on_event(void *ud,

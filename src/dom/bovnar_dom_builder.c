@@ -218,9 +218,6 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 				parse_ok = true;
 			}
 		}
-		/* For a bare (untyped) literal that exceeds INT64_MAX,
-		 * promote the node's type to uint:64 so consumers using
-		 * the unsigned accessor read the correct value. */
 		if (parse_ok && vt.family == vt_plain && v > (uint64_t)INT64_MAX) {
 			n->value_type = BVN_TYPE_UINT_BASE(64u, 0u);
 		}

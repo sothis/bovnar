@@ -145,8 +145,6 @@ static inline bool bvn_float_parse(bvn_float_ctx_t *ctx, const char *s, PNum *r)
 		}
 		if (!has_e) return false;
 		if (eabs_ovf) {
-			/* Exponent magnitude saturates: signal inf or zero rather
-			 * than silently using a clamped value. */
 			r->inf = !eneg;
 			bvn_int_zero(&r->coeff);
 			r->dex = 0;

@@ -7,6 +7,13 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+option(BVNR_HARDEN
+    "Enable runtime hardening flags (stack protector, FORTIFY, format security)"
+    ON)
+option(BVNR_WERROR
+    "Promote all warnings to errors (for CI)"
+    OFF)
+
 set(BVNR_C_FLAGS
     -std=c99
     -Wall
@@ -16,11 +23,29 @@ set(BVNR_C_FLAGS
     -Wcast-qual
     -Wconversion
     -Wno-override-init
+    -Wno-missing-field-initializers
     -pedantic
     $<$<C_COMPILER_ID:GNU>:-fanalyzer>
     -fPIC
     -fvisibility=hidden
+    # bvnr_source_t / bvnr_sink_t are opaque storage that the
+    # library reinterprets via an internal impl struct.  Strict
+    # aliasing would mis-optimise those accesses, so disable it.
+    -fno-strict-aliasing
 )
+if(BVNR_HARDEN)
+    list(APPEND BVNR_C_FLAGS
+        -fstack-protector-strong
+        -Wformat=2
+        -Wformat-security
+    )
+    # FORTIFY_SOURCE requires optimisation; quietly skipped in Debug.
+    list(APPEND BVNR_C_FLAGS
+        $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+endif()
+if(BVNR_WERROR)
+    list(APPEND BVNR_C_FLAGS -Werror)
+endif()
 
 set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
 set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0 -flto=auto -fno-semantic-interposition" CACHE STRING "C flags for Release"         FORCE)
@@ -80,6 +105,7 @@ target_include_directories(bvnr_objects
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/io
         ${CMAKE_CURRENT_SOURCE_DIR}/src/lexer
         ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 )
@@ -97,34 +123,11 @@ target_link_libraries(bvnr_shared PUBLIC m)
 
 add_executable(bovnar src/bovnar.c)
 target_compile_options(bovnar PRIVATE ${BVNR_C_FLAGS})
+set_target_properties(bovnar PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_options(bovnar PRIVATE -pie)
 target_link_libraries(bovnar PRIVATE bvnr_static m)
 
 include(CMakeLists_tests.txt)
 
-option(BVNR_BUILD_PYTHON_TESTS "Build and register Python tests" OFF)
-
-if(BVNR_BUILD_PYTHON_TESTS)
-    find_package(Python3 COMPONENTS Interpreter REQUIRED)
-
-    set(PYTHON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/python")
-    if(DEFINED ENV{PYTHONPATH})
-        set(PYTHON_PATH "${PYTHON_PATH}:$ENV{PYTHONPATH}")
-    endif()
-
-    add_test(NAME bvnr_python_tests
-        COMMAND ${Python3_EXECUTABLE} -m pytest
-            "${CMAKE_CURRENT_SOURCE_DIR}/python/tests"
-            -v
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-
-    set_tests_properties(bvnr_python_tests PROPERTIES
-        ENVIRONMENT
-            "LIBBOVNAR_PATH=${CMAKE_BINARY_DIR}/libbvnr_shared.so;PYTHONPATH=${PYTHON_PATH}"
-        LABELS "python;integration"
-        TIMEOUT 300
-    )
-
-    message(STATUS "Python tests enabled. LIBBOVNAR_PATH set to "
-                   "${CMAKE_BINARY_DIR}/libbvnr_shared.so during testing.")
-endif()
+# Python test registration lives entirely in CMakeLists_tests.txt
+# (granular per-file targets with proper labels and library injection).

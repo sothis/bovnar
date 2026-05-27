@@ -7,7 +7,7 @@ from ._ffi import get_library
 from .enums import Event, ErrorCode
 from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
-    BvnrSource, BvnrSink, BvnrReadFlags, BvnrData,
+    BvnrSource, BvnrSink, BvnrReadFlags, BvnrData, ValueUnit,
     EVENT_CALLBACK_FUNC,
     make_unit_dimensionless,
 )
@@ -110,6 +110,12 @@ class Reader:
     def _wrap_callback(py_fn: Callable):
 
         state = {'exc': None}
+        unit_size = ctypes.sizeof(ValueUnit)
+        # Each event gets a fresh BvnrData (callers may retain sub-struct
+        # references like d.value_type), but we skip the eager bytes copy
+        # for d.data — d.data references the lexer's internal buffer and
+        # is valid for the duration of the callback only.  Call
+        # raw_bytes() / raw_str() within the callback to capture data.
 
         def _c_cb(userdata_void, event_int: int, data_ptr) -> bool:
             try:
@@ -118,24 +124,15 @@ class Reader:
                 if data_ptr:
                     src = data_ptr.contents
                     snap = BvnrData()
-                    snap.type = src.type
+                    snap.type              = src.type
                     snap.value_type.family = src.value_type.family
                     snap.value_type.width  = src.value_type.width
                     snap.value_type.base   = src.value_type.base
-                    ctypes.memmove(
-                        ctypes.byref(snap.value_unit),
-                        ctypes.byref(src.value_unit),
-                        ctypes.sizeof(type(snap.value_unit)),
-                    )
+                    ctypes.memmove(ctypes.addressof(snap.value_unit),
+                                   ctypes.addressof(src.value_unit),
+                                   unit_size)
                     snap.length = src.length
-                    if src.data and src.length:
-                        raw = (ctypes.c_char * src.length).from_address(
-                            src.data).raw
-                        buf = ctypes.create_string_buffer(raw, src.length + 1)
-                        snap.data = ctypes.cast(buf, ctypes.c_void_p)
-                        snap._owned_data = buf
-                    else:
-                        snap.data = None
+                    snap.data   = src.data
                     data = snap
                 result = py_fn(ev, data)
                 return bool(result) if result is not None else True

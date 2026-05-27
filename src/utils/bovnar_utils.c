@@ -383,6 +383,10 @@ const char* bvn_error_to_string(error_code_t code)
 typedef struct { const char* a; uint32_t len; value_base_unit_t u; } bu_entry_t;
 typedef struct { const char* a; uint32_t len; si_prefix_id_t   p; } si_entry_t;
 typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
+#define BU_LEN_INDEX_SIZE 32u
+static volatile uint16_t bu_first_for_len[BU_LEN_INDEX_SIZE];
+static volatile uint32_t bu_max_len;
+static volatile bool     bu_index_ready;
 static const bu_entry_t bu_table[] = {
 	{"atmosphere_technical", 20, bu_atmosphere_technical},
 	{"metric_horsepower",    17, bu_metric_horsepower},
@@ -674,6 +678,23 @@ static const iec_entry_t iec_table[] = {
 	{"Mi", 2, iec_mebi},  {"Ki", 2, iec_kibi},
 	{NULL, 0, iec_none}
 };
+static void bvn_init_bu_index(void)
+{
+	uint32_t count = 0;
+	uint32_t maxlen = 0;
+	for (const bu_entry_t* e = bu_table; e->a; e++) {
+		count++;
+		if (e->len > maxlen) maxlen = e->len;
+	}
+	if (maxlen >= BU_LEN_INDEX_SIZE) maxlen = BU_LEN_INDEX_SIZE - 1u;
+	bu_max_len = maxlen;
+	uint32_t idx = 0;
+	for (int32_t L = (int32_t)BU_LEN_INDEX_SIZE - 1; L >= 0; L--) {
+		while (idx < count && bu_table[idx].len > (uint32_t)L) idx++;
+		bu_first_for_len[L] = (uint16_t)idx;
+	}
+	bu_index_ready = true;
+}
 static uint32_t parse_unit_exponent_suffix(
 	const char* s, uint32_t len, unit_exponent_t* exp)
 {
@@ -838,10 +859,15 @@ static value_unit_component_t bvn_parse_single_unit_component(
 			break;
 		}
 	}
+	if (!bu_index_ready) bvn_init_bu_index();
+	uint32_t bu_skip_for_input;
+	{
+		uint32_t lkup = len > bu_max_len ? bu_max_len : len;
+		bu_skip_for_input = bu_first_for_len[lkup];
+	}
 	const bu_entry_t* best = NULL;
-	for (const bu_entry_t* e = bu_table; e->a; e++) {
-		if (e->len > len)
-			continue;
+	for (const bu_entry_t* e = &bu_table[bu_skip_for_input]; e->a; e++) {
+		if (e->len > len) continue;
 		if (memcmp(s + len - e->len, e->a, e->len) == 0) {
 			best = e;
 			break;

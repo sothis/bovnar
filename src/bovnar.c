@@ -540,6 +540,8 @@ static int cmd_validate(const char *filename)
 		fprintf(stderr, "Validation failed: %s at line %" PRIu64 ", col %" PRIu64 "\n",
 				bvn_error_to_string(err),
 				bvnr_reader_get_error_line(r), bvnr_reader_get_error_column(r));
+	} else {
+		printf("%s: OK\n", filename);
 	}
 	bvnr_reader_destroy(r);
 	close(fd);

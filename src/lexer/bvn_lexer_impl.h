@@ -233,6 +233,7 @@ typedef struct bvnr_lexer_s {
 	uint32_t		resync_struct_depth;
 	uint8_t			resync_saved_struct_nesting;
 	uint64_t		recovery_count;
+	uint8_t			*read_buf;
 } bvnr_lexer_t;
 extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];

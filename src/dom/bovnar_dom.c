@@ -47,9 +47,6 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 	size_t sc  = 0;
 	size_t cap = 0;
 	if (!bvn_dom_stack_reserve(&stack, &cap, 1u)) {
-		/* Allocation failed: fall back to a single-node free without
-		 * descending. The children leak rather than risk a stack
-		 * overflow on deeply nested input. */
 		free(n);
 		return;
 	}
@@ -76,7 +73,6 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 		if (cur->members.entries) {
 			uint32_t mc = cur->members.count;
 			if (!bvn_dom_stack_reserve(&stack, &cap, sc + mc)) {
-				/* Leak remaining subtree on OOM rather than recursing. */
 				free(cur);
 				free(stack);
 				return;

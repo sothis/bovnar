@@ -5,6 +5,9 @@ from .enums import (
 )
 
 OPAQUE_BYTES = 256
+# Use 64-bit words so the ctypes struct's alignment matches the C
+# struct's (pointer-aligned).  c_uint8 arrays have alignment 1.
+_OPAQUE_WORDS = OPAQUE_BYTES // 8
 
 MAX_UNIT_COMPONENTS = 8
 
@@ -166,10 +169,10 @@ EVENT_CALLBACK_FUNC = ctypes.CFUNCTYPE(
 )
 
 class BvnrSource(ctypes.Structure):
-    _fields_ = [('_opaque', ctypes.c_uint8 * OPAQUE_BYTES)]
+    _fields_ = [('_opaque', ctypes.c_uint64 * _OPAQUE_WORDS)]
 
 class BvnrSink(ctypes.Structure):
-    _fields_ = [('_opaque', ctypes.c_uint8 * OPAQUE_BYTES)]
+    _fields_ = [('_opaque', ctypes.c_uint64 * _OPAQUE_WORDS)]
 
 class BvnrReadFlags(ctypes.Structure):
     _fields_ = [
@@ -188,6 +191,7 @@ class BvnrReadFlags(ctypes.Structure):
         ('on_verified',           EVENT_CALLBACK_FUNC),
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
+        ('_reserved',             ctypes.c_uint64 * 4),
     ]
 
 class BvnrWriteFlags(ctypes.Structure):
@@ -207,6 +211,7 @@ class BvnrWriteFlags(ctypes.Structure):
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
         ('unit_flags',            ctypes.c_uint32),
+        ('_reserved',             ctypes.c_uint64 * 4),
     ]
 
 class BvnDomEntry(ctypes.Structure):

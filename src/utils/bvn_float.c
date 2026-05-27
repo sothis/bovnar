@@ -169,6 +169,20 @@ void bvn_float_init_buf(bvn_float_t *f, uint32_t prec,
 	f->_heap   = false;
 	memset(buf, 0, (size_t)nlimbs * sizeof(bvn_limb_t));
 }
+bool bvn_float_is_nan(const bvn_float_t *f)
+	{ return f->_exp == BVN_FLOAT_EXP_NAN; }
+bool bvn_float_is_inf(const bvn_float_t *f)
+	{ return f->_exp == BVN_FLOAT_EXP_INF; }
+bool bvn_float_is_zero(const bvn_float_t *f)
+	{ return f->_exp == BVN_FLOAT_EXP_ZERO; }
+bool bvn_float_is_neg(const bvn_float_t *f)
+	{ return f->_sign < 0; }
+bool bvn_float_is_regular(const bvn_float_t *f)
+{
+	return f->_exp != BVN_FLOAT_EXP_NAN
+		&& f->_exp != BVN_FLOAT_EXP_INF
+		&& f->_exp != BVN_FLOAT_EXP_ZERO;
+}
 void bvn_float_set_nan(bvn_float_t *f)
 {
 	f->_exp  = BVN_FLOAT_EXP_NAN;
@@ -674,10 +688,6 @@ arb_overflow:
 }
 static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 {
-	/* Clamp inputs that would overflow signed long during the
-	 * subsequent exponent arithmetic.  Valid bvn_float values stay
-	 * well within these bounds; hostile inputs (eg. directly-poked
-	 * _exp) are refused. */
 	if (f->_prec > 4194304L) return -1;
 	if (f->_exp  >  1000000000L || f->_exp < -1000000000L) return -1;
 	long prec = f->_prec;
@@ -847,20 +857,9 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 bool bvn_float_to_double(const bvn_float_t *f, double *out)
 {
 	if (!f || !out) return false;
-	if (bvn_float_is_nan(f))  { *out = (f->_sign < 0) ? -NAN  : NAN;      return true; }
-	if (bvn_float_is_inf(f))  { *out = (f->_sign < 0) ? -INFINITY : INFINITY; return true; }
-	if (bvn_float_is_zero(f)) { *out = (f->_sign < 0) ? -0.0 : 0.0;       return true; }
-	size_t bufsz = bvn_float_str_bufsize(f->_prec, 10u);
-	char  *buf   = malloc(bufsz);
-	if (!buf) return false;
-	int n = bvn_float_to_str(f, buf, bufsz, 10);
-	if (n <= 0) { free(buf); return false; }
-	char *end = NULL;
-	double v = strtod(buf, &end);
-	bool ok = (end != buf && end != NULL && *end == '\0');
-	free(buf);
-	if (!ok) return false;
-	*out = v;
+	uint64_t bits = 0;
+	bvn_float_to_bin64(f, &bits);
+	memcpy(out, &bits, sizeof(double));
 	return true;
 }
 bool bvn_float_from_float(bvn_float_t *f, float v)

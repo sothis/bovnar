@@ -34,7 +34,7 @@ typedef struct bvnr_serializer_s {
 	void*			event_userdata;
 	bool			(*on_event)(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bvn_unit_flags_t	unit_flags;
-	uint8_t			wbuf[BVN_SER_WBUF_SIZE];
+	uint8_t			*wbuf;
 	uint32_t		wbuf_pos;
 } bvnr_serializer_t;
 #define BVN_TYPE_CACHE_KEY_CAP  64u

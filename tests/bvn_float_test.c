@@ -566,7 +566,7 @@ static void test_fixed_point(void)
 
 static void test_decimal32(void)
 {
-	puts("── decimal32 (BID) conversion ────────────────────────────────");
+	puts("── decimal32 conversion ──────────────────────────────────────");
 
 	CHECK(bvn_float_parse_dec32("0")  == 0x00000000u, "dec32 +0");
 	CHECK(bvn_float_parse_dec32("-0") == 0x80000000u, "dec32 -0");
@@ -602,7 +602,7 @@ static void test_decimal32(void)
 
 static void test_decimal64(void)
 {
-	puts("── decimal64 (BID) conversion ────────────────────────────────");
+	puts("── decimal64 conversion ──────────────────────────────────────");
 
 	const uint64_t EXP_MASK64 = 0x7FE0000000000000ull;
 	const uint64_t COEF_MASK64 = 0x001FFFFFFFFFFFFFull;

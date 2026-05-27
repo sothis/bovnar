@@ -265,6 +265,7 @@ typedef struct bvnr_read_flags_s {
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bool		continue_on_error;
 	bvnr_on_error_fn	on_error;
+	uint64_t	_reserved[4];
 } bvnr_read_flags_t;
 typedef uint32_t bvn_unit_flags_t;
 #define BVN_UNIT_FLAGS_NONE ((bvn_unit_flags_t)0u)
@@ -287,6 +288,7 @@ typedef struct bvnr_write_flags_s {
 	bool		continue_on_error;
 	bvnr_on_error_fn	on_error;
 	bvn_unit_flags_t	unit_flags;
+	uint64_t	_reserved[4];
 } bvnr_write_flags_t;
 typedef struct bvnr_source_s bvnr_source_t;
 typedef struct bvnr_sink_s   bvnr_sink_t;
@@ -296,31 +298,22 @@ typedef bool (*bvnr_push_fn)
 	(bvnr_sink_t* s, const void* buf, uint32_t len);
 typedef bool (*bvnr_flush_fn)
 	(bvnr_sink_t* s);
+#define BVNR_SOURCE_RESERVED_SIZE 64
+#define BVNR_SINK_RESERVED_SIZE   64
 struct bvnr_source_s {
-	bvnr_pull_fn	pull;
-	int		fd;
-	const uint8_t*	mem_ptr;
-	uint64_t	mem_left;
+	union {
+		void*    _ptr;
+		uint64_t _u64;
+		uint8_t  _opaque[BVNR_SOURCE_RESERVED_SIZE];
+	} _reserved;
 };
 struct bvnr_sink_s {
-	bvnr_push_fn	push;
-	bvnr_flush_fn	flush;
-	int		fd;
-	bool		is_mem;
-	uint8_t*	mem_ptr;
-	uint64_t	mem_left;
-	uint64_t	mem_written;
+	union {
+		void*    _ptr;
+		uint64_t _u64;
+		uint8_t  _opaque[BVNR_SINK_RESERVED_SIZE];
+	} _reserved;
 };
-static inline bool bvn_source_pull(
-	bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
-{
-	return s->pull(s, buf, want, got);
-}
-static inline bool bvn_sink_push(
-	bvnr_sink_t* s, const void* buf, uint32_t len)
-{
-	return s->push(s, buf, len);
-}
 typedef struct bvnr_reader_s bvnr_reader_t;
 typedef struct bvnr_writer_s bvnr_writer_t;
 #define BVN_TYPE_PLAIN \

@@ -37,25 +37,17 @@ typedef struct bvn_float_s {
 	bvn_limb_t *_d;
 	uint32_t    _nlimbs;
 	bool        _heap;
+	uint64_t    _reserved[4];
 } bvn_float_t;
 BVN_API bvn_float_t *bvn_float_alloc(uint32_t prec);
 BVN_API void bvn_float_free(bvn_float_t *f);
 BVN_API void bvn_float_init_buf(bvn_float_t *f, uint32_t prec,
 						bvn_limb_t *buf, uint32_t nlimbs);
-static inline bool bvn_float_is_nan(const bvn_float_t *f)
-	{ return f->_exp == BVN_FLOAT_EXP_NAN; }
-static inline bool bvn_float_is_inf(const bvn_float_t *f)
-	{ return f->_exp == BVN_FLOAT_EXP_INF; }
-static inline bool bvn_float_is_zero(const bvn_float_t *f)
-	{ return f->_exp == BVN_FLOAT_EXP_ZERO; }
-static inline bool bvn_float_is_neg(const bvn_float_t *f)
-	{ return f->_sign < 0; }
-static inline bool bvn_float_is_regular(const bvn_float_t *f)
-{
-	return f->_exp != BVN_FLOAT_EXP_NAN
-		&& f->_exp != BVN_FLOAT_EXP_INF
-		&& f->_exp != BVN_FLOAT_EXP_ZERO;
-}
+BVN_API bool bvn_float_is_nan(const bvn_float_t *f);
+BVN_API bool bvn_float_is_inf(const bvn_float_t *f);
+BVN_API bool bvn_float_is_zero(const bvn_float_t *f);
+BVN_API bool bvn_float_is_neg(const bvn_float_t *f);
+BVN_API bool bvn_float_is_regular(const bvn_float_t *f);
 BVN_API void bvn_float_set_nan (bvn_float_t *f);
 BVN_API void bvn_float_set_inf (bvn_float_t *f, bool neg);
 BVN_API void bvn_float_set_zero(bvn_float_t *f, bool neg);

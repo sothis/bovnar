@@ -23,6 +23,7 @@ typedef struct bvn_int_s {
 	uint32_t  nused;
 	bool      negative;
 	bool      heap;
+	uint64_t  _reserved[2];
 } bvn_int_t;
 BVN_API bvn_int_t *bvn_int_alloc(void);
 BVN_API void       bvn_int_free(bvn_int_t *n);

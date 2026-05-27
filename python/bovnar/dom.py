@@ -336,25 +336,15 @@ class DomDoc:
 
     def __getitem__(self, key: str) -> DomNode:
         """Return a top-level entry by key; raises KeyError if absent."""
-        lib = get_library()
-        ep  = lib.bvn_dom_doc_entries(self._ptr)
-        n   = int(lib.bvn_dom_doc_count(self._ptr))
-        raw = key.encode('utf-8')
-        for i in range(n):
-            e = ep[i]
-            if e.key == raw:
-                return DomNode(e.value, self)
-        raise KeyError(key)
+        ptr = get_library().bvn_dom_lookup(
+            self._ptr, ('.' + key).encode('utf-8'))
+        if not ptr:
+            raise KeyError(key)
+        return DomNode(ptr, self)
 
     def __contains__(self, key: str) -> bool:
-        lib = get_library()
-        ep  = lib.bvn_dom_doc_entries(self._ptr)
-        n   = int(lib.bvn_dom_doc_count(self._ptr))
-        raw = key.encode('utf-8')
-        for i in range(n):
-            if ep[i].key == raw:
-                return True
-        return False
+        return bool(get_library().bvn_dom_lookup(
+            self._ptr, ('.' + key).encode('utf-8')))
 
     def __len__(self) -> int:
         return int(get_library().bvn_dom_doc_count(self._ptr))

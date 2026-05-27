@@ -403,38 +403,134 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
 #ifdef FUZZ_STANDALONE
 
-static int run_file(const char *path)
+static uint64_t fw_prng_state;
+static uint64_t fw_prng_next(void)
+{
+	uint64_t x = fw_prng_state;
+	x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+	fw_prng_state = x ? x : 0x9E3779B97F4A7C15ull;
+	return fw_prng_state;
+}
+static size_t fw_prng_range(size_t lo, size_t hi)
+{
+	if (hi <= lo) return lo;
+	return lo + (size_t)(fw_prng_next() % (hi - lo + 1));
+}
+static void fw_mutate(uint8_t *buf, size_t *plen, size_t cap,
+					   const uint8_t *seed, size_t seedlen)
+{
+	if (*plen == 0) {
+		size_t n = seedlen < cap ? seedlen : cap;
+		memcpy(buf, seed, n);
+		*plen = n ? n : 1;
+		if (*plen == 0) buf[0] = 0;
+		return;
+	}
+	switch (fw_prng_next() % 6u) {
+	case 0: { /* bit flip */
+		size_t pos = fw_prng_range(0, *plen - 1);
+		buf[pos] ^= (uint8_t)(1u << (fw_prng_next() % 8));
+		break;
+	}
+	case 1: { /* byte set */
+		size_t pos = fw_prng_range(0, *plen - 1);
+		buf[pos] = (uint8_t)fw_prng_next();
+		break;
+	}
+	case 2: { /* insert byte */
+		if (*plen < cap) {
+			size_t pos = fw_prng_range(0, *plen);
+			memmove(buf + pos + 1, buf + pos, *plen - pos);
+			buf[pos] = (uint8_t)fw_prng_next();
+			(*plen)++;
+		}
+		break;
+	}
+	case 3: { /* delete byte */
+		if (*plen > 1) {
+			size_t pos = fw_prng_range(0, *plen - 1);
+			memmove(buf + pos, buf + pos + 1, *plen - pos - 1);
+			(*plen)--;
+		}
+		break;
+	}
+	case 4: { /* random block */
+		size_t pos = fw_prng_range(0, *plen - 1);
+		size_t n = fw_prng_range(1, 16);
+		if (pos + n > *plen) n = *plen - pos;
+		for (size_t i = 0; i < n; i++)
+			buf[pos + i] = (uint8_t)fw_prng_next();
+		break;
+	}
+	default: { /* reset to seed */
+		size_t n = seedlen < cap ? seedlen : cap;
+		memcpy(buf, seed, n);
+		*plen = n ? n : 1;
+		break;
+	}
+	}
+}
+
+static int run_file(const char *path, size_t iterations, uint64_t seed)
 {
 	FILE *f = fopen(path, "rb");
 	if (!f) { perror(path); return 1; }
-
 	fseek(f, 0, SEEK_END);
 	long sz = ftell(f);
 	rewind(f);
 	if (sz <= 0) { fclose(f); return 0; }
-
-	uint8_t *buf = malloc((size_t)sz);
-	if (!buf) { fclose(f); return 1; }
-
-	if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
-		free(buf); fclose(f); return 1;
+	uint8_t *seed_buf = malloc((size_t)sz);
+	if (!seed_buf) { fclose(f); return 1; }
+	if (fread(seed_buf, 1, (size_t)sz, f) != (size_t)sz) {
+		free(seed_buf); fclose(f); return 1;
 	}
 	fclose(f);
-
-	LLVMFuzzerTestOneInput(buf, (size_t)sz);
-	free(buf);
+	LLVMFuzzerTestOneInput(seed_buf, (size_t)sz);
+	if (iterations > 0) {
+		size_t cap = (size_t)sz * 4u + 64u;
+		uint8_t *work = malloc(cap);
+		if (!work) { free(seed_buf); return 1; }
+		fw_prng_state = seed ? seed : 0x123456789ABCDEF0ull;
+		size_t plen = 0;
+		for (size_t i = 0; i < iterations; i++) {
+			fw_mutate(work, &plen, cap, seed_buf, (size_t)sz);
+			LLVMFuzzerTestOneInput(work, plen);
+		}
+		free(work);
+	}
+	free(seed_buf);
 	return 0;
 }
 
 int main(int argc, char **argv)
 {
-	if (argc < 2) {
-		fprintf(stderr, "Usage: %s <corpus_file> [...]\n", argv[0]);
+	size_t   iterations = 0;
+	uint64_t seed       = 0xC0FFEE00C0FFEE00ull;
+	const char *env_iter = getenv("BVNR_FUZZ_ITERATIONS");
+	if (env_iter) iterations = (size_t)strtoul(env_iter, NULL, 10);
+	int positional_start = argc;
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
+			iterations = (size_t)strtoul(argv[++i], NULL, 10);
+		} else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+			seed = (uint64_t)strtoull(argv[++i], NULL, 10);
+		} else {
+			positional_start = i;
+			break;
+		}
+	}
+	if (positional_start >= argc) {
+		fprintf(stderr,
+			"Usage: %s [--iterations N] [--seed S] <corpus_file> [...]\n",
+			argv[0]);
 		return 1;
 	}
 	int ret = 0;
-	for (int i = 1; i < argc; i++)
-		ret |= run_file(argv[i]);
+	for (int i = positional_start; i < argc; i++)
+		ret |= run_file(argv[i], iterations, seed);
+	if (ret == 0)
+		printf("[bvnr_fuzz_writer] PASS  %zu mutation iterations\n",
+		       iterations);
 	return ret;
 }
 

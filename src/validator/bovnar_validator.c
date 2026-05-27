@@ -165,67 +165,49 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	v->value_type    = default_type;
 	v->parsed_unit   = default_unit;
 	v->unit_data_len = emit_unit ? 7u : 0u;
-	bvnr_data_t start_d = {0};
-	start_d.type   = token_is_type;
-	start_d.data   = family_name;
-	start_d.length = family_name_len;
-	if (!bvn_emit_unverified(r, ev_type_annotation_start, &start_d))
+	bvnr_data_t d = {0};
+	d.type   = token_is_type;
+	d.data   = family_name;
+	d.length = family_name_len;
+	if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
 		return false;
-	bvnr_data_t start_v = {0};
-	start_v.type       = token_is_type;
-	start_v.value_type = v->value_type;
-	start_v.value_unit = v->parsed_unit;
-	start_v.data       = family_name;
-	start_v.length     = family_name_len;
-	if (!bvn_emit_verified(r, ev_type_annotation_start, &start_v))
+	d.value_type = v->value_type;
+	d.value_unit = v->parsed_unit;
+	if (!bvn_emit_verified(r, ev_type_annotation_start, &d))
 		return false;
-	bvnr_data_t family_d = {0};
-	family_d.type       = token_is_type;
-	family_d.value_type = v->value_type;
-	family_d.value_unit = v->parsed_unit;
-	family_d.data       = family_name;
-	family_d.length     = family_name_len;
-	if (!bvn_emit_both(r, ev_type_annotation_type_family, &family_d))
+	if (!bvn_emit_both(r, ev_type_annotation_type_family, &d))
 		return false;
 	if (emit_width) {
-		bvnr_data_t width_d = {0};
-		width_d.type       = token_is_type_width;
-		width_d.value_type = v->value_type;
-		width_d.value_unit = v->parsed_unit;
+		d.type   = token_is_type_width;
+		d.data   = NULL;
+		d.length = 0;
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
-				&width_d))
+				&d))
 			return false;
 	}
 	if (emit_base) {
-		bvnr_data_t base_d = {0};
-		base_d.type       = token_is_type_base;
-		base_d.value_type = v->value_type;
-		base_d.value_unit = v->parsed_unit;
+		d.type   = token_is_type_base;
+		d.data   = NULL;
+		d.length = 0;
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
-				&base_d))
+				&d))
 			return false;
 	}
 	if (emit_unit) {
-		bvnr_data_t unit_d = {0};
-		unit_d.type       = token_is_unit;
-		unit_d.value_type = v->value_type;
-		unit_d.value_unit = v->parsed_unit;
-		unit_d.data       = no_unit_str;
-		unit_d.length     = 7;
+		d.type   = token_is_unit;
+		d.data   = no_unit_str;
+		d.length = 7;
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
-				&unit_d))
+				&d))
 			return false;
 	}
-	bvnr_data_t end_d = {0};
-	end_d.type       = token_is_type;
-	end_d.value_type = v->value_type;
-	end_d.value_unit = v->parsed_unit;
-	end_d.data       = family_name;
-	end_d.length     = family_name_len;
-	if (!bvn_emit_both(r, ev_type_annotation_end, &end_d))
+	d.type   = token_is_type;
+	d.data   = family_name;
+	d.length = family_name_len;
+	if (!bvn_emit_both(r, ev_type_annotation_end, &d))
 		return false;
 	return true;
 }
@@ -375,16 +357,46 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
 		uint8_t unit_buf[UINT8_MAX + 1];
 		uint8_t ulen = 0;
-		bvnr_data_t start_d = {0};
-		start_d.type   = token_is_type;
-		start_d.data   = raw->type_data;
-		start_d.length = raw->type_len;
-		if (!bvn_emit_unverified(r, ev_type_annotation_start, &start_d))
+		bvnr_data_t d = {0};
+		d.type   = token_is_type;
+		d.data   = raw->type_data;
+		d.length = raw->type_len;
+		if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
 			return false;
-		v->value_type = bvn_parse_type_annotation(
-			raw->type_data, raw->type_len,
-			&type_ok, &unit_ok, &unit_too_long, &parsed_unit,
-			unit_buf, &ulen);
+		bool cache_hit = v->tcache_valid &&
+		                 v->tcache_key_len == raw->type_len &&
+		                 raw->type_len <= BVN_TYPE_CACHE_KEY_CAP &&
+		                 memcmp(v->tcache_key, raw->type_data,
+		                        raw->type_len) == 0;
+		if (cache_hit) {
+			v->value_type = v->tcache_vtype;
+			parsed_unit   = v->tcache_unit;
+			ulen          = v->tcache_ubuf_len;
+			if (ulen)
+				memcpy(unit_buf, v->tcache_ubuf, ulen);
+			type_ok       = v->tcache_type_ok;
+			unit_ok       = v->tcache_unit_ok;
+			unit_too_long = v->tcache_unit_too_long;
+		} else {
+			v->value_type = bvn_parse_type_annotation(
+				raw->type_data, raw->type_len,
+				&type_ok, &unit_ok, &unit_too_long, &parsed_unit,
+				unit_buf, &ulen);
+			if (raw->type_len <= BVN_TYPE_CACHE_KEY_CAP &&
+			    ulen <= BVN_TYPE_CACHE_UBUF_CAP) {
+				v->tcache_key_len       = (uint16_t)raw->type_len;
+				memcpy(v->tcache_key, raw->type_data, raw->type_len);
+				v->tcache_vtype         = v->value_type;
+				v->tcache_unit          = parsed_unit;
+				v->tcache_ubuf_len      = ulen;
+				if (ulen)
+					memcpy(v->tcache_ubuf, unit_buf, ulen);
+				v->tcache_type_ok       = type_ok;
+				v->tcache_unit_ok       = unit_ok;
+				v->tcache_unit_too_long = unit_too_long;
+				v->tcache_valid         = true;
+			}
+		}
 		if (!type_ok) {
 			v->last_error = error_illegal_value_type;
 			return false;
@@ -393,44 +405,30 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		v->unit_data_len = ulen;
 		if (ulen > 0)
 			v->has_annotation_unit = true;
-		bvnr_data_t start_v = {0};
-		start_v.type       = token_is_type;
-		start_v.value_type = v->value_type;
-		start_v.value_unit = v->parsed_unit;
-		start_v.data       = raw->type_data;
-		start_v.length     = raw->type_len;
-		if (!bvn_emit_verified(r, ev_type_annotation_start, &start_v))
+		d.value_type = v->value_type;
+		d.value_unit = v->parsed_unit;
+		if (!bvn_emit_verified(r, ev_type_annotation_start, &d))
 			return false;
-		bvnr_data_t family_d = {0};
-		family_d.type       = token_is_type;
-		family_d.value_type = v->value_type;
-		family_d.value_unit = v->parsed_unit;
-		family_d.data       = raw->type_data;
-		family_d.length     = raw->type_len;
-		if (!bvn_emit_both(r, ev_type_annotation_type_family, &family_d))
+		if (!bvn_emit_both(r, ev_type_annotation_type_family, &d))
 			return false;
 		if (v->value_type.width != 0) {
-			bvnr_data_t width_d = {0};
-			width_d.type       = token_is_type_width;
-			width_d.value_type = v->value_type;
-			width_d.value_unit = v->parsed_unit;
+			d.type   = token_is_type_width;
+			d.data   = NULL;
+			d.length = 0;
 			if (!bvn_emit_both(r,
 					ev_type_annotation_type_family_parameter,
-					&width_d))
+					&d))
 				return false;
 		}
 		if (v->value_type.base != 0) {
-			token_type_t param_tt =
-				(v->value_type.family == vt_float_fix)
+			d.type = (v->value_type.family == vt_float_fix)
 				? token_is_type_q
 				: token_is_type_base;
-			bvnr_data_t base_d = {0};
-			base_d.type       = param_tt;
-			base_d.value_type = v->value_type;
-			base_d.value_unit = v->parsed_unit;
+			d.data   = NULL;
+			d.length = 0;
 			if (!bvn_emit_both(r,
 					ev_type_annotation_type_family_parameter,
-					&base_d))
+					&d))
 				return false;
 		}
 		if (ulen > 0) {
@@ -440,24 +438,18 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 								: error_unit_illegal;
 				return false;
 			}
-			bvnr_data_t unit_d = {0};
-			unit_d.type       = token_is_unit;
-			unit_d.value_type = v->value_type;
-			unit_d.value_unit = v->parsed_unit;
-			unit_d.data       = unit_buf;
-			unit_d.length     = ulen;
+			d.type   = token_is_unit;
+			d.data   = unit_buf;
+			d.length = ulen;
 			if (!bvn_emit_both(r,
 					ev_type_annotation_type_family_parameter,
-					&unit_d))
+					&d))
 				return false;
 		}
-		bvnr_data_t end_d = {0};
-		end_d.type       = token_is_type;
-		end_d.value_type = v->value_type;
-		end_d.value_unit = v->parsed_unit;
-		end_d.data       = raw->type_data;
-		end_d.length     = raw->type_len;
-		if (!bvn_emit_both(r, ev_type_annotation_end, &end_d))
+		d.type   = token_is_type;
+		d.data   = raw->type_data;
+		d.length = raw->type_len;
+		if (!bvn_emit_both(r, ev_type_annotation_end, &d))
 			return false;
 		return true;
 	}
@@ -468,16 +460,38 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		d.value_unit = v->parsed_unit;
 		return bvn_emit_both(r, raw->event, &d);
 	}
+	bool         iu_have = false;
+	bool         iu_ok   = true;
+	value_unit_t iu_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	if (raw->inline_unit_len > 0) {
+		if (v->iucache_valid &&
+		    v->iucache_key_len == raw->inline_unit_len &&
+		    raw->inline_unit_len <= BVN_IU_CACHE_KEY_CAP &&
+		    memcmp(v->iucache_key, raw->inline_unit_data,
+		           raw->inline_unit_len) == 0) {
+			iu_unit = v->iucache_unit;
+			iu_ok   = v->iucache_ok;
+		} else {
+			iu_unit = bvn_parse_unit(raw->inline_unit_data, &iu_ok);
+			if (raw->inline_unit_len <= BVN_IU_CACHE_KEY_CAP) {
+				v->iucache_key_len = (uint8_t)raw->inline_unit_len;
+				memcpy(v->iucache_key, raw->inline_unit_data,
+				       raw->inline_unit_len);
+				v->iucache_unit  = iu_unit;
+				v->iucache_ok    = iu_ok;
+				v->iucache_valid = true;
+			}
+		}
+		iu_have = true;
+	}
 	if (bvn_type_is_plain(v->value_type) &&
 		(tt == token_is_number || tt == token_is_array_number ||
 		 tt == token_is_string || tt == token_is_array_string)) {
 		bool is_currency_unit = false;
-		if (raw->inline_unit_len > 0 &&
+		if (iu_have &&
 		    (tt == token_is_number || tt == token_is_array_number)) {
-			bool u_ok = true;
-			value_unit_t iu = bvn_parse_unit(raw->inline_unit_data, &u_ok);
-			if (u_ok && iu.num_components == 1 &&
-			    bvn_unit_is_currency((int)iu.components[0].base))
+			if (iu_ok && iu_unit.num_components == 1 &&
+			    bvn_unit_is_currency((int)iu_unit.components[0].base))
 				is_currency_unit = true;
 		}
 		if (!bvn_emit_default_type_annotation(r, tt,
@@ -494,20 +508,17 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	if (!bvn_validate_type_value_compat(r, tt,
 										raw->str_data, raw->str_len))
 		return false;
-	if (raw->inline_unit_len > 0) {
-		bool unit_ok = true;
-		value_unit_t inline_unit =
-			bvn_parse_unit(raw->inline_unit_data, &unit_ok);
-		if (!unit_ok) {
+	if (iu_have) {
+		if (!iu_ok) {
 			v->last_error = error_unit_illegal;
 			return false;
 		}
 		if (v->has_annotation_unit &&
-			!bvn_unit_equal(v->parsed_unit, inline_unit)) {
+			!bvn_unit_equal(v->parsed_unit, iu_unit)) {
 			v->last_error = error_unit_mismatch;
 			return false;
 		}
-		v->parsed_unit = inline_unit;
+		v->parsed_unit = iu_unit;
 	}
 	token_type_t dt = tt;
 	bvnr_data_t d = {0};

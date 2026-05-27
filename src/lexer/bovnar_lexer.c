@@ -3,6 +3,48 @@
 #include "bovnar.h"
 #include "bvn_lexer_impl.h"
 #include "bvn_val_impl.h"
+static uint8_t bvn_run_lut_string[256];
+static uint8_t bvn_run_lut_ident[256];
+static uint8_t bvn_run_lut_number[256];
+static uint8_t bvn_run_lut_fraction[256];
+static uint8_t bvn_run_lut_exp[256];
+static uint8_t bvn_run_lut_symbol[256];
+static uint8_t bvn_run_lut_inline_unit[256];
+static uint8_t bvn_run_lut_reference[256];
+static uint8_t bvn_run_lut_type[256];
+static bool    bvn_run_luts_inited = false;
+static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
+{
+	for (int b = 0x20; b <= 0x7e; ++b) {
+		if (b == 0x09 || b == 0x0a || b == 0x0d)
+			continue;
+		if (bvn_after_state_idx_table[st][b] == self_action)
+			lut[b] = 1;
+	}
+}
+static void bvn_init_run_luts(void)
+{
+	if (bvn_run_luts_inited) return;
+	bvn_build_run_lut(bvn_run_lut_string,      copy_string_byte,
+	                  ACT_copy_string_byte);
+	bvn_build_run_lut(bvn_run_lut_ident,       identifier_body,
+	                  ACT_copy_identifier_byte);
+	bvn_build_run_lut(bvn_run_lut_number,      copy_number_byte,
+	                  ACT_copy_number_byte);
+	bvn_build_run_lut(bvn_run_lut_fraction,    copy_fraction_byte,
+	                  ACT_copy_fraction_byte);
+	bvn_build_run_lut(bvn_run_lut_exp,         copy_exp_byte,
+	                  ACT_copy_exp_byte);
+	bvn_build_run_lut(bvn_run_lut_symbol,      symbol_body,
+	                  ACT_copy_symbol_byte);
+	bvn_build_run_lut(bvn_run_lut_inline_unit, inline_unit_body,
+	                  ACT_copy_inline_unit_byte);
+	bvn_build_run_lut(bvn_run_lut_reference,   reference_segment_body,
+	                  ACT_copy_reference_byte);
+	bvn_build_run_lut(bvn_run_lut_type,        copy_type_byte,
+	                  ACT_copy_type_byte);
+	bvn_run_luts_inited = true;
+}
 static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
 	uint64_t offset)
 {
@@ -68,8 +110,10 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	l->in_array_element    = false;
 	l->curr_row_size       = 0;
 	l->array_row_size      = 0;
-	memset(l->arr_frames, 0,
-	       (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
+	if (l->arr_used_max)
+		memset(l->arr_frames, 0,
+		       l->arr_used_max * sizeof(bvn_array_frame_t));
+	l->arr_used_max = 0;
 	return true;
 }
 #define ESC_VALID 0x100u
@@ -257,11 +301,13 @@ bool bvn_action_value_outro(bvnr_reader_t* p)
 		return false;
 	if (!bvn_val_on_value_outro(p))
 		return false;
-	uint64_t base  = p->lex.array_nesting_level;
-	uint64_t total = p->lex.max_array_nesting + 1u;
-	if (base < total)
+	uint32_t base = p->lex.array_nesting_level;
+	uint32_t hwm  = p->lex.arr_used_max;
+	if (hwm > base) {
 		memset(p->lex.arr_frames + base, 0,
-		       (total - base) * sizeof(bvn_array_frame_t));
+		       (hwm - base) * sizeof(bvn_array_frame_t));
+	}
+	p->lex.arr_used_max = (uint16_t)base;
 	if (!p->lex.struct_nesting_level) {
 		p->lex.in_array_element    = false;
 		p->lex.array_nesting_level = 0;
@@ -287,7 +333,7 @@ bool bvn_action_type_outro(bvnr_reader_t* p)
 bool bvn_action_copy_type_byte(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
-	if (l->type_len == sizeof(l->type_data) - 1u) {
+	if (l->type_len == BVN_TYPE_BUF_CAP - 1u) {
 		bvn_lexer_set_error(p, error_type_too_long);
 		return false;
 	}
@@ -370,6 +416,8 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	if (!bvn_val_on_array_intro(p))
 		return false;
 	++p->lex.array_nesting_level;
+	if (p->lex.array_nesting_level > p->lex.arr_used_max)
+		p->lex.arr_used_max = p->lex.array_nesting_level;
 	p->lex.next_state = array_intro;
 	return true;
 }
@@ -683,9 +731,11 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			l->curr_row_size    = 0;
 			l->array_row_size   = 0;
 			l->in_array_element = false;
-			memset(l->arr_frames, 0,
-			       (l->max_array_nesting + 1u) *
-			       sizeof(bvn_array_frame_t));
+			if (l->arr_used_max)
+				memset(l->arr_frames, 0,
+				       l->arr_used_max *
+				       sizeof(bvn_array_frame_t));
+			l->arr_used_max = 0;
 			--l->struct_nesting_level;
 			if (!bvn_val_receive_event(p, ev_struct_end))
 				return false;
@@ -726,8 +776,10 @@ static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	l->array_items          = 0;
 	l->curr_row_size        = 0;
 	l->array_row_size       = 0;
-	memset(l->arr_frames, 0,
-	       (l->max_array_nesting + 1u) * sizeof(bvn_array_frame_t));
+	if (l->arr_used_max)
+		memset(l->arr_frames, 0,
+		       l->arr_used_max * sizeof(bvn_array_frame_t));
+	l->arr_used_max = 0;
 	p->val.value_type          = BVN_TYPE_PLAIN;
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
 	p->val.has_annotation_unit = false;
@@ -813,7 +865,7 @@ bool bvn_action_inline_unit_intro(bvnr_reader_t* p)
 bool bvn_action_copy_inline_unit_byte(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
-	if (l->inline_unit_len == sizeof(l->inline_unit_data) - 1u) {
+	if (l->inline_unit_len == BVN_INLINE_UNIT_BUF_CAP - 1u) {
 		bvn_lexer_set_error(p, error_unit_too_long);
 		return false;
 	}
@@ -995,12 +1047,102 @@ static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
 		l->column = 0;
 	}
 }
+static inline uint32_t bvn_try_bulk_run(
+	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
+{
+	state_t st = l->next_state;
+	const uint8_t* lut;
+	uint8_t* dst;
+	uint32_t dst_len;
+	uint32_t dst_cap;
+	bool is_str_buf = true;
+	switch (st) {
+	case copy_string_byte:
+		lut = bvn_run_lut_string;
+		dst_cap = l->max_string_length;
+		break;
+	case identifier_body:
+		lut = bvn_run_lut_ident;
+		dst_cap = l->max_identifier_length;
+		break;
+	case copy_number_byte:
+		lut = bvn_run_lut_number;
+		dst_cap = l->max_number_length;
+		break;
+	case copy_fraction_byte:
+		lut = bvn_run_lut_fraction;
+		dst_cap = l->max_number_length;
+		break;
+	case copy_exp_byte:
+		lut = bvn_run_lut_exp;
+		dst_cap = l->max_number_length;
+		break;
+	case symbol_body:
+		lut = bvn_run_lut_symbol;
+		dst_cap = l->max_symbol_length;
+		break;
+	case reference_segment_body:
+		lut = bvn_run_lut_reference;
+		dst_cap = l->max_reference_length;
+		break;
+	case inline_unit_body:
+		lut = bvn_run_lut_inline_unit;
+		dst = l->inline_unit_data;
+		dst_len = l->inline_unit_len;
+		dst_cap = BVN_INLINE_UNIT_BUF_CAP - 1u;
+		is_str_buf = false;
+		break;
+	case copy_type_byte:
+		lut = bvn_run_lut_type;
+		dst = l->type_data;
+		dst_len = l->type_len;
+		dst_cap = BVN_TYPE_BUF_CAP - 1u;
+		is_str_buf = false;
+		break;
+	default:
+		return 0;
+	}
+	if (is_str_buf) {
+		dst     = l->str_data;
+		dst_len = l->str_len;
+	}
+	if (!lut[data[start]])
+		return 0;
+	uint32_t end = start + 1u;
+	while (end < len && lut[data[end]]) ++end;
+	uint32_t n = end - start;
+	if ((uint64_t)dst_len + n > (uint64_t)dst_cap)
+		return 0;
+	if (l->max_text_bytes &&
+		l->text_bytes + (uint64_t)n > l->max_text_bytes)
+		return 0;
+	memcpy(dst + dst_len, data + start, n);
+	if (is_str_buf) {
+		l->str_len = (uint16_t)(dst_len + n);
+	} else if (st == copy_type_byte) {
+		l->type_len = (uint8_t)(dst_len + n);
+	} else {
+		l->inline_unit_len = (uint8_t)(dst_len + n);
+	}
+	l->text_bytes += n;
+	l->column     += n;
+	l->byte        = data[end - 1u];
+	l->prev_byte   = data[end - 1u];
+	return n;
+}
 static bool bvn_interpret_input_buffer(
 	bvnr_reader_t* p, const uint8_t* data, uint32_t len,
 	uint32_t* consumed)
 {
 	bvnr_lexer_t* l = &p->lex;
 	for (uint32_t idx = 0; idx < len; ++idx) {
+		if (l->utf8_need == 0u) {
+			uint32_t n = bvn_try_bulk_run(l, data, idx, len);
+			if (n) {
+				idx += n - 1u;
+				continue;
+			}
+		}
 		if (l->max_text_bytes &&
 			l->text_bytes == l->max_text_bytes) {
 			uint8_t offending = data[idx];
@@ -1020,12 +1162,14 @@ static bool bvn_interpret_input_buffer(
 			return false;
 		}
 		++l->text_bytes;
-		l->byte = data[idx];
+		uint8_t b = data[idx];
+		l->byte = b;
 		uint8_t prev = l->prev_byte;
-		l->prev_byte = (uint8_t)l->byte;
+		l->prev_byte = b;
 		uint8_t saved_need = l->utf8_need;
 		bool line_advanced = false;
-		if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
+		if (b < 0x80u && saved_need == 0u) {
+		} else if (!bvn_utf8_feed(l, (uint32_t)b)) {
 			if (l->byte == 0x09)
 				l->column = ((l->column >> 2u) + 1u) << 2u;
 			else if (saved_need == 0)
@@ -1092,10 +1236,15 @@ void bvn_lex_destroy(bvnr_lexer_t* l)
 		return;
 	free(l->arr_frames);
 	l->arr_frames = NULL;
+	free(l->str_data);
+	l->str_data         = NULL;
+	l->type_data        = NULL;
+	l->inline_unit_data = NULL;
 }
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
 {
+	bvn_init_run_luts();
 	memset(l, 0, sizeof(*l));
 	l->next_state  = undefined;
 	l->line        = 1;
@@ -1131,6 +1280,16 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
 	if (!l->arr_frames)
 		return false;
+	uint8_t* bufs = (uint8_t*)malloc(BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP +
+	                                 BVN_INLINE_UNIT_BUF_CAP);
+	if (!bufs) {
+		free(l->arr_frames);
+		l->arr_frames = NULL;
+		return false;
+	}
+	l->str_data         = bufs;
+	l->type_data        = bufs + BVN_STR_BUF_CAP;
+	l->inline_unit_data = bufs + BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP;
 	return true;
 }
 bool bvn_lex_run(bvnr_reader_t* r)

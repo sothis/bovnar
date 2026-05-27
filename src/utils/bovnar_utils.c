@@ -55,9 +55,16 @@ static uint32_t bvn_digit_to_char(uint32_t d, uint32_t base)
 bool bvn_is_special_number_string(const char* s)
 {
 	if (!s) return false;
-	return strcmp(s, "nan")      == 0
-		|| strcmp(s, "infinity") == 0
-		|| strcmp(s, "-infinity") == 0;
+	if (s[0] == 'n')
+		return s[1] == 'a' && s[2] == 'n' && s[3] == '\0';
+	if (s[0] == 'i')
+		return s[1] == 'n' && s[2] == 'f' && s[3] == 'i' && s[4] == 'n'
+		    && s[5] == 'i' && s[6] == 't' && s[7] == 'y' && s[8] == '\0';
+	if (s[0] == '-')
+		return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == 'i'
+		    && s[5] == 'n' && s[6] == 'i' && s[7] == 't' && s[8] == 'y'
+		    && s[9] == '\0';
+	return false;
 }
 bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 {

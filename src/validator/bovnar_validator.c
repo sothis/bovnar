@@ -109,51 +109,85 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	bool              emit_unit  = false;
 	static const char no_unit_str[] = "no_unit";
 	if (tt == token_is_string || tt == token_is_array_string) {
+		if (!bvn_type_is_plain(v->inferred_default_vtype) &&
+		    bvn_type_spec_eq(BVN_TYPE_UTF8, v->inferred_default_vtype)) {
+			v->value_type    = BVN_TYPE_UTF8;
+			v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
+			v->unit_data_len = 0;
+			return true;
+		}
 		default_type    = BVN_TYPE_UTF8;
 		family_name     = "utf8";
 		family_name_len = 4;
 	} else if (tt == token_is_number || tt == token_is_array_number) {
 		bool has_dot = v->acc_has_dot;
 		bool has_exp = v->acc_has_exp;
-		bool is_neg = (str_len > 0 && str[0] == '-');
-		bool is_special = bvn_is_special_number_string(
-			(const char*)str);
-		if (is_currency_unit) {
-			default_type.family = vt_float_dec;
-			default_type.width  = 64;
-			default_type.base   = 0;
-			family_name     = "float_dec";
-			family_name_len = 9;
-			emit_width = true;
-			emit_base  = true;
-			emit_unit  = true;
-		} else if (is_special || has_dot || has_exp) {
+		bool is_neg  = (str_len > 0 && str[0] == '-');
+		if (!is_currency_unit && (has_dot || has_exp)) {
+			value_type_spec_t cand = {.family=vt_float,.width=64,.base=0};
+			if (!bvn_type_is_plain(v->inferred_default_vtype) &&
+			    bvn_type_spec_eq(cand, v->inferred_default_vtype)) {
+				v->value_type    = cand;
+				v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
+				v->unit_data_len = 7u;
+				return true;
+			}
 			default_type.family = vt_float;
 			default_type.width  = 64;
 			default_type.base   = 0;
 			family_name     = "float";
 			family_name_len = 5;
-			emit_width = true;
-			emit_base  = true;
-			emit_unit  = true;
-		} else if (is_neg) {
-			default_type.family = vt_sint;
-			default_type.width  = 64;
-			default_type.base   = 0;
-			family_name     = "sint";
+			emit_width = emit_base = emit_unit = true;
+		} else if (!is_currency_unit
+		           && str_len > (uint32_t)is_neg
+		           && (uint8_t)(str[(uint32_t)is_neg] - '0') <= 9u) {
+			value_type_spec_t cand;
+			cand.family = is_neg ? vt_sint : vt_uint;
+			cand.width  = 64;
+			cand.base   = 0;
+			if (!bvn_type_is_plain(v->inferred_default_vtype) &&
+			    bvn_type_spec_eq(cand, v->inferred_default_vtype)) {
+				v->value_type    = cand;
+				v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
+				v->unit_data_len = 7u;
+				return true;
+			}
+			default_type    = cand;
+			family_name     = is_neg ? "sint" : "uint";
 			family_name_len = 4;
-			emit_width = true;
-			emit_base  = true;
-			emit_unit  = true;
+			emit_width = emit_base = emit_unit = true;
 		} else {
-			default_type.family = vt_uint;
-			default_type.width  = 64;
-			default_type.base   = 0;
-			family_name     = "uint";
-			family_name_len = 4;
-			emit_width = true;
-			emit_base  = true;
-			emit_unit  = true;
+			bool is_special = bvn_is_special_number_string(
+				(const char*)str);
+			if (is_currency_unit) {
+				default_type.family = vt_float_dec;
+				default_type.width  = 64;
+				default_type.base   = 0;
+				family_name     = "float_dec";
+				family_name_len = 9;
+				emit_width = emit_base = emit_unit = true;
+			} else if (is_special) {
+				default_type.family = vt_float;
+				default_type.width  = 64;
+				default_type.base   = 0;
+				family_name     = "float";
+				family_name_len = 5;
+				emit_width = emit_base = emit_unit = true;
+			} else if (is_neg) {
+				default_type.family = vt_sint;
+				default_type.width  = 64;
+				default_type.base   = 0;
+				family_name     = "sint";
+				family_name_len = 4;
+				emit_width = emit_base = emit_unit = true;
+			} else {
+				default_type.family = vt_uint;
+				default_type.width  = 64;
+				default_type.base   = 0;
+				family_name     = "uint";
+				family_name_len = 4;
+				emit_width = emit_base = emit_unit = true;
+			}
 		}
 	} else {
 		return true;

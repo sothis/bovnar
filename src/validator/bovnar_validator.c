@@ -280,6 +280,41 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 	if (bvn_is_special_number_string((const char*)str))
 		return true;
 	uint32_t start = is_neg ? 1u : 0u;
+	if (base == 10u) {
+		/* Fast path for the common case: base-10, no exp/dot (plain integers).
+		 * Avoids bvn_char_to_digit branches and the 64-bit division in
+		 * bvn_acc_digit by using a compile-time overflow threshold. */
+		for (uint32_t i = start; i < len; i++) {
+			uint8_t b = str[i];
+			if (b == '.') { v->acc_has_dot = true; continue; }
+			if (b == 'e' || b == 'E') {
+				v->acc_has_exp = true;
+				v->acc_exp_state = 1;
+				continue;
+			}
+			if (v->acc_exp_state > 0) {
+				if (v->acc_exp_state == 1 && (b == '+' || b == '-'))
+					v->acc_exp_state = 2;
+				else
+					v->acc_exp_state = 2;
+				continue;
+			}
+			uint32_t dv = (uint32_t)(b - (uint8_t)'0');
+			if (dv > 9u) {
+				v->last_error = error_digit_not_in_base;
+				return false;
+			}
+			if (!v->acc_overflow && !v->acc_has_dot) {
+				/* UINT64_MAX = 18446744073709551615; threshold = UINT64_MAX/10 = 1844674407370955161 */
+				if (v->acc_value > (uint64_t)1844674407370955161ULL ||
+				    (v->acc_value == (uint64_t)1844674407370955161ULL && dv > 5u))
+					v->acc_overflow = true;
+				else
+					v->acc_value = v->acc_value * 10u + (uint64_t)dv;
+			}
+		}
+		return true;
+	}
 	for (uint32_t i = start; i < len; i++) {
 		uint8_t b = str[i];
 		if (b == '.' ) { v->acc_has_dot = true; continue; }

@@ -1447,40 +1447,47 @@ static size_t bmark_gen_structs(uint8_t *buf, size_t cap, size_t *out_assignment
 }
 static size_t bmark_gen_arrays(uint8_t *buf, size_t cap, size_t *out_assignments)
 {
-	static const int ROW_LEN = 5;
-	static const int int_vals[] = {42, 0, -1, 999, 7};
-	size_t pos    = 0;
-	size_t elem   = 0;
-	bool   opened = false;
+	static const int ROW_LEN       = 5;
+	static const int ROWS_PER_ASGN = 8;
+	/* all non-negative so inferred_default_vtype cache hits after the first element */
+	static const int int_vals[] = {42, 0, 100, 999, 7};
+	static const int NVALS = (int)(sizeof(int_vals) / sizeof(int_vals[0]));
+	size_t pos  = 0;
+	size_t asgn = 0;
+	size_t elem = 0;
 	for (;;) {
 		char hdr[32];
-		int  hn;
-		if (!opened) {
-			hn = snprintf(hdr, sizeof(hdr), ".a%zu=[", elem);
-			opened = true;
-		} else {
-			hn = snprintf(hdr, sizeof(hdr), "]/[");
-		}
+		int  hn = snprintf(hdr, sizeof(hdr), ".a%zu=[", asgn);
 		if (hn < 0) break;
-		if (pos + (size_t)hn + (size_t)(ROW_LEN * 6) + 4 > cap) break;
+		/* conservative: header + ROWS_PER_ASGN rows (ROW_LEN values up to 4 digits + commas)
+		 * + row separators (]/[) + footer */
+		size_t max_per_asgn = (size_t)hn
+			+ (size_t)ROWS_PER_ASGN * ((size_t)ROW_LEN * 5u + 4u)
+			+ 8u;
+		if (pos + max_per_asgn > cap) break;
 		memcpy(buf + pos, hdr, (size_t)hn);
 		pos += (size_t)hn;
-		for (int col = 0; col < ROW_LEN; col++) {
-			if (col > 0) buf[pos++] = ',';
-			char val[16];
-			int n = snprintf(val, sizeof(val), "%d",
-			                 int_vals[elem % (size_t)(sizeof(int_vals)/sizeof(int_vals[0]))]);
-			size_t vl = (n > 0) ? (size_t)n : 1u;
-			memcpy(buf + pos, val, vl);
-			pos += vl;
-			elem++;
+		for (int row = 0; row < ROWS_PER_ASGN; row++) {
+			if (row > 0) {
+				memcpy(buf + pos, "]/[", 3);
+				pos += 3;
+			}
+			for (int col = 0; col < ROW_LEN; col++) {
+				if (col > 0) buf[pos++] = ',';
+				char val[16];
+				int n = snprintf(val, sizeof(val), "%d",
+				                 int_vals[elem % (size_t)NVALS]);
+				size_t vl = (n > 0) ? (size_t)n : 1u;
+				memcpy(buf + pos, val, vl);
+				pos += vl;
+				elem++;
+			}
 		}
-	}
-	if (opened && pos + 4 <= cap) {
 		memcpy(buf + pos, "];\n", 3);
 		pos += 3;
+		asgn++;
 	}
-	*out_assignments = 1;
+	*out_assignments = asgn;
 	return pos;
 }
 static size_t bmark_gen_units(uint8_t *buf, size_t cap, size_t *out_assignments)

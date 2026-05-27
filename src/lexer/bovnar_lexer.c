@@ -12,6 +12,7 @@ static uint8_t bvn_run_lut_symbol[256];
 static uint8_t bvn_run_lut_inline_unit[256];
 static uint8_t bvn_run_lut_reference[256];
 static uint8_t bvn_run_lut_type[256];
+static uint8_t bvn_run_lut_ws[256];
 static bool    bvn_run_luts_inited = false;
 static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 {
@@ -43,6 +44,12 @@ static void bvn_init_run_luts(void)
 	                  ACT_copy_reference_byte);
 	bvn_build_run_lut(bvn_run_lut_type,        copy_type_byte,
 	                  ACT_copy_type_byte);
+	bvn_run_lut_ws[0x09] = 1;
+	bvn_run_lut_ws[0x0a] = 1;
+	bvn_run_lut_ws[0x0b] = 1;
+	bvn_run_lut_ws[0x0c] = 1;
+	bvn_run_lut_ws[0x0d] = 1;
+	bvn_run_lut_ws[0x20] = 1;
 	bvn_run_luts_inited = true;
 }
 static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
@@ -1030,11 +1037,18 @@ bool bvn_validate_string(const uint8_t* data, size_t len)
 static inline bool bvn_call_action_for_new_byte(bvnr_reader_t* p)
 {
 	uint8_t idx = bvn_after_state_idx_table[p->lex.next_state][p->lex.byte];
-	if (!idx || !bvn_action_table[idx]) {
+	if (idx == ACT_ignore_whitespace)
+		return true;
+	if (!idx) {
 		bvn_lexer_set_error(p, error_unexpected_input_byte);
 		return false;
 	}
-	return bvn_action_table[idx](p);
+	action_t fn = bvn_action_table[idx];
+	if (fn == bvn_action_set_state) {
+		p->lex.next_state = bvn_action_target_state[idx];
+		return true;
+	}
+	return fn(p);
 }
 static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
 {
@@ -1130,6 +1144,43 @@ static inline uint32_t bvn_try_bulk_run(
 	l->prev_byte   = data[end - 1u];
 	return n;
 }
+static inline uint32_t bvn_try_bulk_ws(
+	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
+{
+	state_t st = l->next_state;
+	if (bvn_after_state_idx_table[st][0x20] != ACT_ignore_whitespace ||
+	    bvn_after_state_idx_table[st][0x0a] != ACT_ignore_whitespace)
+		return 0;
+	uint64_t col  = l->column;
+	uint64_t line = l->line;
+	uint8_t  prev = l->prev_byte;
+	uint32_t end  = start;
+	while (end < len) {
+		uint8_t b = data[end];
+		if (b == 0x20)      { ++col; }
+		else if (b == 0x09) { col = ((col >> 2u) + 1u) << 2u; }
+		else if (b == 0x0a) {
+			if (prev != 0x0d) ++line;
+			col = 0;
+		}
+		else if (b == 0x0d) { ++line; col = 0; }
+		else if (b == 0x0b || b == 0x0c) { ++col; }
+		else break;
+		prev = b;
+		++end;
+	}
+	uint32_t n = end - start;
+	if (!n) return 0;
+	if (l->max_text_bytes &&
+	    l->text_bytes + (uint64_t)n > l->max_text_bytes)
+		return 0;
+	l->text_bytes += n;
+	l->line        = line;
+	l->column      = col;
+	l->byte        = data[end - 1u];
+	l->prev_byte   = prev;
+	return n;
+}
 static bool bvn_interpret_input_buffer(
 	bvnr_reader_t* p, const uint8_t* data, uint32_t len,
 	uint32_t* consumed)
@@ -1141,6 +1192,13 @@ static bool bvn_interpret_input_buffer(
 			if (n) {
 				idx += n - 1u;
 				continue;
+			}
+			if (bvn_run_lut_ws[data[idx]]) {
+				n = bvn_try_bulk_ws(l, data, idx, len);
+				if (n) {
+					idx += n - 1u;
+					continue;
+				}
 			}
 		}
 		if (l->max_text_bytes &&
@@ -1292,19 +1350,37 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	l->inline_unit_data = bufs + BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP;
 	return true;
 }
+#define BVN_MEM_CHUNK_MAX (1u << 20)
 bool bvn_lex_run(bvnr_reader_t* r)
 {
 	bvnr_lexer_t* l = &r->lex;
-	uint8_t data[BOVN_READ_BUFFER_SIZE];
+	uint8_t stack_data[BOVN_READ_BUFFER_SIZE];
+	const uint8_t* data;
 	uint32_t nb, off, consumed;
 	uint32_t os_leftover;
+	bool is_mem_src = (l->src.pull == bvn_pull_mem);
 	if (!bvn_val_receive_event(r, ev_stream_start))
 		return false;
 	for (;;) {
-		if (!bvn_source_pull(&l->src, data, BOVN_READ_BUFFER_SIZE, &nb)) {
+		if (is_mem_src) {
+			uint64_t avail = l->src.mem_left;
+			if (!avail) {
+				nb = 0;
+				data = NULL;
+			} else {
+				nb = (avail > (uint64_t)BVN_MEM_CHUNK_MAX)
+					? BVN_MEM_CHUNK_MAX : (uint32_t)avail;
+				data = l->src.mem_ptr;
+				l->src.mem_ptr  += nb;
+				l->src.mem_left -= nb;
+			}
+		} else if (!bvn_source_pull(&l->src, stack_data,
+		                            BOVN_READ_BUFFER_SIZE, &nb)) {
 			bvn_set_eof_error(r, error_reading_from_source_fd);
 			bvn_notify_error(r);
 			return false;
+		} else {
+			data = stack_data;
 		}
 		if (!nb) {
 			if ((l->next_state == value_outro ||

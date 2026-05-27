@@ -40,8 +40,8 @@ static inline bool bvn_emit_unverified(bvnr_reader_t* r,
 									   bvnr_event_t ev, bvnr_data_t* d)
 {
 	bvnr_validator_t* v = &r->val;
-	bvn_normalize_data_ptr(d);
 	if (!v->on_unverified) return true;
+	bvn_normalize_data_ptr(d);
 	if (!v->on_unverified(v->userdata, ev, d)) {
 		v->last_error = error_scanner_callback_failed;
 		return false;
@@ -52,8 +52,8 @@ static inline bool bvn_emit_verified(bvnr_reader_t* r,
 									 bvnr_event_t ev, bvnr_data_t* d)
 {
 	bvnr_validator_t* v = &r->val;
-	bvn_normalize_data_ptr(d);
 	if (!v->on_verified) return true;
+	bvn_normalize_data_ptr(d);
 	if (!v->on_verified(v->userdata, ev, d)) {
 		v->last_error = error_scanner_callback_failed;
 		return false;
@@ -63,6 +63,8 @@ static inline bool bvn_emit_verified(bvnr_reader_t* r,
 static inline bool bvn_emit_both(bvnr_reader_t* r,
 								 bvnr_event_t ev, bvnr_data_t* d)
 {
+	bvnr_validator_t* v = &r->val;
+	if (!v->on_unverified && !v->on_verified) return true;
 	if (!bvn_emit_unverified(r, ev, d)) return false;
 	if (!bvn_emit_verified(r, ev, d))   return false;
 	return true;
@@ -363,20 +365,26 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		d.length = raw->type_len;
 		if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
 			return false;
-		bool cache_hit = v->tcache_valid &&
-		                 v->tcache_key_len == raw->type_len &&
-		                 raw->type_len <= BVN_TYPE_CACHE_KEY_CAP &&
-		                 memcmp(v->tcache_key, raw->type_data,
-		                        raw->type_len) == 0;
-		if (cache_hit) {
-			v->value_type = v->tcache_vtype;
-			parsed_unit   = v->tcache_unit;
-			ulen          = v->tcache_ubuf_len;
+		uint32_t tcache_hit_idx = (uint32_t)-1;
+		for (uint32_t i = 0; i < v->tcache_count; i++) {
+			const bvn_type_cache_slot_t* sl = &v->tcache[i];
+			if (sl->key_len == raw->type_len &&
+			    memcmp(sl->key, raw->type_data, raw->type_len) == 0) {
+				tcache_hit_idx = i;
+				break;
+			}
+		}
+		if (tcache_hit_idx != (uint32_t)-1) {
+			const bvn_type_cache_slot_t* sl =
+				&v->tcache[tcache_hit_idx];
+			v->value_type = sl->vtype;
+			parsed_unit   = sl->unit;
+			ulen          = sl->ubuf_len;
 			if (ulen)
-				memcpy(unit_buf, v->tcache_ubuf, ulen);
-			type_ok       = v->tcache_type_ok;
-			unit_ok       = v->tcache_unit_ok;
-			unit_too_long = v->tcache_unit_too_long;
+				memcpy(unit_buf, sl->ubuf, ulen);
+			type_ok       = sl->type_ok;
+			unit_ok       = sl->unit_ok;
+			unit_too_long = sl->unit_too_long;
 		} else {
 			v->value_type = bvn_parse_type_annotation(
 				raw->type_data, raw->type_len,
@@ -384,17 +392,26 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 				unit_buf, &ulen);
 			if (raw->type_len <= BVN_TYPE_CACHE_KEY_CAP &&
 			    ulen <= BVN_TYPE_CACHE_UBUF_CAP) {
-				v->tcache_key_len       = (uint16_t)raw->type_len;
-				memcpy(v->tcache_key, raw->type_data, raw->type_len);
-				v->tcache_vtype         = v->value_type;
-				v->tcache_unit          = parsed_unit;
-				v->tcache_ubuf_len      = ulen;
+				uint32_t idx;
+				if (v->tcache_count < BVN_TYPE_CACHE_SLOTS) {
+					idx = v->tcache_count;
+					v->tcache_count = (uint8_t)(idx + 1u);
+				} else {
+					idx = v->tcache_next;
+					v->tcache_next = (uint8_t)((idx + 1u)
+						% BVN_TYPE_CACHE_SLOTS);
+				}
+				bvn_type_cache_slot_t* sl = &v->tcache[idx];
+				sl->key_len       = (uint16_t)raw->type_len;
+				memcpy(sl->key, raw->type_data, raw->type_len);
+				sl->vtype         = v->value_type;
+				sl->unit          = parsed_unit;
+				sl->ubuf_len      = ulen;
 				if (ulen)
-					memcpy(v->tcache_ubuf, unit_buf, ulen);
-				v->tcache_type_ok       = type_ok;
-				v->tcache_unit_ok       = unit_ok;
-				v->tcache_unit_too_long = unit_too_long;
-				v->tcache_valid         = true;
+					memcpy(sl->ubuf, unit_buf, ulen);
+				sl->type_ok       = type_ok;
+				sl->unit_ok       = unit_ok;
+				sl->unit_too_long = unit_too_long;
 			}
 		}
 		if (!type_ok) {
@@ -464,22 +481,37 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	bool         iu_ok   = true;
 	value_unit_t iu_unit = BVN_UNIT_NO_PREFIX(bu_none);
 	if (raw->inline_unit_len > 0) {
-		if (v->iucache_valid &&
-		    v->iucache_key_len == raw->inline_unit_len &&
-		    raw->inline_unit_len <= BVN_IU_CACHE_KEY_CAP &&
-		    memcmp(v->iucache_key, raw->inline_unit_data,
-		           raw->inline_unit_len) == 0) {
-			iu_unit = v->iucache_unit;
-			iu_ok   = v->iucache_ok;
+		uint32_t iu_hit_idx = (uint32_t)-1;
+		for (uint32_t i = 0; i < v->iucache_count; i++) {
+			const bvn_iu_cache_slot_t* sl = &v->iucache[i];
+			if (sl->key_len == raw->inline_unit_len &&
+			    memcmp(sl->key, raw->inline_unit_data,
+			           raw->inline_unit_len) == 0) {
+				iu_hit_idx = i;
+				break;
+			}
+		}
+		if (iu_hit_idx != (uint32_t)-1) {
+			iu_unit = v->iucache[iu_hit_idx].unit;
+			iu_ok   = v->iucache[iu_hit_idx].ok;
 		} else {
 			iu_unit = bvn_parse_unit(raw->inline_unit_data, &iu_ok);
 			if (raw->inline_unit_len <= BVN_IU_CACHE_KEY_CAP) {
-				v->iucache_key_len = (uint8_t)raw->inline_unit_len;
-				memcpy(v->iucache_key, raw->inline_unit_data,
+				uint32_t idx;
+				if (v->iucache_count < BVN_IU_CACHE_SLOTS) {
+					idx = v->iucache_count;
+					v->iucache_count = (uint8_t)(idx + 1u);
+				} else {
+					idx = v->iucache_next;
+					v->iucache_next = (uint8_t)((idx + 1u)
+						% BVN_IU_CACHE_SLOTS);
+				}
+				bvn_iu_cache_slot_t* sl = &v->iucache[idx];
+				sl->key_len = (uint8_t)raw->inline_unit_len;
+				memcpy(sl->key, raw->inline_unit_data,
 				       raw->inline_unit_len);
-				v->iucache_unit  = iu_unit;
-				v->iucache_ok    = iu_ok;
-				v->iucache_valid = true;
+				sl->unit = iu_unit;
+				sl->ok   = iu_ok;
 			}
 		}
 		iu_have = true;
@@ -533,9 +565,11 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 }
 bool bvn_val_receive_event(bvnr_reader_t* r, bvnr_event_t ev)
 {
+	bvnr_validator_t* v = &r->val;
+	if (!v->on_unverified && !v->on_verified) return true;
 	bvnr_data_t d = {0};
-	d.value_type = r->val.value_type;
-	d.value_unit = r->val.parsed_unit;
+	d.value_type = v->value_type;
+	d.value_unit = v->parsed_unit;
 	return bvn_emit_both(r, ev, &d);
 }
 bool bvn_val_receive_octet_chunk(

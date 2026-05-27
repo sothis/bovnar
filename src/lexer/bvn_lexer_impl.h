@@ -313,4 +313,5 @@ bool bvn_action_copy_inline_unit_byte    (bvnr_reader_t* p);
 bool bvn_action_to_inline_unit_outro     (bvnr_reader_t* p);
 bool bvn_utf8_classify_leader(
 	uint32_t b, uint8_t* need, uint8_t* lo, uint8_t* hi);
+bool bvn_pull_mem(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got);
 #endif

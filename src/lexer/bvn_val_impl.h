@@ -40,6 +40,25 @@ typedef struct bvnr_serializer_s {
 #define BVN_TYPE_CACHE_KEY_CAP  64u
 #define BVN_IU_CACHE_KEY_CAP    32u
 #define BVN_TYPE_CACHE_UBUF_CAP 64u
+#define BVN_TYPE_CACHE_SLOTS    16u
+#define BVN_IU_CACHE_SLOTS      16u
+typedef struct bvn_type_cache_slot_s {
+	uint16_t		key_len;
+	uint8_t			ubuf_len;
+	bool			type_ok;
+	bool			unit_ok;
+	bool			unit_too_long;
+	value_type_spec_t	vtype;
+	value_unit_t		unit;
+	uint8_t			key[BVN_TYPE_CACHE_KEY_CAP];
+	uint8_t			ubuf[BVN_TYPE_CACHE_UBUF_CAP];
+} bvn_type_cache_slot_t;
+typedef struct bvn_iu_cache_slot_s {
+	uint8_t			key_len;
+	bool			ok;
+	value_unit_t		unit;
+	uint8_t			key[BVN_IU_CACHE_KEY_CAP];
+} bvn_iu_cache_slot_t;
 typedef struct bvnr_validator_s {
 	value_type_spec_t	value_type;
 	value_unit_t		parsed_unit;
@@ -61,21 +80,12 @@ typedef struct bvnr_validator_s {
 	bool			(*on_verified)
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bvnr_on_error_fn	on_error;
-	bool			tcache_valid;
-	bool			tcache_type_ok;
-	bool			tcache_unit_ok;
-	bool			tcache_unit_too_long;
-	uint16_t		tcache_key_len;
-	uint8_t			tcache_ubuf_len;
-	value_type_spec_t	tcache_vtype;
-	value_unit_t		tcache_unit;
-	uint8_t			tcache_key[BVN_TYPE_CACHE_KEY_CAP];
-	uint8_t			tcache_ubuf[BVN_TYPE_CACHE_UBUF_CAP];
-	bool			iucache_valid;
-	bool			iucache_ok;
-	uint8_t			iucache_key_len;
-	value_unit_t		iucache_unit;
-	uint8_t			iucache_key[BVN_IU_CACHE_KEY_CAP];
+	uint8_t			tcache_count;
+	uint8_t			tcache_next;
+	uint8_t			iucache_count;
+	uint8_t			iucache_next;
+	bvn_type_cache_slot_t	tcache[BVN_TYPE_CACHE_SLOTS];
+	bvn_iu_cache_slot_t	iucache[BVN_IU_CACHE_SLOTS];
 } bvnr_validator_t;
 struct bvnr_reader_s {
 	bvnr_lexer_t		lex;

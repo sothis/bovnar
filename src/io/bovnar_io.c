@@ -14,7 +14,7 @@ static bool pull_fd(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 	*got = (uint32_t)n;
 	return true;
 }
-static bool pull_mem(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
+bool bvn_pull_mem(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
 	uint64_t avail = s->mem_left;
 	uint32_t n = avail < (uint64_t)want ? (uint32_t)avail : want;
@@ -64,7 +64,7 @@ void bvnr_source_from_fd(bvnr_source_t* s, int fd)
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len)
 {
 	memset(s, 0, sizeof(*s));
-	s->pull     = pull_mem;
+	s->pull     = bvn_pull_mem;
 	s->mem_ptr  = (const uint8_t*)buf;
 	s->mem_left = len;
 }

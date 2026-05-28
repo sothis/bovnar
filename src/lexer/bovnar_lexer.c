@@ -1188,10 +1188,6 @@ static inline uint32_t bvn_try_bulk_run(
 	}
 	if (!lut[data[start]])
 		return 0;
-	/* Two-stage walk.  Stage 1 is the tight ASCII-only loop — one
-	 * LUT lookup and one increment per byte.  As soon as a non-ASCII
-	 * byte appears, drop into stage 2 which validates multi-byte
-	 * UTF-8 sequences and resumes the ASCII fast path between them. */
 	uint32_t end = start;
 	uint32_t last_complete;
 	while (end < len) {
@@ -1201,7 +1197,7 @@ static inline uint32_t bvn_try_bulk_run(
 		end = a;
 		if (end >= len) break;
 		uint8_t b = data[end];
-		if (b < 0x80u) break;            /* ASCII byte rejected by LUT */
+		if (b < 0x80u) break;
 		if (!lut[b]) break;
 		uint8_t need = 0, lo = 0, hi = 0;
 		if (!bvn_utf8_classify_leader(b, &need, &lo, &hi)) break;

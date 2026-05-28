@@ -55,9 +55,6 @@ static uint32_t bvn_digit_to_char(uint32_t d, uint32_t base)
 bool bvn_is_special_number_string(const char* s)
 {
 	if (!s) return false;
-	/* Fast first-byte filter: 99%+ of numbers start with a digit, so
-	 * the cheap reject path dominates and the multi-byte comparisons
-	 * below are skipped entirely. */
 	uint8_t c = (uint8_t)s[0];
 	if (c != 'n' && c != 'i' && c != '-') return false;
 	if (c == 'n')
@@ -192,21 +189,11 @@ static bool bvn_digits_to_dec(const char* src, uint32_t base,
 	free(dec);
 	return true;
 }
-/* Number of decimal digits in 2^w (which equals the digit count of
- * 2^w - 1 for every w >= 1, since 2^w is never a power of ten). */
 static uint32_t bvn_dec_digits_2pow(uint32_t w)
 {
 	if (w == 0u) return 1u;
 	return (uint32_t)((double)w * 0.30102999566398119521) + 1u;
 }
-/* Cheap magnitude pre-filter for a decimal string `d` against a bound
- * whose decimal length is `max_digits`.  Returns 1 (fewer digits =>
- * strictly below the bound), 0 (more digits => strictly above), or -1
- * (within +/-1 digit => caller must do the exact comparison).  The
- * +/-1 slack absorbs any rounding in max_digits and the unit gap
- * between 2^w and 2^w - 1, so the exact path still decides every
- * borderline value.  This keeps wide-integer range checks O(len)
- * instead of recomputing the O(w^2) decimal bound for every value. */
 static int bvn_dec_digit_prefilter(const char* d, uint32_t max_digits)
 {
 	while (d[0] == '0' && d[1]) d++;
@@ -219,8 +206,6 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
 	if (w == 0) return true;
-	/* Fast first-byte filter: digits never form a special-number
-	 * string, so skip the multi-char compare in the common case. */
 	uint8_t c0 = (uint8_t)s[0];
 	if ((c0 < '0' || c0 > '9') && c0 != '+') {
 		if (bvn_is_special_number_string(s)) return true;
@@ -295,8 +280,6 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 	if (!s) return true;
 	if (w == 0) return true;
 	uint8_t c0 = (uint8_t)s[0];
-	/* Fast first-byte filter: digits and sign chars dominate; the
-	 * multi-char special-number compare only runs for ASCII letters. */
 	if ((c0 < '0' || c0 > '9') && c0 != '-' && c0 != '+') {
 		if (bvn_is_special_number_string(s)) return true;
 	}

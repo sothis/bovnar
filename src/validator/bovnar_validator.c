@@ -348,8 +348,6 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 	bool is_neg = (str_len > 0 && str[0] == '-');
 	if (vt.family != vt_uint && vt.family != vt_sint)
 		return true;
-	/* Special-number check: digits never form `nan`/`infinity`, so
-	 * skip the multi-byte compare for the common case. */
 	if (str_len > 0) {
 		uint8_t c0 = str[0];
 		if ((c0 == 'n' || c0 == 'i' ||

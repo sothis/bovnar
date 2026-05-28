@@ -827,11 +827,6 @@ bool bvnr_write_event(
 bool bvnr_write_finish(bvnr_writer_t* w)
 {
 	if (!w) return false;
-	/* A sticky error means an earlier event was rejected after the key
-	 * and '=' were already emitted, leaving a dangling assignment in the
-	 * sink.  Finishing cannot un-emit it, so report failure rather than
-	 * claim success on truncated, unparseable output (mirrors the
-	 * last_error guard at the top of bvnr_write_event). */
 	if (w->val.last_error != error_none)
 		return false;
 	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0)

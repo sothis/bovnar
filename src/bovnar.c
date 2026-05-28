@@ -1339,11 +1339,6 @@ static bool bmark_event_counter(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 	(void)d;
 	return true;
 }
-/* The benchmark generators below select a format string from a small
- * table of compile-time string literals by index, which -Wformat=2's
- * -Wformat-nonliteral cannot statically verify.  The formats are all
- * trusted internal literals, so silence that one sub-warning across the
- * generator block (still under -Wformat type checking otherwise). */
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wformat-nonliteral"

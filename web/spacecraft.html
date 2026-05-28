@@ -445,7 +445,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
   const SUN_A = 23.44 * D2R;
   const SUN = { x: Math.cos(SUN_A), y: Math.sin(SUN_A) };     // sun direction (ECI, z≈0)
 
-  let orbit = { name: 'AETHER-1', a: 6921, e: 0, i: 48.0, raan: 180.0, argp: 0 };
+  let orbit = { name: 'NYX-1', a: 9171, e: 0, i: 48.0, raan: 180.0, argp: 0 };
   let orbitPath = [];       // sampled ECI [x,y] for drawing
   let pathExtent = 1;
   let resyncDefault = true;
@@ -856,7 +856,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
       ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI);
       ctx.fillStyle = col; ctx.fill();
     };
-    // downlink: sat → ground (150 Mbit/s — dense, fast)
+    // downlink: sat → ground (200 Mbit/s — dense, fast)
     for (let i = 0; i < 4; i++) {
       const f = (t * 0.9 + i / 4) % 1, fade = Math.sin(Math.PI * f);
       dot(1 - f, 2.0, 'rgba(120,235,205,' + (0.85 * fade) + ')');
@@ -1118,11 +1118,11 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 
   /* ════════════════════ 8. Config panel ════════════════════ */
   const DEFAULT_CFG =
-`# ── AETHER-1 spacecraft configuration ──────────────────────
+`# ── NYX-1 spacecraft configuration ──────────────────────
 # Self-describing: every value carries its own type + unit inline.
 # Config uses ASCII unit notation; SI prefixes take a '~' (k~g, k~m, G~Hz).
 .spacecraft = {
-    .name      = "AETHER-1";
+    .name      = "NYX-1";
     .cospar_id = "2026-042B";
     .norad_id  = <uint:32> 99001;
     .bus       = "ESPA-class smallsat";
@@ -1131,7 +1131,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 
 .orbit = {                          # circular orbit (a = R_earth + altitude)
     .epoch           = "2026-05-28T00:00:00Z";
-    .altitude        = <float:64,k~m> 550.0;
+    .altitude        = <float:64,k~m> 2800.0;
     .inclination     = 48.0 deg;
     .raan            = 180.0 deg;
     .arg_of_latitude = 0.0 deg;     # start angle from the ascending node
@@ -1161,11 +1161,11 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 
 .comms = {
     .band           = X;
-    .downlink_rate  = 150 M~bit/s;
+    .downlink_rate  = 200 M~bit/s;
     .uplink_rate    = 64 k~bit/s;
-    .frequency      = 8.45 G~Hz;
-    .transmit_power = 6.0 W;
-    .antenna_gain   = 32.0 dB;
+    .frequency      = 8.20 G~Hz;
+    .transmit_power = 8.0 W;
+    .antenna_gain   = 30.0 dB;
 };
 
 .thermal = {

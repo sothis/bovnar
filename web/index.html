@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bovnar — The Format That Knows What It Means</title>
+<meta name="description" content="Bovnar (BVNR) — unit-safe serialization for scientific and industrial systems. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
+<meta property="og:title" content="Bovnar — Unit-safe serialization for scientific and industrial systems">
+<meta property="og:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error. Built for instrumentation, telemetry, and control systems.">
+<meta property="og:type" content="website">
+<title>Bovnar — Unit-safe serialization for scientific & industrial systems</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
@@ -494,6 +498,140 @@ section { position: relative; z-index: 1; }
   line-height: 1.8;
   max-width: 640px;
 }
+
+/* ── MISSION CONTROL LIVE DEMO ── */
+#demo .section-inner { padding-bottom: 3rem; }
+#demo .section-p code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--cyan);
+}
+
+.demo-window {
+  margin-top: 2.5rem;
+  border: 1px solid var(--border);
+  background: var(--editor-bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 44px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03);
+}
+.demo-titlebar {
+  height: 38px;
+  background: var(--titlebar-bg);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.9rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid #252525;
+}
+.demo-titlename {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text3);
+  letter-spacing: 0.04em;
+}
+.demo-open {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text2);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 0.28rem 0.7rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+.demo-open:hover { border-color: var(--blue2); color: var(--blue); }
+
+.demo-stage {
+  position: relative;
+  width: 100%;
+  height: clamp(540px, 80vh, 860px);
+  background: radial-gradient(circle at 50% 32%, #12131f 0%, #0a0a12 58%, #060608 100%);
+}
+/* Once the live app is mounted, the stage grows to the iframe's measured
+   content height (set in JS) so the embed never needs an inner scrollbar. */
+.demo-stage.is-live { height: auto; }
+.demo-stage iframe {
+  width: 100%;
+  height: clamp(540px, 80vh, 860px);
+  border: 0;
+  display: block;
+}
+
+.demo-poster {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.15rem;
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+.demo-poster::before {
+  content: '';
+  position: absolute;
+  width: min(460px, 70vw); height: min(460px, 70vw);
+  border: 1px solid rgba(86,156,214,0.16);
+  border-radius: 50%;
+  box-shadow: inset 0 0 90px rgba(0,122,204,0.10);
+}
+.demo-poster::after {
+  content: '';
+  position: absolute;
+  width: min(300px, 48vw); height: min(300px, 48vw);
+  border: 1px dashed rgba(78,201,176,0.22);
+  border-radius: 50%;
+  animation: demo-spin 32s linear infinite;
+}
+@keyframes demo-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .demo-poster::after { animation: none; } }
+
+.demo-planet {
+  position: relative;
+  z-index: 1;
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #4a8fe0, #1b3a6b 58%, #0b1830);
+  box-shadow: 0 0 42px rgba(0,122,204,0.45), inset -10px -10px 26px rgba(0,0,0,0.55);
+}
+.demo-launch-label {
+  position: relative; z-index: 1;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.demo-launch-btn {
+  position: relative; z-index: 1;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: #fff;
+  background: var(--blue2);
+  border: none;
+  padding: 0.8rem 1.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.2s;
+}
+.demo-launch-btn:hover {
+  background: #0086d8;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 26px rgba(0,122,204,0.42);
+}
+.demo-hint {
+  position: relative; z-index: 1;
+  font-size: 0.85rem; font-weight: 300; color: var(--text2);
+  max-width: 46ch;
+}
+.demo-poster.is-launched { display: none; }
 
 /* ── PHILOSOPHY ── */
 #philosophy .section-inner {
@@ -1776,6 +1914,7 @@ a[data-doc] { cursor: pointer; }
 <nav>
   <a class="nav-brand" href="#">BOVNAR<span class="ext">.bvnr</span></a>
   <ul class="nav-links">
+    <li><a href="#demo">Live Demo</a></li>
     <li><a href="#philosophy">Philosophy</a></li>
     <li><a href="#syntax">Syntax</a></li>
     <li><a href="#features">Features</a></li>
@@ -1794,22 +1933,23 @@ a[data-doc] { cursor: pointer; }
   <div class="hero-grid">
     <div class="hero-left">
       <div class="hero-label">
-        <span>spec-v1.0</span>
+        <span>unit-safe</span>
         <span class="hl-sep">/</span>
-        <span>mit-license</span>
+        <span>spec-v1.0</span>
         <span class="hl-sep">/</span>
         <span>c99</span>
       </div>
-      <h1 class="hero-h1">The format that<br>knows <em>what it means.</em></h1>
+      <h1 class="hero-h1">Unit-safe serialization<br>for <em>scientific &amp; industrial systems.</em></h1>
       <p class="hero-sub">
-        Every value in a Bovnar document carries its own type family,
-        bit-width, numeric base, and physical unit — inline, without any
-        external schema. Hand the file to anyone; they have everything needed
-        to interpret it exactly as intended.
+        Every measurement carries a validated physical unit — bit-width, numeric
+        base, and dimension travel inline, in the same byte stream, with no
+        external schema. A bare <code>9.81</code> is never ambiguous, and a
+        mismatched unit is a parse error. Built for instrumentation, telemetry,
+        and control systems where the wrong unit is a failure.
       </p>
       <div class="hero-actions">
         <a href="#quickstart" class="btn-primary">Get Started</a>
-        <a href="#philosophy" class="btn-ghost">Read the Philosophy</a>
+        <a href="#philosophy" class="btn-ghost">Why Unit-safe?</a>
       </div>
     </div>
 
@@ -1846,7 +1986,7 @@ a[data-doc] { cursor: pointer; }
             <div class="ln">7</div>
             <div class="ln">8</div>
           </div>
-          <div class="code-body" id="hero-code"><span class="c-comment"># Every value carries its own meaning</span>
+          <div class="code-body" id="hero-code"><span class="c-comment"># Every measurement carries a validated unit</span>
 <span class="c-sigil">.</span><span class="c-key">host</span>     <span class="c-eq">=</span> <span class="c-str">"api.sensors.io"</span><span class="c-semi">;</span>
 <span class="c-sigil">.</span><span class="c-key">port</span>     <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> </span><span class="c-val">443</span><span class="c-semi">;</span>
 <span class="c-sigil">.</span><span class="c-key">timeout</span>  <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">s</span><span class="c-ann">&gt;</span> </span><span class="c-val">2.5</span><span class="c-semi">;</span>
@@ -1862,7 +2002,7 @@ a[data-doc] { cursor: pointer; }
           <div class="esl-right">
             <span>UTF-8</span>
             <span>Ln 8, Col 1</span>
-            <span>self-describing</span>
+            <span>unit-safe</span>
           </div>
         </div>
       </div>
@@ -1872,25 +2012,114 @@ a[data-doc] { cursor: pointer; }
 </section>
 
 <!-- ══════════════════════════════════════════════
+     MISSION CONTROL — LIVE DEMO
+══════════════════════════════════════════════ -->
+<section id="demo">
+  <div class="section-inner">
+    <div class="section-label reveal">live demo</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Mission control, <em>running on Bovnar.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      You just saw the format. Here it is flying a spacecraft. Edit the orbit
+      config and the ground station re-decodes a live <code>.bvnr</code> downlink —
+      units, bit-widths, and types ride inside the stream, parsed in your browser by
+      <code>bovnar_parser.js</code>. The visualizer runs only on <em>decoded</em>
+      values, never the raw simulation.
+    </p>
+
+    <div class="demo-window reveal reveal-delay-3">
+      <div class="demo-titlebar">
+        <div class="editor-dots">
+          <div class="editor-dot ed1"></div>
+          <div class="editor-dot ed2"></div>
+          <div class="editor-dot ed3"></div>
+        </div>
+        <span class="demo-titlename">bovnar — mission-control · spacecraft.html</span>
+        <a class="demo-open" href="../spacecraft.html" target="_blank" rel="noopener">Open full screen ↗</a>
+      </div>
+      <div class="demo-stage">
+        <div class="demo-poster" id="demo-poster" role="button" tabindex="0"
+             aria-label="Launch the live Mission Control demo">
+          <div class="demo-planet"></div>
+          <span class="demo-launch-label">live · interactive · in-browser</span>
+          <button class="demo-launch-btn" type="button" id="demo-launch">▶ Launch Mission Control</button>
+          <p class="demo-hint">
+            Runs the real telemetry simulator and orbit visualizer, decoded
+            entirely from a Bovnar downlink frame.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+(function () {
+  var poster = document.getElementById('demo-poster');
+  if (!poster) return;
+  var stage = poster.parentNode;
+  function launch() {
+    if (stage.querySelector('iframe')) return;
+    var f = document.createElement('iframe');
+    f.src = '../spacecraft.html';
+    f.title = 'Bovnar Mission Control — live demo';
+    f.setAttribute('loading', 'lazy');
+    f.setAttribute('allow', 'fullscreen');
+    f.setAttribute('scrolling', 'no');
+    /* Grow the iframe to its content height so the embed never shows a
+       scrollbar. Same-origin, so we can measure the embedded document. */
+    function fit() {
+      var d = f.contentDocument;
+      if (!d || !d.documentElement) return;
+      var h = Math.max(
+        d.documentElement.scrollHeight,
+        d.body ? d.body.scrollHeight : 0
+      );
+      if (h) f.style.height = h + 'px';
+    }
+    f.addEventListener('load', function () {
+      stage.classList.add('is-live');
+      fit();
+      try {
+        var d = f.contentDocument;
+        if (window.ResizeObserver && d && d.body) new ResizeObserver(fit).observe(d.body);
+        if (d && d.defaultView) d.defaultView.addEventListener('resize', fit);
+      } catch (e) {}
+      /* Re-measure after fonts, the canvas boot, and the first telemetry
+         frame have settled. */
+      setTimeout(fit, 300);
+      setTimeout(fit, 1200);
+    });
+    stage.insertBefore(f, poster);
+    poster.classList.add('is-launched');
+  }
+  poster.addEventListener('click', launch);
+  poster.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); launch(); }
+  });
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
      PHILOSOPHY
 ══════════════════════════════════════════════ -->
 <section id="philosophy">
   <div class="section-inner">
     <div class="philosophy-left">
       <div class="section-label reveal">design-philosophy</div>
-      <h2 class="section-h2 reveal reveal-delay-1"><em>Data that carries</em><br>its own interpretation.</h2>
+      <h2 class="section-h2 reveal reveal-delay-1"><em>Numbers that</em><br>can't lose their units.</h2>
       <p class="section-p reveal reveal-delay-2" style="margin-bottom:2rem;">
-        The serialization landscape is defined by a quiet trade-off: ease of human reading, or
-        precision of machine semantics — rarely both.
+        In scientific and industrial systems, the costly failures are rarely bad syntax —
+        they are unit confusion. A value sent in pounds-force and read as newtons. Feet read
+        as meters. The number parsed fine; the dimension was wrong.
       </p>
       <blockquote class="philosophy-quote reveal reveal-delay-3">
-        "A bare <code style="font-family:var(--mono);color:var(--c-val)">9.81</code> could be meters per second, volts, or a dimensionless ratio. Bovnar makes that difference explicit."
+        "A bare <code style="font-family:var(--mono);color:var(--c-val)">9.81</code> could be meters per second, volts, or a dimensionless ratio. Bovnar makes that difference explicit — and a mismatched unit a parse error."
       </blockquote>
       <p class="section-p reveal reveal-delay-4">
         Bovnar is not a replacement for JSON in simple REST APIs, nor for Protobuf in
-        performance-critical RPC. It fills the space where the data itself must carry
-        its own meaning: scientific instrumentation, IoT telemetry, typed configuration,
-        long-term archival, and mixed text-binary log streams.
+        performance-critical RPC. It is built for the place where dimensional correctness
+        is a requirement: scientific instrumentation and metrology, industrial telemetry and
+        control, IoT sensor networks, long-term measurement archival, and mixed
+        text-binary log streams.
       </p>
     </div>
     <div class="philosophy-right">
@@ -1898,41 +2127,43 @@ a[data-doc] { cursor: pointer; }
         <div class="phil-card reveal">
           <div class="phil-icon">01</div>
           <div>
-            <div class="phil-title">Self-describing at the value level</div>
+            <div class="phil-title">Units travel with every value</div>
             <div class="phil-desc">
-              Type family, bit-width, numeric base, and physical unit all travel with the value,
-              in the same byte stream. No schema file. No code generation step.
+              Physical unit, type family, bit-width, and numeric base all ride in the same byte
+              stream as the value. No schema file, no code generation, no naming convention to
+              decode what a measurement means.
             </div>
           </div>
         </div>
         <div class="phil-card reveal reveal-delay-1">
           <div class="phil-icon">02</div>
           <div>
-            <div class="phil-title">Human-readable, machine-precise</div>
+            <div class="phil-title">A mismatched unit is an error</div>
             <div class="phil-desc">
-              A <code>.bvnr</code> file is UTF-8 prose you can read in any editor. The parser validates
-              type annotations on the fly, with no external toolchain required.
+              Annotate a value as <code>m/s</code> and write an inline unit that doesn't match,
+              and the parser rejects it. Dimensional intent is checked against a built-in unit
+              table — not assumed, not left to the reader.
             </div>
           </div>
         </div>
         <div class="phil-card reveal reveal-delay-2">
           <div class="phil-icon">03</div>
           <div>
-            <div class="phil-title">Optional typing with well-defined defaults</div>
+            <div class="phil-title">Human-readable, machine-precise</div>
             <div class="phil-desc">
-              Omit annotations and get sensible defaults (<code>uint:64</code>, <code>float:64</code>).
-              Add them and the parser validates on the fly. Both modes produce correct, unambiguous output.
+              A <code>.bvnr</code> file is UTF-8 prose you can read in any editor. The parser validates
+              type and unit annotations on the fly, with no external toolchain required.
             </div>
           </div>
         </div>
         <div class="phil-card reveal reveal-delay-3">
           <div class="phil-icon">04</div>
           <div>
-            <div class="phil-title">Precision is a requirement, not a feature</div>
+            <div class="phil-title">Optional typing, well-defined defaults</div>
             <div class="phil-desc">
-              Physical units are a first-class citizen of the format. Compound units like
-              <code>k~g·m/s²</code> and <code>Gi~B</code> are
-              written inline. The format enforces dimensional correctness.
+              Omit annotations and get sensible defaults (<code>uint:64</code>, <code>float:64</code>).
+              Add them — including compound units like <code>k~g·m/s²</code> and <code>Gi~B</code>
+              written inline — and every value is validated. Both modes are unambiguous.
             </div>
           </div>
         </div>
@@ -2383,16 +2614,17 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
 <section id="usecases">
   <div class="section-inner">
     <div class="section-label reveal">applications</div>
-    <h2 class="section-h2 reveal reveal-delay-1">When precision is a <em>requirement.</em></h2>
+    <h2 class="section-h2 reveal reveal-delay-1">Where the wrong unit is a <em>failure.</em></h2>
 
     <div class="usecases-grid">
       <div class="usecase-card reveal">
         <div class="usecase-num">01</div>
         <div>
-          <div class="usecase-title">Scientific &amp; Measurement Data</div>
+          <div class="usecase-title">Scientific Instrumentation &amp; Metrology</div>
           <div class="usecase-desc">
-            Numbers with explicit physical units travel with the payload. No schema, no
-            naming convention, no documentation is needed to interpret the unit correctly.
+            Measurements carry explicit, validated physical units with the payload. No schema, no
+            naming convention, no lab notebook needed to interpret a reading — or to catch a
+            unit mismatch before it reaches analysis.
           </div>
           <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">acceleration</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">9.807</span><span class="c-semi">;</span></div>
         </div>
@@ -2400,10 +2632,11 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
       <div class="usecase-card reveal reveal-delay-1">
         <div class="usecase-num">02</div>
         <div>
-          <div class="usecase-title">Embedded Systems &amp; IoT Telemetry</div>
+          <div class="usecase-title">Industrial Telemetry &amp; IoT</div>
           <div class="usecase-desc">
-            The streaming parser has a small, allocation-friendly footprint. No heap required
-            for the lexer. Resync mode handles unreliable transports gracefully.
+            The streaming parser has a small, allocation-friendly footprint — no heap required
+            for the lexer. Sensor frames carry their units; resync mode handles unreliable
+            field transports gracefully.
           </div>
           <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">temp</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span> <span class="c-val">23.5</span><span class="c-semi">;</span> <span class="c-sigil">.</span><span class="c-key">vcc</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">V</span><span class="c-ann">&gt;</span> <span class="c-val">3.31</span><span class="c-semi">;</span></div>
         </div>
@@ -2650,8 +2883,8 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
         <div class="footer-brand-name">BOVNAR</div>
         <div class="footer-brand-sub">Spec v1.0 · MIT License · C99</div>
         <p class="footer-desc">
-          A typed, unit-aware, text-binary serialisation format and its C99 reference implementation.
-          The format that knows what it means.
+          Unit-safe serialization for scientific and industrial systems. Every measurement
+          carries a validated physical unit, inline. C99 reference implementation, MIT-licensed.
         </p>
       </div>
       <div>

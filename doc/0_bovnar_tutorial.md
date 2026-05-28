@@ -7,9 +7,11 @@
 
 ## Why Bovnar Exists
 
-Serialization formats make a quiet trade-off: either they are easy for humans to read, or they carry precise machine-readable semantics — rarely both. JSON tells you that `9.81` is a number; it does not tell you whether it is meters per second, volts, or a dimensionless ratio. Protobuf tells you the field type, but you need a `.proto` file and a compiler to interpret it. YAML is expressive but has notoriously sharp edges.
+Bovnar is **unit-safe serialization for scientific and industrial systems**. In those domains, the expensive failures are rarely bad syntax — they are unit confusion. A thrust value sent in pounds-force and read as newtons. An altitude in feet read as meters. The number parsed perfectly; the dimension was wrong, and nothing in the data said otherwise.
 
-Bovnar makes a different choice: every value in a Bovnar document is **self-describing**. The type family (signed integer, float, string…), the bit-width, the numeric base, and the physical unit all travel *with* the value, in the same byte stream, without any external schema. You can hand a `.bvnr` file to anyone, and they have everything they need to interpret it correctly — a 64-bit signed integer measured in kilopascals looks different from a 32-bit unsigned integer measured in mebibytes, and the format makes that difference explicit.
+Most formats make a quiet trade-off: either they are easy for humans to read, or they carry precise machine-readable semantics — rarely both, and almost never including the *unit*. JSON tells you that `9.81` is a number; it does not tell you whether it is meters per second, volts, or a dimensionless ratio. Protobuf tells you the field type, but you need a `.proto` file and a compiler to interpret it, and units are outside its scope entirely. YAML is expressive but has notoriously sharp edges.
+
+Bovnar makes a different choice: every value in a Bovnar document is **self-describing and unit-safe**. The type family (signed integer, float, string…), the bit-width, the numeric base, and the physical unit all travel *with* the value, in the same byte stream, without any external schema — and the unit is validated by the parser rather than assumed. Annotate a value as `m/s` and write a mismatched inline unit, and parsing fails. Hand a `.bvnr` file to anyone, and they have everything needed to interpret *and dimensionally trust* it: a 64-bit signed integer measured in kilopascals looks different from a 32-bit unsigned integer measured in mebibytes, and the format makes that difference explicit.
 
 The format also supports raw binary embedding, multi-dimensional arrays with a clean row-separator syntax, and incremental streaming parsing — all in a text layer that is pleasant to read and write by hand.
 

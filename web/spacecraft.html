@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bovnar — Configure a Spacecraft, Decode Its Downlink</title>
+<script>
+  /* When embedded (e.g. the landing-page live demo), mark the document so the
+     standalone Mission Control nav bar is hidden. Runs before paint — no flash. */
+  if (window.self !== window.top) document.documentElement.classList.add('embedded');
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -77,6 +82,12 @@ nav .tag { color: var(--text2); font-family: var(--mono); font-size: 0.72rem; le
 nav .spacer { flex: 1; }
 nav a.link { color: var(--text2); text-decoration: none; font-size: 0.78rem; font-family: var(--mono); }
 nav a.link:hover { color: var(--cyan); }
+
+/* Embedded in an iframe (landing-page demo): drop the standalone nav bar.
+   The grid stays content-height-driven (the telemetry column sets the height
+   and the visualizer absorbs the slack), so the parent page can size the
+   iframe to the content and the embed never needs an inner scrollbar. */
+html.embedded nav { display: none; }
 
 header.intro { padding: 1.1rem 1.4rem 0.4rem; max-width: 1700px; margin: 0 auto; }
 header.intro h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }

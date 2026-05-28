@@ -1,6 +1,6 @@
 # Bovnar (BVNR)
 
-**A typed, unit-aware, text–binary serialisation format — and its C99 reference implementation.**
+**Unit-safe serialization for scientific and industrial systems — with a C99 reference implementation.**
 
 [![Spec version](https://img.shields.io/badge/spec-v1.0-blue)](doc/1_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -10,7 +10,9 @@
 
 ## Overview
 
-Bovnar bridges the gap between human-readable formats and machine-precise semantics. Every value in a `.bvnr` document carries its own type family, bit-width, numeric base, and physical unit — without any external schema. Hand the file to anyone and they have everything required to interpret it correctly.
+In scientific and industrial systems, the expensive failures are rarely bad syntax — they are unit confusion: a value sent in pounds-force and read as newtons, feet read as meters. The number parses fine; the dimension is wrong.
+
+Bovnar closes that gap. Every value in a `.bvnr` document carries its own type family, bit-width, numeric base, and **physical unit** — inline, in the byte stream, with no external schema. The unit is not a comment or a naming convention; it is part of the value and is validated by the parser. Annotate a measurement as `m/s` and write a mismatched inline unit, and parsing fails with `error_unit_mismatch`. Hand the file to anyone and they have everything required to interpret — and to dimensionally trust — every reading.
 
 ```bovnar
 # A self-describing configuration document
@@ -84,9 +86,9 @@ Protocol Buffers and FlatBuffers anchor the strongly-typed, schema-driven end of
 
 Bovnar occupies a different position. It is text-based and human-readable in the same sense that JSON is, but every value is annotated with its type family, bit-width, numeric base, and physical unit — inline, in the byte stream, without any external schema. A `.bvnr` file is self-describing at the individual value level: `<float:64,m/s> 9.81` carries more information than `9.81` can ever carry on its own. The format additionally supports native binary embedding through octet streams, avoiding the size and entropy cost of Base64, and first-class multi-dimensional array syntax that does not reduce to nested lists.
 
-This combination makes Bovnar particularly suited to contexts where the receiving party may not share the sender's schema, where physical correctness matters, or where text readability and binary payloads must coexist in the same document. It is not a replacement for JSON in simple REST APIs, nor for Protobuf in performance-critical RPC. It fills the space where the data itself must carry its own meaning: scientific instrumentation, IoT telemetry, typed configuration files, long-term archival, and mixed text-binary log streams.
+This combination makes Bovnar particularly suited to contexts where dimensional correctness matters, where the receiving party may not share the sender's schema, or where text readability and binary payloads must coexist in the same document. It is not a replacement for JSON in simple REST APIs, nor for Protobuf in performance-critical RPC. It is built for the place where a wrong unit is a failure: scientific instrumentation and metrology, industrial telemetry and control, IoT sensor networks, long-term measurement archival, and mixed text-binary log streams.
 
-If you only need simple key-value interchange, JSON remains the pragmatic choice. If minimal wire size is the overriding constraint, CBOR or Protobuf will outperform any text format. Bovnar is the right tool when precision, self-description, and physical units are requirements rather than nice-to-haves.
+If you only need simple key-value interchange, JSON remains the pragmatic choice. If minimal wire size is the overriding constraint, CBOR or Protobuf will outperform any text format. Bovnar is the right tool when unit-safety, precision, and self-description are requirements rather than nice-to-haves.
 
 ---
 

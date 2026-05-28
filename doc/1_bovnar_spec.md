@@ -29,10 +29,11 @@
 
 ## 1. Overview
 
-**Bovnar** (BVNR) is a **typed, self-describing, text-binary hybrid** serialization format. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich type annotation system.
+**Bovnar** (BVNR) is **unit-safe serialization for scientific and industrial systems**: a **typed, self-describing, text-binary hybrid** format that carries a validated physical unit with every value. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich, unit-aware type annotation system.
 
 ### Design Goals
 
+- **Unit-safe** – every value may carry a physical unit that is validated against a built-in unit table; a unit that conflicts with the type annotation is a parse error (`error_unit_mismatch`)
 - **Self-describing** – values carry explicit type metadata (family, bit-width, base, measurement unit)
 - **Human-readable** for common cases (numbers, strings, symbols, nested structures)
 - **Binary-friendly** via octet stream escape for opaque payloads

@@ -192,7 +192,9 @@ typedef enum value_base_unit_e {
 	bu_scheffel,
 	bu_survey_foot, bu_league, bu_cable, bu_hand,
 	bu_quintal, bu_scruple, bu_baud,
-	bu_delisle, bu_newton_temp, bu_reaumur, bu_romer
+	bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
+	bu_percent, bu_per_mille, bu_per_myriad,
+	bu_per_cent_mille, bu_ppm, bu_ppb
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

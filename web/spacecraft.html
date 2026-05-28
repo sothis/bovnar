@@ -533,7 +533,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
       row('vel', '<float:64,m·s⁻¹> [' + f(st.vel[0],1) + ', ' + f(st.vel[1],1) + ', ' + f(st.vel[2],1) + ']'),
       row('alt', f(st.alt, 2) + ' k~m'),
       row('speed', f(st.speed, 1) + ' m·s⁻¹'),
-      row('batt_soc', f(sim.soc, 3)),
+      row('batt_soc', f(sim.soc * 432, 1) + ' W·h'),   // stored energy = soc × battery_capacity (432 W*h)
       row('batt_v', f(v, 2) + ' V'),
       row('temp_core', f(core, 1) + ' K'),
       row('temp_pan', f(sim.panelTemp, 1) + ' °C'),
@@ -1126,7 +1126,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     .cospar_id = "2026-042B";
     .norad_id  = <uint:32> 99001;
     .bus       = "ESPA-class smallsat";
-    .dry_mass  = 142.6 k~g;
+    .mass      = 142.6 k~g;
 };
 
 .orbit = {                          # circular orbit (a = R_earth + altitude)

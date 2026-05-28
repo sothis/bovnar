@@ -95,6 +95,7 @@ syn region  BovnarTypeAnn
 syn match   BovnarUnitTilde /\~/
 syn match   BovnarSymbol    '\<[A-Za-z_][A-Za-z0-9_+\-]*\>'
 syn match   BovnarTypeUnit  '\<[A-Za-zµΩ°][A-Za-z0-9_·\-\+\/\^]*\>'
+syn match   BovnarTypeUnit  '[%‰‱]'
 syn match   BovnarUnitPrefix '[A-Za-zµ][A-Za-z0-9]*\~[A-Za-z0-9_·\-\+\/*\^]*'
 syn match   BovnarUnitSep   '[*\/]'
 syn match   BovnarUnitExp   '[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]'

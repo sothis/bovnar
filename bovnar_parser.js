@@ -137,8 +137,8 @@
       if (hadWs && !eof()) {
         const c = cur();
         const code = c.charCodeAt(0);
-        /* Unit starts with a letter, °, µ, Ω, or a high byte */
-        if (/[A-Za-z_°µΩ]/.test(c) || code > 0x7F) {
+        /* Unit starts with a letter, %, °, µ, Ω, or a high byte */
+        if (/[A-Za-z_%°µΩ]/.test(c) || code > 0x7F) {
           let unit = '';
           while (!eof() && !/[ \t\r\n;,\[\]{}#]/.test(cur())) {
             unit += cur(); advance();

@@ -488,6 +488,9 @@ static const bu_entry_t bu_table[] = {
 	{"degreeRa",         8, bu_rankine},       {"degreeDe",        8, bu_delisle},
 	{"degreeRe",         8, bu_reaumur},       {"degreeRo",        8, bu_romer},
 	{"degreesN",         8, bu_newton_temp},
+	{"per_cent_mille",  14, bu_per_cent_mille},
+	{"per_myriad",      10, bu_per_myriad},     {"per_mille",       9, bu_per_mille},
+	{"percent",          7, bu_percent},
 	{"leagues",          7, bu_league},        {"quintal",         7, bu_quintal},
 	{"scruple",          7, bu_scruple},
 	{"bushels",          7, bu_bushel},        {"deniers",         7, bu_denier},
@@ -609,6 +612,9 @@ static const bu_entry_t bu_table[] = {
 	{"fath",             4, bu_fathom},        {"ergs",            4, bu_erg},
 	{"vars",             4, bu_var},           {"dram",            4, bu_dram},
 	{"peck",             4, bu_peck},          {"turn",            4, bu_revolution},
+	{"pcm",              3, bu_per_cent_mille},{"ppm",             3, bu_ppm},
+	{"ppb",              3, bu_ppb},
+	{"\xe2\x80\xb0",     3, bu_per_mille},     {"\xe2\x80\xb1",    3, bu_per_myriad},
 	{"lea",              3, bu_league},        {"cbl",             3, bu_cable},
 	{"dwt",              3, bu_pennyweight},   {"rpm",             3, bu_rpm},
 	{"kgf",              3, bu_kilogram_force},{"var",             3, bu_var},
@@ -677,6 +683,7 @@ static const bu_entry_t bu_table[] = {
 	{"dz",               2, bu_doppelzentner},
 	{"\xc3\x85",         2, bu_angstrom},
 	{"\xc2\xb0",         2, bu_degree},
+	{"%",                1, bu_percent},
 	{"G",                1, bu_gauss},         {"P",               1, bu_poise},
 	{"R",                1, bu_roentgen},
 	{"B",                1, bu_byte},          {"C",               1, bu_coulomb},
@@ -1173,6 +1180,12 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_newton_temp:       return "\xc2\xb0""N";
 	case bu_reaumur:           return "\xc2\xb0""Re";
 	case bu_romer:             return "\xc2\xb0""Ro";
+	case bu_percent:           return "%";
+	case bu_per_mille:         return "\xe2\x80\xb0";
+	case bu_per_myriad:        return "\xe2\x80\xb1";
+	case bu_per_cent_mille:    return "pcm";
+	case bu_ppm:               return "ppm";
+	case bu_ppb:               return "ppb";
 	case bu_slug:              return "slug";
 	case bu_thou:              return "thou";
 	case bu_pint_uk:           return "pt_uk";

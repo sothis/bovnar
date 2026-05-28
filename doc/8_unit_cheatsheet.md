@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 0.x · 157 physical units · 164 fiat currencies · 50 cryptocurrencies
+> Spec version 0.x · 163 physical units · 164 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -35,6 +35,7 @@
    - 4.23 [Textile Linear Density](#423-textile-linear-density)
    - 4.24 [Old German Units](#424-old-german-units)
    - 4.25 [Additional Physical Units](#425-additional-physical-units-361367)
+   - 4.26 [Ratio and Proportion](#426-ratio-and-proportion-372377)
 5. [Currencies](#5-currencies)
    - 5.1 [Namespace Rule](#51-namespace-rule)
    - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
@@ -467,6 +468,19 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 
 SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.
 
+### 4.26 Ratio and Proportion
+
+Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These do **not** accept SI or IEC prefixes.
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `%`   | `percent` | per cent | `bu_percent` | 10⁻² |
+| `‰`   | `per_mille` | per mille | `bu_per_mille` | 10⁻³ |
+| `‱`   | `per_myriad` | per myriad | `bu_per_myriad` | 10⁻⁴ |
+| `pcm` | `per_cent_mille` | per cent mille | `bu_per_cent_mille` | 10⁻⁵ |
+| `ppm` | — | parts per million | `bu_ppm` | 10⁻⁶ |
+| `ppb` | — | parts per billion | `bu_ppb` | 10⁻⁹ |
+
 ---
 
 ## 5. Currencies
@@ -745,5 +759,5 @@ No token is simultaneously a valid physical unit symbol and a valid currency cod
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, and 368–371 (157 total) · Fiat: 134–297 (164) · Crypto: 298–347 (50)*
-*`BVN_VALUE_BASE_UNIT_COUNT` = 372 (`bu_romer + 1`)*
+*Physical unit enum range: 1–133, 348–367, 368–371, and 372–377 (163 total) · Fiat: 134–297 (164) · Crypto: 298–347 (50)*
+*`BVN_VALUE_BASE_UNIT_COUNT` = 378 (`bu_ppb + 1`)*

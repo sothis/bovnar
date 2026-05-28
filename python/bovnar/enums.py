@@ -472,7 +472,23 @@ class BaseUnit(IntEnum):
     SCRUPLE            = 366
     BAUD               = 367
 
-    _SENTINEL = 368
+    # Temperature scales (368-371)
+
+    DELISLE            = 368
+    NEWTON_TEMP        = 369
+    REAUMUR            = 370
+    ROMER              = 371
+
+    # Ratio and proportion units (372-377)
+
+    PERCENT            = 372
+    PER_MILLE          = 373
+    PER_MYRIAD         = 374
+    PER_CENT_MILLE     = 375
+    PPM                = 376
+    PPB                = 377
+
+    _SENTINEL = 378
 
 
 # Currency-range sentinels (mirrors C #defines)

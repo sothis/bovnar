@@ -147,7 +147,7 @@ class TestBaseUnit:
 
     def test_count(self):
 
-        assert len(BaseUnit) == 369
+        assert len(BaseUnit) == 379
 
 class TestExponent:
     def test_positive_exponents(self):

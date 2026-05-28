@@ -83,7 +83,7 @@ class TestEnumContiguity:
         assert int(CURRENCY_CRYPTO_LAST) == 347
 
     def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 368
+        assert int(BaseUnit._SENTINEL) == 378
 
     def test_fiat_range_size(self):
         assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 164
@@ -529,11 +529,11 @@ class TestPhysicalUnitCollisions:
 
 
 class TestBaseUnitSentinel:
-    def test_sentinel_is_368(self):
-        assert int(BaseUnit._SENTINEL) == 368
+    def test_sentinel_is_378(self):
+        assert int(BaseUnit._SENTINEL) == 378
 
-    def test_sentinel_is_one_past_baud(self):
-        assert int(BaseUnit._SENTINEL) == int(BaseUnit.BAUD) + 1
+    def test_sentinel_is_one_past_last_unit(self):
+        assert int(BaseUnit._SENTINEL) == int(BaseUnit.PPB) + 1
 
 
 # ── TestPrefixRulesC ───────────────────────────────────────────────────────

@@ -227,6 +227,12 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_newton_temp]        = { bu_newton_temp,        100.0/33.0,              {0, 0, 0, 0, 1, 0, 0}, true,  273.15           },
 	[bu_reaumur]            = { bu_reaumur,            5.0/4.0,                 {0, 0, 0, 0, 1, 0, 0}, true,  273.15           },
 	[bu_romer]              = { bu_romer,              40.0/21.0,               {0, 0, 0, 0, 1, 0, 0}, true,  273.15-100.0/7.0 },
+	[bu_percent]            = { bu_percent,            1e-2,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_per_mille]          = { bu_per_mille,          1e-3,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_per_myriad]         = { bu_per_myriad,         1e-4,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_per_cent_mille]     = { bu_per_cent_mille,     1e-5,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_ppm]                = { bu_ppm,                1e-6,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_ppb]                = { bu_ppb,                1e-9,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))
@@ -515,7 +521,9 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 	bool is_info = (base == bu_bit || base == bu_byte);
 	bool is_german = ((uint32_t)base >= (uint32_t)bu_pfund &&
 	                  (uint32_t)base <= (uint32_t)bu_scheffel);
-	if (is_german) {
+	bool is_ratio = ((uint32_t)base >= (uint32_t)bu_percent &&
+	                 (uint32_t)base <= (uint32_t)bu_ppb);
+	if (is_german || is_ratio) {
 		if (prefix.system == prefix_iec)
 			return prefix.id.iec == iec_none;
 		return prefix.id.si == si_none;

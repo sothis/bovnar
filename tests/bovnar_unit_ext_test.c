@@ -542,7 +542,13 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_newton_temp        == 369, "bu_newton_temp == 369");
 	ASSERT_TRUE((int)bu_reaumur            == 370, "bu_reaumur == 370");
 	ASSERT_TRUE((int)bu_romer              == 371, "bu_romer == 371");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 372, "sentinel == 372");
+	ASSERT_TRUE((int)bu_percent            == 372, "bu_percent == 372");
+	ASSERT_TRUE((int)bu_per_mille          == 373, "bu_per_mille == 373");
+	ASSERT_TRUE((int)bu_per_myriad         == 374, "bu_per_myriad == 374");
+	ASSERT_TRUE((int)bu_per_cent_mille     == 375, "bu_per_cent_mille == 375");
+	ASSERT_TRUE((int)bu_ppm                == 376, "bu_ppm == 376");
+	ASSERT_TRUE((int)bu_ppb                == 377, "bu_ppb == 377");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 378, "sentinel == 378");
 }
 
 static void test_nonsi_si_factors(void)
@@ -668,6 +674,12 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_quintal,       100.0,                       1e-13);
 	CHK(bu_scruple,       1.2959782e-3,                1e-18);
 	CHK(bu_baud,          1.0,                         1e-15);
+	CHK(bu_percent,       1e-2,                        1e-17);
+	CHK(bu_per_mille,     1e-3,                        1e-18);
+	CHK(bu_per_myriad,    1e-4,                        1e-19);
+	CHK(bu_per_cent_mille, 1e-5,                       1e-20);
+	CHK(bu_ppm,           1e-6,                         1e-21);
+	CHK(bu_ppb,           1e-9,                         1e-24);
 #undef CHK
 #undef M_PI_LOCAL
 
@@ -943,6 +955,19 @@ static void test_nonsi_dim_vectors(void)
 	ASSERT_EQ_INT(d[4], 1, "Ro K=1");
 	ASSERT_EQ_INT(d[0], 0, "Ro m=0"); ASSERT_EQ_INT(d[1], 0, "Ro kg=0");
 
+	DIM_OK(bu_percent);
+	for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "% dim[i]=0");
+	DIM_OK(bu_per_mille);
+	for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "permille dim[i]=0");
+	DIM_OK(bu_per_myriad);
+	for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "permyriad dim[i]=0");
+	DIM_OK(bu_per_cent_mille);
+	for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "pcm dim[i]=0");
+	DIM_OK(bu_ppm);
+	for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "ppm dim[i]=0");
+	DIM_OK(bu_ppb);
+	for (int i = 0; i < 7; i++) ASSERT_EQ_INT(d[i], 0, "ppb dim[i]=0");
+
 #undef DIM_OK
 }
 
@@ -1050,6 +1075,12 @@ static void test_nonsi_parse_canonical(void)
 		{ "\xc2\xb0""N",  bu_newton_temp         },
 		{ "\xc2\xb0""Re", bu_reaumur             },
 		{ "\xc2\xb0""Ro", bu_romer               },
+		{ "%",           bu_percent              },
+		{ "\xe2\x80\xb0", bu_per_mille           },
+		{ "\xe2\x80\xb1", bu_per_myriad          },
+		{ "pcm",         bu_per_cent_mille       },
+		{ "ppm",         bu_ppm                  },
+		{ "ppb",         bu_ppb                  },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1248,6 +1279,10 @@ static void test_nonsi_parse_aliases(void)
 		{ "romer",                 bu_romer                },
 		{ "degRo",                 bu_romer                },
 		{ "degreeRo",              bu_romer                },
+		{ "percent",               bu_percent              },
+		{ "per_mille",             bu_per_mille            },
+		{ "per_myriad",            bu_per_myriad           },
+		{ "per_cent_mille",        bu_per_cent_mille       },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {
@@ -1294,6 +1329,8 @@ static void test_nonsi_roundtrip(void)
 		bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss, bu_prussian_elle,
 		bu_prussian_rute, bu_klafter, bu_german_mile, bu_morgen, bu_scheffel,
 		bu_rankine, bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
+		bu_percent, bu_per_mille, bu_per_myriad,
+		bu_per_cent_mille, bu_ppm, bu_ppb,
 	};
 	size_t n = sizeof(units) / sizeof(units[0]);
 	for (size_t i = 0; i < n; i++) {

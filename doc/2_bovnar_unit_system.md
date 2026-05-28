@@ -34,7 +34,8 @@
    - 3.22 [Additional Mass Units](#322-additional-mass-units)
    - 3.23 [Acceleration](#323-acceleration)
    - 3.24 [Signal Rate](#324-signal-rate)
-   - 3.25 [Sentinel Value](#325-sentinel-value)
+   - 3.25 [Ratio and Proportion Units](#325-ratio-and-proportion-units)
+   - 3.26 [Sentinel Value](#326-sentinel-value)
 4. [Prefixes](#4-prefixes)
    - 4.1 [SI Prefixes](#41-si-prefixes)
    - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
@@ -515,7 +516,24 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|-------|
 | `Bd`   | `baud`, `bauds` | baud | `bu_baud` | 1 symbol/s = 1 s⁻¹ (ITU-T V.662) |
 
-### 3.25 Sentinel Value
+### 3.25 Ratio and Proportion Units
+
+Dimensionless scaling factors. A value carrying one of these units reduces to the
+numeric value multiplied by the factor in the canonical (dimensionless) base
+representation — e.g. `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. Like the other
+dimensionless ratios they carry an empty dimension vector, but unlike `rad`/`sr`
+they do **not** accept SI or IEC prefixes (a prefixed `%` is meaningless).
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `%`   | `percent` | per cent | `bu_percent` | 10⁻² |
+| `‰`   | `per_mille` | per mille | `bu_per_mille` | 10⁻³ |
+| `‱`   | `per_myriad` | per myriad | `bu_per_myriad` | 10⁻⁴ |
+| `pcm` | `per_cent_mille` | per cent mille | `bu_per_cent_mille` | 10⁻⁵ |
+| `ppm` | — | parts per million | `bu_ppm` | 10⁻⁶ |
+| `ppb` | — | parts per billion | `bu_ppb` | 10⁻⁹ |
+
+### 3.26 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
 

@@ -102,7 +102,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 {
 	bvnr_validator_t* v = &r->val;
 	value_type_spec_t default_type;
-	static const value_unit_t default_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	const value_unit_t default_unit = BVN_UNIT_NO_PREFIX(bu_none);
 	const char*       family_name;
 	uint32_t          family_name_len;
 	bool              emit_width = false;

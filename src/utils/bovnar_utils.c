@@ -192,6 +192,29 @@ static bool bvn_digits_to_dec(const char* src, uint32_t base,
 	free(dec);
 	return true;
 }
+/* Number of decimal digits in 2^w (which equals the digit count of
+ * 2^w - 1 for every w >= 1, since 2^w is never a power of ten). */
+static uint32_t bvn_dec_digits_2pow(uint32_t w)
+{
+	if (w == 0u) return 1u;
+	return (uint32_t)((double)w * 0.30102999566398119521) + 1u;
+}
+/* Cheap magnitude pre-filter for a decimal string `d` against a bound
+ * whose decimal length is `max_digits`.  Returns 1 (fewer digits =>
+ * strictly below the bound), 0 (more digits => strictly above), or -1
+ * (within +/-1 digit => caller must do the exact comparison).  The
+ * +/-1 slack absorbs any rounding in max_digits and the unit gap
+ * between 2^w and 2^w - 1, so the exact path still decides every
+ * borderline value.  This keeps wide-integer range checks O(len)
+ * instead of recomputing the O(w^2) decimal bound for every value. */
+static int bvn_dec_digit_prefilter(const char* d, uint32_t max_digits)
+{
+	while (d[0] == '0' && d[1]) d++;
+	size_t n = strlen(d);
+	if (n + 1u < (size_t)max_digits)     return 1;
+	if (n > (size_t)max_digits + 1u)     return 0;
+	return -1;
+}
 bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
@@ -223,7 +246,10 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 		}
 		return v <= maxv;
 	}
+	uint32_t max_digits = bvn_dec_digits_2pow(w);
 	if (base == 10) {
+		int pf = bvn_dec_digit_prefilter(p, max_digits);
+		if (pf >= 0) return pf != 0;
 		char *maxs = malloc(BVN_DEC_SCRATCH_SIZE);
 		if (!maxs) return false;
 		int r = bvn_pow2m1_dec(w, maxs, BVN_DEC_SCRATCH_SIZE);
@@ -232,14 +258,18 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 		return ok;
 	}
 	{
-		char *dec  = malloc(BVN_DEC_SCRATCH_SIZE);
-		char *maxs = malloc(BVN_DEC_SCRATCH_SIZE);
-		if (!dec || !maxs) { free(dec); free(maxs); return false; }
-		bool ok = false;
-		if (bvn_digits_to_dec(p, base, dec, BVN_DEC_SCRATCH_SIZE)) {
-			int r = bvn_pow2m1_dec(w, maxs, BVN_DEC_SCRATCH_SIZE);
-			ok = (r >= 0) && (bvn_cmp_dec(dec, maxs) <= 0);
+		char *dec = malloc(BVN_DEC_SCRATCH_SIZE);
+		if (!dec) return false;
+		if (!bvn_digits_to_dec(p, base, dec, BVN_DEC_SCRATCH_SIZE)) {
+			free(dec);
+			return false;
 		}
+		int pf = bvn_dec_digit_prefilter(dec, max_digits);
+		if (pf >= 0) { free(dec); return pf != 0; }
+		char *maxs = malloc(BVN_DEC_SCRATCH_SIZE);
+		if (!maxs) { free(dec); return false; }
+		int r = bvn_pow2m1_dec(w, maxs, BVN_DEC_SCRATCH_SIZE);
+		bool ok = (r >= 0) && (bvn_cmp_dec(dec, maxs) <= 0);
 		free(dec);
 		free(maxs);
 		return ok;
@@ -299,7 +329,10 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 			: ((w >= 64) ? (uint64_t)INT64_MAX : (1ULL << (w - 1)) - 1ULL);
 		return v <= mag;
 	}
+	uint32_t max_digits = bvn_dec_digits_2pow(w - 1);
 	if (base == 10) {
+		int pf = bvn_dec_digit_prefilter(abs, max_digits);
+		if (pf >= 0) return pf != 0;
 		char *maxs = malloc(BVN_DEC_SCRATCH_SIZE);
 		if (!maxs) return false;
 		int r = bvn_pow2m1_dec(w - 1, maxs, BVN_DEC_SCRATCH_SIZE);
@@ -326,6 +359,10 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 		bool ok = false;
 		if (!bvn_digits_to_dec(abs, base, dec, BVN_DEC_SCRATCH_SIZE))
 			goto sint_bigint_done;
+		{
+			int pf = bvn_dec_digit_prefilter(dec, max_digits);
+			if (pf >= 0) { ok = (pf != 0); goto sint_bigint_done; }
+		}
 		int r = bvn_pow2m1_dec(w - 1, maxs, BVN_DEC_SCRATCH_SIZE);
 		if (r < 0)
 			goto sint_bigint_done;

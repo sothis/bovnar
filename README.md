@@ -24,6 +24,8 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
 };
 .acceleration = 70.5 k~m·s⁻²;
 .velocity     = <float:64,m/s> 9.81;
+.price        = <float_dec:64,USD> 19.99;
+.btc_balance  = <uint:64,BTC> 547820000;   # satoshis
 .payload      = \x00 … binary stream … \x00;
 .matrix       = [1, 2, 3]/[4, 5, 6];
 ```
@@ -34,6 +36,7 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
 
 - **Strong, optional typing** — `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8` with explicit bit-width (`8`, `16`, `32`, `64`, …) and numeric base (`_2`, `_16`, `_36`, `_85`, …).
 - **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k~g·m/s²`, and `Gi~B` are written inline; no external schema is needed.
+- **Currency units** — 164 ISO 4217 fiat currencies and 50 cryptocurrencies are first-class units (`<float_dec:64,USD> 19.99`, `<uint:64,BTC> 547820000`), each carrying minor-unit metadata and prefix-validity rules.
 - **Inline unit suffix** — `9.81 m/s` is valid without a full type annotation.
 - **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead.
 - **Multi-dimensional arrays** — Rows separated by `/`; `[1,2,3]/[4,5,6]` is a native 2D structure.
@@ -41,8 +44,10 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
 - **Streaming SAX-style reader** — Incremental parsing from memory, a file descriptor, or a socket via a symmetric `on_unverified` / `on_verified` callback pair.
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
-- **Syntax highlighting** — Ready-made grammars for VS Code and Geany.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, fuzz harnesses (reader, writer, DOM, utils), and a benchmark binary.
+- **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
+- **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) emits the same event stream as the C reference and powers an interactive single-file web playground.
+- **Syntax highlighting** — Ready-made grammars for VS Code, Geany, and Vim.
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 156-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -89,36 +94,42 @@ If you only need simple key-value interchange, JSON remains the pragmatic choice
 
 ```
 bovnar/
-├── include/             # Public C headers
-│   ├── bovnar.h         # Primary API: reader, writer, events, types
-│   ├── bovnar_dom.h     # DOM (tree) API
-│   ├── bovnar_si_units.h
+├── include/                 # Public C headers
+│   ├── bovnar.h             # Primary API: reader, writer, events, types
+│   ├── bovnar_dom.h         # DOM (tree) API
+│   ├── bovnar_si_units.h    # SI / IEC unit API
+│   ├── bovnar_currency.h    # Fiat + crypto currency API
 │   ├── bvn_float.h
 │   └── bvn_int.h
 ├── src/
-│   ├── bovnar.c         # CLI entry point
-│   ├── lexer/           # Tokeniser + state table
-│   ├── validator/       # Semantic validation layer
-│   ├── writer/          # Serialiser
-│   ├── io/              # FD / memory source & sink
-│   ├── dom/             # DOM builder and traversal
-│   └── utils/           # SI units, integer, float utilities
-├── tests/               # C unit, integration, fuzz, and benchmark tests
+│   ├── bovnar.c             # CLI entry point
+│   ├── lexer/               # Tokeniser + state table
+│   ├── validator/           # Semantic validation layer
+│   ├── writer/              # Serialiser + canonicalising observer
+│   ├── io/                  # FD / memory source & sink
+│   ├── dom/                 # DOM builder and traversal
+│   └── utils/               # SI units, currency, integer, float utilities
+├── tests/                   # C unit, integration, conformance, and fuzz tests
 ├── python/
-│   └── bovnar/          # Pure-ctypes Python bindings
-│       ├── __init__.py  # loads / dumps / Reader / Writer
+│   └── bovnar/              # Pure-ctypes Python bindings
+│       ├── __init__.py      # loads / dumps / dom_parse / Reader / Writer
 │       ├── reader.py
 │       ├── writer.py
 │       ├── dom.py
 │       ├── units.py
+│       ├── currency.py
+│       ├── quantity.py
 │       ├── structs.py
 │       ├── enums.py
 │       ├── exceptions.py
 │       └── _ffi.py
-├── examples/            # Annotated .bvnr example files
+├── examples/                # Annotated .bvnr example files
 ├── highlighter/
-│   ├── vscode/          # VS Code TextMate grammar
-│   └── geany/           # Geany filetype definition
+│   ├── vscode/              # VS Code TextMate grammar
+│   ├── geany/               # Geany filetype definition
+│   └── vim/                 # Vim syntax + filetype plugin
+├── web/                     # Single-file browser playground (index.html)
+├── bovnar_parser.js         # Dependency-free JavaScript parser
 ├── doc/
 │   ├── 0_bovnar_tutorial.md
 │   ├── 1_bovnar_spec.md            # Format specification v1.0
@@ -127,7 +138,8 @@ bovnar/
 │   ├── 4_bovnar_python_bindings.md
 │   ├── 5_bovnar.ebnf               # Formal EBNF grammar
 │   ├── 6_bovnar_faq.md             # Frequently asked questions
-│   └── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
+│   ├── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
+│   └── 8_unit_cheatsheet.md        # Units & currencies quick reference
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
 ```
@@ -141,7 +153,7 @@ bovnar/
 - CMake ≥ 3.21
 - A C99-conforming compiler (GCC or Clang recommended)
 - `libm` (math library, standard on all POSIX systems)
-- `libgmp` — optional; enables the arbitrary-precision integer cross-check test binary (`bvnr_int_test`). If absent, that single test is automatically skipped and the rest of the build proceeds normally.
+- `libgmp` — optional; enables the arbitrary-precision integer cross-check sections of `bvnr_int_test`. If absent, that test still builds and runs — only the GMP comparison sections are skipped.
 
 ### Build the library and CLI tool
 
@@ -158,17 +170,52 @@ This produces:
 | Shared library | `build/libbvnr_shared.so` |
 | CLI binary | `build/bovnar` |
 
-Build types: `Debug` (`-O0 -g3`), `Release` (`-O2`), `MinSizeRel` (`-Os`), `RelWithDebInfo` (`-O3 -g3`).
+Build types: `Debug` (`-O0 -g3`), `Release` (`-O3 -flto`), `MinSizeRel` (`-Os`), `RelWithDebInfo` (`-O3 -g3 -flto`). `Release` and `RelWithDebInfo` enable link-time optimisation.
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release .
 cmake --build build
 ```
 
+### Build options
+
+| Option | Default | Effect |
+|---|---|---|
+| `BVNR_HARDEN` | `ON` | Stack protector (CLI), `_FORTIFY_SOURCE=2`, and `-Wformat` security checks. |
+| `BVNR_WERROR` | `OFF` | Promote all warnings to errors (for CI). |
+| `BVNR_FUZZ_TEST` | `ON` | Build the self-contained fuzz harnesses and register them as CTest tests. |
+| `BVNR_FUZZ_EXTERNAL` | `OFF` | Build libFuzzer / AFL++ targets (requires clang or afl-clang-fast). |
+
+```bash
+cmake -B build -DBVNR_WERROR=ON .
+```
+
 ### Link against the library
 
 ```bash
 gcc my_app.c -I include -L build -lbvnr_static -lm -o my_app
+```
+
+---
+
+## Command-Line Tool
+
+The `bovnar` binary built above wraps the library for everyday use:
+
+| Command | Description |
+|---|---|
+| `bovnar validate <file>` | Validate a `.bvnr` file; exit non-zero on the first error. |
+| `bovnar query <path> <file>` | Print a single value by dotted path, e.g. `.sensor.temperature`. |
+| `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
+| `bovnar convert --from <fmt> --to <fmt> <file>` | Convert between `json` and `bvnr` (either direction). |
+| `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. |
+| `bovnar bench [options]` | Benchmark parsing throughput across profiles and payload sizes; `--json` for machine-readable output. |
+
+```bash
+bovnar validate examples/units.bvnr
+bovnar query .system.host config.bvnr
+bovnar convert --from json --to bvnr data.json
+cat data.bvnr | bovnar events -
 ```
 
 ---
@@ -189,7 +236,7 @@ Or use the convenience wrapper at the repository root:
 
 ### Test suite
 
-| Binary | Coverage |
+| Binary / test | Coverage |
 |---|---|
 | `bvnr_reader_test` | Core reader, all token types |
 | `bvnr_extended_reader_test` | Edge cases, resync, error recovery |
@@ -198,23 +245,29 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_dom_test` | DOM builder and traversal |
 | `bvnr_si_test` | SI/IEC unit parsing and formatting |
 | `bvnr_unit_ext_test` | Extended unit symbols, long-name aliases, prefix enforcement |
+| `bvnr_currency_test` | Fiat and crypto currency lookup, minor units, prefix rules |
 | `bvnr_utils_test` | Utility functions |
-| `bvnr_int_test` | Arbitrary-precision integer (optional; requires libgmp — auto-skipped if absent) |
+| `bvnr_int_test` | Arbitrary-precision integer arithmetic (GMP cross-check sections skipped when libgmp is absent) |
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_high_severity_test` | Robustness under malformed input |
+| `bvnr_conformance` | 156-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
+CTest additionally runs every file in `examples/` through `bovnar events` and `bovnar validate` as smoke tests. Label filters narrow the run, e.g. `ctest -L unit`, `ctest -L conformance`, `ctest -L fuzz_deep`, or `ctest -L cli`.
+
 ### Python tests
 
+Python binding tests are registered automatically when a Python 3 interpreter is found at configure time — no extra flag is required:
+
 ```bash
-cmake -B build -DBVNR_BUILD_PYTHON_TESTS=ON .
+cmake -B build .
 cmake --build build
 cd build && ctest -L python --output-on-failure
 ```
 
-Or directly:
+Pure-Python tests (`ctest -L python_pure`) run without the shared library; integration tests (`ctest -L python_integration`) need `libbvnr_shared.so`, whose path CTest injects automatically. To run pytest directly instead:
 
 ```bash
 export LIBBOVNAR_PATH=$(pwd)/build/libbvnr_shared.so
@@ -337,6 +390,8 @@ Reader().read_mem(b".velocity = <float:64,m/s> 9.81;", on_verified=on_event)
 # → 9.81  m/s
 ```
 
+Beyond `loads`/`dumps`, the package provides `dom_parse()` for random-access tree traversal, `loads(..., typed=True)` to preserve each value's exact type and unit as `Quantity` objects for lossless round-trips, and a `currency` module mirroring the C currency API.
+
 See [doc/4_bovnar_python_bindings.md](doc/4_bovnar_python_bindings.md) for the full API.
 
 ---
@@ -355,11 +410,29 @@ cd highlighter/vscode && ./install.sh
 cd highlighter/geany && ./install.sh
 ```
 
+### Vim
+
+```bash
+cd highlighter/vim && ./install.sh
+```
+
+---
+
+## Web Playground
+
+A dependency-free JavaScript parser (`bovnar_parser.js`) reimplements the reference event stream in the browser and drives an interactive single-file playground under `web/`. Serve the repository root and open it — no build step required:
+
+```bash
+./httpd.sh          # python3 -m http.server
+# then open http://localhost:8000/
+```
+
 ---
 
 ## Use Cases
 
 - **Scientific and measurement data** — numbers with explicit physical units travel with the payload.
+- **Financial and crypto data** — monetary amounts carry their ISO 4217 or cryptocurrency unit and minor-unit precision inline, removing ambiguity between currencies and scales.
 - **Embedded systems / IoT** — the streaming parser has a small, allocation-friendly footprint; no heap required for the lexer itself.
 - **Hardware and software configuration** — typed values eliminate range ambiguity (e.g., `<uint:16>` for a port number).
 - **Mixed text + binary payloads** — log entries with attached raw memory dumps, firmware images, or sensor frames.
@@ -380,6 +453,7 @@ cd highlighter/geany && ./install.sh
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
 | [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (156 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 
 ---
 

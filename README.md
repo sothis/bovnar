@@ -46,7 +46,7 @@ Bovnar bridges the gap between human-readable formats and machine-precise semant
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) emits the same event stream as the C reference and powers an interactive single-file web playground.
-- **Syntax highlighting** — Ready-made grammars for VS Code, Geany, and Vim.
+- **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, and Vim, all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
 - **Extensively tested** — Unit tests, socket-pair round-trip tests, a 156-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
@@ -125,7 +125,8 @@ bovnar/
 │       └── _ffi.py
 ├── examples/                # Annotated .bvnr example files
 ├── highlighter/
-│   ├── vscode/              # VS Code TextMate grammar
+│   ├── vscode/              # VS Code TextMate grammar + theme
+│   ├── sublime/             # Sublime Text syntax + colour scheme
 │   ├── geany/               # Geany filetype definition
 │   └── vim/                 # Vim syntax + filetype plugin
 ├── web/                     # Single-file browser playground (index.html)
@@ -403,6 +404,14 @@ See [doc/4_bovnar_python_bindings.md](doc/4_bovnar_python_bindings.md) for the f
 ```bash
 cd highlighter/vscode && ./install.sh
 ```
+
+### Sublime Text
+
+```bash
+cd highlighter/sublime && ./install.sh
+```
+
+Then choose **Preferences → Select Color Scheme… → Bovnar Cyberpunk**.
 
 ### Geany
 

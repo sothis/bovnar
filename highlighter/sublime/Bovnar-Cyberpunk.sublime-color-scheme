@@ -1,0 +1,267 @@
+{
+  // Bovnar Cyberpunk — Sublime Text port of the VS Code "Bovnar Cyberpunk"
+  // theme. Globals and per-scope colours match the VS Code / Vim highlighters
+  // so .bvnr files look identical across all three editors.
+  "name": "Bovnar Cyberpunk",
+  "author": "Janos Sonntag",
+  "globals": {
+    "background": "#1a1b2e",
+    "foreground": "#f8f8f2",
+    "caret": "#ff79c6",
+    "line_highlight": "#2d2f4f40",
+    "selection": "#44475a80",
+    "selection_border": "#6272a4",
+    "inactive_selection": "#44475a40",
+    "gutter": "#1a1b2e",
+    "gutter_foreground": "#4a4e69",
+    "gutter_foreground_highlight": "#f8f8f2",
+    "invisibles": "#3d3f4e",
+    "guide": "#3d3f4e",
+    "active_guide": "#6272a4",
+    "accent": "#ff79c6"
+  },
+  "rules": [
+
+    // ── General-purpose rules (all languages) ───────────────────────────────
+    {
+      "name": "General – Comments",
+      "scope": "comment, punctuation.definition.comment",
+      "foreground": "#6272a4",
+      "font_style": "italic"
+    },
+    {
+      "name": "General – Keywords and Control Flow",
+      "scope": "keyword, keyword.control, keyword.control.flow, keyword.other, keyword.declaration",
+      "foreground": "#ff79c6"
+    },
+    {
+      "name": "General – Storage (type / modifier)",
+      "scope": "storage, storage.type, storage.modifier",
+      "foreground": "#ff79c6"
+    },
+    {
+      "name": "General – Strings",
+      "scope": "string, string.quoted, string.quoted.single, string.quoted.double, string.quoted.triple, string.template, string.regexp, punctuation.definition.string.begin, punctuation.definition.string.end",
+      "foreground": "#f1fa8c"
+    },
+    {
+      "name": "General – Numbers",
+      "scope": "constant.numeric",
+      "foreground": "#bd93f9"
+    },
+    {
+      "name": "General – Constants and Language Keywords",
+      "scope": "constant, constant.language, constant.other",
+      "foreground": "#bd93f9"
+    },
+    {
+      "name": "General – Function / Method Names",
+      "scope": "entity.name.function, entity.name.method, support.function, support.function.builtin, meta.function-call entity.name.function",
+      "foreground": "#50fa7b"
+    },
+    {
+      "name": "General – Class / Type Names",
+      "scope": "entity.name.type, entity.name.class, entity.name.namespace, entity.name.struct, entity.name.enum, entity.name.union, support.class, support.type",
+      "foreground": "#8be9fd"
+    },
+    {
+      "name": "General – Variables and Parameters",
+      "scope": "variable, variable.other, variable.other.readwrite, variable.parameter, variable.other.object, variable.other.property",
+      "foreground": "#f8f8f2"
+    },
+    {
+      "name": "General – Operators",
+      "scope": "keyword.operator",
+      "foreground": "#ff79c6"
+    },
+    {
+      "name": "General – Preprocessor / Import / Include",
+      "scope": "meta.preprocessor, keyword.control.directive, keyword.control.import, keyword.import, keyword.other.import, entity.name.function.preprocessor, meta.preprocessor.macro",
+      "foreground": "#ffb86c"
+    },
+    {
+      "name": "General – Escape Sequences",
+      "scope": "constant.character.escape",
+      "foreground": "#ff79c6"
+    },
+    {
+      "name": "General – Markup / HTML Tags",
+      "scope": "entity.name.tag",
+      "foreground": "#ff79c6"
+    },
+    {
+      "name": "General – HTML / XML Attributes",
+      "scope": "entity.other.attribute-name",
+      "foreground": "#50fa7b"
+    },
+    {
+      "name": "General – Decorators / Annotations",
+      "scope": "entity.name.function.decorator, meta.decorator entity.name.function, punctuation.definition.annotation",
+      "foreground": "#ffb86c",
+      "font_style": "italic"
+    },
+    {
+      "name": "General – Invalid / Error",
+      "scope": "invalid, invalid.illegal",
+      "foreground": "#ff5555",
+      "font_style": "underline"
+    },
+    {
+      "name": "General – Deprecated",
+      "scope": "invalid.deprecated",
+      "foreground": "#ffb86c"
+    },
+    {
+      "name": "General – Punctuation",
+      "scope": "punctuation.separator, punctuation.terminator, punctuation.accessor, punctuation.definition.parameters",
+      "foreground": "#f8f8f2"
+    },
+
+    // ── Bovnar-specific rules (override the general rules above) ─────────────
+    {
+      "name": "Bovnar Comment",
+      "scope": "comment.line.number-sign.bovnar",
+      "foreground": "#6e7a86"
+    },
+    {
+      "name": "Bovnar Key Sigil",
+      "scope": "punctuation.separator.key-sigil.bovnar",
+      "foreground": "#c084fc"
+    },
+    {
+      "name": "Bovnar Key Name",
+      "scope": "entity.name.key.bovnar",
+      "foreground": "#67d1f4"
+    },
+    {
+      "name": "Bovnar Semicolon",
+      "scope": "punctuation.terminator.semicolon.bovnar",
+      "foreground": "#5a6270"
+    },
+    {
+      "name": "Bovnar Assignment Operator",
+      "scope": "keyword.operator.assignment.bovnar",
+      "foreground": "#f47067"
+    },
+    {
+      "name": "Bovnar Type Keywords",
+      "scope": "storage.type.family.bovnar",
+      "foreground": "#e8e8e8",
+      "font_style": "bold"
+    },
+    {
+      "name": "Bovnar no_unit Keyword",
+      "scope": "support.constant.no-unit.bovnar",
+      "foreground": "#87d88c"
+    },
+    {
+      "name": "Bovnar Type Q~Param",
+      "scope": "constant.numeric.q~param.bovnar",
+      "foreground": "#da844c"
+    },
+    {
+      "name": "Bovnar Type Bit Width",
+      "scope": "constant.numeric.width-param.bovnar",
+      "foreground": "#ff5faf"
+    },
+    {
+      "name": "Bovnar Type Base",
+      "scope": "constant.numeric.base-param.bovnar",
+      "foreground": "#afffd7"
+    },
+    {
+      "name": "Bovnar Type Separators",
+      "scope": "punctuation.separator.colon.bovnar, punctuation.separator.comma.bovnar",
+      "foreground": "#6e7a86"
+    },
+    {
+      "name": "Bovnar Unit Expression (type annotation)",
+      "scope": "support.type.unit.bovnar",
+      "foreground": "#5eead4"
+    },
+    {
+      "name": "Bovnar Type Annotation Brackets",
+      "scope": "punctuation.definition.type.begin.bovnar, punctuation.definition.type.end.bovnar",
+      "foreground": "#a09040"
+    },
+
+    { "name": "Bovnar Array Depth 1", "scope": "punctuation.section.array.depth1.bovnar", "foreground": "#da844c" },
+    { "name": "Bovnar Array Depth 2", "scope": "punctuation.section.array.depth2.bovnar", "foreground": "#c084fc" },
+    { "name": "Bovnar Array Depth 3", "scope": "punctuation.section.array.depth3.bovnar", "foreground": "#ff2a7d" },
+    { "name": "Bovnar Array Depth 4", "scope": "punctuation.section.array.depth4.bovnar", "foreground": "#ffa500" },
+    { "name": "Bovnar Array Depth 5", "scope": "punctuation.section.array.depth5.bovnar", "foreground": "#87d88c" },
+
+    { "name": "Bovnar Struct Depth 1", "scope": "punctuation.section.struct.depth1.bovnar", "foreground": "#da844c" },
+    { "name": "Bovnar Struct Depth 2", "scope": "punctuation.section.struct.depth2.bovnar", "foreground": "#c084fc" },
+    { "name": "Bovnar Struct Depth 3", "scope": "punctuation.section.struct.depth3.bovnar", "foreground": "#ff2a7d" },
+    { "name": "Bovnar Struct Depth 4", "scope": "punctuation.section.struct.depth4.bovnar", "foreground": "#ffa500" },
+    { "name": "Bovnar Struct Depth 5", "scope": "punctuation.section.struct.depth5.bovnar", "foreground": "#87d88c" },
+    { "name": "Bovnar Struct Depth 6", "scope": "punctuation.section.struct.depth6.bovnar", "foreground": "#5eead4" },
+    { "name": "Bovnar Struct Depth 7", "scope": "punctuation.section.struct.depth7.bovnar", "foreground": "#f0c64e" },
+    { "name": "Bovnar Struct Depth 8", "scope": "punctuation.section.struct.depth8.bovnar", "foreground": "#67d1f4" },
+
+    {
+      "name": "Bovnar Special Float",
+      "scope": "constant.language.special-float.bovnar",
+      "foreground": "#c084fc"
+    },
+    {
+      "name": "Bovnar Float",
+      "scope": "constant.numeric.float.bovnar",
+      "foreground": "#f0c64e"
+    },
+    {
+      "name": "Bovnar Integer",
+      "scope": "constant.numeric.integer.bovnar",
+      "foreground": "#f0c64e"
+    },
+    {
+      "name": "Bovnar String",
+      "scope": "string.quoted.double.bovnar",
+      "foreground": "#87d88c"
+    },
+    {
+      "name": "Bovnar Valid Escape",
+      "scope": "constant.character.escape.bovnar",
+      "foreground": "#5ab06e",
+      "font_style": "bold"
+    },
+    {
+      "name": "Bovnar Invalid Escape",
+      "scope": "invalid.illegal.escape.bovnar",
+      "foreground": "#f47067",
+      "font_style": "underline"
+    },
+    {
+      "name": "Bovnar Inline Unit Separator Whitespace",
+      "scope": "punctuation.separator.inline-unit.bovnar",
+      "foreground": "#6e7a86"
+    },
+    {
+      "name": "Bovnar Inline Unit",
+      "scope": "support.type.unit.inline.bovnar",
+      "foreground": "#5eead4"
+    },
+    {
+      "name": "Bovnar Symbol",
+      "scope": "variable.other.symbol.bovnar",
+      "foreground": "#67d1f4"
+    },
+    {
+      "name": "Bovnar Reference Operator",
+      "scope": "keyword.operator.reference.bovnar",
+      "foreground": "#f47067",
+      "font_style": "bold"
+    },
+    {
+      "name": "Bovnar Reference Path",
+      "scope": "variable.other.reference-path.bovnar",
+      "foreground": "#d06070"
+    },
+    {
+      "name": "Bovnar Array/Row Separators",
+      "scope": "punctuation.separator.array-row.bovnar",
+      "foreground": "#6e7a86"
+    }
+  ]
+}

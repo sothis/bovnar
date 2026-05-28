@@ -1,0 +1,393 @@
+%YAML 1.2
+---
+# Bovnar (BVNR) syntax for Sublime Text.
+# Scope names mirror the VS Code TextMate grammar (source.bovnar) one-to-one,
+# so the bundled "Bovnar Cyberpunk" colour scheme — and any TextMate-scope
+# colour scheme — highlights Bovnar identically across editors.
+# See: https://www.sublimetext.com/docs/syntax.html
+name: Bovnar
+file_extensions:
+  - bvnr
+scope: source.bovnar
+
+contexts:
+  main:
+    - include: comment
+    - include: assignment
+    - include: type_annotation
+    - include: value
+
+  comment:
+    - match: '#[^\n\r]*'
+      scope: comment.line.number-sign.bovnar
+
+  # ── Assignments: .key = value ; ───────────────────────────────────────────
+  # struct1 is the entry point of the struct depth chain.
+
+  assignment:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct1
+
+  # Shared value patterns used inside every assignment variant. array1 is
+  # included so arrays always enter the depth chain at level 1.
+  assignment_values:
+    - include: comment
+    - match: '='
+      scope: keyword.operator.assignment.bovnar
+    - include: type_annotation
+    - include: special_number
+    - include: number
+    - include: string
+    - include: inline_unit
+    - include: symbol
+    - include: reference
+    - include: array1
+    - match: '/'
+      scope: punctuation.separator.array-row.bovnar
+
+  assignment_in_struct1:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct2
+
+  assignment_in_struct2:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct3
+
+  assignment_in_struct3:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct4
+
+  assignment_in_struct4:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct5
+
+  assignment_in_struct5:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct6
+
+  assignment_in_struct6:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct7
+
+  assignment_in_struct7:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct8
+
+  # Depth 8 cycles back to struct1.
+  assignment_in_struct8:
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+      captures:
+        1: punctuation.separator.key-sigil.bovnar
+        2: entity.name.key.bovnar
+      push:
+        - match: ';'
+          scope: punctuation.terminator.semicolon.bovnar
+          pop: true
+        - include: assignment_values
+        - include: struct1
+
+  # ── Type annotations: <family:width,unit> ─────────────────────────────────
+  # float_fix / float_dec must precede float so the longer names win.
+  type_annotation:
+    - match: '<'
+      scope: punctuation.definition.type.begin.bovnar
+      push:
+        - match: '>'
+          scope: punctuation.definition.type.end.bovnar
+          pop: true
+        - include: comment
+        - match: '\b(float_fix|float_dec|float|uint|sint|utf8)\b'
+          scope: storage.type.family.bovnar
+        - match: '\bno_unit\b'
+          scope: support.constant.no-unit.bovnar
+        - match: '\bq\d+\b'
+          scope: constant.numeric.q~param.bovnar
+        - match: '_\d+'
+          scope: constant.numeric.base-param.bovnar
+        - match: '\b\d+\b'
+          scope: constant.numeric.width-param.bovnar
+        - include: unit_expression
+        - match: ':'
+          scope: punctuation.separator.colon.bovnar
+        - match: ','
+          scope: punctuation.separator.comma.bovnar
+
+  # Top-level value forms; array1/struct1 enter the depth chain.
+  value:
+    - include: comment
+    - include: special_number
+    - include: number
+    - include: string
+    - include: inline_unit
+    - include: symbol
+    - include: reference
+    - include: array1
+    - include: struct1
+
+  special_number:
+    - match: '\$(?:nan|-infinity|infinity)\$'
+      scope: constant.language.special-float.bovnar
+
+  number:
+    # Leading-dot float:  .5  -.5  .7e+3
+    - match: '-?\.\d+(?:[eE][+\-]?\d+)?'
+      scope: constant.numeric.float.bovnar
+    # Integer-led float (trailing dot allowed):  3.14  1.  -8.  5.7e112
+    - match: '-?\d+\.\d*(?:[eE][+\-]?\d+)?'
+      scope: constant.numeric.float.bovnar
+    # Bare / scientific integer:  511  -7  01010110  1e10
+    - match: '-?\d+(?:[eE][+\-]?\d+)?'
+      scope: constant.numeric.integer.bovnar
+
+  # Double-quoted string. Only seven escapes are legal: \t \n \v \f \r \" \\.
+  string:
+    - match: '"'
+      scope: punctuation.definition.string.begin.bovnar
+      push:
+        - meta_scope: string.quoted.double.bovnar
+        - match: '"'
+          scope: punctuation.definition.string.end.bovnar
+          pop: true
+        - match: '\\[tnvfr"\\]'
+          scope: constant.character.escape.bovnar
+        - match: '\\.'
+          scope: invalid.illegal.escape.bovnar
+
+  # Inline unit suffix: mandatory whitespace separates the scalar from the unit.
+  inline_unit:
+    - match: '(?<=[\d$"])(\s+)([A-Za-z_µ°Å][A-Za-z0-9_+~\.\-/:\^\*µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
+      captures:
+        1: punctuation.separator.inline-unit.bovnar
+        2: support.type.unit.inline.bovnar
+
+  # Bare-word value (symbol / enum-like).
+  symbol:
+    - match: '\b[A-Za-z_][A-Za-z0-9_+\-]*'
+      scope: variable.other.symbol.bovnar
+
+  # Reference literal: '&' sigil followed by one or more '.segment' path parts.
+  reference:
+    - match: '(&)((?:\.[A-Za-z_][A-Za-z0-9_+\-]*)+)'
+      captures:
+        1: keyword.operator.reference.bovnar
+        2: variable.other.reference-path.bovnar
+
+  # Scalar content shared by all array depth levels (no nested arrays/structs).
+  array_body:
+    - include: comment
+    - include: type_annotation
+    - include: special_number
+    - include: number
+    - include: string
+    - include: symbol
+    - include: reference
+    - match: ','
+      scope: punctuation.separator.comma.bovnar
+    - match: '/'
+      scope: punctuation.separator.array-row.bovnar
+
+  array1:
+    - match: '\['
+      scope: punctuation.section.array.depth1.bovnar
+      push:
+        - match: '\]'
+          scope: punctuation.section.array.depth1.bovnar
+          pop: true
+        - include: array_body
+        - include: array2
+        - include: struct1
+
+  array2:
+    - match: '\['
+      scope: punctuation.section.array.depth2.bovnar
+      push:
+        - match: '\]'
+          scope: punctuation.section.array.depth2.bovnar
+          pop: true
+        - include: array_body
+        - include: array3
+        - include: struct1
+
+  array3:
+    - match: '\['
+      scope: punctuation.section.array.depth3.bovnar
+      push:
+        - match: '\]'
+          scope: punctuation.section.array.depth3.bovnar
+          pop: true
+        - include: array_body
+        - include: array4
+        - include: struct1
+
+  array4:
+    - match: '\['
+      scope: punctuation.section.array.depth4.bovnar
+      push:
+        - match: '\]'
+          scope: punctuation.section.array.depth4.bovnar
+          pop: true
+        - include: array_body
+        - include: array5
+        - include: struct1
+
+  # Depth 5 cycles back to array1.
+  array5:
+    - match: '\['
+      scope: punctuation.section.array.depth5.bovnar
+      push:
+        - match: '\]'
+          scope: punctuation.section.array.depth5.bovnar
+          pop: true
+        - include: array_body
+        - include: array1
+        - include: struct1
+
+  struct1:
+    - match: '\{'
+      scope: punctuation.section.struct.depth1.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth1.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct1
+
+  struct2:
+    - match: '\{'
+      scope: punctuation.section.struct.depth2.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth2.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct2
+
+  struct3:
+    - match: '\{'
+      scope: punctuation.section.struct.depth3.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth3.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct3
+
+  struct4:
+    - match: '\{'
+      scope: punctuation.section.struct.depth4.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth4.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct4
+
+  struct5:
+    - match: '\{'
+      scope: punctuation.section.struct.depth5.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth5.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct5
+
+  struct6:
+    - match: '\{'
+      scope: punctuation.section.struct.depth6.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth6.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct6
+
+  struct7:
+    - match: '\{'
+      scope: punctuation.section.struct.depth7.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth7.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct7
+
+  # Depth 8 cycles back to struct1.
+  struct8:
+    - match: '\{'
+      scope: punctuation.section.struct.depth8.bovnar
+      push:
+        - match: '\}'
+          scope: punctuation.section.struct.depth8.bovnar
+          pop: true
+        - include: comment
+        - include: assignment_in_struct8
+
+  # Unit string inside a type annotation.
+  unit_expression:
+    - match: '[A-Za-zµΩ°Å][A-Za-z0-9_]*(?:~[A-Za-zµΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?(?:[·/*][A-Za-zµΩ°Å][A-Za-z0-9_]*(?:~[A-Za-zµΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?)*'
+      scope: support.type.unit.bovnar

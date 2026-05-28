@@ -1,7 +1,7 @@
 
 # Bovnar — Read & Write API
 
-> **Spec version:** 1.0
+> **Spec version:** 0.x
 
 This document covers every function you need to read and write Bovnar streams, in the order you call them. Nothing else is included.
 

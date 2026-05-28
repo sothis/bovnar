@@ -223,6 +223,13 @@
         skipWsComments();
       }
 
+      /* Octet stream — a NUL byte where a value is expected switches the
+         text layer into binary chunk mode (§11). */
+      if (!eof() && text.charCodeAt(pos) === 0) {
+        readOctetStream();
+        return;
+      }
+
       /* Null value — nothing between annotation/= and ;/,/] */
       if (eof() ||
           cur() === ';' ||
@@ -274,7 +281,8 @@
       /* Special number */
       if (cur() === '$') {
         const kw = readSpecialNumber();
-        emit(EV.DATA, { kind: 'special', value: kw, text: '$' + kw + '$' });
+        const unit = insideArray ? null : tryInlineUnit();
+        emit(EV.DATA, { kind: 'special', value: kw, text: '$' + kw + '$', unit });
         return;
       }
 
@@ -308,6 +316,47 @@
 
       emit(EV.ERROR, { msg: `Unexpected character: ${JSON.stringify(cur())}` });
       advance();
+    }
+
+    /* Parse an octet stream (the entering NUL byte is cur, not consumed).
+       Binary protocol (§11):
+         tag 0x01 → chunk: 2-byte LE length (0x0000 encodes 65536) + data
+         tag 0x00 → end of stream
+         any other tag → out of sync (hard error) */
+    function readOctetStream() {
+      advance(); // consume the NUL that enters binary mode
+      emit(EV.OCTET_STREAM_START, {});
+      for (;;) {
+        if (eof()) {
+          emit(EV.ERROR, { msg: 'Unterminated octet stream (expected end tag 0x00)' });
+          return;
+        }
+        const tag = text.charCodeAt(pos);
+        advance();
+        if (tag === 0x00) { emit(EV.OCTET_STREAM_END, {}); return; }
+        if (tag !== 0x01) {
+          emit(EV.ERROR, { msg: `Octet stream out of sync (tag 0x${tag.toString(16)})` });
+          return;
+        }
+        /* 16-bit little-endian chunk length; 0x0000 → 65536 */
+        if (pos + 1 >= text.length) {
+          emit(EV.ERROR, { msg: 'Truncated octet-stream chunk length' });
+          return;
+        }
+        const lo = text.charCodeAt(pos); advance();
+        const hi = text.charCodeAt(pos); advance();
+        let len = lo | (hi << 8);
+        if (len === 0) len = 65536;
+
+        let data = '';
+        let i = 0;
+        for (; i < len && !eof(); i++) { data += advance(); }
+        if (i < len) {
+          emit(EV.ERROR, { msg: 'Truncated octet-stream chunk data' });
+          return;
+        }
+        emit(EV.DATA, { kind: 'octet', value: data, text: data, length: len });
+      }
     }
 
     /* Parse one array (opening '[' not yet consumed). */
@@ -418,6 +467,18 @@
 
     /* ── Top-level parse loop ──────────────────────────────────────── */
     emit(EV.STREAM_START, {});
+
+    /* UTF-8 BOM: legal only as the very first bytes of the stream.
+       Accept both the decoded form (U+FEFF) and the raw three-byte
+       sequence 0xEF 0xBB 0xBF when the input was loaded as a byte string. */
+    if (text.charCodeAt(0) === 0xFEFF) {
+      advance();
+    } else if (text.charCodeAt(0) === 0xEF &&
+               text.charCodeAt(1) === 0xBB &&
+               text.charCodeAt(2) === 0xBF) {
+      advance(); advance(); advance();
+    }
+
     while (!eof()) {
       skipWsComments();
       if (eof()) break;

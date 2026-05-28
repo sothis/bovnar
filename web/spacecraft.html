@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bovnar — Configure a Spacecraft, Decode Its Downlink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --editor-bg:   #1e1e1e;
+  --sidebar-bg:  #252526;
+  --panel-bg:    #252526;
+  --panel-bg2:   #2d2d2d;
+  --titlebar-bg: #3c3c3c;
+  --border:      #3e3e42;
+  --border-hi:   #007acc;
+  --select-bg:   #264f78;
+
+  --text:   #d4d4d4;
+  --text2:  #9e9e9e;
+  --text3:  #6a6a6a;
+
+  --blue:    #569cd6;
+  --blue2:   #007acc;
+  --teal:    #4ec9b0;
+  --green:   #6a9955;
+  --yellow:  #dcdcaa;
+  --orange:  #ce9178;
+  --cyan:    #9cdcfe;
+  --red:     #f44747;
+
+  /* Bovnar token colors */
+  --c-comment:  #80a0ff;
+  --c-sigil:    #ff80ff;
+  --c-key:      #40ffff;
+  --c-eq:       #ffff60;
+  --c-ann:      #60ff60;
+  --c-val:      #ffa0a0;
+  --c-unit:     #40ffff;
+  --c-str:      #ffa0a0;
+  --c-semi:     #4a4a5a;
+  --c-struct:   #60ff60;
+  --c-sym:      #c695dc;
+
+  --mono: 'JetBrains Mono', 'Consolas', monospace;
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--editor-bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--editor-bg); }
+::-webkit-scrollbar-thumb { background: #4e4e4e; border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: #4e4e4e var(--editor-bg); }
+
+nav {
+  height: 46px;
+  background: var(--titlebar-bg);
+  border-bottom: 1px solid #252525;
+  display: flex; align-items: center;
+  padding: 0 1.2rem; gap: 1rem;
+}
+.brand {
+  font-family: var(--mono); font-size: 0.82rem; font-weight: 500;
+  letter-spacing: 0.12em; color: var(--blue2); text-decoration: none;
+}
+.brand .ext { color: var(--text3); font-weight: 300; }
+nav .sep { color: var(--text3); font-family: var(--mono); font-size: 0.75rem; }
+nav .tag { color: var(--text2); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; }
+nav .spacer { flex: 1; }
+nav a.link { color: var(--text2); text-decoration: none; font-size: 0.78rem; font-family: var(--mono); }
+nav a.link:hover { color: var(--cyan); }
+
+header.intro { padding: 1.1rem 1.4rem 0.4rem; max-width: 1700px; margin: 0 auto; }
+header.intro h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }
+header.intro h1 .accent { color: var(--teal); }
+header.intro p { color: var(--text2); font-size: 0.92rem; margin-top: 0.35rem; max-width: 90ch; }
+header.intro p code { font-family: var(--mono); color: var(--cyan); font-size: 0.85em; }
+
+/* Config + visualizer stack in the left column; the intrinsically tall telemetry
+   stream fills the right column full-height. Bottoms align naturally (telemetry
+   height ≈ config + viz) and the visualizer just absorbs the leftover height, so
+   there's no ragged mosaic and no dead space. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(440px, 1.2fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "config telemetry"
+    "viz    telemetry";
+  gap: 12px;
+  padding: 12px 1.4rem 2rem;
+  max-width: 1700px; margin: 0 auto;
+}
+.panel.cfg  { grid-area: config; }
+.panel.viz  { grid-area: viz; }
+.panel.tele { grid-area: telemetry; }
+@media (max-width: 980px) {
+  .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas: "config" "viz" "telemetry";
+  }
+  /* single column: the visualizer becomes a fixed banner rather than filling */
+  .panel.viz .canvas-wrap { flex: 0 0 auto; height: clamp(320px, 56vw, 540px); min-height: 0; }
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.panel > .head {
+  background: var(--panel-bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.8rem;
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.06em;
+  color: var(--text2); text-transform: uppercase;
+}
+.panel > .head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+.panel > .head .grow { flex: 1; }
+.panel > .head .hint { text-transform: none; letter-spacing: 0; color: var(--text3); font-size: 0.7rem; }
+.panel > .body { padding: 0.7rem 0.8rem; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* config editor — transparent textarea over a syntax-highlighted layer */
+.editor {
+  position: relative; flex: 1 1 auto; min-height: 240px;
+  background: var(--editor-bg);
+  border: 1px solid var(--border); border-radius: 4px;
+  overflow: hidden;
+}
+.editor:focus-within { border-color: var(--border-hi); }
+#cfg, #cfg-hl {
+  position: absolute; inset: 0; margin: 0;
+  font-family: var(--mono); font-size: 0.78rem; line-height: 1.55;
+  letter-spacing: normal; padding: 0.6rem; tab-size: 2;
+  white-space: pre; overflow: auto;
+  border: 0;
+}
+#cfg-hl { color: var(--text); pointer-events: none; z-index: 0; }
+#cfg {
+  background: transparent; color: transparent; caret-color: var(--text);
+  resize: none; z-index: 1; outline: none;
+}
+.cfg-actions { display: flex; gap: 0.5rem; margin-top: 0.55rem; align-items: center; }
+button.btn {
+  background: var(--panel-bg2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  font-family: var(--mono); font-size: 0.75rem; padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+button.btn:hover { border-color: var(--border-hi); color: var(--cyan); }
+button.btn.primary { background: #094771; border-color: var(--blue2); color: #fff; }
+button.btn.primary:hover { background: #0a5a8f; }
+.cfg-msg { font-family: var(--mono); font-size: 0.72rem; color: var(--text3); margin-left: auto; }
+.cfg-msg.err { color: var(--red); }
+.cfg-msg.ok  { color: var(--teal); }
+
+.derived { margin-top: 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+.derived div { font-family: var(--mono); font-size: 0.72rem; color: var(--text2); display: flex; justify-content: space-between; }
+.derived div b { color: var(--cyan); font-weight: 400; }
+
+/* canvas */
+.canvas-wrap { position: relative; width: 100%; flex: 1; min-height: 360px; background: #0a0a12; }
+canvas#orbit { width: 100%; height: 100%; display: block; }
+.viz-legend {
+  display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding: 0.5rem 0.8rem;
+  font-family: var(--mono); font-size: 0.68rem; color: var(--text3);
+  border-top: 1px solid var(--border);
+}
+.viz-legend span b { color: var(--text2); font-weight: 400; }
+
+/* telemetry controls */
+.controls { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-bottom: 0.55rem; }
+.controls .grow { flex: 1; }
+label.tgl { font-family: var(--mono); font-size: 0.72rem; color: var(--text2); display: flex; align-items: center; gap: 0.3rem; cursor: pointer; user-select: none; }
+label.tgl input { accent-color: var(--blue2); }
+input[type=range] { accent-color: var(--blue2); width: 110px; }
+.speed-lbl { font-family: var(--mono); font-size: 0.7rem; color: var(--text3); min-width: 52px; }
+
+.status-bar {
+  display: flex; flex-wrap: wrap; gap: 0.2rem 1.1rem; padding: 0.4rem 0.6rem;
+  background: var(--editor-bg); border: 1px solid var(--border); border-radius: 4px;
+  font-family: var(--mono); font-size: 0.72rem; margin-bottom: 0.5rem;
+}
+.status-bar span b { color: var(--cyan); font-weight: 400; }
+.status-bar .drop b { color: var(--red); }
+.status-bar .lock.ok b { color: var(--teal); }
+.status-bar .lock.no b { color: var(--red); }
+
+.ticker { display: flex; gap: 2px; margin-bottom: 0.5rem; height: 14px; align-items: stretch; }
+.ticker i { flex: 1; background: #2d4a2d; border-radius: 1px; }
+.ticker i.ok  { background: #2e7d32; }
+.ticker i.bad { background: #b71c1c; }
+.ticker i.cur { box-shadow: 0 0 0 1px var(--cyan) inset; }
+
+/* frame source */
+pre.frame {
+  background: var(--editor-bg); border: 1px solid var(--border); border-radius: 4px;
+  font-family: var(--mono); font-size: 0.76rem; line-height: 1.55;
+  padding: 0.5rem 0; overflow-x: auto; max-height: 340px; overflow-y: auto;
+}
+pre.frame .ln { display: flex; padding: 0 0.6rem; white-space: pre; }
+pre.frame .ln:hover, pre.frame .ln.hl { background: rgba(38,79,120,0.45); }
+pre.frame .ln.err { background: rgba(244,71,71,0.13); }
+pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-right: 0.9em; flex-shrink: 0; user-select: none; }
+.t-comment { color: var(--c-comment); }
+.t-key  { color: var(--c-key); }
+.t-eq   { color: var(--c-eq); }
+.t-ann  { color: var(--c-ann); }
+.t-val  { color: var(--c-val); }
+.t-str  { color: var(--c-str); }
+.t-sym  { color: var(--c-sym); }
+.t-semi { color: var(--c-semi); }
+.t-struct { color: var(--c-struct); }
+
+/* gauges */
+.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0.6rem; }
+.gauge {
+  background: var(--editor-bg); border: 1px solid var(--border); border-radius: 4px;
+  padding: 0.45rem 0.55rem; cursor: default;
+}
+.gauge.hl { border-color: var(--cyan); background: rgba(38,79,120,0.3); }
+.gauge .k { font-family: var(--mono); font-size: 0.67rem; color: var(--text3); letter-spacing: 0.04em; }
+.gauge .v { font-family: var(--mono); font-size: 1.02rem; color: var(--text); margin-top: 1px; }
+.gauge .v .u { font-size: 0.7rem; color: var(--cyan); margin-left: 3px; }
+.gauge .t { font-family: var(--mono); font-size: 0.6rem; color: var(--green); margin-top: 2px; }
+.gauge.sym .v { color: var(--c-sym); }
+.gauge.span2 { grid-column: 1 / -1; }
+.gauge.stale { opacity: 0.45; }
+
+.note { color: var(--text3); font-size: 0.74rem; font-family: var(--mono); margin-top: 0.5rem; }
+.note b { color: var(--text2); font-weight: 400; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="index.html">BOVNAR<span class="ext">.bvnr</span></a>
+  <span class="sep">/</span>
+  <span class="tag">MISSION CONTROL — one format, config to downlink</span>
+  <span class="spacer"></span>
+  <a class="link" href="index.html">&larr; playground</a>
+  <a class="link" href="../doc/1_bovnar_spec.md">spec</a>
+</nav>
+
+<header class="intro">
+  <h1>One format <span class="accent">configures the spacecraft</span> — and <span class="accent">carries its telemetry home</span>.</h1>
+  <p>
+    Every value on this page is real Bovnar, parsed live in your browser by <code>bovnar_parser.js</code>, a
+    JavaScript reader for the format. Edit the config on the left to reshape the orbit; the simulator packs
+    each measurement into a <code>.bvnr</code> downlink frame, and the visualizer runs purely on <em>decoded</em>
+    values — never the raw simulation. Units, bit-widths and types ride <em>inside the stream</em>, so the ground
+    station needs no schema to read it. Hover any gauge to jump to the line it decoded from.
+  </p>
+</header>
+
+<div class="grid">
+
+  <!-- ───────────── CONFIG ───────────── -->
+  <section class="panel cfg">
+    <div class="head"><span class="dot"></span>Spacecraft config <span class="grow"></span><span class="hint">editable · .bvnr</span></div>
+    <div class="body">
+      <div class="editor">
+        <div id="cfg-hl" aria-hidden="true"></div>
+        <textarea id="cfg" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+      </div>
+      <div class="cfg-actions">
+        <button class="btn primary" id="apply">Apply &amp; re-orbit</button>
+        <button class="btn" id="reset-cfg">Reset</button>
+        <span class="cfg-msg" id="cfgmsg"></span>
+      </div>
+      <div class="derived" id="derived"></div>
+    </div>
+  </section>
+
+  <!-- ───────────── VISUALIZER ───────────── -->
+  <section class="panel viz">
+    <div class="head"><span class="dot"></span>Orbit visualizer <span class="grow"></span><span class="hint">ECI · XY projection</span></div>
+    <div class="canvas-wrap"><canvas id="orbit"></canvas></div>
+    <div class="viz-legend">
+      <span><b>◐</b> Earth (day / night)</span>
+      <span><b style="color:#4ec9b0">●</b> spacecraft (decoded pos)</span>
+      <span><b style="color:#78ebcd">↓</b> downlink · <b style="color:#e8c878">↑</b> uplink</span>
+    </div>
+  </section>
+
+  <!-- ───────────── TELEMETRY ───────────── -->
+  <section class="panel tele">
+    <div class="head"><span class="dot"></span>Downlink frame <span class="grow"></span><span class="hint">.bvnr stream</span></div>
+    <div class="body">
+      <div class="controls">
+        <button class="btn primary" id="play">⏸ Pause</button>
+        <button class="btn" id="step">⏭ Step</button>
+        <input type="range" id="speed" min="1" max="240" value="80">
+        <span class="speed-lbl" id="speedlbl">80×</span>
+        <span class="grow"></span>
+        <label class="tgl"><input type="checkbox" id="noisy"> noisy channel</label>
+        <label class="tgl"><input type="checkbox" id="resync" checked> resync</label>
+      </div>
+
+      <div class="status-bar">
+        <span>frame <b id="s-frame">0</b></span>
+        <span>MET <b id="s-met">0 s</b></span>
+        <span>orbits <b id="s-orb">0.00</b></span>
+        <span class="drop">dropped <b id="s-drop">0</b></span>
+        <span class="lock ok" id="s-lock">lock <b>ACQ</b></span>
+      </div>
+
+      <div class="ticker" id="ticker"></div>
+
+      <pre class="frame" id="framesrc"></pre>
+
+      <div class="gauges" id="gauges"></div>
+
+      <div class="note">
+        With <b>resync</b> on, a corrupt assignment is skipped and the rest of the frame still decodes — the
+        reader's recovery mode. Off, one bad line drops the whole frame. Flip <b>noisy channel</b> to compare.
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="../bovnar_parser.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { parseBovnar, EV } = window.BovnarParser;
+  const $ = (id) => document.getElementById(id);
+
+  /* ════════════════════ 1. Bovnar event-stream decoder ════════════════════ */
+  /* Consumes the parser's events into:
+       - rows:  ordered list for display (depth, key, kind, type, unit, line)
+       - map:   nested object for value extraction
+       - errs:  parse errors (line + msg)                                     */
+  function decode(text) {
+    const rows = [], errs = [], root = {};
+    const stack = [{ obj: root }];
+    let key = null, ann = null;
+    let inArray = false, arr = null;
+
+    parseBovnar(text, (ev) => {
+      const top = stack[stack.length - 1];
+      switch (ev.type) {
+        case EV.ASSIGNMENT_START: key = ev.data.key; ann = null; break;
+        case EV.TYPE_ANN_START:   ann = {}; break;
+        case EV.TYPE_ANN_FAMILY:  (ann = ann || {}).family = ev.data.family; break;
+        case EV.TYPE_ANN_PARAM: {
+          ann = ann || {};
+          const d = ev.data;
+          if (d.kind === 'width') ann.width = d.value;
+          else if (d.kind === 'base') ann.base = d.value;
+          else if (d.kind === 'q') ann.q = d.value;
+          else if (d.kind === 'unit') ann.unit = d.text;
+          break;
+        }
+        case EV.STRUCT_START: {
+          const o = {};
+          if (key != null) top.obj[key] = { struct: o };
+          rows.push({ depth: stack.length - 1, key, kind: 'struct', line: ev.line });
+          stack.push({ obj: o });
+          key = null; ann = null;
+          break;
+        }
+        case EV.STRUCT_END: stack.pop(); break;
+        case EV.ARRAY_ROW_START:
+          if (inArray) { arr.rows.push([]); }
+          else {
+            inArray = true;
+            arr = { key, unit: ann && ann.unit, family: ann && ann.family,
+                    width: ann && ann.width, rows: [[]], line: ev.line,
+                    depth: stack.length - 1 };
+            key = null; ann = null;
+          }
+          break;
+        case EV.ARRAY_DIM_START: break;
+        case EV.ARRAY_ROW_END:   break;
+        case EV.DATA: {
+          if (inArray) {
+            arr.rows[arr.rows.length - 1].push(ev.data.value);
+          } else {
+            const unit = (ann && ann.unit) || ev.data.unit || null;
+            const node = { value: ev.data.value, dataKind: ev.data.kind, unit,
+                           family: ann && ann.family, width: ann && ann.width, line: ev.line };
+            if (key != null) top.obj[key] = node;
+            rows.push({ depth: stack.length - 1, key, kind: 'value',
+                        valueText: ev.data.text, dataKind: ev.data.kind,
+                        unit, family: node.family, width: node.width, line: ev.line });
+            ann = null;
+          }
+          break;
+        }
+        case EV.ASSIGNMENT_END:
+          if (inArray) {
+            const flat = arr.rows.map((r) => r.join(', ')).join('] / [');
+            if (arr.key != null) top.obj[arr.key] = { array: arr.rows, unit: arr.unit, family: arr.family, width: arr.width };
+            rows.push({ depth: arr.depth, key: arr.key, kind: 'array',
+                        valueText: '[' + flat + ']', unit: arr.unit,
+                        family: arr.family, width: arr.width, line: arr.line });
+            inArray = false; arr = null;
+          }
+          key = null; ann = null;
+          break;
+        case EV.ERROR: errs.push({ msg: ev.data.msg, line: ev.line }); break;
+      }
+    });
+    return { rows, map: root, errs };
+  }
+
+  /* small helpers to pull typed numbers out of a decoded map */
+  function gnum(node) { return node ? parseFloat(node.value) : NaN; }
+  function gvec(node) {
+    if (!node || !node.array || !node.array[0]) return null;
+    return node.array[0].map(parseFloat);
+  }
+
+  /* ════════════════════ 2. Orbit propagation (Kepler) ════════════════════ */
+  const MU = 398600.4418;   // km^3/s^2
+  const RE = 6371;          // km
+  const D2R = Math.PI / 180;
+  // Sun azimuth = obliquity, which puts the Sun perpendicular to the tilted spin
+  // axis (equinox) ⇒ the day/night terminator runs parallel to the Earth's axis.
+  const SUN_A = 23.44 * D2R;
+  const SUN = { x: Math.cos(SUN_A), y: Math.sin(SUN_A) };     // sun direction (ECI, z≈0)
+
+  let orbit = { name: 'AETHER-1', a: 6921, e: 0, i: 48.0, raan: 180.0, argp: 0 };
+  let orbitPath = [];       // sampled ECI [x,y] for drawing
+  let pathExtent = 1;
+  let resyncDefault = true;
+
+  function rotZ(v, a) { const c = Math.cos(a), s = Math.sin(a); return [v[0]*c - v[1]*s, v[0]*s + v[1]*c, v[2]]; }
+  function rotX(v, a) { const c = Math.cos(a), s = Math.sin(a); return [v[0], v[1]*c - v[2]*s, v[1]*s + v[2]*c]; }
+  function pqw2eci(v) { return rotZ(rotX(rotZ(v, orbit.argp*D2R), orbit.i*D2R), orbit.raan*D2R); }
+
+  function propagate(t) {
+    const { a, e } = orbit;
+    const n = Math.sqrt(MU / (a*a*a));
+    const M = n * t;
+    let E = M;
+    for (let k = 0; k < 8; k++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E));
+    const nu = 2 * Math.atan2(Math.sqrt(1+e)*Math.sin(E/2), Math.sqrt(1-e)*Math.cos(E/2));
+    const r = a * (1 - e*Math.cos(E));
+    const pos = pqw2eci([r*Math.cos(nu), r*Math.sin(nu), 0]);
+    const p = a * (1 - e*e);
+    const vk = Math.sqrt(MU / p);
+    const vel = pqw2eci([-vk*Math.sin(nu), vk*(e + Math.cos(nu)), 0]).map((c) => c * 1000); // m/s
+    const speed = Math.sqrt(MU * (2/r - 1/a)) * 1000;
+    const alt = r - RE;
+    const dotS = pos[0]*SUN.x + pos[1]*SUN.y;              // Sun direction (in orbital plane)
+    const rr = Math.hypot(pos[0], pos[1], pos[2]);
+    const perp = Math.sqrt(Math.max(0, rr*rr - dotS*dotS));
+    const eclipse = dotS < 0 && perp < RE;
+    return { pos, vel, alt, speed, eclipse };
+  }
+
+  function rebuildOrbit() {
+    orbitPath = [];
+    let mx = RE;
+    const { a, e } = orbit, p = a * (1 - e*e);
+    for (let k = 0; k <= 240; k++) {
+      const nu = 2*Math.PI * k / 240;
+      const r = p / (1 + e*Math.cos(nu));
+      const v = pqw2eci([r*Math.cos(nu), r*Math.sin(nu), 0]);
+      orbitPath.push([v[0], v[1]]);
+      mx = Math.max(mx, Math.abs(v[0]), Math.abs(v[1]));
+    }
+    pathExtent = mx;
+    sim.period = 2*Math.PI * Math.sqrt(a*a*a / MU);
+    sim.trail.length = 0;
+  }
+
+  /* ════════════════════ 3. Simulation + downlink state ════════════════════ */
+  const sim = {
+    met: 0, speed: 80, playing: true, period: 5400,
+    soc: 0.92, panelTemp: 22, tframe: 0, dropped: 0, held: false,
+    history: [], lastGood: null, noisy: false, resync: true,
+    trail: [], epochMs: Date.parse('2026-05-28T00:00:00Z'),
+  };
+
+  function updateBattery(dt, eclipse) {
+    sim.soc = Math.min(1, Math.max(0.05, sim.soc + (eclipse ? -0.00007 : 0.00011) * dt));
+    sim.panelTemp += ((eclipse ? -58 : 56) - sim.panelTemp) * Math.min(1, dt / 700);
+  }
+
+  function modeOf(eclipse) {
+    if (sim.soc < 0.25) return 'SAFE_HOLD';
+    return eclipse ? 'ECLIPSE' : 'NOMINAL';
+  }
+
+  const f = (n, d) => Number(n).toFixed(d);
+  // ISO-8601 to whole seconds. TAI = UTC + 37 leap seconds (constant since 2017).
+  const isoUTC = (ms) => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
+  const isoTAI = (ms) => new Date(ms + 37000).toISOString().replace(/\.\d+Z$/, '');
+
+  function buildFrame(st) {
+    const v = 24 + 6 * sim.soc;
+    const core = 291 + (st.eclipse ? -4 : 4);
+    const utcMs = sim.epochMs + sim.met * 1000;
+    const row = (k, val) => '    .' + k.padEnd(12) + ' = ' + val + ';';
+    // Scalars use Bovnar's inline unit suffix (no annotation needed); the state
+    // vectors keep full type annotations (inline units aren't allowed in arrays).
+    // Telemetry units use Unicode notation (m·s⁻¹, °C) — vs the ASCII config.
+    return [
+      '.tm = {',
+      row('mission_time', f(sim.met, 1) + ' s'),
+      row('utc', '"' + isoUTC(utcMs) + '"'),
+      row('tai', '"' + isoTAI(utcMs) + '"'),
+      row('mode', modeOf(st.eclipse)),
+      row('eclipse', st.eclipse ? 'true' : 'false'),
+      row('pos', '<float:64,k~m> [' + f(st.pos[0],2) + ', ' + f(st.pos[1],2) + ', ' + f(st.pos[2],2) + ']'),
+      row('vel', '<float:64,m·s⁻¹> [' + f(st.vel[0],1) + ', ' + f(st.vel[1],1) + ', ' + f(st.vel[2],1) + ']'),
+      row('alt', f(st.alt, 2) + ' k~m'),
+      row('speed', f(st.speed, 1) + ' m·s⁻¹'),
+      row('batt_soc', f(sim.soc, 3)),
+      row('batt_v', f(v, 2) + ' V'),
+      row('temp_core', f(core, 1) + ' K'),
+      row('temp_pan', f(sim.panelTemp, 1) + ' °C'),
+      '};',
+    ].join('\n');
+  }
+
+  /* Damage a frame to model a noisy radio link (still recoverable per-line). */
+  function corrupt(text) {
+    return text
+      .replace(/(\.speed\s+)= /, '$1  ')                  // drop '=' → recoverable parse error
+      .replace(/(\.mode\s+= )(\w+);/, '$1N§$2@!;');       // junk symbol
+  }
+
+  /* ════════════════════ 4. Canvas drawing ════════════════════ */
+  const cv = $('orbit'), ctx = cv.getContext('2d');
+  let stars = [];
+  function sizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!stars.length) for (let k = 0; k < 160; k++) {
+      const big = Math.random() < 0.12;
+      stars.push({ x: Math.random(), y: Math.random(),
+                   r: big ? Math.random()*1.0 + 1.0 : Math.random()*0.7 + 0.4,
+                   b: Math.random()*0.6 + 0.25,
+                   tw: Math.random()*Math.PI*2 });
+    }
+  }
+
+  const D = Math.PI / 180;
+
+  // Real metro centres ([lon, lat, scale]); scale ≈ metro size/brightness.
+  const CITY_CENTERS = [
+    // North America
+    [-74.0,40.7,1.3],[-71.1,42.4,0.7],[-75.2,40.0,0.7],[-77.0,38.9,0.8],[-76.6,39.3,0.5],
+    [-80.0,40.4,0.5],[-78.9,42.9,0.4],[-81.7,41.5,0.5],[-83.0,42.3,0.6],[-87.6,41.9,1.0],
+    [-93.3,45.0,0.6],[-90.2,38.6,0.5],[-94.6,39.1,0.5],[-84.4,33.7,0.8],[-80.8,35.2,0.5],
+    [-86.8,36.2,0.4],[-80.2,25.8,0.8],[-82.5,28.0,0.5],[-81.4,28.5,0.5],[-90.1,29.95,0.4],
+    [-95.4,29.8,0.8],[-96.8,32.8,0.8],[-98.5,29.4,0.5],[-97.7,30.3,0.5],[-104.9,39.7,0.6],
+    [-112.1,33.4,0.7],[-115.1,36.1,0.5],[-111.9,40.8,0.4],[-118.2,34.1,1.2],[-117.2,32.7,0.6],
+    [-122.3,37.8,0.9],[-121.5,38.6,0.4],[-122.7,45.5,0.5],[-122.3,47.6,0.7],[-123.1,49.3,0.6],
+    [-79.4,43.7,0.8],[-73.6,45.5,0.6],[-75.7,45.4,0.4],[-99.1,19.4,1.1],[-103.3,20.7,0.5],
+    [-100.3,25.7,0.6],[-82.4,23.1,0.4],[-90.5,14.6,0.4],
+    // South America
+    [-74.1,4.7,0.7],[-75.6,6.2,0.4],[-66.9,10.5,0.5],[-77.0,-12.0,0.8],[-78.5,-0.2,0.4],
+    [-70.7,-33.5,0.7],[-58.4,-34.6,1.0],[-64.2,-31.4,0.4],[-56.2,-34.9,0.4],[-46.6,-23.5,1.2],
+    [-43.2,-22.9,0.9],[-47.9,-15.8,0.5],[-43.9,-19.9,0.5],[-38.5,-13.0,0.5],[-34.9,-8.0,0.4],
+    [-38.5,-3.7,0.4],[-51.2,-30.0,0.4],
+    // Europe
+    [-0.1,51.5,1.1],[-1.9,52.5,0.5],[-2.2,53.5,0.5],[-6.3,53.3,0.4],[2.3,48.9,1.1],[4.8,45.8,0.4],
+    [5.4,43.3,0.4],[-3.7,40.4,0.8],[2.2,41.4,0.7],[-9.1,38.7,0.5],[12.5,41.9,0.7],[9.2,45.5,0.7],
+    [14.3,40.8,0.5],[7.7,45.1,0.4],[13.4,52.5,0.8],[10.0,53.6,0.5],[11.6,48.1,0.5],[8.7,50.1,0.5],
+    [6.9,51.0,0.9],[4.9,52.4,0.6],[4.4,50.8,0.5],[16.4,48.2,0.5],[8.5,47.4,0.4],[14.4,50.1,0.5],
+    [21.0,52.2,0.6],[19.0,47.5,0.5],[26.1,44.4,0.5],[12.6,55.7,0.5],[18.1,59.3,0.5],[10.7,59.9,0.4],
+    [24.9,60.2,0.4],[23.7,38.0,0.6],[30.5,50.5,0.7],[37.6,55.8,1.0],[30.3,59.9,0.6],[29.0,41.0,1.0],
+    [32.9,39.9,0.5],[20.5,44.8,0.4],
+    // Africa / Middle East
+    [31.2,30.0,1.0],[29.9,31.2,0.5],[34.8,32.1,0.7],[35.5,33.9,0.4],[35.9,32.0,0.4],[44.4,33.3,0.7],
+    [46.7,24.7,0.7],[39.2,21.5,0.5],[55.3,25.3,0.8],[54.4,24.5,0.4],[51.5,25.3,0.4],[47.9,29.4,0.4],
+    [51.4,35.7,0.9],[-7.6,33.6,0.5],[3.1,36.8,0.5],[10.2,36.8,0.4],[3.4,6.5,0.9],[7.5,9.1,0.4],
+    [-4.0,5.3,0.4],[-0.2,5.6,0.4],[15.3,-4.3,0.5],[36.8,-1.3,0.5],[38.7,9.0,0.4],[32.5,15.6,0.4],
+    [28.0,-26.2,0.7],[18.4,-33.9,0.5],[31.0,-29.9,0.4],
+    // South Asia
+    [77.2,28.6,1.2],[72.9,19.1,1.1],[88.4,22.6,0.9],[80.3,13.1,0.7],[77.6,13.0,0.7],[78.5,17.4,0.6],
+    [72.6,23.0,0.5],[73.9,18.5,0.5],[75.8,26.9,0.4],[80.9,26.8,0.4],[72.8,21.2,0.4],[67.0,24.9,0.9],
+    [74.3,31.5,0.8],[73.0,33.7,0.4],[90.4,23.8,0.9],[91.8,22.4,0.4],[79.9,6.9,0.4],
+    // East Asia
+    [116.4,39.9,1.1],[117.2,39.1,0.6],[121.5,31.2,1.3],[113.3,23.1,1.0],[114.1,22.5,0.8],
+    [114.2,22.3,0.8],[104.1,30.7,0.7],[106.5,29.6,0.7],[114.3,30.6,0.6],[108.9,34.3,0.5],
+    [118.8,32.1,0.5],[120.2,30.3,0.5],[123.4,41.8,0.5],[120.4,36.1,0.4],[121.6,25.0,0.7],
+    [126.98,37.6,1.1],[129.0,35.2,0.5],[139.7,35.7,1.4],[135.5,34.7,0.9],[136.9,35.2,0.6],
+    [130.4,33.6,0.4],[141.4,43.1,0.4],
+    // SE Asia / Oceania
+    [100.5,13.8,0.9],[106.7,10.8,0.8],[105.8,21.0,0.6],[106.8,-6.2,1.0],[112.7,-7.3,0.5],
+    [101.7,3.1,0.6],[103.8,1.35,0.8],[120.98,14.6,0.9],[96.2,16.8,0.4],
+    [151.2,-33.9,0.8],[144.96,-37.8,0.7],[153.0,-27.5,0.5],[115.9,-32.0,0.4],[174.8,-36.9,0.5],
+  ];
+  // Scatter each centre into a fine point field: a compact dense core plus a
+  // sparse, faint exurban/road sprinkle. Brightness emerges from point DENSITY
+  // under additive blending — no big blobs.
+  const LIGHTS = (() => {
+    let seed = 9301;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+    const out = [];
+    for (const [lo, la, sc] of CITY_CENTERS) {
+      const nCore = Math.round(9 + sc * 14), sdC = 0.16 + sc * 0.32;
+      for (let k = 0; k < nCore; k++) {
+        const gx = gauss(), gy = gauss();
+        const inten = Math.max(0.2, 1 - Math.hypot(gx, gy) * 0.4) * (0.5 + rnd() * 0.5);
+        out.push([lo + gx * sdC, la + gy * sdC * 0.8, inten]);
+      }
+      const nHalo = Math.round(5 + sc * 9), sdH = 0.6 + sc * 1.3;
+      for (let k = 0; k < nHalo; k++) {
+        const gx = gauss(), gy = gauss();
+        out.push([lo + gx * sdH, la + gy * sdH * 0.7, 0.12 + rnd() * 0.18]);
+      }
+    }
+    return out;
+  })();
+
+  const OBLIQ = 23.44 * D;                  // axial tilt (obliquity) — slants the spin axis in-plane
+  const LEAN  = 28 * D;                      // view lean — how far above the equator we look
+  const cE = Math.cos(OBLIQ), sE = Math.sin(OBLIQ);
+  const cB = Math.cos(LEAN),  sB = Math.sin(LEAN);
+
+  // Project a (lon, lat) on the rotating globe. The spin axis carries the real
+  // obliquity (a roll about the view axis) and the globe is leant toward the
+  // viewer so the caps read from above. z>0 ⇒ visible hemisphere.
+  function projGlobe(lonDeg, latDeg, rot) {
+    const lam = lonDeg * D + rot, phi = latDeg * D, cphi = Math.cos(phi);
+    const x = cphi * Math.sin(lam), y = Math.sin(phi), z = cphi * Math.cos(lam);
+    const y1 = y * cB - z * sB, z1 = y * sB + z * cB;            // lean about screen-X
+    return { x: x * cE - y1 * sE, y: x * sE + y1 * cE, z: z1 };  // obliquity roll about screen-Z
+  }
+
+  // ── Earth surface texture (NASA Blue Marble, cloud-free, equirectangular) ──
+  let earthTex = null;   // { data, w, h } once the image has decoded
+  (function loadEarth() {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      earthTex = { data: x.getImageData(0, 0, img.width, img.height).data, w: img.width, h: img.height };
+    };
+    img.src = 'earth.jpg';
+  })();
+
+  // The globe is rendered by per-pixel inverse texture mapping into a small
+  // offscreen, with the day/night Lambert term baked in. The spin is slow, so we
+  // only re-render when the rotation changes appreciably, then scale onto the disk.
+  const GLOBE_N = 320;
+  const globeCv = document.createElement('canvas');
+  globeCv.width = globeCv.height = GLOBE_N;
+  let globeRot = null;
+  function renderGlobe(rot) {
+    const N = GLOBE_N, g = globeCv.getContext('2d'), img = g.getImageData(0, 0, N, N), d = img.data;
+    const tw = earthTex.w, th = earthTex.h, td = earthTex.data;
+    const Sx = SUN.x, Sy = -SUN.y, TW = 0.18;            // sun dir (screen); terminator half-width (wider ⇒ softer twilight)
+    const I2PI = 1 / (2 * Math.PI), IPI = 1 / Math.PI;
+    for (let j = 0; j < N; j++) {
+      const ny = ((j + 0.5) / N) * 2 - 1;
+      for (let i = 0; i < N; i++) {
+        const nx = ((i + 0.5) / N) * 2 - 1, o = (j * N + i) * 4;
+        const r2 = nx*nx + ny*ny;
+        // Past the limb (r²>1) clamp the normal onto the rim (nz=0) and keep
+        // sampling — the buffer stays continuous so the anti-aliased clip can
+        // define a clean edge (no dark step/ring at the border).
+        let snx = nx, sny = ny, nz;
+        if (r2 >= 1) { const inv = 1 / Math.sqrt(r2); snx = nx * inv; sny = ny * inv; nz = 0; }
+        else nz = Math.sqrt(1 - r2);
+        // screen normal (snx,-sny,nz) → invert roll(Z) then lean(X) → geographic vector
+        const v0x = snx*cE - sny*sE;
+        const y1  = -snx*sE - sny*cE;
+        const v0y = y1*cB + nz*sB;
+        const v0z = -y1*sB + nz*cB;
+        const lat = Math.asin(v0y < -1 ? -1 : v0y > 1 ? 1 : v0y);
+        let u = Math.atan2(v0x, v0z) * I2PI - rot * I2PI + 0.5; u -= Math.floor(u);
+        let v = 0.5 - lat * IPI; if (v < 0) v = 0; else if (v > 0.999) v = 0.999;
+        // bilinear texture fetch (wrap longitude, clamp latitude) so a slow spin
+        // shifts the surface smoothly instead of snapping one whole texel at a time
+        const fx = u * tw - 0.5, fy = v * th - 0.5;
+        const x0 = Math.floor(fx), y0 = Math.floor(fy);
+        const wx = fx - x0, wy = fy - y0;
+        const xa = ((x0 % tw) + tw) % tw, xb = (xa + 1) % tw;
+        const ya = y0 < 0 ? 0 : y0 >= th ? th - 1 : y0;
+        const yb = y0 + 1 < 0 ? 0 : y0 + 1 >= th ? th - 1 : y0 + 1;
+        const i00 = (ya * tw + xa) * 4, i10 = (ya * tw + xb) * 4;
+        const i01 = (yb * tw + xa) * 4, i11 = (yb * tw + xb) * 4;
+        const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy),
+              w01 = (1 - wx) * wy,       w11 = wx * wy;
+        let t = (snx*Sx + sny*Sy + TW) / (2 * TW); t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const lit = t * t * (3 - 2 * t);                 // smoothstep day fraction across the terminator
+        const m = 0.17 + 0.83 * lit;                     // brighter night floor → full daylight
+        d[o]   = (td[i00]   * w00 + td[i10]   * w10 + td[i01]   * w01 + td[i11]   * w11) * m;
+        d[o+1] = (td[i00+1] * w00 + td[i10+1] * w10 + td[i01+1] * w01 + td[i11+1] * w11) * m;
+        d[o+2] = (td[i00+2] * w00 + td[i10+2] * w10 + td[i01+2] * w01 + td[i11+2] * w11) * m + 9 * (1 - lit); // cool earthshine on the night side
+        d[o+3] = 255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    globeRot = rot;
+  }
+
+  // True when the satellite is occluded by the Earth disk (far side, inside limb).
+  function behindEarth(x, y, z) {
+    const rho2 = x*x + y*y;
+    return rho2 < RE*RE && z < Math.sqrt(RE*RE - rho2);
+  }
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawEarth(cx, cy, R) {
+    const rot = (sim.met / 17200) * 2 * Math.PI; // ~5× sidereal — livelier spin, still ≪ orbit rate
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.clip();
+
+    if (earthTex) {
+      // texture-mapped Blue Marble; cheap per-frame redraw whenever the spin moved
+      if (rot !== globeRot) renderGlobe(rot);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(globeCv, cx - R, cy - R, 2*R, 2*R);
+    } else {
+      ctx.fillStyle = '#0c2a4a'; ctx.fillRect(cx - R, cy - R, 2*R, 2*R);   // fallback before load
+    }
+
+    // city / street lights on the night side — fine 1px additive points; the
+    // glow over big metros emerges from overlapping points, not from blobs.
+    const sdx = SUN.x, sdy = -SUN.y;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const nightAt = (px, py) => -((px - cx) * sdx + (py - cy) * sdy) / R;   // >0 ⇒ night
+    for (const [lo, la, inten] of LIGHTS) {
+      const p = projGlobe(lo, la, rot);
+      if (p.z <= 0.04) continue;                          // far hemisphere
+      const px = cx + p.x * R, py = cy - p.y * R;
+      const nt = nightAt(px, py);
+      if (nt <= 0.02) continue;
+      const a = Math.min(1, nt * 2.6) * Math.min(1, p.z * 2.8) * inten;
+      if (a < 0.03) continue;
+      const g0 = (170 + inten * 48) | 0, b0 = (98 + inten * 54) | 0;   // sodium→whiter
+      ctx.fillStyle = 'rgba(255,' + g0 + ',' + b0 + ',' + (0.5 * a) + ')';
+      ctx.fillRect(px, py, 1, 1);     // fractional coords → sub-pixel smooth drift, no jump
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function drawSatellite(x, y, velAngle, earthAngle, eclipse, occluded) {
+    ctx.save();
+    // When behind Earth, back the craft with a dark, cyan-rimmed disc so it stays
+    // legible against bright sunlit terrain (e.g. polar ice) rather than washing out.
+    if (occluded) {
+      ctx.fillStyle = 'rgba(6,10,20,0.72)';
+      ctx.beginPath(); ctx.arc(x, y, 15, 0, 2*Math.PI); ctx.fill();
+      ctx.lineWidth = 1.3; ctx.strokeStyle = 'rgba(120,200,255,0.95)';
+      ctx.beginPath(); ctx.arc(x, y, 15, 0, 2*Math.PI); ctx.stroke();
+    }
+    ctx.globalAlpha = occluded ? 0.78 : 1;
+    const dim = eclipse ? 0.55 : 1;
+    const glow = !eclipse && !occluded;
+    // nadir antenna (points at Earth) — drawn in screen space
+    const ax = Math.cos(earthAngle), ay = Math.sin(earthAngle);
+    ctx.strokeStyle = 'rgba(210,210,220,' + dim + ')'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + ax*9, y + ay*9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + ax*10, y + ay*10, 2.4, earthAngle - 1.1, earthAngle + 1.1);
+    ctx.strokeStyle = 'rgba(180,200,220,' + dim + ')'; ctx.stroke();
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(velAngle);              // local +x aligned with velocity
+    const gap = 5, pL = 13, pW = 8;
+    if (glow) { ctx.shadowColor = 'rgba(120,200,255,0.6)'; ctx.shadowBlur = 7; }
+
+    for (const s of [-1, 1]) {
+      const cy0 = s * (gap + pL / 2);
+      // boom
+      ctx.strokeStyle = 'rgba(190,190,200,' + dim + ')'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, s * 3); ctx.lineTo(0, s * gap); ctx.stroke();
+      // panel
+      const pg = ctx.createLinearGradient(-pW/2, cy0 - pL/2, pW/2, cy0 + pL/2);
+      pg.addColorStop(0, 'rgba(46,78,160,' + dim + ')');
+      pg.addColorStop(0.5, 'rgba(86,140,225,' + dim + ')');
+      pg.addColorStop(1, 'rgba(32,58,128,' + dim + ')');
+      ctx.fillStyle = pg;
+      ctx.fillRect(-pW/2, cy0 - pL/2, pW, pL);
+      ctx.shadowBlur = 0;
+      // cell grid
+      ctx.strokeStyle = 'rgba(8,16,36,' + (0.8 * dim) + ')'; ctx.lineWidth = 0.5;
+      for (let i = 1; i < 3; i++) { const gx = -pW/2 + i*pW/3; ctx.beginPath(); ctx.moveTo(gx, cy0 - pL/2); ctx.lineTo(gx, cy0 + pL/2); ctx.stroke(); }
+      for (let j = 1; j < 4; j++) { const gy = cy0 - pL/2 + j*pL/4; ctx.beginPath(); ctx.moveTo(-pW/2, gy); ctx.lineTo(pW/2, gy); ctx.stroke(); }
+      if (glow) { ctx.shadowColor = 'rgba(120,200,255,0.6)'; ctx.shadowBlur = 7; }
+    }
+    ctx.shadowBlur = 0;
+
+    // bus (gold-foil body)
+    const bw = 9, bh = 7;
+    const bg = ctx.createLinearGradient(-bw/2, -bh/2, bw/2, bh/2);
+    bg.addColorStop(0, 'rgba(225,185,95,' + dim + ')');
+    bg.addColorStop(0.5, 'rgba(255,216,124,' + dim + ')');
+    bg.addColorStop(1, 'rgba(176,134,58,' + dim + ')');
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = 'rgba(120,90,40,' + dim + ')'; ctx.lineWidth = 0.8;
+    roundRectPath(-bw/2, -bh/2, bw, bh, 1.6); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  }
+
+  // Animated RF link between the craft and its sub-satellite (nadir) point on
+  // Earth: teal pulses stream down (downlink, fast/dense), amber pulses climb up
+  // (uplink, slow/sparse). Only drawn when there's line of sight.
+  function drawCommsLink(sx, sy, cx, cy, er, pos) {
+    // sub-satellite (nadir) point: project RE·(pos/|pos|) so the beam lands on the
+    // globe's surface beneath the craft, not on the disk's silhouette/rim.
+    const r3 = Math.hypot(pos[0], pos[1], pos[2] || 0) || 1;
+    const gx = cx + (pos[0] / r3) * er, gy = cy - (pos[1] / r3) * er;
+    const t = performance.now() * 0.001;
+
+    ctx.save();
+    // faint dashed beam
+    ctx.strokeStyle = 'rgba(120,200,255,0.16)'; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(sx, sy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const dot = (frac, r, col) => {
+      const px = gx + (sx - gx) * frac, py = gy + (sy - gy) * frac;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI);
+      ctx.fillStyle = col; ctx.fill();
+    };
+    // downlink: sat → ground (150 Mbit/s — dense, fast)
+    for (let i = 0; i < 4; i++) {
+      const f = (t * 0.9 + i / 4) % 1, fade = Math.sin(Math.PI * f);
+      dot(1 - f, 2.0, 'rgba(120,235,205,' + (0.85 * fade) + ')');
+    }
+    // uplink: ground → sat (64 kbit/s — sparse, slow)
+    for (let i = 0; i < 2; i++) {
+      const f = (t * 0.4 + i / 2) % 1, fade = Math.sin(Math.PI * f);
+      dot(f, 1.6, 'rgba(232,200,120,' + (0.8 * fade) + ')');
+    }
+    ctx.restore();
+  }
+
+  function drawOrbit(view) {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    const cx = w/2, cy = h/2;
+    const scale = (Math.min(w, h)/2 - 30) / pathExtent * 0.84;   // zoomed out a touch
+    const SX = (x) => cx + x*scale, SY = (y) => cy - y*scale;
+
+    // deep-space background
+    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h)*0.7);
+    bg.addColorStop(0, '#0c1020'); bg.addColorStop(1, '#05060d');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    for (const s of stars) {
+      const tw = 0.6 + 0.4*Math.sin(s.tw + performance.now()*0.0016);
+      ctx.fillStyle = 'rgba(205,215,255,' + (s.b*tw) + ')';
+      ctx.beginPath(); ctx.arc(s.x*w, s.y*h, s.r, 0, 2*Math.PI); ctx.fill();
+    }
+
+    const er = RE*scale;
+
+    drawEarth(cx, cy, er);
+
+    // (no Sun glyph — the Sun would be far off-frame; it only drives the lighting)
+
+    // fading trail of decoded positions (dimmed where it passes behind Earth)
+    if (sim.trail.length > 1) {
+      for (let k = 1; k < sim.trail.length; k++) {
+        const a = k / sim.trail.length;
+        const p0 = sim.trail[k-1], p1 = sim.trail[k];
+        const occ = behindEarth(p1[0], p1[1], p1[2] || 0);
+        ctx.strokeStyle = 'rgba(120,235,205,' + (a * (occ ? 0.16 : 0.8)) + ')';
+        ctx.lineWidth = 0.5 + a*1.8;
+        ctx.beginPath();
+        ctx.moveTo(SX(p0[0]), SY(p0[1]));
+        ctx.lineTo(SX(p1[0]), SY(p1[1]));
+        ctx.stroke();
+      }
+    }
+
+    if (view) {
+      const hx = SX(view.pos[0]), hy = SY(view.pos[1]);
+      const occluded = behindEarth(view.pos[0], view.pos[1], view.pos[2] || 0);
+      const velAngle = Math.atan2(-view.vel[1], view.vel[0]);   // screen-space
+      const earthAngle = Math.atan2(cy - hy, cx - hx);
+
+      if (!occluded && !view.stale) drawCommsLink(hx, hy, cx, cy, er, view.pos);
+      drawSatellite(hx, hy, velAngle, earthAngle, view.eclipse, occluded);
+
+      // HUD
+      ctx.font = '11px JetBrains Mono, monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(156,220,254,0.92)';
+      ctx.fillText('ALT  ' + view.alt.toFixed(1) + ' km', 12, 20);
+      ctx.fillText('VEL  ' + (view.speed/1000).toFixed(3) + ' km/s', 12, 34);
+      ctx.fillText('MODE ' + view.mode, 12, 48);
+      let hudY = 62;
+      if (view.eclipse) { ctx.fillStyle = 'rgba(122,138,168,0.95)'; ctx.fillText('☾ ECLIPSE', 12, hudY); hudY += 14; }
+      if (occluded) { ctx.fillStyle = 'rgba(140,162,196,0.95)'; ctx.fillText('⊘ BEHIND EARTH', 12, hudY); }
+      if (view.stale) { ctx.fillStyle = '#f44747'; ctx.fillText('▲ HOLDING — frame dropped', 12, h - 12); }
+    }
+  }
+
+  /* ════════════════════ 5. Syntax highlight for the frame source ════════════════════ */
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function span(c, t) { return '<span class="t-' + c + '">' + esc(t) + '</span>'; }
+  function hi(line) {
+    let code = line, tail = '';
+    const h = line.indexOf('#');
+    if (h >= 0) { code = line.slice(0, h); tail = line.slice(h); }
+    const re = /(\s+)|(<[^>]*>)|("(?:[^"\\]|\\.)*")|(&\.[\w.\-+]*)|(\.[A-Za-z_][\w+\-]*)|(-?\d[\d.eE+\-]*)|([A-Za-z_°µμΩÅ][\w·~*°µμΩÅ⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-]*)|(=)|(;)|([\[\]{}\/,])|(.)/g;
+    let out = '', m;
+    while ((m = re.exec(code))) {
+      if (m[1]) out += esc(m[1]);
+      else if (m[2]) out += span('ann', m[2]);
+      else if (m[3]) out += span('str', m[3]);
+      else if (m[4]) out += span('val', m[4]);
+      else if (m[5]) out += span('key', m[5]);
+      else if (m[6]) out += span('val', m[6]);
+      else if (m[7]) out += span('sym', m[7]);
+      else if (m[8]) out += span('eq', m[8]);
+      else if (m[9]) out += span('semi', m[9]);
+      else if (m[10]) out += span('struct', m[10]);
+      else if (m[11]) out += esc(m[11]);
+    }
+    if (tail) out += span('comment', tail);
+    return out;
+  }
+
+  /* ════════════════════ 6. Render: frame source + gauges ════════════════════ */
+  const GAUGE_META = {
+    mission_time: { label: 'MISSION TIME' },
+    utc:       { label: 'UTC', span: true },
+    tai:       { label: 'TAI', span: true },
+    mode:      { label: 'MODE', sym: true },
+    eclipse:   { label: 'ECLIPSE', sym: true },
+    pos:       { label: 'POSITION (ECI)', span: true },
+    vel:       { label: 'VELOCITY (ECI)', span: true },
+    alt:       { label: 'ALTITUDE' },
+    speed:     { label: 'ORBITAL SPEED' },
+    batt_soc:  { label: 'BATTERY SOC' },
+    batt_v:    { label: 'BUS VOLTAGE' },
+    temp_core: { label: 'CORE TEMP' },
+    temp_pan:  { label: 'PANEL TEMP' },
+  };
+
+  function renderFrame(text, errs) {
+    const errLines = new Set(errs.map((e) => e.line));
+    $('framesrc').innerHTML = text.split('\n').map((l, i) => {
+      const ln = i + 1;
+      return '<div class="ln' + (errLines.has(ln) ? ' err' : '') + '" data-line="' + ln + '">' +
+             '<span class="gut">' + ln + '</span><span>' + hi(l) + '</span></div>';
+    }).join('');
+    applyHover();
+  }
+
+  function renderGauges(rows, stale) {
+    const tm = rows.filter((r) => r.depth === 1 && r.kind !== 'struct');
+    $('gauges').innerHTML = tm.map((r) => {
+      const meta = GAUGE_META[r.key] || { label: r.key };
+      const cls = ['gauge'];
+      if (meta.sym) cls.push('sym');
+      if (meta.span) cls.push('span2');
+      if (stale) cls.push('stale');
+      let val = r.valueText;
+      if (r.dataKind === 'string') val = '"' + val + '"';
+      const unit = r.unit ? '<span class="u">' + esc(r.unit) + '</span>' : '';
+      const type = r.family ? (r.family + (r.width ? ':' + r.width : '')) : (r.dataKind === 'symbol' ? 'symbol' : '');
+      return '<div class="' + cls.join(' ') + '" data-line="' + r.line + '">' +
+             '<div class="k">' + esc(meta.label) + '</div>' +
+             '<div class="v">' + esc(val) + unit + '</div>' +
+             (type ? '<div class="t">&lt;' + esc(type) + '&gt;</div>' : '') +
+             '</div>';
+    }).join('');
+    applyHover();
+  }
+
+  /* hover coupling between gauges and frame source. The hovered line is kept in
+     state and re-applied after every DOM rebuild (applyHover) so the live
+     telemetry redraw — which replaces the gauge/frame markup ~14×/s — can't drop
+     the highlight and make it flicker. mouseleave (not mouseout) avoids clearing
+     as the pointer crosses between child spans of the same row. */
+  let hoverLine = null;
+  function applyHover() {
+    document.querySelectorAll('[data-line]').forEach((n) => {
+      n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine);
+    });
+  }
+  function wireHover(container) {
+    container.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('[data-line]'); if (!el) return;
+      const ln = el.getAttribute('data-line');
+      if (ln !== hoverLine) { hoverLine = ln; applyHover(); }
+    });
+    container.addEventListener('mouseleave', () => {
+      if (hoverLine != null) { hoverLine = null; applyHover(); }
+    });
+  }
+  wireHover($('gauges')); wireHover($('framesrc'));
+
+  /* ════════════════════ 7. Main loop ════════════════════ */
+  function pushTicker(ok) {
+    sim.history.push(ok);
+    if (sim.history.length > 60) sim.history.shift();
+    $('ticker').innerHTML = sim.history.map((o, i) =>
+      '<i class="' + (o ? 'ok' : 'bad') + (i === sim.history.length - 1 ? ' cur' : '') + '"></i>').join('');
+  }
+
+  // Advance + render one frame. The canvas (orbit/globe/satellite) is redrawn
+  // every animation frame for smooth motion; the heavy telemetry DOM (frame
+  // source, gauges, status) is updated only when `doDom` is true (throttled).
+  function frame(dt, doDom) {
+    const adv = dt > 0;
+    if (adv) sim.met += dt;
+    const st = propagate(sim.met);
+    if (adv) updateBattery(dt, st.eclipse);
+
+    let text = buildFrame(st), dec, bad = false, drop = false;
+    if (doDom) {
+      if (sim.noisy && (sim.tframe % 5 === 4)) text = corrupt(text);
+      dec = decode(text);
+      bad = dec.errs.length > 0;
+      drop = bad && !sim.resync;            // resync off → discard whole frame
+      sim.held = drop;                      // hold the viz until the next good frame
+      if (drop) sim.dropped++;
+      sim.tframe++;
+    } else {
+      dec = decode(text);                   // clean decode, just to drive the satellite
+    }
+
+    // Build the view from DECODED values (bovnar drives the visualizer)
+    let view;
+    if (sim.held) {
+      view = Object.assign({}, sim.lastGood || { pos: st.pos, vel: st.vel, alt: st.alt, speed: st.speed, mode: 'NOMINAL', eclipse: st.eclipse }, { stale: true });
+    } else {
+      const m = dec.map.tm && dec.map.tm.struct;
+      const pos = m && gvec(m.pos), vel = m && gvec(m.vel);
+      view = {
+        pos: pos || st.pos, vel: vel || st.vel,
+        alt: m && m.alt ? gnum(m.alt) : st.alt,
+        speed: m && m.speed ? gnum(m.speed) : st.speed,
+        mode: m && m.mode ? m.mode.value : modeOf(st.eclipse),
+        eclipse: st.eclipse, stale: false,
+      };
+      sim.lastGood = view;
+    }
+
+    if (adv && doDom) {
+      sim.trail.push([view.pos[0], view.pos[1], view.pos[2]]);
+      if (sim.trail.length > 130) sim.trail.shift();
+    }
+
+    drawOrbit(view);
+
+    if (doDom) {
+      pushTicker(!bad);
+      renderFrame(text, dec.errs);
+      renderGauges(dec.rows, drop);
+      $('s-frame').textContent = sim.tframe;
+      $('s-met').textContent = fmtClock(sim.met);
+      $('s-orb').textContent = (sim.met / sim.period).toFixed(2);
+      $('s-drop').textContent = sim.dropped;
+      const lock = $('s-lock');
+      if (drop) { lock.className = 'lock no'; lock.innerHTML = 'lock <b>LOST</b>'; }
+      else { lock.className = 'lock ok'; lock.innerHTML = 'lock <b>LOCKED</b>'; }
+    }
+  }
+
+  function fmtClock(s) {
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+    return h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  }
+
+  const STEP_DT = 60;                       // seconds advanced by the Step button
+  const DOM_MS = 70;                         // min ms between telemetry/DOM updates (~14 Hz)
+  let rafId = null, lastWall = null, domAccum = 1e9;
+  function loop(now) {
+    if (lastWall == null) lastWall = now;
+    let el = now - lastWall; lastWall = now;
+    if (el > 250) el = 250;                  // clamp big hitches (tab switch etc.)
+    const dt = el / 1000 * sim.speed;        // real elapsed time × speed
+    domAccum += el;
+    let doDom = false;
+    if (domAccum >= DOM_MS) { doDom = true; domAccum = 0; }
+    frame(dt, doDom);
+    rafId = requestAnimationFrame(loop);
+  }
+  function start() { if (rafId == null) { lastWall = null; domAccum = 1e9; rafId = requestAnimationFrame(loop); } }
+  function stop()  { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
+
+  /* ════════════════════ 8. Config panel ════════════════════ */
+  const DEFAULT_CFG =
+`# ── AETHER-1 spacecraft configuration ──────────────────────
+# Self-describing: every value carries its own type + unit inline.
+# Config uses ASCII unit notation; SI prefixes take a '~' (k~g, k~m, G~Hz).
+.spacecraft = {
+    .name      = "AETHER-1";
+    .cospar_id = "2026-042B";
+    .norad_id  = <uint:32> 99001;
+    .bus       = "ESPA-class smallsat";
+    .dry_mass  = 142.6 k~g;
+};
+
+.orbit = {                          # circular orbit (a = R_earth + altitude)
+    .epoch           = "2026-05-28T00:00:00Z";
+    .altitude        = <float:64,k~m> 550.0;
+    .inclination     = 48.0 deg;
+    .raan            = 180.0 deg;
+    .arg_of_latitude = 0.0 deg;     # start angle from the ascending node
+};
+
+.power = {
+    .solar_array_power = 620 W;
+    .battery_capacity  = 432 W*h;
+    .bus_voltage       = <float:64,V> 28.0;
+    .min_soc           = 0.30;
+};
+
+.propulsion = {
+    .type             = monopropellant;
+    .thrust           = 1.0 N;
+    .specific_impulse = 221 s;
+    .propellant_mass  = 9.8 k~g;
+};
+
+.adcs = {
+    .mode              = three_axis_stabilized;
+    .pointing_accuracy = 0.05 deg;
+    .slew_rate         = 1.5 deg/s;
+    .sensors           = [ "star_tracker", "sun_sensor", "imu", "magnetometer" ];
+    .actuators         = [ "reaction_wheel", "magnetorquer" ];
+};
+
+.comms = {
+    .band           = X;
+    .downlink_rate  = 150 M~bit/s;
+    .uplink_rate    = 64 k~bit/s;
+    .frequency      = 8.45 G~Hz;
+    .transmit_power = 6.0 W;
+    .antenna_gain   = 32.0 dB;
+};
+
+.thermal = {
+    .operating_temp_min = -20.0 degC;
+    .operating_temp_max = 55.0 degC;
+    .heater_power       = 18 W;
+};
+
+.telemetry = {
+    .rate     = 1.0 Hz;
+    .resync   = true;
+    .channels = [ "pos", "vel", "alt", "batt", "thermal", "adcs" ];
+};`;
+
+  function applyConfig() {
+    const txt = $('cfg').value;
+    const dec = decode(txt);
+    const msg = $('cfgmsg');
+    if (dec.errs.length) {
+      msg.className = 'cfg-msg err';
+      msg.textContent = '✗ ' + dec.errs.length + ' parse error(s), line ' + dec.errs[0].line;
+      return;
+    }
+    const o = dec.map.orbit && dec.map.orbit.struct;
+    if (!o || !o.altitude) {
+      msg.className = 'cfg-msg err'; msg.textContent = '✗ no .orbit.altitude found';
+      return;
+    }
+    orbit = {
+      name: (dec.map.spacecraft && dec.map.spacecraft.struct.name && dec.map.spacecraft.struct.name.value) || 'SAT',
+      a: gnum(o.altitude) + RE,                      // circular: a = R_earth + altitude
+      e: 0,
+      i: o.inclination ? gnum(o.inclination) : 0,
+      raan: o.raan ? gnum(o.raan) : 0,
+      argp: o.arg_of_latitude ? gnum(o.arg_of_latitude) : 0,   // u = ω + ν, with ν=0 at epoch
+    };
+    if (o.epoch) { const ep = Date.parse(o.epoch.value); if (!isNaN(ep)) sim.epochMs = ep; }
+    const tm = dec.map.telemetry && dec.map.telemetry.struct;
+    if (tm && tm.resync) { sim.resync = (tm.resync.value === 'true'); $('resync').checked = sim.resync; }
+    rebuildOrbit();
+    renderDerived();
+    msg.className = 'cfg-msg ok';
+    msg.textContent = '✓ orbit updated — ' + orbit.name;
+  }
+
+  function renderDerived() {
+    const alt = orbit.a - RE;
+    const vc = Math.sqrt(MU / orbit.a) * 1000;       // circular orbital speed (m/s)
+    $('derived').innerHTML = [
+      ['altitude',    alt.toFixed(0) + ' km'],
+      ['period',      (sim.period/60).toFixed(1) + ' min'],
+      ['orbital vel', (vc/1000).toFixed(2) + ' km/s'],
+      ['inclination', orbit.i.toFixed(2) + '°'],
+    ].map(([k, v]) => '<div><span>' + k + '</span><b>' + v + '</b></div>').join('');
+  }
+
+  /* ════════════════════ 9. Controls wiring ════════════════════ */
+  // keep the Bovnar syntax-highlight layer in sync with the config textarea
+  function updateCfgHL() {
+    $('cfg-hl').innerHTML = $('cfg').value.split('\n').map(hi).join('\n') + '\n';
+  }
+  $('cfg').addEventListener('input', updateCfgHL);
+  $('cfg').addEventListener('scroll', () => {
+    $('cfg-hl').scrollTop = $('cfg').scrollTop;
+    $('cfg-hl').scrollLeft = $('cfg').scrollLeft;
+  });
+
+  $('apply').addEventListener('click', applyConfig);
+  $('reset-cfg').addEventListener('click', () => { $('cfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig(); });
+  $('play').addEventListener('click', () => {
+    sim.playing = !sim.playing;
+    $('play').textContent = sim.playing ? '⏸ Pause' : '▶ Play';
+    sim.playing ? start() : stop();
+  });
+  $('step').addEventListener('click', () => { if (sim.playing) { sim.playing = false; $('play').textContent = '▶ Play'; stop(); } frame(STEP_DT, true); });
+  $('speed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('speedlbl').textContent = sim.speed + '×'; });
+  $('noisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
+  $('resync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
+  window.addEventListener('resize', () => { sizeCanvas(); drawOrbit(sim.lastGood); });
+  // The visualizer's height comes from the flex row, so it isn't final until the
+  // sibling panels (telemetry markup, web fonts) settle after boot. Re-sync the
+  // backing buffer to the canvas's real box whenever it changes, or it stays
+  // pinned to the boot-time min-height and the globe renders stretched/clipped.
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { sizeCanvas(); drawOrbit(sim.lastGood); }).observe(cv);
+  }
+
+  /* ════════════════════ 10. Boot ════════════════════ */
+  $('cfg').value = DEFAULT_CFG;
+  updateCfgHL();
+  sizeCanvas();
+  applyConfig();
+  const params = new URLSearchParams(location.search);
+  if (params.has('met')) sim.met = +params.get('met') || 0;
+  if (params.has('speed')) { sim.speed = +params.get('speed') || sim.speed; $('speed').value = sim.speed; $('speedlbl').textContent = sim.speed + '×'; }
+  frame(0, true);
+  start();
+})();
+</script>
+</body>
+</html>

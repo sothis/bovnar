@@ -1,9 +1,9 @@
 # Bovnar Python Bindings
 
-> **Version:** 1.0
+> **Version:** 0.x
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (spec v1.0).
+library (spec v0.x).
 
 No compiled extension module is needed — the bindings load `libbvnr_shared.so` at
 import time via the standard `ctypes.CDLL` machinery.

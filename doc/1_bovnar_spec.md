@@ -1,7 +1,7 @@
 # Bovnar Specification
 
-> **Version:** 1.0
-> **Status:** Released
+> **Version:** 0.x
+> **Status:** Draft
 > **Last updated:** 2026-05-15
 
 ---

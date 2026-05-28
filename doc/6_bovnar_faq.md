@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Frequently Asked Questions
 
-> **Applies to:** Bovnar specification v1.0
+> **Applies to:** Bovnar specification v0.x
 
 ---
 

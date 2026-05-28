@@ -1,6 +1,6 @@
 # Bovnar Quantity Annotation System — Unit and Currency Reference
 
-> **Applies to:** Bovnar (BVNR) specification version 1.1
+> **Applies to:** Bovnar (BVNR) specification version 0.x
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
 ---

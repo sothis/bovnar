@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — A Practical Tutorial
 
-**Format version:** 1.0  
+**Format version:** 0.x
 **Audience:** Developers already comfortable with JSON or similar text formats.
 
 ---

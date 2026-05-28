@@ -1,6 +1,6 @@
 (* ================================================================== *)
 (*  BOVNAR  –  EBNF derived from parser/lexer/validator implementation *)
-(*  Version 1.0   Notation: ISO/IEC 14977:1996                        *)
+(*  Version 0.x   Notation: ISO/IEC 14977:1996                        *)
 (*    { }  = zero or more       [ ]  = optional                       *)
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)

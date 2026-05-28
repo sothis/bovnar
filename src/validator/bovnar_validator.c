@@ -102,7 +102,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 {
 	bvnr_validator_t* v = &r->val;
 	value_type_spec_t default_type;
-	value_unit_t      default_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	static const value_unit_t default_unit = BVN_UNIT_NO_PREFIX(bu_none);
 	const char*       family_name;
 	uint32_t          family_name_len;
 	bool              emit_width = false;
@@ -204,10 +204,12 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	v->value_type    = default_type;
 	v->parsed_unit   = default_unit;
 	v->unit_data_len = emit_unit ? 7u : 0u;
-	bvnr_data_t d = {0};
-	d.type   = token_is_type;
-	d.data   = family_name;
-	d.length = family_name_len;
+	bvnr_data_t d;
+	d.type       = token_is_type;
+	d.value_type = BVN_TYPE_PLAIN;
+	d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	d.data       = family_name;
+	d.length     = family_name_len;
 	if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
 		return false;
 	d.value_type = v->value_type;
@@ -346,7 +348,15 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 	bool is_neg = (str_len > 0 && str[0] == '-');
 	if (vt.family != vt_uint && vt.family != vt_sint)
 		return true;
-	if (bvn_is_special_number_string((const char*)str)) return true;
+	/* Special-number check: digits never form `nan`/`infinity`, so
+	 * skip the multi-byte compare for the common case. */
+	if (str_len > 0) {
+		uint8_t c0 = str[0];
+		if ((c0 == 'n' || c0 == 'i' ||
+		     (c0 == '-' && str_len > 1 && str[1] == 'i')) &&
+		    bvn_is_special_number_string((const char*)str))
+			return true;
+	}
 	uint32_t w = bvn_effective_width(vt);
 	if (w > 64u) {
 		if (vt.family == vt_uint)
@@ -427,10 +437,12 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
 		uint8_t unit_buf[UINT8_MAX + 1];
 		uint8_t ulen = 0;
-		bvnr_data_t d = {0};
-		d.type   = token_is_type;
-		d.data   = raw->type_data;
-		d.length = raw->type_len;
+		bvnr_data_t d;
+		d.type       = token_is_type;
+		d.value_type = BVN_TYPE_PLAIN;
+		d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
+		d.data       = raw->type_data;
+		d.length     = raw->type_len;
 		if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
 			return false;
 		uint32_t tcache_hit_idx = (uint32_t)-1;
@@ -487,6 +499,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			return false;
 		}
 		v->parsed_unit   = parsed_unit;
+		if (!BVN_UNIT_IS_NO_UNIT(parsed_unit))
+			v->parsed_unit_serial++;
 		v->unit_data_len = ulen;
 		if (ulen > 0)
 			v->has_annotation_unit = true;
@@ -539,10 +553,12 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		return true;
 	}
 	if (tt == token_is_null_value) {
-		bvnr_data_t d = {0};
+		bvnr_data_t d;
 		d.type       = tt;
 		d.value_type = v->value_type;
 		d.value_unit = v->parsed_unit;
+		d.data       = NULL;
+		d.length     = 0;
 		return bvn_emit_both(r, raw->event, &d);
 	}
 	bool         iu_have = false;
@@ -619,15 +635,19 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			return false;
 		}
 		v->parsed_unit = iu_unit;
+		if (!BVN_UNIT_IS_NO_UNIT(iu_unit))
+			v->parsed_unit_serial++;
 	}
-	token_type_t dt = tt;
-	bvnr_data_t d = {0};
-	d.type       = dt;
+	bvnr_data_t d;
+	d.type       = tt;
 	d.value_type = v->value_type;
 	d.value_unit = v->parsed_unit;
 	if (tt != token_is_null_value) {
 		d.data   = raw->str_data;
 		d.length = raw->str_len;
+	} else {
+		d.data   = NULL;
+		d.length = 0;
 	}
 	return bvn_emit_both(r, raw->event, &d);
 }

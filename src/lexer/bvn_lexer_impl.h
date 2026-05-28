@@ -183,6 +183,7 @@ typedef struct bvn_array_frame_s {
 	uint64_t		saved_row;
 	value_type_spec_t	saved_vtype;
 	value_unit_t		saved_vunit;
+	uint32_t		saved_unit_serial;
 	uint64_t		dim_row_size;
 	bool			in_dim_seq;
 } bvn_array_frame_t;
@@ -233,7 +234,6 @@ typedef struct bvnr_lexer_s {
 	uint32_t		resync_struct_depth;
 	uint8_t			resync_saved_struct_nesting;
 	uint64_t		recovery_count;
-	uint8_t			*read_buf;
 } bvnr_lexer_t;
 extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];

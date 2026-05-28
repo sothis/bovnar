@@ -13,14 +13,10 @@ bvnr_writer_t* bvnr_writer_create(void)
 	bvnr_writer_t* w = malloc(sizeof(*w));
 	if (!w) return NULL;
 	memset(w, 0, sizeof(*w));
-	w->ser.wbuf = malloc(BVN_SER_WBUF_SIZE);
-	if (!w->ser.wbuf) { free(w); return NULL; }
 	return w;
 }
 void bvnr_writer_destroy(bvnr_writer_t* w)
 {
-	if (!w) return;
-	free(w->ser.wbuf);
 	free(w);
 }
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
@@ -759,9 +755,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 }
 static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 {
-	uint8_t* saved_wbuf = w->ser.wbuf;
 	memset(w, 0, sizeof(*w));
-	w->ser.wbuf = saved_wbuf;
 	w->ser.pretty = false;
 	w->ser.indent = 0;
 	w->ser.need_semi = false;

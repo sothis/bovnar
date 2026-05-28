@@ -34,14 +34,19 @@ set(BVNR_C_FLAGS
     -fno-strict-aliasing
 )
 if(BVNR_HARDEN)
+    # -Wformat=2 / -Wformat-security: compile-time only, zero runtime cost.
     list(APPEND BVNR_C_FLAGS
-        -fstack-protector-strong
         -Wformat=2
         -Wformat-security
     )
-    # FORTIFY_SOURCE requires optimisation; quietly skipped in Debug.
+    # FORTIFY_SOURCE: cheap runtime checks on libc string/io calls; needs
+    # optimisation to be active, so silently no-op in Debug.
     list(APPEND BVNR_C_FLAGS
         $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+    # Stack protector: ~10-15% slowdown on the parser hot path because the
+    # state-machine functions touch local arrays.  Apply it only to the
+    # CLI executable (where user input enters via argv / files) instead
+    # of the inner library translation units — see the bovnar target below.
 endif()
 if(BVNR_WERROR)
     list(APPEND BVNR_C_FLAGS -Werror)
@@ -123,6 +128,12 @@ target_link_libraries(bvnr_shared PUBLIC m)
 
 add_executable(bovnar src/bovnar.c)
 target_compile_options(bovnar PRIVATE ${BVNR_C_FLAGS})
+if(BVNR_HARDEN)
+    # Stack protector is applied to the CLI binary's own TU (where argv
+    # and stdin are first touched).  Library TUs are exempt so the
+    # parser hot path stays fast.
+    target_compile_options(bovnar PRIVATE -fstack-protector-strong)
+endif()
 set_target_properties(bovnar PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_options(bovnar PRIVATE -pie)
 target_link_libraries(bovnar PRIVATE bvnr_static m)

@@ -101,8 +101,9 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 		--l->array_nesting_level;
 		if (l->array_nesting_level > 0) {
 			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
-			p->val.value_type  = f->saved_vtype;
-			p->val.parsed_unit = f->saved_vunit;
+			p->val.value_type         = f->saved_vtype;
+			p->val.parsed_unit        = f->saved_vunit;
+			p->val.parsed_unit_serial = f->saved_unit_serial;
 		}
 	}
 	l->utf8_need = 0;
@@ -428,6 +429,7 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	f->saved_row   = p->lex.array_row_size;
 	f->saved_vtype = p->val.value_type;
 	f->saved_vunit = p->val.parsed_unit;
+	f->saved_unit_serial = p->val.parsed_unit_serial;
 	p->lex.curr_row_size  = 0;
 	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : 0;
 	++p->lex.curr_row_size;
@@ -460,7 +462,10 @@ bool bvn_action_array_outro(bvnr_reader_t* p)
 	p->lex.curr_row_size  = f->saved_curr + 1u;
 	p->lex.array_row_size = f->saved_row;
 	p->val.value_type     = f->saved_vtype;
-	p->val.parsed_unit    = f->saved_vunit;
+	if (p->val.parsed_unit_serial != f->saved_unit_serial) {
+		p->val.parsed_unit         = f->saved_vunit;
+		p->val.parsed_unit_serial  = f->saved_unit_serial;
+	}
 	p->lex.next_state = array_outro;
 	return true;
 }
@@ -487,7 +492,10 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 	p->lex.arr_frames[p->lex.array_nesting_level].in_dim_seq = false;
 	bvn_array_frame_t *par = &p->lex.arr_frames[p->lex.array_nesting_level - 1u];
 	p->val.value_type  = par->saved_vtype;
-	p->val.parsed_unit = par->saved_vunit;
+	if (p->val.parsed_unit_serial != par->saved_unit_serial) {
+		p->val.parsed_unit         = par->saved_vunit;
+		p->val.parsed_unit_serial  = par->saved_unit_serial;
+	}
 	++p->lex.curr_row_size;
 	p->lex.token_type = token_is_null_value;
 	p->lex.next_state = new_array_value;
@@ -824,8 +832,9 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 		--l->array_nesting_level;
 		if (l->array_nesting_level > 0) {
 			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
-			p->val.value_type  = f->saved_vtype;
-			p->val.parsed_unit = f->saved_vunit;
+			p->val.value_type         = f->saved_vtype;
+			p->val.parsed_unit        = f->saved_vunit;
+			p->val.parsed_unit_serial = f->saved_unit_serial;
 		}
 	}
 	if (!bvn_resync_semicolon_reset(p))
@@ -1179,24 +1188,35 @@ static inline uint32_t bvn_try_bulk_run(
 	}
 	if (!lut[data[start]])
 		return 0;
+	/* Two-stage walk.  Stage 1 is the tight ASCII-only loop — one
+	 * LUT lookup and one increment per byte.  As soon as a non-ASCII
+	 * byte appears, drop into stage 2 which validates multi-byte
+	 * UTF-8 sequences and resumes the ASCII fast path between them. */
 	uint32_t end = start;
-	uint32_t last_complete = start;
-	uint8_t need = 0, lo = 0, hi = 0;
+	uint32_t last_complete;
 	while (end < len) {
+		uint32_t a = end;
+		while (a < len && data[a] < 0x80u && lut[data[a]]) ++a;
+		last_complete = a;
+		end = a;
+		if (end >= len) break;
 		uint8_t b = data[end];
-		if (need) {
-			if (b < lo || b > hi) break;
+		if (b < 0x80u) break;            /* ASCII byte rejected by LUT */
+		if (!lut[b]) break;
+		uint8_t need = 0, lo = 0, hi = 0;
+		if (!bvn_utf8_classify_leader(b, &need, &lo, &hi)) break;
+		++end;
+		bool seq_ok = true;
+		while (need) {
+			if (end >= len) { seq_ok = false; break; }
+			uint8_t cb = data[end];
+			if (cb < lo || cb > hi) { seq_ok = false; break; }
 			--need;
 			lo = 0x80u; hi = 0xbfu;
-			if (!need) last_complete = end + 1u;
-		} else if (b < 0x80u) {
-			if (!lut[b]) break;
-			last_complete = end + 1u;
-		} else {
-			if (!lut[b]) break;
-			if (!bvn_utf8_classify_leader(b, &need, &lo, &hi)) break;
+			++end;
 		}
-		++end;
+		if (!seq_ok) break;
+		last_complete = end;
 	}
 	end = last_complete;
 	if (end == start) return 0;
@@ -1376,8 +1396,6 @@ void bvn_lex_destroy(bvnr_lexer_t* l)
 	l->str_data         = NULL;
 	l->type_data        = NULL;
 	l->inline_unit_data = NULL;
-	free(l->read_buf);
-	l->read_buf = NULL;
 }
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
@@ -1428,21 +1446,13 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	l->str_data         = bufs;
 	l->type_data        = bufs + BVN_STR_BUF_CAP;
 	l->inline_unit_data = bufs + BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP;
-	l->read_buf = malloc(BOVN_READ_BUFFER_SIZE);
-	if (!l->read_buf) {
-		free(bufs);
-		l->str_data = l->type_data = l->inline_unit_data = NULL;
-		free(l->arr_frames);
-		l->arr_frames = NULL;
-		return false;
-	}
 	return true;
 }
 #define BVN_MEM_CHUNK_MAX (1u << 20)
 bool bvn_lex_run(bvnr_reader_t* r)
 {
 	bvnr_lexer_t* l = &r->lex;
-	uint8_t* stack_data = l->read_buf;
+	uint8_t stack_data[BOVN_READ_BUFFER_SIZE];
 	const uint8_t* data;
 	uint32_t nb, off, consumed;
 	uint32_t os_leftover;

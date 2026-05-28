@@ -55,16 +55,19 @@ static uint32_t bvn_digit_to_char(uint32_t d, uint32_t base)
 bool bvn_is_special_number_string(const char* s)
 {
 	if (!s) return false;
-	if (s[0] == 'n')
+	/* Fast first-byte filter: 99%+ of numbers start with a digit, so
+	 * the cheap reject path dominates and the multi-byte comparisons
+	 * below are skipped entirely. */
+	uint8_t c = (uint8_t)s[0];
+	if (c != 'n' && c != 'i' && c != '-') return false;
+	if (c == 'n')
 		return s[1] == 'a' && s[2] == 'n' && s[3] == '\0';
-	if (s[0] == 'i')
+	if (c == 'i')
 		return s[1] == 'n' && s[2] == 'f' && s[3] == 'i' && s[4] == 'n'
 		    && s[5] == 'i' && s[6] == 't' && s[7] == 'y' && s[8] == '\0';
-	if (s[0] == '-')
-		return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == 'i'
-		    && s[5] == 'n' && s[6] == 'i' && s[7] == 't' && s[8] == 'y'
-		    && s[9] == '\0';
-	return false;
+	return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == 'i'
+	    && s[5] == 'n' && s[6] == 'i' && s[7] == 't' && s[8] == 'y'
+	    && s[9] == '\0';
 }
 bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 {
@@ -193,8 +196,13 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
 	if (w == 0) return true;
-	if (bvn_is_special_number_string(s)) return true;
-	if (s[0] == '-') return false;
+	/* Fast first-byte filter: digits never form a special-number
+	 * string, so skip the multi-char compare in the common case. */
+	uint8_t c0 = (uint8_t)s[0];
+	if ((c0 < '0' || c0 > '9') && c0 != '+') {
+		if (bvn_is_special_number_string(s)) return true;
+		if (c0 == '-') return false;
+	}
 	const char* p = s;
 	if (*p == '+') p++;
 	if (w <= 64) {
@@ -256,7 +264,12 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
 	if (w == 0) return true;
-	if (bvn_is_special_number_string(s)) return true;
+	uint8_t c0 = (uint8_t)s[0];
+	/* Fast first-byte filter: digits and sign chars dominate; the
+	 * multi-char special-number compare only runs for ASCII letters. */
+	if ((c0 < '0' || c0 > '9') && c0 != '-' && c0 != '+') {
+		if (bvn_is_special_number_string(s)) return true;
+	}
 	bool neg = (s[0] == '-');
 	const char* abs = s;
 	if (neg || s[0] == '+') abs++;

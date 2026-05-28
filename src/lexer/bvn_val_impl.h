@@ -34,9 +34,14 @@ typedef struct bvnr_serializer_s {
 	void*			event_userdata;
 	bool			(*on_event)(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bvn_unit_flags_t	unit_flags;
-	uint8_t			*wbuf;
+	uint8_t			wbuf[BVN_SER_WBUF_SIZE];
 	uint32_t		wbuf_pos;
 } bvnr_serializer_t;
+/* True when a value_unit_t is the "no unit" default produced by
+ * BVN_UNIT_NO_PREFIX(bu_none).  Used to gate the parsed_unit_serial
+ * bump so arrays of unit-less numbers don't invalidate the cache. */
+#define BVN_UNIT_IS_NO_UNIT(u) \
+	((u).num_components == 1u && (u).components[0].base == bu_none)
 #define BVN_TYPE_CACHE_KEY_CAP  64u
 #define BVN_IU_CACHE_KEY_CAP    32u
 #define BVN_TYPE_CACHE_UBUF_CAP 64u
@@ -63,6 +68,12 @@ typedef struct bvnr_validator_s {
 	value_type_spec_t	value_type;
 	value_unit_t		parsed_unit;
 	value_type_spec_t	inferred_default_vtype;
+	/* Monotonic counter incremented every time parsed_unit is set to
+	 * a non-default value.  The array-frame save/restore compares
+	 * this against a snapshot to skip the 132-byte ValueUnit copy
+	 * when the value hasn't changed since the frame entry — which is
+	 * the common case for arrays of unit-less numbers. */
+	uint32_t		parsed_unit_serial;
 	uint64_t		acc_value;
 	bool			acc_overflow;
 	bool			acc_has_dot;

@@ -14,8 +14,6 @@ bvnr_canon_observer_t *bvnr_canon_observer_create(
 	bvnr_canon_observer_t *obs = malloc(sizeof(*obs));
 	if (!obs) return NULL;
 	memset(obs, 0, sizeof(*obs));
-	obs->ser.wbuf = malloc(BVN_SER_WBUF_SIZE);
-	if (!obs->ser.wbuf) { free(obs); return NULL; }
 	obs->ser.sink              = *sink;
 	obs->ser.pretty            = pretty;
 	obs->ser.max_array_nesting = UINT8_MAX;
@@ -23,8 +21,6 @@ bvnr_canon_observer_t *bvnr_canon_observer_create(
 }
 void bvnr_canon_observer_destroy(bvnr_canon_observer_t *obs)
 {
-	if (!obs) return;
-	free(obs->ser.wbuf);
 	free(obs);
 }
 bool bvnr_canon_observer_on_event(void *ud,

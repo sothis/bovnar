@@ -109,7 +109,16 @@ class Writer:
 
         try:
             if not self._finished and exc_type is None:
-                self.finish()
+                # A writer already in a sticky error state has an
+                # unterminated, broken stream, and that error was raised
+                # when it occurred.  finish() now reports that failure, so
+                # calling it here would re-raise an error the caller has
+                # already handled inside the block — skip it and just
+                # release resources.
+                poisoned = (self._ptr is not None and
+                            self._lib.bvnr_writer_get_error(self._ptr) != 0)
+                if not poisoned:
+                    self.finish()
         finally:
             self._close_owned_fd()
 

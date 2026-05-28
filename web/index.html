@@ -1937,13 +1937,13 @@ a[data-doc] { cursor: pointer; }
   <a class="nav-brand" href="#">BOVNAR<span class="ext">.bvnr</span></a>
   <ul class="nav-links">
     <li><a href="#demo">Live Demo</a></li>
+    <li><a href="#playground">Playground</a></li>
     <li><a href="#philosophy">Philosophy</a></li>
     <li><a href="#syntax">Syntax</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#quickstart">Quick Start</a></li>
     <li><a href="#usecases">Use Cases</a></li>
     <li><a href="#docs">Docs</a></li>
-    <li><a href="#playground">Playground</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>
 </nav>
@@ -2119,6 +2119,61 @@ a[data-doc] { cursor: pointer; }
   });
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════
+     PLAYGROUND
+══════════════════════════════════════════════ -->
+<section id="playground">
+  <div class="section-inner" style="padding-bottom:3rem;">
+    <div class="section-label reveal">live parser</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Parse events, <em>as you type.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Type any valid (or invalid) Bovnar below. The parser emits events in real time —
+      every token, type annotation, and error is shown as it is recognised.
+    </p>
+
+    <div class="playground-layout reveal reveal-delay-3">
+      <!-- ── editor ── -->
+      <div class="pg-editor-col">
+        <div class="pg-col-header">
+          <span class="pg-col-title">Editor</span>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
+            <span class="pg-col-badge" id="pg-status">ready</span>
+          </div>
+        </div>
+        <div class="pg-editor-wrap">
+          <div id="pg-highlight" aria-hidden="true"></div>
+          <textarea id="pg-editor" spellcheck="false" autocomplete="off" autocorrect="off"
+            placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
+          ></textarea>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;padding:0.55rem 0.85rem;background:var(--panel-bg);border-top:1px solid var(--border);">
+          <button class="pg-example-btn" data-example="typed">Typed values</button>
+          <button class="pg-example-btn" data-example="units">SI units</button>
+          <button class="pg-example-btn" data-example="struct">Nested struct</button>
+          <button class="pg-example-btn" data-example="array">Array</button>
+          <button class="pg-example-btn" data-example="strings">Strings</button>
+          <button class="pg-example-btn" data-example="errors">Parse errors</button>
+        </div>
+      </div>
+
+      <!-- ── event log ── -->
+      <div class="pg-events-col">
+        <div class="pg-col-header">
+          <span class="pg-col-title">Event Stream</span>
+          <span class="pg-col-badge" id="pg-ev-count">0 events</span>
+          <button class="pg-clear-btn" id="pg-clear">clear</button>
+        </div>
+        <div id="pg-event-log">
+          <div class="pg-empty-state" id="pg-empty">
+            <span style="color:var(--text3);font-size:0.9rem;">◈</span>
+            <span>Events appear here as you type.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ══════════════════════════════════════════════
      PHILOSOPHY
@@ -2834,61 +2889,6 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
           <div class="doc-card-tag">Quick reference</div>
         </div>
       </a>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════════
-     PLAYGROUND
-══════════════════════════════════════════════ -->
-<section id="playground">
-  <div class="section-inner" style="padding-bottom:3rem;">
-    <div class="section-label reveal">live parser</div>
-    <h2 class="section-h2 reveal reveal-delay-1">Parse events, <em>as you type.</em></h2>
-    <p class="section-p reveal reveal-delay-2">
-      Type any valid (or invalid) Bovnar below. The parser emits events in real time —
-      every token, type annotation, and error is shown as it is recognised.
-    </p>
-
-    <div class="playground-layout reveal reveal-delay-3">
-      <!-- ── editor ── -->
-      <div class="pg-editor-col">
-        <div class="pg-col-header">
-          <span class="pg-col-title">Editor</span>
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
-            <span class="pg-col-badge" id="pg-status">ready</span>
-          </div>
-        </div>
-        <div class="pg-editor-wrap">
-          <div id="pg-highlight" aria-hidden="true"></div>
-          <textarea id="pg-editor" spellcheck="false" autocomplete="off" autocorrect="off"
-            placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
-          ></textarea>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;padding:0.55rem 0.85rem;background:var(--panel-bg);border-top:1px solid var(--border);">
-          <button class="pg-example-btn" data-example="typed">Typed values</button>
-          <button class="pg-example-btn" data-example="units">SI units</button>
-          <button class="pg-example-btn" data-example="struct">Nested struct</button>
-          <button class="pg-example-btn" data-example="array">Array</button>
-          <button class="pg-example-btn" data-example="strings">Strings</button>
-          <button class="pg-example-btn" data-example="errors">Parse errors</button>
-        </div>
-      </div>
-
-      <!-- ── event log ── -->
-      <div class="pg-events-col">
-        <div class="pg-col-header">
-          <span class="pg-col-title">Event Stream</span>
-          <span class="pg-col-badge" id="pg-ev-count">0 events</span>
-          <button class="pg-clear-btn" id="pg-clear">clear</button>
-        </div>
-        <div id="pg-event-log">
-          <div class="pg-empty-state" id="pg-empty">
-            <span style="color:var(--text3);font-size:0.9rem;">◈</span>
-            <span>Events appear here as you type.</span>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </section>

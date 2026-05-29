@@ -191,10 +191,28 @@ static inline uint32_t bvn_effective_base_or_10(value_type_spec_t vt)
  * re-emitting the identical annotation event burst. The full event sequence
  * (start, family, width param, base param, unit param, end) is only emitted
  * when the inferred type actually changes.
+ *
+ * The comparison is by *effective* family/width/base (bvn_default_type_equiv),
+ * not raw fields, and an explicit annotation primes inferred_default_vtype just
+ * like a synthesised default. This keeps the canonical serialiser idempotent:
+ * an explicit "<uint:64,_10,no_unit>" (base == 10) and the synthesised uint
+ * default (base == 0, effective 10) are the same effective type, so a following
+ * bare element is suppressed identically whether the run was opened by an
+ * explicit annotation or an inferred one.
  */
+static inline bool bvn_default_type_equiv(
+	value_type_spec_t a, value_type_spec_t b)
+{
+	return a.family == b.family &&
+	       bvn_effective_width(a) == bvn_effective_width(b) &&
+	       bvn_effective_base(a)  == bvn_effective_base(b)  &&
+	       bvn_effective_q(a)     == bvn_effective_q(b);
+}
 static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	token_type_t tt, const uint8_t* str, uint32_t str_len,
-	bool is_currency_unit)
+	bool is_currency_unit,
+	const uint8_t* inline_unit_str, uint32_t inline_unit_len,
+	value_unit_t inline_unit_val)
 {
 	bvnr_validator_t* v = &r->val;
 	value_type_spec_t default_type;
@@ -207,7 +225,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	static const char no_unit_str[] = "no_unit";
 	if (tt == token_is_string || tt == token_is_array_string) {
 		if (!bvn_type_is_plain(v->inferred_default_vtype) &&
-		    bvn_type_spec_eq(BVN_TYPE_UTF8, v->inferred_default_vtype)) {
+		    bvn_default_type_equiv(BVN_TYPE_UTF8, v->inferred_default_vtype)) {
 			v->value_type    = BVN_TYPE_UTF8;
 			v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
 			v->unit_data_len = 0;
@@ -223,7 +241,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		if (!is_currency_unit && (has_dot || has_exp)) {
 			value_type_spec_t cand = {.family=vt_float,.width=64,.base=0};
 			if (!bvn_type_is_plain(v->inferred_default_vtype) &&
-			    bvn_type_spec_eq(cand, v->inferred_default_vtype)) {
+			    bvn_default_type_equiv(cand, v->inferred_default_vtype)) {
 				v->value_type    = cand;
 				v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
 				v->unit_data_len = 7u;
@@ -243,7 +261,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 			cand.width  = 64;
 			cand.base   = 0;
 			if (!bvn_type_is_plain(v->inferred_default_vtype) &&
-			    bvn_type_spec_eq(cand, v->inferred_default_vtype)) {
+			    bvn_default_type_equiv(cand, v->inferred_default_vtype)) {
 				v->value_type    = cand;
 				v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
 				v->unit_data_len = 7u;
@@ -262,7 +280,14 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 				default_type.base   = 0;
 				family_name     = "float_dec";
 				family_name_len = 9;
-				emit_width = emit_base = emit_unit = true;
+				/*
+				 * float_dec has no numeric-base parameter; the
+				 * parser rejects "<float_dec:...,_10>", so the
+				 * canonical default must not emit a base param or
+				 * its own output would fail to re-parse.
+				 */
+				emit_width = emit_unit = true;
+				emit_base  = false;
 			} else if (is_special) {
 				default_type.family = vt_float;
 				default_type.width  = 64;
@@ -294,7 +319,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		return true;
 	}
 	if (!bvn_type_is_plain(v->inferred_default_vtype) &&
-	    bvn_type_spec_eq(default_type, v->inferred_default_vtype)) {
+	    bvn_default_type_equiv(default_type, v->inferred_default_vtype)) {
 		v->value_type    = default_type;
 		v->parsed_unit   = default_unit;
 		v->unit_data_len = emit_unit ? 7u : 0u;
@@ -302,8 +327,19 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	}
 	v->inferred_default_vtype = default_type;
 	v->value_type    = default_type;
-	v->parsed_unit   = default_unit;
-	v->unit_data_len = emit_unit ? 7u : 0u;
+	/*
+	 * Fold an inline unit on an otherwise un-annotated value into the
+	 * synthesised annotation (e.g. "9.81 m/s" -> "<float:64,m/s> 9.81").
+	 * The serialiser renders the unit from the annotation's unit param, not
+	 * from the data event, so without this the inline unit would be dropped.
+	 * Only numeric defaults carry a unit param (emit_unit); utf8 ignores
+	 * units by spec, so a unit on a string is intentionally not folded.
+	 */
+	bool have_inline_unit =
+		emit_unit && inline_unit_str != NULL && inline_unit_len > 0;
+	v->parsed_unit   = have_inline_unit ? inline_unit_val : default_unit;
+	v->unit_data_len = have_inline_unit ? (uint8_t)inline_unit_len
+	                 : (emit_unit ? 7u : 0u);
 	bvnr_data_t d;
 	d.type       = token_is_type;
 	d.value_type = BVN_TYPE_PLAIN;
@@ -338,8 +374,13 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	}
 	if (emit_unit) {
 		d.type   = token_is_unit;
-		d.data   = no_unit_str;
-		d.length = 7;
+		if (have_inline_unit) {
+			d.data   = inline_unit_str;
+			d.length = inline_unit_len;
+		} else {
+			d.data   = no_unit_str;
+			d.length = 7;
+		}
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
 				&d))
@@ -652,6 +693,13 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			v->last_error = error_illegal_value_type;
 			return false;
 		}
+		/*
+		 * Prime the default-annotation suppression state so a following
+		 * bare array element of the same effective type is suppressed
+		 * identically to a synthesised-default run — without this the
+		 * canonical serialiser is not idempotent on heterogeneous arrays.
+		 */
+		v->inferred_default_vtype = v->value_type;
 		v->parsed_unit   = parsed_unit;
 		if (!BVN_UNIT_IS_NO_UNIT(parsed_unit))
 			v->parsed_unit_serial++;
@@ -722,7 +770,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		if (kw_bool) {
 			if (bvn_type_is_plain(v->value_type)) {
 				if (!bvn_emit_default_type_annotation(r,
-						token_is_bool, s, n, false))
+						token_is_bool, s, n, false,
+						NULL, 0, BVN_UNIT_NO_PREFIX(bu_none)))
 					return false;
 			} else if (v->value_type.family != vt_bool) {
 				v->last_error = error_type_value_mismatch;
@@ -795,8 +844,18 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			    bvn_unit_is_currency((int)iu_unit.components[0].base))
 				is_currency_unit = true;
 		}
+		const uint8_t* fold_unit_str = NULL;
+		uint32_t       fold_unit_len = 0;
+		value_unit_t   fold_unit_val = BVN_UNIT_NO_PREFIX(bu_none);
+		if (iu_have && iu_ok &&
+		    (tt == token_is_number || tt == token_is_array_number)) {
+			fold_unit_str = raw->inline_unit_data;
+			fold_unit_len = raw->inline_unit_len;
+			fold_unit_val = iu_unit;
+		}
 		if (!bvn_emit_default_type_annotation(r, tt,
-				raw->str_data, raw->str_len, is_currency_unit))
+				raw->str_data, raw->str_len, is_currency_unit,
+				fold_unit_str, fold_unit_len, fold_unit_val))
 			return false;
 	}
 	if (tt == token_is_number || tt == token_is_array_number ||

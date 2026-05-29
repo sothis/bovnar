@@ -551,7 +551,44 @@ macro(_bvnr_cli_example stem)
         TIMEOUT 30
         PASS_REGULAR_EXPRESSION ": OK"
         FAIL_REGULAR_EXPRESSION "Validation failed|error|Error")
+
+    # Assert the canonical serialiser is idempotent: pretty-printing the
+    # canonical output again must reproduce it byte-for-byte (and re-parse).
+    add_test(
+        NAME    bvnr_cli_idempotent_${stem}
+        COMMAND "${CMAKE_COMMAND}"
+                -DBOVNAR=$<TARGET_FILE:bovnar>
+                -DBVNR_FILE=${_bvnr_ex_file}
+                -DTMP_FILE=${CMAKE_CURRENT_BINARY_DIR}/idem_${stem}.bvnr
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pretty_print_idempotent.cmake)
+    set_tests_properties(bvnr_cli_idempotent_${stem} PROPERTIES
+        LABELS  "cli;examples;idempotent"
+        TIMEOUT 30)
 endmacro()
+
+# An inline unit on an un-annotated value must survive canonicalisation by being
+# folded into the synthesised annotation (e.g. "9.81 m/s" -> "<float:64,_10,m/s>").
+# The idempotency test cannot catch a drop here ("no_unit" -> "no_unit" is itself
+# idempotent), so assert the units are present in the canonical output directly.
+add_test(
+    NAME    bvnr_cli_inline_unit_preserved
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DBVNR_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr
+            "-DREQUIRE=<float:64,_10,m/s> 9.81|<float:64,_10,k~g> 70.5|<uint:64,_10,Gi~B> 4|<uint:64,_10,B> 1500|<sint:64,_10,°C> -40|<float:64,_10,Pa> 101325.0"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pretty_print_contains.cmake)
+set_tests_properties(bvnr_cli_inline_unit_preserved PROPERTIES
+    LABELS "cli;examples;units" TIMEOUT 30)
+
+add_test(
+    NAME    bvnr_cli_inline_currency_preserved
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DBVNR_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/financial.bvnr
+            "-DREQUIRE=<float_dec:64,USD> 29.95|<float_dec:64,EUR> 149.00"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pretty_print_contains.cmake)
+set_tests_properties(bvnr_cli_inline_currency_preserved PROPERTIES
+    LABELS "cli;examples;currency" TIMEOUT 30)
 
 _bvnr_cli_example(arrays)
 _bvnr_cli_example(floats)

@@ -853,8 +853,18 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 130–133 | Apothecary/dry volume (`FLUID_DRAM`, `MINIM`, `PECK`, `BUSHEL`) |
 | 134–297 | ISO 4217 fiat currencies (`AED` … `ZWL`) — see `CURRENCY_FIAT_FIRST` / `CURRENCY_FIAT_LAST` |
 | 298–347 | Cryptocurrencies (`BTC` … `RUNE`) — see `CURRENCY_CRYPTO_FIRST` / `CURRENCY_CRYPTO_LAST` |
-| 348–367 | Additional physical units (old German units, survey foot, league, cable, hand, quintal, scruple, baud) |
-| 368 | `_SENTINEL` (internal bound; do not use) |
+| 348–360 | Historical German units (`PFUND`, `ZENTNER`, `LOT`, Prussian line/zoll/fuss/elle/rute, `KLAFTER`, `GERMAN_MILE`, `MORGEN`, `SCHEFFEL`) |
+| 361–367 | Additional physical units (`SURVEY_FOOT`, `LEAGUE`, `CABLE`, `HAND`, `QUINTAL`, `SCRUPLE`, `BAUD`) |
+| 368–371 | Temperature scales (`DELISLE`, `NEWTON_TEMP`, `REAUMUR`, `ROMER`) |
+| 372–377 | Ratio/proportion units (`PERCENT`, `PER_MILLE`, `PER_MYRIAD`, `PER_CENT_MILLE`, `PPM`, `PPB`) |
+| 378 | `_SENTINEL` (internal bound; do not use) |
+
+> **Note on `CUP`:** the Cuban-Peso currency is exposed as **`BaseUnit.CUP_`** (trailing
+> underscore), not `BaseUnit.CUP`. The plain name `CUP` is the US-cup volume unit
+> (enum value 81); since Python enum member names must be unique, the currency at
+> value 167 takes the suffixed name. This affects the Python member name only — the
+> `.bvnr` wire token is still the bare uppercase `CUP`, and case stays load-bearing
+> (`cup` = volume, `CUP` = currency).
 
 ---
 

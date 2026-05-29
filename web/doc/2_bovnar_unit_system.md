@@ -1964,4 +1964,4 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1.*
+*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v0.x.*

@@ -282,7 +282,7 @@ class BaseUnit(IntEnum):
     CNY = 164   # Chinese Yuan            - minor unit: 2
     COP = 165   # Colombian Peso          - minor unit: 2
     CRC = 166   # Costa Rican Colon       - minor unit: 2
-    CUP_ = 167  # Cuban Peso              - minor unit: 2  (CUP_ avoids collision with physical CUP=81)
+    CUP_ = 167  # Cuban Peso  - minor unit: 2  (trailing _ : the bare name CUP is the US-cup volume unit = 81; wire token is still bare uppercase "CUP")
     CVE = 168   # Cape Verdean Escudo     - minor unit: 2
     CZK = 169   # Czech Koruna            - minor unit: 2
     DJF = 170   # Djiboutian Franc        - minor unit: 0

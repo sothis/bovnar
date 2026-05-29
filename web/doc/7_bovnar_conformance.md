@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (118 cases) ──→ for each test case:                │
+│  Test corpus (168 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -423,16 +423,16 @@ specifies:
 | `encoding` | 9 | UTF-8 validity, BOM placement, byte classes |
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 16 | Escapes, concatenation, UTF-8, limits |
-| `numbers` | 15 | Integer, float, scientific, special numbers |
-| `types` | 26 | All five type families, widths, bases, errors |
-| `default_synthesis` | 5 | Auto-type inference rules |
-| `symbols` | 5 | Bare-word values and limits |
-| `references` | 3 | Dotted paths and limits |
+| `numbers` | 16 | Integer, float, scientific, special numbers |
+| `types` | 29 | All five type families, widths, bases, errors |
+| `default_synthesis` | 8 | Auto-type inference rules |
+| `symbols` | 6 | Bare-word values and limits |
+| `references` | 4 | Dotted paths and limits |
 | `null_values` | 5 | Null in all positions |
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 13 | 1D, 2D, nested, typed, null, limits |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
-| `units` | 17 | SI/IEC prefixes, compound, inline, errors |
+| `units` | 20 | SI/IEC prefixes, compound, inline, errors |
 | `special_numbers` | 5 | `$nan$`, `$infinity$`, `$-infinity$` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
@@ -448,7 +448,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..156
+1..168
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

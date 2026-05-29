@@ -821,6 +821,17 @@ static char *parse_json_string(const char **p)
 					 * encoding it would emit invalid UTF-8. */
 					free(str); return NULL;
 				}
+				if (cp == 0) {
+					/* bovnar forbids the NUL byte in strings.
+					 * Encoding it here would also truncate this
+					 * NUL-terminated buffer, silently dropping the
+					 * rest of the string, so reject it as a hard
+					 * error like any other forbidden control byte. */
+					fprintf(stderr, "convert: JSON string contains a "
+						"NUL (\\u0000), which bovnar cannot "
+						"represent in a string\n");
+					free(str); return NULL;
+				}
 				out = encode_utf8(out, cp);
 				break;
 			}
@@ -1052,8 +1063,10 @@ static bool json_key_is_valid_bvnr_id(const char *key)
 	if (!key || !*key) return false;
 	const unsigned char *p = (const unsigned char *)key;
 	unsigned char c0 = p[0];
+	/* bovnar rejects byte 0xC2 (the UTF-8 leader for U+0080-U+00BF) at both
+	 * identifier start and body, so the valid multibyte leaders are 0xC3-0xF4. */
 	bool start_ok = (c0 >= 'A' && c0 <= 'Z') || (c0 >= 'a' && c0 <= 'z')
-	              || c0 == '_' || (c0 >= 0xC2 && c0 <= 0xF4);
+	              || c0 == '_' || (c0 >= 0xC3 && c0 <= 0xF4);
 	if (!start_ok) return false;
 	for (size_t i = 1; p[i]; i++) {
 		unsigned char c = p[i];
@@ -1291,6 +1304,25 @@ static void print_json_string_escaped(const char *s, uint32_t len)
 	}
 	putchar('"');
 }
+/*
+ * Emit a double as the shortest decimal string that parses back to the exact
+ * same IEEE-754 value, so json -> bvnr -> json stays value-exact without the
+ * noise of a fixed 17-significant-digit rendering (0.1 prints as "0.1", not
+ * "0.10000000000000001"). We cannot reproduce the original JSON literal's
+ * spelling — that is lost when the number is parsed to a double, so "2.0" comes
+ * back as "2" and "1e10" as "1e+10" — but the value is preserved exactly. NaN
+ * and infinities have no JSON form and are emitted as null.
+ */
+static void print_json_double(double v)
+{
+	if (!isfinite(v)) { fputs("null", stdout); return; }
+	char buf[32];
+	for (int prec = 1; prec <= 17; prec++) {
+		snprintf(buf, sizeof(buf), "%.*g", prec, v);
+		if (strtod(buf, NULL) == v) break;
+	}
+	fputs(buf, stdout);
+}
 static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 {
 	if (!node) { fputs("null", stdout); return; }
@@ -1324,10 +1356,7 @@ static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 	case BVN_DOM_FLOAT: {
 		double v;
 		bvn_dom_get_float(node, &v);
-		/* JSON has no NaN/Infinity; emit null rather than inventing a
-		 * finite stand-in that would round-trip to a wrong value. */
-		if (!isfinite(v)) fputs("null", stdout);
-		else              printf("%.17g", v);
+		print_json_double(v);
 		break;
 	}
 	case BVN_DOM_BOOL: {
@@ -1444,8 +1473,34 @@ static int cmd_convert_bvnr_to_json(const char *file)
 	bvn_dom_doc_destroy(doc);
 	return 0;
 }
+/* Map a file name to its format ("json" or "bvnr") by extension, or NULL if
+ * the extension is unknown. Used to auto-detect the conversion direction so
+ * the caller need not spell out --from/--to. */
+static const char *convert_format_from_ext(const char *file)
+{
+	const char *dot = strrchr(file, '.');
+	if (!dot) return NULL;
+	if (strcmp(dot, ".json") == 0) return "json";
+	if (strcmp(dot, ".bvnr") == 0) return "bvnr";
+	return NULL;
+}
+
 static int cmd_convert(const char *from, const char *to, const char *file)
 {
+	/* Auto-detect direction from the file extension when not given
+	 * explicitly: a .json input converts to bvnr, a .bvnr input to json.
+	 * --from/--to still override this. */
+	if (!from || !to) {
+		const char *fmt = convert_format_from_ext(file);
+		if (!fmt) {
+			fprintf(stderr,
+					"convert: cannot detect format of '%s' from its "
+					"extension; pass --from/--to explicitly\n", file);
+			return 1;
+		}
+		if (!from) from = fmt;
+		if (!to)   to   = (strcmp(fmt, "json") == 0) ? "bvnr" : "json";
+	}
 	if (strcmp(from, "json") == 0 && strcmp(to, "bvnr") == 0)
 		return cmd_convert_json_to_bvnr(file);
 	if (strcmp(from, "bvnr") == 0 && strcmp(to, "json") == 0)
@@ -2045,7 +2100,8 @@ static void usage(const char *prog)
 		"  validate      Validate a .bvnr file\n"
 		"  query <path>  Query a value by path (e.g. .sensor.temperature)\n"
 		"  pretty-print  Pretty-print a .bvnr file\n"
-		"  convert --from <fmt> --to <fmt>  Convert between formats\n"
+		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
+		"                  Override with --from <fmt> --to <fmt> if needed\n"
 		"                  Supported: json -> bvnr,  bvnr -> json\n"
 		"  events [opts] <file|->\n"
 		"                  Print lexer and validator events side by side.\n"
@@ -2069,8 +2125,8 @@ static void usage(const char *prog)
 		"  %s validate config.bvnr\n"
 		"  %s query .system.host config.bvnr\n"
 		"  %s pretty-print data.bvnr\n"
-		"  %s convert --from json --to bvnr data.json\n"
-		"  %s convert --from bvnr --to json data.bvnr\n"
+		"  %s convert data.json\n"
+		"  %s convert data.bvnr\n"
 		"  %s events data.bvnr\n"
 		"  %s events -c -d data.bvnr\n"
 		"  cat data.bvnr | %s events -\n"
@@ -2099,8 +2155,11 @@ int main(int argc, char **argv)
 			else if (strcmp(argv[i], "--to") == 0 && i+1 < argc) to = argv[++i];
 			else file = argv[i];
 		}
-		if (!from || !to || !file) {
-			fprintf(stderr, "Usage: %s convert --from <fmt> --to <fmt> <file>\n", argv[0]);
+		if (!file) {
+			fprintf(stderr,
+					"Usage: %s convert <file>            (direction from extension)\n"
+					"       %s convert --from <fmt> --to <fmt> <file>\n",
+					argv[0], argv[0]);
 			return 1;
 		}
 		return cmd_convert(from, to, file);

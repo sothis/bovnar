@@ -213,14 +213,15 @@ The `bovnar` binary built above wraps the library for everyday use:
 | `bovnar validate <file>` | Validate a `.bvnr` file; exit non-zero on the first error. |
 | `bovnar query <path> <file>` | Print a single value by dotted path, e.g. `.sensor.temperature`. |
 | `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
-| `bovnar convert --from <fmt> --to <fmt> <file>` | Convert between `json` and `bvnr` (either direction). |
+| `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |
 | `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. |
 | `bovnar bench [options]` | Benchmark parsing throughput across profiles and payload sizes; `--json` for machine-readable output. |
 
 ```bash
 bovnar validate examples/units.bvnr
 bovnar query .system.host config.bvnr
-bovnar convert --from json --to bvnr data.json
+bovnar convert data.json          # json -> bvnr (direction from extension)
+bovnar convert data.bvnr          # bvnr -> json
 cat data.bvnr | bovnar events -
 ```
 
@@ -261,9 +262,15 @@ since JSON has no equivalent:
   them as numbers safely);
 - `$nan` and `$inf` become `null` (JSON has no non-finite numbers).
 
-Consequently `json → bvnr → json` reproduces the input (the empty-array case
-above aside), but `bvnr → json → bvnr` is lossy whenever the document uses
-units, symbols, references, octets, or wide integers.
+Consequently `json → bvnr → json` preserves every value (the empty-array case
+above aside). Integers, booleans, null, strings, and array/object structure also
+reproduce *textually*; floating-point values reproduce their exact `double`
+value but not necessarily their original spelling. Floats are re-emitted as the
+**shortest decimal that round-trips** to the same `double`, so `0.1` comes back
+as `0.1` — but the lexical form is lost when the literal is parsed, so `2.0`
+comes back as `2` and `1e10` as `1e+10`. The reverse path, `bvnr → json → bvnr`,
+is lossy whenever the document uses units, symbols, references, octets, or wide
+integers.
 
 ---
 

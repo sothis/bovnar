@@ -320,15 +320,64 @@ if (BVNR_FUZZ_EXTERNAL)
 
     string(JOIN "," _ext_san_str ${BVNR_FUZZ_SANITIZERS})
 
+    # Sanitizer / coverage flags.  The library translation units are
+    # instrumented for coverage feedback but must NOT pull in libFuzzer's
+    # main() — only the harness target links the fuzzer runtime, hence
+    # "fuzzer-no-link" on the library and "fuzzer" on the harness.  Under
+    # AFL the compiler driver (afl-clang-fast) performs instrumentation, so
+    # the library and harness share one flag set and the source's own
+    # __AFL_LOOP main() is compiled in.
     if (BVNR_FUZZ_ENGINE STREQUAL "libfuzzer")
-        set(_ext_cf "-fsanitize=fuzzer,${_ext_san_str}")
-        set(_ext_lf "-fsanitize=fuzzer,${_ext_san_str}")
-        set(_ext_def "")
+        set(_ext_lib_cf -fsanitize=fuzzer-no-link,${_ext_san_str})
+        set(_ext_cf     -fsanitize=fuzzer,${_ext_san_str})
+        set(_ext_lf     -fsanitize=fuzzer,${_ext_san_str})
     else()
-        set(_ext_cf "-fsanitize=${_ext_san_str}")
-        set(_ext_lf "-fsanitize=${_ext_san_str}")
-        set(_ext_def "")
+        set(_ext_lib_cf -fsanitize=${_ext_san_str})
+        set(_ext_cf     -fsanitize=${_ext_san_str})
+        set(_ext_lf     -fsanitize=${_ext_san_str})
     endif()
+
+    list(APPEND _ext_lib_cf -g -O1 -fno-omit-frame-pointer)
+    list(APPEND _ext_cf     -g -O1 -fno-omit-frame-pointer)
+
+    # Instrumented copy of the core library.  Kept separate from
+    # bvnr_static (built without instrumentation for the normal unit tests)
+    # so the fuzzers get coverage feedback through the parser internals.
+    add_library(bvnr_fuzz_objects OBJECT ${BVNR_SOURCES})
+    target_compile_options(bvnr_fuzz_objects PRIVATE
+        -Wall -Wextra -Wno-override-init ${_ext_lib_cf})
+    target_include_directories(bvnr_fuzz_objects
+        PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/io
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/lexer
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+
+    # _bvnr_fuzz_external(<name> <source>): a coverage-guided fuzz target.
+    # libFuzzer supplies main(); under AFL the source's __AFL_LOOP main() is
+    # compiled in by the afl driver.  These are run manually, not by CTest:
+    #   ./build/tests/bvnr_fuzz_ext_reader -max_total_time=60 corpus/reader
+    macro(_bvnr_fuzz_external name source)
+        add_executable(bvnr_fuzz_ext_${name} ${source}
+            $<TARGET_OBJECTS:bvnr_fuzz_objects>)
+        target_compile_options(bvnr_fuzz_ext_${name} PRIVATE
+            -Wall -Wextra -Wno-override-init ${_ext_cf})
+        target_include_directories(bvnr_fuzz_ext_${name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+        target_link_options(bvnr_fuzz_ext_${name} PRIVATE ${_ext_lf})
+        target_link_libraries(bvnr_fuzz_ext_${name} PRIVATE m)
+    endmacro()
+
+    _bvnr_fuzz_external(reader tests/bovnar_fuzz_reader.c)
+    _bvnr_fuzz_external(dom    tests/bovnar_fuzz_dom.c)
+    _bvnr_fuzz_external(utils  tests/bovnar_fuzz_utils.c)
+
+    # Corpus seed generator: writes starter inputs under
+    # <out>/{reader,dom,utils} (default ./corpus).  Plain tool, no
+    # instrumentation.  Run before the fuzzers to seed their corpora.
+    add_executable(bvnr_fuzz_seed_gen tests/bovnar_fuzz_seed_gen.c)
+    target_compile_options(bvnr_fuzz_seed_gen PRIVATE
+        -Wall -Wextra -Wno-override-init)
 
 endif()
 

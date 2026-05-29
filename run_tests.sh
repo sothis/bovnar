@@ -23,6 +23,17 @@ FAIL=0
 SKIP=0
 FAILED_TESTS=()
 
+# Single scratch dir for all temp artifacts (fuzz seed, idempotency / converter
+# round-trip outputs); cleaned up on exit.
+SCRATCH_DIR="$(mktemp -d "${TMPDIR:-/tmp}/bvnr_run_tests.XXXXXX")"
+trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+# Repo root (this script assumes it is invoked from there) and the cmake helper
+# scripts that CTest also drives, so the shell runner and CTest share one
+# source of truth for the converter / canonical-form assertions.
+SRC_DIR="$(pwd)"
+CMAKE_BIN="${CMAKE:-cmake}"
+
 _green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
 _red()    { printf '\033[0;31m%s\033[0m\n' "$*"; }
 _yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
@@ -68,6 +79,15 @@ run_test "bvnr_high_severity_test"        "$TESTS_DIR/bvnr_high_severity_test"
 run_test "bvnr_int_test"                  "$TESTS_DIR/bvnr_int_test"
 run_test "bvnr_float_test"                "$TESTS_DIR/bvnr_float_test"
 run_test "bvnr_float_fix_dec_test"        "$TESTS_DIR/bvnr_float_fix_dec_test"
+run_test "bvnr_currency_test"             "$TESTS_DIR/bvnr_currency_test"
+
+echo
+
+_bold "=== Conformance tests ==="
+
+run_test "bvnr_conformance (self)"        "$TESTS_DIR/bvnr_conformance"
+run_test "bvnr_conformance (iut self)"    "$TESTS_DIR/bvnr_conformance" \
+    --iut "$TESTS_DIR/bvnr_conformance_iut"
 
 echo
 
@@ -86,8 +106,7 @@ if [[ $RUN_FUZZ -eq 1 ]]; then
         "$TESTS_DIR/bvnr_fuzz_test" \
         --harness utils --iterations "$FUZZ_ITER" --seed 42
 
-    SEED_FILE=$(mktemp /tmp/bvnr_fuzz_writer_seed_XXXXXX.bin)
-    trap 'rm -f "$SEED_FILE"' EXIT
+    SEED_FILE="${SCRATCH_DIR}/bvnr_fuzz_writer_seed.bin"
     printf 'X' > "$SEED_FILE"
 
     run_test "bvnr_fuzz_writer_test (smoke)" \
@@ -124,13 +143,110 @@ run_cli_test() {
     fi
 }
 
+# Drive one of the shared cmake -P helper scripts (the same ones CTest uses)
+# and treat a zero exit as PASS.  Skipped when the bovnar binary is missing.
+run_cmake_check() {
+    local label="$1"; shift
+
+    if [[ ! -x "${BOVNAR_BIN}" ]]; then
+        _yellow "  SKIP  $label  (not built: ${BOVNAR_BIN})"
+        (( SKIP++ )) || true
+        return
+    fi
+
+    printf '  %-52s ' "$label"
+    if "${CMAKE_BIN}" "$@" > /dev/null 2>&1; then
+        _green "PASS"
+        (( PASS++ )) || true
+    else
+        _red "FAIL"
+        (( FAIL++ )) || true
+        FAILED_TESTS+=("$label")
+    fi
+}
+
 for bvnr_file in "${EXAMPLES_DIR}"/*.bvnr; do
     stem=$(basename "${bvnr_file}" .bvnr)
     run_cli_test "bovnar events   ${stem}.bvnr" \
         "${BOVNAR_BIN}" events "${bvnr_file}"
     run_cli_test "bovnar validate ${stem}.bvnr" \
         "${BOVNAR_BIN}" validate "${bvnr_file}"
+    run_cmake_check "pretty-print idempotent ${stem}.bvnr" \
+        -DBOVNAR="${BOVNAR_BIN}" \
+        -DBVNR_FILE="${bvnr_file}" \
+        -DTMP_FILE="${SCRATCH_DIR}/idem_${stem}.bvnr" \
+        -P "${SRC_DIR}/cmake/pretty_print_idempotent.cmake"
 done
+
+echo
+
+_bold "=== Canonical-form preservation ==="
+
+run_cmake_check "inline units preserved (units.bvnr)" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DBVNR_FILE="${SRC_DIR}/examples/units.bvnr" \
+    "-DREQUIRE=<float:64,_10,m/s> 9.81|<float:64,_10,k~g> 70.5|<uint:64,_10,Gi~B> 4|<uint:64,_10,B> 1500|<sint:64,_10,°C> -40|<float:64,_10,Pa> 101325.0" \
+    -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
+
+run_cmake_check "inline currency preserved (financial.bvnr)" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DBVNR_FILE="${SRC_DIR}/examples/financial.bvnr" \
+    "-DREQUIRE=<float_dec:64,USD> 29.95|<float_dec:64,EUR> 149.00" \
+    -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
+
+echo
+
+_bold "=== JSON <-> bvnr converter ==="
+
+run_cmake_check "convert round-trip (roundtrip.json)" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DJSON_FILE="${SRC_DIR}/tests/json/roundtrip.json" \
+    -DTMP_FILE="${SCRATCH_DIR}/convert_roundtrip.bvnr" \
+    -P "${SRC_DIR}/cmake/convert_json_roundtrip.cmake"
+
+run_convert_fail() {
+    local label="$1" file="$2" needle="$3"
+    run_cmake_check "$label" \
+        -DBOVNAR="${BOVNAR_BIN}" \
+        -DJSON_FILE="${SRC_DIR}/tests/json/${file}" \
+        "-DNEEDLE=${needle}" \
+        -P "${SRC_DIR}/cmake/convert_expect_fail.cmake"
+}
+
+run_convert_fail "convert rejects bad_key.json"      bad_key.json      "not a valid bovnar identifier"
+run_convert_fail "convert rejects bad_overflow.json" bad_overflow.json "out of range"
+run_convert_fail "convert rejects bad_trailing.json" bad_trailing.json "trailing content"
+run_convert_fail "convert rejects bad_nul.json"      bad_nul.json      "NUL"
+
+echo
+
+_bold "=== Python binding tests ==="
+
+PY_BIN="${PYTHON:-python3}"
+PY_SRC="${SRC_DIR}/python"
+PY_TESTS="${PY_SRC}/tests"
+SHARED_LIB="$(ls "${BUILD_DIR}"/libbvnr_shared.* 2>/dev/null | head -1 || true)"
+
+if ! command -v "${PY_BIN}" > /dev/null 2>&1; then
+    _yellow "  SKIP  python suite  (no ${PY_BIN})"
+    (( SKIP++ )) || true
+elif ! "${PY_BIN}" -m pytest --version > /dev/null 2>&1; then
+    _yellow "  SKIP  python suite  (pytest not installed)"
+    (( SKIP++ )) || true
+else
+    printf '  %-52s ' "pytest python/tests"
+    # The integration tests find the shared lib via LIBBOVNAR_PATH; pure tests
+    # ignore it.  Tests needing the lib self-skip when it is absent.
+    if ( cd "${PY_SRC}" && LIBBOVNAR_PATH="${SHARED_LIB}" \
+            "${PY_BIN}" -m pytest "${PY_TESTS}" --tb=short -q > /dev/null 2>&1 ); then
+        _green "PASS"
+        (( PASS++ )) || true
+    else
+        _red "FAIL"
+        (( FAIL++ )) || true
+        FAILED_TESTS+=("pytest python/tests")
+    fi
+fi
 
 echo
 

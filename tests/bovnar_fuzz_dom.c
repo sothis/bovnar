@@ -39,8 +39,9 @@ static void assert_valid_error(error_code_t e)
 
 static void assert_valid_dom_type(bvn_dom_type_t t)
 {
-
-	if ((unsigned)t > (unsigned)BVN_DOM_OCTET_STREAM)
+	/* BVN_DOM_BOOL is the last (highest) enumerator — keep this bound in
+	 * sync with bvn_dom_type_t in bovnar_dom.h when new types are added. */
+	if ((unsigned)t > (unsigned)BVN_DOM_BOOL)
 		__builtin_trap();
 }
 

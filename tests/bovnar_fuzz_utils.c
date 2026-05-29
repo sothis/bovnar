@@ -160,7 +160,10 @@ static void fuzz_get_value_unit(const uint8_t *p, size_t n)
 
 	if (ok) {
 
-		if (u.num_components >= BVNR_MAX_UNIT_COMPONENTS)
+		/* A fully-saturated unit fills all BVNR_MAX_UNIT_COMPONENTS slots,
+		 * so num_components == BVNR_MAX_UNIT_COMPONENTS is valid; the parser
+		 * caps it there.  Only a count *beyond* the array is a real bug. */
+		if (u.num_components > BVNR_MAX_UNIT_COMPONENTS)
 			__builtin_trap();
 
 		char strbuf[512];

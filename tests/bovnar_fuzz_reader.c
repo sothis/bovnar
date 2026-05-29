@@ -205,12 +205,18 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	(void)col; (void)offset;
 
 	uint64_t recovery_count = bvnr_reader_get_recovery_count(r);
-	if (continue_on_error && !ctx.aborted) {
 
-		(void)recovery_count;
-	}
-
-	if (err == error_none && !ctx.aborted &&
+	/*
+	 * The unverified callback fires per token as it is lexed; the verified
+	 * callback fires only once a token passes validation.  In a fully clean
+	 * parse the two counts match 1:1.  But under continue_on_error the reader
+	 * recovers from rejected tokens (e.g. an unsupported "<float:8>" width):
+	 * the unverified callback already fired for the bad token, validation
+	 * then drops it (no verified callback), and the stream still finishes at
+	 * error_none.  A divergence is therefore expected whenever any recovery
+	 * occurred, so only assert the 1:1 invariant when recovery_count == 0.
+	 */
+	if (err == error_none && !ctx.aborted && recovery_count == 0 &&
 		!no_unverified_cb && !no_verified_cb) {
 		if (ctx.unverified_events != ctx.verified_events)
 			__builtin_trap();

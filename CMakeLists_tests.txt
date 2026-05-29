@@ -601,3 +601,35 @@ _bvnr_cli_example(test)
 _bvnr_cli_example(units)
 _bvnr_cli_example(financial)
 _bvnr_cli_example(crypto_portfolio)
+
+# ── json <-> bvnr converter ──────────────────────────────────────────────────
+# Round-trip fidelity: json -> bvnr -> json must reproduce the input (modulo
+# whitespace), covering uint64 above INT64_MAX, nested/jagged/single-row arrays,
+# arrays of objects, mixed-type arrays, nested objects, booleans and null.
+add_test(
+    NAME    bvnr_cli_convert_roundtrip
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DJSON_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/json/roundtrip.json
+            -DTMP_FILE=${CMAKE_CURRENT_BINARY_DIR}/convert_roundtrip.bvnr
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/convert_json_roundtrip.cmake)
+set_tests_properties(bvnr_cli_convert_roundtrip PROPERTIES
+    LABELS "cli;convert" TIMEOUT 30)
+
+# Unrepresentable / malformed JSON must fail loudly (non-zero exit + message),
+# never silently drop or corrupt data.
+macro(_bvnr_convert_fail name file needle)
+    add_test(
+        NAME    bvnr_cli_convert_fail_${name}
+        COMMAND "${CMAKE_COMMAND}"
+                -DBOVNAR=$<TARGET_FILE:bovnar>
+                -DJSON_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/json/${file}
+                "-DNEEDLE=${needle}"
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/convert_expect_fail.cmake)
+    set_tests_properties(bvnr_cli_convert_fail_${name} PROPERTIES
+        LABELS "cli;convert" TIMEOUT 30)
+endmacro()
+
+_bvnr_convert_fail(bad_key          bad_key.json              "not a valid bovnar identifier")
+_bvnr_convert_fail(int_overflow     bad_overflow.json         "out of range")
+_bvnr_convert_fail(trailing         bad_trailing.json         "trailing content")

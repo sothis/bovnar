@@ -224,6 +224,47 @@ bovnar convert --from json --to bvnr data.json
 cat data.bvnr | bovnar events -
 ```
 
+### JSON conversion: what is and isn't preserved
+
+The two data models do not fully overlap, so conversion is faithful in one
+direction and necessarily lossy in the other. The converter never silently
+drops or corrupts data — anything it cannot represent is a hard error with a
+diagnostic, not a quietly mangled result.
+
+**`json → bvnr`** is structurally 1:1 and value-preserving. Integers keep full
+64-bit range in both signs (including unsigned values above `INT64_MAX`); JSON
+arrays map to bovnar bracket arrays element-for-element — so nested arrays,
+jagged arrays, single-row matrices, arrays of objects, and arrays mixing
+scalars, arrays and objects all carry over; nested objects become structs. It
+rejects, rather than mauls:
+
+- a top-level value that is not an object (bovnar documents are sets of
+  assignments);
+- object keys that are not valid bovnar identifiers (spaces, leading digits,
+  punctuation, empty);
+- integer literals that exceed 64 bits, and malformed JSON (leading zeros,
+  invalid escapes, unescaped control characters, lone surrogates, trailing
+  content);
+- nesting deeper than the writer's array/struct limit (errors cleanly).
+
+One representational caveat: bovnar has no zero-length array (`[]` denotes a
+single null element), so an empty JSON array round-trips to `[null]`.
+
+**`bvnr → json`** keeps every value but cannot carry bovnar's extra semantics,
+since JSON has no equivalent:
+
+- type annotations — bit-width, base, and **physical unit / currency** — are
+  dropped (a `<float:64,m/s> 9.81` becomes a bare `9.81`);
+- symbols and references are emitted as strings; octet streams as a lowercase
+  hex string;
+- integers wider than 64 bits are emitted as decimal strings (JSON cannot hold
+  them as numbers safely);
+- `$nan` and `$inf` become `null` (JSON has no non-finite numbers).
+
+Consequently `json → bvnr → json` reproduces the input (the empty-array case
+above aside), but `bvnr → json → bvnr` is lossy whenever the document uses
+units, symbols, references, octets, or wide integers.
+
 ---
 
 ## Running the Tests

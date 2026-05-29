@@ -682,7 +682,7 @@ static int cmd_pretty(const char *filename)
 	return ok ? 0 : 1;
 }
 typedef enum {
-	BVN_JSON_NULL, BVN_JSON_BOOL, BVN_JSON_INT, BVN_JSON_FLOAT,
+	BVN_JSON_NULL, BVN_JSON_BOOL, BVN_JSON_INT, BVN_JSON_UINT, BVN_JSON_FLOAT,
 	BVN_JSON_STRING, BVN_JSON_ARRAY, BVN_JSON_OBJECT
 } JsonNodeType;
 typedef struct JsonNode {
@@ -690,6 +690,7 @@ typedef struct JsonNode {
 	union {
 		bool b;
 		int64_t i;
+		uint64_t u;
 		double f;
 		char *s;
 		struct { struct JsonNode **items; uint32_t count; } arr;
@@ -796,7 +797,6 @@ static char *parse_json_string(const char **p)
 			case 'n':  *out++ = '\n'; break;
 			case 'r':  *out++ = '\r'; break;
 			case 't':  *out++ = '\t'; break;
-			case 'v':  *out++ = '\v'; break;
 			case 'u': {
 				if (end - in < 5) { free(str); return NULL; }
 				int hi = parse_hex4(in + 1);
@@ -815,12 +815,20 @@ static char *parse_json_string(const char **p)
 					cp = 0x10000u + (((cp - 0xd800u) << 10) |
 					     ((uint32_t)lo - 0xdc00u));
 					in += 6;
+				} else if (cp >= 0xdc00u && cp <= 0xdfffu) {
+					/* A low surrogate with no preceding high
+					 * surrogate is not a valid scalar value;
+					 * encoding it would emit invalid UTF-8. */
+					free(str); return NULL;
 				}
 				out = encode_utf8(out, cp);
 				break;
 			}
-			default:   *out++ = *in;  break;
+			default:   free(str); return NULL;
 			}
+		} else if ((uint8_t)*in < 0x20) {
+			/* Unescaped control characters are invalid in JSON strings. */
+			free(str); return NULL;
 		} else {
 			*out++ = *in;
 		}
@@ -909,6 +917,45 @@ static JsonNode *json_parse_object(const char **p, int depth)
 	}
 	return node;
 }
+/*
+ * Validate and span a JSON number per the RFC 8259 grammar:
+ *   number = [ '-' ] int [ frac ] [ exp ]
+ *   int    = '0' | [1-9] digit*       (no leading zeros)
+ *   frac   = '.' digit+
+ *   exp    = ('e'|'E') ['+'|'-'] digit+
+ * On success advances *endp past the number and reports whether it is a
+ * floating-point literal. Returns false for malformed numbers (bare '-',
+ * leading zeros, missing fraction/exponent digits, etc.).
+ */
+static bool scan_json_number(const char *s, const char **endp, bool *is_float)
+{
+	const char *p = s;
+	bool isf = false;
+	if (*p == '-') p++;
+	if (*p == '0') {
+		p++;
+	} else if (*p >= '1' && *p <= '9') {
+		while (isdigit((unsigned char)*p)) p++;
+	} else {
+		return false;
+	}
+	if (*p == '.') {
+		isf = true;
+		p++;
+		if (!isdigit((unsigned char)*p)) return false;
+		while (isdigit((unsigned char)*p)) p++;
+	}
+	if (*p == 'e' || *p == 'E') {
+		isf = true;
+		p++;
+		if (*p == '+' || *p == '-') p++;
+		if (!isdigit((unsigned char)*p)) return false;
+		while (isdigit((unsigned char)*p)) p++;
+	}
+	*endp = p;
+	*is_float = isf;
+	return true;
+}
 static JsonNode *json_parse_value_depth(const char **p, int depth)
 {
 	skip_ws(p);
@@ -951,22 +998,39 @@ static JsonNode *json_parse_value_depth(const char **p, int depth)
 		return n;
 	}
 	if (**p == '-' || isdigit((unsigned char)**p)) {
-		char *end;
+		const char *num_end;
 		bool is_float = false;
-		const char *scan = *p;
-		if (*scan == '-') scan++;
-		while (isdigit((unsigned char)*scan)) scan++;
-		if (*scan == '.' || *scan == 'e' || *scan == 'E') is_float = true;
+		if (!scan_json_number(*p, &num_end, &is_float)) {
+			fprintf(stderr, "convert: malformed JSON number\n");
+			return NULL;
+		}
 		JsonNode *n = calloc(1, sizeof(*n));
 		if (!n) return NULL;
+		char *end;
+		errno = 0;
 		if (is_float) {
 			n->type = BVN_JSON_FLOAT;
 			n->u.f = strtod(*p, &end);
-		} else {
+		} else if (**p == '-') {
 			n->type = BVN_JSON_INT;
-			n->u.i = (int64_t)strtoll(*p, &end, 10);
+			n->u.i = strtoll(*p, &end, 10);
+			if (errno == ERANGE) {
+				fprintf(stderr, "convert: integer literal out of "
+					"range for 64-bit signed\n");
+				free(n);
+				return NULL;
+			}
+		} else {
+			n->type = BVN_JSON_UINT;
+			n->u.u = strtoull(*p, &end, 10);
+			if (errno == ERANGE) {
+				fprintf(stderr, "convert: integer literal out of "
+					"range for 64-bit unsigned\n");
+				free(n);
+				return NULL;
+			}
 		}
-		*p = end;
+		*p = num_end;
 		return n;
 	}
 	return NULL;
@@ -976,67 +1040,110 @@ static JsonNode *json_parse_value(const char **p)
 	return json_parse_value_depth(p, 0);
 }
 static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *node);
-static bool write_bvn_array(bvnr_writer_t *w, const char *key, const JsonNode *node)
+/*
+ * A bovnar key is a lexer identifier: it starts with a letter, '_', or a UTF-8
+ * leader byte (0xC2-0xF4), and continues with letters, digits, '_', '+', '-',
+ * or UTF-8 bytes. JSON object keys are arbitrary strings, so reject the ones
+ * bovnar cannot represent (spaces, leading digits, punctuation, empty) up front
+ * with a clear message rather than letting the writer fail opaquely.
+ */
+static bool json_key_is_valid_bvnr_id(const char *key)
 {
-	bool all_strings = (node->u.arr.count > 0);
-	for (uint32_t i = 0; i < node->u.arr.count; i++) {
-		const JsonNode *e = node->u.arr.items[i];
-		if (!e || e->type != BVN_JSON_STRING) { all_strings = false; break; }
-	}
-	{
-		bvnr_data_t d = {0};
-		d.type   = token_is_identifier;
-		d.data   = key;
-		d.length = (uint32_t)strlen(key);
-		if (!bvnr_write_event(w, ev_assignment_start, &d)) return false;
-	}
-	{
-		bvnr_data_t d = {0};
-		d.type = all_strings ? token_is_array_string : token_is_array_number;
-		if (!bvnr_write_event(w, ev_array_row_start, &d)) return false;
-	}
-	for (uint32_t i = 0; i < node->u.arr.count; i++) {
-		const JsonNode *e = node->u.arr.items[i];
-		bvnr_data_t d = {0};
-		char nbuf[64];
-		int n;
-		if (!e || e->type == BVN_JSON_NULL) {
-			d.type = token_is_null_value;
-		} else if (e->type == BVN_JSON_BOOL) {
-			const char *sym = e->u.b ? "true" : "false";
-			d.type   = token_is_bool;
-			d.data   = sym;
-			d.length = (uint32_t)strlen(sym);
-		} else if (e->type == BVN_JSON_INT) {
-			if (e->u.i >= 0) {
-				n = snprintf(nbuf, sizeof(nbuf), "%" PRIu64,
-					     (uint64_t)e->u.i);
-			} else {
-				n = snprintf(nbuf, sizeof(nbuf), "%" PRId64, e->u.i);
-			}
-			d.type   = token_is_array_number;
-			d.data   = nbuf;
-			d.length = (n > 0) ? (uint32_t)n : 1u;
-		} else if (e->type == BVN_JSON_FLOAT) {
-			n = snprintf(nbuf, sizeof(nbuf), "%.17g", e->u.f);
-			d.type   = token_is_array_number;
-			d.data   = nbuf;
-			d.length = (n > 0) ? (uint32_t)n : 1u;
-		} else if (e->type == BVN_JSON_STRING) {
-			d.type   = token_is_array_string;
-			d.data   = e->u.s;
-			d.length = (uint32_t)strlen(e->u.s);
-		} else {
-			fprintf(stderr, "warn: nested array/object inside JSON array ignored\n");
-			continue;
-		}
-		if (!bvnr_write_event(w, ev_data, &d)) return false;
-	}
-	{
-		bvnr_data_t d = {0};
-		if (!bvnr_write_event(w, ev_array_row_end, &d)) return false;
+	if (!key || !*key) return false;
+	const unsigned char *p = (const unsigned char *)key;
+	unsigned char c0 = p[0];
+	bool start_ok = (c0 >= 'A' && c0 <= 'Z') || (c0 >= 'a' && c0 <= 'z')
+	              || c0 == '_' || (c0 >= 0xC2 && c0 <= 0xF4);
+	if (!start_ok) return false;
+	for (size_t i = 1; p[i]; i++) {
+		unsigned char c = p[i];
+		bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+		        || (c >= '0' && c <= '9') || c == '_' || c == '+'
+		        || c == '-' || (c >= 0x80 && c != 0xC2);
+		if (!ok) return false;
 	}
 	return true;
+}
+/*
+ * A JSON array/object maps onto bovnar's general container model: a JSON array
+ * becomes a bracket array whose elements are emitted in place (scalars as data
+ * events, nested arrays as nested rows, objects as structs), and a JSON object
+ * becomes a struct. This is a 1:1 structural mapping — it preserves jagged
+ * nesting, arrays of objects, and single-row matrices that the older '/'-based
+ * 2-D encoding could not. These three helpers are mutually recursive.
+ */
+static bool write_bvn_element(bvnr_writer_t *w, const JsonNode *e);
+static bool write_bvn_array_body(bvnr_writer_t *w, const JsonNode *node);
+static bool write_bvn_struct_body(bvnr_writer_t *w, const JsonNode *node);
+/* Emit one scalar array element as an ev_data event. */
+static bool write_bvn_array_elem(bvnr_writer_t *w, const JsonNode *e)
+{
+	bvnr_data_t d = {0};
+	char nbuf[64];
+	int n;
+	if (!e || e->type == BVN_JSON_NULL) {
+		d.type = token_is_null_value;
+	} else if (e->type == BVN_JSON_BOOL) {
+		const char *sym = e->u.b ? "true" : "false";
+		d.type   = token_is_bool;
+		d.data   = sym;
+		d.length = (uint32_t)strlen(sym);
+	} else if (e->type == BVN_JSON_UINT) {
+		n = snprintf(nbuf, sizeof(nbuf), "%" PRIu64, e->u.u);
+		d.type   = token_is_array_number;
+		d.data   = nbuf;
+		d.length = (n > 0) ? (uint32_t)n : 1u;
+	} else if (e->type == BVN_JSON_INT) {
+		n = snprintf(nbuf, sizeof(nbuf), "%" PRId64, e->u.i);
+		d.type   = token_is_array_number;
+		d.data   = nbuf;
+		d.length = (n > 0) ? (uint32_t)n : 1u;
+	} else if (e->type == BVN_JSON_FLOAT) {
+		n = snprintf(nbuf, sizeof(nbuf), "%.17g", e->u.f);
+		d.type   = token_is_array_number;
+		d.data   = nbuf;
+		d.length = (n > 0) ? (uint32_t)n : 1u;
+	} else if (e->type == BVN_JSON_STRING) {
+		d.type   = token_is_array_string;
+		d.data   = e->u.s;
+		d.length = (uint32_t)strlen(e->u.s);
+	} else {
+		return false;
+	}
+	return bvnr_write_event(w, ev_data, &d);
+}
+/* Emit a JSON object's members as a bovnar struct body (no leading key). */
+static bool write_bvn_struct_body(bvnr_writer_t *w, const JsonNode *node)
+{
+	bvnr_data_t d = {0};
+	if (!bvnr_write_event(w, ev_struct_start, &d)) return false;
+	for (uint32_t i = 0; i < node->u.obj.count; i++)
+		if (!write_bvn_value(w, node->u.obj.keys[i], node->u.obj.values[i]))
+			return false;
+	bvnr_data_t e = {0};
+	return bvnr_write_event(w, ev_struct_end, &e);
+}
+/* Emit a JSON array's elements as a bovnar bracket-array body (no leading key).
+ * The row-type token is only a hint and is ignored for heterogeneous/nested
+ * content, so a single number row start is fine; each element carries its own
+ * type. */
+static bool write_bvn_array_body(bvnr_writer_t *w, const JsonNode *node)
+{
+	bvnr_data_t d = {0};
+	d.type = token_is_array_number;
+	if (!bvnr_write_event(w, ev_array_row_start, &d)) return false;
+	for (uint32_t i = 0; i < node->u.arr.count; i++)
+		if (!write_bvn_element(w, node->u.arr.items[i])) return false;
+	bvnr_data_t e = {0};
+	return bvnr_write_event(w, ev_array_row_end, &e);
+}
+/* Emit one array element (no key), dispatching scalars to a data event and
+ * containers to a nested array/struct body. */
+static bool write_bvn_element(bvnr_writer_t *w, const JsonNode *e)
+{
+	if (e && e->type == BVN_JSON_ARRAY)  return write_bvn_array_body(w, e);
+	if (e && e->type == BVN_JSON_OBJECT) return write_bvn_struct_body(w, e);
+	return write_bvn_array_elem(w, e);
 }
 static bool write_bvn_root(bvnr_writer_t *w, const JsonNode *root)
 {
@@ -1052,17 +1159,28 @@ static bool write_bvn_root(bvnr_writer_t *w, const JsonNode *root)
 }
 static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *node)
 {
+	if (!json_key_is_valid_bvnr_id(key)) {
+		fprintf(stderr, "convert: JSON key '%s' is not a valid bovnar "
+			"identifier (must start with a letter or '_' and contain "
+			"only letters, digits, '_', '+', '-')\n", key);
+		return false;
+	}
 	if (!node) return bvnr_write_null(w, key);
 	switch (node->type) {
 	case BVN_JSON_NULL:   return bvnr_write_null(w, key);
 	case BVN_JSON_BOOL:   return bvnr_write_bool(w, key, node->u.b);
-	case BVN_JSON_INT:
-		if (node->u.i >= 0)
-			return bvnr_write_uint(w, key, 0, (uint64_t)node->u.i);
-		return bvnr_write_sint(w, key, 0, node->u.i);
+	case BVN_JSON_UINT:   return bvnr_write_uint(w, key, 0, node->u.u);
+	case BVN_JSON_INT:    return bvnr_write_sint(w, key, 0, node->u.i);
 	case BVN_JSON_FLOAT:  return bvnr_write_float(w, key, 0, node->u.f);
 	case BVN_JSON_STRING: return bvnr_write_string(w, key, node->u.s);
-	case BVN_JSON_ARRAY:  return write_bvn_array(w, key, node);
+	case BVN_JSON_ARRAY: {
+		bvnr_data_t d = {0};
+		d.type   = token_is_identifier;
+		d.data   = key;
+		d.length = (uint32_t)strlen(key);
+		if (!bvnr_write_event(w, ev_assignment_start, &d)) return false;
+		return write_bvn_array_body(w, node);
+	}
 	case BVN_JSON_OBJECT: {
 		if (!bvnr_write_struct_start(w, key)) return false;
 		for (uint32_t i = 0; i < node->u.obj.count; i++) {
@@ -1111,6 +1229,13 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		free(buf);
 		return 1;
 	}
+	skip_ws(&p);
+	if (*p != '\0') {
+		fprintf(stderr, "convert: trailing content after JSON value\n");
+		json_free_node(root);
+		free(buf);
+		return 1;
+	}
 	bvnr_writer_t *w = bvnr_writer_create();
 	if (!w) { json_free_node(root); free(buf); return 1; }
 	bvnr_sink_t sink;
@@ -1125,7 +1250,13 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	bool ok = write_bvn_root(w, root);
 	if (ok) ok = bvnr_write_finish(w);
 	if (!ok) {
-		fprintf(stderr, "Bovnar writer error: %s\n", bvn_error_to_string(bvnr_writer_get_error(w)));
+		/* Only surface a writer-level error here; structural problems
+		 * (bad keys, unrepresentable nesting) already printed their own
+		 * diagnostic and leave the writer error at error_none. */
+		error_code_t werr = bvnr_writer_get_error(w);
+		if (werr != error_none)
+			fprintf(stderr, "Bovnar writer error: %s\n",
+				bvn_error_to_string(werr));
 	}
 	bvnr_writer_destroy(w);
 	json_free_node(root);
@@ -1193,9 +1324,10 @@ static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 	case BVN_DOM_FLOAT: {
 		double v;
 		bvn_dom_get_float(node, &v);
-		if (isnan(v))        fputs("null", stdout);
-		else if (isinf(v))   fputs(v > 0 ? "1e308" : "-1e308", stdout);
-		else                 printf("%.17g", v);
+		/* JSON has no NaN/Infinity; emit null rather than inventing a
+		 * finite stand-in that would round-trip to a wrong value. */
+		if (!isfinite(v)) fputs("null", stdout);
+		else              printf("%.17g", v);
 		break;
 	}
 	case BVN_DOM_BOOL: {
@@ -1246,7 +1378,27 @@ static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 		break;
 	}
 	case BVN_DOM_ARRAY: {
-		uint32_t cnt = bvn_dom_array_count(node);
+		uint32_t cnt  = bvn_dom_array_count(node);
+		uint32_t dims = bvn_dom_array_dims(node);
+		if (dims > 1 && cnt % dims == 0) {
+			/* Multi-row bovnar array -> nested JSON arrays (one inner
+			 * array per row) so the dimensionality survives. */
+			uint32_t row_len = cnt / dims;
+			putchar('[');
+			for (uint32_t r = 0; r < dims; r++) {
+				if (r) { putchar(','); if (pretty) putchar(' '); }
+				putchar('[');
+				for (uint32_t c = 0; c < row_len; c++) {
+					if (c) { putchar(','); if (pretty) putchar(' '); }
+					print_json_node(
+						bvn_dom_array_at(node, r * row_len + c),
+						indent, pretty);
+				}
+				putchar(']');
+			}
+			putchar(']');
+			break;
+		}
 		putchar('[');
 		for (uint32_t i = 0; i < cnt; i++) {
 			if (i) { putchar(','); if (pretty) putchar(' '); }

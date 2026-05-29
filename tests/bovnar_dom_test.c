@@ -309,6 +309,53 @@ static void test_getter_semantics(void)
 	bvn_dom_doc_destroy(doc);
 }
 
+/*
+ * Regression: an array whose elements are themselves arrays (the
+ * "[[1,2],[3,4]]" bracket-nested form) produces back-to-back array_row_end
+ * events. The builder's deferred array pop must close the inner array at the
+ * parent's row_end; otherwise the outer array stays open and silently absorbs
+ * every following sibling assignment (the keys after it simply vanished). This
+ * guards the fix in on_verified() / ev_array_row_end.
+ */
+static void test_nested_array_elements(void)
+{
+	const char *bvn =
+		".a = [[1, 2], [3, 4]];\n"
+		".b = 99;\n"
+		".c = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]];\n"
+		".d = ok;\n";
+	bvn_dom_doc_t *doc = parse_doc(bvn);
+	if (!doc) return;
+
+	ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(doc), error_none,
+				   "nested-array document must parse without error");
+	/* The bug dropped every key after the first nested array. */
+	ASSERT_EQ_UINT(bvn_dom_doc_count(doc), 4,
+				   "all four top-level keys must survive");
+
+	bvn_dom_node_t *a = bvn_dom_lookup(doc, ".a");
+	ASSERT_EQ_UINT(bvn_dom_node_type(a), BVN_DOM_ARRAY, ".a must be an array");
+	ASSERT_EQ_UINT(bvn_dom_array_count(a), 2,
+				   ".a must have exactly two (array) elements, not absorb .b");
+	ASSERT_EQ_UINT(bvn_dom_node_type(bvn_dom_array_at(a, 0)), BVN_DOM_ARRAY,
+				   ".a[0] must itself be an array");
+
+	/* .b must still exist as its own key with its own value. */
+	bvn_dom_node_t *bnode = bvn_dom_lookup(doc, ".b");
+	ASSERT_NOT_NULL(bnode, ".b must not be absorbed into .a");
+	uint64_t bv = 0;
+	ASSERT_TRUE(bvn_dom_get_u64(bnode, &bv) && bv == 99u,
+				".b must equal 99");
+
+	/* Deeper nesting must also keep its sibling. */
+	bvn_dom_node_t *c = bvn_dom_lookup(doc, ".c");
+	ASSERT_EQ_UINT(bvn_dom_node_type(c), BVN_DOM_ARRAY, ".c must be an array");
+	ASSERT_EQ_UINT(bvn_dom_array_count(c), 2, ".c must have two elements");
+	ASSERT_NOT_NULL(bvn_dom_lookup(doc, ".d"),
+					".d after deep nesting must survive");
+
+	bvn_dom_doc_destroy(doc);
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -318,6 +365,7 @@ int main(void)
 	test_bom_and_parse_errors();
 	test_lookup_edge_cases();
 	test_getter_semantics();
+	test_nested_array_elements();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

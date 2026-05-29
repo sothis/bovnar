@@ -516,6 +516,18 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		break;
 	}
 	case ev_array_row_end: {
+		/*
+		 * A nested array element (the [[...],[...]] form) closes its own
+		 * row before the parent's row closes, producing back-to-back
+		 * row_end events. The inner array's pop is deferred (pending), so
+		 * apply it now — otherwise this parent row_end would mis-operate
+		 * on the still-open child scope, leaving the parent array un-popped
+		 * and silently absorbing every following sibling. A pending pop is
+		 * only ever cancelled by ev_array_dim_start (which clears the flag
+		 * to continue the same array across '/' dimensions), so if it is
+		 * still set here the child array is genuinely finished.
+		 */
+		builder_do_deferred_pop(b);
 		bvn_scope_t *top = builder_top(b);
 		if (top && top->kind == BVN_SCOPE_ARRAY) {
 			uint32_t row_size = top->node->arr.count - b->row_start_count;

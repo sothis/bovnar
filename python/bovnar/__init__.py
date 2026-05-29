@@ -396,7 +396,9 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
     text = raw.decode('utf-8', errors='replace')
 
     if tok_type == _TOKEN_IS_BOOL:
-        return text in ('true', 'on')
+        # The validator normalises on/off to canonical true/false text
+        # before emitting token_is_bool, so only "true"/"false" arrive here.
+        return text == 'true'
 
     if tok_type == _TOKEN_IS_SYMBOL:
         return text

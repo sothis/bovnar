@@ -3190,8 +3190,8 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
 .escaped  = "tab:\\there\\nnewline";
 .concat   = "hello " "world";
 .ref      = &.sensor.name;
-.special  = $nan$;
-.neg_inf  = $-infinity$;`,
+.special  = $nan;
+.neg_inf  = $-inf;`,
 
     errors: `# These trigger parser errors (shown in red)
 .valid = 42;
@@ -3422,9 +3422,16 @@ hljs.registerLanguage('bovnar', function() {
     end: /$/
   };
 
+  /* $nan / $inf / $-inf, with an optional inline unit ($nan s). The unit
+     is folded in here because the keyword now ends in a letter, so
+     INLINE_UNIT's digit/" lookbehind can no longer detect it without
+     false-positives on ordinary symbols that happen to end in n/f. */
   const SPECIAL_FLOAT = {
-    scope: 'bvn-special',
-    match: /\$(?:-infinity|infinity|nan)\$/
+    match: [
+      /\$(?:-inf|inf|nan)\b/,
+      /(?:\s+[A-Za-z_µΩ°][A-Za-z0-9_~·µΩ°¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*)?/
+    ],
+    scope: { 1: 'bvn-special', 2: 'bvn-unit' }
   };
 
   /* Matches leading-dot floats (.5, -.5), integer-led floats (3.14, 1.),
@@ -3444,12 +3451,13 @@ hljs.registerLanguage('bovnar', function() {
     ]
   };
 
-  /* Inline unit suffix: mandatory whitespace after a scalar (digit, $, or
+  /* Inline unit suffix: mandatory whitespace after a scalar (digit or
      closing "), then unit chars including SI/IEC prefix~base notation,
-     Unicode superscript exponents, and compound separators. */
+     Unicode superscript exponents, and compound separators.  (Special
+     numbers carry their own optional unit in SPECIAL_FLOAT.) */
   const INLINE_UNIT = {
     match: [
-      /(?<=[\d$"])\s+/,
+      /(?<=[\d"])\s+/,
       /[A-Za-z_µΩ°][A-Za-z0-9_~·µΩ°¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*/
     ],
     scope: { 2: 'bvn-unit' }
@@ -3474,7 +3482,7 @@ hljs.registerLanguage('bovnar', function() {
       COMMENT,
       {
         scope: 'bvn-type',
-        match: /\b(?:float_fix|float_dec|float|uint|sint|utf8)\b/
+        match: /\b(?:float_fix|float_dec|float|uint|sint|utf8|bool)\b/
       },
       { scope: 'bvn-unit',  match: /\bno_unit\b/ },
       { scope: 'bvn-param', match: /\bq\d+\b/ },

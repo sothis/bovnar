@@ -289,8 +289,10 @@ static bvn_dom_node_t *make_bool(const char *str, uint32_t len,
 	if (!n) return NULL;
 	n->value_type = vt;
 	n->value_unit = vu;
-	n->val.int_val = (str && ((len == 4 && memcmp(str, "true", 4) == 0) ||
-	                          (len == 2 && memcmp(str, "on", 2) == 0)))
+	/* The validator collapses on/off to the canonical true/false text
+	 * before emitting token_is_bool, so the only spellings that reach
+	 * the DOM builder are "true" and "false". */
+	n->val.int_val = (str && len == 4 && memcmp(str, "true", 4) == 0)
 		? 1 : 0;
 	return n;
 }

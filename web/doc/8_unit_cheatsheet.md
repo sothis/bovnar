@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 0.x · 163 physical units · 164 fiat currencies · 50 cryptocurrencies
+> Spec version 0.x · 164 physical units · 164 fiat currencies · 50 cryptocurrencies
 
 ---
 

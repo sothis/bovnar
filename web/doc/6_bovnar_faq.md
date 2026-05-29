@@ -404,7 +404,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-133 named base units across the following categories:
+164 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).

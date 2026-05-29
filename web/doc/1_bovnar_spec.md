@@ -959,7 +959,7 @@ ev_data
 
 ### 11.1 Base Units
 
-The unit system supports **133 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 21 named SI-derived units, and the non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/2_bovnar_unit_system.md`](2_bovnar_unit_system.md)**.
+The unit system supports **164 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 21 named SI-derived units, and the non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/2_bovnar_unit_system.md`](2_bovnar_unit_system.md)**.
 
 **SI base units and digital units**
 
@@ -1652,7 +1652,8 @@ typedef enum bvnr_event_e {
     ev_type_annotation_start,
     ev_type_annotation_end,
     ev_type_annotation_type_family,
-    ev_type_annotation_type_family_parameter
+    ev_type_annotation_type_family_parameter,
+    ev_stream_end
 } bvnr_event_t;
 
 typedef enum value_type_family_e {
@@ -2030,7 +2031,12 @@ ev_type_annotation_type_family_parameter  (base:_10)
 ev_type_annotation_type_family_parameter  (unit:no_unit)
 ev_type_annotation_end
 ev_data                        data="42"
+ev_stream_end
 ```
+
+> Every stream is bracketed by `ev_stream_start` … `ev_stream_end`; the reader
+> emits `ev_stream_end` once after the final assignment (it is omitted from the
+> remaining appendix examples for brevity).
 
 ### A.2 Typed Assignment
 
@@ -2145,11 +2151,20 @@ f → l → o → a → t       → ACT_tf_float_done → type_body_outro
 
 ### B.2 Special Number State Machine
 
+A single leading `$` sigil introduces the keyword; there is no trailing sigil.
+The lexer recognises the three reserved spellings letter-by-letter and fires the
+matching outro action at the final letter:
+
 ```
-n → a → n → $  → "nan"
-i → n → f → i → n → i → t → y → $ → "infinity"
-- → i → n → f → i → n → i → t → y → $ → "-infinity"
+$ → n → a → n           → ACT_sp_nan_outro     → "nan"   (3 bytes)
+$ → i → n → f           → ACT_sp_inf_outro     → "inf"   (3 bytes)
+$ → - → i → n → f       → ACT_sp_neginf_outro  → "-inf"  (4 bytes)
 ```
+
+The keyword must be followed by a value terminator (whitespace, `,`, `;`, `]`,
+`#`, or — after whitespace — an inline unit). Any other trailing byte (e.g.
+`$infinity`, `$nans`) is `error_unexpected_input_byte`, so the three spellings
+are reserved. The stored token text omits the `$` sigil: `nan`, `inf`, `-inf`.
 
 ### B.3 Default Width, Base, and Q
 

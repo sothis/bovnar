@@ -50,9 +50,11 @@ from .units   import (
     exponent_to_int, int_to_exponent,
     convert_value,
 )
+from . import currency
 
 __all__ = [
     'loads', 'dumps', 'dom_parse',
+    'currency',
     'unit_factor', 'unit_to_str', 'parse_unit',
     'write_array',
     'Quantity',

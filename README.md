@@ -47,7 +47,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
-- **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) emits the same event stream as the C reference and powers an interactive single-file web playground.
+- **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) approximates the C reference event stream (lenient: it does not synthesise default type annotations or perform type/value validation) and powers an interactive single-file web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, and Vim, all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
 - **Extensively tested** — Unit tests, socket-pair round-trip tests, a 168-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
@@ -434,7 +434,7 @@ cd highlighter/vim && ./install.sh
 
 ## Web Playground
 
-A dependency-free JavaScript parser (`web/bovnar_parser.js`) reimplements the reference event stream in the browser and drives an interactive single-file playground (`web/index.html`). Serve the `web/` directory and open it — no build step required:
+A dependency-free JavaScript parser (`web/bovnar_parser.js`) approximates the reference event stream in the browser and drives an interactive single-file playground (`web/index.html`). It is deliberately lenient — it adds an `ev_assignment_end` delimiter the C core does not emit, does not synthesise the default type-annotation events, and performs no type/value validation — so it is a visualisation aid, not a conformant second implementation. Serve the `web/` directory and open it — no build step required:
 
 ```bash
 cd web && ./httpd.sh          # python3 -m http.server

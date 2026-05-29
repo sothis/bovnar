@@ -1,5 +1,13 @@
-/* bovnar_parser.js — JavaScript parser for the Bovnar format
- * Emits events matching the reference C implementation's event stream.
+/* bovnar_parser.js — lenient JavaScript parser for the Bovnar format,
+ * used by the web visualizer.  It approximates the reference C
+ * implementation's event stream but is deliberately NOT a faithful
+ * reproduction of it:
+ *   - it adds an ev_assignment_end delimiter that the C core does not emit
+ *     (used by the visualizer to close an assignment's render scope);
+ *   - it does not synthesise the default type-annotation event sequence
+ *     that the C validator emits for unannotated values; and
+ *   - it performs no type/value-compatibility validation, so it accepts
+ *     some inputs the C validator would reject.
  * Exported as window.BovnarParser = { parseBovnar, EV }
  */
 (function (global) {
@@ -123,7 +131,7 @@
     function readSpecialNumber() {
       advance(); // skip the '$' sigil
       let kw = '';
-      while (!eof() && !/[ \t\r\n;,\[\]{}#]/.test(cur())) { kw += cur(); advance(); }
+      while (!eof() && !/[ \t\r\n\v\f;,\[\]{}#]/.test(cur())) { kw += cur(); advance(); }
       return kw;
     }
 
@@ -140,7 +148,7 @@
         /* Unit starts with a letter, %, °, µ, Ω, or a high byte */
         if (/[A-Za-z_%°µΩ]/.test(c) || code > 0x7F) {
           let unit = '';
-          while (!eof() && !/[ \t\r\n;,\[\]{}#]/.test(cur())) {
+          while (!eof() && !/[ \t\r\n\v\f;,\[\]{}#]/.test(cur())) {
             unit += cur(); advance();
           }
           return unit;
@@ -278,9 +286,13 @@
         return;
       }
 
-      /* Special number */
+      /* Special number — only $nan, $inf, $-inf are valid; the C lexer
+         hard-errors on any other spelling (e.g. $infinity, $nan$, $). */
       if (cur() === '$') {
         const kw = readSpecialNumber();
+        if (kw !== 'nan' && kw !== 'inf' && kw !== '-inf') {
+          emit(EV.ERROR, { msg: `Invalid special number: '$${kw}'` });
+        }
         const unit = insideArray ? null : tryInlineUnit();
         emit(EV.DATA, { kind: 'special', value: kw, text: '$' + kw, unit });
         return;
@@ -290,7 +302,7 @@
       if (cur() === '&') {
         advance();
         let ref = '';
-        while (!eof() && !/[ \t\r\n;,\[\]{}#]/.test(cur())) { ref += cur(); advance(); }
+        while (!eof() && !/[ \t\r\n\v\f;,\[\]{}#]/.test(cur())) { ref += cur(); advance(); }
         emit(EV.DATA, { kind: 'reference', value: ref, text: '&' + ref });
         return;
       }
@@ -308,9 +320,12 @@
          on / off), which the validator reclassifies out of the symbol space. */
       if (/[A-Za-z_]/.test(cur()) || cur().charCodeAt(0) > 0x7F) {
         let sym = '';
-        while (!eof() && !/[ \t\r\n;,\[\]{}#<>=]/.test(cur())) {
+        let illegalDot = false;
+        while (!eof() && !/[ \t\r\n\v\f;,\[\]{}#<>=]/.test(cur())) {
+          if (cur() === '.') illegalDot = true;  // '.' is a hard error in a symbol body
           sym += cur(); advance();
         }
+        if (illegalDot) emit(EV.ERROR, { msg: `Illegal '.' in symbol '${sym}'` });
         if (sym === 'null') {
           emit(EV.DATA, { kind: 'null', value: null, text: sym });
         } else if (sym === 'true' || sym === 'on') {

@@ -3,10 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1e1e1e">
 <meta name="description" content="Bovnar (BVNR) — unit-safe serialization for scientific and industrial systems. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
 <meta property="og:title" content="Bovnar — Unit-safe serialization for scientific and industrial systems">
 <meta property="og:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error. Built for instrumentation, telemetry, and control systems.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="/bovnar-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bovnar — unit-safe serialization for scientific & industrial systems">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="/bovnar-og.png">
 <title>Bovnar — Unit-safe serialization for scientific & industrial systems</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -1929,12 +1942,13 @@ a[data-doc] { cursor: pointer; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false"><defs><linearGradient id="bvnrGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient><symbol id="bvnr-mk" viewBox="0 0 256 256"><path d="M118 66 L96 66 L60 128 L96 190 L118 190" fill="none" stroke="url(#bvnrGrad)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M138 66 L160 66 L196 128 L160 190 L138 190" fill="none" stroke="url(#bvnrGrad)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M128 94 L162 128 L128 162 L94 128 Z" fill="#33a78f"/><path d="M128 94 L94 128 L128 128 Z" fill="#9cdcfe"/><path d="M128 94 L162 128 L128 128 Z" fill="#4ec9b0"/><path d="M94 128 L128 162 L128 128 Z" fill="#3fb89e"/><path d="M162 128 L128 162 L128 128 Z" fill="#2c9281"/></symbol><symbol id="bvnr-fav" viewBox="0 0 64 64"><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#bvnrGrad)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#bvnrGrad)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></symbol></defs></svg>
 
 <!-- ══════════════════════════════════════════════
      NAVIGATION
 ══════════════════════════════════════════════ -->
 <nav>
-  <a class="nav-brand" href="#">BOVNAR<span class="ext">.bvnr</span></a>
+  <a class="nav-brand" href="#"><svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true" style="flex:none;vertical-align:-4px;margin-right:.55rem"><use href="#bvnr-fav"/></svg>BOVNAR<span class="ext">.bvnr</span></a>
   <ul class="nav-links">
     <li><a href="#demo">Live Demo</a></li>
     <li><a href="#playground">Playground</a></li>
@@ -2900,7 +2914,7 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
   <div class="footer-main">
     <div class="footer-inner">
       <div>
-        <div class="footer-brand-name">BOVNAR</div>
+        <div class="footer-brand-name" style="display:flex;align-items:center;gap:.55rem"><svg width="24" height="24" viewBox="0 0 256 256" aria-hidden="true" style="flex:none"><use href="#bvnr-mk"/></svg>BOVNAR</div>
         <div class="footer-brand-sub">Spec v0.x (draft) · MIT License · C99</div>
         <p class="footer-desc">
           Unit-safe serialization for scientific and industrial systems. Every measurement
@@ -3649,3 +3663,4 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
 </body>
 </html>
+

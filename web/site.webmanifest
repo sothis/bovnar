@@ -1,0 +1,13 @@
+{
+  "name": "Bovnar",
+  "short_name": "Bovnar",
+  "description": "Unit-safe serialization for scientific & industrial systems.",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/bovnar-mark.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/bovnar-mark-tile.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "theme_color": "#007acc",
+  "background_color": "#1e1e1e",
+  "display": "standalone"
+}

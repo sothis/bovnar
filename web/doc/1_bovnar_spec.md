@@ -2234,7 +2234,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar Specification v1.0*
+*End of Bovnar Specification (draft, v0.x)*
 
 
 

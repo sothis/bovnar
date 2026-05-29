@@ -1164,6 +1164,6 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification v1.0*
+*End of Bovnar FAQ — Specification (draft, v0.x)*
 
 ==> build/merged/bvnr_py_src_exmpl.txt <==

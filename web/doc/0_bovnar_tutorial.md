@@ -917,5 +917,5 @@ $nan$  $infinity$  $-infinity$
 
 ---
 
-*Bovnar Specification v1.0 — format by the Bovnar project.*
+*Bovnar Specification (draft, v0.x) — format by the Bovnar project.*
 

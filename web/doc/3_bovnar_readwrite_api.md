@@ -1113,7 +1113,7 @@ int main(void)
 
 ---
 
-*End of Bovnar Read & Write API Reference v1.0*
+*End of Bovnar Read & Write API Reference (draft, v0.x)*
 
 
 

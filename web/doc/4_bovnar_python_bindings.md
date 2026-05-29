@@ -859,7 +859,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ## Spec version
 
-These bindings target **Bovnar spec v1.0**.  The
+These bindings target the **Bovnar spec (draft, v0.x)**.  The
 `ErrorCode.UNIT_MISMATCH` member (value 38) and
 `ErrorCode.ARRAY_NESTING_TOO_HIGH` (value 6) are present in the current
 implementation.  The reference C library implementation is under active

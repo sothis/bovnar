@@ -28,6 +28,47 @@
 #include "bvn_io_impl.h"
 #include "bvn_lexer_impl.h"
 #include "bvn_val_impl.h"
+/*
+ * ===========================================================================
+ * Lexer / tokenizer
+ * ===========================================================================
+ *
+ * The lexer is a table-driven state machine. For every (state, input byte)
+ * pair, bvn_after_state_idx_table (generated in bovnar_state_table.c) yields
+ * an action index; bvn_action_table maps that index to a handler function and
+ * bvn_action_target_state gives the fall-through next state. This design was
+ * chosen over a hand-written switch because the bovnar grammar has ~90 states
+ * and the byte-classification logic is dense and regular: encoding it as a
+ * flat table keeps the hot loop branch-light (one table lookup + one indirect
+ * call per byte) and makes the grammar auditable as data rather than control
+ * flow.
+ *
+ * As tokens complete, the lexer pushes raw tokens into the validator
+ * (bvn_val_receive*), which performs the semantic layer. The lexer itself
+ * only recognises lexical structure and enforces length/UTF-8 limits.
+ *
+ * Two cross-cutting concerns shape the rest of this file:
+ *
+ *  - Performance: a byte-at-a-time indirect-call loop is slow for the common
+ *    case of long identifiers/strings/numbers. The "run LUT" tables below let
+ *    the inner loop detect a maximal run of bytes that all self-loop in the
+ *    current copy-state and bulk-memcpy them in one shot (bvn_try_bulk_run /
+ *    bvn_try_bulk_ws), falling back to the per-byte path at run boundaries.
+ *
+ *  - Error recovery: with continue_on_error set, a lexical error does not
+ *    abort the parse. Instead the machine enters the `resync` family of
+ *    states (bvn_enter_resync + bvn_action_resync_*), discards bytes up to the
+ *    next safe boundary (a top-level ';'), emits the structural close events
+ *    the validator needs to stay balanced, and resumes — counting each event
+ *    in recovery_count.
+ */
+
+/*
+ * Run lookup tables: for each "copy byte" state, lut[b] == 1 iff byte b would
+ * keep the machine in that same state (i.e. it is a legal continuation that
+ * does not terminate the token). Built once from the authoritative transition
+ * table so the two can never drift apart. These power the bulk-copy fast path.
+ */
 static uint8_t bvn_run_lut_string[256];
 static uint8_t bvn_run_lut_ident[256];
 static uint8_t bvn_run_lut_number[256];
@@ -40,6 +81,13 @@ static uint8_t bvn_run_lut_type[256];
 static uint8_t bvn_run_lut_ws[256];
 static uint8_t bvn_ws_accepting_state[dimension_state];
 static bool    bvn_run_luts_inited = false;
+/*
+ * Mark every printable/high byte that the transition table maps to the given
+ * "self" action (the action that copies a byte and stays in the same state).
+ * Control bytes 0x09/0x0a/0x0d are deliberately excluded so the bulk path
+ * never swallows line-affecting whitespace, keeping line/column accounting
+ * exact.
+ */
 static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 {
 	for (int b = 0x20; b <= 0x7e; ++b) {
@@ -53,6 +101,12 @@ static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 			lut[b] = 1;
 	}
 }
+/*
+ * Populate all run LUTs plus the whitespace-accepting-state table. Marked as a
+ * constructor so the tables are ready before main() even if the library is
+ * used without an explicit init call; bvn_lex_init also calls it (guarded by
+ * bvn_run_luts_inited) so static-init order is never relied upon.
+ */
 __attribute__((constructor))
 static void bvn_init_run_luts(void)
 {
@@ -112,6 +166,21 @@ static inline void bvn_notify_error(bvnr_reader_t* p)
 					v->error_byte, v->error_offset);
 	}
 }
+/*
+ * Begin error recovery (only reached when continue_on_error is set).
+ *
+ * The tricky part is that the validator downstream tracks open arrays and
+ * structs; if we just skipped bytes we would leave it with dangling open
+ * scopes and every subsequent token would be misinterpreted. So before
+ * switching to the `resync` state we synthesise the array-row-end events
+ * needed to close every currently-open array level, restoring each parent
+ * frame's saved type/unit as we unwind. Struct nesting is intentionally left
+ * standing and remembered in resync_saved_struct_nesting: structs are closed
+ * later, at the resync boundary, because a stray byte inside a struct should
+ * not silently discard the whole enclosing object. All scratch state (string
+ * buffers, UTF-8 progress, accumulator) is reset so the next good token starts
+ * clean, and recovery_count is bumped for diagnostics.
+ */
 static bool bvn_enter_resync(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
@@ -160,6 +229,12 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	l->arr_used_max = 0;
 	return true;
 }
+/*
+ * Escape decode table. The high bit (ESC_VALID) flags a legal escape letter;
+ * the low byte holds the replacement character. A single table lookup replaces
+ * a switch and lets bvn_decode_escape stay branch-free on the hot path. Only
+ * the bovnar-approved escapes are present; everything else decodes as invalid.
+ */
 #define ESC_VALID 0x100u
 static const uint16_t bvn_escape_lut[256] = {
 	['t']  = ESC_VALID | '\t',  ['n']  = ESC_VALID | '\n',
@@ -177,6 +252,15 @@ static inline bool bvn_decode_escape(bvnr_reader_t* p, uint8_t* out)
 	*out = (uint8_t)(e & 0xffu);
 	return true;
 }
+/*
+ * Append the current byte to a length-bounded buffer, raising `overflow` if
+ * the per-token limit is hit. Every variable-length token (identifier, string,
+ * number, symbol, reference) funnels through this so the configurable size
+ * caps are enforced uniformly in one place — the defence against a hostile
+ * stream trying to exhaust memory with one unbounded token. The thin
+ * bvn_push_str/_number/_string/_reference wrappers just bind the right limit
+ * and error code.
+ */
 static inline bool bvn_push_bounded(
 	bvnr_reader_t* p, uint8_t* dst, uint32_t len, uint32_t max,
 	error_code_t overflow, state_t after)
@@ -237,6 +321,17 @@ static inline bool bvn_lex_number_begin(bvnr_reader_t* p, bool is_array)
 		p->lex.token_type = token_is_number;
 	return true;
 }
+/*
+ * Emit the token that has just finished accumulating.
+ *
+ * Called at every token boundary (whitespace, separators, closing bytes). It
+ * NUL-terminates the three scratch buffers — the validator and unit/type
+ * parsers expect C strings even though lengths are also passed — packages them
+ * into a bvnr_raw_token_t, and hands them to the sink (normally bvn_val_receive).
+ * Structural tokens carry no payload and are filtered out early; an identifier
+ * maps to an assignment-start event, everything else to a data event. On
+ * success all scratch lengths are zeroed so the next token starts fresh.
+ */
 static bool bvn_lex_finalize(bvnr_reader_t* p, bvn_lex_sink_fn sink)
 {
 	bvnr_lexer_t* l = &p->lex;
@@ -273,6 +368,20 @@ static bool bvn_lex_finalize(bvnr_reader_t* p, bvn_lex_sink_fn sink)
 	l->token_type        = token_is_unknown;
 	return true;
 }
+/*
+ * ---------------------------------------------------------------------------
+ * Action handlers
+ * ---------------------------------------------------------------------------
+ * One handler per ACT_* index. Each is invoked with the just-read byte already
+ * in p->lex.byte and is responsible for (a) mutating accumulator/scratch state
+ * and (b) setting p->lex.next_state. They return false (after recording an
+ * error) to abort or trigger recovery. Most are tiny state-setters; the few
+ * with real logic (arrays, structs, octet streams, resync) are commented
+ * individually below.
+ *
+ * bvn_action_set_state is the degenerate handler for pure transitions that do
+ * no work; the dispatch loop special-cases it to skip the indirect call.
+ */
 bool bvn_action_set_state(bvnr_reader_t* p)
 {
 	uint8_t idx = bvn_after_state_idx_table[p->lex.next_state][p->lex.byte];
@@ -435,6 +544,18 @@ bool bvn_action_arr_special_number_intro(bvnr_reader_t* p)
 	p->lex.next_state = sp_start;
 	return true;
 }
+/*
+ * '[' — open an array level.
+ *
+ * bovnar arrays are rectangular/multi-dimensional, so each nesting level needs
+ * its own bookkeeping: the per-row element count and the established row size
+ * to check ragged rows against. We push the parent level's counters AND its
+ * value-type/unit onto arr_frames[level] (a manually managed stack sized at
+ * init to max_array_nesting+1) so they can be restored on the matching ']'.
+ * Saving type/unit per frame is what lets an inner array inherit, then later
+ * not clobber, the element type annotation of its parent. in_dim_seq carries
+ * the expected row width for subsequent sibling rows of a multi-dim array.
+ */
 bool bvn_action_array_intro(bvnr_reader_t* p)
 {
 	if (p->lex.max_array_items &&
@@ -468,6 +589,14 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	p->lex.next_state = array_intro;
 	return true;
 }
+/*
+ * ']' — close the current array level. Finalises any pending element, asks the
+ * validator to verify this row's width against the established row size, then
+ * pops the saved frame: the just-closed row's width becomes the parent frame's
+ * dim_row_size (so the parent can enforce that sibling rows match), and the
+ * parent's counters/type are restored. The unit_serial guard avoids
+ * needlessly overwriting a unit that the inner scope never changed.
+ */
 bool bvn_action_array_outro(bvnr_reader_t* p)
 {
 	if (!p->lex.array_nesting_level) {
@@ -525,6 +654,11 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 	p->lex.next_state = new_array_value;
 	return true;
 }
+/*
+ * Dimension separator between rows of a multi-dimensional array. Emits
+ * ev_array_dim_start and flags the current frame as a dimension sequence so
+ * the next opened row inherits the sibling row width to validate against.
+ */
 bool bvn_action_array_dim_sep(bvnr_reader_t* p)
 {
 	if (!bvn_val_receive_event(p, ev_array_dim_start))
@@ -553,6 +687,13 @@ bool bvn_action_kw_advance(bvnr_reader_t* p)
 	p->lex.next_state = bvn_kw_advance_state[p->lex.next_state];
 	return true;
 }
+/*
+ * The grammar recognises the float keywords nan/inf/-inf letter-by-letter via
+ * the sp_* states. Once matched, this writes the canonical spelling into the
+ * number buffer so downstream parsing sees a normal numeric token rather than
+ * having to special-case keyword tokens. bvn_action_tf_*_done does the
+ * analogous thing for type-family keywords (uint/sint/float/utf8/bool).
+ */
 static bool bvn_special_keyword_outro(bvnr_reader_t* p,
 	const char* s, uint32_t len)
 {
@@ -638,6 +779,12 @@ bool bvn_action_copy_reference_byte(bvnr_reader_t* p)
 {
 	return bvn_push_reference_byte(p, reference_segment_body);
 }
+/*
+ * Entry to a binary octet stream. This only flips the state and signals the
+ * validator; the actual length-prefixed binary framing is read out-of-band by
+ * bvn_read_octet_stream because that data is not text and must bypass the
+ * UTF-8/whitespace machinery entirely (see the main loop in bvn_lex_run).
+ */
 bool bvn_action_octet_stream_intro(bvnr_reader_t* p)
 {
 	p->lex.token_type = token_is_octet_stream;
@@ -728,6 +875,18 @@ bool bvn_action_type_null_then_array_outro(bvnr_reader_t* p)
 		return false;
 	return bvn_action_array_outro(p);
 }
+/*
+ * ---------------------------------------------------------------------------
+ * Resync (error-recovery) handlers
+ * ---------------------------------------------------------------------------
+ * Active only after bvn_enter_resync. The goal is to reach the next safe
+ * top-level boundary (a ';' that is not inside a bracket pair or string) and
+ * resume normal parsing there. While skipping we still have to track bracket
+ * and string/comment nesting so a ';' inside skipped-over junk is not mistaken
+ * for the boundary — resync_array_depth / resync_struct_depth count brackets
+ * opened *after* recovery began. resync_string/_comment states swallow string
+ * and comment bodies wholesale so their contents can't trigger false resyncs.
+ */
 bool bvn_action_resync_skip(bvnr_reader_t* p)
 {
 	p->lex.next_state = resync;
@@ -742,6 +901,15 @@ bool bvn_action_resync_open_bracket(bvnr_reader_t* p)
 	p->lex.next_state = resync;
 	return true;
 }
+/*
+ * A closing bracket seen during resync. If it merely balances a bracket opened
+ * since recovery started, just decrement the resync depth. Otherwise it closes
+ * a real array/struct that was open before the error, so we must emit the
+ * corresponding close events to the validator (unwinding array frames, or
+ * closing all arrays then the struct for '}') to keep its scope stack
+ * balanced. This is what lets recovery rejoin the stream cleanly at a point
+ * inside a still-open container rather than only at the very top level.
+ */
 bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
@@ -804,6 +972,14 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 	}
 	return true;
 }
+/*
+ * Reached a ';' boundary during recovery: collapse everything back to a clean
+ * value_outro state. Any structs opened since recovery began are closed (down
+ * to the nesting level captured when recovery started), all array/scratch
+ * state is cleared, and the value type/unit are reset to plain. After this the
+ * machine is indistinguishable from having just finished a well-formed
+ * assignment, so the next byte resumes normal parsing.
+ */
 static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
@@ -907,6 +1083,12 @@ bool bvn_action_resync_comment_outro(bvnr_reader_t* p)
 	p->lex.next_state = resync;
 	return true;
 }
+/*
+ * Inline unit suffix (e.g. the `kg` in `42 kg`). Disallowed inside array
+ * elements — array element types/units come from the array's annotation, not
+ * from each element — hence the early rejection. The bytes are accumulated in
+ * a dedicated small buffer and later parsed by the unit machinery.
+ */
 bool bvn_action_inline_unit_intro(bvnr_reader_t* p)
 {
 	if (p->lex.in_array_element) {
@@ -949,6 +1131,26 @@ static inline void bvn_capture_os_error(bvnr_reader_t* p, error_code_t err)
 	p->val.error_byte   = 0;
 	p->val.error_offset = l->processed_bytes;
 }
+/*
+ * ---------------------------------------------------------------------------
+ * Octet-stream reading
+ * ---------------------------------------------------------------------------
+ * An octet stream is raw binary framed as repeated [0x01][len_lo][len_hi]
+ * [len bytes] chunks terminated by a 0x00 tag. Because the framing is binary,
+ * it is read directly from the source here rather than through the text state
+ * machine. When the text loop hands control over, some bytes of the next chunk
+ * may already sit in the text buffer; those "residual" bytes are consumed
+ * first (src->resid) before pulling more from the underlying source, and any
+ * bytes left over after the stream ends are returned so the text loop can
+ * resume exactly where the binary data stopped.
+ */
+
+/*
+ * Fill `output` with exactly `length` bytes, drawing first from the residual
+ * buffer then from the source, looping over short reads. Also mirrors bytes to
+ * the debug sink and enforces the file-size cap, so the binary path honours the
+ * same limits and tee behaviour as the text path.
+ */
 static bool bvn_os_read_exact(
 	octet_source_t* src, void* output, uint32_t length)
 {
@@ -999,6 +1201,13 @@ static bool bvn_os_read_exact(
 	}
 	return true;
 }
+/*
+ * Drive the chunk loop: read a tag, and on 0x01 read the 16-bit little-endian
+ * length (where 0 means the maximal 65536, since 0-length chunks are useless)
+ * and forward that many bytes to the validator; on 0x00 emit the stream-end
+ * event and stop. Any other tag is a framing desync. *out_leftover reports how
+ * many residual bytes were not consumed so the caller can rewind the text loop.
+ */
 static bool bvn_read_octet_stream(
 	bvnr_reader_t* p, const uint8_t* resid, uint32_t resid_len,
 	uint32_t* out_leftover)
@@ -1035,6 +1244,15 @@ static bool bvn_read_octet_stream(
 			return false;
 	}
 }
+/*
+ * Classify a UTF-8 leading byte: how many continuation bytes follow (`need`)
+ * and the valid range [lo,hi] of the *first* continuation. The per-leader lo/hi
+ * ranges are the standard UTF-8 well-formedness constraints from RFC 3629 /
+ * Unicode Table 3-7 that reject overlong encodings, surrogates (0xED) and
+ * out-of-range code points (0xF4), so validation is exact rather than the
+ * naive "0x80-0xBF for every trailing byte". Returns false for bytes that can
+ * never begin a sequence (0x80-0xC1, 0xF5-0xFF).
+ */
 bool bvn_utf8_classify_leader(
 	uint32_t b, uint8_t* need, uint8_t* lo, uint8_t* hi)
 {
@@ -1052,6 +1270,13 @@ bool bvn_utf8_classify_leader(
 typedef struct {
 	uint8_t need, lo, hi;
 } utf8_state_t;
+/*
+ * Incremental UTF-8 validator: feed one byte, return false on malformation.
+ * Holding the decode state in a tiny struct (need/lo/hi) lets the same logic
+ * serve both the streaming lexer (state stored across buffer boundaries in
+ * bvn_utf8_feed) and the one-shot bvn_validate_string. After the first
+ * continuation byte the range relaxes to the generic 0x80-0xBF.
+ */
 static inline bool bvn_utf8_feed_st(utf8_state_t* st, uint32_t b)
 {
 	if (st->need) {
@@ -1075,6 +1300,11 @@ static bool bvn_utf8_feed(bvnr_lexer_t* l, uint32_t b)
 	l->utf8_hi   = st.hi;
 	return ok;
 }
+/*
+ * Public helper: is the whole buffer well-formed UTF-8? Runs the incremental
+ * validator to completion and requires no pending continuation bytes at the
+ * end (a truncated multibyte sequence at EOF is invalid).
+ */
 bool bvn_validate_string(const uint8_t* data, size_t len)
 {
 	utf8_state_t st = {0};
@@ -1084,6 +1314,13 @@ bool bvn_validate_string(const uint8_t* data, size_t len)
 	}
 	return st.need == 0;
 }
+/*
+ * The core per-byte step: look up the action for (current state, byte), then
+ * dispatch. Whitespace is the hottest case so it short-circuits before the
+ * indirect call; a zero index means the byte is illegal in this state. Pure
+ * state transitions (bvn_action_set_state) are inlined here too, so an actual
+ * function-pointer call only happens for handlers that do real work.
+ */
 static inline bool bvn_call_action_for_new_byte(bvnr_reader_t* p)
 {
 	uint8_t idx = bvn_after_state_idx_table[p->lex.next_state][p->lex.byte];
@@ -1111,6 +1348,14 @@ static inline void bvn_advance_line(bvnr_lexer_t* l, uint8_t prev)
 		l->column = 0;
 	}
 }
+/*
+ * Scan ahead to find the end of a maximal run of string-body bytes starting at
+ * `start`: stops at a control byte, a quote, a backslash (escape), or any
+ * malformed/incomplete UTF-8. Returns the index one past the last byte that is
+ * safe to bulk-copy — crucially it never returns mid-multibyte-sequence
+ * (last_complete tracks the last code-point boundary), so a UTF-8 character
+ * split across the run boundary is left for the per-byte path to handle.
+ */
 static inline uint32_t bvn_string_ext_end(
 	const uint8_t* data, uint32_t start, uint32_t len)
 {
@@ -1137,6 +1382,19 @@ static inline uint32_t bvn_string_ext_end(
 	}
 	return need ? last_complete : i;
 }
+/*
+ * Bulk fast path. If the machine is sitting in one of the "copy byte" states,
+ * find the longest run of bytes from `start` that all stay in that state and
+ * memcpy them into the target buffer in a single call, returning how many
+ * bytes were consumed (0 = fall back to the per-byte loop). This is the main
+ * throughput win: long strings/identifiers/numbers no longer pay one indirect
+ * call per byte. All the limits the per-byte path enforces (buffer capacity,
+ * max_string_length, max_text_bytes) are re-applied to the run length so the
+ * fast path can never overrun a bound. Strings get a dedicated branch because
+ * their terminator set differs; the rest share a run-LUT-driven scanner that
+ * also walks complete UTF-8 sequences. l->byte/prev_byte are updated to the
+ * last copied byte so the per-byte path resumes consistently.
+ */
 static inline uint32_t bvn_try_bulk_run(
 	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
 {
@@ -1265,6 +1523,13 @@ static inline uint32_t bvn_try_bulk_run(
 	l->prev_byte   = data[start + n - 1u];
 	return n;
 }
+/*
+ * Companion fast path for whitespace runs, used only in states that accept
+ * whitespace as a no-op. It collapses a span of spaces/tabs/newlines in one
+ * pass while keeping line and column accounting exact — including tab stops
+ * (rounded up to multiples of 4) and CR/LF handling (a CRLF pair counts as one
+ * line). This matters because indentation in pretty-printed bovnar is common.
+ */
 static inline uint32_t bvn_try_bulk_ws(
 	bvnr_lexer_t* l, const uint8_t* data, uint32_t start, uint32_t len)
 {
@@ -1301,6 +1566,17 @@ static inline uint32_t bvn_try_bulk_ws(
 	l->prev_byte   = prev;
 	return n;
 }
+/*
+ * Run the state machine over one contiguous input buffer.
+ *
+ * For each position it first tries the bulk fast paths (only when not mid
+ * UTF-8 sequence), then falls back to the exact per-byte path: enforce the
+ * text-byte cap, validate UTF-8 incrementally, update line/column, and invoke
+ * the byte's action. On a per-byte error it either aborts or, under
+ * continue_on_error, enters resync and keeps going. The one place it returns
+ * early mid-buffer is when an octet-stream intro is hit: *consumed marks where
+ * binary framing takes over so the caller can switch to bvn_read_octet_stream.
+ */
 static bool bvn_interpret_input_buffer(
 	bvnr_reader_t* p, const uint8_t* data, uint32_t len,
 	uint32_t* consumed)
@@ -1408,6 +1684,11 @@ static inline void bvn_set_eof_error(bvnr_reader_t* p, error_code_t err)
 	p->val.last_error = err;
 	bvn_set_error_pos(p, 0, p->lex.processed_bytes);
 }
+/*
+ * Free lexer-owned heap. Note str_data/type_data/inline_unit_data are a single
+ * allocation (see bvn_lex_init) carved into three regions, so only str_data is
+ * freed; the other two pointers just alias into it and are nulled.
+ */
 void bvn_lex_destroy(bvnr_lexer_t* l)
 {
 	if (!l)
@@ -1419,6 +1700,14 @@ void bvn_lex_destroy(bvnr_lexer_t* l)
 	l->type_data        = NULL;
 	l->inline_unit_data = NULL;
 }
+/*
+ * Initialise a lexer: copy caller limits, falling back to the compiled-in
+ * defaults for any left at zero, then allocate the array-frame stack and the
+ * scratch buffers. The three scratch buffers are deliberately carved from one
+ * malloc to save two allocations and keep them in one cache-friendly block;
+ * bvn_lex_destroy relies on this layout. An optional debug sink tees the raw
+ * bytes consumed, used by the canonicaliser/observer tooling.
+ */
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
 {
@@ -1470,6 +1759,19 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	l->inline_unit_data = bufs + BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP;
 	return true;
 }
+/*
+ * Top-level read loop: pull buffer, lex it, repeat until EOF.
+ *
+ * Two source modes are handled. For an in-memory source the lexer walks the
+ * caller's buffer directly in <=1 MiB windows (no copy into stack_data) — the
+ * zero-copy fast path that motivated exposing bvn_pull_mem. For an fd source
+ * it reads into a stack buffer. At EOF the next_state is inspected to decide
+ * whether the stream ended cleanly (only legal at a top-level value boundary
+ * with no open structs) or is truncated/incomplete; mid-resync EOF is also a
+ * truncation. The octet-stream intro is the one place the text loop yields to
+ * the binary reader and then resumes at the returned offset. stream_start /
+ * stream_end events bracket the whole run for the validator.
+ */
 #define BVN_MEM_CHUNK_MAX (1u << 20)
 bool bvn_lex_run(bvnr_reader_t* r)
 {

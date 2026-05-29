@@ -29,6 +29,25 @@
 #include <unistd.h>
 #include "bovnar.h"
 #include "bvn_io_impl.h"
+/*
+ * Source/sink backends.
+ *
+ * The reader and writer never touch a file descriptor or a memory buffer
+ * directly; they only call the pull/push/flush function pointers installed
+ * here. That single indirection is what lets the same parser drive a socket,
+ * a regular file, an in-memory buffer, or a caller-supplied custom transport
+ * with no special-casing in the core. This file provides the two backends
+ * that ship with the library: a POSIX fd backend and a fixed memory buffer
+ * backend.
+ */
+
+/*
+ * fd source: read up to `want` bytes. read() may legitimately return fewer
+ * bytes than requested (short read), so *got reports the actual count and the
+ * caller loops as needed — we never assume a full fill. The EINTR retry loop
+ * makes the pull robust against signals interrupting a blocking read, which is
+ * otherwise a spurious failure on a perfectly good fd.
+ */
 static bool pull_fd(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
 	bvn_source_impl_t* impl = bvn_source_impl(s);
@@ -40,6 +59,13 @@ static bool pull_fd(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 	*got = (uint32_t)n;
 	return true;
 }
+/*
+ * Memory source: hand out bytes from a caller-owned buffer. This is exposed
+ * (non-static, declared in the lexer impl header) because the lexer needs to
+ * recognise the in-memory case to enable zero-copy fast paths — when the input
+ * already lives in RAM there is no point copying it through an intermediate
+ * read buffer. Always succeeds; a short count simply signals end-of-input.
+ */
 bool bvn_pull_mem(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
 	bvn_source_impl_t* impl = bvn_source_impl(s);
@@ -53,6 +79,14 @@ bool bvn_pull_mem(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 	*got = n;
 	return true;
 }
+/*
+ * fd sink: write exactly `len` bytes or fail. Unlike the pull side, the writer
+ * contract is all-or-nothing, so we loop until the whole buffer is drained —
+ * write() can accept a partial chunk on a pipe/socket. EINTR is retried; a
+ * write() of 0 is treated as a full disk (ENOSPC) because there is no other
+ * way to make progress. mem_written is tracked so callers can report how many
+ * bytes were emitted even for a streaming fd.
+ */
 static bool push_fd(bvnr_sink_t* s, const void* buf, uint32_t len)
 {
 	bvn_sink_impl_t* impl = bvn_sink_impl(s);
@@ -72,8 +106,20 @@ static bool push_fd(bvnr_sink_t* s, const void* buf, uint32_t len)
 	}
 	return true;
 }
+/*
+ * Both backends flush eagerly (push_fd writes straight through, push_mem
+ * copies straight in), so there is no buffered state to drain. flush is a
+ * no-op kept only to satisfy the sink interface, so a generic caller can call
+ * flush uniformly without knowing the backing type.
+ */
 static bool flush_fd (bvnr_sink_t* s) { (void)s; return true; }
 static bool flush_mem(bvnr_sink_t* s) { (void)s; return true; }
+/*
+ * Memory sink: copy into a caller-supplied fixed buffer. Refuses to write past
+ * `mem_left` rather than truncating, so an overflow is reported as a hard
+ * failure (error_sink_buffer_exhausted upstream) instead of silently producing
+ * a corrupt, partial stream.
+ */
 static bool push_mem(bvnr_sink_t* s, const void* buf, uint32_t len)
 {
 	bvn_sink_impl_t* impl = bvn_sink_impl(s);
@@ -84,6 +130,13 @@ static bool push_mem(bvnr_sink_t* s, const void* buf, uint32_t len)
 	impl->mem_written += len;
 	return true;
 }
+/*
+ * Public constructors. Each zeroes the whole opaque blob first (so unused
+ * reserved bytes are deterministic) and then installs the backend's function
+ * pointers plus its state. After this the handle is fully self-contained and
+ * can be passed to the reader/writer; the library reaches the backend only
+ * through the stored pointers.
+ */
 void bvnr_source_from_fd(bvnr_source_t* s, int fd)
 {
 	memset(s, 0, sizeof(*s));
@@ -118,6 +171,11 @@ void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap)
 	impl->mem_left    = cap;
 	impl->mem_written = 0;
 }
+/*
+ * Byte counter, valid for both sink kinds. For the memory sink it doubles as
+ * the produced length; for an fd sink it is the running total actually handed
+ * to write(). Lets callers size/verify output without re-measuring it.
+ */
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s)
 {
 	return bvn_sink_impl_c(s)->mem_written;

@@ -31,6 +31,33 @@
 #include "bovnar_dom.h"
 #include "bvn_dom_impl.h"
 #include "bovnar_si_units.h"
+/*
+ * ===========================================================================
+ * DOM (in-memory document tree)
+ * ===========================================================================
+ *
+ * The streaming reader is allocation-light but forces the caller to react to
+ * events. The DOM is the convenience alternative: parse a whole document into a
+ * tree of bvn_dom_node_t (built by the observer in bovnar_dom_builder.c) and
+ * then navigate/query it randomly. A document is a bvn_dom_doc_t (a list of
+ * top-level key/value entries plus any parse_error); every value is a node
+ * tagged with its bvn_dom_type_t, carrying its value_type and unit, and using a
+ * union for the payload (inline int/float, heap string/octets, child
+ * struct/array). Integers wider than 64 bits are stored as a heap bvn_int_t
+ * (val.bigint), narrower ones inline (val.int_val) — the value_type.width is
+ * the discriminator everywhere in this file.
+ *
+ * This file holds construction helpers (used by the builder), the destructor,
+ * navigation (lookup by path, struct/array access) and a family of typed
+ * accessors that convert a node's value to a requested C type with range
+ * checking.
+ */
+
+/*
+ * Duplicate a length-counted slice into a fresh NUL-terminated heap string.
+ * Used for keys and string payloads since DOM nodes own their text (the parse
+ * buffers they came from are transient).
+ */
 char *bvn_dom_strdup(const char *s, uint32_t len)
 {
 	char *r = malloc(len + 1u);
@@ -64,6 +91,15 @@ static bool bvn_dom_stack_reserve(bvn_dom_node_t ***stack,
 	*cap   = nc;
 	return true;
 }
+/*
+ * Free a node and its entire subtree. Deliberately ITERATIVE, using an explicit
+ * heap-allocated work stack rather than recursion: a hostile or simply deep
+ * document could nest thousands of levels, and a recursive free would blow the
+ * C call stack. Children are pushed and processed in a loop; the node's own
+ * payload (bigint/string/octets) is released as it is popped. If the work stack
+ * can't grow, it falls back to freeing the current node and bailing — leaking
+ * is preferable to crashing under memory pressure.
+ */
 void bvn_dom_node_destroy(bvn_dom_node_t *n)
 {
 	if (!n) return;
@@ -202,6 +238,13 @@ bvn_dom_node_t *bvn_dom_struct_get(const bvn_dom_node_t *node,
 	}
 	return NULL;
 }
+/*
+ * Resolve a dotted path like ".a.b.c" to a node, walking struct members from
+ * the document root. A leading dot is optional. Each segment is matched by key;
+ * descending requires the current node to be a struct, so a path that tries to
+ * descend into a scalar returns NULL. Segment length is capped at the local
+ * buffer size, which also bounds key length for lookups.
+ */
 bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc,
 							   const char *path)
 {
@@ -322,6 +365,13 @@ int32_t bvn_dom_get_unit_string(const bvn_dom_node_t *node,
 	if (!node) return -1;
 	return bvn_unit_to_string(node->value_unit, buf, bufsize);
 }
+/*
+ * Convert a numeric node to its value expressed in SI base units, applying the
+ * unit's scale factor (and offset for affine units such as °C/°F, where the
+ * conversion is value*factor + offset rather than a pure scaling). This is the
+ * payoff of carrying units in the type system: e.g. a node "5 km" returns 5000.
+ * Non-numeric nodes or units with no SI mapping return 0.0.
+ */
 double bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node)
 {
 	if (!node) return 0.0;
@@ -391,6 +441,13 @@ const bvn_int_t *bvn_dom_get_bigint(const bvn_dom_node_t *node)
 	if (node->value_type.width <= 64u)      return NULL;
 	return node->val.bigint;
 }
+/*
+ * Render an integer node to a freshly allocated string in any base, hiding the
+ * narrow-vs-bignum split: wide values format via bvn_int_to_str, narrow ones
+ * via the int/uint formatters chosen by signedness. The caller owns the result
+ * (bvn_dom_free_string). This is the only way to read a >64-bit DOM integer as
+ * a value, since it can't fit any C integer type.
+ */
 char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base)
 {
 	if (!node || node->type != BVN_DOM_INT) return NULL;
@@ -423,6 +480,16 @@ void bvn_dom_free_string(char *s)
 {
 	free(s);
 }
+/*
+ * The two raw integer extractors behind every bvn_dom_get_iN / get_uN
+ * accessor. They
+ * normalise the narrow/bignum storage split into a single int64/uint64, failing
+ * if a wide value doesn't fit 64 bits or a negative value is requested as
+ * unsigned. The public fixed-width getters (get_i32, get_u8, ...) layer a range
+ * check on top, so each returns false rather than silently truncating when the
+ * value is out of range for the requested C type. make_narrow_int and the
+ * bvn_dom_node_from_* constructors are the symmetric builders.
+ */
 static bool dom_raw_i64(const bvn_dom_node_t *node, int64_t *out)
 {
 	if (!node || node->type != BVN_DOM_INT || !out) return false;

@@ -28,9 +28,28 @@
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 bool bvn_ser_finish_stream(bvnr_serializer_t *s);
+/*
+ * ===========================================================================
+ * Canonicalising observer
+ * ===========================================================================
+ *
+ * A thin adapter that lets the serializer be driven directly by a reader's
+ * event callback, without going through the full bvnr_writer_t (and without
+ * re-validating — the events already came from a validating reader). Plugging
+ * one of these in as a reader's on_verified callback re-emits every event to a
+ * sink, producing a canonical (or pretty-printed) copy of the input: the
+ * foundation of the pretty-print / canonicalise tooling. It is just a
+ * bvnr_serializer_t wrapped in an opaque handle so the raw serializer type
+ * stays private to the library.
+ */
 struct bvnr_canon_observer_s {
 	bvnr_serializer_t ser;
 };
+/*
+ * max_array_nesting is set to the maximum because the event source (a reader)
+ * has already enforced its own nesting limits; the observer should faithfully
+ * reproduce whatever it is fed rather than impose a second, stricter cap.
+ */
 bvnr_canon_observer_t *bvnr_canon_observer_create(
 	const bvnr_sink_t *sink, bool pretty)
 {

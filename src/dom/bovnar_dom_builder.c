@@ -42,6 +42,28 @@
 #ifndef BVN_DOM_OCT_MAX_BYTES
 #define BVN_DOM_OCT_MAX_BYTES  (256u * 1024u * 1024u)
 #endif
+/*
+ * ===========================================================================
+ * DOM builder (event consumer that materialises the tree)
+ * ===========================================================================
+ *
+ * This bridges the streaming reader and the DOM: it registers on_verified as
+ * the reader's callback, and as events arrive it builds the bvn_dom_doc_t tree
+ * defined in bovnar_dom.c. The only real state it needs is a scope stack — the
+ * chain of containers currently open (document root, struct, or array) — so
+ * that each value can be attached to the right parent. builder_attach inspects
+ * the top scope to decide between doc_add / struct_add / array_append.
+ *
+ * Two subtleties:
+ *  - Pending key: a struct/doc member arrives as an assignment-start (the key)
+ *    followed later by its value event; the key is buffered until the value is
+ *    built and attached.
+ *  - Deferred array pop: an array row closes (ev_array_row_end) before we know
+ *    whether a sibling dimension follows (ev_array_dim_start) — for
+ *    multi-dimensional arrays the same array node must stay on the stack across
+ *    rows. So the pop is deferred (pending_array_pop) and only applied when the
+ *    next non-dimension event confirms the array is really finished.
+ */
 typedef enum bvn_scope_kind_e {
 	BVN_SCOPE_DOC,
 	BVN_SCOPE_STRUCT,
@@ -124,6 +146,12 @@ static void builder_clear_key(bvn_builder_t *b)
 	b->key_len = 0;
 	if (b->key) b->key[0] = '\0';
 }
+/*
+ * Attach a freshly built value to the currently open container, dispatching on
+ * the top scope kind: a document/struct member keyed by the buffered key, or an
+ * array element (no key). On failure the value is owned/destroyed by the add
+ * helper, so callers must not free it again.
+ */
 static bool builder_attach(bvn_builder_t *b, bvn_dom_node_t *val)
 {
 	bvn_scope_t *top = builder_top(b);
@@ -170,6 +198,15 @@ static bvn_dom_node_t *make_null(value_type_spec_t vt, value_unit_t vu)
 	n->value_unit = vu;
 	return n;
 }
+/*
+ * Build an INT node from the literal text. The effective width decides storage:
+ * >64 bits parses into a heap bvn_int_t (arbitrary precision), otherwise into
+ * the inline int64. Each make_* builder follows the same contract — take the
+ * value text plus its resolved type/unit, allocate the typed node, and clean up
+ * fully on any failure. The strtoll/strtoull fallback covers plain (untyped)
+ * literals the typed parser declines; an untyped value above INT64_MAX is
+ * promoted to uint64 so it isn't misread as negative.
+ */
 static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 								value_type_spec_t vt, value_unit_t vu)
 {
@@ -376,6 +413,13 @@ static bvn_dom_node_t *make_array(value_type_spec_t vt, value_unit_t vu)
 	n->arr.num_dims = 1;
 	return n;
 }
+/*
+ * Decide whether a numeric token should become a FLOAT or INT node. An explicit
+ * float family forces float; an explicit int family forces int; otherwise
+ * (untyped) it sniffs the text for a dot/exponent or a special value (nan/inf).
+ * This is what lets a bare "3.14" land as a float and "42" as an int without an
+ * annotation.
+ */
 static bool number_is_float(const char *s, uint32_t len,
 							value_type_spec_t vt)
 {
@@ -405,6 +449,17 @@ static void builder_do_deferred_pop(bvn_builder_t *b)
 		builder_pop(b);
 	}
 }
+/*
+ * The reader's verified-event callback: the state machine that turns the event
+ * stream into tree mutations. assignment_start buffers the key; struct/array
+ * starts allocate a container, attach it, and push a scope; the matching ends
+ * pop; ev_data builds the right leaf node via the make_* helpers and attaches
+ * it; octet-stream events accumulate binary chunks into oct_buf and emit one
+ * octet node at the end. Array dimension/row events drive the deferred-pop and
+ * per-dimension row-size bookkeeping described at the top of the file. Returning
+ * false aborts the parse — the reader surfaces it as
+ * error_scanner_callback_failed, which bvn_dom_parse maps back to b->last_error.
+ */
 static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 {
 	bvn_builder_t *b = (bvn_builder_t *)userdata;
@@ -553,6 +608,15 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 	}
 	return true;
 }
+/*
+ * Public one-shot parse: build a complete DOM from an in-memory buffer. It
+ * wires a builder (with the document scope pushed) as the reader's on_verified
+ * consumer, runs the reader to completion, and returns the document. On a parse
+ * failure the document is still returned but carries parse_error — callers
+ * check bvn_dom_doc_get_parse_error rather than relying on a NULL return, so
+ * partial structure can be inspected. bvn_dom_parse_fd[_ex] slurp a file
+ * descriptor into a bounded buffer first, then delegate here.
+ */
 bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 {
 	bvn_dom_doc_t *doc = bvn_dom_doc_create();
@@ -600,6 +664,12 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 	builder_cleanup(&b);
 	return doc;
 }
+/*
+ * Read an entire fd into a growable buffer (capped at max_bytes to bound memory
+ * against an endless stream) and parse it. EINTR is retried; the buffer doubles
+ * until the cap. Because the DOM needs the whole document in memory anyway,
+ * slurping first is simpler than driving the reader off the fd directly.
+ */
 bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
 {
 	if (!max_bytes || max_bytes > (uint64_t)BVN_DOM_FD_MAX_BYTES)

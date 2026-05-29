@@ -32,6 +32,42 @@
 #include "bvn_float.h"
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
+/*
+ * ===========================================================================
+ * Writer / serializer
+ * ===========================================================================
+ *
+ * The writer is the inverse of the reader: the caller drives it with the same
+ * bvnr_event_t stream the reader emits (so reader output can be piped straight
+ * into a writer to canonicalise/pretty-print), and it produces bovnar bytes.
+ *
+ * Each bvnr_write_event goes through two stages, mirroring the reader's
+ * lexer/validator split but in reverse:
+ *
+ *   1. bvn_writer_validate_event — reject anything that would produce an
+ *      ill-formed or out-of-spec document (bad identifier, value out of range
+ *      for its type, unbalanced struct close, illegal type spec, ...). This is
+ *      what makes the writer safe to feed with caller-supplied data: it cannot
+ *      be coaxed into emitting a stream the reader would reject.
+ *   2. bvn_ser_serialize_event — actually format the bytes.
+ *
+ * Output buffering: for an fd sink, bytes are accumulated in wbuf and flushed
+ * in BVN_SER_WBUF_SIZE chunks to amortise write() syscalls; for a memory sink
+ * the wbuf is bypassed and bytes are copied straight in (bvn_ser_push). Errors
+ * are sticky — once w->val.last_error is set, every further call short-circuits
+ * — so callers can write a whole document and check once at bvnr_write_finish.
+ *
+ * Separator bookkeeping is the fiddly part: bovnar uses ';' between top-level/
+ * struct members and ',' between array elements, and pretty mode adds
+ * indentation/newlines. need_semi, the per-depth arr_need_comma[], and
+ * struct_depth_at_array_start[] together decide when a separator is due — see
+ * bvn_ser_emit_pending_comma / bvn_ser_mark_value_done.
+ */
+
+/*
+ * Writer = serializer + a validator (reused only for its type/unit state and
+ * error fields). Created zeroed and inert; bvnr_open_write_* installs the sink.
+ */
 bvnr_writer_t* bvnr_writer_create(void)
 {
 	bvnr_writer_t* w = malloc(sizeof(*w));
@@ -43,6 +79,12 @@ void bvnr_writer_destroy(bvnr_writer_t* w)
 {
 	free(w);
 }
+/*
+ * Record the first error and the byte offset it occurred at (flushed bytes plus
+ * what is still buffered), then return false so callers can `return
+ * bvn_writer_set_error(...)` as a one-liner. Because errors are sticky upstream,
+ * only the first error's position is kept — the most useful one to report.
+ */
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
 {
 	w->val.last_error   = err;
@@ -57,6 +99,14 @@ bool bvn_ser_flush_wbuf(bvnr_serializer_t* s)
 	s->wbuf_pos = 0;
 	return true;
 }
+/*
+ * Central output primitive. Memory sinks are written through directly (no
+ * point double-buffering a buffer into another buffer), while fd sinks
+ * accumulate into wbuf and flush a full block at a time, turning many tiny
+ * emits (one per byte/separator) into a few large write() calls. All the
+ * push_byte/push_str/indent/newline helpers below funnel through here so the
+ * buffering policy lives in exactly one place.
+ */
 static bool bvn_ser_push(bvnr_serializer_t* s,
 	const void* data, uint32_t len)
 {
@@ -156,6 +206,18 @@ static bool bvn_validate_id_for_writer(bvnr_writer_t* w,
 	if (need_free) free(buf);
 	return ok;
 }
+/*
+ * Validate a numeric literal the caller wants to emit against its declared
+ * type: digits legal in the base, sign legal for the family (no '-' for uint),
+ * dot/exponent only for float families, and the value within the type's range.
+ *
+ * The static_buf/malloc pattern recurring through these validators exists
+ * because the underlying string validators want a NUL-terminated C string, but
+ * event payloads are (ptr,len) and not necessarily terminated. Short values use
+ * a stack buffer (the overwhelmingly common case, zero allocation); only an
+ * unusually long literal falls back to malloc. The same idiom appears in the
+ * id/symbol/reference/string-as-number validators.
+ */
 static bool bvn_validate_number_for_writer(bvnr_writer_t* w,
 	const void* data, uint32_t length, value_type_spec_t vt)
 {
@@ -328,6 +390,15 @@ static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 	if (need_free) free(buf);
 	return ok;
 }
+/*
+ * Validate a type annotation itself (independent of any value): width and base
+ * must be legal for the family. These rules encode the format spec — e.g.
+ * float widths are 16 or multiples of 32 up to the max precision; float_fix's
+ * fractional-bit count q must be smaller than the total width; float_dec takes
+ * no base; an explicit numeric base must be 2-62, 64 or 85 (the supported digit
+ * alphabets); bool carries neither width nor base. Catching these here means a
+ * malformed <...> can never reach the byte stream.
+ */
 static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 	value_type_spec_t vt)
 {
@@ -405,6 +476,15 @@ static bool bvn_check_type_value_compat(bvnr_writer_t* w,
 	}
 	return true;
 }
+/*
+ * Stage 1 of bvnr_write_event: semantic validation of one event before any
+ * bytes are produced. Besides per-kind value checks it enforces structural
+ * invariants the serializer assumes — stream_start happens once, struct closes
+ * are balanced, nesting depths stay within the configured caps — and snapshots
+ * the active value_type/unit from annotation events so subsequent data events
+ * can be range-checked against it. Returning false here (via
+ * bvn_writer_set_error) aborts the write before the stream is corrupted.
+ */
 static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	bvnr_event_t ev, bvnr_data_t* data)
 {
@@ -502,6 +582,14 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	}
 	return true;
 }
+/*
+ * Emit a quoted string, escaping only the characters that must be escaped. The
+ * run_start cursor batches every maximal span of literal (non-escaped) bytes
+ * into a single push, so a clean string is written essentially as one memcpy
+ * plus the surrounding quotes rather than byte-by-byte. UTF-8 multibyte
+ * sequences pass through verbatim (the validate stage already proved they are
+ * well-formed), which is why no per-byte UTF-8 handling is needed here.
+ */
 static bool bvn_ser_serialize_string(bvnr_serializer_t* s,
 	const uint8_t* data, uint32_t len)
 {
@@ -533,6 +621,18 @@ static bool bvn_ser_serialize_string(bvnr_serializer_t* s,
 	}
 	return bvn_ser_push_byte(s, '"');
 }
+/*
+ * Comma placement in arrays is subtle: a comma separates *array elements*, but
+ * a struct or nested array opened as an element contains its own values that
+ * must NOT get element-commas. We disambiguate by remembering the struct depth
+ * at which each array level began (struct_depth_at_array_start). A value is a
+ * "direct" element of array level idx only if the current struct depth equals
+ * the depth recorded when that array opened; values produced while deeper
+ * inside a struct are not direct elements and so don't arm the comma flag.
+ *
+ * bvn_ser_emit_pending_comma writes the comma due before the next element;
+ * bvn_ser_mark_value_done arms the flag after a complete value is emitted.
+ */
 static inline bool bvn_ser_is_direct_array_element(
 	const bvnr_serializer_t* s, uint32_t idx)
 {
@@ -570,6 +670,19 @@ static void bvn_ser_mark_value_done(bvnr_serializer_t* s)
 		return;
 	s->arr_need_comma[idx] = true;
 }
+/*
+ * Stage 2: turn one (already-validated) event into bytes.
+ *
+ * This is the formatter that knows the concrete bovnar syntax: `.key = ` for
+ * assignments, `<...>` type annotations with the `:`-then-`,` parameter
+ * punctuation, `{}` structs, `[]` arrays with `/` dimension separators,
+ * `$nan`/`$inf` for special floats, `&` reference prefix, and the 0x00/0x01
+ * binary octet-stream framing. Interleaved through every case is the separator
+ * state machine (need_semi, pending commas, indentation) so output is
+ * syntactically correct in both compact and pretty modes. had_type_annotation
+ * suppresses the pending comma between a value's annotation and the value
+ * itself, since they form one element.
+ */
 bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 	bvnr_event_t ev, bvnr_data_t* d)
 {
@@ -855,6 +968,13 @@ bool bvnr_open_write_mem(
 	bvnr_sink_to_mem(&sink, buf, cap);
 	return bvnr_open_write_sink(w, &sink, pretty, options);
 }
+/*
+ * Public event entry point: validate, serialize, then notify the optional
+ * on_event observer. Bails immediately if a prior error is latched or the
+ * stream is already finished, so a caller can write a whole document without
+ * checking after every call. A serialize failure is mapped to the right sink
+ * error (buffer exhausted vs. write failed) for accurate diagnostics.
+ */
 bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data)
 {
@@ -876,6 +996,13 @@ bool bvnr_write_event(
 	}
 	return true;
 }
+/*
+ * Close out the document: refuse if any struct/array is still open (that would
+ * be a truncated stream), emit the trailing ';' if one is pending, flush the
+ * write buffer and the sink, and latch finished so no further events are
+ * accepted. Must be called for output to be complete — the final separator and
+ * any buffered bytes are only guaranteed on disk after this returns true.
+ */
 bool bvnr_write_finish(bvnr_writer_t* w)
 {
 	if (!w) return false;

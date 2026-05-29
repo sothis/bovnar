@@ -38,6 +38,40 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
+/*
+ * ===========================================================================
+ * Shared utilities: number parsing/formatting/validation and unit handling
+ * ===========================================================================
+ *
+ * This is the cross-cutting toolbox used by the reader, writer and DOM. It has
+ * three loosely related groups:
+ *
+ *  1. Digit/number primitives: convert characters to/from digit values in any
+ *     base from 2 up to 62, plus the special base-64 and base-85 alphabets;
+ *     validate numeric literals; and check that an integer literal fits a given
+ *     bit width. The width check is the interesting part — bovnar supports
+ *     integers up to BVN_MAX_INT_WIDTH bits, far past uint64, so for wide types
+ *     the bound 2^w-1 cannot be held in a register. It is instead materialised
+ *     as a decimal *string* (bvn_pow2m1_dec) and compared digit-string against
+ *     the (base-converted) literal (bvn_cmp_dec). Cheap length-based prefilters
+ *     avoid that expensive path for the common in-range/out-of-range cases.
+ *
+ *  2. Unit parsing/formatting: turn a textual unit like "kg.m/s^2" into a
+ *     structured value_unit_t and back, including SI/IEC prefixes, exponents,
+ *     and currency codes.
+ *
+ *  3. Identifier/symbol/reference validation and scalar parse/format helpers
+ *     that wrap the bignum routines for the <=64-bit fast path.
+ */
+
+/*
+ * Map an ASCII character to its digit value in `base`, or return `base` itself
+ * to signal "not a valid digit". Bases 64 and 85 use their own fixed alphabets
+ * (standard base64 and Ascii85). For bases up to 62 the ordering is
+ * 0-9, a-z, A-Z; note that for base<=36 upper- and lower-case are the SAME
+ * digit (case-insensitive hex etc.), while for base>36 they are distinct
+ * digits — hence the branch on `base > 36u`.
+ */
 #define BVN_DEC_SCRATCH_SIZE 10000u
 uint32_t bvn_char_to_digit(uint32_t c, uint32_t base)
 {
@@ -99,6 +133,14 @@ bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 	}
 	return true;
 }
+/*
+ * Validate a full numeric literal (optional sign, mantissa with optional dot,
+ * optional exponent) in the given base. The exponent marker is base-dependent:
+ * decimal-style 'e'/'E' only when the base is small enough (<=14) that 'e'
+ * isn't itself a digit, and hex-float-style 'p'/'P' for power-of-two bases up
+ * to 16. The exponent itself is always decimal. Requires at least one mantissa
+ * digit and, if an exponent marker appears, at least one exponent digit.
+ */
 bool bvn_validate_number_in_base(const char* s, uint32_t base)
 {
 	if (!s || !*s) return false;
@@ -134,6 +176,15 @@ bool bvn_validate_number_in_base(const char* s, uint32_t base)
 	}
 	return has_mant_digit && (!has_exp || has_exp_digit);
 }
+/*
+ * Compute 2^n - 1 as a decimal string — i.e. the largest unsigned value
+ * representable in n bits. Used as the upper bound when range-checking integers
+ * wider than 64 bits, where the bound itself can't fit in any machine integer.
+ * Implemented as schoolbook doubling: maintain the number as an array of
+ * little-endian decimal digits, double it n times, then subtract one. O(n^2)
+ * in digit count, which is fine because n is a type width (thousands of bits at
+ * most) and the result is cached/compared as a string.
+ */
 static int bvn_pow2m1_dec(uint32_t n, char* buf, size_t cap)
 {
 	if (!buf || cap < 2u) return -1;
@@ -172,6 +223,11 @@ static int bvn_pow2m1_dec(uint32_t n, char* buf, size_t cap)
 	free(dig);
 	return (int)len;
 }
+/*
+ * Compare two non-negative decimal strings numerically. Leading zeros are
+ * skipped first so the comparison reduces to "longer string wins, else
+ * lexicographic" — valid only because both are pure decimal with no sign.
+ */
 static int bvn_cmp_dec(const char* a, const char* b)
 {
 	while (*a == '0' && a[1]) a++;
@@ -181,6 +237,12 @@ static int bvn_cmp_dec(const char* a, const char* b)
 	if (la > lb) return  1;
 	return strcmp(a, b);
 }
+/*
+ * Convert an arbitrary-base digit string to a decimal string (Horner's method:
+ * dec = dec*base + digit, with dec kept as little-endian decimal digits). Lets
+ * the wide-integer range check normalise any base to decimal once and then do
+ * all comparisons in base 10 against bvn_pow2m1_dec's output.
+ */
 static bool bvn_digits_to_dec(const char* src, uint32_t base,
 	char* buf, size_t cap)
 {
@@ -210,11 +272,21 @@ static bool bvn_digits_to_dec(const char* src, uint32_t base,
 	free(dec);
 	return true;
 }
+/*
+ * Approximate decimal digit count of a w-bit value: w * log10(2), rounded up.
+ * Used only to size the cheap length-based prefilter, so a small over-estimate
+ * is harmless.
+ */
 static uint32_t bvn_dec_digits_2pow(uint32_t w)
 {
 	if (w == 0u) return 1u;
 	return (uint32_t)((double)w * 0.30102999566398119521) + 1u;
 }
+/*
+ * Fast accept/reject by digit count before the costly exact comparison:
+ * clearly-shorter numbers are in range (1), clearly-longer are out (0), and the
+ * ambiguous boundary length returns -1 to mean "must compare exactly".
+ */
 static int bvn_dec_digit_prefilter(const char* d, uint32_t max_digits)
 {
 	while (d[0] == '0' && d[1]) d++;
@@ -223,6 +295,17 @@ static int bvn_dec_digit_prefilter(const char* d, uint32_t max_digits)
 	if (n > (size_t)max_digits + 1u)     return 0;
 	return -1;
 }
+/*
+ * Does the unsigned literal `s` (in `base`) fit in `w` bits?
+ *
+ * Two regimes: for w<=64 it parses to a uint64 (strtoull for base 10, manual
+ * Horner with overflow guard otherwise) and compares against 2^w-1. For wider
+ * types it normalises to decimal, tries the length prefilter, and only on an
+ * ambiguous length materialises the exact bound 2^w-1 for a string compare.
+ * w==0 means "width unspecified" and always passes; nan/inf pass through.
+ * bvn_validate_sint_range mirrors this with the asymmetric signed bounds and a
+ * 2^(w-1) magnitude limit.
+ */
 bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
@@ -389,6 +472,10 @@ sint_bigint_done:
 		return ok;
 	}
 }
+/*
+ * Map an error code to a short stable identifier string for diagnostics/logs.
+ * Returns a static string (never NULL), so it is safe to print unconditionally.
+ */
 const char* bvn_error_to_string(error_code_t code)
 {
 	switch (code) {
@@ -441,6 +528,14 @@ typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
 static volatile uint16_t bu_first_for_len[BU_LEN_INDEX_SIZE];
 static volatile uint32_t bu_max_len;
 static volatile bool     bu_index_ready;
+/*
+ * Symbol -> base-unit lookup table. CRUCIAL INVARIANT: entries are ordered by
+ * DESCENDING symbol length. The parser matches a unit symbol as the suffix of a
+ * component and must prefer the longest match (so "min" isn't shadowed by "m"),
+ * and bvn_init_bu_index builds its length index assuming this ordering. When
+ * adding a unit, insert it in the correct length group. The si_table/iec_table
+ * below map the prefix symbols (k, M, Ki, ...) the same way.
+ */
 static const bu_entry_t bu_table[] = {
 	{"atmosphere_technical", 20, bu_atmosphere_technical},
 	{"metric_horsepower",    17, bu_metric_horsepower},
@@ -739,6 +834,14 @@ static const iec_entry_t iec_table[] = {
 	{"Mi", 2, iec_mebi},  {"Ki", 2, iec_kibi},
 	{NULL, 0, iec_none}
 };
+/*
+ * Build a length index over bu_table (which is kept sorted by descending
+ * symbol length). bu_first_for_len[L] is the first table entry whose symbol is
+ * at most L bytes long. Because unit symbols are matched against the *suffix*
+ * of a component (the prefix is whatever precedes them), the parser must try
+ * the longest candidate symbols first; this index lets it skip straight past
+ * all entries longer than the input rather than scanning the whole table.
+ */
 static void bvn_init_bu_index(void)
 {
 	uint32_t count = 0;
@@ -756,6 +859,14 @@ static void bvn_init_bu_index(void)
 	}
 	bu_index_ready = true;
 }
+/*
+ * Strip and decode an exponent suffix from the end of a unit component,
+ * returning the number of bytes consumed (0 if none). bovnar accepts three
+ * spellings, all handled here: ASCII caret form ("^2", "^-3"), Unicode
+ * superscript digits (e.g. "²", "³", and the U+2070 block for 4-9), and a
+ * Unicode superscript minus for negative exponents. Defaulting to exp_linear
+ * when absent means "m" and "m^1" parse identically.
+ */
 static uint32_t parse_unit_exponent_suffix(
 	const char* s, uint32_t len, unit_exponent_t* exp)
 {
@@ -868,6 +979,18 @@ static unit_exponent_t bvn_negate_exponent(unit_exponent_t e)
 	default:              return e;
 	}
 }
+/*
+ * Parse one unit component "[prefix~]base[^exp]" into its structured form.
+ *
+ * Order of operations matters: the exponent suffix is removed first, then the
+ * remainder is resolved as base ± prefix. Currencies are checked before the SI
+ * table because a currency code may itself look like a prefixed unit, and they
+ * use an explicit '~' to separate an (SI/IEC) prefix from the currency. For
+ * physical units the base symbol is matched as the longest suffix (via the
+ * length index) and whatever precedes it must be a known prefix followed by
+ * '~'. bvn_prefix_unit_valid rejects nonsensical prefix/unit pairings (e.g. a
+ * binary IEC prefix on a non-information unit). *ok reports validity.
+ */
 static value_unit_component_t bvn_parse_single_unit_component(
 	const char* s, uint32_t len, bool* ok)
 {
@@ -972,6 +1095,15 @@ static value_unit_component_t bvn_parse_single_unit_component(
 	*ok = false;
 	return r;
 }
+/*
+ * Parse a complete unit expression into a value_unit_t (up to
+ * BVNR_MAX_UNIT_COMPONENTS components). The literal "no_unit" maps to the empty
+ * unit. A component-separated expression uses '*' / '·' for multiplication and
+ * '/' to switch into the denominator, where component exponents are negated so
+ * "m/s^2" becomes [m^1, s^-2]. With no separator the whole string is a single
+ * component, handled by the fast path. bvn_parse_unit is the convenience
+ * NUL-terminated wrapper around this length-counted form.
+ */
 value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 {
 	value_unit_t result = { .num_components = 0 };
@@ -1264,6 +1396,12 @@ static const char* base_unit_str(value_base_unit_t b)
 		return "";
 	}
 }
+/*
+ * Render an exponent as a Unicode superscript suffix (e.g. ² ³ ⁻²). This is the
+ * default, pretty form; bvn_write_exponent_suffix_ascii produces the plain
+ * "^2" / "^-2" form selected by BVN_UNIT_ASCII_EXP for ASCII-only consumers.
+ * exp_linear writes nothing (the implied exponent 1 is never spelled out).
+ */
 static int32_t bvn_write_exponent_suffix(
 	char* buf, size_t bufsize, unit_exponent_t e)
 {
@@ -1482,6 +1620,13 @@ static int32_t bvn_write_exponent_suffix_ascii(
 	buf[pos] = '\0';
 	return pos;
 }
+/*
+ * Format one component as "[prefix~]base[exp]" — the inverse of
+ * bvn_parse_single_unit_component. _ex is the same but routes the exponent
+ * through the ASCII or Unicode writer per flags. Every write is bounds-checked
+ * against bufsize and returns -1 on overflow so the caller can surface
+ * error_unit_too_long rather than truncate.
+ */
 static int32_t bvn_write_unit_component(
 	char* buf, size_t bufsize, const value_unit_component_t* c)
 {
@@ -1566,6 +1711,12 @@ static int32_t bvn_write_unit_component_ex(
 	pos += w;
 	return pos;
 }
+/*
+ * Structural equality of two units (component-wise, order-sensitive). Used to
+ * reconcile an inline unit against an annotation unit — note this is exact
+ * identity, not dimensional equivalence, so "m/s" and "m·s^-1" written
+ * differently would not compare equal here even though they mean the same.
+ */
 bool bvn_unit_equal(value_unit_t a, value_unit_t b)
 {
 	if (a.num_components != b.num_components)
@@ -1617,6 +1768,15 @@ static int32_t bvni_pexp_to_si_prefix_id(int32_t pexp)
 	}
 	return -1;
 }
+/*
+ * Try to collapse a reduced unit back into a single named SI derived unit with
+ * the right prefix (e.g. kg·m/s² -> N, or 1000 of those -> kN). It computes the
+ * unit's SI dimension vector and net scale factor, finds a named derived unit
+ * (bvni_si_named_derived) with the same dimensions, and — if the leftover scale
+ * is an exact power of ten that maps to an SI prefix — emits that prefixed
+ * named unit. Only invoked under BVN_UNIT_REDUCE; affine units (those with an
+ * offset, like °C) are left alone because they can't be rescaled by a factor.
+ */
 static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 {
 	bool aff, ok;
@@ -1669,6 +1829,16 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 	}
 	return u;
 }
+/*
+ * Format a whole unit to text. The empty unit prints as "no_unit". A
+ * multi-component unit is grouped into numerator (positive exponents) and
+ * denominator (negative exponents): if both are present it prints
+ * "a·b/c·d" with denominator exponents negated back to positive; otherwise it
+ * prints a flat "·"-joined product. The separator is '·' (U+00B7) normally or
+ * '*' under BVN_UNIT_ASCII_EXP. With BVN_UNIT_REDUCE it first reduces to SI base
+ * units and attempts the named-SI collapse above. bvn_unit_to_string is the
+ * plain wrapper with default (Unicode, non-reducing) flags.
+ */
 int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                bvn_unit_flags_t flags)
 {
@@ -1878,6 +2048,13 @@ static double bvn_single_component_factor(value_unit_component_t c)
 		result = 1.0 / result;
 	return result;
 }
+/*
+ * The multiplicative scale a unit's prefixes contribute (e.g. "km" -> 1000),
+ * folding each component's prefix factor raised to its exponent. Lets a
+ * consumer convert a stored value to base-unit magnitude.
+ * bvn_unit_prefix_exponent is the base-10 log of the same, for callers that
+ * prefer an integer power of ten over a floating factor.
+ */
 double bvn_unit_prefix_factor(value_unit_t u)
 {
 	double f = 1.0;
@@ -1898,6 +2075,20 @@ int32_t bvn_unit_prefix_exponent(value_unit_t u)
 	}
 	return total;
 }
+/*
+ * Parse the body of a type annotation (the text inside `<...>`, e.g.
+ * "uint:32,_16,kg") into a value_type_spec_t plus its unit.
+ *
+ * Grammar: a family keyword, then optional `:`-introduced, `,`-separated
+ * parameters in any order — a bare number is the bit width, `_N` is the numeric
+ * base (rejected for the decimal float families), `qN` is the fixed-point
+ * fraction-bit count, and anything else is the unit string. The four out-flags
+ * separate the kinds of failure the caller must distinguish: an unparseable
+ * type (type_ok) is fatal, whereas a bad/oversized unit (unit_ok /
+ * unit_too_long) may be tolerated for utf8 where a trailing token isn't a unit.
+ * Returning these separately is what lets the validator produce precise
+ * error_unit_illegal vs error_unit_too_long vs error_illegal_value_type codes.
+ */
 value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,
@@ -2079,6 +2270,14 @@ value_type_spec_t bvn_parse_type_annotation(
 	}
 	return r;
 }
+/*
+ * Identifier well-formedness: must start with a letter, '_' or a UTF-8
+ * multibyte lead, and may not contain whitespace, controls, or any of the
+ * characters the grammar reserves for punctuation (the explicit reject set).
+ * The trailing bvn_validate_string call also guarantees the whole thing is
+ * valid UTF-8. bvn_validate_symbol reuses the same rules; bvn_validate_reference
+ * applies them to each dot-separated segment of a `.a.b.c` path.
+ */
 bool bvn_validate_identifier(const char* id)
 {
 	if (!id || !*id) return false;
@@ -2159,6 +2358,15 @@ bool bvn_validate_number(const char* s)
 	}
 	return has_mant_dig && (!has_exp || has_exp_dig);
 }
+/*
+ * Format an unsigned integer in any supported base, left-padded with leading
+ * zeros to min_digits. Digits are produced least-significant-first into a
+ * stack scratch buffer and then copied out in order — the standard trick that
+ * avoids needing to know the length up front. Returns -1 if the base is
+ * unsupported or the output buffer is too small (never truncates silently).
+ * bvn_format_int64 prepends '-' and formats the magnitude, taking care with
+ * INT64_MIN whose magnitude doesn't fit in int64.
+ */
 int32_t bvn_format_uint64(char* buf, size_t bufsize, uint64_t value,
 						  uint32_t base, uint32_t min_digits)
 {
@@ -2215,6 +2423,14 @@ uint32_t bvn_min_digits_for_type(value_type_spec_t vt)
 	while (v >= base) { v /= base; digits++; }
 	return digits;
 }
+/*
+ * Parse a signed integer in the type's effective base into int64. Bases 2-36
+ * defer to the libc strtoll (fast, locale-free here); larger bases (up to 62,
+ * plus 64/85) are parsed by hand via bvn_char_to_digit because strtoll doesn't
+ * know those alphabets. Overflow is checked before it happens, and INT64_MIN is
+ * handled specially since its magnitude is one past INT64_MAX. The uint64 and
+ * double parsers follow the same base-split structure.
+ */
 bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 {
 	if (!s || !out) return false;
@@ -2275,6 +2491,14 @@ bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 	*out = acc;
 	return true;
 }
+/*
+ * Parse a floating literal in an arbitrary base into a double. It routes
+ * through the arbitrary-precision bvn_float parser (which understands non-
+ * decimal mantissas and hex-float p-exponents) and then narrows to double; the
+ * decimal fast path falls back to bvn_float_parse_f64 if the bignum parse
+ * declines. bvn_format_double is the inverse, going double -> bvn_float -> text
+ * so the rendered precision matches the declared width.
+ */
 bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out)
 {
 	if (!s || !out) return false;
@@ -2317,6 +2541,11 @@ bool bvn_parse_double(const char* s, value_type_spec_t vt, double* out)
 {
 	return bvn_parse_double_in_base(s, bvn_effective_base(vt), out);
 }
+/*
+ * Expose the escape-replacement table (escape letter -> literal byte) so other
+ * components decode string escapes identically to the lexer. A non-zero entry
+ * is a recognised escape; zero means "not a valid escape character".
+ */
 const uint8_t* bvn_get_escape_repl_table(void)
 {
 	static const uint8_t table[256] = {

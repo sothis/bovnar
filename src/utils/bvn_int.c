@@ -28,6 +28,29 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <limits.h>
+/*
+ * ===========================================================================
+ * Arbitrary-precision integers (bignum)
+ * ===========================================================================
+ *
+ * bovnar integers can be far wider than 64 bits (uint:1024, etc.), so values
+ * that don't fit a machine register are held here as a magnitude-plus-sign
+ * bignum: `limbs` is a little-endian array of 32-bit limbs (limbs[0] least
+ * significant), `nused` is the count of significant limbs, and `negative` is a
+ * separate sign flag (sign-magnitude, not two's complement — chosen because the
+ * format's integers are conceptually signed/unsigned decimal text, and
+ * sign-magnitude makes base conversion and printing trivial). Zero is the
+ * canonical nused==0 with negative==false; bvn_int_norm restores that form.
+ *
+ * Storage can be heap-backed (grown on demand by bigint_ensure_cap, `heap`
+ * true) or wrap a caller-provided fixed buffer (`heap` false, never grows).
+ * 32-bit limbs are used so every limb*limb product and limb/word division fits
+ * in a uint64 intermediate, keeping the arithmetic portable C with no need for
+ * compiler 128-bit support.
+ *
+ * The heavy routine is bvn_int_divrem (full bignum/bignum division); everything
+ * else is schoolbook add/mul/shift over the limb array.
+ */
 static uint32_t bigint_char_to_digit(uint32_t c, uint32_t base)
 {
 	if (base == 64u) {
@@ -66,6 +89,13 @@ static uint32_t bigint_digit_to_char(uint32_t d, uint32_t base)
 	if (d <  62u) return 'A' + (d - 36u);
 	return 0u;
 }
+/*
+ * Guarantee at least `need` limbs of capacity. Heap-backed numbers grow
+ * geometrically (doubling) to keep repeated appends amortised O(1); fixed-buffer
+ * numbers (heap==false) cannot grow and fail instead. A hard ceiling of
+ * BVN_INT_MAX_LIMBS bounds memory use against a pathological input. Newly added
+ * limbs are zeroed so callers may treat capacity beyond nused as clean.
+ */
 static bool bigint_ensure_cap(bvn_int_t *n, uint32_t need)
 {
 	if (need > BVN_INT_MAX_LIMBS) return false;
@@ -81,6 +111,11 @@ static bool bigint_ensure_cap(bvn_int_t *n, uint32_t need)
 	n->nlimbs = nc;
 	return true;
 }
+/*
+ * n = n*mul + add, in one pass with carry propagation. This is the workhorse
+ * of base conversion (bvn_int_from_str): each input digit does n = n*base +
+ * digit. The uint64 product can't overflow because both operands are 32-bit.
+ */
 static bool bigint_mul_add_word(bvn_int_t *n, uint32_t mul, uint32_t add)
 {
 	uint64_t carry = (uint64_t)add;
@@ -111,6 +146,11 @@ bool bvn_int_is_zero(const bvn_int_t *n)
 {
 	return !n || n->nused == 0;
 }
+/*
+ * Parse a signed integer string in the given base (2-62, 64, 85) into a bignum
+ * via repeated multiply-accumulate. A lone sign or empty string is rejected;
+ * the sign is only applied to a non-zero result so "-0" normalises to +0.
+ */
 bool bvn_int_from_str(bvn_int_t *n, const char *s, uint32_t base)
 {
 	if (!n || !s) return false;
@@ -143,6 +183,14 @@ size_t bvn_int_str_bufsize(uint32_t bits, uint32_t base)
 	else                  bpd = 1u;
 	return (size_t)((bits + bpd - 1u) / bpd) + 2u;
 }
+/*
+ * Convert a bignum to a string in `base` by repeated division: divide the whole
+ * magnitude by the base, the remainder is the next least-significant digit,
+ * repeat until zero. Works on a private copy of the limbs so the source is
+ * untouched. Digits come out reversed and are flipped into the caller buffer.
+ * Returns -1 (rather than truncating) if the buffer is too small — size it with
+ * bvn_int_str_bufsize, which upper-bounds the digit count from the bit width.
+ */
 int32_t bvn_int_to_str(const bvn_int_t *n,
 						char *buf, size_t bufsize,
 						uint32_t base)
@@ -306,6 +354,11 @@ void bvn_int_zero(bvn_int_t *n)
 	n->nused    = 0;
 	n->negative = false;
 }
+/*
+ * Restore canonical form by dropping leading zero limbs. Every routine that may
+ * produce a high zero limb (subtraction, division, shifts) calls this so that
+ * nused always reflects the true magnitude and comparisons stay correct.
+ */
 void bvn_int_norm(bvn_int_t *n)
 {
 	while (n->nused > 0 && n->limbs[n->nused - 1] == 0u)
@@ -452,6 +505,12 @@ bool bvn_int_setbit(bvn_int_t *n, int i)
 	n->limbs[wi] |= (1u << bi);
 	return true;
 }
+/*
+ * Three-way compare (-1/0/+1) respecting sign. Differing signs decide
+ * immediately (with a +0/-0 equality guard); same sign compares magnitudes by
+ * limb count then most-significant limb downward, and the result is flipped for
+ * negatives so e.g. -5 < -3.
+ */
 int bvn_int_cmp(const bvn_int_t *a, const bvn_int_t *b)
 {
 	if (a->negative != b->negative) {
@@ -494,6 +553,20 @@ bool bvn_int_sub_inplace(bvn_int_t *a, const bvn_int_t *b)
 	bvn_int_norm(a);
 	return (borrow == 0);
 }
+/*
+ * Full bignum division: a = q*b + r (truncating toward zero; r takes a's sign).
+ *
+ * This is Knuth's Algorithm D (TAOCP Vol. 2, 4.3.1) for multi-limb division,
+ * with cheaper special cases peeled off first: zero dividend, dividend shorter
+ * than divisor (quotient 0), equal-length quick magnitude compare, and a
+ * single-limb divisor (the simple bvn_int_div_u32 long-division). The general
+ * path normalises by left-shifting both operands so the divisor's top limb has
+ * its high bit set (s), which makes the per-digit quotient estimate q_hat
+ * accurate to within 1; the estimate is then refined and a multiply-subtract
+ * with occasional add-back computes each quotient limb. The remainder is
+ * de-normalised (right-shifted by s) at the end. u/v are temporary normalised
+ * buffers freed before return.
+ */
 bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 					const bvn_int_t *a, const bvn_int_t *b)
 {

@@ -34,6 +34,26 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
+/*
+ * ===========================================================================
+ * SI conversion and dimensional analysis
+ * ===========================================================================
+ *
+ * This file gives units physical meaning. Every base unit maps (in
+ * si_conv_table) to: a factor converting it to the coherent SI unit of its
+ * kind, an integer exponent vector over the seven SI base dimensions
+ * [length, mass, time, current, temperature, amount, luminosity], and — for
+ * temperatures — an affine offset (°C/°F/etc. need value*factor + offset, not a
+ * pure scaling).
+ *
+ * From those two pieces of data the library can: convert a value to SI base
+ * units (bvn_unit_to_si_factor), compute a unit's dimension signature
+ * (bvn_unit_dimension_vector), decide whether two units measure the same
+ * quantity and may be inter-converted (bvn_units_compatible /
+ * bvn_unit_convert_factor), and algebraically simplify a compound unit
+ * (bvn_unit_reduce). The exponent enum <-> int helpers at the top bridge the
+ * compact unit_exponent_t representation and ordinary arithmetic.
+ */
 int32_t bvn_exponent_to_int(unit_exponent_t e)
 {
 	switch (e) {
@@ -91,6 +111,14 @@ typedef struct {
 	bool              is_affine;
 	double            affine_offset;
 } bvn_si_conv_entry_t;
+/*
+ * The master conversion table, indexed directly by value_base_unit_t (the
+ * designated initialisers make the index == .base, which bvn_verify_conv_table
+ * asserts in debug builds). to_si_factor scales the unit to coherent SI (e.g.
+ * inch -> 0.0254 m, hour -> 3600 s); dims is its dimension exponent vector;
+ * is_affine/affine_offset handle the temperature scales. Currency slots are
+ * skipped here — they are handled by bovnar_currency.c, not by SI conversion.
+ */
 static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_none]               = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
 	[bu_bit]                = { bu_bit,                1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
@@ -279,6 +307,14 @@ static const bvn_si_conv_entry_t *bvn_find_si_conv(value_base_unit_t bu)
 		return NULL;
 	return &si_conv_table[bu];
 }
+/*
+ * Compute the scalar factor that converts a value in unit `u` to SI base units,
+ * multiplying each component's (prefix·base-factor)^exponent. Affine units are
+ * special: an offset only makes sense for a lone linear temperature (e.g. plain
+ * °C), so an affine unit with exponent != 1, or two affine components, sets
+ * *ok=false. The reported *affine_offset lets the caller apply the +offset step
+ * itself (see bvn_dom_get_value_in_base_units).
+ */
 double bvn_unit_to_si_factor(value_unit_t u,
 			     bool *is_affine,
 			     double *affine_offset,
@@ -332,6 +368,12 @@ double bvn_unit_to_si_factor(value_unit_t u,
 	}
 	return f;
 }
+/*
+ * Sum each component's dimension vector (scaled by its exponent) to get the
+ * unit's overall physical signature, e.g. m/s² -> [1,0,-2,0,0,0,0]. Two units
+ * with equal signatures measure the same kind of quantity. This is the basis
+ * of compatibility checking and of the named-SI collapse in the formatter.
+ */
 bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
 {
 	bvn_verify_conv_table();
@@ -369,6 +411,14 @@ static bool info_net_exponent(value_unit_t u, value_base_unit_t info_base,
 	*out = sum;
 	return true;
 }
+/*
+ * Two units are inter-convertible iff they have the same SI dimension vector
+ * AND the same net information-unit exponents. Bits/bytes are dimensionless in
+ * the SI sense but are not freely interchangeable with pure numbers, so they
+ * are tracked separately (info_net_exponent) — e.g. "B/s" is not compatible
+ * with "1/s". bvn_unit_convert_factor builds on this to return the actual
+ * multiplier a->b, refusing affine conversions unless the offsets match.
+ */
 bool bvn_units_compatible(value_unit_t a, value_unit_t b)
 {
 	int32_t a_bit, b_bit, a_byte, b_byte;
@@ -419,6 +469,16 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 	}
 	return fa / fb;
 }
+/*
+ * Algebraically simplify a compound unit: combine repeated bases by summing
+ * their exponents (m·m -> m²), fold all the prefix powers into a single scalar
+ * *scale (so km -> m with scale 1000), drop components whose exponent cancels to
+ * zero, and sort the survivors (numerator before denominator, then by exponent
+ * magnitude, then base) for a canonical form. Exponents whose magnitude exceeds
+ * the representable range (>9) are folded into *scale instead and flagged via
+ * *overflow. This underlies the BVN_UNIT_REDUCE formatting option and the
+ * named-SI collapse.
+ */
 value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 {
 	bvn_verify_conv_table();
@@ -534,6 +594,15 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	}
 	return result;
 }
+/*
+ * Enforce which prefixes may legally attach to which base unit — the rule set
+ * that makes "kg" and "Kib" valid but "Ks" (binary prefix on seconds) or
+ * "kPfund" (prefix on a historical German unit) invalid. Currencies defer to
+ * the currency rule; information units (bit/byte) accept IEC binary prefixes and
+ * only SI prefixes >= kilo; German historical and ratio units (%/ppm/...) accept
+ * no prefix at all; everything else accepts any SI prefix. Called everywhere a
+ * unit is validated so the policy lives in exactly one place.
+ */
 bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 {
 	if ((uint32_t)prefix.system >= BVN_PREFIX_SYSTEM_COUNT)

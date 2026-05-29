@@ -27,6 +27,18 @@
 #include "bovnar.h"
 #include <stdbool.h>
 #include <stdint.h>
+/*
+ * Private layout of the source/sink handles.
+ *
+ * The public header exposes bvnr_source_t / bvnr_sink_t only as fixed-size
+ * opaque blobs (a reserved byte array, see BVNR_SOURCE_RESERVED_SIZE). That
+ * keeps the ABI stable: callers can place a source/sink on the stack or embed
+ * it in their own structs without ever seeing — or being able to break on —
+ * the real fields. Here we define the real layout and cast the opaque blob to
+ * it. The static_assert-style size_check typedefs below guarantee at compile
+ * time that the private struct still fits inside the public blob, so the cast
+ * can never overflow the caller's storage.
+ */
 typedef struct bvn_source_impl_s {
 	bvnr_pull_fn	pull;
 	int		fd;
@@ -42,10 +54,23 @@ typedef struct bvn_sink_impl_s {
 	uint64_t	mem_left;
 	uint64_t	mem_written;
 } bvn_sink_impl_t;
+/*
+ * Compile-time size guards: a negative array length is a hard error, so the
+ * build fails immediately if the private impl ever grows past the reserved
+ * size in the public header — a clear signal to bump BVNR_*_RESERVED_SIZE
+ * rather than silently corrupting caller memory at runtime.
+ */
 typedef char bvn_source_size_check_[
 	sizeof(bvn_source_impl_t) <= sizeof(bvnr_source_t) ? 1 : -1];
 typedef char bvn_sink_size_check_[
 	sizeof(bvn_sink_impl_t)   <= sizeof(bvnr_sink_t)   ? 1 : -1];
+/*
+ * The reinterpret-cast accessors. Going through these named helpers (rather
+ * than scattering casts everywhere) keeps the aliasing in one place and
+ * documents intent. The pull/push wrappers below dispatch through the stored
+ * function pointer so the rest of the library is agnostic to fd vs. memory
+ * backing.
+ */
 static inline bvn_source_impl_t* bvn_source_impl(bvnr_source_t* s)
 	{ return (bvn_source_impl_t*)(void*)s; }
 static inline const bvn_source_impl_t* bvn_source_impl_c(const bvnr_source_t* s)

@@ -31,6 +31,29 @@
 #include <stdio.h>
 #include <float.h>
 #include <limits.h>
+/*
+ * ===========================================================================
+ * Arbitrary-precision binary floating point
+ * ===========================================================================
+ *
+ * bovnar supports floats far wider than IEEE double (up to BVN_FLOAT_MAX_PREC
+ * bits of mantissa). A bvn_float_t holds a value as sign · mantissa · 2^exp:
+ * _sign, a binary exponent _exp, and a mantissa in the limb array _d of _prec
+ * significant bits (normalised so the leading bit is set). Non-finite and zero
+ * values are encoded by sentinel exponents (BVN_FLOAT_EXP_NAN/INF/ZERO) rather
+ * than mantissa patterns, which keeps the arithmetic paths from special-casing
+ * the mantissa.
+ *
+ * The defining requirement is *correct rounding*: parsing a decimal string and
+ * formatting back must round to nearest-even at the target precision, with no
+ * accumulated error. That is impossible with hardware floats for arbitrary
+ * precision, so decimal<->binary conversion is done exactly using big integers:
+ * a decimal literal d×10^e is represented as an exact rational num/den, and
+ * bvnf_rational_to_float performs one big-integer division producing the
+ * mantissa plus the guard/round/sticky bits needed for round-to-nearest-even.
+ * The local bvnf_bn type and the BVN_INT_LOCAL macros (see bvn_float_impl.h)
+ * provide stack-allocated big integers so the common precisions need no heap.
+ */
 typedef struct {
 	uint32_t *limbs;
 	uint32_t  nlimbs;
@@ -242,6 +265,13 @@ bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 	}
 	return true;
 }
+/*
+ * Copy a big-integer mantissa Q into the float's limb array, repacking from the
+ * 32-bit bvn_int limbs to the platform's bvn_limb_t (which may be 64-bit). Any
+ * unused high limbs are zeroed. Kept separate so the rounding code can work in
+ * the uniform 32-bit bvn_int domain and only convert to the storage limb width
+ * once, at the end.
+ */
 static void bvnf_store_mant(bvn_float_t *f, const bvn_int_t *Q)
 {
 	uint32_t nl = f->_nlimbs;
@@ -259,6 +289,17 @@ static void bvnf_store_mant(bvn_float_t *f, const bvn_int_t *Q)
 		f->_d[i] = (i < Q->nused) ? Q->limbs[i] : 0u;
 #endif
 }
+/*
+ * Long division of (num << shift) / den, one bit at a time, emitting only the
+ * top `want` quotient bits and folding everything below into a single sticky
+ * bit. This is the fallback used when the scaled numerator would exceed the
+ * fixed big-int bit budget (BVN_INT_MAX_BITS): instead of materialising the
+ * huge shifted value, it shifts a running remainder R left one bit per
+ * iteration and pulls in the next numerator bit — classic restoring division —
+ * so memory stays bounded by the divisor size. The sticky bit (any discarded
+ * low bit or nonzero final remainder) is exactly what round-to-nearest-even
+ * needs below.
+ */
 static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 						 const bvn_int_t *den,
 						 uint32_t *Q, uint32_t q_words,
@@ -294,6 +335,21 @@ static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 	*sticky_out = sticky;
 	return true;
 }
+/*
+ * The heart of correct decimal->binary conversion: turn the exact rational
+ * num/den into a correctly-rounded bvn_float of precision f->_prec.
+ *
+ * Steps: estimate the binary exponent E from the bit lengths (refined by one
+ * comparison so the leading mantissa bit lands right), then divide to obtain
+ * prec+2 quotient bits — prec mantissa bits plus the guard and round bits —
+ * while tracking a sticky bit for everything beyond. Depending on the sign of
+ * the required shift and whether the operands fit the big-int budget, the
+ * division is done either exactly via bvn_int_divrem (remainder gives sticky)
+ * or via the bounded-memory bvnf_bitdiv. The classic round-to-nearest-even
+ * decision uses guard/round/sticky and the mantissa LSB; a carry out of the
+ * mantissa on round-up bumps the exponent. The result is stored normalised by
+ * bvnf_store_mant.
+ */
 static bool bvnf_rational_to_float(bvn_float_t *f, bool neg,
 									bvn_int_t *num, bvn_int_t *den)
 {
@@ -385,6 +441,15 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
 	*log2base = k;
 	return true;
 }
+/*
+ * Parse a floating literal in base 2-36 into a correctly-rounded bvn_float.
+ * nan/inf are recognised up front. The mantissa digits and the (decimal or, for
+ * power-of-two bases, binary) exponent are read into an exact rational num/den
+ * — fractional digits and negative exponents go into the denominator, integer
+ * scaling into the numerator — and bvnf_rational_to_float does the rounding.
+ * Routing all decimal parsing through the exact rational is what makes
+ * round-tripping lossless, unlike strtod which only gives double precision.
+ */
 bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 {
 	if (!f || !s || base < 2 || base > 36) return false;
@@ -789,6 +854,15 @@ overflow:
 	free(digs);
 	return ret;
 }
+/*
+ * Format a bvn_float as text in base 2-36. After handling nan/inf/±0 it
+ * dispatches by base kind: power-of-two bases (bvnf_to_str_pow2) read mantissa
+ * bits directly into digit groups — exact and cheap; base 10 (bvnf_to_str_dec)
+ * does the harder exact binary->decimal conversion with shortest-round-trip
+ * digit generation; other bases use the general bvnf_to_str_arb. Returns -1 on
+ * too-small buffer rather than truncating. Size the buffer with
+ * bvn_float_str_bufsize, which bounds the digit count from precision and base.
+ */
 int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 						  uint32_t base)
 {
@@ -816,6 +890,15 @@ int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 		return bvnf_to_str_dec(f, buf, bufsize);
 	return bvnf_to_str_arb(f, buf, bufsize, base);
 }
+/*
+ * Load an IEEE-754 double into a bvn_float exactly (a double is always
+ * representable when prec>=53). It decomposes the bit pattern into sign, 11-bit
+ * exponent and 52-bit mantissa, reconstructs the implicit leading 1 (or handles
+ * subnormals), normalises so the leading bit is at the top, and places the
+ * 53-bit significand into the mantissa limbs at the right offset for the target
+ * precision. The negative-zero case is preserved via the 1.0/v sign test.
+ * bvn_float_to_double is the inverse with round-to-nearest-even back to 53 bits.
+ */
 bool bvn_float_from_double(bvn_float_t *f, double v)
 {
 	if (!f) return false;
@@ -899,6 +982,17 @@ bool bvn_float_to_float(const bvn_float_t *f, float *out)
 	return true;
 }
 #include "bvn_float_impl.h"
+/*
+ * Encode a bvn_float into an arbitrary IEEE-754-style binary interchange format
+ * described by (exp_bits, man_bits, bias) — the same machinery serves binary16
+ * through binary256 and the decimal-interchange helpers, just with different
+ * field sizes. nan/inf are written as their reserved all-ones-exponent
+ * patterns. For finite values it round-trips through the decimal string and the
+ * shared to_ieee_binary packer (in bvn_float_impl.h), which handles the
+ * subnormal/rounding/overflow rules for the requested field widths.
+ * bvn_float_from_ieee_bin is the inverse decode. The fixed-width bin16/32/64/...
+ * wrappers below just call these with the standard parameter sets.
+ */
 void bvn_float_to_ieee_bin(const bvn_float_t *f,
 							uint32_t exp_bits, uint32_t man_bits, int32_t bias,
 							uint32_t *bits, int bits32)
@@ -1111,6 +1205,14 @@ static bool from_ieee_decimal(bvn_float_t *f,
 	final_str[flen] = '\0';
 	return bvn_float_from_str(f, final_str, 10);
 }
+/*
+ * IEEE-754 *decimal* interchange encoders (decimal16/32/64/128/256). Unlike the
+ * binary formats these store a decimal significand, so the value is rendered to
+ * a decimal string, re-parsed into the exact PNum, and packed by the shared
+ * to_ieee_decimal with the format's (storage bits, combination bits, coefficient
+ * digits, bias, ...) parameters. Going via the string keeps one correctly-
+ * rounded decimal representation as the single source of truth for every width.
+ */
 void bvn_float_to_dec16(const bvn_float_t *f, uint16_t *out)
 {
 	if (!f || !out) return;
@@ -1212,6 +1314,12 @@ bool bvn_float_from_dec256(bvn_float_t *f, const uint32_t bits[8])
 {
 	return from_ieee_decimal(f, 256, 20, 235, 611867, bits, 8);
 }
+/*
+ * Fixed-point (Qm.n) encoders/decoders: represent the value as an integer
+ * scaled by 2^frac_bits. Like the IEEE helpers they round-trip through the
+ * decimal string so the scaling and rounding are done by one shared, exact
+ * routine rather than re-implemented per width. Used for the float_fix family.
+ */
 int16_t bvn_float_to_fix16(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;

@@ -29,6 +29,28 @@
 #include "bvn_float.h"
 #include "bvn_int.h"
 #include "bvn_val_impl.h"
+/*
+ * ===========================================================================
+ * High-level write convenience API
+ * ===========================================================================
+ *
+ * bvnr_write_event is the low-level interface: powerful but verbose, requiring
+ * the caller to emit the assignment-start, the type-annotation event burst, and
+ * the data event by hand. The bvnr_write_* helpers here wrap that for the
+ * common "write one typed key = value" case so application code reads like
+ * bvnr_write_uint(w, "age", 8, 42) instead of a dozen event calls.
+ *
+ * The shared shape of every helper: emit_key (the `.key =` part), then for
+ * numeric values bvnr_write_type_annotation (the `<...>` part), then the data
+ * event. The numbers are formatted to a text buffer first because the byte
+ * stream is textual; widths/bases are validated here so a bad call fails before
+ * touching the sink. The bvnf/bvni variants accept the library's
+ * arbitrary-precision float/int types for values that don't fit in double/u64.
+ */
+
+/*
+ * Emit the `.key =` assignment header common to every typed-value helper.
+ */
 static bool emit_key(bvnr_writer_t *w, const char *key)
 {
 	if (!key)
@@ -40,6 +62,16 @@ static bool emit_key(bvnr_writer_t *w, const char *key)
 	};
 	return bvnr_write_event(w, ev_assignment_start, &d);
 }
+/*
+ * Expand a (type spec, unit) pair into the full `<family:width,_base,unit>`
+ * event sequence. Only the parameters that are actually meaningful for the
+ * family are emitted — e.g. width only for numeric/utf8 types, an explicit base
+ * only when it differs from the default 10, the q parameter only for float_fix,
+ * and the unit only when present. Suppressing redundant parameters is what
+ * keeps annotations compact (`<uint>` rather than `<uint:64,_10,no_unit>`).
+ * The unit is rendered to text honouring the writer's unit_flags (reduce /
+ * ASCII-exponent options).
+ */
 bool bvnr_write_type_annotation(bvnr_writer_t *w,
 				value_type_spec_t vt,
 				value_unit_t vu)
@@ -104,6 +136,12 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 	d.length = 0;
 	return bvnr_write_event(w, ev_type_annotation_end, &d);
 }
+/*
+ * Common tail for every numeric helper: write the annotation, then the value
+ * event. The token type is a parameter because a non-decimal-base number is
+ * carried as a string token (the digits use a non-numeric alphabet), whereas
+ * base-10 uses the number token; callers pick accordingly.
+ */
 static bool emit_numeric_tt(bvnr_writer_t *w,
 			     value_type_spec_t vt, value_unit_t vu,
 			     const char *valbuf, token_type_t tt)
@@ -163,6 +201,13 @@ bool bvnr_write_bool(bvnr_writer_t *w, const char *key, bool value)
 	};
 	return bvnr_write_event(w, ev_data, &d);
 }
+/*
+ * The scalar helpers below all follow one pattern, with a no-unit wrapper
+ * delegating to a _unit variant: validate width, format the value to text, then
+ * emit_numeric. A width of 0 means "unspecified" (the reader infers a default).
+ * Float helpers narrow the value through float when width<=32 so the emitted
+ * text matches the precision the type promises rather than the full double.
+ */
 bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
 			 uint32_t width, uint64_t value)
 {
@@ -299,6 +344,14 @@ bool bvnr_write_bvnf(bvnr_writer_t *w, const char *key,
 {
 	return bvnr_write_bvnf_base_unit(w, key, f, width, 10u, BVN_UNIT_NONE);
 }
+/*
+ * Emit an arbitrary-precision float (bvn_float_t) for values beyond double's
+ * range/precision. Only base 10 and 16 are meaningful for floats. The text
+ * length is unbounded in principle, so unlike the scalar helpers it formats
+ * into a malloc'd buffer sized by bvn_float_str_bufsize. A base-16 value is
+ * carried as a string token (hex digits aren't a number-token alphabet) unless
+ * it is a special value like inf/nan. The bvni variant is the integer analogue.
+ */
 bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 				const bvn_float_t *f,
 				uint32_t width, uint32_t base,

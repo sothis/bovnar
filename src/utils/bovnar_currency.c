@@ -28,6 +28,22 @@
 #define N_FIAT   (BVN_CURRENCY_FIAT_LAST  - BVN_CURRENCY_FIAT_FIRST  + 1)
 #define N_CRYPTO (BVN_CURRENCY_CRYPTO_LAST - BVN_CURRENCY_CRYPTO_FIRST + 1)
 #define N_TOTAL  (N_FIAT + N_CRYPTO)
+/*
+ * ===========================================================================
+ * Currency catalogue
+ * ===========================================================================
+ *
+ * bovnar treats currencies as base units, so a money value carries its currency
+ * the way a length carries metres. This table is the catalogue: ISO 4217 fiat
+ * currencies first, then a list of crypto assets. CRITICAL INVARIANT: the
+ * table is laid out so that a currency's value_base_unit_t enum value equals
+ * BVN_CURRENCY_FIAT_FIRST + its index here. Every lookup below is therefore a
+ * direct O(1) index (base - BVN_CURRENCY_FIAT_FIRST) rather than a search — so
+ * the ordering of this array must stay in lockstep with the enum. Each entry
+ * records the ISO numeric code (0 for crypto), the minor-unit digit count (e.g.
+ * 2 for cents, 0 for yen, 18 for ether — used by float_dec/currency formatting),
+ * whether it is crypto, and a human name.
+ */
 static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   { "AED", 784, 2, false, "UAE Dirham" },
   { "AFN", 971, 2, false, "Afghan Afghani" },
@@ -244,6 +260,11 @@ static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   { "PYTH",  0,  6, true,  "Pyth Network" },
   { "RUNE",  0,  8, true,  "THORChain" },
 };
+/*
+ * Range predicates over the currency enum block. Because fiat and crypto occupy
+ * contiguous enum ranges, "is this base a currency / fiat / crypto" is just a
+ * bounds check — no table access needed.
+ */
 bool bvn_unit_is_currency(int base)
 {
     return (base >= BVN_CURRENCY_FIAT_FIRST && base <= BVN_CURRENCY_CRYPTO_LAST);
@@ -271,6 +292,13 @@ const bvn_currency_info_t *bvn_currency_info(int base)
         return NULL;
     return &g_currency_table[base - BVN_CURRENCY_FIAT_FIRST];
 }
+/*
+ * Resolve a 3-4 letter uppercase code (e.g. "USD", "USDT") to its base-unit
+ * enum value, or 0 if unknown. Rejects non-uppercase input up front, then does
+ * a linear scan of the catalogue. Returns the enum value (index +
+ * BVN_CURRENCY_FIAT_FIRST), the inverse of the indexing used by the info
+ * lookups above. 0 is a safe "not a currency" sentinel since it is bu_none.
+ */
 int bvn_parse_currency_str(const uint8_t *s, uint32_t len)
 {
     if (!s || len < 3 || len > 4)
@@ -286,6 +314,12 @@ int bvn_parse_currency_str(const uint8_t *s, uint32_t len)
     }
     return 0;
 }
+/*
+ * Which prefix systems may attach to a currency. Binary IEC prefixes
+ * (prefix_system == 1, e.g. "Ki") are nonsensical on money, so they are
+ * rejected; SI prefixes (kEUR, etc.) are allowed. Non-currency bases are not
+ * this function's concern and pass through.
+ */
 bool bvn_currency_prefix_valid(int base, int prefix_system)
 {
     if (!bvn_unit_is_currency(base))

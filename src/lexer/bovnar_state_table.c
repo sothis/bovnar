@@ -23,6 +23,30 @@
  */
 
 #include "bvn_lexer_impl.h"
+/*
+ * ===========================================================================
+ * Lexer transition tables (the "grammar as data")
+ * ===========================================================================
+ *
+ * This file is pure data backing the table-driven lexer in bovnar_lexer.c. It
+ * is kept separate from the engine so the grammar can be reviewed and modified
+ * as tables without touching the interpreter, and so the large rodata lives in
+ * its own translation unit.
+ *
+ *   bvn_after_state_idx_table[state][byte]  -> ACT_* action index
+ *   bvn_action_table[ACT_*]                 -> handler function pointer
+ *   bvn_action_target_state[ACT_*]          -> next state for pure transitions
+ *   bvn_kw_advance_state[state]             -> next state for keyword matching
+ *
+ * The BVN_EACH_256 / BVN_WHITESPACE / BVN_UTF8_* / BVN_REJECT_ASCII_CTRL
+ * macros are designated-initialiser helpers that fill whole byte ranges of a
+ * row at once: e.g. one macro marks every UTF-8 continuation byte, another
+ * rejects every disallowed ASCII control byte. This keeps each state's row
+ * declarative — you list the bytes that matter and a macro supplies the
+ * uniform default for the rest — and guarantees all 256 columns are defined.
+ * An action index of 0 (ACT_NONE) means "byte illegal in this state" and is
+ * what the engine turns into error_unexpected_input_byte.
+ */
 #define BVN_EACH_256(a) \
 	[0x00]=(a),[0x01]=(a),[0x02]=(a),[0x03]=(a), \
 	[0x04]=(a),[0x05]=(a),[0x06]=(a),[0x07]=(a), \

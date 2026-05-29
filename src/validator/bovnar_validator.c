@@ -30,6 +30,50 @@
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 #include "bovnar_currency.h"
+/*
+ * ===========================================================================
+ * Validator (semantic layer)
+ * ===========================================================================
+ *
+ * The lexer produces lexically valid tokens; the validator turns them into
+ * meaning and enforces the type system. It sits behind the lexer and is fed
+ * raw tokens (bvn_val_receive) and structural events (bvn_val_receive_event).
+ *
+ * Dual emission — the central design choice. Each value can be observed at two
+ * stages via two independent callbacks:
+ *
+ *   on_unverified : fired the moment the lexer hands a token over, before any
+ *                   semantic check. Lets a consumer see the raw token stream.
+ *   on_verified   : fired only after type/range/unit checks pass, carrying the
+ *                   resolved value_type and unit.
+ *
+ * Tooling (the canonicaliser, the events demo) uses both to show the lexer and
+ * validator views side by side; ordinary consumers usually set only
+ * on_verified. The bvn_emit_unverified/_verified/_both helpers centralise the
+ * "callback returned false => error_scanner_callback_failed" contract.
+ *
+ * Type inference — bovnar values may omit an explicit type annotation. When a
+ * bare value arrives the validator infers a default family (uint/sint/float/
+ * utf8/bool) from the literal's shape and *synthesises* the full annotation
+ * event sequence (bvn_emit_default_type_annotation), so a downstream writer can
+ * round-trip the value with an explicit type even though the input had none.
+ *
+ * Accumulator — bvn_acc_* incrementally fold a numeric literal into a uint64
+ * while it is being parsed, tracking dot/exponent presence. This makes range
+ * checking for <=64-bit types allocation-free; wider types fall back to the
+ * arbitrary-precision validators in bovnar_utils.c.
+ *
+ * Caches — type annotations and inline units repeat heavily in real documents
+ * (every element of a typed array, say). tcache/iucache are small FIFO caches
+ * keyed on the raw annotation bytes so the comparatively expensive parse is
+ * done once per distinct annotation rather than once per value.
+ */
+
+/*
+ * Reader = lexer + validator bundled. Created zeroed; the actual buffers are
+ * allocated later by bvnr_open_read_*, so a freshly created reader is cheap and
+ * reusable across multiple open/read cycles.
+ */
 bvnr_reader_t* bvnr_reader_create(void)
 {
 	bvnr_reader_t* r = malloc(sizeof(*r));
@@ -56,6 +100,11 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 		v->on_error      = opts->on_error;
 	}
 }
+/*
+ * Callbacks receive a non-NULL data pointer even for empty payloads: consumers
+ * can blindly read/printf the pointer without a NULL guard. This sentinel is
+ * the shared "" they see in that case.
+ */
 static const uint8_t bvn_empty_sentinel[1] = { 0 };
 static inline void bvn_normalize_data_ptr(bvnr_data_t* d)
 {
@@ -103,6 +152,13 @@ void bvn_acc_reset(bvnr_validator_t* v)
 	v->acc_has_exp   = false;
 	v->acc_exp_state = 0;
 }
+/*
+ * Fold one more digit into the running integer accumulator, in arbitrary base.
+ * Stops accumulating once a dot is seen (the integer value is then meaningless)
+ * or once overflow is detected — the overflow flag is sticky and is what
+ * bvn_check_acc_range turns into error_value_out_of_range for <=64-bit types.
+ * The pre-multiply comparison avoids ever actually overflowing uint64.
+ */
 void bvn_acc_digit(bvnr_validator_t* v, uint32_t dv, uint32_t base)
 {
 	if (v->acc_overflow || v->acc_has_dot) return;
@@ -120,6 +176,22 @@ static inline uint32_t bvn_effective_base_or_10(value_type_spec_t vt)
 		return 10u;
 	return vt.base ? vt.base : 10u;
 }
+/*
+ * Infer and emit a default type annotation for an untyped value.
+ *
+ * The family is chosen from the literal's shape: strings -> utf8; numbers with
+ * a dot/exponent -> float; numbers with a leading '-' -> sint, else uint;
+ * nan/inf -> float; a number carrying a currency unit -> float_dec (money must
+ * not be binary float); bools -> bool. The inferred 64-bit type then becomes
+ * v->value_type so the value is validated as if it had been explicitly typed.
+ *
+ * inferred_default_vtype is an optimisation: consecutive values of the same
+ * inferred type (e.g. a long array of plain ints) are extremely common, so if
+ * the new inference matches the previous one we update state but skip
+ * re-emitting the identical annotation event burst. The full event sequence
+ * (start, family, width param, base param, unit param, end) is only emitted
+ * when the inferred type actually changes.
+ */
 static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	token_type_t tt, const uint8_t* str, uint32_t str_len,
 	bool is_currency_unit)
@@ -280,6 +352,18 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		return false;
 	return true;
 }
+/*
+ * Re-scan a complete numeric literal to (a) populate the integer accumulator
+ * for range checking and (b) set acc_has_dot / acc_has_exp. The lexer already
+ * proved the literal is well-formed, so this is about extracting semantics, not
+ * re-validating syntax — except for digit-in-base checking when the literal
+ * came in as a string that must be interpreted in a non-decimal base.
+ *
+ * The base-10 path is split out and hand-tuned (inline overflow guard against
+ * the UINT64 threshold 1.8e19) because decimal is by far the hot case; other
+ * bases defer to bvn_char_to_digit + bvn_acc_digit. The acc_exp_state tracks
+ * sign/digits of the exponent so exponent digits aren't folded into the value.
+ */
 static bool bvn_acc_parse_number(bvnr_validator_t* v,
 	const uint8_t* str, uint32_t len, token_type_t tt)
 {
@@ -367,6 +451,17 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 	}
 	return true;
 }
+/*
+ * Verify an integer literal fits the declared width/signedness.
+ *
+ * For widths > 64 bits the accumulator is useless, so it delegates to the
+ * string-based arbitrary-precision range checks. For <=64 bits it computes the
+ * exact bound from the width — note signed negatives allow one more magnitude
+ * than positives (e.g. INT8 reaches -128 but only +127), handled by the is_neg
+ * branch — and compares the accumulated magnitude. nan/inf pass through (they
+ * are floats wearing a numeric token). A sticky overflow flag is an immediate
+ * out-of-range.
+ */
 bool bvn_check_acc_range(bvnr_validator_t* v,
 	const uint8_t* str, uint32_t str_len, token_type_t tt)
 {
@@ -413,6 +508,16 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 	}
 	return true;
 }
+/*
+ * Gatekeeper: does the actual token kind agree with the declared type family?
+ *
+ * Enforces the core type rules — utf8 demands a string, bool demands a bool
+ * token, numeric types demand a number (or a string that parses as a number in
+ * the declared base), and dot/exponent are only allowed for the float
+ * families. plain (untyped) and null always pass. When the checks pass for an
+ * integer type it tail-calls the range check, so this one function is the
+ * single "is this value legal for its type" decision point.
+ */
 bool bvn_validate_type_value_compat(bvnr_reader_t* r,
 	token_type_t tt, const uint8_t* str, uint32_t str_len)
 {
@@ -461,6 +566,22 @@ bool bvn_validate_type_value_compat(bvnr_reader_t* r,
 	}
 	return bvn_check_acc_range(v, str, str_len, tt);
 }
+/*
+ * The main token entry point — the validator's dispatch core.
+ *
+ * Handles each raw token kind in turn:
+ *  - type annotation: parse (via cache) into value_type + unit, then replay the
+ *    annotation as the structured event burst the writer expects; a unit bumps
+ *    parsed_unit_serial so array frames can tell whether the unit changed.
+ *  - symbol: recognise the reserved keywords null/true/false/on/off and rewrite
+ *    them into null/bool tokens (bovnar has no separate keyword token kind).
+ *  - inline unit: parse (via cache) the trailing unit and reconcile it with any
+ *    annotation unit — a mismatch is error_unit_mismatch, the rule that "42 m"
+ *    with a <,kg> annotation is illegal.
+ *  - bare value: infer a default type, fold the accumulator, run the
+ *    type/value/range checks, then emit the verified data event.
+ * Every path ends by emitting the value (or its rewrite) through bvn_emit_both.
+ */
 bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 {
 	bvnr_validator_t* v = &r->val;
@@ -715,6 +836,12 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	}
 	return bvn_emit_both(r, raw->event, &d);
 }
+/*
+ * Forward a payload-less structural event (struct/array open/close, stream
+ * start/end, etc.). Short-circuits entirely when no callbacks are installed —
+ * a validate-only run (no consumer) then does zero per-event work. The current
+ * type/unit are attached so observers see the active context on every event.
+ */
 bool bvn_val_receive_event(bvnr_reader_t* r, bvnr_event_t ev)
 {
 	bvnr_validator_t* v = &r->val;
@@ -734,6 +861,12 @@ bool bvn_val_receive_octet_chunk(
 	d.length     = len;
 	return bvn_emit_both(r, ev_data, &d);
 }
+/*
+ * Reset per-value state at the start (and end) of each assignment so a type
+ * annotation, unit, or accumulator left over from the previous value can never
+ * leak into the next one. Both intro and outro reset identically; having both
+ * makes the invariant hold regardless of which boundary the grammar hits first.
+ */
 bool bvn_val_on_value_intro(bvnr_reader_t* r)
 {
 	bvnr_validator_t* v = &r->val;
@@ -764,6 +897,12 @@ bool bvn_val_on_array_intro(bvnr_reader_t* r)
 	return bvn_emit_unverified(r, ev_array_row_start, &d) &&
 		   bvn_emit_verified(r, ev_array_row_start, &d);
 }
+/*
+ * Closing a row enforces rectangularity: the first row to close establishes the
+ * expected width (*array_row_size); every later sibling row must match it or it
+ * is error_array_row_size_mismatch. bvn_val_on_new_array_value applies the same
+ * bound element-by-element so an over-long row is caught as early as possible.
+ */
 bool bvn_val_on_array_outro(bvnr_reader_t* r,
 	uint64_t curr_row_size, uint64_t* array_row_size)
 {
@@ -817,6 +956,14 @@ uint64_t bvnr_reader_get_recovery_count(const bvnr_reader_t* r)
 {
 	return r ? r->lex.recovery_count : 0;
 }
+/*
+ * Bind a reader to a source and arm it for bvnr_read. Tears down any previous
+ * lexer state first so a single reader can be reused for many documents.
+ * Requires a source with a real pull function (a zeroed/uninitialised source is
+ * rejected rather than crashing). The optional dbg_sink tees raw input for the
+ * canonicaliser. bvnr_open_read_mem is a thin convenience wrapper that builds a
+ * memory source (and optional memory debug sink) and forwards here.
+ */
 bool bvnr_open_read_source(
 	bvnr_reader_t* r, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* options)

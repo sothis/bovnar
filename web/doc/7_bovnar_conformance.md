@@ -171,7 +171,7 @@ Options:
 | `arrays` | 1D, 2D, nested, typed, null elements |
 | `octet_streams` | Binary chunk protocol |
 | `units` | SI, IEC, compound, inline suffix, mismatch errors |
-| `special_numbers` | `$nan$`, `$infinity$`, `$-infinity$` |
+| `special_numbers` | `$nan`, `$inf`, `$-inf` |
 | `roundtrip` | Multi-assignment sequences |
 | `recovery` | Error-resync behaviour |
 | `comments` | Comment parsing |
@@ -433,7 +433,7 @@ specifies:
 | `arrays` | 13 | 1D, 2D, nested, typed, null, limits |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
 | `units` | 20 | SI/IEC prefixes, compound, inline, errors |
-| `special_numbers` | 5 | `$nan$`, `$infinity$`, `$-infinity$` |
+| `special_numbers` | 5 | `$nan`, `$inf`, `$-inf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 4 | Comment styles |

@@ -133,7 +133,7 @@ bool bvnr_write_bool(bvnr_writer_t *w, const char *key, bool value)
 	if (!emit_key(w, key)) return false;
 	const char *sym = value ? "true" : "false";
 	bvnr_data_t d = {
-		.type   = token_is_symbol,
+		.type   = token_is_bool,
 		.data   = (const void *)sym,
 		.length = (uint32_t)strlen(sym),
 	};

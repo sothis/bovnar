@@ -382,7 +382,7 @@ static void test_parse_inline_unit_scalar(void)
 	ASSERT_TRUE(!ctx.has_errors, "inline 'no_unit' keyword must parse");
 
 	/* special-number with space separator */
-	parse_payload(".x = $nan$ s;", false, &ctx);
+	parse_payload(".x = $nan s;", false, &ctx);
 	ASSERT_TRUE(!ctx.has_errors, "inline unit after special-number must parse");
 
 	/* number with exponent */
@@ -400,7 +400,7 @@ static void test_parse_inline_unit_scalar(void)
 		"unit starting with e (eV) is unambiguous after whitespace separator");
 
 	/* comment replaces explicit whitespace: newline from comment counts */
-	parse_payload(".x = $nan$ # comment\n s;", false, &ctx);
+	parse_payload(".x = $nan # comment\n s;", false, &ctx);
 	ASSERT_TRUE(!ctx.has_errors,
 		"comment newline satisfies whitespace requirement for special-number");
 }
@@ -422,7 +422,7 @@ static void test_parse_inline_unit_separator_errors(void)
 		"direct adjacency on float must be rejected");
 
 	/* no separator after special-number */
-	parse_payload(".x = $nan$s;", true, &ctx);
+	parse_payload(".x = $nans;", true, &ctx);
 	ASSERT_TRUE(ctx.has_errors,
 		"direct adjacency after special-number must error");
 

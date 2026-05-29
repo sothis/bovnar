@@ -45,6 +45,7 @@
         { "include": "#number"          },
         { "include": "#string"          },
         { "include": "#inline_unit"     },
+        { "include": "#keyword"         },
         { "include": "#symbol"          },
         { "include": "#reference"       },
         { "include": "#array1"          },
@@ -179,7 +180,7 @@
         { "include": "#comment" },
 
         { "comment": "Type-family keywords. Longer names (float_fix, float_dec) must appear before float.",
-          "match": "\\b(float_fix|float_dec|float|uint|sint|utf8)\\b",
+          "match": "\\b(float_fix|float_dec|float|uint|sint|utf8|bool)\\b",
           "name": "storage.type.family.bovnar" },
 
         { "comment": "Explicitly-dimensionless keyword.",
@@ -213,6 +214,7 @@
         { "include": "#number"         },
         { "include": "#string"         },
         { "include": "#inline_unit"    },
+        { "include": "#keyword"        },
         { "include": "#symbol"         },
         { "include": "#reference"      },
         { "include": "#array1"         },
@@ -221,9 +223,17 @@
     },
 
     "special_number": {
-      "comment": "$nan$  $infinity$  $-infinity$ — both dollar delimiters are mandatory.",
-      "match": "\\$(?:nan|-infinity|infinity)\\$",
+      "comment": "$nan  $inf  $-inf — a single leading $ sigil, no trailing $. The keyword ends like a number; a trailing identifier byte (e.g. $infinity) is an error and is not matched.",
+      "match": "\\$(?:nan|-inf|inf)(?![A-Za-z0-9_])",
       "name": "constant.language.special-float.bovnar"
+    },
+
+    "keyword": {
+      "comment": "Reserved value-position keywords. true/false/on/off carry the bool type family (on==true, off==false); null is the null value. The validator reclassifies these out of the symbol space, so they must be matched before #symbol.",
+      "patterns": [
+        { "match": "\\b(?:true|false|on|off)\\b", "name": "constant.language.boolean.bovnar" },
+        { "match": "\\bnull\\b", "name": "constant.language.null.bovnar" }
+      ]
     },
 
     "number": {
@@ -262,8 +272,8 @@
     },
 
     "inline_unit": {
-      "comment": "Inline unit suffix: mandatory whitespace separates the scalar from the unit.",
-      "match": "(?<=[\\d$\"])(\\s+)([A-Za-z_%‰‱µ°Å][A-Za-z0-9_+~\\.\\-/:\\^\\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
+      "comment": "Inline unit suffix: mandatory whitespace separates the scalar from the unit. The lookbehind fires after a digit, a closing string quote, or the tail of a special-number keyword ($nan/$inf/$-inf) — variable-length alternation, supported by Oniguruma.",
+      "match": "(?<=[\\d\"]|\\$nan|\\$inf|\\$-inf)(\\s+)([A-Za-z_%‰‱µ°Å][A-Za-z0-9_+~\\.\\-/:\\^\\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
       "captures": {
         "1": { "name": "punctuation.separator.inline-unit.bovnar" },
         "2": { "name": "support.type.unit.inline.bovnar"          }
@@ -300,6 +310,7 @@
         { "include": "#special_number"  },
         { "include": "#number"          },
         { "include": "#string"          },
+        { "include": "#keyword"         },
         { "include": "#symbol"          },
         { "include": "#reference"       },
         { "match": ",", "name": "punctuation.separator.comma.bovnar"     },

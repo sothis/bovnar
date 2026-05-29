@@ -190,6 +190,10 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 				emit_width = emit_base = emit_unit = true;
 			}
 		}
+	} else if (tt == token_is_bool) {
+		default_type    = BVN_TYPE_BOOL;
+		family_name     = "bool";
+		family_name_len = 4;
 	} else {
 		return true;
 	}
@@ -399,6 +403,13 @@ bool bvn_validate_type_value_compat(bvnr_reader_t* r,
 		}
 		return true;
 	}
+	if (vt.family == vt_bool) {
+		if (tt != token_is_bool) {
+			v->last_error = error_type_value_mismatch;
+			return false;
+		}
+		return true;
+	}
 	if (!bvn_type_is_numeric(vt))
 		return true;
 	if (tt != token_is_number    && tt != token_is_array_number &&
@@ -549,6 +560,37 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		if (!bvn_emit_both(r, ev_type_annotation_end, &d))
 			return false;
 		return true;
+	}
+	if (tt == token_is_symbol) {
+		const uint8_t* s = raw->str_data;
+		uint32_t       n = raw->str_len;
+		bool           kw_bool = false, kw_true = false;
+		if (n == 4 && memcmp(s, "null", 4) == 0) {
+			tt = token_is_null_value;
+		} else if ((n == 4 && memcmp(s, "true", 4) == 0) ||
+		           (n == 2 && memcmp(s, "on", 2) == 0)) {
+			kw_bool = true; kw_true = true;
+		} else if ((n == 5 && memcmp(s, "false", 5) == 0) ||
+		           (n == 3 && memcmp(s, "off", 3) == 0)) {
+			kw_bool = true; kw_true = false;
+		}
+		if (kw_bool) {
+			if (bvn_type_is_plain(v->value_type)) {
+				if (!bvn_emit_default_type_annotation(r,
+						token_is_bool, s, n, false))
+					return false;
+			} else if (v->value_type.family != vt_bool) {
+				v->last_error = error_type_value_mismatch;
+				return false;
+			}
+			bvnr_data_t d;
+			d.type       = token_is_bool;
+			d.value_type = v->value_type;
+			d.value_unit = v->parsed_unit;
+			d.data       = kw_true ? "true" : "false";
+			d.length     = kw_true ? 4u : 5u;
+			return bvn_emit_both(r, ev_data, &d);
+		}
 	}
 	if (tt == token_is_null_value) {
 		bvnr_data_t d;

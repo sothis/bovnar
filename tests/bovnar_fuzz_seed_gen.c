@@ -53,9 +53,9 @@ static const char *bvnr_seeds[] = {
 	".x = false;\n",
 	".x = ;\n",
 
-	".x = $nan$;\n",
-	".x = $infinity$;\n",
-	".x = $-infinity$;\n",
+	".x = $nan;\n",
+	".x = $inf;\n",
+	".x = $-inf;\n",
 
 	".x = \"tab\\there\";\n",
 	".x = \"nl\\nhere\";\n",
@@ -73,7 +73,7 @@ static const char *bvnr_seeds[] = {
 	".x = <sint:32> -2147483648;\n",
 	".x = <float:32> 3.14;\n",
 	".x = <float:64> 1e100;\n",
-	".x = <float:64> $nan$;\n",
+	".x = <float:64> $nan;\n",
 	".x = <utf8> \"text\";\n",
 
 	".x = <uint:_16> \"ff\";\n",
@@ -236,8 +236,8 @@ static const utils_seed_t utils_seeds[] = {
 	{ 4, 0, 0, "",                  "empty string" },
 
 	{ 5, 0, 0, "nan",               "nan" },
-	{ 5, 0, 0, "infinity",          "infinity" },
-	{ 5, 0, 0, "-infinity",         "-infinity" },
+	{ 5, 0, 0, "inf",               "inf" },
+	{ 5, 0, 0, "-inf",              "-inf" },
 	{ 5, 0, 0, "notspecial",        "not special" },
 
 	{ 6, 10, 0, "12345",            "base-10 digits" },

@@ -524,7 +524,8 @@ To emit an explicit `<utf8>` annotation, use the low-level `emit` API with
 
 #### `write_bool(key, value)`
 
-Write the symbol `true` or `false` (no type annotation, no quotes).
+Write a `bool` value (`token_is_bool`) — serialized as the bare keyword
+`true` or `false`. On read-back it decodes to a Python `bool`.
 
 #### `write_null(key)`
 

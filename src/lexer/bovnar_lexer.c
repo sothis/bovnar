@@ -545,9 +545,9 @@ static bool bvn_special_keyword_outro(bvnr_reader_t* p,
 bool bvn_action_sp_nan_outro(bvnr_reader_t* p)
 	{ return bvn_special_keyword_outro(p, "nan", 3); }
 bool bvn_action_sp_inf_outro(bvnr_reader_t* p)
-	{ return bvn_special_keyword_outro(p, "infinity", 8); }
+	{ return bvn_special_keyword_outro(p, "inf", 3); }
 bool bvn_action_sp_neginf_outro(bvnr_reader_t* p)
-	{ return bvn_special_keyword_outro(p, "-infinity", 9); }
+	{ return bvn_special_keyword_outro(p, "-inf", 4); }
 static bool bvn_tf_family_done(bvnr_reader_t* p,
 	const char* name, uint32_t len, state_t after)
 {
@@ -564,6 +564,8 @@ bool bvn_action_tf_float_done(bvnr_reader_t* p)
 	{ return bvn_tf_family_done(p, "float",     5, type_body_outro); }
 bool bvn_action_tf_utf8_done(bvnr_reader_t* p)
 	{ return bvn_tf_family_done(p, "utf8",      4, type_body_outro); }
+bool bvn_action_tf_bool_done(bvnr_reader_t* p)
+	{ return bvn_tf_family_done(p, "bool",      4, type_body_outro); }
 bool bvn_action_string_intro(bvnr_reader_t* p)
 {
 	p->lex.token_type = p->lex.in_array_element

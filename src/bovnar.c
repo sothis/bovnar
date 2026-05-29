@@ -56,6 +56,12 @@ static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 		printf("%g", v);
 		break;
 	}
+	case BVN_DOM_BOOL: {
+		bool b = false;
+		bvn_dom_get_bool(node, &b);
+		fputs(b ? "true" : "false", stdout);
+		break;
+	}
 	case BVN_DOM_STRING: {
 		const char *s; uint32_t l;
 		bvn_dom_get_string(node, &s, &l);
@@ -140,6 +146,7 @@ static const char *evt_tok_str(token_type_t t)
 	case token_is_type_width:   return "type_width";
 	case token_is_type_base:    return "type_base";
 	case token_is_type_q:       return "type_q";
+	case token_is_bool:         return "bool";
 	case token_is_unknown:      return "unknown";
 	}
 	return "?";
@@ -175,6 +182,7 @@ static const char *evt_vtf_str(value_type_family_t f)
 	case vt_float:     return "float";
 	case vt_float_fix: return "float_fix";
 	case vt_float_dec: return "float_dec";
+	case vt_bool:      return "bool";
 	case vt_illegal:   return "ILLEGAL";
 	}
 	return "?";
@@ -972,7 +980,7 @@ static bool write_bvn_array(bvnr_writer_t *w, const char *key, const JsonNode *n
 			d.type = token_is_null_value;
 		} else if (e->type == BVN_JSON_BOOL) {
 			const char *sym = e->u.b ? "true" : "false";
-			d.type   = token_is_symbol;
+			d.type   = token_is_bool;
 			d.data   = sym;
 			d.length = (uint32_t)strlen(sym);
 		} else if (e->type == BVN_JSON_INT) {
@@ -1164,6 +1172,12 @@ static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 		if (isnan(v))        fputs("null", stdout);
 		else if (isinf(v))   fputs(v > 0 ? "1e308" : "-1e308", stdout);
 		else                 printf("%.17g", v);
+		break;
+	}
+	case BVN_DOM_BOOL: {
+		bool b = false;
+		bvn_dom_get_bool(node, &b);
+		fputs(b ? "true" : "false", stdout);
 		break;
 	}
 	case BVN_DOM_STRING: {

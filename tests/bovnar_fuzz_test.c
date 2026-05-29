@@ -311,9 +311,9 @@ static const seed_entry_t CORPUS[] = {
 	S(".x = \"hello world\";\n"),
 	S(".x = true;\n"),
 	S(".x = ;\n"),
-	S(".x = $nan$;\n"),
-	S(".x = $infinity$;\n"),
-	S(".x = $-infinity$;\n"),
+	S(".x = $nan;\n"),
+	S(".x = $inf;\n"),
+	S(".x = $-inf;\n"),
 	S(".x = .5;\n"),
 	S(".x = 123.;\n"),
 	S(".x = 1e6;\n"),
@@ -337,7 +337,7 @@ static const seed_entry_t CORPUS[] = {
 	S(".x = <float:16> 1.0;\n"),
 	S(".x = <float:32> 3.14;\n"),
 	S(".x = <float:64> 1e100;\n"),
-	S(".x = <float:64> $nan$;\n"),
+	S(".x = <float:64> $nan;\n"),
 	S(".x = <float:128> 1.0;\n"),
 	S(".x = <utf8> \"text\";\n"),
 
@@ -527,7 +527,7 @@ static void dom_exercise_node(const bvn_dom_node_t *node)
 	if (!node) return;
 
 	bvn_dom_type_t dtype = bvn_dom_node_type(node);
-	if ((unsigned)dtype > (unsigned)BVN_DOM_OCTET_STREAM) __builtin_trap();
+	if ((unsigned)dtype > (unsigned)BVN_DOM_BOOL) __builtin_trap();
 
 	(void)bvn_dom_is_null(node);
 

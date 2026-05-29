@@ -294,9 +294,9 @@ class TestSpecialFloats:
         with Reader() as r:
             r.read_mem(special_floats, on_verified=cb)
         raw_strs = [v.decode('utf-8') for v in values if v]
-        assert 'nan'       in raw_strs
-        assert 'infinity'  in raw_strs
-        assert '-infinity' in raw_strs
+        assert 'nan'  in raw_strs
+        assert 'inf'  in raw_strs
+        assert '-inf' in raw_strs
 
 @needs_lib
 class TestComments:

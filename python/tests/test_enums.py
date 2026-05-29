@@ -35,7 +35,8 @@ class TestValueTypeFamily:
         assert ValueTypeFamily.PLAIN == 0
 
     def test_illegal(self):
-        assert ValueTypeFamily.ILLEGAL == 7
+        assert ValueTypeFamily.BOOL == 7
+        assert ValueTypeFamily.ILLEGAL == 8
 
     def test_numeric_families(self):
         assert ValueTypeFamily.UINT == 3

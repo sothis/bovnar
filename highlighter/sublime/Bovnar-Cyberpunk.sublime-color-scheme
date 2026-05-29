@@ -206,6 +206,17 @@
       "foreground": "#c084fc"
     },
     {
+      "name": "Bovnar Boolean",
+      "scope": "constant.language.boolean.bovnar",
+      "foreground": "#c084fc"
+    },
+    {
+      "name": "Bovnar Null",
+      "scope": "constant.language.null.bovnar",
+      "foreground": "#7a8390",
+      "font_style": "italic"
+    },
+    {
       "name": "Bovnar Float",
       "scope": "constant.numeric.float.bovnar",
       "foreground": "#f0c64e"

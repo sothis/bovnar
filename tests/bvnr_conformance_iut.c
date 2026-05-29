@@ -119,6 +119,7 @@ static const char *toktype_str(token_type_t t)
 	case token_is_type_base:    return "type_base";
 	case token_is_type_q:       return "type_q";
 	case token_is_unit:         return "unit";
+	case token_is_bool:         return "bool";
 	case token_is_unknown:      return "unknown";
 	}
 	return "?";

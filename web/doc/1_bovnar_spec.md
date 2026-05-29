@@ -92,14 +92,15 @@ Each assignment is:
 | Assignment | `.key = value ;` | `.foo = 42;` |
 | Type annotation | `<type-spec>` placed after `=`, before the value | `.foo = <uint:32> 42;` |
 | Number | `[-]digits[.digits][e[+/-]digits]` | `42`, `-3.14`, `1e6` |
-| Special number | `$nan$`, `$infinity$`, `$-infinity$` | `.x = $infinity$;` |
+| Special number | `$nan`, `$inf`, `$-inf` | `.x = $inf;` |
+| Boolean | `true` / `false` / `on` / `off` | `.b = true;`, `.b = off;` |
 | String | `"…"` with escapes | `.s = "hello\nworld";` |
-| Symbol | bare identifier (no quotes) | `.s = true;`, `.day = Monday;` |
+| Symbol | bare identifier (no quotes) | `.s = ok;`, `.day = Monday;` |
 | Reference | `&.path.to.key` | `.ref = &.config.host;` |
 | Array | `[ … ]` rows separated by `/` | `.a = [1,2,3]/[4,5,6];` |
 | Struct | `{ … }` | `.s = {.x = 1; .y = 2;};` |
 | Octet stream | `\x00` … binary … `\x00` | binary escape |
-| Null value | absent token | `.x = ;`, `[,1,]` |
+| Null value | absent token or `null` keyword | `.x = ;`, `.x = null;`, `[,1,]` |
 | Unit (type annotation) | inside `<…>` as a type param | `<float:64,m/s>` |
 | Unit (inline suffix) | after scalar value, before `;` | `.speed = 9.81 m/s;` |
 | Fixed-point type | `<float_fix:[width,]qN[,unit]>` | `<float_fix:32,q16>`, `<float_fix:q8>` |
@@ -271,6 +272,15 @@ A **symbol** is an unquoted bare-word token that appears in value position. It s
 .flags = [red, green, blue];  # symbols as array elements
 ```
 
+**Reserved keywords.** Five exact bare words are *not* symbols: `null`, `true`, `false`, `on`, and `off`. Lexically they are still symbol tokens, but the validator reserves the exact spellings and reclassifies them — `null` to a null value, and `true`/`false`/`on`/`off` to a `bool` value (`on` ≡ `true`, `off` ≡ `false`). A bare boolean with no annotation synthesises a `<bool>` type (§10); an explicit `<bool>` annotation accepts only these four keywords. A longer word that merely begins with a keyword (`ontology`, `nullable`, `truthy`) remains an ordinary symbol.
+
+```bovnar
+.enabled = true;           # bool value (vt_bool), not a symbol
+.debug   = off;            # bool false
+.choice  = <bool> on;      # explicit; on == true
+.label   = truthy;         # symbol "truthy" — not a keyword
+```
+
 ### 4.5 References
 
 A **reference** is a dotted path to another key, introduced by `&`.
@@ -330,26 +340,27 @@ dec-exponent  = ("e" | "E") [ "+" | "-" ] DIGIT { DIGIT }
 #### Special Number Literals
 
 ```
-special-number = "$" ( "nan" | "infinity" | "-infinity" ) "$"
+special-number = "$" ( "nan" | "inf" | "-inf" )
 ```
 
-Both `$` delimiters are mandatory. The stored token text is the bare keyword without delimiters.
+A single leading `$` sigil introduces the keyword; there is **no** trailing `$`. The keyword ends at its final letter and must be followed by a value terminator (whitespace, `,`, `;`, `]`, `#`, or — after whitespace — an inline unit). A non-terminator byte after the keyword (e.g. `$infinity`, `$nans`) is `error_unexpected_input_byte`, so the three spellings are reserved. The stored token text is the keyword without the sigil: `nan`, `inf`, `-inf`.
 
 ```bovnar
-.not_a_number = $nan$;
-.infinite = $infinity$;
-.neg_infinite = $-infinity$;
+.not_a_number = $nan;
+.infinite = $inf;
+.neg_infinite = $-inf;
 ```
 
 ### 4.7 Null Values
 
-A null value is the **absence** of a raw-value token. It occurs when:
+A null value is the **absence** of a raw-value token, or the reserved keyword `null`. It occurs when:
 
-- At assignment level: `.key = ;` (nothing between `=` and `;`)
-- In array context: leading/trailing commas, or consecutive commas: `[,1,,2,]`
+- At assignment level: `.key = ;` (nothing between `=` and `;`), or `.key = null;`
+- In array context: leading/trailing commas, or consecutive commas: `[,1,,2,]`; a bare `null` element is equivalent
 
 ```bovnar
 .null = ;                    # null value
+.also = null;                # the null keyword — identical to the empty slot
 .items = [,1, ,2,];          # null, 1, null, 2, null
 ```
 
@@ -399,7 +410,7 @@ In all cases the annotation comes **before** the value it describes.
 .key<uint:32> = 42;    # ERROR: type annotation must follow '=', not the key
 ```
 
-Six type families are recognized:
+Seven type families are recognized:
 
 | Family | Keyword | Parameter syntax | Default Width |
 |--------|---------|-----------------|---------------|
@@ -409,13 +420,14 @@ Six type families are recognized:
 | Fixed-point (Q-format) | `float_fix` | `:width,qN,unit` | 64 |
 | Decimal floating-point (IEEE 754-2008) | `float_dec` | `:width,unit` | 64 |
 | UTF-8 string | `utf8` | Lexer accepts params; stored but ignored | — |
+| Boolean | `bool` | none (any parameter → `error_illegal_value_type`) | — |
 
 **Parameter syntax:**
 
 ```
 type-spec = param-type [ ":" type-param-list ]
 
-param-type = "uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
+param-type = "uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8" | "bool"
 
 type-param-list = type-param { "," type-param }
 
@@ -545,6 +557,7 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 |-------------|---------|
 | `vt_plain` (default) | Any value |
 | `vt_utf8` | String only |
+| `vt_bool` | Boolean keyword only (`true`/`false`/`on`/`off`) |
 | `vt_uint` | Number or string (digits) |
 | `vt_sint` | Number or string (digits, may be negative) |
 | `vt_float` | Number or string (may have `.`, `e`/`E`; base 16 strings use `p`/`P`) — only base 10 or 16 |
@@ -581,7 +594,7 @@ Base `10` (default) or `16` are accepted; all other bases are rejected.
 ```bovnar
 .valid = <float:64> 3.14;
 .valid = <float:64> 1e100;
-.valid = <float:64> $nan$;
+.valid = <float:64> $nan;
 .valid = <float:16> 3.14;      # half-precision
 .valid = <float:256> 3.14;     # 256-bit extended precision
 
@@ -617,7 +630,7 @@ Values are written as ordinary decimal literals or special numbers.
 ```bovnar
 .valid   = <float_dec:32> 3.14;
 .valid   = <float_dec:64,Pa> 101325;
-.valid   = <float_dec:128> $nan$;
+.valid   = <float_dec:128> $nan;
 
 .invalid = <float_dec:8> 1.0;         # width 8 not valid → error_illegal_value_type
 .invalid = <float_dec:64,_10> 1.0;    # base param forbidden → error_illegal_value_type
@@ -648,16 +661,16 @@ The `p`/`P` exponent value is always interpreted as a decimal integer (the binar
 
 ### 6.4 Special Number Semantics
 
-`$nan$`, `$infinity$`, `$-infinity$` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected only when the declared type is `utf8`, because the token type (`token_is_number`) is incompatible with a string-only family.
+`$nan`, `$inf`, `$-inf` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected only when the declared type is `utf8`, because the token type (`token_is_number`) is incompatible with a string-only family.
 
 ```bovnar
-.okay_f64  = <float:64>  $infinity$;
-.okay_f32  = <float:32>  $nan$;
-.okay_u8   = <uint:8>    $nan$;         # accepted — range check bypassed
-.okay_s16  = <sint:16>   $-infinity$;   # accepted — range check bypassed
+.okay_f64  = <float:64>  $inf;
+.okay_f32  = <float:32>  $nan;
+.okay_u8   = <uint:8>    $nan;         # accepted — range check bypassed
+.okay_s16  = <sint:16>   $-inf;   # accepted — range check bypassed
 
 # Fine in plain/untyped context too
-.untyped = $infinity$;       # defaults to float:64
+.untyped = $inf;       # defaults to float:64
 ```
 
 ### 6.5 Inline Unit Suffix
@@ -891,7 +904,8 @@ When a number or string value carries **no explicit** type annotation (i.e. the 
 | Value Form | Synthesised Type |
 |------------|-----------------|
 | Quoted string | `<utf8>` |
-| Special number (`$nan$`, `$infinity$`, `$-infinity$`) | `<float:64,_10,no_unit>` |
+| Boolean keyword (`true`/`false`/`on`/`off`) | `<bool>` |
+| Special number (`$nan`, `$inf`, `$-inf`) | `<float:64,_10,no_unit>` |
 | Number with `.` or `e`/`E` (float literal) | `<float:64,_10,no_unit>` |
 | Negative integer | `<sint:64,_10,no_unit>` |
 | Plain integer | `<uint:64,_10,no_unit>` |
@@ -930,7 +944,7 @@ ev_data
 
 # No annotation → synthesised <float:64,_10,no_unit>
 .y = 3.14;
-.z = $infinity$;
+.z = $inf;
 
 # No annotation → synthesised <sint:64,_10,no_unit>
 .w = -7;
@@ -1314,8 +1328,8 @@ The complete grammar is maintained as a standalone file:
 The grammar uses ISO/IEC 14977:1996 notation and is derived from and verified against the reference implementation. It covers:
 
 - Top-level stream and assignment structure
-- Type annotations (all six families: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`)
-- Value forms: numbers, special numbers, strings, symbols, references, arrays, structs, octet streams, inline unit suffixes
+- Type annotations (all seven families: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool`)
+- Value forms: numbers, special numbers, booleans, strings, symbols, references, arrays, structs, octet streams, inline unit suffixes
 - Lexical primitives and UTF-8 byte class definitions
 - Unit sub-grammar (SI/IEC prefixes, base units, compound units, exponents)
 - Constraints not expressible in context-free EBNF (UTF-8 validity, BOM placement, nesting limits, type/value compatibility, error recovery behaviour)
@@ -1531,8 +1545,8 @@ The unit may be written directly after the value literal instead of — or redun
 .big_constant  = <float_dec:256> 1.4142135623730950488016887242096980785696718753769480731766797;
 
 # Special values are accepted
-.nan_dec       = <float_dec:64> $nan$;
-.inf_dec       = <float_dec:32> $infinity$;
+.nan_dec       = <float_dec:64> $nan;
+.inf_dec       = <float_dec:32> $inf;
 
 # null of a decimal float type
 .missing_dec   = <float_dec:64> ;

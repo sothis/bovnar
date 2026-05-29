@@ -44,6 +44,7 @@ typedef enum value_type_family_e {
 	vt_float,
 	vt_float_fix,
 	vt_float_dec,
+	vt_bool,
 	vt_illegal
 } value_type_family_t;
 typedef enum token_type_e {
@@ -62,6 +63,7 @@ typedef enum token_type_e {
 	token_is_type_width,
 	token_is_type_base,
 	token_is_type_q,
+	token_is_bool,
 	token_is_unknown
 } token_type_t;
 typedef enum error_code_e {
@@ -322,6 +324,8 @@ typedef struct bvnr_writer_s bvnr_writer_t;
 	((value_type_spec_t){ .family = vt_plain, .width = 0,  .base = 0  })
 #define BVN_TYPE_UTF8 \
 	((value_type_spec_t){ .family = vt_utf8,  .width = 0,  .base = 0  })
+#define BVN_TYPE_BOOL \
+	((value_type_spec_t){ .family = vt_bool,  .width = 0,  .base = 0  })
 #define BVN_TYPE_SINT(w) \
 	((value_type_spec_t){ .family = vt_sint,  .width = (w), .base = 0  })
 #define BVN_TYPE_UINT(w) \

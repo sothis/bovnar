@@ -242,7 +242,8 @@ class Writer:
     _TOKEN_IS_TYPE_WIDTH  = 12
     _TOKEN_IS_TYPE_BASE   = 13
     _TOKEN_IS_TYPE_Q      = 14
-    _TOKEN_IS_UNKNOWN     = 15
+    _TOKEN_IS_BOOL        = 15
+    _TOKEN_IS_UNKNOWN     = 16
 
     def _emit_annotation(self,
                           family_name: str,
@@ -440,7 +441,7 @@ class Writer:
         self.emit(Event.ASSIGNMENT_START, key=key)
         sym = b'true' if value else b'false'
         d = BvnrData()
-        d.type = self._TOKEN_IS_SYMBOL
+        d.type = self._TOKEN_IS_BOOL
         d.data = ctypes.cast(ctypes.c_char_p(sym), ctypes.c_void_p)
         d.length = len(sym)
         ok = self._lib.bvnr_write_event(self._ptr, int(Event.DATA), ctypes.byref(d))
@@ -488,7 +489,7 @@ class Writer:
         self.emit(Event.ASSIGNMENT_START, key=key)
         self._emit_annotation(family_name, vt, vu)
 
-        _SPECIAL = frozenset(('nan', 'infinity', '-infinity'))
+        _SPECIAL = frozenset(('nan', 'inf', '-inf'))
         _decimal_float_families = frozenset((
             int(ValueTypeFamily.FLOAT_FIX),
             int(ValueTypeFamily.FLOAT_DEC),

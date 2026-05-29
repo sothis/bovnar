@@ -156,7 +156,7 @@ A BOM appearing inside any *subsequent* comment is valid UTF-8 and accepted with
 
 ## 3. Type System and Annotations
 
-**What are the six type families?**
+**What are the seven type families?**
 
 | Keyword | Description |
 |---|---|
@@ -166,6 +166,7 @@ A BOM appearing inside any *subsequent* comment is valid UTF-8 and accepted with
 | `float_fix` | Q-format signed fixed-point |
 | `float_dec` | IEEE 754-2008 decimal floating-point |
 | `utf8` | UTF-8 string |
+| `bool` | Boolean (`true`/`false`); takes no parameters |
 
 ---
 
@@ -178,6 +179,7 @@ on the literal:
 - Negative integer literal → `sint:64`
 - Literal containing `.` or `e` → `float:64`
 - Quoted string → `utf8`
+- Boolean keyword (`true`/`false`/`on`/`off`) → `bool`
 
 This is called default type synthesis and is convenient for configuration files
 and quick hand-authored data. For precision-sensitive use cases, always write an
@@ -465,13 +467,15 @@ at all — specifying one is a hard error.
 
 **What are the special number literals?**
 
-Three special values bypass normal numeric parsing. Both dollar signs are
-mandatory:
+Three special values bypass normal numeric parsing. A single leading `$`
+sigil introduces the keyword — there is no trailing `$`, and the keyword ends
+like any number. The three spellings are reserved (`$infinity`, `$nans`, etc.
+are errors):
 
 ```bovnar
-.nan = $nan$;
-.inf = $infinity$;
-.neg = $-infinity$;
+.nan = $nan;
+.inf = $inf;
+.neg = $-inf;
 ```
 
 They are valid in both typed and untyped context and may be combined with any
@@ -671,23 +675,41 @@ Yes:
 
 **What is a null value?**
 
-An explicit absence of value — nothing between `=` and `;`:
+An explicit absence of value — nothing between `=` and `;`, or the reserved
+keyword `null`:
 
 ```bovnar
 .nothing    = ;              # null, no type annotation
+.also_null  = null;          # the null keyword — identical to the empty slot
 .typed_null = <uint:32> ;    # null with an explicit type
+```
+
+---
+
+**Does Bovnar have booleans?**
+
+Yes. `true`, `false`, `on`, and `off` are reserved keywords carrying the
+`bool` type family (`on` ≡ `true`, `off` ≡ `false`). A bare boolean
+synthesises a `<bool>` annotation; `<bool>` takes no parameters and accepts
+only those four keywords. They serialize canonically as `true` / `false`:
+
+```bovnar
+.enabled = true;
+.debug   = off;          # == false
+.typed   = <bool> on;    # explicit; on == true
 ```
 
 ---
 
 **What is a symbol?**
 
-A bare, unquoted word in value position. Bovnar has no native boolean type;
-`true` and `false` are simply symbols by convention:
+A bare, unquoted word in value position — for application-defined enums and
+the like. The reserved keywords `null`, `true`, `false`, `on`, `off` are *not*
+symbols (a word that merely starts with one, like `Monday` or `ontology`, is):
 
 ```bovnar
 .status  = ok;
-.enabled = true;    # symbol "true", not a boolean keyword
+.mode    = read_only;
 .day     = Monday;
 ```
 

@@ -385,6 +385,7 @@ def _seal_array(arr: _ArrScope):
 
 
 _TOKEN_IS_SYMBOL = 3
+_TOKEN_IS_BOOL   = 15
 
 
 def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> object:
@@ -394,11 +395,10 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
         return None
     text = raw.decode('utf-8', errors='replace')
 
+    if tok_type == _TOKEN_IS_BOOL:
+        return text in ('true', 'on')
+
     if tok_type == _TOKEN_IS_SYMBOL:
-        if text == 'true':
-            return True
-        if text == 'false':
-            return False
         return text
 
     if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
@@ -410,10 +410,10 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
     if fam in (ValueTypeFamily.FLOAT,
                ValueTypeFamily.FLOAT_FIX,
                ValueTypeFamily.FLOAT_DEC):
-        if text in ('nan', 'infinity', '-infinity'):
+        if text in ('nan', 'inf', '-inf'):
             return {'nan': float('nan'),
-                    'infinity': float('inf'),
-                    '-infinity': float('-inf')}[text]
+                    'inf': float('inf'),
+                    '-inf': float('-inf')}[text]
         try:
             return float(text)
         except ValueError:
@@ -507,7 +507,7 @@ def _emit_array_element(w: Writer, elem) -> None:
 
     _TOKEN_IS_ARRAY_NUMBER = 5
     _TOKEN_IS_ARRAY_STRING = 6
-    _TOKEN_IS_SYMBOL       = 3
+    _TOKEN_IS_BOOL         = 15
     _TOKEN_IS_NULL_VALUE   = 9
 
     if elem is None:
@@ -518,7 +518,7 @@ def _emit_array_element(w: Writer, elem) -> None:
     elif isinstance(elem, bool):
         sym = b'true' if elem else b'false'
         d = BvnrData()
-        d.type = _TOKEN_IS_SYMBOL
+        d.type = _TOKEN_IS_BOOL
         d.data   = _ct.cast(_ct.c_char_p(sym), _ct.c_void_p)
         d.length = len(sym)
         _write_event_data(w, d)
@@ -539,7 +539,7 @@ def _emit_array_element(w: Writer, elem) -> None:
         import math as _math
         vt  = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
         if _math.isinf(elem):
-            _s = '-infinity' if elem < 0 else 'infinity'
+            _s = '-inf' if elem < 0 else 'inf'
         elif _math.isnan(elem):
             _s = 'nan'
         else:

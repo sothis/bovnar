@@ -17,7 +17,8 @@ typedef enum bvn_dom_type_e {
 	BVN_DOM_REFERENCE,
 	BVN_DOM_STRUCT,
 	BVN_DOM_ARRAY,
-	BVN_DOM_OCTET_STREAM
+	BVN_DOM_OCTET_STREAM,
+	BVN_DOM_BOOL
 } bvn_dom_type_t;
 typedef struct bvn_dom_node_s  bvn_dom_node_t;
 typedef struct bvn_dom_doc_s   bvn_dom_doc_t;
@@ -40,6 +41,7 @@ BVN_API bvn_dom_node_t *bvn_dom_array_at(const bvn_dom_node_t *node,
 BVN_API bvn_dom_type_t  bvn_dom_node_type(const bvn_dom_node_t *node);
 BVN_API bool            bvn_dom_is_null(const bvn_dom_node_t *node);
 BVN_API bool bvn_dom_get_float(const bvn_dom_node_t *node, double *out);
+BVN_API bool bvn_dom_get_bool(const bvn_dom_node_t *node, bool *out);
 BVN_API bool bvn_dom_get_string(const bvn_dom_node_t *node,
 						const char **out, uint32_t *len);
 BVN_API bool bvn_dom_get_symbol(const bvn_dom_node_t *node,

@@ -776,8 +776,8 @@ int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 	}
 	if (bvn_float_is_inf(f)) {
 		bool neg = f->_sign < 0;
-		if (neg) { if (bufsize < 10) return -1; memcpy(buf, "-infinity", 10); return 9; }
-		else     { if (bufsize < 9)  return -1; memcpy(buf, "infinity", 9);   return 8; }
+		if (neg) { if (bufsize < 5) return -1; memcpy(buf, "-inf", 5); return 4; }
+		else     { if (bufsize < 4) return -1; memcpy(buf, "inf", 4);  return 3; }
 	}
 	if (bvn_float_is_zero(f)) {
 		if (bufsize < 4) return -1;

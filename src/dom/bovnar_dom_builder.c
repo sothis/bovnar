@@ -246,9 +246,9 @@ static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 	memcpy(buf, str, (size_t)len);
 	buf[len] = '\0';
 	if (bvn_is_special_number_string(buf)) {
-		if      (strcmp(buf, "nan")       == 0) n->val.float_val = NAN;
-		else if (strcmp(buf, "infinity")  == 0) n->val.float_val = INFINITY;
-		else if (strcmp(buf, "-infinity") == 0) n->val.float_val = -INFINITY;
+		if      (strcmp(buf, "nan")  == 0) n->val.float_val = NAN;
+		else if (strcmp(buf, "inf")  == 0) n->val.float_val = INFINITY;
+		else if (strcmp(buf, "-inf") == 0) n->val.float_val = -INFINITY;
 	} else {
 		uint32_t base = bvn_effective_base(vt);
 		uint32_t prec = vt.width ? vt.width : 64u;
@@ -280,6 +280,18 @@ static bvn_dom_node_t *make_string(const char *str, uint32_t len,
 	n->val.str.data = bvn_dom_strdup(str, len);
 	n->val.str.len  = len;
 	if (!n->val.str.data) { bvn_dom_node_destroy(n); return NULL; }
+	return n;
+}
+static bvn_dom_node_t *make_bool(const char *str, uint32_t len,
+								 value_type_spec_t vt, value_unit_t vu)
+{
+	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_BOOL);
+	if (!n) return NULL;
+	n->value_type = vt;
+	n->value_unit = vu;
+	n->val.int_val = (str && ((len == 4 && memcmp(str, "true", 4) == 0) ||
+	                          (len == 2 && memcmp(str, "on", 2) == 0)))
+		? 1 : 0;
 	return n;
 }
 static bvn_dom_node_t *make_symbol(const char *str, uint32_t len,
@@ -489,6 +501,9 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		case token_is_string:
 		case token_is_array_string:
 			nd = make_string(str, len, vt, vu);
+			break;
+		case token_is_bool:
+			nd = make_bool(str, len, vt, vu);
 			break;
 		case token_is_symbol:
 			nd = make_symbol(str, len, vt, vu);

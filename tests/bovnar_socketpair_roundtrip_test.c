@@ -165,7 +165,8 @@ static bool capture_callback(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 		e->token = d->type;
 
 		e->vt = (ctx->pending_vt.family != vt_plain || d->type == token_is_string
-				 || d->type == token_is_null_value || d->type == token_is_symbol)
+				 || d->type == token_is_null_value || d->type == token_is_symbol
+				 || d->type == token_is_bool)
 			  ? d->value_type
 			  : ctx->pending_vt;
 
@@ -476,8 +477,8 @@ static void test_rt_scalars(void)
 	int i = 0;
 
 	verify_assignment(&ctx.entries[i++], "name",    "Alice", vt_utf8,   0,  "name");
-	verify_assignment(&ctx.entries[i++], "active",  "true",  vt_plain,  0,  "active");
-	verify_assignment(&ctx.entries[i++], "done",    "false", vt_plain,  0,  "done");
+	verify_assignment(&ctx.entries[i++], "active",  "true",  vt_bool,   0,  "active");
+	verify_assignment(&ctx.entries[i++], "done",    "false", vt_bool,   0,  "done");
 	verify_assignment(&ctx.entries[i++], "missing", NULL,    vt_plain,  0,  "missing");
 	verify_assignment(&ctx.entries[i++], "u8",      "255",   vt_uint,   8,  "u8");
 	verify_assignment(&ctx.entries[i++], "u16",     "65535", vt_uint,   16, "u16");
@@ -517,7 +518,7 @@ static void test_rt_structs(void)
 						 vt_uint, 16, "port");
 	verify_struct_begin (&ctx.entries[i++], "tls",     "tls struct begin");
 	verify_assignment   (&ctx.entries[i++], "enabled", "true",
-						 vt_plain, 0, "enabled");
+						 vt_bool, 0, "enabled");
 	verify_assignment   (&ctx.entries[i++], "cert",    "/etc/certs/server.pem",
 						 vt_utf8, 0, "cert");
 	verify_struct_end   (&ctx.entries[i++],            "tls struct end");

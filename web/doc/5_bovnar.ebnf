@@ -5,7 +5,8 @@
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
-(*  Updated: 2026-05-12 — add float_fix, float_dec, q~param          *)
+(*  Updated: 2026-05-29 — null/true/false/on/off keywords, bool       *)
+(*    type family, special numbers respelled $nan / $inf / $-inf      *)
 (* ================================================================== *)
 
 
@@ -49,6 +50,10 @@
 (*   (raw bytes only), then to on_verified (with value_type and       *)
 (*   value_unit filled in).  All other type-annotation events and     *)
 (*   ev_data are emitted to both callbacks simultaneously.            *)
+(*   For bool keywords (true/false/on/off) the same default type-     *)
+(*   annotation sequence is emitted, synthesising <bool> when no       *)
+(*   explicit annotation was given (no width/base/unit params).        *)
+(*                                                                    *)
 (*   ev_data is also emitted for null values, symbols, references,    *)
 (*   and octet-stream chunks without a preceding type-annotation       *)
 (*   sequence. Struct values do NOT produce ev_data; they are          *)
@@ -136,6 +141,7 @@ id-body-char = "+" | "-"
 value        = [type-annotation , ws] , raw-value ;
 
 raw-value    = null-value
+             | bool-value
              | ( number | special-number | string ) , [ ws-mandatory , inline-unit ]
              | symbol
              | reference
@@ -143,11 +149,26 @@ raw-value    = null-value
              | struct
              | octet-stream ;
 
-(* null-value: the empty production.                                  *)
-(* At assignment level:  ".foo = ;" – no token between "=" and ";".  *)
+(* null-value: either the reserved keyword "null" or the empty        *)
+(* production.                                                        *)
+(* At assignment level:  ".foo = ;" and ".foo = null;" are equivalent. *)
 (* In array context: a leading or trailing comma, two consecutive     *)
-(* commas, or a type annotation immediately followed by "," / "]".   *)
-null-value   = (* empty *) ;
+(* commas, a bare "null", or a type annotation immediately followed   *)
+(* by "," / "]" all denote a null element.                            *)
+null-value   = "null" | (* empty *) ;
+
+(* bool-value: a reserved keyword in value position.  "on" is an      *)
+(* alias for "true" and "off" for "false"; the validator collapses    *)
+(* all four spellings to a vt_bool value (canonical text "true" /     *)
+(* "false") and synthesises a <bool> type annotation when none is     *)
+(* given (see §4).  An explicit <bool> annotation accepts only these  *)
+(* keywords as its value.                                             *)
+(*                                                                    *)
+(* Lexically these keywords — together with "null" — are ordinary     *)
+(* symbol tokens (§7); the validator reserves the exact words and     *)
+(* reclassifies them.  A longer word that merely starts with one      *)
+(* (e.g. "truthy", "nullable") remains a plain symbol.                *)
+bool-value   = "true" | "false" | "on" | "off" ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -169,6 +190,7 @@ null-value   = (* empty *) ;
 (*   floats (has "." or "e"/"E") → <float:64,_10,no_unit>            *)
 (*   negative integers           → <sint:64,_10,no_unit>             *)
 (*   plain integers              → <uint:64,_10,no_unit>             *)
+(*   bool keywords (true/false/on/off) → <bool>                      *)
 (* The full type-annotation event sequence is always emitted for      *)
 (* number and string values, whether annotated explicitly or not.     *)
 
@@ -191,7 +213,10 @@ type-spec    = param-type ;
 (* "_dec" are accumulated via copy_type_byte.  The final string        *)
 (* ("float", "float_fix", or "float_dec") is dispatched in           *)
 (* bvn_parse_type_annotation.                                         *)
-param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8")
+(* "bool" is a parameterless family: any width, base, q, or unit      *)
+(* parameter is error_illegal_value_type.  Its only valid values are  *)
+(* the bool keywords (see bool-value, §3).                            *)
+param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8" | "bool")
              , [ws , ":" , ws , type-param-list] ;
 
 (* The parameter list is accumulated byte-by-byte into type_data by   *)
@@ -332,11 +357,15 @@ dot-led      = "." , DIGIT , {DIGIT} ;
 
 dec-exponent = ("e" | "E") , ["+" | "-"] , DIGIT , {DIGIT} ;
 
-(* Special IEEE-754 values: both "$" delimiters are mandatory.        *)
-(* sp_nan3 / sp_inf8 / sp_neg9 require "$" as the next byte; any     *)
-(* other byte is a hard error.  The stored token text is the bare     *)
-(* keyword without delimiters: "nan", "infinity", "-infinity".        *)
-special-number = "$" , ("nan" | "infinity" | "-infinity") , "$" ;
+(* Special IEEE-754 values: a leading "$" sigil introduces the        *)
+(* keyword; there is NO trailing delimiter.  The keyword is complete  *)
+(* after its final letter and is then terminated like any number      *)
+(* (whitespace, ",", ";", "]", "#", or — after whitespace — an        *)
+(* inline unit).  A non-terminator byte after the keyword (e.g.       *)
+(* "$infinity", "$nans") is error_unexpected_input_byte, so the three *)
+(* spellings are effectively reserved.  The stored token text is the  *)
+(* keyword without the sigil: "nan", "inf", "-inf".                   *)
+special-number = "$" , ("nan" | "inf" | "-inf") ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -389,14 +418,14 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 (* Examples:                                                           *)
 (*   .a = 9.81 m/s;          (* space separator *)                    *)
 (*   .b = <float:64> 1.5 k~m; (* with type annotation *)             *)
-(*   .c = $nan$ s;            (* special-number with unit *)           *)
+(*   .c = $nan s;             (* special-number with unit *)           *)
 (*   .d = 1.5e3 k~J;          (* number with exponent *)              *)
 (*   .e = "FF" m;             (* string literal with unit *)          *)
 (*                                                                     *)
 (* State-machine flow:                                                 *)
 (*   1. Whitespace from a number-body state fires ACT_to_number_outro *)
-(*      → number_outro.  Special numbers ($nan$, $infinity$,          *)
-(*      $-infinity$) enter number_outro_nosp directly; both states    *)
+(*      → number_outro.  Special numbers ($nan, $inf, $-inf)          *)
+(*      enter number_outro_nosp directly; both states                 *)
 (*      require subsequent whitespace before a unit can begin.        *)
 (*      Strings enter string_outro_nosp after the closing "";        *)
 (*      whitespace transitions to string_outro.                       *)
@@ -434,6 +463,11 @@ inline-unit-char  = ALPHA | DIGIT | "_" | "+" | "-" | "." | "/" | ":" | "^" | "*
 (*   "," / "]" / ";" terminate the symbol cleanly (not errors)       *)
 (*   "." is a hard error (same as in identifier body)                *)
 
+(* Reserved keywords: a symbol token whose text is exactly "null",   *)
+(* "true", "false", "on", or "off" is reclassified by the validator   *)
+(* (see null-value / bool-value, §3) and is NOT delivered as a symbol.*)
+(* Any other bare word — including one that merely begins with a      *)
+(* keyword, like "ontology" or "nullish" — remains a symbol.          *)
 symbol        = id-start , {sym-body-char} ;
 
 (* sym-body-char spans the same byte range as id-body-char; the       *)
@@ -615,10 +649,13 @@ byte         = (* any single byte 0x00–0xFF *) ;
      those tokens.  0xC2 is accepted inside quoted strings and in type
      parameter bodies (copy_type_byte / type_body_outro).
 
-  d) Special-number delimiters
-     Both the leading and trailing "$" are mandatory.  sp_nan3 /
-     sp_inf8 / sp_neg9 require "$" as the next byte; any other byte is
-     a hard error.
+  d) Special-number sigil
+     A single leading "$" introduces the keyword; there is no trailing
+     "$".  The keyword (nan / inf / -inf) ends at its final letter and
+     must be followed by a value terminator (whitespace, "," ";" "]"
+     "#", or — after whitespace — an inline unit).  Any other following
+     byte is error_unexpected_input_byte, which reserves the three
+     spellings (e.g. "$infinity" and "$nans" are hard errors).
 
   e) String concatenation
      Adjacent string literals with only whitespace/comments between
@@ -711,7 +748,7 @@ byte         = (* any single byte 0x00–0xFF *) ;
        1. Whitespace from number-body states (zero_intro, copy_number_byte,
           fraction_intro, copy_fraction_byte, copy_exp_byte) fires
           ACT_to_number_outro → number_outro.  Special numbers
-          ($nan$, $infinity$, $-infinity$) enter number_outro_nosp
+          ($nan, $inf, $-inf) enter number_outro_nosp
           directly; a further whitespace character transitions to
           number_outro.  Strings enter string_outro_nosp after the
           closing quote; whitespace transitions to string_outro.

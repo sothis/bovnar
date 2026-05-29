@@ -301,6 +301,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_dom_get_float.restype  = c_bool
     lib.bvn_dom_get_float.argtypes = [c_void_p, P(c_double)]
 
+    lib.bvn_dom_get_bool.restype  = c_bool
+    lib.bvn_dom_get_bool.argtypes = [c_void_p, P(c_bool)]
+
     lib.bvn_dom_get_string.restype  = c_bool
     lib.bvn_dom_get_string.argtypes = [c_void_p, P(c_void_p), P(c_uint32)]
 

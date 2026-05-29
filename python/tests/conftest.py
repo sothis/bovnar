@@ -92,9 +92,9 @@ def null_typed():
 @pytest.fixture
 def special_floats():
     return (
-        b".not_a_number = $nan$;\n"
-        b".pos_inf = $infinity$;\n"
-        b".neg_inf = $-infinity$;\n"
+        b".not_a_number = $nan;\n"
+        b".pos_inf = $inf;\n"
+        b".neg_inf = $-inf;\n"
     )
 
 @pytest.fixture

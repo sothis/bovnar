@@ -2346,20 +2346,19 @@ static void test_rb3_special_number_respects_max_number_length(void)
 
 	/*
 	 * bvn_special_keyword_outro wrote special-value keywords ("nan",
-	 * "infinity", "-infinity") directly into str_data without
-	 * consulting max_number_length.  A caller that configured a tight
-	 * limit to bound processing cost would silently receive tokens that
-	 * exceeded it.
+	 * "inf", "-inf") directly into str_data without consulting
+	 * max_number_length.  A caller that configured a tight limit to bound
+	 * processing cost would silently receive tokens that exceeded it.
 	 *
 	 * After fix: the limit is checked before the write; a violation
 	 * returns error_number_too_long just like an overlong regular number.
 	 *
-	 * Bovnar special-number syntax uses $ delimiters: $nan$, $infinity$,
-	 * $-infinity$.  The stored token string is the inner keyword text
-	 * ("nan" = 3 bytes, "infinity" = 8 bytes, "-infinity" = 9 bytes).
+	 * Bovnar special-number syntax uses a leading $ sigil: $nan, $inf,
+	 * $-inf.  The stored token string is the keyword text without the
+	 * sigil ("nan" = 3 bytes, "inf" = 3 bytes, "-inf" = 4 bytes).
 	 *
-	 * max_number_length = 3 allows "nan" (3 bytes, exactly at limit)
-	 * but rejects "infinity" (8) and "-infinity" (9).
+	 * max_number_length = 3 allows "nan" and "inf" (3 bytes, exactly at
+	 * limit) but rejects "-inf" (4).
 	 */
 	capture_t ctx = {0};
 	bvnr_read_flags_t f = {
@@ -2370,26 +2369,31 @@ static void test_rb3_special_number_respects_max_number_length(void)
 	};
 	bvnr_reader_t *r = NULL;
 
-	/* "$nan$" (3-char keyword) must succeed under limit=3 */
+	/* "$nan" (3-char keyword) must succeed under limit=3 */
 	ctx = (capture_t){0};
-	ASSERT_TRUE(do_parse_str(".x = $nan$;\n", &f, &r),
-				"rb3: '$nan$' (3-char keyword) with limit=3 must succeed");
+	ASSERT_TRUE(do_parse_str(".x = $nan;\n", &f, &r),
+				"rb3: '$nan' (3-char keyword) with limit=3 must succeed");
 	bvnr_reader_destroy(r); r = NULL;
 
-	/* "$infinity$" (8-char keyword) must fail under limit=3 */
+	/* "$inf" (3-char keyword) must succeed under limit=3 */
 	ctx = (capture_t){0};
-	ASSERT_FALSE(do_parse_str(".x = $infinity$;\n", &f, &r),
-				 "rb3: '$infinity$' (8-char keyword) with limit=3 must fail");
-	ASSERT_EQ_INT(bvnr_reader_get_error(r), error_number_too_long,
-				  "rb3: error must be error_number_too_long for '$infinity$'");
+	ASSERT_TRUE(do_parse_str(".x = $inf;\n", &f, &r),
+				"rb3: '$inf' (3-char keyword) with limit=3 must succeed");
 	bvnr_reader_destroy(r); r = NULL;
 
-	/* "$-infinity$" (9-char keyword) must fail under limit=3 */
+	/* "$-inf" (4-char keyword) must fail under limit=3 */
 	ctx = (capture_t){0};
-	ASSERT_FALSE(do_parse_str(".x = $-infinity$;\n", &f, &r),
-				 "rb3: '$-infinity$' (9-char keyword) with limit=3 must fail");
+	ASSERT_FALSE(do_parse_str(".x = $-inf;\n", &f, &r),
+				 "rb3: '$-inf' (4-char keyword) with limit=3 must fail");
 	ASSERT_EQ_INT(bvnr_reader_get_error(r), error_number_too_long,
-				  "rb3: error must be error_number_too_long for '$-infinity$'");
+				  "rb3: error must be error_number_too_long for '$-inf'");
+	bvnr_reader_destroy(r); r = NULL;
+
+	/* "$-inf" (4-char keyword) must succeed under limit=4 */
+	f.max_number_length = 4;
+	ctx = (capture_t){0};
+	ASSERT_TRUE(do_parse_str(".x = $-inf;\n", &f, &r),
+				"rb3: '$-inf' (4-char keyword) with limit=4 must succeed");
 	bvnr_reader_destroy(r);
 }
 

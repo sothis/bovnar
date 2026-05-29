@@ -17,6 +17,7 @@ class DomType(IntEnum):
     STRUCT       = 6
     ARRAY        = 7
     OCTET_STREAM = 8
+    BOOL         = 9
 
 class DomNode:
     """
@@ -118,6 +119,13 @@ class DomNode:
         if not lib.bvn_dom_get_float(self._ptr, ctypes.byref(out)):
             raise ValueError("Node is not a float")
         return float(out.value)
+
+    def as_bool(self) -> bool:
+        lib = get_library()
+        out = ctypes.c_bool()
+        if not lib.bvn_dom_get_bool(self._ptr, ctypes.byref(out)):
+            raise ValueError("Node is not a bool")
+        return bool(out.value)
 
     def as_str(self) -> str:
         """Return string, symbol, or reference value as Python str."""
@@ -257,6 +265,8 @@ class DomNode:
             return int(self.as_int_str(10))
         if dt == DomType.FLOAT:
             return self.as_float()
+        if dt == DomType.BOOL:
+            return self.as_bool()
         if dt in (DomType.STRING, DomType.SYMBOL, DomType.REFERENCE):
             return self.as_str()
         if dt == DomType.OCTET_STREAM:

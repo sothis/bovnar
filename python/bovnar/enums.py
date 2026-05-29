@@ -29,7 +29,8 @@ class ValueTypeFamily(IntEnum):
     FLOAT       = 4
     FLOAT_FIX   = 5
     FLOAT_DEC   = 6
-    ILLEGAL     = 7
+    BOOL        = 7
+    ILLEGAL     = 8
 
 
 class PrefixSystem(IntEnum):

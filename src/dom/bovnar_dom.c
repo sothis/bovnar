@@ -226,6 +226,12 @@ bool bvn_dom_is_null(const bvn_dom_node_t *node)
 {
 	return node && node->type == BVN_DOM_NULL;
 }
+bool bvn_dom_get_bool(const bvn_dom_node_t *node, bool *out)
+{
+	if (!node || !out || node->type != BVN_DOM_BOOL) return false;
+	*out = node->val.int_val != 0;
+	return true;
+}
 bool bvn_dom_get_float(const bvn_dom_node_t *node, double *out)
 {
 	if (!node || !out) return false;

@@ -39,6 +39,7 @@ hi BovnarTypeUnitExp  ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarTypePrefix   ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarOctetData    ctermfg=102 guifg=#6272a4 gui=italic
 hi BovnarNull         ctermfg=240 guifg=#4c5661 gui=italic
+hi BovnarBoolean      ctermfg=170 guifg=#c084fc gui=bold
 
 " 8 cycling colors for { } depth — levels 1,9,17,… share color 1; 2,10,18,… color 2; etc.
 hi BovnarStructDelim1 ctermfg=209 guifg=#da844c gui=none
@@ -51,7 +52,9 @@ hi BovnarStructDelim7 ctermfg=220 guifg=#f0c64e gui=none
 hi BovnarStructDelim8 ctermfg=39  guifg=#67d1f4 gui=none
 
 syn match   BovnarOctetData    '\\x[0-9A-Fa-f]\{2\}'
-syn match   BovnarSpecialFloat '\$\(nan\|-infinity\|infinity\)\$'
+" $nan  $inf  $-inf — single leading sigil, no trailing $; \> rejects a
+" trailing identifier byte so $infinity (an error) is not matched.
+syn match   BovnarSpecialFloat '\$\(nan\|-inf\|inf\)\>'
 
 syn region  BovnarComment start=/#/ end=/$/
 
@@ -94,6 +97,11 @@ syn region  BovnarTypeAnn
 
 syn match   BovnarUnitTilde /\~/
 syn match   BovnarSymbol    '\<[A-Za-z_][A-Za-z0-9_+\-]*\>'
+" Reserved value keywords — defined after BovnarSymbol so they win the tie and
+" are coloured as keywords, not symbols. on==true, off==false; null is a null.
+syn match   BovnarBoolean   '\<\(true\|false\|on\|off\)\>'
+syn match   BovnarNullKw    '\<null\>'
+hi link     BovnarNullKw    BovnarNull
 syn match   BovnarTypeUnit  '\<[A-Za-zµΩ°][A-Za-z0-9_·\-\+\/\^]*\>'
 syn match   BovnarTypeUnit  '[%‰‱]'
 syn match   BovnarUnitPrefix '[A-Za-zµ][A-Za-z0-9]*\~[A-Za-z0-9_·\-\+\/*\^]*'
@@ -101,7 +109,7 @@ syn match   BovnarUnitSep   '[*\/]'
 syn match   BovnarUnitExp   '[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]'
 syn match   BovnarUnitExp   '\^[+-]\=\d\+'
 
-syn match   BovnarType     '\v(float_fix|float_dec|float|uint|sint|utf8)'
+syn match   BovnarType     '\v(float_fix|float_dec|float|uint|sint|utf8|bool)'
 syn match   BovnarNoUnit   'no_unit'
 syn match   BovnarTypeDelim '[<>]' contained
 syn match   BovnarTypeSep  ':' contained
@@ -125,7 +133,8 @@ syn cluster BovnarContent contains=
       \ BovnarSemicolon,BovnarAssign,BovnarTypeAnn,
       \ BovnarNegative,BovnarFloat,BovnarInteger,
       \ BovnarString,BovnarEscape,BovnarInvalidEsc,
-      \ BovnarSymbol,BovnarRefOp,BovnarRefPath,
+      \ BovnarSymbol,BovnarBoolean,BovnarNullKw,
+      \ BovnarRefOp,BovnarRefPath,
       \ BovnarArraySep,BovnarRowSep,
       \ BovnarNull,BovnarSpecialFloat,BovnarOctetData,
       \ BovnarUnitTilde,BovnarUnitSep,BovnarUnitExp,

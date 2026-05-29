@@ -60,11 +60,8 @@ bool bvn_is_special_number_string(const char* s)
 	if (c == 'n')
 		return s[1] == 'a' && s[2] == 'n' && s[3] == '\0';
 	if (c == 'i')
-		return s[1] == 'n' && s[2] == 'f' && s[3] == 'i' && s[4] == 'n'
-		    && s[5] == 'i' && s[6] == 't' && s[7] == 'y' && s[8] == '\0';
-	return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == 'i'
-	    && s[5] == 'n' && s[6] == 'i' && s[7] == 't' && s[8] == 'y'
-	    && s[9] == '\0';
+		return s[1] == 'n' && s[2] == 'f' && s[3] == '\0';
+	return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == '\0';
 }
 bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 {
@@ -1901,6 +1898,8 @@ value_type_spec_t bvn_parse_type_annotation(
 		r.family = vt_uint; pos += 4;
 	} else if (pos + 4 <= len && memcmp(str + pos, "utf8", 4) == 0) {
 		r.family = vt_utf8; pos += 4;
+	} else if (pos + 4 <= len && memcmp(str + pos, "bool", 4) == 0) {
+		r.family = vt_bool; pos += 4;
 	} else if (pos + 4 <= len && memcmp(str + pos, "sint", 4) == 0) {
 		r.family = vt_sint; pos += 4;
 	} else {
@@ -2044,6 +2043,12 @@ value_type_spec_t bvn_parse_type_annotation(
 	if (r.family == vt_float_fix) {
 		uint32_t eff_w = r.width ? r.width : 64u;
 		if (r.base >= eff_w) {
+			*type_ok = false;
+			return r;
+		}
+	}
+	if (r.family == vt_bool) {
+		if (r.width != 0u || r.base != 0u || *unit_buf_len != 0u) {
 			*type_ok = false;
 			return r;
 		}

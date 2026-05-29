@@ -28,6 +28,7 @@ typedef enum state_e {
 	tf_ut, tf_utf,
 	tf_s, tf_si, tf_sin,
 	tf_f, tf_fl, tf_flo, tf_floa,
+	tf_b, tf_bo, tf_boo,
 	value_intro,
 		array_intro,
 		new_array_value,
@@ -44,11 +45,9 @@ typedef enum state_e {
 		exp_sign_intro,
 		copy_exp_byte,
 		sp_start,
-		sp_nan1, sp_nan2, sp_nan3,
-		sp_inf1, sp_inf2, sp_inf3, sp_inf4,
-		sp_inf5, sp_inf6, sp_inf7, sp_inf8,
-		sp_neg1, sp_neg2, sp_neg3, sp_neg4,
-		sp_neg5, sp_neg6, sp_neg7, sp_neg8, sp_neg9,
+		sp_nan1, sp_nan2,
+		sp_inf1, sp_inf2,
+		sp_neg1, sp_neg2, sp_neg3,
 	symbol_intro,
 	symbol_body,
 	symbol_outro,
@@ -112,10 +111,12 @@ enum action_id {
 	ACT_tf_to_f,
 	ACT_tf_u_to_ui,
 	ACT_tf_u_to_ut,
+	ACT_tf_to_b,
 	ACT_tf_uint_done,
 	ACT_tf_sint_done,
 	ACT_tf_float_done,
 	ACT_tf_utf8_done,
+	ACT_tf_bool_done,
 	ACT_array_intro,
 	ACT_array_outro,
 	ACT_new_array_value,
@@ -270,6 +271,7 @@ bool bvn_action_tf_uint_done              (bvnr_reader_t* p);
 bool bvn_action_tf_sint_done              (bvnr_reader_t* p);
 bool bvn_action_tf_float_done             (bvnr_reader_t* p);
 bool bvn_action_tf_utf8_done              (bvnr_reader_t* p);
+bool bvn_action_tf_bool_done              (bvnr_reader_t* p);
 bool bvn_action_array_intro               (bvnr_reader_t* p);
 bool bvn_action_array_outro               (bvnr_reader_t* p);
 bool bvn_action_new_array_value           (bvnr_reader_t* p);

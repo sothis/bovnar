@@ -344,6 +344,10 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 				error_illegal_value_type);
 		}
 	}
+	if (vt.family == vt_bool) {
+		if (vt.width != 0 || vt.base != 0)
+			return bvn_writer_set_error(w, error_illegal_value_type);
+	}
 	return true;
 }
 static bool bvn_check_type_value_compat(bvnr_writer_t* w,
@@ -353,6 +357,13 @@ static bool bvn_check_type_value_compat(bvnr_writer_t* w,
 		return true;
 	if (vt.family == vt_utf8) {
 		if (tt != token_is_string && tt != token_is_array_string) {
+			return bvn_writer_set_error(w,
+				error_type_value_mismatch);
+		}
+		return true;
+	}
+	if (vt.family == vt_bool) {
+		if (tt != token_is_bool) {
 			return bvn_writer_set_error(w,
 				error_type_value_mismatch);
 		}
@@ -420,6 +431,17 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 						data->data, data->length, vt))
 					return false;
 			}
+		} else if (tt == token_is_bool) {
+			const char* bs = (const char*)data->data;
+			uint32_t    bn = data->length;
+			bool ok = bs && (
+				(bn == 4 && memcmp(bs, "true",  4) == 0) ||
+				(bn == 5 && memcmp(bs, "false", 5) == 0) ||
+				(bn == 2 && memcmp(bs, "on",    2) == 0) ||
+				(bn == 3 && memcmp(bs, "off",   3) == 0));
+			if (!ok)
+				return bvn_writer_set_error(w,
+					error_type_value_mismatch);
 		} else if (tt == token_is_symbol) {
 			if (!bvn_validate_symbol_for_writer(w,
 					data->data, data->length))
@@ -566,6 +588,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		case vt_float_fix: fname = "float_fix"; break;
 		case vt_float_dec: fname = "float_dec"; break;
 		case vt_utf8:      fname = "utf8";      break;
+		case vt_bool:      fname = "bool";      break;
 		default:           fname = "plain";     break;
 		}
 		if (!bvn_ser_push_str(s, fname))
@@ -706,8 +729,6 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 						return false;
 					if (!bvn_ser_push(s, d->data, d->length))
 						return false;
-					if (!bvn_ser_push_byte(s, '$'))
-						return false;
 				} else {
 					if (!bvn_ser_push(s, d->data, d->length))
 						return false;
@@ -717,6 +738,13 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				   d->type == token_is_array_string) {
 			if (!bvn_ser_serialize_string(s,
 					(const uint8_t*)d->data, d->length))
+				return false;
+		} else if (d->type == token_is_bool) {
+			const char* bs = (const char*)d->data;
+			uint32_t    bn = d->length;
+			bool tv = bs && ((bn == 4 && memcmp(bs, "true", 4) == 0) ||
+			                 (bn == 2 && memcmp(bs, "on", 2) == 0));
+			if (!bvn_ser_push_str(s, tv ? "true" : "false"))
 				return false;
 		} else if (d->type == token_is_symbol) {
 			if (d->data && d->length) {

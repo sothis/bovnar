@@ -62,12 +62,14 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 | Type annotation | `<family:width,unit>` before value | `<uint:32,k~m> 1000` |
 | Integer | `[-]digits` | `42`, `-7` |
 | Float | `[-]digits[.digits][e[±]digits]` | `3.14`, `1e-6` |
-| Special float | `$nan$` `$infinity$` `$-infinity$` | `.x = $nan$;` |
+| Special float | `$nan` `$inf` `$-inf` | `.x = $nan;` |
+| Boolean | `true` `false` `on` `off` (`<bool>`) | `.b = on;` |
 | String | `"…"` with C-style escapes | `"hello\nworld"` |
-| Symbol | bare identifier (no quotes) | `true`, `Monday` |
+| Symbol | bare identifier (no quotes) | `ok`, `Monday` |
 | Reference | `&.path.to.key` | `&.config.host` |
 | Array | `[ … ]` rows separated by `/` | `[1,2]/[3,4]` |
 | Struct | `{ .key = val; … }` | `{.x = 1; .y = 2;}` |
+| Null | empty slot or `null` keyword | `.x = ;`, `.x = null;` |
 | Octet stream | `\x00 … binary … \x00` | raw bytes |
 
 ---

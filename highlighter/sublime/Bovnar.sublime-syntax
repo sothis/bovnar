@@ -47,6 +47,7 @@ contexts:
     - include: number
     - include: string
     - include: inline_unit
+    - include: keyword
     - include: symbol
     - include: reference
     - include: array1
@@ -160,7 +161,7 @@ contexts:
           scope: punctuation.definition.type.end.bovnar
           pop: true
         - include: comment
-        - match: '\b(float_fix|float_dec|float|uint|sint|utf8)\b'
+        - match: '\b(float_fix|float_dec|float|uint|sint|utf8|bool)\b'
           scope: storage.type.family.bovnar
         - match: '\bno_unit\b'
           scope: support.constant.no-unit.bovnar
@@ -183,14 +184,26 @@ contexts:
     - include: number
     - include: string
     - include: inline_unit
+    - include: keyword
     - include: symbol
     - include: reference
     - include: array1
     - include: struct1
 
   special_number:
-    - match: '\$(?:nan|-infinity|infinity)\$'
+    # $nan  $inf  $-inf — a single leading $ sigil, no trailing $. The keyword
+    # ends like a number; a trailing identifier byte (e.g. $infinity) is an error.
+    - match: '\$(?:nan|-inf|inf)(?![A-Za-z0-9_])'
       scope: constant.language.special-float.bovnar
+
+  # Reserved value-position keywords. true/false/on/off carry the bool type
+  # family (on==true, off==false); null is the null value. The validator
+  # reclassifies these out of the symbol space, so they precede `symbol`.
+  keyword:
+    - match: '\b(?:true|false|on|off)\b'
+      scope: constant.language.boolean.bovnar
+    - match: '\bnull\b'
+      scope: constant.language.null.bovnar
 
   number:
     # Leading-dot float:  .5  -.5  .7e+3
@@ -218,8 +231,10 @@ contexts:
           scope: invalid.illegal.escape.bovnar
 
   # Inline unit suffix: mandatory whitespace separates the scalar from the unit.
+  # The lookbehind fires after a digit, a closing string quote, or the tail of a
+  # special-number keyword ($nan/$inf/$-inf) — variable-length alternation (Oniguruma).
   inline_unit:
-    - match: '(?<=[\d$"])(\s+)([A-Za-z_%‰‱µ°Å][A-Za-z0-9_+~\.\-/:\^\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
+    - match: '(?<=[\d"]|\$nan|\$inf|\$-inf)(\s+)([A-Za-z_%‰‱µ°Å][A-Za-z0-9_+~\.\-/:\^\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
       captures:
         1: punctuation.separator.inline-unit.bovnar
         2: support.type.unit.inline.bovnar
@@ -243,6 +258,7 @@ contexts:
     - include: special_number
     - include: number
     - include: string
+    - include: keyword
     - include: symbol
     - include: reference
     - match: ','

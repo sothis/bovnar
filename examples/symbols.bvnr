@@ -22,13 +22,14 @@
 .month    = January;        # mixed case
 
 
-# ── 2. Boolean-like symbols ───────────────────────────────────────────────────
-# BVNR has no native boolean type; true/false are parsed as symbols.
+# ── 2. Booleans vs. boolean-like symbols ──────────────────────────────────────
+# true/false/on/off are reserved keywords carrying the <bool> type family;
+# they are NOT symbols.  Other truthy/falsy words remain ordinary symbols.
 
-.debug    = false;          # symbol "false"
-.verbose  = true;           # symbol "true"
-.enabled  = yes;            # alternative truthy symbol
-.disabled = no;             # alternative falsy symbol
+.debug    = false;          # bool value (on==true, off==false)
+.verbose  = true;           # bool value
+.enabled  = yes;            # symbol "yes" — not a reserved keyword
+.disabled = no;             # symbol "no"  — not a reserved keyword
 
 
 # ── 3. Enumeration values ─────────────────────────────────────────────────────

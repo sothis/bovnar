@@ -21,11 +21,11 @@
 
 
 # ── 2. Special number literals ────────────────────────────────────────────────
-# $nan$, $infinity$, $-infinity$ — both $ delimiters are mandatory.
+# $nan, $inf, $-inf — a leading $ sigil introduces the keyword.
 
-.not_a_number    = $nan$;       # IEEE 754 NaN
-.pos_infinity    = $infinity$;  # +∞
-.neg_infinity    = $-infinity$; # -∞
+.not_a_number    = $nan;   # IEEE 754 NaN
+.pos_infinity    = $inf;   # +∞
+.neg_infinity    = $-inf;  # -∞
 
 
 # ── 3. Explicit binary float — all valid widths ───────────────────────────────
@@ -53,10 +53,10 @@
 
 # ── 5. Binary float — special values with explicit type ──────────────────────
 
-.nan32   = <float:32>  $nan$;
-.nan64   = <float:64>  $nan$;
-.inf32   = <float:32>  $infinity$;
-.neginf64 = <float:64> $-infinity$;
+.nan32   = <float:32>  $nan;
+.nan64   = <float:64>  $nan;
+.inf32   = <float:32>  $inf;
+.neginf64 = <float:64> $-inf;
 
 
 # ── 6. Binary float with SI units ────────────────────────────────────────────
@@ -126,8 +126,8 @@
 .dec128     = <float_dec:128>  1.23456789012345678901234567890123456789; # 34 digits
 .dec256     = <float_dec:256>  1.23456789012345678901234567890123456789012345678901234567890; # 70 digits
 
-.dec_nan    = <float_dec:64>   $nan$;        # special values are valid for float_dec
-.dec_inf    = <float_dec:64>   $infinity$;
+.dec_nan    = <float_dec:64>   $nan;        # special values are valid for float_dec
+.dec_inf    = <float_dec:64>   $inf;
 
 .dec_unit   = <float_dec:64,Pa>  101325;     # with SI unit: pascals
 

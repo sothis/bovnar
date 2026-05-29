@@ -82,19 +82,20 @@ This would fail:
 
 ## Value Tokens: What Can Appear After `=`
 
-There are nine categories of raw values:
+There are ten categories of raw values:
 
 | Category | Example |
 |---|---|
 | Integer literal | `42`, `-7`, `"FF"` (base-16, quoted) |
 | Float literal | `3.14`, `1e6`, `-.5` |
-| Special number | `$nan$`, `$infinity$`, `$-infinity$` |
+| Special number | `$nan`, `$inf`, `$-inf` |
+| Boolean | `true`, `false`, `on`, `off` |
 | Quoted string | `"hello world"` |
-| Symbol (bare word) | `true`, `ok`, `Monday` |
+| Symbol (bare word) | `ok`, `Monday`, `read_only` |
 | Reference | `&.other.key` |
 | Array | `[1, 2, 3]` |
 | Struct | `{.x = 1; .y = 2;}` |
-| Null | `;` (empty slot between `=` and `;`) |
+| Null | `;` (empty) or the `null` keyword |
 
 Each is covered in depth below, starting with numbers because that is where Bovnar's type system is most visible.
 
@@ -136,7 +137,7 @@ Placing the annotation anywhere else is a hard error:
 
 ### Type Families
 
-There are six type families:
+There are seven type families:
 
 | Keyword | Description |
 |---|---|
@@ -146,6 +147,7 @@ There are six type families:
 | `float_fix` | Q-format signed fixed-point |
 | `float_dec` | IEEE 754-2008 decimal floating-point |
 | `utf8` | UTF-8 string |
+| `bool` | Boolean (`true`/`false`); takes no parameters |
 
 ### Parameters
 
@@ -206,15 +208,15 @@ Signed values use a minus prefix inside the string:
 
 #### Special Number Literals
 
-Three special values bypass normal numeric parsing. Both dollar signs are mandatory:
+Three special values bypass normal numeric parsing. A single leading `$` sigil introduces the keyword — there is no trailing `$`, and the keyword ends like any number (at whitespace, `,`, `;`, `]`, a comment, or — after whitespace — an inline unit):
 
 ```bovnar
-.nan = $nan$;
-.inf = $infinity$;
-.neg = $-infinity$;
+.nan = $nan;
+.inf = $inf;
+.neg = $-inf;
 ```
 
-These may be combined with any float type annotation and are valid in untyped context too.
+The three spellings are reserved: a stray byte after the keyword (e.g. `$infinity`, `$nans`) is a hard error. They may be combined with any float type annotation and are valid in untyped context too.
 
 ---
 
@@ -424,24 +426,37 @@ A symbol is a bare word in value position — no quotes. It is its own token typ
 .status  = ok;
 .mode    = read_only;
 .day     = Monday;
-.enabled = true;       # 'true' is a symbol, not a boolean keyword
-.flag    = false;      # same — a symbol named "false"
 ```
-
-Bovnar has no native boolean type. The convention of using `true` and `false` symbols is universally understood, but the format leaves interpretation to the application layer.
 
 Symbol bodies follow the same character rules as identifier bodies: letters, digits, `+`, `-`, `_`, and valid UTF-8 high bytes. The key distinction from an identifier is context: identifiers appear as keys (after the opening dot), symbols appear as values.
 
 Inside an array, `]` and `,` terminate a symbol. At assignment level, `;` terminates it.
 
+Five bare words are **reserved keywords** and are *not* symbols: `null`, `true`, `false`, `on`, and `off` (see below). A longer word that merely starts with one — `ontology`, `nullable`, `truthy` — is still an ordinary symbol.
+
+---
+
+## Booleans
+
+`true`, `false`, `on`, and `off` are reserved keywords carrying the `bool` type family. `on` is an alias for `true` and `off` for `false`; all four collapse to a boolean value and serialize canonically as `true` / `false`:
+
+```bovnar
+.enabled = true;
+.debug   = off;          # same value as false
+.typed   = <bool> on;    # explicit annotation; on == true
+```
+
+A bare boolean synthesises a `<bool>` annotation automatically. The `<bool>` family takes no parameters (`<bool:8>` is a hard error), and only the four keywords are valid `<bool>` values.
+
 ---
 
 ## Null Values
 
-A null is the explicit absence of a value. It appears as an empty slot — nothing between `=` and `;`, or extra commas inside an array:
+A null is the explicit absence of a value. It appears as an empty slot — nothing between `=` and `;` — or, equivalently, the reserved keyword `null`; extra commas inside an array also produce nulls:
 
 ```bovnar
 .nothing    = ;              # null, no type
+.also_null  = null;          # the null keyword — same as the empty slot
 .typed_null = <uint:32> ;    # null with an explicit type annotation
 ```
 
@@ -867,6 +882,7 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 <float_fix:32,q16>     # Q-format fixed-point, 32-bit, 16 fractional bits
 <float_dec:64>         # IEEE 754-2008 decimal, 64-bit
 <utf8>                 # UTF-8 string
+<bool>                 # boolean (true/false); no parameters
 
 # ── Units ──────────────────────────────────────────────────────────
 <float:64,s>           # seconds
@@ -878,7 +894,11 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 <float:64,no_unit>     # explicitly dimensionless
 
 # ── Special values ─────────────────────────────────────────────────
-$nan$  $infinity$  $-infinity$
+$nan  $inf  $-inf
+
+# ── Booleans and null (reserved keywords) ──────────────────────────
+.b = true;   .b = false;   .b = on;   .b = off;   # on==true, off==false
+.n = null;   .n = ;                                # null keyword == empty
 
 # ── Inline unit suffix (scalar context only) ───────────────────────
 .x = 9.81 m/s;

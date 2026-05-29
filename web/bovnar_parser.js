@@ -118,12 +118,12 @@
       return s;
     }
 
-    /* Read $nan$, $infinity$, $-infinity$ — cur is '$'. */
+    /* Read $nan, $inf, $-inf — cur is '$'.  A single leading sigil; the
+       keyword ends like a number (no trailing '$'). */
     function readSpecialNumber() {
-      advance(); // skip opening $
+      advance(); // skip the '$' sigil
       let kw = '';
-      while (!eof() && cur() !== '$') { kw += cur(); advance(); }
-      if (!eof()) advance(); // skip closing $
+      while (!eof() && !/[ \t\r\n;,\[\]{}#]/.test(cur())) { kw += cur(); advance(); }
       return kw;
     }
 
@@ -282,7 +282,7 @@
       if (cur() === '$') {
         const kw = readSpecialNumber();
         const unit = insideArray ? null : tryInlineUnit();
-        emit(EV.DATA, { kind: 'special', value: kw, text: '$' + kw + '$', unit });
+        emit(EV.DATA, { kind: 'special', value: kw, text: '$' + kw, unit });
         return;
       }
 
@@ -304,13 +304,22 @@
         return;
       }
 
-      /* Symbol (bare word) */
+      /* Symbol (bare word) — or a reserved keyword (null / true / false /
+         on / off), which the validator reclassifies out of the symbol space. */
       if (/[A-Za-z_]/.test(cur()) || cur().charCodeAt(0) > 0x7F) {
         let sym = '';
         while (!eof() && !/[ \t\r\n;,\[\]{}#<>=]/.test(cur())) {
           sym += cur(); advance();
         }
-        emit(EV.DATA, { kind: 'symbol', value: sym, text: sym });
+        if (sym === 'null') {
+          emit(EV.DATA, { kind: 'null', value: null, text: sym });
+        } else if (sym === 'true' || sym === 'on') {
+          emit(EV.DATA, { kind: 'bool', value: true, text: 'true' });
+        } else if (sym === 'false' || sym === 'off') {
+          emit(EV.DATA, { kind: 'bool', value: false, text: 'false' });
+        } else {
+          emit(EV.DATA, { kind: 'symbol', value: sym, text: sym });
+        }
         return;
       }
 

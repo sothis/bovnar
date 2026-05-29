@@ -96,6 +96,113 @@ static bool readback_validate(const uint8_t *buf, uint32_t len)
 	return ok;
 }
 
+/*
+ * Structural well-formedness tracker for harness_random_events.
+ *
+ * The writer faithfully serialises whatever event sequence it is handed,
+ * so a nonsensical ordering can make it emit structurally invalid bvnr (a
+ * stray "/" at top level, a dangling ".key =", a bare type-family
+ * fragment, raw octet framing in text, ...) which the reader then —
+ * correctly — refuses to parse back.  The read↔write round-trip invariant
+ * therefore only holds when the emitted events form a grammatically valid
+ * document.  This mirror of the writer grammar lets the harness assert
+ * readback only for such sequences; it is deliberately a subset (when in
+ * doubt it reports "not well-formed", which merely skips an assertion).
+ */
+enum {
+	WS_KEY,          /* expect assignment_start / struct_end            */
+	WS_VALUE,        /* RHS of assignment: annotation_start or a value  */
+	WS_VALUE_NOANNO, /* after annotation_end: a concrete value          */
+	WS_ANNO_FAM,     /* after annotation_start: expect type_family      */
+	WS_ANNO_PARAM,   /* after type_family: param or annotation_end      */
+	WS_ARRAY,        /* in array row: element / row_end / dim_start      */
+	WS_NEED_ROW,     /* after dim_start: expect array_row_start          */
+	WS_OCTET,        /* in octet stream: chunk or octet_stream_end       */
+	WS_DEAD          /* sequence is not well-formed (sticky)             */
+};
+#define WS_MAX_DEPTH (MAX_EVENTS + 1u)
+
+static int ws_post_value(uint32_t a_depth, uint32_t s_depth,
+                         const uint32_t *sda)
+{
+	/* Innermost open container is an array iff no struct was opened
+	 * after the innermost array row started. */
+	if (a_depth > 0 && s_depth == sda[a_depth - 1u])
+		return WS_ARRAY;
+	return WS_KEY;
+}
+
+static int ws_step(int st, bvnr_event_t ev, token_type_t tt,
+                   uint32_t *a_depth, uint32_t *s_depth, uint32_t *sda,
+                   bool *just_row_end)
+{
+	if (st == WS_DEAD) return WS_DEAD;
+	bool jre = *just_row_end;
+	*just_row_end = false;
+
+	switch (ev) {
+	case ev_assignment_start:
+		return (st == WS_KEY) ? WS_VALUE : WS_DEAD;
+	case ev_type_annotation_start:
+		return (st == WS_VALUE || st == WS_ARRAY) ? WS_ANNO_FAM : WS_DEAD;
+	case ev_type_annotation_type_family:
+		return (st == WS_ANNO_FAM) ? WS_ANNO_PARAM : WS_DEAD;
+	case ev_type_annotation_type_family_parameter:
+		return (st == WS_ANNO_PARAM) ? WS_ANNO_PARAM : WS_DEAD;
+	case ev_type_annotation_end:
+		return (st == WS_ANNO_PARAM) ? WS_VALUE_NOANNO : WS_DEAD;
+	case ev_data:
+		if (st == WS_OCTET)
+			return (tt == token_is_octet_stream) ? WS_OCTET : WS_DEAD;
+		if (st == WS_VALUE || st == WS_VALUE_NOANNO || st == WS_ARRAY) {
+			/* raw octet framing is not legal in text position */
+			if (tt == token_is_octet_stream) return WS_DEAD;
+			return ws_post_value(*a_depth, *s_depth, sda);
+		}
+		return WS_DEAD;
+	case ev_struct_start:
+		if (st == WS_VALUE || st == WS_VALUE_NOANNO || st == WS_ARRAY) {
+			if (*s_depth + *a_depth >= WS_MAX_DEPTH) return WS_DEAD;
+			(*s_depth)++;
+			return WS_KEY;
+		}
+		return WS_DEAD;
+	case ev_struct_end:
+		if (st == WS_KEY && *s_depth > 0 &&
+		    (*a_depth == 0 || *s_depth > sda[*a_depth - 1u])) {
+			(*s_depth)--;
+			return ws_post_value(*a_depth, *s_depth, sda);
+		}
+		return WS_DEAD;
+	case ev_array_row_start:
+		if (st == WS_VALUE || st == WS_VALUE_NOANNO ||
+		    st == WS_ARRAY  || st == WS_NEED_ROW) {
+			if (*s_depth + *a_depth >= WS_MAX_DEPTH) return WS_DEAD;
+			sda[*a_depth] = *s_depth;
+			(*a_depth)++;
+			return WS_ARRAY;
+		}
+		return WS_DEAD;
+	case ev_array_row_end:
+		if (st == WS_ARRAY && *a_depth > 0) {
+			(*a_depth)--;
+			*just_row_end = true;
+			return ws_post_value(*a_depth, *s_depth, sda);
+		}
+		return WS_DEAD;
+	case ev_array_dim_start:
+		return jre ? WS_NEED_ROW : WS_DEAD;
+	case ev_octet_stream_start:
+		return (st == WS_VALUE || st == WS_VALUE_NOANNO || st == WS_ARRAY)
+			 ? WS_OCTET : WS_DEAD;
+	case ev_octet_stream_end:
+		return (st == WS_OCTET)
+			 ? ws_post_value(*a_depth, *s_depth, sda) : WS_DEAD;
+	default:
+		return WS_DEAD;
+	}
+}
+
 static void harness_random_events(const uint8_t *data, size_t len)
 {
 	cursor_t cur = { data, len };
@@ -121,6 +228,12 @@ static void harness_random_events(const uint8_t *data, size_t len)
 		bvnr_data_t hdr; memset(&hdr, 0, sizeof(hdr));
 		(void)bvnr_write_event(w, ev_stream_start, &hdr);
 	}
+
+	int      wstate       = WS_KEY;
+	uint32_t a_depth      = 0;
+	uint32_t s_depth      = 0;
+	uint32_t sda[WS_MAX_DEPTH];
+	bool     just_row_end = false;
 
 	for (uint8_t i = 0; i < n_events; i++) {
 		uint8_t ev_idx = cur_u8(&cur) % N_EVENTS;
@@ -168,8 +281,13 @@ static void harness_random_events(const uint8_t *data, size_t len)
 		d.length     = got;
 		d.type       = TOKENS[tok_idx];
 
+		wstate = ws_step(wstate, ev, d.type,
+		                 &a_depth, &s_depth, sda, &just_row_end);
+
 		(void)bvnr_write_event(w, ev, &d);
 	}
+
+	bool well_formed = (wstate == WS_KEY && a_depth == 0 && s_depth == 0);
 
 	bool finished = bvnr_write_finish(w);
 
@@ -179,11 +297,9 @@ static void harness_random_events(const uint8_t *data, size_t len)
 	uint32_t bw = bvnr_writer_bytes_written(w);
 	if (bw > cap) __builtin_trap();
 
-	if (finished && bw > 0) {
-		if (!readback_validate(outbuf, bw)) {
-
+	if (finished && bw > 0 && well_formed) {
+		if (!readback_validate(outbuf, bw))
 			__builtin_trap();
-		}
 	}
 
 done:

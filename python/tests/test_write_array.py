@@ -237,7 +237,7 @@ class TestWriteArrayInDumps:
 @needs_lib
 class TestWriteArraySpecialFloats:
     """Regression tests for Bug 2: float inf/nan must be encoded as bovnar
-    special-number literals ($infinity$, $-infinity$, $nan$), not as Python
+    special-number literals ($inf, $-inf, $nan), not as Python
     repr() strings ('inf', '-inf', 'nan')."""
 
     def test_nan_in_array_does_not_raise(self):
@@ -256,39 +256,39 @@ class TestWriteArraySpecialFloats:
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('nan')])
         out = w.get_output()
-        assert b'$nan$' in out
+        assert b'$nan' in out
 
     def test_pos_inf_encoded_as_special_literal(self):
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('inf')])
         out = w.get_output()
-        assert b'$infinity$' in out
+        assert b'$inf' in out
 
     def test_neg_inf_encoded_as_special_literal(self):
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('-inf')])
         out = w.get_output()
-        assert b'$-infinity$' in out
+        assert b'$-inf' in out
 
     def test_mixed_specials_and_normal_floats(self):
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('nan'), float('inf'), float('-inf'), 1.5])
         out = w.get_output()
-        assert b'$nan$' in out
-        assert b'$infinity$' in out
-        assert b'$-infinity$' in out
+        assert b'$nan' in out
+        assert b'$inf' in out
+        assert b'$-inf' in out
         assert b'1.5' in out
 
 
 @needs_lib
 class TestBoolRoundtrip:
-    """Regression tests for the bool symbol roundtrip bug.
+    """Regression tests for the bool roundtrip.
 
-    BVNR booleans are written as the bare symbols ``true`` / ``false``.
-    The parser delivers them as ``token_is_symbol`` (type field == 3) with
-    ``value_type.family == vt_plain``.  _decode_value must inspect the token
-    type, not only the type family, so that these symbols are decoded back to
-    Python ``True`` / ``False`` rather than the strings ``'true'`` / ``'false'``.
+    BVNR booleans are written as the bare keywords ``true`` / ``false``.
+    The parser delivers them as ``token_is_bool`` (type field == 15) with
+    ``value_type.family == vt_bool``.  _decode_value must inspect the token
+    type so that these keywords are decoded back to Python ``True`` /
+    ``False`` rather than the strings ``'true'`` / ``'false'``.
     """
 
     def test_true_roundtrips_to_python_bool(self):

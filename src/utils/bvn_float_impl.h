@@ -497,16 +497,50 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 	}
 	int be = E + bias;
 	if (be < 0) {
-		int shift = -be;
-		for (int i = 0; i < shift && !bvn_int_is_zero(&C); i++) {
-			bvn_int_div_u32(&C, 10u);
+		/*
+		 * Subnormal: the exponent sits below the format minimum, so the
+		 * coefficient must be divided down by 10^shift to lift the biased
+		 * exponent to 0. This drops `shift` low-order decimal digits and so
+		 * must round to nearest, ties to even — a plain truncation here is
+		 * biased toward zero and loses a unit in the last place. The guard is
+		 * the most significant dropped digit (the one extracted at the final
+		 * iteration); every lower dropped digit folds into the sticky flag.
+		 * Entering this block C has at most max_coeff_digs digits, so after
+		 * dropping >=1 digit a round-up adds at most one digit and can never
+		 * overflow the coefficient field (no carry-out renormalisation needed).
+		 */
+		int      shift  = -be;
+		bool     sticky = false;
+		uint32_t guard  = 0u;
+		for (int i = 0; i < shift; i++) {
+			if (bvn_int_is_zero(&C)) break;   /* higher digits all zero: guard 0 */
+			uint32_t digit = bvn_int_div_u32(&C, 10u);
 			E++;
+			if (i == shift - 1)  guard = digit;
+			else if (digit != 0u) sticky = true;
 		}
+		if ((guard > 5u) ||
+			(guard == 5u && (sticky || bvn_int_getbit(&C, 0) == 1)))
+			bvni_add_u32(ctx, &C, 1u);
 		be = 0;
 		if (bvn_int_is_zero(&C)) {
 			if (p->neg) bits[(total-1)/32] |= (1u << ((total-1)%32));
 			return;
 		}
+	}
+	/*
+	 * Clamp to the maximum encodable exponent. The magnitude is in range but
+	 * the normalised coefficient (trailing zeros already stripped by the
+	 * parser) leaves the biased exponent above be_max. IEEE 754 requires
+	 * lengthening the coefficient with trailing zeros and lowering the
+	 * exponent until it fits, rather than rounding to Infinity. Only when the
+	 * coefficient already uses the full max_coeff_digs digits and be is still
+	 * out of range is the value a genuine overflow.
+	 */
+	while (be >= be_max &&
+		   bvni_count_decimal_digits(ctx, &C) < f->max_coeff_digs) {
+		bvni_mul_u32(ctx, &C, 10u);
+		E--; be--;
 	}
 	if (be >= be_max) {
 		/*

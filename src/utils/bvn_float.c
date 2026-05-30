@@ -542,6 +542,15 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 	bool neg = false;
 	if      (*s == '+') s++;
 	else if (*s == '-') { neg = true; s++; }
+	/*
+	 * Accept the conventional C99 hex-float prefix. Only skip "0x"/"0X" when a
+	 * hex digit or radix point follows, so a bare "0" (the value zero) is left
+	 * for the digit scanner. Without this, "0x1.8p+1" parsed the leading '0'
+	 * and stopped at 'x', silently yielding 0.0.
+	 */
+	if (base == 16u && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') &&
+		(bvnf_digit((uint8_t)s[2], 16u) < 16u || s[2] == '.'))
+		s += 2;
 	{
 		const char *p = s;
 		uint8_t c0 = (uint8_t)(*p | 0x20);

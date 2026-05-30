@@ -2343,11 +2343,11 @@ a[data-doc] { cursor: pointer; }
 <header class="intro">
   <h1>One format <span class="accent">configures the spacecraft</span> — and <span class="accent">carries its telemetry home</span>.</h1>
   <p>
-    Every value on this page is real Bovnar, parsed live in your browser by <code>bovnar_parser.js</code>, a
-    JavaScript reader for the format. Edit the config on the left to reshape the orbit; the simulator packs
-    each measurement into a <code>.bvnr</code> downlink frame, and the visualizer runs purely on <em>decoded</em>
-    values — never the raw simulation. Units, bit-widths and types ride <em>inside the stream</em>, so the ground
-    station needs no schema to read it. Hover any gauge to jump to the line it decoded from.
+    You saw the syntax — here's a spacecraft running on it. One format, the whole loop:
+    <strong>config in, telemetry out</strong>. Edit the orbit; the craft encodes each measurement into a
+    <code>.bvnr</code> frame and the ground station decodes it — the orbit you see is drawn only from those
+    <em>decoded</em> values, a full round-trip through the format. Units, bit-widths and types ride
+    <em>inside the stream</em>; no schema required. Hover a gauge to jump to the line it decoded.
   </p>
 </header>
 

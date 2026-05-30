@@ -248,17 +248,25 @@ void bvn_float_init_buf(bvn_float_t *f, uint32_t prec,
 	f->_heap   = false;
 	memset(buf, 0, (size_t)nlimbs * sizeof(bvn_limb_t));
 }
+/*
+ * Predicates treat a NULL handle as "none of the above": a NULL float is not a
+ * NaN, an infinity, a zero, negative, or regular. Without these guards a NULL
+ * dereferences immediately, which is inconsistent with every from_, to_dec and
+ * to_fix entry point (all of which already null-check) and turns a caller bug
+ * into a crash instead of a benign false.
+ */
 bool bvn_float_is_nan(const bvn_float_t *f)
-	{ return f->_exp == BVN_FLOAT_EXP_NAN; }
+	{ return f && f->_exp == BVN_FLOAT_EXP_NAN; }
 bool bvn_float_is_inf(const bvn_float_t *f)
-	{ return f->_exp == BVN_FLOAT_EXP_INF; }
+	{ return f && f->_exp == BVN_FLOAT_EXP_INF; }
 bool bvn_float_is_zero(const bvn_float_t *f)
-	{ return f->_exp == BVN_FLOAT_EXP_ZERO; }
+	{ return f && f->_exp == BVN_FLOAT_EXP_ZERO; }
 bool bvn_float_is_neg(const bvn_float_t *f)
-	{ return f->_sign < 0; }
+	{ return f && f->_sign < 0; }
 bool bvn_float_is_regular(const bvn_float_t *f)
 {
-	return f->_exp != BVN_FLOAT_EXP_NAN
+	return f
+		&& f->_exp != BVN_FLOAT_EXP_NAN
 		&& f->_exp != BVN_FLOAT_EXP_INF
 		&& f->_exp != BVN_FLOAT_EXP_ZERO;
 }
@@ -290,6 +298,7 @@ static void bvnf_store_mant(bvn_float_t *f, const bvn_int_t *Q);
  */
 bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 {
+	if (!dst || !src) return false;
 	dst->_sign = src->_sign;
 	dst->_exp  = src->_exp;
 	if (!bvn_float_is_regular(src)) {
@@ -768,7 +777,7 @@ static int32_t bvnf_to_str_pow2(const bvn_float_t *f, char *buf,
 		for (long d = 0; d <= last_nz; d++) PUTC(fdigs[d]);
 	}
 	{
-		long bin_exp = f->_exp - 1L;
+		int64_t bin_exp = f->_exp - 1;        /* _exp is int64; long would truncate on LLP64 */
 		PUTC('p');
 		if (bin_exp >= 0) {
 			PUTC('+');
@@ -780,7 +789,7 @@ static int32_t bvnf_to_str_pow2(const bvn_float_t *f, char *buf,
 		if (bin_exp == 0) {
 			ebuf[en++] = '0';
 		} else {
-			long ev = bin_exp;
+			int64_t ev = bin_exp;
 			while (ev > 0) { ebuf[en++] = (char)('0' + ev % 10); ev /= 10; }
 			for (int i = 0, j = en - 1; i < j; i++, j--) {
 				char t = ebuf[i]; ebuf[i] = ebuf[j]; ebuf[j] = t;
@@ -1143,6 +1152,21 @@ bool bvn_float_to_float(const bvn_float_t *f, float *out)
 }
 #include "bvn_float_impl.h"
 /*
+ * Correctly-rounded conversion of a base-10 floating literal straight to double.
+ * The literal is formed as an exact rational and rounded to binary64 a SINGLE
+ * time (round-to-nearest-even), so the result is correct across the whole range,
+ * including subnormals -- unlike parsing into a finite-precision bvn_float and
+ * narrowing with bvn_float_to_double, which rounds twice and is 1 ULP off for
+ * subnormal results. This is the public, externally-linked entry point for that
+ * path; it wraps the static-inline parser in bvn_float_impl.h so callers in
+ * other translation units (e.g. the value layer) need not include that internal
+ * header. NULL yields 0.0.
+ */
+double bvn_float_strtod(const char *s)
+{
+	return s ? bvn_float_parse_f64(s) : 0.0;
+}
+/*
  * Encode a bvn_float into an arbitrary IEEE-754-style binary interchange format
  * described by (exp_bits, man_bits, bias) — the same machinery serves binary16
  * through binary256 and the decimal-interchange helpers, just with different
@@ -1244,7 +1268,9 @@ void bvn_float_to_ieee_bin(const bvn_float_t *f,
 							uint32_t exp_bits, uint32_t man_bits, int32_t bias,
 							uint32_t *bits, int bits32)
 {
+	if (!bits) return;
 	for (int i = 0; i < bits32; i++) bits[i] = 0;
+	if (!f) return;                                /* NULL handle -> all-zero field */
 	if (bvn_float_is_nan(f)) {
 		for (uint32_t i = 0; i < exp_bits; i++)
 			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
@@ -1362,25 +1388,30 @@ bool bvn_float_from_ieee_bin(bvn_float_t *f,
 void bvn_float_to_bin16(const bvn_float_t *f, uint16_t *out)
 {
 	uint32_t b[1] = {0};
+	if (!out) return;
 	bvn_float_to_ieee_bin(f, 5, 10, 15, b, 1);
 	*out = (uint16_t)b[0];
 }
 void bvn_float_to_bin32(const bvn_float_t *f, uint32_t *out)
 {
+	if (!out) return;
 	bvn_float_to_ieee_bin(f, 8, 23, 127, out, 1);
 }
 void bvn_float_to_bin64(const bvn_float_t *f, uint64_t *out)
 {
 	uint32_t b[2] = {0};
+	if (!out) return;
 	bvn_float_to_ieee_bin(f, 11, 52, 1023, b, 2);
 	*out = (uint64_t)b[0] | ((uint64_t)b[1] << 32);
 }
 void bvn_float_to_bin128(const bvn_float_t *f, uint32_t out[4])
 {
+	if (!out) return;
 	bvn_float_to_ieee_bin(f, 15, 112, 16383, out, 4);
 }
 void bvn_float_to_bin256(const bvn_float_t *f, uint32_t out[8])
 {
+	if (!out) return;
 	bvn_float_to_ieee_bin(f, 19, 236, 262143, out, 8);
 }
 bool bvn_float_from_bin16(bvn_float_t *f, uint16_t bits)

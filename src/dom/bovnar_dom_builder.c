@@ -312,20 +312,22 @@ static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 		else if (strcmp(buf, "-inf") == 0) n->val.float_val = -INFINITY;
 	} else {
 		uint32_t base = bvn_effective_base(vt);
-		uint32_t prec = vt.width ? vt.width : 64u;
-		if (prec < 64u) prec = 64u;
-		if (prec > 128u) prec = 128u;
-		uint32_t nlimbs = BVN_FLOAT_NLIMBS(prec);
-		bvn_limb_t limb_buf[BVN_FLOAT_NLIMBS(128u)];
-		bvn_float_t f;
-		bvn_float_init_buf(&f, prec, limb_buf, nlimbs);
 		double v = 0.0;
-		if (!bvn_float_from_str(&f, buf, base)) {
+		/*
+		 * Convert through the canonical decimal/base parser. For base 10 this
+		 * takes the exact-rational single-rounding path, which is correctly
+		 * rounded across the whole binary64 range including subnormals. The
+		 * former local route -- parse into a finite-precision bvn_float, then
+		 * bvn_float_to_double -- rounded twice and was 1 ULP off for subnormal
+		 * results (the stored value is a double regardless of the parse width,
+		 * so nothing is lost by delegating). For non-decimal bases this still
+		 * rejects a literal the parser cannot consume.
+		 */
+		if (!bvn_parse_double_in_base(buf, base, &v)) {
 			if (buf_on_heap) free(buf);
 			bvn_dom_node_destroy(n);
 			return NULL;
 		}
-		bvn_float_to_double(&f, &v);
 		n->val.float_val = v;
 	}
 	if (buf_on_heap) free(buf);

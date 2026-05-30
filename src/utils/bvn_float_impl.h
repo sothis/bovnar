@@ -611,6 +611,15 @@ static inline void to_fixed_point(bvn_float_ctx_t *ctx,
 	else             bvni_mul_pow10(ctx, &den, -p->dex);
 	if (bvn_float_has_overflow(ctx)) return;
 	bvni_shl(ctx, &num, frac_bits);
+	/*
+	 * The shift can itself overflow the fixed BVN_INT_LOCAL budget (it did not
+	 * before mul_pow10 cleared, but a large frac_bits or a wide coefficient can
+	 * trip it here). Re-check before dividing: on a fixed buffer bvni_shl leaves
+	 * num partially shifted, so divrem would otherwise run on a truncated
+	 * numerator and emit a silently wrong (though in-bounds) result. The public
+	 * bvnf_to_fix_direct guards its shift the same way.
+	 */
+	if (bvn_float_has_overflow(ctx)) return;
 	BVN_INT_LOCAL(Q);
 	BVN_INT_LOCAL(R);
 	bvn_int_divrem(&Q, &R, &num, &den);
@@ -652,6 +661,17 @@ static inline uint16_t bvn_float_parse_bin16(const char *s)
 	to_ieee_binary(&ctx, &p, &f, b, 1);
 	return (uint16_t)b[0];
 }
+/*
+ * _Float16 is a compiler/target extension (and only since C23 a standard
+ * optional type), exactly like _Float128 and the _Decimal* helpers below, so it
+ * must be feature-tested rather than merely have its pedantic warning silenced.
+ * Without the guard, every translation unit that includes this header fails to
+ * COMPILE on any target lacking _Float16 (e.g. x86-64 built with -mno-sse, or
+ * embedded cores without a half-precision type) -- a hard error, not a warning.
+ * The raw-bits packer bvn_float_parse_bin16 above stays unconditional; only the
+ * _Float16-typed convenience wrapper is gated, mirroring bvn_float_parse_f128.
+ */
+#if defined(__FLT16_MAX__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 static inline _Float16 bvn_float_parse_f16(const char *s)
@@ -660,6 +680,7 @@ static inline _Float16 bvn_float_parse_f16(const char *s)
 	c.u = bvn_float_parse_bin16(s); return c.f;
 }
 #pragma GCC diagnostic pop
+#endif
 static inline uint32_t bvn_float_parse_bin32(const char *s)
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);

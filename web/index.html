@@ -2113,6 +2113,8 @@ a[data-doc] { cursor: pointer; }
   --border:      #3e3e42;
   --border-hi:   #007acc;
   --select-bg:   #264f78;
+  --up:          #3fb87f;
+  --down:        #e0533d;
 
   --text:   #ededed;
   --text2:  #c2c2c2;
@@ -2253,15 +2255,15 @@ a[data-doc] { cursor: pointer; }
   overflow: hidden;
 }
 #launch-demo .editor:focus-within { border-color: var(--border-hi); }
-#launch-demo #cfg, #launch-demo #cfg-hl {
+#launch-demo #cfg, #launch-demo #cfg-hl, #launch-demo #fcfg, #launch-demo #fcfg-hl, #launch-demo #icfg, #launch-demo #icfg-hl {
   position: absolute; inset: 0; margin: 0;
   font-family: var(--mono); font-size: 0.78rem; line-height: 1.55;
   letter-spacing: normal; padding: 0.6rem; tab-size: 2;
   white-space: pre; overflow: auto;
   border: 0;
 }
-#launch-demo #cfg-hl { color: var(--text); pointer-events: none; z-index: 0; }
-#launch-demo #cfg {
+#launch-demo #cfg-hl, #launch-demo #fcfg-hl, #launch-demo #icfg-hl { color: var(--text); pointer-events: none; z-index: 0; }
+#launch-demo #cfg, #launch-demo #fcfg, #launch-demo #icfg {
   background: transparent; color: transparent; caret-color: var(--text);
   resize: none; z-index: 1; outline: none;
 }
@@ -2376,19 +2378,72 @@ a[data-doc] { cursor: pointer; }
 
 #launch-demo .note { color: var(--text3); font-size: 0.74rem; font-family: var(--mono); margin-top: 0.5rem; }
 #launch-demo .note b { color: var(--text2); font-weight: 400; }
+
+/* ── demo switcher (Mission Control ⇆ Trading Desk) ── */
+#launch-demo .demo-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.9rem; }
+#launch-demo .demo-tab {
+  font-family: var(--mono); font-size: 0.74rem; padding: 0.4rem 0.95rem;
+  border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0;
+  background: var(--panel-bg); color: var(--text3); cursor: pointer; letter-spacing: 0.04em;
+}
+#launch-demo .demo-tab:hover { color: var(--text); }
+#launch-demo .demo-tab.active { background: var(--panel-bg2); color: var(--cyan); box-shadow: inset 0 2px 0 var(--blue2); }
+#launch-demo .demo-pane[hidden] { display: none; }
+
+/* trading-desk grid (reuses the shared .panel/.head/.body/.gauge/.editor styles) */
+#launch-demo .fgrid {
+  display: grid; gap: 12px; padding: 12px 1.4rem 0; max-width: 1700px; margin: 0 auto;
+  grid-template-columns: minmax(320px, 1fr) minmax(460px, 1.5fr);
+  grid-template-areas: "config chart" "feed blotter";
+}
+#launch-demo .panel.chart { grid-area: chart; }
+#launch-demo .panel.feed  { grid-area: feed; }
+#launch-demo .panel.blot  { grid-area: blotter; }
+#launch-demo .fgrid .editor { min-height: 430px; }   /* fits the ~21-line instrument config */
+@media (max-width: 980px) {
+  #launch-demo .fgrid { grid-template-columns: 1fr; grid-template-areas: "chart" "config" "feed" "blotter"; }
+}
+#launch-demo .chart-wrap { position: relative; width: 100%; flex: 1; min-height: 340px; background: #0c0e14; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+#launch-demo canvas#fpx, #launch-demo canvas#ipx { width: 100%; height: 100%; display: block; }
+#launch-demo .alarm-banner { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; min-height: 24px; align-items: center; }
+#launch-demo .alarm-chip { font-family: var(--mono); font-size: 0.64rem; padding: 0.18rem 0.5rem; border-radius: 3px; letter-spacing: 0.03em; }
+#launch-demo .alarm-chip.ok { background: rgba(63,184,127,0.13); color: var(--up); border: 1px solid rgba(63,184,127,0.35); }
+#launch-demo .alarm-chip.warn { background: rgba(220,200,80,0.10); color: var(--yellow); border: 1px solid rgba(220,200,80,0.35); }
+#launch-demo .alarm-chip.alarm { background: rgba(224,83,61,0.14); color: var(--down); border: 1px solid rgba(224,83,61,0.45); }
+#launch-demo .chart-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding: 0.5rem 0.2rem 0; font-family: var(--mono); font-size: 0.68rem; color: var(--text3); }
+#launch-demo .chart-legend b { font-weight: 400; }
+#launch-demo .gauge.big .v { font-size: 1.32rem; }
+#launch-demo .gauge.up .v { color: var(--up); }
+#launch-demo .gauge.down .v { color: var(--down); }
+#launch-demo .exact-panel { margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--editor-bg); padding: 0.55rem 0.65rem; }
+#launch-demo .exact-panel .t { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin-bottom: 0.4rem; }
+#launch-demo .exact-row { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 0.82rem; padding: 0.12rem 0; gap: 0.6rem; }
+#launch-demo .exact-row .lab { color: var(--text2); }
+#launch-demo .exact-row.bvnr .val { color: var(--teal); }
+#launch-demo .exact-row.flt .val { color: var(--yellow); }
+#launch-demo .exact-row.drift { margin-top: 0.35rem; padding-top: 0.4rem; border-top: 1px solid var(--border); }
+#launch-demo .exact-row.drift .lab { color: var(--text); }
+#launch-demo .exact-row.drift .val { color: var(--red); font-weight: 500; }
+#launch-demo .exact-note { font-family: var(--mono); font-size: 0.64rem; color: var(--text3); margin-top: 0.45rem; line-height: 1.5; }
 </style>
 <section id="launch-demo" aria-label="Live Mission Control demo">
 <header class="intro">
-  <h1>One format <span class="accent">configures the spacecraft</span> — and <span class="accent">carries its telemetry home</span>.</h1>
-  <p>
+  <h1>One format, <span class="accent">end to end</span> — <span class="accent">config in, decoded values out</span>.</h1>
+  <p id="demo-blurb">
     You saw the syntax — here's a spacecraft running on it. One format, the whole loop:
     <strong>config in, telemetry out</strong>. Edit the orbit; the craft encodes each measurement into a
     <code>.bvnr</code> frame and the ground station decodes it — the orbit you see is drawn only from those
     <em>decoded</em> values, a full round-trip through the format. Units, bit-widths and types ride
     <em>inside the stream</em>; no schema required. Hover a gauge to jump to the line it decoded.
   </p>
+  <div class="demo-tabs" role="tablist">
+    <button class="demo-tab active" data-demo="mc" role="tab">◐ Mission Control</button>
+    <button class="demo-tab" data-demo="fin" role="tab">$ Trading Desk</button>
+    <button class="demo-tab" data-demo="ind" role="tab">⚙ Plant Control</button>
+  </div>
 </header>
 
+<div id="demo-mc" class="demo-pane">
 <div class="grid">
 
   <!-- ───────────── CONFIG ───────────── -->
@@ -2454,6 +2509,143 @@ a[data-doc] { cursor: pointer; }
   </section>
 
 </div>
+</div><!-- /#demo-mc -->
+
+<div id="demo-fin" class="demo-pane" hidden>
+<div class="fgrid">
+  <section class="panel cfg">
+    <div class="head"><span class="dot"></span>Instrument config <span class="grow"></span><span class="hint">editable · .bvnr</span></div>
+    <div class="body">
+      <div class="editor"><div id="fcfg-hl" aria-hidden="true"></div><textarea id="fcfg" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
+      <div class="cfg-actions">
+        <button class="btn primary" id="fapply">Apply &amp; restart</button>
+        <button class="btn" id="freset">Reset</button>
+        <span class="cfg-msg" id="fcfgmsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel chart">
+    <div class="head"><span class="dot"></span>Price <span class="grow"></span><span class="hint" id="fsymhint">ACME · USD</span></div>
+    <div class="body">
+      <div class="controls">
+        <button class="btn primary" id="fplay">⏸ Pause</button>
+        <input type="range" id="fspeed" min="1" max="40" value="2">
+        <span class="speed-lbl" id="fspeedlbl">2×</span>
+        <span class="grow"></span>
+        <label class="tgl"><input type="checkbox" id="fnoisy"> noisy feed</label>
+        <label class="tgl"><input type="checkbox" id="fresync" checked> resync</label>
+      </div>
+      <div class="chart-wrap"><canvas id="fpx"></canvas></div>
+      <div class="chart-legend">
+        <span><b style="color:#7fd1ff">―</b> last</span>
+        <span><b style="color:#6e7a86">┄</b> EMA</span>
+        <span><b style="color:#3fb87f">▲</b> buy · <b style="color:#e0533d">▼</b> sell</span>
+        <span><b style="color:#3a4a5a">▒</b> bid/ask</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel feed">
+    <div class="head"><span class="dot"></span>Market-data feed <span class="grow"></span><span class="hint">.bvnr tick</span></div>
+    <div class="body">
+      <div class="status-bar">
+        <span>tick <b id="fs-seq">0</b></span>
+        <span>rate <b id="fs-rate">—</b></span>
+        <span class="drop">dropped <b id="fs-drop">0</b></span>
+        <span class="lock ok" id="fs-lock">lock <b>ACQ</b></span>
+      </div>
+      <div class="ticker" id="fticker"></div>
+      <pre class="frame" id="fframesrc"></pre>
+      <div class="note"><b>resync</b> on: a corrupt field is skipped and the rest of the tick still decodes. Off: one bad line drops the whole tick. Flip <b>noisy feed</b> to compare.</div>
+    </div>
+  </section>
+
+  <section class="panel blot">
+    <div class="head"><span class="dot"></span>Blotter &amp; ledger <span class="grow"></span><span class="hint">decoded</span></div>
+    <div class="body">
+      <div class="gauges" id="fgauges"></div>
+      <div class="exact-panel">
+        <div class="t">Ledger — exact decimal vs naïve binary float</div>
+        <div class="exact-row bvnr"><span class="lab">Fees · Bovnar <span style="color:var(--text3)">float_dec</span></span><span class="val" id="ffee-bvnr">$0.00</span></div>
+        <div class="exact-row flt"><span class="lab">Fees · naïve float32</span><span class="val" id="ffee-flt">$0.00</span></div>
+        <div class="exact-row bvnr"><span class="lab">Mark P&amp;L · Bovnar exact</span><span class="val" id="fpnl-bvnr">$0.00</span></div>
+        <div class="exact-row flt"><span class="lab">Mark P&amp;L · naïve float32</span><span class="val" id="fpnl-flt">$0.00</span></div>
+        <div class="exact-row drift"><span class="lab">Float error (and counting)</span><span class="val" id="fdrift">$0.00</span></div>
+        <div class="exact-note">Same numbers, two pipelines. Bovnar's exact decimal text → integer minor units (penny-perfect). A binary-float book drifts. That gap is real money.</div>
+      </div>
+    </div>
+  </section>
+</div>
+</div><!-- /#demo-fin -->
+
+<div id="demo-ind" class="demo-pane" hidden>
+<div class="fgrid">
+  <section class="panel cfg">
+    <div class="head"><span class="dot"></span>Reactor config <span class="grow"></span><span class="hint">editable · .bvnr</span></div>
+    <div class="body">
+      <div class="editor"><div id="icfg-hl" aria-hidden="true"></div><textarea id="icfg" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
+      <div class="cfg-actions">
+        <button class="btn primary" id="iapply">Apply &amp; restart</button>
+        <button class="btn" id="ireset">Reset</button>
+        <span class="cfg-msg" id="icfgmsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel chart">
+    <div class="head"><span class="dot"></span>Process — jacketed reactor <span class="grow"></span><span class="hint" id="ihint">PID temperature loop</span></div>
+    <div class="body">
+      <div class="controls">
+        <button class="btn primary" id="iplay">⏸ Pause</button>
+        <input type="range" id="ispeed" min="1" max="30" value="6">
+        <span class="speed-lbl" id="ispeedlbl">6×</span>
+        <span class="grow"></span>
+        <label class="tgl"><input type="checkbox" id="imismatch"> scaling mismatch</label>
+        <label class="tgl"><input type="checkbox" id="inoisy"> noisy bus</label>
+        <label class="tgl"><input type="checkbox" id="iresync" checked> resync</label>
+      </div>
+      <div class="chart-wrap"><canvas id="ipx"></canvas></div>
+      <div class="chart-legend">
+        <span><b style="color:#e88a3a">▮</b> jacket heat</span>
+        <span><b style="color:#7fd1ff">―</b> temp · <b style="color:#6e7a86">┄</b> setpoint</span>
+        <span><b style="color:#4ec9b0">✚</b> agitator</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel feed">
+    <div class="head"><span class="dot"></span>PLC telemetry <span class="grow"></span><span class="hint">.bvnr frame</span></div>
+    <div class="body">
+      <div class="status-bar">
+        <span>cycle <b id="is-cyc">0</b></span>
+        <span>rate <b id="is-rate">—</b></span>
+        <span class="drop">dropped <b id="is-drop">0</b></span>
+        <span class="lock ok" id="is-lock">lock <b>ACQ</b></span>
+      </div>
+      <div class="ticker" id="iticker"></div>
+      <pre class="frame" id="iframesrc"></pre>
+      <div class="note"><b>resync</b> on: a corrupt register is skipped and the rest of the frame still decodes. Off: a bad line drops the cycle. Flip <b>noisy bus</b> to compare.</div>
+    </div>
+  </section>
+
+  <section class="panel blot">
+    <div class="head"><span class="dot"></span>HMI — gauges &amp; alarms <span class="grow"></span><span class="hint">decoded</span></div>
+    <div class="body">
+      <div class="alarm-banner" id="ialarms"></div>
+      <div class="gauges" id="igauges"></div>
+      <div class="exact-panel">
+        <div class="t">Temperature register — raw Modbus vs self-describing Bovnar</div>
+        <div class="exact-row"><span class="lab">Raw register · uint:16</span><span class="val" id="iraw" style="color:var(--text)">—</span></div>
+        <div class="exact-row flt"><span class="lab">Naïve decode · assumed scale</span><span class="val" id="inaive">—</span></div>
+        <div class="exact-row bvnr"><span class="lab">Bovnar · <span style="color:var(--text3)">float_fix:16,q8,°C</span></span><span class="val" id="ibvnr">—</span></div>
+        <div class="exact-row drift"><span class="lab">Verdict</span><span class="val" id="iverdict">scaling matches</span></div>
+        <div class="exact-note">The register is a bare 16-bit integer — its Q-scaling and unit live in a manual, out of band. Toggle <b>scaling mismatch</b>: the naïve poller applies the wrong Q-factor and reads a false over-temperature; the Bovnar frame carries the type inline, so it can't be misread.</div>
+      </div>
+    </div>
+  </section>
+</div>
+</div><!-- /#demo-ind -->
 </section>
 
 
@@ -4129,7 +4321,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
   const D = Math.PI / 180;
 
-  // Real metro centres ([lon, lat, scale]); scale ≈ metro size/brightness.
+  // Real metro centers ([lon, lat, scale]); scale ≈ metro size/brightness.
   const CITY_CENTERS = [
     // North America
     [-74.0,40.7,1.3],[-71.1,42.4,0.7],[-75.2,40.0,0.7],[-77.0,38.9,0.8],[-76.6,39.3,0.5],
@@ -4175,7 +4367,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     [101.7,3.1,0.6],[103.8,1.35,0.8],[120.98,14.6,0.9],[96.2,16.8,0.4],
     [151.2,-33.9,0.8],[144.96,-37.8,0.7],[153.0,-27.5,0.5],[115.9,-32.0,0.4],[174.8,-36.9,0.5],
   ];
-  // Scatter each centre into a fine point field: a compact dense core plus a
+  // Scatter each center into a fine point field: a compact dense core plus a
   // sparse, faint exurban/road sprinkle. Brightness emerges from point DENSITY
   // under additive blending — no big blobs.
   let LIGHTS = (() => {
@@ -4868,9 +5060,551 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   if (params.has('met')) sim.met = +params.get('met') || 0;
   if (params.has('speed')) { sim.speed = +params.get('speed') || sim.speed; $('speed').value = sim.speed; $('speedlbl').textContent = sim.speed + '×'; }
   frame(0, true);
-  start();
+  // Registered with the demo switcher — the controller starts exactly one sim.
+  window.BvnrDemos = window.BvnrDemos || {};
+  window.BvnrDemos.mc = {
+    activate() { sizeCanvas(); frame(0, true); if (sim.playing) start(); },
+    deactivate() { stop(); },
+  };
 })();
+</script>
 
+<script id="bvnr-trading-sim">
+(function () {
+  'use strict';
+  if (!window.BovnarParser || !window.BovnarHighlight) return;
+  const { parseBovnar, EV } = window.BovnarParser;
+  const Hl = window.BovnarHighlight;
+  const $ = (id) => document.getElementById(id);
+
+  function decode(text) {
+    const rows = [], errs = [], root = {};
+    const stack = [{ obj: root }];
+    let key = null, ann = null;
+    parseBovnar(text, (ev) => {
+      const top = stack[stack.length - 1];
+      switch (ev.type) {
+        case EV.ASSIGNMENT_START: key = ev.data.key; ann = null; break;
+        case EV.TYPE_ANN_START: ann = {}; break;
+        case EV.TYPE_ANN_FAMILY: (ann = ann || {}).family = ev.data.family; break;
+        case EV.TYPE_ANN_PARAM: { ann = ann || {}; const d = ev.data; if (d.kind === 'width') ann.width = d.value; else if (d.kind === 'unit') ann.unit = d.text; break; }
+        case EV.STRUCT_START: { const o = {}; if (key != null) top.obj[key] = { struct: o }; stack.push({ obj: o }); key = null; ann = null; break; }
+        case EV.STRUCT_END: stack.pop(); break;
+        case EV.DATA: {
+          const unit = (ann && ann.unit) || ev.data.unit || null;
+          const node = { value: ev.data.value, text: ev.data.text, dataKind: ev.data.kind, unit, family: ann && ann.family, width: ann && ann.width, line: ev.line };
+          if (key != null) top.obj[key] = node; ann = null; break;
+        }
+        case EV.ASSIGNMENT_END: key = null; ann = null; break;
+        case EV.ERROR: errs.push({ msg: ev.data.msg, line: ev.line }); break;
+      }
+    });
+    return { map: root, errs };
+  }
+  const gnum = (n) => (n ? parseFloat(n.value) : NaN);
+  const gstr = (n) => (n ? String(n.value) : null);
+
+  function toMicros(decStr) {
+    let s = String(decStr).trim(); let neg = false;
+    if (s[0] === '-') { neg = true; s = s.slice(1); } else if (s[0] === '+') s = s.slice(1);
+    let dot = s.indexOf('.'); let int = dot < 0 ? s : s.slice(0, dot); let frac = dot < 0 ? '' : s.slice(dot + 1);
+    frac = (frac + '000000').slice(0, 6);
+    let v = BigInt(int || '0') * 1000000n + BigInt(frac || '0');
+    return neg ? -v : v;
+  }
+  const microsToNum = (b) => Number(b) / 1e6;
+  const fr = Math.fround;
+  function money(n, dp) { const s = n < 0 ? '-' : ''; return s + '$' + Math.abs(n).toFixed(dp == null ? 2 : dp); }
+  let rs = 8731; function rnd() { rs = (rs * 1103515245 + 12345) & 0x7fffffff; return rs / 0x7fffffff; }
+  function gauss() { return Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd()); }
+  const isoUTC = (ms) => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
+
+  const sim = {
+    symbol: 'ACME', currency: 'USD', decimals: 2, last: 142.50, volStep: 0.0009, spread: 0.04,
+    feeStr: '0.07', tradeSize: 50, maxPos: 500, ema: null, thresh: 0.12,
+    seq: 0, vol: 0, tms: Date.parse('2026-05-30T14:30:00Z'),
+    playing: true, speed: 2, noisy: false, resync: true,
+    pos: 0, cashMicros: 0n, feeMicros: 0n, cashF: 0, feeF: 0, fills: 0, dropped: 0, tframe: 0,
+    hist: [], trades: [], history: [], lastGood: null,
+  };
+  const MAXHIST = 200;
+
+  function buildTick() {
+    const dp = sim.decimals, half = sim.spread / 2;
+    const bid = (sim.last - half).toFixed(dp), ask = (sim.last + half).toFixed(dp), last = sim.last.toFixed(dp), cur = sim.currency;
+    const row = (k, v) => '    .' + k.padEnd(7) + ' = ' + v + ';';
+    return ['.tick = {', row('seq', '<uint:32> ' + sim.seq), row('ts', '"' + isoUTC(sim.tms) + '"'),
+      row('bid', '<float_dec:64,' + cur + '> ' + bid), row('ask', '<float_dec:64,' + cur + '> ' + ask),
+      row('last', '<float_dec:64,' + cur + '> ' + last), row('volume', '<uint:64> ' + sim.vol), '};'].join('\n');
+  }
+  function corrupt(text) {
+    const f = ['bid', 'ask', 'last', 'seq'][(rnd() * 4) | 0];
+    if (rnd() < 0.5) return text.replace(new RegExp('(\\.' + f + '\\s+)= '), '$1  ');
+    return text.replace(new RegExp('(\\.' + f + '\\s+= [^;\\n]*)'), '$1 §@!');
+  }
+  function fill(qty, priceStr) {
+    const pm = toMicros(priceStr), pf = parseFloat(priceStr);
+    sim.cashMicros -= BigInt(qty) * pm; sim.cashMicros -= toMicros(sim.feeStr); sim.feeMicros += toMicros(sim.feeStr);
+    sim.cashF = fr(sim.cashF - fr(qty * pf) - parseFloat(sim.feeStr)); sim.feeF = fr(sim.feeF + parseFloat(sim.feeStr));
+    sim.pos += qty; sim.fills++; sim.trades.push({ i: sim.hist.length, price: pf, side: qty > 0 ? 1 : -1 });
+  }
+
+  function step() {
+    sim.last = Math.max(0.5, sim.last * (1 + gauss() * sim.volStep));
+    sim.seq++; sim.vol = 50 + ((rnd() * 950) | 0); sim.tms += 1000;
+    sim.ema = sim.ema == null ? sim.last : sim.ema + (sim.last - sim.ema) * 0.04;
+    let text = buildTick();
+    if (sim.noisy && (sim.tframe % 4 === 3)) text = corrupt(text);
+    const dec = decode(text); const bad = dec.errs.length > 0; const drop = bad && !sim.resync;
+    if (drop) sim.dropped++; sim.tframe++;
+    const m = dec.map.tick && dec.map.tick.struct;
+    let bidS, askS, lastS;
+    if (drop || !m) { const g = sim.lastGood; if (g) { bidS = g.bid; askS = g.ask; lastS = g.last; } }
+    else {
+      lastS = gstr(m.last) || (sim.lastGood && sim.lastGood.last);
+      bidS = gstr(m.bid) || (sim.lastGood && sim.lastGood.bid);
+      askS = gstr(m.ask) || (sim.lastGood && sim.lastGood.ask);
+      sim.lastGood = { bid: bidS, ask: askS, last: lastS };
+    }
+    if (lastS == null) { lastS = sim.last.toFixed(sim.decimals); bidS = lastS; askS = lastS; }
+    const px = parseFloat(lastS), dev = px - sim.ema;
+    if (!drop) {
+      if (dev < -sim.thresh && sim.pos < sim.maxPos) fill(sim.tradeSize, lastS);
+      else if (dev > sim.thresh && sim.pos > -sim.maxPos) fill(-sim.tradeSize, lastS);
+    }
+    sim.hist.push({ last: parseFloat(lastS), bid: parseFloat(bidS), ask: parseFloat(askS), ema: sim.ema });
+    if (sim.hist.length > MAXHIST) { sim.hist.shift(); for (const t of sim.trades) t.i--; }
+    while (sim.trades.length && sim.trades[0].i < 0) sim.trades.shift();
+    pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS);
+    $('fs-seq').textContent = sim.seq; $('fs-drop').textContent = sim.dropped;
+    const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
+  }
+  function pushTicker(ok) {
+    sim.history.push(ok); if (sim.history.length > 64) sim.history.shift();
+    $('fticker').innerHTML = sim.history.map((o, i) => '<i class="' + (o ? 'ok' : 'bad') + (i === sim.history.length - 1 ? ' cur' : '') + '"></i>').join('');
+  }
+  function renderFrame(text, errs) {
+    const el = new Set(errs.map((e) => e.line));
+    $('fframesrc').innerHTML = text.split('\n').map((l, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + Hl.highlightLine(l) + '</span></div>').join('');
+  }
+  function renderBlotter(lastS, bidS, askS) {
+    const dp = sim.decimals, cur = sim.currency, last = parseFloat(lastS);
+    const prev = sim.hist.length > 1 ? sim.hist[sim.hist.length - 2].last : last;
+    const dir = last > prev ? 'up' : last < prev ? 'down' : '';
+    const spread = parseFloat(askS) - parseFloat(bidS);
+    const g = (cls, k, v, u) => '<div class="gauge ' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
+    $('fgauges').innerHTML =
+      g('span2 big ' + dir, 'Last', last.toFixed(dp), cur) + g('', 'Bid', parseFloat(bidS).toFixed(dp), cur) +
+      g('', 'Ask', parseFloat(askS).toFixed(dp), cur) + g('', 'Spread', spread.toFixed(dp), cur) +
+      g('', 'Position', sim.pos, 'sh') + g('', 'Fills', sim.fills, '');
+    const feeB = microsToNum(sim.feeMicros), feeF = sim.feeF;
+    const pnlB = microsToNum(sim.cashMicros + BigInt(sim.pos) * toMicros(lastS));
+    const pnlF = fr(sim.cashF + fr(sim.pos * last));
+    const drift = Math.max(Math.abs(feeB - feeF), Math.abs(pnlB - pnlF));
+    $('ffee-bvnr').textContent = money(feeB); $('ffee-flt').textContent = money(feeF, 6);
+    $('fpnl-bvnr').textContent = money(pnlB); $('fpnl-flt').textContent = money(pnlF, 6);
+    $('fdrift').textContent = drift < 0.005 ? '$' + drift.toFixed(8) : money(drift, 4);
+  }
+
+  const cv = $('fpx'), ctx = cv.getContext('2d');
+  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function drawChart() {
+    const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0c0e14'; ctx.fillRect(0, 0, w, h);
+    const A = sim.hist; if (A.length < 2) return;
+    const padL = 6, padR = 58, padT = 12, padB = 14;
+    let lo = Infinity, hi = -Infinity; for (const p of A) { if (p.bid < lo) lo = p.bid; if (p.ask > hi) hi = p.ask; }
+    const span = (hi - lo) || 1; lo -= span * 0.12; hi += span * 0.12;
+    const off = MAXHIST - A.length;
+    const X = (i) => padL + (i / (MAXHIST - 1)) * (w - padL - padR);
+    const Y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (h - padT - padB);
+    ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'left';
+    for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = Y(v); ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillStyle = 'rgba(160,170,190,0.7)'; ctx.fillText(v.toFixed(sim.decimals), w - padR + 5, y + 3); }
+    ctx.beginPath();
+    for (let i = 0; i < A.length; i++) { const x = X(i + off); i ? ctx.lineTo(x, Y(A[i].ask)) : ctx.moveTo(x, Y(A[i].ask)); }
+    for (let i = A.length - 1; i >= 0; i--) ctx.lineTo(X(i + off), Y(A[i].bid));
+    ctx.closePath(); ctx.fillStyle = 'rgba(90,120,160,0.16)'; ctx.fill();
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(140,156,176,0.75)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 0; i < A.length; i++) { const x = X(i + off), y = Y(A[i].ema); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = '#7fd1ff'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (let i = 0; i < A.length; i++) { const x = X(i + off), y = Y(A[i].last); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    for (const t of sim.trades) {
+      if (t.i < 0 || t.i >= A.length) continue; const x = X(t.i + off), y = Y(t.price), up = t.side > 0; ctx.fillStyle = up ? '#3fb87f' : '#e0533d'; const s = 4; ctx.beginPath();
+      if (up) { ctx.moveTo(x, y + 7 - s); ctx.lineTo(x - s, y + 7 + s); ctx.lineTo(x + s, y + 7 + s); } else { ctx.moveTo(x, y - 7 + s); ctx.lineTo(x - s, y - 7 - s); ctx.lineTo(x + s, y - 7 - s); }
+      ctx.closePath(); ctx.fill();
+    }
+    const lastP = A[A.length - 1].last, ly = Y(lastP), lx = X(MAXHIST - 1);
+    ctx.strokeStyle = 'rgba(127,209,255,0.35)'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(padL, ly); ctx.lineTo(w - padR, ly); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#7fd1ff'; ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = 'rgba(10,14,20,0.9)'; ctx.fillRect(w - padR + 1, ly - 8, padR - 2, 16); ctx.fillStyle = '#7fd1ff'; ctx.fillText(lastP.toFixed(sim.decimals), w - padR + 5, ly + 3);
+  }
+
+  let rafId = null, lastWall = null, acc = 0;
+  function loop(now) {
+    if (lastWall == null) lastWall = now; let el = now - lastWall; lastWall = now; if (el > 250) el = 250;
+    acc += el; const interval = 1000 / sim.speed; let did = false;
+    while (acc >= interval) { acc -= interval; step(); did = true; }
+    if (did) $('fs-rate').textContent = sim.speed + '/s';
+    drawChart(); rafId = requestAnimationFrame(loop);
+  }
+  function start() { if (rafId == null) { lastWall = null; acc = 0; rafId = requestAnimationFrame(loop); } }
+  function stop() { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
+
+  const DEFAULT_CFG =
+`# ── ACME equity — market-data feed config ──────────────
+# Prices ride as float_dec: exact decimal money, currency inline.
+.instrument = {
+    .symbol       = "ACME";
+    .currency     = USD;
+    .decimals     = <uint:8> 2;
+    .start_price  = <float_dec:64,USD> 142.50;
+    .volatility   = <float_dec:32,%> 1.1;       # per-tick swing
+    .spread       = <float_dec:64,USD> 0.04;
+    .fee_per_fill = <float_dec:64,USD> 0.07;
+};
+
+.strategy = {
+    .trade_size = <uint:32> 50;
+    .max_pos    = <uint:32> 500;
+};
+
+.feed = {
+    .resync = true;
+};`;
+
+  function applyConfig() {
+    const dec = decode($('fcfg').value), msg = $('fcfgmsg');
+    if (dec.errs.length) { msg.className = 'cfg-msg err'; msg.textContent = '✗ parse error, line ' + dec.errs[0].line; return; }
+    const inst = dec.map.instrument && dec.map.instrument.struct, strat = dec.map.strategy && dec.map.strategy.struct, feed = dec.map.feed && dec.map.feed.struct;
+    if (!inst || !inst.start_price) { msg.className = 'cfg-msg err'; msg.textContent = '✗ no .instrument.start_price'; return; }
+    sim.symbol = (inst.symbol && String(inst.symbol.value)) || 'SYM';
+    sim.currency = (inst.currency && String(inst.currency.value)) || 'USD';
+    sim.decimals = inst.decimals ? Math.max(0, Math.min(6, gnum(inst.decimals) | 0)) : 2;
+    sim.last = gnum(inst.start_price);
+    sim.volStep = (inst.volatility ? gnum(inst.volatility) : 1) / 100 * 0.08;
+    sim.spread = inst.spread ? gnum(inst.spread) : 0.04;
+    sim.feeStr = inst.fee_per_fill ? String(inst.fee_per_fill.value) : '0.07';
+    sim.tradeSize = strat && strat.trade_size ? (gnum(strat.trade_size) | 0) : 50;
+    sim.maxPos = strat && strat.max_pos ? (gnum(strat.max_pos) | 0) : 500;
+    sim.thresh = Math.max(0.01, sim.spread * 3);
+    if (feed && feed.resync) { sim.resync = (feed.resync.value === true || feed.resync.value === 'true'); $('fresync').checked = sim.resync; }
+    sim.ema = null; sim.seq = 0; sim.pos = 0; sim.fills = 0; sim.dropped = 0; sim.tframe = 0;
+    sim.cashMicros = 0n; sim.feeMicros = 0n; sim.cashF = 0; sim.feeF = 0;
+    sim.hist = []; sim.trades = []; sim.history = []; sim.lastGood = null;
+    $('fsymhint').textContent = sim.symbol + ' · ' + sim.currency;
+    msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + sim.symbol + ' restarted';
+  }
+  function updateCfgHL() { $('fcfg-hl').innerHTML = $('fcfg').value.split('\n').map((l) => Hl.highlightLine(l)).join('\n') + '\n'; }
+  $('fcfg').addEventListener('input', updateCfgHL);
+  $('fcfg').addEventListener('scroll', () => { $('fcfg-hl').scrollTop = $('fcfg').scrollTop; $('fcfg-hl').scrollLeft = $('fcfg').scrollLeft; });
+  $('fapply').addEventListener('click', applyConfig);
+  $('freset').addEventListener('click', () => { $('fcfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig(); });
+  $('fplay').addEventListener('click', () => { sim.playing = !sim.playing; $('fplay').textContent = sim.playing ? '⏸ Pause' : '▶ Play'; sim.playing ? start() : stop(); });
+  $('fspeed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('fspeedlbl').textContent = sim.speed + '×'; });
+  $('fnoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
+  $('fresync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
+  if (window.ResizeObserver) new ResizeObserver(() => { sizeCanvas(); drawChart(); }).observe(cv);
+
+  $('fcfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig();
+  for (let i = 0; i < 3; i++) step();   // seed a few ticks so the panel/chart aren't blank on first view
+  window.BvnrDemos = window.BvnrDemos || {};
+  window.BvnrDemos.fin = {
+    activate() { sizeCanvas(); drawChart(); if (sim.playing) start(); },
+    deactivate() { stop(); },
+  };
+})();
+</script>
+
+<script id="bvnr-industrial-sim">
+(function () {
+  'use strict';
+  if (!window.BovnarParser || !window.BovnarHighlight) return;
+  const { parseBovnar, EV } = window.BovnarParser;
+  const Hl = window.BovnarHighlight;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+  function decode(text) {
+    const errs = [], root = {}; const stack = [{ obj: root }]; let key = null, ann = null;
+    parseBovnar(text, (ev) => {
+      const top = stack[stack.length - 1];
+      switch (ev.type) {
+        case EV.ASSIGNMENT_START: key = ev.data.key; ann = null; break;
+        case EV.TYPE_ANN_START: ann = {}; break;
+        case EV.TYPE_ANN_FAMILY: (ann = ann || {}).family = ev.data.family; break;
+        case EV.TYPE_ANN_PARAM: { ann = ann || {}; const d = ev.data; if (d.kind === 'unit') ann.unit = d.text; break; }
+        case EV.STRUCT_START: { const o = {}; if (key != null) top.obj[key] = { struct: o }; stack.push({ obj: o }); key = null; ann = null; break; }
+        case EV.STRUCT_END: stack.pop(); break;
+        case EV.DATA: { if (key != null) top.obj[key] = { value: ev.data.value, text: ev.data.text, unit: (ann && ann.unit) || null, line: ev.line }; ann = null; break; }
+        case EV.ASSIGNMENT_END: key = null; ann = null; break;
+        case EV.ERROR: errs.push({ msg: ev.data.msg, line: ev.line }); break;
+      }
+    });
+    return { map: root, errs };
+  }
+
+  let rs = 5501; function rnd() { rs = (rs * 1103515245 + 12345) & 0x7fffffff; return rs / 0x7fffffff; }
+  function gauss() { return Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd()); }
+
+  const BITS = [
+    { m: 1, name: 'RUN', cls: 'ok' }, { m: 2, name: 'HEATING', cls: 'warn' }, { m: 4, name: 'AT SETPOINT', cls: 'ok' },
+    { m: 8, name: 'HIGH TEMP', cls: 'alarm' }, { m: 16, name: 'HIGH PRESS', cls: 'alarm' }, { m: 32, name: 'LOW LEVEL', cls: 'warn' },
+  ];
+
+  const sim = {
+    ambient: 22, setpoint: 78.5, temp: 24, pressure: 1.0, level: 60, flow: 14.7, agitator: 220, heater: 0, status: 0,
+    Kp: 3, Ki: 0.04, Kd: 6, integ: 0, prevErr: 0, tempMax: 86, pressMax: 3.0, levelMin: 38,
+    cyc: 0, dropped: 0, tframe: 0, playing: true, speed: 6, noisy: false, resync: true, mismatch: false,
+    hist: [], history: [], lastGood: null,
+  };
+
+  const f2 = (n) => n.toFixed(2), f1 = (n) => n.toFixed(1);
+  function buildFrame() {
+    const row = (k, v) => '    .' + k.padEnd(9) + ' = ' + v + ';';
+    const st = (sim.status >>> 0).toString(2).padStart(16, '0').slice(-16);
+    return ['.reactor = {',
+      row('setpoint', '<float_fix:16,q8,°C> ' + f2(sim.setpoint)),
+      row('temp', '<float_fix:16,q8,°C> ' + f2(sim.temp)),
+      row('pressure', '<float_fix:16,q8,bar> ' + f2(sim.pressure)),
+      row('level', '<float_fix:16,q8,%> ' + f1(sim.level)),
+      row('flow_in', '<float_fix:32,q8,L/min> ' + f1(sim.flow)),
+      row('agitator', '<uint:16,rpm> ' + sim.agitator),
+      row('heater', '<float_fix:16,q8,%> ' + f1(sim.heater)),
+      row('status', '<uint:16,_2> ' + st), '};'].join('\n');
+  }
+  function corrupt(text) {
+    const f = ['temp', 'pressure', 'level', 'status'][(rnd() * 4) | 0];
+    if (rnd() < 0.5) return text.replace(new RegExp('(\\.' + f + '\\s+)= '), '$1  ');
+    return text.replace(new RegExp('(\\.' + f + '\\s+= [^;\\n]*)'), '$1 §@!');
+  }
+
+  function step() {
+    sim.cyc++;
+    const kH = 0.075, kL = 0.05, dt = 0.2;
+    sim.temp += (kH * sim.heater - kL * (sim.temp - sim.ambient)) * dt + gauss() * 0.04;
+    sim.pressure = 1.0 + 0.03 * (sim.temp - sim.ambient) + gauss() * 0.02;
+    sim.level = 55 + 20 * Math.sin(sim.cyc / 60) + gauss() * 0.3;
+    sim.flow = 14 + gauss() * 0.4;
+    sim.agitator = 220 + Math.round(gauss() * 4);
+    let st = 0;
+    if (sim.playing) st |= 1;
+    if (sim.heater > 5) st |= 2;
+    if (Math.abs(sim.setpoint - sim.temp) < 0.8) st |= 4;
+    if (sim.temp > sim.tempMax) st |= 8;
+    if (sim.pressure > sim.pressMax) st |= 16;
+    if (sim.level < sim.levelMin) st |= 32;
+    sim.status = st;
+
+    let text = buildFrame();
+    if (sim.noisy && (sim.tframe % 4 === 3)) text = corrupt(text);
+    const dec = decode(text); const bad = dec.errs.length > 0; const drop = bad && !sim.resync;
+    if (drop) sim.dropped++; sim.tframe++;
+    const m = dec.map.reactor && dec.map.reactor.struct;
+    let D;
+    if (drop || !m) {
+      D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, press: sim.pressure, level: sim.level, flow: sim.flow, agit: sim.agitator, heat: sim.heater, status: sim.status };
+    } else {
+      const num = (n, f) => (n ? parseFloat(n.value) : f);
+      D = {
+        temp: num(m.temp, sim.temp), set: num(m.setpoint, sim.setpoint), press: num(m.pressure, sim.pressure),
+        level: num(m.level, sim.level), flow: num(m.flow_in, sim.flow), agit: m.agitator ? parseInt(m.agitator.value, 10) : sim.agitator,
+        heat: num(m.heater, sim.heater),
+        status: m.status ? parseInt(String(m.status.value).replace(/[^01]/g, '') || '0', 2) : sim.status,
+      };
+      sim.lastGood = D;
+    }
+    // PID runs on the DECODED temperature → next heater output (closed loop through the format)
+    if (!drop) {
+      const err = sim.setpoint - D.temp;
+      sim.integ = clamp(sim.integ + err, -1500, 1500);     // headroom for the integral to reach setpoint
+      sim.heater = clamp(sim.Kp * err + sim.Ki * sim.integ + sim.Kd * (err - sim.prevErr), 0, 100);
+      sim.prevErr = err;
+    }
+    sim.hist.push({ temp: D.temp, set: D.set }); if (sim.hist.length > 180) sim.hist.shift();
+
+    pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D);
+    $('is-cyc').textContent = sim.cyc; $('is-drop').textContent = sim.dropped;
+    const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
+  }
+
+  function pushTicker(ok) {
+    sim.history.push(ok); if (sim.history.length > 64) sim.history.shift();
+    $('iticker').innerHTML = sim.history.map((o, i) => '<i class="' + (o ? 'ok' : 'bad') + (i === sim.history.length - 1 ? ' cur' : '') + '"></i>').join('');
+  }
+  function renderFrame(text, errs) {
+    const el = new Set(errs.map((e) => e.line));
+    $('iframesrc').innerHTML = text.split('\n').map((l, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + Hl.highlightLine(l) + '</span></div>').join('');
+  }
+  function renderHMI(D) {
+    const hiT = (D.status & 8), hiP = (D.status & 16), loL = (D.status & 32);
+    $('ialarms').innerHTML = BITS.filter((b) => D.status & b.m).map((b) => '<span class="alarm-chip ' + b.cls + '">' + b.name + '</span>').join('') ||
+      '<span class="alarm-chip ok">● NOMINAL</span>';
+    const g = (cls, k, v, u) => '<div class="gauge ' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
+    $('igauges').innerHTML =
+      g('span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''), 'Temperature', D.temp.toFixed(2), '°C') +
+      g('', 'Setpoint', D.set.toFixed(2), '°C') + g(hiP ? 'down' : '', 'Pressure', D.press.toFixed(2), 'bar') +
+      g(loL ? 'down' : '', 'Level', D.level.toFixed(1), '%') + g('', 'Flow in', D.flow.toFixed(1), 'L/min') +
+      g('', 'Heater', D.heat.toFixed(0), '%') + g('', 'Agitator', D.agit, 'rpm');
+    // raw register vs self-describing Bovnar
+    const reg = Math.max(0, Math.min(65535, Math.round(D.temp * 256)));
+    const naive = reg / (sim.mismatch ? 16 : 256);
+    $('iraw').textContent = reg;
+    $('inaive').textContent = naive.toFixed(2) + ' °C';
+    $('ibvnr').textContent = D.temp.toFixed(2) + ' °C';
+    const v = $('iverdict');
+    if (sim.mismatch) { v.textContent = '✗ false over-temp: reads ' + naive.toFixed(0) + ' °C'; v.style.color = 'var(--down)'; }
+    else { v.textContent = '✓ scaling matches'; v.style.color = 'var(--up)'; }
+  }
+
+  const cv = $('ipx'), ctx = cv.getContext('2d');
+  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function line(a, b, c, d) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); }
+  function draw() {
+    const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h); ctx.fillStyle = '#0c0e14'; ctx.fillRect(0, 0, w, h);
+    const D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, level: sim.level, heat: sim.heater, flow: sim.flow };
+    const splitY = Math.round(h * 0.60);
+    const tankW = Math.min(110, w * 0.30), tankH = Math.round((splitY - 30) * 0.86);
+    const tx = Math.round(w * 0.40 - tankW / 2), ty = Math.round((splitY - tankH) / 2) + 6;
+    const heat = clamp(sim.heater / 100, 0, 1);
+    ctx.fillStyle = 'rgba(232,138,58,' + (0.12 + 0.6 * heat) + ')'; ctx.fillRect(tx - 9, ty + 8, 6, tankH - 16); ctx.fillRect(tx + tankW + 3, ty + 8, 6, tankH - 16);
+    const tt = clamp((D.temp - 22) / (95 - 22), 0, 1);
+    const cr = Math.round(47 + 170 * tt), cg = Math.round(109 - 11 * tt), cb = Math.round(176 - 129 * tt);
+    const fillH = Math.round(tankH * clamp(D.level, 0, 100) / 100);
+    ctx.fillStyle = 'rgb(' + cr + ',' + cg + ',' + cb + ')'; ctx.fillRect(tx, ty + tankH - fillH, tankW, fillH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; line(tx, ty + tankH - fillH, tx + tankW, ty + tankH - fillH);
+    ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 2; rrect(tx, ty, tankW, tankH, 7); ctx.stroke();
+    const ipx0 = tx + tankW * 0.28; ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 4; line(ipx0, ty - 22, ipx0, ty);
+    const tnow = performance.now() * 0.001;
+    for (let i = 0; i < 3; i++) { const f = ((tnow * 0.6 * (D.flow / 14) + i / 3) % 1); ctx.fillStyle = 'rgba(120,200,255,' + (0.8 * Math.sin(Math.PI * f)) + ')'; ctx.beginPath(); ctx.arc(ipx0, ty - 22 + f * 22, 1.8, 0, 6.283); ctx.fill(); }
+    ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 4; line(tx + tankW * 0.72, ty + tankH, tx + tankW * 0.72, ty + tankH + 16);
+    const cxa = tx + tankW / 2, sTop = ty - 16, sBot = ty + tankH * 0.55;
+    ctx.strokeStyle = '#9aa3b0'; ctx.lineWidth = 2; line(cxa, sTop, cxa, sBot);
+    const ang = sim.cyc * 0.5, pw = tankW * 0.30, k = Math.cos(ang);
+    ctx.strokeStyle = '#4ec9b0'; ctx.lineWidth = 2.5; line(cxa - pw * k, sBot, cxa + pw * k, sBot);
+    ctx.fillStyle = '#3a4150'; ctx.fillRect(cxa - 9, sTop - 9, 18, 9);
+    // trend strip
+    const ty2 = splitY + 6, th2 = h - splitY - 12, x0 = 8, w0 = w - 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(x0, ty2, w0, th2);
+    const A = sim.hist; if (A.length >= 2) {
+      let lo = Infinity, hi = -Infinity; for (const p of A) { lo = Math.min(lo, p.temp, p.set); hi = Math.max(hi, p.temp, p.set); }
+      const sp = (hi - lo) || 1; lo -= sp * 0.15; hi += sp * 0.15; const N = 180, off = N - A.length;
+      const X = (i) => x0 + (i / (N - 1)) * w0, Y = (v) => ty2 + (1 - (v - lo) / (hi - lo)) * th2;
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(140,156,176,0.8)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i < A.length; i++) { const xx = X(i + off), yy = Y(A[i].set); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = '#7fd1ff'; ctx.lineWidth = 1.6; ctx.beginPath();
+      for (let i = 0; i < A.length; i++) { const xx = X(i + off), yy = Y(A[i].temp); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke();
+      const lt = A[A.length - 1].temp, ly = Y(lt); ctx.fillStyle = '#7fd1ff'; ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.fillText(lt.toFixed(1) + '°C', x0 + w0 - 3, Math.max(ty2 + 10, ly - 3));
+    }
+  }
+
+  let rafId = null, lastWall = null, acc = 0;
+  function loop(now) {
+    if (lastWall == null) lastWall = now; let el = now - lastWall; lastWall = now; if (el > 250) el = 250;
+    acc += el; const interval = 1000 / sim.speed; let did = false;
+    while (acc >= interval) { acc -= interval; step(); did = true; }
+    if (did) $('is-rate').textContent = sim.speed + '/s';
+    draw(); rafId = requestAnimationFrame(loop);
+  }
+  function start() { if (rafId == null) { lastWall = null; acc = 0; rafId = requestAnimationFrame(loop); } }
+  function stop() { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
+
+  const DEFAULT_CFG =
+`# ── Reactor R-204 — PLC telemetry config ───────────────
+# Fixed-point registers carry their scaling (q) and unit inline.
+.control = {
+    .setpoint = <float_fix:16,q8,°C> 78.50;
+    .kp       = <float_fix:16,q8>    3.0;
+    .ki       = <float_fix:16,q8>    0.04;
+    .kd       = <float_fix:16,q8>    6.0;
+};
+
+.limits = {
+    .temp_max  = <float_fix:16,q8,°C>  86.0;
+    .press_max = <float_fix:16,q8,bar> 3.0;
+    .level_min = <float_fix:16,q8,%>   38.0;
+};
+
+.bus = {
+    .resync = true;
+};`;
+
+  function applyConfig() {
+    const dec = decode($('icfg').value), msg = $('icfgmsg');
+    if (dec.errs.length) { msg.className = 'cfg-msg err'; msg.textContent = '✗ parse error, line ' + dec.errs[0].line; return; }
+    const c = dec.map.control && dec.map.control.struct, lim = dec.map.limits && dec.map.limits.struct, bus = dec.map.bus && dec.map.bus.struct;
+    if (!c || !c.setpoint) { msg.className = 'cfg-msg err'; msg.textContent = '✗ no .control.setpoint'; return; }
+    sim.setpoint = parseFloat(c.setpoint.value);
+    sim.Kp = c.kp ? parseFloat(c.kp.value) : 3; sim.Ki = c.ki ? parseFloat(c.ki.value) : 0.04; sim.Kd = c.kd ? parseFloat(c.kd.value) : 6;
+    sim.tempMax = lim && lim.temp_max ? parseFloat(lim.temp_max.value) : 86;
+    sim.pressMax = lim && lim.press_max ? parseFloat(lim.press_max.value) : 3.0;
+    sim.levelMin = lim && lim.level_min ? parseFloat(lim.level_min.value) : 38;
+    if (bus && bus.resync) { sim.resync = (bus.resync.value === true || bus.resync.value === 'true'); $('iresync').checked = sim.resync; }
+    sim.temp = sim.ambient + 2; sim.pressure = 1.0; sim.heater = 0; sim.integ = 0; sim.prevErr = 0; sim.cyc = 0; sim.dropped = 0; sim.tframe = 0;
+    sim.hist = []; sim.history = []; sim.lastGood = null;
+    msg.className = 'cfg-msg ok'; msg.textContent = '✓ reactor restarted';
+  }
+  function updateCfgHL() { $('icfg-hl').innerHTML = $('icfg').value.split('\n').map((l) => Hl.highlightLine(l)).join('\n') + '\n'; }
+  $('icfg').addEventListener('input', updateCfgHL);
+  $('icfg').addEventListener('scroll', () => { $('icfg-hl').scrollTop = $('icfg').scrollTop; $('icfg-hl').scrollLeft = $('icfg').scrollLeft; });
+  $('iapply').addEventListener('click', applyConfig);
+  $('ireset').addEventListener('click', () => { $('icfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig(); });
+  $('iplay').addEventListener('click', () => { sim.playing = !sim.playing; $('iplay').textContent = sim.playing ? '⏸ Pause' : '▶ Play'; sim.playing ? start() : stop(); });
+  $('ispeed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('ispeedlbl').textContent = sim.speed + '×'; });
+  $('imismatch').addEventListener('change', (e) => { sim.mismatch = e.target.checked; });
+  $('inoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
+  $('iresync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
+  if (window.ResizeObserver) new ResizeObserver(() => { sizeCanvas(); draw(); }).observe(cv);
+
+  $('icfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig();
+  for (let i = 0; i < 3; i++) step();   // seed a few cycles so the HMI/trend aren't blank on first view
+  window.BvnrDemos = window.BvnrDemos || {};
+  window.BvnrDemos.ind = { activate() { sizeCanvas(); draw(); if (sim.playing) start(); }, deactivate() { stop(); } };
+})();
+</script>
+
+<script id="bvnr-demo-switch">
+(function () {
+  const panes = { mc: document.getElementById('demo-mc'), fin: document.getElementById('demo-fin'), ind: document.getElementById('demo-ind') };
+  if (!panes.mc || !panes.fin || !panes.ind) return;
+  const blurb = document.getElementById('demo-blurb');
+  const BLURBS = {
+    mc: blurb ? blurb.innerHTML : '',
+    fin: '<strong>Same format, a trading desk.</strong> The exchange serializes every tick as ' +
+         '<code>&lt;float_dec:64,USD&gt;</code> — exact decimal money, currency <em>inline</em> — and the chart and ' +
+         'ledger run only on <em>decoded</em> values. Because prices ride as decimal (not binary float), the book stays ' +
+         'penny-perfect; watch the naïve-float ledger drift against it.',
+    ind: '<strong>Same format, a plant floor.</strong> A PLC streams reactor registers as ' +
+         '<code>&lt;float_fix:16,q8,°C&gt;</code> — fixed-point scaling and unit <em>inline</em>, just like the device — ' +
+         'and the HMI and PID loop run only on <em>decoded</em> values. Toggle <em>scaling mismatch</em> to see the ' +
+         'classic Modbus disaster a self-describing register can\'t cause.',
+  };
+  let current = 'mc';
+  // Reserve the height of the TALLEST blurb so the shorter ones don't shrink the
+  // header on switch (which would shift everything below up). Re-measured on
+  // resize since the blurbs wrap to different line counts at different widths.
+  function reserveBlurb() {
+    if (!blurb) return;
+    blurb.style.minHeight = '0';
+    let max = 0;
+    for (const k in BLURBS) { blurb.innerHTML = BLURBS[k]; if (blurb.offsetHeight > max) max = blurb.offsetHeight; }
+    blurb.innerHTML = BLURBS[current];
+    blurb.style.minHeight = max + 'px';
+  }
+  function switchTo(name) {
+    const D = window.BvnrDemos || {};
+    for (const k in D) if (k !== name && D[k]) D[k].deactivate();   // stop the other sim first
+    for (const k in panes) panes[k].hidden = (k !== name);
+    current = name;
+    if (blurb && BLURBS[name]) blurb.innerHTML = BLURBS[name];
+    document.querySelectorAll('#launch-demo .demo-tab').forEach((t) => t.classList.toggle('active', t.dataset.demo === name));
+    if (D[name]) D[name].activate();                                // size + draw + start (pane now visible)
+  }
+  document.querySelectorAll('#launch-demo .demo-tab').forEach((t) => t.addEventListener('click', () => switchTo(t.dataset.demo)));
+  switchTo('mc');
+  reserveBlurb();
+  let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(reserveBlurb, 150); });
+})();
 </script>
 </body>
 </html>

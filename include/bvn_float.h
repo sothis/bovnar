@@ -81,7 +81,26 @@ BVN_API int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize
 						  uint32_t base);
 BVN_API size_t bvn_float_str_bufsize(uint32_t prec, uint32_t base);
 BVN_API bool bvn_float_from_double(bvn_float_t *f, double v);
+/*
+ * Narrowing a bvn_float to a fixed-width binary format (bvn_float_to_double /
+ * to_float / to_bin*) rounds the *stored* value once, correctly. It cannot undo
+ * a rounding that already happened when the bvn_float was built: if a decimal
+ * string was parsed into a bvn_float whose precision lacks headroom over the
+ * target -- target significand bits plus, for subnormal results, the subnormal
+ * shift -- the parse and the narrowing round in sequence (double rounding) and
+ * the result can be 1 ULP off in the subnormal range. For a correctly-rounded
+ * decimal-string-to-binary64 conversion either give the bvn_float ample
+ * precision before narrowing, or use the exact single-rounding decimal path
+ * (bvn_float_strtod, which bvn_parse_double_in_base uses for base 10).
+ */
 BVN_API bool bvn_float_to_double  (const bvn_float_t *f, double *out);
+/*
+ * Correctly-rounded base-10 decimal string -> double (single rounding, correct
+ * for subnormals). NULL returns 0.0. This is the supported public form of the
+ * conversion the value layer uses; prefer it over building a low-precision
+ * bvn_float and narrowing.
+ */
+BVN_API double bvn_float_strtod(const char *s);
 BVN_API bool bvn_float_from_float (bvn_float_t *f, float v);
 BVN_API bool bvn_float_to_float   (const bvn_float_t *f, float *out);
 BVN_API void bvn_float_to_ieee_bin(const bvn_float_t *f,

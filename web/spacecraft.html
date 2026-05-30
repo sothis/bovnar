@@ -42,18 +42,32 @@
   --cyan:    #9cdcfe;
   --red:     #f44747;
 
-  /* Bovnar token colors */
-  --c-comment:  #80a0ff;
-  --c-sigil:    #ff80ff;
-  --c-key:      #40ffff;
-  --c-eq:       #ffff60;
-  --c-ann:      #60ff60;
-  --c-val:      #ffa0a0;
-  --c-unit:     #40ffff;
-  --c-str:      #ffa0a0;
-  --c-semi:     #4a4a5a;
-  --c-struct:   #60ff60;
-  --c-sym:      #c695dc;
+  /* Bovnar token colors — kept in lock-step with highlighter/vim/bovnar.vim */
+  --c-comment:  #6e7a86;
+  --c-sigil:    #c084fc;
+  --c-key:      #67d1f4;
+  --c-eq:       #f47067;
+  --c-ann:      #a09040;
+  --c-type:     #e8e8e8;
+  --c-width:    #ff5faf;
+  --c-base:     #afffd7;
+  --c-param:    #da844c;
+  --c-val:      #f0c64e;
+  --c-neg:      #f47067;
+  --c-unit:     #5eead4;
+  --c-unitsep:  #6e7a86;
+  --c-str:      #87d88c;
+  --c-semi:     #5a6270;
+  --c-sym:      #67d1f4;
+  --c-bool:     #c084fc;
+  --c-null:     #4c5661;
+  --c-special:  #c084fc;
+  --c-refop:    #f47067;
+  --c-refpath:  #d06070;
+  --c-sep:      #6e7a86;
+  /* { } / [ ] rainbow depth (vim BovnarStructDelim1-8 / ArrayDelim1-5) */
+  --c-d1: #da844c; --c-d2: #c084fc; --c-d3: #ff2a7d; --c-d4: #ffa500;
+  --c-d5: #87d88c; --c-d6: #5eead4; --c-d7: #f0c64e; --c-d8: #67d1f4;
 
   --mono: 'JetBrains Mono', 'Consolas', monospace;
   --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -102,17 +116,17 @@ header.intro h1 .accent { color: var(--teal); }
 header.intro p { color: var(--text2); font-size: 0.92rem; margin-top: 0.35rem; max-width: 90ch; }
 header.intro p code { font-family: var(--mono); color: var(--cyan); font-size: 0.85em; }
 
-/* Config + visualizer stack in the left column; the intrinsically tall telemetry
-   stream fills the right column full-height. Bottoms align naturally (telemetry
-   height ≈ config + viz) and the visualizer just absorbs the leftover height, so
-   there's no ragged mosaic and no dead space. */
+/* Visualizer (top) + config (bottom) stack in the left column; the intrinsically
+   tall telemetry stream fills the right column full-height. The config sits at its
+   natural height and the visualizer absorbs the leftover height above it, so
+   bottoms align (telemetry height ≈ viz + config) with no ragged mosaic. */
 .grid {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(440px, 1.2fr);
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 1fr auto;
   grid-template-areas:
-    "config telemetry"
-    "viz    telemetry";
+    "viz    telemetry"
+    "config telemetry";
   gap: 12px;
   padding: 12px 1.4rem 2rem;
   max-width: 1700px; margin: 0 auto;
@@ -124,7 +138,7 @@ header.intro p code { font-family: var(--mono); color: var(--cyan); font-size: 0
   .grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
-    grid-template-areas: "config" "viz" "telemetry";
+    grid-template-areas: "viz" "config" "telemetry";
   }
   /* single column: the visualizer becomes a fixed banner rather than filling */
   .panel.viz .canvas-wrap { flex: 0 0 auto; height: clamp(320px, 56vw, 540px); min-height: 0; }
@@ -152,7 +166,10 @@ header.intro p code { font-family: var(--mono); color: var(--cyan); font-size: 0
 
 /* config editor — transparent textarea over a syntax-highlighted layer */
 .editor {
-  position: relative; flex: 1 1 auto; min-height: 240px;
+  /* Static fallback that fits the default config (~22 lines at 0.78rem of the
+     16px root × 1.55 + padding); fitCfgEditor() then sets the exact height in JS
+     so the pane never needs its own scrollbar. flex absorbs extra column height. */
+  position: relative; flex: 1 1 auto; min-height: 447px;
   background: var(--editor-bg);
   border: 1px solid var(--border); border-radius: 4px;
   overflow: hidden;
@@ -233,14 +250,32 @@ pre.frame .ln:hover, pre.frame .ln.hl { background: rgba(38,79,120,0.45); }
 pre.frame .ln.err { background: rgba(244,71,71,0.13); }
 pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-right: 0.9em; flex-shrink: 0; user-select: none; }
 .t-comment { color: var(--c-comment); }
-.t-key  { color: var(--c-key); }
-.t-eq   { color: var(--c-eq); }
-.t-ann  { color: var(--c-ann); }
-.t-val  { color: var(--c-val); }
-.t-str  { color: var(--c-str); }
-.t-sym  { color: var(--c-sym); }
-.t-semi { color: var(--c-semi); }
-.t-struct { color: var(--c-struct); }
+.t-sigil   { color: var(--c-sigil); }
+.t-key     { color: var(--c-key); }
+.t-eq      { color: var(--c-eq); }
+.t-semi    { color: var(--c-semi); }
+.t-str     { color: var(--c-str); }
+.t-num     { color: var(--c-val); }
+.t-neg     { color: var(--c-neg); }
+.t-unit    { color: var(--c-unit); }
+.t-unitsep { color: var(--c-unitsep); }
+.t-sym     { color: var(--c-sym); }
+.t-bool    { color: var(--c-bool); font-weight: 600; }
+.t-null    { color: var(--c-null); font-style: italic; }
+.t-special { color: var(--c-special); }
+.t-sep     { color: var(--c-sep); }
+.t-adelim  { color: var(--c-ann); }
+.t-type    { color: var(--c-type); font-weight: 600; }
+.t-tsep    { color: var(--c-sep); }
+.t-width   { color: var(--c-width); }
+.t-base    { color: var(--c-base); }
+.t-param   { color: var(--c-param); }
+.t-refop   { color: var(--c-refop); font-weight: 600; }
+.t-refpath { color: var(--c-refpath); }
+.t-d1 { color: var(--c-d1); } .t-d2 { color: var(--c-d2); }
+.t-d3 { color: var(--c-d3); } .t-d4 { color: var(--c-d4); }
+.t-d5 { color: var(--c-d5); } .t-d6 { color: var(--c-d6); }
+.t-d7 { color: var(--c-d7); } .t-d8 { color: var(--c-d8); }
 
 /* gauges */
 .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0.6rem; }
@@ -256,6 +291,10 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 .gauge.sym .v { color: var(--c-sym); }
 .gauge.span2 { grid-column: 1 / -1; }
 .gauge.stale { opacity: 0.45; }
+/* a field whose downlink value is currently corrupt: blank it out and flag it */
+.gauge.err { border-color: var(--red); background: rgba(244,71,71,0.08); }
+.gauge.err .v { color: var(--red); }
+.gauge.err .t { color: var(--red); opacity: 0.7; }
 
 .note { color: var(--text3); font-size: 0.74rem; font-family: var(--mono); margin-top: 0.5rem; }
 .note b { color: var(--text2); font-weight: 400; }
@@ -311,7 +350,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     <div class="viz-legend">
       <span><b>◐</b> Earth (day / night)</span>
       <span><b style="color:#4ec9b0">●</b> spacecraft (decoded pos)</span>
-      <span><b style="color:#78ebcd">↓</b> downlink · <b style="color:#e8c878">↑</b> uplink</span>
+      <span><b style="color:#82f0d2">→</b> flight direction</span>
     </div>
   </section>
 
@@ -353,6 +392,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 </div>
 
 <script src="bovnar_parser.js"></script>
+<script src="bovnar_highlight.js"></script>
 <script>
 (function () {
   'use strict';
@@ -454,7 +494,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
   const SUN_A = 23.44 * D2R;
   const SUN = { x: Math.cos(SUN_A), y: Math.sin(SUN_A) };     // sun direction (ECI, z≈0)
 
-  let orbit = { name: 'NYX-1', a: 9171, e: 0, i: 75.0, raan: 140.0, argp: 0 };
+  let orbit = { name: 'NYX-1', a: 8171, e: 0, i: 75.0, raan: 194.0, argp: 20.0 };
   let orbitPath = [];       // sampled ECI [x,y] for drawing
   let pathExtent = 1;
   let resyncDefault = true;
@@ -504,7 +544,7 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
   const sim = {
     met: 0, speed: 80, playing: true, period: 5400,
     soc: 0.92, panelTemp: 22, tframe: 0, dropped: 0, held: false,
-    history: [], lastGood: null, noisy: false, resync: true,
+    history: [], lastGood: null, noisy: false, resync: true, noiseBurst: 0, noiseTargets: [],
     trail: [], epochMs: Date.parse('2026-05-28T00:00:00Z'),
   };
 
@@ -519,14 +559,41 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
   }
 
   const f = (n, d) => Number(n).toFixed(d);
-  // ISO-8601 to whole seconds. TAI = UTC + 37 leap seconds (constant since 2017).
-  const isoUTC = (ms) => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
-  const isoTAI = (ms) => new Date(ms + 37000).toISOString().replace(/\.\d+Z$/, '');
+  // The downlink carries TAI only (no UTC). TAI = UTC + 37 leap seconds (constant
+  // since 2017); the trailing 'Z' is dropped because TAI is not a UTC wall-clock.
+  const TAI_OFFSET_MS = 37000;
+  const isoTAI = (ms) => new Date(ms + TAI_OFFSET_MS).toISOString().replace(/\.\d+Z$/, '');
+  // Recover Mission Elapsed Time from a decoded TAI stamp: treat it as the TAI
+  // instant (append 'Z'), back out the 37 s leap offset to UTC, then subtract the
+  // UTC epoch. Returns NaN if the stamp can't be parsed (e.g. a corrupt frame).
+  function metFromTAI(tai) {
+    const t = Date.parse(tai + 'Z');
+    return isNaN(t) ? NaN : (t - TAI_OFFSET_MS - sim.epochMs) / 1000;
+  }
+
+  // Minor, realistic deviations layered onto the clean Kepler state for the
+  // telemetry readout: a slow orbital swell (slight eccentricity / J2 breathing)
+  // plus a little sensor noise. Built from incommensurate sines so it looks
+  // irregular yet never jitters frame-to-frame. Position stays clean — only the
+  // reported alt / speed / velocity drift, like a real GPS+IMU solution that
+  // never reads perfectly nominal.
+  function deviations(t) {
+    const dAlt = 0.60 * Math.sin(t / 55) + 0.28 * Math.sin(t / 19 + 1.7) + 0.10 * Math.sin(t / 6 + 0.6);   // km
+    const dSpd = 2.0 * Math.sin(t / 41 + 0.4) + 0.9 * Math.sin(t / 11 + 2.1) + 0.4 * Math.sin(t / 4 + 1.2); // m/s
+    return { dAlt: dAlt, dSpd: dSpd };
+  }
 
   function buildFrame(st) {
     const v = 24 + 6 * sim.soc;
     const core = 291 + (st.eclipse ? -4 : 4);
     const utcMs = sim.epochMs + sim.met * 1000;
+    const dev = deviations(sim.met);
+    const altR = st.alt + dev.dAlt;                       // deviated altitude (km)
+    const spd = st.speed + dev.dSpd;                      // deviated speed (m/s)
+    // Velocity: keep the clean direction (so the flight-direction arrow stays
+    // steady) and apply the speed deviation as a magnitude change only.
+    const vmag = Math.hypot(st.vel[0], st.vel[1], st.vel[2]) || 1, vscale = spd / vmag;
+    const vel = [st.vel[0] * vscale, st.vel[1] * vscale, st.vel[2] * vscale];
     const row = (k, val) => '    .' + k.padEnd(12) + ' = ' + val + ';';
     // Scalars use Bovnar's inline unit suffix (no annotation needed); the state
     // vectors keep full type annotations (inline units aren't allowed in arrays).
@@ -534,15 +601,14 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     return [
       '.tm = {',
       row('mission_time', f(sim.met, 1) + ' s'),
-      row('utc', '"' + isoUTC(utcMs) + '"'),
       row('tai', '"' + isoTAI(utcMs) + '"'),
       row('mode', modeOf(st.eclipse)),
       row('eclipse', st.eclipse ? 'true' : 'false'),
       row('pos', '<float:64,k~m> [' + f(st.pos[0],2) + ', ' + f(st.pos[1],2) + ', ' + f(st.pos[2],2) + ']'),
-      row('vel', '<float:64,m·s⁻¹> [' + f(st.vel[0],1) + ', ' + f(st.vel[1],1) + ', ' + f(st.vel[2],1) + ']'),
-      row('alt', f(st.alt, 2) + ' k~m'),
-      row('speed', f(st.speed, 1) + ' m·s⁻¹'),
-      row('batt_soc', f(sim.soc * 432, 1) + ' W·h'),   // stored energy = soc × battery_capacity (432 W*h)
+      row('vel', '<float:64,m·s⁻¹> [' + f(vel[0],1) + ', ' + f(vel[1],1) + ', ' + f(vel[2],1) + ']'),
+      row('alt', f(altR, 2) + ' k~m'),
+      row('speed', f(spd, 1) + ' m·s⁻¹'),
+      row('batt_cap', f(sim.soc * 15.43, 2) + ' A·h'),   // stored charge = soc × battery capacity (15.43 A·h ≈ 432 W*h / 28 V)
       row('batt_v', f(v, 2) + ' V'),
       row('temp_core', f(core, 1) + ' K'),
       row('temp_pan', f(sim.panelTemp, 1) + ' °C'),
@@ -550,11 +616,51 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     ].join('\n');
   }
 
-  /* Damage a frame to model a noisy radio link (still recoverable per-line). */
-  function corrupt(text) {
-    return text
-      .replace(/(\.speed\s+)= /, '$1  ')                  // drop '=' → recoverable parse error
-      .replace(/(\.mode\s+= )(\w+);/, '$1N§$2@!;');       // junk symbol
+  /* Damage a frame to model a noisy radio link. A burst targets a *fixed* set of
+     fields (chosen when it starts) so the same gauges stay blank / the same lines
+     stay flagged throughout — but the actual corruption applied to each line is
+     re-randomised every frame: a different syntax error and different illegal
+     bytes each time, so one error frame shows a varied mix rather than one canned
+     pattern. Every fault is still a single mangled assignment (per-line). */
+  const JUNK = '§¶µ¤×÷±®©¿¡‽@#%&▒▓░█◊¬^~|°·';
+  function junk(n) {
+    let s = '';
+    for (let k = 0; k < n; k++) s += JUNK[Math.floor(Math.random() * JUNK.length)];
+    return s;
+  }
+  const rnd = (n) => Math.floor(Math.random() * n);
+  function damageLine(line) {
+    const m = line.match(/^(\s+\.\w+\s*)=(\s*)([^;]*)(;)/);
+    if (!m) return line.replace(/;?\s*$/, ' ' + junk(1 + rnd(3)));        // fallback: tack on junk
+    const head = m[1], sp = m[2], val = m[3], semi = m[4];
+    switch (rnd(8)) {
+      case 0: return head + ' ' + sp + val + semi;                        // dropped '=' → syntax error
+      case 1: return head + '=' + sp + val;                               // dropped ';' → syntax error
+      case 2: return head + '=' + sp + val + ' ' + junk(1 + rnd(4)) + semi; // illegal bytes after value
+      case 3: return head + '=' + sp + junk(2 + rnd(5)) + semi;           // value replaced by junk
+      case 4: { const c = 1 + rnd(Math.max(1, val.length));              // junk spliced into the value
+        return head + '=' + sp + val.slice(0, c) + junk(1 + rnd(2)) + val.slice(c) + semi; }
+      case 5: return head + (Math.random() < 0.5 ? ':=' : '==') + sp + val + semi; // mangled operator
+      case 6: return head.replace(/(\.\w)(\w*)/, (s, a, b) => a + junk(1) + b) + '=' + sp + val + semi; // illegal char in key
+      default: return head + '=' + sp + val + (Math.random() < 0.5 ? '}' : ']') + semi; // stray bracket
+    }
+  }
+  // Pick 1–3 distinct telemetry fields to corrupt for the duration of a burst.
+  function pickNoiseTargets() {
+    const pool = Object.keys(GAUGE_META), out = [];
+    const n = Math.min(pool.length, 1 + rnd(3));
+    for (let k = 0; k < n; k++) out.push(pool.splice(rnd(pool.length), 1)[0]);
+    return out;
+  }
+  function corrupt(text, keys) {
+    const lines = text.split('\n');
+    for (const key of keys) {
+      const re = new RegExp('^\\s+\\.' + key + '\\b');
+      for (let i = 0; i < lines.length; i++) {
+        if (re.test(lines[i])) { lines[i] = damageLine(lines[i]); break; }
+      }
+    }
+    return lines.join('\n');
   }
 
   /* ════════════════════ 4. Canvas drawing ════════════════════ */
@@ -843,40 +949,30 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     ctx.restore();
   }
 
-  // Animated RF link between the craft and its sub-satellite (nadir) point on
-  // Earth: teal pulses stream down (downlink, fast/dense), amber pulses climb up
-  // (uplink, slow/sparse). Only drawn when there's line of sight.
-  function drawCommsLink(sx, sy, cx, cy, er, pos) {
-    // sub-satellite (nadir) point: project RE·(pos/|pos|) so the beam lands on the
-    // globe's surface beneath the craft, not on the disk's silhouette/rim.
-    const r3 = Math.hypot(pos[0], pos[1], pos[2] || 0) || 1;
-    const gx = cx + (pos[0] / r3) * er, gy = cy - (pos[1] / r3) * er;
-    const t = performance.now() * 0.001;
-
+  // Small movement vector — a short arrow along the velocity direction so the
+  // flight direction reads at a glance. Dark backing keeps it legible over the
+  // bright sunlit globe; `dim` fades it in eclipse / when behind Earth.
+  function drawVelocityArrow(x, y, ang, dim) {
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const start = 7, len = 15, head = 4.5;
+    const sx = x + dx * start, sy = y + dy * start;
+    const ex = x + dx * (start + len), ey = y + dy * (start + len);
+    const px = -dy, py = dx;                       // unit perpendicular
     ctx.save();
-    // faint dashed beam
-    ctx.strokeStyle = 'rgba(120,200,255,0.16)'; ctx.lineWidth = 1;
-    ctx.setLineDash([3, 4]);
-    ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(sx, sy); ctx.stroke();
-    ctx.setLineDash([]);
-
-    const dot = (frac, r, col) => {
-      const px = gx + (sx - gx) * frac, py = gy + (sy - gy) * frac;
-      ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI);
-      ctx.fillStyle = col; ctx.fill();
-    };
-    // downlink: sat → ground (200 Mbit/s — dense, fast)
-    for (let i = 0; i < 4; i++) {
-      const f = (t * 0.9 + i / 4) % 1, fade = Math.sin(Math.PI * f);
-      dot(1 - f, 2.0, 'rgba(120,235,205,' + (0.85 * fade) + ')');
-    }
-    // uplink: ground → sat (64 kbit/s — sparse, slow)
-    for (let i = 0; i < 2; i++) {
-      const f = (t * 0.4 + i / 2) % 1, fade = Math.sin(Math.PI * f);
-      dot(f, 1.6, 'rgba(232,200,120,' + (0.8 * fade) + ')');
-    }
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(8,14,24,' + (0.55 * dim) + ')'; ctx.lineWidth = 2.3;   // backing
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = 'rgba(130,240,210,' + (0.95 * dim) + ')'; ctx.lineWidth = 1.0; // shaft
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = 'rgba(130,240,210,' + (0.95 * dim) + ')';                        // head
+    ctx.beginPath();
+    ctx.moveTo(ex + dx * head, ey + dy * head);
+    ctx.lineTo(ex - dx * head * 0.4 + px * head * 0.6, ey - dy * head * 0.4 + py * head * 0.6);
+    ctx.lineTo(ex - dx * head * 0.4 - px * head * 0.6, ey - dy * head * 0.4 - py * head * 0.6);
+    ctx.closePath(); ctx.fill();
     ctx.restore();
   }
+
 
   function drawOrbit(view) {
     const w = cv.clientWidth, h = cv.clientHeight;
@@ -921,8 +1017,8 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
       const velAngle = Math.atan2(-view.vel[1], view.vel[0]);   // screen-space
       const earthAngle = Math.atan2(cy - hy, cx - hx);
 
-      if (!occluded && !view.stale) drawCommsLink(hx, hy, cx, cy, er, view.pos);
       drawSatellite(hx, hy, velAngle, earthAngle, view.eclipse, occluded);
+      drawVelocityArrow(hx, hy, velAngle, occluded ? 0.5 : (view.eclipse ? 0.7 : 1));
 
       // HUD
       ctx.font = '11px JetBrains Mono, monospace'; ctx.textAlign = 'left';
@@ -939,34 +1035,13 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 
   /* ════════════════════ 5. Syntax highlight for the frame source ════════════════════ */
   function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  function span(c, t) { return '<span class="t-' + c + '">' + esc(t) + '</span>'; }
-  function hi(line) {
-    let code = line, tail = '';
-    const h = line.indexOf('#');
-    if (h >= 0) { code = line.slice(0, h); tail = line.slice(h); }
-    const re = /(\s+)|(<[^>]*>)|("(?:[^"\\]|\\.)*")|(&\.[\w.\-+]*)|(\.[A-Za-z_][\w+\-]*)|(-?\d[\d.eE+\-]*)|([A-Za-z_°µμΩÅ][\w·~*°µμΩÅ⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-]*)|(=)|(;)|([\[\]{}\/,])|(.)/g;
-    let out = '', m;
-    while ((m = re.exec(code))) {
-      if (m[1]) out += esc(m[1]);
-      else if (m[2]) out += span('ann', m[2]);
-      else if (m[3]) out += span('str', m[3]);
-      else if (m[4]) out += span('val', m[4]);
-      else if (m[5]) out += span('key', m[5]);
-      else if (m[6]) out += span('val', m[6]);
-      else if (m[7]) out += span('sym', m[7]);
-      else if (m[8]) out += span('eq', m[8]);
-      else if (m[9]) out += span('semi', m[9]);
-      else if (m[10]) out += span('struct', m[10]);
-      else if (m[11]) out += esc(m[11]);
-    }
-    if (tail) out += span('comment', tail);
-    return out;
-  }
+  // Syntax highlighting is delegated to the shared, vim-consistent highlighter
+  // (bovnar_highlight.js); hi() colours one editor / frame-source line.
+  const hi = (line) => BovnarHighlight.highlightLine(line);
 
   /* ════════════════════ 6. Render: frame source + gauges ════════════════════ */
   const GAUGE_META = {
     mission_time: { label: 'MISSION TIME' },
-    utc:       { label: 'UTC', span: true },
     tai:       { label: 'TAI', span: true },
     mode:      { label: 'MODE', sym: true },
     eclipse:   { label: 'ECLIPSE', sym: true },
@@ -974,30 +1049,51 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     vel:       { label: 'VELOCITY (ECI)', span: true },
     alt:       { label: 'ALTITUDE' },
     speed:     { label: 'ORBITAL SPEED' },
-    batt_soc:  { label: 'BATTERY SOC' },
+    batt_cap:  { label: 'BATTERY CAP' },
     batt_v:    { label: 'BUS VOLTAGE' },
     temp_core: { label: 'CORE TEMP' },
     temp_pan:  { label: 'PANEL TEMP' },
   };
 
-  function renderFrame(text, errs) {
+  function renderFrame(text, errs, badKeys) {
+    // Flag a line as errored if the parser reported an error on it OR it carries a
+    // field we deliberately corrupted this frame — keyed marking is reliable even
+    // when a fault shifts the parser's reported line.
     const errLines = new Set(errs.map((e) => e.line));
+    badKeys = badKeys || new Set();
     $('framesrc').innerHTML = text.split('\n').map((l, i) => {
       const ln = i + 1;
-      return '<div class="ln' + (errLines.has(ln) ? ' err' : '') + '" data-line="' + ln + '">' +
+      const km = l.match(/^\s+\.(\w+)\b/);
+      const isErr = errLines.has(ln) || (km && badKeys.has(km[1]));
+      return '<div class="ln' + (isErr ? ' err' : '') + '" data-line="' + ln + '">' +
              '<span class="gut">' + ln + '</span><span>' + hi(l) + '</span></div>';
     }).join('');
     applyHover();
   }
 
-  function renderGauges(rows, stale) {
-    const tm = rows.filter((r) => r.depth === 1 && r.kind !== 'struct');
-    $('gauges').innerHTML = tm.map((r) => {
-      const meta = GAUGE_META[r.key] || { label: r.key };
+  function renderGauges(rows, stale, badKeys) {
+    badKeys = badKeys || new Set();
+    // Index the decoded telemetry rows by key, then render one tile per known
+    // field in a FIXED order. A field that errored this frame (in badKeys) — or
+    // that simply failed to decode — gets a blank, error-marked tile that holds
+    // its place; the tile is cleared for as long as that field's error persists.
+    const byKey = {};
+    rows.forEach((r) => { if (r.depth === 1 && r.kind !== 'struct') byKey[r.key] = r; });
+    $('gauges').innerHTML = Object.keys(GAUGE_META).map((key) => {
+      const meta = GAUGE_META[key], r = byKey[key];
+      const errored = badKeys.has(key) || !r;
       const cls = ['gauge'];
       if (meta.sym) cls.push('sym');
       if (meta.span) cls.push('span2');
-      if (stale) cls.push('stale');
+      if (errored) cls.push('err');
+      else if (stale) cls.push('stale');
+      if (errored) {
+        return '<div class="' + cls.join(' ') + '"' + (r ? ' data-line="' + r.line + '"' : '') + '>' +
+               '<div class="k">' + esc(meta.label) + '</div>' +
+               '<div class="v">—</div>' +
+               '<div class="t">no data</div>' +
+               '</div>';
+      }
       let val = r.valueText;
       if (r.dataKind === 'string') val = '"' + val + '"';
       const unit = r.unit ? '<span class="u">' + esc(r.unit) + '</span>' : '';
@@ -1051,15 +1147,40 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
     const st = propagate(sim.met);
     if (adv) updateBattery(dt, st.eclipse);
 
-    let text = buildFrame(st), dec, bad = false, drop = false;
+    let text = buildFrame(st), dec, bad = false, drop = false, badKeys = new Set();
     if (doDom) {
-      if (sim.noisy && (sim.tframe % 5 === 4)) text = corrupt(text);
+      // Noisy channel: long bursts of consecutive corrupt frames (a sustained
+      // dropout), not a single-frame flicker, so the lock-LOST/skip stays visible
+      // even at high speed where individual frames whizz past. A burst fixes its
+      // target fields up-front (pickNoiseTargets) and re-damages the SAME fields
+      // every frame, so one line stays flagged / one gauge stays blank throughout.
+      if (sim.noisy) {
+        if (sim.noiseBurst <= 0 && Math.random() < 0.1) {
+          sim.noiseBurst = 16 + Math.floor(Math.random() * 14);   // 16–29 frames — long dropout
+          sim.noiseTargets = pickNoiseTargets();
+        }
+        if (sim.noiseBurst > 0) {
+          text = corrupt(text, sim.noiseTargets);
+          badKeys = new Set(sim.noiseTargets);
+          sim.noiseBurst--;
+        } else { sim.noiseTargets = []; }
+      } else { sim.noiseBurst = 0; sim.noiseTargets = []; }
       dec = decode(text);
       bad = dec.errs.length > 0;
       drop = bad && !sim.resync;            // resync off → discard whole frame
       sim.held = drop;                      // hold the viz until the next good frame
       if (drop) sim.dropped++;
       sim.tframe++;
+      // resync OFF: the parser can't recover, so the frame is lost from the first
+      // error onward — blank every gauge at or after the first corrupted field
+      // (GAUGE_META order matches the downlink line order). Fields before it had
+      // already decoded and stay shown.
+      if (drop && badKeys.size) {
+        const keys = Object.keys(GAUGE_META);
+        let first = Infinity;
+        badKeys.forEach((k) => { const i = keys.indexOf(k); if (i >= 0 && i < first) first = i; });
+        if (first < Infinity) badKeys = new Set(keys.slice(first));
+      }
     } else {
       dec = decode(text);                   // clean decode, just to drive the satellite
     }
@@ -1090,10 +1211,15 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 
     if (doDom) {
       pushTicker(!bad);
-      renderFrame(text, dec.errs);
-      renderGauges(dec.rows, drop);
+      renderFrame(text, dec.errs, badKeys);
+      renderGauges(dec.rows, drop, badKeys);
       $('s-frame').textContent = sim.tframe;
-      $('s-met').textContent = fmtClock(sim.met);
+      // MET is recovered from the decoded TAI stamp (with the leap-second offset
+      // backed out), so the status clock is driven by the stream like everything
+      // else; fall back to the sim clock if this frame's TAI didn't decode.
+      const tmm = dec.map.tm && dec.map.tm.struct;
+      const metTAI = tmm && tmm.tai && tmm.tai.value ? metFromTAI(tmm.tai.value) : NaN;
+      $('s-met').textContent = fmtClock(isNaN(metTAI) ? sim.met : metTAI);
       $('s-orb').textContent = (sim.met / sim.period).toFixed(2);
       $('s-drop').textContent = sim.dropped;
       const lock = $('s-lock');
@@ -1109,84 +1235,56 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
   }
 
   const STEP_DT = 60;                       // seconds advanced by the Step button
-  const DOM_MS = 70;                         // min ms between telemetry/DOM updates (~14 Hz)
-  let rafId = null, lastWall = null, domAccum = 1e9;
+  // The canvas redraws every animation frame for smooth motion, but a downlink
+  // FRAME is emitted on a mission-time cadence — one packet per FRAME_MET seconds
+  // of mission time — so frame (and error-injection) rate tracks the speed slider:
+  // slow the sim and packets/dropouts visibly slow too. A wall-clock floor still
+  // caps the DOM update so very high speeds can't thrash the telemetry pane.
+  const FRAME_MET = 15;                      // mission seconds between downlink frames
+  const MIN_FRAME_MS = 70;                   // wall-clock floor between DOM updates (~14 Hz cap)
+  let rafId = null, lastWall = null, metAccum = FRAME_MET, lastFrameWall = 0;
   function loop(now) {
     if (lastWall == null) lastWall = now;
     let el = now - lastWall; lastWall = now;
     if (el > 250) el = 250;                  // clamp big hitches (tab switch etc.)
-    const dt = el / 1000 * sim.speed;        // real elapsed time × speed
-    domAccum += el;
+    const dt = el / 1000 * sim.speed;        // mission seconds advanced this tick
+    metAccum += dt;
     let doDom = false;
-    if (domAccum >= DOM_MS) { doDom = true; domAccum = 0; }
+    if (metAccum >= FRAME_MET && (now - lastFrameWall) >= MIN_FRAME_MS) {
+      doDom = true; metAccum = 0; lastFrameWall = now;
+    }
     frame(dt, doDom);
     rafId = requestAnimationFrame(loop);
   }
-  function start() { if (rafId == null) { lastWall = null; domAccum = 1e9; rafId = requestAnimationFrame(loop); } }
+  function start() { if (rafId == null) { lastWall = null; metAccum = FRAME_MET; lastFrameWall = 0; rafId = requestAnimationFrame(loop); } }
   function stop()  { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
 
   /* ════════════════════ 8. Config panel ════════════════════ */
+  // Only the fields the visualizer actually reads — edit any of them to reshape
+  // the orbit live. Self-describing: each value carries its own type + unit
+  // inline (ASCII notation; SI prefixes take a '~', e.g. k~m).
   const DEFAULT_CFG =
-`# ── NYX-1 spacecraft configuration ──────────────────────
-# Self-describing: every value carries its own type + unit inline.
-# Config uses ASCII unit notation; SI prefixes take a '~' (k~g, k~m, G~Hz).
-.spacecraft = {
-    .name      = "NYX-1";
-    .cospar_id = "2026-042B";
-    .norad_id  = <uint:32> 99001;
-    .bus       = "ESPA-class smallsat";
-    .mass      = 142.6 k~g;
+`.spacecraft = {
+    # orbit-updated badge
+    .name = "NYX-1";
 };
 
-.orbit = {                          # circular orbit (a = R_earth + altitude)
+.orbit = {
+    # TAI downlink stamp
     .epoch           = "2026-05-28T00:00:00Z";
-    .altitude        = <float:64,k~m> 2800.0;
+    # R_earth + altitude
+    .altitude        = <float:64,k~m> 1800.0;
+    # orbital-plane tilt
     .inclination     = 75.0 deg;
-    .raan            = 140.0 deg;
-    .arg_of_latitude = 0.0 deg;     # start angle from the ascending node
-};
-
-.power = {
-    .solar_array_power = 620 W;
-    .battery_capacity  = 432 W*h;
-    .bus_voltage       = <float:64,V> 28.0;
-    .min_soc           = 0.30;
-};
-
-.propulsion = {
-    .type             = monopropellant;
-    .thrust           = 1.0 N;
-    .specific_impulse = 221 s;
-    .propellant_mass  = 9.8 k~g;
-};
-
-.adcs = {
-    .mode              = three_axis_stabilized;
-    .pointing_accuracy = 0.05 deg;
-    .slew_rate         = 1.5 deg/s;
-    .sensors           = [ "star_tracker", "sun_sensor", "imu", "magnetometer" ];
-    .actuators         = [ "reaction_wheel", "magnetorquer" ];
-};
-
-.comms = {
-    .band           = X;
-    .downlink_rate  = 200 M~bit/s;
-    .uplink_rate    = 64 k~bit/s;
-    .frequency      = 8.20 G~Hz;
-    .transmit_power = 8.0 W;
-    .antenna_gain   = 30.0 dB;
-};
-
-.thermal = {
-    .operating_temp_min = -20.0 degC;
-    .operating_temp_max = 55.0 degC;
-    .heater_power       = 18 W;
+    # ascending-node swing
+    .raan            = 194.0 deg;
+    # start angle from node
+    .arg_of_latitude = 20.0 deg;
 };
 
 .telemetry = {
-    .rate     = 1.0 Hz;
-    .resync   = true;
-    .channels = [ "pos", "vel", "alt", "batt", "thermal", "adcs" ];
+    # enable error recovery
+    .resync = true;
 };`;
 
   function applyConfig() {
@@ -1212,8 +1310,13 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
       argp: o.arg_of_latitude ? gnum(o.arg_of_latitude) : 0,   // u = ω + ν, with ν=0 at epoch
     };
     if (o.epoch) { const ep = Date.parse(o.epoch.value); if (!isNaN(ep)) sim.epochMs = ep; }
+    // Sync the resync toggle to the config on every apply/re-orbit (defaults to
+    // on when the flag is absent), so the checkbox always reflects the config.
+    // The parser yields a real boolean for true/false, so compare loosely.
     const tm = dec.map.telemetry && dec.map.telemetry.struct;
-    if (tm && tm.resync) { sim.resync = (tm.resync.value === 'true'); $('resync').checked = sim.resync; }
+    const rv = tm && tm.resync ? tm.resync.value : undefined;
+    sim.resync = !(rv === false || rv === 'false');
+    $('resync').checked = sim.resync;
     rebuildOrbit();
     renderDerived();
     msg.className = 'cfg-msg ok';
@@ -1233,8 +1336,20 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
 
   /* ════════════════════ 9. Controls wiring ════════════════════ */
   // keep the Bovnar syntax-highlight layer in sync with the config textarea
+  // Grow the editor to exactly fit its content so the config pane never needs an
+  // internal scrollbar. Derived from the real computed line metrics (line-height
+  // is unitless, so this is independent of the web font and any page zoom).
+  const cfgEditor = document.querySelector('.editor');
+  function fitCfgEditor() {
+    const ta = $('cfg'), cs = getComputedStyle(ta);
+    const lh = parseFloat(cs.lineHeight) || 19;
+    const lines = ta.value.split('\n').length;
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    cfgEditor.style.minHeight = Math.ceil(lines * lh + pad + 2) + 'px';   // +2 = editor borders
+  }
   function updateCfgHL() {
     $('cfg-hl').innerHTML = $('cfg').value.split('\n').map(hi).join('\n') + '\n';
+    fitCfgEditor();
   }
   $('cfg').addEventListener('input', updateCfgHL);
   $('cfg').addEventListener('scroll', () => {
@@ -1252,7 +1367,14 @@ pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-ri
   $('step').addEventListener('click', () => { if (sim.playing) { sim.playing = false; $('play').textContent = '▶ Play'; stop(); } frame(STEP_DT, true); });
   $('speed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('speedlbl').textContent = sim.speed + '×'; });
   $('noisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
-  $('resync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
+  // Two-way bind the resync toggle to the config's .resync flag: flipping the
+  // checkbox rewrites the value in the config text (applyConfig does the reverse).
+  function setCfgResync(on) {
+    const ta = $('cfg');
+    const next = ta.value.replace(/(\.resync\s*=\s*)(?:true|false)(\s*;)/, '$1' + (on ? 'true' : 'false') + '$2');
+    if (next !== ta.value) { ta.value = next; updateCfgHL(); }
+  }
+  $('resync').addEventListener('change', (e) => { sim.resync = e.target.checked; setCfgResync(sim.resync); });
   window.addEventListener('resize', () => { sizeCanvas(); drawOrbit(sim.lastGood); });
   // The visualizer's height comes from the flex row, so it isn't final until the
   // sibling panels (telemetry markup, web fonts) settle after boot. Re-sync the

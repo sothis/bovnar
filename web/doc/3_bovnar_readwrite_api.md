@@ -1114,8 +1114,3 @@ int main(void)
 ---
 
 *End of Bovnar Read & Write API Reference (draft, v0.x)*
-
-
-
-
-==> doc/4_bovnar_python_bindings.md <==

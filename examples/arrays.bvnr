@@ -84,13 +84,15 @@
 
 
 # ── 10. Nested arrays ─────────────────────────────────────────────────────────
-# Array elements can themselves be arrays.
-# Sub-arrays inside one bracket group must have equal element counts.
+# Array elements can themselves be arrays. Only the /-separated rows of one
+# array are length-checked; comma-separated sub-arrays are independent elements.
 
 .nested_equal   = [[1, 2], [3, 4]];           # two 2-element sub-arrays: OK
-.nested_unequal = [[1, 2], [3, 4, 5]];        # different sizes in element pos: OK
-                                               # (nested arrays are elements, not sub-rows)
-.tensor_2d = [[1, 2]/[3, 4], [5, 6]/[7, 8]];  # nested 2D arrays as elements
+.nested_unequal = [[1, 2], [3, 4, 5]];        # ragged sub-arrays: OK
+                                               # (nested arrays are elements, not /-rows)
+.tensor_2d = [[1, 2]/[3, 4], [5, 6]/[7, 8]];  # nested 2D /-arrays as elements: OK
+.tensor_jagged = [[1,2]/[3,4], [5,6,7]/[8,9,10]]; # sibling 2D blocks of different
+                                               # leaf width: OK (independent elements)
 
 
 # ── 11. Structs as array elements ────────────────────────────────────────────

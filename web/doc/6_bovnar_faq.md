@@ -619,10 +619,11 @@ Leading, trailing, or consecutive commas produce null elements:
 Yes, inner arrays are just element values:
 
 ```bovnar
-.nested = [[1, 2], [3, 4]];   # valid; inner arrays at the same depth must have equal lengths
+.nested = [[1, 2], [3, 4]];   # valid; the two sub-arrays are independent element values
+.ragged = [[1, 2], [3, 4, 5]]; # also valid — comma-separated sub-arrays may differ in length
 ```
 
-Note: the row-size consistency rule applies to nested arrays too. All bracket pairs at the same nesting depth within a single assignment must have the same element count. `[[1, 2], [3, 4, 5]]` is **not** valid and produces `error_array_row_size_mismatch` because the two inner arrays have 2 and 3 elements respectively.
+Note: the row-size consistency rule is **scoped to a single array** and applies only to its `/`-separated dimension rows. Comma-separated elements — including sub-arrays — are independent of one another, so `[[1, 2], [3, 4, 5]]` is **valid**. The error `error_array_row_size_mismatch` only fires when the `/`-rows of one array disagree, e.g. `[1,2,3]/[4,5]` or, for a nested `/`-array, `[[1,2]/[3,4,5]]`.
 
 ---
 

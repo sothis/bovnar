@@ -24,6 +24,10 @@
 
 #ifndef BVN_FLOAT_IMPL_H_
 #define BVN_FLOAT_IMPL_H_
+#include "bvn_float.h"   /* public API (bvn_float_alloc/from_str/to_*): the
+                          * binary and fixed-point string parsers below route
+                          * through the arbitrary-precision heap engine, so they
+                          * need its declarations regardless of include site. */
 #include "bvn_int.h"
 #include <limits.h>
 #include <stdbool.h>
@@ -176,6 +180,148 @@ static inline bool bvn_float_parse(bvn_float_ctx_t *ctx, const char *s, PNum *r)
 		}
 		r->dex += eneg ? -eabs : eabs;
 	}
+	while (!bvn_int_is_zero(&r->coeff) && !bvn_float_has_overflow(ctx)) {
+		uint32_t rem = bvn_int_div_u32(&r->coeff, 10u);
+		if (rem != 0) {
+			bvni_mul_u32(ctx, &r->coeff, 10u);
+			bvni_add_u32(ctx, &r->coeff, rem);
+			break;
+		}
+		r->dex++;
+	}
+	if (bvn_int_is_zero(&r->coeff)) r->dex = 0;
+	if (bvn_float_has_overflow(ctx)) {
+		r->inf = true;
+		bvn_int_zero(&r->coeff);
+		r->dex = 0;
+	}
+	return true;
+}
+#ifndef BVN_FLOAT_RO_DIGITS
+#define BVN_FLOAT_RO_DIGITS 160
+#endif
+/*
+ * Decimal-domain sibling of bvn_float_parse, used only by the DECIMAL
+ * interchange encoders. It is identical to bvn_float_parse except that it
+ * retains at most BVN_FLOAT_RO_DIGITS significant digits in the coefficient;
+ * any further significant digits are folded into the decimal exponent and
+ * collapsed into a single round-to-ODD on the retained coefficient (its last
+ * decimal digit is forced odd iff the dropped tail was non-zero -- a decimal
+ * integer is even exactly when its low bit is clear, and +1 on an even value
+ * never carries out of the units digit, so the digit count cannot grow).
+ *
+ * to_ieee_decimal then performs its own round-to-nearest-even down to the
+ * format width; decimal round-to-odd composes exactly with a later same-radix
+ * round-to-nearest, so the final decimal result is correctly rounded. The cap
+ * sits far above every decimal format's max_coeff_digs (so ordinary inputs are
+ * untouched and round identically to before) yet far below the ~616-digit
+ * fixed-buffer ceiling, which is what stops a long finite literal from
+ * overflowing the coefficient and mis-saturating to Infinity.
+ *
+ * This must NOT back the binary or fixed-point encoders: decimal round-to-odd
+ * does not compose with a binary round-to-nearest (an exact binary midpoint has
+ * a many-digit decimal expansion that the cap would perturb, breaking
+ * ties-to-even), so those paths round an exact rational via the heap engine
+ * instead.
+ */
+static inline bool bvn_float_parse_ro(bvn_float_ctx_t *ctx, const char *s, PNum *r)
+{
+	r->neg = false; r->inf = false; r->nan = false;
+	bvn_int_zero(&r->coeff);
+	r->dex = 0;
+	bvn_float_clear_overflow(ctx);
+	if (!s) return false;
+	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+	if (*s == '+') s++;
+	else if (*s == '-') { r->neg = true; s++; }
+	{
+		char c1 = *s | 0x20;
+		if (c1 == 'i' && (s[1]|0x20)=='n' && (s[2]|0x20)=='f')
+			{ r->inf = true; return true; }
+		if (c1 == 'n' && (s[1]|0x20)=='a' && (s[2]|0x20)=='n')
+			{ r->nan = true; return true; }
+	}
+	uint32_t acc = 0;
+	int acc_digs = 0, int_digs = 0, frac_digs = 0;
+	int  sig = 0;          /* significant digits retained in the coefficient */
+	int  extra_sig = 0;    /* significant digits dropped past the cap        */
+	bool started = false;  /* first non-zero significant digit seen          */
+	bool sticky = false;   /* a dropped significant digit was non-zero       */
+	while (*s >= '0' && *s <= '9') {
+		int d = *s - '0';
+		int_digs++;
+		if (started || d != 0) {
+			started = true;
+			if (sig < BVN_FLOAT_RO_DIGITS) {
+				acc = acc * 10u + (uint32_t)d;
+				acc_digs++; sig++;
+				if (acc_digs == 9) {
+					bvni_mul_u32(ctx, &r->coeff, 1000000000u);
+					bvni_add_u32(ctx, &r->coeff, acc);
+					acc = 0; acc_digs = 0;
+				}
+			} else {
+				extra_sig++;
+				if (d != 0) sticky = true;
+			}
+		}
+		s++;
+	}
+	if (*s == '.') {
+		s++;
+		while (*s >= '0' && *s <= '9') {
+			int d = *s - '0';
+			frac_digs++;
+			if (started || d != 0) {
+				started = true;
+				if (sig < BVN_FLOAT_RO_DIGITS) {
+					acc = acc * 10u + (uint32_t)d;
+					acc_digs++; sig++;
+					if (acc_digs == 9) {
+						bvni_mul_u32(ctx, &r->coeff, 1000000000u);
+						bvni_add_u32(ctx, &r->coeff, acc);
+						acc = 0; acc_digs = 0;
+					}
+				} else {
+					extra_sig++;
+					if (d != 0) sticky = true;
+				}
+			}
+			s++;
+		}
+	}
+	if (acc_digs > 0) {
+		bvni_mul_pow10(ctx, &r->coeff, acc_digs);
+		bvni_add_u32(ctx, &r->coeff, acc);
+	}
+	/* dropped significant digits raise the exponent by their count; dropped
+	 * fractional digits below the cap contribute only to the sticky bit */
+	r->dex = -frac_digs + extra_sig;
+	if (int_digs == 0 && frac_digs == 0) return false;
+	if (*s == 'e' || *s == 'E') {
+		s++;
+		bool eneg = false;
+		if      (*s == '+') s++;
+		else if (*s == '-') { eneg = true; s++; }
+		int eabs = 0; bool has_e = false; bool eabs_ovf = false;
+		while (*s >= '0' && *s <= '9') {
+			if (!eabs_ovf) {
+				if (eabs > (INT_MAX - (*s - '0')) / 10) eabs_ovf = true;
+				else eabs = eabs * 10 + (*s - '0');
+			}
+			has_e = true; s++;
+		}
+		if (!has_e) return false;
+		if (eabs_ovf) {
+			r->inf = !eneg;
+			bvn_int_zero(&r->coeff);
+			r->dex = 0;
+			return true;
+		}
+		r->dex += eneg ? -eabs : eabs;
+	}
+	if (sticky && bvn_int_getbit(&r->coeff, 0) == 0)
+		bvni_add_u32(ctx, &r->coeff, 1u);
 	while (!bvn_int_is_zero(&r->coeff) && !bvn_float_has_overflow(ctx)) {
 		uint32_t rem = bvn_int_div_u32(&r->coeff, 10u);
 		if (rem != 0) {
@@ -679,14 +825,64 @@ static inline void to_fixed_point(bvn_float_ctx_t *ctx,
 			bits[w-1] &= mask;
 	}
 }
+/*
+ * True when the numeric literal is negative, mirroring the sign handling in
+ * bvn_float_parse. Used only to re-apply the sign bit of a NaN result: the heap
+ * engine yields a canonical (positive) NaN, but bovnar's encoders and tests
+ * treat "-nan" as sign-set, so the rerouted binary parsers restore it.
+ */
+static inline bool bvnf_leading_minus(const char *s)
+{
+	if (!s) return false;
+	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+	return *s == '-';
+}
+/*
+ * Intermediate precision for the fixed-point string parsers. Rounding
+ * value*2^frac to a Q-format integer needs the exact rational: a finite decimal
+ * can fall arbitrarily close to a fixed-point half-ulp, so a binary
+ * intermediate must carry enough bits that it lands on the correct side of
+ * every tie. total_bits covers the result, frac_bits the fractional binary
+ * positions, and ~log2(10) < 4 bits per input digit bound the decimal exponent;
+ * +64 is slack. Clamped to the engine's precision ceiling (an input long enough
+ * to need more than that is far beyond any real fixed-point literal).
+ */
+static inline uint32_t bvnf_fix_prec(int total_bits, int frac_bits, const char *s)
+{
+	size_t n = s ? strlen(s) : (size_t)0;
+	unsigned long long p = (unsigned long long)total_bits
+	    + (frac_bits > 0 ? (unsigned long long)frac_bits : 0ull)
+	    + 4ull * (unsigned long long)n + 64ull;
+	if (p < 64ull)            p = 64ull;
+	if (p > BVN_FLOAT_MAX_PREC) p = BVN_FLOAT_MAX_PREC;
+	return (uint32_t)p;
+}
+/*
+ * The binary and fixed-point string parsers below route through the
+ * arbitrary-precision heap engine (bvn_float_from_str at a precision wide enough
+ * to be double-rounding-free, then the validated bvn_float_to_* encoder) rather
+ * than the fixed 2048-bit PNum scratch. The scratch path formed coeff / 10^|exp|
+ * in a single fixed buffer and saturated to +/-Infinity (binary) or 0 (fixed)
+ * whenever 10^|exp| overflowed it, so a long finite literal -- e.g. a value near
+ * 1.0 written with hundreds of digits, or a representable subnormal whose exact
+ * rational needs more than 2048 bits -- was converted incorrectly. The heap
+ * engine (to 32768 bits) has no such ceiling. For each binary width the
+ * intermediate precision is >= 2p+2 (p = stored mantissa bits + 1), which makes
+ * the final narrowing in bvn_float_to_binNN provably free of double rounding,
+ * including subnormals. The DECIMAL parsers do NOT route this way (see
+ * bvn_float_parse_ro): a binary intermediate cannot represent decimal ties.
+ */
 static inline uint16_t bvn_float_parse_bin16(const char *s)
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	BinFmt f = {5, 10, 15};
-	uint32_t b[1] = {0};
-	to_ieee_binary(&ctx, &p, &f, b, 1);
-	return (uint16_t)b[0];
+	uint16_t out = 0u;
+	bvn_float_t *f = bvn_float_alloc(32u);   /* >= 2*(10+1)+2 */
+	if (!f) return 0u;
+	if (bvn_float_from_str(f, s, 10u)) {
+		bvn_float_to_bin16(f, &out);
+		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out |= 0x8000u;
+	}
+	bvn_float_free(f);
+	return out;
 }
 /*
  * _Float16 is a compiler/target extension (and only since C23 a standard
@@ -710,12 +906,15 @@ static inline _Float16 bvn_float_parse_f16(const char *s)
 #endif
 static inline uint32_t bvn_float_parse_bin32(const char *s)
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	BinFmt f = {8, 23, 127};
-	uint32_t b[1] = {0};
-	to_ieee_binary(&ctx, &p, &f, b, 1);
-	return b[0];
+	uint32_t out = 0u;
+	bvn_float_t *f = bvn_float_alloc(56u);   /* >= 2*(23+1)+2 */
+	if (!f) return 0u;
+	if (bvn_float_from_str(f, s, 10u)) {
+		bvn_float_to_bin32(f, &out);
+		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out |= 0x80000000u;
+	}
+	bvn_float_free(f);
+	return out;
 }
 static inline float bvn_float_parse_f32(const char *s)
 {
@@ -724,12 +923,16 @@ static inline float bvn_float_parse_f32(const char *s)
 }
 static inline uint64_t bvn_float_parse_bin64(const char *s)
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	BinFmt f = {11, 52, 1023};
-	uint32_t b[2] = {0,0};
-	to_ieee_binary(&ctx, &p, &f, b, 2);
-	return (uint64_t)b[0] | ((uint64_t)b[1] << 32);
+	uint64_t out = 0u;
+	bvn_float_t *f = bvn_float_alloc(120u);  /* >= 2*(52+1)+2 */
+	if (!f) return 0u;
+	if (bvn_float_from_str(f, s, 10u)) {
+		bvn_float_to_bin64(f, &out);
+		if (bvn_float_is_nan(f) && bvnf_leading_minus(s))
+			out |= 0x8000000000000000ull;
+	}
+	bvn_float_free(f);
+	return out;
 }
 static inline double bvn_float_parse_f64(const char *s)
 {
@@ -738,10 +941,14 @@ static inline double bvn_float_parse_f64(const char *s)
 }
 static inline void bvn_float_parse_bin128(const char *s, uint32_t out[4])
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	BinFmt f = {15, 112, 16383};
-	to_ieee_binary(&ctx, &p, &f, out, 4);
+	out[0] = out[1] = out[2] = out[3] = 0u;
+	bvn_float_t *f = bvn_float_alloc(240u);  /* >= 2*(112+1)+2 */
+	if (!f) return;
+	if (bvn_float_from_str(f, s, 10u)) {
+		bvn_float_to_bin128(f, out);
+		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out[3] |= 0x80000000u;
+	}
+	bvn_float_free(f);
 }
 #if defined(__SIZEOF_FLOAT128__) && !defined(__clang__)
 #pragma GCC diagnostic push
@@ -755,15 +962,19 @@ static inline _Float128 bvn_float_parse_f128(const char *s)
 #endif
 static inline void bvn_float_parse_bin256(const char *s, uint32_t out[8])
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	BinFmt f = {19, 236, 262143};
-	to_ieee_binary(&ctx, &p, &f, out, 8);
+	for (int i = 0; i < 8; i++) out[i] = 0u;
+	bvn_float_t *f = bvn_float_alloc(488u);  /* >= 2*(236+1)+2 */
+	if (!f) return;
+	if (bvn_float_from_str(f, s, 10u)) {
+		bvn_float_to_bin256(f, out);
+		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out[7] |= 0x80000000u;
+	}
+	bvn_float_free(f);
 }
 static inline uint16_t bvn_float_parse_dec16(const char *s)
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
+	PNum p; bvn_float_pnum_init(&p); bvn_float_parse_ro(&ctx, s, &p);
 	DecFmt f = {16, 6, 9, 24, 2};
 	uint32_t b[1] = {0};
 	to_ieee_decimal(&ctx, &p, &f, b, 1);
@@ -772,7 +983,7 @@ static inline uint16_t bvn_float_parse_dec16(const char *s)
 static inline uint32_t bvn_float_parse_dec32(const char *s)
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
+	PNum p; bvn_float_pnum_init(&p); bvn_float_parse_ro(&ctx, s, &p);
 	DecFmt f = {32, 8, 23, 101, 7};
 	uint32_t b[1] = {0};
 	to_ieee_decimal(&ctx, &p, &f, b, 1);
@@ -790,7 +1001,7 @@ static inline _Decimal32 bvn_float_parse_d32(const char *s)
 static inline uint64_t bvn_float_parse_dec64(const char *s)
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
+	PNum p; bvn_float_pnum_init(&p); bvn_float_parse_ro(&ctx, s, &p);
 	DecFmt f = {64, 10, 53, 398, 16};
 	uint32_t b[2] = {0,0};
 	to_ieee_decimal(&ctx, &p, &f, b, 2);
@@ -806,7 +1017,7 @@ static inline _Decimal64 bvn_float_parse_d64(const char *s)
 static inline void bvn_float_parse_dec128(const char *s, uint32_t out[4])
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
+	PNum p; bvn_float_pnum_init(&p); bvn_float_parse_ro(&ctx, s, &p);
 	DecFmt f = {128, 14, 113, 6176, 34};
 	to_ieee_decimal(&ctx, &p, &f, out, 4);
 }
@@ -821,44 +1032,56 @@ static inline _Decimal128 bvn_float_parse_d128(const char *s)
 static inline void bvn_float_parse_dec256(const char *s, uint32_t out[8])
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
+	PNum p; bvn_float_pnum_init(&p); bvn_float_parse_ro(&ctx, s, &p);
 	DecFmt f = {256, 20, 235, 611867, 70};
 	to_ieee_decimal(&ctx, &p, &f, out, 8);
 }
 static inline int16_t bvn_float_parse_fix16(const char *s, int frac)
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	uint32_t b[1] = {0};
-	to_fixed_point(&ctx, &p, 16, frac, b, 1);
-	return (int16_t)b[0];
+	int16_t out = 0;
+	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(16, frac, s));
+	if (!f) return 0;
+	if (bvn_float_from_str(f, s, 10u))
+		out = bvn_float_to_fix16(f, (uint32_t)frac);
+	bvn_float_free(f);
+	return out;
 }
 static inline int32_t bvn_float_parse_fix32(const char *s, int frac)
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	uint32_t b[1] = {0};
-	to_fixed_point(&ctx, &p, 32, frac, b, 1);
-	return (int32_t)b[0];
+	int32_t out = 0;
+	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(32, frac, s));
+	if (!f) return 0;
+	if (bvn_float_from_str(f, s, 10u))
+		out = bvn_float_to_fix32(f, (uint32_t)frac);
+	bvn_float_free(f);
+	return out;
 }
 static inline int64_t bvn_float_parse_fix64(const char *s, int frac)
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	uint32_t b[2] = {0,0};
-	to_fixed_point(&ctx, &p, 64, frac, b, 2);
-	return (int64_t)((uint64_t)b[0] | ((uint64_t)b[1] << 32));
+	int64_t out = 0;
+	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(64, frac, s));
+	if (!f) return 0;
+	if (bvn_float_from_str(f, s, 10u))
+		out = bvn_float_to_fix64(f, (uint32_t)frac);
+	bvn_float_free(f);
+	return out;
 }
 static inline void bvn_float_parse_fix128(const char *s, int frac, uint32_t out[4])
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	to_fixed_point(&ctx, &p, 128, frac, out, 4);
+	out[0] = out[1] = out[2] = out[3] = 0u;
+	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(128, frac, s));
+	if (!f) return;
+	if (bvn_float_from_str(f, s, 10u))
+		bvn_float_to_fix128(f, (uint32_t)frac, out);
+	bvn_float_free(f);
 }
 static inline void bvn_float_parse_fix256(const char *s, int frac, uint32_t out[8])
 {
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	to_fixed_point(&ctx, &p, 256, frac, out, 8);
+	for (int i = 0; i < 8; i++) out[i] = 0u;
+	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(256, frac, s));
+	if (!f) return;
+	if (bvn_float_from_str(f, s, 10u))
+		bvn_float_to_fix256(f, (uint32_t)frac, out);
+	bvn_float_free(f);
 }
 #endif

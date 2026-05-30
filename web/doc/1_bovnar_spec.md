@@ -746,36 +746,36 @@ Leading/trailing commas and consecutive commas produce null elements:
 
 ### 7.3 Row-Size Consistency
 
-The validator enforces a **consistent element count** across all bracket pairs that occur at the same nesting depth within a single assignment:
+The consistency rule is scoped to a **single array** and to its `/`-separated dimension rows only:
 
-- For **`/`-separated dimension rows** (e.g. `[1,2,3]/[4,5,6]`): all rows must have the same element count. A mismatch produces `error_array_row_size_mismatch`.
-- For **nested element arrays** at the same depth (e.g. `[[1,2],[3,4]]`): all inner arrays at the same nesting level must have the same element count. A mismatch at the inner level also produces `error_array_row_size_mismatch`.
-
-```bovnar
-.ok1 = [1,2,3]/[4,5,6];      # valid: both rows have 3 elements
-.ok2 = [[1,2],[3,4]];         # valid: both inner arrays have 2 elements
-
-.bad1 = [1,2,3]/[4,5];        # error_array_row_size_mismatch: row 2 has 2 elements, row 1 had 3
-.bad2 = [[1,2],[3,4,5]];      # error_array_row_size_mismatch: second inner array has 3, first had 2
-```
-
-Arrays that are themselves elements at an outer nesting level are independent of their parent's row-size tracking; only arrays at the same nesting level are compared against each other.
+- The **`/`-separated dimension rows of one array** (e.g. `[1,2,3]/[4,5,6]`) must all have the same element count. A mismatch produces `error_array_row_size_mismatch`. The lexer performs this check as each row closes, so an offending row is rejected at the earliest possible byte — the element that overshoots, or the `]` that falls short.
+- **Comma-separated elements are independent of one another**, even when those elements are themselves arrays. Sub-arrays sitting side by side in a row (`[[1,2],[3,4,5]]`) are ordinary element *values*, not dimension rows of their parent, so their lengths are never compared.
 
 ```bovnar
-.ok3 = [[1,2],[3,4]];         # element values — both inner arrays identical size: valid
-.ok4 = [[[1]],[[2]]];         # nested to depth 2 — each level uniform: valid
+.ok1 = [1,2,3]/[4,5,6];      # valid: both /-rows of one array have 3 elements
+.ok2 = [[1,2],[3,4]];         # valid: two independent sub-arrays (coincidentally equal)
+.ok3 = [[1,2],[3,4,5]];       # valid: ragged sub-arrays are fine — they are elements, not rows
+
+.bad1 = [1,2,3]/[4,5];        # error_array_row_size_mismatch: /-row 2 has 2 elements, row 1 had 3
+.bad2 = [[1,2]/[3,4,5]];      # error_array_row_size_mismatch: the inner /-array's own rows are 2 vs 3
 ```
+
+`/` creates another dimension row of the *same* array; `,` introduces another *element* (see §7.4). Only the former is length-checked.
 
 ### 7.4 Nested Arrays
 
-Arrays nested as element values inside a row participate in the same row-size consistency check as other element-level arrays. The row-size check operates per nesting level: all bracket pairs at depth N must have the same element count, independently of depth N+1.
+An array nested as an element value is a self-contained array. Its `/`-dimension rows are checked among themselves, but its shape is **completely independent** of any sibling element and of its parent's row width. The check never crosses a comma boundary and never descends from one element into another.
 
 ```bovnar
-.valid = [[1, 2], [3, 4]];     # inner arrays at depth 1: both 2 elements — valid
-.also  = [[[1,2],[3,4]],[[5,6],[7,8]]]; # uniform at every depth — valid
+.valid  = [[1, 2], [3, 4]];                # two sub-arrays as elements — independent (here equal): valid
+.ragged = [[1, 2], [3, 4, 5]];             # sub-arrays of different length — valid (elements, not rows)
+.tensor = [[1,2]/[3,4], [5,6]/[7,8]];      # two 2×2 /-arrays as elements — each validates its own rows
+.mixed  = [[1,2]/[3,4], [5,6,7]/[8,9,10]]; # two /-arrays of different leaf width as elements — valid
 
-.bad   = [[1, 2], [3, 4, 5]];  # inner arrays: 2 vs 3 elements — error_array_row_size_mismatch
+.bad = [[1, 2]/[3, 4, 5]];                 # one /-array whose own rows are 2 vs 3 — error_array_row_size_mismatch
 ```
+
+This makes bovnar arrays **per-array rectangular** rather than globally rectangular: a single `/`-array is a clean N-dimensional block, but a document may place blocks of differing shape side by side as elements. It is also what lets a jagged JSON array round-trip through the `json → bvnr` converter unchanged.
 
 ### 7.5 Array Elements with Type Annotations
 
@@ -1232,7 +1232,7 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 
 | Check | Error |
 |-------|-------|
-| Element count mismatch across `/`-dimension rows or across element arrays at the same nesting depth | `error_array_row_size_mismatch` |
+| Element count mismatch across the `/`-dimension rows of a single array (comma-separated elements are independent) | `error_array_row_size_mismatch` |
 | Array nesting overflow (exceeds `max_array_nesting`) | `error_array_nesting_too_high` |
 | Comma outside array context | `error_unexpected_input_byte` |
 
@@ -1421,9 +1421,12 @@ The unit may be written directly after the value literal instead of — or redun
 # Array with typed nulls
 .nullable = [<sint:16> 1, <sint:16> , <sint:16> 3];
 
-# These produce error_array_row_size_mismatch:
-# .bad1 = [1,2,3]/[4,5];           # row sizes differ: 3 vs 2
-# .bad2 = [[1,2],[3,4,5]];         # inner array sizes differ: 2 vs 3
+# Ragged sub-arrays are fine — comma-separated elements are independent
+.ragged_nested = [[1,2],[3,4,5]];
+
+# These produce error_array_row_size_mismatch (a single array's /-rows disagree):
+# .bad1 = [1,2,3]/[4,5];           # /-row sizes differ: 3 vs 2
+# .bad2 = [[1,2]/[3,4,5]];         # inner /-array's own rows differ: 2 vs 3
 ```
 
 ### 15.6 Deeply Nested Struct
@@ -1592,13 +1595,14 @@ The unit may be written directly after the value literal instead of — or redun
 # Unknown escape
 .string = "\x";                  # error_illegal_escape_sequence
 
-# Array row-size mismatch — applies to /‐dimension rows AND nested element arrays
-# at the same bracket depth. Both of these produce error_array_row_size_mismatch:
-# .bad1 = [1,2,3]/[4,5];           # row sizes differ: 3 vs 2
-# .bad2 = [[1,2],[3,4,5]];         # inner arrays differ: 2 vs 3
-# Uniform sizes are valid:
+# Array row-size mismatch — applies only to the /‐dimension rows of a single
+# array. Both of these produce error_array_row_size_mismatch:
+# .bad1 = [1,2,3]/[4,5];           # /-row sizes differ: 3 vs 2
+# .bad2 = [[1,2]/[3,4,5]];         # inner /-array's own rows differ: 2 vs 3
+# Uniform /-rows are valid; ragged comma-separated sub-arrays are also valid:
 .ok1 = [1,2,3]/[4,5,6];    # valid — both dimension rows have 3 elements
-.ok2 = [[1,2],[3,4]];       # valid — both inner arrays have 2 elements
+.ok2 = [[1,2],[3,4]];       # valid — independent sub-arrays (here equal)
+.ok3 = [[1,2],[3,4,5]];     # valid — ragged sub-arrays are independent elements
 
 # Comma outside array
 .comma_outside = 42,;            # error_unexpected_input_byte

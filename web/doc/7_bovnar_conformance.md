@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (168 cases) ──→ for each test case:                │
+│  Test corpus (174 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -430,7 +430,7 @@ specifies:
 | `references` | 4 | Dotted paths and limits |
 | `null_values` | 5 | Null in all positions |
 | `structs` | 7 | Nesting, empty, unmatched braces |
-| `arrays` | 13 | 1D, 2D, nested, typed, null, limits |
+| `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
 | `units` | 20 | SI/IEC prefixes, compound, inline, errors |
 | `special_numbers` | 5 | `$nan`, `$inf`, `$-inf` |
@@ -448,7 +448,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..168
+1..174
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

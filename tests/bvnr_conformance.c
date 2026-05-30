@@ -897,6 +897,27 @@ static const cf_case_t g_cases[] = {
 	ERROR_LIM("ARR-013", "arrays", "too many array items",
 	          ".a = [1, 2, 3, 4, 5];",
 	          error_too_many_array_items, 0, 0, 0, 0, 0, 3),
+	/*
+	 * Row-size consistency is per-array and scoped to '/'-dimension rows only
+	 * (Model: per-array rectangular, not globally rectangular). The '/'-rows of
+	 * one array must match; comma-separated elements — including sub-arrays —
+	 * are independent and may be ragged.
+	 */
+	ERROR_CASE("ARR-014", "arrays", "/-dimension rows of one array must match",
+	           ".a = [1, 2, 3]/[4, 5];",
+	           error_array_row_size_mismatch),
+	ERROR_CASE("ARR-015", "arrays", "third /-row disagrees with established width",
+	           ".a = [1, 2]/[3, 4]/[5, 6, 7];",
+	           error_array_row_size_mismatch),
+	ERROR_CASE("ARR-016", "arrays", "nested /-array's own rows must match",
+	           ".a = [[1, 2]/[3, 4, 5]];",
+	           error_array_row_size_mismatch),
+	VALID("ARR-017", "arrays", "ragged comma-separated sub-arrays are independent",
+	      ".a = [[1, 2], [3, 4, 5]];"),
+	VALID("ARR-018", "arrays", "sibling /-blocks may differ in leaf width",
+	      ".a = [[1, 2]/[3, 4], [5, 6, 7]/[8, 9, 10]];"),
+	VALID("ARR-019", "arrays", "/-row width does not leak across a sibling branch",
+	      ".a = [[1, 2]/[3, 4]]/[[5, 6, 7]/[8, 9, 10]];"),
 
 	/* ── OCTET STREAMS ───────────────────────────────────────────── */
 	VALID_BIN("OCT-001", "octet_streams", "single-chunk octet stream",

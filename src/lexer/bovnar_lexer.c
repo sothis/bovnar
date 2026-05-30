@@ -578,6 +578,21 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	p->lex.curr_row_size  = 0;
 	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : 0;
 	++p->lex.curr_row_size;
+	/*
+	 * The array we are about to open tracks its OWN '/'-dimension sequence in
+	 * the child frame (arr_frames[level + 1]). Start that frame clean: a row
+	 * width established by a *previous, unrelated* array instance at this depth
+	 * (a sibling branch reached via the parent's own '/' or ',') must never
+	 * leak in and falsely constrain this fresh array's nested rows. Only a '/'
+	 * occurring inside this very array may later set in_dim_seq here. Without
+	 * this reset, "[[1,2]/[3,4]]/[[5,6,7]/[8,9,10]]" wrongly rejects the second
+	 * branch's inner rows against the first branch's width. The index is in
+	 * range: the nesting guard above rejected level == max_array_nesting, and
+	 * arr_frames is sized max_array_nesting + 1.
+	 */
+	bvn_array_frame_t *child = &p->lex.arr_frames[level + 1u];
+	child->in_dim_seq   = false;
+	child->dim_row_size = 0;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
 	bvn_acc_reset(&p->val);

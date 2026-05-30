@@ -2530,8 +2530,8 @@ a[data-doc] { cursor: pointer; }
     <div class="body">
       <div class="controls">
         <button class="btn primary" id="fplay">⏸ Pause</button>
-        <input type="range" id="fspeed" min="1" max="40" value="2">
-        <span class="speed-lbl" id="fspeedlbl">2×</span>
+        <input type="range" id="fspeed" min="1" max="40" value="6">
+        <span class="speed-lbl" id="fspeedlbl">6×</span>
         <span class="grow"></span>
         <label class="tgl"><input type="checkbox" id="fnoisy"> noisy feed</label>
         <label class="tgl"><input type="checkbox" id="fresync" checked> resync</label>
@@ -4380,14 +4380,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       for (let k = 0; k < nCore; k++) {
         const gx = gauss(), gy = gauss();
         const inten = Math.max(0.2, 1 - Math.hypot(gx, gy) * 0.4) * (0.5 + rnd() * 0.5);
-        // …, twinkle phase, twinkle speed, twinkle amplitude — dense cores twinkle a little
-        out.push([lo + gx * sdC, la + gy * sdC * 0.8, inten, rnd() * 6.2832, 0.7 + rnd() * 2.4, 0.18 + rnd() * 0.30]);
+        // …, twinkle phase, twinkle speed, twinkle amplitude — dense cores barely
+        // breathe: a slow, low-amplitude shimmer, like a steady metro seen from orbit
+        out.push([lo + gx * sdC, la + gy * sdC * 0.8, inten, rnd() * 6.2832, 0.9 + rnd() * 1.6, 0.022 + rnd() * 0.028]);
       }
       const nHalo = Math.round(5 + sc * 9), sdH = 0.6 + sc * 1.3;
       for (let k = 0; k < nHalo; k++) {
         const gx = gauss(), gy = gauss();
-        // faint exurban/road lights twinkle harder and faster
-        out.push([lo + gx * sdH, la + gy * sdH * 0.7, 0.12 + rnd() * 0.18, rnd() * 6.2832, 1.1 + rnd() * 3.0, 0.35 + rnd() * 0.5]);
+        // faint exurban/road lights shimmer a touch more than the cores, but still slow and gentle
+        out.push([lo + gx * sdH, la + gy * sdH * 0.7, 0.12 + rnd() * 0.18, rnd() * 6.2832, 1.3 + rnd() * 2.2, 0.035 + rnd() * 0.05]);
       }
     }
     return out;
@@ -4463,7 +4464,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const N = GLOBE_N, g = globeCv.getContext('2d'), img = g.getImageData(0, 0, N, N), d = img.data;
     const tw = earthTex.w, th = earthTex.h, td = earthTex.data;
     const ntd = nightTex && nightTex.data, ntw = nightTex ? nightTex.w : 0, nth = nightTex ? nightTex.h : 0;
-    const Sx = SUN.x, Sy = -SUN.y, TW = 0.18;            // sun dir (screen); terminator half-width (wider ⇒ softer twilight)
+    const Sx = SUN.x, Sy = -SUN.y, TW = 0.28;            // sun dir (screen); terminator half-width — the twilight band is centred on the disc (lit=0.5 at the centre) and spans ±TW of the radius, so it stays soft without eating the dark night hemisphere
     const I2PI = 1 / (2 * Math.PI), IPI = 1 / Math.PI;
     for (let j = 0; j < N; j++) {
       const ny = ((j + 0.5) / N) * 2 - 1;
@@ -4562,15 +4563,23 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // rate is independent of the simulation speed.
     const tnow = performance.now() * 0.001;
     // With the real Black Marble texture present these synthetic points become a
-    // dim flicker accent over it; without it they ARE the city lights (full).
-    const synthGain = nightTex ? 0.4 : 1;
+    // faint flicker accent over it (kept low so the twinkle never dominates the
+    // steady baked lights); without it they ARE the city lights (full).
+    const synthGain = nightTex ? 0.12 : 1;
     for (const [lo, la, inten, tw, sp, am] of LIGHTS) {
       const p = projGlobe(lo, la, rot);
       if (p.z <= 0.04) continue;                          // far hemisphere
       const px = cx + p.x * R, py = cy - p.y * R;
       const nt = nightAt(px, py);
       if (nt <= 0.02) continue;
-      const fl = 1 + am * (Math.sin(tnow * sp + tw) * 0.65 + Math.sin(tnow * sp * 1.7 + tw * 2.3) * 0.35);
+      // Atmospheric scintillation: three incommensurate components per light —
+      // a slow drift plus two faster, out-of-phase ripples — so the brightness
+      // wanders organically (never a clean repeating pulse). Each light has its
+      // own phase/rate, so the field glistens incoherently, the way real city
+      // lights shimmer through the air column when seen from orbit.
+      const fl = 1 + am * (Math.sin(tnow * sp + tw)
+                        + 0.5 * Math.sin(tnow * sp * 2.3 + tw * 1.9)
+                        + 0.22 * Math.sin(tnow * sp * 3.9 + tw * 3.1)) * 0.58;
       const a = Math.min(1, nt * 2.6) * Math.min(1, p.z * 2.8) * inten * fl * synthGain;
       if (a < 0.03) continue;
       const g0 = (170 + inten * 48) | 0, b0 = (98 + inten * 54) | 0;   // sodium→whiter
@@ -4941,7 +4950,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     # TAI downlink stamp
     .epoch           = "2026-05-28T00:00:00Z";
     # R_earth + altitude
-    .altitude        = <float:64,k~m> 1800.0;
+    .altitude        = <float:64,k~m> 900.0;
     # orbital-plane tilt
     .inclination     = 75.0 deg;
     # ascending-node swing
@@ -5016,7 +5025,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     cfgEditor.style.minHeight = Math.ceil(lines * lh + pad + 2) + 'px';   // +2 = editor borders
   }
   function updateCfgHL() {
-    $('cfg-hl').innerHTML = $('cfg').value.split('\n').map(hi).join('\n') + '\n';
+    $('cfg-hl').innerHTML = BovnarHighlight.highlightLines($('cfg').value).join('\n') + '\n';
     fitCfgEditor();
   }
   $('cfg').addEventListener('input', updateCfgHL);
@@ -5124,7 +5133,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     symbol: 'ACME', currency: 'USD', decimals: 2, last: 142.50, volStep: 0.0009, spread: 0.04,
     feeStr: '0.07', tradeSize: 50, maxPos: 500, ema: null, thresh: 0.12,
     seq: 0, vol: 0, tms: Date.parse('2026-05-30T14:30:00Z'),
-    playing: true, speed: 2, noisy: false, resync: true,
+    playing: true, speed: 6, noisy: false, resync: true,
     pos: 0, cashMicros: 0n, feeMicros: 0n, cashF: 0, feeF: 0, fills: 0, dropped: 0, tframe: 0,
     hist: [], trades: [], history: [], lastGood: null,
   };

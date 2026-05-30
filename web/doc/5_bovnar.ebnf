@@ -517,16 +517,21 @@ ref-body-char = sym-body-char | "." ;
 (* Leading and trailing commas produce null elements:                 *)
 (*   [,1,2,]  →  four elements: null, 1, 2, null.                   *)
 (*                                                                    *)
-(* Semantic constraints (enforced by the validator):                  *)
-(*   a) No element-count consistency check is performed between        *)
-(*      "/"-separated dimension rows or between arrays that appear as  *)
-(*      element values.  The validator defines                         *)
-(*      error_array_row_size_mismatch (code 2) and contains tracking   *)
-(*      code, but the per-bracket-pair context save/restore mechanism  *)
-(*      ensures array_row_size is always zero when the comparison      *)
-(*      executes, making the error unreachable by any input.           *)
-(*      [[1,2],[3,4,5]], [1,2,3]/[4,5], and all similar forms are      *)
-(*      accepted regardless of element count.                          *)
+(* Semantic constraints (enforced by the lexer/validator):            *)
+(*   a) The "/"-separated dimension rows of a SINGLE array must all    *)
+(*      have the same element count; a mismatch is                     *)
+(*      error_array_row_size_mismatch (code 2).  The lexer checks each *)
+(*      row as it closes, so the error fires at the earliest byte (the *)
+(*      overshooting element, or the closing "]" of a short row).      *)
+(*      The per-bracket-pair context save/restore mechanism keeps this *)
+(*      check scoped to one array instance: a "/"-row width never      *)
+(*      leaks across a "," boundary or into a sibling branch.          *)
+(*      Comma-separated elements are therefore INDEPENDENT, even when  *)
+(*      they are themselves arrays:                                    *)
+(*        [1,2,3]/[4,5]        → error (one array's /-rows: 3 vs 2)    *)
+(*        [[1,2]/[3,4,5]]      → error (inner /-array's rows: 2 vs 3)  *)
+(*        [[1,2],[3,4,5]]      → accepted (independent sub-arrays)     *)
+(*        [[1,2]/[3,4], [5,6,7]/[8,9,10]] → accepted (sibling blocks)  *)
 (*   b) Array nesting depth ≤ max_array_nesting (default 255).      *)
 
 array        = array-row , {"/" , ws , array-row} ;
@@ -668,13 +673,15 @@ byte         = (* any single byte 0x00–0xFF *) ;
      (exp_intro state).
 
   g) Array row-size consistency
-     The validator contains row-size tracking code and defines
-     error_array_row_size_mismatch, but the per-bracket-pair context
-     save/restore mechanism ensures array_row_size is always zero when
-     the comparisons execute. The error is not reachable by any input
-     in the current implementation. All /‐separated rows and nested
-     element arrays are accepted regardless of element count.
-     Violation: error_array_row_size_mismatch.
+     The "/"-separated dimension rows of a single array must all have
+     the same element count; the lexer checks each row as it closes, so
+     the violation is reported at the earliest offending byte. The
+     per-bracket-pair context save/restore mechanism keeps the check
+     scoped to one array instance, so a "/"-row width never leaks across
+     a "," boundary or into a sibling branch — comma-separated elements
+     (including nested arrays) are independent and may differ in length.
+     Violation: error_array_row_size_mismatch
+       (e.g. [1,2,3]/[4,5] or [[1,2]/[3,4,5]]; but [[1,2],[3,4,5]] is OK).
 
   h) Array and struct nesting limits
      Array nesting (bracket depth): max_array_nesting (default 255) = 255.

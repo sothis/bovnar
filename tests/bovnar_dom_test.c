@@ -356,6 +356,57 @@ static void test_nested_array_elements(void)
 
 	bvn_dom_doc_destroy(doc);
 }
+/*
+ * Array row-size consistency is per-array and scoped to '/'-dimension rows only
+ * (per-array rectangular, not globally rectangular). The DOM rides on the same
+ * reader as the streaming API, so it must surface error_array_row_size_mismatch
+ * when a single array's '/'-rows disagree, yet accept ragged comma-separated
+ * sub-arrays and independent sibling '/'-blocks. The sibling-branch case guards
+ * the cross-branch row-width leak fixed in bvn_action_array_intro.
+ */
+static void test_array_row_size_model(void)
+{
+	/* Ragged comma-separated sub-arrays are independent elements: valid. */
+	bvn_dom_doc_t *ragged = parse_doc(".a = [[1, 2], [3, 4, 5]];\n");
+	if (ragged) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(ragged), error_none,
+					   "ragged comma-separated sub-arrays must parse cleanly");
+		bvn_dom_node_t *a = bvn_dom_lookup(ragged, ".a");
+		ASSERT_EQ_UINT(bvn_dom_array_count(a), 2, ".a has two sub-array elements");
+		ASSERT_EQ_UINT(bvn_dom_array_count(bvn_dom_array_at(a, 0)), 2,
+					   ".a[0] has two elements");
+		ASSERT_EQ_UINT(bvn_dom_array_count(bvn_dom_array_at(a, 1)), 3,
+					   ".a[1] has three elements (ragged is allowed)");
+		bvn_dom_doc_destroy(ragged);
+	}
+
+	/* Two independent 2-D /-blocks placed side by side: valid (no leak). */
+	bvn_dom_doc_t *sib =
+		parse_doc(".a = [[1, 2]/[3, 4]]/[[5, 6, 7]/[8, 9, 10]];\n");
+	if (sib) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(sib), error_none,
+					   "a /-row width must not leak across a sibling branch");
+		bvn_dom_doc_destroy(sib);
+	}
+
+	/* A single array's /-rows disagree: must be rejected. */
+	bvn_dom_doc_t *bad = parse_doc(".a = [1, 2, 3]/[4, 5];\n");
+	if (bad) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(bad),
+					   error_array_row_size_mismatch,
+					   "mismatched /-rows of one array must error in the DOM");
+		bvn_dom_doc_destroy(bad);
+	}
+
+	/* A nested /-array whose own rows disagree: must be rejected. */
+	bvn_dom_doc_t *bad2 = parse_doc(".a = [[1, 2]/[3, 4, 5]];\n");
+	if (bad2) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(bad2),
+					   error_array_row_size_mismatch,
+					   "mismatched rows of a nested /-array must error in the DOM");
+		bvn_dom_doc_destroy(bad2);
+	}
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -366,6 +417,7 @@ int main(void)
 	test_lookup_edge_cases();
 	test_getter_semantics();
 	test_nested_array_elements();
+	test_array_row_size_model();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

@@ -1152,19 +1152,39 @@ bool bvn_float_to_float(const bvn_float_t *f, float *out)
 }
 #include "bvn_float_impl.h"
 /*
- * Correctly-rounded conversion of a base-10 floating literal straight to double.
- * The literal is formed as an exact rational and rounded to binary64 a SINGLE
- * time (round-to-nearest-even), so the result is correct across the whole range,
- * including subnormals -- unlike parsing into a finite-precision bvn_float and
- * narrowing with bvn_float_to_double, which rounds twice and is 1 ULP off for
- * subnormal results. This is the public, externally-linked entry point for that
- * path; it wraps the static-inline parser in bvn_float_impl.h so callers in
- * other translation units (e.g. the value layer) need not include that internal
- * header. NULL yields 0.0.
+ * Correctly-rounded conversion of a base-10 floating literal to double, correct
+ * across the whole range including subnormals AND at any input length.
+ *
+ * The literal is parsed by bvn_float_from_str into a 128-bit intermediate using
+ * the arbitrary-precision heap engine (an exact rational rounded once, to
+ * nearest-even), then narrowed to binary64 by bvn_float_to_double. Because the
+ * intermediate width 128 >= 2*53 + 2, that second rounding is provably free of
+ * double-rounding error for every binary64 result, normal or subnormal (the
+ * classic 2p+2 bound; for a target of m <= 53 effective bits, 128 >= 2m+2 too),
+ * so the pair composes to a single correctly-rounded result.
+ *
+ * This deliberately does NOT use the fixed-buffer bvn_float_parse_f64 helper:
+ * that path accumulates the coefficient (and forms 10^|exp| in to_ieee_binary)
+ * in a 2048-bit scratch and saturates to +/-inf on ANY overflow of it, so a long
+ * finite literal -- a many-digit coefficient with a matching exponent, e.g. a
+ * value near 1.0 written with hundreds of digits, or a deep-subnormal magnitude
+ * spelled out in full -- wrongly became infinity once it exceeded ~600 digits.
+ * The heap engine (up to 32768 bits) has no such ceiling. NULL yields 0.0; a
+ * parse failure or allocation failure also yields 0.0 (there is no error channel
+ * in the double-returning signature). This is the public, externally-linked
+ * entry point so callers in other translation units (e.g. the value layer) need
+ * not include the internal bvn_float_impl.h header.
  */
 double bvn_float_strtod(const char *s)
 {
-	return s ? bvn_float_parse_f64(s) : 0.0;
+	if (!s) return 0.0;
+	bvn_float_t *f = bvn_float_alloc(128u);
+	if (!f) return 0.0;
+	double out = 0.0;
+	if (bvn_float_from_str(f, s, 10u))
+		(void)bvn_float_to_double(f, &out);
+	bvn_float_free(f);
+	return out;
 }
 /*
  * Encode a bvn_float into an arbitrary IEEE-754-style binary interchange format

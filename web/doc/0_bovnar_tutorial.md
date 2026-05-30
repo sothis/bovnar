@@ -532,14 +532,15 @@ Multiple rows are separated by `/`. Each bracketed group is one row:
 
 The event stream reflects this: `ev_array_row_start`, elements, `ev_array_row_end`, then `ev_array_dim_start` before the second `ev_array_row_start`. Row-separator `/` and array nesting are independent concepts — do not confuse them. The `/` between `]` and `[` creates a new dimension in the *same* array, not a nested one.
 
-The validator enforces a **consistent element count** across all bracket pairs at the same nesting depth. This applies to both `/`-separated dimension rows and to nested element arrays at the same depth — all must have the same element count:
+The lexer enforces a **consistent element count** across the `/`-separated dimension rows **of a single array** — and only those. Comma-separated elements are independent, even when they are themselves arrays, so sub-arrays placed side by side may have different lengths:
 
 ```bovnar
-.ok1 = [1, 2, 3]/[4, 5, 6];   # valid: both rows have 3 elements
-.ok2 = [[1, 2], [3, 4]];       # valid: both inner arrays have 2 elements
+.ok1 = [1, 2, 3]/[4, 5, 6];   # valid: both /-rows of one array have 3 elements
+.ok2 = [[1, 2], [3, 4]];       # valid: two independent sub-arrays (coincidentally equal)
+.ok3 = [[1, 2], [3, 4, 5]];    # valid: ragged sub-arrays are fine — they are elements, not rows
 
-.bad1 = [1, 2, 3]/[4, 5];      # error_array_row_size_mismatch: 3 vs 2
-.bad2 = [[1, 2], [3, 4, 5]];   # error_array_row_size_mismatch: 2 vs 3
+.bad1 = [1, 2, 3]/[4, 5];      # error_array_row_size_mismatch: 3 vs 2 (/-rows of one array)
+.bad2 = [[1, 2]/[3, 4, 5]];    # error_array_row_size_mismatch: 2 vs 3 (one /-array's own rows)
 ```
 
 ### Per-Element Type Annotations
@@ -780,10 +781,11 @@ Understanding the error codes is essential for debugging. The parser reports lin
 .x = {;    # error_illegal_struct_close
 ```
 
-**Nested arrays enforce uniform element counts:**
+**A `/`-array's dimension rows must match:**
 ```bovnar
-.ok  = [[1, 2], [3, 4]];         # valid — both inner arrays have 2 elements
-.bad = [[1, 2], [3, 4, 5]];      # error_array_row_size_mismatch — 2 vs 3
+.ok  = [[1, 2]/[3, 4]];          # valid — the /-array's two rows both have 2 elements
+.bad = [[1, 2]/[3, 4, 5]];       # error_array_row_size_mismatch — 2 vs 3 (/-rows)
+# note: [[1,2],[3,4,5]] is *valid* — comma-separated sub-arrays are independent elements
 ```
 
 ---

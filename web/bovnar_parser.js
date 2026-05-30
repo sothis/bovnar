@@ -383,12 +383,16 @@
       }
     }
 
-    /* Parse one array (opening '[' not yet consumed). */
-    function readArray() {
+    /* Parse one bracket row '[...]' (opening '[' not yet consumed) and return
+       its element-position count. A row always has at least one position (an
+       empty '[]' is one null element, '[,]' is two), so the count equals
+       commas + 1 — matching the C lexer's curr_row_size. */
+    function readArrayRow() {
       advance(); // skip '['
       emit(EV.ARRAY_ROW_START, {});
       skipWsComments();
 
+      let count = 1; // every row holds at least one (possibly null) position
       if (!eof() && cur() !== ']') {
         /* First element (may be null if cur is ',' or ']') */
         readArrayElement();
@@ -399,6 +403,7 @@
           if (eof() || cur() !== ',') break;
           advance(); // consume ','
           readArrayElement();
+          count++;
         }
       }
 
@@ -406,23 +411,46 @@
       if (!eof() && cur() === ']') advance(); // skip ']'
       else emit(EV.ERROR, { msg: 'Unclosed array (expected \']\')' });
       emit(EV.ARRAY_ROW_END, {});
+      return count;
+    }
 
-      /* Additional dimension rows separated by '/'.
-         Tentatively consume '/' then skip ws+comments; backtrack fully
-         if the next non-whitespace token is not '['. */
-      const sp = pos, sl = line, sc = col;
-      skipWsComments();
-      if (!eof() && cur() === '/') {
-        advance(); // tentatively skip '/'
-        skipWsComments();
-        if (!eof() && cur() === '[') {
-          emit(EV.ARRAY_DIM_START, {});
-          readArray();
-        } else {
-          pos = sp; line = sl; col = sc; // not a dimension separator
+    /* Parse one array (opening '[' not yet consumed).
+
+       Row-size consistency is per-array and scoped to '/'-dimension rows only:
+       all '/'-separated rows of *this* array must have the same element count
+       (error_array_row_size_mismatch in the C reader). Comma-separated elements
+       — including nested arrays parsed by their own readArray invocation — are
+       independent, so a sibling array's width never constrains this one. */
+    function readArray() {
+      let firstCount = -1;
+      for (;;) {
+        const count = readArrayRow();
+        if (firstCount < 0) {
+          firstCount = count;
+        } else if (count !== firstCount) {
+          emit(EV.ERROR, {
+            msg: `array_row_size_mismatch: dimension row has ${count} ` +
+                 `element(s), expected ${firstCount}`,
+          });
         }
-      } else {
+
+        /* Additional dimension rows separated by '/'.
+           Tentatively consume '/' then skip ws+comments; backtrack fully
+           if the next non-whitespace token is not '['. */
+        const sp = pos, sl = line, sc = col;
+        skipWsComments();
+        if (!eof() && cur() === '/') {
+          advance(); // tentatively skip '/'
+          skipWsComments();
+          if (!eof() && cur() === '[') {
+            emit(EV.ARRAY_DIM_START, {});
+            continue; // next dimension row of the SAME array
+          }
+          pos = sp; line = sl; col = sc; // not a dimension separator
+          break;
+        }
         pos = sp; line = sl; col = sc;
+        break;
       }
     }
 

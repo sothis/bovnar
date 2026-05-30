@@ -928,7 +928,7 @@ static void bvnf_shorten_digits(const bvn_float_t *f, uint32_t base,
 }
 static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 {
-	if (f->_prec > 4194304L) return -1;
+	if (f->_prec > BVN_FLOAT_MAX_PREC) return -1;
 	if (f->_exp  >  1000000000L || f->_exp < -1000000000L) return -1;
 	long prec = f->_prec;
 	long exp2 = f->_exp;
@@ -1532,6 +1532,16 @@ static bool from_ieee_decimal(bvn_float_t *f,
 		uint32_t rem = bvn_int_div_u32(&T, 10u);
 		rev[rlen++]  = (char)('0' + rem);
 	}
+	/*
+	 * Reject non-canonical significands. A coefficient with more than
+	 * max_coeff_digs digits cannot occur in a well-formed encoding (the encoder
+	 * never emits one), but a coefficient field wider than the digit limit can
+	 * carry it in malformed input — notably decimal16, whose 9-bit field holds
+	 * 0..511 while only 0..99 is canonical. IEEE 754 (§3.5.2) interprets such an
+	 * encoding as zero; doing so also keeps from_dec* a left inverse of to_dec*
+	 * on every value to_dec* can produce.
+	 */
+	if (rlen > max_coeff_digs) { bvn_float_set_zero(f, neg); return true; }
 	char final_str[320];
 	int  flen = 0;
 	if (neg) final_str[flen++] = '-';

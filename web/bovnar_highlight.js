@@ -102,10 +102,13 @@
         if (j < 0 || j > lim) { out += esc('<'); i++; afterNum = false; continue; }
         out += ann(src.slice(i, j + 1)); i = j + 1; afterNum = false; continue;
       }
-      if (c === '"') {                                  // string literal
+      if (c === '"') {                                  // string literal (unescaped newlines are legal, so it may span lines)
         let j = i + 1;
-        while (j < src.length) { if (src[j] === '\\') { j += 2; continue; } if (src[j] === '"' || src[j] === '\n') { if (src[j] === '"') j++; break; } j++; }
-        out += span('str', src.slice(i, j)); i = j; afterNum = false; continue;
+        while (j < src.length) { if (src[j] === '\\') { j += 2; continue; } if (src[j] === '"') { j++; break; } j++; }
+        // Wrap each physical line of the string in its own span so the emitted HTML
+        // stays balanced when split on '\n' (see highlightLines / gutter renderers).
+        out += src.slice(i, j).split('\n').map((seg) => span('str', seg)).join('\n');
+        i = j; afterNum = false; continue;
       }
       if (c === '&' && (m = /^&(?:\.[A-Za-z_][\w+\-]*)+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if (c === '$' && (m = /^\$(?:-?inf|nan)\b/.exec(r))) { out += span('special', m[0]); i += m[0].length; afterNum = false; continue; }
@@ -131,5 +134,12 @@
     return out;
   }
 
-  global.BovnarHighlight = { highlight: tokenize, highlightLine: tokenize, esc: esc };
+  // Per-line HTML for gutter / line-number views. Highlighting the whole document
+  // at once threads cross-line state (open strings, bracket depth), and the string
+  // scanner closes/reopens its span at each newline, so every returned line is a
+  // self-contained, balanced fragment. Use this instead of mapping highlightLine
+  // over pre-split lines, which cannot see a string left open on a previous line.
+  function highlightLines(src) { return tokenize(src).split('\n'); }
+
+  global.BovnarHighlight = { highlight: tokenize, highlightLine: tokenize, highlightLines: highlightLines, esc: esc };
 })(typeof window !== 'undefined' ? window : this);

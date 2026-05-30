@@ -3528,8 +3528,8 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
   </div>
 </div>
 
-<script src="bovnar_parser.js"></script>
-<script src="bovnar_highlight.js"></script>
+<script src="bovnar_parser.js?v=20260530"></script>
+<script src="bovnar_highlight.js?v=20260530"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
@@ -4703,8 +4703,8 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   /* ════════════════════ 5. Syntax highlight for the frame source ════════════════════ */
   function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   // Syntax highlighting is delegated to the shared, vim-consistent highlighter
-  // (bovnar_highlight.js); hi() colours one editor / frame-source line.
-  const hi = (line) => BovnarHighlight.highlightLine(line);
+  // (bovnar_highlight.js); highlightLines() colours a whole document while
+  // threading cross-line state (open strings) — see renderFrame below.
 
   /* ════════════════════ 6. Render: frame source + gauges ════════════════════ */
   const GAUGE_META = {
@@ -4728,12 +4728,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // when a fault shifts the parser's reported line.
     const errLines = new Set(errs.map((e) => e.line));
     badKeys = badKeys || new Set();
+    const hlLines = BovnarHighlight.highlightLines(text);   // cross-line state (open strings) preserved
     $('framesrc').innerHTML = text.split('\n').map((l, i) => {
       const ln = i + 1;
       const km = l.match(/^\s+\.(\w+)\b/);
       const isErr = errLines.has(ln) || (km && badKeys.has(km[1]));
       return '<div class="ln' + (isErr ? ' err' : '') + '" data-line="' + ln + '">' +
-             '<span class="gut">' + ln + '</span><span>' + hi(l) + '</span></div>';
+             '<span class="gut">' + ln + '</span><span>' + hlLines[i] + '</span></div>';
     }).join('');
     applyHover();
   }
@@ -5185,7 +5186,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   function renderFrame(text, errs) {
     const el = new Set(errs.map((e) => e.line));
-    $('fframesrc').innerHTML = text.split('\n').map((l, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + Hl.highlightLine(l) + '</span></div>').join('');
+    $('fframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
   }
   function renderBlotter(lastS, bidS, askS) {
     const dp = sim.decimals, cur = sim.currency, last = parseFloat(lastS);
@@ -5294,7 +5295,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     $('fsymhint').textContent = sim.symbol + ' · ' + sim.currency;
     msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + sim.symbol + ' restarted';
   }
-  function updateCfgHL() { $('fcfg-hl').innerHTML = $('fcfg').value.split('\n').map((l) => Hl.highlightLine(l)).join('\n') + '\n'; }
+  function updateCfgHL() { $('fcfg-hl').innerHTML = Hl.highlightLines($('fcfg').value).join('\n') + '\n'; }
   $('fcfg').addEventListener('input', updateCfgHL);
   $('fcfg').addEventListener('scroll', () => { $('fcfg-hl').scrollTop = $('fcfg').scrollTop; $('fcfg-hl').scrollLeft = $('fcfg').scrollLeft; });
   $('fapply').addEventListener('click', applyConfig);
@@ -5433,7 +5434,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   function renderFrame(text, errs) {
     const el = new Set(errs.map((e) => e.line));
-    $('iframesrc').innerHTML = text.split('\n').map((l, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + Hl.highlightLine(l) + '</span></div>').join('');
+    $('iframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
   }
   function renderHMI(D) {
     const hiT = (D.status & 8), hiP = (D.status & 16), loL = (D.status & 32);
@@ -5544,7 +5545,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.hist = []; sim.history = []; sim.lastGood = null;
     msg.className = 'cfg-msg ok'; msg.textContent = '✓ reactor restarted';
   }
-  function updateCfgHL() { $('icfg-hl').innerHTML = $('icfg').value.split('\n').map((l) => Hl.highlightLine(l)).join('\n') + '\n'; }
+  function updateCfgHL() { $('icfg-hl').innerHTML = Hl.highlightLines($('icfg').value).join('\n') + '\n'; }
   $('icfg').addEventListener('input', updateCfgHL);
   $('icfg').addEventListener('scroll', () => { $('icfg-hl').scrollTop = $('icfg').scrollTop; $('icfg-hl').scrollLeft = $('icfg').scrollLeft; });
   $('iapply').addEventListener('click', applyConfig);

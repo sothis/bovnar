@@ -515,12 +515,39 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 			}
 		}
 	}
+	/*
+	 * Canonicalise the cohort. A decimal value has many encodings that differ
+	 * only in their quantum (coefficient C with trailing zeros vs C/10 with the
+	 * exponent raised); they denote the same number. The encoder must pick one
+	 * deterministically, otherwise the same value serialises to different bytes
+	 * depending on provenance: the parser already strips trailing zeros, but the
+	 * rounding step above can reintroduce them (e.g. 7.07560058344503e27 rounds
+	 * to coefficient 7075600583445030), so a freshly-rounded value and the same
+	 * value decoded-then-re-encoded would land on different cohort members.
+	 *
+	 * We canonicalise to the shortest coefficient: strip trailing zero digits,
+	 * raising E by one each time. Stripping raises the biased exponent, so it is
+	 * bounded so be never reaches be_max; the clamp loop below re-adds exactly
+	 * the trailing zeros that values near Emax require, and that clamped form is
+	 * then the canonical representative for those (it is the unique shortest
+	 * coefficient whose exponent still fits). The result is a function of the
+	 * value alone, independent of how the coefficient was produced.
+	 */
+	while (E + bias < be_max - 1) {
+		uint32_t r = bvn_int_div_u32(&C, 10u);
+		if (r != 0u) {                 /* not a trailing zero: undo and stop */
+			bvni_mul_u32(ctx, &C, 10u);
+			bvni_add_u32(ctx, &C, r);
+			break;
+		}
+		E++;
+	}
 	int be = E + bias;
 	if (be < 0) be = 0;   /* unreachable: the combined drop already lifts be >= 0 */
 	/*
 	 * Clamp to the maximum encodable exponent. The magnitude is in range but
-	 * the normalised coefficient (trailing zeros already stripped by the
-	 * parser) leaves the biased exponent above be_max. IEEE 754 requires
+	 * the shortest coefficient (trailing zeros stripped above) leaves the
+	 * biased exponent above be_max. IEEE 754 requires
 	 * lengthening the coefficient with trailing zeros and lowering the
 	 * exponent until it fits, rather than rounding to Infinity. Only when the
 	 * coefficient already uses the full max_coeff_digs digits and be is still

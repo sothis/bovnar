@@ -76,6 +76,18 @@ BVN_API void bvn_float_set_nan (bvn_float_t *f);
 BVN_API void bvn_float_set_inf (bvn_float_t *f, bool neg);
 BVN_API void bvn_float_set_zero(bvn_float_t *f, bool neg);
 BVN_API bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src);
+/*
+ * Parse a number in the given base into f (rounded to f's precision). Returns
+ * false on malformed input. Note a capacity limit: a finite decimal whose exact
+ * value would need more than BVN_INT_MAX_BITS of intermediate precision -- i.e.
+ * an extreme decimal exponent (on this build, magnitude beyond ~1e9865 -- the
+ * exact bound shifts slightly with the number of coefficient digits), such as
+ * "1e10000" or "1e-10000" -- saturates to +/-inf or +/-0 and still returns
+ * true, rather than failing. The 64-bit stored exponent is not the binding
+ * limit here; the exact rational is. Callers parsing untrusted extreme
+ * exponents can distinguish saturation from a literal inf/0 via
+ * bvn_float_is_inf / bvn_float_is_zero if that matters.
+ */
 BVN_API bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base);
 BVN_API int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 						  uint32_t base);
@@ -85,20 +97,26 @@ BVN_API bool bvn_float_from_double(bvn_float_t *f, double v);
  * Narrowing a bvn_float to a fixed-width binary format (bvn_float_to_double /
  * to_float / to_bin*) rounds the *stored* value once, correctly. It cannot undo
  * a rounding that already happened when the bvn_float was built: if a decimal
- * string was parsed into a bvn_float whose precision lacks headroom over the
- * target -- target significand bits plus, for subnormal results, the subnormal
- * shift -- the parse and the narrowing round in sequence (double rounding) and
- * the result can be 1 ULP off in the subnormal range. For a correctly-rounded
- * decimal-string-to-binary64 conversion either give the bvn_float ample
- * precision before narrowing, or use the exact single-rounding decimal path
- * (bvn_float_strtod, which bvn_parse_double_in_base uses for base 10).
+ * string was parsed into a bvn_float whose precision only modestly exceeds the
+ * target, the parse and the narrowing round in sequence (double rounding) and
+ * the result can be 1 ULP off. This is NOT confined to subnormals -- normal
+ * results are affected too. Concretely, parsing at p bits and narrowing to a
+ * t-bit significand can double-round for any p from t+1 up to roughly 2*t, in
+ * both the normal and subnormal ranges (subnormals are simply the most visible
+ * because their effective target width is smaller). To guarantee a
+ * correctly-rounded narrowing, give the bvn_float about twice the target
+ * significand width plus two guard bits before narrowing (~2*t + 2; e.g. >=108
+ * bits for binary64, where t = 53 -- empirically clean at 128), or, for a
+ * subnormal target, that plus the subnormal shift. Simpler: use the exact
+ * single-rounding decimal path (bvn_float_strtod, which bvn_parse_double_in_base
+ * uses for base 10), which is correctly rounded at any input length.
  */
 BVN_API bool bvn_float_to_double  (const bvn_float_t *f, double *out);
 /*
- * Correctly-rounded base-10 decimal string -> double (single rounding, correct
- * for subnormals). NULL returns 0.0. This is the supported public form of the
- * conversion the value layer uses; prefer it over building a low-precision
- * bvn_float and narrowing.
+ * Correctly-rounded base-10 decimal string -> double in a single rounding step,
+ * across the whole range (normals, subnormals, and overflow to inf). NULL
+ * returns 0.0. This is the supported public form of the conversion the value
+ * layer uses; prefer it over building a low-precision bvn_float and narrowing.
  */
 BVN_API double bvn_float_strtod(const char *s);
 BVN_API bool bvn_float_from_float (bvn_float_t *f, float v);
@@ -119,6 +137,20 @@ BVN_API bool bvn_float_from_bin32 (bvn_float_t *f, uint32_t bits);
 BVN_API bool bvn_float_from_bin64 (bvn_float_t *f, uint64_t bits);
 BVN_API bool bvn_float_from_bin128(bvn_float_t *f, const uint32_t bits[4]);
 BVN_API bool bvn_float_from_bin256(bvn_float_t *f, const uint32_t bits[8]);
+/*
+ * IEEE-style decimal interchange formats (custom binary storage layout, see
+ * doc/1_bovnar_spec.md S5.2). to_dec* rounds the stored value to the format's
+ * digit width with round-to-nearest-even and emits the CANONICAL cohort member:
+ * the shortest coefficient (trailing zeros stripped), with the exponent clamped
+ * only as the IEEE exponent range near Emax requires. The encoding is therefore
+ * a deterministic function of the value alone -- the same number always
+ * serialises to the same bytes regardless of how it was produced, and
+ * to_dec*(from_dec*(bits)) reproduces bits for any value to_dec* can emit.
+ * from_dec* decodes any valid cohort member; a non-canonical significand (more
+ * digits than the format allows, possible only in malformed input -- e.g.
+ * decimal16's 9-bit coefficient field versus its 2-digit maximum) is read as
+ * zero, per IEEE 754 S3.5.2.
+ */
 BVN_API void bvn_float_to_dec16 (const bvn_float_t *f, uint16_t *out);
 BVN_API void bvn_float_to_dec32 (const bvn_float_t *f, uint32_t *out);
 BVN_API void bvn_float_to_dec64 (const bvn_float_t *f, uint64_t *out);

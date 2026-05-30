@@ -1514,91 +1514,273 @@ static bool from_ieee_decimal(bvn_float_t *f,
 	return bvn_float_from_str(f, final_str, 10);
 }
 /*
- * IEEE-754 *decimal* interchange encoders (decimal16/32/64/128/256). Unlike the
- * binary formats these store a decimal significand, so the value is rendered to
- * a decimal string, re-parsed into the exact PNum, and packed by the shared
- * to_ieee_decimal with the format's (storage bits, combination bits, coefficient
- * digits, bias, ...) parameters. Going via the string keeps one correctly-
- * rounded decimal representation as the single source of truth for every width.
+ * Load a regular float's mantissa limbs into a 32-bit bvn_int (repacking from the
+ * platform limb width). The result is the bare integer significand M; the value
+ * of the float is M * 2^(_exp - _prec) with M's top bit at position _prec-1.
+ */
+static void bvnf_load_mant_bvint(const bvn_float_t *f, bvn_int_t *M)
+{
+#if BVN_LIMB_BITS == 64
+	for (uint32_t i = 0; i < f->_nlimbs; i++) {
+		if (2u * i      < M->nlimbs) M->limbs[2u * i]      = (uint32_t)(f->_d[i] & 0xffffffffu);
+		if (2u * i + 1u < M->nlimbs) M->limbs[2u * i + 1u] = (uint32_t)(f->_d[i] >> 32);
+	}
+	M->nused = (f->_nlimbs * 2u <= M->nlimbs) ? f->_nlimbs * 2u : M->nlimbs;
+#else
+	for (uint32_t i = 0; i < f->_nlimbs && i < M->nlimbs; i++) M->limbs[i] = f->_d[i];
+	M->nused = (f->_nlimbs <= M->nlimbs) ? f->_nlimbs : M->nlimbs;
+#endif
+	bvn_int_norm(M);
+}
+/*
+ * Fixed-point (Qm.n) conversion done directly from the binary mantissa with a
+ * single round-to-nearest-even — no decimal round-trip. The value is
+ * M * 2^(_exp - _prec); scaling by 2^frac_bits gives M * 2^(_exp - _prec +
+ * frac_bits). A non-negative shift is exact (no rounding); a negative shift
+ * drops |sh| low bits, rounded to nearest with ties to even using one guard bit
+ * and an exact sticky. The result is two's-complemented into total_bits and the
+ * top word masked/sign-extended to the field width, matching the prior decoder's
+ * overflow-wrap semantics. Routing this straight off the mantissa avoids the
+ * double rounding that a float -> shortest-decimal-string -> round path incurs.
+ */
+static void bvnf_to_fix_direct(const bvn_float_t *f, int total_bits,
+								uint32_t frac_bits, uint32_t *bits, int bits32)
+{
+	for (int i = 0; i < bits32; i++) bits[i] = 0;
+	if (!bvn_float_is_regular(f)) return;          /* nan/inf/zero -> 0 */
+	bool neg = f->_sign < 0;
+	uint32_t qhint = bvnf_hint_limbs(f->_prec + frac_bits + 64u);
+	bvn_int_t M;
+	if (!bvnf_scratch(&M, qhint)) return;
+	bvnf_load_mant_bvint(f, &M);
+	long sh = (long)f->_exp - (long)f->_prec + (long)frac_bits;
+	if (sh >= 0) {
+		if (sh > (long)INT_MAX || !bvn_int_shl(&M, (int)sh)) {
+			bvnf_scratch_free(&M); return;
+		}
+	} else {
+		long d   = -sh;
+		int  mlen = bvn_int_bitlen(&M);
+		if (d > (long)mlen) {                      /* |value*2^frac| < 1/2 */
+			bvn_int_zero(&M);
+		} else {
+			int  di     = (int)d;
+			int  guard  = bvn_int_getbit(&M, di - 1);
+			bool sticky = false;
+			for (int i = 0; i < di - 1 && !sticky; i++)
+				if (bvn_int_getbit(&M, i)) sticky = true;
+			bvn_int_shr(&M, di);
+			if (guard && (sticky || bvn_int_getbit(&M, 0) == 1)) {
+				if (!bvn_int_add_u32(&M, 1u)) { bvnf_scratch_free(&M); return; }
+			}
+		}
+	}
+	int w = (total_bits + 31) / 32;
+	if (w > bits32) w = bits32;
+	for (int i = 0; i < w; i++)
+		bits[i] = (i < (int)M.nused) ? M.limbs[i] : 0u;
+	if (neg) {
+		for (int i = 0; i < w; i++) bits[i] = ~bits[i];
+		uint64_t carry = 1;
+		for (int i = 0; i < w && carry; i++) {
+			uint64_t s = (uint64_t)bits[i] + carry;
+			bits[i] = (uint32_t)s;
+			carry   = s >> 32;
+		}
+	}
+	if (total_bits % 32 != 0 && w > 0) {
+		uint32_t mask = ((uint32_t)1 << (total_bits % 32)) - 1u;
+		if (neg && (bits[w - 1] & ((uint32_t)1 << ((total_bits % 32) - 1))))
+			bits[w - 1] |= ~mask;
+		else
+			bits[w - 1] &= mask;
+	}
+	bvnf_scratch_free(&M);
+}
+/* Number of decimal digits in a (small) big integer. -1 on allocation failure. */
+static int bvnf_dec_digit_count(const bvn_int_t *b)
+{
+	if (bvn_int_is_zero(b)) return 0;
+	bvn_int_t t;
+	if (!bvnf_scratch(&t, b->nused + 2u)) return -1;
+	if (!bvn_int_copy(&t, b)) { bvnf_scratch_free(&t); return -1; }
+	int d = 0;
+	while (!bvn_int_is_zero(&t)) { bvn_int_div_u32(&t, 10u); d++; }
+	bvnf_scratch_free(&t);
+	return d;
+}
+/*
+ * Render a regular, non-zero float to exactly D significant decimal digits using
+ * round-to-ODD (von Neumann / sticky rounding). The exact value M * 2^e2 is
+ * formed as an exact rational num/den, scaled by 10^s so the quotient carries a
+ * few more than D digits, divided once (the remainder is an exact inexact flag),
+ * trimmed to D digits, and — when inexact — its last digit forced odd. Feeding a
+ * round-to-odd D-digit value into to_ieee_decimal's final round-to-nearest-even
+ * is provably free of double-rounding error, so the packed result is the
+ * correctly-rounded narrowing of the *exact* float, not of a shortest string.
+ * Writes "[-]digits e exponent" into out. false on overflow/alloc failure, which
+ * makes the caller fall back to the (non-correctly-rounded but safe) string path.
+ */
+static bool bvnf_dec_render_roundodd(const bvn_float_t *f, int D,
+									  char *out, size_t outsz)
+{
+	long e2  = (long)f->_exp - (long)f->_prec;
+	long ep  = (long)f->_exp - 1L;
+	long E10est = (ep >= 0) ? (ep * 302L + 999L) / 1000L
+							 : -(((-ep) * 301L) / 1000L);
+	long s = (long)D + 2L - E10est;          /* guarantees quotient has > D digits */
+	long mag = (long)f->_prec + (e2 < 0 ? -e2 : e2) + (s < 0 ? -s : s) * 4L + 64L;
+	if (mag < 64L) mag = 64L;
+	uint32_t hint = bvnf_hint_limbs((uint32_t)mag);
+	bvn_int_t num, den, Q, R;
+	if (!bvnf_scratch(&num, hint)) return false;
+	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return false; }
+	bvnf_load_mant_bvint(f, &num);
+	bvn_int_from_uint64(&den, 1u);
+	bool ok = true;
+	if      (e2 > 0) ok = (e2 <= (long)INT_MAX) && bvn_int_shl(&num, (int)e2);
+	else if (e2 < 0) ok = (-e2 <= (long)INT_MAX) && bvn_int_shl(&den, (int)(-e2));
+	if (ok) {
+		if      (s > 0) ok = (s <= (long)INT_MAX) && bvn_int_mul_pow10(&num, (int)s);
+		else if (s < 0) ok = (-s <= (long)INT_MAX) && bvn_int_mul_pow10(&den, (int)(-s));
+	}
+#define RRO_FAIL() do { bvnf_scratch_free(&num); bvnf_scratch_free(&den); return false; } while (0)
+	if (!ok) RRO_FAIL();
+	if (!bvnf_scratch(&Q, hint)) RRO_FAIL();
+	if (!bvnf_scratch(&R, hint)) { bvnf_scratch_free(&Q); RRO_FAIL(); }
+	ok = bvn_int_divrem(&Q, &R, &num, &den);
+	bool inexact = ok && !bvn_int_is_zero(&R);
+	bvnf_scratch_free(&num);
+	bvnf_scratch_free(&den);
+	if (!ok) { bvnf_scratch_free(&Q); bvnf_scratch_free(&R); return false; }
+	bvnf_scratch_free(&R);
+#undef RRO_FAIL
+	int g0 = bvnf_dec_digit_count(&Q);
+	if (g0 < 0) { bvnf_scratch_free(&Q); return false; }
+	long E10 = (long)g0 - 1L - s;            /* decimal exponent of the leading digit */
+	int  g = g0;
+	while (g > D) {
+		uint32_t r = bvn_int_div_u32(&Q, 10u);
+		if (r) inexact = true;
+		g--;
+	}
+	if (inexact) {                            /* force last digit odd */
+		bvn_int_t c;
+		if (!bvnf_scratch(&c, Q.nused + 2u)) { bvnf_scratch_free(&Q); return false; }
+		if (!bvn_int_copy(&c, &Q)) { bvnf_scratch_free(&c); bvnf_scratch_free(&Q); return false; }
+		uint32_t last = bvn_int_div_u32(&c, 10u);
+		bvnf_scratch_free(&c);
+		if ((last & 1u) == 0u) {
+			if (!bvn_int_add_u32(&Q, 1u)) { bvnf_scratch_free(&Q); return false; }
+		}
+	}
+	char tmp[96];
+	int  tn = 0;
+	if (bvn_int_is_zero(&Q)) {
+		tmp[tn++] = '0';
+	} else {
+		bvn_int_t c;
+		if (!bvnf_scratch(&c, Q.nused + 2u)) { bvnf_scratch_free(&Q); return false; }
+		if (!bvn_int_copy(&c, &Q)) { bvnf_scratch_free(&c); bvnf_scratch_free(&Q); return false; }
+		while (!bvn_int_is_zero(&c) && tn < (int)sizeof(tmp))
+			tmp[tn++] = (char)('0' + bvn_int_div_u32(&c, 10u));
+		bvnf_scratch_free(&c);
+	}
+	bvnf_scratch_free(&Q);
+	size_t pos = 0;
+	if (f->_sign < 0) { if (pos + 1 >= outsz) return false; out[pos++] = '-'; }
+	for (int i = tn - 1; i >= 0; i--) { if (pos + 1 >= outsz) return false; out[pos++] = tmp[i]; }
+	if (pos + 1 >= outsz) return false;
+	out[pos++] = 'e';
+	long expo = E10 - (long)(tn - 1);        /* value = (tn-digit integer) * 10^expo */
+	long ev   = expo;
+	if (ev < 0) { if (pos + 1 >= outsz) return false; out[pos++] = '-'; ev = -ev; }
+	else        { if (pos + 1 >= outsz) return false; out[pos++] = '+'; }
+	char eb[24];
+	int  en = 0;
+	if (ev == 0) eb[en++] = '0';
+	else while (ev > 0) { eb[en++] = (char)('0' + ev % 10); ev /= 10; }
+	for (int i = en - 1; i >= 0; i--) { if (pos + 1 >= outsz) return false; out[pos++] = eb[i]; }
+	out[pos] = '\0';
+	return true;
+}
+/*
+ * Encode a float into an IEEE-754 decimal interchange field set. Regular values
+ * are rendered to max_coeff_digs+4 significant digits with round-to-odd (see
+ * bvnf_dec_render_roundodd) and packed by to_ieee_decimal, which performs the
+ * single, format-aware round-to-nearest-even at the target width. nan/inf/zero
+ * are handed to the packer directly. On any overflow/allocation failure of the
+ * exact-render path it falls back to the shortest-string rendering.
+ */
+static void bvnf_encode_dec(const bvn_float_t *f, const DecFmt *fmt,
+							uint32_t *bits, int bits32)
+{
+	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
+	PNum p; bvn_float_pnum_init(&p);
+	char sbuf[160];
+	bool built = false;
+	if (bvn_float_is_nan(f)) {
+		p.nan = true;  p.neg = (f->_sign < 0); built = true;
+	} else if (bvn_float_is_inf(f)) {
+		p.inf = true;  p.neg = (f->_sign < 0); built = true;
+	} else if (bvn_float_is_zero(f)) {
+		p.neg = (f->_sign < 0); built = true;          /* coeff stays zero */
+	} else if (bvnf_dec_render_roundodd(f, fmt->max_coeff_digs + 4, sbuf, sizeof sbuf)) {
+		bvn_float_parse(&ctx, sbuf, &p);
+		built = true;
+	}
+	if (!built) {
+		size_t bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
+		char  *buf = malloc(bsz);
+		if (buf) {
+			int n = bvn_float_to_str(f, buf, bsz, 10);
+			if (n > 0) bvn_float_parse(&ctx, buf, &p);
+			free(buf);
+		}
+	}
+	to_ieee_decimal(&ctx, &p, fmt, bits, bits32);
+}
+/*
+ * IEEE-754 *decimal* interchange encoders (decimal16/32/64/128/256). The source
+ * float is rounded once, directly from its exact binary value, to the format's
+ * decimal coefficient/exponent by bvnf_encode_dec + to_ieee_decimal. (An earlier
+ * implementation rendered the shortest round-tripping decimal first and then
+ * rounded that to the coefficient width, which double-rounded and could be off
+ * by a unit in the last place; bvnf_encode_dec's round-to-odd render removes it.)
  */
 void bvn_float_to_dec16(const bvn_float_t *f, uint16_t *out)
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { *out = 0; return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); *out = 0; return; }
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	bvn_float_parse(&ctx, buf, &p);
-	free(buf);
 	uint32_t b[1] = {0};
 	DecFmt fmt = {16, 6, 9, 24, 2};
-	to_ieee_decimal(&ctx, &p, &fmt, b, 1);
+	bvnf_encode_dec(f, &fmt, b, 1);
 	*out = (uint16_t)b[0];
 }
 void bvn_float_to_dec32(const bvn_float_t *f, uint32_t *out)
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { *out = 0; return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); *out = 0; return; }
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	bvn_float_parse(&ctx, buf, &p);
-	free(buf);
 	DecFmt fmt = {32, 8, 23, 101, 7};
-	to_ieee_decimal(&ctx, &p, &fmt, out, 1);
+	bvnf_encode_dec(f, &fmt, out, 1);
 }
 void bvn_float_to_dec64(const bvn_float_t *f, uint64_t *out)
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { *out = 0; return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); *out = 0; return; }
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	bvn_float_parse(&ctx, buf, &p);
-	free(buf);
 	uint32_t b[2] = {0, 0};
 	DecFmt fmt = {64, 10, 53, 398, 16};
-	to_ieee_decimal(&ctx, &p, &fmt, b, 2);
+	bvnf_encode_dec(f, &fmt, b, 2);
 	*out = (uint64_t)b[0] | ((uint64_t)b[1] << 32);
 }
 void bvn_float_to_dec128(const bvn_float_t *f, uint32_t out[4])
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { memset(out, 0, 16); return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); memset(out, 0, 16); return; }
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	bvn_float_parse(&ctx, buf, &p);
-	free(buf);
 	DecFmt fmt = {128, 14, 113, 6176, 34};
-	to_ieee_decimal(&ctx, &p, &fmt, out, 4);
+	bvnf_encode_dec(f, &fmt, out, 4);
 }
 void bvn_float_to_dec256(const bvn_float_t *f, uint32_t out[8])
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { memset(out, 0, 32); return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); memset(out, 0, 32); return; }
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	bvn_float_parse(&ctx, buf, &p);
-	free(buf);
 	DecFmt fmt = {256, 20, 235, 611867, 70};
-	to_ieee_decimal(&ctx, &p, &fmt, out, 8);
+	bvnf_encode_dec(f, &fmt, out, 8);
 }
 bool bvn_float_from_dec16(bvn_float_t *f, uint16_t bits)
 {
@@ -1631,60 +1813,33 @@ bool bvn_float_from_dec256(bvn_float_t *f, const uint32_t bits[8])
 int16_t bvn_float_to_fix16(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) return 0;
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); return 0; }
-	int16_t r = bvn_float_parse_fix16(buf, (int)frac_bits);
-	free(buf);
-	return r;
+	uint32_t b[1] = {0};
+	bvnf_to_fix_direct(f, 16, frac_bits, b, 1);
+	return (int16_t)b[0];
 }
 int32_t bvn_float_to_fix32(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) return 0;
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); return 0; }
-	int32_t r = bvn_float_parse_fix32(buf, (int)frac_bits);
-	free(buf);
-	return r;
+	uint32_t b[1] = {0};
+	bvnf_to_fix_direct(f, 32, frac_bits, b, 1);
+	return (int32_t)b[0];
 }
 int64_t bvn_float_to_fix64(const bvn_float_t *f, uint32_t frac_bits)
 {
 	if (!f) return 0;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) return 0;
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); return 0; }
-	int64_t r = bvn_float_parse_fix64(buf, (int)frac_bits);
-	free(buf);
-	return r;
+	uint32_t b[2] = {0, 0};
+	bvnf_to_fix_direct(f, 64, frac_bits, b, 2);
+	return (int64_t)((uint64_t)b[0] | ((uint64_t)b[1] << 32));
 }
 void bvn_float_to_fix128(const bvn_float_t *f, uint32_t frac_bits, uint32_t out[4])
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { memset(out, 0, 16); return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); memset(out, 0, 16); return; }
-	bvn_float_parse_fix128(buf, (int)frac_bits, out);
-	free(buf);
+	bvnf_to_fix_direct(f, 128, frac_bits, out, 4);
 }
 void bvn_float_to_fix256(const bvn_float_t *f, uint32_t frac_bits, uint32_t out[8])
 {
 	if (!f || !out) return;
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) { memset(out, 0, 32); return; }
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); memset(out, 0, 32); return; }
-	bvn_float_parse_fix256(buf, (int)frac_bits, out);
-	free(buf);
+	bvnf_to_fix_direct(f, 256, frac_bits, out, 8);
 }
 static bool from_fix_common(bvn_float_t *f, bool neg,
 							 const uint32_t *abs_words, int nwords,

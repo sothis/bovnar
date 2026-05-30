@@ -467,67 +467,56 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 	int E = p->dex;
 	{
 		/*
-		 * Reduce the coefficient to at most max_coeff_digs digits, rounding the
-		 * dropped tail to nearest with ties to even. All but the final dropped
-		 * digit accumulate into a sticky flag; we then round on that last digit:
-		 * up when it exceeds 5, or equals 5 with a nonzero tail or an odd
-		 * surviving coefficient. A carry that regrows the digit count past the
-		 * limit (…999 -> 1000) drops one further digit.
+		 * Reduce the coefficient in a SINGLE round-to-nearest, ties-to-even step
+		 * that satisfies both width constraints at once: at most max_coeff_digs
+		 * significant digits AND a biased exponent of at least 0 (the subnormal
+		 * floor). Each dropped low-order digit raises E by one, so the number of
+		 * digits to drop is the larger of the two requirements — the digit-count
+		 * surplus (dig - max_coeff_digs) and the subnormal shift (-(E + bias)).
+		 * Rounding only once, at that combined resolution, is what keeps a
+		 * many-digit value that lands in the subnormal range from being rounded
+		 * twice (first to max_coeff_digs, then again down to the subnormal width),
+		 * which could be off by a unit in the last place. The guard is the most
+		 * significant dropped digit; every lower dropped digit folds into sticky;
+		 * a carry that regrows the count past the limit (…999 -> 1000) drops one
+		 * further (exact, trailing-zero) digit.
+		 *
+		 * For values whose exponent is already in range (be >= 0) the subnormal
+		 * term is non-positive and this reduces exactly to the old digit-count
+		 * trim; for in-range-digit subnormals (dig <= max_coeff_digs) it reduces
+		 * exactly to the old subnormal trim. Only the genuine many-digit-subnormal
+		 * overlap — previously double-rounded — changes behaviour.
 		 */
-		int dig  = bvni_count_decimal_digits(ctx, &C);
-		int drop = dig - f->max_coeff_digs;
+		int dig       = bvni_count_decimal_digits(ctx, &C);
+		int drop_digs = dig - f->max_coeff_digs;
+		int drop_exp  = -(E + bias);
+		int drop      = drop_digs > drop_exp ? drop_digs : drop_exp;
 		if (drop > 0) {
 			bool     sticky = false;
-			uint32_t rd     = 0u;
+			uint32_t guard  = 0u;
 			for (int i = 0; i < drop; i++) {
-				rd = bvn_int_div_u32(&C, 10u);
-				E++;
-				if (i + 1 < drop && rd != 0u) sticky = true;
+				if (bvn_int_is_zero(&C)) { guard = 0u; break; } /* rest, incl. guard, are 0 */
+				uint32_t d2 = bvn_int_div_u32(&C, 10u);
+				if (i == drop - 1)      guard  = d2;
+				else if (d2 != 0u)      sticky = true;
 			}
-			bool round_up = (rd > 5u) ||
-				(rd == 5u && (sticky || bvn_int_getbit(&C, 0) == 1));
-			if (round_up) {
+			E += drop;
+			if ((guard > 5u) ||
+				(guard == 5u && (sticky || bvn_int_getbit(&C, 0) == 1))) {
 				bvni_add_u32(ctx, &C, 1u);
 				if (bvni_count_decimal_digits(ctx, &C) > f->max_coeff_digs) {
 					bvn_int_div_u32(&C, 10u);
 					E++;
 				}
 			}
+			if (bvn_int_is_zero(&C)) {   /* rounded away (subnormal underflow to 0) */
+				if (p->neg) bits[(total-1)/32] |= (1u << ((total-1)%32));
+				return;
+			}
 		}
 	}
 	int be = E + bias;
-	if (be < 0) {
-		/*
-		 * Subnormal: the exponent sits below the format minimum, so the
-		 * coefficient must be divided down by 10^shift to lift the biased
-		 * exponent to 0. This drops `shift` low-order decimal digits and so
-		 * must round to nearest, ties to even — a plain truncation here is
-		 * biased toward zero and loses a unit in the last place. The guard is
-		 * the most significant dropped digit (the one extracted at the final
-		 * iteration); every lower dropped digit folds into the sticky flag.
-		 * Entering this block C has at most max_coeff_digs digits, so after
-		 * dropping >=1 digit a round-up adds at most one digit and can never
-		 * overflow the coefficient field (no carry-out renormalisation needed).
-		 */
-		int      shift  = -be;
-		bool     sticky = false;
-		uint32_t guard  = 0u;
-		for (int i = 0; i < shift; i++) {
-			if (bvn_int_is_zero(&C)) break;   /* higher digits all zero: guard 0 */
-			uint32_t digit = bvn_int_div_u32(&C, 10u);
-			E++;
-			if (i == shift - 1)  guard = digit;
-			else if (digit != 0u) sticky = true;
-		}
-		if ((guard > 5u) ||
-			(guard == 5u && (sticky || bvn_int_getbit(&C, 0) == 1)))
-			bvni_add_u32(ctx, &C, 1u);
-		be = 0;
-		if (bvn_int_is_zero(&C)) {
-			if (p->neg) bits[(total-1)/32] |= (1u << ((total-1)%32));
-			return;
-		}
-	}
+	if (be < 0) be = 0;   /* unreachable: the combined drop already lifts be >= 0 */
 	/*
 	 * Clamp to the maximum encodable exponent. The magnitude is in range but
 	 * the normalised coefficient (trailing zeros already stripped by the

@@ -392,24 +392,57 @@ typedef struct {
 	int bias;
 	int max_coeff_digs;
 } DecFmt;
+/*
+ * Distinguish the genuine IEEE-754 decimal interchange formats (decimal32/64/128)
+ * from bovnar's narrower in-house widths. Every standard format satisfies
+ * bias == 3*2^(exp_bits-3) + p - 2 (Emax = 3*2^(exp_bits-3), bias = Emax + p - 2);
+ * the in-house decimal16/256 use a different exponent layout. Only the standard
+ * formats use the BID combination field — the "11" coefficient prefix and the
+ * 1111x Infinity/NaN encoding — and cap the biased exponent at 3*2^(exp_bits-2);
+ * the others use the full exponent field with an all-ones special encoding.
+ */
+static inline bool bvnf_dec_is_standard(int exp_bits, int max_coeff_digs, int bias)
+{
+	return bias == 3 * (1 << (exp_bits - 3)) + max_coeff_digs - 2;
+}
 static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const DecFmt *f,
 									uint32_t *bits, int bits32)
 {
 	int cbits = f->coeff_bits;
 	int ebits = f->exp_bits;
 	int bias  = f->bias;
-	int emax  = (1 << ebits) - 1;
+	bool is_std = bvnf_dec_is_standard(ebits, f->max_coeff_digs, bias);
+	/* Standard formats reserve the "11" combination prefix, so their biased
+	 * exponent tops out at 3*2^(exp_bits-2); the in-house widths use the full
+	 * field, reserving only the all-ones code for Infinity/NaN. */
+	int be_max = is_std ? (3 << (ebits - 2)) : ((1 << ebits) - 1);
 	int total = f->total_bits;
 	for (int i = 0; i < bits32; i++) bits[i] = 0;
 	bvn_float_clear_overflow(ctx);
 	if (p->nan || p->inf) {
-		for (int i = 0; i < ebits; i++) {
-			int pos = total - 2 - i;
-			if (pos >= 0)
-				bits[pos / 32] |= (1u << (pos % 32));
-		}
-		if (p->nan) {
-			if (cbits > 0) {
+		/*
+		 * Special values. Standard formats use the IEEE combination field: the
+		 * four bits below the sign are 1111, and the fifth bit selects Infinity
+		 * (0) or NaN (1) — matching the BID encoding emitted by libbid/hardware.
+		 * The in-house widths keep bovnar's own convention: every exponent-field
+		 * bit set, with NaN flagged by the top coefficient bit.
+		 */
+		if (is_std) {
+			for (int i = 0; i < 4; i++) {
+				int pos = total - 2 - i;
+				if (pos >= 0) bits[pos / 32] |= (1u << (pos % 32));
+			}
+			if (p->nan) {
+				int pos = total - 6;
+				if (pos >= 0) bits[pos / 32] |= (1u << (pos % 32));
+			}
+		} else {
+			for (int i = 0; i < ebits; i++) {
+				int pos = total - 2 - i;
+				if (pos >= 0)
+					bits[pos / 32] |= (1u << (pos % 32));
+			}
+			if (p->nan && cbits > 0) {
 				int wi = (cbits - 1) / 32, bi2 = (cbits - 1) % 32;
 				bits[wi] |= (1u << bi2);
 			}
@@ -425,18 +458,33 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 	bvni_copy(ctx, &C, &p->coeff);
 	int E = p->dex;
 	{
-		int dig = bvni_count_decimal_digits(ctx, &C);
-		while (dig > f->max_coeff_digs) {
-			uint32_t rem = bvn_int_div_u32(&C, 10u);
-			E++;
-			if (rem >= 5u) {
+		/*
+		 * Reduce the coefficient to at most max_coeff_digs digits, rounding the
+		 * dropped tail to nearest with ties to even. All but the final dropped
+		 * digit accumulate into a sticky flag; we then round on that last digit:
+		 * up when it exceeds 5, or equals 5 with a nonzero tail or an odd
+		 * surviving coefficient. A carry that regrows the digit count past the
+		 * limit (…999 -> 1000) drops one further digit.
+		 */
+		int dig  = bvni_count_decimal_digits(ctx, &C);
+		int drop = dig - f->max_coeff_digs;
+		if (drop > 0) {
+			bool     sticky = false;
+			uint32_t rd     = 0u;
+			for (int i = 0; i < drop; i++) {
+				rd = bvn_int_div_u32(&C, 10u);
+				E++;
+				if (i + 1 < drop && rd != 0u) sticky = true;
+			}
+			bool round_up = (rd > 5u) ||
+				(rd == 5u && (sticky || bvn_int_getbit(&C, 0) == 1));
+			if (round_up) {
 				bvni_add_u32(ctx, &C, 1u);
 				if (bvni_count_decimal_digits(ctx, &C) > f->max_coeff_digs) {
 					bvn_int_div_u32(&C, 10u);
 					E++;
 				}
 			}
-			dig = bvni_count_decimal_digits(ctx, &C);
 		}
 	}
 	int be = E + bias;
@@ -452,26 +500,65 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 			return;
 		}
 	}
-	if (be >= emax) {
-		for (int i = 0; i < ebits; i++) {
-			int pos = total - 2 - i;
-			if (pos >= 0)
-				bits[pos / 32] |= (1u << (pos % 32));
+	if (be >= be_max) {
+		/*
+		 * Finite magnitude too large for this format's exponent range rounds to
+		 * Infinity. Emit the same special pattern the p->inf path uses: the 1111x
+		 * combination (fifth bit 0) for standard formats, all exponent bits for
+		 * the in-house widths. (Emitting all-ones unconditionally would decode as
+		 * NaN under the standard 1111x scheme.)
+		 */
+		if (is_std) {
+			for (int i = 0; i < 4; i++) {
+				int pos = total - 2 - i;
+				if (pos >= 0) bits[pos / 32] |= (1u << (pos % 32));
+			}
+		} else {
+			for (int i = 0; i < ebits; i++) {
+				int pos = total - 2 - i;
+				if (pos >= 0)
+					bits[pos / 32] |= (1u << (pos % 32));
+			}
 		}
 		if (p->neg) bits[(total-1)/32] |= (1u << ((total-1)%32));
 		return;
 	}
-	(void)emax;
-	while (bvn_int_bitlen(&C) > cbits)
-		bvn_int_shr(&C, 1);
-	BVN_INT_LOCAL(ebig);
-	bvn_int_from_uint64(&ebig, (uint64_t)be);
-	bvni_shl(ctx, &ebig, cbits);
-	int rn = ((int)ebig.nused > (int)C.nused) ? (int)ebig.nused : (int)C.nused;
-	for (int i = 0; i < rn && i < bits32; i++) {
-		uint32_t ev = ((uint32_t)i < ebig.nused) ? ebig.limbs[i] : 0u;
-		uint32_t cv = ((uint32_t)i < C.nused)    ? C.limbs[i]    : 0u;
-		bits[i] = ev | cv;
+	/*
+	 * Pack the biased exponent and coefficient. CASE A — the coefficient fits in
+	 * coeff_bits — places it directly in the trailing field with the exponent
+	 * above it; this is the only case for the in-house widths and for decimal128.
+	 * CASE B — the coefficient needs one more bit, reachable for decimal32/64
+	 * whose 10^p exceeds 2^coeff_bits — uses the BID combination field: a "11"
+	 * prefix, then the exponent, then the low tL = total-3-exp_bits coefficient
+	 * bits with the implicit 2^coeff_bits top bit cleared.
+	 */
+	if (bvn_int_bitlen(&C) <= cbits) {
+		BVN_INT_LOCAL(ebig);
+		bvn_int_from_uint64(&ebig, (uint64_t)be);
+		bvni_shl(ctx, &ebig, cbits);
+		for (uint32_t i = 0; i < ebig.nused && (int)i < bits32; i++)
+			bits[i] |= ebig.limbs[i];
+		for (uint32_t i = 0; i < C.nused && (int)i < bits32; i++)
+			bits[i] |= C.limbs[i];
+	} else {
+		int tL = total - 3 - ebits;
+		{
+			int wi = cbits / 32, b2 = cbits % 32;
+			if ((uint32_t)wi < C.nlimbs) C.limbs[wi] &= ~(1u << b2);
+			bvn_int_norm(&C);
+		}
+		BVN_INT_LOCAL(ebig);
+		bvn_int_from_uint64(&ebig, (uint64_t)be);
+		bvni_shl(ctx, &ebig, tL);
+		BVN_INT_LOCAL(combo);
+		bvn_int_from_uint64(&combo, 3u);
+		bvni_shl(ctx, &combo, total - 3);
+		for (uint32_t i = 0; i < combo.nused && (int)i < bits32; i++)
+			bits[i] |= combo.limbs[i];
+		for (uint32_t i = 0; i < ebig.nused && (int)i < bits32; i++)
+			bits[i] |= ebig.limbs[i];
+		for (uint32_t i = 0; i < C.nused && (int)i < bits32; i++)
+			bits[i] |= C.limbs[i];
 	}
 	if (p->neg) {
 		int sign_pos = total - 1;
@@ -598,7 +685,7 @@ static inline uint16_t bvn_float_parse_dec16(const char *s)
 {
 	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
 	PNum p; bvn_float_pnum_init(&p); bvn_float_parse(&ctx, s, &p);
-	DecFmt f = {16, 6, 9, 101, 2};
+	DecFmt f = {16, 6, 9, 24, 2};
 	uint32_t b[1] = {0};
 	to_ieee_decimal(&ctx, &p, &f, b, 1);
 	return (uint16_t)b[0];

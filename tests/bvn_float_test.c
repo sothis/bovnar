@@ -595,16 +595,15 @@ static void test_decimal32(void)
 	CHECK(bvn_float_parse_dec32("0")  == 0x00000000u, "dec32 +0");
 	CHECK(bvn_float_parse_dec32("-0") == 0x80000000u, "dec32 -0");
 
-	CHECK(bvn_float_parse_dec32("inf")  == 0x7F800000u, "dec32 +inf");
-	CHECK(bvn_float_parse_dec32("-inf") == 0xFF800000u, "dec32 -inf");
-	CHECK(bvn_float_parse_dec32("INF")  == 0x7F800000u, "dec32 INF");
+	CHECK(bvn_float_parse_dec32("inf")  == 0x78000000u, "dec32 +inf");
+	CHECK(bvn_float_parse_dec32("-inf") == 0xF8000000u, "dec32 -inf");
+	CHECK(bvn_float_parse_dec32("INF")  == 0x78000000u, "dec32 INF");
 
 	{ uint32_t nb = bvn_float_parse_dec32("nan");
-	  CHECK((nb & 0x7F800000u) == 0x7F800000u, "dec32 nan: exp bits");
-	  CHECK((nb & 0x00400000u) != 0u,           "dec32 nan: coeff MSB"); }
+	  CHECK((nb & 0x7C000000u) == 0x7C000000u, "dec32 nan: combination 11111"); }
 	{ uint32_t nb = bvn_float_parse_dec32("-nan");
 	  CHECK((nb >> 31) == 1u,                   "dec32 -nan: sign bit");
-	  CHECK((nb & 0x7F800000u) == 0x7F800000u,  "dec32 -nan: exp bits"); }
+	  CHECK((nb & 0x7C000000u) == 0x7C000000u,  "dec32 -nan: combination 11111"); }
 
 	CHECK(bvn_float_parse_dec32("1")  == 0x32800001u, "dec32 1");
 	CHECK(bvn_float_parse_dec32("-1") == 0xB2800001u, "dec32 -1");
@@ -628,26 +627,23 @@ static void test_decimal64(void)
 {
 	puts("── decimal64 conversion ──────────────────────────────────────");
 
-	const uint64_t EXP_MASK64 = 0x7FE0000000000000ull;
-	const uint64_t COEF_MASK64 = 0x001FFFFFFFFFFFFFull;
+	const uint64_t COMB_MASK64 = 0x7C00000000000000ull;
 
 	CHECK(bvn_float_parse_dec64("0")  == 0x0000000000000000ull, "dec64 +0");
 	CHECK(bvn_float_parse_dec64("-0") == 0x8000000000000000ull, "dec64 -0");
 
 	{ uint64_t inf = bvn_float_parse_dec64("inf");
-	  CHECK((inf & EXP_MASK64) == EXP_MASK64,  "dec64 +inf: exp bits all set");
-	  CHECK((inf & COEF_MASK64) == 0ull,        "dec64 +inf: coeff is zero"); }
+	  CHECK(inf == 0x7800000000000000ull,       "dec64 +inf: combination 11110"); }
 
 	{ uint64_t inf = bvn_float_parse_dec64("-inf");
-	  CHECK((inf >> 63) == 1ull,                "dec64 -inf: sign bit"); }
+	  CHECK(inf == 0xF800000000000000ull,       "dec64 -inf"); }
 
 	{ uint64_t nb = bvn_float_parse_dec64("nan");
-	  CHECK((nb & EXP_MASK64) == EXP_MASK64,   "dec64 nan: exp bits");
-	  CHECK((nb & (1ull << 52)) != 0ull,        "dec64 nan: coeff MSB (bit52)"); }
+	  CHECK((nb & COMB_MASK64) == COMB_MASK64,  "dec64 nan: combination 11111"); }
 
 	{ uint64_t nb = bvn_float_parse_dec64("-nan");
 	  CHECK((nb >> 63) == 1ull,                 "dec64 -nan: sign bit");
-	  CHECK((nb & EXP_MASK64) == EXP_MASK64,   "dec64 -nan: exp bits"); }
+	  CHECK((nb & COMB_MASK64) == COMB_MASK64,  "dec64 -nan: combination 11111"); }
 
 	{ uint64_t expected = ((uint64_t)398 << 53) | 1ull;
 	  CHECK(bvn_float_parse_dec64("1") == expected, "dec64 1"); }

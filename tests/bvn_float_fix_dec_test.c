@@ -520,19 +520,35 @@ static void test_bvn_float_dec_api(void)
 	bvn_float_to_double(&f, &out);
 	CHECK(fabs(out - 2.71828) < 1e-4, "dec128 round-trip: e approx");
 
-	/* dec16 — very narrow-range format: bias=101, 6 exp bits → [0..62].
-	 * Unbiased exponent range = [-101, -39].  Values near 1.5 produce
-	 * biased_exp ≈ 100 which overflows the 6-bit field → Inf.
-	 * Use a value in the representable range, e.g. 1.0e-50
-	 * (be = -50 + 101 = 51, which fits in 6 bits). */
-	bvn_float_from_double(&f, 1.0e-50);
+	/* dec16 — a 16-bit decimal extrapolating the IEEE decimal family:
+	 * 1 sign + 6-bit biased exponent + 9-bit coefficient, p = 2 digits,
+	 * Emax = 3*2^(6-3) = 24, bias = Emax + p - 2 = 24.  The coefficient
+	 * exponent q therefore ranges [-24, 23], so ordinary magnitudes such as
+	 * 1.5 are representable (be = -1 + 24 = 23, well inside the field). */
+	bvn_float_from_double(&f, 1.5);
 	uint16_t dec16_bits;
 	bvn_float_to_dec16(&f, &dec16_bits);
 	bvn_float_set_zero(&f, false);
 	bvn_float_from_dec16(&f, dec16_bits);
 	bvn_float_to_double(&f, &out);
-	/* double can represent 1e-50; allow 1% relative error for 2-digit precision. */
-	CHECK(fabs(out - 1.0e-50) < 1.0e-50 * 0.1, "dec16 round-trip: 1e-50");
+	CHECK(fabs(out - 1.5) < 1.5 * 0.01, "dec16 round-trip: 1.5");
+
+	bvn_float_from_double(&f, 6.0e-23);
+	bvn_float_to_dec16(&f, &dec16_bits);
+	bvn_float_set_zero(&f, false);
+	bvn_float_from_dec16(&f, dec16_bits);
+	bvn_float_to_double(&f, &out);
+	CHECK(fabs(out - 6.0e-23) < 6.0e-23 * 0.1, "dec16 round-trip: 6e-23");
+
+	bvn_float_set_inf(&f, false);
+	bvn_float_to_dec16(&f, &dec16_bits);
+	bvn_float_from_dec16(&f, dec16_bits);
+	CHECK(bvn_float_is_inf(&f) && !bvn_float_is_neg(&f), "dec16 +Inf round-trip");
+
+	bvn_float_set_nan(&f);
+	bvn_float_to_dec16(&f, &dec16_bits);
+	bvn_float_from_dec16(&f, dec16_bits);
+	CHECK(bvn_float_is_nan(&f), "dec16 NaN round-trip");
 }
 
 /* ── bvn_float_t ↔ fix conversion API ─────────────────────────────── */

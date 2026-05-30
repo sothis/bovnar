@@ -775,6 +775,128 @@ arb_overflow:
 	free(digs);
 	return ret;
 }
+/*
+ * Exact equality of two finite, same-precision bvn_floats. The representation is
+ * canonical (normalised leading mantissa bit), so identical sign, exponent and
+ * mantissa limbs imply identical real values. Used to test whether a shortened
+ * decimal still parses back to the original float.
+ */
+static bool bvnf_regular_eq(const bvn_float_t *a, const bvn_float_t *b)
+{
+	if (a->_sign != b->_sign || a->_exp != b->_exp) return false;
+	uint32_t nl = (a->_nlimbs < b->_nlimbs) ? a->_nlimbs : b->_nlimbs;
+	if (memcmp(a->_d, b->_d, (size_t)nl * sizeof(bvn_limb_t)) != 0) return false;
+	for (uint32_t i = nl; i < a->_nlimbs; i++) if (a->_d[i]) return false;
+	for (uint32_t i = nl; i < b->_nlimbs; i++) if (b->_d[i]) return false;
+	return true;
+}
+/*
+ * Take the first k significant digits of a digit string, either truncated
+ * (up == false) or rounded up by one unit in the last place (up == true). These
+ * two candidates bracket the value, so the nearest k-digit decimal is always one
+ * of them. A carry out of the leading digit (…9 -> 10) collapses to "1" and
+ * reports *eshift = 1 so the caller bumps the decimal exponent. Trailing zeros
+ * are trimmed. The output buffer doubles as scratch for the digit values.
+ */
+static void bvnf_take_k(const char *digs, long n, uint32_t base,
+						long k, bool up, char *out, long *out_n, long *eshift)
+{
+	static const char D[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+	uint8_t *v = (uint8_t *)out;
+	(void)n;
+	for (long i = 0; i < k; i++) v[i] = (uint8_t)bvnf_digit((uint8_t)digs[i], base);
+	*eshift = 0;
+	if (up) {
+		long j = k - 1;
+		for (;;) {
+			v[j]++;
+			if ((uint32_t)v[j] < base) break;
+			v[j] = 0;
+			if (j == 0) { v[0] = 1; *eshift = 1; break; }
+			j--;
+		}
+	}
+	long m = k;
+	while (m > 1 && v[m - 1] == 0) m--;
+	for (long i = 0; i < m; i++) out[i] = D[v[i]];
+	*out_n = m;
+}
+/*
+ * Build the decimal text for one candidate (sign, leading digit, fraction, 'e',
+ * exponent), parse it back at the float's own precision and base, and report
+ * whether it reproduces f exactly. This is the round-trip oracle that drives the
+ * shortening search.
+ */
+static bool bvnf_rt_candidate(const bvn_float_t *f, uint32_t base,
+							  const char *d, long rn, long E,
+							  char *cnd, bvn_float_t *t)
+{
+	char *c = cnd;
+	if (f->_sign < 0) *c++ = '-';
+	*c++ = d[0];
+	if (rn > 1) { *c++ = '.'; for (long i = 1; i < rn; i++) *c++ = d[i]; }
+	*c++ = 'e';
+	long ev = E;
+	if (ev < 0) { *c++ = '-'; ev = -ev; } else *c++ = '+';
+	char eb[24]; int en = 0;
+	if (ev == 0) eb[en++] = '0';
+	else while (ev > 0) { eb[en++] = (char)('0' + ev % 10); ev /= 10; }
+	while (en > 0) *c++ = eb[--en];
+	*c = '\0';
+	return bvn_float_from_str(t, cnd, base) && bvnf_regular_eq(t, f);
+}
+/*
+ * Reduce a faithful, correctly-rounded digit string to the fewest digits that
+ * still parse back to exactly f at its own precision — true shortest round-trip.
+ * Feasibility is monotonic in the digit count k (more digits is a strictly closer
+ * approximation that stays inside the round-trip interval), so a binary search
+ * suffices; at each k we test both the truncated and the rounded-up candidate,
+ * since the nearest k-digit decimal is one of the two. The final length picks the
+ * candidate nearest the true value (ties to even). On any allocation or parse
+ * failure the input is left unchanged — still correct, just not minimal.
+ */
+static void bvnf_shorten_digits(const bvn_float_t *f, uint32_t base,
+								char *digs, long *pn, long *pE)
+{
+	long n = *pn;
+	if (n <= 1) return;
+	bvn_float_t *t   = bvn_float_alloc(f->_prec);
+	char        *cnd = malloc((size_t)n + 32u);
+	char        *df  = malloc((size_t)n + 2u);
+	char        *dc  = malloc((size_t)n + 2u);
+	if (!t || !cnd || !df || !dc) {
+		free(cnd); free(df); free(dc); bvn_float_free(t); return;
+	}
+	long lo = 1, hi = n;
+	while (lo < hi) {
+		long k = lo + (hi - lo) / 2;
+		long fn, fe, cn, ce;
+		bvnf_take_k(digs, n, base, k, false, df, &fn, &fe);
+		bvnf_take_k(digs, n, base, k, true,  dc, &cn, &ce);
+		bool feasible = bvnf_rt_candidate(f, base, df, fn, *pE + fe, cnd, t)
+					 || bvnf_rt_candidate(f, base, dc, cn, *pE + ce, cnd, t);
+		if (feasible) hi = k; else lo = k + 1;
+	}
+	{
+		long k = lo, fn, fe, cn, ce;
+		bvnf_take_k(digs, n, base, k, false, df, &fn, &fe);
+		bvnf_take_k(digs, n, base, k, true,  dc, &cn, &ce);
+		uint32_t nd = (k < n) ? bvnf_digit((uint8_t)digs[k], base) : 0u;
+		bool sticky = false;
+		for (long i = k + 1; i < n; i++)
+			if (bvnf_digit((uint8_t)digs[i], base) != 0u) { sticky = true; break; }
+		uint32_t last = bvnf_digit((uint8_t)digs[k - 1], base);
+		bool near_is_ceil = (2u * nd > base) ||
+			(2u * nd == base && (sticky || (last & 1u)));
+		bool near_ok = near_is_ceil
+			? bvnf_rt_candidate(f, base, dc, cn, *pE + ce, cnd, t)
+			: bvnf_rt_candidate(f, base, df, fn, *pE + fe, cnd, t);
+		bool use_ceil = near_is_ceil ? near_ok : !near_ok;
+		if (use_ceil) { memcpy(digs, dc, (size_t)cn); *pn = cn; *pE += ce; }
+		else          { memcpy(digs, df, (size_t)fn); *pn = fn; *pE += fe; }
+	}
+	free(cnd); free(df); free(dc); bvn_float_free(t);
+}
 static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 {
 	if (f->_prec > 4194304L) return -1;
@@ -824,6 +946,7 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	long last = ndigits - 1;
 	while (last > 0 && digs[last] == '0') last--;
 	ndigits = last + 1;
+	bvnf_shorten_digits(f, 10u, digs, &ndigits, &E10);
 	size_t pos = 0;
 	int32_t ret = -1;
 #define PUTC(c) do { if (pos + 1 >= bufsize) goto overflow; \
@@ -858,8 +981,10 @@ overflow:
  * Format a bvn_float as text in base 2-36. After handling nan/inf/±0 it
  * dispatches by base kind: power-of-two bases (bvnf_to_str_pow2) read mantissa
  * bits directly into digit groups — exact and cheap; base 10 (bvnf_to_str_dec)
- * does the harder exact binary->decimal conversion with shortest-round-trip
- * digit generation; other bases use the general bvnf_to_str_arb. Returns -1 on
+ * does the harder exact binary->decimal conversion and then reduces the result
+ * to the genuinely shortest digit string that still round-trips to this float
+ * at its own precision; other bases use bvnf_to_str_arb, which is round-trip
+ * faithful (enough digits to reparse exactly) but not minimised. Returns -1 on
  * too-small buffer rather than truncating. Size the buffer with
  * bvn_float_str_bufsize, which bounds the digit count from precision and base.
  */
@@ -993,6 +1118,89 @@ bool bvn_float_to_float(const bvn_float_t *f, float *out)
  * bvn_float_from_ieee_bin is the inverse decode. The fixed-width bin16/32/64/...
  * wrappers below just call these with the standard parameter sets.
  */
+/*
+ * Repack a finite, non-zero bvn_float straight into an IEEE-754 binary field set,
+ * without the decimal-string detour the old path used. The value is
+ * significand * 2^(_exp - _prec) with the leading mantissa bit at _prec-1, so in
+ * 1.fff form its unbiased exponent is _exp-1 and the biased exponent is
+ * _exp-1+bias. We keep man_bits+1 significant bits and round the discarded low
+ * bits to nearest, ties to even, using one guard bit plus an exact sticky bit
+ * (computed by masking off the low drop-1 bits and comparing). Subnormals fold
+ * the extra right shift into the cut and clamp the biased exponent to 0; a
+ * round-up that carries out of the mantissa, or an exponent that reaches the
+ * all-ones code, yields Infinity. Single-rounded by construction.
+ */
+static void bvnf_to_ieee_bin_direct(const bvn_float_t *f,
+		uint32_t exp_bits, uint32_t man_bits, int32_t bias,
+		uint32_t *bits, int bits32)
+{
+	int eall  = (int)((1u << exp_bits) - 1u);
+	int total = 1 + (int)exp_bits + (int)man_bits;
+	for (int i = 0; i < bits32; i++) bits[i] = 0;
+	if (f->_sign < 0)
+		bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
+	long be   = f->_exp - 1L + (long)bias;
+	long drop = (long)f->_prec - ((long)man_bits + 1L);
+	if (be <= 0) { drop += (1L - be); be = 0; }
+	uint32_t _sb[BVN_INT_MAX_BITS / 32];
+	bvn_int_t S = { _sb, BVN_INT_MAX_BITS / 32, 0, false, false };
+	memset(_sb, 0, sizeof _sb);
+#if BVN_LIMB_BITS == 64
+	for (uint32_t i = 0; i < f->_nlimbs; i++) {
+		if (2u * i      < S.nlimbs) S.limbs[2u * i]      = (uint32_t)(f->_d[i] & 0xffffffffu);
+		if (2u * i + 1u < S.nlimbs) S.limbs[2u * i + 1u] = (uint32_t)(f->_d[i] >> 32);
+	}
+	S.nused = (f->_nlimbs * 2u <= S.nlimbs) ? f->_nlimbs * 2u : S.nlimbs;
+#else
+	for (uint32_t i = 0; i < f->_nlimbs && i < S.nlimbs; i++) S.limbs[i] = f->_d[i];
+	S.nused = (f->_nlimbs <= S.nlimbs) ? f->_nlimbs : S.nlimbs;
+#endif
+	bvn_int_norm(&S);
+	bool gbit = false, sticky = false;
+	if (drop > 0) {
+		gbit = bvn_int_getbit(&S, (int)drop - 1) == 1;
+		if (drop >= 2) {
+			uint32_t _tb[BVN_INT_MAX_BITS / 32];
+			bvn_int_t T = { _tb, BVN_INT_MAX_BITS / 32, 0, false, false };
+			memset(_tb, 0, sizeof _tb);
+			bvn_int_copy(&T, &S);
+			bvn_int_shr(&T, (int)drop - 1);
+			bvn_int_shl(&T, (int)drop - 1);
+			sticky = bvn_int_cmp(&T, &S) != 0;
+		}
+		bvn_int_shr(&S, (int)drop);
+	} else if (drop < 0) {
+		bvn_int_shl(&S, (int)(-drop));
+	}
+	if (gbit && (sticky || bvn_int_getbit(&S, 0) == 1)) {
+		bvn_int_add_u32(&S, 1u);
+		if (bvn_int_bitlen(&S) > (int)man_bits + 1) {
+			bvn_int_shr(&S, 1);
+			be++;
+		}
+	}
+	if (be >= eall) {
+		for (uint32_t i = 0; i < exp_bits; i++)
+			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
+		return;
+	}
+	if (be == 0 && bvn_int_getbit(&S, (int)man_bits) == 1)
+		be = 1;
+	if (be > 0) {
+		int wi = (int)man_bits / 32, b2 = (int)man_bits % 32;
+		if ((uint32_t)wi < S.nlimbs) S.limbs[wi] &= ~(1u << b2);
+		bvn_int_norm(&S);
+		uint32_t _eb[BVN_INT_MAX_BITS / 32];
+		bvn_int_t eb = { _eb, BVN_INT_MAX_BITS / 32, 0, false, false };
+		memset(_eb, 0, sizeof _eb);
+		bvn_int_from_uint64(&eb, (uint64_t)be);
+		bvn_int_shl(&eb, (int)man_bits);
+		for (uint32_t i = 0; i < eb.nused && (int)i < bits32; i++)
+			bits[i] |= eb.limbs[i];
+	}
+	for (uint32_t i = 0; i < S.nused && (int)i < bits32; i++)
+		bits[i] |= S.limbs[i];
+}
 void bvn_float_to_ieee_bin(const bvn_float_t *f,
 							uint32_t exp_bits, uint32_t man_bits, int32_t bias,
 							uint32_t *bits, int bits32)
@@ -1017,17 +1225,15 @@ void bvn_float_to_ieee_bin(const bvn_float_t *f,
 		}
 		return;
 	}
-	size_t _bsz = bvn_float_str_bufsize((uint32_t)f->_prec, 10u);
-	char  *buf  = malloc(_bsz);
-	if (!buf) return;
-	int n = bvn_float_to_str(f, buf, _bsz, 10);
-	if (n <= 0) { free(buf); return; }
-	bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
-	PNum p; bvn_float_pnum_init(&p);
-	bvn_float_parse(&ctx, buf, &p);
-	free(buf);
-	BinFmt fmt = { (int)exp_bits, (int)man_bits, (int)bias };
-	to_ieee_binary(&ctx, &p, &fmt, bits, bits32);
+	/* Signed zero is the only finite case the direct repack does not cover. */
+	if (bvn_float_is_zero(f)) {
+		if (f->_sign < 0) {
+			int total = 1 + (int)exp_bits + (int)man_bits;
+			bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
+		}
+		return;
+	}
+	bvnf_to_ieee_bin_direct(f, exp_bits, man_bits, bias, bits, bits32);
 }
 bool bvn_float_from_ieee_bin(bvn_float_t *f,
 							  uint32_t exp_bits, uint32_t man_bits, int32_t bias,
@@ -1140,11 +1346,12 @@ bool bvn_float_from_bin256(bvn_float_t *f, const uint32_t bits[8])
 }
 static bool from_ieee_decimal(bvn_float_t *f,
 							   int total_bits, int exp_bits, int coeff_bits,
-							   int bias, const uint32_t *bits, int bits32)
+							   int bias, int max_coeff_digs, const uint32_t *bits, int bits32)
 {
 	if (!f || !bits) return false;
 	int sign_pos = total_bits - 1;
 	bool neg = ((bits[sign_pos / 32] >> (sign_pos % 32)) & 1u) != 0u;
+	bool is_std = bvnf_dec_is_standard(exp_bits, max_coeff_digs, bias);
 	uint32_t raw_exp = 0;
 	for (int i = 0; i < exp_bits && i < 32; i++) {
 		int pos = coeff_bits + i;
@@ -1152,30 +1359,70 @@ static bool from_ieee_decimal(bvn_float_t *f,
 		if ((bits[pos / 32] >> (pos % 32)) & 1u)
 			raw_exp |= (1u << i);
 	}
-	uint32_t exp_max = (exp_bits < 32) ? ((1u << exp_bits) - 1u) : 0xffffffffu;
-	if (raw_exp == exp_max) {
-		bool coeff_zero = true;
-		for (int i = 0; i < coeff_bits && coeff_zero; i++) {
-			if (i >= bits32 * 32) break;
-			if ((bits[i / 32] >> (i % 32)) & 1u) coeff_zero = false;
+	/*
+	 * Special-value detection mirrors the encoder. Standard formats use the BID
+	 * combination field: top four exponent-field bits 1111, fifth bit selecting
+	 * Infinity (0) or NaN (1). The in-house widths flag specials with the all-ones
+	 * exponent field, telling Infinity from NaN by whether the coefficient is zero.
+	 */
+	if (is_std) {
+		if ((raw_exp >> (exp_bits - 4)) == 0xFu) {
+			if ((raw_exp >> (exp_bits - 5)) & 1u) bvn_float_set_nan(f);
+			else                                  bvn_float_set_inf(f, neg);
+			return true;
 		}
-		if (coeff_zero) bvn_float_set_inf(f, neg);
-		else            bvn_float_set_nan(f);
-		return true;
+	} else {
+		uint32_t exp_max = (exp_bits < 32) ? ((1u << exp_bits) - 1u) : 0xffffffffu;
+		if (raw_exp == exp_max) {
+			bool coeff_zero = true;
+			for (int i = 0; i < coeff_bits && coeff_zero; i++) {
+				if (i >= bits32 * 32) break;
+				if ((bits[i / 32] >> (i % 32)) & 1u) coeff_zero = false;
+			}
+			if (coeff_zero) bvn_float_set_inf(f, neg);
+			else            bvn_float_set_nan(f);
+			return true;
+		}
 	}
 	int cb_words = (coeff_bits + 31) / 32;
 	if (cb_words > 8) cb_words = 8;
 	uint32_t cb[8] = {0};
-	for (int i = 0; i < coeff_bits && i < 256; i++) {
-		if (i >= bits32 * 32) break;
-		if ((bits[i / 32] >> (i % 32)) & 1u)
-			cb[i / 32] |= (1u << (i % 32));
+	int64_t unbiased;
+	/*
+	 * CASE B (standard formats only): a "11" combination prefix that is not the
+	 * 1111x special. The exponent then lives in the exp_bits field at bit
+	 * tL = total-3-exp_bits, and the coefficient is the low tL bits with the
+	 * implicit 2^coeff_bits top bit restored. CASE A reads the exponent from the
+	 * trailing field's top and the coefficient straight from the low bits.
+	 */
+	if (is_std && raw_exp >= (3u << (exp_bits - 2))) {
+		int tL = total_bits - 3 - exp_bits;
+		uint32_t be_field = 0;
+		for (int i = 0; i < exp_bits && i < 32; i++) {
+			int pos = tL + i;
+			if (pos >= bits32 * 32) break;
+			if ((bits[pos / 32] >> (pos % 32)) & 1u)
+				be_field |= (1u << i);
+		}
+		unbiased = (int64_t)be_field - (int64_t)bias;
+		for (int i = 0; i < tL && i < 256; i++) {
+			if (i >= bits32 * 32) break;
+			if ((bits[i / 32] >> (i % 32)) & 1u)
+				cb[i / 32] |= (1u << (i % 32));
+		}
+		cb[coeff_bits / 32] |= (1u << (coeff_bits % 32));
+	} else {
+		unbiased = (int64_t)raw_exp - (int64_t)bias;
+		for (int i = 0; i < coeff_bits && i < 256; i++) {
+			if (i >= bits32 * 32) break;
+			if ((bits[i / 32] >> (i % 32)) & 1u)
+				cb[i / 32] |= (1u << (i % 32));
+		}
 	}
 	bool coeff_zero = true;
 	for (int i = 0; i < cb_words && coeff_zero; i++)
 		if (cb[i]) coeff_zero = false;
 	if (coeff_zero) { bvn_float_set_zero(f, neg); return true; }
-	int64_t unbiased = (int64_t)raw_exp - (int64_t)bias;
 	uint32_t tmp[8];
 	for (int i = 0; i < cb_words; i++) tmp[i] = cb[i];
 	bvn_int_t T;
@@ -1226,7 +1473,7 @@ void bvn_float_to_dec16(const bvn_float_t *f, uint16_t *out)
 	bvn_float_parse(&ctx, buf, &p);
 	free(buf);
 	uint32_t b[1] = {0};
-	DecFmt fmt = {16, 6, 9, 101, 2};
+	DecFmt fmt = {16, 6, 9, 24, 2};
 	to_ieee_decimal(&ctx, &p, &fmt, b, 1);
 	*out = (uint16_t)b[0];
 }
@@ -1295,24 +1542,24 @@ void bvn_float_to_dec256(const bvn_float_t *f, uint32_t out[8])
 bool bvn_float_from_dec16(bvn_float_t *f, uint16_t bits)
 {
 	uint32_t b = bits;
-	return from_ieee_decimal(f, 16, 6, 9, 101, &b, 1);
+	return from_ieee_decimal(f, 16, 6, 9, 24, 2, &b, 1);
 }
 bool bvn_float_from_dec32(bvn_float_t *f, uint32_t bits)
 {
-	return from_ieee_decimal(f, 32, 8, 23, 101, &bits, 1);
+	return from_ieee_decimal(f, 32, 8, 23, 101, 7, &bits, 1);
 }
 bool bvn_float_from_dec64(bvn_float_t *f, uint64_t bits)
 {
 	uint32_t b[2] = { (uint32_t)(bits & 0xffffffffu), (uint32_t)(bits >> 32) };
-	return from_ieee_decimal(f, 64, 10, 53, 398, b, 2);
+	return from_ieee_decimal(f, 64, 10, 53, 398, 16, b, 2);
 }
 bool bvn_float_from_dec128(bvn_float_t *f, const uint32_t bits[4])
 {
-	return from_ieee_decimal(f, 128, 14, 113, 6176, bits, 4);
+	return from_ieee_decimal(f, 128, 14, 113, 6176, 34, bits, 4);
 }
 bool bvn_float_from_dec256(bvn_float_t *f, const uint32_t bits[8])
 {
-	return from_ieee_decimal(f, 256, 20, 235, 611867, bits, 8);
+	return from_ieee_decimal(f, 256, 20, 235, 611867, 70, bits, 8);
 }
 /*
  * Fixed-point (Qm.n) encoders/decoders: represent the value as an integer

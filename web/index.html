@@ -1015,6 +1015,8 @@ section { position: relative; z-index: 1; }
 }
 
 .qs-step {
+  display: flex;
+  flex-direction: column;
   padding: 2rem;
   border-right: 1px solid var(--border);
 }
@@ -1060,6 +1062,7 @@ section { position: relative; z-index: 1; }
   line-height: 1.9;
   overflow-x: auto;
   white-space: pre;
+  flex: 1 1 auto;          /* fill the (grid-equalized) step so both columns match height */
 }
 
 /* ── USE CASES ── */
@@ -1703,13 +1706,11 @@ a[data-doc] { cursor: pointer; }
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
-  min-height: 560px;
 }
 
 .pg-events-col {
   display: flex;
   flex-direction: column;
-  min-height: 560px;
   background: var(--sidebar-bg);
 }
 
@@ -1717,7 +1718,8 @@ a[data-doc] { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.55rem 1rem;
+  min-height: 2.5rem;            /* fixed so both column headers match height */
+  padding: 0.4rem 1rem;
   background: var(--panel-bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -1754,7 +1756,8 @@ a[data-doc] { cursor: pointer; }
 
 .pg-editor-wrap {
   position: relative;
-  flex: 1;
+  flex: 0 0 auto;
+  height: 23.85rem;   /* 15 lines: 15 × 1.85 line-height × 0.78rem + 2 × 1.1rem padding */
   overflow: hidden;
   background: var(--editor-bg);
 }
@@ -1820,7 +1823,8 @@ a[data-doc] { cursor: pointer; }
 .hl-dim          { color: var(--text2); }
 
 #pg-event-log {
-  height: 41rem; /* ~25 event rows */
+  flex: 1;          /* fill the column, which the grid sizes to the 15-line editor */
+  min-height: 0;
   overflow-y: auto;
   padding: 0.6rem 0;
   font-family: var(--mono);
@@ -1833,8 +1837,8 @@ a[data-doc] { cursor: pointer; }
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  padding: 0.2rem 1rem;
-  line-height: 1.65;
+  padding: 0.12rem 1rem;
+  line-height: 1.4;
   border-left: 2px solid transparent;
   transition: background 0.1s;
   cursor: default;
@@ -1908,12 +1912,15 @@ a[data-doc] { cursor: pointer; }
 }
 
 .pg-example-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
   font-family: var(--mono);
   font-size: 0.65rem;
   color: var(--text2);
   background: transparent;
   border: 1px solid var(--border);
-  padding: 0.2rem 0.65rem;
+  padding: 0.2rem 0.5rem;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
   letter-spacing: 0.03em;
@@ -3161,13 +3168,13 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
             placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
           ></textarea>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;padding:0.55rem 0.85rem;background:var(--panel-bg);border-top:1px solid var(--border);">
-          <button class="pg-example-btn" data-example="typed">Typed values</button>
-          <button class="pg-example-btn" data-example="units">SI units</button>
-          <button class="pg-example-btn" data-example="struct">Nested struct</button>
+        <div style="display:flex;flex-wrap:nowrap;gap:0.3rem;padding:0.55rem 0.85rem;background:var(--panel-bg);border-top:1px solid var(--border);">
+          <button class="pg-example-btn" data-example="typed">Typed</button>
+          <button class="pg-example-btn" data-example="units">Units</button>
+          <button class="pg-example-btn" data-example="struct">Struct</button>
           <button class="pg-example-btn" data-example="array">Array</button>
           <button class="pg-example-btn" data-example="strings">Strings</button>
-          <button class="pg-example-btn" data-example="errors">Parse errors</button>
+          <button class="pg-example-btn" data-example="errors">Errors</button>
         </div>
       </div>
 
@@ -3319,55 +3326,29 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
 
   /* ── Example presets ─────────────────────────────────────────────── */
   const EXAMPLES = {
-    typed: `# Typed scalar values
-.port     = <uint:16> 443;
-.offset   = <sint:64> -2147483648;
-.ratio    = <float:64> 3.14159;
-.label    = <utf8> "hello world";
-.enabled  = true;
-.timeout  = <float:64,s> 2.5;`,
+    typed: `.port    = <uint:16> 443;
+.enabled = true;`,
 
-    units: `# SI units and compound expressions
-.velocity     = <float:64,m/s> 9.81;
-.acceleration = <float:64,m/s²> 9.807;
-.force        = <float:64,k~g·m/s²> 1.0;
-.storage      = <uint:64,Gi~B> 16;
-.temperature  = <float:32,°C> 23.5;
-.inline_speed = 120 k~m/h;`,
+    units: `.velocity = <float:64,m/s> 9.81;
+.storage  = <uint:64,Gi~B> 16;`,
 
     struct: `# Nested struct
 .sensor = {
-    .id          = <uint:16> 7;
-    .name        = "pressure_01";
-    .value       = <float:32,k~Pa> 101.325;
-    .active      = true;
-    .calibration = {
-        .offset = <float:32> -0.02;
-        .gain   = <float:32> 1.001;
-    };
+    .id   = <uint:16> 7;
+    .name = "pressure_01";
 };`,
 
-    array: `# Multi-dimensional arrays and typed elements
-.matrix   = [1.0, 0.0, 0.0]/[0.0, 1.0, 0.0]/[0.0, 0.0, 1.0];
-.ports    = <uint:16> [80, 443, 8080, 8443];
-.mixed    = [<uint:8> 255, <sint:8> -1, <float:64> 3.14];
-.with_nulls = [,1,,2,];`,
+    array: `# Arrays
+.rgb  = [255, 128, 0];
+.size = [16, 9];`,
 
-    strings: `# String literals and concatenation
-.simple   = "hello world";
-.escaped  = "tab:\\there\\nnewline";
-.concat   = "hello " "world";
-.ref      = &.sensor.name;
-.special  = $nan;
-.neg_inf  = $-inf;`,
+    strings: `# Strings
+.greeting = "hello world";
+.path     = "/usr/local/bin";`,
 
     errors: `# These trigger parser errors (shown in red)
 .valid = 42;
-. = 100;
-.bad_escape = "\\x";
-.ok_after   = "recovered";
-.missing_gt = <uint:32 99;
-.fine_again = true;`,
+.missing_gt = <uint:32 99;`,
   };
 
   /* ── Rendering helpers ───────────────────────────────────────────── */

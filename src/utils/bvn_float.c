@@ -246,6 +246,16 @@ void bvn_float_set_zero(bvn_float_t *f, bool neg)
 	f->_sign = neg ? -1 : 1;
 	memset(f->_d, 0, (size_t)f->_nlimbs * sizeof(bvn_limb_t));
 }
+/* Defined below, after the bvn_int repack helpers; needed by bvn_float_copy. */
+static void bvnf_store_mant(bvn_float_t *f, const bvn_int_t *Q);
+/*
+ * Copy src into dst, preserving the represented value (sign * M * 2^(_exp-_prec),
+ * with the leading mantissa bit at _prec-1). When the precisions match this is a
+ * straight limb copy. When they differ the mantissa must be repositioned so its
+ * leading bit lands at dst's _prec-1: widening shifts left (exact), narrowing
+ * shifts right with round-to-nearest-even (a carry out of the mantissa bumps the
+ * exponent). Non-finite and zero values copy sign+exponent only.
+ */
 bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 {
 	dst->_sign = src->_sign;
@@ -254,15 +264,49 @@ bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 		memset(dst->_d, 0, (size_t)dst->_nlimbs * sizeof(bvn_limb_t));
 		return true;
 	}
-	uint32_t dnl = dst->_nlimbs, snl = src->_nlimbs;
-	if (dnl >= snl) {
-		uint32_t pad = dnl - snl;
-		memset(dst->_d, 0, (size_t)pad * sizeof(bvn_limb_t));
-		memcpy(dst->_d + pad, src->_d, (size_t)snl * sizeof(bvn_limb_t));
-	} else {
-		uint32_t skip = snl - dnl;
-		memcpy(dst->_d, src->_d + skip, (size_t)dnl * sizeof(bvn_limb_t));
+	if (dst->_prec == src->_prec) {
+		uint32_t nl = (dst->_nlimbs < src->_nlimbs) ? dst->_nlimbs : src->_nlimbs;
+		memset(dst->_d, 0, (size_t)dst->_nlimbs * sizeof(bvn_limb_t));
+		memcpy(dst->_d, src->_d, (size_t)nl * sizeof(bvn_limb_t));
+		return true;
 	}
+	/*
+	 * Differing precision: load the mantissa as a 32-bit big integer, reposition
+	 * the leading bit, and round to nearest-even when low bits are dropped.
+	 */
+	int shift = (int)dst->_prec - (int)src->_prec;
+	uint32_t _mb[BVN_INT_MAX_BITS / 32 + 2];
+	bvn_int_t M = { _mb, BVN_INT_MAX_BITS / 32 + 2, 0, false, false };
+	memset(_mb, 0, sizeof _mb);
+#if BVN_LIMB_BITS == 64
+	for (uint32_t i = 0; i < src->_nlimbs; i++) {
+		if (2u * i      < M.nlimbs) M.limbs[2u * i]      = (uint32_t)(src->_d[i] & 0xffffffffu);
+		if (2u * i + 1u < M.nlimbs) M.limbs[2u * i + 1u] = (uint32_t)(src->_d[i] >> 32);
+	}
+	M.nused = (src->_nlimbs * 2u <= M.nlimbs) ? src->_nlimbs * 2u : M.nlimbs;
+#else
+	for (uint32_t i = 0; i < src->_nlimbs && i < M.nlimbs; i++) M.limbs[i] = src->_d[i];
+	M.nused = (src->_nlimbs <= M.nlimbs) ? src->_nlimbs : M.nlimbs;
+#endif
+	bvn_int_norm(&M);
+	if (shift > 0) {
+		if (!bvn_int_shl(&M, shift)) return false;
+	} else {
+		int  d      = -shift;
+		int  guard  = bvn_int_getbit(&M, d - 1);
+		bool sticky = false;
+		for (int i = 0; i < d - 1 && !sticky; i++)
+			if (bvn_int_getbit(&M, i)) sticky = true;
+		bvn_int_shr(&M, d);
+		if (guard && (sticky || bvn_int_getbit(&M, 0) == 1)) {
+			if (!bvn_int_add_u32(&M, 1u)) return false;
+			if (bvn_int_bitlen(&M) > (int)dst->_prec) {
+				bvn_int_shr(&M, 1);
+				dst->_exp += 1;
+			}
+		}
+	}
+	bvnf_store_mant(dst, &M);
 	return true;
 }
 /*
@@ -442,9 +486,9 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
 	return true;
 }
 /*
- * Parse a floating literal in base 2-36 into a correctly-rounded bvn_float.
+ * Parse a floating literal in base 10 or 16 into a correctly-rounded bvn_float.
  * nan/inf are recognised up front. The mantissa digits and the (decimal or, for
- * power-of-two bases, binary) exponent are read into an exact rational num/den
+ * base 16, binary 'p') exponent are read into an exact rational num/den
  * — fractional digits and negative exponents go into the denominator, integer
  * scaling into the numerator — and bvnf_rational_to_float does the rounding.
  * Routing all decimal parsing through the exact rational is what makes
@@ -452,7 +496,7 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
  */
 bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 {
-	if (!f || !s || base < 2 || base > 36) return false;
+	if (!f || !s || (base != 10u && base != 16u)) return false;
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
 	bool neg = false;
 	if      (*s == '+') s++;
@@ -696,85 +740,6 @@ p2_done:
 	free(fdigs);
 	return ret;
 }
-static int32_t bvnf_to_str_arb(const bvn_float_t *f, char *buf,
-								 size_t bufsize, uint32_t base)
-{
-	static const char DIGS[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-	size_t pos = 0;
-#define PUTC_ARB(c) do { \
-	if (pos + 1 >= bufsize) goto arb_overflow; \
-	buf[pos++] = (char)(c); \
-} while (0)
-	long prec = f->_prec;
-	long exp2 = f->_exp;
-	long e2   = exp2 - prec;
-	double log2b = log2((double)base);
-	long ep = exp2 - 1L;
-	long E_b;
-	if (ep >= 0) E_b =  (long)ceil( (double)ep / log2b);
-	else         E_b = -(long)floor((double)(-ep) / log2b);
-	long ndigits = (long)ceil((double)prec / log2b) + 4L;
-	long k = ndigits - 1L - E_b;
-	if (f->_nlimbs > (UINT32_MAX - 8u) / 2u) return -1;
-	bvnf_bn M = {0};
-	if (!bvnf_bn_init(&M, f->_nlimbs * 2u + 8u)) return -1;
-	if (!bvnf_bn_from_float_mant(&M, f)) { bvnf_bn_free(&M); return -1; }
-	if (k >= 0 && e2 >= 0) {
-		bvnf_bn_shl(&M, (uint32_t)e2);
-		for (long i = 0; i < k; i++) bvnf_bn_mul_u32(&M, base);
-	} else if (k >= 0 && e2 < 0) {
-		for (long i = 0; i < k; i++) bvnf_bn_mul_u32(&M, base);
-		bvnf_bn_shr(&M, (uint32_t)(-e2));
-	} else if (k < 0 && e2 >= 0) {
-		bvnf_bn_shl(&M, (uint32_t)e2);
-		for (long i = 0; i < -k; i++) bvnf_bn_div_u32(&M, base);
-	} else {
-		bvnf_bn_shr(&M, (uint32_t)(-e2));
-		for (long i = 0; i < -k; i++) bvnf_bn_div_u32(&M, base);
-	}
-	if (ndigits <= 0) { bvnf_bn_free(&M); return -1; }
-	char *digs = calloc((size_t)(ndigits + 4), 1u);
-	if (!digs) { bvnf_bn_free(&M); return -1; }
-	for (long i = 0; i < ndigits; i++) {
-		uint32_t rem = bvnf_bn_div_u32(&M, base);
-		digs[i] = DIGS[rem < base ? rem : 0u];
-	}
-	bvnf_bn_free(&M);
-	for (long i = 0, j = ndigits - 1; i < j; i++, j--) {
-		char t = digs[i]; digs[i] = digs[j]; digs[j] = t;
-	}
-	if (ndigits > 1 && digs[0] == '0') {
-		memmove(digs, digs + 1, (size_t)(ndigits - 1));
-		digs[ndigits - 1] = '0';
-		E_b--;
-	}
-	long last = ndigits - 1;
-	while (last > 0 && digs[last] == '0') last--;
-	ndigits = last + 1;
-	int32_t ret = -1;
-	if (f->_sign < 0) PUTC_ARB('-');
-	PUTC_ARB(digs[0]);
-	if (ndigits > 1) {
-		PUTC_ARB('.');
-		for (long i = 1; i < ndigits; i++) PUTC_ARB(digs[i]);
-	}
-	PUTC_ARB('e');
-	if (E_b < 0) { PUTC_ARB('-'); E_b = -E_b; }
-	else           PUTC_ARB('+');
-	{
-		char ebuf[32]; int en = 0;
-		if (E_b == 0) { ebuf[en++] = '0'; }
-		else { long ev = E_b; while (ev > 0) { ebuf[en++] = (char)('0' + ev%10); ev /= 10; } }
-		for (int i = 0, j = en-1; i < j; i++, j--) { char t=ebuf[i]; ebuf[i]=ebuf[j]; ebuf[j]=t; }
-		for (int i = 0; i < en; i++) PUTC_ARB(ebuf[i]);
-	}
-	buf[pos] = '\0';
-	ret = (int32_t)pos;
-arb_overflow:
-#undef PUTC_ARB
-	free(digs);
-	return ret;
-}
 /*
  * Exact equality of two finite, same-precision bvn_floats. The representation is
  * canonical (normalised leading mantissa bit), so identical sign, exponent and
@@ -978,20 +943,19 @@ overflow:
 	return ret;
 }
 /*
- * Format a bvn_float as text in base 2-36. After handling nan/inf/±0 it
- * dispatches by base kind: power-of-two bases (bvnf_to_str_pow2) read mantissa
- * bits directly into digit groups — exact and cheap; base 10 (bvnf_to_str_dec)
- * does the harder exact binary->decimal conversion and then reduces the result
- * to the genuinely shortest digit string that still round-trips to this float
- * at its own precision; other bases use bvnf_to_str_arb, which is round-trip
- * faithful (enough digits to reparse exactly) but not minimised. Returns -1 on
- * too-small buffer rather than truncating. Size the buffer with
- * bvn_float_str_bufsize, which bounds the digit count from precision and base.
+ * Format a bvn_float as text. Only base 10 and base 16 are supported. After
+ * handling nan/inf/±0 it dispatches by base: base 16 (bvnf_to_str_pow2) reads
+ * mantissa bits directly into hex digit groups with a binary 'p' exponent —
+ * exact and cheap; base 10 (bvnf_to_str_dec) does the harder exact
+ * binary->decimal conversion and then reduces the result to the genuinely
+ * shortest digit string that still round-trips to this float at its own
+ * precision. Returns -1 on a too-small buffer rather than truncating. Size the
+ * buffer with bvn_float_str_bufsize.
  */
 int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 						  uint32_t base)
 {
-	if (!f || !buf || bufsize < 2 || base < 2 || base > 36) return -1;
+	if (!f || !buf || bufsize < 2 || (base != 10u && base != 16u)) return -1;
 	if (bvn_float_is_nan(f)) {
 		if (bufsize < 4) return -1;
 		memcpy(buf, "nan", 4);
@@ -1008,12 +972,12 @@ int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 		memcpy(buf, "0.0", 4);
 		return 3;
 	}
-	uint32_t log2b = 0;
-	if (bvnf_pow2_base(base, &log2b))
+	if (base == 16u) {
+		uint32_t log2b = 0;
+		bvnf_pow2_base(base, &log2b);
 		return bvnf_to_str_pow2(f, buf, bufsize, log2b);
-	if (base == 10u)
-		return bvnf_to_str_dec(f, buf, bufsize);
-	return bvnf_to_str_arb(f, buf, bufsize, base);
+	}
+	return bvnf_to_str_dec(f, buf, bufsize);
 }
 /*
  * Load an IEEE-754 double into a bvn_float exactly (a double is always
@@ -1030,7 +994,7 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 	if (isnan(v))  { bvn_float_set_nan(f);  return true; }
 	if (isinf(v))  { bvn_float_set_inf(f, v < 0.0); return true; }
 	if (v == 0.0) {
-		bvn_float_set_zero(f, (1.0 / v) < 0.0);
+		bvn_float_set_zero(f, signbit(v) != 0);
 		return true;
 	}
 	uint64_t bits;
@@ -1066,8 +1030,16 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 		if (lo_off > 0u && lo_limb + 1u < f->_nlimbs)
 			f->_d[lo_limb + 1u] = full_man >> (64u - lo_off);
 	} else {
-		uint64_t scaled = full_man >> (unsigned)(-shift);
-		if (f->_nlimbs > 0u) f->_d[0] = scaled;
+		unsigned dnum   = (unsigned)(-shift);          /* low bits dropped */
+		uint64_t kept   = full_man >> dnum;
+		uint64_t guard  = (full_man >> (dnum - 1u)) & 1u;
+		uint64_t sticky = (dnum >= 2u)
+			? ((full_man & (((uint64_t)1u << (dnum - 1u)) - 1u)) != 0u) : 0u;
+		if (guard && (sticky || (kept & 1u))) {
+			kept++;
+			if (kept >> (unsigned)prec) { kept >>= 1; f->_exp += 1; }
+		}
+		if (f->_nlimbs > 0u) f->_d[0] = kept;
 	}
 #else
 	if (shift >= 0) {
@@ -1079,9 +1051,17 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 		if (lo_off > 0u && lo_limb + 2 < f->_nlimbs)
 			f->_d[lo_limb + 2] = (uint32_t)(full_man >> (64u - lo_off));
 	} else {
-		uint64_t scaled = full_man >> (unsigned)(-shift);
-		if (f->_nlimbs > 0) f->_d[0] = (uint32_t)(scaled & 0xffffffffu);
-		if (f->_nlimbs > 1) f->_d[1] = (uint32_t)(scaled >> 32);
+		unsigned dnum   = (unsigned)(-shift);
+		uint64_t kept   = full_man >> dnum;
+		uint64_t guard  = (full_man >> (dnum - 1u)) & 1u;
+		uint64_t sticky = (dnum >= 2u)
+			? ((full_man & (((uint64_t)1u << (dnum - 1u)) - 1u)) != 0u) : 0u;
+		if (guard && (sticky || (kept & 1u))) {
+			kept++;
+			if (kept >> (unsigned)prec) { kept >>= 1; f->_exp += 1; }
+		}
+		if (f->_nlimbs > 0) f->_d[0] = (uint32_t)(kept & 0xffffffffu);
+		if (f->_nlimbs > 1) f->_d[1] = (uint32_t)(kept >> 32);
 	}
 #endif
 	return true;

@@ -10,17 +10,17 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1e1e1e">
-<meta name="description" content="Bovnar (BVNR) — unit-safe serialization for scientific and industrial systems. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
-<meta property="og:title" content="Bovnar — Unit-safe serialization for scientific and industrial systems">
+<meta name="description" content="Bovnar (BVNR) — unit-safe serialization for science, industry and finance. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
+<meta property="og:title" content="Bovnar — Unit-safe serialization for science, industry and finance">
 <meta property="og:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error. Built for instrumentation, telemetry, and control systems.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="/bovnar-og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Bovnar — unit-safe serialization for scientific & industrial systems">
+<meta property="og:image:alt" content="Bovnar — unit-safe serialization for science, industry and finance">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="/bovnar-og.png">
-<title>Bovnar — Unit-safe serialization for scientific & industrial systems</title>
+<title>Bovnar — Unit-safe serialization for science, industry and finance</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
@@ -437,17 +437,13 @@ nav {
   opacity: 0;
   white-space: nowrap;
   vertical-align: middle;
-  animation: ann-unfold 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  /* slower + smoother roll-out (easeOutExpo); per-value delay is set inline */
+  animation: ann-unfold 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.ann-appear:nth-child(1)  { animation-delay: 0.8s; }
-.ann-appear:nth-child(2)  { animation-delay: 1.5s; }
-.ann-appear:nth-child(3)  { animation-delay: 2.2s; }
-.ann-appear:nth-child(4)  { animation-delay: 2.9s; }
-.ann-appear:nth-child(5)  { animation-delay: 3.6s; }
 
 @keyframes ann-unfold {
-  from { max-width: 0; opacity: 0; }
-  to   { max-width: 300px; opacity: 1; }
+  from { max-width: 0;     opacity: 0; }
+  to   { max-width: 340px; opacity: 1; }
 }
 
 /* ── SCROLL HINT ── */
@@ -1993,7 +1989,7 @@ a[data-doc] { cursor: pointer; }
         <span class="hl-sep">/</span>
         <span>c99</span>
       </div>
-      <h1 class="hero-h1">Unit-safe serialization<br>for <em>scientific &amp; industrial systems.</em></h1>
+      <h1 class="hero-h1">Unit-safe serialization<br>for <em>science, industry and finance.</em></h1>
       <p class="hero-sub">
         Every measurement carries a validated physical unit — bit-width, numeric
         base, and dimension travel inline, in the same byte stream, with no
@@ -2041,13 +2037,13 @@ a[data-doc] { cursor: pointer; }
             <div class="ln">8</div>
           </div>
           <div class="code-body" id="hero-code"><span class="c-comment"># Every measurement carries a validated unit</span>
-<span class="c-sigil">.</span><span class="c-key">host</span>   <span class="c-eq">=</span> <span class="c-str">"api.sensors.io"</span><span class="c-semi">;</span>
-<span class="c-sigil">.</span><span class="c-key">mass</span>   <span class="c-eq">=</span> <span class="c-val">142.6</span> <span class="c-unit">k~g</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">host</span>   <span class="c-eq">=</span> <span class="ann-appear" style="animation-delay:.6s"><span class="c-str">"api.sensors.io"</span><span class="c-semi">;</span></span>
+<span class="c-sigil">.</span><span class="c-key">mass</span>   <span class="c-eq">=</span> <span class="ann-appear" style="animation-delay:1.1s"><span class="c-val">142.6</span> <span class="c-unit">k~g</span><span class="c-semi">;</span></span>
 <span class="c-sigil">.</span><span class="c-key">sensor</span> <span class="c-eq">=</span> <span class="c-struct">{</span>
-    <span class="c-sigil">.</span><span class="c-key">pressure</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> </span><span class="c-val">101.325</span><span class="c-semi">;</span>
-    <span class="c-sigil">.</span><span class="c-key">velocity</span> <span class="c-eq">=</span> <span class="ann-appear"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> </span><span class="c-val">9.81</span><span class="c-semi">;</span>
+    <span class="c-sigil">.</span><span class="c-key">pressure</span> <span class="c-eq">=</span> <span class="ann-appear" style="animation-delay:1.6s"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">k~Pa</span><span class="c-ann">&gt;</span> <span class="c-val">101.325</span><span class="c-semi">;</span></span>
+    <span class="c-sigil">.</span><span class="c-key">velocity</span> <span class="c-eq">=</span> <span class="ann-appear" style="animation-delay:2.1s"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> <span class="c-val">9.81</span><span class="c-semi">;</span></span>
 <span class="c-struct">}</span><span class="c-semi">;</span>
-<span class="c-sigil">.</span><span class="c-key">matrix</span> <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
+<span class="c-sigil">.</span><span class="c-key">matrix</span> <span class="c-eq">=</span> <span class="ann-appear" style="animation-delay:2.6s"><span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">;</span></span></div>
         </div>
         <div class="editor-statusline">
           <div class="esl-left">
@@ -3208,7 +3204,7 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
         <div class="footer-brand-name" style="display:flex;align-items:center;gap:.55rem"><svg width="24" height="24" viewBox="0 0 256 256" aria-hidden="true" style="flex:none"><use href="#bvnr-mk"/></svg>BOVNAR</div>
         <div class="footer-brand-sub">Spec v0.x (draft) · MIT License · C99</div>
         <p class="footer-desc">
-          Unit-safe serialization for scientific and industrial systems. Every measurement
+          Unit-safe serialization for science, industry and finance. Every measurement
           carries a validated physical unit, inline. C99 reference implementation, MIT-licensed.
         </p>
       </div>

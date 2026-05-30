@@ -183,6 +183,38 @@ static uint32_t bvnf_bn_div_u32(bvnf_bn *b, uint32_t d)
 	bvnf_bn_norm(b);
 	return (uint32_t)rem;
 }
+/*
+ * Growable heap-backed scratch big integer. This replaces the former fixed
+ * uint32_t[BVN_INT_MAX_BITS/32] stack arrays, each of which cost ~4 KiB of stack
+ * regardless of the working precision — hostile to the small task stacks common
+ * on embedded targets (a single bvn_float_from_str frame was ~16 KiB). Starting
+ * small and letting the bvn_int_* routines grow on demand (capped internally at
+ * BVN_INT_MAX_LIMBS) keeps every frame flat and commits memory proportional to
+ * the value actually computed. init_limbs is only a sizing hint to avoid early
+ * reallocations; correctness does not depend on it.
+ */
+static bool bvnf_scratch(bvn_int_t *n, uint32_t init_limbs)
+{
+	if (init_limbs < 8u)               init_limbs = 8u;
+	if (init_limbs > BVN_INT_MAX_LIMBS) init_limbs = BVN_INT_MAX_LIMBS;
+	uint32_t *p = calloc(init_limbs, sizeof(uint32_t));
+	if (!p) return false;
+	n->limbs       = p;
+	n->nlimbs      = init_limbs;
+	n->nused       = 0;
+	n->negative    = false;
+	n->heap        = true;
+	n->_reserved[0] = 0;
+	n->_reserved[1] = 0;
+	return true;
+}
+static void bvnf_scratch_free(bvn_int_t *n) { free(n->limbs); n->limbs = NULL; }
+/* Limb hint from a bit precision: ceil(prec/32) plus headroom. */
+static uint32_t bvnf_hint_limbs(uint32_t prec)
+{
+	uint32_t l = prec / 32u + 8u;
+	return (l > BVN_INT_MAX_LIMBS) ? BVN_INT_MAX_LIMBS : l;
+}
 bvn_float_t *bvn_float_alloc(uint32_t prec)
 {
 	if (!prec || prec > BVN_FLOAT_MAX_PREC) return NULL;
@@ -275,9 +307,9 @@ bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 	 * the leading bit, and round to nearest-even when low bits are dropped.
 	 */
 	int shift = (int)dst->_prec - (int)src->_prec;
-	uint32_t _mb[BVN_INT_MAX_BITS / 32 + 2];
-	bvn_int_t M = { _mb, BVN_INT_MAX_BITS / 32 + 2, 0, false, false };
-	memset(_mb, 0, sizeof _mb);
+	uint32_t hint = bvnf_hint_limbs(dst->_prec > src->_prec ? dst->_prec : src->_prec);
+	bvn_int_t M;
+	if (!bvnf_scratch(&M, hint + 2u)) return false;
 #if BVN_LIMB_BITS == 64
 	for (uint32_t i = 0; i < src->_nlimbs; i++) {
 		if (2u * i      < M.nlimbs) M.limbs[2u * i]      = (uint32_t)(src->_d[i] & 0xffffffffu);
@@ -290,7 +322,7 @@ bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 #endif
 	bvn_int_norm(&M);
 	if (shift > 0) {
-		if (!bvn_int_shl(&M, shift)) return false;
+		if (!bvn_int_shl(&M, shift)) { bvnf_scratch_free(&M); return false; }
 	} else {
 		int  d      = -shift;
 		int  guard  = bvn_int_getbit(&M, d - 1);
@@ -299,7 +331,7 @@ bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 			if (bvn_int_getbit(&M, i)) sticky = true;
 		bvn_int_shr(&M, d);
 		if (guard && (sticky || bvn_int_getbit(&M, 0) == 1)) {
-			if (!bvn_int_add_u32(&M, 1u)) return false;
+			if (!bvn_int_add_u32(&M, 1u)) { bvnf_scratch_free(&M); return false; }
 			if (bvn_int_bitlen(&M) > (int)dst->_prec) {
 				bvn_int_shr(&M, 1);
 				dst->_exp += 1;
@@ -307,6 +339,7 @@ bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src)
 		}
 	}
 	bvnf_store_mant(dst, &M);
+	bvnf_scratch_free(&M);
 	return true;
 }
 /*
@@ -354,16 +387,15 @@ static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 	int total = nb + (shift > 0 ? shift : 0);
 	if (total <= 0) { *sticky_out = false; return true; }
 	uint32_t r_cap = (uint32_t)(db / 32) + 4u;
-	uint32_t *r_limbs = calloc(r_cap, sizeof(uint32_t));
-	if (!r_limbs) return false;
-	bvn_int_t R = { r_limbs, r_cap, 0, false, true };
+	bvn_int_t R;
+	if (!bvnf_scratch(&R, r_cap)) return false;
 	memset(Q, 0, (size_t)q_words * sizeof(uint32_t));
 	bool sticky = false;
 	for (int i = total - 1; i >= 0; i--) {
-		bvn_int_shl(&R, 1);
+		if (!bvn_int_shl(&R, 1)) { bvnf_scratch_free(&R); return false; }
 		int src = i - shift;
 		if (src >= 0 && bvn_int_getbit(num, src))
-			bvn_int_add_u32(&R, 1u);
+			if (!bvn_int_add_u32(&R, 1u)) { bvnf_scratch_free(&R); return false; }
 		if (bvn_int_cmp(&R, den) >= 0) {
 			bvn_int_sub_inplace(&R, den);
 			if (i < want) {
@@ -375,7 +407,7 @@ static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 		}
 	}
 	if (!bvn_int_is_zero(&R)) sticky = true;
-	free(r_limbs);
+	bvnf_scratch_free(&R);
 	*sticky_out = sticky;
 	return true;
 }
@@ -403,9 +435,9 @@ static bool bvnf_rational_to_float(bvn_float_t *f, bool neg,
 	int db   = bvn_int_bitlen(den);
 	int E = nb - db;
 	{
-		uint32_t _tb[BVN_INT_MAX_BITS / 32];
-		bvn_int_t tmp = { _tb, BVN_INT_MAX_BITS/32, 0, false, false };
-		memset(_tb, 0, sizeof _tb);
+		uint32_t hint = bvnf_hint_limbs((uint32_t)((nb > db ? nb : db) + (E < 0 ? -E : E)));
+		bvn_int_t tmp;
+		if (!bvnf_scratch(&tmp, hint)) return false;
 		if (E >= 0) {
 			if (bvn_int_copy(&tmp, den) && bvn_int_shl(&tmp, E))
 				if (bvn_int_cmp(&tmp, num) > 0) E--;
@@ -413,6 +445,7 @@ static bool bvnf_rational_to_float(bvn_float_t *f, bool neg,
 			if (bvn_int_copy(&tmp, num) && bvn_int_shl(&tmp, -E))
 				if (bvn_int_cmp(den, &tmp) > 0) E--;
 		}
+		bvnf_scratch_free(&tmp);
 	}
 	f->_sign = neg ? -1 : 1;
 	f->_exp  = (int64_t)E + 1;
@@ -426,30 +459,38 @@ static bool bvnf_rational_to_float(bvn_float_t *f, bool neg,
 	if (shift >= 0 && nb + shift > (int)BVN_INT_MAX_BITS - 32) {
 		ok = bvnf_bitdiv(num, shift, den, _Qb, q_words, want, &sticky);
 	} else if (shift >= 0) {
-		uint32_t _sb[BVN_INT_MAX_BITS / 32];
-		bvn_int_t scaled = { _sb, BVN_INT_MAX_BITS/32, 0, false, false };
-		memset(_sb, 0, sizeof _sb);
-		uint32_t _Rb[BVN_INT_MAX_BITS / 32 + 4];
-		bvn_int_t Q_int = { _Qb, q_words, 0, false, false };
-		bvn_int_t R_int = { _Rb, BVN_INT_MAX_BITS/32 + 4, 0, false, false };
-		memset(_Rb, 0, sizeof _Rb);
-		ok = bvn_int_copy(&scaled, num) && bvn_int_shl(&scaled, shift)
-			 && bvn_int_divrem(&Q_int, &R_int, &scaled, den);
-		if (ok) sticky = !bvn_int_is_zero(&R_int);
+		bvn_int_t Q_int = { _Qb, q_words, 0, false, false, { 0, 0 } };
+		bvn_int_t scaled, R_int;
+		if (!bvnf_scratch(&scaled, bvnf_hint_limbs((uint32_t)(nb + shift)))) {
+			ok = false;
+		} else if (!bvnf_scratch(&R_int, bvnf_hint_limbs((uint32_t)db))) {
+			bvnf_scratch_free(&scaled);
+			ok = false;
+		} else {
+			ok = bvn_int_copy(&scaled, num) && bvn_int_shl(&scaled, shift)
+				 && bvn_int_divrem(&Q_int, &R_int, &scaled, den);
+			if (ok) sticky = !bvn_int_is_zero(&R_int);
+			bvnf_scratch_free(&scaled);
+			bvnf_scratch_free(&R_int);
+		}
 	} else {
-		uint32_t _ds[BVN_INT_MAX_BITS / 32];
-		bvn_int_t dscaled = { _ds, BVN_INT_MAX_BITS/32, 0, false, false };
-		memset(_ds, 0, sizeof _ds);
-		uint32_t _Rb[BVN_INT_MAX_BITS / 32 + 4];
-		bvn_int_t Q_int = { _Qb, q_words, 0, false, false };
-		bvn_int_t R_int = { _Rb, BVN_INT_MAX_BITS/32 + 4, 0, false, false };
-		memset(_Rb, 0, sizeof _Rb);
-		ok = bvn_int_copy(&dscaled, den) && bvn_int_shl(&dscaled, -shift)
-			 && bvn_int_divrem(&Q_int, &R_int, num, &dscaled);
-		if (ok) sticky = !bvn_int_is_zero(&R_int);
+		bvn_int_t Q_int = { _Qb, q_words, 0, false, false, { 0, 0 } };
+		bvn_int_t dscaled, R_int;
+		if (!bvnf_scratch(&dscaled, bvnf_hint_limbs((uint32_t)(db - shift)))) {
+			ok = false;
+		} else if (!bvnf_scratch(&R_int, bvnf_hint_limbs((uint32_t)(db - shift)))) {
+			bvnf_scratch_free(&dscaled);
+			ok = false;
+		} else {
+			ok = bvn_int_copy(&dscaled, den) && bvn_int_shl(&dscaled, -shift)
+				 && bvn_int_divrem(&Q_int, &R_int, num, &dscaled);
+			if (ok) sticky = !bvn_int_is_zero(&R_int);
+			bvnf_scratch_free(&dscaled);
+			bvnf_scratch_free(&R_int);
+		}
 	}
 	if (!ok) RTF_RET(false);
-	bvn_int_t Q_view = { _Qb, q_words, q_words, false, false };
+	bvn_int_t Q_view = { _Qb, q_words, q_words, false, false, { 0, 0 } };
 	while (Q_view.nused > 0 && _Qb[Q_view.nused - 1] == 0) Q_view.nused--;
 	bool rbit     = (bool)bvn_int_getbit(&Q_view, 0);
 	bool gbit     = (bool)bvn_int_getbit(&Q_view, 1);
@@ -509,16 +550,11 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 		if (c0 == 'i' && ((uint8_t)(p[1]|0x20)) == 'n' && ((uint8_t)(p[2]|0x20)) == 'f')
 			{ bvn_float_set_inf(f, neg); return true; }
 	}
-	uint32_t _nb[BVN_INT_MAX_BITS / 32];
-	uint32_t _db[BVN_INT_MAX_BITS / 32];
-	uint32_t _tb[BVN_INT_MAX_BITS / 32];
-	bvn_int_t num, den, tmp;
-	num = (bvn_int_t){ _nb, BVN_INT_MAX_BITS/32, 0, false, false };
-	den = (bvn_int_t){ _db, BVN_INT_MAX_BITS/32, 0, false, false };
-	tmp = (bvn_int_t){ _tb, BVN_INT_MAX_BITS/32, 0, false, false };
-	memset(_nb, 0, sizeof _nb);
-	memset(_db, 0, sizeof _db);
-	memset(_tb, 0, sizeof _tb);
+	bvn_int_t num, den;
+	uint32_t hint = bvnf_hint_limbs(f ? f->_prec : 64u);
+	if (!bvnf_scratch(&num, hint)) return false;
+	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return false; }
+	bool rc = false;
 	bvn_int_from_uint64(&den, 1u);
 	uint32_t acc = 0, acc_d = 0;
 	bool overflow = false;
@@ -564,13 +600,20 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 		}
 		FLUSH_CHUNK();
 	}
-	if (!has_int && !has_frac) return false;
+	if (!has_int && !has_frac) { rc = false; goto cleanup; }
 	long exp_val = 0;
 	bool use_bin_exp = false;
 	bool eneg = false;
 	bool exp_overflow = false;
-	if (*s == 'e' || *s == 'E' || *s == 'p' || *s == 'P') {
-		use_bin_exp = (*s == 'p' || *s == 'P');
+	/*
+	 * Exponent marker is base-specific: 'e'/'E' (decimal exponent) for base 10,
+	 * 'p'/'P' (binary exponent) for base 16. In base 16 'e'/'E' are digits and
+	 * were already consumed above, so they can never reach here; we must also not
+	 * accept 'p' in base 10 (it is not a valid base-10 token).
+	 */
+	if ((base == 10u && (*s == 'e' || *s == 'E')) ||
+		(base == 16u && (*s == 'p' || *s == 'P'))) {
+		use_bin_exp = (base == 16u);
 		s++;
 		if      (*s == '+') s++;
 		else if (*s == '-') { eneg = true; s++; }
@@ -583,22 +626,22 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 			}
 			has_e = true; s++;
 		}
-		if (!has_e) return false;
+		if (!has_e) { rc = false; goto cleanup; }
 		if (exp_overflow) {
-			if (eneg) { bvn_float_set_zero(f, neg); return true; }
-			else      { bvn_float_set_inf (f, neg); return true; }
+			if (eneg) { bvn_float_set_zero(f, neg); }
+			else      { bvn_float_set_inf (f, neg); }
+			rc = true; goto cleanup;
 		}
 		exp_val = eneg ? -eabs : eabs;
 	}
 	if (overflow) {
-		if (exp_val < 0) { bvn_float_set_zero(f, neg); return true; }
-		bvn_float_set_inf(f, neg);
-		return true;
+		if (exp_val < 0) { bvn_float_set_zero(f, neg); }
+		else             { bvn_float_set_inf(f, neg); }
+		rc = true; goto cleanup;
 	}
-	if (base == 10) use_bin_exp = false;
 	uint32_t log2b = 0;
 	bool b_is_pow2 = bvnf_pow2_base(base, &log2b);
-	if (bvn_int_is_zero(&num)) { bvn_float_set_zero(f, neg); return true; }
+	if (bvn_int_is_zero(&num)) { bvn_float_set_zero(f, neg); rc = true; goto cleanup; }
 	if (use_bin_exp || b_is_pow2) {
 		long net_shift;
 		if (b_is_pow2) {
@@ -608,13 +651,13 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 			goto rational_path;
 		}
 		if (net_shift >= 0) {
-			if (!bvn_int_shl(&num, (int)net_shift)) {
-				bvn_float_set_inf(f, neg); return true;
+			if (net_shift > (long)INT_MAX || !bvn_int_shl(&num, (int)net_shift)) {
+				bvn_float_set_inf(f, neg); rc = true; goto cleanup;
 			}
 		} else {
 			bvn_int_from_uint64(&den, 1u);
-			if (!bvn_int_shl(&den, (int)(-net_shift))) {
-				bvn_float_set_zero(f, neg); return true;
+			if (-net_shift > (long)INT_MAX || !bvn_int_shl(&den, (int)(-net_shift))) {
+				bvn_float_set_zero(f, neg); rc = true; goto cleanup;
 			}
 		}
 	} else {
@@ -624,36 +667,39 @@ rational_path:;
 			if (net_b_exp >= 0) {
 				for (long i = 0; i < net_b_exp; i++) {
 					if (!bvn_int_mul_u32(&num, base)) {
-						bvn_float_set_inf(f, neg); return true;
+						bvn_float_set_inf(f, neg); rc = true; goto cleanup;
 					}
 				}
 			} else {
 				for (long i = 0; i < -net_b_exp; i++) {
 					if (!bvn_int_mul_u32(&den, base)) {
-						bvn_float_set_zero(f, neg); return true;
+						bvn_float_set_zero(f, neg); rc = true; goto cleanup;
 					}
 				}
 			}
 		} else {
 			for (int i = 0; i < frac_digits; i++) {
 				if (!bvn_int_mul_u32(&den, base)) {
-					bvn_float_set_zero(f, neg); return true;
+					bvn_float_set_zero(f, neg); rc = true; goto cleanup;
 				}
 			}
 			if (exp_val >= 0) {
-				if (!bvn_int_shl(&num, (int)exp_val)) {
-					bvn_float_set_inf(f, neg); return true;
+				if (exp_val > (long)INT_MAX || !bvn_int_shl(&num, (int)exp_val)) {
+					bvn_float_set_inf(f, neg); rc = true; goto cleanup;
 				}
 			} else {
-				if (!bvn_int_shl(&den, (int)(-exp_val))) {
-					bvn_float_set_zero(f, neg); return true;
+				if (-exp_val > (long)INT_MAX || !bvn_int_shl(&den, (int)(-exp_val))) {
+					bvn_float_set_zero(f, neg); rc = true; goto cleanup;
 				}
 			}
 		}
 	}
-	if (bvn_int_is_zero(&num)) { bvn_float_set_zero(f, neg); return true; }
-	(void)tmp;
-	return bvnf_rational_to_float(f, neg, &num, &den);
+	if (bvn_int_is_zero(&num)) { bvn_float_set_zero(f, neg); rc = true; goto cleanup; }
+	rc = bvnf_rational_to_float(f, neg, &num, &den);
+cleanup:
+	bvnf_scratch_free(&num);
+	bvnf_scratch_free(&den);
+	return rc;
 #undef FLUSH_CHUNK
 }
 size_t bvn_float_str_bufsize(uint32_t prec, uint32_t base)
@@ -903,7 +949,7 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	for (long i = 0, j = ndigits - 1; i < j; i++, j--) {
 		char t = digs[i]; digs[i] = digs[j]; digs[j] = t;
 	}
-	if (ndigits > 1 && digs[0] == '0') {
+	while (ndigits > 1 && digs[0] == '0') {
 		memmove(digs, digs + 1, (size_t)(ndigits - 1));
 		digs[ndigits - 1] = '0';
 		E10--;
@@ -1122,9 +1168,9 @@ static void bvnf_to_ieee_bin_direct(const bvn_float_t *f,
 	long be   = f->_exp - 1L + (long)bias;
 	long drop = (long)f->_prec - ((long)man_bits + 1L);
 	if (be <= 0) { drop += (1L - be); be = 0; }
-	uint32_t _sb[BVN_INT_MAX_BITS / 32];
-	bvn_int_t S = { _sb, BVN_INT_MAX_BITS / 32, 0, false, false };
-	memset(_sb, 0, sizeof _sb);
+	uint32_t shint = bvnf_hint_limbs(f->_prec > (man_bits + 1u) ? f->_prec : (man_bits + 1u));
+	bvn_int_t S;
+	if (!bvnf_scratch(&S, shint)) return;
 #if BVN_LIMB_BITS == 64
 	for (uint32_t i = 0; i < f->_nlimbs; i++) {
 		if (2u * i      < S.nlimbs) S.limbs[2u * i]      = (uint32_t)(f->_d[i] & 0xffffffffu);
@@ -1140,13 +1186,14 @@ static void bvnf_to_ieee_bin_direct(const bvn_float_t *f,
 	if (drop > 0) {
 		gbit = bvn_int_getbit(&S, (int)drop - 1) == 1;
 		if (drop >= 2) {
-			uint32_t _tb[BVN_INT_MAX_BITS / 32];
-			bvn_int_t T = { _tb, BVN_INT_MAX_BITS / 32, 0, false, false };
-			memset(_tb, 0, sizeof _tb);
-			bvn_int_copy(&T, &S);
-			bvn_int_shr(&T, (int)drop - 1);
-			bvn_int_shl(&T, (int)drop - 1);
-			sticky = bvn_int_cmp(&T, &S) != 0;
+			bvn_int_t T;
+			if (bvnf_scratch(&T, shint)) {
+				bvn_int_copy(&T, &S);
+				bvn_int_shr(&T, (int)drop - 1);
+				bvn_int_shl(&T, (int)drop - 1);
+				sticky = bvn_int_cmp(&T, &S) != 0;
+				bvnf_scratch_free(&T);
+			}
 		}
 		bvn_int_shr(&S, (int)drop);
 	} else if (drop < 0) {
@@ -1162,6 +1209,7 @@ static void bvnf_to_ieee_bin_direct(const bvn_float_t *f,
 	if (be >= eall) {
 		for (uint32_t i = 0; i < exp_bits; i++)
 			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
+		bvnf_scratch_free(&S);
 		return;
 	}
 	if (be == 0 && bvn_int_getbit(&S, (int)man_bits) == 1)
@@ -1170,16 +1218,18 @@ static void bvnf_to_ieee_bin_direct(const bvn_float_t *f,
 		int wi = (int)man_bits / 32, b2 = (int)man_bits % 32;
 		if ((uint32_t)wi < S.nlimbs) S.limbs[wi] &= ~(1u << b2);
 		bvn_int_norm(&S);
-		uint32_t _eb[BVN_INT_MAX_BITS / 32];
-		bvn_int_t eb = { _eb, BVN_INT_MAX_BITS / 32, 0, false, false };
-		memset(_eb, 0, sizeof _eb);
-		bvn_int_from_uint64(&eb, (uint64_t)be);
-		bvn_int_shl(&eb, (int)man_bits);
-		for (uint32_t i = 0; i < eb.nused && (int)i < bits32; i++)
-			bits[i] |= eb.limbs[i];
+		bvn_int_t eb;
+		if (bvnf_scratch(&eb, bvnf_hint_limbs(man_bits + 64u))) {
+			bvn_int_from_uint64(&eb, (uint64_t)be);
+			bvn_int_shl(&eb, (int)man_bits);
+			for (uint32_t i = 0; i < eb.nused && (int)i < bits32; i++)
+				bits[i] |= eb.limbs[i];
+			bvnf_scratch_free(&eb);
+		}
 	}
 	for (uint32_t i = 0; i < S.nused && (int)i < bits32; i++)
 		bits[i] |= S.limbs[i];
+	bvnf_scratch_free(&S);
 }
 void bvn_float_to_ieee_bin(const bvn_float_t *f,
 							uint32_t exp_bits, uint32_t man_bits, int32_t bias,
@@ -1249,33 +1299,55 @@ bool bvn_float_from_ieee_bin(bvn_float_t *f,
 	}
 	f->_sign = neg ? -1 : 1;
 	long unbiased = (long)raw_exp - (long)bias;
-	uint32_t _mb[BVN_INT_MAX_BITS / 32];
-	bvn_int_t mant = { _mb, BVN_INT_MAX_BITS/32, 0, false, false };
-	memset(_mb, 0, sizeof _mb);
+	bvn_int_t mant;
+	if (!bvnf_scratch(&mant, bvnf_hint_limbs(man_bits + 2u))) return false;
 	if (raw_exp != 0) {
 		bvn_int_from_uint64(&mant, 1u);
-		if (!bvn_int_shl(&mant, (int)man_bits)) return false;
+		if (!bvn_int_shl(&mant, (int)man_bits)) { bvnf_scratch_free(&mant); return false; }
 	}
 	for (uint32_t i = 0; i < man_bits; i++) {
 		if ((bits[i / 32] >> (i % 32)) & 1u)
-			if (!bvn_int_setbit(&mant, (int)i)) return false;
+			if (!bvn_int_setbit(&mant, (int)i)) { bvnf_scratch_free(&mant); return false; }
 	}
-	if (bvn_int_is_zero(&mant)) { bvn_float_set_zero(f, neg); return true; }
+	if (bvn_int_is_zero(&mant)) { bvnf_scratch_free(&mant); bvn_float_set_zero(f, neg); return true; }
 	int leading = bvn_int_bitlen(&mant) - 1;
 	long mpfr_exp = (raw_exp != 0) ?
 					(unbiased + 1L) :
-					(unbiased - (long)man_bits + (long)leading + 1L);
+					/* subnormal: exponent base is e_min = 1 - bias, not -bias */
+					(unbiased - (long)man_bits + (long)leading + 2L);
 	int target_top = (int)f->_prec - 1;
 	int cur_top    = leading;
 	int shift      = target_top - cur_top;
-	uint32_t _qb[BVN_INT_MAX_BITS / 32];
-	bvn_int_t Q = { _qb, BVN_INT_MAX_BITS/32, 0, false, false };
-	memset(_qb, 0, sizeof _qb);
+	uint32_t qhint = bvnf_hint_limbs(f->_prec > (man_bits + 1u) ? f->_prec : (man_bits + 1u));
+	bvn_int_t Q;
+	if (!bvnf_scratch(&Q, qhint)) { bvnf_scratch_free(&mant); return false; }
 	bvn_int_copy(&Q, &mant);
-	if (shift > 0) bvn_int_shl(&Q, shift);
-	else if (shift < 0) bvn_int_shr(&Q, -shift);
+	bvnf_scratch_free(&mant);
+	if (shift > 0) {
+		if (!bvn_int_shl(&Q, shift)) { bvnf_scratch_free(&Q); return false; }
+	} else if (shift < 0) {
+		/*
+		 * Target precision is narrower than the source significand: round the
+		 * dropped low bits to nearest, ties to even (mirrors bvn_float_copy).
+		 * A plain truncating shift here would lose a unit in the last place.
+		 */
+		int  d      = -shift;
+		int  guard  = bvn_int_getbit(&Q, d - 1);
+		bool sticky = false;
+		for (int i = 0; i < d - 1 && !sticky; i++)
+			if (bvn_int_getbit(&Q, i)) sticky = true;
+		bvn_int_shr(&Q, d);
+		if (guard && (sticky || bvn_int_getbit(&Q, 0) == 1)) {
+			if (!bvn_int_add_u32(&Q, 1u)) { bvnf_scratch_free(&Q); return false; }
+			if (bvn_int_bitlen(&Q) > (int)f->_prec) {
+				bvn_int_shr(&Q, 1);
+				mpfr_exp += 1L;
+			}
+		}
+	}
 	f->_exp = mpfr_exp;
 	bvnf_store_mant(f, &Q);
+	bvnf_scratch_free(&Q);
 	return true;
 }
 void bvn_float_to_bin16(const bvn_float_t *f, uint16_t *out)
@@ -1628,21 +1700,33 @@ static bool from_fix_common(bvn_float_t *f, bool neg,
 	}
 	int leading = bvn_int_bitlen(&M) - 1;
 	long mpfr_exp = (long)leading + 1L - (long)frac_bits;
-	uint32_t _qb[16];
-	memset(_qb, 0, sizeof _qb);
-	for (int i = 0; i < 8; i++) _qb[i] = _mb[i];
+	uint32_t qhint = bvnf_hint_limbs(f->_prec > 257u ? f->_prec : 257u);
 	bvn_int_t Q;
-	Q.limbs    = _qb;
-	Q.nlimbs   = 16;
-	Q.nused    = M.nused;
-	Q.negative = false;
-	Q.heap     = false;
+	if (!bvnf_scratch(&Q, qhint)) return false;
+	bvn_int_copy(&Q, &M);
 	int shift = (int)f->_prec - 1 - leading;
-	if (shift > 0) { if (!bvn_int_shl(&Q, shift))  return false; }
-	else if (shift < 0) { bvn_int_shr(&Q, -shift); }
+	if (shift > 0) {
+		if (!bvn_int_shl(&Q, shift)) { bvnf_scratch_free(&Q); return false; }
+	} else if (shift < 0) {
+		/* Narrowing: round dropped low bits to nearest, ties to even. */
+		int  d      = -shift;
+		int  guard  = bvn_int_getbit(&Q, d - 1);
+		bool sticky = false;
+		for (int i = 0; i < d - 1 && !sticky; i++)
+			if (bvn_int_getbit(&Q, i)) sticky = true;
+		bvn_int_shr(&Q, d);
+		if (guard && (sticky || bvn_int_getbit(&Q, 0) == 1)) {
+			if (!bvn_int_add_u32(&Q, 1u)) { bvnf_scratch_free(&Q); return false; }
+			if (bvn_int_bitlen(&Q) > (int)f->_prec) {
+				bvn_int_shr(&Q, 1);
+				mpfr_exp += 1L;
+			}
+		}
+	}
 	f->_sign = neg ? -1 : 1;
 	f->_exp  = mpfr_exp;
 	bvnf_store_mant(f, &Q);
+	bvnf_scratch_free(&Q);
 	return true;
 }
 bool bvn_float_from_fix16(bvn_float_t *f, int16_t bits, uint32_t frac_bits)

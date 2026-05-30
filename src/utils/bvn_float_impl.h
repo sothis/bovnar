@@ -393,13 +393,21 @@ typedef struct {
 	int max_coeff_digs;
 } DecFmt;
 /*
- * Distinguish the genuine IEEE-754 decimal interchange formats (decimal32/64/128)
- * from bovnar's narrower in-house widths. Every standard format satisfies
- * bias == 3*2^(exp_bits-3) + p - 2 (Emax = 3*2^(exp_bits-3), bias = Emax + p - 2);
- * the in-house decimal16/256 use a different exponent layout. Only the standard
- * formats use the BID combination field — the "11" coefficient prefix and the
- * 1111x Infinity/NaN encoding — and cap the biased exponent at 3*2^(exp_bits-2);
- * the others use the full exponent field with an all-ones special encoding.
+ * Classify a decimal width as "BID-standard" vs bovnar's in-house layout. The
+ * test is purely the IEEE relation bias == 3*2^(exp_bits-3) + p - 2 (Emax =
+ * 3*2^(exp_bits-3), bias = Emax + p - 2). This holds for the genuine IEEE-754
+ * interchange formats decimal32/64/128 and, by construction of its parameters
+ * (exp_bits=6, p=2, bias=24), for bovnar's decimal16 as well — so decimal16 is
+ * encoded exactly like the IEEE widths. Only decimal256 fails the relation and
+ * uses the in-house layout. BID-standard formats use the combination field —
+ * the "11" coefficient prefix and the 1111x Infinity/NaN encoding — and cap the
+ * biased exponent at 3*2^(exp_bits-2); the in-house width uses the full exponent
+ * field with an all-ones special encoding.
+ *
+ * NOTE: the standard/in-house split is *inferred* from the bias here. That makes
+ * the encoding silently dependent on the exact (exp_bits, p, bias) tuple: if
+ * decimal16's bias were ever changed it could flip layout. The tuples are fixed
+ * by the on-disk format (doc/1_bovnar_spec.md §5.2) and must not be altered.
  */
 static inline bool bvnf_dec_is_standard(int exp_bits, int max_coeff_digs, int bias)
 {
@@ -413,7 +421,7 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 	int bias  = f->bias;
 	bool is_std = bvnf_dec_is_standard(ebits, f->max_coeff_digs, bias);
 	/* Standard formats reserve the "11" combination prefix, so their biased
-	 * exponent tops out at 3*2^(exp_bits-2); the in-house widths use the full
+	 * exponent tops out at 3*2^(exp_bits-2); the in-house width uses the full
 	 * field, reserving only the all-ones code for Infinity/NaN. */
 	int be_max = is_std ? (3 << (ebits - 2)) : ((1 << ebits) - 1);
 	int total = f->total_bits;
@@ -424,7 +432,7 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 		 * Special values. Standard formats use the IEEE combination field: the
 		 * four bits below the sign are 1111, and the fifth bit selects Infinity
 		 * (0) or NaN (1) — matching the BID encoding emitted by libbid/hardware.
-		 * The in-house widths keep bovnar's own convention: every exponent-field
+		 * The in-house width keeps bovnar's own convention: every exponent-field
 		 * bit set, with NaN flagged by the top coefficient bit.
 		 */
 		if (is_std) {
@@ -505,7 +513,7 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 		 * Finite magnitude too large for this format's exponent range rounds to
 		 * Infinity. Emit the same special pattern the p->inf path uses: the 1111x
 		 * combination (fifth bit 0) for standard formats, all exponent bits for
-		 * the in-house widths. (Emitting all-ones unconditionally would decode as
+		 * the in-house width. (Emitting all-ones unconditionally would decode as
 		 * NaN under the standard 1111x scheme.)
 		 */
 		if (is_std) {
@@ -526,7 +534,7 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 	/*
 	 * Pack the biased exponent and coefficient. CASE A — the coefficient fits in
 	 * coeff_bits — places it directly in the trailing field with the exponent
-	 * above it; this is the only case for the in-house widths and for decimal128.
+	 * above it; this is the only case for the in-house width and for decimal128.
 	 * CASE B — the coefficient needs one more bit, reachable for decimal32/64
 	 * whose 10^p exceeds 2^coeff_bits — uses the BID combination field: a "11"
 	 * prefix, then the exponent, then the low tL = total-3-exp_bits coefficient

@@ -27,8 +27,17 @@ classifiers     = [
 ]
 
 [project.optional-dependencies]
+# numpy >= 1.24 makes np.array() raise on ragged input (older versions only
+# warn and build an object array), which the strictness tests rely on.
+# pint >= 0.22 has the SI ronna/quetta/ronto/quecto prefixes plus the offset-unit
+# and custom-dimension support the bovnar<->pint bridge needs.
+numpy = ["numpy>=1.24"]
+pint  = ["pint>=0.22"]
+all   = ["numpy>=1.24", "pint>=0.22"]
 dev = [
     "pytest>=7",
+    "numpy>=1.24",
+    "pint>=0.22",
 ]
 
 [project.urls]

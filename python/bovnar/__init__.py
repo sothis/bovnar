@@ -51,6 +51,12 @@ from .units   import (
     convert_value,
 )
 from . import currency
+# pint bridge: functions only; pint itself is imported lazily on first use, so
+# importing bovnar never requires pint to be installed.
+from ._pint_bridge import to_pint, to_pint_unit, from_pint, from_pint_unit
+# numpy bridge: likewise numpy is imported lazily, only when these are called.
+from ._numpy import (to_numpy, to_pint_array, from_numpy, from_pint_array,
+                     array_to_bvnr)
 
 __all__ = [
     'loads', 'dumps', 'dom_parse',
@@ -81,6 +87,9 @@ __all__ = [
     'unit_to_str_ex',
     'exponent_to_int', 'int_to_exponent',
     'convert_value',
+
+    'to_pint', 'to_pint_unit', 'from_pint', 'from_pint_unit',
+    'to_numpy', 'to_pint_array', 'from_numpy', 'from_pint_array', 'array_to_bvnr',
 
     'BovnarError', 'BovnarLibraryNotFound',
     'BovnarParseError', 'BovnarWriteError', 'BovnarArgumentError',

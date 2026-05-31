@@ -240,7 +240,7 @@ The unit goes inside the angle brackets, after the other parameters:
 SI prefixes are written before the base unit symbol with a **mandatory `~`** separator:
 
 ```bovnar
-.k_ohm  = <float:32,k~Ω>   4.7;     # kilo-ohm
+.k_ohm  = <float:32,k~Ω>   4.7;     # kilo-ohm
 .milli  = <float:32,m~V>   330.0;   # millivolt
 .micro  = <float:32,µ~s>   50.0;    # microsecond (µ = U+00B5)
 .giga   = <float:64,G~Hz>  2.4;     # gigahertz
@@ -648,7 +648,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 .radio = {
     .frequency  = <float:64,M~Hz>  868.1;
-    .tx_power   = <sint:8,dBm>    14;
+    .tx_power   = <sint:8,dB>     14;          # dB (power level); 'dBm' is not a bovnar unit
     .bandwidth  = <float:32,k~Hz>  125.0;
     .sf         = <uint:8>         7;          # spreading factor
 };

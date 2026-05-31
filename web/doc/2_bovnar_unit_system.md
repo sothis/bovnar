@@ -696,6 +696,26 @@ The first `/` sets a latching "in-denominator" flag to `true` for all subsequent
 
 Both `k~g·m/s²` and `k~g·m·s⁻²` parse to identical `value_unit_t` representations.
 
+#### Parenthesised grouping
+
+A `(…)` group is a sub-expression evaluated independently. Like any factor it
+obeys the latching denominator, so a `/` before a group negates the group's net
+component exponents as a whole. This makes the readable denominator form work and
+compose correctly:
+
+```bovnar
+.pressure = <float:64,k~g/(m·s²)> 101325;  # kg·m⁻¹·s⁻² — same as k~g/m·s²
+.areal    = <float:64,(k~g/m)·s²> 1.0;     # kg·m⁻¹·s²  — grouping changes the s sign
+.rate     = <float:64,m/(s·s)> 1.0;        # m·s⁻²
+```
+
+`k~g/(m·s²)` and `k~g/m·s²` therefore parse to the **same** `value_unit_t` (the
+canonical, parenless form is what the writer emits). Rules: an explicit separator
+is required before a group (`m·(s)`, not `m(s)`); a group is not followed by its
+own exponent (`(m·s)²` is rejected — write `m²·s²`); parentheses must balance;
+empty groups (`()`) are rejected; nesting is bounded at 16. Unmatched or malformed
+groups raise `error_unit_illegal`.
+
 ---
 
 ## 6. Exponents

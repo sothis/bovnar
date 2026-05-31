@@ -306,8 +306,8 @@ The stored text includes the leading dot and all intermediate dots:
 **Examples:**
 
 ```bovnar
-.config.host = "example.com";     # dotted key
-.ref = &.config.host;             # reference → ".config.host"
+.config = { .host = "example.com"; };  # nested struct
+.ref = &.config.host;                  # reference → ".config.host"
 ```
 
 ### 4.6 Numbers
@@ -322,7 +322,7 @@ dot-led       = "." DIGIT { DIGIT }
 dec-exponent  = ("e" | "E") [ "+" | "-" ] DIGIT { DIGIT }
 ```
 
-- Only `e`/`E` accepted as exponent marker in bare literals (quoted string literals use `p`/`P` for power-of-2 bases — see §6.3)
+- Only `e`/`E` accepted as exponent marker in bare literals (base-16 float values in quoted string literals use `p`/`P` — see §6.3)
 - Leading zeros are valid (`007` is accepted)
 - A trailing dot without fractional digits is valid (`123.`)
 - `.` alone is a hard error
@@ -649,12 +649,12 @@ Digits in values are checked against the declared base:
 
 #### Exponent Markers in Quoted String Literals
 
-Bare number literals always use `e`/`E` as the exponent separator (§4.6). Quoted string number literals follow the same rule **except** for base 16 (`_16`) float values, where `p`/`P` must be used instead of `e`/`E`. This is required because `e` and `E` are valid hexadecimal digits: in `"1.8e+2"` with base 16, `e` is a mantissa digit, not an exponent marker. The `p`/`P` exponent separator is accepted for any power-of-2 base (`_2`, `_4`, `_8`, `_16`) in quoted string literals.
+Bare number literals always use `e`/`E` as the exponent separator (§4.6). Quoted string number literals follow the same rule **except** for base-16 (`_16`) float values, where `p`/`P` must be used instead of `e`/`E`. This is required because `e` and `E` are valid hexadecimal digits: with base 16 you must write `"1.8p+2"`, not `"1.8e+2"` — the `e` would be read as a mantissa digit rather than an exponent marker, leaving the trailing `+2` invalid. Float values support a decimal base (the default) and base-16 (`_16`); the `p`/`P` exponent separator applies to the base-16 form.
 
 ```bovnar
-.hex_float  = <float:64,_16> "1.8p+2";   # OK: 1.8₁₆ × 2² = 6.0
-.hex_float2 = <float:64,_16> "1.8e+2";   # OK: mantissa is 1.8e₁₆ (no exponent)
-.bin_float  = <float:64,_2>  "1.1p+3";   # OK: 1.1₂ × 2³ = 12.0
+.hex_float  = <float:64,_16> "1.8p+2";   # OK: 1.8₁₆ × 2² = 6.0  (p = binary exponent)
+.hex_mant   = <float:64,_16> "1.8e";     # OK: 'e' is a hex digit → mantissa 1.8e₁₆
+.dec_float  = <float:64> 12.0;           # OK: default decimal base
 ```
 
 The `p`/`P` exponent value is always interpreted as a decimal integer (the binary exponent bias), matching the C99 hexadecimal floating-point literal convention.
@@ -1071,8 +1071,9 @@ The unit system supports **163 named base units** across SI, IEC-binary, Imperia
 The unit system supports **compound units** composed of multiple base-unit terms combined with product and division separators.
 
 ```
-compound-unit  = "no_unit"
-               | unit-component { unit-sep unit-component }
+compound-unit  = "no_unit" | unit-expr
+unit-expr      = unit-factor { unit-sep unit-factor }
+unit-factor    = unit-component | "(" unit-expr ")"
 
 unit-sep       = "*" | "/" | "·"       (* "·" = U+00B7 MIDDLE DOT *)
 
@@ -1090,6 +1091,8 @@ unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 The `·` (middle dot, U+00B7, encoded as `0xC2 0xB7`) and `*` (asterisk) are semantically equivalent; both indicate multiplication of the adjacent unit components.
 
 The `/` separator divides the preceding components by the following ones. The first `/` switches all subsequent components into the denominator; additional `/` separators do not toggle back to the numerator. Every component after the first `/` is always in the denominator.
+
+**Parenthesised grouping.** A `(…)` group is a sub-expression evaluated independently; like any factor it obeys the latching denominator, so a `/` before a group negates the group's net exponents as a whole. Thus `k~g/(m·s²)` parses to `kg·m⁻¹·s⁻²` (identical to `k~g/m·s²`), while `(k~g/m)·s²` is `kg·m⁻¹·s²`. An explicit separator is required before a group (`m·(s)`, not `m(s)`); a group is not followed by its own exponent (`(m·s)²` is rejected); parentheses must balance and nest no deeper than 16. The writer emits the canonical, parenless form.
 
 **Within each `unit-component`:**
 
@@ -1109,6 +1112,7 @@ The `/` separator divides the preceding components by the following ones. The fi
 .moment = <float:64,m*s> 1.0;           # meter-seconds
 .area_density = <float:64,k~g/m²> 5.0;  # kilograms per square meter
 .three_term = <float:64,k~g·m·s⁻²> 9.81;  # equivalent to k~g·m/s²
+.pressure = <float:64,k~g/(m·s²)> 101325; # grouped denominator (= k~g/m·s²)
 
 # Explicitly dimensionless
 .no_unit_float = <float:64,no_unit> 3.14;

@@ -301,7 +301,7 @@ one-character unit — `mV` would be ambiguous. The `~` resolves all such
 cases unambiguously:
 
 ```bovnar
-.k_ohm = <float:32,k~Ω> 4.7;
+.k_ohm = <float:32,k~Ω> 4.7;
 .micro = <float:32,µ~s> 50.0;
 .giga  = <float:64,G~Hz> 2.4;
 ```

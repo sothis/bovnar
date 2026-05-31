@@ -4382,13 +4382,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
         const inten = Math.max(0.2, 1 - Math.hypot(gx, gy) * 0.4) * (0.5 + rnd() * 0.5);
         // …, twinkle phase, twinkle speed, twinkle amplitude — dense cores barely
         // breathe: a slow, low-amplitude shimmer, like a steady metro seen from orbit
-        out.push([lo + gx * sdC, la + gy * sdC * 0.8, inten, rnd() * 6.2832, 0.9 + rnd() * 1.6, 0.022 + rnd() * 0.028]);
+        out.push([lo + gx * sdC, la + gy * sdC * 0.8, inten, rnd() * 6.2832, 0.22 + rnd() * 0.4, 0.014 + rnd() * 0.018]);
       }
       const nHalo = Math.round(5 + sc * 9), sdH = 0.6 + sc * 1.3;
       for (let k = 0; k < nHalo; k++) {
         const gx = gauss(), gy = gauss();
         // faint exurban/road lights shimmer a touch more than the cores, but still slow and gentle
-        out.push([lo + gx * sdH, la + gy * sdH * 0.7, 0.12 + rnd() * 0.18, rnd() * 6.2832, 1.3 + rnd() * 2.2, 0.035 + rnd() * 0.05]);
+        out.push([lo + gx * sdH, la + gy * sdH * 0.7, 0.12 + rnd() * 0.18, rnd() * 6.2832, 0.35 + rnd() * 0.6, 0.022 + rnd() * 0.03]);
       }
     }
     return out;
@@ -4464,7 +4464,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const N = GLOBE_N, g = globeCv.getContext('2d'), img = g.getImageData(0, 0, N, N), d = img.data;
     const tw = earthTex.w, th = earthTex.h, td = earthTex.data;
     const ntd = nightTex && nightTex.data, ntw = nightTex ? nightTex.w : 0, nth = nightTex ? nightTex.h : 0;
-    const Sx = SUN.x, Sy = -SUN.y, TW = 0.28;            // sun dir (screen); terminator half-width — the twilight band is centred on the disc (lit=0.5 at the centre) and spans ±TW of the radius, so it stays soft without eating the dark night hemisphere
+    const Sx = SUN.x, Sy = -SUN.y, TW = 0.34;            // sun dir (screen); terminator half-width — the twilight band is centred on the disc (lit=0.5 at the centre) and spans ±TW of the radius, so it stays soft without eating the dark night hemisphere
     const I2PI = 1 / (2 * Math.PI), IPI = 1 / Math.PI;
     for (let j = 0; j < N; j++) {
       const ny = ((j + 0.5) / N) * 2 - 1;
@@ -4499,7 +4499,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
               w01 = (1 - wx) * wy,       w11 = wx * wy;
         let t = (snx*Sx + sny*Sy + TW) / (2 * TW); t = t < 0 ? 0 : t > 1 ? 1 : t;
         const lit = t * t * (3 - 2 * t);                 // smoothstep day fraction across the terminator
-        const m = 0.17 + 0.83 * lit;                     // brighter night floor → full daylight
+        const m = 0.08 + 0.92 * lit;                     // dark night floor → full daylight, so the twilight reads as a real fade on BOTH sides of the border, not a flat grey night that starts at the centre
         d[o]   = (td[i00]   * w00 + td[i10]   * w10 + td[i01]   * w01 + td[i11]   * w11) * m;
         d[o+1] = (td[i00+1] * w00 + td[i10+1] * w10 + td[i01+1] * w01 + td[i11+1] * w11) * m;
         d[o+2] = (td[i00+2] * w00 + td[i10+2] * w10 + td[i01+2] * w01 + td[i11+2] * w11) * m + 9 * (1 - lit); // cool earthshine on the night side
@@ -4572,14 +4572,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       const px = cx + p.x * R, py = cy - p.y * R;
       const nt = nightAt(px, py);
       if (nt <= 0.02) continue;
-      // Atmospheric scintillation: three incommensurate components per light —
-      // a slow drift plus two faster, out-of-phase ripples — so the brightness
-      // wanders organically (never a clean repeating pulse). Each light has its
-      // own phase/rate, so the field glistens incoherently, the way real city
-      // lights shimmer through the air column when seen from orbit.
+      // Gentle atmospheric breathing: two slow, incommensurate waves per light
+      // so the brightness drifts softly and never repeats. No fast component —
+      // the eye latches onto quick changes, so quick = "flicker"; slow = the calm
+      // glow of city lights seen through the air column from orbit. Each light
+      // keeps its own phase/rate, so the field glows incoherently, not in sync.
       const fl = 1 + am * (Math.sin(tnow * sp + tw)
-                        + 0.5 * Math.sin(tnow * sp * 2.3 + tw * 1.9)
-                        + 0.22 * Math.sin(tnow * sp * 3.9 + tw * 3.1)) * 0.58;
+                        + 0.45 * Math.sin(tnow * sp * 1.8 + tw * 2.3)) * 0.7;
       const a = Math.min(1, nt * 2.6) * Math.min(1, p.z * 2.8) * inten * fl * synthGain;
       if (a < 0.03) continue;
       const g0 = (170 + inten * 48) | 0, b0 = (98 + inten * 54) | 0;   // sodium→whiter
@@ -4610,9 +4609,17 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     ctx.beginPath(); ctx.arc(x + ax*10, y + ay*10, 2.4, earthAngle - 1.1, earthAngle + 1.1);
     ctx.strokeStyle = 'rgba(180,200,220,' + dim + ')'; ctx.stroke();
 
+    // ── solar wings — single-axis Sun tracking ──────────────────────────────
+    // The array gimbals to hold the Sun. The Sun is effectively infinitely far,
+    // so it's a fixed direction: the wings keep a near-constant inertial attitude
+    // (broad faces square to the Sun) while the bus below rotates for its own
+    // nadir/velocity pointing — exactly how a real LEO solar-array drive behaves.
+    // In this orbit-plane view the Sun lies in the plane, so the array can face
+    // it squarely right around the orbit; in eclipse it simply holds its sun-lock.
+    const sunAngle = Math.atan2(-SUN.y, SUN.x);   // screen dir of the Sun (matches the globe's lit side)
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(velAngle);              // local +x aligned with velocity
+    ctx.rotate(sunAngle);              // local +x points at the Sun; wings spread ⟂ to it, faces toward it
     const gap = 5, pL = 13, pW = 8;
     if (glow) { ctx.shadowColor = 'rgba(120,200,255,0.6)'; ctx.shadowBlur = 7; }
 
@@ -4636,8 +4643,12 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       if (glow) { ctx.shadowColor = 'rgba(120,200,255,0.6)'; ctx.shadowBlur = 7; }
     }
     ctx.shadowBlur = 0;
+    ctx.restore();
 
-    // bus (gold-foil body)
+    // ── bus (gold-foil body) — holds the spacecraft's velocity/nadir attitude ─
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(velAngle);              // local +x aligned with velocity
     const bw = 9, bh = 7;
     const bg = ctx.createLinearGradient(-bw/2, -bh/2, bw/2, bh/2);
     bg.addColorStop(0, 'rgba(225,185,95,' + dim + ')');
@@ -4952,11 +4963,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     # R_earth + altitude
     .altitude        = <float:64,k~m> 900.0;
     # orbital-plane tilt
-    .inclination     = 75.0 deg;
+    .inclination     = 100.0 deg;
     # ascending-node swing
     .raan            = 194.0 deg;
     # start angle from node
-    .arg_of_latitude = 20.0 deg;
+    .arg_of_latitude = 0.0 deg;
 };
 
 .telemetry = {

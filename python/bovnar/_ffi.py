@@ -23,6 +23,7 @@
 import ctypes
 import ctypes.util
 import os
+import sys
 from pathlib import Path
 
 from .structs import (
@@ -36,12 +37,22 @@ from .exceptions import BovnarLibraryNotFound
 
 _lib: ctypes.CDLL | None = None
 
-_LIBRARY_NAME = 'libbvnr_shared.so'
 _LIBRARY_BASE = 'bovnar'
+
+def _library_name() -> str:
+    """Platform-specific filename of the bvnr_shared CMake target."""
+    if sys.platform == 'darwin':
+        return 'libbvnr_shared.dylib'
+    if sys.platform in ('win32', 'cygwin'):
+        return 'bvnr_shared.dll'
+    return 'libbvnr_shared.so'
+
+_LIBRARY_NAME = _library_name()
 
 def _candidate_paths() -> list[str]:
     paths: list[str] = []
 
+    # 1. Explicit override always wins (developer pointing at a custom build).
     env_path = os.environ.get('LIBBOVNAR_PATH')
     if env_path:
         paths.append(env_path)
@@ -50,10 +61,20 @@ def _candidate_paths() -> list[str]:
     if env_dir:
         paths.append(str(Path(env_dir) / _LIBRARY_NAME))
 
+    # 2. Bundled-in-wheel case: CMake installs the shared library directly into
+    #    the package directory, next to this file.  This is the normal path for
+    #    a `pip install bovnar`.
+    bundled = Path(__file__).parent / _LIBRARY_NAME
+    if bundled.exists():
+        paths.append(str(bundled))
+
+    # 3. A system-wide install (e.g. distro package).
     found = ctypes.util.find_library(_LIBRARY_BASE)
     if found:
         paths.append(found)
 
+    # 4. Editable/source checkout: fall back to the CMake build tree at the
+    #    repo root (python/bovnar/_ffi.py -> ../../build).
     script_dir = Path(__file__).parent
     for rel in ('../../build', '../../build/release', '../..', '.'):
         p = (script_dir / rel / _LIBRARY_NAME).resolve()

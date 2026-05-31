@@ -13,6 +13,9 @@ option(BVNR_HARDEN
 option(BVNR_WERROR
     "Promote all warnings to errors (for CI)"
     OFF)
+option(BVNR_BUILD_TESTS
+    "Build and register the C/Python test suite"
+    ON)
 
 set(BVNR_C_FLAGS
     -std=c99
@@ -52,12 +55,23 @@ if(BVNR_WERROR)
     list(APPEND BVNR_C_FLAGS -Werror)
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
-set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0 -flto=auto -fno-semantic-interposition" CACHE STRING "C flags for Release"         FORCE)
-set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3 -flto=auto -fno-semantic-interposition" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
+# LTO tuning uses GCC-only spellings (-flto=auto, -fno-semantic-interposition).
+# Other compilers — notably AppleClang for the macOS cibuildwheel wheels — get a
+# plain optimised build so the same tree builds everywhere. The GCC path is
+# unchanged.
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    set(BVNR_LTO_CFLAGS " -flto=auto -fno-semantic-interposition")
+else()
+    set(BVNR_LTO_CFLAGS "")
+endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
+set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for Release"         FORCE)
+set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
+
+if((CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto=auto")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -flto=auto")
@@ -138,7 +152,20 @@ set_target_properties(bovnar PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_options(bovnar PRIVATE -pie)
 target_link_libraries(bovnar PRIVATE bvnr_static m)
 
-include(CMakeLists_tests.txt)
+# The test suite spins up dozens of executables at configure time and pulls in
+# CTest/GMP/pytest wiring.  Skip it when building the Python wheel
+# (scikit-build-core defines SKBUILD) so `pip install` only compiles the lib.
+if(BVNR_BUILD_TESTS AND NOT SKBUILD)
+    include(CMakeLists_tests.txt)
+    # Python test registration lives entirely in CMakeLists_tests.txt
+    # (granular per-file targets with proper labels and library injection).
+endif()
 
-# Python test registration lives entirely in CMakeLists_tests.txt
-# (granular per-file targets with proper labels and library injection).
+# When built as a Python wheel, install the shared library directly into the
+# `bovnar` package directory so the ctypes loader (_ffi.py) finds it in-place,
+# with no LIBBOVNAR_PATH or system install required.
+if(SKBUILD)
+    install(TARGETS bvnr_shared
+        LIBRARY DESTINATION bovnar    # libbvnr_shared.so / .dylib
+        RUNTIME DESTINATION bovnar)   # bvnr_shared.dll (Windows)
+endif()

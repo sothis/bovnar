@@ -1,0 +1,90 @@
+[build-system]
+requires      = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name            = "bovnar"
+version         = "0.2.0"
+description     = "Python bindings for the Bovnar (BVNR) typed, unit-aware serialisation format"
+readme          = "python/README.md"
+license         = "MIT"
+license-files   = ["LICENSE"]
+requires-python = ">=3.10"
+authors         = [
+    { name = "Janos Sonntag" },
+]
+keywords        = ["bovnar", "bvnr", "serialisation", "units", "ctypes"]
+classifiers     = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: C",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+# numpy >= 1.24 makes np.array() raise on ragged input (older versions only
+# warn and build an object array), which the strictness tests rely on.
+# pint >= 0.22 has the SI ronna/quetta/ronto/quecto prefixes plus the offset-unit
+# and custom-dimension support the bovnar<->pint bridge needs.
+numpy = ["numpy>=1.24"]
+pint  = ["pint>=0.22"]
+all   = ["numpy>=1.24", "pint>=0.22"]
+dev = [
+    "pytest>=7",
+    "numpy>=1.24",
+    "pint>=0.22",
+]
+
+[project.urls]
+Source        = "https://github.com/sothis/bovnar"
+Documentation = "https://github.com/sothis/bovnar/tree/main/doc"
+Issues        = "https://github.com/sothis/bovnar/issues"
+
+# ── scikit-build-core (CMake-driven build) ──────────────────────────────────
+# pyproject.toml lives at the repo root so the build can reach the C sources in
+# src/ and include/.  The pure-Python package stays under python/bovnar and is
+# mapped to `bovnar` in the wheel; CMake installs libbvnr_shared.* alongside it.
+[tool.scikit-build]
+build-dir        = "build/skbuild/{wheel_tag}"
+wheel.packages   = ["python/bovnar"]
+cmake.build-type = "Release"
+
+[tool.scikit-build.cmake.define]
+# Compile only the library, not the dozens of test executables.
+BVNR_BUILD_TESTS = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+markers = [
+    "needs_lib: integration test that requires libbvnr_shared.so (deselect with -m 'not needs_lib')",
+]
+
+# ── cibuildwheel (binary wheels for PyPI) ───────────────────────────────────
+[tool.cibuildwheel]
+# CPython only; PyPy and musllinux are out of scope for the first release.
+build         = "cp310-* cp311-* cp312-* cp313-*"
+skip          = "*-musllinux* pp*"
+build-frontend = "build"
+# The bundled libbvnr_shared.* makes every test that touches the C library
+# runnable straight from the installed wheel.
+test-requires = ["pytest", "numpy>=1.24", "pint>=0.22"]
+test-command  = "pytest {project}/python/tests"
+
+[tool.cibuildwheel.linux]
+# Build native aarch64 wheels on the arm runner instead of QEMU emulation.
+archs = ["auto64"]
+
+[tool.cibuildwheel.macos]
+# Each macOS runner builds for its own native arch (x86_64 on macos-13,
+# arm64 on macos-14); no cross-compiled universal2.
+archs = ["auto64"]

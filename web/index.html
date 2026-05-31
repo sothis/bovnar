@@ -4432,11 +4432,6 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.panelTemp += ((eclipse ? -58 : 56) - sim.panelTemp) * Math.min(1, dt / 700);
   }
 
-  function modeOf(eclipse) {
-    if (sim.soc < 0.25) return 'SAFE_HOLD';
-    return eclipse ? 'ECLIPSE' : 'NOMINAL';
-  }
-
   const f = (n, d) => Number(n).toFixed(d);
   // The downlink carries TAI only (no UTC). TAI = UTC + 37 leap seconds (constant
   // since 2017); the trailing 'Z' is dropped because TAI is not a UTC wall-clock.
@@ -4481,7 +4476,6 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       '.tm = {',
       row('mission_time', f(sim.met, 1) + ' s'),
       row('tai', '"' + isoTAI(utcMs) + '"'),
-      row('mode', modeOf(st.eclipse)),
       row('eclipse', st.eclipse ? 'true' : 'false'),
       row('pos', '<float:64,k~m> [' + f(st.pos[0],2) + ', ' + f(st.pos[1],2) + ', ' + f(st.pos[2],2) + ']'),
       row('vel', '<float:64,m·s⁻¹> [' + f(vel[0],1) + ', ' + f(vel[1],1) + ', ' + f(vel[2],1) + ']'),
@@ -4924,13 +4918,16 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
     // (no Sun glyph — the Sun would be far off-frame; it only drives the lighting)
 
-    // fading trail of decoded positions (dimmed where it passes behind Earth)
+    // fading trail of decoded positions (hidden where it passes behind Earth —
+    // a segment with either endpoint occluded is skipped, so the trail cleanly
+    // disappears at the limb instead of bleeding over the disk)
     if (sim.trail.length > 1) {
       for (let k = 1; k < sim.trail.length; k++) {
         const a = k / sim.trail.length;
         const p0 = sim.trail[k-1], p1 = sim.trail[k];
-        const occ = behindEarth(p1[0], p1[1], p1[2] || 0);
-        ctx.strokeStyle = 'rgba(120,235,205,' + (a * (occ ? 0.16 : 0.8)) + ')';
+        if (behindEarth(p0[0], p0[1], p0[2] || 0) ||
+            behindEarth(p1[0], p1[1], p1[2] || 0)) continue;
+        ctx.strokeStyle = 'rgba(120,235,205,' + (a * 0.8) + ')';
         ctx.lineWidth = 0.5 + a*1.8;
         ctx.beginPath();
         ctx.moveTo(SX(p0[0]), SY(p0[1]));
@@ -4952,8 +4949,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       ctx.fillStyle = 'rgba(156,220,254,0.92)';
       ctx.fillText('ALT  ' + view.alt.toFixed(1) + ' km', 12, 20);
       ctx.fillText('VEL  ' + (view.speed/1000).toFixed(3) + ' km/s', 12, 34);
-      ctx.fillText('MODE ' + view.mode, 12, 48);
-      let hudY = 62;
+      let hudY = 48;
       if (view.eclipse) { ctx.fillStyle = 'rgba(122,138,168,0.95)'; ctx.fillText('☾ ECLIPSE', 12, hudY); hudY += 14; }
       if (occluded) { ctx.fillStyle = 'rgba(140,162,196,0.95)'; ctx.fillText('⊘ BEHIND EARTH', 12, hudY); }
       if (view.stale) { ctx.fillStyle = '#f44747'; ctx.fillText('▲ HOLDING — frame dropped', 12, h - 12); }
@@ -4970,7 +4966,6 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   const GAUGE_META = {
     mission_time: { label: 'MISSION TIME' },
     tai:       { label: 'TAI', span: true },
-    mode:      { label: 'MODE', sym: true },
     eclipse:   { label: 'ECLIPSE', sym: true },
     pos:       { label: 'POSITION (ECI)', span: true },
     vel:       { label: 'VELOCITY (ECI)', span: true },
@@ -5116,7 +5111,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // Build the view from DECODED values (bovnar drives the visualizer)
     let view;
     if (sim.held) {
-      view = Object.assign({}, sim.lastGood || { pos: st.pos, vel: st.vel, alt: st.alt, speed: st.speed, mode: 'NOMINAL', eclipse: st.eclipse }, { stale: true });
+      view = Object.assign({}, sim.lastGood || { pos: st.pos, vel: st.vel, alt: st.alt, speed: st.speed, eclipse: st.eclipse }, { stale: true });
     } else {
       const m = dec.map.tm && dec.map.tm.struct;
       const pos = m && gvec(m.pos), vel = m && gvec(m.vel);
@@ -5124,7 +5119,6 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
         pos: pos || st.pos, vel: vel || st.vel,
         alt: m && m.alt ? gnum(m.alt) : st.alt,
         speed: m && m.speed ? gnum(m.speed) : st.speed,
-        mode: m && m.mode ? m.mode.value : modeOf(st.eclipse),
         eclipse: st.eclipse, stale: false,
       };
       sim.lastGood = view;

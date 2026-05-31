@@ -1272,6 +1272,50 @@ static void test_parse_unit_n(void)
 	bvn_parse_unit_n(NULL, 0, &ok);
 	ASSERT_TRUE(!ok, "parse_unit_n NULL: ok=false");
 }
+static void test_parse_unit_parens(void)
+{
+	printf("  parenthesised unit grouping...\n");
+	bool ok;
+
+	/* A grouped denominator equals the flat form dimensionally (pressure). */
+	value_unit_t grouped = bvn_parse_unit((const uint8_t*)"k~g/(m·s²)", &ok);
+	ASSERT_TRUE(ok, "parse 'k~g/(m·s²)' ok");
+	value_unit_t flat = bvn_parse_unit((const uint8_t*)"k~g/m·s²", &ok);
+	ASSERT_TRUE(ok, "parse 'k~g/m·s²' ok");
+	ASSERT_TRUE(bvn_units_compatible(grouped, flat),
+		"k~g/(m·s²) == k~g/m·s² dimensionally");
+
+	/* Grouping changes the sign: (k~g/m)·s² is kg·m⁻¹·s², not the pressure. */
+	value_unit_t areal = bvn_parse_unit((const uint8_t*)"(k~g/m)·s²", &ok);
+	ASSERT_TRUE(ok, "parse '(k~g/m)·s²' ok");
+	ASSERT_TRUE(!bvn_units_compatible(areal, grouped),
+		"(k~g/m)·s² differs from k~g/(m·s²)");
+
+	/* a/(b/c) == a·c/b */
+	value_unit_t nested = bvn_parse_unit((const uint8_t*)"m/(s/A)", &ok);
+	ASSERT_TRUE(ok, "parse 'm/(s/A)' ok");
+	value_unit_t nested_flat = bvn_parse_unit((const uint8_t*)"m·A/s", &ok);
+	ASSERT_TRUE(ok, "parse 'm·A/s' ok");
+	ASSERT_TRUE(bvn_units_compatible(nested, nested_flat),
+		"m/(s/A) == m·A/s");
+
+	/* Malformed groups are rejected. */
+	bvn_parse_unit((const uint8_t*)"k~g/(m·s²", &ok);
+	ASSERT_TRUE(!ok, "unmatched '(' rejected");
+	bvn_parse_unit((const uint8_t*)"()", &ok);
+	ASSERT_TRUE(!ok, "empty group '()' rejected");
+	bvn_parse_unit((const uint8_t*)"m(s)", &ok);
+	ASSERT_TRUE(!ok, "implicit multiply 'm(s)' rejected");
+	bvn_parse_unit((const uint8_t*)"(m·s)²", &ok);
+	ASSERT_TRUE(!ok, "group exponent '(m·s)²' rejected");
+	bvn_parse_unit((const uint8_t*)"m·()", &ok);
+	ASSERT_TRUE(!ok, "empty group in expression rejected");
+
+	/* Parenless expressions are unchanged (regression guard). */
+	value_unit_t plain = bvn_parse_unit((const uint8_t*)"m/s²", &ok);
+	ASSERT_TRUE(ok, "parse 'm/s²' ok (parenless regression)");
+	ASSERT_EQ_INT((int64_t)plain.num_components, 2, "m/s² has 2 components");
+}
 
 static void test_parse_no_unit_normalised(void)
 {
@@ -1530,6 +1574,7 @@ int main(void)
 	test_si_factor_out_of_range_base();
 	test_si_factor_num_components_overflow();
 	test_parse_unit_n();
+	test_parse_unit_parens();
 	test_parse_no_unit_normalised();
 	test_unit_to_string_num_components_clamp();
 	test_neg_exp_round_trip();

@@ -1118,89 +1118,106 @@ static value_unit_component_t bvn_parse_single_unit_component(
  * component, handled by the fast path. bvn_parse_unit is the convenience
  * NUL-terminated wrapper around this length-counted form.
  */
-value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
+/*
+ * Parenthesised grouping in unit expressions (spec 1.0). A "(...)" group is a
+ * sub-expression parsed independently; like any factor it obeys the sticky
+ * denominator, so a "/" before a group negates the group's net component
+ * exponents. This makes the readable forms work and compose correctly:
+ *   k~g/(m·s²)   -> kg·m⁻¹·s⁻²     (pressure)
+ *   (k~g/m)·s²   -> kg·m⁻¹·s²
+ *   a/(b/c)      -> a·c·b⁻¹
+ * Parenless expressions are unaffected (identical to the pre-1.0 flat parser).
+ * An explicit separator is required between a factor and a group ("m·(s)", not
+ * "m(s)"); a group is not yet followed by its own exponent. Nesting is bounded.
+ */
+#define BVN_UNIT_GROUP_MAX_DEPTH 16u
+static value_unit_t bvn_parse_unit_expr(
+	const char* s, uint32_t slen, uint32_t depth, bool* ok)
 {
 	value_unit_t result = { .num_components = 0 };
 	*ok = true;
-	if (!unit || !len) { *ok = false; return result; }
-	const char* s    = (const char*)unit;
-	uint32_t    slen = len;
-	if (slen == 7 && memcmp(s, "no_unit", 7) == 0) {
-		return result;
-	}
-	bool has_sep = false;
-	for (uint32_t i = 0; i < slen; ) {
-		uint8_t b = (uint8_t)s[i];
-		if (b == '*' || b == '/') { has_sep = true; break; }
-		if (b == 0xC2 && i + 1 < slen && (uint8_t)s[i + 1] == 0xB7)
-			{ has_sep = true; break; }
-		i++;
-	}
-	if (!has_sep) {
-		bool comp_ok;
-		value_unit_component_t comp =
-			bvn_parse_single_unit_component(s, slen, &comp_ok);
-		if (!comp_ok) { *ok = false; return result; }
-		result.num_components = 1;
-		result.components[0]  = comp;
-		return result;
-	}
+	if (!s || !slen)                    { *ok = false; return result; }
+	if (depth > BVN_UNIT_GROUP_MAX_DEPTH) { *ok = false; return result; }
+	if (slen == 7 && memcmp(s, "no_unit", 7) == 0)
+		return result;                  /* the empty (dimensionless) unit */
+
 	bool     in_denominator = false;
-	uint32_t comp_start     = 0;
 	uint32_t i              = 0;
-	while (i <= slen) {
-		bool     at_end      = (i == slen);
-		bool     is_sep      = false;
-		uint32_t sep_len     = 0;
-		bool     is_division = false;
-		if (!at_end) {
-			uint8_t b = (uint8_t)s[i];
-			if (b == '*') {
-				is_sep  = true;
-				sep_len = 1;
-			} else if (b == '/') {
-				is_sep      = true;
-				sep_len     = 1;
-				is_division = true;
-			} else if (b == 0xC2 && i + 1 < slen &&
-					   (uint8_t)s[i + 1] == 0xB7) {
-				is_sep  = true;
-				sep_len = 2;
+	while (i < slen) {
+		if (s[i] == '(') {
+			/* Factor is a parenthesised group: find the matching ')'. */
+			uint32_t pd = 1, j = i + 1;
+			for (; j < slen && pd; j++) {
+				if (s[j] == '(')      pd++;
+				else if (s[j] == ')') pd--;
+				if (pd == 0) break;
 			}
-		}
-		if (at_end || is_sep) {
-			uint32_t comp_len = i - comp_start;
-			if (comp_len > 0) {
+			if (pd != 0) { *ok = false; return result; }  /* unmatched '(' */
+			bool gok;
+			value_unit_t grp = bvn_parse_unit_expr(
+				s + i + 1, j - (i + 1), depth + 1, &gok);
+			if (!gok) { *ok = false; return result; }
+			uint32_t gn = grp.num_components < BVNR_MAX_UNIT_COMPONENTS
+			            ? grp.num_components : BVNR_MAX_UNIT_COMPONENTS;
+			for (uint32_t k = 0; k < gn; k++) {
 				if (result.num_components >= BVNR_MAX_UNIT_COMPONENTS) {
-					*ok = false;
-					return result;
+					*ok = false; return result;
 				}
-				bool comp_ok;
-				value_unit_component_t comp =
-					bvn_parse_single_unit_component(
-						s + comp_start, comp_len, &comp_ok);
-				if (!comp_ok) { *ok = false; return result; }
-				if (in_denominator) {
-					comp.exponent =
-						bvn_negate_exponent(comp.exponent);
-				}
-				result.components[result.num_components++] = comp;
-			} else if (!at_end || comp_start > 0) {
-				*ok = false;
-				return result;
+				value_unit_component_t c = grp.components[k];
+				if (in_denominator)
+					c.exponent = bvn_negate_exponent(c.exponent);
+				result.components[result.num_components++] = c;
 			}
-			if (is_division)
-				in_denominator = true;
-			comp_start = i + sep_len;
+			i = j + 1;                  /* advance past ')' */
+		} else {
+			/* Factor is a plain component: scan to the next top-level
+			 * separator or '('. */
+			uint32_t start = i;
+			while (i < slen) {
+				uint8_t b = (uint8_t)s[i];
+				if (b == '*' || b == '/' || b == '(')
+					break;
+				if (b == 0xC2 && i + 1 < slen &&
+					(uint8_t)s[i + 1] == 0xB7)
+					break;
+				i++;
+			}
+			if (i == start) { *ok = false; return result; } /* empty */
+			bool comp_ok;
+			value_unit_component_t comp = bvn_parse_single_unit_component(
+				s + start, i - start, &comp_ok);
+			if (!comp_ok) { *ok = false; return result; }
+			if (in_denominator)
+				comp.exponent = bvn_negate_exponent(comp.exponent);
+			if (result.num_components >= BVNR_MAX_UNIT_COMPONENTS) {
+				*ok = false; return result;
+			}
+			result.components[result.num_components++] = comp;
 		}
-		if (is_sep)
-			i += sep_len;
-		else
-			i++;
+		/* Consume the separator between factors (or stop at end). */
+		if (i < slen) {
+			uint8_t b = (uint8_t)s[i];
+			if (b == '/')      { in_denominator = true; i++; }
+			else if (b == '*') { i++; }
+			else if (b == 0xC2 && i + 1 < slen &&
+					 (uint8_t)s[i + 1] == 0xB7) { i += 2; }
+			else { *ok = false; return result; } /* '(' (implicit mult) or
+			                                       * an exponent after ')' */
+			if (i >= slen) { *ok = false; return result; } /* trailing sep */
+		}
 	}
 	if (result.num_components == 0)
 		*ok = false;
 	return result;
+}
+value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
+{
+	*ok = true;
+	if (!unit || !len) {
+		*ok = false;
+		return (value_unit_t){ .num_components = 0 };
+	}
+	return bvn_parse_unit_expr((const char*)unit, len, 0, ok);
 }
 value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok)
 {

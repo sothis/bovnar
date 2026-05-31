@@ -275,12 +275,14 @@ unit-param   = unit-char , {unit-char} ;
 unit-char    = (* any byte accepted by copy_type_byte that is not     *)
                (* "," (0x2C) or ">" (0x3E):                          *)
                (* A–Z, a–z, 0–9, "*", ".", "/", "-", ":", "^", "_",  *)
-               (* or a UTF-8 multi-byte byte (0x80–0xF4)             *) ;
+               (* "~", "$", "(", ")", or a UTF-8 multi-byte byte     *)
+               (* (0x80–0xF4)                                         *) ;
 
 (* ── Unit sub-grammar (semantic, enforced by bvn_parse_unit) ─── *)
 (*                                                                     *)
-(* resolved-unit = "no_unit"                                          *)
-(*               | unit-component , {unit-sep , unit-component} ;     *)
+(* resolved-unit = "no_unit" | unit-expr ;                            *)
+(* unit-expr     = unit-factor , {unit-sep , unit-factor} ;           *)
+(* unit-factor   = unit-component | "(" , unit-expr , ")" ;           *)
 (*                                                                     *)
 (* unit-sep      = "*"                        (* product – U+002A  *) *)
 (*               | "·"                        (* product – U+00B7  *) *)
@@ -288,14 +290,19 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*   "·" is the middle dot, encoded as 0xC2 0xB7 (UTF-8 for U+00B7). *)
 (*   "*" and "·" are semantically equivalent (multiplication).        *)
 (*                                                                     *)
-(* Semantics of "/": the first "/" switches all subsequent components  *)
-(* into the denominator (their stored exponents are negated).         *)
-(* Additional "/" separators do not toggle back to the numerator;     *)
-(* every component after the first "/" is always in the denominator.  *)
+(* Semantics of "/": the first "/" switches every subsequent factor    *)
+(* into the denominator (its stored exponents are negated). A "(...)"  *)
+(* group is a sub-expression evaluated independently; when it falls in  *)
+(* the denominator its net exponents are negated as a whole, so        *)
+(* "k~g/(m·s²)" = kg·m⁻¹·s⁻² and "(k~g/m)·s²" = kg·m⁻¹·s². Additional   *)
+(* "/" separators at one level never toggle back to the numerator.     *)
+(* An explicit separator is required before a group ("m·(s)", not      *)
+(* "m(s)"); a group is not (yet) followed by its own exponent; paren    *)
+(* nesting is bounded at 16.                                           *)
 (*                                                                     *)
-(* Empty components between separators (e.g. "m//s", "m*·s") and     *)
-(* more than BVN_MAX_UNIT_COMPONENTS = 8 total components per unit    *)
-(* string both produce error_unit_illegal.                            *)
+(* Empty components or groups (e.g. "m//s", "()", "m*·s"), unmatched   *)
+(* parentheses, and more than BVN_MAX_UNIT_COMPONENTS = 8 total        *)
+(* components per unit string all produce error_unit_illegal.          *)
 (*                                                                     *)
 (* unit-component = [prefix "~"] base-unit [unit-exponent] ;          *)
 (*                                                                     *)
@@ -453,7 +460,7 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 inline-unit-start = ALPHA | "_" | "$" | utf8-leader ;
 
 inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
-                  | utf8-leader | utf8-continuation ;
+                  | "(" | ")" | utf8-leader | utf8-continuation ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)

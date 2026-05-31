@@ -97,19 +97,21 @@ BVN_API bool bvn_float_from_double(bvn_float_t *f, double v);
  * Narrowing a bvn_float to a fixed-width binary format (bvn_float_to_double /
  * to_float / to_bin*) rounds the *stored* value once, correctly. It cannot undo
  * a rounding that already happened when the bvn_float was built: if a decimal
- * string was parsed into a bvn_float whose precision only modestly exceeds the
- * target, the parse and the narrowing round in sequence (double rounding) and
- * the result can be 1 ULP off. This is NOT confined to subnormals -- normal
- * results are affected too. Concretely, parsing at p bits and narrowing to a
- * t-bit significand can double-round for any p from t+1 up to roughly 2*t, in
- * both the normal and subnormal ranges (subnormals are simply the most visible
- * because their effective target width is smaller). To guarantee a
- * correctly-rounded narrowing, give the bvn_float about twice the target
- * significand width plus two guard bits before narrowing (~2*t + 2; e.g. >=108
- * bits for binary64, where t = 53 -- empirically clean at 128), or, for a
- * subnormal target, that plus the subnormal shift. Simpler: use the exact
- * single-rounding decimal path (bvn_float_strtod, which bvn_parse_double_in_base
- * uses for base 10), which is correctly rounded at any input length.
+ * string was parsed into a fixed-width bvn_float and then narrowed, the parse
+ * and the narrowing round in sequence (double rounding) and the result can be 1
+ * ULP off for inputs near a rounding midpoint. This is NOT confined to
+ * subnormals -- normal results are affected too, and NO fixed intermediate
+ * width removes it (widening only shrinks the set of inputs that trip it, never
+ * to zero; the "double rounding is innocuous when the intermediate is >= 2t+2"
+ * result governs the exact products/sums of t-bit operands, not the rounding of
+ * an arbitrary-length decimal string). To convert a STRING correctly, do not
+ * build a bvn_float and narrow at all: use the exact single-rounding path
+ * bvn_float_strtoieee_bin / bvn_float_strtod (used by bvn_parse_double_in_base
+ * for base 10 and 16 and by the bvn_float_parse_bin* helpers), which rounds the
+ * exact rational once and is correctly rounded at any input length. Narrowing a
+ * bvn_float that already holds the value you want (e.g. the result of arithmetic
+ * at full precision) is fine; it is only the parse-then-narrow sequence on a
+ * decimal/hex string that double-rounds.
  */
 BVN_API bool bvn_float_to_double  (const bvn_float_t *f, double *out);
 /*
@@ -122,6 +124,22 @@ BVN_API double bvn_float_strtod(const char *s);
 BVN_API bool bvn_float_from_float (bvn_float_t *f, float v);
 BVN_API bool bvn_float_to_float   (const bvn_float_t *f, float *out);
 BVN_API void bvn_float_to_ieee_bin(const bvn_float_t *f,
+							uint32_t exp_bits, uint32_t man_bits, int32_t bias,
+							uint32_t *bits, int bits32);
+/*
+ * Correctly-rounded base-10 or base-16 (hex-float) string -> IEEE-754 binary
+ * interchange value, in a SINGLE rounding step across the whole range (normals,
+ * subnormals, overflow to inf, underflow to zero). The literal is parsed as an
+ * exact rational num/den and rounded once to the requested (exp_bits, man_bits,
+ * bias) format; it does NOT build an intermediate fixed-width bvn_float and then
+ * narrow, so it cannot double-round near a rounding midpoint at any input
+ * length. The bit layout of *bits matches bvn_float_to_ieee_bin. This is the
+ * primitive behind bvn_float_strtod and the bvn_float_parse_bin* helpers; the
+ * value layer uses it for base-10 and base-16 float literals. NULL string or an
+ * unsupported base leaves *bits all-zero (i.e. +0.0); a syntactically invalid
+ * literal likewise yields +0.0 (there is no error channel in this signature).
+ */
+BVN_API void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 							uint32_t exp_bits, uint32_t man_bits, int32_t bias,
 							uint32_t *bits, int bits32);
 BVN_API bool bvn_float_from_ieee_bin(bvn_float_t *f,
@@ -179,3 +197,4 @@ BVN_API bool bvn_float_from_fix256(bvn_float_t *f, const uint32_t bits[8],
 }
 #endif
 #endif
+

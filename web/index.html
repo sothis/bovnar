@@ -1133,6 +1133,141 @@ section { position: relative; z-index: 1; }
   line-height: 1.8;
 }
 
+/* ── NUMPY BRIDGE ── */
+#numpy { border-top: 1px solid var(--border); }
+
+.np-pipeline {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1.05fr;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+.np-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.np-stage-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.np-stage-label::before {
+  content: '';
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 8px var(--teal);
+  flex: none;
+}
+.np-stage .code-block { font-size: 0.72rem; }
+
+.np-arrow {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+.np-arrow-call {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--cyan);
+  background: rgba(0,122,204,0.08);
+  border: 1px solid rgba(0,122,204,0.28);
+  padding: 0.35rem 0.55rem;
+  white-space: nowrap;
+  text-align: center;
+}
+.np-arrow-glyph {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--blue2);
+}
+
+/* the rendered ndarray */
+.np-array {
+  flex: 1 1 auto;
+  background: var(--editor-bg);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--teal);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.np-array-meta {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--text3);
+}
+.np-array-meta b { color: var(--cyan); font-weight: 400; }
+.np-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.np-cell {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--c-val);
+  text-align: center;
+  padding: 0.4rem 0.2rem;
+  background: rgba(94,234,212,0.05);
+  border: 1px solid rgba(94,234,212,0.14);
+}
+.np-unit-badge {
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--c-unit);
+  background: rgba(94,234,212,0.08);
+  border: 1px solid rgba(94,234,212,0.32);
+  padding: 0.22rem 0.55rem;
+}
+.np-unit-badge b { color: var(--text3); font-weight: 400; }
+
+.np-payoff {
+  margin-top: 1.75rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+.np-benefit {
+  background: var(--editor-bg);
+  padding: 1.4rem 1.5rem;
+}
+.np-benefit-icon {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--teal);
+  margin-bottom: 0.55rem;
+}
+.np-benefit-title {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+.np-benefit-desc {
+  font-size: 0.82rem;
+  color: var(--text3);
+  line-height: 1.6;
+}
+.np-benefit-desc code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--cyan);
+}
+
 /* ── CONFORMANCE BAR ── */
 .conformance-bar {
   position: relative; z-index: 1;
@@ -1949,6 +2084,10 @@ a[data-doc] { cursor: pointer; }
   .syntax-desc { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }
   .qs-pane-inner { grid-template-columns: 1fr; }
+  .np-pipeline { grid-template-columns: 1fr; gap: 1.25rem; }
+  .np-arrow { flex-direction: row; gap: 1rem; }
+  .np-arrow-glyph { transform: rotate(90deg); }
+  .np-payoff { grid-template-columns: 1fr; }
   .usecases-grid { grid-template-columns: 1fr; }
   .docs-grid { grid-template-columns: repeat(2, 1fr); }
   .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
@@ -2008,6 +2147,7 @@ a[data-doc] { cursor: pointer; }
     <li><a href="#syntax">Syntax</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="#numpy">NumPy</a></li>
     <li><a href="#usecases">Use Cases</a></li>
     <li><a href="#docs">Docs</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
@@ -2961,13 +3101,14 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
 
       <div class="feature-card reveal reveal-delay-2" data-n="6">
         <div class="feature-tag">Python</div>
-        <div class="feature-title">Pure-ctypes bindings</div>
+        <div class="feature-title">Pure-ctypes + NumPy bridge</div>
         <div class="feature-desc">
-          No compiled extension. No Cython. Load the shared library and use
-          a full-featured high-level API or a low-level streaming interface.
+          No compiled extension. No Cython. A full high-level / streaming API —
+          plus a zero-glue <code>NumPy</code> bridge that loads typed arrays
+          straight into an <code>ndarray</code> with the physical unit attached.
         </div>
-        <div class="feature-example">bovnar.<span class="py-fn">loads</span>(raw)[<span class="py-str">"pressure"</span>]
-<span class="c-comment"># → 101.325</span></div>
+        <div class="feature-example">bovnar.<span class="py-fn">to_numpy</span>(arr, return_unit=<span class="py-kw">True</span>)
+<span class="c-comment"># → (ndarray float64, 'm/s²')</span></div>
       </div>
     </div>
   </div>
@@ -3110,6 +3251,24 @@ q = doc[<span class="py-str">"pressure"</span>]
 out = bovnar.<span class="py-fn">dumps</span>(doc)
 <span class="py-bi">assert</span> bovnar.<span class="py-fn">loads</span>(out, typed=<span class="py-kw">True</span>) == doc</div>
           </div>
+          <div class="qs-step">
+            <div class="qs-step-num">04</div>
+            <div class="qs-step-title">NumPy bridge</div>
+            <div class="qs-step-desc">Typed arrays load straight into a <code>numpy.ndarray</code> &mdash; bovnar widths map to native dtypes (<code>float:32&nbsp;→&nbsp;float32</code>) and the whole-array unit rides alongside. NumPy is an optional, lazily-imported extra (<code>pip install "bovnar[numpy]"</code>).</div>
+            <div class="code-block"><span class="py-kw">import</span> bovnar, numpy <span class="py-kw">as</span> np
+
+src = <span class="py-str">b".accel = &lt;float:64,m/s^2&gt; "</span> \
+      <span class="py-str">b"[9.81,0.02,-9.79]/[0.05,9.80,0.01];"</span>
+doc = bovnar.<span class="py-fn">loads</span>(src, typed=<span class="py-kw">True</span>)
+
+a, unit = bovnar.<span class="py-fn">to_numpy</span>(
+    doc[<span class="py-str">"accel"</span>], return_unit=<span class="py-kw">True</span>)
+<span class="c-comment"># a.shape == (2, 3)  a.dtype == float64  unit == 'm/s²'</span>
+
+g = np.linalg.<span class="py-fn">norm</span>(a, axis=<span class="py-num">1</span>)   <span class="c-comment"># vectorized, per row</span>
+out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_mag"</span>, g, unit=unit)
+<span class="c-comment"># → .g_mag = &lt;float:64,m/s²&gt; [9.810…, 9.800…];</span></div>
+          </div>
         </div>
       </div>
 
@@ -3153,6 +3312,86 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
   $(<span class="sh-cmd">pwd</span>)/build/libbvnr_shared.so
 <span class="sh-cmd">cd</span> python &amp;&amp; <span class="sh-cmd">pytest</span> tests <span class="sh-flag">-v</span></div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     NUMPY BRIDGE
+══════════════════════════════════════════════ -->
+<section id="numpy">
+  <div class="section-inner">
+    <div class="section-label reveal">python · scientific computing</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Straight into <em>NumPy</em> &mdash; units and all.</h2>
+    <p class="section-p reveal reveal-delay-2">
+      A unit-tagged Bovnar array is already the shape of a tensor. The optional
+      NumPy bridge reads it directly into an <code>ndarray</code> &mdash; native
+      dtype, original shape, and the physical unit carried alongside &mdash; so
+      the wire format and your analysis code never disagree about what a number
+      means.
+    </p>
+
+    <div class="np-pipeline reveal reveal-delay-2">
+      <div class="np-stage">
+        <div class="np-stage-label">accel_log.bvnr &mdash; on the wire</div>
+        <div class="code-block"><span class="c-sigil">.</span><span class="c-key">accel</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span>
+  <span class="c-struct">[</span><span class="c-val">9.81</span><span class="c-semi">,</span> <span class="c-val">0.02</span><span class="c-semi">,</span> <span class="c-val">-9.79</span><span class="c-struct">]</span><span class="c-semi">/</span>
+  <span class="c-struct">[</span><span class="c-val">0.05</span><span class="c-semi">,</span> <span class="c-val">9.80</span><span class="c-semi">,</span> <span class="c-val">0.01</span><span class="c-struct">]</span><span class="c-semi">;</span>
+<span class="c-comment"># self-describing: type,
+# width and unit travel
+# with the payload</span></div>
+      </div>
+
+      <div class="np-arrow">
+        <div class="np-arrow-call">bovnar.to_numpy(<br>&nbsp;&nbsp;src, return_unit=True)</div>
+        <div class="np-arrow-glyph">&rarr;</div>
+      </div>
+
+      <div class="np-stage">
+        <div class="np-stage-label">numpy.ndarray &mdash; in memory</div>
+        <div class="np-array">
+          <div class="np-array-meta">shape <b>(2, 3)</b> &nbsp;·&nbsp; dtype <b>float64</b></div>
+          <div class="np-grid">
+            <div class="np-cell">9.81</div>
+            <div class="np-cell">0.02</div>
+            <div class="np-cell">-9.79</div>
+            <div class="np-cell">0.05</div>
+            <div class="np-cell">9.80</div>
+            <div class="np-cell">0.01</div>
+          </div>
+          <div class="np-unit-badge"><b>unit</b> &nbsp;m/s²</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="np-payoff reveal reveal-delay-3">
+      <div class="np-benefit">
+        <div class="np-benefit-icon">[ ]</div>
+        <div class="np-benefit-title">Zero glue code</div>
+        <div class="np-benefit-desc">
+          The wire array becomes a vectorized <code>ndarray</code> in a single
+          call. <code>/</code>-rows and bracket nesting collapse to the same
+          shape automatically.
+        </div>
+      </div>
+      <div class="np-benefit">
+        <div class="np-benefit-icon">⚖</div>
+        <div class="np-benefit-title">Units never drift</div>
+        <div class="np-benefit-desc">
+          The unit is returned beside the data &mdash; never baked into values.
+          Mixed units or dtypes <em>raise</em> instead of silently corrupting the
+          math.
+        </div>
+      </div>
+      <div class="np-benefit">
+        <div class="np-benefit-icon">⇄</div>
+        <div class="np-benefit-title">Round-trips losslessly</div>
+        <div class="np-benefit-desc">
+          Write results back with <code>from_numpy</code> /
+          <code>array_to_bvnr</code> &mdash; dtype and unit preserved. A pint
+          hand-off (<code>to_pint_array</code>) is one call further.
         </div>
       </div>
     </div>
@@ -3221,7 +3460,8 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
           <div class="usecase-desc">
             Matrices, image frames, time-series batches — any tabular structure where rows
             are a natural unit. The <code>/</code> separator
-            creates new rows; the result is a 3×3 matrix or any rectangular array.
+            creates new rows; the result is a 3×3 matrix or any rectangular array — and the
+            Python <code>NumPy</code> bridge loads it into an <code>ndarray</code> in one call.
           </div>
           <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">matrix</span>   <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">7,8,9</span><span class="c-struct">]</span><span class="c-semi">;</span>
 <span class="c-sigil">.</span><span class="c-key">rotation</span> <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,0,0</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">0,1,0</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">0,0,1</span><span class="c-struct">]</span><span class="c-semi">;</span></div>

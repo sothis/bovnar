@@ -518,6 +518,178 @@ static bool bvnf_rational_to_float(bvn_float_t *f, bool neg,
 	free(_Qb);
 	return true;
 }
+/*
+ * Round the exact value (-1)^neg * num/den (num > 0, den > 0) DIRECTLY to an
+ * IEEE-754 binary interchange format (man_bits fraction bits, exp_bits, bias)
+ * with a single round-to-nearest-even, and pack it into bits[] using the same
+ * field layout as bvn_float_to_ieee_bin. This is the correct decimal/hex-float
+ * -> binary conversion: it rounds the exact rational once, at the position the
+ * target format actually rounds at, so it is correct for normals, subnormals,
+ * overflow (-> Inf) and underflow (-> 0) alike, with no intermediate fixed-width
+ * bvn_float to double-round through.
+ *
+ * Method (the textbook big-integer comparison, identical in spirit to
+ * bvnf_rational_to_float but clamped to the format): estimate E with
+ * 2^E <= V < 2^{E+1}; pick the unit-in-last-place exponent F (F = E - man_bits
+ * for a normal result, F = e_min - man_bits for the subnormal/underflow region,
+ * where e_min = 1 - bias); form Q = round(V * 2^-F) by dividing num*2^(2-F) by
+ * den, keeping two extra low quotient bits (round + guard) plus an exact sticky
+ * bit from the remainder, then applying ties-to-even; finally normalise Q into
+ * the biased exponent and fraction, propagating a mantissa carry into the
+ * exponent and saturating to Infinity on overflow.
+ */
+static void bvnf_rational_to_ieee_bin(bool neg, bvn_int_t *num, bvn_int_t *den,
+		uint32_t exp_bits, uint32_t man_bits, int32_t bias,
+		uint32_t *bits, int bits32)
+{
+	int  total = 1 + (int)exp_bits + (int)man_bits;
+	long eall  = (long)((1u << exp_bits) - 1u);   /* reserved all-ones exponent */
+	long emin  = 1L - (long)bias;                 /* min normal unbiased exponent */
+	int  i;
+	for (i = 0; i < bits32; i++) bits[i] = 0;
+	if (neg) bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
+	if (bvn_int_is_zero(num)) return;             /* +/-0 (sign already set) */
+
+	/* --- estimate E such that 2^E <= num/den < 2^{E+1} --- */
+	int  nb = bvn_int_bitlen(num);
+	int  db = bvn_int_bitlen(den);
+	long E  = (long)nb - (long)db;
+	{
+		uint32_t hint = bvnf_hint_limbs((uint32_t)((nb > db ? nb : db)
+									   + (E < 0 ? -(int)E : (int)E) + 4));
+		bvn_int_t tmp;
+		if (bvnf_scratch(&tmp, hint)) {
+			if (E >= 0) {
+				if (bvn_int_copy(&tmp, den) && bvn_int_shl(&tmp, (int)E))
+					if (bvn_int_cmp(&tmp, num) > 0) E--;
+			} else {
+				if (bvn_int_copy(&tmp, num) && bvn_int_shl(&tmp, (int)(-E)))
+					if (bvn_int_cmp(den, &tmp) > 0) E--;
+			}
+			bvnf_scratch_free(&tmp);
+		}
+	}
+
+	/* early overflow: V >= 2^{e_max+1} can only round to Infinity */
+	if (E + (long)bias >= eall) {
+		for (i = 0; i < (int)exp_bits; i++)
+			bits[(man_bits + (uint32_t)i) / 32] |= 1u << ((man_bits + (uint32_t)i) % 32);
+		return;
+	}
+
+	/* --- choose the ulp exponent F and the provisional biased exponent --- */
+	long be, F;
+	if (E + (long)bias >= 1L) { F = E - (long)man_bits;   be = E + (long)bias; }
+	else                      { F = emin - (long)man_bits; be = 0;             }
+
+	/* --- Q_ext = floor(num/den * 2^(2-F)); two low bits kept as round+guard --- */
+	long     shift  = 2L - F;
+	int      want   = (int)man_bits + 8;          /* >= significand+guard bit count */
+	uint32_t q_words = (uint32_t)(want + 31) / 32u + 4u;
+	uint32_t *Qb = calloc(q_words, sizeof(uint32_t));
+	if (!Qb) return;                              /* OOM: leave +/-0 */
+	bool sticky = false, ok = true;
+
+	if (shift >= 0) {
+		if (shift > (long)INT_MAX) {
+			ok = false;
+		} else if (nb + (int)shift > (int)BVN_INT_MAX_BITS - 32) {
+			ok = bvnf_bitdiv(num, (int)shift, den, Qb, q_words, want, &sticky);
+		} else {
+			bvn_int_t Q_int = { Qb, q_words, 0, false, false, { 0, 0 } };
+			bvn_int_t scaled, R_int;
+			if (!bvnf_scratch(&scaled, bvnf_hint_limbs((uint32_t)(nb + (int)shift + 4)))) {
+				ok = false;
+			} else if (!bvnf_scratch(&R_int, bvnf_hint_limbs((uint32_t)(db + 4)))) {
+				bvnf_scratch_free(&scaled); ok = false;
+			} else {
+				ok = bvn_int_copy(&scaled, num) && bvn_int_shl(&scaled, (int)shift)
+					 && bvn_int_divrem(&Q_int, &R_int, &scaled, den);
+				if (ok) sticky = !bvn_int_is_zero(&R_int);
+				bvnf_scratch_free(&scaled);
+				bvnf_scratch_free(&R_int);
+			}
+		}
+	} else {
+		long ns = -shift;
+		if (ns > (long)INT_MAX) {
+			ok = false;
+		} else {
+			bvn_int_t Q_int = { Qb, q_words, 0, false, false, { 0, 0 } };
+			bvn_int_t dscaled, R_int;
+			if (!bvnf_scratch(&dscaled, bvnf_hint_limbs((uint32_t)(db + (int)ns + 4)))) {
+				ok = false;
+			} else if (!bvnf_scratch(&R_int, bvnf_hint_limbs((uint32_t)(db + (int)ns + 4)))) {
+				bvnf_scratch_free(&dscaled); ok = false;
+			} else {
+				ok = bvn_int_copy(&dscaled, den) && bvn_int_shl(&dscaled, (int)ns)
+					 && bvn_int_divrem(&Q_int, &R_int, num, &dscaled);
+				if (ok) sticky = !bvn_int_is_zero(&R_int);
+				bvnf_scratch_free(&dscaled);
+				bvnf_scratch_free(&R_int);
+			}
+		}
+	}
+	if (!ok) {
+		/* The exact division would exceed the big-int budget -- only reachable
+		 * at astronomically large/small exponents that cannot be constructed in
+		 * BVN_INT_MAX_BITS to begin with. Saturate by magnitude so we never emit
+		 * a wrong finite value: large -> Inf, tiny -> 0. */
+		free(Qb);
+		if (E >= 0)
+			for (i = 0; i < (int)exp_bits; i++)
+				bits[(man_bits + (uint32_t)i) / 32] |= 1u << ((man_bits + (uint32_t)i) % 32);
+		return;
+	}
+
+	bvn_int_t Q = { Qb, q_words, q_words, false, false, { 0, 0 } };
+	while (Q.nused > 0 && Qb[Q.nused - 1] == 0) Q.nused--;
+
+	/* round-to-nearest-even: bit1 is the guard (rounding) bit, bit0 plus the
+	 * division sticky is the tail below it, bit2 is the kept significand's LSB. */
+	bool rbit = (bool)bvn_int_getbit(&Q, 0);
+	bool gbit = (bool)bvn_int_getbit(&Q, 1);
+	bool lsb  = (bool)bvn_int_getbit(&Q, 2);
+	bool round_up = gbit && (rbit || sticky || lsb);
+	bvn_int_shr(&Q, 2);                            /* drop guard bits -> units of 2^F */
+	if (round_up) {
+		if (!bvn_int_add_u32(&Q, 1u)) { free(Qb); return; }
+	}
+
+	/* --- normalise into (be, fraction), carrying into the exponent --- */
+	if (be > 0) {                                  /* normal */
+		if (bvn_int_bitlen(&Q) > (int)man_bits + 1) {  /* 1.11..1 + 1 -> 10.0 */
+			bvn_int_shr(&Q, 1);
+			be++;
+		}
+		if (be >= eall) {                          /* overflow -> Infinity */
+			free(Qb);
+			for (i = 0; i < (int)exp_bits; i++)
+				bits[(man_bits + (uint32_t)i) / 32] |= 1u << ((man_bits + (uint32_t)i) % 32);
+			return;
+		}
+	}
+	/* a subnormal that rounded up to 2^man_bits is exactly the smallest normal */
+	if (be == 0 && bvn_int_getbit(&Q, (int)man_bits) == 1) be = 1;
+
+	/* pack the biased exponent and the fraction (implicit leading bit dropped) */
+	if (be > 0) {
+		int wi = (int)man_bits / 32, b2 = (int)man_bits % 32;
+		if ((uint32_t)wi < Q.nlimbs) Qb[wi] &= ~(1u << b2);
+		while (Q.nused > 0 && Qb[Q.nused - 1] == 0) Q.nused--;
+		bvn_int_t eb;
+		if (bvnf_scratch(&eb, bvnf_hint_limbs(man_bits + 64u))) {
+			bvn_int_from_uint64(&eb, (uint64_t)be);
+			bvn_int_shl(&eb, (int)man_bits);
+			for (i = 0; (uint32_t)i < eb.nused && i < bits32; i++)
+				bits[i] |= eb.limbs[i];
+			bvnf_scratch_free(&eb);
+		}
+	}
+	for (i = 0; (uint32_t)i < Q.nused && i < bits32; i++)
+		bits[i] |= Qb[i];
+	free(Qb);
+}
 static uint32_t bvnf_digit(uint8_t c, uint32_t base)
 {
 	uint32_t d;
@@ -536,21 +708,35 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
 	return true;
 }
 /*
- * Parse a floating literal in base 10 or 16 into a correctly-rounded bvn_float.
- * nan/inf are recognised up front. The mantissa digits and the (decimal or, for
- * base 16, binary 'p') exponent are read into an exact rational num/den
- * — fractional digits and negative exponents go into the denominator, integer
- * scaling into the numerator — and bvnf_rational_to_float does the rounding.
- * Routing all decimal parsing through the exact rational is what makes
- * round-tripping lossless, unlike strtod which only gives double precision.
+ * Shared exact-rational parser for base 10 / base 16 (hex-float) literals. Reads
+ * the mantissa digits and the (decimal 'e' or binary 'p') exponent into an exact
+ * rational num/den -- fractional digits and negative exponents go into the
+ * denominator, integer scaling into the numerator -- and reports what the
+ * literal denotes via the return value. num and den are caller-owned scratch
+ * ints (the caller allocates and frees them); on BVNF_RK_OK they hold the exact
+ * value's numerator and denominator (both > 0) and *neg_out carries the sign.
+ * NAN/INF/ZERO are returned with *neg_out set so the caller can pack the right
+ * signed pattern; FAIL means the text is not a number. Both bvn_float_from_str
+ * (which then rounds to a bvn_float) and bvn_float_strtoieee_bin (which rounds
+ * straight to an IEEE binary format) build on this single parser.
  */
-bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
+typedef enum {
+	BVNF_RK_OK = 0,
+	BVNF_RK_NAN,
+	BVNF_RK_INF,
+	BVNF_RK_ZERO,
+	BVNF_RK_FAIL
+} bvnf_rkind;
+static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
+									  bool *neg_out, bvn_int_t *num, bvn_int_t *den)
 {
-	if (!f || !s || (base != 10u && base != 16u)) return false;
+	*neg_out = false;
+	if (!s || (base != 10u && base != 16u)) return BVNF_RK_FAIL;
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
 	bool neg = false;
 	if      (*s == '+') s++;
 	else if (*s == '-') { neg = true; s++; }
+	*neg_out = neg;
 	/*
 	 * Accept the conventional C99 hex-float prefix. Only skip "0x"/"0X" when a
 	 * hex digit or radix point follows, so a bare "0" (the value zero) is left
@@ -564,16 +750,12 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 		const char *p = s;
 		uint8_t c0 = (uint8_t)(*p | 0x20);
 		if (c0 == 'n' && ((uint8_t)(p[1]|0x20)) == 'a' && ((uint8_t)(p[2]|0x20)) == 'n')
-			{ bvn_float_set_nan(f); return true; }
+			return BVNF_RK_NAN;
 		if (c0 == 'i' && ((uint8_t)(p[1]|0x20)) == 'n' && ((uint8_t)(p[2]|0x20)) == 'f')
-			{ bvn_float_set_inf(f, neg); return true; }
+			return BVNF_RK_INF;
 	}
-	bvn_int_t num, den;
-	uint32_t hint = bvnf_hint_limbs(f ? f->_prec : 64u);
-	if (!bvnf_scratch(&num, hint)) return false;
-	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return false; }
-	bool rc = false;
-	bvn_int_from_uint64(&den, 1u);
+	bvn_int_zero(num);
+	bvn_int_from_uint64(den, 1u);
 	uint32_t acc = 0, acc_d = 0;
 	bool overflow = false;
 	int frac_digits = 0;
@@ -582,11 +764,10 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 #define FLUSH_CHUNK() \
 	do { \
 		if (acc_d > 0 && !overflow) { \
-			  \
 			uint32_t _mul = 1; \
 			for (uint32_t _k = 0; _k < acc_d; _k++) _mul *= base; \
-			if (!bvn_int_mul_u32(&num, _mul)) { overflow = true; break; } \
-			if (!bvn_int_add_u32(&num, acc))  { overflow = true; break; } \
+			if (!bvn_int_mul_u32(num, _mul)) { overflow = true; break; } \
+			if (!bvn_int_add_u32(num, acc))  { overflow = true; break; } \
 			acc = 0; acc_d = 0; \
 		} \
 	} while (0)
@@ -618,7 +799,7 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 		}
 		FLUSH_CHUNK();
 	}
-	if (!has_int && !has_frac) { rc = false; goto cleanup; }
+	if (!has_int && !has_frac) return BVNF_RK_FAIL;
 	long exp_val = 0;
 	bool use_bin_exp = false;
 	bool eneg = false;
@@ -644,22 +825,14 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 			}
 			has_e = true; s++;
 		}
-		if (!has_e) { rc = false; goto cleanup; }
-		if (exp_overflow) {
-			if (eneg) { bvn_float_set_zero(f, neg); }
-			else      { bvn_float_set_inf (f, neg); }
-			rc = true; goto cleanup;
-		}
+		if (!has_e) return BVNF_RK_FAIL;
+		if (exp_overflow) return eneg ? BVNF_RK_ZERO : BVNF_RK_INF;
 		exp_val = eneg ? -eabs : eabs;
 	}
-	if (overflow) {
-		if (exp_val < 0) { bvn_float_set_zero(f, neg); }
-		else             { bvn_float_set_inf(f, neg); }
-		rc = true; goto cleanup;
-	}
+	if (overflow) return (exp_val < 0) ? BVNF_RK_ZERO : BVNF_RK_INF;
 	uint32_t log2b = 0;
 	bool b_is_pow2 = bvnf_pow2_base(base, &log2b);
-	if (bvn_int_is_zero(&num)) { bvn_float_set_zero(f, neg); rc = true; goto cleanup; }
+	if (bvn_int_is_zero(num)) return BVNF_RK_ZERO;
 	if (use_bin_exp || b_is_pow2) {
 		long net_shift;
 		if (b_is_pow2) {
@@ -669,56 +842,119 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 			goto rational_path;
 		}
 		if (net_shift >= 0) {
-			if (net_shift > (long)INT_MAX || !bvn_int_shl(&num, (int)net_shift)) {
-				bvn_float_set_inf(f, neg); rc = true; goto cleanup;
-			}
+			if (net_shift > (long)INT_MAX || !bvn_int_shl(num, (int)net_shift))
+				return BVNF_RK_INF;
 		} else {
-			bvn_int_from_uint64(&den, 1u);
-			if (-net_shift > (long)INT_MAX || !bvn_int_shl(&den, (int)(-net_shift))) {
-				bvn_float_set_zero(f, neg); rc = true; goto cleanup;
-			}
+			bvn_int_from_uint64(den, 1u);
+			if (-net_shift > (long)INT_MAX || !bvn_int_shl(den, (int)(-net_shift)))
+				return BVNF_RK_ZERO;
 		}
 	} else {
 rational_path:;
 		long net_b_exp = exp_val - (long)frac_digits;
 		if (!use_bin_exp) {
 			if (net_b_exp >= 0) {
-				for (long i = 0; i < net_b_exp; i++) {
-					if (!bvn_int_mul_u32(&num, base)) {
-						bvn_float_set_inf(f, neg); rc = true; goto cleanup;
-					}
-				}
+				for (long i = 0; i < net_b_exp; i++)
+					if (!bvn_int_mul_u32(num, base)) return BVNF_RK_INF;
 			} else {
-				for (long i = 0; i < -net_b_exp; i++) {
-					if (!bvn_int_mul_u32(&den, base)) {
-						bvn_float_set_zero(f, neg); rc = true; goto cleanup;
-					}
-				}
+				for (long i = 0; i < -net_b_exp; i++)
+					if (!bvn_int_mul_u32(den, base)) return BVNF_RK_ZERO;
 			}
 		} else {
-			for (int i = 0; i < frac_digits; i++) {
-				if (!bvn_int_mul_u32(&den, base)) {
-					bvn_float_set_zero(f, neg); rc = true; goto cleanup;
-				}
-			}
+			for (int i = 0; i < frac_digits; i++)
+				if (!bvn_int_mul_u32(den, base)) return BVNF_RK_ZERO;
 			if (exp_val >= 0) {
-				if (exp_val > (long)INT_MAX || !bvn_int_shl(&num, (int)exp_val)) {
-					bvn_float_set_inf(f, neg); rc = true; goto cleanup;
-				}
+				if (exp_val > (long)INT_MAX || !bvn_int_shl(num, (int)exp_val))
+					return BVNF_RK_INF;
 			} else {
-				if (-exp_val > (long)INT_MAX || !bvn_int_shl(&den, (int)(-exp_val))) {
-					bvn_float_set_zero(f, neg); rc = true; goto cleanup;
-				}
+				if (-exp_val > (long)INT_MAX || !bvn_int_shl(den, (int)(-exp_val)))
+					return BVNF_RK_ZERO;
 			}
 		}
 	}
-	if (bvn_int_is_zero(&num)) { bvn_float_set_zero(f, neg); rc = true; goto cleanup; }
-	rc = bvnf_rational_to_float(f, neg, &num, &den);
-cleanup:
+	if (bvn_int_is_zero(num)) return BVNF_RK_ZERO;
+	return BVNF_RK_OK;
+#undef FLUSH_CHUNK
+}
+/*
+ * Parse a floating literal in base 10 or 16 into a correctly-rounded bvn_float
+ * of precision f->_prec. The exact rational is built by bvnf_parse_rational and
+ * rounded once by bvnf_rational_to_float. Routing all parsing through the exact
+ * rational is what makes round-tripping lossless, unlike strtod which only gives
+ * double precision. (To convert directly to a fixed binary format such as
+ * double, use bvn_float_strtoieee_bin / bvn_float_strtod instead -- they round
+ * the exact rational straight to the target and never double-round.)
+ */
+bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
+{
+	if (!f || !s || (base != 10u && base != 16u)) return false;
+	bvn_int_t num, den;
+	uint32_t hint = bvnf_hint_limbs(f->_prec);
+	if (!bvnf_scratch(&num, hint)) return false;
+	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return false; }
+	bool neg = false;
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den);
+	bool rc;
+	switch (k) {
+		case BVNF_RK_OK:   rc = bvnf_rational_to_float(f, neg, &num, &den); break;
+		case BVNF_RK_NAN:  bvn_float_set_nan(f);        rc = true;  break;
+		case BVNF_RK_INF:  bvn_float_set_inf(f, neg);   rc = true;  break;
+		case BVNF_RK_ZERO: bvn_float_set_zero(f, neg);  rc = true;  break;
+		case BVNF_RK_FAIL:
+		default:           rc = false; break;
+	}
 	bvnf_scratch_free(&num);
 	bvnf_scratch_free(&den);
 	return rc;
-#undef FLUSH_CHUNK
+}
+/*
+ * Public, externally-linked entry point: a base-10/16 string straight to a
+ * correctly-rounded IEEE-754 binary interchange value, in a single rounding.
+ * See the header for the contract. nan/inf/zero are packed with the requested
+ * field widths exactly as bvn_float_to_ieee_bin would; finite values are rounded
+ * by bvnf_rational_to_ieee_bin from the exact rational. Because nothing here
+ * builds an intermediate fixed-width bvn_float, it cannot double-round, at any
+ * input length, in either the normal or subnormal range -- which is the bug the
+ * old parse-into-128-bits-then-narrow path had.
+ */
+void bvn_float_strtoieee_bin(const char *s, uint32_t base,
+		uint32_t exp_bits, uint32_t man_bits, int32_t bias,
+		uint32_t *bits, int bits32)
+{
+	if (!bits) return;
+	for (int i = 0; i < bits32; i++) bits[i] = 0;
+	if (!s || (base != 10u && base != 16u)) return;
+	int total = 1 + (int)exp_bits + (int)man_bits;
+	bvn_int_t num, den;
+	uint32_t hint = bvnf_hint_limbs(man_bits + 64u);
+	if (!bvnf_scratch(&num, hint)) return;
+	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return; }
+	bool neg = false;
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den);
+	switch (k) {
+	case BVNF_RK_OK:
+		bvnf_rational_to_ieee_bin(neg, &num, &den, exp_bits, man_bits, bias, bits, bits32);
+		break;
+	case BVNF_RK_NAN:
+		for (uint32_t i = 0; i < exp_bits; i++)
+			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
+		if (man_bits > 0) bits[(man_bits - 1) / 32] |= 1u << ((man_bits - 1) % 32);
+		if (neg) bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
+		break;
+	case BVNF_RK_INF:
+		for (uint32_t i = 0; i < exp_bits; i++)
+			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
+		if (neg) bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
+		break;
+	case BVNF_RK_ZERO:
+		if (neg) bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
+		break;
+	case BVNF_RK_FAIL:
+	default:
+		break;                                  /* +0.0 */
+	}
+	bvnf_scratch_free(&num);
+	bvnf_scratch_free(&den);
 }
 size_t bvn_float_str_bufsize(uint32_t prec, uint32_t base)
 {
@@ -1153,37 +1389,29 @@ bool bvn_float_to_float(const bvn_float_t *f, float *out)
 #include "bvn_float_impl.h"
 /*
  * Correctly-rounded conversion of a base-10 floating literal to double, correct
- * across the whole range including subnormals AND at any input length.
+ * across the whole range -- normals, subnormals, overflow to +/-inf, underflow
+ * to 0 -- and at any input length.
  *
- * The literal is parsed by bvn_float_from_str into a 128-bit intermediate using
- * the arbitrary-precision heap engine (an exact rational rounded once, to
- * nearest-even), then narrowed to binary64 by bvn_float_to_double. Because the
- * intermediate width 128 >= 2*53 + 2, that second rounding is provably free of
- * double-rounding error for every binary64 result, normal or subnormal (the
- * classic 2p+2 bound; for a target of m <= 53 effective bits, 128 >= 2m+2 too),
- * so the pair composes to a single correctly-rounded result.
- *
- * This deliberately does NOT use the fixed-buffer bvn_float_parse_f64 helper:
- * that path accumulates the coefficient (and forms 10^|exp| in to_ieee_binary)
- * in a 2048-bit scratch and saturates to +/-inf on ANY overflow of it, so a long
- * finite literal -- a many-digit coefficient with a matching exponent, e.g. a
- * value near 1.0 written with hundreds of digits, or a deep-subnormal magnitude
- * spelled out in full -- wrongly became infinity once it exceeded ~600 digits.
- * The heap engine (up to 32768 bits) has no such ceiling. NULL yields 0.0; a
- * parse failure or allocation failure also yields 0.0 (there is no error channel
- * in the double-returning signature). This is the public, externally-linked
- * entry point so callers in other translation units (e.g. the value layer) need
- * not include the internal bvn_float_impl.h header.
+ * It rounds the exact rational num/den straight to binary64 in a SINGLE step via
+ * bvn_float_strtoieee_bin. It deliberately does NOT parse into a fixed-width
+ * bvn_float and then narrow with bvn_float_to_double: that is two roundings
+ * (decimal -> p bits, then p -> 53 bits) and double-rounds by 1 ULP for inputs
+ * near a rounding midpoint. No fixed intermediate width p fixes this -- the
+ * "2p+2" rule concerns the exact product/sum of p-bit operands, not the rounding
+ * of an arbitrary-length decimal string -- so the only correct route is to round
+ * the exact value once, which is what this does. NULL yields 0.0; a parse or
+ * allocation failure also yields 0.0 (there is no error channel in the
+ * double-returning signature). Public and externally linked so callers in other
+ * translation units (e.g. the value layer) need not include bvn_float_impl.h.
  */
 double bvn_float_strtod(const char *s)
 {
+	uint32_t b[2] = { 0u, 0u };
 	if (!s) return 0.0;
-	bvn_float_t *f = bvn_float_alloc(128u);
-	if (!f) return 0.0;
-	double out = 0.0;
-	if (bvn_float_from_str(f, s, 10u))
-		(void)bvn_float_to_double(f, &out);
-	bvn_float_free(f);
+	bvn_float_strtoieee_bin(s, 10u, 11u, 52u, 1023u, b, 2);
+	uint64_t u = (uint64_t)b[0] | ((uint64_t)b[1] << 32);
+	double out;
+	memcpy(&out, &u, sizeof out);
 	return out;
 }
 /*
@@ -2012,3 +2240,4 @@ bool bvn_float_from_fix256(bvn_float_t *f, const uint32_t bits[8],
 	}
 	return from_fix_common(f, neg, w, 8, frac_bits);
 }
+

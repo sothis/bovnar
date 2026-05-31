@@ -2494,21 +2494,17 @@ bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 /*
  * Parse a floating literal in an arbitrary base into a double.
  *
- * Base 10 goes straight through bvn_float_strtod, which forms the literal as
- * an exact rational num/den and rounds it ONCE to binary64 (correct rounding,
- * including the subnormal range). The previous route -- parse into a finite
- * 64-bit-precision bvn_float, then narrow with bvn_float_to_double -- rounds
- * twice: once when from_str fits the value to the bvn_float's precision and
- * again when to_double cuts it to binary64. For results in the binary64
- * subnormal range the intermediate has too few significant bits to absorb the
- * second rounding, so it was off by 1 ULP (e.g. 2.2250738585072011e-308 landed
- * on the smallest normal instead of the largest subnormal). bvn_float_strtod
- * cannot double-round because there is no lossy intermediate.
- *
- * Non-decimal bases keep the bignum route: bvn_float_strtod is decimal-only,
- * whereas bvn_float_from_str understands non-decimal mantissas and hex-float
- * p-exponents. There the source already has enough precision relative to
- * binary64's normal range that the narrowing is single-rounded in practice.
+ * Base 10 and base 16 both go through bvn_float_strtoieee_bin, which forms the
+ * literal as an exact rational num/den and rounds it ONCE to binary64 (correct
+ * rounding across the whole range: normals, subnormals, overflow to inf,
+ * underflow to 0, at any input length). It does NOT build an intermediate
+ * fixed-width bvn_float and then narrow -- that sequence rounds twice and is off
+ * by 1 ULP for inputs near a rounding midpoint, and no fixed intermediate width
+ * removes it (the previous base-10 route landed 2.2250738585072011e-308 on the
+ * smallest normal instead of the largest subnormal; the previous base-16 route
+ * mis-rounded hex-floats with more than 64 significant bits the same way).
+ * bvn_float_strtoieee_bin understands both decimal mantissas and hex-float
+ * p-exponents, so a single exact path now serves both bases.
  *
  * bvn_format_double is the inverse, going double -> bvn_float -> text so the
  * rendered precision matches the declared width.
@@ -2516,16 +2512,15 @@ bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out)
 {
 	if (!s || !out) return false;
-	if (base == 10) {
-		*out = bvn_float_strtod(s);
+	if (base == 10u || base == 16u) {
+		uint32_t b[2] = { 0u, 0u };
+		bvn_float_strtoieee_bin(s, base, 11u, 52u, 1023, b, 2);
+		uint64_t u = (uint64_t)b[0] | ((uint64_t)b[1] << 32);
+		memcpy(out, &u, sizeof *out);
 		return true;
 	}
-	bvn_limb_t _dlimbs[BVN_FLOAT_NLIMBS(64u)];
-	bvn_float_t f;
-	bvn_float_init_buf(&f, 64u, _dlimbs, BVN_FLOAT_NLIMBS(64u));
-	if (!bvn_float_from_str(&f, s, base))
-		return false;
-	return bvn_float_to_double(&f, out);
+	/* No other base denotes a floating literal in this format. */
+	return false;
 }
 bool bvn_looks_like_double(const char* s)
 {
@@ -2568,3 +2563,4 @@ const uint8_t* bvn_get_escape_repl_table(void)
 	};
 	return table;
 }
+

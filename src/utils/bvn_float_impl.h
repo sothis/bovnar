@@ -874,15 +874,9 @@ static inline uint32_t bvnf_fix_prec(int total_bits, int frac_bits, const char *
  */
 static inline uint16_t bvn_float_parse_bin16(const char *s)
 {
-	uint16_t out = 0u;
-	bvn_float_t *f = bvn_float_alloc(32u);   /* >= 2*(10+1)+2 */
-	if (!f) return 0u;
-	if (bvn_float_from_str(f, s, 10u)) {
-		bvn_float_to_bin16(f, &out);
-		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out |= 0x8000u;
-	}
-	bvn_float_free(f);
-	return out;
+	uint32_t b[1] = { 0u };
+	bvn_float_strtoieee_bin(s, 10u, 5u, 10u, 15, b, 1);
+	return (uint16_t)b[0];
 }
 /*
  * _Float16 is a compiler/target extension (and only since C23 a standard
@@ -906,15 +900,9 @@ static inline _Float16 bvn_float_parse_f16(const char *s)
 #endif
 static inline uint32_t bvn_float_parse_bin32(const char *s)
 {
-	uint32_t out = 0u;
-	bvn_float_t *f = bvn_float_alloc(56u);   /* >= 2*(23+1)+2 */
-	if (!f) return 0u;
-	if (bvn_float_from_str(f, s, 10u)) {
-		bvn_float_to_bin32(f, &out);
-		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out |= 0x80000000u;
-	}
-	bvn_float_free(f);
-	return out;
+	uint32_t b[1] = { 0u };
+	bvn_float_strtoieee_bin(s, 10u, 8u, 23u, 127, b, 1);
+	return b[0];
 }
 static inline float bvn_float_parse_f32(const char *s)
 {
@@ -923,16 +911,9 @@ static inline float bvn_float_parse_f32(const char *s)
 }
 static inline uint64_t bvn_float_parse_bin64(const char *s)
 {
-	uint64_t out = 0u;
-	bvn_float_t *f = bvn_float_alloc(120u);  /* >= 2*(52+1)+2 */
-	if (!f) return 0u;
-	if (bvn_float_from_str(f, s, 10u)) {
-		bvn_float_to_bin64(f, &out);
-		if (bvn_float_is_nan(f) && bvnf_leading_minus(s))
-			out |= 0x8000000000000000ull;
-	}
-	bvn_float_free(f);
-	return out;
+	uint32_t b[2] = { 0u, 0u };
+	bvn_float_strtoieee_bin(s, 10u, 11u, 52u, 1023, b, 2);
+	return (uint64_t)b[0] | ((uint64_t)b[1] << 32);
 }
 static inline double bvn_float_parse_f64(const char *s)
 {
@@ -941,14 +922,7 @@ static inline double bvn_float_parse_f64(const char *s)
 }
 static inline void bvn_float_parse_bin128(const char *s, uint32_t out[4])
 {
-	out[0] = out[1] = out[2] = out[3] = 0u;
-	bvn_float_t *f = bvn_float_alloc(240u);  /* >= 2*(112+1)+2 */
-	if (!f) return;
-	if (bvn_float_from_str(f, s, 10u)) {
-		bvn_float_to_bin128(f, out);
-		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out[3] |= 0x80000000u;
-	}
-	bvn_float_free(f);
+	bvn_float_strtoieee_bin(s, 10u, 15u, 112u, 16383, out, 4);
 }
 #if defined(__SIZEOF_FLOAT128__) && !defined(__clang__)
 #pragma GCC diagnostic push
@@ -962,14 +936,7 @@ static inline _Float128 bvn_float_parse_f128(const char *s)
 #endif
 static inline void bvn_float_parse_bin256(const char *s, uint32_t out[8])
 {
-	for (int i = 0; i < 8; i++) out[i] = 0u;
-	bvn_float_t *f = bvn_float_alloc(488u);  /* >= 2*(236+1)+2 */
-	if (!f) return;
-	if (bvn_float_from_str(f, s, 10u)) {
-		bvn_float_to_bin256(f, out);
-		if (bvn_float_is_nan(f) && bvnf_leading_minus(s)) out[7] |= 0x80000000u;
-	}
-	bvn_float_free(f);
+	bvn_float_strtoieee_bin(s, 10u, 19u, 236u, 262143, out, 8);
 }
 static inline uint16_t bvn_float_parse_dec16(const char *s)
 {
@@ -1085,3 +1052,4 @@ static inline void bvn_float_parse_fix256(const char *s, int frac, uint32_t out[
 	bvn_float_free(f);
 }
 #endif
+

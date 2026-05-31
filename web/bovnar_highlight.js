@@ -55,7 +55,7 @@
   function span(cls, t) { return '<span class="bvh-' + cls + '">' + esc(t) + '</span>'; }
 
   // Token char classes shared by the body scanner and the annotation scanner.
-  const ID  = /^[A-Za-z_µμΩÅ°%‰‱][\w·~µμΩÅ°⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-*\/^]*/;
+  const ID  = /^[A-Za-z_$µμΩÅ°%‰‱][\w·~µμΩÅ°⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-*\/^$]*/;
   const NUM = /^-?(?:\d[\d_]*(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)/;
 
   // Split a unit so '~', '*' and '/' read as separators (vim BovnarUnitTilde /

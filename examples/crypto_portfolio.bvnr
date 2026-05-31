@@ -10,51 +10,51 @@
 # integer representation (satoshis for BTC, wei for ETH, etc.).
 # The application retrieves minor_unit() from the currency table to scale.
 
-.btc_balance_sat    = <uint:64,BTC>   547820000;     # 5.4782 BTC (satoshis)
-.eth_balance_wei    = <uint:64,ETH>   2500000000000000000; # 2.5 ETH (wei)
-.sol_balance_lmp    = <uint:64,SOL>   18500000000;   # 18.5 SOL (lamports, 1e9)
-.xrp_balance_drop   = <uint:64,XRP>  250000000;     # 250 XRP (drops, 1e6)
-.ada_balance_lvc    = <uint:64,ADA>  1500000000;    # 1500 ADA (lovelaces, 1e6)
+.btc_balance_sat    = <uint:64,$BTC>   547820000;     # 5.4782 BTC (satoshis)
+.eth_balance_wei    = <uint:64,$ETH>   2500000000000000000; # 2.5 ETH (wei)
+.sol_balance_lmp    = <uint:64,$SOL>   18500000000;   # 18.5 SOL (lamports, 1e9)
+.xrp_balance_drop   = <uint:64,$XRP>  250000000;     # 250 XRP (drops, 1e6)
+.ada_balance_lvc    = <uint:64,$ADA>  1500000000;    # 1500 ADA (lovelaces, 1e6)
 
 # ── Human-readable decimal amounts ────────────────────────────────────────
 # float_dec provides exact decimal representation without binary rounding.
 
-.btc_decimal        = <float_dec:64,BTC>     0.547820;
-.eth_decimal        = <float_dec:64,ETH>     2.5;
-.sol_decimal        = <float_dec:64,SOL>    18.5;
-.doge_decimal       = <float_dec:64,DOGE> 42000.0;
-.usdt_amount        = <float_dec:64,USDT>  5000.00;
-.usdc_amount        = <float_dec:64,USDC>  5000.00;
+.btc_decimal        = <float_dec:64,$BTC>     0.547820;
+.eth_decimal        = <float_dec:64,$ETH>     2.5;
+.sol_decimal        = <float_dec:64,$SOL>    18.5;
+.doge_decimal       = <float_dec:64,$DOGE> 42000.0;
+.usdt_amount        = <float_dec:64,$USDT>  5000.00;
+.usdc_amount        = <float_dec:64,$USDC>  5000.00;
 
 # ── Crypto prices quoted in fiat ──────────────────────────────────────────
 # Unit: fiat / crypto — a price is always fiat-per-crypto.
 
-.btc_price_usd      = <float_dec:64,USD/BTC>   68500.00;
-.eth_price_usd      = <float_dec:64,USD/ETH>    3842.50;
-.sol_price_eur      = <float_dec:64,EUR/SOL>     148.20;
-.doge_price_usd     = <float_dec:64,USD/DOGE>     0.1612;
-.xau_price_btc      = <float_dec:64,BTC/XAU>     0.03432; # BTC per troy oz gold
+.btc_price_usd      = <float_dec:64,$USD/$BTC>   68500.00;
+.eth_price_usd      = <float_dec:64,$USD/$ETH>    3842.50;
+.sol_price_eur      = <float_dec:64,$EUR/$SOL>     148.20;
+.doge_price_usd     = <float_dec:64,$USD/$DOGE>     0.1612;
+.xau_price_btc      = <float_dec:64,$BTC/$XAU>     0.03432; # BTC per troy oz gold
 
 # ── Cross-crypto rates ─────────────────────────────────────────────────────
 
-.eth_btc_rate       = <float_dec:64,BTC/ETH>    0.05610;
-.sol_eth_rate       = <float_dec:64,ETH/SOL>    0.03852;
+.eth_btc_rate       = <float_dec:64,$BTC/$ETH>    0.05610;
+.sol_eth_rate       = <float_dec:64,$ETH/$SOL>    0.03852;
 
-# ── Reporting-scale: k~BTC, M~USDT ────────────────────────────────────────
+# ── Reporting-scale: k~$BTC, M~USDT ────────────────────────────────────────
 
-.treasury_kbtc      = <float_dec:64,k~BTC>    0.021;    # 21 BTC
-.protocol_tvl_musdt = <float_dec:64,M~USDT>   1234.5;   # $1.2345B TVL
+.treasury_kbtc      = <float_dec:64,k~$BTC>    0.021;    # 21 BTC
+.protocol_tvl_musdt = <float_dec:64,M~$USDT>   1234.5;   # $1.2345B TVL
 
 # ── Gas / network fees ────────────────────────────────────────────────────
 
-.eth_gas_gwei       = <float_dec:64,G~ETH>   35.0;   # gas price: 35 Gwei
-.sol_fee_lamports   = <uint:32,SOL>           5000;   # 0.000005 SOL
+.eth_gas_gwei       = <float_dec:64,G~$ETH>   35.0;   # gas price: 35 Gwei
+.sol_fee_lamports   = <uint:32,$SOL>           5000;   # 0.000005 SOL
 
 # ── Stablecoin positions ──────────────────────────────────────────────────
 
 .stablecoins = [
-    {.token = USDT; .balance = <float_dec:64,USDT>  10000.00;},
-    {.token = USDC; .balance = <float_dec:64,USDC>   8500.00;}
+    {.token = USDT; .balance = <float_dec:64,$USDT>  10000.00;},
+    {.token = USDC; .balance = <float_dec:64,$USDC>   8500.00;}
 ];
 
 # ── Full portfolio struct ──────────────────────────────────────────────────
@@ -67,31 +67,31 @@
     .holdings = [
         {
             .asset         = ETH;
-            .amount        = <float_dec:64,ETH>         2.500;
-            .cost_basis    = <float_dec:64,USD/ETH>  2100.00;   # avg buy price
-            .current_price = <float_dec:64,USD/ETH>  3842.50;
+            .amount        = <float_dec:64,$ETH>         2.500;
+            .cost_basis    = <float_dec:64,$USD/$ETH>  2100.00;   # avg buy price
+            .current_price = <float_dec:64,$USD/$ETH>  3842.50;
         },
         {
             .asset         = BTC;
-            .amount        = <float_dec:64,BTC>         0.120;
-            .cost_basis    = <float_dec:64,USD/BTC> 45000.00;
-            .current_price = <float_dec:64,USD/BTC> 68500.00;
+            .amount        = <float_dec:64,$BTC>         0.120;
+            .cost_basis    = <float_dec:64,$USD/$BTC> 45000.00;
+            .current_price = <float_dec:64,$USD/$BTC> 68500.00;
         },
         {
             .asset         = USDT;
-            .amount        = <float_dec:64,USDT>    10000.00;
-            .cost_basis    = <float_dec:64,USD/USDT>    1.00;
-            .current_price = <float_dec:64,USD/USDT>    1.00;
+            .amount        = <float_dec:64,$USDT>    10000.00;
+            .cost_basis    = <float_dec:64,$USD/$USDT>    1.00;
+            .current_price = <float_dec:64,$USD/$USDT>    1.00;
         },
         {
             .asset         = DOGE;
-            .amount        = <float_dec:64,DOGE>   500000.0;
-            .cost_basis    = <float_dec:64,USD/DOGE>    0.08;
-            .current_price = <float_dec:64,USD/DOGE>    0.1612;
+            .amount        = <float_dec:64,$DOGE>   500000.0;
+            .cost_basis    = <float_dec:64,$USD/$DOGE>    0.08;
+            .current_price = <float_dec:64,$USD/$DOGE>    0.1612;
         }
     ];
 
-    .total_value_usd = <float_dec:128,USD> 27990.00;
+    .total_value_usd = <float_dec:128,$USD> 27990.00;
 };
 
 # ── DeFi liquidity pool entry ──────────────────────────────────────────────
@@ -100,10 +100,10 @@
     .pool           = "ETH/USDC 0.3%";
     .token0         = ETH;
     .token1         = USDC;
-    .amount0        = <float_dec:64,ETH>    1.25;
-    .amount1        = <float_dec:64,USDC> 4803.13;
-    .price_lower    = <float_dec:64,USDC/ETH> 3000.00;
-    .price_upper    = <float_dec:64,USDC/ETH> 5000.00;
-    .fees_earned    = <float_dec:64,USDC>    42.87;
+    .amount0        = <float_dec:64,$ETH>    1.25;
+    .amount1        = <float_dec:64,$USDC> 4803.13;
+    .price_lower    = <float_dec:64,$USDC/$ETH> 3000.00;
+    .price_upper    = <float_dec:64,$USDC/$ETH> 5000.00;
+    .fees_earned    = <float_dec:64,$USDC>    42.87;
     .in_range       = true;
 };

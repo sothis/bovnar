@@ -1006,17 +1006,28 @@ static value_unit_component_t bvn_parse_single_unit_component(
 	len -= suf;
 	if (len == 0) { *ok = false; return r; }
 	{
-		int cid = bvn_parse_currency_str((const uint8_t*)s, len);
-		if (cid > 0) {
-			r.base = (value_base_unit_t)cid;
+		/* Currencies carry a mandatory '$' sigil (spec 1.0): standalone "$USD",
+		 * or prefixed "<prefix>~$EUR".  A bare code is no longer a currency, so
+		 * the CUP/cup namespace collision can no longer arise. */
+		if (s[0] == '$') {
+			int cid = bvn_parse_currency_str((const uint8_t*)s + 1, len - 1);
+			if (cid > 0) {
+				r.base = (value_base_unit_t)cid;
+				return r;
+			}
+			*ok = false;   /* '$' introduces a currency and nothing else */
 			return r;
 		}
 		for (uint32_t ti = 1; ti + 1 < len; ti++) {
 			if (s[ti] != '~') continue;
 			uint32_t pfx_len  = ti;
 			uint32_t curr_off = ti + 1;
-			uint32_t curr_len = len - curr_off;
-			cid = bvn_parse_currency_str((const uint8_t*)s + curr_off, curr_len);
+			if (curr_off >= len || s[curr_off] != '$')
+				break;     /* no sigil after '~' -> not a currency component */
+			uint32_t code_off = curr_off + 1;
+			uint32_t code_len = len - code_off;
+			int cid = bvn_parse_currency_str(
+				(const uint8_t*)s + code_off, code_len);
 			if (cid > 0) {
 				r.base = (value_base_unit_t)cid;
 				for (const iec_entry_t* e = iec_table; e->a; e++) {
@@ -1040,7 +1051,8 @@ static value_unit_component_t bvn_parse_single_unit_component(
 				*ok = false;
 				return r;
 			}
-			break;
+			*ok = false;   /* '$' after '~' but unknown currency code */
+			return r;
 		}
 	}
 	if (!bu_index_ready) bvn_init_bu_index();
@@ -1651,6 +1663,12 @@ static int32_t bvn_write_unit_component(
 		if (pos + 1 >= (int32_t)bufsize) return -1;
 		buf[pos++] = '~';
 	}
+	if (bvn_unit_is_currency((int)c->base)) {
+		/* Mandatory currency sigil (spec 1.0) so output round-trips: "$USD",
+		 * and "<prefix>~$EUR" once the prefix/'~' above is already written. */
+		if (pos + 1 >= (int32_t)bufsize) return -1;
+		buf[pos++] = '$';
+	}
 	{
 		const char* bu = base_unit_str(c->base);
 		size_t bulen = strlen(bu);
@@ -1690,6 +1708,12 @@ static int32_t bvn_write_unit_component_ex(
 	if (has_prefix) {
 		if (pos + 1 >= (int32_t)bufsize) return -1;
 		buf[pos++] = '~';
+	}
+	if (bvn_unit_is_currency((int)c->base)) {
+		/* Mandatory currency sigil (spec 1.0) so output round-trips: "$USD",
+		 * and "<prefix>~$EUR" once the prefix/'~' above is already written. */
+		if (pos + 1 >= (int32_t)bufsize) return -1;
+		buf[pos++] = '$';
 	}
 	{
 		const char* bu = base_unit_str(c->base);

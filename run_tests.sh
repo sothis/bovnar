@@ -191,7 +191,7 @@ run_cmake_check "inline units preserved (units.bvnr)" \
 run_cmake_check "inline currency preserved (financial.bvnr)" \
     -DBOVNAR="${BOVNAR_BIN}" \
     -DBVNR_FILE="${SRC_DIR}/examples/financial.bvnr" \
-    "-DREQUIRE=<float_dec:64,USD> 29.95|<float_dec:64,EUR> 149.00" \
+    "-DREQUIRE=<float_dec:64,\$USD> 29.95|<float_dec:64,\$EUR> 149.00" \
     -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
 
 echo

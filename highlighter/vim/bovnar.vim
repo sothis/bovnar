@@ -104,7 +104,9 @@ syn match   BovnarNullKw    '\<null\>'
 hi link     BovnarNullKw    BovnarNull
 syn match   BovnarTypeUnit  '\<[A-Za-zµΩ°][A-Za-z0-9_·\-\+\/\^]*\>'
 syn match   BovnarTypeUnit  '[%‰‱]'
-syn match   BovnarUnitPrefix '[A-Za-zµ][A-Za-z0-9]*\~[A-Za-z0-9_·\-\+\/*\^]*'
+" Currency component carries a mandatory '$' sigil (spec 1.0): $USD, $BTC.
+syn match   BovnarTypeUnit  '\$[A-Za-z][A-Za-z0-9]*'
+syn match   BovnarUnitPrefix '[A-Za-zµ][A-Za-z0-9]*\~\$\=[A-Za-z0-9_·\-\+\/*\^]*'
 syn match   BovnarUnitSep   '[*\/]'
 syn match   BovnarUnitExp   '[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]'
 syn match   BovnarUnitExp   '\^[+-]\=\d\+'

@@ -103,11 +103,16 @@
 .none_sym = none;           # symbol "none" — purely application-defined
 
 
-# ── 11. Symbols in heterogeneous arrays ───────────────────────────────────────
+# ── 11. Mixed-type data is a struct, not an array ─────────────────────────────
+# Array elements are homogeneous in spec 1.0, so values of different kinds
+# (symbol, uint, string) belong in a struct with named fields.
 
-.config_items = [
-    enabled,                # symbol
-    42,                     # uint
-    "label",                # string
-    active                  # symbol
-];
+.config_items = {
+    .mode    = enabled;     # symbol
+    .retries = 42;          # uint
+    .label   = "label";     # string
+    .state   = active;      # symbol
+};
+
+# A homogeneous array of symbols is, of course, fine:
+.config_flags = [enabled, active, pending];

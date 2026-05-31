@@ -81,12 +81,14 @@
 .base_rate  = 9600;
 .base_unit  = baud;
 
-.uart_cfg = [
-    &.base_rate,            # reference as first element
-    8,                      # plain uint: data bits
-    none,                   # symbol: no parity
-    1                       # plain uint: stop bits
-];
+# Heterogeneous data (a reference, two uints, a symbol) is a struct, not an
+# array — array elements are homogeneous in spec 1.0.
+.uart_cfg = {
+    .base_rate = &.base_rate;   # reference field
+    .data_bits = 8;             # plain uint
+    .parity    = none;          # symbol: no parity
+    .stop_bits = 1;             # plain uint
+};
 
 
 # ── 7. References inside structs ─────────────────────────────────────────────
@@ -111,12 +113,14 @@
 
 .base_timeout = 60;
 
-.pipeline = [
-    &.base_timeout,         # reference to integer
-    &.server.address,       # reference to string in nested struct
-    enabled,                # symbol
-    "stage-1"               # string literal
-];
+# Mixed kinds (references, a symbol, a string) belong in a struct — array
+# elements are homogeneous in spec 1.0. A pure reference list stays an array.
+.pipeline = {
+    .timeout = &.base_timeout;     # reference to integer
+    .address = &.server.address;   # reference to string in nested struct
+    .mode    = enabled;            # symbol
+    .stage   = "stage-1";          # string literal
+};
 
 
 # ── 9. Null reference slot ────────────────────────────────────────────────────

@@ -129,7 +129,13 @@ typedef enum error_code_e {
 	error_value_out_of_range            = 35,
 	error_digit_not_in_base             = 36,
 	error_recovered                     = 37,
-	error_unit_mismatch                 = 38
+	error_unit_mismatch                 = 38,
+	/* Array element homogeneity (spec 1.0): every non-null element of an array
+	 * must share the same kind and physical dimension; sibling sub-arrays must
+	 * match in length and element shape (recursively); sibling structs must
+	 * share the same keys with recursively-matching fields. */
+	error_array_element_type_mismatch   = 39,
+	error_struct_shape_mismatch         = 40
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,

@@ -360,29 +360,26 @@ static void test_nested_array_elements(void)
  * Array row-size consistency is per-array and scoped to '/'-dimension rows only
  * (per-array rectangular, not globally rectangular). The DOM rides on the same
  * reader as the streaming API, so it must surface error_array_row_size_mismatch
- * when a single array's '/'-rows disagree, yet accept ragged comma-separated
- * sub-arrays and independent sibling '/'-blocks. The sibling-branch case guards
- * the cross-branch row-width leak fixed in bvn_action_array_intro.
+ * when a single array's '/'-rows disagree. Since spec 1.0, array elements are
+ * also homogeneous (above the lexer, in the materialised DOM): ragged
+ * comma-separated sub-arrays now disagree in length and are rejected. The
+ * sibling-branch case (same-shaped blocks) still guards the cross-branch
+ * row-width leak fixed in bvn_action_array_intro.
  */
 static void test_array_row_size_model(void)
 {
-	/* Ragged comma-separated sub-arrays are independent elements: valid. */
+	/* Ragged comma-separated sub-arrays: heterogeneous, rejected (spec 1.0). */
 	bvn_dom_doc_t *ragged = parse_doc(".a = [[1, 2], [3, 4, 5]];\n");
 	if (ragged) {
-		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(ragged), error_none,
-					   "ragged comma-separated sub-arrays must parse cleanly");
-		bvn_dom_node_t *a = bvn_dom_lookup(ragged, ".a");
-		ASSERT_EQ_UINT(bvn_dom_array_count(a), 2, ".a has two sub-array elements");
-		ASSERT_EQ_UINT(bvn_dom_array_count(bvn_dom_array_at(a, 0)), 2,
-					   ".a[0] has two elements");
-		ASSERT_EQ_UINT(bvn_dom_array_count(bvn_dom_array_at(a, 1)), 3,
-					   ".a[1] has three elements (ragged is allowed)");
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(ragged),
+					   error_array_row_size_mismatch,
+					   "ragged comma-separated sub-arrays must be rejected");
 		bvn_dom_doc_destroy(ragged);
 	}
 
-	/* Two independent 2-D /-blocks placed side by side: valid (no leak). */
+	/* Two same-shaped 2-D /-blocks side by side: valid (no leak, homogeneous). */
 	bvn_dom_doc_t *sib =
-		parse_doc(".a = [[1, 2]/[3, 4]]/[[5, 6, 7]/[8, 9, 10]];\n");
+		parse_doc(".a = [[1, 2]/[3, 4]]/[[5, 6]/[7, 8]];\n");
 	if (sib) {
 		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(sib), error_none,
 					   "a /-row width must not leak across a sibling branch");
@@ -407,6 +404,54 @@ static void test_array_row_size_model(void)
 		bvn_dom_doc_destroy(bad2);
 	}
 }
+/*
+ * Array element homogeneity (spec 1.0), "shape uniform, fields free": every
+ * non-null array element shares the same kind; bare scalar arrays and matrices
+ * also share dimension and are rectangular; struct elements share keys and field
+ * kinds, but a scalar field may carry a different unit/length in each record.
+ */
+static void expect_parse(const char *src, error_code_t want, const char *msg)
+{
+	bvn_dom_doc_t *d = parse_doc(src);
+	if (d) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(d), (unsigned)want, msg);
+		bvn_dom_doc_destroy(d);
+	}
+}
+static void test_array_homogeneity(void)
+{
+	/* Valid: uniform kind/dimension, mixed numeric encodings, sparse holes. */
+	expect_parse(".a = [1, 2, 3];\n", error_none, "uniform ints");
+	expect_parse(".a = [1, 2.5, 3];\n", error_none, "int+float, same (no) dimension");
+	expect_parse(".a = [1, , 3];\n", error_none, "null hole keeps array valid");
+	expect_parse(".a = <float:64,m> [1.0, 2.0];\n", error_none, "uniform unit");
+	expect_parse(".a = [[1, 2], [3, 4]];\n", error_none, "rectangular matrix");
+	expect_parse(".a = <float_dec:64,$USD> [1.0, 2.0];\n", error_none,
+				 "uniform currency array");
+
+	/* Invalid: kind mismatch, dimension mismatch, ragged, struct keys. */
+	expect_parse(".a = [1, \"two\"];\n", error_array_element_type_mismatch,
+				 "number vs string is heterogeneous");
+	expect_parse(".a = [1, {.x = 1;}];\n", error_array_element_type_mismatch,
+				 "scalar vs struct is heterogeneous");
+	expect_parse(".a = [<float:64,k~g> 1.0, <float:64,m> 2.0];\n",
+				 error_array_element_type_mismatch, "mass vs length is heterogeneous");
+	expect_parse(".a = [[1, 2], [3, 4, 5]];\n", error_array_row_size_mismatch,
+				 "ragged sub-arrays rejected");
+	expect_parse(".a = [{.x = 1;}, {.y = 1;}];\n", error_struct_shape_mismatch,
+				 "differing struct keys rejected");
+	expect_parse(".a = [{.x = 1;}, {.x = \"s\";}];\n",
+				 error_array_element_type_mismatch, "struct field kind must match");
+
+	/* Fields free: per-record units and list lengths are allowed. */
+	expect_parse(".a = [{.bal = <float_dec:64,$USD> 1.0;},"
+				 "{.bal = <float_dec:64,$EUR> 2.0;}];\n", error_none,
+				 "multi-currency record array is valid (fields free)");
+	expect_parse(".a = [{.args = [\"a\", \"b\"];}, {.args = [\"c\"];}];\n",
+				 error_none, "per-record list lengths may differ (fields free)");
+	expect_parse(".a = [{.x = 1;}, {.x = 2;}, {.x = 3;}];\n", error_none,
+				 "same-key struct array is valid");
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -418,6 +463,7 @@ int main(void)
 	test_getter_semantics();
 	test_nested_array_elements();
 	test_array_row_size_model();
+	test_array_homogeneity();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

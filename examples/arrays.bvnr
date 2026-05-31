@@ -84,15 +84,16 @@
 
 
 # ── 10. Nested arrays ─────────────────────────────────────────────────────────
-# Array elements can themselves be arrays. Only the /-separated rows of one
-# array are length-checked; comma-separated sub-arrays are independent elements.
+# Array elements can themselves be arrays. Since spec 1.0 array elements are
+# homogeneous, so sibling sub-arrays must match in length (and element shape):
+# bare arrays and matrices are rectangular.
 
 .nested_equal   = [[1, 2], [3, 4]];           # two 2-element sub-arrays: OK
-.nested_unequal = [[1, 2], [3, 4, 5]];        # ragged sub-arrays: OK
-                                               # (nested arrays are elements, not /-rows)
+# .nested_unequal = [[1, 2], [3, 4, 5]];      # REJECTED in 1.0: ragged sub-arrays
+                                               # (sibling sub-arrays differ in length)
 .tensor_2d = [[1, 2]/[3, 4], [5, 6]/[7, 8]];  # nested 2D /-arrays as elements: OK
-.tensor_jagged = [[1,2]/[3,4], [5,6,7]/[8,9,10]]; # sibling 2D blocks of different
-                                               # leaf width: OK (independent elements)
+# .tensor_jagged = [[1,2]/[3,4], [5,6,7]/[8,9,10]]; # REJECTED in 1.0: sibling 2D
+                                               # blocks of different leaf width
 
 
 # ── 11. Structs as array elements ────────────────────────────────────────────
@@ -103,18 +104,25 @@
 ];
 
 
-# ── 12. Heterogeneous elements (mixed tokens) ─────────────────────────────────
-# An array can hold values of completely different types as individual elements.
+# ── 12. Homogeneity: mixed-type data is a struct, not an array ────────────────
+# Since spec 1.0, array elements are homogeneous: every non-null element shares
+# the same kind and (for bare scalar arrays) the same physical dimension. Values
+# of completely different kinds belong in a struct with named fields:
 
-.heterogeneous = [
-    42,                         # uint
-    -7,                         # sint
-    3.14,                       # float
-    "hello",                    # string
-    {.x = 1; .y = 2;},         # struct
-    [10, 20]/[30, 40],          # nested array
-    i_am_a_symbol               # symbol (bare identifier)
-];
+.record = {
+    .count   = 42;              # uint
+    .delta   = -7;              # sint
+    .ratio   = 3.14;            # float
+    .label   = "hello";         # string
+    .point   = {.x = 1; .y = 2;};  # struct
+    .grid    = [10, 20]/[30, 40];  # nested array
+    .kind    = i_am_a_symbol;   # symbol (bare identifier)
+};
+
+# The following WOULD be rejected (error_array_element_type_mismatch):
+#   .bad = [42, "hello", {.x = 1;}];   # uint, string, struct in one array
+# Mixing encodings of the same dimension is fine (numbers interoperate):
+.same_dimension = [<uint:8> 1, <sint:16> -2, <float:64> 3.5];  # all dimensionless
 
 
 # ── 13. References as array elements ─────────────────────────────────────────

@@ -11,9 +11,7 @@
   "samples": [1, 2, 3],
   "matrix": [[1, 2], [3, 4]],
   "single_row": [[1, 2, 3]],
-  "jagged": [[1, 2], [3, 4, 5]],
   "records": [{"id": 1, "label": "a"}, {"id": 2, "label": "b"}],
-  "mixed": [1, [2, 3], {"k": 4}, "end"],
   "deep": [[[1], [2]], [[3], [4]]],
   "nested": {"inner": {"v": 100, "list": [9, 8, 7]}}
 }

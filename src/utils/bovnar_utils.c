@@ -518,6 +518,8 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_digit_not_in_base:         return "digit_not_in_base";
 	case error_recovered:                 return "recovered";
 	case error_unit_mismatch:             return "unit_mismatch";
+	case error_array_element_type_mismatch: return "array_element_type_mismatch";
+	case error_struct_shape_mismatch:     return "struct_shape_mismatch";
 	default:                              return "unknown_error";
 	}
 }

@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include "bovnar.h"
 #include "bovnar_dom.h"
+#include "bovnar_si_units.h"
 #include "bvn_dom_impl.h"
 #include "bvn_float.h"
 #ifndef BVN_DOM_FD_MAX_BYTES
@@ -631,6 +632,171 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
  * partial structure can be inspected. bvn_dom_parse_fd[_ex] slurp a file
  * descriptor into a bounded buffer first, then delegate here.
  */
+/*
+ * Array element homogeneity (spec 1.0). Heterogeneous arrays are a parse error:
+ * every non-null element of an array must share the same kind and physical
+ * dimension. The check is recursive and runs over the materialised DOM (the
+ * streaming reader validates per-value types/units; cross-element structure is
+ * a whole-array property, so it is enforced where the structure exists).
+ *
+ * The rules, decided for 1.0:
+ *   - scalars: same physical dimension; the numeric encodings (int/float) may
+ *     mix freely, bool/utf8/symbol/reference/octet may not mix with numbers or
+ *     each other;
+ *   - sub-arrays: same length and recursively-matching element shape;
+ *   - structs: same keys (same order) with recursively-matching field shapes;
+ *   - null / empty: a hole that matches any element and never establishes or
+ *     breaks the shape (so sparse arrays like [1,,3] stay valid).
+ */
+/*
+ * "Same physical dimension" for homogeneity. bvn_units_compatible covers the SI
+ * physical units, but it returns false for any unit containing a currency
+ * (currencies deliberately have no SI dimension). For homogeneity each currency
+ * is its own dimension, so when the SI check fails we fall back to comparing the
+ * base components and exponents directly (ignoring prefix magnitude): "$USD" and
+ * "$USD" match, "$USD" and "$EUR" do not, "k~$USD" and "$USD" match, and
+ * "$USD/oz_t" matches another "$USD/oz_t". Pure-physical units never reach the
+ * fallback because bvn_units_compatible already decided them.
+ */
+static bool bvn_dom_same_dimension(value_unit_t a, value_unit_t b)
+{
+	if (bvn_units_compatible(a, b))
+		return true;
+	if (a.num_components != b.num_components)
+		return false;
+	uint32_t n = a.num_components < BVNR_MAX_UNIT_COMPONENTS
+	           ? a.num_components : BVNR_MAX_UNIT_COMPONENTS;
+	for (uint32_t i = 0; i < n; i++) {
+		if (a.components[i].base     != b.components[i].base)     return false;
+		if (a.components[i].exponent != b.components[i].exponent) return false;
+	}
+	return true;
+}
+static const bvn_dom_node_t *bvn_dom_first_nonnull_elem(
+	const bvn_dom_node_t *arr)
+{
+	uint32_t n = bvn_dom_array_count(arr);
+	for (uint32_t i = 0; i < n; i++) {
+		const bvn_dom_node_t *e = bvn_dom_array_at(arr, i);
+		if (e && bvn_dom_node_type(e) != BVN_DOM_NULL)
+			return e;
+	}
+	return NULL;
+}
+/*
+ * Structural type-shape equality of two array siblings. Returns error_none when
+ * a and b are mutually homogeneous, otherwise the specific mismatch code. null
+ * on either side is a hole and always matches.
+ *
+ * check_dim distinguishes the two scopes of the spec-1.0 rule ("shape uniform,
+ * fields free"). In a bare array / matrix context (check_dim = true) elements
+ * must share the same physical dimension AND sub-arrays must be rectangular
+ * (equal length). Once the path descends into a struct, its fields need only
+ * match in KIND and nesting: a scalar field may carry a different unit in each
+ * record (e.g. a multi-currency ledger) and a list field may have a different
+ * length in each record (e.g. per-record argument lists). So struct-field
+ * recursion passes check_dim = false, freeing both dimension and array length.
+ */
+static error_code_t bvn_dom_shape_equal(
+	const bvn_dom_node_t *a, const bvn_dom_node_t *b, bool check_dim)
+{
+	bvn_dom_type_t ta = bvn_dom_node_type(a);
+	bvn_dom_type_t tb = bvn_dom_node_type(b);
+	if (ta == BVN_DOM_NULL || tb == BVN_DOM_NULL)
+		return error_none;
+	bool a_num = (ta == BVN_DOM_INT || ta == BVN_DOM_FLOAT);
+	bool b_num = (tb == BVN_DOM_INT || tb == BVN_DOM_FLOAT);
+	if (a_num && b_num) {
+		/* Both numeric: kinds match (encodings may mix). Dimension only when
+		 * comparing array/matrix elements, not struct fields. */
+		if (check_dim &&
+			!bvn_dom_same_dimension(bvn_dom_get_unit(a), bvn_dom_get_unit(b)))
+			return error_array_element_type_mismatch;
+		return error_none;
+	}
+	if (ta != tb)
+		return error_array_element_type_mismatch;
+	switch (ta) {
+	case BVN_DOM_ARRAY: {
+		/* rectangular only in the bare array / matrix context; list fields of
+		 * records may vary in length (check_dim == false). */
+		if (check_dim &&
+			bvn_dom_array_count(a) != bvn_dom_array_count(b))
+			return error_array_row_size_mismatch;
+		const bvn_dom_node_t *ra = bvn_dom_first_nonnull_elem(a);
+		const bvn_dom_node_t *rb = bvn_dom_first_nonnull_elem(b);
+		if (ra && rb)
+			return bvn_dom_shape_equal(ra, rb, check_dim);   /* matrices stay uniform */
+		return error_none;
+	}
+	case BVN_DOM_STRUCT: {
+		uint32_t na = bvn_dom_struct_count(a);
+		if (na != bvn_dom_struct_count(b))
+			return error_struct_shape_mismatch;
+		const bvn_dom_entry_t *ea = bvn_dom_struct_entries(a);
+		const bvn_dom_entry_t *eb = bvn_dom_struct_entries(b);
+		for (uint32_t i = 0; i < na; i++) {
+			if (!ea[i].key || !eb[i].key ||
+				strcmp(ea[i].key, eb[i].key) != 0)
+				return error_struct_shape_mismatch;
+			/* fields free: compare kind/shape, not dimension. */
+			error_code_t e =
+				bvn_dom_shape_equal(ea[i].value, eb[i].value, false);
+			if (e != error_none)
+				return e;
+		}
+		return error_none;
+	}
+	default:
+		/* string / symbol / bool / reference / octet: same kind suffices. */
+		return error_none;
+	}
+}
+/*
+ * Recursively verify that every array in the subtree is homogeneous. Descends
+ * into struct fields and array elements so a violation at any depth is found.
+ */
+static error_code_t bvn_dom_check_homogeneous(const bvn_dom_node_t *node)
+{
+	if (!node)
+		return error_none;
+	switch (bvn_dom_node_type(node)) {
+	case BVN_DOM_ARRAY: {
+		uint32_t n = bvn_dom_array_count(node);
+		const bvn_dom_node_t *ref = NULL;
+		for (uint32_t i = 0; i < n; i++) {
+			const bvn_dom_node_t *e = bvn_dom_array_at(node, i);
+			error_code_t sub = bvn_dom_check_homogeneous(e);
+			if (sub != error_none)
+				return sub;
+			if (!e || bvn_dom_node_type(e) == BVN_DOM_NULL)
+				continue;             /* hole */
+			if (!ref)
+				ref = e;              /* first non-null sets the shape */
+			else {
+				/* array elements: dimension is enforced (bare arrays and
+				 * matrices are uniform). */
+				error_code_t cmp = bvn_dom_shape_equal(ref, e, true);
+				if (cmp != error_none)
+					return cmp;
+			}
+		}
+		return error_none;
+	}
+	case BVN_DOM_STRUCT: {
+		uint32_t n = bvn_dom_struct_count(node);
+		const bvn_dom_entry_t *ent = bvn_dom_struct_entries(node);
+		for (uint32_t i = 0; i < n; i++) {
+			error_code_t sub = bvn_dom_check_homogeneous(ent[i].value);
+			if (sub != error_none)
+				return sub;
+		}
+		return error_none;
+	}
+	default:
+		return error_none;
+	}
+}
 bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 {
 	bvn_dom_doc_t *doc = bvn_dom_doc_create();
@@ -672,6 +838,17 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 			doc->parse_error = b.last_error;
 		else
 			doc->parse_error = reader_err;
+	} else {
+		/* Per-value syntax/type/unit all passed; now enforce cross-element
+		 * array homogeneity over the materialised tree (spec 1.0). */
+		for (uint32_t i = 0; i < doc->count; i++) {
+			error_code_t herr =
+				bvn_dom_check_homogeneous(doc->entries[i].value);
+			if (herr != error_none) {
+				doc->parse_error = herr;
+				break;
+			}
+		}
 	}
 	bvnr_reader_destroy(rd);
 	builder_do_deferred_pop(&b);

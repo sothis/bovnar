@@ -572,12 +572,34 @@ static int cmd_validate(const char *filename)
 		fprintf(stderr, "Validation failed: %s at line %" PRIu64 ", col %" PRIu64 "\n",
 				bvn_error_to_string(err),
 				bvnr_reader_get_error_line(r), bvnr_reader_get_error_column(r));
-	} else {
-		printf("%s: OK\n", filename);
+		bvnr_reader_destroy(r);
+		close(fd);
+		return 1;
 	}
 	bvnr_reader_destroy(r);
 	close(fd);
-	return ok ? 0 : 1;
+	/*
+	 * The streaming pass above validated per-value syntax, types and units.
+	 * Array element homogeneity (spec 1.0) is a cross-element, whole-array
+	 * property, enforced over the materialised DOM — so run a second pass
+	 * through bvn_dom_parse_fd and surface any homogeneity error.
+	 */
+	int fd2 = open(filename, O_RDONLY);
+	if (fd2 < 0) { perror(filename); return 1; }
+	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd2);
+	close(fd2);
+	if (!doc) {
+		fprintf(stderr, "Validation failed: out of memory\n");
+		return 1;
+	}
+	error_code_t herr = bvn_dom_doc_get_parse_error(doc);
+	bvn_dom_doc_destroy(doc);
+	if (herr != error_none) {
+		fprintf(stderr, "Validation failed: %s\n", bvn_error_to_string(herr));
+		return 1;
+	}
+	printf("%s: OK\n", filename);
+	return 0;
 }
 static int cmd_query(const char *path, const char *filename)
 {
@@ -1249,16 +1271,25 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		free(buf);
 		return 1;
 	}
+	/*
+	 * Render to a memory buffer first so the result can be validated for array
+	 * homogeneity (spec 1.0) before it is emitted. JSON permits heterogeneous
+	 * and ragged arrays, which have no bovnar representation; emitting them
+	 * would produce a .bvnr file that bovnar itself rejects, so we hard-error
+	 * instead (no silent lossy output). Re-using bvn_dom_parse keeps the
+	 * converter's notion of "valid" identical to the library's.
+	 */
+	uint64_t out_cap = (uint64_t)size * 8u + 65536u;
+	char *out = malloc(out_cap);
+	if (!out) { json_free_node(root); free(buf); return 1; }
 	bvnr_writer_t *w = bvnr_writer_create();
-	if (!w) { json_free_node(root); free(buf); return 1; }
+	if (!w) { free(out); json_free_node(root); free(buf); return 1; }
 	bvnr_sink_t sink;
-	bvnr_sink_to_fd(&sink, STDOUT_FILENO);
+	bvnr_sink_to_mem(&sink, out, out_cap);
 	bvnr_write_flags_t wflags = {0};
 	if (!bvnr_open_write_sink(w, &sink, true, &wflags)) {
-		bvnr_writer_destroy(w);
-		json_free_node(root);
-		free(buf);
-		return 1;
+		bvnr_writer_destroy(w); free(out);
+		json_free_node(root); free(buf); return 1;
 	}
 	bool ok = write_bvn_root(w, root);
 	if (ok) ok = bvnr_write_finish(w);
@@ -1270,11 +1301,28 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		if (werr != error_none)
 			fprintf(stderr, "Bovnar writer error: %s\n",
 				bvn_error_to_string(werr));
+		bvnr_writer_destroy(w); free(out);
+		json_free_node(root); free(buf); return 1;
 	}
+	uint64_t out_len = bvnr_writer_bytes_written(w);
 	bvnr_writer_destroy(w);
+	if (out_len <= (uint64_t)UINT32_MAX) {
+		bvn_dom_doc_t *chk = bvn_dom_parse(out, (uint32_t)out_len);
+		error_code_t herr = chk ? bvn_dom_doc_get_parse_error(chk) : error_none;
+		if (chk) bvn_dom_doc_destroy(chk);
+		if (herr != error_none) {
+			fprintf(stderr, "convert: the JSON has no bovnar representation: %s "
+				"(a heterogeneous or ragged array — bovnar 1.0 arrays are "
+				"homogeneous; model mixed data as a struct)\n",
+				bvn_error_to_string(herr));
+			free(out); json_free_node(root); free(buf); return 1;
+		}
+	}
+	fwrite(out, 1, (size_t)out_len, stdout);
+	free(out);
 	json_free_node(root);
 	free(buf);
-	return ok ? 0 : 1;
+	return 0;
 }
 static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty);
 static void print_json_indent(int level, bool pretty)

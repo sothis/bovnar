@@ -37,6 +37,9 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_doppelzentner = 100.0 * kilogram',
     'bvnr_gauss = 0.0001 * kilogram * second**-2 * ampere**-1',
     'bvnr_german_mile = 7420.44 * meter',
+    # gradian (gon): pint's native `gradian` alias is absent in some pint
+    # versions, so define it from bovnar's factor (pi/200 rad) for stability.
+    'bvnr_gradian = 0.015707963267948967 * radian',
     'bvnr_klafter = 1.88312 * meter',
     'bvnr_lot = 0.015625 * kilogram',
     'bvnr_maxwell = 1e-08 * meter**2 * kilogram * second**-2 * ampere**-1',
@@ -54,6 +57,10 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_prussian_rute = 3.76624 * meter',
     'bvnr_prussian_zoll = 0.026154416666666666 * meter',
     'bvnr_quintal = 100.0 * kilogram',
+    # Réaumur: pint's `degree_Reaumur` definition differs across versions
+    # (some use a 4/5 scale, giving 100 degRe -> 353.15 K instead of 398.15 K),
+    # so pin it to bovnar's factor (5/4) + offset (273.15 K).
+    'bvnr_reaumur = 1.25 * kelvin; offset: 273.15',
     'bvnr_romer = 1.9047619047619047 * kelvin; offset: 258.8642857142857',
     'bvnr_scheffel = 0.054961 * meter**3',
     'bvnr_var = 1.0 * meter**2 * kilogram * second**-3',
@@ -149,7 +156,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
      87: 'barn',                         # BARN
      88: 'arcminute',                    # ARCMINUTE
      89: 'arcsecond',                    # ARCSECOND
-     90: 'gradian',                      # GRAD
+     90: 'bvnr_gradian',                 # GRAD
      91: 'poise',                        # POISE
      92: 'stokes',                       # STOKES
      96: 'stilb',                        # STILB
@@ -197,7 +204,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     # Affine temperature scales mapped to pint native offset units
      34: 'degC',                         # CELSIUS
      63: 'degF',                         # FAHRENHEIT
-    370: 'degree_Reaumur',               # REAUMUR
+    370: 'bvnr_reaumur',                 # REAUMUR
 
     # Affine temperature scales defined from bovnar factor+offset (absent in pint)
     368: 'bvnr_delisle',                 # DELISLE

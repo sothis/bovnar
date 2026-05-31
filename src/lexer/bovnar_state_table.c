@@ -374,7 +374,8 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x30] = ACT_zero_intro,
 		[0x3c] = ACT_type_intro,
 		[0x5b] = ACT_array_intro,
-		[0x5d] = ACT_array_outro,
+		/* "]" straight after "[" (only ws/comments between) = empty array. */
+		[0x5d] = ACT_array_outro_empty,
 		[0x5f] = ACT_symbol_intro,
 		[0x7b] = ACT_struct_intro,
 		BVN_ALPHA_UPPER(ACT_symbol_intro),
@@ -747,6 +748,7 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_tf_bool_done]               = bvn_action_tf_bool_done,
 	[ACT_array_intro]                = bvn_action_array_intro,
 	[ACT_array_outro]                = bvn_action_array_outro,
+	[ACT_array_outro_empty]          = bvn_action_array_outro_empty,
 	[ACT_new_array_value]            = bvn_action_new_array_value,
 	[ACT_array_dim_sep]              = bvn_action_array_dim_sep,
 	[ACT_exp_intro]                  = bvn_action_exp_intro,

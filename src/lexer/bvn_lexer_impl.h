@@ -143,6 +143,7 @@ enum action_id {
 	ACT_tf_bool_done,
 	ACT_array_intro,
 	ACT_array_outro,
+	ACT_array_outro_empty,
 	ACT_new_array_value,
 	ACT_array_dim_sep,
 	ACT_exp_intro,
@@ -298,6 +299,7 @@ bool bvn_action_tf_utf8_done              (bvnr_reader_t* p);
 bool bvn_action_tf_bool_done              (bvnr_reader_t* p);
 bool bvn_action_array_intro               (bvnr_reader_t* p);
 bool bvn_action_array_outro               (bvnr_reader_t* p);
+bool bvn_action_array_outro_empty         (bvnr_reader_t* p);
 bool bvn_action_new_array_value           (bvnr_reader_t* p);
 bool bvn_action_array_dim_sep             (bvnr_reader_t* p);
 bool bvn_action_exp_intro                 (bvnr_reader_t* p);

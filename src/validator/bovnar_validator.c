@@ -967,7 +967,10 @@ bool bvn_val_on_array_outro(bvnr_reader_t* r,
 {
 	bvnr_validator_t* v = &r->val;
 	bvnr_data_t       d = {0};
-	if (!*array_row_size)
+	/* UINT64_MAX is the "row width not yet established" sentinel: a width of 0
+	 * is a real, valid width (an empty row, "[]"), so it must be distinguishable
+	 * from "unset". The first row to close fixes the width; siblings must match. */
+	if (*array_row_size == UINT64_MAX)
 		*array_row_size = curr_row_size;
 	else if (*array_row_size != curr_row_size) {
 		v->last_error = error_array_row_size_mismatch;
@@ -979,7 +982,7 @@ bool bvn_val_on_new_array_value(bvnr_reader_t* r,
 	uint64_t curr_row_size, uint64_t array_row_size)
 {
 	bvnr_validator_t* v = &r->val;
-	if (array_row_size && curr_row_size >= array_row_size) {
+	if (array_row_size != UINT64_MAX && curr_row_size >= array_row_size) {
 		v->last_error = error_array_row_size_mismatch;
 		return false;
 	}

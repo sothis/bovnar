@@ -738,11 +738,28 @@ ev_array_dim_start → ev_array_row_start  → 3× ev_data  → ev_array_row_end
 
 ### 7.2 Null Elements
 
-Leading/trailing commas and consecutive commas produce null elements:
+Leading/trailing commas, consecutive commas, and the bare keyword `null` all
+produce null elements:
 
 ```bovnar
 .items = [,1,,2,];   # 5 elements: null, 1, null, 2, null
+.one   = [null];     # 1 element: a single null
 ```
+
+**Empty arrays.** A row with nothing between the brackets is **empty** — zero
+elements, no `ev_data` emitted. It is distinct from a one-null row:
+
+```bovnar
+.empty = [];         # 0 elements
+.null1 = [null];     # 1 element (null)
+```
+
+So `bvn_dom_array_count([])` is `0` and `bvn_dom_array_count([null])` is `1`. The
+canonical serialiser writes a null array element as the explicit `null` keyword
+(e.g. `[, 1]` round-trips through `[null, 1]`), so an empty slot never collides
+with the empty array. Empty rows interact with row-size consistency (§7.3): all
+`/`-rows must share one width, and `0` is a valid width — `[]/[]` is two empty
+rows, but `[]/[1]` is `error_array_row_size_mismatch`.
 
 ### 7.3 Row-Size Consistency
 

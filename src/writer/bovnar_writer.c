@@ -857,6 +857,17 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		}
 		s->had_type_annotation = false;
 		if (d->type == token_is_null_value) {
+			/* A null *direct array element* is written as the explicit "null"
+			 * keyword. A null can no longer be an empty slot: an empty slot with
+			 * no delimiting comma is now an empty array "[]" (zero elements), so
+			 * "[null]" (one null) must stay distinct from "[]". Emitting "null"
+			 * uniformly keeps every position unambiguous and round-trip-safe.
+			 * Top-level nulls (".x = ;") and struct-field nulls are unaffected. */
+			if (s->array_depth > 0 &&
+				bvn_ser_is_direct_array_element(s, s->array_depth - 1u)) {
+				if (!bvn_ser_push_str(s, "null"))
+					return false;
+			}
 		} else if (d->type == token_is_number ||
 				   d->type == token_is_array_number) {
 			if (d->data && d->length) {

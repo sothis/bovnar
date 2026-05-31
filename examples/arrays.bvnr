@@ -14,9 +14,10 @@
 
 # ── 1. Empty arrays ───────────────────────────────────────────────────────────
 
-.empty       = [];              # empty array (no elements, no rows)
-.empty_2d    = []/[];           # two empty rows
-.empty_typed = <uint:32> [];    # typed empty array
+.empty       = [];              # empty array: 0 elements (no ev_data)
+.one_null    = [null];          # 1 element: a single null — NOT the same as []
+.empty_2d    = []/[];           # two empty rows (width 0 is valid)
+.empty_typed = <uint:32> [];    # typed empty array, 0 elements
 
 
 # ── 2. Single-row arrays (i.e. a list) ────────────────────────────────────────

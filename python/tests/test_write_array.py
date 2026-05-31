@@ -69,10 +69,10 @@ class TestWriteArrayFlat:
         assert result == [-5, 0, 5]
 
     def test_empty_list(self):
-        # BVNR rows must contain at least one element; an empty row produces
-        # an implicit null, so [] round-trips as [None].
+        # An empty array "[]" is a genuinely empty row (zero elements) and is
+        # distinct from "[null]" (one null element); it round-trips as [].
         result = _roundtrip([])
-        assert result == [None]
+        assert result == []
 
     def test_output_contains_key(self):
         with Writer.to_mem() as w:

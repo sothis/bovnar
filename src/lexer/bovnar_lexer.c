@@ -576,7 +576,9 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	f->saved_vunit = p->val.parsed_unit;
 	f->saved_unit_serial = p->val.parsed_unit_serial;
 	p->lex.curr_row_size  = 0;
-	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : 0;
+	/* UINT64_MAX = "row width not yet established" (an empty row has width 0,
+	 * a real value, so 0 can no longer double as the unset sentinel). */
+	p->lex.array_row_size = f->in_dim_seq ? f->dim_row_size : UINT64_MAX;
 	++p->lex.curr_row_size;
 	/*
 	 * The array we are about to open tracks its OWN '/'-dimension sequence in
@@ -622,6 +624,40 @@ bool bvn_action_array_outro(bvnr_reader_t* p)
 		return false;
 	if (!bvn_val_on_array_outro(p, p->lex.curr_row_size,
 								&p->lex.array_row_size))
+		return false;
+	--p->lex.array_nesting_level;
+	uint64_t level = p->lex.array_nesting_level;
+	bvn_array_frame_t *f = &p->lex.arr_frames[level];
+	f->dim_row_size       = p->lex.array_row_size;
+	p->lex.curr_row_size  = f->saved_curr + 1u;
+	p->lex.array_row_size = f->saved_row;
+	p->val.value_type     = f->saved_vtype;
+	if (p->val.parsed_unit_serial != f->saved_unit_serial) {
+		p->val.parsed_unit         = f->saved_vunit;
+		p->val.parsed_unit_serial  = f->saved_unit_serial;
+	}
+	p->lex.next_state = array_outro;
+	return true;
+}
+/*
+ * ']' reached directly from the array_intro state — only whitespace or comments
+ * appeared between '[' and ']'. This is an EMPTY array row (zero elements).
+ * array_intro pre-seeds the first element position with a null placeholder
+ * (curr_row_size == 1, token_is_null_value); an empty row must NOT finalise it,
+ * so — unlike bvn_action_array_outro — this emits no ev_data, reports a row
+ * width of 0, and then pops the frame identically. "[]" is therefore distinct
+ * from "[null]" (one null element). A width of 0 is a real width: an empty
+ * '/'-row may only sit beside other empty rows ([]/[] is valid; []/[1] is a
+ * row-size mismatch).
+ */
+bool bvn_action_array_outro_empty(bvnr_reader_t* p)
+{
+	if (!p->lex.array_nesting_level) {
+		bvn_lexer_set_error(p, error_unexpected_input_byte);
+		return false;
+	}
+	p->lex.curr_row_size = 0u;
+	if (!bvn_val_on_array_outro(p, 0u, &p->lex.array_row_size))
 		return false;
 	--p->lex.array_nesting_level;
 	uint64_t level = p->lex.array_nesting_level;

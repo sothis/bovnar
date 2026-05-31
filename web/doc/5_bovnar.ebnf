@@ -550,8 +550,12 @@ array        = array-row , {"/" , ws , array-row} ;
 
 array-row    = "[" , ws , [row-content] , ws , "]" ;
 
-(* row-content: at least one element position.  Leading / trailing     *)
-(* commas or consecutive commas each expand to a null-value element.  *)
+(* row-content is OPTIONAL: "[]" (nothing between the brackets) is an   *)
+(* EMPTY row — zero elements, no ev_data. It is distinct from "[null]"  *)
+(* (one null element) and "[,]" (two null elements). When present,      *)
+(* row-content has at least one element position; leading / trailing /  *)
+(* consecutive commas each expand to a null-value element. An empty row  *)
+(* has width 0, a valid row width for /-dimension consistency.          *)
 row-content  = array-elem , {ws , "," , ws , array-elem} ;
 
 (* array-elem has the same structure as a top-level value.            *)

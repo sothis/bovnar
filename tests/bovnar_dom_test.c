@@ -452,6 +452,55 @@ static void test_array_homogeneity(void)
 	expect_parse(".a = [{.x = 1;}, {.x = 2;}, {.x = 3;}];\n", error_none,
 				 "same-key struct array is valid");
 }
+/*
+ * Empty arrays: "[]" is a genuinely empty row (0 elements), distinct from
+ * "[null]" (1 null) and "[,]" (2 nulls). Width 0 is a real width, so empty
+ * "/"-rows and empty sibling sub-arrays follow the same rectangular rule.
+ */
+static void test_empty_array_semantics(void)
+{
+	bvn_dom_doc_t *d;
+	bvn_dom_node_t *a;
+
+	d = parse_doc(".a = [];\n");
+	if (d) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(d), error_none, "[] parses");
+		a = bvn_dom_lookup(d, ".a");
+		ASSERT_EQ_UINT(bvn_dom_array_count(a), 0, "[] has 0 elements");
+		bvn_dom_doc_destroy(d);
+	}
+	d = parse_doc(".a = [null];\n");
+	if (d) {
+		a = bvn_dom_lookup(d, ".a");
+		ASSERT_EQ_UINT(bvn_dom_array_count(a), 1, "[null] has 1 element");
+		ASSERT_EQ_UINT(bvn_dom_node_type(bvn_dom_array_at(a, 0)),
+					   BVN_DOM_NULL, "[null][0] is a null");
+		bvn_dom_doc_destroy(d);
+	}
+	d = parse_doc(".a = [,];\n");
+	if (d) {
+		a = bvn_dom_lookup(d, ".a");
+		ASSERT_EQ_UINT(bvn_dom_array_count(a), 2, "[,] has 2 null elements");
+		bvn_dom_doc_destroy(d);
+	}
+	d = parse_doc(".a = <uint:32> [];\n");
+	if (d) {
+		a = bvn_dom_lookup(d, ".a");
+		ASSERT_EQ_UINT(bvn_dom_array_count(a), 0, "typed [] has 0 elements");
+		bvn_dom_doc_destroy(d);
+	}
+	/* Empty /-rows: all-empty valid; empty mixed with non-empty is ragged. */
+	expect_parse(".a = []/[];\n",     error_none,                  "[]/[] valid");
+	expect_parse(".a = []/[]/[];\n",  error_none,                  "[]/[]/[] valid");
+	expect_parse(".a = []/[1];\n",    error_array_row_size_mismatch, "[]/[1] ragged");
+	expect_parse(".a = [1]/[];\n",    error_array_row_size_mismatch, "[1]/[] ragged");
+	/* Empty vs non-empty sibling sub-arrays differ in length: rejected. */
+	expect_parse(".a = [[], [1]];\n",     error_array_row_size_mismatch,
+				 "[] vs [1] siblings");
+	expect_parse(".a = [[], []];\n",      error_none, "[] vs [] siblings valid");
+	expect_parse(".a = [[], [], [1]];\n", error_array_row_size_mismatch,
+				 "empty,empty,len1 siblings");
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -464,6 +513,7 @@ int main(void)
 	test_nested_array_elements();
 	test_array_row_size_model();
 	test_array_homogeneity();
+	test_empty_array_semantics();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

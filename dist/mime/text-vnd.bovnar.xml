@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  freedesktop.org shared-mime-info database entry for the Bovnar (BVNR) format.
+
+  Install system-wide:
+      install -Dm644 text-vnd.bovnar.xml \
+          /usr/share/mime/packages/text-vnd.bovnar.xml
+      update-mime-database /usr/share/mime
+
+  Or per-user:
+      install -Dm644 text-vnd.bovnar.xml \
+          ~/.local/share/mime/packages/text-vnd.bovnar.xml
+      update-mime-database ~/.local/share/mime
+
+  Detection is by the *.bvnr glob, which is the reliable mechanism for a text
+  format with no fixed byte signature (the same approach shared-mime-info uses
+  for *.toml, *.ini, etc.). A low-priority heuristic <magic> is included only to
+  help with extension-less files and never overrides a real signature.
+-->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="text/vnd.bovnar">
+    <comment>Bovnar document</comment>
+    <acronym>BVNR</acronym>
+    <expanded-acronym>Bovnar typed, unit-aware serialisation</expanded-acronym>
+    <sub-class-of type="text/plain"/>
+    <!-- Back-compat with the pre-registration unofficial name. -->
+    <alias type="text/x-bovnar"/>
+    <glob pattern="*.bvnr"/>
+    <!-- Heuristic only: a top-level assignment line ".<ident> = ..." appearing
+         near the start of the file. Low priority so the glob and any stronger
+         match win. -->
+    <magic priority="20">
+      <match type="string" value="\n." offset="0:4096"/>
+    </magic>
+    <icon name="text-x-generic"/>
+  </mime-type>
+</mime-info>

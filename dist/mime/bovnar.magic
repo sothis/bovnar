@@ -1,0 +1,29 @@
+# file(1) magic for the Bovnar (BVNR) typed, unit-aware serialisation format.
+#
+# The *.bvnr extension is the AUTHORITATIVE signal (see the shared-mime-info
+# glob); this content magic is a best-effort fallback for extension-less files.
+# It matches a top-level assignment line — ".<identifier> = ..." at column 0,
+# i.e. preceded by a newline — within the first 256 lines, skipping leading
+# "#" comments and blank lines.
+#
+# Heuristic limitations (acceptable because the extension is authoritative):
+#   * A document whose very first byte begins the assignment (no comment/blank
+#     header line) is identified by extension only.
+#   * A non-Bovnar text file that embeds a Bovnar document at column 0 (e.g. a
+#     Markdown README with a ```bovnar code block) may match.
+# The newline anchor deliberately avoids false positives on source code such as
+# "self.port = 8080" or "module.exports = ...", where the dotted name is not at
+# the start of a line.
+#
+# Compile and use:
+#     file -C -m bovnar.magic            # produces bovnar.magic.mgc
+#     file -m bovnar.magic FILE          # human-readable type
+#     file --mime-type -m bovnar.magic FILE
+#
+# Install so plain `file` uses it (Linux):
+#     cat bovnar.magic >> /etc/magic && (cd /etc && file -C)   # or
+#     install -Dm644 bovnar.magic ~/.magic && file -C -m ~/.magic
+#
+0	regex/256l	\n\\.[A-Za-z_][A-Za-z0-9_]*[[:blank:]]*=	Bovnar document
+!:mime	text/vnd.bovnar
+!:ext	bvnr

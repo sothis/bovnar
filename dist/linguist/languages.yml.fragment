@@ -1,0 +1,18 @@
+# Entry to add to github/linguist: lib/linguist/languages.yml
+# (insert in alphabetical order, in the "B" section).
+#
+# Notes:
+#   * tm_scope must match the scopeName of the submitted TextMate grammar
+#     (highlighter/vscode/bovnar-highlight/syntaxes/Bovnar.tmLanguage.json ->
+#     "source.bovnar").
+#   * language_id must be unique. Do NOT hand-pick it: run `script/update-ids`
+#     in the linguist checkout, which assigns the next free id.
+#   * color is the brand pink from the Bovnar Cyberpunk theme; adjust to taste.
+Bovnar:
+  type: data
+  color: "#ff79c6"
+  extensions:
+    - ".bvnr"
+  tm_scope: source.bovnar
+  ace_mode: text
+  language_id: 0   # placeholder — replace via `script/update-ids`

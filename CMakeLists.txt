@@ -169,3 +169,20 @@ if(SKBUILD)
         LIBRARY DESTINATION bovnar    # libbvnr_shared.so / .dylib
         RUNTIME DESTINATION bovnar)   # bvnr_shared.dll (Windows)
 endif()
+
+# System integration for the Bovnar media type (text/vnd.bovnar) and the .bvnr
+# extension. Skipped for the Python wheel build (SKBUILD). After `make install`
+# run `update-mime-database <datadir>/mime` to refresh the desktop database.
+if(NOT SKBUILD)
+    include(GNUInstallDirs)
+    option(BVNR_INSTALL_MIME
+        "Install the freedesktop shared-mime-info entry + file(1) magic for *.bvnr"
+        ON)
+    if(BVNR_INSTALL_MIME)
+        install(FILES dist/mime/text-vnd.bovnar.xml
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/mime/packages)
+        install(FILES dist/mime/bovnar.magic
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/bovnar
+            RENAME magic)
+    endif()
+endif()

@@ -1,8 +1,8 @@
 # Bovnar Specification
 
-> **Version:** 0.x
-> **Status:** Draft
-> **Last updated:** 2026-05-15
+> **Version:** 1.0
+> **Status:** Stable
+> **Last updated:** 2026-05-31
 
 ---
 
@@ -746,36 +746,34 @@ Leading/trailing commas and consecutive commas produce null elements:
 
 ### 7.3 Row-Size Consistency
 
-The consistency rule is scoped to a **single array** and to its `/`-separated dimension rows only:
+A single array's `/`-separated dimension rows (e.g. `[1,2,3]/[4,5,6]`) must all have the same element count. A mismatch produces `error_array_row_size_mismatch`; the lexer performs this check as each row closes, so an offending row is rejected at the earliest possible byte — the element that overshoots, or the `]` that falls short. This makes one `/`-array a clean rectangular N-dimensional block.
 
-- The **`/`-separated dimension rows of one array** (e.g. `[1,2,3]/[4,5,6]`) must all have the same element count. A mismatch produces `error_array_row_size_mismatch`. The lexer performs this check as each row closes, so an offending row is rejected at the earliest possible byte — the element that overshoots, or the `]` that falls short.
-- **Comma-separated elements are independent of one another**, even when those elements are themselves arrays. Sub-arrays sitting side by side in a row (`[[1,2],[3,4,5]]`) are ordinary element *values*, not dimension rows of their parent, so their lengths are never compared.
+Comma-separated elements are distinct *values*, but since spec 1.0 they are no longer unconstrained: they must be **homogeneous** (§7.4).
 
-```bovnar
-.ok1 = [1,2,3]/[4,5,6];      # valid: both /-rows of one array have 3 elements
-.ok2 = [[1,2],[3,4]];         # valid: two independent sub-arrays (coincidentally equal)
-.ok3 = [[1,2],[3,4,5]];       # valid: ragged sub-arrays are fine — they are elements, not rows
+### 7.4 Element Homogeneity
 
-.bad1 = [1,2,3]/[4,5];        # error_array_row_size_mismatch: /-row 2 has 2 elements, row 1 had 3
-.bad2 = [[1,2]/[3,4,5]];      # error_array_row_size_mismatch: the inner /-array's own rows are 2 vs 3
-```
+Since spec 1.0 the elements of an array must be **homogeneous**. The rule is *"shape uniform, fields free"*, checked over the materialised value (above the lexer; it complements the streaming reader's per-value type and unit checks):
 
-`/` creates another dimension row of the *same* array; `,` introduces another *element* (see §7.4). Only the former is length-checked.
-
-### 7.4 Nested Arrays
-
-An array nested as an element value is a self-contained array. Its `/`-dimension rows are checked among themselves, but its shape is **completely independent** of any sibling element and of its parent's row width. The check never crosses a comma boundary and never descends from one element into another.
+- **Kind.** Every non-null element shares the same kind — number, string, symbol, bool, reference, octet stream, array, or struct. `[1, "two"]` and `[1, {.x=1;}]` are `error_array_element_type_mismatch`.
+- **Dimension** (bare scalar arrays and matrices). Numeric elements must share the same physical dimension; the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected; `[1, 2.5, 3]` (all dimensionless) is fine. Each currency is its own dimension, so a bare array may not mix `$USD` and `$EUR` values.
+- **Rectangular** (nested arrays). Sibling sub-arrays must have the same length and recursively-matching element shape: `[[1,2],[3,4]]` is valid, `[[1,2],[3,4,5]]` is `error_array_row_size_mismatch`.
+- **Structs — same keys, fields free.** Sibling structs must share the same keys, in order, with the same per-field *kinds* and nesting. Differing keys are `error_struct_shape_mismatch`; a field that is a number in one record and a string in another is `error_array_element_type_mismatch`. But a scalar field may carry a **different unit** in each record, and a list field a **different length** — so a multi-currency ledger and per-record argument lists are valid.
+- **Null is a hole.** `null` / empty array elements match any shape and never establish or break homogeneity, so sparse arrays like `[1, , 3]` remain valid.
 
 ```bovnar
-.valid  = [[1, 2], [3, 4]];                # two sub-arrays as elements — independent (here equal): valid
-.ragged = [[1, 2], [3, 4, 5]];             # sub-arrays of different length — valid (elements, not rows)
-.tensor = [[1,2]/[3,4], [5,6]/[7,8]];      # two 2×2 /-arrays as elements — each validates its own rows
-.mixed  = [[1,2]/[3,4], [5,6,7]/[8,9,10]]; # two /-arrays of different leaf width as elements — valid
+.ok_scalars = [1, 2.5, 3];                 # valid: same (no) dimension, encodings may mix
+.ok_matrix  = [[1, 2], [3, 4]];            # valid: rectangular
+.ok_records = [{.cur = USD; .bal = <float_dec:64,$USD> 1.0;},
+               {.cur = EUR; .bal = <float_dec:64,$EUR> 2.0;}]; # valid: same keys, fields free
+.ok_sparse  = [1, , 3];                    # valid: null hole
 
-.bad = [[1, 2]/[3, 4, 5]];                 # one /-array whose own rows are 2 vs 3 — error_array_row_size_mismatch
+.bad_kind   = [1, "two"];                  # error_array_element_type_mismatch
+.bad_dim    = [<float:64,m> 1.0, <float:64,k~g> 2.0];  # error_array_element_type_mismatch
+.bad_ragged = [[1, 2], [3, 4, 5]];         # error_array_row_size_mismatch
+.bad_keys   = [{.x = 1;}, {.y = 1;}];      # error_struct_shape_mismatch
 ```
 
-This makes bovnar arrays **per-array rectangular** rather than globally rectangular: a single `/`-array is a clean N-dimensional block, but a document may place blocks of differing shape side by side as elements. It is also what lets a jagged JSON array round-trip through the `json → bvnr` converter unchanged.
+A bare array of measurements is therefore uniform — a consumer may treat its elements identically — while records (structs) describe genuinely different things. **Heterogeneous data is modelled with a struct, not an array.** (This is a deliberate tightening over pre-1.0 drafts, which allowed ragged and mixed-type arrays; it also means a ragged or mixed-type JSON array has no bovnar representation and the `json → bvnr` converter rejects it rather than losing structure.)
 
 ### 7.5 Array Elements with Type Annotations
 
@@ -1232,7 +1230,8 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 
 | Check | Error |
 |-------|-------|
-| Element count mismatch across the `/`-dimension rows of a single array (comma-separated elements are independent) | `error_array_row_size_mismatch` |
+| Element count mismatch across the `/`-dimension rows of a single array, or ragged sibling sub-arrays (§7.4) | `error_array_row_size_mismatch` |
+| Array elements of mixed kind or dimension, or a struct field that differs in kind across record elements (§7.4) | `error_array_element_type_mismatch` |
 | Array nesting overflow (exceeds `max_array_nesting`) | `error_array_nesting_too_high` |
 | Comma outside array context | `error_unexpected_input_byte` |
 
@@ -1241,6 +1240,7 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 | Check | Error |
 |-------|-------|
 | Unmatched `}` | `error_illegal_struct_close` |
+| Struct array elements with differing key sets (§7.4) | `error_struct_shape_mismatch` |
 | Nesting depth exceeded | `error_struct_nesting_too_high` |
 
 ### 12.6 Identifier Validation
@@ -1421,12 +1421,13 @@ The unit may be written directly after the value literal instead of — or redun
 # Array with typed nulls
 .nullable = [<sint:16> 1, <sint:16> , <sint:16> 3];
 
-# Ragged sub-arrays are fine — comma-separated elements are independent
-.ragged_nested = [[1,2],[3,4,5]];
+# Sibling sub-arrays must match in length (homogeneity, §7.4):
+.rect_nested = [[1,2],[3,4]];
 
-# These produce error_array_row_size_mismatch (a single array's /-rows disagree):
+# These produce error_array_row_size_mismatch:
 # .bad1 = [1,2,3]/[4,5];           # /-row sizes differ: 3 vs 2
 # .bad2 = [[1,2]/[3,4,5]];         # inner /-array's own rows differ: 2 vs 3
+# .bad3 = [[1,2],[3,4,5]];         # ragged sibling sub-arrays differ: 2 vs 3
 ```
 
 ### 15.6 Deeply Nested Struct
@@ -1595,14 +1596,14 @@ The unit may be written directly after the value literal instead of — or redun
 # Unknown escape
 .string = "\x";                  # error_illegal_escape_sequence
 
-# Array row-size mismatch — applies only to the /‐dimension rows of a single
-# array. Both of these produce error_array_row_size_mismatch:
+# error_array_row_size_mismatch — /-dimension rows of one array, and (since 1.0)
+# ragged sibling sub-arrays, must match in length:
 # .bad1 = [1,2,3]/[4,5];           # /-row sizes differ: 3 vs 2
 # .bad2 = [[1,2]/[3,4,5]];         # inner /-array's own rows differ: 2 vs 3
-# Uniform /-rows are valid; ragged comma-separated sub-arrays are also valid:
+# .bad3 = [[1,2],[3,4,5]];         # ragged sibling sub-arrays differ: 2 vs 3
+# Uniform /-rows and rectangular sibling sub-arrays are valid:
 .ok1 = [1,2,3]/[4,5,6];    # valid — both dimension rows have 3 elements
-.ok2 = [[1,2],[3,4]];       # valid — independent sub-arrays (here equal)
-.ok3 = [[1,2],[3,4,5]];     # valid — ragged sub-arrays are independent elements
+.ok2 = [[1,2],[3,4]];       # valid — rectangular sub-arrays
 
 # Comma outside array
 .comma_outside = 42,;            # error_unexpected_input_byte
@@ -2019,6 +2020,43 @@ typedef enum error_code_e {
 
 ---
 
+## 17. Versioning & Stability
+
+Bovnar follows semantic versioning of the **format**, independent of any
+implementation's version.
+
+**What 1.0 freezes.** The grammar is stable. A `.bvnr` document that is valid
+under spec 1.0 will remain valid, and will decode to the same values, under every
+1.x revision. This covers the lexical structure, the type families and their
+annotations, arrays (including the homogeneity rules of §7.4), structs, octet
+streams, references, and the error codes in §13. Conforming archives may rely on
+this for long-term storage.
+
+**What may still grow in 1.x (additive only).** The following may be *extended*
+without breaking existing documents, and such extensions ship as minor (1.x)
+revisions:
+
+- the **unit and currency tables** — new physical units, prefixes, and ISO 4217 /
+  crypto currency codes may be added (a document never depends on a code being
+  *absent*);
+- **new error codes** appended after the current maximum (existing numeric values
+  never change);
+- new optional reader/writer flags and limits whose defaults preserve current
+  behaviour.
+
+A reader from an older 1.x point release may not recognise a unit or currency
+added in a newer one; that is the expected direction of forward compatibility and
+is not a break of the 1.0 promise.
+
+**What requires a 2.0.** Any change that could render a valid 1.x document invalid,
+change how it decodes, renumber an error code, or alter the grammar is a breaking
+change and is reserved for a major (2.0) revision. The two changes that motivated
+the 1.0 freeze — the **mandatory `$` currency sigil** (§10.4 of the unit-system
+reference) and **array element homogeneity** (§7.4) — were exactly such breaks, so
+they were made *before* 1.0 and cannot be reconsidered within 1.x.
+
+---
+
 ## Appendix A: Event Sequence Reference
 
 ### A.1 Simple Assignment (Untyped)
@@ -2267,7 +2305,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar Specification (draft, v0.x)*
+*End of Bovnar Specification (v1.0)*
 
 
 

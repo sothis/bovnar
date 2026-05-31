@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 0.x · 163 physical units · 164 fiat currencies · 50 cryptocurrencies
+> Spec version 1.0 · 163 physical units · 164 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -37,7 +37,7 @@
    - 4.25 [Additional Physical Units](#425-additional-physical-units-361367)
    - 4.26 [Ratio and Proportion](#426-ratio-and-proportion-372377)
 5. [Currencies](#5-currencies)
-   - 5.1 [Namespace Rule](#51-namespace-rule)
+   - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
    - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
    - 5.3 [Cryptocurrencies](#53-cryptocurrencies)
    - 5.4 [Currency Prefix Rules](#54-currency-prefix-rules)
@@ -485,9 +485,14 @@ Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These 
 
 ## 5. Currencies
 
-### 5.1 Namespace Rule
+### 5.1 The Mandatory Currency Sigil
 
-Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4** is dispatched to the **currency table first**. If not found there, the physical unit table is tried. If found in neither, `error_unit_illegal` is raised. Case is load-bearing: `cup ≠ CUP`.
+As of spec 1.0 a currency code carries a **mandatory `$` sigil**: write `$USD`,
+`$BTC`, `k~$EUR`, `$USD/oz_t`. The codes listed in the tables below are the bare
+ISO 4217 / crypto identifiers — prefix each with `$` when you use it in a document.
+A bare code (no `$`) is **not** a currency; it is matched against the physical-unit
+table and raises `error_unit_illegal` if it is not a unit. This removes every
+currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit).
 
 ### 5.2 ISO 4217 Fiat Currencies
 
@@ -670,7 +675,7 @@ Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4
 
 50 codes. Enum values `bu_btc` (298) … `bu_rune` (347). `numeric_code = 0` for all.
 
-> **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,BTC>` stores satoshis; divide by 10⁸ to obtain BTC.
+> **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,$BTC>` stores satoshis; divide by 10⁸ to obtain BTC.
 
 | Code   | Min | Subunit | Name |
 |--------|----:|---------|------|

@@ -1,6 +1,6 @@
 # Bovnar Quantity Annotation System — Unit and Currency Reference
 
-> **Applies to:** Bovnar (BVNR) specification version 0.x
+> **Applies to:** Bovnar (BVNR) specification version 1.0
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
 ---
@@ -62,7 +62,7 @@
     - 10.1 [The Namespace Rule as Disambiguator](#101-the-namespace-rule-as-disambiguator)
     - 10.2 [Exhaustive Conflict Table](#102-exhaustive-conflict-table)
     - 10.3 [The CUP Case in Detail](#103-the-cup-case-in-detail)
-    - 10.4 [Disambiguation Proposals](#104-disambiguation-proposals)
+    - 10.4 [The Mandatory Currency Sigil](#104-the-mandatory-currency-sigil)
 11. [C Data Model](#11-c-data-model)
     - 11.1 [Enumerations](#111-enumerations)
     - 11.2 [Structures](#112-structures)
@@ -620,10 +620,10 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 ```bovnar
 .valid1   = <uint:64,Ki~B>  8;     # OK: IEC prefix on byte
 .valid2   = <uint:32,M~b>   100;   # OK: SI mega on bit
-.valid3   = <float_dec:64,k~USD> 250.0;  # OK: kilo on currency
+.valid3   = <float_dec:64,k~$USD> 250.0;  # OK: kilo on currency
 .invalid1 = <uint:64,Ki~m>  1;     # ERROR: IEC prefix on meter
 .invalid2 = <uint:32,m~B>   512;   # ERROR: SI milli on byte
-.invalid3 = <float_dec:64,Ki~USD> 1;     # ERROR: IEC prefix on currency
+.invalid3 = <float_dec:64,Ki~$USD> 1;     # ERROR: IEC prefix on currency
 ```
 
 ---
@@ -641,7 +641,7 @@ unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
 .distance    = <float:64,k~m>    1.5;     # kilometer
 .frequency   = <float:64,M~Hz>   2400;    # megahertz
 .storage     = <uint:64,Ki~B>    1024;    # kibibytes
-.fund_nav    = <float_dec:64,k~USD> 250.0; # $250,000
+.fund_nav    = <float_dec:64,k~$USD> 250.0; # $250,000
 ```
 
 ### 5.2 Compound Units
@@ -666,10 +666,10 @@ exp-digit      = "¹" | "²" | "³" | "⁴" | "⁵"
 Currency codes participate in compound expressions using the same separators:
 
 ```bovnar
-.gold_spot    = <float_dec:64,USD/oz_t>   2351.40;  # $/troy oz
-.rent         = <float_dec:64,EUR/m²>       12.50;  # €/m²
-.billing_rate = <float_dec:64,EUR/h>       150.00;  # €/h
-.eur_usd      = <float_dec:64,USD/EUR>      1.0842; # exchange rate
+.gold_spot    = <float_dec:64,$USD/oz_t>   2351.40;  # $/troy oz
+.rent         = <float_dec:64,$EUR/m²>       12.50;  # €/m²
+.billing_rate = <float_dec:64,$EUR/h>       150.00;  # €/h
+.eur_usd      = <float_dec:64,$USD/$EUR>      1.0842; # exchange rate
 ```
 
 > The sub-grammar is **semantic**, not lexical. The outer lexer captures the type-annotation body as a raw byte sequence; `bvn_parse_unit` parses the unit string portion after the lexer finishes.
@@ -784,7 +784,7 @@ This reservation requires no new sigil character and no change to the unit gramm
 
 164 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. Base enum values are assigned alphabetically, beginning at `bu_aed = 134` and ending at `bu_zwl = 297`. Two codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro) and `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022).
 
-The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. `<uint:64,KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift. Minor units are **bold** below when they differ from 2. `Num` is the ISO 4217 numeric identifier.
+The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. `<uint:64,$KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift. Minor units are **bold** below when they differ from 2. `Num` is the ISO 4217 numeric identifier.
 
 | Code | Num | Min | Name |
 |------|----:|----:|------|
@@ -959,7 +959,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 
 50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. Base enum values begin at `bu_btc = 298` and end at `bu_rune = 347`. The `minor_unit` field holds the canonical on-chain decimal places. `numeric_code = 0` for all cryptocurrencies.
 
-> **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,BTC>` stores satoshis; divide by 10⁸ to obtain whole BTC.
+> **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,$BTC>` stores satoshis; divide by 10⁸ to obtain whole BTC.
 
 | Code   | Min | Subunit | Name |
 |--------|----:|---------|------|
@@ -1019,9 +1019,9 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 **All SI prefixes** are permitted on all currency units. `k~USD` denotes "values in thousands of USD" — a common scale annotation in financial reporting.
 
 ```bovnar
-.fund_nav   = <float_dec:64,k~USD>    250.0;   # $250,000
-.gdp        = <float_dec:64,M~EUR> 42800.0;    # €42.8 billion
-.eth_gwei   = <float_dec:64,G~ETH>    35.0;    # 35 Gwei gas price
+.fund_nav   = <float_dec:64,k~$USD>    250.0;   # $250,000
+.gdp        = <float_dec:64,M~$EUR> 42800.0;    # €42.8 billion
+.eth_gwei   = <float_dec:64,G~$ETH>    35.0;    # 35 Gwei gas price
 ```
 
 **IEC binary prefixes** (`Ki~`, `Mi~`, …) are **forbidden** on all currency units. `bvn_currency_prefix_valid()` returns `false` for any IEC prefix; the parser raises `error_unit_illegal`.
@@ -1031,12 +1031,12 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 Currency codes participate in compound unit expressions using the existing separators:
 
 ```bovnar
-.gold_spot    = <float_dec:64,USD/oz_t>    2351.40;  # $/troy oz
-.wheat        = <float_dec:64,USD/bsh>        5.82;  # $/bushel
-.rent         = <float_dec:64,EUR/m²>        12.50;  # €/m²
-.billing_rate = <float_dec:64,EUR/h>         150.00; # €/h
-.eur_usd      = <float_dec:64,USD/EUR>        1.0842; # exchange rate
-.eth_btc      = <float_dec:64,BTC/ETH>       0.05610; # cross-crypto rate
+.gold_spot    = <float_dec:64,$USD/oz_t>    2351.40;  # $/troy oz
+.wheat        = <float_dec:64,$USD/bsh>        5.82;  # $/bushel
+.rent         = <float_dec:64,$EUR/m²>        12.50;  # €/m²
+.billing_rate = <float_dec:64,$EUR/h>         150.00; # €/h
+.eur_usd      = <float_dec:64,$USD/$EUR>        1.0842; # exchange rate
+.eth_btc      = <float_dec:64,$BTC/$ETH>       0.05610; # cross-crypto rate
 ```
 
 Currency × currency compounds (`USD·EUR`) are syntactically valid and produce no error. Their financial interpretation is the application's responsibility.
@@ -1048,7 +1048,7 @@ Bovnar annotates denomination; it does not store exchange rates or timestamps. T
 ```bovnar
 .snapshot = {
     .epoch    = <uint:64,s>              1716400000;
-    .eur_usd  = <float_dec:64,USD/EUR>        1.0842;
+    .eur_usd  = <float_dec:64,$USD/$EUR>        1.0842;
 };
 ```
 
@@ -1060,16 +1060,16 @@ Bovnar annotates denomination; it does not store exchange rates or timestamps. T
 
 | Use case | Recommended annotation | Rationale |
 |----------|----------------------|-----------|
-| Decimal monetary amount | `<float_dec:64,USD>` | Exact decimal; 16 significant digits |
-| High-precision / actuarial | `<float_dec:128,USD>` | 34 significant digits |
-| Integer minor-unit storage | `<uint:64,USD>` | Value in cents; app reads `minor_unit()` |
-| Negative balances in minor units | `<sint:64,USD>` | |
-| Zero-minor-unit currency | `<uint:64,JPY>` | Integer is the only correct representation |
-| 3-minor-unit currency | `<uint:64,KWD>` | Value in fils |
-| Commodity price | `<float_dec:64,USD/oz_t>` | $/troy oz |
-| Exchange rate | `<float_dec:64,USD/EUR>` | USD per EUR |
-| On-chain satoshi balance | `<uint:64,BTC>` | Integer satoshis |
-| Human-readable BTC amount | `<float_dec:64,BTC>` | |
+| Decimal monetary amount | `<float_dec:64,$USD>` | Exact decimal; 16 significant digits |
+| High-precision / actuarial | `<float_dec:128,$USD>` | 34 significant digits |
+| Integer minor-unit storage | `<uint:64,$USD>` | Value in cents; app reads `minor_unit()` |
+| Negative balances in minor units | `<sint:64,$USD>` | |
+| Zero-minor-unit currency | `<uint:64,$JPY>` | Integer is the only correct representation |
+| 3-minor-unit currency | `<uint:64,$KWD>` | Value in fils |
+| Commodity price | `<float_dec:64,$USD/oz_t>` | $/troy oz |
+| Exchange rate | `<float_dec:64,$USD/$EUR>` | USD per EUR |
+| On-chain satoshi balance | `<uint:64,$BTC>` | Integer satoshis |
+| Human-readable BTC amount | `<float_dec:64,$BTC>` | |
 
 > **`float` (binary floating-point) is discouraged** for monetary amounts. Binary fractions cannot represent 0.10 USD exactly. Use `float_dec` for decimal-exact storage.
 >
@@ -1131,63 +1131,30 @@ The following table lists every case where a physical-unit symbol or alias coinc
 
 ```bovnar
 .recipe_volume = <float_dec:32,cup>  2.0;   # 2 US cups (volume)
-.balance       = <float_dec:64,CUP>  15.00; # 15 Cuban Pesos (currency)
+.balance       = <float_dec:64,$CUP>  15.00; # 15 Cuban Pesos (currency)
 ```
 
 Calling `bvn_unit_to_si_factor` on a `CUP` unit returns `*ok = false` because `bvn_find_si_conv` skips currency enum values. Calling `bvn_unit_is_currency` on a `cup` unit returns `false`. The two are completely disjoint in both parsing and the conversion API.
 
 **A user who writes `CUP` intending the culinary cup will receive `error_unit_illegal`** only if `CUP` is then used in a context where a physical unit is expected but a currency is found — for example, as the denominator of a physical calculation. In practice, the annotation is accepted as the Cuban Peso; the error surfaces only at the application layer when the value is treated as a volume. This is a semantic error, not a parse error, and it is the same class of error as any mismatched-denomination annotation.
 
-### 10.4 Disambiguation Proposals
+### 10.4 The Mandatory Currency Sigil
 
-Three approaches are available, in increasing order of invasiveness:
-
----
-
-**Proposal A — Enforce case discipline (current implementation; recommended)**
-
-The namespace rule already produces an unambiguous grammar. No parser changes are needed. The action items are editorial and tooling:
-
-1. **Document `BTU` as a valid alias.** The alias `BTU` (all-uppercase) is looked up in the currency table first; when not found there, the physical unit table matches it as `bu_btu`. `Btu` and `btu` are also accepted. This document has already noted this in §3.6.
-2. **Document the case rule explicitly** (done above in §10.1–10.3).
-3. **Add a linter rule** that warns when a 3–4 uppercase-letter physical unit *alias* is written in all-caps where the canonical symbol is mixed-case or lowercase (e.g. warn on `BTU`, `ERG`, `BAR`).
-
-Trade-off: The rule is invisible — users who do not read this section may be surprised by `CUP` routing to Cuban Peso. Tooling (IDE tooltips, error messages) must surface the distinction.
-
----
-
-**Proposal B — Currency sigil prefix**
-
-Introduce an optional `$` prefix for currency codes: `$USD`, `$CUP`, `$BTC`. Physical units remain unchanged. The currency table lookup accepts tokens with or without the sigil.
+A currency code carries a **mandatory `$` sigil** as of spec 1.0. This is the resolution of the `CUP` (Cuban Peso) vs `cup` (the physical cup) namespace collision: a currency is *only* recognised in its sigil form, so a bare code can never collide with a physical-unit symbol — present or future.
 
 ```bovnar
-# Sigil form — explicit and unambiguous:
-.price  = <float_dec:64,$USD>   19.99;
-.volume = <float_dec:32,cup>     2.0;
+# Currencies — the '$' sigil is required:
+.price   = <float_dec:64,$USD>      19.99;   # US Dollar
+.btc     = <uint:64,$BTC>        54782000;   # Bitcoin (satoshis)
+.fund    = <float_dec:64,k~$EUR>   250.0;    # kilo-Euro (prefix before the sigil)
+.spot    = <float_dec:64,$USD/oz_t> 2351.40; # currency / physical-unit compound
 
-# Sigil-free form — backward-compatible, still works:
-.price  = <float_dec:64,USD>    19.99;
+# A bare code is no longer a currency:
+.volume  = <float_dec:32,cup>        2.0;    # the physical 'cup', unambiguously
+# .bad   = <float_dec:64,$USD> 1.0;           # error_unit_illegal: 'USD' is not a unit
 ```
 
-Trade-off: Requires a parser change. The `$` character must be added to the unit token character set and handled in `bvn_parse_unit`. Because the sigil is optional, the ambiguity between `CUP` (currency) and a hypothetical future physical unit `CUP` is not fully eliminated — only the sigil form is truly unambiguous. The sigil form is however immediately readable as "this is a currency" for human readers, which reduces the cognitive burden.
-
----
-
-**Proposal C — Mandatory namespace delimiter**
-
-Require a namespace qualifier for currency codes: `fx:USD`, `crypto:BTC`, `fx:CUP`. Physical units have no prefix. This makes the taxonomy explicit and extensible.
-
-```bovnar
-.price  = <float_dec:64,fx:USD>     19.99;
-.btc    = <uint:64,crypto:BTC>   54782000;
-.volume = <float_dec:32,cup>          2.0;
-```
-
-Trade-off: The most invasive option. It requires grammar changes, breaks all existing currency-annotated files, and increases verbosity. It does eliminate every present and future namespace collision at the cost of backward compatibility. Appropriate if the currency feature is still in a pre-stable phase and breaking changes are acceptable.
-
----
-
-**Recommendation:** Ship Proposal A with the linter rule. The `CUP`/`cup` split is logically clean and already implemented. The linter rule catches the highest-risk failure mode (user writes `BTU` or similar all-caps aliases). Revisit Proposal B if the currency feature gains a BVNR 1.2 stable revision, since the optional sigil can be introduced without breaking existing files.
+The sigil attaches directly before the currency code, after any SI/IEC prefix and its `~` (`k~$EUR`, `M~$USDT`). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this **breaks** any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning & Stability section of the specification).
 
 ---
 
@@ -1741,7 +1708,7 @@ ev_data   data="9.81"
 #### Full event sequence — currency unit
 
 ```
-Input: .price = <float_dec:64,USD> 19.99;
+Input: .price = <float_dec:64,$USD> 19.99;
 
 ev_assignment_start          data = "price"
 ev_type_annotation_start     data = "float_dec:64,USD"
@@ -1889,39 +1856,39 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ```bovnar
 # ── Fiat scalar amounts ────────────────────────────────────────────────────
-.price_usd     = <float_dec:64,USD>   19.99;
-.balance_eur   = <float_dec:64,EUR>  342.00;
-.yen_fee       = <uint:64,JPY>           500;    # zero minor unit — integer only
-.kwd_invoice   = <uint:64,KWD>          3500;    # 3.500 KWD in fils
+.price_usd     = <float_dec:64,$USD>   19.99;
+.balance_eur   = <float_dec:64,$EUR>  342.00;
+.yen_fee       = <uint:64,$JPY>           500;    # zero minor unit — integer only
+.kwd_invoice   = <uint:64,$KWD>          3500;    # 3.500 KWD in fils
 
 # "CUP" (uppercase) is the Cuban Peso, NOT the US cup volume unit:
-.cup_balance   = <float_dec:64,CUP>    25.00;   # 25 Cuban Pesos
+.cup_balance   = <float_dec:64,$CUP>    25.00;   # 25 Cuban Pesos
 
 # ── Crypto scalar amounts ──────────────────────────────────────────────────
-.btc_sat       = <uint:64,BTC>   54782000;       # on-chain satoshis
-.eth_readable  = <float_dec:64,ETH>    2.5;
-.doge_bag      = <float_dec:64,DOGE> 42000.0;
-.usdt_stable   = <float_dec:64,USDT>  5000.00;
+.btc_sat       = <uint:64,$BTC>   54782000;       # on-chain satoshis
+.eth_readable  = <float_dec:64,$ETH>    2.5;
+.doge_bag      = <float_dec:64,$DOGE> 42000.0;
+.usdt_stable   = <float_dec:64,$USDT>  5000.00;
 
 # ── Compound units ─────────────────────────────────────────────────────────
-.gold_price    = <float_dec:64,USD/oz_t>   2351.40;  # $/troy oz
-.wheat         = <float_dec:64,USD/bsh>       5.82;  # $/bushel
-.rent          = <float_dec:64,EUR/m²>       12.50;  # €/m²
-.billing_rate  = <float_dec:64,EUR/h>        150.00; # €/h
-.eur_usd       = <float_dec:64,USD/EUR>       1.0842; # exchange rate
+.gold_price    = <float_dec:64,$USD/oz_t>   2351.40;  # $/troy oz
+.wheat         = <float_dec:64,$USD/bsh>       5.82;  # $/bushel
+.rent          = <float_dec:64,$EUR/m²>       12.50;  # €/m²
+.billing_rate  = <float_dec:64,$EUR/h>        150.00; # €/h
+.eur_usd       = <float_dec:64,$USD/$EUR>       1.0842; # exchange rate
 
 # ── Reporting scale ────────────────────────────────────────────────────────
-.fund_nav      = <float_dec:64,k~USD>    250.0;     # $250,000
-.gdp           = <float_dec:64,M~EUR> 42800.0;      # €42.8 billion
+.fund_nav      = <float_dec:64,k~$USD>    250.0;     # $250,000
+.gdp           = <float_dec:64,M~$EUR> 42800.0;      # €42.8 billion
 
 # ── Exchange rate with timestamp ───────────────────────────────────────────
 .snapshot = {
     .epoch    = <uint:64,s>              1716400000;
-    .eur_usd  = <float_dec:64,USD/EUR>        1.0842;
+    .eur_usd  = <float_dec:64,$USD/$EUR>        1.0842;
 };
 
 # ── Array of prices ────────────────────────────────────────────────────────
-.tier_prices   = <float_dec:64,USD> [9.99, 19.99, 49.99, 99.99];
+.tier_prices   = <float_dec:64,$USD> [9.99, 19.99, 49.99, 99.99];
 ```
 
 ### 15.5 Error Cases
@@ -1937,7 +1904,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 .bad3 = <float:64,foobar>    1.0;
 
 # IEC prefix on a currency → error_unit_illegal
-.bad4 = <float_dec:64,Ki~USD> 1.0;
+.bad4 = <float_dec:64,Ki~$USD> 1.0;
 
 # Annotation unit differs from inline unit → error_unit_mismatch
 .bad5 = <float:64,m> 1.0 s;
@@ -1955,13 +1922,13 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 .ok3  = <float:64,BTU>      1.0;    # valid: same as Btu or btu
 
 # Correct: sub-kilo SI prefix on currency is accepted
-.ok4  = <float_dec:64,m~USD> 0.001; # valid: milli-dollar (one tenth of a cent)
+.ok4  = <float_dec:64,m~$USD> 0.001; # valid: milli-dollar (one tenth of a cent)
 
 # Correct: cup (volume) vs CUP (currency) — both valid, different meaning
 .vol  = <float_dec:32,cup>  2.0;    # US cup (236.6 mL)
-.bal  = <float_dec:64,CUP> 25.00;   # Cuban Peso
+.bal  = <float_dec:64,$CUP> 25.00;   # Cuban Peso
 ```
 
 ---
 
-*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v0.x.*
+*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.0.*

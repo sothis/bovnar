@@ -1,8 +1,8 @@
 # Bovnar Conformance Test Tool
 
-> **Version:** 0.x
+> **Version:** 1.0
 > **Protocol:** bvnr-conformance-v1
-> **Last updated:** 2026-05-17
+> **Last updated:** 2026-05-31
 
 ---
 

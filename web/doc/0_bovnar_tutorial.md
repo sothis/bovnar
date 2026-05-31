@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — A Practical Tutorial
 
-**Format version:** 0.x
+**Format version:** 1.0
 **Audience:** Developers already comfortable with JSON or similar text formats.
 
 ---
@@ -532,12 +532,12 @@ Multiple rows are separated by `/`. Each bracketed group is one row:
 
 The event stream reflects this: `ev_array_row_start`, elements, `ev_array_row_end`, then `ev_array_dim_start` before the second `ev_array_row_start`. Row-separator `/` and array nesting are independent concepts — do not confuse them. The `/` between `]` and `[` creates a new dimension in the *same* array, not a nested one.
 
-The lexer enforces a **consistent element count** across the `/`-separated dimension rows **of a single array** — and only those. Comma-separated elements are independent, even when they are themselves arrays, so sub-arrays placed side by side may have different lengths:
+The `/`-separated dimension rows of a single array must have a **consistent element count**, and (since spec 1.0) array elements are **homogeneous**: sibling sub-arrays must also match in length, so bare arrays and matrices are rectangular:
 
 ```bovnar
 .ok1 = [1, 2, 3]/[4, 5, 6];   # valid: both /-rows of one array have 3 elements
-.ok2 = [[1, 2], [3, 4]];       # valid: two independent sub-arrays (coincidentally equal)
-.ok3 = [[1, 2], [3, 4, 5]];    # valid: ragged sub-arrays are fine — they are elements, not rows
+.ok2 = [[1, 2], [3, 4]];       # valid: rectangular sub-arrays
+# .ok3 = [[1, 2], [3, 4, 5]];  # error_array_row_size_mismatch: sibling sub-arrays differ (2 vs 3)
 
 .bad1 = [1, 2, 3]/[4, 5];      # error_array_row_size_mismatch: 3 vs 2 (/-rows of one array)
 .bad2 = [[1, 2]/[3, 4, 5]];    # error_array_row_size_mismatch: 2 vs 3 (one /-array's own rows)
@@ -785,7 +785,7 @@ Understanding the error codes is essential for debugging. The parser reports lin
 ```bovnar
 .ok  = [[1, 2]/[3, 4]];          # valid — the /-array's two rows both have 2 elements
 .bad = [[1, 2]/[3, 4, 5]];       # error_array_row_size_mismatch — 2 vs 3 (/-rows)
-# note: [[1,2],[3,4,5]] is *valid* — comma-separated sub-arrays are independent elements
+# note: [[1,2],[3,4,5]] is also rejected — sibling sub-arrays must match in length (1.0 homogeneity)
 ```
 
 ---
@@ -939,5 +939,5 @@ $nan  $inf  $-inf
 
 ---
 
-*Bovnar Specification (draft, v0.x) — format by the Bovnar project.*
+*Bovnar Specification (v1.0) — format by the Bovnar project.*
 

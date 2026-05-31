@@ -1,9 +1,9 @@
 # Bovnar Python Bindings
 
-> **Version:** 0.x
+> **Version:** 1.0
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (spec v0.x).
+library (spec v1.0).
 
 No compiled extension module is needed — the bindings load `libbvnr_shared.so` at
 import time via the standard `ctypes.CDLL` machinery.
@@ -1102,7 +1102,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ## Spec version
 
-These bindings target the **Bovnar spec (draft, v0.x)**.  The
+These bindings target the **Bovnar spec (v1.0)**.  The
 `ErrorCode.UNIT_MISMATCH` member (value 38) and
 `ErrorCode.ARRAY_NESTING_TOO_HIGH` (value 6) are present in the current
 implementation.  The reference C library implementation is under active

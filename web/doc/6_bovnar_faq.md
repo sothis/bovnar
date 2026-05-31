@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Frequently Asked Questions
 
-> **Applies to:** Bovnar specification v0.x
+> **Applies to:** Bovnar specification v1.0
 
 ---
 
@@ -70,7 +70,7 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Version 0.x (draft).
+Version 1.0.
 
 ---
 
@@ -589,14 +589,18 @@ separator.
 
 **Can array elements have different types?**
 
-Yes. Annotations can be per-element rather than per-array:
+Array elements must be **homogeneous** (spec 1.0): every non-null element shares
+the same kind, and a bare array of numbers shares the same physical dimension.
+The numeric *encodings* may still mix, since they all denote the same dimension:
 
 ```bovnar
-.mixed = [<uint:8> 1, <sint:8> -1, <float:32> 3.14];
+.mixed = [<uint:8> 1, <sint:8> -1, <float:32> 3.14];   # valid: all dimensionless
 ```
 
-A whole-array annotation (placed before `[`) is the default type for elements
-that do not carry their own annotation:
+But genuinely different kinds (`[1, "two"]`) or dimensions (`[<float:64,m> 1.0,
+<float:64,k~g> 2.0]`) are a parse error. Heterogeneous data goes in a **struct**,
+not an array. A whole-array annotation (placed before `[`) is the default type
+for elements that do not carry their own annotation:
 
 ```bovnar
 .ports = <uint:16> [80, 443, 8080];
@@ -619,11 +623,11 @@ Leading, trailing, or consecutive commas produce null elements:
 Yes, inner arrays are just element values:
 
 ```bovnar
-.nested = [[1, 2], [3, 4]];   # valid; the two sub-arrays are independent element values
-.ragged = [[1, 2], [3, 4, 5]]; # also valid — comma-separated sub-arrays may differ in length
+.nested = [[1, 2], [3, 4]];    # valid; rectangular sub-arrays
+.ragged = [[1, 2], [3, 4, 5]];  # error_array_row_size_mismatch — sibling sub-arrays differ in length
 ```
 
-Note: the row-size consistency rule is **scoped to a single array** and applies only to its `/`-separated dimension rows. Comma-separated elements — including sub-arrays — are independent of one another, so `[[1, 2], [3, 4, 5]]` is **valid**. The error `error_array_row_size_mismatch` only fires when the `/`-rows of one array disagree, e.g. `[1,2,3]/[4,5]` or, for a nested `/`-array, `[[1,2]/[3,4,5]]`.
+Note: since spec 1.0 sibling sub-arrays must match in length (and element shape), so bare arrays and matrices are rectangular — `[[1, 2], [3, 4, 5]]` is rejected. `error_array_row_size_mismatch` fires both when the `/`-rows of one array disagree (`[1,2,3]/[4,5]`) and when ragged sibling sub-arrays disagree (`[[1,2],[3,4,5]]`).
 
 ---
 
@@ -1187,4 +1191,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification (draft, v0.x)*
+*End of Bovnar FAQ — Specification (v1.0)*

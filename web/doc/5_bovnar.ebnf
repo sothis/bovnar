@@ -1,6 +1,6 @@
 (* ================================================================== *)
 (*  BOVNAR  –  EBNF derived from parser/lexer/validator implementation *)
-(*  Version 0.x   Notation: ISO/IEC 14977:1996                        *)
+(*  Version 1.0   Notation: ISO/IEC 14977:1996                        *)
 (*    { }  = zero or more       [ ]  = optional                       *)
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
@@ -447,9 +447,12 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 
 inline-unit       = inline-unit-start , { inline-unit-char } ;
 
-inline-unit-start = ALPHA | "_" | utf8-leader ;
+(* A currency component carries a mandatory "$" sigil (spec 1.0): "$USD",      *)
+(* "$BTC", or prefixed "<prefix>~$EUR".  Bare codes are no longer currencies,  *)
+(* so a currency code can never collide with a physical-unit symbol.           *)
+inline-unit-start = ALPHA | "_" | "$" | utf8-leader ;
 
-inline-unit-char  = ALPHA | DIGIT | "_" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
+inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
                   | utf8-leader | utf8-continuation ;
 
 

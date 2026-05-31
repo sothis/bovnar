@@ -232,12 +232,11 @@ direction and necessarily lossy in the other. The converter never silently
 drops or corrupts data — anything it cannot represent is a hard error with a
 diagnostic, not a quietly mangled result.
 
-**`json → bvnr`** is structurally 1:1 and value-preserving. Integers keep full
-64-bit range in both signs (including unsigned values above `INT64_MAX`); JSON
-arrays map to bovnar bracket arrays element-for-element — so nested arrays,
-jagged arrays, single-row matrices, arrays of objects, and arrays mixing
-scalars, arrays and objects all carry over; nested objects become structs. It
-rejects, rather than mauls:
+**`json → bvnr`** is value-preserving for the data bovnar can represent. Integers
+keep full 64-bit range in both signs (including unsigned values above
+`INT64_MAX`); homogeneous JSON arrays — flat lists, rectangular nested arrays,
+arrays of same-shaped objects — map to bovnar arrays element-for-element, and
+nested objects become structs. It rejects, rather than mauls:
 
 - a top-level value that is not an object (bovnar documents are sets of
   assignments);
@@ -246,7 +245,11 @@ rejects, rather than mauls:
 - integer literals that exceed 64 bits, and malformed JSON (leading zeros,
   invalid escapes, unescaped control characters, lone surrogates, trailing
   content);
-- nesting deeper than the writer's array/struct limit (errors cleanly).
+- nesting deeper than the writer's array/struct limit (errors cleanly);
+- **heterogeneous or ragged arrays** — bovnar 1.0 arrays are homogeneous (see the
+  spec's §7.4), so a JSON array that mixes element kinds (`[1, "two", {…}]`) or
+  whose sub-arrays differ in length (`[[1,2],[3,4,5]]`) has no bovnar
+  representation and is a hard error. Model such data as an object/struct.
 
 One representational caveat: bovnar has no zero-length array (`[]` denotes a
 single null element), so an empty JSON array round-trips to `[null]`.

@@ -85,6 +85,8 @@ test-command  = "pytest {project}/python/tests"
 archs = ["auto64"]
 
 [tool.cibuildwheel.macos]
-# Each macOS runner builds for its own native arch (x86_64 on macos-13,
-# arm64 on macos-14); no cross-compiled universal2.
-archs = ["auto64"]
+# Build both macOS arches on the Apple-Silicon runner (macos-14): arm64 native
+# plus x86_64 cross-compiled. This avoids the scarce/deprecated Intel
+# (macos-13) hosted runners, which routinely never get picked up. The x86_64
+# slice is build-only — cibuildwheel skips its test phase on an arm host.
+archs = ["arm64", "x86_64"]

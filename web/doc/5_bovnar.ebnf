@@ -237,7 +237,7 @@ type-param-list = type-param , {ws , "," , ws , type-param} ;
 
 type-param   = width-param           (* e.g. 32, 64                        *)
              | base-param            (* e.g. _16, _64, _85                 *)
-             | q~param               (* e.g. q8, q16  – float_fix only     *)
+             | q-param               (* e.g. q8, q16  – float_fix only     *)
              | unit-param ;          (* e.g. m~s, Gi~B, m^2                *)
 
 (* Width: one or more decimal digits.  0 means "no width restriction".*)
@@ -265,7 +265,7 @@ base-param   = "_" , DIGIT , {DIGIT} ;
 (* Q is stored in value_type_spec_t.base and retrieved via            *)
 (* bvn_effective_q; bvn_effective_base always returns 10 for          *)
 (* float_fix and float_dec.                                           *)
-q~param      = "q" , DIGIT , {DIGIT} ;
+q-param      = "q" , DIGIT , {DIGIT} ;
 
 (* Unit parameter: everything up to the next "," or ">".             *)
 (* Parsed against the unit table by bvn_parse_unit.              *)

@@ -26,8 +26,8 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 };
 .acceleration = 70.5 k~m·s⁻²;
 .velocity     = <float:64,m/s> 9.81;
-.price        = <float_dec:64,USD> 19.99;
-.btc_balance  = <uint:64,BTC> 547820000;   # satoshis
+.price        = <float_dec:64,$USD> 19.99;
+.btc_balance  = <uint:64,$BTC> 547820000;   # satoshis
 .payload      = \x00 … binary stream … \x00;
 .matrix       = [1, 2, 3]/[4, 5, 6];
 ```
@@ -38,7 +38,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 
 - **Strong, optional typing** — `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8` with explicit bit-width (`8`, `16`, `32`, `64`, …) and numeric base (`_2`, `_16`, `_36`, `_85`, …).
 - **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k~g·m/s²`, and `Gi~B` are written inline; no external schema is needed.
-- **Currency units** — 164 ISO 4217 fiat currencies and 50 cryptocurrencies are first-class units (`<float_dec:64,USD> 19.99`, `<uint:64,BTC> 547820000`), each carrying minor-unit metadata and prefix-validity rules.
+- **Currency units** — 164 ISO 4217 fiat currencies and 50 cryptocurrencies are first-class units, written with a mandatory `$` sigil (`<float_dec:64,$USD> 19.99`, `<uint:64,$BTC> 547820000`), each carrying minor-unit metadata and prefix-validity rules.
 - **Inline unit suffix** — `9.81 m/s` is valid without a full type annotation.
 - **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead.
 - **Multi-dimensional arrays** — Rows separated by `/`; `[1,2,3]/[4,5,6]` is a native 2D structure.

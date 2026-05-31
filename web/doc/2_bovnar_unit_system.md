@@ -136,8 +136,8 @@ A unit may be written directly after a scalar value literal, between the value a
 ```bovnar
 .distance  = 1500 m;            # inline physical unit
 .speed     = 9.81 m/s;          # compound inline unit
-.price     = 19.99 USD;         # inline currency code
-.gold_rate = 2351.40 USD/oz_t;  # inline compound currency/unit
+.price     = 19.99 $USD;        # inline currency (mandatory $ sigil)
+.gold_rate = 2351.40 $USD/oz_t; # inline compound currency/unit
 .ratio     = 3.14 no_unit;      # explicit dimensionless
 ```
 

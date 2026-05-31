@@ -1362,7 +1362,7 @@ The grammar uses ISO/IEC 14977:1996 notation and is derived from and verified ag
      .precision = <float:64,Pa> 100;},
     {.name = "humidity";
      .value = <float:32> 0.45;
-     .unit = "%";},
+     .precision = <float:32> 0.01;},
     {.name = "wind_speed";
      .value = <float:32,m/s> 5.2;
      .precision = <float:32,m/s> 0.1;}

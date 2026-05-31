@@ -528,8 +528,10 @@ The bovnar `(family, width)` maps directly to the numpy dtype (`uint:8` →
 
 **Strict by default:**
 
-* an array that mixes element dtypes raises (`dtype=` to coerce);
-* ragged data raises (`dtype=object` to keep it ragged);
+* an array that mixes numeric encodings (e.g. `uint:8` and `float:64`) raises
+  unless you pass `dtype=` to coerce to one;
+* bovnar 1.0 arrays are rectangular and homogeneous, so the result is always a
+  regular ndarray — there is no ragged case to handle;
 * a `null` element cannot fill an integer array (`dtype=float` or `dtype=object`);
 * the unit is a whole-array property (numpy has one dtype per array) — mixed
   units raise; it is returned alongside the data, never baked into elements.

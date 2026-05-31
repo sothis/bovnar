@@ -529,12 +529,14 @@ ref-body-char = sym-body-char | "." ;
 (*      The per-bracket-pair context save/restore mechanism keeps this *)
 (*      check scoped to one array instance: a "/"-row width never      *)
 (*      leaks across a "," boundary or into a sibling branch.          *)
-(*      Comma-separated elements are therefore INDEPENDENT, even when  *)
-(*      they are themselves arrays:                                    *)
+(*      Beyond /-row consistency, array elements must be HOMOGENEOUS   *)
+(*      (spec 1.0, enforced above the grammar): same kind, same        *)
+(*      dimension for bare scalar arrays, and rectangular sibling      *)
+(*      sub-arrays.  Examples:                                         *)
 (*        [1,2,3]/[4,5]        → error (one array's /-rows: 3 vs 2)    *)
 (*        [[1,2]/[3,4,5]]      → error (inner /-array's rows: 2 vs 3)  *)
-(*        [[1,2],[3,4,5]]      → accepted (independent sub-arrays)     *)
-(*        [[1,2]/[3,4], [5,6,7]/[8,9,10]] → accepted (sibling blocks)  *)
+(*        [[1,2],[3,4,5]]      → error (ragged sibling sub-arrays)     *)
+(*        [[1,2]/[3,4], [5,6]/[7,8]] → accepted (same-shape blocks)    *)
 (*   b) Array nesting depth ≤ max_array_nesting (default 255).      *)
 
 array        = array-row , {"/" , ws , array-row} ;
@@ -679,12 +681,12 @@ byte         = (* any single byte 0x00–0xFF *) ;
      The "/"-separated dimension rows of a single array must all have
      the same element count; the lexer checks each row as it closes, so
      the violation is reported at the earliest offending byte. The
-     per-bracket-pair context save/restore mechanism keeps the check
-     scoped to one array instance, so a "/"-row width never leaks across
-     a "," boundary or into a sibling branch — comma-separated elements
-     (including nested arrays) are independent and may differ in length.
+     per-bracket-pair context save/restore mechanism keeps the /-row
+     check scoped to one array instance. In addition, array elements must
+     be homogeneous (spec 1.0, enforced above the grammar): sibling
+     sub-arrays must match in length, so a bare array/matrix is rectangular.
      Violation: error_array_row_size_mismatch
-       (e.g. [1,2,3]/[4,5] or [[1,2]/[3,4,5]]; but [[1,2],[3,4,5]] is OK).
+       (e.g. [1,2,3]/[4,5], [[1,2]/[3,4,5]], or [[1,2],[3,4,5]]).
 
   h) Array and struct nesting limits
      Array nesting (bracket depth): max_array_nesting (default 255) = 255.

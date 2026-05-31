@@ -63,6 +63,8 @@ EXPECTED = [
     ('position_eci',      'float64', (6, 3),    'k~m'),
     ('data_throughput',   'uint64',  (6,),      'Ki~B'),
     ('frequency_bins',    'float32', (6,),      'M~Hz'),
+    ('attitude_covariance', 'float64', (2, 2, 3, 3),    ''),
+    ('efield_tensor',     'float32', (2, 2, 2, 2, 3),  'V/m'),
 ]
 _UNIT_KEYS = [k for k, _, _, u in EXPECTED if u]
 
@@ -93,7 +95,7 @@ class TestFixtureContents:
     def test_rank_and_dtype_variety(self, doc_loads):
         ranks = {to_numpy(doc_loads[k]).ndim for k, *_ in EXPECTED}
         dtypes = {str(to_numpy(doc_loads[k]).dtype) for k, *_ in EXPECTED}
-        assert ranks == {1, 2, 3}                     # showcases 1-D, 2-D and 3-D
+        assert ranks == {1, 2, 3, 4, 5}               # showcases 1-D through 5-D
         assert len(dtypes) >= 7                        # spread of int/uint/float widths
 
 

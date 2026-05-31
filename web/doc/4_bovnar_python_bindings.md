@@ -16,7 +16,12 @@ import time via the standard `ctypes.CDLL` machinery.
 |---|---|
 | Python ≥ 3.10 | `dataclasses`, `enum.IntEnum`, union-type annotations (`X \| Y`) |
 | `libbvnr_shared.so` | Runtime only; see *Library discovery* below |
+| `numpy` ≥ 1.24 | **Optional** — only for the NumPy bridge (`pip install bovnar[numpy]`) |
+| `pint` ≥ 0.22 | **Optional** — only for the pint bridge (`pip install bovnar[pint]`) |
 | pytest ≥ 7 | Test suite only (`pip install bovnar[dev]`) |
+
+`numpy` and `pint` are imported **lazily, on first use** of their respective
+bridge functions — importing `bovnar` never requires either to be installed.
 
 ---
 
@@ -25,6 +30,14 @@ import time via the standard `ctypes.CDLL` machinery.
 ```bash
 # Editable install from source (recommended during development)
 pip install -e ".[dev]"
+```
+
+Optional extras pull in the dependencies for the bridges:
+
+```bash
+pip install "bovnar[numpy]"   # NumPy bridge
+pip install "bovnar[pint]"    # pint bridge
+pip install "bovnar[all]"     # both numpy and pint
 ```
 
 ---
@@ -386,6 +399,214 @@ multi-row array.
 
 ---
 
+## pint bridge
+
+bovnar units interoperate with [pint](https://pint.readthedocs.io/) through a
+hand-verified translation table (`bovnar._pint_units`). pint is an **optional**
+dependency, imported lazily on first use; importing `bovnar` never requires it.
+Install with `pip install "bovnar[pint]"` (or `bovnar[all]`).
+
+The four bridge functions are exported from the top-level `bovnar` namespace
+(and from `bovnar._pint_bridge`):
+
+| Function | Direction | Description |
+|---|---|---|
+| `to_pint(value, vu, *, ureg=None)` | bovnar → pint | Wrap a scalar/ndarray + `ValueUnit` in a pint `Quantity` |
+| `to_pint_unit(vu, *, ureg=None)` | bovnar → pint | `ValueUnit` → pint `Unit` (dimensionless when no real unit) |
+| `from_pint(qty, *, ureg=None, validate=True)` | pint → bovnar | `Quantity` → `(magnitude, ValueUnit)` |
+| `from_pint_unit(unit, *, ureg=None, validate=True)` | pint → bovnar | `Unit` / `Quantity` / `str` → `ValueUnit` |
+
+```python
+import bovnar
+
+vu  = bovnar.parse_unit("k~m")        # kilometre
+qty = bovnar.to_pint(5.0, vu)         # <Quantity(5.0, 'kilometer')>
+
+mag, vu2 = bovnar.from_pint(qty)      # (5.0, ValueUnit for km)
+vu3      = bovnar.from_pint_unit("newton")     # str/Unit/Quantity all accepted
+```
+
+### Prefixes ride in the unit, never the magnitude
+
+bovnar's `k~m` maps to pint `kilometer` — the prefix is kept inside the unit
+*name*, never folded into the magnitude. A wrapped value is therefore returned
+unscaled, so a wrapped numpy array is never silently rescaled.
+
+### Affine temperature units
+
+Offset/affine scales (`°C`, `°F`, Réaumur, Delisle, Newton, Rømer) cannot carry
+a prefix or exponent — pint forbids it and bovnar never emits it. A prefixed or
+exponentiated affine unit raises `BovnarArgumentError` rather than a cryptic
+pint error.
+
+### Validation
+
+`from_pint` / `from_pint_unit` validate the resulting `ValueUnit` by default
+(`validate=True`); a pint unit that maps to a structurally invalid bovnar unit
+(e.g. a prefix not permitted on that base) raises `BovnarArgumentError`. pint
+units with more than 8 components, non-integer exponents, or exponents outside
+`[-9, 9]` also raise.
+
+### Registry control: `build_registry`
+
+A module-level default `pint.UnitRegistry` is built on first use. To share a
+registry across calls — or to register bovnar's custom units onto your own —
+pass `ureg=`:
+
+```python
+from bovnar._pint_units import build_registry, is_currency_unit
+
+ureg = build_registry()                       # fresh registry with bovnar units
+ureg = build_registry(my_existing_registry)   # extend an existing one
+ureg = build_registry(with_currencies=False)  # skip the currency dimensions
+
+qty  = bovnar.to_pint(5.0, vu, ureg=ureg)
+```
+
+`build_registry` registers bovnar's custom physical-unit definitions — units
+where pint's own definition differs or is missing (e.g. `bvnr_gauss`,
+`bvnr_var`, the historical German units) — plus, by default, the ISO 4217 +
+crypto currencies as custom dimensions. `is_currency_unit(unit)` reports whether
+a pint unit involves a currency dimension (holds for products such as
+`USD/year`).
+
+### Semantic caveats
+
+A few bovnar units map to a pint native unit whose *semantics* differ slightly;
+these are recorded in `bovnar._pint_units.SEMANTIC_CAVEATS` (e.g. `BYTE`,
+`DECIBEL`, `NEPER`). Consult that dict when exact round-trip semantics matter.
+
+The mapping is **not 1:1** by construction (bovnar `b`=bit vs pint barn,
+`R`=roentgen vs pint's gas constant). The translation table is locked against
+silent drift by `TestUnitTableIntegrity`, which re-derives every physical unit's
+dimension and magnitude from bovnar and asserts the pint bridge reproduces both.
+
+---
+
+## NumPy bridge
+
+The NumPy bridge converts between bovnar arrays and `numpy.ndarray`. numpy is an
+**optional** dependency, imported lazily on first use. Install with
+`pip install "bovnar[numpy]"` (or `bovnar[all]`).
+
+All five functions are exported from the top-level `bovnar` namespace (and from
+`bovnar._numpy`):
+
+| Function | Direction | Description |
+|---|---|---|
+| `to_numpy(src, *, dtype=None, return_unit=False)` | bovnar → numpy | Array → `ndarray` (optionally `(ndarray, unit_str)`) |
+| `to_pint_array(src, *, dtype=None, ureg=None)` | bovnar → pint | Array → pint `Quantity` (ndarray data + unit) |
+| `from_numpy(writer, key, arr, *, unit=None)` | numpy → bovnar | Write an `ndarray` into a `Writer` |
+| `from_pint_array(writer, key, qty)` | pint → bovnar | Write a pint `Quantity` (magnitude + unit) into a `Writer` |
+| `array_to_bvnr(key, arr, *, unit=None, pretty=True)` | numpy → bovnar | `ndarray` → bovnar bytes (convenience) |
+
+### Reading: `to_numpy`
+
+*src* is either a `DomNode` for an ARRAY (random-access, from `dom_parse`) or
+the nested list/tuple that `loads(..., typed=True)` produces. Both
+`/`-separated rows and bracket nesting collapse to the same `ndarray` shape.
+
+```python
+import bovnar
+
+# from a typed loads() result
+doc = bovnar.loads(b'.a=<uint:8>[1,2,3];', typed=True)
+arr = bovnar.to_numpy(doc['a'])               # dtype uint8
+
+# with the whole-array unit
+arr, unit = bovnar.to_numpy(
+    bovnar.loads(b'.a=<float:32,m/s>[1,2,3]/[4,5,6];', typed=True)['a'],
+    return_unit=True)                         # unit == 'm/s', arr.shape == (2, 3)
+
+# from a DOM node
+arr = bovnar.to_numpy(bovnar.dom_parse(b'.a=<sint:16>[10,-20,30];')['a'])
+```
+
+The bovnar `(family, width)` maps directly to the numpy dtype (`uint:8` →
+`uint8`, `float:32` → `float32`, …); `FLOAT_FIX` / `FLOAT_DEC` fall back to
+`float64`. Pass `dtype=` to coerce.
+
+**Strict by default:**
+
+* an array that mixes element dtypes raises (`dtype=` to coerce);
+* ragged data raises (`dtype=object` to keep it ragged);
+* a `null` element cannot fill an integer array (`dtype=float` or `dtype=object`);
+* the unit is a whole-array property (numpy has one dtype per array) — mixed
+  units raise; it is returned alongside the data, never baked into elements.
+
+### Writing: `from_numpy` / `array_to_bvnr`
+
+```python
+import numpy as np
+import bovnar
+from bovnar import Writer
+
+with Writer.to_mem() as w:
+    bovnar.from_numpy(w, "velocity",
+                      np.array([1.5, 2.5], dtype=np.float32), unit="m/s")
+out = w.get_output()
+
+# one-shot convenience
+raw = bovnar.array_to_bvnr("matrix", np.arange(8).reshape(2, 2, 2))
+```
+
+* `from_numpy` requires a 1-D-or-higher array; write a 0-D scalar with the
+  scalar `Writer` API instead.
+* *unit* may be a bovnar unit string, a `ValueUnit`, or a pint `Unit`/`Quantity`.
+* Units apply to **numeric** arrays only — a unit on a `bool` or string array
+  raises `BovnarArgumentError`.
+* `array_to_bvnr` grows its write buffer like `dumps()` (4 MiB, doubling up to
+  256 MiB).
+
+### pint arrays
+
+`to_pint_array` and `from_pint_array` bridge straight through to pint
+Quantities backed by ndarrays, reusing the unit translation above:
+
+```python
+q = bovnar.to_pint_array(
+    bovnar.loads(b'.a=<float:64,k~m>[1,2,3];', typed=True)['a'])
+# q is a pint Quantity: magnitude ndarray [1, 2, 3], unit 'kilometer'
+
+with Writer.to_mem() as w:
+    bovnar.from_pint_array(w, "dist", q)
+```
+
+---
+
+## Currency helpers
+
+The `bovnar.currency` submodule (exposed as `bovnar.currency`) provides
+metadata for the ISO 4217 fiat and cryptocurrency `BaseUnit` members. It is pure
+Python — no library or optional dependency required.
+
+```python
+from bovnar import currency, BaseUnit
+
+currency.is_currency(BaseUnit.USD)   # True
+currency.is_fiat(BaseUnit.USD)       # True
+currency.is_crypto(BaseUnit.BTC)     # True
+
+info = currency.currency_info(BaseUnit.USD)
+info.code           # 'USD'
+info.numeric_code   # 840 (ISO 4217 numeric; 0 for crypto)
+info.minor_unit     # 2   (decimal places: 1 major = 10^minor minor units)
+info.name           # 'US Dollar'
+
+currency.minor_unit(BaseUnit.JPY)    # 0
+currency.currency_code(BaseUnit.EUR) # 'EUR'
+currency.from_code('GBP')            # BaseUnit.GBP
+
+for ci in currency.all_fiat():       # all_crypto() / all_currencies() also exist
+    ...
+```
+
+`CurrencyInfo` is a frozen dataclass; `currency_info`, `minor_unit`,
+`currency_name`, `currency_code`, and `from_code` raise for non-currency bases
+or unknown codes.
+
+---
+
 ## `Reader` reference
 
 ### Construction
@@ -645,7 +866,7 @@ for as long as any derived `DomNode` is in use.
 
 ```
 NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
-REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8
+REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 ```
 
 ---
@@ -666,6 +887,10 @@ pytest -m needs_lib
 pytest -v --tb=short
 ```
 
+The NumPy- and pint-bridge tests `pytest.importorskip` their dependency, so they
+are skipped automatically when `numpy` / `pint` is not installed. Install
+`bovnar[all]` to run the full suite.
+
 ---
 
 ## Package layout
@@ -674,6 +899,10 @@ pytest -v --tb=short
 bovnar/
 ├── __init__.py      # loads() / dumps() / dom_parse() / unit helpers — public API
 ├── _ffi.py          # ctypes FFI: library discovery + argtypes/restype
+├── _numpy.py        # NumPy bridge: to_numpy/from_numpy/to_pint_array/array_to_bvnr (numpy optional)
+├── _pint_bridge.py  # pint bridge: to_pint/from_pint/to_pint_unit/from_pint_unit (pint optional)
+├── _pint_units.py   # verified bovnar↔pint unit table + build_registry()
+├── currency.py      # ISO 4217 / crypto currency metadata (pure Python)
 ├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
@@ -684,18 +913,21 @@ bovnar/
 └── writer.py        # Writer class
 
 tests/
-├── conftest.py           # shared fixtures, needs_lib marker
-├── test_analytics.py     # analytic / benchmarking tests (needs_lib)
-├── test_array_parser.py  # array parsing integration tests (needs_lib)
-├── test_currency_units.py# currency unit round-trip tests (needs_lib)
-├── test_dom.py           # DOM API integration tests (needs_lib)
-├── test_enums.py         # pure-Python enum tests
-├── test_reader.py        # integration: Reader (needs_lib)
-├── test_structs.py       # pure-Python struct / helper tests
-├── test_unit_physics.py  # unit physics / conversion tests (needs_lib)
-├── test_units.py         # mixed: unit parsing / serialisation (needs_lib for FFI)
-├── test_write_array.py   # write_array integration tests (needs_lib)
-└── test_writer.py        # integration: Writer (needs_lib)
+├── conftest.py                   # shared fixtures, needs_lib marker
+├── test_analytics.py             # analytic / benchmarking tests (needs_lib)
+├── test_array_parser.py          # array parsing integration tests (needs_lib)
+├── test_currency_units.py        # currency unit round-trip tests (needs_lib)
+├── test_dom.py                   # DOM API integration tests (needs_lib)
+├── test_enums.py                 # pure-Python enum tests
+├── test_example_numpy_roundtrip.py # NumPy bridge end-to-end example (needs_lib + numpy)
+├── test_numpy_bridge.py          # NumPy bridge tests (needs_lib + numpy)
+├── test_pint_bridge.py           # pint bridge + unit-table integrity (needs_lib + pint)
+├── test_reader.py                # integration: Reader (needs_lib)
+├── test_structs.py               # pure-Python struct / helper tests
+├── test_unit_physics.py          # unit physics / conversion tests (needs_lib)
+├── test_units.py                 # mixed: unit parsing / serialisation (needs_lib for FFI)
+├── test_write_array.py           # write_array integration tests (needs_lib)
+└── test_writer.py                # integration: Writer (needs_lib)
 ```
 
 ---

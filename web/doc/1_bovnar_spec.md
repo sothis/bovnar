@@ -310,6 +310,23 @@ The stored text includes the leading dot and all intermediate dots:
 .ref = &.config.host;                  # reference → ".config.host"
 ```
 
+**Resolution.** A reference is stored **unresolved** — as the path string only.
+The parser and library never dereference it, so:
+
+- the target **need not exist** at parse time; a reference to a missing key
+  (`&.nope`), a forward reference (`&.x` before `.x` is defined), or a reference
+  to a value outside the document is accepted and stored verbatim;
+- **cycles are not detected** (`.a = &.b; .b = &.a;` parses), and cannot hang the
+  library, which never follows a reference (`bvn_dom_lookup` navigates literal
+  structure only, stopping at a reference rather than dereferencing it);
+- **resolution is entirely the application's responsibility**, including how to
+  treat dangling paths and cycles.
+
+A reference path is bounded by `max_reference_length` (`error_reference_too_long`
+otherwise). In an array, references are homogeneous by **kind** — an array of
+references is uniform regardless of what its targets resolve to (their target
+types are unknown to the parser).
+
 ### 4.6 Numbers
 
 #### Bare Number Literals

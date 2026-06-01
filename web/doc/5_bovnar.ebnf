@@ -495,6 +495,9 @@ sym-body-char = id-body-char ;
 (* "&.foo.bar" stores ".foo.bar".                                     *)
 (* At least one segment is required; "&" alone or "&." without a      *)
 (* following id-start character is an error.                          *)
+(* A reference is stored UNRESOLVED — the path is a string token; the *)
+(* library never dereferences it, so the target need not exist and    *)
+(* cycles are not detected. Resolution is the application's job.       *)
 
 reference    = "&" , ref-segment , {ref-segment} ;
 ref-segment  = "." , id-start , {ref-body-char} ;

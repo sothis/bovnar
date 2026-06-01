@@ -537,6 +537,51 @@ static void test_struct_unique_keys(void)
 		bvn_dom_doc_destroy(d);
 	}
 }
+/*
+ * References are stored UNRESOLVED — the path string only. The library never
+ * dereferences them, so dangling, forward and cyclic references all parse, and
+ * lookup navigates literal structure (it does not follow a reference). The path
+ * grammar requires "." + id-start segments.
+ */
+static void test_references(void)
+{
+	bvn_dom_doc_t *d;
+	const char *path; uint32_t pl;
+
+	d = parse_doc(".x = 42;\n.r = &.x;\n");
+	if (d) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(d), error_none,
+					   "reference parses");
+		bvn_dom_node_t *r = bvn_dom_lookup(d, ".r");
+		ASSERT_EQ_UINT(bvn_dom_node_type(r), BVN_DOM_REFERENCE,
+					   ".r is a reference node");
+		ASSERT_TRUE(bvn_dom_get_reference(r, &path, &pl) &&
+					pl == 2u && memcmp(path, ".x", 2) == 0,
+					"reference stores the path '.x', unresolved");
+		bvn_dom_doc_destroy(d);
+	}
+	/* Dangling, cyclic and forward references are all accepted (app-resolved). */
+	expect_parse(".r = &.nonexistent;\n", error_none, "dangling reference accepted");
+	expect_parse(".a = &.b;\n.b = &.a;\n", error_none, "reference cycle accepted");
+	expect_parse(".r = &.x;\n.x = 1;\n",   error_none, "forward reference accepted");
+
+	/* lookup does not follow references (structural navigation only). */
+	d = parse_doc(".b = {.c = 1;};\n.a = &.b;\n");
+	if (d) {
+		ASSERT_NULL(bvn_dom_lookup(d, ".a.c"),
+					"lookup does not dereference a reference mid-path");
+		bvn_dom_doc_destroy(d);
+	}
+	/* Path grammar. */
+	expect_parse(".r = &;\n",    error_unexpected_input_byte, "'&' alone rejected");
+	expect_parse(".r = &.;\n",   error_unexpected_input_byte, "'&.' rejected");
+	expect_parse(".r = &..x;\n", error_unexpected_input_byte, "empty segment rejected");
+	expect_parse(".a = {.b = {.c = 1;};}; .r = &.a.b.c;\n", error_none,
+				 "nested reference path accepted");
+	/* References are homogeneous by kind regardless of resolved target type. */
+	expect_parse(".i = 1; .s = \"x\"; .arr = [&.i, &.s];\n", error_none,
+				 "array of references is homogeneous by kind");
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -551,6 +596,7 @@ int main(void)
 	test_array_homogeneity();
 	test_empty_array_semantics();
 	test_struct_unique_keys();
+	test_references();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

@@ -179,8 +179,10 @@ bool-value   = "true" | "false" | "on" | "off" ;
 (*  4. Type annotations                                                *)
 (* ─────────────────────────────────────────────────────────────────  *)
 
-(* Lexer: a keyword state machine (tf_* states) recognises the six    *)
-(* family names.  After the family keyword the raw bytes of the ":…"  *)
+(* Lexer: a keyword state machine (tf_* states) recognises the seven  *)
+(* family names via five keyword paths (float_fix / float_dec share    *)
+(* the "float" prefix; see §4 below).  After the family keyword the    *)
+(* raw bytes of the ":…"                                              *)
 (* parameter string are accumulated into type_data by copy_type_byte. *)
 (*                                                                    *)
 (* Validator: bvn_parse_type_annotation parses the accumulated string *)
@@ -437,11 +439,10 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 (*                                                                     *)
 (* State-machine flow:                                                 *)
 (*   1. Whitespace from a number-body state fires ACT_to_number_outro *)
-(*      → number_outro.  Special numbers (nan, inf, ninf)          *)
-(*      enter number_outro_nosp directly; both states                 *)
-(*      require subsequent whitespace before a unit can begin.        *)
-(*      Strings enter string_outro_nosp after the closing "";        *)
-(*      whitespace transitions to string_outro.                       *)
+(*      → number_outro.  Strings enter string_outro_nosp after the    *)
+(*      closing ""; whitespace transitions to string_outro.           *)
+(*      Special numbers (nan, inf, ninf) are lexed as symbols and      *)
+(*      take no inline unit (give the unit via the type annotation).   *)
 (*   2. From number_outro / string_outro (whitespace already seen):   *)
 (*        alpha / "_" / UTF-8 leader → ACT_inline_unit_intro          *)
 (*   3. ACT_inline_unit_intro pushes the first byte and enters        *)
@@ -555,7 +556,7 @@ ref-body-char = sym-body-char | "." ;
 (*        [[1,2]/[3,4,5]]      → error (inner /-array's rows: 2 vs 3)  *)
 (*        [[1,2],[3,4,5]]      → error (ragged sibling sub-arrays)     *)
 (*        [[1,2]/[3,4], [5,6]/[7,8]] → accepted (same-shape blocks)    *)
-(*   b) Array nesting depth ≤ max_array_nesting (default 255).      *)
+(*   b) Array nesting depth ≤ max_array_nesting (default 64, cap 255).*)
 
 array        = array-row , {"/" , ws , array-row} ;
 
@@ -585,7 +586,8 @@ array-elem   = [type-annotation , ws] , raw-value ;
 (* Keys must be UNIQUE within one scope (a struct, or the top-level    *)
 (* document); a repeat is error_duplicate_struct_key (enforced above   *)
 (* the grammar). The same key in different scopes is unrelated.        *)
-(* Nesting depth: struct_nesting_level ≤ max_struct_nesting (255).    *)
+(* Nesting depth: struct_nesting_level ≤ max_struct_nesting           *)
+(* (default 64 when the flag is 0; hard cap 255).                      *)
 (* An unmatched "}" is error_illegal_struct_close.                    *)
 
 struct       = "{" , ws , {assignment , ws} , "}" ;
@@ -714,8 +716,10 @@ byte         = (* any single byte 0x00–0xFF *) ;
        (e.g. [1,2,3]/[4,5], [[1,2]/[3,4,5]], or [[1,2],[3,4,5]]).
 
   h) Array and struct nesting limits
-     Array nesting (bracket depth): max_array_nesting (default 255) = 255.
-     Struct nesting: max_struct_nesting (default 255) = 255.
+     Array nesting (bracket depth): max_array_nesting (default 64 when
+       the flag is 0; hard cap 255).
+     Struct nesting: max_struct_nesting (default 64 when the flag is 0;
+       hard cap 255).
 
   i) Type-annotation / value compatibility (enforced by validator)
      "utf8" requires a string value.
@@ -775,22 +779,23 @@ byte         = (* any single byte 0x00–0xFF *) ;
      error_got_incomplete_bvnr_stream.
 
   o) Inline unit suffix
-     An inline-unit follows a scalar number, special-number, or string
-     in non-array context only.  At least one whitespace character MUST
-     separate the value literal from the unit.  The only accepted form
-     is "value unit"; any other form (no separator or colon) is a
-     hard error.
+     An inline-unit follows a scalar number or string in non-array
+     context only.  A special-number keyword (nan, inf, ninf) takes NO
+     inline unit — it is lexed as a symbol, and symbols accept no inline
+     suffix; "inf m/s" is error_unexpected_input_byte.  Supply a unit
+     for a special value through the type annotation (<float:64,m/s> inf).
+     At least one whitespace character MUST separate the value literal
+     from the unit.  The only accepted form is "value unit"; any other
+     form (no separator or colon) is a hard error.
 
      State-machine flow:
        1. Whitespace from number-body states (zero_intro, copy_number_byte,
           fraction_intro, copy_fraction_byte, copy_exp_byte) fires
-          ACT_to_number_outro → number_outro.  Special numbers
-          (nan, inf, ninf) enter number_outro_nosp
-          directly; a further whitespace character transitions to
-          number_outro.  Strings enter string_outro_nosp after the
-          closing quote; whitespace transitions to string_outro.
-          A comment's terminating newline also counts as whitespace
-          (comment_outro promotes *_nosp → the ws-seen counterpart).
+          ACT_to_number_outro → number_outro.  Strings enter
+          string_outro_nosp after the closing quote; whitespace
+          transitions to string_outro.  A comment's terminating newline
+          also counts as whitespace (comment_outro promotes string_outro_nosp
+          → string_outro).
        2. From number_outro / string_outro (at least one ws consumed):
             alpha / "_" / UTF-8-leader → ACT_inline_unit_intro
        3. ACT_inline_unit_intro pushes the first byte and enters

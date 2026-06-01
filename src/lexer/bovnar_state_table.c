@@ -474,6 +474,9 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5f] = ACT_inline_unit_intro,
 		BVN_UTF8_LEADER(ACT_inline_unit_intro),
 	},
+	/* Vestigial row: number_outro_nosp is unreachable since nan/inf/ninf
+	 * became bare keywords (lexed as symbols). Kept to avoid renumbering
+	 * state_t before the 1.0 freeze. See bvn_lexer_impl.h. */
 	[number_outro_nosp] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
 		[0x23] = ACT_comment_intro,

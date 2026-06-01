@@ -8110,6 +8110,10 @@ typedef enum state_e {
 	struct_intro,
 	struct_outro,
 	value_outro,
+	/* Vestigial: unreachable since nan/inf/ninf became bare keywords
+	 * (lexed as symbols) rather than $-sigil numbers. No action sets it
+	 * as next_state; retained only to avoid renumbering state_t before
+	 * the 1.0 freeze. See bvn_after_state_idx_table[number_outro_nosp]. */
 	number_outro_nosp,
 	inline_unit_body,
 	inline_unit_outro,
@@ -8803,6 +8807,9 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5f] = ACT_inline_unit_intro,
 		BVN_UTF8_LEADER(ACT_inline_unit_intro),
 	},
+	/* Vestigial row: number_outro_nosp is unreachable since nan/inf/ninf
+	 * became bare keywords (lexed as symbols). Kept to avoid renumbering
+	 * state_t before the 1.0 freeze. See bvn_lexer_impl.h. */
 	[number_outro_nosp] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
 		[0x23] = ACT_comment_intro,
@@ -9673,6 +9680,8 @@ bool bvn_action_comment_intro(bvnr_reader_t* p)
 bool bvn_action_comment_outro(bvnr_reader_t* p)
 {
 	state_t s = p->lex.last_state;
+	/* number_outro_nosp is vestigial (unreachable since nan/inf/ninf
+	 * became bare keywords); the first branch is dead but harmless. */
 	if      (s == number_outro_nosp) s = number_outro;
 	else if (s == string_outro_nosp) s = string_outro;
 	p->lex.next_state = s;

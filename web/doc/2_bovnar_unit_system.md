@@ -314,7 +314,7 @@ Bovnar supports 157 named physical base units. Currency codes are a separate nam
 | `thm`  | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
 | `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
 
-> **`BTU` alias note:** `BTU` (all uppercase, three characters) is a valid alias for `bu_btu`. Although it matches the currency namespace pattern, the currency lookup fails first (no ISO 4217 entry for `BTU`), and the parser then finds it in the physical unit table. `Btu` and `btu` are also accepted. See §10.2 for the complete conflict table.
+> **`BTU` alias note:** `BTU` (all uppercase, three characters) is a valid alias for `bu_btu`. Because currencies require the `$` sigil, the bare token `BTU` is a physical-unit lookup and resolves to `bu_btu`; `Btu` and `btu` are also accepted. See §10.2 for the complete look-alike table.
 
 ### 3.7 Power Units
 
@@ -357,7 +357,7 @@ Bovnar supports 157 named physical base units. Currency codes are a separate nam
 | `tsp`  | `teaspoon`, `teaspoons` | US teaspoon | `bu_teaspoon` | 4.92892159375×10⁻⁶ m³ |
 | `bbl`  | `barrel`, `barrels` | petroleum barrel | `bu_barrel` | 0.158987294928 m³ |
 
-> **`cup` disambiguation:** The canonical symbol for the US cup volume unit is `cup` (all lowercase). The all-uppercase token `CUP` refers exclusively to the Cuban Peso (ISO 4217 code 192). The two tokens are parsed by different lookup tables and cannot be confused. See §10.3 for full details.
+> **`cup` disambiguation:** The canonical symbol for the US cup volume unit is `cup` (all lowercase). The Cuban Peso (ISO 4217 code 192) is written with the mandatory currency sigil as `$CUP`; the bare uppercase token `CUP` is `error_unit_illegal`. The two cannot be confused. See §10.3 for full details.
 
 #### UK Imperial Volume
 
@@ -788,17 +788,16 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 Currency amounts are dimensional quantities in financial computing. `$19.99 USD` carries a denomination dimension just as `9.81 m/s²` carries an acceleration dimension. Bovnar extends the unit system with 214 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.
 
-### 9.1 Namespace Rule
+### 9.1 The `$` Sigil Rule
 
-Any token consisting **exclusively of uppercase ASCII letters with length 3 or 4** is dispatched to the currency table first. With the sole exception of `BTU` (a registered alias for `bu_btu`), no physical base unit symbol matches this pattern — all others are either single-letter (`m`, `K`, `A`…), mixed-case (`Hz`, `Pa`, `Wb`…), or lowercase-dominated (`mol`, `min`, `bar`…).
+As of spec 1.0 a currency is recognised **only** in its `$`-sigil form (`$USD`, `$BTC`, or prefixed `k~$EUR`). The sigil — and nothing else — dispatches a component to the currency table; see §10.4 for the full rules and rationale.
 
-Classification happens at the lookup stage:
+Classification happens at the lookup stage, per unit component:
 
-1. If the token is all-uppercase 3–4 ASCII characters, the currency table is consulted first.
-2. If not found in the currency table (or the token does not match the all-uppercase 3–4 char pattern), the physical unit table is consulted.
-3. If not found in either table, `error_unit_illegal` is raised.
+1. A component introduced by `$` (after any SI/IEC prefix and its `~`) is looked up in the **currency table**. If the code is not found there, `error_unit_illegal` is raised — a `$` introduces a currency and nothing else.
+2. A component **without** a `$` is looked up only in the **physical unit table**. A bare code such as `USD` or `CUP` is therefore never a currency; if it is not a physical unit it is `error_unit_illegal`.
 
-This reservation requires no new sigil character and no change to the unit grammar character set. The full implications for ambiguous cases are analysed in §10.
+Because the sigil is mandatory, a bare uppercase code can never collide with a physical-unit symbol — present or future — so the two namespaces are disjoint by construction. The collision cases this resolves are catalogued for reference in §10.
 
 ### 9.2 ISO 4217 Fiat Currencies and Precious Metals
 
@@ -1099,64 +1098,53 @@ Bovnar annotates denomination; it does not store exchange rates or timestamps. T
 
 ## 10. Symbol Disambiguation
 
-This section exhaustively documents every case where a physical-unit token and a currency token could be confused, explains how the namespace rule resolves each case, and proposes options for tightening the separation further.
+This section documents how a physical-unit token and a currency token are kept apart. The mandatory `$` currency sigil (§10.4) is the normative rule and resolves every potential collision; the look-alike tables that follow are retained for reference.
 
 ### 10.1 The Namespace Rule as Disambiguator
 
-The rule from §9.1 produces a strict partition:
+The mandatory `$` sigil (§9.1, normative rule in §10.4) makes the two namespaces disjoint by construction: the sigil — and nothing else — selects the currency table, so a bare token is **always** a physical-unit lookup and can never be mistaken for a currency.
 
-| Token class | Criteria | Examples |
+| Written token | Looked up in | Result |
 |---|---|---|
-| Physical unit | Any symbol that does **not** consist exclusively of 3–4 uppercase ASCII letters, **or** is an all-uppercase alias registered in the physical unit table | `m`, `Hz`, `cup`, `Btu`, `BTU`, `mol`, `rad`, `k~g` |
-| Currency code | Exclusively 3–4 uppercase ASCII letters, found in the currency table | `USD`, `EUR`, `CUP`, `BTC`, `DOGE` |
-| Error | Exclusively 3–4 uppercase ASCII letters, found in neither table | `XYZ`, `ABC` |
+| `$USD`, `$BTC`, `k~$EUR` | currency table (sigil present) | currency, or `error_unit_illegal` if the code is unknown |
+| `m`, `Hz`, `cup`, `BTU`, `k~g` (no `$`) | physical unit table only | physical unit, or `error_unit_illegal` if unknown |
+| `USD`, `CUP`, `XYZ` (no `$`) | physical unit table only | `error_unit_illegal` — not physical units, and a bare code is never a currency |
 
-The classification is performed at the token level, before any prefix or compound parsing. A token that fails both the physical-unit table and the currency table lookup raises `error_unit_illegal` regardless of whether it looks meaningful to a human reader.
-
-**Case sensitivity is therefore load-bearing.** `cup` and `CUP` are distinct tokens that dispatch to entirely different lookup tables.
+Because the lookup is sigil-driven rather than spelling-driven, **case is no longer load-bearing for disambiguation**: `cup` and `CUP` are both physical-unit lookups (the first matches `bu_cup`, the second is `error_unit_illegal`), and the Cuban Peso is written `$CUP`.
 
 ### 10.2 Exhaustive Conflict Table
 
-The following table lists every case where a physical-unit symbol or alias coincides with or could be confused with a valid or plausible currency token.
+Before the sigil, several uppercase tokens *looked* like they could be either a physical unit or a currency. The sigil removes the ambiguity outright; the table below is retained as a reference for the codes that previously needed disambiguation. In every row, the bare form is a physical-unit lookup and the currency is only ever the `$`-prefixed form.
 
-| Token | Physical meaning | Currency meaning | Resolution |
-|-------|-----------------|-----------------|------------|
-| `cup` | US cup (236.6 mL, `bu_cup`) | — | Unambiguous: no currency uses lowercase |
-| `CUP` | — | Cuban Peso (ISO 4217:192) | Unambiguous: dispatches to currency table |
-| `BTU` | International Table BTU (`bu_btu`) | *(not ISO 4217)* | Currency lookup fails; physical table matches `bu_btu` |
-| `Btu` | International Table BTU (`bu_btu`) | — | Unambiguous: mixed-case, not in currency table |
-| `btu` | International Table BTU (`bu_btu`) | — | Unambiguous: all-lowercase |
-| `SOL` | — | Solana (cryptocurrency) | Unambiguous: no physical unit named `SOL` |
-| `sol` | *(not a defined unit)* | — | `error_unit_illegal` |
-| `BAR` | *(not a valid alias for bar)* | *(not ISO 4217)* | `error_unit_illegal`; use `bar` (lowercase) |
-| `ERG` | *(not a valid alias for erg)* | *(not ISO 4217)* | `error_unit_illegal`; use `erg` (lowercase) |
-| `CAD` | *(not a valid alias)* | Canadian Dollar (ISO 4217) | Unambiguous: dispatches to currency table |
-| `AUD` | *(not a valid alias)* | Australian Dollar | Unambiguous |
-| `GBP` | *(not a valid alias)* | Pound Sterling | Unambiguous |
-| `XAU` | *(not a valid alias)* | Gold (ISO 4217 X-code) | Unambiguous |
+| Token | Bare form (no `$`) | `$`-sigil form | Notes |
+|-------|--------------------|----------------|-------|
+| `cup` / `CUP` | `cup` → US cup (`bu_cup`); `CUP` → `error_unit_illegal` | `$CUP` → Cuban Peso (ISO 4217:192) | the classic look-alike, now fully separated |
+| `BTU` | `BTU` → International Table BTU (`bu_btu`); `Btu`, `btu` also accepted | *(not ISO 4217)* | uppercase `BTU` is a physical alias, not a currency |
+| `SOL` | `SOL` → `error_unit_illegal` (no physical unit) | `$SOL` → Solana (crypto) | |
+| `BAR` | `BAR` → `error_unit_illegal`; use lowercase `bar` | *(not ISO 4217)* | |
+| `ERG` | `ERG` → `error_unit_illegal`; use lowercase `erg` | *(not ISO 4217)* | |
+| `CAD`, `AUD`, `GBP`, `XAU` | `error_unit_illegal` (no physical unit) | `$CAD`, `$AUD`, `$GBP`, `$XAU` → the respective currencies | |
 
-**Key finding:** There are no cases where the same token is simultaneously a valid physical unit symbol and a valid ISO 4217 / cryptocurrency code. All conflicts involve either a token that was never a valid physical unit symbol (the uppercase-only form of an alias that is defined only in lowercase or mixed-case), or a token that is not in the currency table either.
+**Key finding:** with the sigil, no token is simultaneously a valid bare physical-unit symbol and a valid currency — currencies live entirely under `$`, physical units entirely without it.
 
 ### 10.3 The CUP Case in Detail
 
-`CUP` is the single most likely source of user confusion because the ISO 4217 currency code for the Cuban Peso shares its letter sequence with the English word for the culinary measure.
-
-**Behavior by token:**
+`CUP` is the classic example because the ISO 4217 code for the Cuban Peso shares its letters with the English word for the culinary measure. Under the sigil rule the two are unambiguous:
 
 | Written in BVNR | Resolved as | Enum value | SI factor |
 |-----------------|-------------|------------|-----------|
 | `cup`           | US cup      | `bu_cup`   | 2.365882365×10⁻⁴ m³ |
 | `cups`          | US cup (long form) | `bu_cup` | 2.365882365×10⁻⁴ m³ |
-| `CUP`           | Cuban Peso  | `bu_cup` *(currency enum)* | — (monetary, no SI factor) |
+| `CUP`           | *(error)* — bare uppercase is not a physical unit | — | `error_unit_illegal` |
+| `$CUP`          | Cuban Peso  | `bu_cup` *(currency enum)* | — (monetary, no SI factor) |
 
 ```bovnar
-.recipe_volume = <float_dec:32,cup>  2.0;   # 2 US cups (volume)
-.balance       = <float_dec:64,$CUP>  15.00; # 15 Cuban Pesos (currency)
+.recipe_volume = <float_dec:32,cup>  2.0;    # 2 US cups (volume)
+.balance       = <float_dec:64,$CUP> 15.00;  # 15 Cuban Pesos (currency)
+# .bad         = <float_dec:64,CUP>  15.00;  # error_unit_illegal: bare 'CUP' is not a unit
 ```
 
-Calling `bvn_unit_to_si_factor` on a `CUP` unit returns `*ok = false` because `bvn_find_si_conv` skips currency enum values. Calling `bvn_unit_is_currency` on a `cup` unit returns `false`. The two are completely disjoint in both parsing and the conversion API.
-
-**A user who writes `CUP` intending the culinary cup will receive `error_unit_illegal`** only if `CUP` is then used in a context where a physical unit is expected but a currency is found — for example, as the denominator of a physical calculation. In practice, the annotation is accepted as the Cuban Peso; the error surfaces only at the application layer when the value is treated as a volume. This is a semantic error, not a parse error, and it is the same class of error as any mismatched-denomination annotation.
+Calling `bvn_unit_to_si_factor` on a `$CUP` unit returns `*ok = false` because `bvn_find_si_conv` skips currency enum values. Calling `bvn_unit_is_currency` on a `cup` unit returns `false`. The two are completely disjoint in both parsing and the conversion API — and, because the peso *must* be written `$CUP`, a user who writes the bare `CUP` intending the culinary cup gets an immediate `error_unit_illegal` (the correct spelling is lowercase `cup`) rather than a silently-accepted currency.
 
 ### 10.4 The Mandatory Currency Sigil
 
@@ -1171,7 +1159,7 @@ A currency code carries a **mandatory `$` sigil** as of spec 1.0. This is the re
 
 # A bare code is no longer a currency:
 .volume  = <float_dec:32,cup>        2.0;    # the physical 'cup', unambiguously
-# .bad   = <float_dec:64,$USD> 1.0;           # error_unit_illegal: 'USD' is not a unit
+# .bad   = <float_dec:64,USD> 1.0;            # error_unit_illegal: bare 'USD' is not a unit (needs '$')
 ```
 
 The sigil attaches directly before the currency code, after any SI/IEC prefix and its `~` (`k~$EUR`, `M~$USDT`). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this **breaks** any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning & Stability section of the specification).
@@ -1499,7 +1487,7 @@ Single-pass parsing algorithm:
 1. `memcmp` against `"no_unit"` → return `BVN_UNIT_NONE` immediately on match.
 2. Scan for separator characters to distinguish simple vs. compound paths.
 3. For compound units, split on `0x2A` (`*`), `0x2F` (`/`), `0xC2 0xB7` (`·`); parse each slice as a component; negate denominator exponents.
-4. For each component, if the token is all-uppercase 3–4 ASCII characters, dispatch to the currency table first; fall back to the physical unit table if not found there.
+4. For each component, if it is introduced by the `$` sigil (after any prefix and its `~`), look the code up in the currency table; otherwise look it up in the physical unit table only. A bare code is never a currency.
 
 ```c
 bool ok;
@@ -1799,7 +1787,7 @@ The validator raises the following unit-specific errors:
 
 | Error code | Value | Trigger condition |
 |------------|-------|-------------------|
-| `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, unknown currency code, all-uppercase 3–4 char token not found in either table (e.g. `XYZ`), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. `m//s`), or more than 8 components |
+| `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, unknown currency code after `$`, a bare token in neither the physical-unit table nor (lacking the `$` sigil) recognised as a currency (e.g. `XYZ`, or bare `USD`), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. `m//s`), or more than 8 components |
 | `error_unit_too_long` | 22 | Unit string exceeds the internal type-buffer size limit |
 | `error_unit_mismatch` | 38 | An inline unit suffix and an explicit type-annotation unit are both present, but parse to different `value_unit_t` representations |
 | `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element |

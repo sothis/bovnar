@@ -85,6 +85,10 @@ typedef enum state_e {
 	struct_intro,
 	struct_outro,
 	value_outro,
+	/* Vestigial: unreachable since nan/inf/ninf became bare keywords
+	 * (lexed as symbols) rather than $-sigil numbers. No action sets it
+	 * as next_state; retained only to avoid renumbering state_t before
+	 * the 1.0 freeze. See bvn_after_state_idx_table[number_outro_nosp]. */
 	number_outro_nosp,
 	inline_unit_body,
 	inline_unit_outro,

@@ -745,22 +745,18 @@ All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are fo
 
 ## 6. Symbol Disambiguation
 
-All potential conflicts between physical unit tokens and currency tokens:
+As of spec 1.0 a currency is written **only** with the `$` sigil (§5.1), so the bare form is always a physical-unit lookup and the namespaces never collide:
 
-| Token | Physical meaning | Currency meaning | Resolution |
-|-------|-----------------|-----------------|------------|
-| `cup`  | US cup (236.6 mL, `bu_cup`) | — | Unambiguous: lowercase never dispatches to currency table |
-| `CUP`  | — | Cuban Peso (ISO 4217:192) | Unambiguous: dispatches to currency table |
-| `BTU`  | International Table BTU (`bu_btu`) | *(not in ISO 4217)* | Currency lookup fails; physical table matches |
-| `Btu`  | International Table BTU (`bu_btu`) | — | Mixed-case; unambiguous |
-| `btu`  | International Table BTU (`bu_btu`) | — | All-lowercase; unambiguous |
-| `SOL`  | — | Solana (crypto) | Unambiguous: no physical unit named `SOL` |
-| `BAR`  | *(no uppercase alias for `bar`)* | *(not in ISO 4217)* | `error_unit_illegal`; use lowercase `bar` |
-| `ERG`  | *(no uppercase alias for `erg`)* | *(not in ISO 4217)* | `error_unit_illegal`; use lowercase `erg` |
-| `CAD`  | *(no alias)* | Canadian Dollar | Unambiguous: currency table |
-| `XAU`  | *(no alias)* | Gold (ISO 4217 X-code) | Unambiguous: currency table |
+| Token | Bare form (no `$`) | `$`-sigil form |
+|-------|--------------------|----------------|
+| `cup` / `CUP` | `cup` → US cup (`bu_cup`); `CUP` → `error_unit_illegal` | `$CUP` → Cuban Peso (ISO 4217:192) |
+| `BTU`  | `BTU` → BTU (`bu_btu`); `Btu`, `btu` also accepted | *(not ISO 4217)* |
+| `SOL`  | `SOL` → `error_unit_illegal` | `$SOL` → Solana (crypto) |
+| `BAR`  | `BAR` → `error_unit_illegal`; use lowercase `bar` | *(not ISO 4217)* |
+| `ERG`  | `ERG` → `error_unit_illegal`; use lowercase `erg` | *(not ISO 4217)* |
+| `CAD`, `XAU` | `error_unit_illegal` (no physical unit) | `$CAD` → Canadian Dollar; `$XAU` → Gold (X-code) |
 
-No token is simultaneously a valid physical unit symbol and a valid currency code. Every apparent conflict is resolved by case, or the uppercase token does not exist in one or both tables.
+No bare token is simultaneously a valid physical unit and a currency: currencies live entirely under `$`, physical units entirely without it.
 
 ---
 

@@ -398,6 +398,8 @@ bool bvn_action_comment_intro(bvnr_reader_t* p)
 bool bvn_action_comment_outro(bvnr_reader_t* p)
 {
 	state_t s = p->lex.last_state;
+	/* number_outro_nosp is vestigial (unreachable since nan/inf/ninf
+	 * became bare keywords); the first branch is dead but harmless. */
 	if      (s == number_outro_nosp) s = number_outro;
 	else if (s == string_outro_nosp) s = string_outro;
 	p->lex.next_state = s;

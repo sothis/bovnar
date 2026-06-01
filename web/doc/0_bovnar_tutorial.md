@@ -758,7 +758,7 @@ Understanding the error codes is essential for debugging. The parser reports lin
 
 **Too many unit components:**
 ```bovnar
-.x = <float:64,m*s*k~g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 > 8 max)
+.x = <float:64,m*s*k~g*A*K*mol*cd*b*V> 1.0;  # error_unit_illegal (9 > 8 max)
 ```
 
 **Inline unit suffix inside array:**
@@ -778,7 +778,7 @@ Understanding the error codes is essential for debugging. The parser reports lin
 
 **Unmatched struct close:**
 ```bovnar
-.x = {;    # error_illegal_struct_close
+.x = 1;}   # error_illegal_struct_close (a stray '}' at the top level)
 ```
 
 **A `/`-array's dimension rows must match:**

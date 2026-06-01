@@ -41,8 +41,8 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
 **Shared**
 
 22. [`bvnr_write_type_annotation`](#22-bvnr_write_type_annotation)
-23. [`bvn_parse_unit`](#23-bvn_parse_unit)
-24. [`bvn_unit_to_string`](#24-bvn_unit_to_string)
+23. [`bvn_parse_unit`](#23-bvn_parse_unit--bvn_parse_unit_n)
+24. [`bvn_unit_to_string`](#24-bvn_unit_to_string--bvn_unit_to_string_ex)
 25. [`bvn_error_to_string`](#25-bvn_error_to_string)
 
 ---

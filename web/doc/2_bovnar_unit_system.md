@@ -18,7 +18,7 @@
    - 3.6 [Energy Units](#36-energy-units)
    - 3.7 [Power Units](#37-power-units)
    - 3.8 [Force Units](#38-force-units)
-   - 3.9 [Speed Units](#39-speed-units)
+   - 3.9 [Speed and Rotational Frequency](#39-speed-and-rotational-frequency-units)
    - 3.10 [Volume Units](#310-volume-units)
    - 3.11 [Area Units](#311-area-units)
    - 3.12 [Angle Units](#312-angle-units)
@@ -51,7 +51,7 @@
 7. [The `no_unit` Keyword](#7-the-no_unit-keyword)
 8. [Constraints and Limits](#8-constraints-and-limits)
 9. [Currency Codes](#9-currency-codes)
-   - 9.1 [Namespace Rule](#91-namespace-rule)
+   - 9.1 [The `$` Sigil Rule](#91-the--sigil-rule)
    - 9.2 [ISO 4217 Fiat Currencies and Precious Metals](#92-iso-4217-fiat-currencies-and-precious-metals)
    - 9.3 [Cryptocurrencies](#93-cryptocurrencies)
    - 9.4 [Prefix Rules for Currency Units](#94-prefix-rules-for-currency-units)
@@ -176,7 +176,7 @@ When both are present, equality is checked after parsing via `memcmp` on the com
 
 ## 3. Physical Base Units
 
-Bovnar supports 157 named physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 163 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -204,7 +204,7 @@ Bovnar supports 157 named physical base units. Currency codes are a separate nam
 | `J`    | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
 | `W`    | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
 | `V`    | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
-| `Ω`    | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126, UTF-8: `0xE2 0x84 0xA6` |
+| `Ω`    | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN, UTF-8: `0xE2 0x84 0xA6`; U+03A9 (Greek capital omega) **not** accepted |
 | `F`    | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`    | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
 | `S`    | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
@@ -238,7 +238,7 @@ Bovnar supports 157 named physical base units. Currency codes are a separate nam
 | `bar`  | — | bar | `bu_bar` | 10⁵ Pa |
 | `eV`   | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
 | `Da`   | `dalton` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
-| `au`   | `astronomical_unit` | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
+| `au`   | — | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
 | `ha`   | `hectare` | hectare | `bu_hectare` | 10⁴ m² |
 
 ### 3.4 Imperial and US Customary Units

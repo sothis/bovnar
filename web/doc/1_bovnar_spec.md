@@ -1053,7 +1053,7 @@ The unit system supports **163 named base units** across SI, IEC-binary, Imperia
 | `J` | joule | `bu_joule` |
 | `W` | watt | `bu_watt` |
 | `V` | volt | `bu_volt` |
-| `Ω` | ohm | `bu_ohm` |
+| `Ω` | ohm | `bu_ohm` |
 | `F` | farad | `bu_farad` |
 | `C` | coulomb | `bu_coulomb` |
 | `S` | siemens | `bu_siemens` |
@@ -1681,8 +1681,8 @@ The unit may be written directly after the value literal instead of — or redun
 # Negative unsigned
 .z = <uint:8> -1;                 # error_value_out_of_range
 
-# Unmatched struct close
-.struct = {;                     # error_illegal_struct_close
+# Unmatched struct close — a '}' at the top level (struct nesting 0)
+.stray_close = 1;}               # error_illegal_struct_close
 
 # Unknown escape
 .string = "\x";                  # error_illegal_escape_sequence

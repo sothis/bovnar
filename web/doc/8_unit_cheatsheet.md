@@ -159,7 +159,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `J`   | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
 | `W`   | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
 | `V`   | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
-| `Ω`   | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 |
+| `Ω`   | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) **not** accepted |
 | `F`   | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`   | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
 | `S`   | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
@@ -192,7 +192,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `bar` | — | bar | `bu_bar` | 10⁵ Pa |
 | `eV`  | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
 | `Da`  | `dalton` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
-| `au`  | `astronomical_unit` | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
+| `au`  | — | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
 | `ha`  | `hectare` | hectare | `bu_hectare` | 10⁴ m² |
 
 ### 4.4 Imperial & US Customary — Length
@@ -468,7 +468,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 
 SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.
 
-### 4.26 Ratio and Proportion
+### 4.26 Ratio and Proportion (372–377)
 
 Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These do **not** accept SI or IEC prefixes.
 

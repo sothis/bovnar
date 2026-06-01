@@ -15,7 +15,7 @@ authors         = [
 ]
 keywords        = ["bovnar", "bvnr", "serialisation", "units", "ctypes"]
 classifiers     = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: POSIX :: Linux",
@@ -72,7 +72,7 @@ markers = [
 # ── cibuildwheel (binary wheels for PyPI) ───────────────────────────────────
 [tool.cibuildwheel]
 # CPython only; PyPy and musllinux are out of scope for the first release.
-build         = "cp310-* cp311-* cp312-* cp313-*"
+build         = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip          = "*-musllinux* pp*"
 build-frontend = "build"
 # The bundled libbvnr_shared.* makes every test that touches the C library

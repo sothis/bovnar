@@ -585,7 +585,7 @@ A struct is a nested scope, grouping zero or more assignments inside `{…}`. Ev
 };
 ```
 
-Structs nest to arbitrary depth (the enforced maximum is 255 levels):
+Structs nest deeply — the limit is `max_struct_nesting`, which defaults to 64 and has a hard cap of 255:
 
 ```bovnar
 .config = {

@@ -845,7 +845,7 @@ Individual elements may carry type annotations. The annotation appears **before*
 
 | Constraint | Limit |
 |------------|-------|
-| Array nesting depth | 255 |
+| Array nesting depth | `max_array_nesting` — default 64, hard cap 255 |
 | Total array items | `max_array_items` (configurable; 0 → 2 147 483 647 internal default) |
 
 ---
@@ -886,7 +886,7 @@ document, alongside array homogeneity (§7.4).
 
 ### 8.2 Nesting
 
-Structs can be nested up to 255 levels. Exceeding this produces `error_struct_nesting_too_high`.
+Structs can be nested up to `max_struct_nesting` levels — default 64, hard cap 255 (the limit field is a `uint8_t`; setting it to 0 selects the default of 64). Exceeding the configured limit produces `error_struct_nesting_too_high`.
 
 ### 8.3 Empty Structs
 

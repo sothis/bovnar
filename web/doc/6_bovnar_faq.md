@@ -670,7 +670,7 @@ with `};`:
 
 **How deeply can structs nest?**
 
-Up to 255 levels (the enforced maximum). An empty struct (`{}`) is valid. An
+Up to `max_struct_nesting` levels — the reference reader defaults to 64 and the field (a `uint8_t`) has a hard cap of 255. An empty struct (`{}`) is valid. An
 unmatched closing brace is `error_illegal_struct_close`.
 
 ---

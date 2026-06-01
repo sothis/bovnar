@@ -21,8 +21,10 @@ relevant authorities and systems.
   `update-mime-database <datadir>/mime`.
 - **`bovnar.magic`** — `file(1)` content magic (best-effort fallback for
   extension-less files; the extension is authoritative). Compile/test with
-  `file -C -m bovnar.magic`. Verified to match the `examples/*.bvnr` documents
-  and to reject ordinary source code.
+  `file -C -m bovnar.magic`. Verified to content-match the `examples/*.bvnr`
+  documents that lead with a comment or blank line, and to reject ordinary
+  source code; a file that opens directly with an assignment is recognised by
+  extension only (see the heuristic notes in the file).
 
 ### `nginx/` — web server
 - **`bovnar-mime.conf`** — maps `.bvnr` → `text/vnd.bovnar; charset=utf-8` for

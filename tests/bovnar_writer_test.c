@@ -793,6 +793,51 @@ static void test_write_float_fix_roundtrip(void)
 	bvnr_writer_destroy(w);
 }
 
+/*
+ * Regression: float_fix stores Q in the .base field, but Q is NOT a numeral
+ * base. Q values outside the {2-62,64,85} numeral-base set (e.g. 1, 63, 100)
+ * must still be writable as long as Q < width — the reader accepts them, so the
+ * writer must round-trip them. Q == width (or greater) must still be rejected.
+ */
+static void test_write_float_fix_q_edges(void)
+{
+	printf("  test_write_float_fix_q_edges...\n");
+
+	const struct { uint32_t w, q; double v; } good[] = {
+		{ 32, 1,   0.5    },
+		{ 64, 63,  0.125  },
+		{ 128, 100, 0.0625 },
+		{ 256, 200, 0.03125 },
+	};
+	for (size_t i = 0; i < sizeof(good) / sizeof(good[0]); i++) {
+		uint8_t output[256];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed");
+		if (!w) continue;
+		ASSERT_TRUE(bvnr_write_float_fix(w, "x", good[i].w, good[i].q, good[i].v),
+					"write float_fix with valid Q outside numeral-base set");
+		ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no write error");
+		last_event_t le = {0};
+		ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+					"float_fix q-edge roundtrip must parse cleanly");
+		ASSERT_EQ_UINT(le.vt.base, good[i].q, "Q preserved through roundtrip");
+		bvnr_writer_destroy(w);
+	}
+
+	/* Q == width must be rejected. */
+	uint8_t output[64];
+	bvnr_sink_t sink;
+	bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+	ASSERT_NOT_NULL(w, "make_writer must succeed");
+	if (w) {
+		ASSERT_FALSE(bvnr_write_float_fix(w, "x", 32, 32, 1.0),
+					 "float_fix with Q == width must fail");
+		bvnr_writer_destroy(w);
+	}
+}
+
 static void test_write_float_dec_roundtrip(void)
 {
 	printf("  test_write_float_dec_roundtrip...\n");
@@ -989,6 +1034,7 @@ int main(void)
 	test_write_float_values();
 	test_write_float_width_over_64_rejected();
 	test_write_float_fix_roundtrip();
+	test_write_float_fix_q_edges();
 	test_write_float_dec_roundtrip();
 	test_write_bool_and_null();
 	test_write_with_units();

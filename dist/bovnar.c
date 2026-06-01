@@ -12685,7 +12685,16 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 		if (vt.base != 0)
 			return bvn_writer_set_error(w, error_illegal_value_type);
 	}
-	if (bvn_type_is_numeric(vt) && vt.base != 0) {
+	/*
+	 * Numeral-base validity applies only to the families whose .base field
+	 * is actually a numeral base (uint/sint/float). For float_fix the .base
+	 * field holds Q (fractional bits, validated above against the width), and
+	 * float_dec leaves it 0 (checked above); neither must be forced into the
+	 * {2-62,64,85} numeral-base set, or valid specs like <float_fix:64,q63>
+	 * would be wrongly rejected.
+	 */
+	if ((vt.family == vt_uint || vt.family == vt_sint ||
+	     vt.family == vt_float) && vt.base != 0) {
 		if (!((vt.base >= 2 && vt.base <= 62) ||
 			  vt.base == 64 || vt.base == 85)) {
 			return bvn_writer_set_error(w,

@@ -2,7 +2,7 @@
   "name": "bovnar-highlight",
   "displayName": "Bovnar Syntax",
   "description": "Syntax highlighting for Bovnar files",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "engines": { "vscode": "^1.70.0" },
   "contributes": {
     "languages": [

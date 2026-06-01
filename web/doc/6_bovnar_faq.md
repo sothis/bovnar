@@ -410,10 +410,10 @@ a mismatch is `error_unit_mismatch`.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
 - **14 non-SI units accepted for use with SI** — liter, minute, hour, day, week, year, degree (angle), degree Celsius, tonne, bar, electronvolt, dalton, astronomical unit, hectare.
 - **2 digital units** — bit (`b`), byte (`B`), with IEC binary prefixes (kibi through quebi).
-- **12 Imperial/US customary length units** — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom, **chain** (`ch`), **rod** (`rd`); plus **thou** (thousandth of an inch, alias `mil`).
+- **13 Imperial/US customary length units** — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom, **chain** (`ch`), **rod** (`rd`), and **thou** (thousandth of an inch, alias `mil`).
 - **11 Imperial/US customary mass units** — pound, ounce, grain, stone, short ton, long ton, troy ounce, carat, **slug**, **dram** (`dr`), **pennyweight** (`dwt`).
-- **2 temperature scales** — degree Fahrenheit (affine), **degree Rankine** (linear, absolute).
-- **5 pressure units** — atmosphere, mmHg, Torr, psi, **inch of mercury** (`inHg`); plus **atmosphere technical** (`at`, = 1 kgf/cm² = 98 066.5 Pa).
+- **6 temperature scales** — degree Fahrenheit (affine), **degree Rankine** (linear, absolute), and the historical **Delisle** (`°De`), **Newton** (`°N`), **Réaumur** (`°Re`), and **Rømer** (`°Ro`) scales (all affine). Degree Celsius is counted among the non-SI accepted units above.
+- **6 pressure units** — atmosphere, mmHg, Torr, psi, **inch of mercury** (`inHg`), and **atmosphere technical** (`at`, = 1 kgf/cm² = 98 066.5 Pa).
 - **5 energy units** — calorie, BTU, erg, therm, **foot-pound** (`ft_lb`).
 - **2 power units** — horsepower (`hp`), **metric horsepower** (`PS`, also `CV`; = 735.49875 W).
 - **4 force units** — pound-force, dyne, kip, **kilogram-force** (`kgf`).
@@ -429,6 +429,9 @@ a mismatch is `error_unit_mismatch`.
 - **2 electrical power units** — **var** (reactive power), **volt-ampere** (`VA`, apparent power).
 - **2 time extensions** — **month** (`mo`, Julian month = 2 629 800 s), **fortnight** (`fn` = 14 d = 1 209 600 s).
 - **2 textile linear density units** — **tex** (1 g/km = 10⁻⁶ kg/m, ISO 1144), **denier** (`den`, 1 g/9 000 m; 9 den = 1 tex).
+- **13 Old German units** — **Pfund** (`Pfd`), **Zentner** (`Ztr`), **Doppelzentner**, **Lot** (mass); **Prussian line, Zoll, Fuß, Elle, Rute**, **Klafter**, and **German (geographical) mile** (length); **Morgen** (area); **Scheffel** (volume). None accept an SI or IEC prefix.
+- **7 surveying & signalling units** — **US survey foot**, **league**, **cable length**, **hand** (length); **quintal**, **scruple** (mass); **baud** (`Bd`, signalling rate).
+- **6 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb** — dimensionless scaling factors that take no prefix.
 
 The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `Ra` (not `R`, which is reserved for röntgen). Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 

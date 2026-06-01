@@ -341,6 +341,8 @@ pytest tests -v
 Callbacks are registered through `bvnr_read_flags_t`. Both `on_unverified` and `on_verified` receive `(void *userdata, bvnr_event_t ev, bvnr_data_t *d)` and must return `true` to continue parsing.
 
 ```c
+#include <stdio.h>
+#include <string.h>
 #include "bovnar.h"
 
 static bool on_event(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
@@ -379,6 +381,7 @@ bvnr_read(r);
 The high-level writer helpers accept a key string and a typed value directly:
 
 ```c
+#include <stdio.h>
 #include "bovnar.h"
 
 int main(void)
@@ -392,6 +395,7 @@ int main(void)
     bvnr_write_float(w, "velocity", 64, 9.81);
 
     bvnr_write_finish(w);
+    buf[bvnr_writer_bytes_written(w)] = '\0';   /* NUL-terminate for puts */
     bvnr_writer_destroy(w);
     puts(buf);
 }

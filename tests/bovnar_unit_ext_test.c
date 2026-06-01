@@ -29,6 +29,15 @@
 #include "bvn_internal_dims.h"
 #include "bovnar_si_units.h"
 
+/*
+ * Internal (non-public) guard exported by bovnar_utils.c: recomputes the
+ * bu_first_for_len / bu_max_len length index from bu_table and returns whether
+ * it matches the precomputed static-const literals the parser actually uses.
+ * The literals exist so unit lookup needs no lazy init and stays thread-safe;
+ * this check fails the build's test step if a table edit makes them stale.
+ */
+extern bool bvn_bu_index_selfcheck(void);
+
 static int failures = 0;
 static int tests    = 0;
 
@@ -51,6 +60,14 @@ static int tests    = 0;
 		failures++; \
 	} \
 } while (0)
+
+static void test_bu_index_selfcheck(void)
+{
+	printf("  bu_first_for_len precomputed-index self-check...\n");
+	ASSERT_TRUE(bvn_bu_index_selfcheck(),
+		"precomputed bu_first_for_len/bu_max_len must match the table; "
+		"regenerate the literals in bovnar_utils.c after editing bu_table");
+}
 
 static void test_new_units_in_enum(void)
 {
@@ -1479,6 +1496,7 @@ int main(void)
 	printf("  Bovnar Unit Extension Test Suite\n");
 	printf("══════════════════════════════════════\n\n");
 
+	test_bu_index_selfcheck();
 	test_new_units_in_enum();
 	test_radian_steradian_si_factor();
 	test_radian_steradian_dim_vector();

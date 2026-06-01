@@ -528,15 +528,37 @@ typedef struct { const char* a; uint32_t len; value_base_unit_t u; } bu_entry_t;
 typedef struct { const char* a; uint32_t len; si_prefix_id_t   p; } si_entry_t;
 typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
 #define BU_LEN_INDEX_SIZE 32u
-static volatile uint16_t bu_first_for_len[BU_LEN_INDEX_SIZE];
-static volatile uint32_t bu_max_len;
-static volatile bool     bu_index_ready;
 /*
- * Symbol -> base-unit lookup table. CRUCIAL INVARIANT: entries are ordered by
- * DESCENDING symbol length. The parser matches a unit symbol as the suffix of a
- * component and must prefer the longest match (so "min" isn't shadowed by "m"),
- * and bvn_init_bu_index builds its length index assuming this ordering. When
- * adding a unit, insert it in the correct length group. The si_table/iec_table
+ * Length index over bu_table: bu_first_for_len[L] is the index of the first
+ * table entry whose symbol is at most L bytes long, so the suffix matcher can
+ * skip straight past the run of entries longer than the input. These values are
+ * a pure function of bu_table and are PRECOMPUTED (rather than built lazily on
+ * first use) so the lookup touches no mutable global state and is therefore
+ * reentrant / thread-safe — concurrent bvn_parse_unit calls are safe without
+ * the caller serialising them. bvn_bu_index_selfcheck() recomputes the index
+ * from the table and is asserted equal to these literals by the unit tests, so
+ * the constants cannot silently drift when the table changes.
+ *
+ * If the table grows past BU_LEN_INDEX_SIZE-1 (=31) byte symbols, widen the
+ * index; the self-check test will flag it.
+ */
+static const uint16_t bu_first_for_len[BU_LEN_INDEX_SIZE] = {
+	486, 461, 383, 341, 277, 205, 150,  57,
+	 57,  57,  30,  11,  11,  11,  10,   8,
+	  4,   1,   1,   1,   0,   0,   0,   0,
+	  0,   0,   0,   0,   0,   0,   0,   0,
+};
+static const uint32_t bu_max_len = 20u;
+/*
+ * Symbol -> base-unit lookup table. CRUCIAL INVARIANT: entries are ordered so
+ * that, for any input, a longer symbol that is a suffix of that input is always
+ * tested before a shorter one that is also a suffix (in practice: grouped by
+ * DESCENDING symbol length). The parser takes the first suffix match and stops,
+ * so this ordering is what makes it prefer the longest match — e.g. "mol" must
+ * resolve to mole, not to prefix "mo" + "l" (liter). Reordering that lets a
+ * shorter suffix precede a longer one is a CORRECTNESS bug, not just a slowdown.
+ * When adding a unit, insert it in the correct length group and update
+ * bu_first_for_len (the self-check test enforces both). The si_table/iec_table
  * below map the prefix symbols (k, M, Ki, ...) the same way.
  */
 static const bu_entry_t bu_table[] = {
@@ -839,21 +861,14 @@ static const iec_entry_t iec_table[] = {
 	{NULL, 0, iec_none}
 };
 /*
- * Build a length index over bu_table. bu_first_for_len[L] is the index of the
- * first table entry whose symbol is at most L bytes long, in table order.
- * Because unit symbols are matched against the *suffix* of a component (the
- * prefix is whatever precedes them), the parser tries the longest candidate
- * symbols first; this index lets it skip straight past the run of entries that
- * are longer than the input rather than scanning from the top every time.
- *
- * The entries are grouped roughly longest-first so that skip is effective, but
- * exact descending order is NOT a correctness requirement: the forward,
- * monotonic walk below guarantees bu_first_for_len[L] never sits after an entry
- * of length <= L, and the lookup additionally filters with `e->len > len`. So a
- * mis-placed entry only costs a few extra (skipped) iterations, never a missed
- * match — do not assume the table is strictly sorted.
+ * Recompute the length index from bu_table and verify it equals the precomputed
+ * bu_first_for_len / bu_max_len literals above. This is the guard that keeps the
+ * baked-in constants honest: it is not used on the parse path (which reads the
+ * literals directly, with no init), only by the unit tests. Returns true iff the
+ * literals are consistent with the current table; a false return after editing
+ * bu_table means the literals must be regenerated.
  */
-static void bvn_init_bu_index(void)
+bool bvn_bu_index_selfcheck(void)
 {
 	uint32_t count = 0;
 	uint32_t maxlen = 0;
@@ -862,13 +877,15 @@ static void bvn_init_bu_index(void)
 		if (e->len > maxlen) maxlen = e->len;
 	}
 	if (maxlen >= BU_LEN_INDEX_SIZE) maxlen = BU_LEN_INDEX_SIZE - 1u;
-	bu_max_len = maxlen;
+	if (bu_max_len != maxlen)
+		return false;
 	uint32_t idx = 0;
 	for (int32_t L = (int32_t)BU_LEN_INDEX_SIZE - 1; L >= 0; L--) {
 		while (idx < count && bu_table[idx].len > (uint32_t)L) idx++;
-		bu_first_for_len[L] = (uint16_t)idx;
+		if (bu_first_for_len[L] != (uint16_t)idx)
+			return false;
 	}
-	bu_index_ready = true;
+	return true;
 }
 /*
  * Strip and decode an exponent suffix from the end of a unit component,
@@ -1066,7 +1083,6 @@ static value_unit_component_t bvn_parse_single_unit_component(
 			return r;
 		}
 	}
-	if (!bu_index_ready) bvn_init_bu_index();
 	uint32_t bu_skip_for_input;
 	{
 		uint32_t lkup = len > bu_max_len ? bu_max_len : len;

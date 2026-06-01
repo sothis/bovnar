@@ -102,7 +102,7 @@ syn match   BovnarSymbol    '\<[A-Za-z_][A-Za-z0-9_+\-]*\>'
 syn match   BovnarBoolean   '\<\(true\|false\|on\|off\)\>'
 syn match   BovnarNullKw    '\<null\>'
 hi link     BovnarNullKw    BovnarNull
-syn match   BovnarTypeUnit  '\<[A-Za-zµΩ°][A-Za-z0-9_·()\-\+\/\^]*\>'
+syn match   BovnarTypeUnit  '\<[A-Za-zµΩΩ°][A-Za-z0-9_·()\-\+\/\^]*\>'
 syn match   BovnarUnitSep   '[()]'
 syn match   BovnarTypeUnit  '[%‰‱]'
 " Currency component carries a mandatory '$' sigil (spec 1.0): $USD, $BTC.

@@ -407,7 +407,7 @@ a mismatch is `error_unit_mismatch`.
 163 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
-- **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
+- **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
 - **14 non-SI units accepted for use with SI** — liter, minute, hour, day, week, year, degree (angle), degree Celsius, tonne, bar, electronvolt, dalton, astronomical unit, hectare.
 - **2 digital units** — bit (`b`), byte (`B`), with IEC binary prefixes (kibi through quebi).
 - **13 Imperial/US customary length units** — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom, **chain** (`ch`), **rod** (`rd`), and **thou** (thousandth of an inch, alias `mil`).

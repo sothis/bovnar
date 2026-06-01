@@ -4073,7 +4073,7 @@ hljs.registerLanguage('bovnar', function() {
   const INLINE_UNIT = {
     match: [
       /(?<=[\d"])\s+/,
-      /[A-Za-z_µΩ°(][A-Za-z0-9_~·µΩ°()¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*/
+      /[A-Za-z_µΩΩ°(][A-Za-z0-9_~·µΩΩ°()¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*/
     ],
     scope: { 2: 'bvn-unit' }
   };
@@ -4082,7 +4082,7 @@ hljs.registerLanguage('bovnar', function() {
      optional exponent and product/division operators. */
   const UNIT_EXPR = {
     scope: 'bvn-unit',
-    match: /[A-Za-zµΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?(?:[·\/*][A-Za-zµΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?)*/
+    match: /[A-Za-zµΩΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?(?:[·\/*][A-Za-zµΩΩ°][A-Za-z0-9_]*(?:~[A-Za-zµΩΩ°][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?)*/
   };
 
   /* Type annotation <...>: brackets get bvn-ann; inside, type-family

@@ -79,7 +79,7 @@
 .distance  = 384400.0 k~m;     # Earth–Moon distance (km)
 .voltage   = 3.3 V;            # supply voltage
 .current   = 0.02 A;           # 20 mA
-.resistance = 4700.0 Ω;        # 4.7 kΩ in ohms (Ω = U+03A9)
+.resistance = 4700.0 Ω;        # 4.7 kΩ in ohms (Ω = U+2126)
 
 
 # ── 8. Annotation + inline unit ──────────────────────────────────────────────

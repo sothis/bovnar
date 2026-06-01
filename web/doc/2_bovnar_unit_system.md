@@ -204,7 +204,7 @@ Bovnar supports 163 named physical base units. Currency codes are a separate nam
 | `J`    | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
 | `W`    | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
 | `V`    | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
-| `Ω`    | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN, UTF-8: `0xE2 0x84 0xA6`; U+03A9 (Greek capital omega) **not** accepted |
+| `Ω`    | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN, UTF-8: `0xE2 0x84 0xA6`; U+03A9 (Greek capital omega) **not** accepted |
 | `F`    | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`    | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
 | `S`    | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |

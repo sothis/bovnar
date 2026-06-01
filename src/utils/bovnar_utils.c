@@ -543,7 +543,7 @@ typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
  * index; the self-check test will flag it.
  */
 static const uint16_t bu_first_for_len[BU_LEN_INDEX_SIZE] = {
-	486, 461, 383, 341, 277, 205, 150,  57,
+	487, 462, 383, 341, 277, 205, 150,  57,
 	 57,  57,  30,  11,  11,  11,  10,   8,
 	  4,   1,   1,   1,   0,   0,   0,   0,
 	  0,   0,   0,   0,   0,   0,   0,   0,
@@ -784,7 +784,8 @@ static const bu_entry_t bu_table[] = {
 	{"\xe2\x84\xa6",    3, bu_ohm},
 	{"deg",              3, bu_degree},        {"bar",             3, bu_bar},
 	{"sec",              3, bu_second},        {"amp",             3, bu_ampere},
-	{"ohm",              3, bu_ohm},           {"lux",             3, bu_lux},
+	{"ohm",              3, bu_ohm},           {"Ohm",             3, bu_ohm},
+	{"lux",              3, bu_lux},
 	{"day",              3, bu_day},           {"bit",             3, bu_bit},
 	{"kat",              3, bu_katal},         {"min",             3, bu_minute},
 	{"mol",              3, bu_mol},           {"rad",             3, bu_radian},

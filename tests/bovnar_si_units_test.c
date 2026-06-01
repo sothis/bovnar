@@ -312,7 +312,7 @@ static void test_dimension_vector(void)
 	ASSERT_EQ_INT(dims[bvn_si_dim_ampere], -1, "V dim[A]=-1");
 
 	bvn_unit_dimension_vector(BVN_UNIT_NO_PREFIX(bu_ohm), dims);
-	ASSERT_EQ_INT(dims[bvn_si_dim_ampere], -2, "Ω dim[A]=-2");
+	ASSERT_EQ_INT(dims[bvn_si_dim_ampere], -2, "Ω dim[A]=-2");
 
 	bvn_unit_dimension_vector(BVN_UNIT_NO_PREFIX(bu_farad), dims);
 	ASSERT_EQ_INT(dims[bvn_si_dim_meter],    -2, "F dim[m]=-2");
@@ -786,7 +786,7 @@ static void test_all_derived_dimensions(void)
 	ASSERT_EQ_INT((int64_t)dims[bvn_si_dim_ampere],  -1,  "V → A⁻¹");
 
 	bvn_unit_dimension_vector(BVN_UNIT_NO_PREFIX(bu_ohm), dims);
-	ASSERT_EQ_INT((int64_t)dims[bvn_si_dim_ampere],  -2,  "Ω → A⁻²");
+	ASSERT_EQ_INT((int64_t)dims[bvn_si_dim_ampere],  -2,  "Ω → A⁻²");
 
 	bvn_unit_dimension_vector(BVN_UNIT_NO_PREFIX(bu_farad), dims);
 	ASSERT_EQ_INT((int64_t)dims[bvn_si_dim_meter],   -2,  "F → m⁻²");

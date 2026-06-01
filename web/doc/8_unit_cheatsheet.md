@@ -159,7 +159,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `J`   | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
 | `W`   | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
 | `V`   | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
-| `Ω`   | `ohm`, `ohms` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) **not** accepted |
+| `Ω`   | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) **not** accepted |
 | `F`   | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`   | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
 | `S`   | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |

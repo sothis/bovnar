@@ -520,9 +520,12 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 	}
 	uint32_t w = bvn_effective_width(vt);
 	if (w > 64u) {
-		if (vt.family == vt_uint)
-			return bvn_validate_uint_range((const char*)str, w, base);
-		return bvn_validate_sint_range((const char*)str, w, base);
+		bool in_range = (vt.family == vt_uint)
+			? bvn_validate_uint_range((const char*)str, w, base)
+			: bvn_validate_sint_range((const char*)str, w, base);
+		if (!in_range)
+			v->last_error = error_value_out_of_range;
+		return in_range;
 	}
 	if (v->acc_overflow) {
 		v->last_error = error_value_out_of_range;

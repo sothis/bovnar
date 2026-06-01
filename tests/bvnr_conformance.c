@@ -779,6 +779,19 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("TYP-021", "types", "sint:8 value -129 out of range",
 	           ".x = <sint:8> -129;",
 	           error_value_out_of_range),
+	/* Arbitrary-width (>64-bit) integers use the bignum range check; an
+	 * over-range value must report error_value_out_of_range, not the
+	 * error_none the path left set before the fix. uint:128 max is 2^128-1;
+	 * this is 2^128. */
+	VALID_KEY("TYP-021b", "types", "uint:128 max (2^128-1) in range",
+	          ".x = <uint:128> 340282366920938463463374607431768211455;",
+	          "x", "340282366920938463463374607431768211455"),
+	ERROR_CASE("TYP-021c", "types", "uint:128 value 2^128 out of range",
+	           ".x = <uint:128> 340282366920938463463374607431768211456;",
+	           error_value_out_of_range),
+	ERROR_CASE("TYP-021d", "types", "sint:128 below min out of range",
+	           ".x = <sint:128> -170141183460469231731687303715884105729;",
+	           error_value_out_of_range),
 	ERROR_CASE("TYP-022", "types", "digit not in base-2",
 	           ".x = <uint:8,_2> \"2\";",
 	           error_digit_not_in_base),

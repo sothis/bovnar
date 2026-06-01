@@ -37,6 +37,21 @@ relevant authorities and systems.
   repo-root `.gitattributes` already carries the `linguist-language=Bovnar`
   override, which activates once the language ships upstream.
 
+### `bovnar.h` / `bovnar.c` — single-file amalgamation
+The whole library as two files, for drop-in use without the CMake build:
+
+- **`bovnar.h`** — the complete public API.
+- **`bovnar.c`** — the complete implementation (`#include "bovnar.h"`; link with `-lm`).
+
+```sh
+cc -c bovnar.c -o bovnar.o        # build the library object
+```
+
+Generated from `include/` and `src/` by the repo-root `amalgamate.py` (do not
+edit by hand); regenerate with `python3 amalgamate.py`. The `bvnr_amalgam`
+CTest compiles and smoke-tests a fresh generation and verifies these committed
+files stay in sync with the sources.
+
 ### IANA (formal media-type registration)
 - The application is **`doc/9_iana_media_type.md`** — a complete RFC 6838
   vendor-tree template. Submit via <https://www.iana.org/form/media-types>.

@@ -77,6 +77,39 @@ class TestToNumpy:
 
 
 @needs_lib
+class TestUnmappableWidthEscapeHatch:
+    """A width with no native numpy dtype (>64-bit integer, or a float width
+    other than 16/32/64/128) must be rejected only under strict inference
+    (dtype=None) — an explicit dtype= must still coerce it. Regression: the
+    inference probe used to raise before the caller's dtype was consulted, so
+    the advertised dtype=object / dtype=float remedies did not work."""
+
+    _BIG = 340282366920938463463374607431768211455  # 2**128 - 1
+
+    def test_bigint_default_raises(self):
+        with pytest.raises(BovnarArgumentError):
+            to_numpy(dom_parse(b'.a=<uint:128>[%d,1];' % self._BIG)['a'])
+
+    def test_bigint_object_exact(self):
+        a = to_numpy(dom_parse(b'.a=<uint:128>[%d,1];' % self._BIG)['a'],
+                     dtype=object)
+        assert a.dtype == object and a[0] == self._BIG and a[1] == 1
+
+    def test_bigint_float_coerces(self):
+        a = to_numpy(dom_parse(b'.a=<uint:128>[%d,1];' % self._BIG)['a'],
+                     dtype=float)
+        assert a.dtype == np.float64 and a[1] == 1.0
+
+    def test_float256_default_raises(self):
+        with pytest.raises(BovnarArgumentError):
+            to_numpy(dom_parse(b'.a=<float:256>[1.5,2.5];')['a'])
+
+    def test_float256_coerces_to_float64(self):
+        a = to_numpy(dom_parse(b'.a=<float:256>[1.5,2.5];')['a'], dtype='float64')
+        assert a.dtype == np.float64 and a.tolist() == [1.5, 2.5]
+
+
+@needs_lib
 class TestToNumpyStrict:
     @pytest.mark.parametrize("payload", [
         b'.a=[<uint:8>1,<float:32>2.0];',     # mixed dtype

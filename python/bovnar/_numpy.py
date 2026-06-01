@@ -144,12 +144,29 @@ def _walk(obj, acc):
     return _leaf(obj, acc)
 
 
+def _gather_dtype(acc, family, width):
+    """Best-effort dtype hint for inference (dtype=None).
+
+    A width with no native numpy dtype — a >64-bit integer (bigint) or a float
+    width other than 16/32/64/128 — is *recorded* as unmappable rather than
+    raised here, so an explicit ``dtype=`` (e.g. ``object`` for bigints, or
+    ``float``) can still coerce the array. Strict inference reports it later in
+    ``_extract`` only when no dtype was supplied.
+    """
+    try:
+        return _family_width_dtype(family, width)
+    except BovnarArgumentError as e:
+        acc['unmappable'] = True
+        acc.setdefault('unmappable_reason', str(e))
+        return None
+
+
 def _leaf(obj, acc):
     if obj is None:
         acc['null'] = True
         return None
     if isinstance(obj, Quantity):
-        dt = _family_width_dtype(obj.vtype.family, obj.vtype.width)
+        dt = _gather_dtype(acc, obj.vtype.family, obj.vtype.width)
         if dt:
             acc['dtypes'].add(dt)
         us = obj.unit_str()
@@ -160,10 +177,11 @@ def _leaf(obj, acc):
             acc['null'] = True
         return val
     if isinstance(obj, DomNode):                  # a non-array leaf node
-        dt = _family_width_dtype(obj.value_type.family, obj.value_type.width)
-        if dt is None:                            # PLAIN: fall back to the node kind
+        if int(obj.value_type.family) == int(F.PLAIN):
             dt = {DomType.INT: 'int64', DomType.FLOAT: 'float64',
                   DomType.BOOL: 'bool', DomType.STRING: 'str'}.get(obj.dom_type)
+        else:
+            dt = _gather_dtype(acc, obj.value_type.family, obj.value_type.width)
         if dt:
             acc['dtypes'].add(dt)
         us = obj.unit_str
@@ -191,10 +209,18 @@ def _extract(src, dtype):
         raise BovnarArgumentError(
             "to_numpy expects a DomNode array or the nested list from "
             "loads(..., typed=True)")
-    acc = {'dtypes': set(), 'units': {}, 'null': False}
+    acc = {'dtypes': set(), 'units': {}, 'null': False, 'unmappable': False}
     values = _walk(src, acc)
 
     if dtype is None:
+        if acc['unmappable']:
+            # A bigint / unsupported-width element with no native numpy dtype.
+            # Strict by default: report it, but the message points at the
+            # explicit-dtype escape hatch (which now works — see _gather_dtype).
+            raise BovnarArgumentError(acc.get(
+                'unmappable_reason',
+                "array has an element with no native numpy dtype; "
+                "pass dtype=object"))
         dts = acc['dtypes']
         if not dts:
             resolved = None

@@ -756,6 +756,41 @@ static error_code_t bvn_dom_shape_equal(
  * Recursively verify that every array in the subtree is homogeneous. Descends
  * into struct fields and array elements so a violation at any depth is found.
  */
+/*
+ * Verify no key is repeated within one scope — a struct, or the top-level
+ * document (spec 1.0). Unique keys keep lookup, references and iteration in
+ * agreement on the value of a key. Sorting a copy of the key pointers keeps
+ * this O(n log n), so a scope with very many members cannot turn quadratic.
+ */
+static int bvn_dom_keycmp(const void *a, const void *b)
+{
+	const char *ka = *(const char *const *)a;
+	const char *kb = *(const char *const *)b;
+	return strcmp(ka ? ka : "", kb ? kb : "");
+}
+static error_code_t bvn_dom_keys_unique(
+	const bvn_dom_entry_t *ent, uint32_t n)
+{
+	if (n < 2u)
+		return error_none;
+	const char **keys = malloc((size_t)n * sizeof(*keys));
+	if (!keys)
+		return error_none;   /* OOM: skip rather than reject a valid document */
+	uint32_t m = 0;
+	for (uint32_t i = 0; i < n; i++)
+		if (ent[i].key && ent[i].key[0])   /* only real, non-empty keys */
+			keys[m++] = ent[i].key;
+	qsort(keys, (size_t)m, sizeof(*keys), bvn_dom_keycmp);
+	error_code_t r = error_none;
+	for (uint32_t i = 1; i < m; i++) {
+		if (strcmp(keys[i], keys[i - 1]) == 0) {
+			r = error_duplicate_struct_key;
+			break;
+		}
+	}
+	free(keys);
+	return r;
+}
 static error_code_t bvn_dom_check_homogeneous(const bvn_dom_node_t *node)
 {
 	if (!node)
@@ -786,6 +821,9 @@ static error_code_t bvn_dom_check_homogeneous(const bvn_dom_node_t *node)
 	case BVN_DOM_STRUCT: {
 		uint32_t n = bvn_dom_struct_count(node);
 		const bvn_dom_entry_t *ent = bvn_dom_struct_entries(node);
+		error_code_t dup = bvn_dom_keys_unique(ent, n);
+		if (dup != error_none)
+			return dup;
 		for (uint32_t i = 0; i < n; i++) {
 			error_code_t sub = bvn_dom_check_homogeneous(ent[i].value);
 			if (sub != error_none)
@@ -839,16 +877,15 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 		else
 			doc->parse_error = reader_err;
 	} else {
-		/* Per-value syntax/type/unit all passed; now enforce cross-element
-		 * array homogeneity over the materialised tree (spec 1.0). */
-		for (uint32_t i = 0; i < doc->count; i++) {
-			error_code_t herr =
-				bvn_dom_check_homogeneous(doc->entries[i].value);
-			if (herr != error_none) {
-				doc->parse_error = herr;
-				break;
-			}
-		}
+		/* Per-value syntax/type/unit all passed; now enforce the cross-element
+		 * structural rules over the materialised tree (spec 1.0): unique keys
+		 * within every scope (including the top-level document) and array
+		 * element homogeneity. */
+		error_code_t herr = bvn_dom_keys_unique(doc->entries, doc->count);
+		for (uint32_t i = 0; herr == error_none && i < doc->count; i++)
+			herr = bvn_dom_check_homogeneous(doc->entries[i].value);
+		if (herr != error_none)
+			doc->parse_error = herr;
 	}
 	bvnr_reader_destroy(rd);
 	builder_do_deferred_pop(&b);

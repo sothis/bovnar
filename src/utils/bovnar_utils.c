@@ -520,6 +520,7 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_unit_mismatch:             return "unit_mismatch";
 	case error_array_element_type_mismatch: return "array_element_type_mismatch";
 	case error_struct_shape_mismatch:     return "struct_shape_mismatch";
+	case error_duplicate_struct_key:      return "duplicate_struct_key";
 	default:                              return "unknown_error";
 	}
 }

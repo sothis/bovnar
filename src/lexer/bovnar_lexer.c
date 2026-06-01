@@ -656,6 +656,13 @@ bool bvn_action_array_outro_empty(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_unexpected_input_byte);
 		return false;
 	}
+	/* Clear the null placeholder array_intro pre-seeded. We skip
+	 * bvn_lex_finalize (which would emit it as an element AND reset the token),
+	 * so reset the pending-token state here — otherwise the lingering
+	 * token_is_null_value would be emitted as a phantom value when the
+	 * enclosing assignment/element is finalised. */
+	p->lex.token_type = token_is_unknown;
+	p->lex.str_len    = 0u;
 	p->lex.curr_row_size = 0u;
 	if (!bvn_val_on_array_outro(p, 0u, &p->lex.array_row_size))
 		return false;

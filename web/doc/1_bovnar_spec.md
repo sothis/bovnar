@@ -831,6 +831,19 @@ Structs group related assignments into a nested scope:
 };
 ```
 
+**Key uniqueness.** Keys must be unique within a single scope — a struct, and
+the top-level document. A repeated key is `error_duplicate_struct_key`, so
+lookup, references, and iteration always agree on the value of a key:
+
+```bovnar
+.bad = {.x = 1; .x = 2;};   # error_duplicate_struct_key
+.ok  = {.x = 1; .y = 2;};   # fine
+```
+
+The same key in *different* scopes is unrelated and always allowed (e.g.
+`.a = {.x = 1;}; .b = {.x = 2;};`). The rule is enforced over the materialised
+document, alongside array homogeneity (§7.4).
+
 ### 8.2 Nesting
 
 Structs can be nested up to 255 levels. Exceeding this produces `error_struct_nesting_too_high`.
@@ -1261,6 +1274,7 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 | Check | Error |
 |-------|-------|
 | Unmatched `}` | `error_illegal_struct_close` |
+| A key repeated within one scope (struct or top-level document) (§8.1) | `error_duplicate_struct_key` |
 | Struct array elements with differing key sets (§7.4) | `error_struct_shape_mismatch` |
 | Nesting depth exceeded | `error_struct_nesting_too_high` |
 

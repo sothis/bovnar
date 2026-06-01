@@ -37,7 +37,7 @@
 .float64   = <float:64>  3.14159265358979323846; # double-precision
 .float96   = <float:96>  1.23456789;    # 3× 32-bit extended
 .float128  = <float:128> 1.23456789012345678901234567890;  # quad-precision
-.float256  = <float:256> 1.23456789012345678901234567890;  # octuple-precision
+.octuple   = <float:256> 1.23456789012345678901234567890;  # octuple-precision (256-bit)
 
 .float_default_width = <float:0>  2.71828; # width 0 → effective 64
 

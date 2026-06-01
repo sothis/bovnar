@@ -566,10 +566,14 @@ array-elem   = [type-annotation , ws] , raw-value ;
 (*  10. Structs  (nested key-value scopes)                            *)
 (* ─────────────────────────────────────────────────────────────────  *)
 
-(* A struct "{" … "}" contains zero or more assignments.              *)
-(* After "}" the struct behaves like any completed value: followed by  *)
-(* ";" at the top level, or "," / "]" in array context.              *)
+(* A struct "{" … "}" contains zero or more assignments. "{}" is an    *)
+(* empty struct (zero members). After "}" the struct behaves like any  *)
+(* completed value: followed by ";" at the top level, or "," / "]" in  *)
+(* array context.                                                      *)
 (*                                                                    *)
+(* Keys must be UNIQUE within one scope (a struct, or the top-level    *)
+(* document); a repeat is error_duplicate_struct_key (enforced above   *)
+(* the grammar). The same key in different scopes is unrelated.        *)
 (* Nesting depth: struct_nesting_level ≤ max_struct_nesting (255).    *)
 (* An unmatched "}" is error_illegal_struct_close.                    *)
 

@@ -26,7 +26,7 @@
 #define BVN_INTERNAL_DIMS_H_
 #include "bovnar.h"
 #define BVN_EVENT_COUNT             15
-#define BVN_ERROR_COUNT             41
+#define BVN_ERROR_COUNT             42
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
@@ -34,7 +34,7 @@
 typedef char bvn_internal_dims_event_check[
 	(ev_stream_end + 1 == BVN_EVENT_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_error_check[
-	(error_struct_shape_mismatch + 1 == BVN_ERROR_COUNT) ? 1 : -1];
+	(error_duplicate_struct_key + 1 == BVN_ERROR_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_prefix_system_check[
 	(prefix_iec + 1 == BVN_PREFIX_SYSTEM_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_si_prefix_check[

@@ -135,7 +135,10 @@ typedef enum error_code_e {
 	 * match in length and element shape (recursively); sibling structs must
 	 * share the same keys with recursively-matching fields. */
 	error_array_element_type_mismatch   = 39,
-	error_struct_shape_mismatch         = 40
+	error_struct_shape_mismatch         = 40,
+	/* A struct (or the top-level document) repeats a key. Keys must be unique
+	 * within one scope so lookup, references and iteration always agree. */
+	error_duplicate_struct_key          = 41
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,

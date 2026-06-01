@@ -501,6 +501,42 @@ static void test_empty_array_semantics(void)
 	expect_parse(".a = [[], [], [1]];\n", error_array_row_size_mismatch,
 				 "empty,empty,len1 siblings");
 }
+/*
+ * Keys must be unique within one scope (a struct, or the top-level document),
+ * so lookup, references and iteration always agree. The same key in *different*
+ * scopes is fine. Also guards that an empty array "[]" leaves no phantom
+ * top-level entry behind.
+ */
+static void test_struct_unique_keys(void)
+{
+	expect_parse(".a = {.x = 1; .x = 2;};\n", error_duplicate_struct_key,
+				 "struct duplicate key");
+	expect_parse(".a = {.x = 1; .y = 2; .x = 3;};\n",
+				 error_duplicate_struct_key, "non-adjacent duplicate key");
+	expect_parse(".x = 1;\n.x = 2;\n", error_duplicate_struct_key,
+				 "top-level duplicate key");
+	expect_parse(".a = {.p = {.x = 1; .x = 2;};};\n",
+				 error_duplicate_struct_key, "duplicate in nested struct");
+	expect_parse(".a = [{.x = 1; .x = 2;}];\n", error_duplicate_struct_key,
+				 "duplicate in array struct element");
+
+	expect_parse(".a = {.x = 1;};\n.b = {.x = 2;};\n", error_none,
+				 "same key in sibling structs is fine");
+	expect_parse(".a = {.x = 1; .p = {.x = 2;};};\n", error_none,
+				 "same key nested vs outer is fine");
+	expect_parse(".a = {.x = 1; .y = 2;};\n", error_none,
+				 "distinct struct keys are fine");
+
+	/* Empty array must not leave a phantom top-level NULL entry. */
+	bvn_dom_doc_t *d = parse_doc(".a = [];\n.b = 2;\n");
+	if (d) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(d), error_none,
+					   "[] then .b parses");
+		ASSERT_EQ_UINT(bvn_dom_doc_count(d), 2,
+					   "[] leaves no phantom top-level entry");
+		bvn_dom_doc_destroy(d);
+	}
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -514,6 +550,7 @@ int main(void)
 	test_array_row_size_model();
 	test_array_homogeneity();
 	test_empty_array_semantics();
+	test_struct_unique_keys();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

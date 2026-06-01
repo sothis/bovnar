@@ -81,9 +81,6 @@ markers = [
 build         = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip          = "*-musllinux*"
 build-frontend = "build"
-# Temporary: surface the manylinux compiler/CMake output so the Linux wheel
-# failure is diagnosable from the CI log. Lower back to 0 once green.
-build-verbosity = 1
 # The bundled libbvnr_shared.* makes every test that touches the C library
 # runnable straight from the installed wheel.
 test-requires = ["pytest", "numpy>=1.24", "pint>=0.22"]

@@ -4073,7 +4073,7 @@ hljs.registerLanguage('bovnar', function() {
   const INLINE_UNIT = {
     match: [
       /(?<=[\d"])\s+/,
-      /[A-Za-z_µΩ°][A-Za-z0-9_~·µΩ°¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*/
+      /[A-Za-z_µΩ°(][A-Za-z0-9_~·µΩ°()¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻.\/:\^\*-]*/
     ],
     scope: { 2: 'bvn-unit' }
   };

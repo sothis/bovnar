@@ -235,7 +235,7 @@ contexts:
   # The lookbehind fires after a digit or a closing string quote. (Special-number
   # keywords nan/inf/ninf take no inline unit — a unit is given via the annotation.)
   inline_unit:
-    - match: '(?<=[\d"])(\s+)([A-Za-z_$%‰‱µ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
+    - match: '(?<=[\d"])(\s+)([A-Za-z_$%(‰‱µ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
       captures:
         1: punctuation.separator.inline-unit.bovnar
         2: support.type.unit.inline.bovnar

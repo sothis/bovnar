@@ -446,10 +446,9 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 				continue;
 			}
 			if (v->acc_exp_state > 0) {
-				if (v->acc_exp_state == 1 && (b == '+' || b == '-'))
-					v->acc_exp_state = 2;
-				else
-					v->acc_exp_state = 2;
+				/* Inside the exponent: a sign or digit, never folded
+				 * into the mantissa accumulator. */
+				v->acc_exp_state = 2;
 				continue;
 			}
 			uint32_t dv = (uint32_t)(b - (uint8_t)'0');
@@ -476,10 +475,8 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 			continue;
 		}
 		if (v->acc_exp_state > 0) {
-			if (v->acc_exp_state == 1 && (b == '+' || b == '-')) {
-				v->acc_exp_state = 2;
-				continue;
-			}
+			/* Inside the exponent: a sign or digit, never folded
+			 * into the mantissa accumulator. */
 			v->acc_exp_state = 2;
 			continue;
 		}

@@ -251,8 +251,8 @@ nested objects become structs. It rejects, rather than mauls:
   whose sub-arrays differ in length (`[[1,2],[3,4,5]]`) has no bovnar
   representation and is a hard error. Model such data as an object/struct.
 
-One representational caveat: bovnar has no zero-length array (`[]` denotes a
-single null element), so an empty JSON array round-trips to `[null]`.
+bovnar's `[]` is a genuine zero-length array — distinct from `[null]`, which is
+one null element — so an empty JSON array round-trips faithfully as `[]`.
 
 **`bvnr → json`** keeps every value but cannot carry bovnar's extra semantics,
 since JSON has no equivalent:
@@ -265,8 +265,8 @@ since JSON has no equivalent:
   them as numbers safely);
 - `nan` and `inf` become `null` (JSON has no non-finite numbers).
 
-Consequently `json → bvnr → json` preserves every value (the empty-array case
-above aside). Integers, booleans, null, strings, and array/object structure also
+Consequently `json → bvnr → json` preserves every value. Integers, booleans,
+null, strings, and array/object structure also
 reproduce *textually*; floating-point values reproduce their exact `double`
 value but not necessarily their original spelling. Floats are re-emitted as the
 **shortest decimal that round-trips** to the same `double`, so `0.1` comes back

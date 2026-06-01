@@ -17,6 +17,10 @@ option(BVNR_ANALYZER
     "Enable GCC -fanalyzer static analysis (dev/CI diagnostic; turn OFF for \
 release wheel builds, where newer GCCs in the manylinux image can ICE on it)"
     ON)
+option(BVNR_LTO
+    "Enable link-time optimization for GCC Release/RelWithDebInfo builds (turn \
+OFF for wheel builds; GCC 14's LTO ICEs on bvn_init_run_luts under manylinux)"
+    ON)
 option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
     ON)
@@ -63,7 +67,7 @@ endif()
 # Other compilers — notably AppleClang for the macOS cibuildwheel wheels — get a
 # plain optimised build so the same tree builds everywhere. The GCC path is
 # unchanged.
-if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+if(BVNR_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(BVNR_LTO_CFLAGS " -flto=auto -fno-semantic-interposition")
 else()
     set(BVNR_LTO_CFLAGS "")
@@ -74,7 +78,8 @@ set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0${BVNR_LTO_CFLAGS}" CACHE STRING "C fla
 set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
 
-if((CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+if(BVNR_LTO
+        AND (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto=auto")

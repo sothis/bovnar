@@ -26,6 +26,8 @@
 (* Events emitted to the validator callbacks (bvnr_event_t):         *)
 (*                                                                    *)
 (*   ev_stream_start  – once at the very start of bvn_lex_run   *)
+(*   ev_stream_end    – once at the very end of bvn_lex_run,          *)
+(*                      after the last value's terminator is consumed *)
 (*   ev_assignment_start   – on the identifier token of an assignment *)
 (*   ev_struct_start       – on "{"                                   *)
 (*   ev_struct_end         – on "}"                                   *)

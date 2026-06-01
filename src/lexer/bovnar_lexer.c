@@ -1871,8 +1871,15 @@ bool bvn_lex_run(bvnr_reader_t* r)
 		if (!nb) {
 			if ((l->next_state == value_outro ||
 				 l->next_state == undefined   ||
-				 l->next_state == first_bom) &&
+				 l->next_state == first_bom   ||
+				 l->next_state == first_comment_intro) &&
 				!l->struct_nesting_level) {
+				/* first_comment_intro: a document that is nothing but a
+				 * leading comment terminated by EOF (no trailing newline)
+				 * is a valid empty document — the EBNF comment production
+				 * ends on CR | LF | EOF. Without this a comment-only file
+				 * missing its final newline wrongly reported
+				 * error_got_incomplete_bvnr_stream. */
 				r->val.last_error = error_none;
 				break;
 			}

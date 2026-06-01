@@ -1041,6 +1041,13 @@ static const cf_case_t g_cases[] = {
 	      "# line 1\n# line 2\n.x = 1;"),
 	VALID("CMT-004", "comments", "comment between assignments",
 	      ".x = 1;\n# between\n.y = 2;"),
+	/* A document that is only a leading comment terminated by EOF (no
+	 * trailing newline) is a valid empty document: the comment production
+	 * ends on CR | LF | EOF. Guards the first_comment_intro EOF-accept. */
+	VALID("CMT-005", "comments", "comment-only document ending at EOF",
+	      "# just a comment, no trailing newline"),
+	VALID("CMT-006", "comments", "two comment lines, last unterminated",
+	      "# line 1\n# line 2 no newline"),
 
 	/* ── WHITESPACE HANDLING ─────────────────────────────────────── */
 	VALID("WS-001", "whitespace", "leading whitespace",

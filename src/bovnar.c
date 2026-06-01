@@ -1311,10 +1311,25 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		error_code_t herr = chk ? bvn_dom_doc_get_parse_error(chk) : error_none;
 		if (chk) bvn_dom_doc_destroy(chk);
 		if (herr != error_none) {
-			fprintf(stderr, "convert: the JSON has no bovnar representation: %s "
-				"(a heterogeneous or ragged array — bovnar 1.0 arrays are "
-				"homogeneous; model mixed data as a struct)\n",
-				bvn_error_to_string(herr));
+			const char *hint;
+			switch (herr) {
+			case error_duplicate_struct_key:
+				hint = "a JSON object with a duplicate key — bovnar keys "
+					"must be unique within a scope";
+				break;
+			case error_struct_shape_mismatch:
+				hint = "an array of objects with differing key sets — "
+					"bovnar array elements must share one shape; model "
+					"mixed data as a struct";
+				break;
+			default:
+				hint = "a heterogeneous or ragged array — bovnar 1.0 "
+					"arrays are homogeneous; model mixed data as a struct";
+				break;
+			}
+			fprintf(stderr, "convert: the JSON has no bovnar "
+				"representation: %s (%s)\n",
+				bvn_error_to_string(herr), hint);
 			free(out); json_free_node(root); free(buf); return 1;
 		}
 	}

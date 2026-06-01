@@ -683,6 +683,8 @@ _bvnr_convert_fail(bad_key          bad_key.json              "not a valid bovna
 _bvnr_convert_fail(int_overflow     bad_overflow.json         "out of range")
 _bvnr_convert_fail(trailing         bad_trailing.json         "trailing content")
 _bvnr_convert_fail(nul_in_string    bad_nul.json              "NUL")
+_bvnr_convert_fail(dup_key          bad_dupkey.json           "duplicate key")
+_bvnr_convert_fail(diff_key_records bad_diffkeys.json         "differing key sets")
 
 # ── Single-file amalgamation: regenerate dist/, compile, and smoke-test ─────
 # Guards against the amalgamation drifting/breaking (static-symbol collisions,

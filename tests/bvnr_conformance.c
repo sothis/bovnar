@@ -1015,6 +1015,15 @@ static const cf_case_t g_cases[] = {
 	      ".f = <float:64,k~Hz> 2.4;"),
 	VALID("UNT-015", "units", "mebi-byte IEC prefix",
 	      ".mem = <uint:64,Mi~B> 512;"),
+	/* An inline unit may begin with a parenthesised group, the same as a
+	 * type-annotation unit (inline-unit-start includes "("). */
+	VALID("UNT-015b", "units", "inline unit with leading paren group",
+	      ".a = 1.0 (m/s)/s;"),
+	VALID("UNT-015c", "units", "annotation unit with leading paren group",
+	      ".a = <float:64,(m/s)/s> 1.0;"),
+	ERROR_CASE("UNT-015d", "units", "inline unit unbalanced leading paren",
+	           ".a = 1.0 (m/s;",
+	           error_unit_illegal),
 	ERROR_CASE("UNT-016", "units", "annotation unit m, inline unit s",
 	           ".d = <float:64,m> 1.5 s;",
 	           error_unit_mismatch),

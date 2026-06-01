@@ -463,9 +463,11 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 (* A currency component carries a mandatory "$" sigil (spec 1.0): "$USD",      *)
 (* "$BTC", or prefixed "<prefix>~$EUR".  Bare codes are no longer currencies,  *)
 (* so a currency code can never collide with a physical-unit symbol.           *)
-inline-unit-start = ALPHA | "_" | "$" | utf8-leader ;
+(* "(" lets an inline unit begin with a parenthesised group, e.g. "(m/s)/s",   *)
+(* so the inline form accepts the same unit grammar as a type-annotation unit. *)
+inline-unit-start = ALPHA | "_" | "$" | "%" | "(" | utf8-leader ;
 
-inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
+inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "%" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
                   | "(" | ")" | utf8-leader | utf8-continuation ;
 
 

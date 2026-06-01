@@ -713,7 +713,7 @@ A **scalar** number or string value may carry an optional unit suffix separated 
 .ratio    = 3.14 no_unit;     # explicitly dimensionless via inline suffix
 ```
 
-The inline unit suffix is **forbidden inside arrays**; any letter or `_` character following a value inside `[ … ]` is a lexical error (`error_unexpected_input_byte`).
+The inline unit suffix is **forbidden inside arrays**; any character that would begin an inline unit — a letter, `_`, `$`, `%`, `(`, or a UTF-8 lead byte — following a value inside `[ … ]` is a lexical error (`error_unexpected_input_byte`).
 
 **Interaction with type annotations:**
 

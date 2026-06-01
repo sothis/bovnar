@@ -2096,8 +2096,8 @@ implementation's version.
 under spec 1.0 will remain valid, and will decode to the same values, under every
 1.x revision. This covers the lexical structure, the type families and their
 annotations, arrays (including the homogeneity rules of §7.4), structs, octet
-streams, references, and the error codes in §13. Conforming archives may rely on
-this for long-term storage.
+streams, references, and the error-code values in §16.10. Conforming archives
+may rely on this for long-term storage.
 
 **What may still grow in 1.x (additive only).** The following may be *extended*
 without breaking existing documents, and such extensions ship as minor (1.x)

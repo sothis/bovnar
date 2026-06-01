@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (190 cases) ──→ for each test case:                │
+│  Test corpus (202 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -91,6 +91,20 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 The reference implementation is the single authoritative oracle.  An
 implementation is conformant when its IUT adapter produces output
 byte-for-byte identical to the reference for every test case.
+
+### Validation tiers
+
+Most cases exercise the **streaming reader** (`bvnr_read`): the lexer,
+validator, and the `on_verified` event stream the IUT protocol mirrors. A
+smaller set — the `homogeneity` group — exercises the **materialised-document
+(DOM) tier** (`bvn_dom_parse`), because the spec-1.0 array-homogeneity (§7.4),
+struct-shape, and duplicate-key (§8.1) rules are enforced *above* the lexer and
+are therefore unreachable through the streaming `on_verified` callback. These
+DOM-tier cases run in **self-test mode only**; under `--iut` they are reported
+as `# SKIP`, since IUT protocol v1 is streaming-only and cannot express a
+DOM-tier check. An implementation that targets full spec-1.0 conformance must
+still enforce these rules in its document/tree API; the self-test cases pin the
+reference behaviour and its frozen error codes (39, 40, 41).
 
 ---
 
@@ -176,6 +190,7 @@ Options:
 | `recovery` | Error-resync behaviour |
 | `comments` | Comment parsing |
 | `whitespace` | Whitespace tolerance |
+| `homogeneity` | DOM-tier: array homogeneity, struct shape, key uniqueness (self-test only) |
 
 ---
 
@@ -274,7 +289,7 @@ OCTET_STREAM_END
 |------|--------|-------|
 | `STREAM_START` | — | Always first |
 | `ASSIGNMENT_START <key>` | key: raw key bytes, safe-escaped | |
-| `TYPE_ANN_START <family>` | family: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8` | |
+| `TYPE_ANN_START <family>` | family: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool` | |
 | `TYPE_FAMILY <family>` | Same as TYPE_ANN_START | |
 | `TYPE_PARAM_WIDTH <N>` | N: effective width (0 → 64) | Only for numeric types |
 | `TYPE_PARAM_BASE <N>` | N: effective base (0 → 10) | Only for numeric types |
@@ -302,6 +317,7 @@ OCTET_STREAM_END
 | `token_is_array_string` | `array_string` |
 | `token_is_null_value` | `null` |
 | `token_is_octet_stream` | `octets` |
+| `token_is_bool` | `bool` |
 
 For `octets` token type, the value field is `<N> bytes` (decimal byte
 count, then a space, then the literal string `bytes`), not the raw
@@ -422,9 +438,9 @@ specifies:
 |-------|-------|---------------|
 | `encoding` | 9 | UTF-8 validity, BOM placement, byte classes |
 | `identifiers` | 11 | Syntax, body characters, length limits |
-| `strings` | 16 | Escapes, concatenation, UTF-8, limits |
+| `strings` | 17 | Escapes, concatenation, UTF-8, limits |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
-| `types` | 29 | All five type families, widths, bases, errors |
+| `types` | 39 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
 | `symbols` | 6 | Bare-word values and limits |
 | `references` | 4 | Dotted paths and limits |
@@ -432,12 +448,14 @@ specifies:
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
-| `units` | 20 | SI/IEC prefixes, compound, inline, errors |
+| `units` | 23 | SI/IEC prefixes, compound, inline, errors |
 | `special_numbers` | 5 | `nan`, `inf`, `ninf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
-| `comments` | 4 | Comment styles |
+| `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
+| `homogeneity` | 12 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
+| **Total** | **202** | |
 
 ---
 
@@ -448,7 +466,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..190
+1..202
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment
@@ -492,6 +510,15 @@ ERROR_LIM("GRP-NNN", "group_name", "description",
           ".long_name = 1;",
           error_identifier_too_long,
           4 /*max_id*/, 0, 0, 0, 0, 0),
+
+/* Materialised-document (DOM) tier — validated via bvn_dom_parse instead of
+   the streaming reader; runs in self-test mode only (skipped under --iut).
+   Use for the spec-1.0 homogeneity / struct-shape / duplicate-key rules. */
+DOM_VALID("GRP-NNN", "group_name", "description",
+          ".a = [1, 2.5, 3];"),
+DOM_ERROR("GRP-NNN", "group_name", "description",
+          ".a = [1, \"two\"];",
+          error_array_element_type_mismatch),
 ```
 
 After editing, rebuild:

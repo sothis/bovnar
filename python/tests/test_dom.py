@@ -29,7 +29,7 @@ from conftest import needs_lib
 
 import bovnar
 from bovnar.dom import DomDoc, DomNode, DomType
-from bovnar.enums import BaseUnit, SIPrefix, ValueTypeFamily
+from bovnar.enums import BaseUnit, ErrorCode, SIPrefix, ValueTypeFamily
 from bovnar.exceptions import BovnarParseError
 
 
@@ -86,6 +86,23 @@ class TestDomDocParse:
     def test_invalid_bvnr_raises(self):
         with pytest.raises(BovnarParseError):
             DomDoc.parse(b"!!! this is not valid BVNR !!!")
+
+    @pytest.mark.parametrize("src, code", [
+        (b'.a = [1, "two"];',                ErrorCode.ARRAY_ELEMENT_TYPE_MISMATCH),
+        (b'.a = [<float:64,m> 1.0, <float:64,k~g> 2.0];',
+                                             ErrorCode.ARRAY_ELEMENT_TYPE_MISMATCH),
+        (b'.a = [[1, 2], [3, 4, 5]];',       ErrorCode.ARRAY_ROW_SIZE_MISMATCH),
+        (b'.a = [{.x = 1;}, {.y = 1;}];',    ErrorCode.STRUCT_SHAPE_MISMATCH),
+        (b'.x = 1; .x = 2;',                 ErrorCode.DUPLICATE_STRUCT_KEY),
+        (b'.s = {.x = 1; .x = 2;};',         ErrorCode.DUPLICATE_STRUCT_KEY),
+    ])
+    def test_spec_1_0_homogeneity_raises(self, src, code):
+        # The materialised-document rules (spec 1.0 §7.4 / §8.1) carry frozen
+        # error codes 39/40/41; the DOM parser must surface them as a proper
+        # BovnarParseError, not crash on an unmapped ErrorCode.
+        with pytest.raises(BovnarParseError) as exc:
+            DomDoc.parse(src)
+        assert exc.value.code == code
 
     def test_empty_doc(self):
         doc = DomDoc.parse(b"")

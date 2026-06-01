@@ -24,6 +24,10 @@
 14. [Formal EBNF](#14-formal-ebnf)
 15. [Complete Examples](#15-complete-examples)
 16. [Reference API](#16-reference-api)
+17. [Versioning & Stability](#17-versioning--stability)
+- [Appendix A: Event Sequence Reference](#appendix-a-event-sequence-reference)
+- [Appendix B: Implementation Notes](#appendix-b-implementation-notes)
+- [Appendix C: Limits Summary](#appendix-c-limits-summary)
 
 ---
 
@@ -1273,7 +1277,8 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 | Mismatched type family for value token | `error_type_value_mismatch` |
 | Dot or exponent in integer-typed value | `error_type_value_mismatch` |
 | Invalid unit string | `error_unit_illegal` |
-| Empty type annotation body | `error_illegal_value_type` |
+| Empty parameter component — `<uint:>`, `<uint:8,>`, `<uint:8,,>`, `<uint:,_16>` (§5.3) | `error_illegal_value_type` |
+| Wholly empty annotation `<>` / `< >` (no family keyword) | `error_unexpected_input_byte` |
 | UTF-8 string / ISO 8601 / IP socket with number value | `error_type_value_mismatch` |
 | Non-decimal base for float type | `error_illegal_value_type` |
 | Base `_N` (N≠10, N≠16) for `float` | `error_illegal_value_type` |
@@ -1673,7 +1678,7 @@ The unit may be written directly after the value literal instead of — or redun
 .x = <float:64,m//s> 1.0;       # error_unit_illegal
 
 # Too many components (> 8)
-.y = <float:64,m*s*k~g*A*K*mol*cd*b> 1.0;  # error_unit_illegal (9 components)
+.y = <float:64,m*s*g*A*K*mol*cd*b*V> 1.0;  # error_unit_illegal (9 components)
 
 # float_fix: Q >= effective width
 .bad_q = <float_fix:16,q16> 1.0;            # Q=16 >= width=16 → error_illegal_value_type
@@ -1727,6 +1732,7 @@ typedef enum value_type_family_e {
     vt_float,
     vt_float_fix,  /* fixed-point binary, Q-format; Q stored in value_type_spec_t.base */
     vt_float_dec,  /* IEEE 754-2008 decimal floating-point                               */
+    vt_bool,       /* boolean (true/false/on/off); see §4.4 and §6.1                     */
     vt_illegal
 } value_type_family_t;
 
@@ -1759,6 +1765,26 @@ typedef struct value_unit_s {
     value_unit_component_t  components[BVNR_MAX_UNIT_COMPONENTS];
 } value_unit_t;
 
+typedef enum token_type_e {
+    token_is_identifier,
+    token_is_string,
+    token_is_number,
+    token_is_symbol,
+    token_is_reference,
+    token_is_array_number,
+    token_is_array_string,
+    token_is_type,
+    token_is_octet_stream,
+    token_is_null_value,
+    token_is_structure,
+    token_is_unit,
+    token_is_type_width,
+    token_is_type_base,
+    token_is_type_q,
+    token_is_bool,
+    token_is_unknown
+} token_type_t;
+
 typedef struct bvnr_data_s {
     token_type_t      type;
     value_type_spec_t value_type;
@@ -1774,6 +1800,7 @@ typedef struct bvnr_data_s {
 /* Type-spec convenience constructors (from bovnar.h) */
 #define BVN_TYPE_PLAIN          ((value_type_spec_t){ .family = vt_plain, .width = 0,  .base = 0  })
 #define BVN_TYPE_UTF8           ((value_type_spec_t){ .family = vt_utf8,  .width = 0,  .base = 0  })
+#define BVN_TYPE_BOOL           ((value_type_spec_t){ .family = vt_bool,  .width = 0,  .base = 0  })
 #define BVN_TYPE_UINT(w)        ((value_type_spec_t){ .family = vt_uint,      .width = (w) })
 #define BVN_TYPE_SINT(w)        ((value_type_spec_t){ .family = vt_sint,      .width = (w) })
 #define BVN_TYPE_FLOAT(w)       ((value_type_spec_t){ .family = vt_float,     .width = (w) })
@@ -1869,7 +1896,7 @@ typedef struct bvnr_read_flags_s {
 void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
-void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint32_t cap);
+void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
 ```
 
@@ -1883,7 +1910,7 @@ bool bvnr_open_read_source(bvnr_reader_t* r, const bvnr_source_t* src,
                         bvnr_read_flags_t* options);
 
 bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint64_t len,
-                        void* mirror_buf, uint32_t mirror_cap,
+                        void* mirror_buf, uint64_t mirror_cap,
                         bvnr_read_flags_t* options);
 
 bool bvnr_read(bvnr_reader_t* r);

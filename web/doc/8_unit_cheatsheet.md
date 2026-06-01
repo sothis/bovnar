@@ -496,7 +496,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 
 ### 5.2 ISO 4217 Fiat Currencies
 
-164 codes. Enum values `bu_aed` (134) … `bu_zwl` (297).
+164 codes occupying `value_base_unit_t` slots **134 … 297** (`BVN_CURRENCY_FIAT_FIRST … BVN_CURRENCY_FIAT_LAST`). Currencies have no named `bu_*` enumerators — they are resolved from the `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value; query them with `bvn_unit_is_fiat` / `bvn_currency_info`.
 
 > **Min** = minor unit exponent N: 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2).
 > Minor units are **bold** when they differ from 2. `numeric_code` is the ISO 4217 numeric identifier.
@@ -673,7 +673,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 
 ### 5.3 Cryptocurrencies
 
-50 codes. Enum values `bu_btc` (298) … `bu_rune` (347). `numeric_code = 0` for all.
+50 codes occupying `value_base_unit_t` slots **298 … 347** (`BVN_CURRENCY_CRYPTO_FIRST … BVN_CURRENCY_CRYPTO_LAST`). Like the fiat codes they have no named `bu_*` enumerators — resolved by `bvn_parse_currency_str`, queried with `bvn_unit_is_crypto` / `bvn_currency_info`. `numeric_code = 0` for all.
 
 > **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,$BTC>` stores satoshis; divide by 10⁸ to obtain BTC.
 

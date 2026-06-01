@@ -586,3 +586,6 @@ class ErrorCode(IntEnum):
     DIGIT_NOT_IN_BASE           = 36
     RECOVERED                   = 37
     UNIT_MISMATCH               = 38
+    ARRAY_ELEMENT_TYPE_MISMATCH = 39
+    STRUCT_SHAPE_MISMATCH       = 40
+    DUPLICATE_STRUCT_KEY        = 41

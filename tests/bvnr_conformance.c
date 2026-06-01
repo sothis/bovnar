@@ -34,6 +34,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "bovnar.h"
+#include "bovnar_dom.h"
 
 /* =========================================================================
  * Event log buffer
@@ -369,6 +370,13 @@ typedef struct cf_case_t {
 	uint32_t       input_bin_len;
 	uint16_t       max_sym_len;
 	uint16_t       max_ref_len;
+	/* When true, the case is validated through the materialised-document
+	 * (DOM) tier — bvn_dom_parse — instead of the streaming reader.  The
+	 * spec-1.0 array-homogeneity (§7.4), struct-shape, and duplicate-key
+	 * (§8.1) rules are enforced above the lexer, so they are unreachable
+	 * through the streaming on_verified path the IUT protocol uses.  These
+	 * cases run in self-test mode only and are skipped under --iut. */
+	bool           dom_validate;
 } cf_case_t;
 
 /* =========================================================================
@@ -571,6 +579,16 @@ static void tap_skip(const char *id, const char *desc, const char *reason)
 #define ERROR_REF(id_, grp_, desc_, inp_, err_, mrl_) \
 	{ id_, grp_, desc_, inp_, CF_ERROR, err_, \
 	  false, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 0, 0, mrl_ }
+
+/* Materialised-document (DOM) tier cases — validated via bvn_dom_parse,
+ * not the streaming reader.  The trailing initializer sets dom_validate. */
+#define DOM_VALID(id_, grp_, desc_, inp_) \
+	{ id_, grp_, desc_, inp_, CF_VALID, error_none, \
+	  false, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 0, 0, 0, true }
+
+#define DOM_ERROR(id_, grp_, desc_, inp_, err_) \
+	{ id_, grp_, desc_, inp_, CF_ERROR, err_, \
+	  false, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 0, 0, 0, true }
 
 /* Binary test data for octet stream cases.
  * These cannot be NUL-terminated C strings since they contain 0x00 bytes. */
@@ -1092,6 +1110,45 @@ static const cf_case_t g_cases[] = {
 	      ".x = 1;\n\n.y = 2;"),
 	VALID("WS-004", "whitespace", "tabs and spaces around operator",
 	      ".x\t=\t1\t;"),
+
+	/* ── HOMOGENEITY (materialised-document / DOM tier, spec 1.0) ──── *
+	 * Array homogeneity (§7.4), struct shape, and key uniqueness (§8.1)
+	 * are enforced above the lexer, so they are validated through
+	 * bvn_dom_parse rather than the streaming reader.  These cases run
+	 * in self-test mode only (skipped under --iut). */
+	DOM_VALID("HOM-001", "homogeneity", "mixed numeric encodings, one dimension",
+	          ".a = [1, 2.5, 3];"),
+	DOM_VALID("HOM-002", "homogeneity", "sparse array with null holes",
+	          ".a = [1, , 3];"),
+	DOM_VALID("HOM-003", "homogeneity", "rectangular nested sub-arrays",
+	          ".a = [[1, 2], [3, 4]];"),
+	DOM_VALID("HOM-004", "homogeneity", "record array — same keys, fields free (per-currency)",
+	          ".a = [{.cur = USD; .bal = <float_dec:64,$USD> 1.0;},"
+	          " {.cur = EUR; .bal = <float_dec:64,$EUR> 2.0;}];"),
+	DOM_ERROR("HOM-005", "homogeneity", "mixed element kinds (number vs string)",
+	          ".a = [1, \"two\"];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-006", "homogeneity", "mixed physical dimension (length vs mass)",
+	          ".a = [<float:64,m> 1.0, <float:64,k~g> 2.0];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-007", "homogeneity", "mixed currency dimension (USD vs EUR)",
+	          ".a = [<float_dec:64,$USD> 1.0, <float_dec:64,$EUR> 2.0];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-008", "homogeneity", "ragged sibling sub-arrays",
+	          ".a = [[1, 2], [3, 4, 5]];",
+	          error_array_row_size_mismatch),
+	DOM_ERROR("HOM-009", "homogeneity", "sibling structs with differing keys",
+	          ".a = [{.x = 1;}, {.y = 1;}];",
+	          error_struct_shape_mismatch),
+	DOM_ERROR("HOM-010", "homogeneity", "record field differs in kind across siblings",
+	          ".a = [{.v = 1;}, {.v = \"two\";}];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-011", "homogeneity", "duplicate key at top-level scope",
+	          ".x = 1; .x = 2;",
+	          error_duplicate_struct_key),
+	DOM_ERROR("HOM-012", "homogeneity", "duplicate key within a struct scope",
+	          ".s = {.x = 1; .x = 2;};",
+	          error_duplicate_struct_key),
 };
 
 #define NUM_CASES ((int)(sizeof(g_cases) / sizeof(g_cases[0])))
@@ -1177,8 +1234,62 @@ static bool check_data_in_log(const evlog_t *log, const char *data)
  * Self-test runner (no IUT)
  * ========================================================================= */
 
+/* Materialised-document (DOM) tier self-test: parse through bvn_dom_parse
+ * and check the resulting parse error against the case expectation.  Used
+ * for the spec-1.0 homogeneity / struct-shape / duplicate-key rules, which
+ * the streaming reader does not enforce. */
+static void run_self_test_dom(const cf_case_t *tc)
+{
+	const void *input     = tc->input_bin ? (const void *)tc->input_bin
+	                                       : (const void *)tc->input;
+	uint32_t    input_len = tc->input_bin ? tc->input_bin_len
+	                                       : (uint32_t)strlen(tc->input);
+
+	bvn_dom_doc_t *doc = bvn_dom_parse(input, input_len);
+	if (!doc) {
+		tap_fail(tc->id, tc->description, "bvn_dom_parse returned NULL");
+		return;
+	}
+
+	error_code_t err = bvn_dom_doc_get_parse_error(doc);
+	bvn_dom_doc_destroy(doc);
+
+	char detail[512];
+	if (tc->expect == CF_VALID) {
+		if (err != error_none) {
+			snprintf(detail, sizeof(detail),
+			         "expected no error but DOM parse got: %s",
+			         bvn_error_to_string(err));
+			tap_fail(tc->id, tc->description, detail);
+		} else {
+			tap_ok(tc->id, tc->description);
+		}
+	} else {
+		if (err == error_none) {
+			snprintf(detail, sizeof(detail),
+			         "expected error %s but DOM parse succeeded",
+			         bvn_error_to_string(tc->expected_error));
+			tap_fail(tc->id, tc->description, detail);
+		} else if (tc->expected_error != error_none &&
+		           err != tc->expected_error) {
+			snprintf(detail, sizeof(detail),
+			         "expected error %s but got %s",
+			         bvn_error_to_string(tc->expected_error),
+			         bvn_error_to_string(err));
+			tap_fail(tc->id, tc->description, detail);
+		} else {
+			tap_ok(tc->id, tc->description);
+		}
+	}
+}
+
 static void run_self_test(const cf_case_t *tc)
 {
+	if (tc->dom_validate) {
+		run_self_test_dom(tc);
+		return;
+	}
+
 	parse_result_t r;
 	if (tc->input_bin) {
 		r = ref_parse(tc->input_bin, tc->input_bin_len,
@@ -1264,6 +1375,11 @@ static void run_self_test(const cf_case_t *tc)
 
 static void run_iut_test(const cf_case_t *tc, const char *iut_path)
 {
+	if (tc->dom_validate) {
+		tap_skip(tc->id, tc->description,
+		         "DOM-tier check; not part of streaming IUT protocol v1");
+		return;
+	}
 	if (tc->iut_skip_reason) {
 		tap_skip(tc->id, tc->description, tc->iut_skip_reason);
 		return;

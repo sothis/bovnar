@@ -200,13 +200,17 @@ class TestErrorCode:
         assert ErrorCode.VALUE_OUT_OF_RANGE     == 35
         assert ErrorCode.DIGIT_NOT_IN_BASE      == 36
         assert ErrorCode.RECOVERED              == 37
+        assert ErrorCode.UNIT_MISMATCH               == 38
+        assert ErrorCode.ARRAY_ELEMENT_TYPE_MISMATCH == 39
+        assert ErrorCode.STRUCT_SHAPE_MISMATCH       == 40
+        assert ErrorCode.DUPLICATE_STRUCT_KEY        == 41
 
     def test_all_unique(self):
         values = [int(e) for e in ErrorCode]
         assert len(values) == len(set(values))
 
     def test_count(self):
-        assert len(ErrorCode) == 39
+        assert len(ErrorCode) == 42
 
     def test_roundtrip(self):
         for code in ErrorCode:

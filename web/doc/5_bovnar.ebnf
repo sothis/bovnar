@@ -466,10 +466,20 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 (* so a currency code can never collide with a physical-unit symbol.           *)
 (* "(" lets an inline unit begin with a parenthesised group, e.g. "(m/s)/s",   *)
 (* so the inline form accepts the same unit grammar as a type-annotation unit. *)
-inline-unit-start = ALPHA | "_" | "$" | "%" | "(" | utf8-leader ;
+inline-unit-start = ALPHA | "_" | "$" | "%" | "(" | unit-lead-byte ;
 
 inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "%" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
-                  | "(" | ")" | utf8-leader | utf8-continuation ;
+                  | "(" | ")" | unit-lead-byte | utf8-continuation ;
+
+(* unit-lead-byte: the UTF-8 lead-byte range accepted inside a unit — the    *)
+(* full 0xC2-0xF4, BROADER than utf8-leader (0xC3-0xF4).  Unlike identifier, *)
+(* symbol, and reference token starts (where 0xC2 is rejected, see §12), a   *)
+(* unit may begin with or contain a 0xC2-led code point: the µ prefix        *)
+(* (U+00B5 = 0xC2 0xB5), the ° / °C units (U+00B0 = 0xC2 0xB0), and the      *)
+(* "·" product separator (U+00B7 = 0xC2 0xB7).  The lexer maps the whole     *)
+(* 0xC2-0xF4 range to ACT_inline_unit_intro / ACT_copy_inline_unit_byte,     *)
+(* matching copy_type_byte in a type-annotation unit body.                   *)
+unit-lead-byte    = (* byte in [0xC2, 0xF4] *) ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)

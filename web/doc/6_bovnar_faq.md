@@ -599,9 +599,17 @@ The numeric *encodings* may still mix, since they all denote the same dimension:
 ```
 
 But genuinely different kinds (`[1, "two"]`) or dimensions (`[<float:64,m> 1.0,
-<float:64,k~g> 2.0]`) are a parse error. Heterogeneous data goes in a **struct**,
-not an array. A whole-array annotation (placed before `[`) is the default type
-for elements that do not carry their own annotation:
+<float:64,k~g> 2.0]`) are rejected with `error_array_element_type_mismatch`.
+Heterogeneous data goes in a **struct**, not an array.
+
+Homogeneity is a **materialised-document** rule: it is checked over the whole
+value once it is assembled, so it is enforced by the DOM parser
+(`bvn_dom_parse` / `bovnar.dom_parse`), not by the streaming SAX `Reader` (nor
+by `loads`, which is built on it) — the streaming layer surfaces per-value
+type/unit errors as the bytes arrive but cannot see sibling elements. Parse
+through the DOM tier (or the `bovnar` CLI's `convert`) if you need these rules
+enforced. A whole-array annotation (placed before `[`) is the default type for
+elements that do not carry their own annotation:
 
 ```bovnar
 .ports = <uint:16> [80, 443, 8080];

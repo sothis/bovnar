@@ -2,6 +2,9 @@
   "name": "Bovnar",
   "short_name": "Bovnar",
   "description": "Unit-safe serialization for scientific & industrial systems.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
     { "src": "/bovnar-mark.svg", "sizes": "any", "type": "image/svg+xml" },

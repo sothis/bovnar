@@ -11,15 +11,23 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="description" content="Bovnar (BVNR) — unit-safe serialization for science, industry and finance. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:url" content="https://www.bovnar.io/">
 <meta property="og:title" content="Bovnar — Unit-safe serialization for science, industry and finance">
 <meta property="og:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error. Built for instrumentation, telemetry, and control systems.">
-<meta property="og:type" content="website">
-<meta property="og:image" content="/bovnar-og.png">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar — unit-safe serialization for science, industry and finance">
+<meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="/bovnar-og.png">
+<meta name="twitter:title" content="Bovnar — Unit-safe serialization for science, industry and finance">
+<meta name="twitter:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:image:alt" content="Bovnar — unit-safe serialization for science, industry and finance">
 <title>Bovnar — Unit-safe serialization for science, industry and finance</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -1389,6 +1397,105 @@ section { position: relative; z-index: 1; }
   color: var(--teal);
 }
 
+/* ── inline text link ── */
+.inline-link {
+  color: var(--blue);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-hi);
+  transition: color 0.15s, border-color 0.15s;
+}
+.inline-link:hover { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+/* ── PDF downloads block ── */
+.doc-downloads {
+  margin-top: 1px;
+  background: var(--sidebar-bg);
+  padding: 2.25rem 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) 1.7fr;
+  gap: 1.75rem 2.5rem;
+  align-items: start;
+}
+.doc-dl-kicker {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 0.55rem;
+}
+.doc-dl-title {
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.45rem;
+}
+.doc-dl-sub {
+  font-size: 0.8rem;
+  color: var(--text3);
+  line-height: 1.6;
+  margin: 0 0 1.1rem;
+  max-width: 32ch;
+}
+.doc-dl-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-hi);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+.doc-dl-all:hover { border-color: var(--pink); color: var(--pink); }
+.doc-dl-arrow { color: var(--pink); font-weight: 700; }
+.doc-dl-meta { color: var(--text3); font-size: 0.66rem; }
+.doc-dl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.doc-dl-list a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--sidebar-bg);
+  padding: 0.62rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text2);
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+.doc-dl-list a:hover { background: var(--panel-bg); color: var(--blue); }
+.doc-dl-num { font-family: var(--mono); font-size: 0.62rem; color: var(--text3); flex-shrink: 0; }
+.doc-dl-ext {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: var(--teal);
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  padding: 0.05rem 0.32rem;
+}
+.doc-dl-list a:hover .doc-dl-ext { border-color: var(--blue); color: var(--blue); }
+@media (max-width: 720px) {
+  .doc-downloads { grid-template-columns: 1fr; }
+  .doc-dl-list { grid-template-columns: 1fr; }
+}
+
 /* ── FOOTER ── */
 footer { position: relative; z-index: 1; }
 
@@ -2126,11 +2233,50 @@ a[data-doc] { cursor: pointer; }
   /* live demo: tighten the chrome so the panels get the width */
   #launch-demo .grid { padding: 10px 0.85rem 1.5rem; gap: 10px; }
   #launch-demo header.intro { padding: 0.9rem 1.1rem 0.2rem; }
-  #launch-demo header.intro h1 { font-size: 1.1rem; }
+  #launch-demo header.intro h2 { font-size: 1.1rem; }
   #launch-demo header.intro p { font-size: 0.85rem; }
   #launch-demo .controls { gap: 0.35rem 0.5rem; }
 }
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.bovnar.io/#website",
+      "url": "https://www.bovnar.io/",
+      "name": "Bovnar",
+      "description": "Unit-safe serialization for scientific and industrial systems.",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://www.bovnar.io/#author" }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://www.bovnar.io/#author",
+      "name": "Janos Sonntag"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://www.bovnar.io/#software",
+      "name": "Bovnar (BVNR)",
+      "alternateName": "BVNR",
+      "url": "https://www.bovnar.io/",
+      "description": "A typed, unit-aware text serialization format. Every value carries its type family, bit-width, numeric base, and validated physical unit or currency inline, with no external schema. C99 reference implementation with Python bindings.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, macOS",
+      "softwareVersion": "1.0.0",
+      "programmingLanguage": ["C", "Python"],
+      "codeRepository": "https://github.com/sothis/bovnar",
+      "downloadUrl": "https://pypi.org/project/bovnar/",
+      "license": "https://opensource.org/licenses/MIT",
+      "keywords": "serialization, data format, physical units, units of measure, dimensional analysis, SI units, telemetry, instrumentation, scientific computing, C library, Python",
+      "author": { "@id": "https://www.bovnar.io/#author" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false"><defs><linearGradient id="bvnrGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient><symbol id="bvnr-mk" viewBox="0 0 256 256"><path d="M118 66 L96 66 L60 128 L96 190 L118 190" fill="none" stroke="url(#bvnrGrad)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M138 66 L160 66 L196 128 L160 190 L138 190" fill="none" stroke="url(#bvnrGrad)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M128 94 L162 128 L128 162 L94 128 Z" fill="#33a78f"/><path d="M128 94 L94 128 L128 128 Z" fill="#9cdcfe"/><path d="M128 94 L162 128 L128 128 Z" fill="#4ec9b0"/><path d="M94 128 L128 162 L128 128 Z" fill="#3fb89e"/><path d="M162 128 L128 162 L128 128 Z" fill="#2c9281"/></symbol><symbol id="bvnr-fav" viewBox="0 0 64 64"><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#bvnrGrad)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#bvnrGrad)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></symbol></defs></svg>
@@ -2332,8 +2478,8 @@ a[data-doc] { cursor: pointer; }
 #launch-demo nav a.link:hover { color: var(--cyan); }
 
 #launch-demo header.intro { padding: 1.1rem 1.4rem 0.4rem; max-width: 1700px; margin: 0 auto; }
-#launch-demo header.intro h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }
-#launch-demo header.intro h1 .accent { color: var(--teal); }
+#launch-demo header.intro h2 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }
+#launch-demo header.intro h2 .accent { color: var(--teal); }
 #launch-demo header.intro p { color: var(--text2); font-size: 0.92rem; margin-top: 0.35rem; max-width: 90ch; }
 #launch-demo header.intro p code { font-family: var(--mono); color: var(--cyan); font-size: 0.85em; }
 
@@ -2568,7 +2714,7 @@ a[data-doc] { cursor: pointer; }
 </style>
 <section id="launch-demo" aria-label="Live Mission Control demo">
 <header class="intro">
-  <h1>One format, <span class="accent">end to end</span> — <span class="accent">config in, decoded values out</span>.</h1>
+  <h2>One format, <span class="accent">end to end</span> — <span class="accent">config in, decoded values out</span>.</h2>
   <p id="demo-blurb">
     You saw the syntax — here's a spacecraft running on it. One format, the whole loop:
     <strong>config in, telemetry out</strong>. Edit the orbit; the craft encodes each measurement into a
@@ -3529,8 +3675,9 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     <div class="section-label reveal">documentation</div>
     <h2 class="section-h2 reveal reveal-delay-1">Everything you need to <em>ship.</em></h2>
     <p class="section-p reveal reveal-delay-2">
-      Eight documents covering every layer of the stack — from a five-minute tutorial
+      Nine documents covering every layer of the stack — from a five-minute tutorial
       to the formal EBNF grammar and the independent conformance verification protocol.
+      Read them inline below, or <a href="#doc-downloads" class="inline-link">download the full set as PDF</a>.
     </p>
     <div class="docs-grid">
       <a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial" class="doc-card reveal">
@@ -3593,7 +3740,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">07</div>
         <div>
           <div class="doc-card-title">Conformance Test Tool</div>
-          <div class="doc-card-desc">180+ test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
+          <div class="doc-card-desc">207 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
           <div class="doc-card-tag">Verification</div>
         </div>
       </a>
@@ -3601,10 +3748,32 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">08</div>
         <div>
           <div class="doc-card-title">Units &amp; Currencies Reference</div>
-          <div class="doc-card-desc">All 157 physical units, 164 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
+          <div class="doc-card-desc">All 163 physical units, 164 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
           <div class="doc-card-tag">Quick reference</div>
         </div>
       </a>
+    </div>
+
+    <div id="doc-downloads" class="doc-downloads reveal">
+      <div class="doc-dl-head">
+        <div class="doc-dl-kicker">PDF downloads</div>
+        <h3 class="doc-dl-title">Take the documentation offline</h3>
+        <p class="doc-dl-sub">Print-ready, self-contained PDFs of every document — or grab the complete set as one archive.</p>
+        <a class="doc-dl-all" href="doc/pdf/bovnar-docs-pdf.zip" download aria-label="Download all nine documentation PDFs as a ZIP archive">
+          <span class="doc-dl-arrow">↓</span> Download all <span class="doc-dl-meta">ZIP · 9 PDFs</span>
+        </a>
+      </div>
+      <ul class="doc-dl-list">
+        <li><a href="doc/pdf/bovnar-tutorial.pdf"        download aria-label="Download the Tutorial as PDF"><span class="doc-dl-num">00</span> Tutorial <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-specification.pdf"   download aria-label="Download the Specification as PDF"><span class="doc-dl-num">01</span> Specification <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-unit-system.pdf"     download aria-label="Download the Unit System Reference as PDF"><span class="doc-dl-num">02</span> Unit System Reference <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-readwrite-api.pdf"   download aria-label="Download the Read and Write API reference as PDF"><span class="doc-dl-num">03</span> Read &amp; Write API <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-python-bindings.pdf" download aria-label="Download the Python Bindings reference as PDF"><span class="doc-dl-num">04</span> Python Bindings <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-grammar.pdf"         download aria-label="Download the formal EBNF grammar as PDF"><span class="doc-dl-num">05</span> Formal EBNF Grammar <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-faq.pdf"             download aria-label="Download the FAQ as PDF"><span class="doc-dl-num">06</span> FAQ <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-conformance.pdf"     download aria-label="Download the Conformance Test Tool reference as PDF"><span class="doc-dl-num">07</span> Conformance Test Tool <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-cheatsheet.pdf"      download aria-label="Download the Units and Currencies reference as PDF"><span class="doc-dl-num">08</span> Units &amp; Currencies Reference <span class="doc-dl-ext">PDF</span></a></li>
+      </ul>
     </div>
   </div>
 </section>

@@ -62,7 +62,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 | Type annotation | `<family:width,unit>` before value | `<uint:32,k~m> 1000` |
 | Integer | `[-]digits` | `42`, `-7` |
 | Float | `[-]digits[.digits][e[±]digits]` | `3.14`, `1e-6` |
-| Special float | `$nan` `$inf` `$-inf` | `.x = $nan;` |
+| Special float | `nan` `inf` `ninf` | `.x = nan;` |
 | Boolean | `true` `false` `on` `off` (`<bool>`) | `.b = on;` |
 | String | `"…"` with C-style escapes | `"hello\nworld"` |
 | Symbol | bare identifier (no quotes) | `ok`, `Monday` |
@@ -263,7 +263,7 @@ since JSON has no equivalent:
   hex string;
 - integers wider than 64 bits are emitted as decimal strings (JSON cannot hold
   them as numbers safely);
-- `$nan` and `$inf` become `null` (JSON has no non-finite numbers).
+- `nan` and `inf` become `null` (JSON has no non-finite numbers).
 
 Consequently `json → bvnr → json` preserves every value (the empty-array case
 above aside). Integers, booleans, null, strings, and array/object structure also

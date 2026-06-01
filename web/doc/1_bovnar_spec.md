@@ -92,7 +92,7 @@ Each assignment is:
 | Assignment | `.key = value ;` | `.foo = 42;` |
 | Type annotation | `<type-spec>` placed after `=`, before the value | `.foo = <uint:32> 42;` |
 | Number | `[-]digits[.digits][e[+/-]digits]` | `42`, `-3.14`, `1e6` |
-| Special number | `$nan`, `$inf`, `$-inf` | `.x = $inf;` |
+| Special number | `nan`, `inf`, `ninf` | `.x = inf;` |
 | Boolean | `true` / `false` / `on` / `off` | `.b = true;`, `.b = off;` |
 | String | `"…"` with escapes | `.s = "hello\nworld";` |
 | Symbol | bare identifier (no quotes) | `.s = ok;`, `.day = Monday;` |
@@ -357,15 +357,15 @@ dec-exponent  = ("e" | "E") [ "+" | "-" ] DIGIT { DIGIT }
 #### Special Number Literals
 
 ```
-special-number = "$" ( "nan" | "inf" | "-inf" )
+special-number = "nan" | "inf" | "ninf"
 ```
 
-A single leading `$` sigil introduces the keyword; there is **no** trailing `$`. The keyword ends at its final letter and must be followed by a value terminator (whitespace, `,`, `;`, `]`, `#`, or — after whitespace — an inline unit). A non-terminator byte after the keyword (e.g. `$infinity`, `$nans`) is `error_unexpected_input_byte`, so the three spellings are reserved. The stored token text is the keyword without the sigil: `nan`, `inf`, `-inf`.
+The special IEEE-754 values are **bare reserved keywords** — `nan`, `inf`, and `ninf` (negative infinity) — with no sigil. Like `null`/`true`/`false`/`on`/`off`, they are lexed as symbols and reclassified to numeric special values by the validator; a bare word that is not one of these exact spellings (e.g. `infinity`, `nans`) stays an ordinary symbol. The stored token text is the keyword itself: `nan`, `inf`, `ninf`. A special-number keyword takes **no inline unit suffix** — supply a unit through the type annotation instead (`<float:64,m/s> inf`).
 
 ```bovnar
-.not_a_number = $nan;
-.infinite = $inf;
-.neg_infinite = $-inf;
+.not_a_number = nan;
+.infinite = inf;
+.neg_infinite = ninf;
 ```
 
 ### 4.7 Null Values
@@ -611,7 +611,7 @@ Base `10` (default) or `16` are accepted; all other bases are rejected.
 ```bovnar
 .valid = <float:64> 3.14;
 .valid = <float:64> 1e100;
-.valid = <float:64> $nan;
+.valid = <float:64> nan;
 .valid = <float:16> 3.14;      # half-precision
 .valid = <float:256> 3.14;     # 256-bit extended precision
 
@@ -647,7 +647,7 @@ Values are written as ordinary decimal literals or special numbers.
 ```bovnar
 .valid   = <float_dec:32> 3.14;
 .valid   = <float_dec:64,Pa> 101325;
-.valid   = <float_dec:128> $nan;
+.valid   = <float_dec:128> nan;
 
 .invalid = <float_dec:8> 1.0;         # width 8 not valid → error_illegal_value_type
 .invalid = <float_dec:64,_10> 1.0;    # base param forbidden → error_illegal_value_type
@@ -678,16 +678,16 @@ The `p`/`P` exponent value is always interpreted as a decimal integer (the binar
 
 ### 6.4 Special Number Semantics
 
-`$nan`, `$inf`, `$-inf` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected only when the declared type is `utf8`, because the token type (`token_is_number`) is incompatible with a string-only family.
+`nan`, `inf`, `ninf` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected only when the declared type is `utf8`, because the token type (`token_is_number`) is incompatible with a string-only family.
 
 ```bovnar
-.okay_f64  = <float:64>  $inf;
-.okay_f32  = <float:32>  $nan;
-.okay_u8   = <uint:8>    $nan;         # accepted — range check bypassed
-.okay_s16  = <sint:16>   $-inf;   # accepted — range check bypassed
+.okay_f64  = <float:64>  inf;
+.okay_f32  = <float:32>  nan;
+.okay_u8   = <uint:8>    nan;         # accepted — range check bypassed
+.okay_s16  = <sint:16>   ninf;   # accepted — range check bypassed
 
 # Fine in plain/untyped context too
-.untyped = $inf;       # defaults to float:64
+.untyped = inf;       # defaults to float:64
 ```
 
 ### 6.5 Inline Unit Suffix
@@ -950,7 +950,7 @@ When a number or string value carries **no explicit** type annotation (i.e. the 
 |------------|-----------------|
 | Quoted string | `<utf8>` |
 | Boolean keyword (`true`/`false`/`on`/`off`) | `<bool>` |
-| Special number (`$nan`, `$inf`, `$-inf`) | `<float:64,_10,no_unit>` |
+| Special number (`nan`, `inf`, `ninf`) | `<float:64,_10,no_unit>` |
 | Number with `.` or `e`/`E` (float literal) | `<float:64,_10,no_unit>` |
 | Negative integer | `<sint:64,_10,no_unit>` |
 | Plain integer | `<uint:64,_10,no_unit>` |
@@ -989,7 +989,7 @@ ev_data
 
 # No annotation → synthesised <float:64,_10,no_unit>
 .y = 3.14;
-.z = $inf;
+.z = inf;
 
 # No annotation → synthesised <sint:64,_10,no_unit>
 .w = -7;
@@ -1601,8 +1601,8 @@ The unit may be written directly after the value literal instead of — or redun
 .big_constant  = <float_dec:256> 1.4142135623730950488016887242096980785696718753769480731766797;
 
 # Special values are accepted
-.nan_dec       = <float_dec:64> $nan;
-.inf_dec       = <float_dec:32> $inf;
+.nan_dec       = <float_dec:64> nan;
+.inf_dec       = <float_dec:32> inf;
 
 # null of a decimal float type
 .missing_dec   = <float_dec:64> ;
@@ -2243,22 +2243,24 @@ f → l → o → a → t       → ACT_tf_float_done → type_body_outro
                                               → (nothing)         → "float"
 ```
 
-### B.2 Special Number State Machine
+### B.2 Special Number Keywords
 
-A single leading `$` sigil introduces the keyword; there is no trailing sigil.
-The lexer recognises the three reserved spellings letter-by-letter and fires the
-matching outro action at the final letter:
+The special floats are bare reserved keywords — `nan`, `inf`, and `ninf`
+(negative infinity) — with no sigil. The lexer reads them as ordinary symbols;
+the validator then reclassifies a symbol whose text is exactly one of these
+three spellings into a numeric special value (`token_is_number`), the same way
+it reclassifies `null`/`true`/`false`/`on`/`off`:
 
 ```
-$ → n → a → n           → ACT_sp_nan_outro     → "nan"   (3 bytes)
-$ → i → n → f           → ACT_sp_inf_outro     → "inf"   (3 bytes)
-$ → - → i → n → f       → ACT_sp_neginf_outro  → "-inf"  (4 bytes)
+symbol "nan"   → reclassify → special number  "nan"   (3 bytes)
+symbol "inf"   → reclassify → special number  "inf"   (3 bytes)
+symbol "ninf"  → reclassify → special number  "ninf"  (4 bytes)
 ```
 
-The keyword must be followed by a value terminator (whitespace, `,`, `;`, `]`,
-`#`, or — after whitespace — an inline unit). Any other trailing byte (e.g.
-`$infinity`, `$nans`) is `error_unexpected_input_byte`, so the three spellings
-are reserved. The stored token text omits the `$` sigil: `nan`, `inf`, `-inf`.
+Any other bare word (e.g. `infinity`, `nans`) stays an ordinary symbol. The
+stored token text is the keyword itself: `nan`, `inf`, `ninf`. A special-number
+keyword takes no inline unit suffix; a unit is supplied through the type
+annotation (`<float:64,m/s> inf`).
 
 ### B.3 Default Width, Base, and Q
 

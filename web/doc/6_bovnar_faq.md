@@ -467,19 +467,20 @@ at all — specifying one is a hard error.
 
 **What are the special number literals?**
 
-Three special values bypass normal numeric parsing. A single leading `$`
-sigil introduces the keyword — there is no trailing `$`, and the keyword ends
-like any number. The three spellings are reserved (`$infinity`, `$nans`, etc.
-are errors):
+Three special values bypass normal numeric parsing. They are bare reserved
+keywords — no sigil — and, like `null`/`true`/`false`, are reclassified out of
+the symbol space by the validator. Only these exact spellings are reserved;
+any other bare word (e.g. `infinity`, `nans`) is an ordinary symbol:
 
 ```bovnar
-.nan = $nan;
-.inf = $inf;
-.neg = $-inf;
+.nan = nan;
+.inf = inf;
+.neg = ninf;     # negative infinity
 ```
 
 They are valid in both typed and untyped context and may be combined with any
-float type annotation.
+float type annotation. A special-number keyword takes no inline unit suffix —
+give its unit via the annotation (`<float:64,m/s> inf`).
 
 ---
 

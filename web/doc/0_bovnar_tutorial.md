@@ -88,7 +88,7 @@ There are ten categories of raw values:
 |---|---|
 | Integer literal | `42`, `-7`, `"FF"` (base-16, quoted) |
 | Float literal | `3.14`, `1e6`, `-.5` |
-| Special number | `$nan`, `$inf`, `$-inf` |
+| Special number | `nan`, `inf`, `ninf` |
 | Boolean | `true`, `false`, `on`, `off` |
 | Quoted string | `"hello world"` |
 | Symbol (bare word) | `ok`, `Monday`, `read_only` |
@@ -208,15 +208,15 @@ Signed values use a minus prefix inside the string:
 
 #### Special Number Literals
 
-Three special values bypass normal numeric parsing. A single leading `$` sigil introduces the keyword — there is no trailing `$`, and the keyword ends like any number (at whitespace, `,`, `;`, `]`, a comment, or — after whitespace — an inline unit):
+Three special values bypass normal numeric parsing. They are **bare reserved keywords** — no sigil — and, like `null`/`true`/`false`, are reclassified out of the symbol space by the validator:
 
 ```bovnar
-.nan = $nan;
-.inf = $inf;
-.neg = $-inf;
+.nan = nan;
+.inf = inf;
+.neg = ninf;     # negative infinity
 ```
 
-The three spellings are reserved: a stray byte after the keyword (e.g. `$infinity`, `$nans`) is a hard error. They may be combined with any float type annotation and are valid in untyped context too.
+Only these exact spellings are reserved: any other bare word (e.g. `infinity`, `nans`) is an ordinary symbol. They may be combined with any float type annotation and are valid in untyped context too. A special-number keyword takes no inline unit suffix — give its unit via the annotation (`<float:64,m/s> inf`).
 
 ---
 
@@ -896,7 +896,7 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 <float:64,no_unit>     # explicitly dimensionless
 
 # ── Special values ─────────────────────────────────────────────────
-$nan  $inf  $-inf
+nan  inf  ninf
 
 # ── Booleans and null (reserved keywords) ──────────────────────────
 .b = true;   .b = false;   .b = on;   .b = off;   # on==true, off==false

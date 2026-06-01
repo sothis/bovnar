@@ -6,7 +6,7 @@
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
 (*  Updated: 2026-05-29 — null/true/false/on/off keywords, bool       *)
-(*    type family, special numbers respelled $nan / $inf / $-inf      *)
+(*    type family, special numbers respelled nan / inf / ninf      *)
 (* ================================================================== *)
 
 
@@ -142,7 +142,8 @@ value        = [type-annotation , ws] , raw-value ;
 
 raw-value    = null-value
              | bool-value
-             | ( number | special-number | string ) , [ ws-mandatory , inline-unit ]
+             | special-number
+             | ( number | string ) , [ ws-mandatory , inline-unit ]
              | symbol
              | reference
              | array
@@ -366,15 +367,14 @@ dot-led      = "." , DIGIT , {DIGIT} ;
 
 dec-exponent = ("e" | "E") , ["+" | "-"] , DIGIT , {DIGIT} ;
 
-(* Special IEEE-754 values: a leading "$" sigil introduces the        *)
-(* keyword; there is NO trailing delimiter.  The keyword is complete  *)
-(* after its final letter and is then terminated like any number      *)
-(* (whitespace, ",", ";", "]", "#", or — after whitespace — an        *)
-(* inline unit).  A non-terminator byte after the keyword (e.g.       *)
-(* "$infinity", "$nans") is error_unexpected_input_byte, so the three *)
-(* spellings are effectively reserved.  The stored token text is the  *)
-(* keyword without the sigil: "nan", "inf", "-inf".                   *)
-special-number = "$" , ("nan" | "inf" | "-inf") ;
+(* Special IEEE-754 values are bare reserved keywords: nan, inf, and   *)
+(* ninf (negative infinity).  Like null / true / false / on / off they *)
+(* are lexed as ordinary symbols and reclassified to numeric special   *)
+(* values by the validator; a bare word that is not one of these exact *)
+(* spellings stays an ordinary symbol (e.g. "infinity", "nans").       *)
+(* There is no sigil and no inline-unit suffix — a unit is supplied    *)
+(* via the type annotation, e.g. <float:64,m/s> inf.                   *)
+special-number = "nan" | "inf" | "ninf" ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -415,9 +415,10 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 (*  6.5  Inline unit suffix                                           *)
 (* ─────────────────────────────────────────────────────────────────  *)
 
-(* An inline-unit may follow a scalar number, special-number, or      *)
-(* string value.  At least one whitespace character (ws-mandatory) is *)
-(* the sole required separator between the value literal and the unit.*)
+(* An inline-unit may follow a scalar number or string value (but not *)
+(* a special-number keyword — give its unit via the type annotation).  *)
+(* At least one whitespace character (ws-mandatory) is the sole        *)
+(* required separator between the value literal and the unit.          *)
 (* Inline units are forbidden inside array elements (enforced at the  *)
 (* action level; not expressible in context-free EBNF).               *)
 (*                                                                     *)
@@ -427,13 +428,13 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 (* Examples:                                                           *)
 (*   .a = 9.81 m/s;          (* space separator *)                    *)
 (*   .b = <float:64> 1.5 k~m; (* with type annotation *)             *)
-(*   .c = $nan s;             (* special-number with unit *)           *)
+(*   .c = <float:64,s> inf;  (* special-number unit via annotation *) *)
 (*   .d = 1.5e3 k~J;          (* number with exponent *)              *)
 (*   .e = "FF" m;             (* string literal with unit *)          *)
 (*                                                                     *)
 (* State-machine flow:                                                 *)
 (*   1. Whitespace from a number-body state fires ACT_to_number_outro *)
-(*      → number_outro.  Special numbers ($nan, $inf, $-inf)          *)
+(*      → number_outro.  Special numbers (nan, inf, ninf)          *)
 (*      enter number_outro_nosp directly; both states                 *)
 (*      require subsequent whitespace before a unit can begin.        *)
 (*      Strings enter string_outro_nosp after the closing "";        *)
@@ -679,13 +680,12 @@ byte         = (* any single byte 0x00–0xFF *) ;
      those tokens.  0xC2 is accepted inside quoted strings and in type
      parameter bodies (copy_type_byte / type_body_outro).
 
-  d) Special-number sigil
-     A single leading "$" introduces the keyword; there is no trailing
-     "$".  The keyword (nan / inf / -inf) ends at its final letter and
-     must be followed by a value terminator (whitespace, "," ";" "]"
-     "#", or — after whitespace — an inline unit).  Any other following
-     byte is error_unexpected_input_byte, which reserves the three
-     spellings (e.g. "$infinity" and "$nans" are hard errors).
+  d) Special-number keywords
+     The special floats nan / inf / ninf are bare reserved keywords (no
+     sigil).  They are lexed as symbols and reclassified to numeric
+     special values by the validator, like null / true / false / on /
+     off; any other bare word (e.g. "infinity", "nans") stays a symbol.
+     They take no inline unit — a unit is supplied via the annotation.
 
   e) String concatenation
      Adjacent string literals with only whitespace/comments between
@@ -780,7 +780,7 @@ byte         = (* any single byte 0x00–0xFF *) ;
        1. Whitespace from number-body states (zero_intro, copy_number_byte,
           fraction_intro, copy_fraction_byte, copy_exp_byte) fires
           ACT_to_number_outro → number_outro.  Special numbers
-          ($nan, $inf, $-inf) enter number_outro_nosp
+          (nan, inf, ninf) enter number_outro_nosp
           directly; a further whitespace character transitions to
           number_outro.  Strings enter string_outro_nosp after the
           closing quote; whitespace transitions to string_outro.

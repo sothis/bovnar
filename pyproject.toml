@@ -62,6 +62,9 @@ cmake.build-type = "Release"
 [tool.scikit-build.cmake.define]
 # Compile only the library, not the dozens of test executables.
 BVNR_BUILD_TESTS = "OFF"
+# -fanalyzer is a dev/CI diagnostic; disable it for wheel builds. Newer GCCs in
+# the manylinux image can ICE under -fanalyzer on the bignum/state-machine code.
+BVNR_ANALYZER = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
@@ -73,7 +76,7 @@ markers = [
 [tool.cibuildwheel]
 # CPython only; PyPy and musllinux are out of scope for the first release.
 build         = "cp310-* cp311-* cp312-* cp313-* cp314-*"
-skip          = "*-musllinux* pp*"
+skip          = "*-musllinux*"
 build-frontend = "build"
 # The bundled libbvnr_shared.* makes every test that touches the C library
 # runnable straight from the installed wheel.

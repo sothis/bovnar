@@ -13,6 +13,10 @@ option(BVNR_HARDEN
 option(BVNR_WERROR
     "Promote all warnings to errors (for CI)"
     OFF)
+option(BVNR_ANALYZER
+    "Enable GCC -fanalyzer static analysis (dev/CI diagnostic; turn OFF for \
+release wheel builds, where newer GCCs in the manylinux image can ICE on it)"
+    ON)
 option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
     ON)
@@ -28,7 +32,7 @@ set(BVNR_C_FLAGS
     -Wno-override-init
     -Wno-missing-field-initializers
     -pedantic
-    $<$<C_COMPILER_ID:GNU>:-fanalyzer>
+    $<$<AND:$<BOOL:${BVNR_ANALYZER}>,$<C_COMPILER_ID:GNU>>:-fanalyzer>
     -fPIC
     -fvisibility=hidden
     # bvnr_source_t / bvnr_sink_t are opaque storage that the

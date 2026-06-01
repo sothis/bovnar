@@ -42,7 +42,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build sdist
-        run: pipx run build --sdist
+        # `pipx run build` no longer resolves (the package's executable is
+        # `pyproject-build`); name it explicitly so the sdist is actually built.
+        run: pipx run --spec build pyproject-build --sdist
 
       - name: Check metadata
         run: pipx run twine check dist/*

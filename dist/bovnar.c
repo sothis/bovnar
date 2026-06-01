@@ -5654,7 +5654,7 @@ static const bu_entry_t bu_table[] = {
 	{"prussian_morgen",      15, bu_morgen},
 	{"nautical_miles",  14, bu_nautical_mile},
 	{"survey_foot",     11, bu_survey_foot},
-	{"foot_pounds",     11, bu_foot_pound},    {"fluid_ounce_uk",  13, bu_fluid_ounce_uk},
+	{"foot_pounds",     11, bu_foot_pound},    {"fluid_ounce_uk",  14, bu_fluid_ounce_uk},
 	{"german_mile",     11, bu_german_mile},
 	{"nautical_mile",   13, bu_nautical_mile},
 	{"kilogram_force",  14, bu_kilogram_force},
@@ -5821,7 +5821,8 @@ static const bu_entry_t bu_table[] = {
 	{"volt",             4, bu_volt},          {"ohms",            4, bu_ohm},
 	{"days",             4, bu_day},           {"hour",            4, bu_hour},
 	{"Byte",             4, bu_byte},          {"byte",            4, bu_byte},
-	{"thou",             4, bu_thou},          {"bits",            4, bu_bit},
+	{"thou",             4, bu_thou},          {"mils",            4, bu_thou},
+	{"bits",             4, bu_bit},
 	{"gray",             4, bu_gray},          {"degC",            4, bu_celsius},
 	{"degN",             4, bu_newton_temp},
 	{"\xc2\xb0""Ra",     4, bu_rankine},       {"\xc2\xb0""De",    4, bu_delisle},
@@ -5940,12 +5941,19 @@ static const iec_entry_t iec_table[] = {
 	{NULL, 0, iec_none}
 };
 /*
- * Build a length index over bu_table (which is kept sorted by descending
- * symbol length). bu_first_for_len[L] is the first table entry whose symbol is
- * at most L bytes long. Because unit symbols are matched against the *suffix*
- * of a component (the prefix is whatever precedes them), the parser must try
- * the longest candidate symbols first; this index lets it skip straight past
- * all entries longer than the input rather than scanning the whole table.
+ * Build a length index over bu_table. bu_first_for_len[L] is the index of the
+ * first table entry whose symbol is at most L bytes long, in table order.
+ * Because unit symbols are matched against the *suffix* of a component (the
+ * prefix is whatever precedes them), the parser tries the longest candidate
+ * symbols first; this index lets it skip straight past the run of entries that
+ * are longer than the input rather than scanning from the top every time.
+ *
+ * The entries are grouped roughly longest-first so that skip is effective, but
+ * exact descending order is NOT a correctness requirement: the forward,
+ * monotonic walk below guarantees bu_first_for_len[L] never sits after an entry
+ * of length <= L, and the lookup additionally filters with `e->len > len`. So a
+ * mis-placed entry only costs a few extra (skipped) iterations, never a missed
+ * match — do not assume the table is strictly sorted.
  */
 static void bvn_init_bu_index(void)
 {

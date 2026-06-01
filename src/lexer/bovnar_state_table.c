@@ -580,13 +580,13 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5c] = ACT_escape_from_copy,
 	},
 	[escape_from_copy] = {
-		[0x22] = ACT_replace_escaped_byte,
-		[0x5c] = ACT_replace_escaped_byte,
-		[0x66] = ACT_replace_escaped_byte,
-		[0x6e] = ACT_replace_escaped_byte,
-		[0x72] = ACT_replace_escaped_byte,
-		[0x74] = ACT_replace_escaped_byte,
-		[0x76] = ACT_replace_escaped_byte,
+		/* Every byte after a backslash is handed to bvn_decode_escape,
+		 * which accepts the seven bovnar escapes (\" \\ \f \n \r \t \v)
+		 * and rejects anything else as error_illegal_escape_sequence.
+		 * Routing all 256 columns here (rather than leaving non-escape
+		 * bytes at ACT_NONE) is what makes that error reachable instead
+		 * of the generic error_unexpected_input_byte. */
+		BVN_EACH_256(ACT_replace_escaped_byte),
 	},
 	[string_intro] = {
 		BVN_EACH_256(ACT_copy_string_byte),

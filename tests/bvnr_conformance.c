@@ -680,7 +680,7 @@ static const cf_case_t g_cases[] = {
 	      ".s = <utf8> \"hello\";"),
 	ERROR_CASE("STR-013", "strings", "illegal escape sequence in string",
 	           ".s = \"\\q\";",
-	           error_unexpected_input_byte),
+	           error_illegal_escape_sequence),
 	ERROR_CASE("STR-014", "strings", "raw control byte 0x01 in string",
 	           ".s = \"\x01\";",
 	           error_unexpected_input_byte),

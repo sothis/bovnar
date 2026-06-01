@@ -1290,21 +1290,35 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 
 ### 12.4 Array Validation
 
-| Check | Error |
-|-------|-------|
-| Element count mismatch across the `/`-dimension rows of a single array, or ragged sibling sub-arrays (§7.4) | `error_array_row_size_mismatch` |
-| Array elements of mixed kind or dimension, or a struct field that differs in kind across record elements (§7.4) | `error_array_element_type_mismatch` |
-| Array nesting overflow (exceeds `max_array_nesting`) | `error_array_nesting_too_high` |
-| Comma outside array context | `error_unexpected_input_byte` |
+| Check | Error | Tier |
+|-------|-------|------|
+| Element count mismatch across the `/`-dimension rows of a single array | `error_array_row_size_mismatch` | Streaming |
+| Ragged sibling sub-arrays — differing lengths between siblings (§7.4) | `error_array_row_size_mismatch` | DOM |
+| Array elements of mixed kind or dimension, or a struct field that differs in kind across record elements (§7.4) | `error_array_element_type_mismatch` | DOM |
+| Array nesting overflow (exceeds `max_array_nesting`) | `error_array_nesting_too_high` | Streaming |
+| Comma outside array context | `error_unexpected_input_byte` | Streaming |
 
 ### 12.5 Struct Validation
 
-| Check | Error |
-|-------|-------|
-| Unmatched `}` | `error_illegal_struct_close` |
-| A key repeated within one scope (struct or top-level document) (§8.1) | `error_duplicate_struct_key` |
-| Struct array elements with differing key sets (§7.4) | `error_struct_shape_mismatch` |
-| Nesting depth exceeded | `error_struct_nesting_too_high` |
+| Check | Error | Tier |
+|-------|-------|------|
+| Unmatched `}` | `error_illegal_struct_close` | Streaming |
+| A key repeated within one scope (struct or top-level document) (§8.1) | `error_duplicate_struct_key` | DOM |
+| Struct array elements with differing key sets (§7.4) | `error_struct_shape_mismatch` | DOM |
+| Nesting depth exceeded | `error_struct_nesting_too_high` | Streaming |
+
+> **Validation tier.** *Streaming* checks are raised by the pull-based reader
+> (`bvnr_read`) during the `on_verified` event stream. *DOM* checks — the
+> spec-1.0 homogeneity (§7.4), struct-shape, and duplicate-key (§8.1) rules —
+> are enforced only when a document is **materialised** into a tree
+> (`bvn_dom_parse`), because they require comparing sibling elements that the
+> streaming reader sees one at a time. A streaming-only consumer therefore
+> accepts a heterogeneous array, a ragged sibling sub-array, a shape-mismatched
+> record set, or a duplicate key without error; a full spec-1.0 implementation
+> must apply these four checks (`error_array_row_size_mismatch` for ragged
+> siblings, `error_array_element_type_mismatch`, `error_struct_shape_mismatch`,
+> `error_duplicate_struct_key`) in its document/tree API. See the conformance
+> tool's "Validation tiers" (§3 of `doc/7_bovnar_conformance.md`).
 
 ### 12.6 Identifier Validation
 
@@ -1987,6 +2001,16 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
    this predicate internally before writing. */
 bool bvn_unit_valid(value_unit_t u);
 
+/* Structural equality of two units: same num_components and, component
+   for component, the same base, exponent, and prefix.  This is the
+   strict, order-sensitive comparison the validator uses to match an
+   inline unit suffix against a type-annotation unit (error_unit_mismatch
+   on disagreement).  For dimensional equivalence — units that measure
+   the same physical quantity but differ in spelling or factoring (e.g.
+   W vs VA, or the two no_unit forms) — use bvn_units_compatible from
+   bovnar_si_units.h (§11.8) instead. */
+bool bvn_unit_equal(value_unit_t a, value_unit_t b);
+
 /* Compute the combined prefix factor across all components (ignoring
    base-unit conversion factors).  Each component's prefix factor is
    raised to |exponent| and multiplied together; denominator components
@@ -2084,8 +2108,8 @@ typedef enum error_code_e {
     error_invalid_byte_order_mark       = 20,
     error_type_too_long                 = 21,
     error_unit_too_long                 = 22,
-    error_expected_string_in_array      = 23,
-    error_expected_number_in_array      = 24,
+    error_expected_string_in_array      = 23,  /* reserved; never set by the library */
+    error_expected_number_in_array      = 24,  /* reserved; never set by the library */
     error_illegal_value_type            = 25,
     error_scanner_callback_failed       = 26,
     error_file_too_long                 = 27,

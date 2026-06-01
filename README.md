@@ -2,7 +2,7 @@
 
 **Unit-safe serialization for scientific and industrial systems — with a C99 reference implementation.**
 
-[![Spec version](https://img.shields.io/badge/spec-0.x%20draft-orange)](doc/1_bovnar_spec.md)
+[![Spec version](https://img.shields.io/badge/spec-1.0%20stable-blue)](doc/1_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
 
@@ -36,7 +36,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 
 ## Key Features
 
-- **Strong, optional typing** — `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8` with explicit bit-width (`8`, `16`, `32`, `64`, …) and numeric base (`_2`, `_16`, `_36`, `_85`, …).
+- **Strong, optional typing** — seven families (`uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool`) with explicit bit-width (`8`, `16`, `32`, `64`, …) and numeric base (`_2`, `_16`, `_36`, `_85`, …).
 - **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k~g·m/s²`, and `Gi~B` are written inline; no external schema is needed.
 - **Currency units** — 164 ISO 4217 fiat currencies and 50 cryptocurrencies are first-class units, written with a mandatory `$` sigil (`<float_dec:64,$USD> 19.99`, `<uint:64,$BTC> 547820000`), each carrying minor-unit metadata and prefix-validity rules.
 - **Inline unit suffix** — `9.81 m/s` is valid without a full type annotation.
@@ -49,7 +49,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) approximates the C reference event stream (lenient: it does not synthesise default type annotations or perform type/value validation) and powers an interactive single-file web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, and Vim, all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 168-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 202-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -138,7 +138,7 @@ bovnar/
 │   └── bovnar_parser.js     # Dependency-free JavaScript parser
 ├── doc/
 │   ├── 0_bovnar_tutorial.md
-│   ├── 1_bovnar_spec.md            # Format specification (draft, v0.x)
+│   ├── 1_bovnar_spec.md            # Format specification (v1.0, stable)
 │   ├── 2_bovnar_unit_system.md
 │   ├── 3_bovnar_readwrite_api.md
 │   ├── 4_bovnar_python_bindings.md
@@ -308,7 +308,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 168-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 202-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -510,14 +510,14 @@ cd web && ./httpd.sh          # python3 -m http.server
 
 | Document | Description |
 |---|---|
-| [Specification (Draft, v0.x)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
+| [Specification (v1.0, stable)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Tutorial](doc/0_bovnar_tutorial.md) | Practical introduction for developers familiar with JSON or similar formats. |
 | [Unit System Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (168 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (202 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 
 ---

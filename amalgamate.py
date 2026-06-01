@@ -139,8 +139,23 @@ def build_impl(header_inlined):
     return text
 
 
+USAGE = (
+    "usage: amalgamate.py [OUT_DIR]\n"
+    "\n"
+    "Generate the single-file amalgamation (bovnar.h + bovnar.c).\n"
+    "OUT_DIR defaults to the repository's dist/ directory.\n"
+)
+
+
 def main():
-    out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist")
+    args = sys.argv[1:]
+    if args and args[0] in ("-h", "--help"):
+        sys.stdout.write(USAGE)
+        return
+    if len(args) > 1:
+        sys.stderr.write("error: too many arguments\n\n" + USAGE)
+        sys.exit(2)
+    out_dir = args[0] if args else os.path.join(ROOT, "dist")
     os.makedirs(out_dir, exist_ok=True)
     hdr, header_inlined = build_header()
     impl = build_impl(header_inlined)

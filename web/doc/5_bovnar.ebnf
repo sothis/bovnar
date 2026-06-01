@@ -355,10 +355,12 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* bare number literal without base validation.  Digit validity against*)
 (* a non-decimal base is checked later by bvn_acc_parse_number.       *)
 (* Leading zeros are not rejected by the lexer ("007" is valid).      *)
-(* Only "e"/"E" are accepted as exponent markers in bare literals;    *)
-(* "p"/"P" (binary exponent) is recognised by the validator inside    *)
-(* quoted-string number values, but since <float> rejects non-decimal  *)
-(* bases, "p"/"P" is not reachable in any valid annotated value.      *)
+(* Only "e"/"E" are accepted as exponent markers in bare literals.    *)
+(* "p"/"P" (binary exponent) is recognised by the validator inside a   *)
+(* quoted-string number value of a base-16 float, e.g.                 *)
+(* <float:64,_16> "1.8p+2"; there "e"/"E" are hex mantissa digits, so  *)
+(* the binary exponent must use "p"/"P" (see spec §6.3).  It is the     *)
+(* only context in which "p"/"P" is reachable.                         *)
 
 number       = ["-"] , (int-led | dot-led) , [dec-exponent] ;
 

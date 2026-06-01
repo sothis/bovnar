@@ -114,8 +114,8 @@ typedef enum error_code_e {
 	error_invalid_byte_order_mark       = 20,
 	error_type_too_long                 = 21,
 	error_unit_too_long                 = 22,
-	error_expected_string_in_array      = 23,
-	error_expected_number_in_array      = 24,
+	error_expected_string_in_array      = 23,  /* reserved; never set by the library */
+	error_expected_number_in_array      = 24,  /* reserved; never set by the library */
 	error_illegal_value_type            = 25,
 	error_scanner_callback_failed       = 26,
 	error_file_too_long                 = 27,
@@ -128,7 +128,7 @@ typedef enum error_code_e {
 	error_type_value_mismatch           = 34,
 	error_value_out_of_range            = 35,
 	error_digit_not_in_base             = 36,
-	error_recovered                     = 37,
+	error_recovered                     = 37,  /* reserved; never set by the library */
 	error_unit_mismatch                 = 38,
 	/* Array element homogeneity (spec 1.0): every non-null element of an array
 	 * must share the same kind and physical dimension; sibling sub-arrays must

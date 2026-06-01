@@ -2,7 +2,7 @@
 
 > **Version:** 1.0
 > **Status:** Stable
-> **Last updated:** 2026-05-31
+> **Last updated:** 2026-06-01
 
 ---
 
@@ -2156,6 +2156,16 @@ typedef enum error_code_e {
 
 Bovnar follows semantic versioning of the **format**, independent of any
 implementation's version.
+
+**Implementation version.** The reference implementation exposes its own
+version, which tracks the format version but may advance independently for
+implementation-only fixes. The C header defines `BVNR_VERSION_MAJOR`,
+`BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the comparable integer
+`BVNR_VERSION` (`major*10000 + minor*100 + patch`, so `#if BVNR_VERSION >= 10000`
+tests "≥ 1.0.0"), and `BVNR_VERSION_STRING` (`"1.0.0"`). The Python package
+mirrors this as `bovnar.__version__`. These name the *implementation* release,
+not the frozen *format* version (which is 1.0); both read `1.0.0` for this
+release.
 
 **What 1.0 freezes.** The grammar is stable. A `.bvnr` document that is valid
 under spec 1.0 will remain valid, and will decode to the same values, under every

@@ -41,6 +41,19 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/*
+ * Library/format version. The spec is frozen at 1.0; the reference
+ * implementation versions in lockstep with the Python package (pyproject.toml,
+ * bovnar.__version__). BVNR_VERSION is an int that increases monotonically and
+ * is safe for #if comparison, e.g. #if BVNR_VERSION >= 10000.
+ */
+#define BVNR_VERSION_MAJOR		1
+#define BVNR_VERSION_MINOR		0
+#define BVNR_VERSION_PATCH		0
+#define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
+					 (BVNR_VERSION_MINOR) * 100 + \
+					 (BVNR_VERSION_PATCH))
+#define BVNR_VERSION_STRING		"1.0.0"
 #define BVNR_MAX_UNIT_COMPONENTS		8
 #define BVN_MAX_INT_WIDTH			32768u
 typedef enum bvnr_event_e {

@@ -432,7 +432,7 @@ Symbol bodies follow the same character rules as identifier bodies: letters, dig
 
 Inside an array, `]` and `,` terminate a symbol. At assignment level, `;` terminates it.
 
-Five bare words are **reserved keywords** and are *not* symbols: `null`, `true`, `false`, `on`, and `off` (see below). A longer word that merely starts with one — `ontology`, `nullable`, `truthy` — is still an ordinary symbol.
+Eight bare words are **reserved keywords** and are *not* symbols: `null`, `true`, `false`, `on`, `off`, and the special floats `nan`, `inf`, `ninf` (see the special-number section). A longer word that merely starts with one — `ontology`, `nullable`, `truthy`, `infinity` — is still an ordinary symbol.
 
 ---
 

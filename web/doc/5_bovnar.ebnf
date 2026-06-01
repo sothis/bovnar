@@ -15,10 +15,13 @@
 (* ─────────────────────────────────────────────────────────────────  *)
 
 (* Valid end-of-stream states (lexer states where EOF is accepted):   *)
-(*   undefined   – nothing has been read yet (empty stream)           *)
-(*   first_bom   – BOM or first-line comment consumed, no assignment  *)
-(*   value_outro – the semicolon of the last assignment was consumed  *)
-(* In all three cases struct_nesting_level must be zero.              *)
+(*   undefined       – nothing has been read yet (empty stream)       *)
+(*   first_comment_intro – inside a leading comment that runs to EOF  *)
+(*                     with no trailing newline (comment-only stream) *)
+(*   first_bom       – BOM or first-line comment (its newline seen),  *)
+(*                     no assignment yet                              *)
+(*   value_outro     – the semicolon of the last assignment consumed  *)
+(* In all four cases struct_nesting_level must be zero.               *)
 
 (* Events emitted to the validator callbacks (bvnr_event_t):         *)
 (*                                                                    *)

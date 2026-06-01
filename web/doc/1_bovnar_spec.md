@@ -272,7 +272,7 @@ A **symbol** is an unquoted bare-word token that appears in value position. It s
 .flags = [red, green, blue];  # symbols as array elements
 ```
 
-**Reserved keywords.** Five exact bare words are *not* symbols: `null`, `true`, `false`, `on`, and `off`. Lexically they are still symbol tokens, but the validator reserves the exact spellings and reclassifies them — `null` to a null value, and `true`/`false`/`on`/`off` to a `bool` value (`on` ≡ `true`, `off` ≡ `false`). A bare boolean with no annotation synthesises a `<bool>` type (§10); an explicit `<bool>` annotation accepts only these four keywords. A longer word that merely begins with a keyword (`ontology`, `nullable`, `truthy`) remains an ordinary symbol.
+**Reserved keywords.** Eight exact bare words are *not* symbols: `null`, `true`, `false`, `on`, `off`, `nan`, `inf`, and `ninf`. Lexically they are still symbol tokens, but the validator reserves the exact spellings and reclassifies them — `null` to a null value, `true`/`false`/`on`/`off` to a `bool` value (`on` ≡ `true`, `off` ≡ `false`), and the special floats `nan`/`inf`/`ninf` to numeric special values (§6.4). A bare boolean with no annotation synthesises a `<bool>` type (§10); an explicit `<bool>` annotation accepts only the four bool keywords. A longer word that merely begins with a keyword (`ontology`, `nullable`, `truthy`, `infinity`) remains an ordinary symbol.
 
 ```bovnar
 .enabled = true;           # bool value (vt_bool), not a symbol
@@ -502,6 +502,12 @@ Parameters are **identified by class** — each class is recognised by its synta
 #      <uint:_10,no_unit,32>      — identical
 #      <uint:no_unit,_10,32>      — identical
 ```
+
+Because parameters are class-identified rather than positional, an empty
+positional slot is never needed, so the parameter list is parsed strictly: a
+comma must introduce a real parameter, and a `:` must be followed by at least
+one parameter. Empty, trailing, or doubled components — `<uint:8,>`,
+`<uint:8,,>`, `<uint:,_16>`, and the bare `<uint:>` — are `error_illegal_value_type`.
 
 ### 5.4 Examples
 
@@ -2067,6 +2073,15 @@ typedef enum error_code_e {
     error_digit_not_in_base             = 36,
     error_recovered                     = 37,  /* reserved; never set by the library */
     error_unit_mismatch                 = 38,
+    /* Array element homogeneity (spec 1.0): every non-null element of an array
+     * must share the same kind and physical dimension; sibling sub-arrays must
+     * match in length and element shape (recursively); sibling structs must
+     * share the same keys with recursively-matching fields. */
+    error_array_element_type_mismatch   = 39,
+    error_struct_shape_mismatch         = 40,
+    /* A struct (or the top-level document) repeats a key. Keys must be unique
+     * within one scope so lookup, references and iteration always agree. */
+    error_duplicate_struct_key          = 41,
 } error_code_t;
 ```
 

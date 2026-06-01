@@ -710,8 +710,9 @@ only those four keywords. They serialize canonically as `true` / `false`:
 **What is a symbol?**
 
 A bare, unquoted word in value position — for application-defined enums and
-the like. The reserved keywords `null`, `true`, `false`, `on`, `off` are *not*
-symbols (a word that merely starts with one, like `Monday` or `ontology`, is):
+the like. The reserved keywords `null`, `true`, `false`, `on`, `off` and the
+special floats `nan`, `inf`, `ninf` are *not* symbols (a word that merely
+starts with one, like `Monday`, `ontology`, or `infinity`, is):
 
 ```bovnar
 .status  = ok;

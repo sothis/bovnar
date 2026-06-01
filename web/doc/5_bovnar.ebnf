@@ -737,9 +737,10 @@ byte         = (* any single byte 0x00–0xFF *) ;
      "utf8" requires a string value.
      "uint", "sint", "float", "float_fix", "float_dec" accept a number or
        string value; a quoted string allows special float notation.
-     "utf8" parameters (width, base, unit) are lexically accepted and
-       stored but carry no semantic meaning; no error is raised for
-       a non-empty "utf8" parameter list.
+     "utf8" and "bool" are parameterless: the lexer accepts the ":"
+       and parameter bytes, but bvn_parse_type_annotation rejects any
+       width, base, q, or unit parameter as error_illegal_value_type
+       (e.g. "<utf8:8>" and "<utf8:,m>" are both errors).
      "uint" rejects negative number literals (error_value_out_of_range).
      Digit characters in the value must be valid for the declared base
        (error_digit_not_in_base).

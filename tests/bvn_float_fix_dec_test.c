@@ -280,7 +280,7 @@ static void test_reader_float_fix(void)
 	CHECK(g_cap.got_data, "float_fix: dot-led value accepted");
 
 	/* Special numbers. */
-	read_snippet(".x = <float_fix:32,q8> $nan;\n");
+	read_snippet(".x = <float_fix:32,q8> nan;\n");
 	CHECK(g_cap.family == vt_float_fix, "float_fix: nan special accepted");
 }
 
@@ -303,7 +303,7 @@ static void test_reader_float_dec(void)
 	read_snippet(".x = <float_dec:256> 1.0;\n");
 	CHECK(g_cap.family == vt_float_dec && g_cap.width == 256, "float_dec:256");
 
-	read_snippet(".x = <float_dec:16> $inf;\n");
+	read_snippet(".x = <float_dec:16> inf;\n");
 	CHECK(g_cap.family == vt_float_dec, "float_dec: infinity special");
 }
 

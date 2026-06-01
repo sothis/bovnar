@@ -126,15 +126,6 @@
       return s;
     }
 
-    /* Read $nan, $inf, $-inf — cur is '$'.  A single leading sigil; the
-       keyword ends like a number (no trailing '$'). */
-    function readSpecialNumber() {
-      advance(); // skip the '$' sigil
-      let kw = '';
-      while (!eof() && !/[ \t\r\n\v\f;,\[\]{}#]/.test(cur())) { kw += cur(); advance(); }
-      return kw;
-    }
-
     /* Try to read an optional inline unit suffix after a scalar.
        Requires at least one whitespace before the unit.
        NOT allowed inside arrays. */
@@ -289,18 +280,6 @@
         return;
       }
 
-      /* Special number — only $nan, $inf, $-inf are valid; the C lexer
-         hard-errors on any other spelling (e.g. $infinity, $nan$, $). */
-      if (cur() === '$') {
-        const kw = readSpecialNumber();
-        if (kw !== 'nan' && kw !== 'inf' && kw !== '-inf') {
-          emit(EV.ERROR, { msg: `Invalid special number: '$${kw}'` });
-        }
-        const unit = insideArray ? null : tryInlineUnit();
-        emit(EV.DATA, { kind: 'special', value: kw, text: '$' + kw, unit });
-        return;
-      }
-
       /* Reference */
       if (cur() === '&') {
         advance();
@@ -335,6 +314,10 @@
           emit(EV.DATA, { kind: 'bool', value: true, text: 'true' });
         } else if (sym === 'false' || sym === 'off') {
           emit(EV.DATA, { kind: 'bool', value: false, text: 'false' });
+        } else if (sym === 'nan' || sym === 'inf' || sym === 'ninf') {
+          /* Special floats are bare reserved keywords (no sigil, no inline
+             unit), reclassified out of the symbol space like null/bool. */
+          emit(EV.DATA, { kind: 'special', value: sym, text: sym });
         } else {
           emit(EV.DATA, { kind: 'symbol', value: sym, text: sym });
         }

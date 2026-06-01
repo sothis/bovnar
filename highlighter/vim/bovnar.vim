@@ -52,9 +52,9 @@ hi BovnarStructDelim7 ctermfg=220 guifg=#f0c64e gui=none
 hi BovnarStructDelim8 ctermfg=39  guifg=#67d1f4 gui=none
 
 syn match   BovnarOctetData    '\\x[0-9A-Fa-f]\{2\}'
-" $nan  $inf  $-inf — single leading sigil, no trailing $; \> rejects a
-" trailing identifier byte so $infinity (an error) is not matched.
-syn match   BovnarSpecialFloat '\$\(nan\|-inf\|inf\)\>'
+" nan  inf  ninf — bare reserved keywords (no sigil); \< and \> word
+" boundaries keep e.g. 'infinity' or 'nana' from matching.
+syn match   BovnarSpecialFloat '\<\(nan\|inf\|ninf\)\>'
 
 syn region  BovnarComment start=/#/ end=/$/
 

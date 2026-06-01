@@ -114,12 +114,12 @@ bool bvn_is_special_number_string(const char* s)
 {
 	if (!s) return false;
 	uint8_t c = (uint8_t)s[0];
-	if (c != 'n' && c != 'i' && c != '-') return false;
-	if (c == 'n')
-		return s[1] == 'a' && s[2] == 'n' && s[3] == '\0';
-	if (c == 'i')
+	if (c != 'n' && c != 'i') return false;
+	if (c == 'i')                                   /* inf  */
 		return s[1] == 'n' && s[2] == 'f' && s[3] == '\0';
-	return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == '\0';
+	if (s[1] == 'a')                                /* nan  */
+		return s[2] == 'n' && s[3] == '\0';
+	return s[1] == 'i' && s[2] == 'n' && s[3] == 'f' && s[4] == '\0';  /* ninf */
 }
 bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 {

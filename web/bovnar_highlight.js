@@ -111,13 +111,13 @@
         i = j; afterNum = false; continue;
       }
       if (c === '&' && (m = /^&(?:\.[A-Za-z_][\w+\-]*)+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
-      if (c === '$' && (m = /^\$(?:-?inf|nan)\b/.exec(r))) { out += span('special', m[0]); i += m[0].length; afterNum = false; continue; }
       if (c === '.' && (m = /^\.[A-Za-z_][\w+\-]*/.exec(r))) { out += span('sigil', '.') + span('key', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if ((m = NUM.exec(r)) && /\d/.test(m[0])) { let s = m[0]; if (s[0] === '-') { out += span('neg', '-'); s = s.slice(1); } out += span('num', s); i += m[0].length; afterNum = true; continue; }
       if ((m = ID.exec(r))) {
         const w = m[0];
         if (/^(?:true|false|on|off)$/.test(w)) out += span('bool', w);
         else if (w === 'null') out += span('null', w);
+        else if (/^(?:nan|inf|ninf)$/.test(w)) out += span('special', w);  // bare special-float keywords
         else if (afterNum) out += unit(w);            // an inline unit follows a number
         else out += span('sym', w);
         i += w.length; afterNum = false; continue;

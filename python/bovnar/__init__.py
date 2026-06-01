@@ -445,10 +445,10 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
     if fam in (ValueTypeFamily.FLOAT,
                ValueTypeFamily.FLOAT_FIX,
                ValueTypeFamily.FLOAT_DEC):
-        if text in ('nan', 'inf', '-inf'):
+        if text in ('nan', 'inf', 'ninf'):
             return {'nan': float('nan'),
                     'inf': float('inf'),
-                    '-inf': float('-inf')}[text]
+                    'ninf': float('-inf')}[text]
         try:
             return float(text)
         except ValueError:
@@ -574,7 +574,7 @@ def _emit_array_element(w: Writer, elem) -> None:
         import math as _math
         vt  = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
         if _math.isinf(elem):
-            _s = '-inf' if elem < 0 else 'inf'
+            _s = 'ninf' if elem < 0 else 'inf'
         elif _math.isnan(elem):
             _s = 'nan'
         else:

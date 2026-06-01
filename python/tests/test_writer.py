@@ -502,7 +502,7 @@ class TestWriteFloatFix:
         with Writer.to_mem() as w:
             w.write_float_fix('nan_val', float('nan'), width=64, q=16)
         out = w.get_output()
-        assert b'$nan' in out
+        assert b'nan' in out
 
 
 @needs_lib
@@ -546,13 +546,13 @@ class TestWriteFloatDec:
         with Writer.to_mem() as w:
             w.write_float_dec('v', float('nan'), width=64)
         out = w.get_output()
-        assert b'$nan' in out
+        assert b'nan' in out
 
     def test_float_dec_infinity_is_special_literal(self):
         with Writer.to_mem() as w:
             w.write_float_dec('v', float('inf'), width=64)
         out = w.get_output()
-        assert b'$inf' in out
+        assert b'inf' in out
 
 
 @needs_lib

@@ -77,9 +77,9 @@ static const char *bvnr_seeds[] = {
 	".x = false;\n",
 	".x = ;\n",
 
-	".x = $nan;\n",
-	".x = $inf;\n",
-	".x = $-inf;\n",
+	".x = nan;\n",
+	".x = inf;\n",
+	".x = ninf;\n",
 
 	".x = \"tab\\there\";\n",
 	".x = \"nl\\nhere\";\n",
@@ -97,7 +97,7 @@ static const char *bvnr_seeds[] = {
 	".x = <sint:32> -2147483648;\n",
 	".x = <float:32> 3.14;\n",
 	".x = <float:64> 1e100;\n",
-	".x = <float:64> $nan;\n",
+	".x = <float:64> nan;\n",
 	".x = <utf8> \"text\";\n",
 
 	".x = <uint:_16> \"ff\";\n",

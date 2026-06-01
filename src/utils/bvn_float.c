@@ -1263,7 +1263,9 @@ int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 	}
 	if (bvn_float_is_inf(f)) {
 		bool neg = f->_sign < 0;
-		if (neg) { if (bufsize < 5) return -1; memcpy(buf, "-inf", 5); return 4; }
+		/* Negative infinity is "ninf" in bovnar (a bare reserved keyword);
+		 * a leading "-" would not re-parse as a special-number keyword. */
+		if (neg) { if (bufsize < 5) return -1; memcpy(buf, "ninf", 5); return 4; }
 		else     { if (bufsize < 4) return -1; memcpy(buf, "inf", 4);  return 3; }
 	}
 	if (bvn_float_is_zero(f)) {

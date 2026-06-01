@@ -310,7 +310,7 @@ static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 	if (bvn_is_special_number_string(buf)) {
 		if      (strcmp(buf, "nan")  == 0) n->val.float_val = NAN;
 		else if (strcmp(buf, "inf")  == 0) n->val.float_val = INFINITY;
-		else if (strcmp(buf, "-inf") == 0) n->val.float_val = -INFINITY;
+		else if (strcmp(buf, "ninf") == 0) n->val.float_val = -INFINITY;
 	} else {
 		uint32_t base = bvn_effective_base(vt);
 		double v = 0.0;

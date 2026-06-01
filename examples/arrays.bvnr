@@ -75,7 +75,7 @@
 
 # ── 8. Mixed annotation: array-wide + per-element override ───────────────────
 
-.pi_arr = <float> [-3.14, 3.14]/[$nan, $-inf];  # float:64 for all
+.pi_arr = <float> [-3.14, 3.14]/[nan, ninf];  # float:64 for all
 
 
 # ── 9. Arrays of typed integers with units ───────────────────────────────────

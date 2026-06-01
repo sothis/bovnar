@@ -259,7 +259,7 @@ class TestWriteArrayInDumps:
 @needs_lib
 class TestWriteArraySpecialFloats:
     """Regression tests for Bug 2: float inf/nan must be encoded as bovnar
-    special-number literals ($inf, $-inf, $nan), not as Python
+    special-number keywords (inf, ninf, nan), not as Python
     repr() strings ('inf', '-inf', 'nan')."""
 
     def test_nan_in_array_does_not_raise(self):
@@ -278,27 +278,27 @@ class TestWriteArraySpecialFloats:
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('nan')])
         out = w.get_output()
-        assert b'$nan' in out
+        assert b'nan' in out
 
     def test_pos_inf_encoded_as_special_literal(self):
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('inf')])
         out = w.get_output()
-        assert b'$inf' in out
+        assert b'inf' in out
 
     def test_neg_inf_encoded_as_special_literal(self):
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('-inf')])
         out = w.get_output()
-        assert b'$-inf' in out
+        assert b'ninf' in out
 
     def test_mixed_specials_and_normal_floats(self):
         with Writer.to_mem() as w:
             write_array(w, 'v', [float('nan'), float('inf'), float('-inf'), 1.5])
         out = w.get_output()
-        assert b'$nan' in out
-        assert b'$inf' in out
-        assert b'$-inf' in out
+        assert b'nan' in out
+        assert b'inf' in out
+        assert b'ninf' in out
         assert b'1.5' in out
 
 

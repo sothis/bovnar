@@ -530,20 +530,6 @@ bool bvn_action_copy_fraction_byte(bvnr_reader_t* p)
 {
 	return bvn_push_number_byte(p, copy_fraction_byte);
 }
-bool bvn_action_special_number_intro(bvnr_reader_t* p)
-{
-	p->lex.str_len    = 0;
-	p->lex.token_type = token_is_number;
-	p->lex.next_state = sp_start;
-	return true;
-}
-bool bvn_action_arr_special_number_intro(bvnr_reader_t* p)
-{
-	p->lex.str_len    = 0;
-	p->lex.token_type = token_is_array_number;
-	p->lex.next_state = sp_start;
-	return true;
-}
 /*
  * '[' — open an array level.
  *
@@ -746,31 +732,13 @@ bool bvn_action_kw_advance(bvnr_reader_t* p)
 	return true;
 }
 /*
- * The grammar recognises the float keywords nan/inf/-inf letter-by-letter via
- * the sp_* states. Once matched, this writes the canonical spelling into the
- * number buffer so downstream parsing sees a normal numeric token rather than
- * having to special-case keyword tokens. bvn_action_tf_*_done does the
- * analogous thing for type-family keywords (uint/sint/float/utf8/bool).
+ * The grammar recognises the type-family keywords (uint/sint/float/utf8/bool)
+ * letter-by-letter via the tf_* states. Once matched, bvn_tf_family_done writes
+ * the canonical spelling into type_data so downstream parsing sees a normal
+ * type token. (The special floats nan/inf/ninf are no longer lexed here: they
+ * are bare reserved keywords reclassified from symbols by the validator, like
+ * null/true/false.)
  */
-static bool bvn_special_keyword_outro(bvnr_reader_t* p,
-	const char* s, uint32_t len)
-{
-	if (len > (uint32_t)p->lex.max_number_length) {
-		bvn_lexer_set_error(p, error_number_too_long);
-		return false;
-	}
-	memcpy(p->lex.str_data, s, len);
-	p->lex.str_data[len] = '\0';
-	p->lex.str_len = (uint16_t)len;
-	p->lex.next_state = number_outro_nosp;
-	return true;
-}
-bool bvn_action_sp_nan_outro(bvnr_reader_t* p)
-	{ return bvn_special_keyword_outro(p, "nan", 3); }
-bool bvn_action_sp_inf_outro(bvnr_reader_t* p)
-	{ return bvn_special_keyword_outro(p, "inf", 3); }
-bool bvn_action_sp_neginf_outro(bvnr_reader_t* p)
-	{ return bvn_special_keyword_outro(p, "-inf", 4); }
 static bool bvn_tf_family_done(bvnr_reader_t* p,
 	const char* name, uint32_t len, state_t after)
 {

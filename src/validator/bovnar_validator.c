@@ -514,8 +514,7 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 		return true;
 	if (str_len > 0) {
 		uint8_t c0 = str[0];
-		if ((c0 == 'n' || c0 == 'i' ||
-		     (c0 == '-' && str_len > 1 && str[1] == 'i')) &&
+		if ((c0 == 'n' || c0 == 'i') &&
 		    bvn_is_special_number_string((const char*)str))
 			return true;
 	}
@@ -766,6 +765,18 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		} else if ((n == 5 && memcmp(s, "false", 5) == 0) ||
 		           (n == 3 && memcmp(s, "off", 3) == 0)) {
 			kw_bool = true; kw_true = false;
+		} else if ((n == 3 && (memcmp(s, "nan", 3) == 0 ||
+		                       memcmp(s, "inf", 3) == 0)) ||
+		           (n == 4 && memcmp(s, "ninf", 4) == 0)) {
+			/* Special floats are bare reserved keywords (like null/
+			 * true/false). Reclassify to a number token and fall
+			 * through to the bare-value path, which synthesises the
+			 * default <float:64> and applies special-number handling
+			 * via bvn_is_special_number_string on raw->str_data.
+			 * Array context is carried structurally by the array-row
+			 * events, so (as for null/bool) a single token type
+			 * suffices regardless of nesting. */
+			tt = token_is_number;
 		}
 		if (kw_bool) {
 			if (bvn_type_is_plain(v->value_type)) {

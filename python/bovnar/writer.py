@@ -511,7 +511,7 @@ class Writer:
         self.emit(Event.ASSIGNMENT_START, key=key)
         self._emit_annotation(family_name, vt, vu)
 
-        _SPECIAL = frozenset(('nan', 'inf', '-inf'))
+        _SPECIAL = frozenset(('nan', 'inf', 'ninf'))
         _decimal_float_families = frozenset((
             int(ValueTypeFamily.FLOAT_FIX),
             int(ValueTypeFamily.FLOAT_DEC),

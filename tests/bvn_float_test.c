@@ -852,7 +852,8 @@ static void test_bvnf_to_str(void)
 
 	bvn_float_set_inf(&f, true);
 	n = bvn_float_to_str(&f, strbuf, sizeof(strbuf), 10);
-	CHECK(n > 0 && strbuf[0] == '-', "to_str(-Inf) starts with '-'");
+	CHECK(n == 4 && memcmp(strbuf, "ninf", 4) == 0,
+	      "to_str(-Inf) is bovnar keyword \"ninf\"");
 }
 
 static void test_bvnf_ieee_roundtrip(void)

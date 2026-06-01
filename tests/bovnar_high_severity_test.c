@@ -945,9 +945,8 @@ static void test_special_float_write(void)
 				strstr(ctx.val[2], "Inf")      != NULL,
 				"-Inf: value token contains 'inf'");
 
-	ASSERT_TRUE(ctx.val[2][0] == '-' ||
-				strstr(ctx.val[2], "-") != NULL,
-				"-Inf: value token has a minus sign");
+	ASSERT_TRUE(strcmp(ctx.val[2], "ninf") == 0,
+				"-Inf: value token is the bovnar keyword \"ninf\"");
 }
 
 static void test_open_write_mem_and_bytes_written(void)
@@ -2364,60 +2363,54 @@ static void test_rb2_nested_array_eof_balanced(void)
 	bvnr_reader_destroy(r);
 }
 
-static void test_rb3_special_number_respects_max_number_length(void)
+static void test_rb3_special_number_respects_max_symbol_length(void)
 {
-	printf("  test_rb3_special_number_respects_max_number_length...\n");
+	printf("  test_rb3_special_number_respects_max_symbol_length...\n");
 
 	/*
-	 * bvn_special_keyword_outro wrote special-value keywords ("nan",
-	 * "inf", "-inf") directly into str_data without consulting
-	 * max_number_length.  A caller that configured a tight limit to bound
-	 * processing cost would silently receive tokens that exceeded it.
+	 * Special floats are bare reserved keywords (nan / inf / ninf) that lex
+	 * as symbols and are reclassified to numbers by the validator. As
+	 * symbols they are bounded by max_symbol_length, so a caller that
+	 * configures a tight limit to bound processing cost gets a clean
+	 * error_symbol_too_long rather than an over-limit token.
 	 *
-	 * After fix: the limit is checked before the write; a violation
-	 * returns error_number_too_long just like an overlong regular number.
-	 *
-	 * Bovnar special-number syntax uses a leading $ sigil: $nan, $inf,
-	 * $-inf.  The stored token string is the keyword text without the
-	 * sigil ("nan" = 3 bytes, "inf" = 3 bytes, "-inf" = 4 bytes).
-	 *
-	 * max_number_length = 3 allows "nan" and "inf" (3 bytes, exactly at
-	 * limit) but rejects "-inf" (4).
+	 * max_symbol_length = 3 allows "nan" and "inf" (3 bytes, exactly at the
+	 * limit) but rejects "ninf" (4).
 	 */
 	capture_t ctx = {0};
 	bvnr_read_flags_t f = {
-		.max_number_length = 3,
+		.max_symbol_length = 3,
 		.on_verified       = capture_verified,
 		.on_error          = capture_error,
 		.userdata          = &ctx,
 	};
 	bvnr_reader_t *r = NULL;
 
-	/* "$nan" (3-char keyword) must succeed under limit=3 */
+	/* "nan" (3-char keyword) must succeed under limit=3 */
 	ctx = (capture_t){0};
-	ASSERT_TRUE(do_parse_str(".x = $nan;\n", &f, &r),
-				"rb3: '$nan' (3-char keyword) with limit=3 must succeed");
+	ASSERT_TRUE(do_parse_str(".x = nan;\n", &f, &r),
+				"rb3: 'nan' (3-char keyword) with limit=3 must succeed");
 	bvnr_reader_destroy(r); r = NULL;
 
-	/* "$inf" (3-char keyword) must succeed under limit=3 */
+	/* "inf" (3-char keyword) must succeed under limit=3 */
 	ctx = (capture_t){0};
-	ASSERT_TRUE(do_parse_str(".x = $inf;\n", &f, &r),
-				"rb3: '$inf' (3-char keyword) with limit=3 must succeed");
+	ASSERT_TRUE(do_parse_str(".x = inf;\n", &f, &r),
+				"rb3: 'inf' (3-char keyword) with limit=3 must succeed");
 	bvnr_reader_destroy(r); r = NULL;
 
-	/* "$-inf" (4-char keyword) must fail under limit=3 */
+	/* "ninf" (4-char keyword) must fail under limit=3 */
 	ctx = (capture_t){0};
-	ASSERT_FALSE(do_parse_str(".x = $-inf;\n", &f, &r),
-				 "rb3: '$-inf' (4-char keyword) with limit=3 must fail");
-	ASSERT_EQ_INT(bvnr_reader_get_error(r), error_number_too_long,
-				  "rb3: error must be error_number_too_long for '$-inf'");
+	ASSERT_FALSE(do_parse_str(".x = ninf;\n", &f, &r),
+				 "rb3: 'ninf' (4-char keyword) with limit=3 must fail");
+	ASSERT_EQ_INT(bvnr_reader_get_error(r), error_symbol_too_long,
+				  "rb3: error must be error_symbol_too_long for 'ninf'");
 	bvnr_reader_destroy(r); r = NULL;
 
-	/* "$-inf" (4-char keyword) must succeed under limit=4 */
-	f.max_number_length = 4;
+	/* "ninf" (4-char keyword) must succeed under limit=4 */
+	f.max_symbol_length = 4;
 	ctx = (capture_t){0};
-	ASSERT_TRUE(do_parse_str(".x = $-inf;\n", &f, &r),
-				"rb3: '$-inf' (4-char keyword) with limit=4 must succeed");
+	ASSERT_TRUE(do_parse_str(".x = ninf;\n", &f, &r),
+				"rb3: 'ninf' (4-char keyword) with limit=4 must succeed");
 	bvnr_reader_destroy(r);
 }
 
@@ -2616,7 +2609,7 @@ int main(void)
 	test_rb1_eof_resync_callback_fires();
 	test_rb2_eof_array_events_balanced();
 	test_rb2_nested_array_eof_balanced();
-	test_rb3_special_number_respects_max_number_length();
+	test_rb3_special_number_respects_max_symbol_length();
 	test_rb4_advance_line_once_per_byte();
 	test_rb5_resync_bracket_no_duplicate_row_end();
 

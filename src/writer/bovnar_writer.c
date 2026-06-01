@@ -676,7 +676,7 @@ static void bvn_ser_mark_value_done(bvnr_serializer_t* s)
  * This is the formatter that knows the concrete bovnar syntax: `.key = ` for
  * assignments, `<...>` type annotations with the `:`-then-`,` parameter
  * punctuation, `{}` structs, `[]` arrays with `/` dimension separators,
- * `$nan`/`$inf` for special floats, `&` reference prefix, and the 0x00/0x01
+ * `nan`/`inf`/`ninf` bare keywords for special floats, `&` reference prefix, and the 0x00/0x01
  * binary octet-stream framing. Interleaved through every case is the separator
  * state machine (need_semi, pending commas, indentation) so output is
  * syntactically correct in both compact and pretty modes. had_type_annotation
@@ -871,16 +871,11 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		} else if (d->type == token_is_number ||
 				   d->type == token_is_array_number) {
 			if (d->data && d->length) {
-				const char* str = (const char*)d->data;
-				if (bvn_is_special_number_string(str)) {
-					if (!bvn_ser_push_byte(s, '$'))
-						return false;
-					if (!bvn_ser_push(s, d->data, d->length))
-						return false;
-				} else {
-					if (!bvn_ser_push(s, d->data, d->length))
-						return false;
-				}
+				/* Special floats (nan/inf/ninf) are emitted as the
+				 * bare keyword, exactly like any other number token —
+				 * no sigil. */
+				if (!bvn_ser_push(s, d->data, d->length))
+					return false;
 			}
 		} else if (d->type == token_is_string ||
 				   d->type == token_is_array_string) {

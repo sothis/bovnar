@@ -191,9 +191,10 @@ contexts:
     - include: struct1
 
   special_number:
-    # $nan  $inf  $-inf — a single leading $ sigil, no trailing $. The keyword
-    # ends like a number; a trailing identifier byte (e.g. $infinity) is an error.
-    - match: '\$(?:nan|-inf|inf)(?![A-Za-z0-9_])'
+    # nan  inf  ninf — bare reserved keywords (no sigil), reclassified out of
+    # the symbol space like null/true/false. Word boundaries exclude e.g.
+    # 'infinity'/'nana'.
+    - match: '(?<![A-Za-z0-9_])(?:nan|inf|ninf)(?![A-Za-z0-9_])'
       scope: constant.language.special-float.bovnar
 
   # Reserved value-position keywords. true/false/on/off carry the bool type
@@ -231,10 +232,10 @@ contexts:
           scope: invalid.illegal.escape.bovnar
 
   # Inline unit suffix: mandatory whitespace separates the scalar from the unit.
-  # The lookbehind fires after a digit, a closing string quote, or the tail of a
-  # special-number keyword ($nan/$inf/$-inf) — variable-length alternation (Oniguruma).
+  # The lookbehind fires after a digit or a closing string quote. (Special-number
+  # keywords nan/inf/ninf take no inline unit — a unit is given via the annotation.)
   inline_unit:
-    - match: '(?<=[\d"]|\$nan|\$inf|\$-inf)(\s+)([A-Za-z_$%‰‱µ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
+    - match: '(?<=[\d"])(\s+)([A-Za-z_$%‰‱µ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
       captures:
         1: punctuation.separator.inline-unit.bovnar
         2: support.type.unit.inline.bovnar

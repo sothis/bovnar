@@ -318,7 +318,7 @@ class TestSpecialFloats:
         raw_strs = [v.decode('utf-8') for v in values if v]
         assert 'nan'  in raw_strs
         assert 'inf'  in raw_strs
-        assert '-inf' in raw_strs
+        assert 'ninf' in raw_strs
 
 @needs_lib
 class TestComments:

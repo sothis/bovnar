@@ -405,9 +405,11 @@ static void test_parse_inline_unit_scalar(void)
 	parse_payload(".ratio = 3.14 no_unit;", false, &ctx);
 	ASSERT_TRUE(!ctx.has_errors, "inline 'no_unit' keyword must parse");
 
-	/* special-number with space separator */
-	parse_payload(".x = $nan s;", false, &ctx);
-	ASSERT_TRUE(!ctx.has_errors, "inline unit after special-number must parse");
+	/* special-number unit is supplied via the type annotation: the bare
+	 * keywords nan/inf/ninf take no inline unit suffix. */
+	parse_payload(".x = <float:64,s> nan;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors,
+		"special-number unit via type annotation must parse");
 
 	/* number with exponent */
 	parse_payload(".x = 1.5e3 k~J;", false, &ctx);
@@ -424,9 +426,9 @@ static void test_parse_inline_unit_scalar(void)
 		"unit starting with e (eV) is unambiguous after whitespace separator");
 
 	/* comment replaces explicit whitespace: newline from comment counts */
-	parse_payload(".x = $nan # comment\n s;", false, &ctx);
+	parse_payload(".x = 9.81 # comment\n m;", false, &ctx);
 	ASSERT_TRUE(!ctx.has_errors,
-		"comment newline satisfies whitespace requirement for special-number");
+		"comment newline satisfies the inline-unit whitespace requirement");
 }
 
 static void test_parse_inline_unit_separator_errors(void)
@@ -445,10 +447,11 @@ static void test_parse_inline_unit_separator_errors(void)
 	ASSERT_TRUE(ctx.has_errors,
 		"direct adjacency on float must be rejected");
 
-	/* no separator after special-number */
-	parse_payload(".x = $nans;", true, &ctx);
+	/* a special-number keyword takes no inline unit (use the annotation);
+	 * note "nans" is itself just a valid symbol, not nan + s. */
+	parse_payload(".x = inf m;", true, &ctx);
 	ASSERT_TRUE(ctx.has_errors,
-		"direct adjacency after special-number must error");
+		"special-number keyword followed by an inline unit must error");
 
 	/* no separator after exponent */
 	parse_payload(".x = 1.5e3k-J;", true, &ctx);

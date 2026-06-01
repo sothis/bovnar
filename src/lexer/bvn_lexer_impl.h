@@ -68,10 +68,6 @@ typedef enum state_e {
 		exp_intro,
 		exp_sign_intro,
 		copy_exp_byte,
-		sp_start,
-		sp_nan1, sp_nan2,
-		sp_inf1, sp_inf2,
-		sp_neg1, sp_neg2, sp_neg3,
 	symbol_intro,
 	symbol_body,
 	symbol_outro,
@@ -121,15 +117,7 @@ enum action_id {
 	ACT_fraction_no_int,
 	ACT_copy_fraction_byte,
 	ACT_to_number_outro,
-	ACT_special_number_intro,
-	ACT_arr_special_number_intro,
 	ACT_kw_advance,
-	ACT_sp_to_nan1,
-	ACT_sp_to_inf1,
-	ACT_sp_to_neg1,
-	ACT_sp_nan_outro,
-	ACT_sp_inf_outro,
-	ACT_sp_neginf_outro,
 	ACT_tf_to_u,
 	ACT_tf_to_s,
 	ACT_tf_to_f,
@@ -286,12 +274,7 @@ bool bvn_action_zero_intro                (bvnr_reader_t* p);
 bool bvn_action_fraction_intro            (bvnr_reader_t* p);
 bool bvn_action_fraction_no_int           (bvnr_reader_t* p);
 bool bvn_action_copy_fraction_byte        (bvnr_reader_t* p);
-bool bvn_action_special_number_intro      (bvnr_reader_t* p);
-bool bvn_action_arr_special_number_intro  (bvnr_reader_t* p);
 bool bvn_action_kw_advance                (bvnr_reader_t* p);
-bool bvn_action_sp_nan_outro              (bvnr_reader_t* p);
-bool bvn_action_sp_inf_outro              (bvnr_reader_t* p);
-bool bvn_action_sp_neginf_outro           (bvnr_reader_t* p);
 bool bvn_action_tf_uint_done              (bvnr_reader_t* p);
 bool bvn_action_tf_sint_done              (bvnr_reader_t* p);
 bool bvn_action_tf_float_done             (bvnr_reader_t* p);

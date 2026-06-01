@@ -217,6 +217,15 @@ static void test_parse_long_name_aliases(void)
 		{ "radians",    bu_radian    },
 		{ "steradian",  bu_steradian },
 		{ "steradians", bu_steradian },
+		/* Regression: documented aliases that must parse.
+		 * "fluid_ounce_uk" once carried a wrong length (13 vs 14) and
+		 * was unparseable; "mils" (plural of mil/thou) was missing. */
+		{ "thou",            bu_thou           },
+		{ "mil",             bu_thou           },
+		{ "mils",            bu_thou           },
+		{ "fl_oz_uk",        bu_fluid_ounce_uk },
+		{ "fluid_ounce_uk",  bu_fluid_ounce_uk },
+		{ "fluid_ounces_uk", bu_fluid_ounce_uk },
 	};
 	size_t n = sizeof(cases) / sizeof(cases[0]);
 	for (size_t i = 0; i < n; i++) {

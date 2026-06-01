@@ -167,7 +167,7 @@
     },
 
     "type_annotation": {
-      "comment": "Matches <type-spec> blocks including the new float_fix / float_dec families (v1.3) and the q~param for fixed-point Q~format. float_fix and float_dec must precede float in the alternation so the longer names win.",
+      "comment": "Matches <type-spec> blocks including the float_fix / float_dec families and the q-param for fixed-point Q-format (all part of the frozen spec 1.0). float_fix and float_dec must precede float in the alternation so the longer names win.",
       "begin": "<",
       "beginCaptures": {
         "0": { "name": "punctuation.definition.type.begin.bovnar" }

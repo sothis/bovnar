@@ -1422,7 +1422,12 @@ static inline uint32_t bvn_string_ext_end(
 	uint32_t i = start;
 	while (i < len) {
 		uint8_t b = data[i];
-		if (b < 0x20u || b == 0x22u || b == 0x5cu)
+		/* 0x00-0x1F and 0x7F (DEL) are rejected control bytes in string
+		 * bodies (BVN_REJECT_ASCII_CTRL); break so the per-byte path
+		 * raises the error rather than the fast path swallowing them.
+		 * Without the explicit 0x7F check the bulk scanner would drift
+		 * from the authoritative transition table and accept DEL. */
+		if (b < 0x20u || b == 0x7fu || b == 0x22u || b == 0x5cu)
 			break;
 		if (b < 0x80u) {
 			if (need) return last_complete;

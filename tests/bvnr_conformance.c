@@ -684,6 +684,13 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("STR-014", "strings", "raw control byte 0x01 in string",
 	           ".s = \"\x01\";",
 	           error_unexpected_input_byte),
+	/* DEL (0x7F) after a run of ordinary bytes: exercises the bulk-copy
+	 * fast path, which must reject it identically to the per-byte path
+	 * (regression guard against bvn_string_ext_end drifting from the
+	 * authoritative transition table's BVN_REJECT_ASCII_CTRL). */
+	ERROR_CASE("STR-017", "strings", "raw DEL 0x7F mid-string (bulk path)",
+	           ".s = \"aaaaaaaa\x7f\";",
+	           error_unexpected_input_byte),
 	ERROR_LIM("STR-015", "strings", "string too long",
 	          ".s = \"abcdefghij\";",
 	          error_string_too_long, 0, 5, 0, 0, 0, 0),

@@ -169,6 +169,23 @@ static void test_resync_on_error(void)
 			   true);
 }
 
+/*
+ * Regression: a semantic error (value out of range) is detected only once the
+ * value's terminating ';' has been consumed, so the stream is already at a
+ * clean assignment boundary. Recovery must resume at the *next* assignment
+ * rather than skipping forward to the following ';' (which would swallow the
+ * valid ".second"). See §13.2.
+ */
+static void test_resync_after_value_error_keeps_next(void)
+{
+	const char *payload = ".first = 1; .broken = <uint:8> 999; .second = 2;";
+	run_reader(payload,
+			   true,
+			   error_value_out_of_range,
+			   true,
+			   true);   /* .second must survive recovery */
+}
+
 static void test_incomplete_stream(void)
 {
 	const char *payload = ".a = \"value";
@@ -225,6 +242,7 @@ int main(void)
 {
 	printf("Running bovnar_reader_test regression suite...\n");
 	test_resync_on_error();
+	test_resync_after_value_error_keeps_next();
 	test_incomplete_stream();
 	test_comment_inside_array();
 	test_bom_error_after_comment();

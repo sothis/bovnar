@@ -10987,6 +10987,18 @@ static bool bvn_interpret_input_buffer(
 			if (l->continue_on_error) {
 				if (!bvn_enter_resync(p))
 					return false;
+				/*
+				 * A semantic error (e.g. value-out-of-range) is only
+				 * detected once the value's terminating ';' has been
+				 * consumed, so the stream is already at a clean
+				 * assignment boundary. Skipping forward to the *next*
+				 * ';' would swallow the following — possibly valid —
+				 * assignment. Per §13.2 ("resume on ';' at the saved
+				 * nesting depth") treat the just-consumed ';' as that
+				 * boundary and resume normal parsing immediately.
+				 */
+				if (l->byte == (uint8_t)';')
+					bvn_resync_semicolon_reset(p);
 			} else {
 				return false;
 			}

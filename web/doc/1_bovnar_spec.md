@@ -436,7 +436,7 @@ Seven type families are recognized:
 | Binary floating-point | `float` | `:width,_base,unit` (base `_10` or `_16` only) | 64 |
 | Fixed-point (Q-format) | `float_fix` | `:width,qN,unit` | 64 |
 | Decimal floating-point (IEEE 754-2008) | `float_dec` | `:width,unit` | 64 |
-| UTF-8 string | `utf8` | Lexer accepts params; stored but ignored | — |
+| UTF-8 string | `utf8` | none (any parameter → `error_illegal_value_type`) | — |
 | Boolean | `bool` | none (any parameter → `error_illegal_value_type`) | — |
 
 **Parameter syntax:**

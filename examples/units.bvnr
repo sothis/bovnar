@@ -299,8 +299,8 @@
 .float_unit   = <float:64,m/s>        9.81;       # float — fully supported
 .fix_unit     = <float_fix:32,q8,m/s> 9.81;       # float_fix — supported
 .dec_unit     = <float_dec:64,Pa>     101325;      # float_dec — supported
-# utf8 unit annotation is lexically accepted but semantically ignored:
-.utf8_unit    = <utf8:m> "3.14";                  # no validation error raised
+# utf8 is a parameterless family: <utf8:m> would be error_illegal_value_type.
+.utf8_plain   = <utf8> "3.14";                    # carries no width/base/unit
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -800,6 +800,18 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("TYP-026", "types", "utf8 type with number value",
 	           ".x = <utf8> 42;",
 	           error_type_value_mismatch),
+	/* utf8 and bool are parameterless families: any width/base/unit is
+	 * error_illegal_value_type (symmetric — utf8 no longer accepts and
+	 * silently ignores parameters). */
+	ERROR_CASE("TYP-031", "types", "utf8 with width parameter",
+	           ".x = <utf8:8> \"hi\";",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-032", "types", "utf8 with unit parameter",
+	           ".x = <utf8:m> \"hi\";",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-033", "types", "bool with width parameter",
+	           ".x = <bool:8> true;",
+	           error_illegal_value_type),
 	/* Strict type-param-list: empty / trailing / bare-colon parameter
 	 * components are rejected (a comma must introduce a real parameter,
 	 * and ":" requires a non-empty list). Guards against the re-parser

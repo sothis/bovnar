@@ -261,9 +261,9 @@ Yes, with `<utf8>`:
 ```
 
 This is redundant — a bare quoted literal is already synthesised as `utf8` — but
-it makes the type explicit, which is useful for documentation and tooling. A unit
-parameter inside a `<utf8>` annotation is lexically accepted and stored but
-semantically ignored; no error is raised.
+it makes the type explicit, which is useful for documentation and tooling. `utf8`
+is a parameterless family: a width, base, q, or unit parameter inside a `<utf8>`
+annotation is `error_illegal_value_type`.
 
 ---
 

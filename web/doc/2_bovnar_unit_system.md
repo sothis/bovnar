@@ -170,7 +170,7 @@ When both are present, equality is checked after parsing via `memcmp` on the com
 | `float`     | Supported (binary floating-point; discouraged for monetary amounts — see §9.7) |
 | `float_fix` | Supported (wrong for monetary values — see §9.7) |
 | `float_dec` | Supported; **recommended** for monetary amounts |
-| `utf8`      | Lexically accepted and stored, but semantically ignored (no error raised) |
+| `utf8`      | Parameterless: a unit (or any other parameter) is `error_illegal_value_type` |
 
 ---
 

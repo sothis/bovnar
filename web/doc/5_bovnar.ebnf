@@ -203,7 +203,9 @@ type-spec    = param-type ;
 (* at most one of each class (width, base, q, unit) is permitted.     *)
 (*                                                                     *)
 (* "utf8" goes to type_body_outro after the keyword; the lexer        *)
-(* accepts ":" and parameters, but they carry no semantic meaning.    *)
+(* accepts ":" and the parameter bytes, but utf8 is a parameterless    *)
+(* family — any width, base, q, or unit parameter is rejected by        *)
+(* bvn_parse_type_annotation as error_illegal_value_type (see bool).   *)
 (*                                                                     *)
 (* "float_fix" and "float_dec" are not separate keyword paths in the  *)
 (* lexer state table.  The lexer fires ACT_tf_float_done after the    *)
@@ -213,9 +215,9 @@ type-spec    = param-type ;
 (* "_dec" are accumulated via copy_type_byte.  The final string        *)
 (* ("float", "float_fix", or "float_dec") is dispatched in           *)
 (* bvn_parse_type_annotation.                                         *)
-(* "bool" is a parameterless family: any width, base, q, or unit      *)
-(* parameter is error_illegal_value_type.  Its only valid values are  *)
-(* the bool keywords (see bool-value, §3).                            *)
+(* "bool" and "utf8" are parameterless families: any width, base, q,  *)
+(* or unit parameter is error_illegal_value_type.  bool's only valid   *)
+(* values are the bool keywords (see bool-value, §3).                  *)
 param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8" | "bool")
              , [ws , ":" , ws , type-param-list] ;
 

@@ -410,8 +410,8 @@ In all cases the annotation comes **before** the value it describes.
 **Correct placement:**
 
 ```bovnar
-.key = <uint:32> 42;
-.key = <float:64> 3.14;
+.an_int  = <uint:32> 42;
+.a_float = <float:64> 3.14;
 .arr = [<uint:8> 1, <sint:16> -2];
 
 # Whole-array annotation — applies to all elements that lack their own annotation
@@ -497,10 +497,10 @@ For `float_fix`, the wire representation is a signed Q-format integer stored in
 Parameters are **identified by class** — each class is recognised by its syntactic form — and at most one of each class may appear. They can appear in any order:
 
 ```bovnar
-# All of these are equivalent:
+# All of these annotations are equivalent (parameter order is free):
 .val = <uint:32,_10,no_unit> 42;
-.val = <uint:_10,no_unit,32> 42;
-.val = <uint:no_unit,_10,32> 42;
+#      <uint:_10,no_unit,32>      — identical
+#      <uint:no_unit,_10,32>      — identical
 ```
 
 ### 5.4 Examples

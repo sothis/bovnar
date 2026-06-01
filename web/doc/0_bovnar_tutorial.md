@@ -507,8 +507,8 @@ References are valid in arrays and structs:
 A reference is not a null. If a field is optional and currently has no referent, represent the absence with an explicit null:
 
 ```bovnar
-.override = ;           # null — no reference, use internal default
-.override = &.config.x; # non-null — follow this reference
+.override = ;             # null — no reference, use internal default
+# .override = &.config.x; # or, non-null — follow this reference
 ```
 
 ---

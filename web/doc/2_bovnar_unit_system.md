@@ -125,8 +125,8 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 
 ```bovnar
 .val = <uint:32,_10,no_unit> 42;
-.val = <uint:_10,no_unit,32> 42;   # identical
-.val = <uint:no_unit,_10,32> 42;   # identical
+#      <uint:_10,no_unit,32>        — identical (parameter order is free)
+#      <uint:no_unit,_10,32>        — identical
 ```
 
 ### 2.2 Inline Unit Suffix

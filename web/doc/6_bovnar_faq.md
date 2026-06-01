@@ -206,8 +206,8 @@ position. The following three are equivalent:
 
 ```bovnar
 .x = <uint:32,_16,m> "1F4";
-.x = <uint:_16,m,32> "1F4";
-.x = <uint:m,32,_16> "1F4";
+#    <uint:_16,m,32>     — identical (parameter order is free)
+#    <uint:m,32,_16>     — identical
 ```
 
 ---

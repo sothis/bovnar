@@ -800,6 +800,22 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("TYP-026", "types", "utf8 type with number value",
 	           ".x = <utf8> 42;",
 	           error_type_value_mismatch),
+	/* Strict type-param-list: empty / trailing / bare-colon parameter
+	 * components are rejected (a comma must introduce a real parameter,
+	 * and ":" requires a non-empty list). Guards against the re-parser
+	 * drifting lenient from the EBNF type-param-list production. */
+	ERROR_CASE("TYP-027", "types", "trailing comma in type params",
+	           ".x = <uint:8,> 5;",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-028", "types", "double comma (empty middle param)",
+	           ".x = <uint:8,,> 5;",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-029", "types", "empty width before base",
+	           ".x = <uint:,_16> \"ff\";",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-030", "types", "bare colon with empty param list",
+	           ".x = <uint:> 5;",
+	           error_illegal_value_type),
 
 	/* ── DEFAULT TYPE SYNTHESIS ──────────────────────────────────── */
 	VALID("DTS-001", "default_synthesis", "plain integer → uint:64",

@@ -197,7 +197,10 @@
             raw += cur(); advance();
           }
           raw = raw.trim();
-          if (!raw) continue;
+          /* A comma/colon must introduce a real parameter: empty or
+           * trailing components (<uint:8,>, <uint:8,,>, <uint:,_16>) are
+           * rejected, matching the C core's strict type-param-list. */
+          if (!raw) { emit(EV.ERROR, { msg: 'Empty type parameter' }); continue; }
 
           let paramData;
           if (/^\d+$/.test(raw)) {

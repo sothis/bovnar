@@ -2172,6 +2172,13 @@ value_type_spec_t bvn_parse_type_annotation(
 		}
 		pos++;
 		while (pos < len && str[pos] == ' ') pos++;
+		/* A ":" must introduce at least one parameter; "<uint:>" with an
+		 * empty list is rejected (param-type = family [":" type-param-list],
+		 * the list being mandatory once the colon is present). */
+		if (pos >= len) {
+			*type_ok = false;
+			return r;
+		}
 	}
 	bool need_comma = false;
 	while (pos < len) {
@@ -2184,8 +2191,16 @@ value_type_spec_t bvn_parse_type_annotation(
 			while (pos < len && str[pos] == ' ') pos++;
 		}
 		need_comma = true;
-		if (pos >= len || str[pos] == ',')
-			continue;
+		/* A comma must be followed by a real parameter. Empty or
+		 * trailing components (<uint:8,>, <uint:8,,>, <uint:,_16>) are
+		 * rejected to match the strict type-param-list grammar
+		 * (type-param-list = type-param , {ws "," ws type-param}); since
+		 * parameters are class-identified and order-independent, empty
+		 * positional slots are never required. */
+		if (pos >= len || str[pos] == ',') {
+			*type_ok = false;
+			return r;
+		}
 		uint8_t c = str[pos];
 		if (c >= '0' && c <= '9') {
 			uint64_t w = 0;

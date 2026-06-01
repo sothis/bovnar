@@ -47,7 +47,10 @@ jobs:
         run: pipx run --spec build pyproject-build --sdist
 
       - name: Check metadata
-        run: pipx run twine check dist/*
+        # Only the built sdist — the repo has a committed dist/ (the amalgamation:
+        # dist/README.md, dist/bovnar.c, …), so a bare dist/* glob feeds those to
+        # twine and errors "Unknown distribution format: 'README.md'".
+        run: pipx run twine check dist/*.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:

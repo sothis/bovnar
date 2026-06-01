@@ -627,6 +627,27 @@ static void test_bvn_float_fix_api(void)
 	CHECK(ok, "from_fix128 ok");
 	bvn_float_to_double(&f, &out);
 	CHECK(fabs(out - 1.0) < 1e-9, "from_fix128 round-trip: 1.0 Q16");
+
+	/* Overflow must SATURATE to the representable extreme, never wrap. */
+	bvn_float_from_double(&f, 1000000.0);            /* >> [-128, 127.996] */
+	CHECK(bvn_float_to_fix16(&f, 8) == 32767,  "to_fix16 q8 1e6 saturates +max");
+	bvn_float_from_double(&f, -1000000.0);
+	CHECK(bvn_float_to_fix16(&f, 8) == -32768, "to_fix16 q8 -1e6 saturates -min");
+	bvn_float_from_double(&f, 70000.0);              /* q0: signed-16 range */
+	CHECK(bvn_float_to_fix16(&f, 0) == 32767,  "to_fix16 q0 70000 saturates +max");
+
+	/* in_range predicate: boundary exactness. */
+	bvn_float_from_double(&f, 127.99609375);
+	CHECK(bvn_float_fix_in_range(&f, 16, 8),  "127.99609375 fits q8/16");
+	bvn_float_from_double(&f, 128.0);
+	CHECK(!bvn_float_fix_in_range(&f, 16, 8), "128 does not fit q8/16");
+	bvn_float_from_double(&f, -128.0);
+	CHECK(bvn_float_fix_in_range(&f, 16, 8),  "-128 fits q8/16 (min)");
+	/* string convenience + special-number exemption. */
+	CHECK(bvn_float_str_fits_fix("127.5", 10, 16, 8),     "str 127.5 fits");
+	CHECK(!bvn_float_str_fits_fix("1000", 10, 16, 8),     "str 1000 does not fit");
+	CHECK(!bvn_float_str_fits_fix("1e6", 10, 16, 8),      "str 1e6 does not fit");
+	CHECK(bvn_float_str_fits_fix("nan", 10, 16, 8),       "nan is range-exempt");
 }
 
 /* ── Validation error cases ────────────────────────────────────────── */
@@ -662,6 +683,20 @@ static void test_validation_errors(void)
 	/* Q >= width. */
 	err = read_error(".x = <float_fix:32,q32> 1.0;\n");
 	CHECK(err == error_illegal_value_type, "float_fix:32,q32 → illegal");
+
+	/* Value outside the Q-format range → error_value_out_of_range. */
+	err = read_error(".x = <float_fix:16,q8> 128;\n");
+	CHECK(err == error_value_out_of_range, "float_fix:16,q8 128 → out_of_range");
+	err = read_error(".x = <float_fix:16,q8> 1000000;\n");
+	CHECK(err == error_value_out_of_range, "float_fix:16,q8 1e6 → out_of_range");
+	err = read_error(".x = <float_fix:16,q0> 70000;\n");
+	CHECK(err == error_value_out_of_range, "float_fix:16,q0 70000 → out_of_range");
+	err = read_error(".x = <float_fix:16,q8> 127.99609375;\n");
+	CHECK(err == error_none, "float_fix:16,q8 max is in range");
+	err = read_error(".x = <float_fix:16,q8> -128;\n");
+	CHECK(err == error_none, "float_fix:16,q8 min is in range");
+	err = read_error(".x = <float_fix:16,q8> nan;\n");
+	CHECK(err == error_none, "float_fix special number is range-exempt");
 
 	/* Invalid width for float_dec. */
 	err = read_error(".x = <float_dec:8> 1.0;\n");

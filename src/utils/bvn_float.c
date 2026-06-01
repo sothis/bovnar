@@ -1834,9 +1834,23 @@ static void bvnf_load_mant_bvint(const bvn_float_t *f, bvn_int_t *M)
  * overflow-wrap semantics. Routing this straight off the mantissa avoids the
  * double rounding that a float -> shortest-decimal-string -> round path incurs.
  */
-static void bvnf_to_fix_direct(const bvn_float_t *f, int total_bits,
-								uint32_t frac_bits, uint32_t *bits, int bits32)
+/*
+ * Core conversion. Computes M = round(|value| * 2^frac_bits) and writes the
+ * signed two's-complement fixed-point datum into bits[]. A value outside the
+ * representable signed range [-2^(total_bits-1), 2^(total_bits-1)-1] is an
+ * overflow:
+ *   - reported through *overflow_out (when non-NULL), and
+ *   - if `saturate`, clamped to the nearest representable extreme (+max for a
+ *     positive overflow, -2^(total_bits-1) for a negative one) instead of the
+ *     historical low-bits wrap, so a too-large datum can never silently decode
+ *     to an unrelated value. When `saturate` is false the function is a pure
+ *     range probe: it sets *overflow_out and leaves bits[] zeroed.
+ */
+static void bvnf_to_fix_core(const bvn_float_t *f, int total_bits,
+							  uint32_t frac_bits, uint32_t *bits, int bits32,
+							  bool saturate, bool *overflow_out)
 {
+	if (overflow_out) *overflow_out = false;
 	for (int i = 0; i < bits32; i++) bits[i] = 0;
 	if (!bvn_float_is_regular(f)) return;          /* nan/inf/zero -> 0 */
 	bool neg = f->_sign < 0;
@@ -1866,6 +1880,45 @@ static void bvnf_to_fix_direct(const bvn_float_t *f, int total_bits,
 			}
 		}
 	}
+	/*
+	 * Overflow check against the signed range. Positive magnitude is
+	 * representable up to 2^(total_bits-1)-1 (bitlen <= total_bits-1);
+	 * negative up to 2^(total_bits-1) (bitlen == total_bits with only the
+	 * top bit set).
+	 */
+	{
+		int  bl = bvn_int_bitlen(&M);
+		bool ov;
+		if (!neg) {
+			ov = (bl >= total_bits);
+		} else if (bl < total_bits) {
+			ov = false;
+		} else if (bl > total_bits) {
+			ov = true;
+		} else {
+			ov = false;
+			for (int i = 0; i < total_bits - 1; i++)
+				if (bvn_int_getbit(&M, i)) { ov = true; break; }
+		}
+		if (ov) {
+			if (overflow_out) *overflow_out = true;
+			if (!saturate) { bvnf_scratch_free(&M); return; }
+			bvn_int_zero(&M);
+			if (!neg) {
+				for (int i = 0; i < total_bits - 1; i++)
+					if (!bvn_int_setbit(&M, i)) {
+						bvnf_scratch_free(&M); return;
+					}
+			} else {
+				if (!bvn_int_setbit(&M, total_bits - 1)) {
+					bvnf_scratch_free(&M); return;
+				}
+			}
+		} else if (!saturate) {
+			/* probe only: no overflow, nothing to emit */
+			bvnf_scratch_free(&M); return;
+		}
+	}
 	int w = (total_bits + 31) / 32;
 	if (w > bits32) w = bits32;
 	for (int i = 0; i < w; i++)
@@ -1887,6 +1940,49 @@ static void bvnf_to_fix_direct(const bvn_float_t *f, int total_bits,
 			bits[w - 1] &= mask;
 	}
 	bvnf_scratch_free(&M);
+}
+static void bvnf_to_fix_direct(const bvn_float_t *f, int total_bits,
+								uint32_t frac_bits, uint32_t *bits, int bits32)
+{
+	bvnf_to_fix_core(f, total_bits, frac_bits, bits, bits32,
+					 true /*saturate*/, NULL);
+}
+/*
+ * Range probe: does `value * 2^frac_bits` round to a datum that fits the signed
+ * `total_bits`-bit Q-format without overflow? nan/inf/zero map to 0 and so
+ * always "fit" (special numbers are range-exempt by spec §6.4). Used by the
+ * reader and writer to reject an out-of-range fixed-point value rather than let
+ * it saturate or wrap.
+ */
+bool bvn_float_fix_in_range(const bvn_float_t *f,
+							uint32_t total_bits, uint32_t frac_bits)
+{
+	if (!f || !bvn_float_is_regular(f)) return true;
+	uint32_t tmp[8];
+	bool ov = false;
+	bvnf_to_fix_core(f, (int)total_bits, frac_bits, tmp,
+					 (int)(sizeof tmp / sizeof tmp[0]), false /*probe*/, &ov);
+	return !ov;
+}
+/*
+ * Convenience: parse a NUL-terminated numeric literal in `base` and report
+ * whether it fits the signed total_bits/frac_bits Q-format. Allocation failure
+ * and parse failure both return true (don't reject a value the caller already
+ * validated syntactically). total_bits is one of 16/32/64/128/256.
+ */
+bool bvn_float_str_fits_fix(const char *s, uint32_t base,
+							uint32_t total_bits, uint32_t frac_bits)
+{
+	if (!s) return true;
+	uint32_t prec = total_bits + frac_bits + 64u;
+	if (prec > BVN_FLOAT_MAX_PREC) prec = BVN_FLOAT_MAX_PREC;
+	bvn_float_t *f = bvn_float_alloc(prec);
+	if (!f) return true;
+	bool fits = true;
+	if (bvn_float_from_str(f, s, base))
+		fits = bvn_float_fix_in_range(f, total_bits, frac_bits);
+	bvn_float_free(f);
+	return fits;
 }
 /* Number of decimal digits in a (small) big integer. -1 on allocation failure. */
 static int bvnf_dec_digit_count(const bvn_int_t *b)

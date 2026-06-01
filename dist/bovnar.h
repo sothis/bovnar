@@ -295,6 +295,16 @@ BVN_API bool bvn_float_from_fix128(bvn_float_t *f, const uint32_t bits[4],
 							uint32_t frac_bits);
 BVN_API bool bvn_float_from_fix256(bvn_float_t *f, const uint32_t bits[8],
 							uint32_t frac_bits);
+/*
+ * Range checks for fixed-point (Q-format). Return true iff value * 2^frac_bits
+ * rounds to a datum representable in a signed total_bits-bit field (total_bits
+ * one of 16/32/64/128/256). The bvn_float_to_fixNN encoders saturate to the
+ * representable extreme on overflow rather than wrapping.
+ */
+BVN_API bool bvn_float_fix_in_range(const bvn_float_t *f,
+							uint32_t total_bits, uint32_t frac_bits);
+BVN_API bool bvn_float_str_fits_fix(const char *s, uint32_t base,
+							uint32_t total_bits, uint32_t frac_bits);
 #ifdef __cplusplus
 }
 #endif

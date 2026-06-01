@@ -637,12 +637,25 @@ The Q parameter (`qN`) specifies fractional bits; `0 ≤ N < effective_width`.
 Base parameter (`_N`) is forbidden.
 The mathematical value of a fixed-point datum is `raw_integer × 2^(-Q)`.
 
+**Range.** A `float_fix` value must lie within the declared format's signed
+range — `raw_integer = round(value × 2^Q)` must fit a signed `width`-bit field,
+i.e. `value ∈ [-2^(width-1-Q), 2^(width-1-Q) − 2^(-Q)]`. A value outside that
+range is `error_value_out_of_range`, exactly as for `uint`/`sint` overflow
+(special numbers `nan`/`inf`/`ninf` are range-exempt, §6.4). The C encoders
+`bvn_float_to_fixNN` additionally **saturate** to the representable extreme on
+overflow rather than wrapping, so a fixed-point datum can never silently decode
+to an unrelated value.
+
 ```bovnar
-.valid   = <float_fix:16,q8> 3.14;    # Q8 in 16-bit: range [-128, 127.996]
+.valid   = <float_fix:16,q8> 3.14;    # Q8 in 16-bit: range [-128, 127.99609375]
+.valid   = <float_fix:16,q8> 127.99609375;  # max in range
+.valid   = <float_fix:16,q8> -128;    # min in range
 .valid   = <float_fix:32,q16> -1.5;   # Q16 in 32-bit
 .valid   = <float_fix:64,q0> 42;      # Q0 = pure integer, no fractional part
 .valid   = <float_fix:32,q8,m/s> 9.81;
 
+.invalid = <float_fix:16,q8> 128;     # exceeds Q8/16-bit range → error_value_out_of_range
+.invalid = <float_fix:16,q0> 70000;   # exceeds signed-16-bit range → error_value_out_of_range
 .invalid = <float_fix:16,q16> 1.0;    # Q >= width → error_illegal_value_type
 .invalid = <float_fix:8> 1.0;         # width 8 not in {0,16,32,64,128,256}
 .invalid = <float_fix:32,q8,_10> 1.0; # base param forbidden → error_illegal_value_type
@@ -1273,6 +1286,7 @@ Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default 
 |-------|-------|
 | Number in base-N string contains out-of-base digit | `error_digit_not_in_base` |
 | Integer value exceeds declared width | `error_value_out_of_range` |
+| `float_fix` value outside the declared Q-format range (§6.2) | `error_value_out_of_range` |
 | Negative number with `uint` type | `error_value_out_of_range` |
 | Mismatched type family for value token | `error_type_value_mismatch` |
 | Dot or exponent in integer-typed value | `error_type_value_mismatch` |
@@ -2168,10 +2182,12 @@ is not a break of the 1.0 promise.
 
 **What requires a 2.0.** Any change that could render a valid 1.x document invalid,
 change how it decodes, renumber an error code, or alter the grammar is a breaking
-change and is reserved for a major (2.0) revision. The two changes that motivated
+change and is reserved for a major (2.0) revision. The changes that motivated
 the 1.0 freeze — the **mandatory `$` currency sigil** (§10.4 of the unit-system
-reference) and **array element homogeneity** (§7.4) — were exactly such breaks, so
-they were made *before* 1.0 and cannot be reconsidered within 1.x.
+reference), **array element homogeneity** (§7.4), and **`float_fix` value-range
+validation** (§6.2, rejecting a value the declared Q-format cannot represent) —
+were exactly such breaks, so they were made *before* 1.0 and cannot be
+reconsidered within 1.x.
 
 ---
 

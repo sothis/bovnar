@@ -2,7 +2,7 @@
 
 > **Version:** 1.0
 > **Protocol:** bvnr-conformance-v1
-> **Last updated:** 2026-05-31
+> **Last updated:** 2026-06-01
 
 ---
 
@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (202 cases) ──→ for each test case:                │
+│  Test corpus (207 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -440,7 +440,7 @@ specifies:
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 17 | Escapes, concatenation, UTF-8, limits |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
-| `types` | 39 | All seven type families, widths, bases, errors |
+| `types` | 44 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
 | `symbols` | 6 | Bare-word values and limits |
 | `references` | 4 | Dotted paths and limits |
@@ -455,7 +455,7 @@ specifies:
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 12 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **202** | |
+| **Total** | **207** | |
 
 ---
 
@@ -466,7 +466,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..202
+1..207
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

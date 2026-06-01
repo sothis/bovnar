@@ -836,6 +836,28 @@ static void test_write_float_fix_q_edges(void)
 					 "float_fix with Q == width must fail");
 		bvnr_writer_destroy(w);
 	}
+
+	/* Value outside the Q-format's representable range must be rejected,
+	 * not silently saturated/wrapped on a later decode. */
+	const struct { uint32_t w, q; double v; } oor[] = {
+		{ 16, 8, 1000000.0 },   /* range [-128, 127.996] */
+		{ 16, 8, 128.0 },
+		{ 16, 8, -200.0 },
+		{ 32, 16, 1e9 },
+		{ 16, 0, 70000.0 },     /* q0: signed 16-bit int range */
+	};
+	for (size_t i = 0; i < sizeof(oor) / sizeof(oor[0]); i++) {
+		uint8_t obuf[64];
+		bvnr_sink_t sk;
+		bvnr_writer_t *ww = make_writer(obuf, sizeof(obuf), &sk);
+		ASSERT_NOT_NULL(ww, "make_writer must succeed");
+		if (!ww) continue;
+		ASSERT_FALSE(bvnr_write_float_fix(ww, "x", oor[i].w, oor[i].q, oor[i].v),
+					 "out-of-range float_fix value must be rejected");
+		ASSERT_EQ_INT(bvnr_writer_get_error(ww), error_value_out_of_range,
+					  "rejection must be error_value_out_of_range");
+		bvnr_writer_destroy(ww);
+	}
 }
 
 static void test_write_float_dec_roundtrip(void)

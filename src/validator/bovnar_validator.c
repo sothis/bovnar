@@ -604,6 +604,26 @@ bool bvn_validate_type_value_compat(bvnr_reader_t* r,
 		v->last_error = error_type_value_mismatch;
 		return false;
 	}
+	/*
+	 * Fixed-point range: a value outside the declared Q-format's signed range
+	 * (e.g. 1000000 in float_fix:16,q8, whose range is [-128, 127.996]) is
+	 * error_value_out_of_range, mirroring the uint/sint overflow check. Without
+	 * this the literal would be accepted and then silently saturate/wrap when an
+	 * application converts it to the fixed-point wire form. Special numbers
+	 * (nan/inf/ninf) are range-exempt (§6.4) and skipped.
+	 */
+	if (vt.family == vt_float_fix && str_len > 0) {
+		uint8_t c0 = str[0];
+		bool special = (c0 == 'n' || c0 == 'i') &&
+					   bvn_is_special_number_string((const char*)str);
+		if (!special &&
+			!bvn_float_str_fits_fix((const char*)str, 10u,
+									bvn_effective_width(vt),
+									bvn_effective_q(vt))) {
+			v->last_error = error_value_out_of_range;
+			return false;
+		}
+	}
 	return bvn_check_acc_range(v, str, str_len, tt);
 }
 /*

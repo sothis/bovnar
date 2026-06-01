@@ -284,6 +284,15 @@ static bool bvn_validate_number_for_writer(bvnr_writer_t* w,
 					error_value_out_of_range);
 				goto out;
 			}
+		} else if (vt.family == vt_float_fix) {
+			/* Refuse to emit a value the declared Q-format can't hold
+			 * (would saturate/wrap on decode); matches the reader. */
+			if (!bvn_float_str_fits_fix(buf, 10u, width,
+									    bvn_effective_q(vt))) {
+				ok = bvn_writer_set_error(w,
+					error_value_out_of_range);
+				goto out;
+			}
 		}
 	}
 out:
@@ -336,6 +345,13 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 			}
 		} else if (vt.family == vt_sint && vt.width) {
 			if (!bvn_validate_sint_range(buf, width, base)) {
+				ok = bvn_writer_set_error(w,
+					error_value_out_of_range);
+				goto out;
+			}
+		} else if (vt.family == vt_float_fix) {
+			if (!bvn_float_str_fits_fix(buf, 10u, width,
+									    bvn_effective_q(vt))) {
 				ok = bvn_writer_set_error(w,
 					error_value_out_of_range);
 				goto out;

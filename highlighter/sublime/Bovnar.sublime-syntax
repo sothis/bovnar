@@ -25,7 +25,7 @@ contexts:
   # struct1 is the entry point of the struct depth chain.
 
   assignment:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -55,7 +55,7 @@ contexts:
       scope: punctuation.separator.array-row.bovnar
 
   assignment_in_struct1:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -67,7 +67,7 @@ contexts:
         - include: struct2
 
   assignment_in_struct2:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -79,7 +79,7 @@ contexts:
         - include: struct3
 
   assignment_in_struct3:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -91,7 +91,7 @@ contexts:
         - include: struct4
 
   assignment_in_struct4:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -103,7 +103,7 @@ contexts:
         - include: struct5
 
   assignment_in_struct5:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -115,7 +115,7 @@ contexts:
         - include: struct6
 
   assignment_in_struct6:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -127,7 +127,7 @@ contexts:
         - include: struct7
 
   assignment_in_struct7:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -140,7 +140,7 @@ contexts:
 
   # Depth 8 cycles back to struct1.
   assignment_in_struct8:
-    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_][A-Za-z0-9_+\-]*)'
+    - match: '(?:^|(?<=[{;]))\s*(\.)([A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)'
       captures:
         1: punctuation.separator.key-sigil.bovnar
         2: entity.name.key.bovnar
@@ -194,16 +194,16 @@ contexts:
     # nan  inf  ninf — bare reserved keywords (no sigil), reclassified out of
     # the symbol space like null/true/false. Word boundaries exclude e.g.
     # 'infinity'/'nana'.
-    - match: '(?<![A-Za-z0-9_])(?:nan|inf|ninf)(?![A-Za-z0-9_])'
+    - match: '(?<![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])(?:nan|inf|ninf)(?![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])'
       scope: constant.language.special-float.bovnar
 
   # Reserved value-position keywords. true/false/on/off carry the bool type
   # family (on==true, off==false); null is the null value. The validator
   # reclassifies these out of the symbol space, so they precede `symbol`.
   keyword:
-    - match: '\b(?:true|false|on|off)\b'
+    - match: '(?<![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])(?:true|false|on|off)(?![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])'
       scope: constant.language.boolean.bovnar
-    - match: '\bnull\b'
+    - match: '(?<![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])null(?![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])'
       scope: constant.language.null.bovnar
 
   number:
@@ -235,19 +235,19 @@ contexts:
   # The lookbehind fires after a digit or a closing string quote. (Special-number
   # keywords nan/inf/ninf take no inline unit — a unit is given via the annotation.)
   inline_unit:
-    - match: '(?<=[\d"])(\s+)([A-Za-z_$%(‰‱µ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
+    - match: '(?<=[\d"])(\s+)([A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
       captures:
         1: punctuation.separator.inline-unit.bovnar
         2: support.type.unit.inline.bovnar
 
   # Bare-word value (symbol / enum-like).
   symbol:
-    - match: '\b[A-Za-z_][A-Za-z0-9_+\-]*'
+    - match: '[A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*'
       scope: variable.other.symbol.bovnar
 
   # Reference literal: '&' sigil followed by one or more '.segment' path parts.
   reference:
-    - match: '(&)((?:\.[A-Za-z_][A-Za-z0-9_+\-]*)+)'
+    - match: '(&)((?:\.[A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)+)'
       captures:
         1: keyword.operator.reference.bovnar
         2: variable.other.reference-path.bovnar
@@ -406,5 +406,5 @@ contexts:
 
   # Unit string inside a type annotation.
   unit_expression:
-    - match: '[A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*(?:~[A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?(?:[·/*][A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*(?:~[A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\^[+\-]?\d+)?)*'
+    - match: '[A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*'
       scope: support.type.unit.bovnar

@@ -497,7 +497,7 @@ section { position: relative; z-index: 1; }
 .section-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 5.5rem 3rem;
+  padding: 2.85rem 3rem;
 }
 
 .section-label {
@@ -505,7 +505,7 @@ section { position: relative; z-index: 1; }
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   color: var(--text3);
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.85rem;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -514,11 +514,11 @@ section { position: relative; z-index: 1; }
 
 .section-h2 {
   font-family: var(--mono);
-  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-size: clamp(1.5rem, 2.8vw, 2.3rem);
   font-weight: 400;
   line-height: 1.15;
   color: var(--text);
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.9rem;
   letter-spacing: -0.01em;
 }
 .section-h2 em {
@@ -527,11 +527,147 @@ section { position: relative; z-index: 1; }
 }
 
 .section-p {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 400;
   color: var(--text2);
-  line-height: 1.8;
-  max-width: 640px;
+  line-height: 1.65;
+  max-width: 680px;
+}
+
+/* ── THE CORE IDEA / ANATOMY ── */
+#anatomy { border-top: 1px solid var(--border); background: var(--sidebar-bg); }
+#anatomy .section-p code { font-family: var(--mono); color: var(--cyan); font-size: 0.9em; }
+
+.anat-contrast {
+  margin-top: 1.6rem;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) auto minmax(0, 1.55fr);
+  align-items: stretch;
+  gap: 1.4rem;
+}
+.anat-bare, .anat-rich {
+  background: var(--editor-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem 1.6rem;
+  display: flex;
+  flex-direction: column;
+}
+.anat-rich {
+  border-color: rgba(0,122,204,0.5);
+  box-shadow: 0 0 0 1px rgba(0,122,204,0.12), 0 10px 34px rgba(0,0,0,0.35);
+}
+.anat-tag {
+  font-family: var(--mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 1.1rem;
+}
+.anat-rich .anat-tag { color: var(--teal); }
+.anat-code {
+  font-family: var(--mono);
+  color: var(--text);
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.anat-bare .anat-code {
+  font-size: 2rem;
+  color: var(--c-val);
+  letter-spacing: 0.02em;
+}
+.anat-note {
+  margin-top: 1.15rem;
+  font-size: 0.78rem;
+  color: var(--text3);
+  line-height: 1.5;
+}
+.anat-rich .anat-note { color: var(--text2); }
+.anat-note b { color: var(--teal); font-weight: 600; }
+.anat-arrow {
+  align-self: center;
+  font-family: var(--mono);
+  font-size: 1.7rem;
+  color: var(--blue2);
+}
+
+/* the annotated, self-describing line — labels hang beneath their tokens */
+.anat-line { position: relative; padding-bottom: 2.9rem; font-size: 1.15rem; line-height: 1.5; }
+.tok-label { position: relative; }
+.tok-label::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 1.55em;
+  width: 1px;
+  height: 1.15rem;
+  background: var(--border-hi);
+  opacity: 0.55;
+}
+.tok-label::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 50%;
+  top: calc(1.55em + 1.25rem);
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue2);
+  white-space: nowrap;
+}
+
+/* the three kinds of context that characterise a number */
+.anat-pillars {
+  margin-top: 1.6rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.anat-pillar { background: var(--editor-bg); padding: 1.4rem 1.5rem; }
+.anat-pillar-h {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.anat-pillar-h .n {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--blue2);
+  border: 1px solid rgba(0,122,204,0.3);
+  background: rgba(0,122,204,0.05);
+  padding: 0.1rem 0.36rem;
+  flex-shrink: 0;
+}
+.anat-chip {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  background: rgba(0,0,0,0.22);
+  border-left: 2px solid var(--border);
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.85rem;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.anat-pillar-d { font-size: 0.8rem; color: var(--text3); line-height: 1.6; }
+.anat-pillar-d code { font-family: var(--mono); color: var(--cyan); font-size: 0.85em; }
+
+@media (max-width: 820px) {
+  .anat-contrast { grid-template-columns: 1fr; }
+  .anat-arrow { transform: rotate(90deg); justify-self: center; }
+  .anat-pillars { grid-template-columns: 1fr; }
 }
 
 /* ── MISSION CONTROL LIVE DEMO ── */
@@ -543,7 +679,7 @@ section { position: relative; z-index: 1; }
 }
 
 .demo-window {
-  margin-top: 2.5rem;
+  margin-top: 1.5rem;
   border: 1px solid var(--border);
   background: var(--editor-bg);
   display: flex;
@@ -668,77 +804,10 @@ section { position: relative; z-index: 1; }
 }
 .demo-poster.is-launched { display: none; }
 
-/* ── PHILOSOPHY ── */
-#philosophy .section-inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5rem;
-  align-items: start;
-}
-.philosophy-right { padding-top: 2.5rem; }
-
-.philosophy-quote {
-  font-family: var(--sans);
-  font-size: 1.1rem;
-  font-weight: 400;
-  font-style: italic;
-  color: var(--text2);
-  line-height: 1.65;
-  border-left: 2px solid var(--blue2);
-  padding-left: 1.5rem;
-  margin-bottom: 2.5rem;
-  background: rgba(0,122,204,0.03);
-  padding: 1rem 1.5rem;
-}
-
-.philosophy-cards { display: flex; flex-direction: column; gap: 1px; }
-
-.phil-card {
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border);
-  padding: 1.25rem 1.5rem;
-  display: flex;
-  gap: 1.25rem;
-  align-items: flex-start;
-  transition: border-color 0.15s, background 0.15s;
-}
-.phil-card:hover { border-color: var(--border-hi); background: #2a2a2b; }
-
-.phil-icon {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--blue);
-  border: 1px solid rgba(0,122,204,0.4);
-  background: rgba(0,122,204,0.06);
-  padding: 0.2rem 0.5rem;
-  flex-shrink: 0;
-  margin-top: 0.1rem;
-  letter-spacing: 0.05em;
-}
-
-.phil-title {
-  font-family: var(--sans);
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 0.3rem;
-}
-.phil-desc {
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: var(--text3);
-  line-height: 1.6;
-}
-.phil-desc code {
-  font-family: var(--mono);
-  font-size: 0.82em;
-  color: var(--cyan);
-}
-
 /* ── COMPARISON ── */
 #comparison { border-top: 1px solid var(--border); }
 
-.cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 3rem; }
+.cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 1.6rem; }
 .comparison-table {
   width: 100%;
   min-width: 640px;             /* 7 columns stay readable; the wrapper scrolls on narrow screens */
@@ -775,7 +844,7 @@ section { position: relative; z-index: 1; }
   background: rgba(0,122,204,0.06);
   border-bottom: none;
   border-top: 1px solid var(--blue2);
-  padding: 1.1rem 1.25rem;
+  padding: 1.1rem 1.25rem 1.1rem 3.2rem;
 }
 .comparison-table .bf-tag {
   display: inline-block;
@@ -812,7 +881,7 @@ section { position: relative; z-index: 1; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px;
-  margin-top: 3rem;
+  margin-top: 1.6rem;
 }
 
 .syntax-card {
@@ -892,7 +961,7 @@ section { position: relative; z-index: 1; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  margin-top: 3rem;
+  margin-top: 1.6rem;
   background: var(--border);
 }
 
@@ -902,6 +971,8 @@ section { position: relative; z-index: 1; }
   transition: background 0.15s;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .feature-card:hover { background: #232323; }
 .feature-card::before {
@@ -950,17 +1021,18 @@ section { position: relative; z-index: 1; }
 }
 
 .feature-example {
-  margin-top: 1.1rem;
+  margin-top: auto;
   font-family: var(--mono);
   font-size: 0.73rem;
   color: var(--text);
-  padding: 0.6rem 0.85rem;
+  padding: 0.7rem 0.85rem;
   background: rgba(0,0,0,0.18);
   border-left: 2px solid var(--border);
   white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.8;
+  word-break: break-word;
+  line-height: 1.7;
   overflow: hidden;
+  min-height: 5.2rem;
 }
 
 /* C language token colors */
@@ -1071,268 +1143,12 @@ section { position: relative; z-index: 1; }
   background: var(--editor-bg);
   border: 1px solid var(--border);
   border-left: 2px solid var(--blue2);
-  padding: 1.1rem 1.25rem;
+  padding: 1.1rem 1.25rem 1.1rem 3.2rem;
   line-height: 1.9;
   overflow-x: auto;
   white-space: pre;
   flex: 1 1 auto;          /* fill the (grid-equalized) step so both columns match height */
 }
-
-/* ── USE CASES ── */
-#usecases { border-top: 1px solid var(--border); }
-
-.usecases-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  margin-top: 3rem;
-  background: var(--border);
-}
-
-.usecase-card {
-  background: var(--editor-bg);
-  padding: 1.75rem;
-  display: flex;
-  gap: 1.25rem;
-  align-items: flex-start;
-  transition: background 0.15s;
-}
-.usecase-card:hover { background: #232323; }
-
-.usecase-num {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--blue2);
-  border: 1px solid rgba(0,122,204,0.3);
-  padding: 0.15rem 0.4rem;
-  flex-shrink: 0;
-  margin-top: 0.15rem;
-  background: rgba(0,122,204,0.05);
-}
-
-.usecase-title {
-  font-family: var(--sans);
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 0.4rem;
-}
-.usecase-desc {
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: var(--text3);
-  line-height: 1.65;
-}
-.usecase-desc code {
-  font-family: var(--mono);
-  font-size: 0.82em;
-  color: var(--cyan);
-}
-.usecase-example {
-  margin-top: 0.65rem;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--text);
-  padding: 0.5rem 0.75rem;
-  background: rgba(0,0,0,0.18);
-  border-left: 2px solid var(--border);
-  white-space: pre-wrap;
-  line-height: 1.8;
-}
-
-/* ── NUMPY BRIDGE ── */
-#numpy { border-top: 1px solid var(--border); }
-
-.np-pipeline {
-  margin-top: 3rem;
-  display: grid;
-  grid-template-columns: 1fr auto 1.05fr;
-  gap: 1.5rem;
-  align-items: stretch;
-}
-.np-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  min-width: 0;
-}
-.np-stage-label {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.03em;
-  color: var(--text3);
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-.np-stage-label::before {
-  content: '';
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--teal);
-  box-shadow: 0 0 8px var(--teal);
-  flex: none;
-}
-.np-stage .code-block { font-size: 0.72rem; }
-
-.np-arrow {
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.55rem;
-}
-.np-arrow-call {
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  color: var(--cyan);
-  background: rgba(0,122,204,0.08);
-  border: 1px solid rgba(0,122,204,0.28);
-  padding: 0.35rem 0.55rem;
-  white-space: nowrap;
-  text-align: center;
-}
-.np-arrow-glyph {
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--blue2);
-}
-
-/* the rendered ndarray */
-.np-array {
-  flex: 1 1 auto;
-  background: var(--editor-bg);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--teal);
-  padding: 1rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-.np-array-meta {
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  color: var(--text3);
-}
-.np-array-meta b { color: var(--cyan); font-weight: 400; }
-.np-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-}
-.np-cell {
-  font-family: var(--mono);
-  font-size: 0.74rem;
-  color: var(--c-val);
-  text-align: center;
-  padding: 0.4rem 0.2rem;
-  background: rgba(94,234,212,0.05);
-  border: 1px solid rgba(94,234,212,0.14);
-}
-.np-unit-badge {
-  align-self: flex-start;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--c-unit);
-  background: rgba(94,234,212,0.08);
-  border: 1px solid rgba(94,234,212,0.32);
-  padding: 0.22rem 0.55rem;
-}
-.np-unit-badge b { color: var(--text3); font-weight: 400; }
-
-.np-payoff {
-  margin-top: 1.75rem;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--border);
-}
-.np-benefit {
-  background: var(--editor-bg);
-  padding: 1.4rem 1.5rem;
-}
-.np-benefit-icon {
-  font-family: var(--mono);
-  font-size: 0.95rem;
-  color: var(--teal);
-  margin-bottom: 0.55rem;
-}
-.np-benefit-title {
-  font-family: var(--sans);
-  font-size: 0.92rem;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 0.35rem;
-}
-.np-benefit-desc {
-  font-size: 0.82rem;
-  color: var(--text3);
-  line-height: 1.6;
-}
-.np-benefit-desc code {
-  font-family: var(--mono);
-  font-size: 0.85em;
-  color: var(--cyan);
-}
-
-/* ── CONFORMANCE BAR ── */
-.conformance-bar {
-  position: relative; z-index: 1;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-bg);
-}
-.conformance-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem 3rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
-.conf-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-.conf-icon {
-  font-size: 1rem;
-  color: var(--teal);
-  flex-shrink: 0;
-  width: 1.5rem;
-  text-align: center;
-  font-family: var(--mono);
-}
-.conf-title {
-  font-family: var(--sans);
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--text);
-}
-.conf-sub {
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  color: var(--text3);
-  letter-spacing: 0.03em;
-  margin-top: 0.1rem;
-}
-.conf-cta {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  font-weight: 400;
-  letter-spacing: 0.03em;
-  color: var(--blue);
-  text-decoration: none;
-  border: 1px solid rgba(0,122,204,0.35);
-  padding: 0.45rem 1rem;
-  white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
-  flex-shrink: 0;
-}
-.conf-cta:hover { background: rgba(0,122,204,0.1); border-color: var(--blue2); color: var(--blue2); }
 
 /* ── DOCS ── */
 #docs {
@@ -1343,7 +1159,7 @@ section { position: relative; z-index: 1; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  margin-top: 3rem;
+  margin-top: 1.6rem;
   background: var(--border);
 }
 .doc-card {
@@ -1479,6 +1295,9 @@ section { position: relative; z-index: 1; }
   transition: background 0.12s, color 0.12s;
 }
 .doc-dl-list a:hover { background: var(--panel-bg); color: var(--blue); }
+/* odd item count: let the final entry fill the trailing column so no
+   empty (border-coloured) grid cell is left over */
+.doc-dl-list li:last-child { grid-column: 1 / -1; }
 .doc-dl-num { font-family: var(--mono); font-size: 0.62rem; color: var(--text3); flex-shrink: 0; }
 .doc-dl-ext {
   margin-left: auto;
@@ -1872,6 +1691,7 @@ footer { position: relative; z-index: 1; }
 .hljs-bvn-unit    { color: var(--c-unit); }
 .hljs-bvn-param   { color: var(--c-param); }
 .hljs-bvn-special { color: #c084fc; }
+.hljs-bvn-keyword { color: #c084fc; font-weight: 600; }
 .hljs-bvn-val     { color: var(--c-val); }
 .hljs-bvn-str     { color: var(--c-str); }
 .hljs-bvn-esc     { color: #5ab06e; font-weight: 600; }
@@ -1939,12 +1759,13 @@ a[data-doc] { cursor: pointer; }
   border-top: 1px solid var(--border);
   background: var(--editor-bg);
 }
+#playground .section-p code { font-family: var(--mono); color: var(--cyan); font-size: 0.9em; }
 
 .playground-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);   /* 0 floor: content can't widen a column */
   gap: 0;
-  margin-top: 2.5rem;
+  margin-top: 1.5rem;
   border: 1px solid var(--border);
   overflow: hidden;
 }
@@ -2009,22 +1830,60 @@ a[data-doc] { cursor: pointer; }
   background: var(--editor-bg);
 }
 
+#pg-error-overlay {
+  position: absolute;
+  top: 0; left: 3.2rem; right: 0; bottom: 0;   /* aligned to the editor text origin */
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.pg-err-char {
+  position: absolute;
+  background: rgba(244,71,71,0.28);
+  border-bottom: 2px solid var(--red);
+  border-radius: 1px;
+}
+
+#pg-gutter {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 2.6rem;
+  padding: 1.1rem 0.55rem 1.1rem 0;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.85;
+  text-align: right;
+  color: var(--text3);
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  box-sizing: border-box;
+  white-space: pre;
+  z-index: 3;
+}
+.pg-gutter-num { display: block; }
+.pg-gutter-num.err { color: var(--red); font-weight: 600; }
+
 #pg-highlight {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   margin: 0;
-  padding: 1.1rem 1.25rem;
+  padding: 1.1rem 1.25rem 1.1rem 3.2rem;
   font-family: var(--mono);
   font-size: 0.78rem;
   line-height: 1.85;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: pre;          /* must match the textarea's wrap=off so the
+                                coloured layer and the caret never diverge */
   overflow: hidden;
   pointer-events: none;
   tab-size: 4;
   -moz-tab-size: 4;
   box-sizing: border-box;
   color: var(--text);
+  z-index: 1;
 }
 
 #pg-editor {
@@ -2041,12 +1900,12 @@ a[data-doc] { cursor: pointer; }
   line-height: 1.85;
   border: none;
   outline: none;
-  padding: 1.1rem 1.25rem;
+  padding: 1.1rem 1.25rem 1.1rem 3.2rem;
   tab-size: 4;
   scrollbar-width: thin;
   scrollbar-color: #4e4e4e transparent;
   box-sizing: border-box;
-  z-index: 1;
+  z-index: 2;
   overflow: auto;
 }
 #pg-editor::placeholder { color: var(--text3); }
@@ -2069,73 +1928,104 @@ a[data-doc] { cursor: pointer; }
 .hl-struct-brace { color: var(--c-struct); }
 .hl-dim          { color: var(--text2); }
 
-#pg-event-log {
+/* ── on_verified event tree ── */
+#pg-event-tree {
   flex: 1;          /* fill the column, which the grid sizes to the 15-line editor */
   min-height: 0;
   overflow-y: auto;
-  padding: 0.6rem 0;
+  padding: 0.55rem 0.3rem;
   font-family: var(--mono);
-  font-size: 0.73rem;
+  font-size: 0.735rem;
+  line-height: 1.55;
   scrollbar-width: thin;
   scrollbar-color: #4e4e4e var(--sidebar-bg);
 }
 
-.pg-ev {
+.pg-row {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
-  padding: 0.12rem 1rem;
-  line-height: 1.4;
-  border-left: 2px solid transparent;
-  transition: background 0.1s;
-  cursor: default;
-}
-.pg-ev:hover { background: rgba(255,255,255,0.025); }
-
-.pg-ev-pos {
-  color: var(--text3);
-  font-size: 0.62rem;
-  flex-shrink: 0;
-  min-width: 5.5rem;
-  letter-spacing: 0.02em;
-}
-
-.pg-ev-type {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
-  min-width: 13rem;
-}
-
-.pg-ev-detail {
-  color: var(--text2);
-  flex: 1;
-  min-width: 0;            /* allow the ellipsis to truncate instead of forcing width */
+  gap: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
+.pg-row:hover { background: rgba(255,255,255,0.03); }
+.pg-row.branch { cursor: pointer; }
+.pg-row.branch:hover { background: rgba(86,156,214,0.07); }
 
-/* event-type color classes */
-.ev-stream      { color: var(--text3); }
-.ev-assignment  { color: var(--c-key); }
-.ev-typeann     { color: var(--c-ann); }
-.ev-struct      { color: var(--teal); }
-.ev-array       { color: var(--yellow); }
-.ev-data        { color: var(--c-val); }
-.ev-error       { color: var(--red); }
+.pg-tw {
+  flex: none;
+  width: 0.95rem;
+  text-align: center;
+  color: var(--text3);
+  user-select: none;
+}
+.pg-tw.br::before { content: '▾'; }
+.pg-node.collapsed > .pg-row > .pg-tw.br::before { content: '▸'; }
+.pg-tw.leaf { color: var(--c-unit); font-size: 0.7rem; }
 
-.pg-ev.is-error { border-left-color: var(--red); background: rgba(244,71,71,0.04); }
-.pg-ev.is-error .pg-ev-type { color: var(--red); }
+.pg-children { margin-left: 0.95rem; border-left: 1px solid var(--border); padding-left: 0.15rem; }
+.pg-node.collapsed > .pg-children { display: none; }
 
-.pg-ev-key  { color: var(--c-key); }
-.pg-ev-str  { color: var(--c-str); }
-.pg-ev-num  { color: var(--c-val); }
-.pg-ev-sym  { color: var(--c-unit); }
-.pg-ev-ref  { color: var(--c-param); }
-.pg-ev-null { color: var(--text3); }
-.pg-ev-fam  { color: var(--c-type); font-weight: 500; }
-.pg-ev-unit { color: var(--c-unit); }
+/* one-line preview shown only while a node is collapsed */
+.pg-summary { display: none; color: var(--text3); }
+.pg-node.collapsed > .pg-row .pg-summary { display: inline; }
+
+.pg-ev-name  { color: var(--blue2); }                 /* the C event symbol */
+.pg-key2     { color: var(--c-key); }
+.pg-ann-tag  { color: var(--text3); font-size: 0.62rem; letter-spacing: 0.04em; }
+.pg-ann-tag.synth { color: var(--c-val); }
+.pg-lk { color: var(--text3); display: inline-block; min-width: 3.7rem; }  /* param label */
+.pg-lv { color: var(--c-type); }
+.pg-vt { color: var(--c-unit); }                      /* ‹float:64, m/s› */
+.pg-dnum  { color: var(--c-val); }
+.pg-dstr  { color: var(--c-str); }
+.pg-dsym  { color: var(--c-unit); }
+.pg-dref  { color: var(--c-param); }
+.pg-dnull { color: var(--text3); }
+.pg-arr-tag { color: var(--text3); font-size: 0.62rem; }
+
+/* ── on_error channel — the separate bvnr_on_error_fn callback ── */
+.pg-error-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: rgba(244,71,71,0.05);
+  max-height: 8.5rem;
+  overflow-y: auto;
+}
+.pg-error-panel.empty { background: transparent; }
+.pg-error-head {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 0.5rem 0.85rem 0.25rem;
+}
+.pg-error-head .n { color: var(--red); }
+.pg-error-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.18rem 0.85rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.pg-error-row:hover { background: rgba(244,71,71,0.12); }
+.pg-error-pos  { color: var(--text3); flex: none; min-width: 3.4rem; }
+.pg-error-code { color: var(--red); }
+.pg-error-num  { color: var(--text3); }
+.pg-error-none { color: var(--teal); padding: 0.1rem 0.85rem 0.6rem; font-size: 0.7rem; }
+
+.pg-examples-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+  padding: 0.55rem 0.85rem;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+}
 
 .pg-empty-state {
   display: flex;
@@ -2185,19 +2075,12 @@ a[data-doc] { cursor: pointer; }
   .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; }
   .hero-right { display: none; }
 
-  .section-inner { padding: 4rem 1.5rem; }
-  #philosophy .section-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+  .section-inner { padding: 2.5rem 1.2rem; }
   .syntax-grid { grid-template-columns: 1fr; }
   .syntax-desc { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }
   .qs-pane-inner { grid-template-columns: 1fr; }
-  .np-pipeline { grid-template-columns: 1fr; gap: 1.25rem; }
-  .np-arrow { flex-direction: row; gap: 1rem; }
-  .np-arrow-glyph { transform: rotate(90deg); }
-  .np-payoff { grid-template-columns: 1fr; }
-  .usecases-grid { grid-template-columns: 1fr; }
   .docs-grid { grid-template-columns: repeat(2, 1fr); }
-  .conformance-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
 .footer-inner { grid-template-columns: 1fr 1fr; }
   .comparison-table { font-size: 0.78rem; }
 
@@ -2289,12 +2172,10 @@ a[data-doc] { cursor: pointer; }
   <ul class="nav-links">
     <li><a href="#launch-demo">Live Demo</a></li>
     <li><a href="#playground">Playground</a></li>
-    <li><a href="#philosophy">Philosophy</a></li>
+    <li><a href="#anatomy">The Idea</a></li>
     <li><a href="#syntax">Syntax</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#quickstart">Quick Start</a></li>
-    <li><a href="#numpy">NumPy</a></li>
-    <li><a href="#usecases">Use Cases</a></li>
     <li><a href="#docs">Docs</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>
@@ -2315,15 +2196,13 @@ a[data-doc] { cursor: pointer; }
       </div>
       <h1 class="hero-h1">Unit-safe serialization<br>for <em>science, industry and finance.</em></h1>
       <p class="hero-sub">
-        Every measurement carries a validated physical unit — bit-width, numeric
-        base, and dimension travel inline, in the same byte stream, with no
-        external schema. A bare <code>9.81</code> is never ambiguous, and a
-        mismatched unit is a parse error. Built for instrumentation, telemetry,
-        and control systems where the wrong unit is a failure.
+        Every value carries its width, base, and physical unit inline — no schema, just
+        human-readable text. A bare <code>9.81</code> is never ambiguous, and a mismatched
+        unit is a parse error.
       </p>
       <div class="hero-actions">
         <a href="#quickstart" class="btn-primary">Get Started</a>
-        <a href="#philosophy" class="btn-ghost">Why Unit-safe?</a>
+        <a href="#anatomy" class="btn-ghost">Why Unit-safe?</a>
       </div>
     </div>
 
@@ -2433,7 +2312,7 @@ a[data-doc] { cursor: pointer; }
   --c-semi:     #5a6270;
   --c-sym:      #67d1f4;
   --c-bool:     #c084fc;
-  --c-null:     #4c5661;
+  --c-null:     #c084fc;
   --c-special:  #c084fc;
   --c-refop:    #f47067;
   --c-refpath:  #d06070;
@@ -2627,7 +2506,7 @@ a[data-doc] { cursor: pointer; }
 #launch-demo .t-unitsep { color: var(--c-unitsep); }
 #launch-demo .t-sym { color: var(--c-sym); }
 #launch-demo .t-bool { color: var(--c-bool); font-weight: 600; }
-#launch-demo .t-null { color: var(--c-null); font-style: italic; }
+#launch-demo .t-null { color: var(--c-null); font-weight: 600; }
 #launch-demo .t-special { color: var(--c-special); }
 #launch-demo .t-sep { color: var(--c-sep); }
 #launch-demo .t-adelim { color: var(--c-ann); }
@@ -2895,7 +2774,8 @@ a[data-doc] { cursor: pointer; }
       <div class="chart-legend">
         <span><b style="color:#e88a3a">▮</b> jacket heat</span>
         <span><b style="color:#7fd1ff">―</b> temp · <b style="color:#6e7a86">┄</b> setpoint</span>
-        <span><b style="color:#4ec9b0">✚</b> agitator</span>
+        <span><b style="color:#4ec9b0">✚</b> impeller</span>
+        <span><b style="color:#e0533d">◔</b> pressure</span>
       </div>
     </div>
   </section>
@@ -2936,76 +2816,122 @@ a[data-doc] { cursor: pointer; }
 
 
 <!-- ══════════════════════════════════════════════
-     PHILOSOPHY
+     PLAYGROUND
 ══════════════════════════════════════════════ -->
-<section id="philosophy">
-  <div class="section-inner">
-    <div class="philosophy-left">
-      <div class="section-label reveal">design-philosophy</div>
-      <h2 class="section-h2 reveal reveal-delay-1"><em>Numbers that</em><br>can't lose their units.</h2>
-      <p class="section-p reveal reveal-delay-2" style="margin-bottom:2rem;">
-        In scientific and industrial systems, the costly failures are rarely bad syntax —
-        they are unit confusion. A value sent in pounds-force and read as newtons. Feet read
-        as meters. The number parsed fine; the dimension was wrong.
-      </p>
-      <blockquote class="philosophy-quote reveal reveal-delay-3">
-        "A bare <code style="font-family:var(--mono);color:var(--c-val)">9.81</code> could be meters per second, volts, or a dimensionless ratio. Bovnar makes that difference explicit — and a mismatched unit a parse error."
-      </blockquote>
-      <p class="section-p reveal reveal-delay-4">
-        Bovnar is not a replacement for JSON in simple REST APIs, nor for Protobuf in
-        performance-critical RPC. It is built for the place where dimensional correctness
-        is a requirement: scientific instrumentation and metrology, industrial telemetry and
-        control, IoT sensor networks, long-term measurement archival, and mixed
-        text-binary log streams.
-      </p>
-    </div>
-    <div class="philosophy-right">
-      <div class="philosophy-cards">
-        <div class="phil-card reveal">
-          <div class="phil-icon">01</div>
-          <div>
-            <div class="phil-title">Units travel with every value</div>
-            <div class="phil-desc">
-              Physical unit, type family, bit-width, and numeric base all ride in the same byte
-              stream as the value. No schema file, no code generation, no naming convention to
-              decode what a measurement means.
-            </div>
+<section id="playground">
+  <div class="section-inner" style="padding-bottom:3rem;">
+    <div class="section-label reveal">live parser</div>
+    <h2 class="section-h2 reveal reveal-delay-1">The real <em>event stream.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      This is the reference C reader's <code>on_verified</code> callback stream, reproduced in the browser —
+      the same events, in the same order, that <code>bvnr_read()</code> delivers. Bare values get the
+      validator's <em>synthesised</em> default annotation; type, range, base and unit violations surface on the
+      separate <code>on_error</code> channel, exactly as the C core reports them.
+    </p>
+
+    <div class="playground-layout reveal reveal-delay-3">
+      <!-- ── editor ── -->
+      <div class="pg-editor-col">
+        <div class="pg-col-header">
+          <span class="pg-col-title">Editor</span>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
+            <span class="pg-col-badge" id="pg-status">ready</span>
           </div>
         </div>
-        <div class="phil-card reveal reveal-delay-1">
-          <div class="phil-icon">02</div>
-          <div>
-            <div class="phil-title">A mismatched unit is an error</div>
-            <div class="phil-desc">
-              Annotate a value as <code>m/s</code> and write an inline unit that doesn't match,
-              and the parser rejects it. Dimensional intent is checked against a built-in unit
-              table — not assumed, not left to the reader.
-            </div>
+        <div class="pg-editor-wrap">
+          <div id="pg-error-overlay" aria-hidden="true"></div>
+          <div id="pg-gutter" aria-hidden="true"></div>
+          <div id="pg-highlight" aria-hidden="true"></div>
+          <textarea id="pg-editor" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"
+            placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
+          ></textarea>
+        </div>
+        <div class="pg-examples-bar">
+          <button class="pg-example-btn" data-example="typed">Typed</button>
+          <button class="pg-example-btn" data-example="units">Units</button>
+          <button class="pg-example-btn" data-example="struct">Struct</button>
+          <button class="pg-example-btn" data-example="array">Array</button>
+          <button class="pg-example-btn" data-example="defaults">Defaults</button>
+          <button class="pg-example-btn" data-example="errors">Errors</button>
+        </div>
+      </div>
+
+      <!-- ── on_verified event tree + on_error channel ── -->
+      <div class="pg-events-col">
+        <div class="pg-col-header">
+          <span class="pg-col-title">on_verified · event tree</span>
+          <span class="pg-col-badge" id="pg-ev-count">0 events</span>
+          <button class="pg-clear-btn" id="pg-clear">clear</button>
+        </div>
+        <div id="pg-event-tree">
+          <div class="pg-empty-state" id="pg-empty">
+            <span style="color:var(--text3);font-size:0.9rem;">◈</span>
+            <span>Events appear here as you type.</span>
           </div>
         </div>
-        <div class="phil-card reveal reveal-delay-2">
-          <div class="phil-icon">03</div>
-          <div>
-            <div class="phil-title">Human-readable, machine-precise</div>
-            <div class="phil-desc">
-              A <code>.bvnr</code> file is UTF-8 prose you can read in any editor. The parser validates
-              type and unit annotations on the fly, with no external toolchain required.
-            </div>
-          </div>
-        </div>
-        <div class="phil-card reveal reveal-delay-3">
-          <div class="phil-icon">04</div>
-          <div>
-            <div class="phil-title">Optional typing, well-defined defaults</div>
-            <div class="phil-desc">
-              Omit annotations and get sensible defaults (<code>uint:64</code>, <code>float:64</code>).
-              Add them — including compound units like <code>k~g·m/s²</code> and <code>Gi~B</code>
-              written inline — and every value is validated. Both modes are unambiguous.
-            </div>
-          </div>
+        <div class="pg-error-panel empty" id="pg-error-panel">
+          <div class="pg-error-head">on_error <span class="n" id="pg-error-count"></span></div>
+          <div id="pg-error-list"><div class="pg-error-none">no errors</div></div>
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     THE CORE IDEA — the context travels with the number
+══════════════════════════════════════════════ -->
+<section id="anatomy">
+  <div class="section-inner">
+    <div class="section-label reveal">the core idea</div>
+    <h2 class="section-h2 reveal reveal-delay-1">The context travels <em>with the number.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      In science and industry the costly failures are rarely bad syntax — they are unit confusion:
+      pounds-force read as newtons, feet as meters. The number parses fine; the
+      <code style="font-family:var(--mono);color:var(--c-val)">9.81</code> is right but the context is
+      wrong. Bovnar keeps that context — width, base, and unit — <em>inline</em> with every value, as
+      plain human-readable text with no external schema, and rejects a mismatched unit as a parse
+      error rather than a silent bug.
+    </p>
+
+    <div class="anat-contrast reveal reveal-delay-2">
+      <div class="anat-bare">
+        <div class="anat-tag">a number, no context</div>
+        <div class="anat-code">9.81</div>
+        <div class="anat-note">Width? Base? Unit? Anyone's guess without an out-of-band schema or naming convention.</div>
+      </div>
+      <div class="anat-arrow">→</div>
+      <div class="anat-rich">
+        <div class="anat-tag">a value, in context</div>
+        <div class="anat-code"><div class="anat-line"><span class="c-sigil">.</span><span class="c-key">thrust</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="tok-label c-type" data-label="type">float</span><span class="c-semi">:</span><span class="tok-label c-param" data-label="bit-width">64</span><span class="c-semi">,</span><span class="tok-label c-unit" data-label="unit">k~g·m·s⁻²</span><span class="c-ann">&gt;</span> <span class="c-val">9.81</span><span class="c-semi">;</span></div></div>
+        <div class="anat-note">Type, width, and unit ride <b>inline, in the same byte stream</b> as the value. No schema, no codegen, no lookup table.</div>
+      </div>
+    </div>
+
+    <div class="anat-pillars reveal reveal-delay-3">
+      <div class="anat-pillar">
+        <div class="anat-pillar-h"><span class="n">01</span> Bit-width</div>
+        <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span></div>
+        <div class="anat-pillar-d">Exact storage width, 8&ndash;64 bits. A <code>uint:16</code> can never silently widen into a 64-bit float.</div>
+      </div>
+      <div class="anat-pillar">
+        <div class="anat-pillar-h"><span class="n">02</span> Numeric base</div>
+        <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_2</span><span class="c-ann">&gt;</span> <span class="c-val">11001010</span></div>
+        <div class="anat-pillar-d">Binary, hex, or decimal &mdash; the radix is declared, so <code>11001010</code> is never mistaken for a decimal.</div>
+      </div>
+      <div class="anat-pillar">
+        <div class="anat-pillar-h"><span class="n">03</span> Physical unit</div>
+        <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g·m·s⁻²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span></div>
+        <div class="anat-pillar-d">SI base &amp; derived units, IEC prefixes, and compound expressions &mdash; validated by the parser, not the reader.</div>
+      </div>
+    </div>
+
+    <p class="section-p reveal reveal-delay-3" style="margin-top:1.6rem;max-width:760px;">
+      All of it is optional: omit annotations for well-defined defaults (<code>uint:64</code>,
+      <code>float:64</code>), or add them for full parser validation. Both modes are unambiguous —
+      and a <code>.bvnr</code> file stays UTF-8 prose you can read in any editor, no toolchain required.
+    </p>
   </div>
 </section>
 
@@ -3108,8 +3034,7 @@ a[data-doc] { cursor: pointer; }
     <div class="section-label reveal">syntax</div>
     <h2 class="section-h2 reveal reveal-delay-1">The grammar of <em>precision.</em></h2>
     <p class="section-p reveal reveal-delay-2">
-      Every assignment is a declaration. The type annotation is not metadata —
-      it is part of the value itself.
+      Every assignment is a declaration: the annotation is part of the value, not a note about it.
     </p>
 
     <div class="syntax-grid">
@@ -3268,7 +3193,7 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
     <div class="section-label reveal">quick-start</div>
     <h2 class="section-h2 reveal reveal-delay-1">Up in <em>minutes.</em></h2>
 
-    <div style="margin-top:2.5rem;" class="reveal reveal-delay-2">
+    <div style="margin-top:1.5rem;" class="reveal reveal-delay-2">
       <div class="quickstart-tabs">
         <button class="qs-tab active" onclick="showTab('c')">C99 API</button>
         <button class="qs-tab" onclick="showTab('python')">Python</button>
@@ -3465,209 +3390,6 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </section>
 
 <!-- ══════════════════════════════════════════════
-     NUMPY BRIDGE
-══════════════════════════════════════════════ -->
-<section id="numpy">
-  <div class="section-inner">
-    <div class="section-label reveal">python · scientific computing</div>
-    <h2 class="section-h2 reveal reveal-delay-1">Straight into <em>NumPy</em> &mdash; units and all.</h2>
-    <p class="section-p reveal reveal-delay-2">
-      A unit-tagged Bovnar array is already the shape of a tensor. The optional
-      NumPy bridge reads it directly into an <code>ndarray</code> &mdash; native
-      dtype, original shape, and the physical unit carried alongside &mdash; so
-      the wire format and your analysis code never disagree about what a number
-      means.
-    </p>
-
-    <div class="np-pipeline reveal reveal-delay-2">
-      <div class="np-stage">
-        <div class="np-stage-label">accel_log.bvnr &mdash; on the wire</div>
-        <div class="code-block"><span class="c-sigil">.</span><span class="c-key">accel</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span>
-  <span class="c-struct">[</span><span class="c-val">9.81</span><span class="c-semi">,</span> <span class="c-val">0.02</span><span class="c-semi">,</span> <span class="c-val">-9.79</span><span class="c-struct">]</span><span class="c-semi">/</span>
-  <span class="c-struct">[</span><span class="c-val">0.05</span><span class="c-semi">,</span> <span class="c-val">9.80</span><span class="c-semi">,</span> <span class="c-val">0.01</span><span class="c-struct">]</span><span class="c-semi">;</span>
-<span class="c-comment"># self-describing: type,
-# width and unit travel
-# with the payload</span></div>
-      </div>
-
-      <div class="np-arrow">
-        <div class="np-arrow-call">bovnar.to_numpy(<br>&nbsp;&nbsp;src, return_unit=True)</div>
-        <div class="np-arrow-glyph">&rarr;</div>
-      </div>
-
-      <div class="np-stage">
-        <div class="np-stage-label">numpy.ndarray &mdash; in memory</div>
-        <div class="np-array">
-          <div class="np-array-meta">shape <b>(2, 3)</b> &nbsp;·&nbsp; dtype <b>float64</b></div>
-          <div class="np-grid">
-            <div class="np-cell">9.81</div>
-            <div class="np-cell">0.02</div>
-            <div class="np-cell">-9.79</div>
-            <div class="np-cell">0.05</div>
-            <div class="np-cell">9.80</div>
-            <div class="np-cell">0.01</div>
-          </div>
-          <div class="np-unit-badge"><b>unit</b> &nbsp;m/s²</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="np-payoff reveal reveal-delay-3">
-      <div class="np-benefit">
-        <div class="np-benefit-icon">[ ]</div>
-        <div class="np-benefit-title">Zero glue code</div>
-        <div class="np-benefit-desc">
-          The wire array becomes a vectorized <code>ndarray</code> in a single
-          call. <code>/</code>-rows and bracket nesting collapse to the same
-          shape automatically.
-        </div>
-      </div>
-      <div class="np-benefit">
-        <div class="np-benefit-icon">⚖</div>
-        <div class="np-benefit-title">Units never drift</div>
-        <div class="np-benefit-desc">
-          The unit is returned beside the data &mdash; never baked into values.
-          Mixed units or dtypes <em>raise</em> instead of silently corrupting the
-          math.
-        </div>
-      </div>
-      <div class="np-benefit">
-        <div class="np-benefit-icon">⇄</div>
-        <div class="np-benefit-title">Round-trips losslessly</div>
-        <div class="np-benefit-desc">
-          Write results back with <code>from_numpy</code> /
-          <code>array_to_bvnr</code> &mdash; dtype and unit preserved. A pint
-          hand-off (<code>to_pint_array</code>) is one call further.
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════════
-     USE CASES
-══════════════════════════════════════════════ -->
-<section id="usecases">
-  <div class="section-inner">
-    <div class="section-label reveal">applications</div>
-    <h2 class="section-h2 reveal reveal-delay-1">Where the wrong unit is a <em>failure.</em></h2>
-
-    <div class="usecases-grid">
-      <div class="usecase-card reveal">
-        <div class="usecase-num">01</div>
-        <div>
-          <div class="usecase-title">Scientific Instrumentation &amp; Metrology</div>
-          <div class="usecase-desc">
-            Measurements carry explicit, validated physical units with the payload. No schema, no
-            naming convention, no lab notebook needed to interpret a reading — or to catch a
-            unit mismatch before it reaches analysis.
-          </div>
-          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">acceleration</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">9.807</span><span class="c-semi">;</span></div>
-        </div>
-      </div>
-      <div class="usecase-card reveal reveal-delay-1">
-        <div class="usecase-num">02</div>
-        <div>
-          <div class="usecase-title">Industrial Telemetry &amp; IoT</div>
-          <div class="usecase-desc">
-            The streaming parser has a small, allocation-friendly footprint — no heap required
-            for the lexer. Sensor frames carry their units; resync mode handles unreliable
-            field transports gracefully.
-          </div>
-          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">temp</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span> <span class="c-val">23.5</span><span class="c-semi">;</span> <span class="c-sigil">.</span><span class="c-key">vcc</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">V</span><span class="c-ann">&gt;</span> <span class="c-val">3.31</span><span class="c-semi">;</span></div>
-        </div>
-      </div>
-      <div class="usecase-card reveal">
-        <div class="usecase-num">03</div>
-        <div>
-          <div class="usecase-title">Typed Configuration Files</div>
-          <div class="usecase-desc">
-            Typed values eliminate range ambiguity. A <code>&lt;uint:16&gt;</code> port number
-            cannot accidentally become a 64-bit float. Optional annotations; sensible defaults.
-          </div>
-          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">port</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">5432</span><span class="c-semi">;</span> <span class="c-sigil">.</span><span class="c-key">timeout</span> <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">s</span><span class="c-ann">&gt;</span> <span class="c-val">2.5</span><span class="c-semi">;</span></div>
-        </div>
-      </div>
-      <div class="usecase-card reveal reveal-delay-1">
-        <div class="usecase-num">04</div>
-        <div>
-          <div class="usecase-title">Mixed Text + Binary Payloads</div>
-          <div class="usecase-desc">
-            Log entries with attached raw memory dumps, firmware images, or sensor frames
-            coexist in the same document. No Base64 overhead; octet streams are native.
-          </div>
-          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">frame_data</span> <span class="c-eq">=</span> <span class="c-str">\x00 … raw bytes … \x00</span><span class="c-semi">;</span></div>
-        </div>
-      </div>
-      <div class="usecase-card reveal">
-        <div class="usecase-num">05</div>
-        <div>
-          <div class="usecase-title">Multi-dimensional &amp; Tabular Data</div>
-          <div class="usecase-desc">
-            Matrices, image frames, time-series batches — any tabular structure where rows
-            are a natural unit. The <code>/</code> separator
-            creates new rows; the result is a 3×3 matrix or any rectangular array — and the
-            Python <code>NumPy</code> bridge loads it into an <code>ndarray</code> in one call.
-          </div>
-          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">matrix</span>   <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,2,3</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">4,5,6</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">7,8,9</span><span class="c-struct">]</span><span class="c-semi">;</span>
-<span class="c-sigil">.</span><span class="c-key">rotation</span> <span class="c-eq">=</span> <span class="c-struct">[</span><span class="c-val">1,0,0</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">0,1,0</span><span class="c-struct">]</span><span class="c-semi">/</span><span class="c-struct">[</span><span class="c-val">0,0,1</span><span class="c-struct">]</span><span class="c-semi">;</span></div>
-        </div>
-      </div>
-      <div class="usecase-card reveal reveal-delay-1">
-        <div class="usecase-num">06</div>
-        <div>
-          <div class="usecase-title">Long-term Archival</div>
-          <div class="usecase-desc">
-            Self-describing data stays interpretable without an out-of-band schema, even years
-            after the original application is gone. The file itself is the documentation.
-          </div>
-          <div class="usecase-example"><span class="c-sigil">.</span><span class="c-key">spec_version</span> <span class="c-eq">=</span> <span class="c-str">"bovnar-1.0"</span><span class="c-semi">;</span> <span class="c-comment"># always readable</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════════
-     CONFORMANCE TRUST BAR
-══════════════════════════════════════════════ -->
-<div class="conformance-bar">
-  <div class="conformance-inner">
-    <div class="conf-badge reveal">
-      <div class="conf-icon">✓</div>
-      <div>
-        <div class="conf-title">Formally Specified</div>
-        <div class="conf-sub">Full EBNF grammar. Unambiguous.</div>
-      </div>
-    </div>
-    <div class="conf-badge reveal reveal-delay-1">
-      <div class="conf-icon">⚡</div>
-      <div>
-        <div class="conf-title">180+ Conformance Tests</div>
-        <div class="conf-sub">TAP output. CTest integrated.</div>
-      </div>
-    </div>
-    <div class="conf-badge reveal reveal-delay-2">
-      <div class="conf-icon">⊕</div>
-      <div>
-        <div class="conf-title">Verifiable by Any Impl.</div>
-        <div class="conf-sub">Open IUT protocol. Fork and test.</div>
-      </div>
-    </div>
-    <div class="conf-badge reveal reveal-delay-3">
-      <div class="conf-icon">⬡</div>
-      <div>
-        <div class="conf-title">14 Test Suites</div>
-        <div class="conf-sub">Unit, roundtrip, fuzz, benchmark.</div>
-      </div>
-    </div>
-    <a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool" class="conf-cta reveal reveal-delay-4">
-      Read the Conformance Spec →
-    </a>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
      DOCS
 ══════════════════════════════════════════════ -->
 <section id="docs">
@@ -3675,9 +3397,8 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     <div class="section-label reveal">documentation</div>
     <h2 class="section-h2 reveal reveal-delay-1">Everything you need to <em>ship.</em></h2>
     <p class="section-p reveal reveal-delay-2">
-      Nine documents covering every layer of the stack — from a five-minute tutorial
-      to the formal EBNF grammar and the independent conformance verification protocol.
-      Read them inline below, or <a href="#doc-downloads" class="inline-link">download the full set as PDF</a>.
+      Nine documents — from a five-minute tutorial to the formal EBNF grammar and conformance
+      protocol. Read inline below, or <a href="#doc-downloads" class="inline-link">download the full set as PDF</a>.
     </p>
     <div class="docs-grid">
       <a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial" class="doc-card reveal">
@@ -3774,61 +3495,6 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <li><a href="doc/pdf/bovnar-conformance.pdf"     download aria-label="Download the Conformance Test Tool reference as PDF"><span class="doc-dl-num">07</span> Conformance Test Tool <span class="doc-dl-ext">PDF</span></a></li>
         <li><a href="doc/pdf/bovnar-cheatsheet.pdf"      download aria-label="Download the Units and Currencies reference as PDF"><span class="doc-dl-num">08</span> Units &amp; Currencies Reference <span class="doc-dl-ext">PDF</span></a></li>
       </ul>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════════
-     PLAYGROUND
-══════════════════════════════════════════════ -->
-<section id="playground">
-  <div class="section-inner" style="padding-bottom:3rem;">
-    <div class="section-label reveal">live parser</div>
-    <h2 class="section-h2 reveal reveal-delay-1">Parse events, <em>as you type.</em></h2>
-    <p class="section-p reveal reveal-delay-2">
-      Type any valid (or invalid) Bovnar below. The parser emits events in real time —
-      every token, type annotation, and error is shown as it is recognised.
-    </p>
-
-    <div class="playground-layout reveal reveal-delay-3">
-      <!-- ── editor ── -->
-      <div class="pg-editor-col">
-        <div class="pg-col-header">
-          <span class="pg-col-title">Editor</span>
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
-            <span class="pg-col-badge" id="pg-status">ready</span>
-          </div>
-        </div>
-        <div class="pg-editor-wrap">
-          <div id="pg-highlight" aria-hidden="true"></div>
-          <textarea id="pg-editor" spellcheck="false" autocomplete="off" autocorrect="off"
-            placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
-          ></textarea>
-        </div>
-        <div style="display:flex;flex-wrap:nowrap;gap:0.3rem;padding:0.55rem 0.85rem;background:var(--panel-bg);border-top:1px solid var(--border);">
-          <button class="pg-example-btn" data-example="typed">Typed</button>
-          <button class="pg-example-btn" data-example="units">Units</button>
-          <button class="pg-example-btn" data-example="struct">Struct</button>
-          <button class="pg-example-btn" data-example="array">Array</button>
-          <button class="pg-example-btn" data-example="strings">Strings</button>
-          <button class="pg-example-btn" data-example="errors">Errors</button>
-        </div>
-      </div>
-
-      <!-- ── event log ── -->
-      <div class="pg-events-col">
-        <div class="pg-col-header">
-          <span class="pg-col-title">Event Stream</span>
-          <span class="pg-col-badge" id="pg-ev-count">0 events</span>
-          <button class="pg-clear-btn" id="pg-clear">clear</button>
-        </div>
-        <div id="pg-event-log">
-          <div class="pg-empty-state" id="pg-empty">
-            <span style="color:var(--text3);font-size:0.9rem;">◈</span>
-            <span>Events appear here as you type.</span>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </section>
@@ -3939,28 +3605,93 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </div>
 </div>
 
-<script src="bovnar_parser.js?v=20260530"></script>
-<script src="bovnar_highlight.js?v=20260530"></script>
+<script src="bovnar_units.js?v=20260603"></script>
+<script src="bovnar_parser.js?v=20260603p"></script>
+<script src="bovnar_highlight.js?v=20260603"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
-  const EV = BovnarParser.EV;
-  const parse = BovnarParser.parseBovnar;
+  const parseF = BovnarParser.parseFaithful;
 
   const editor   = document.getElementById('pg-editor');
   const hlDiv    = document.getElementById('pg-highlight');
-  const log      = document.getElementById('pg-event-log');
+  const gutter   = document.getElementById('pg-gutter');
+  const overlay  = document.getElementById('pg-error-overlay');
+  const treeEl   = document.getElementById('pg-event-tree');
   const empty    = document.getElementById('pg-empty');
   const countEl  = document.getElementById('pg-ev-count');
   const statusEl = document.getElementById('pg-status');
   const clearBtn = document.getElementById('pg-clear');
+  const errPanel = document.getElementById('pg-error-panel');
+  const errList  = document.getElementById('pg-error-list');
+  const errCount = document.getElementById('pg-error-count');
 
   /* ── Syntax highlighter — shared, vim-consistent (bovnar_highlight.js) ── */
   function highlightBovnar(src) { return BovnarHighlight.highlight(src); }
 
+  /* lines (1-based) flagged in the gutter; marks = first-char of each error */
+  let errorLines = new Set();
+  let errorMarks = [];   /* [{ line, col }] — the character that produced the error */
+
+  /* width of one (monospace) character in the editor font */
+  function charWidth() {
+    const cs = getComputedStyle(editor);
+    const ctx = (charWidth._c || (charWidth._c = document.createElement('canvas').getContext('2d')));
+    ctx.font = cs.fontSize + ' ' + cs.fontFamily;
+    return ctx.measureText('0').width || (parseFloat(cs.fontSize) * 0.6);
+  }
+
+  function renderGutter() {
+    const n = editor.value.split('\n').length;
+    let h = '';
+    for (let i = 1; i <= n; i++)
+      h += `<span class="pg-gutter-num${errorLines.has(i) ? ' err' : ''}">${i}</span>`;
+    gutter.innerHTML = h;
+    gutter.scrollTop = editor.scrollTop;
+  }
+
+  /* red mark on the single character that produced each error */
+  function renderErrorOverlay() {
+    overlay.innerHTML = '';
+    if (!errorMarks.length) return;
+    const cs = getComputedStyle(editor);
+    const lh = parseFloat(cs.lineHeight) || 18;
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const cw = charWidth();
+    errorMarks.forEach(function (m) {
+      const bar = document.createElement('div');
+      bar.className = 'pg-err-char';
+      bar.style.top = (padTop + (m.line - 1) * lh - editor.scrollTop) + 'px';
+      bar.style.left = ((m.col - 1) * cw - editor.scrollLeft) + 'px';
+      bar.style.width = cw + 'px';
+      bar.style.height = lh + 'px';
+      overlay.appendChild(bar);
+    });
+  }
+
   function syncHighlight() {
     hlDiv.innerHTML = highlightBovnar(editor.value) + '\n';
-    hlDiv.scrollTop = editor.scrollTop;
+    hlDiv.scrollTop  = editor.scrollTop;
+    hlDiv.scrollLeft = editor.scrollLeft;
+    renderGutter();
+  }
+
+  /* place the caret at line:col and scroll it into view (used by on_error rows) */
+  function jumpTo(line, col) {
+    const lines = editor.value.split('\n');
+    let idx = 0;
+    for (let i = 0; i < line - 1 && i < lines.length; i++) idx += lines[i].length + 1;
+    idx = Math.min(idx + Math.max(0, col - 1), editor.value.length);
+    editor.focus();
+    editor.setSelectionRange(idx, idx);
+    const lh = parseFloat(getComputedStyle(editor).lineHeight) || 16;
+    editor.scrollTop = Math.max(0, (line - 1) * lh - editor.clientHeight / 2);
+    /* bring the target column into view horizontally (wrap=off) */
+    const x = (col - 1) * charWidth();
+    if (x < editor.scrollLeft || x > editor.scrollLeft + editor.clientWidth - 40)
+      editor.scrollLeft = Math.max(0, x - editor.clientWidth / 2);
+    syncHighlight();
+    renderErrorOverlay();
   }
 
   /* ── Example presets ─────────────────────────────────────────────── */
@@ -3973,21 +3704,26 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
     struct: `# Nested struct
 .sensor = {
-    .id   = <uint:16> 7;
-    .name = "pressure_01";
+    .id    = <uint:16> 7;
+    .value = 101.325 k~Pa;
 };`,
 
-    array: `# Arrays
-.rgb  = [255, 128, 0];
-.size = [16, 9];`,
+    array: `# 3x3 matrix (rows separated by /)
+.matrix = [1, 2, 3]/
+          [4, 5, 6]/
+          [7, 8, 9];`,
 
-    strings: `# Strings
-.greeting = "hello world";
-.path     = "/usr/local/bin";`,
+    defaults: `# Bare values get the validator's
+# synthesised default annotation:
+.count  = 42;
+.mass   = 142.6 k~g;
+.label  = "sensor-01";
+.active = true;`,
 
-    errors: `# These trigger parser errors (shown in red)
-.valid = 42;
-.missing_gt = <uint:32 99;`,
+    errors: `# Each surfaces on the on_error channel
+.small = <uint:8> 999;
+.speed = <float:64,m/s> 9.81 ft;
+.bits  = <uint:32,_2> 11201;`,
   };
 
   /* ── Rendering helpers ───────────────────────────────────────────── */
@@ -3998,110 +3734,169 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
       .replace(/>/g, '&gt;');
   }
 
-  const EV_CLASS = {
-    [EV.STREAM_START]:     'ev-stream',
-    [EV.STREAM_END]:       'ev-stream',
-    [EV.ASSIGNMENT_START]: 'ev-assignment',
-    [EV.ASSIGNMENT_END]:   'ev-assignment',
-    [EV.TYPE_ANN_START]:   'ev-typeann',
-    [EV.TYPE_ANN_FAMILY]:  'ev-typeann',
-    [EV.TYPE_ANN_PARAM]:   'ev-typeann',
-    [EV.TYPE_ANN_END]:     'ev-typeann',
-    [EV.STRUCT_START]:     'ev-struct',
-    [EV.STRUCT_END]:       'ev-struct',
-    [EV.ARRAY_ROW_START]:  'ev-array',
-    [EV.ARRAY_ROW_END]:    'ev-array',
-    [EV.ARRAY_DIM_START]:  'ev-array',
-    [EV.DATA]:             'ev-data',
-    [EV.OCTET_STREAM_START]: 'ev-array',
-    [EV.OCTET_STREAM_END]:   'ev-array',
-    [EV.ERROR]:            'ev-error',
-  };
-
-  function detail(ev) {
-    const d = ev.data;
-    switch (ev.type) {
-      case EV.ASSIGNMENT_START:
-      case EV.ASSIGNMENT_END:
-        return `<span class="pg-ev-key">.${esc(d.key)}</span>`;
-
-      case EV.TYPE_ANN_FAMILY:
-        return `<span class="pg-ev-fam">${esc(d.family)}</span>`;
-
-      case EV.TYPE_ANN_PARAM: {
-        const kindColor = d.kind === 'unit' ? 'pg-ev-unit' : 'pg-ev-num';
-        return `<span class="pg-ev-sym">${esc(d.kind)}</span>`
-             + `<span class="pg-ev-null"> → </span>`
-             + `<span class="${kindColor}">${esc(d.text)}</span>`;
-      }
-
-      case EV.DATA: {
-        if (d.kind === 'null') return `<span class="pg-ev-null">null</span>`;
-        if (d.kind === 'string') {
-          const val = `<span class="pg-ev-str">"${esc(d.value.length > 40 ? d.value.slice(0,40)+'…' : d.value)}"</span>`;
-          return val + (d.unit ? ` <span class="pg-ev-unit">${esc(d.unit)}</span>` : '');
-        }
-        if (d.kind === 'number') {
-          return `<span class="pg-ev-num">${esc(d.value)}</span>`
-               + (d.unit ? ` <span class="pg-ev-unit">${esc(d.unit)}</span>` : '');
-        }
-        if (d.kind === 'special')
-          return `<span class="pg-ev-num">$${esc(d.value)}$</span>`;
-        if (d.kind === 'symbol')
-          return `<span class="pg-ev-sym">${esc(d.value)}</span>`;
-        if (d.kind === 'reference')
-          return `<span class="pg-ev-ref">&amp;${esc(d.value)}</span>`;
-        return '';
-      }
-
-      case EV.ERROR:
-        return `<span style="color:var(--red)">${esc(d.msg)}</span>`;
-
-      default:
-        return '';
-    }
+  /* ── Tree builders (faithful C on_verified stream, grouped per assignment) ── */
+  function el(tag, cls, html) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
   }
-
-  function typeLabel(type) {
-    return type.replace(/^ev_/, '').replace(/_/g, '_');
+  function evName(n, title) {
+    return `<span class="pg-ev-name"${title ? ` title="${esc(title)}"` : ''}>${n}</span>`;
+  }
+  function branch(labelHTML, kids, summaryHTML) {
+    const node = el('div', 'pg-node');
+    if (kids && kids.length) {
+      node.classList.add('collapsed');   /* every branch starts collapsed */
+      const row = el('div', 'pg-row branch');
+      const tw = el('span', 'pg-tw br');
+      const lab = el('span'); lab.innerHTML = labelHTML + (summaryHTML || '');
+      row.appendChild(tw); row.appendChild(lab); node.appendChild(row);
+      const ch = el('div', 'pg-children');
+      kids.forEach((k) => ch.appendChild(k));
+      node.appendChild(ch);
+      /* whole row toggles — clicks on child rows live in .pg-children, a
+         sibling of this row, so they never bubble through it */
+      row.addEventListener('click', function () { node.classList.toggle('collapsed'); });
+      return node;
+    }
+    const row = el('div', 'pg-row');
+    const tw = el('span', 'pg-tw leaf', '•');
+    const lab = el('span'); lab.innerHTML = labelHTML;
+    row.appendChild(tw); row.appendChild(lab); node.appendChild(row);
+    return node;
+  }
+  function leaf(labelHTML) {
+    const node = el('div', 'pg-node');
+    const row = el('div', 'pg-row');
+    const tw = el('span', 'pg-tw leaf', '•');
+    const lab = el('span'); lab.innerHTML = labelHTML;
+    row.appendChild(tw); row.appendChild(lab); node.appendChild(row);
+    return node;
+  }
+  function vtStr(vt, unit) {
+    if (vt && vt.familyName && vt.familyName !== 'plain') {
+      let s = vt.familyName + (vt.width != null ? ':' + vt.width : '');
+      if (unit) s += ', ' + unit;
+      return ` <span class="pg-vt">‹${esc(s)}›</span>`;
+    }
+    return unit ? ` <span class="pg-vt">‹${esc(unit)}›</span>` : '';
+  }
+  function valueText(v) {
+    if (v.type === 'null') return `<span class="pg-dnull">null</span>`;
+    if (v.type === 'reference') return `<span class="pg-dref">${esc(v.text)}</span>`;
+    if (v.kind === 'string') {
+      const t = v.text.length > 48 ? v.text.slice(0, 48) + '…' : v.text;
+      return `<span class="pg-dstr">"${esc(t)}"</span>`;
+    }
+    if (v.kind === 'bool' || v.kind === 'symbol') return `<span class="pg-dsym">${esc(v.text)}</span>`;
+    return `<span class="pg-dnum">${esc(v.text)}</span>`;   /* number / special */
+  }
+  function renderAnn(ann) {
+    const tag = ann.synthesized
+      ? `<span class="pg-ann-tag synth">✦ synthesised</span>`
+      : `<span class="pg-ann-tag">explicit</span>`;
+    const kids = [];
+    kids.push(leaf(`<span class="pg-lk">family</span><span class="pg-lv">${esc(ann.family)}</span>`));
+    for (const p of ann.params) {
+      const v = p.kind === 'unit'
+        ? esc(p.text)
+        : esc(String(p.text != null ? p.text : '').replace(/^_/, ''));
+      kids.push(leaf(`<span class="pg-lk" title="ev_type_annotation_type_family_parameter">`
+        + `${esc(p.kind)}</span><span class="pg-lv">${v}</span>`));
+    }
+    return branch(`<span title="ev_type_annotation_start … ev_type_annotation_end">`
+      + `type annotation</span> ${tag}`, kids);
+  }
+  function valuePreview(v) {
+    if (v.type === 'scalar' || v.type === 'null' || v.type === 'reference')
+      return valueText(v) + vtStr(v.valueType, v.valueUnit);
+    if (v.type === 'struct')
+      return `<span class="pg-arr-tag">{ ${v.children.length} field`
+        + `${v.children.length !== 1 ? 's' : ''} }</span>`;
+    if (v.type === 'array') {
+      const c = v.rows[0] ? v.rows[0].elements.length : 0;
+      return `<span class="pg-arr-tag">[ ${v.rows.length}×${c} ]</span>`;
+    }
+    if (v.type === 'octet') return `<span class="pg-arr-tag">⟨ ${v.total} bytes ⟩</span>`;
+    return '';
+  }
+  function renderValue(v) {
+    if (v.type === 'scalar' || v.type === 'null' || v.type === 'reference')
+      return leaf(`${evName('ev_data')} ${valueText(v)}${vtStr(v.valueType, v.valueUnit)}`);
+    if (v.type === 'struct') {
+      const kids = v.children.map(renderAssign);
+      return branch(`${evName('ev_struct_start')} <span class="pg-arr-tag">`
+        + `${v.children.length} field${v.children.length !== 1 ? 's' : ''}</span>`, kids);
+    }
+    if (v.type === 'array') {
+      const cols = v.rows[0] ? v.rows[0].elements.length : 0;
+      const kids = v.rows.map(function (row, k) {
+        const cells = row.elements.map((e) => e.type === 'array' ? '[…]' : valueText(e))
+          .join('<span class="pg-dnull">, </span>');
+        return leaf(`${evName('ev_array_row_start')} <span class="pg-arr-tag">row ${k}</span> `
+          + `[ ${cells} ]`);
+      });
+      return branch(`${evName('ev_array_row_start')} <span class="pg-arr-tag">`
+        + `${v.rows.length}×${cols}${v.dims > 1 ? ' · ' + v.dims + ' dims' : ''}</span>`, kids);
+    }
+    if (v.type === 'octet') {
+      const kids = v.chunks.map((c, k) => leaf(`${evName('ev_data')} `
+        + `<span class="pg-arr-tag">chunk ${k}</span> <span class="pg-dnum">${c.length} bytes</span>`));
+      return branch(`${evName('ev_octet_stream_start')} <span class="pg-arr-tag">`
+        + `${v.total} bytes</span>`, kids);
+    }
+    return leaf(evName('ev_data'));
+  }
+  function renderAssign(a) {
+    const kids = [];
+    if (a.ann) kids.push(renderAnn(a.ann));
+    kids.push(renderValue(a.value));
+    const summary = `<span class="pg-summary"> = ${valuePreview(a.value)}</span>`;
+    return branch(`<span class="pg-key2">·${esc(a.key)}</span> ${evName('ev_assignment_start')}`,
+      kids, summary);
   }
 
   /* ── Parse & render ──────────────────────────────────────────────── */
-  let evCount = 0;
-  let hasErrors = false;
-
   function runParse(text) {
-    log.innerHTML = '';
-    evCount = 0;
-    hasErrors = false;
-
-    /* Collect all events so we can render newest-first. */
-    const evList = [];
-    parse(text, function (ev) {
-      evCount++;
-      if (ev.type === EV.ERROR) hasErrors = true;
-      evList.push(ev);
-    });
-
+    const res = parseF(text);
+    treeEl.innerHTML = '';
     const frag = document.createDocumentFragment();
-    for (let i = evList.length - 1; i >= 0; i--) {
-      const ev = evList[i];
-      const row = document.createElement('div');
-      const cls = EV_CLASS[ev.type] || '';
-      const isErr = ev.type === EV.ERROR;
-      row.className = 'pg-ev' + (isErr ? ' is-error' : '');
-      row.innerHTML =
-        `<span class="pg-ev-pos">${ev.line}:${ev.col}</span>` +
-        `<span class="pg-ev-type ${cls}">${esc(typeLabel(ev.type))}</span>` +
-        `<span class="pg-ev-detail">${detail(ev)}</span>`;
-      frag.appendChild(row);
+    frag.appendChild(leaf(evName('ev_stream_start')));
+    res.tree.children.forEach((a) => frag.appendChild(renderAssign(a)));
+    frag.appendChild(leaf(evName('ev_stream_end')));
+    treeEl.appendChild(frag);
+
+    countEl.textContent = res.events.length + ' event' + (res.events.length !== 1 ? 's' : '');
+
+    if (res.errors.length) {
+      errPanel.classList.remove('empty');
+      errCount.textContent = '· ' + res.errors.length;
+      errList.innerHTML = '';
+      res.errors.forEach(function (e) {
+        const row = el('div', 'pg-error-row',
+          `<span class="pg-error-pos" title="line ${e.line}, column ${e.col}">`
+          + `${e.line}:${e.col}</span>`
+          + `<span class="pg-error-code">${esc(e.code)}</span>`
+          + `<span class="pg-error-num">#${e.codeNum}</span>`);
+        row.title = 'jump to line ' + e.line + ', column ' + e.col;
+        row.addEventListener('click', function () { jumpTo(e.line, e.col); });
+        errList.appendChild(row);
+      });
+    } else {
+      errPanel.classList.add('empty');
+      errCount.textContent = '';
+      errList.innerHTML = '<div class="pg-error-none">no errors</div>';
     }
 
-    log.appendChild(frag);
+    errorLines = new Set(res.errors.map((e) => e.line));
+    errorMarks = res.errors.map((e) => ({ line: e.line, col: e.col }));
+    renderGutter();
+    renderErrorOverlay();
+
+    statusEl.textContent = res.errors.length ? 'errors' : 'ok';
+    statusEl.style.color = res.errors.length ? 'var(--red)' : 'var(--teal)';
     empty.style.display = 'none';
-    countEl.textContent = evCount + ' event' + (evCount !== 1 ? 's' : '');
-    statusEl.textContent = hasErrors ? 'errors' : 'ok';
-    statusEl.style.color = hasErrors ? 'var(--red)' : 'var(--teal)';
   }
 
   /* ── Debounce ────────────────────────────────────────────────────── */
@@ -4111,20 +3906,38 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     timer = setTimeout(function () {
       const text = editor.value;
       if (!text.trim()) {
-        log.innerHTML = '';
-        log.appendChild(empty);
+        treeEl.innerHTML = '';
+        treeEl.appendChild(empty);
         empty.style.display = 'flex';
         countEl.textContent = '0 events';
         statusEl.textContent = 'ready';
         statusEl.style.color = '';
+        errPanel.classList.add('empty');
+        errCount.textContent = '';
+        errList.innerHTML = '<div class="pg-error-none">no errors</div>';
+        errorLines = new Set();
+        errorMarks = [];
+        renderGutter();
+        renderErrorOverlay();
         return;
       }
       runParse(text);
     }, 80);
   }
 
-  editor.addEventListener('input', function () { syncHighlight(); schedParse(); });
-  editor.addEventListener('scroll', function () { hlDiv.scrollTop = editor.scrollTop; });
+  editor.addEventListener('input', function () {
+    /* the marks belong to the previous text — drop them so a stale red box
+       can't sit at the wrong place during the debounce window */
+    overlay.innerHTML = '';
+    syncHighlight();
+    schedParse();
+  });
+  editor.addEventListener('scroll', function () {
+    hlDiv.scrollTop  = editor.scrollTop;
+    hlDiv.scrollLeft = editor.scrollLeft;   /* horizontal sync (wrap=off) */
+    gutter.scrollTop = editor.scrollTop;     /* gutter only scrolls vertically */
+    renderErrorOverlay();
+  });
   editor.addEventListener('keydown', function (e) {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -4218,6 +4031,14 @@ hljs.registerLanguage('bovnar', function() {
     match: /\b(?:nan|inf|ninf)\b/
   };
 
+  /* Reserved value keywords true/false/on/off/null — reclassified out of the
+     symbol space (on==true, off==false; null is the null keyword). Matched
+     before the generic symbol rule so they colour as keywords, not symbols. */
+  const KEYWORD = {
+    scope: 'bvn-keyword',
+    match: /\b(?:true|false|on|off|null)\b/
+  };
+
   /* Matches leading-dot floats (.5, -.5), integer-led floats (3.14, 1.),
      bare integers (42, -7), and scientific notation (1e6, 2.5e-3). */
   const NUMBER = {
@@ -4285,7 +4106,7 @@ hljs.registerLanguage('bovnar', function() {
     end: /(?=[,;\s\[\]{}#]|$)/,
     beginScope: 'bvn-refop',
     contains: [
-      { scope: 'bvn-refpath', match: /\.[A-Za-z_][A-Za-z0-9_+\-]*/ }
+      { scope: 'bvn-refpath', match: /\.[A-Za-z_\u00C0-\uFFFF][A-Za-z0-9_+\-\u0080-\uFFFF]*/ }
     ]
   };
 
@@ -4295,7 +4116,7 @@ hljs.registerLanguage('bovnar', function() {
      type annotations are inside TYPE_ANN scope; dots in references are
      inside REFERENCE scope — so no false positives in practice. */
   const KEY_SIGIL = {
-    match: [/\./, /[A-Za-z_][A-Za-z0-9_+\-]*/],
+    match: [/\./, /[A-Za-z_\u00C0-\uFFFF][A-Za-z0-9_+\-\u0080-\uFFFF]*/],
     scope: { 1: 'bvn-sigil', 2: 'bvn-key' }
   };
 
@@ -4307,6 +4128,7 @@ hljs.registerLanguage('bovnar', function() {
       COMMENT,
       TYPE_ANN,
       SPECIAL_FLOAT,
+      KEYWORD,
       STRING,
       REFERENCE,
       KEY_SIGIL,
@@ -4316,7 +4138,7 @@ hljs.registerLanguage('bovnar', function() {
       { scope: 'bvn-semi', match: /;/ },
       { scope: 'bvn-ann',  match: /[\[\]{}]/ },
       { scope: 'bvn-sep',  match: /[,\/]/ },
-      { scope: 'bvn-sym',  match: /\b[A-Za-z_][A-Za-z0-9_+\-]*\b/ }
+      { scope: 'bvn-sym',  match: /[A-Za-z_\u00C0-\uFFFF][A-Za-z0-9_+\-\u0080-\uFFFF]*/ }
     ]
   };
 });
@@ -5556,13 +5378,19 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const bid = (sim.last - half).toFixed(dp), ask = (sim.last + half).toFixed(dp), last = sim.last.toFixed(dp), cur = sim.currency;
     const row = (k, v) => '    .' + k.padEnd(7) + ' = ' + v + ';';
     return ['.tick = {', row('seq', '<uint:32> ' + sim.seq), row('ts', '"' + isoUTC(sim.tms) + '"'),
-      row('bid', '<float_dec:64,' + cur + '> ' + bid), row('ask', '<float_dec:64,' + cur + '> ' + ask),
-      row('last', '<float_dec:64,' + cur + '> ' + last), row('volume', '<uint:64> ' + sim.vol), '};'].join('\n');
+      row('bid', '<float_dec:64,$' + cur + '> ' + bid), row('ask', '<float_dec:64,$' + cur + '> ' + ask),
+      row('last', '<float_dec:64,$' + cur + '> ' + last), row('volume', '<uint:64> ' + sim.vol), '};'].join('\n');
   }
   function corrupt(text) {
     const f = ['bid', 'ask', 'last', 'seq'][(rnd() * 4) | 0];
-    if (rnd() < 0.5) return text.replace(new RegExp('(\\.' + f + '\\s+)= '), '$1  ');
-    return text.replace(new RegExp('(\\.' + f + '\\s+= [^;\\n]*)'), '$1 §@!');
+    // Two wire-corruption flavours, both of which the decoder must reject — the
+    // old "append §@!" trick was silently absorbed as an inline unit and slipped
+    // through clean, so half the noisy ticks looked valid:
+    //  - garbled framing: the field's leading '.' is lost, so the record can't
+    //    be located → skipped under resync, sinks the whole tick without it;
+    //  - dropped delimiter: the '=' is gone, so the assignment can't be formed.
+    if (rnd() < 0.5) return text.replace(new RegExp('(\\n\\s*)\\.(' + f + ')\\b'), '$1 $2');
+    return text.replace(new RegExp('(\\.' + f + '\\s+)= '), '$1  ');
   }
   function fill(qty, priceStr) {
     const pm = toMicros(priceStr), pf = parseFloat(priceStr);
@@ -5679,10 +5507,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     .symbol       = "ACME";
     .currency     = USD;
     .decimals     = <uint:8> 2;
-    .start_price  = <float_dec:64,USD> 142.50;
+    .start_price  = <float_dec:64,$USD> 142.50;
     .volatility   = <float_dec:32,%> 1.1;       # per-tick swing
-    .spread       = <float_dec:64,USD> 0.04;
-    .fee_per_fill = <float_dec:64,USD> 0.07;
+    .spread       = <float_dec:64,$USD> 0.04;
+    .fee_per_fill = <float_dec:64,$USD> 0.07;
 };
 
 .strategy = {
@@ -5778,6 +5606,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     Kp: 3, Ki: 0.04, Kd: 6, integ: 0, prevErr: 0, tempMax: 86, pressMax: 3.0, levelMin: 38,
     cyc: 0, dropped: 0, tframe: 0, playing: true, speed: 6, noisy: false, resync: true, mismatch: false,
     hist: [], history: [], lastGood: null,
+    bubbles: [], steam: [], impAng: 0, bubAcc: 0, steamAcc: 0,
   };
 
   const f2 = (n) => n.toFixed(2), f1 = (n) => n.toFixed(1);
@@ -5796,8 +5625,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   function corrupt(text) {
     const f = ['temp', 'pressure', 'level', 'status'][(rnd() * 4) | 0];
-    if (rnd() < 0.5) return text.replace(new RegExp('(\\.' + f + '\\s+)= '), '$1  ');
-    return text.replace(new RegExp('(\\.' + f + '\\s+= [^;\\n]*)'), '$1 §@!');
+    // Two wire-corruption flavours, both of which the decoder must reject — the
+    // old "append §@!" trick was silently absorbed as an inline unit and slipped
+    // through clean, so half the noisy frames looked valid:
+    //  - garbled framing: the register's leading '.' is lost, so the record
+    //    can't be located → skipped under resync, sinks the cycle without it;
+    //  - dropped delimiter: the '=' is gone, so the assignment can't be formed.
+    if (rnd() < 0.5) return text.replace(new RegExp('(\\n\\s*)\\.(' + f + ')\\b'), '$1 $2');
+    return text.replace(new RegExp('(\\.' + f + '\\s+)= '), '$1  ');
   }
 
   function step() {
@@ -5882,41 +5717,169 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
   function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function line(a, b, c, d) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); }
+  // Analog dial gauge with redline arc, needle and value readout. frac/redFrac
+  // are 0..1 along a 270° sweep; `alarm` pulses the value arc when over redline.
+  function drawGauge(cx, cy, R, frac, redFrac, label, valTxt, alarm, tnow) {
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, sweep = a1 - a0;
+    const over = alarm || frac >= redFrac;
+    let col = over ? ((Math.floor(tnow * 4) % 2 === 0) ? '#ff8870' : '#e0533d') : '#7fd1ff';
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = R * 0.16;
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(224,83,61,0.5)'; ctx.lineWidth = R * 0.16;
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0 + sweep * clamp(redFrac, 0, 1), a1); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = R * 0.16; ctx.shadowColor = col; ctx.shadowBlur = over ? 12 : 6;
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0, a0 + sweep * clamp(frac, 0, 1)); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1;
+    for (let k = 0; k <= 10; k++) { const a = a0 + sweep * k / 10, c = Math.cos(a), s = Math.sin(a); ctx.beginPath(); ctx.moveTo(cx + c * R * 1.10, cy + s * R * 1.10); ctx.lineTo(cx + c * R * 1.18, cy + s * R * 1.18); ctx.stroke(); }
+    const av = a0 + sweep * clamp(frac, 0, 1);
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(av) * R * 0.8, cy + Math.sin(av) * R * 0.8); ctx.stroke();
+    ctx.fillStyle = '#cfd6e0'; ctx.beginPath(); ctx.arc(cx, cy, R * 0.11, 0, 6.283); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(160,170,190,0.85)'; ctx.font = '9px JetBrains Mono, monospace'; ctx.fillText(label, cx, cy + R * 0.55);
+    ctx.fillStyle = col; ctx.font = 'bold 13px JetBrains Mono, monospace'; ctx.fillText(valTxt, cx, cy + R * 0.82);
+    ctx.restore();
+  }
+
+  let lastDraw = null;
   function draw() {
-    const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h); ctx.fillStyle = '#0c0e14'; ctx.fillRect(0, 0, w, h);
-    const D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, level: sim.level, heat: sim.heater, flow: sim.flow };
-    const splitY = Math.round(h * 0.60);
-    const tankW = Math.min(110, w * 0.30), tankH = Math.round((splitY - 30) * 0.86);
-    const tx = Math.round(w * 0.40 - tankW / 2), ty = Math.round((splitY - tankH) / 2) + 6;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    const tnow = performance.now() * 0.001;
+    const dt = lastDraw == null ? 0.016 : Math.min(0.05, tnow - lastDraw); lastDraw = tnow;
+    ctx.clearRect(0, 0, w, h);
+    const bgg = ctx.createLinearGradient(0, 0, 0, h); bgg.addColorStop(0, '#0d1018'); bgg.addColorStop(1, '#090b11');
+    ctx.fillStyle = bgg; ctx.fillRect(0, 0, w, h);
+
+    const D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, press: sim.pressure, level: sim.level, heat: sim.heater, flow: sim.flow, agit: sim.agitator };
     const heat = clamp(sim.heater / 100, 0, 1);
-    ctx.fillStyle = 'rgba(232,138,58,' + (0.12 + 0.6 * heat) + ')'; ctx.fillRect(tx - 9, ty + 8, 6, tankH - 16); ctx.fillRect(tx + tankW + 3, ty + 8, 6, tankH - 16);
     const tt = clamp((D.temp - 22) / (95 - 22), 0, 1);
     const cr = Math.round(47 + 170 * tt), cg = Math.round(109 - 11 * tt), cb = Math.round(176 - 129 * tt);
+    const hiT = sim.status & 8, hiP = sim.status & 16, loL = sim.status & 32;
+    const blink = Math.floor(tnow * 4) % 2 === 0;
+
+    const splitY = Math.round(h * 0.58);
+    const tankW = Math.min(96, w * 0.26), tankH = Math.round((splitY - 26) * 0.84);
+    const tx = Math.round(w * 0.30 - tankW / 2), ty = Math.round((splitY - tankH) / 2) + 4;
+    const cxT = tx + tankW / 2;
     const fillH = Math.round(tankH * clamp(D.level, 0, 100) / 100);
-    ctx.fillStyle = 'rgb(' + cr + ',' + cg + ',' + cb + ')'; ctx.fillRect(tx, ty + tankH - fillH, tankW, fillH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; line(tx, ty + tankH - fillH, tx + tankW, ty + tankH - fillH);
-    ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 2; rrect(tx, ty, tankW, tankH, 7); ctx.stroke();
-    const ipx0 = tx + tankW * 0.28; ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 4; line(ipx0, ty - 22, ipx0, ty);
-    const tnow = performance.now() * 0.001;
-    for (let i = 0; i < 3; i++) { const f = ((tnow * 0.6 * (D.flow / 14) + i / 3) % 1); ctx.fillStyle = 'rgba(120,200,255,' + (0.8 * Math.sin(Math.PI * f)) + ')'; ctx.beginPath(); ctx.arc(ipx0, ty - 22 + f * 22, 1.8, 0, 6.283); ctx.fill(); }
+    const fillTop = ty + tankH - fillH;
+
+    // hot glow behind the vessel
+    if (heat > 0.02) {
+      const gg = ctx.createRadialGradient(cxT, ty + tankH * 0.62, 4, cxT, ty + tankH * 0.62, tankW * 1.5);
+      gg.addColorStop(0, 'rgba(232,138,58,' + (0.20 * heat) + ')'); gg.addColorStop(1, 'rgba(232,138,58,0)');
+      ctx.fillStyle = gg; ctx.fillRect(tx - tankW, ty - 24, tankW * 3, tankH + 48);
+    }
+
+    // ── heating jacket (both sides): gradient + pulsing coil ticks ──
+    const jw = 7, jpulse = 0.6 + 0.4 * Math.sin(tnow * 5);
+    function jacket(jx) {
+      const jg = ctx.createLinearGradient(0, ty, 0, ty + tankH);
+      jg.addColorStop(0, 'rgba(232,138,58,' + (0.10 + 0.45 * heat) + ')');
+      jg.addColorStop(0.5, 'rgba(255,170,80,' + (0.16 + 0.65 * heat) + ')');
+      jg.addColorStop(1, 'rgba(232,138,58,' + (0.10 + 0.45 * heat) + ')');
+      ctx.fillStyle = jg; ctx.fillRect(jx, ty + 6, jw, tankH - 12);
+      ctx.strokeStyle = 'rgba(255,205,130,' + (0.25 + 0.55 * heat * jpulse) + ')'; ctx.lineWidth = 1;
+      for (let yy = ty + 10; yy < ty + tankH - 8; yy += 6) line(jx, yy, jx + jw, yy);
+    }
+    jacket(tx - 4 - jw); jacket(tx + tankW + 4);
+
+    // inlet pipe + animated flow droplets (cadence ∝ flow)
+    const inX = tx + tankW * 0.26, fsp = clamp(D.flow / 14, 0.2, 2.5);
+    ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 4; line(inX, ty - 22, inX, ty);
+    for (let i = 0; i < 4; i++) { const f = ((tnow * 0.7 * fsp + i / 4) % 1); ctx.fillStyle = 'rgba(120,200,255,' + (0.85 * Math.sin(Math.PI * f)) + ')'; ctx.beginPath(); ctx.arc(inX, ty - 22 + f * 22, 1.8, 0, 6.283); ctx.fill(); }
+    // outlet pipe
     ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 4; line(tx + tankW * 0.72, ty + tankH, tx + tankW * 0.72, ty + tankH + 16);
-    const cxa = tx + tankW / 2, sTop = ty - 16, sBot = ty + tankH * 0.55;
-    ctx.strokeStyle = '#9aa3b0'; ctx.lineWidth = 2; line(cxa, sTop, cxa, sBot);
-    const ang = sim.cyc * 0.5, pw = tankW * 0.30, k = Math.cos(ang);
-    ctx.strokeStyle = '#4ec9b0'; ctx.lineWidth = 2.5; line(cxa - pw * k, sBot, cxa + pw * k, sBot);
-    ctx.fillStyle = '#3a4150'; ctx.fillRect(cxa - 9, sTop - 9, 18, 9);
-    // trend strip
-    const ty2 = splitY + 6, th2 = h - splitY - 12, x0 = 8, w0 = w - 16;
-    ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(x0, ty2, w0, th2);
-    const A = sim.hist; if (A.length >= 2) {
+
+    // ── liquid + bubbles + impeller, clipped to the vessel interior ──
+    const ampl = 1.2 + 2.4 * clamp((D.agit - 180) / 120, 0, 1) + 2.2 * heat;
+    const wT = tnow * (1.6 + D.agit / 320);
+    const waveY = (i, steps) => fillTop + Math.sin(wT + i * 0.7) * ampl + Math.sin(wT * 0.6 + i * 1.3) * ampl * 0.45;
+    ctx.save();
+    rrect(tx, ty, tankW, tankH, 7); ctx.clip();
+    if (fillH > 2) {
+      const steps = 14;
+      const lg = ctx.createLinearGradient(0, fillTop, 0, ty + tankH);
+      lg.addColorStop(0, 'rgba(' + cr + ',' + cg + ',' + cb + ',0.95)');
+      lg.addColorStop(1, 'rgba(' + Math.round(cr * 0.66) + ',' + Math.round(cg * 0.66) + ',' + Math.round(cb * 0.7) + ',0.98)');
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(tx, ty + tankH); ctx.lineTo(tx, waveY(0, steps));
+      for (let i = 0; i <= steps; i++) ctx.lineTo(tx + tankW * i / steps, waveY(i, steps));
+      ctx.lineTo(tx + tankW, ty + tankH); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i <= steps; i++) { const xx = tx + tankW * i / steps, yy = waveY(i, steps); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke();
+
+      // convection bubbles — spawn rate climbs with heater output
+      sim.bubAcc += dt * (2 + heat * 70);
+      while (sim.bubAcc >= 1 && sim.bubbles.length < 70) { sim.bubAcc -= 1; sim.bubbles.push({ x: tx + tankW * (0.15 + 0.7 * rnd()), y: ty + tankH - 3 - rnd() * 6, r: 0.7 + rnd() * 1.7, vy: 14 + rnd() * 26 + heat * 24, ph: rnd() * 6.283, ws: 1.5 + rnd() * 2.5, amp: 0.6 + rnd() * 1.2 }); }
+      ctx.fillStyle = 'rgb(210,235,255)';
+      for (let i = sim.bubbles.length - 1; i >= 0; i--) { const b = sim.bubbles[i]; b.y -= b.vy * dt; if (b.y <= fillTop + 1) { sim.bubbles.splice(i, 1); continue; } const a = clamp((b.y - fillTop) / (ty + tankH - fillTop), 0, 1); ctx.globalAlpha = 0.2 + 0.5 * a; ctx.beginPath(); ctx.arc(b.x + Math.sin(tnow * b.ws + b.ph) * b.amp, b.y, b.r, 0, 6.283); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    }
+    // impeller — spins at a rate proportional to the decoded agitator rpm
+    sim.impAng += (D.agit / 220) * 2.2 * 2 * Math.PI * dt;
+    const hubY = fillTop + (ty + tankH - fillTop) * 0.52;
+    ctx.strokeStyle = '#9aa3b0'; ctx.lineWidth = 2; line(cxT, ty - 14, cxT, hubY);
+    ctx.save(); ctx.translate(cxT, hubY); ctx.scale(1, 0.34); ctx.rotate(sim.impAng);
+    const bR = tankW * 0.34; ctx.strokeStyle = '#4ec9b0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let b = 0; b < 3; b++) { ctx.rotate(Math.PI * 2 / 3); ctx.beginPath(); ctx.moveTo(-bR, 0); ctx.quadraticCurveTo(bR * 0.3, bR * 0.5, bR, 0); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(78,201,176,0.18)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, bR, 0, 6.283); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#3a4150'; ctx.beginPath(); ctx.arc(cxT, hubY, 3, 0, 6.283); ctx.fill();
+    ctx.restore(); // end clip
+
+    // vessel outline (flashes on high-temp alarm) + motor block
+    ctx.strokeStyle = (hiT && blink) ? '#e0533d' : '#5a6270'; ctx.lineWidth = (hiT && blink) ? 2.5 : 2; rrect(tx, ty, tankW, tankH, 7); ctx.stroke();
+    ctx.fillStyle = '#3a4150'; ctx.fillRect(cxT - 9, ty - 23, 18, 9);
+    // level reference mark (flashes on low-level alarm)
+    ctx.strokeStyle = (loL && blink) ? '#e0533d' : 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); line(tx + tankW + 3, fillTop, tx + tankW + 11, fillTop); ctx.setLineDash([]);
+
+    // ── steam plume above the vessel when the batch runs hot ──
+    const steamI = clamp((tt - 0.5) / 0.5, 0, 1);
+    sim.steamAcc += dt * steamI * 24;
+    while (sim.steamAcc >= 1 && sim.steam.length < 40) { sim.steamAcc -= 1; sim.steam.push({ x: cxT + (rnd() - 0.5) * tankW * 0.6, y: ty - 2, r: 3 + rnd() * 4, vy: 12 + rnd() * 16, life: 0, max: 1.3 + rnd() * 1.1, drift: (rnd() - 0.5) * 12 }); }
+    for (let i = sim.steam.length - 1; i >= 0; i--) { const s = sim.steam[i]; s.life += dt; if (s.life >= s.max) { sim.steam.splice(i, 1); continue; } s.y -= s.vy * dt; s.x += s.drift * dt; const a = 1 - s.life / s.max; ctx.fillStyle = 'rgba(220,230,245,' + (0.16 * a * steamI) + ')'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (1 + s.life), 0, 6.283); ctx.fill(); }
+
+    // ── thermometer (wide layouts only) ──
+    if (w > 420) {
+      const thX = Math.round(w * 0.52), thW = 9, thTop = ty + 6, thH = tankH - 34, bulbR = 9;
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; rrect(thX - thW / 2, thTop, thW, thH, thW / 2); ctx.fill();
+      ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 1.5; rrect(thX - thW / 2, thTop, thW, thH, thW / 2); ctx.stroke();
+      const bulbY = thTop + thH + bulbR - 1, full = Math.max(40, sim.tempMax * 1.15);
+      const tFrac = clamp((D.temp - sim.ambient) / (full - sim.ambient), 0, 1), mTop = thTop + thH * (1 - tFrac);
+      const mc = (D.temp > sim.tempMax) ? '#e0533d' : 'rgb(' + cr + ',' + cg + ',' + cb + ')';
+      ctx.fillStyle = mc; ctx.beginPath(); ctx.arc(thX, bulbY, bulbR, 0, 6.283); ctx.fill();
+      rrect(thX - 2.5, mTop, 5, bulbY - mTop, 2.5); ctx.fill();
+      const rlY = thTop + thH * (1 - clamp((sim.tempMax - sim.ambient) / (full - sim.ambient), 0, 1));
+      ctx.strokeStyle = 'rgba(224,83,61,0.7)'; ctx.lineWidth = 1; line(thX - thW, rlY, thX + thW, rlY);
+      ctx.fillStyle = '#7fd1ff'; ctx.textAlign = 'center'; ctx.font = 'bold 11px JetBrains Mono, monospace'; ctx.fillText(D.temp.toFixed(1) + '°', thX, bulbY + bulbR + 12);
+    }
+
+    // ── analog pressure dial ──
+    const R = clamp(Math.min(splitY * 0.30, w * 0.15), 26, 62);
+    const full = sim.pressMax * 1.3;
+    drawGauge(w * 0.78, ty + tankH * 0.45, R, D.press / full, sim.pressMax / full, 'PRESSURE bar', D.press.toFixed(2), hiP, tnow);
+
+    // ── trend strip ──
+    const ty2 = splitY + 8, th2 = h - splitY - 14, x0 = 8, w0 = w - 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.025)'; rrect(x0, ty2, w0, th2, 4); ctx.fill();
+    const A = sim.hist;
+    if (A.length >= 2) {
       let lo = Infinity, hi = -Infinity; for (const p of A) { lo = Math.min(lo, p.temp, p.set); hi = Math.max(hi, p.temp, p.set); }
-      const sp = (hi - lo) || 1; lo -= sp * 0.15; hi += sp * 0.15; const N = 180, off = N - A.length;
+      const sp = (hi - lo) || 1; lo -= sp * 0.18; hi += sp * 0.18; const N = 180, off = N - A.length;
       const X = (i) => x0 + (i / (N - 1)) * w0, Y = (v) => ty2 + (1 - (v - lo) / (hi - lo)) * th2;
-      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(140,156,176,0.8)'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) { const yy = ty2 + th2 * k / 4; line(x0, yy, x0 + w0, yy); }
+      const sps = A[A.length - 1].set;
+      ctx.fillStyle = 'rgba(110,122,134,0.12)'; const by = Y(sps + 0.8); ctx.fillRect(x0, by, w0, Math.max(1, Y(sps - 0.8) - by));
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(150,165,185,0.8)'; ctx.lineWidth = 1; ctx.beginPath();
       for (let i = 0; i < A.length; i++) { const xx = X(i + off), yy = Y(A[i].set); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(X(off), ty2 + th2);
+      for (let i = 0; i < A.length; i++) ctx.lineTo(X(i + off), Y(A[i].temp));
+      ctx.lineTo(X(A.length - 1 + off), ty2 + th2); ctx.closePath();
+      const ag = ctx.createLinearGradient(0, ty2, 0, ty2 + th2); ag.addColorStop(0, 'rgba(127,209,255,0.22)'); ag.addColorStop(1, 'rgba(127,209,255,0)'); ctx.fillStyle = ag; ctx.fill();
       ctx.strokeStyle = '#7fd1ff'; ctx.lineWidth = 1.6; ctx.beginPath();
       for (let i = 0; i < A.length; i++) { const xx = X(i + off), yy = Y(A[i].temp); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke();
-      const lt = A[A.length - 1].temp, ly = Y(lt); ctx.fillStyle = '#7fd1ff'; ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.fillText(lt.toFixed(1) + '°C', x0 + w0 - 3, Math.max(ty2 + 10, ly - 3));
+      const lt = A[A.length - 1].temp, ly = Y(lt);
+      ctx.fillStyle = '#7fd1ff'; ctx.shadowColor = '#7fd1ff'; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(X(N - 1), ly, 2.6, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.fillText(lt.toFixed(1) + '°C', x0 + w0 - 3, Math.max(ty2 + 10, ly - 4));
     }
   }
 
@@ -5964,6 +5927,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     if (bus && bus.resync) { sim.resync = (bus.resync.value === true || bus.resync.value === 'true'); $('iresync').checked = sim.resync; }
     sim.temp = sim.ambient + 2; sim.pressure = 1.0; sim.heater = 0; sim.integ = 0; sim.prevErr = 0; sim.cyc = 0; sim.dropped = 0; sim.tframe = 0;
     sim.hist = []; sim.history = []; sim.lastGood = null;
+    sim.bubbles = []; sim.steam = []; sim.impAng = 0; sim.bubAcc = 0; sim.steamAcc = 0;
     msg.className = 'cfg-msg ok'; msg.textContent = '✓ reactor restarted';
   }
   function updateCfgHL() { $('icfg-hl').innerHTML = Hl.highlightLines($('icfg').value).join('\n') + '\n'; }
@@ -5993,7 +5957,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   const BLURBS = {
     mc: blurb ? blurb.innerHTML : '',
     fin: '<strong>Same format, a trading desk.</strong> The exchange serializes every tick as ' +
-         '<code>&lt;float_dec:64,USD&gt;</code> — exact decimal money, currency <em>inline</em> — and the chart and ' +
+         '<code>&lt;float_dec:64,$USD&gt;</code> — exact decimal money, currency <em>inline</em> — and the chart and ' +
          'ledger run only on <em>decoded</em> values. Because prices ride as decimal (not binary float), the book stays ' +
          'penny-perfect; watch the naïve-float ledger drift against it.',
     ind: '<strong>Same format, a plant floor.</strong> A PLC streams reactor registers as ' +

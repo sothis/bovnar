@@ -72,10 +72,10 @@ grammar is specified in EBNF (see published specification) to support
 independent, interoperable implementations.
 
 **Published specification:**
-- Format specification: <https://github.com/sothis/bovnar/blob/main/doc/1_bovnar_spec.md>
-- Grammar (EBNF): <https://github.com/sothis/bovnar/blob/main/doc/5_bovnar.ebnf>
-- Unit system: <https://github.com/sothis/bovnar/blob/main/doc/2_bovnar_unit_system.md>
-- Project / overview: <https://github.com/sothis/bovnar>
+- Format specification: <https://www.bovnar.io/doc/1_bovnar_spec.md>
+- Grammar (EBNF): <https://www.bovnar.io/doc/5_bovnar.ebnf>
+- Unit system: <https://www.bovnar.io/doc/2_bovnar_unit_system.md>
+- Project / overview: <https://www.bovnar.io/>
 
 **Applications that use this media type:**
 Configuration and data interchange for scientific, engineering, financial, and

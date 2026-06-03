@@ -20,7 +20,7 @@
 
     "assignment": {
       "comment": "Top-level .key = value ; — uses struct1/array1 as entry points for depth coloring.",
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -54,7 +54,7 @@
     },
 
     "assignment_in_struct1": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -68,7 +68,7 @@
     },
 
     "assignment_in_struct2": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -82,7 +82,7 @@
     },
 
     "assignment_in_struct3": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -96,7 +96,7 @@
     },
 
     "assignment_in_struct4": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -110,7 +110,7 @@
     },
 
     "assignment_in_struct5": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -124,7 +124,7 @@
     },
 
     "assignment_in_struct6": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -138,7 +138,7 @@
     },
 
     "assignment_in_struct7": {
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -153,7 +153,7 @@
 
     "assignment_in_struct8": {
       "comment": "Depth 8 cycles back to struct1.",
-      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_][A-Za-z0-9_+\\-]*))",
+      "begin": "(?:^|(?<=[{;]))\\s*(\\.)((?:[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*))",
       "beginCaptures": {
         "1": { "name": "punctuation.separator.key-sigil.bovnar" },
         "2": { "name": "entity.name.key.bovnar"                 }
@@ -224,15 +224,15 @@
 
     "special_number": {
       "comment": "nan  inf  ninf — bare reserved keywords (no sigil), reclassified out of the symbol space like null/true/false. Word boundaries keep e.g. 'infinity'/'nana' from matching.",
-      "match": "(?<![A-Za-z0-9_])(?:nan|inf|ninf)(?![A-Za-z0-9_])",
+      "match": "(?<![A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}])(?:nan|inf|ninf)(?![A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}])",
       "name": "constant.language.special-float.bovnar"
     },
 
     "keyword": {
       "comment": "Reserved value-position keywords. true/false/on/off carry the bool type family (on==true, off==false); null is the null value. The validator reclassifies these out of the symbol space, so they must be matched before #symbol.",
       "patterns": [
-        { "match": "\\b(?:true|false|on|off)\\b", "name": "constant.language.boolean.bovnar" },
-        { "match": "\\bnull\\b", "name": "constant.language.null.bovnar" }
+        { "match": "(?<![A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}])(?:true|false|on|off)(?![A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}])", "name": "constant.language.boolean.bovnar" },
+        { "match": "(?<![A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}])null(?![A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}])", "name": "constant.language.null.bovnar" }
       ]
     },
 
@@ -273,7 +273,7 @@
 
     "inline_unit": {
       "comment": "Inline unit suffix: mandatory whitespace separates the scalar from the unit. The lookbehind fires after a digit or a closing string quote. (Special-number keywords nan/inf/ninf take no inline unit — a unit is given via the type annotation.)",
-      "match": "(?<=[\\d\"])(\\s+)([A-Za-z_$%(‰‱µ°Å][A-Za-z0-9_$()+~\\.\\-/:\\^\\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
+      "match": "(?<=[\\d\"])(\\s+)([A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\\.\\-/:\\^\\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
       "captures": {
         "1": { "name": "punctuation.separator.inline-unit.bovnar" },
         "2": { "name": "support.type.unit.inline.bovnar"          }
@@ -282,7 +282,7 @@
 
     "symbol": {
       "comment": "Bare-word value (symbol / enum-like).",
-      "match": "\\b[A-Za-z_][A-Za-z0-9_+\\-]*",
+      "match": "[A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*",
       "name": "variable.other.symbol.bovnar"
     },
 
@@ -294,7 +294,7 @@
       },
       "end": "(?=[\\s;,\\[\\]{}#])",
       "patterns": [
-        { "match": "\\.([A-Za-z_][A-Za-z0-9_+\\-]*)",
+        { "match": "\\.([A-Za-z_\\p{L}][A-Za-z0-9_+\\-\\p{L}\\p{N}\\p{M}]*)",
           "captures": {
             "0": { "name": "variable.other.reference-path.bovnar" }
           }
@@ -472,7 +472,7 @@
 
     "unit_expression": {
       "comment": "Unit string inside a type annotation.",
-      "match": "[A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*(?:~[A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?(?:[·/*][A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*(?:~[A-Za-z$%‰‱µΩΩ°Å][A-Za-z0-9_]*)?(?:[¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]|\\^[+\\-]?\\d+)?)*",
+      "match": "[A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\\.\\-/:\\^\\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*",
       "name": "support.type.unit.bovnar"
     }
 

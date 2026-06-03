@@ -52,9 +52,6 @@ hi BovnarStructDelim7 ctermfg=220 guifg=#f0c64e gui=none
 hi BovnarStructDelim8 ctermfg=39  guifg=#67d1f4 gui=none
 
 syn match   BovnarOctetData    '\\x[0-9A-Fa-f]\{2\}'
-" nan  inf  ninf — bare reserved keywords (no sigil); \< and \> word
-" boundaries keep e.g. 'infinity' or 'nana' from matching.
-syn match   BovnarSpecialFloat '\<\(nan\|inf\|ninf\)\>'
 
 syn region  BovnarComment start=/#/ end=/$/
 
@@ -62,26 +59,35 @@ syn match   BovnarArraySep    ','
 syn match   BovnarRowSep      '/'
 syn match   BovnarKeySigil    '\.'
 
-syn match   BovnarNegative '-\(\d\+\.\d*\([eE][+-]\=\d\+\)\=\|\.\d\+\([eE][+-]\=\d\+\)\=\|\d\+[eE][+-]\=\d\+\|\d\+\)' contains=BovnarFloat,BovnarInteger
+syn match   BovnarNegative '-\(\d\+\.\d*\([eE][+-]\=\d\+\)\=\|\.\d\+\([eE][+-]\=\d\+\)\=\|\d\+[eE][+-]\=\d\+\|\d\+\)' contains=BovnarFloat,BovnarInteger nextgroup=BovnarInlineUnit skipwhite
 
 syn match   BovnarAssign    '='
 syn match   BovnarSemicolon ';'
 
 syn match   BovnarNull '=\s*;'
 
-syn match   BovnarInteger '\d\+'
-syn match   BovnarFloat   '\d\+\.\d*\([eE][+-]\=\d\+\)\?'
-syn match   BovnarFloat   '\d\+[eE][+-]\=\d\+'
-syn match   BovnarFloat   '\.\d\+\([eE][+-]\=\d\+\)\?'
+syn match   BovnarInteger '\d\+' nextgroup=BovnarInlineUnit skipwhite
+syn match   BovnarFloat   '\d\+\.\d*\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
+syn match   BovnarFloat   '\d\+[eE][+-]\=\d\+' nextgroup=BovnarInlineUnit skipwhite
+syn match   BovnarFloat   '\.\d\+\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
 
 syn region  BovnarString
       \ start=/"/ skip=/\\./ end=/"/
       \ contains=BovnarEscape,BovnarInvalidEsc
-syn match   BovnarEscape     '\\[tnvfr"\\]'
+      \ nextgroup=BovnarInlineUnit skipwhite
+" InvalidEsc is defined BEFORE Escape so that on the \t \n \v \f \r \" \\ valid
+" escapes — which both patterns match with equal length — the later-defined
+" BovnarEscape wins vim's last-defined-wins tie-break. Only genuinely illegal
+" sequences (e.g. \q) fall through to BovnarInvalidEsc.
 syn match   BovnarInvalidEsc '\\.'
+syn match   BovnarEscape     '\\[tnvfr"\\]'
 
 syn match   BovnarRefOp   '&'
-syn match   BovnarRefPath '&\(\.[A-Za-z_][A-Za-z0-9_+\-]*\)\+'
+" The whole '&.seg.seg' is matched as one item (the '&' included) so it wins over
+" BovnarKeyName, which would otherwise grab each '.seg' and colour the path like a
+" key. (A '&\zs' split leaves the path exposed to BovnarKeyName, so the sigil is
+" kept inside the path match here; web/sublime/vscode split it via captures.)
+syn match   BovnarRefPath '&\(\.[A-Za-z_\d192-\d65535][A-Za-z0-9_+\-\d128-\d65535]*\)\+'
 
 syn region  BovnarTypeAnn
       \ start=/</ end=/>/
@@ -95,22 +101,44 @@ syn region  BovnarTypeAnn
       \          BovnarRefPath,BovnarArraySep
       \ keepend
 
-syn match   BovnarUnitTilde /\~/
-syn match   BovnarSymbol    '\<[A-Za-z_][A-Za-z0-9_+\-]*\>'
+syn match   BovnarUnitTilde /\~/ contained
+syn match   BovnarSymbol    '\<[A-Za-z_\d192-\d65535][A-Za-z0-9_+\-\d128-\d65535]*\>'
 " Reserved value keywords — defined after BovnarSymbol so they win the tie and
-" are coloured as keywords, not symbols. on==true, off==false; null is a null.
-syn match   BovnarBoolean   '\<\(true\|false\|on\|off\)\>'
-syn match   BovnarNullKw    '\<null\>'
-hi link     BovnarNullKw    BovnarNull
-syn match   BovnarTypeUnit  '\<[A-Za-zµΩΩ°][A-Za-z0-9_·()\-\+\/\^]*\>'
-syn match   BovnarUnitSep   '[()]'
-syn match   BovnarTypeUnit  '[%‰‱]'
+" are coloured as keywords, not symbols. on==true, off==false; null is the null
+" keyword. All reserved keywords share the keyword colour and differ from symbols.
+" The trailing '\%([+-]\)\@!' is required because '+' and '-' are valid
+" symbol-body chars that vim's \> boundary does NOT exclude: without it,
+" 'on-failure' would colour 'on' as a keyword (it wins the same-start tie). The
+" guard makes the keyword fail there so BovnarSymbol matches the whole word.
+syn match   BovnarBoolean   '\<\(true\|false\|on\|off\)\>\%([+-]\)\@!'
+syn match   BovnarNullKw    '\<null\>\%([+-]\)\@!'
+hi          BovnarNullKw    ctermfg=170 guifg=#c084fc gui=bold
+" nan / inf / ninf — bare reserved special-float keywords (no sigil). Defined
+" after BovnarSymbol too, so they win the tie; \< \> keep 'infinity'/'nana' out,
+" and the '\%([+-]\)\@!' guard keeps 'inf-loop' etc. a single symbol.
+syn match   BovnarSpecialFloat '\<\(nan\|inf\|ninf\)\>\%([+-]\)\@!'
+" No \< \> word boundaries: vim treats the leading °, µ, Ω of a unit as non-word
+" characters, so a leading \< never matches a unit that starts with one (e.g.
+" '°C'). The group is 'contained' (only reached inside <…> or a BovnarInlineUnit),
+" so the boundaries are unnecessary anyway.
+syn match   BovnarTypeUnit  '[A-Za-zµΩΩ°][A-Za-z0-9_·()\-\+\/\^]*' contained
+syn match   BovnarUnitSep   '[()]' contained
+syn match   BovnarTypeUnit  '[%‰‱]' contained
 " Currency component carries a mandatory '$' sigil (spec 1.0): $USD, $BTC.
-syn match   BovnarTypeUnit  '\$[A-Za-z][A-Za-z0-9]*'
-syn match   BovnarUnitPrefix '[A-Za-zµ][A-Za-z0-9]*\~\$\=[A-Za-z0-9_·\-\+\/*\^]*'
-syn match   BovnarUnitSep   '[*\/]'
-syn match   BovnarUnitExp   '[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]'
-syn match   BovnarUnitExp   '\^[+-]\=\d\+'
+syn match   BovnarTypeUnit  '\$[A-Za-z][A-Za-z0-9]*' contained
+syn match   BovnarUnitPrefix '[A-Za-zµ][A-Za-z0-9]*\~\$\=[A-Za-z0-9_·\-\+\/*\^]*' contained
+syn match   BovnarUnitSep   '[*\/]' contained
+syn match   BovnarUnitExp   '[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]' contained
+syn match   BovnarUnitExp   '\^[+-]\=\d\+' contained
+
+" Inline unit suffix -- only valid immediately after a number (reached via the
+" numeric matches' nextgroup). Keeps value-position barewords as BovnarSymbol and
+" stops illegal symbol chars (* / ^ ( ) ?) being coloured as units/separators.
+" '#' is excluded from both char classes so a trailing comment after a value
+" ('.x = 5 # note') falls through to BovnarComment instead of being swallowed as
+" a bogus unit by the nextgroup.
+syn match BovnarInlineUnit '[^ \t\r;,#0-9+*/^()~\-\]}][^ \t\r;,#\]}]*' contained contains=BovnarUnitPrefix,BovnarTypeUnit,BovnarUnitSep,BovnarUnitExp,BovnarUnitTilde
+hi link BovnarInlineUnit BovnarTypeUnit
 
 syn match   BovnarType     '\v(float_fix|float_dec|float|uint|sint|utf8|bool)'
 syn match   BovnarNoUnit   'no_unit'
@@ -126,7 +154,7 @@ syn match   BovnarTypeUnitExp '\^[+-]\=\d\+' contained
 syn match   BovnarTypeUnitExp '\/[1-9]'      contained
 syn match   BovnarTypePrefix  '[A-Za-zµ][A-Za-z0-9]*\~' contained
 
-syn match   BovnarKeyName '\.[A-Za-z_][A-Za-z0-9_+\-]*'
+syn match   BovnarKeyName '\.[A-Za-z_\d192-\d65535][A-Za-z0-9_+\-\d128-\d65535]*'
 
 " Terminal items only — no struct or array regions.
 " Both BovnarArray1 and BovnarStruct1 are non-contained and are added explicitly
@@ -140,8 +168,6 @@ syn cluster BovnarContent contains=
       \ BovnarRefOp,BovnarRefPath,
       \ BovnarArraySep,BovnarRowSep,
       \ BovnarNull,BovnarSpecialFloat,BovnarOctetData,
-      \ BovnarUnitTilde,BovnarUnitSep,BovnarUnitExp,
-      \ BovnarUnitPrefix,BovnarNoUnit,BovnarTypeUnit,
       \ BovnarType
 
 " 5-level array region chain.
@@ -220,3 +246,10 @@ syn region BovnarStruct61 matchgroup=BovnarStructDelim5 start=/{/ end=/}/ contai
 syn region BovnarStruct62 matchgroup=BovnarStructDelim6 start=/{/ end=/}/ contained contains=@BovnarContent,BovnarStruct63,BovnarArray1
 syn region BovnarStruct63 matchgroup=BovnarStructDelim7 start=/{/ end=/}/ contained contains=@BovnarContent,BovnarStruct64,BovnarArray1
 syn region BovnarStruct64 matchgroup=BovnarStructDelim8 start=/{/ end=/}/ contained contains=@BovnarContent,BovnarArray1
+
+" Parse from the start of the file. Bovnar arrays and structs are regions that
+" routinely span blank lines (e.g. multi-row matrices, blank-separated struct
+" members). Vim's default sync resynchronises at blank lines and loses the
+" enclosing [ … ] / { … } nesting there, leaving the matching ] or } after a
+" blank line uncoloured. 'fromstart' guarantees correct nesting at any depth.
+syntax sync fromstart

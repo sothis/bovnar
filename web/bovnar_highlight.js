@@ -28,7 +28,7 @@
 .bvh-unitsep{color:#6e7a86}
 .bvh-sym{color:#67d1f4}
 .bvh-bool{color:#c084fc;font-weight:600}
-.bvh-null{color:#4c5661;font-style:italic}
+.bvh-null{color:#c084fc;font-weight:600}
 .bvh-special{color:#c084fc}
 .bvh-sep{color:#6e7a86}
 .bvh-adelim{color:#a09040}
@@ -55,8 +55,17 @@
   function span(cls, t) { return '<span class="bvh-' + cls + '">' + esc(t) + '</span>'; }
 
   // Token char classes shared by the body scanner and the annotation scanner.
-  const ID  = /^[A-Za-z_$µμΩΩÅ°%‰‱][\w·~µμΩΩÅ°⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-*\/^$()]*/;
-  const NUM = /^-?(?:\d[\d_]*(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)/;
+  // Non-ASCII letters are valid identifier chars (parser: id-start ≥ U+00C0,
+  // id-body > U+007F), so the ranges keep symbols like 'schön' coloured.
+  const ID  = /^[A-Za-z_$µμΩΩÅ°%‰‱\u00C0-\uFFFF][\w·~µμΩΩÅ°⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-*\/^$()\u0080-\uFFFF]*/;
+  // A bare *symbol* (value-position word / keyword) is stricter than a unit:
+  // the C core allows only A-Za-z0-9_+- plus non-ASCII, rejecting unit-only
+  // chars (* / ^ ( ) $ : ? ...). ID stays the broad *unit* charset (used after
+  // a number and inside <...> annotations); SYM is used wherever a symbol is read.
+  const SYM = /^[A-Za-z_\u00C0-\uFFFF][A-Za-z0-9_+\-\u0080-\uFFFF]*/;
+  // Bovnar bare number literals have no digit-group separators (the grammar's
+  // int-led / dot-led are plain DIGIT runs), so no '_' inside the digit class.
+  const NUM = /^-?(?:\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)/;
 
   // Split a unit so '~', '*' and '/' read as separators (vim BovnarUnitTilde /
   // UnitSep) and the rest as the unit body (BovnarTypeUnit / UnitExp).
@@ -108,17 +117,21 @@
         // Wrap each physical line of the string in its own span so the emitted HTML
         // stays balanced when split on '\n' (see highlightLines / gutter renderers).
         out += src.slice(i, j).split('\n').map((seg) => span('str', seg)).join('\n');
-        i = j; afterNum = false; continue;
+        // A string value, like a number, may carry an inline unit suffix
+        // (e.g. "FF" m), so arm the inline-unit scanner for the next word.
+        i = j; afterNum = true; continue;
       }
-      if (c === '&' && (m = /^&(?:\.[A-Za-z_][\w+\-]*)+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
-      if (c === '.' && (m = /^\.[A-Za-z_][\w+\-]*/.exec(r))) { out += span('sigil', '.') + span('key', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
+      if (c === '&' && (m = /^&(?:\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*)+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
+      if (c === '.' && (m = /^\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*/.exec(r))) { out += span('sigil', '.') + span('key', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if ((m = NUM.exec(r)) && /\d/.test(m[0])) { let s = m[0]; if (s[0] === '-') { out += span('neg', '-'); s = s.slice(1); } out += span('num', s); i += m[0].length; afterNum = true; continue; }
-      if ((m = ID.exec(r))) {
+      if (afterNum && (m = ID.exec(r))) {              // inline unit suffix after a number (broad unit charset)
+        out += unit(m[0]); i += m[0].length; afterNum = false; continue;
+      }
+      if ((m = SYM.exec(r))) {                          // keyword or bare symbol -- strict charset only
         const w = m[0];
         if (/^(?:true|false|on|off)$/.test(w)) out += span('bool', w);
         else if (w === 'null') out += span('null', w);
         else if (/^(?:nan|inf|ninf)$/.test(w)) out += span('special', w);  // bare special-float keywords
-        else if (afterNum) out += unit(w);            // an inline unit follows a number
         else out += span('sym', w);
         i += w.length; afterNum = false; continue;
       }

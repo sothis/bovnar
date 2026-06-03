@@ -268,7 +268,7 @@
     {
       "name": "Bovnar Null",
       "scope": "constant.language.null.bovnar",
-      "settings": { "foreground": "#7a8390", "fontStyle": "italic" }
+      "settings": { "foreground": "#c084fc" }
     },
     {
       "name": "Bovnar Float",

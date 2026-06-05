@@ -75,8 +75,9 @@ available — see the project documentation.
 
 ## Links
 
+- Web: https://bovnar.io
 - Source & docs: https://github.com/sothis/bovnar
-- Format documentation: https://github.com/sothis/bovnar/tree/main/doc
+
 
 ## License
 

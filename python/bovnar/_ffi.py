@@ -30,8 +30,8 @@ from .structs import (
     BvnrSource, BvnrSink,
     BvnrReadFlags, BvnrWriteFlags,
     BvnrData, ValueTypeSpec, ValueUnit, ValueUnitPrefix,
-    BvnDomEntry,
-    EVENT_CALLBACK_FUNC, ON_ERROR_FUNC,
+    BvnDomEntry, BvnrDocStreamOpts,
+    EVENT_CALLBACK_FUNC, ON_ERROR_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC,
 )
 from .exceptions import BovnarLibraryNotFound
 
@@ -418,3 +418,39 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvn_dom_free_string.restype  = None
     lib.bvn_dom_free_string.argtypes = [c_void_p]
+
+    # ── bovnar_stream.h: framing, multiplexing, document-in-document ──────────
+    lib.bvnr_frame_write.restype  = c_bool
+    lib.bvnr_frame_write.argtypes = [P(BvnrSink), c_void_p, c_uint64]
+
+    lib.bvnr_doc_stream_read.restype  = c_bool
+    lib.bvnr_doc_stream_read.argtypes = [
+        P(BvnrSource), P(BvnrDocStreamOpts), P(c_uint64),
+    ]
+
+    lib.bvnr_mux_begin.restype  = c_bool
+    lib.bvnr_mux_begin.argtypes = [c_void_p, c_char_p]
+
+    lib.bvnr_mux_send.restype  = c_bool
+    lib.bvnr_mux_send.argtypes = [c_void_p, c_uint64, c_void_p, c_uint64]
+
+    lib.bvnr_mux_end.restype  = c_bool
+    lib.bvnr_mux_end.argtypes = [c_void_p]
+
+    lib.bvnr_demux_create.restype  = c_void_p
+    lib.bvnr_demux_create.argtypes = [MUX_ON_MSG_FUNC, c_void_p, c_uint64]
+
+    lib.bvnr_demux_destroy.restype  = None
+    lib.bvnr_demux_destroy.argtypes = [c_void_p]
+
+    lib.bvnr_demux_on_event.restype  = c_bool
+    lib.bvnr_demux_on_event.argtypes = [c_void_p, c_int, P(BvnrData)]
+
+    lib.bvnr_demux_error.restype  = c_int
+    lib.bvnr_demux_error.argtypes = [c_void_p]
+
+    lib.bvnr_embed_document.restype  = c_bool
+    lib.bvnr_embed_document.argtypes = [c_void_p, c_char_p, c_void_p, c_uint64]
+
+    lib.bvnr_parse_embedded.restype  = c_bool
+    lib.bvnr_parse_embedded.argtypes = [c_void_p, c_uint64, P(BvnrReadFlags)]

@@ -25,13 +25,14 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 SEARCH_DIRS = [
     "include",
     "src", "src/dom", "src/io", "src/lexer",
-    "src/utils", "src/validator", "src/writer",
+    "src/stream", "src/utils", "src/validator", "src/writer",
 ]
 
 # Public headers, in dependency order (recursion handles transitive includes).
 PUBLIC_HEADERS = [
     "bvn_int.h", "bvn_float.h", "bovnar.h",
     "bovnar_si_units.h", "bovnar_currency.h", "bovnar_dom.h",
+    "bovnar_stream.h",
 ]
 
 # Implementation translation units (the CLI src/bovnar.c is intentionally
@@ -51,6 +52,7 @@ IMPL_SOURCES = [
     "src/writer/bovnar_canon_observer.c",
     "src/dom/bovnar_dom.c",
     "src/dom/bovnar_dom_builder.c",
+    "src/stream/bovnar_stream.c",
 ]
 
 # Capture any trailing content after the directive (e.g. a comment that opens a

@@ -42,6 +42,10 @@ set(BVNR_C_FLAGS
     # bvnr_source_t / bvnr_sink_t are opaque storage that the
     # library reinterprets via an internal impl struct.  Strict
     # aliasing would mis-optimise those accesses, so disable it.
+    # NOTE: this only protects *this* build.  The impl structs are
+    # also tagged __may_alias__ (see src/io/bvn_io_impl.h) so the
+    # single-file amalgamation stays correct when a consumer compiles
+    # dist/bovnar.c at -O2/-O3 without this flag.
     -fno-strict-aliasing
 )
 if(BVNR_HARDEN)
@@ -110,6 +114,10 @@ set(BVNR_SOURCES_DOM
     src/dom/bovnar_dom_builder.c
 )
 
+set(BVNR_SOURCES_STREAM
+    src/stream/bovnar_stream.c
+)
+
 set(BVNR_SOURCES_UTILS
     src/utils/bovnar_utils.c
     src/utils/bovnar_si_units.c
@@ -124,6 +132,7 @@ set(BVNR_SOURCES
     ${BVNR_SOURCES_WRITER}
     ${BVNR_SOURCES_IO}
     ${BVNR_SOURCES_DOM}
+    ${BVNR_SOURCES_STREAM}
     ${BVNR_SOURCES_UTILS}
 )
 

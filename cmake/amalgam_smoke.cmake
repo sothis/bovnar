@@ -28,7 +28,7 @@ endif()
 # 2. Compile the freshly-generated amalgamation + smoke test (strict flags).
 set(exe "${BIN_DIR}/amalgam_smoke")
 execute_process(
-    COMMAND "${CC}" -std=c11 -Wall -Wextra -Wconversion -Wno-override-init -Werror
+    COMMAND "${CC}" -std=c99 -pedantic -O2 -Wall -Wextra -Wconversion -Wno-override-init -Werror
             "-I${gen}"
             "${SRC_DIR}/tests/amalgam_smoke.c"
             "${gen}/bovnar.c"

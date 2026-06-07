@@ -103,6 +103,7 @@ bovnar/
 │   ├── bovnar_dom.h         # DOM (tree) API
 │   ├── bovnar_si_units.h    # SI / IEC unit API
 │   ├── bovnar_currency.h    # Fiat + crypto currency API
+│   ├── bovnar_stream.h      # Framing, multiplexing & document-in-document
 │   ├── bvn_float.h
 │   └── bvn_int.h
 ├── src/
@@ -112,6 +113,7 @@ bovnar/
 │   ├── writer/              # Serialiser + canonicalising observer
 │   ├── io/                  # FD / memory source & sink
 │   ├── dom/                 # DOM builder and traversal
+│   ├── stream/              # Framing / multiplexing on the event API
 │   └── utils/               # SI units, currency, integer, float utilities
 ├── tests/                   # C unit, integration, conformance, and fuzz tests
 ├── python/
@@ -145,7 +147,8 @@ bovnar/
 │   ├── 5_bovnar.ebnf               # Formal EBNF grammar
 │   ├── 6_bovnar_faq.md             # Frequently asked questions
 │   ├── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
-│   └── 8_unit_cheatsheet.md        # Units & currencies quick reference
+│   ├── 8_unit_cheatsheet.md        # Units & currencies quick reference
+│   └── 10_bovnar_streaming.md      # Streaming, framing & multiplexing
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
 ```
@@ -523,6 +526,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
 | [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (207 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
+| [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 
 ---
 

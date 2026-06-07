@@ -190,6 +190,24 @@ EVENT_CALLBACK_FUNC = ctypes.CFUNCTYPE(
     ctypes.POINTER(BvnrData),
 )
 
+# bvnr_stream.h callback signatures.
+#   bool (*on_document)(void* ud, uint64_t index, bool ok, error_code_t err)
+ON_DOCUMENT_FUNC = ctypes.CFUNCTYPE(
+    ctypes.c_bool,
+    ctypes.c_void_p,
+    ctypes.c_uint64,
+    ctypes.c_bool,
+    ctypes.c_int,
+)
+#   bool (*on_message)(void* ud, uint64_t channel, const uint8_t* data, uint64_t len)
+MUX_ON_MSG_FUNC = ctypes.CFUNCTYPE(
+    ctypes.c_bool,
+    ctypes.c_void_p,
+    ctypes.c_uint64,
+    ctypes.c_void_p,
+    ctypes.c_uint64,
+)
+
 class BvnrSource(ctypes.Structure):
     _fields_ = [('_opaque', ctypes.c_uint64 * _OPAQUE_WORDS)]
 
@@ -234,6 +252,16 @@ class BvnrWriteFlags(ctypes.Structure):
         ('on_error',              ON_ERROR_FUNC),
         ('unit_flags',            ctypes.c_uint32),
         ('_reserved',             ctypes.c_uint64 * 4),
+    ]
+
+class BvnrDocStreamOpts(ctypes.Structure):
+    """Mirror of bvnr_doc_stream_opts_t (bovnar_stream.h)."""
+    _fields_ = [
+        ('flags',                ctypes.POINTER(BvnrReadFlags)),
+        ('userdata',             ctypes.c_void_p),
+        ('on_document',          ON_DOCUMENT_FUNC),
+        ('continue_past_failed', ctypes.c_bool),
+        ('max_document_size',    ctypes.c_uint64),
     ]
 
 class BvnDomEntry(ctypes.Structure):

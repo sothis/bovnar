@@ -56,6 +56,16 @@ extern "C" {
 #define BVNR_VERSION_STRING		"1.0.0"
 #define BVNR_MAX_UNIT_COMPONENTS		8
 #define BVN_MAX_INT_WIDTH			32768u
+/*
+ * Sentinel for bvnr_read_flags_t.max_file_size and bvnr_write_flags_t.max_file_size:
+ * removes the byte-count cap entirely, enabling unbounded ("endless") streaming
+ * of up to 2^64-1 bytes through the lexer/validator. Every byte/offset/line/column
+ * counter in the core is already 64-bit, so the only limit on a single never-ending
+ * document (or octet stream) is this policy knob. NOTE the asymmetry: a *zero*
+ * max_file_size selects the conservative 2 GiB internal default (spec 9.5); only
+ * this explicit sentinel uncaps it.
+ */
+#define BVNR_FILESIZE_UNLIMITED			UINT64_MAX
 typedef enum bvnr_event_e {
 	ev_stream_start,
 	ev_assignment_start,

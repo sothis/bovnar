@@ -38,6 +38,7 @@ DOCS = [
     ("6_bovnar_faq.md",             "bovnar-faq",              "FAQ"),
     ("7_bovnar_conformance.md",     "bovnar-conformance",      "Conformance Test Tool"),
     ("8_unit_cheatsheet.md",        "bovnar-cheatsheet",       "Units & Currencies Cheat Sheet"),
+    ("10_bovnar_streaming.md",      "bovnar-streaming",        "Streaming, Framing & Multiplexing"),
 ]
 
 PYGMENTS_CSS = HtmlFormatter(style="friendly").get_style_defs(".codehilite")

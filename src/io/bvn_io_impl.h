@@ -38,13 +38,31 @@
  * it. The static_assert-style size_check typedefs below guarantee at compile
  * time that the private struct still fits inside the public blob, so the cast
  * can never overflow the caller's storage.
+ *
+ * BVN_MAY_ALIAS: the impl structs deliberately reinterpret the storage of the
+ * public union blob (a different declared type), so accessing the blob through
+ * a bvn_*_impl_t* is a type-punning access. Without telling the compiler, the
+ * type-based alias analysis (TBAA, active at -O2/-O3) is entitled to assume the
+ * union store (e.g. `w->ser.sink = *sink;`) and the impl-typed loads of fields
+ * like `is_mem`/`mem_left` never alias, and may drop the stores — which silently
+ * miscompiles a memory sink. Separate compilation hid this (the optimiser cannot
+ * co-analyse store and load across the opaque call boundary); the single-file
+ * amalgamation at -O2 exposed it. Marking the impl types may_alias makes every
+ * access through them alias-permissive, the standard fix for ABI-stable opaque
+ * storage reinterpreted as a concrete struct. MSVC does not do this style of
+ * TBAA and has no equivalent attribute, so it is a no-op there.
  */
+#if defined(__GNUC__) || defined(__clang__)
+#  define BVN_MAY_ALIAS __attribute__((__may_alias__))
+#else
+#  define BVN_MAY_ALIAS
+#endif
 typedef struct bvn_source_impl_s {
 	bvnr_pull_fn	pull;
 	int		fd;
 	const uint8_t*	mem_ptr;
 	uint64_t	mem_left;
-} bvn_source_impl_t;
+} BVN_MAY_ALIAS bvn_source_impl_t;
 typedef struct bvn_sink_impl_s {
 	bvnr_push_fn	push;
 	bvnr_flush_fn	flush;
@@ -53,7 +71,7 @@ typedef struct bvn_sink_impl_s {
 	uint8_t*	mem_ptr;
 	uint64_t	mem_left;
 	uint64_t	mem_written;
-} bvn_sink_impl_t;
+} BVN_MAY_ALIAS bvn_sink_impl_t;
 /*
  * Compile-time size guards: a negative array length is a hard error, so the
  * build fails immediately if the private impl ever grows past the reserved

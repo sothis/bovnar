@@ -12,6 +12,7 @@ add_executable(bvnr_writer_test          tests/bovnar_writer_test.c)
 add_executable(bvnr_extended_reader_test tests/bovnar_extended_reader_test.c)
 add_executable(bvnr_utils_test           tests/bovnar_utils_test.c)
 add_executable(bvnr_socketpair_roundtrip_test tests/bovnar_socketpair_roundtrip_test.c)
+add_executable(bvnr_stream_test          tests/bovnar_stream_test.c)
 add_executable(bvnr_high_severity_test   tests/bovnar_high_severity_test.c)
 add_executable(bvnr_currency_test        tests/bovnar_currency_test.c)
 
@@ -48,6 +49,9 @@ target_link_libraries(bvnr_utils_test PRIVATE bvnr_static m)
 
 target_compile_options(bvnr_socketpair_roundtrip_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_socketpair_roundtrip_test PRIVATE bvnr_static pthread)
+
+target_compile_options(bvnr_stream_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_stream_test PRIVATE bvnr_static m)
 
 target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static m)
@@ -116,6 +120,11 @@ add_test(NAME bvnr_socketpair_roundtrip_test
     COMMAND bvnr_socketpair_roundtrip_test)
 set_tests_properties(bvnr_socketpair_roundtrip_test PROPERTIES
     LABELS "unit;roundtrip"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
+add_test(NAME bvnr_stream_test COMMAND bvnr_stream_test)
+set_tests_properties(bvnr_stream_test PROPERTIES
+    LABELS "unit;stream"
     PASS_REGULAR_EXPRESSION "PASSED")
 
 add_test(NAME bvnr_high_severity_test COMMAND bvnr_high_severity_test)
@@ -529,6 +538,13 @@ if(Python3_FOUND)
         "writer;python_arrays"
         60)
 
+    # Streaming layer bindings (bovnar_stream.h): multi-document framing, octet
+    # multiplexing with cross-chunk reassembly, and document-in-document.
+    _bvnr_pytest_lib(bvnr_py_stream
+        test_stream.py
+        "stream"
+        60)
+
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.
@@ -678,6 +694,17 @@ macro(_bvnr_convert_fail name file needle)
     set_tests_properties(bvnr_cli_convert_fail_${name} PROPERTIES
         LABELS "cli;convert" TIMEOUT 30)
 endmacro()
+
+# ── streaming CLI: frames pack/list + mux pack/list round-trips ──────────────
+add_test(
+    NAME    bvnr_cli_stream_roundtrip
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DEX_DIR=${CMAKE_CURRENT_SOURCE_DIR}/examples
+            -DTMP_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/stream_cli_roundtrip.cmake)
+set_tests_properties(bvnr_cli_stream_roundtrip PROPERTIES
+    LABELS "cli;stream" TIMEOUT 30)
 
 _bvnr_convert_fail(bad_key          bad_key.json              "not a valid bovnar identifier")
 _bvnr_convert_fail(int_overflow     bad_overflow.json         "out of range")

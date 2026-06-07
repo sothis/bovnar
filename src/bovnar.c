@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include "bovnar.h"
 #include "bovnar_dom.h"
+#include "bovnar_stream.h"
 static void print_indent(uint32_t level, bool pretty)
 {
 	if (!pretty) return;
@@ -2155,6 +2156,246 @@ static int cmd_bench(int argc, char **argv)
 	printf("\n");
 	return 0;
 }
+/*
+ * ---------------------------------------------------------------------------
+ * Streaming/framing subcommands (frames, mux)
+ * ---------------------------------------------------------------------------
+ * Thin CLI drivers over the bovnar_stream layer so the multi-document framing
+ * and octet-multiplexing conventions can be produced and consumed from the
+ * shell. See doc/10_bovnar_streaming.md for the wire conventions.
+ */
+
+/* Read everything available on `fd` into a freshly malloc'd buffer. Does not
+ * close fd — the caller owns its lifetime. Keeping the fd ownership out of this
+ * function (slurp opens/closes unconditionally) is also what keeps -fanalyzer
+ * from a false "leak of fd" report on the conditional stdin-vs-file path. */
+static int read_all_fd(int fd, uint8_t **out, uint64_t *outlen)
+{
+	size_t cap = 65536, len = 0;
+	uint8_t *buf = malloc(cap);
+	if (!buf) return -1;
+	for (;;) {
+		if (len == cap) {
+			size_t ncap = cap * 2u;
+			uint8_t *nb = realloc(buf, ncap);
+			if (!nb) { free(buf); return -1; }
+			buf = nb; cap = ncap;
+		}
+		ssize_t n = read(fd, buf + len, cap - len);
+		if (n < 0) {
+			if (errno == EINTR) continue;
+			free(buf); return -1;
+		}
+		if (n == 0) break;
+		len += (size_t)n;
+	}
+	*out = buf;
+	*outlen = (uint64_t)len;
+	return 0;
+}
+
+/* Read an entire file (or stdin for "-") into a freshly malloc'd buffer. */
+static int slurp(const char *path, uint8_t **out, uint64_t *outlen)
+{
+	if (strcmp(path, "-") == 0)
+		return read_all_fd(STDIN_FILENO, out, outlen);
+	int fd = open(path, O_RDONLY);
+	if (fd < 0) { perror(path); return -1; }
+	int rc = read_all_fd(fd, out, outlen);
+	close(fd);
+	return rc;
+}
+
+static int cmd_frames_pack(int argc, char **argv)
+{
+	if (argc < 1) {
+		fprintf(stderr, "frames pack: need at least one file\n");
+		return 2;
+	}
+	bvnr_sink_t sink;
+	bvnr_sink_to_fd(&sink, STDOUT_FILENO);
+	for (int i = 0; i < argc; i++) {
+		uint8_t *buf = NULL; uint64_t len = 0;
+		if (slurp(argv[i], &buf, &len) != 0) return 1;
+		bool ok = bvnr_frame_write(&sink, buf, len);
+		free(buf);
+		if (!ok) {
+			fprintf(stderr, "frames pack: write failed on %s\n", argv[i]);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static bool frames_on_document(void *ud, uint64_t index, bool ok, error_code_t err)
+{
+	(void)ud;
+	if (ok)
+		printf("frame %" PRIu64 ": OK\n", index);
+	else
+		printf("frame %" PRIu64 ": ERROR %s\n", index, bvn_error_to_string(err));
+	return true;   /* keep listing even past a bad frame */
+}
+
+static int cmd_frames_list(const char *path)
+{
+	bool is_stdin = (strcmp(path, "-") == 0);
+	int fd = is_stdin ? STDIN_FILENO : open(path, O_RDONLY);
+	if (fd < 0) { perror(path); return 1; }
+	bvnr_source_t src;
+	bvnr_source_from_fd(&src, fd);
+	bvnr_read_flags_t fl = {0};
+	fl.max_file_size      = BVNR_FILESIZE_UNLIMITED;
+	fl.max_array_nesting  = 255;
+	fl.max_struct_nesting = 255;
+	/* Strict per-document parsing so each frame's status is reported accurately
+	 * (no resync masking errors), but keep listing every frame regardless. */
+	fl.continue_on_error  = false;
+	bvnr_doc_stream_opts_t opts = {0};
+	opts.flags                = &fl;
+	opts.on_document          = frames_on_document;
+	opts.continue_past_failed = true;
+	opts.max_document_size    = BVNR_FILESIZE_UNLIMITED;
+	uint64_t count = 0;
+	bool ok = bvnr_doc_stream_read(&src, &opts, &count);
+	if (!is_stdin) close(fd);
+	printf("%" PRIu64 " document(s)\n", count);
+	if (!ok) {
+		fprintf(stderr, "frames list: framing/IO error after %" PRIu64
+				" document(s)\n", count);
+		return 1;
+	}
+	return 0;
+}
+
+static int cmd_frames(int argc, char **argv)
+{
+	if (argc < 1) {
+		fprintf(stderr, "Usage: frames pack <file>... | frames list <file|->\n");
+		return 2;
+	}
+	if (strcmp(argv[0], "pack") == 0)
+		return cmd_frames_pack(argc - 1, argv + 1);
+	if (strcmp(argv[0], "list") == 0) {
+		if (argc < 2) { fprintf(stderr, "frames list: need a file or -\n"); return 2; }
+		return cmd_frames_list(argv[1]);
+	}
+	fprintf(stderr, "frames: unknown action '%s' (use pack|list)\n", argv[0]);
+	return 2;
+}
+
+static int cmd_mux_pack(int argc, char **argv)
+{
+	if (argc < 1) {
+		fprintf(stderr, "mux pack: need at least one channel:file argument\n");
+		return 2;
+	}
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return 1;
+	bvnr_sink_t sink;
+	bvnr_sink_to_fd(&sink, STDOUT_FILENO);
+	bvnr_data_t hdr = {0};
+	int rc = 1;
+	if (!bvnr_open_write_sink(w, &sink, false, NULL)) goto done;
+	if (!bvnr_write_event(w, ev_stream_start, &hdr))   goto done;
+	if (!bvnr_mux_begin(w, "mux"))                     goto done;
+	for (int i = 0; i < argc; i++) {
+		char *colon = strchr(argv[i], ':');
+		if (!colon) {
+			fprintf(stderr, "mux pack: expected channel:file, got '%s'\n", argv[i]);
+			goto done;
+		}
+		*colon = '\0';
+		char *endp = NULL;
+		errno = 0;
+		uint64_t channel = strtoull(argv[i], &endp, 10);
+		if (endp == argv[i] || *endp != '\0' || errno != 0) {
+			fprintf(stderr, "mux pack: invalid channel '%s' (want a number)\n",
+					argv[i]);
+			goto done;
+		}
+		const char *path = colon + 1;
+		uint8_t *buf = NULL; uint64_t len = 0;
+		if (slurp(path, &buf, &len) != 0) goto done;
+		bool ok = bvnr_mux_send(w, channel, buf, len);
+		free(buf);
+		if (!ok) {
+			fprintf(stderr, "mux pack: send failed on channel %" PRIu64 "\n", channel);
+			goto done;
+		}
+	}
+	if (!bvnr_mux_end(w))        goto done;
+	if (!bvnr_write_finish(w))   goto done;
+	rc = 0;
+done:
+	/* Only report a writer-layer failure; CLI argument errors already printed
+	 * their own message and leave the writer's error code clean. */
+	if (rc != 0) {
+		error_code_t werr = bvnr_writer_get_error(w);
+		if (werr != error_none)
+			fprintf(stderr, "mux pack: writer error %s\n",
+					bvn_error_to_string(werr));
+	}
+	bvnr_writer_destroy(w);
+	return rc;
+}
+
+static bool mux_print_msg(void *ud, uint64_t channel, const uint8_t *data, uint64_t len)
+{
+	(void)ud; (void)data;
+	printf("channel %" PRIu64 ": %" PRIu64 " bytes\n", channel, len);
+	return true;
+}
+
+static int cmd_mux_list(const char *path)
+{
+	bool is_stdin = (strcmp(path, "-") == 0);
+	int fd = is_stdin ? STDIN_FILENO : open(path, O_RDONLY);
+	if (fd < 0) { perror(path); return 1; }
+	bvnr_demux_t *dm = bvnr_demux_create(mux_print_msg, NULL, 0);
+	bvnr_reader_t *r = bvnr_reader_create();
+	if (!dm || !r) {
+		bvnr_demux_destroy(dm); bvnr_reader_destroy(r);
+		if (!is_stdin) close(fd);
+		return 1;
+	}
+	bvnr_source_t src;
+	bvnr_source_from_fd(&src, fd);
+	bvnr_read_flags_t fl = {0};
+	fl.max_file_size      = BVNR_FILESIZE_UNLIMITED;
+	fl.max_array_nesting  = 255;
+	fl.max_struct_nesting = 255;
+	fl.on_verified        = bvnr_demux_on_event;
+	fl.userdata           = dm;
+	bool ok = bvnr_open_read_source(r, &src, NULL, &fl) && bvnr_read(r);
+	error_code_t derr = bvnr_demux_error(dm);
+	if (!ok)
+		fprintf(stderr, "mux list: parse error %s\n",
+				bvn_error_to_string(bvnr_reader_get_error(r)));
+	else if (derr != error_none)
+		fprintf(stderr, "mux list: demux error %s\n", bvn_error_to_string(derr));
+	bvnr_reader_destroy(r);
+	bvnr_demux_destroy(dm);
+	if (!is_stdin) close(fd);
+	return (ok && derr == error_none) ? 0 : 1;
+}
+
+static int cmd_mux(int argc, char **argv)
+{
+	if (argc < 1) {
+		fprintf(stderr, "Usage: mux pack <channel:file>... | mux list <file|->\n");
+		return 2;
+	}
+	if (strcmp(argv[0], "pack") == 0)
+		return cmd_mux_pack(argc - 1, argv + 1);
+	if (strcmp(argv[0], "list") == 0) {
+		if (argc < 2) { fprintf(stderr, "mux list: need a file or -\n"); return 2; }
+		return cmd_mux_list(argv[1]);
+	}
+	fprintf(stderr, "mux: unknown action '%s' (use pack|list)\n", argv[0]);
+	return 2;
+}
+
 static void usage(const char *prog)
 {
 	fprintf(stderr,
@@ -2173,6 +2414,14 @@ static void usage(const char *prog)
 		"                    -c  Continue parsing on errors (resync mode)\n"
 		"                    -d  Enable debug re-serialisation output to stderr\n"
 		"                    -p  Pretty-print debug output (requires -d)\n"
+		"  frames pack <file>...\n"
+		"                  Wrap each document in a length-prefixed frame (stdout).\n"
+		"  frames list <file|->\n"
+		"                  List the documents in a frame stream.\n"
+		"  mux pack <channel:file>...\n"
+		"                  Multiplex files onto channels in one octet stream (stdout).\n"
+		"  mux list <file|->\n"
+		"                  List the channel/message sizes in a multiplexed stream.\n"
 		"  bench [opts]\n"
 		"                  Run parsing throughput benchmark.\n"
 		"                  Options:\n"
@@ -2193,10 +2442,14 @@ static void usage(const char *prog)
 		"  %s events data.bvnr\n"
 		"  %s events -c -d data.bvnr\n"
 		"  cat data.bvnr | %s events -\n"
+		"  %s frames pack a.bvnr b.bvnr > docs.bvf\n"
+		"  %s frames list docs.bvf\n"
+		"  %s mux pack 1:a.bvnr 2:b.bvnr | %s mux list -\n"
 		"  %s bench --profile scalars --size 4096\n"
 		"  %s bench --profile all --size 1024,65536 --iterations 200 --json\n",
 		prog,
-		prog, prog, prog, prog, prog, prog, prog, prog, prog, prog);
+		prog, prog, prog, prog, prog, prog, prog, prog, prog, prog,
+		prog, prog, prog, prog);
 }
 int main(int argc, char **argv)
 {
@@ -2228,6 +2481,10 @@ int main(int argc, char **argv)
 		return cmd_convert(from, to, file);
 	} else if (strcmp(cmd, "events") == 0) {
 		return cmd_events(argc - 2, argv + 2);
+	} else if (strcmp(cmd, "frames") == 0) {
+		return cmd_frames(argc - 2, argv + 2);
+	} else if (strcmp(cmd, "mux") == 0) {
+		return cmd_mux(argc - 2, argv + 2);
 	} else if (strcmp(cmd, "bench") == 0) {
 		return cmd_bench(argc - 2, argv + 2);
 	} else if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {

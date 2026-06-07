@@ -75,6 +75,7 @@ run_test "bvnr_si_test"                   "$TESTS_DIR/bvnr_si_test"
 run_test "bvnr_unit_ext_test"             "$TESTS_DIR/bvnr_unit_ext_test"
 run_test "bvnr_utils_test"                "$TESTS_DIR/bvnr_utils_test"
 run_test "bvnr_socketpair_roundtrip_test" "$TESTS_DIR/bvnr_socketpair_roundtrip_test"
+run_test "bvnr_stream_test"               "$TESTS_DIR/bvnr_stream_test"
 run_test "bvnr_high_severity_test"        "$TESTS_DIR/bvnr_high_severity_test"
 run_test "bvnr_int_test"                  "$TESTS_DIR/bvnr_int_test"
 run_test "bvnr_float_test"                "$TESTS_DIR/bvnr_float_test"
@@ -217,6 +218,16 @@ run_convert_fail "convert rejects bad_key.json"      bad_key.json      "not a va
 run_convert_fail "convert rejects bad_overflow.json" bad_overflow.json "out of range"
 run_convert_fail "convert rejects bad_trailing.json" bad_trailing.json "trailing content"
 run_convert_fail "convert rejects bad_nul.json"      bad_nul.json      "NUL"
+
+echo
+
+_bold "=== Streaming CLI (frames + mux) ==="
+
+run_cmake_check "frames pack/list + mux pack/list round-trip" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DEX_DIR="${SRC_DIR}/examples" \
+    -DTMP_DIR="${SCRATCH_DIR}" \
+    -P "${SRC_DIR}/cmake/stream_cli_roundtrip.cmake"
 
 echo
 

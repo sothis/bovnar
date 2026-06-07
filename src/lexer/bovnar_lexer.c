@@ -1506,7 +1506,12 @@ static inline uint32_t bvn_try_bulk_run(
 	if (!lut[data[start]])
 		return 0;
 	uint32_t end = start;
-	uint32_t last_complete;
+	/* Initialised to `start` so the degenerate start>=len case (which the
+	 * caller never produces — data[start] is read above) is well-defined and
+	 * returns 0 below, rather than reading an uninitialised value. The optimiser
+	 * cannot prove start<len once this is inlined into bvn_lex_run, so an
+	 * uninitialised declaration trips -Wmaybe-uninitialized at -O2. */
+	uint32_t last_complete = start;
 	while (end < len) {
 		uint32_t a = end;
 		while (a < len && data[a] < 0x80u && lut[data[a]]) ++a;

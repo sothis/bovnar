@@ -73,6 +73,19 @@ print(bovnar.units_compatible(m, mps))      # False
 A streaming SAX-style `Reader`/`Writer` and a random-access `DomDoc` API are also
 available — see the project documentation.
 
+The `bovnar.stream` module adds multi-document framing, octet multiplexing, and
+document-in-document:
+
+```python
+from bovnar import stream
+
+blob = stream.dump_documents([{"id": 1}, {"id": 2}])     # frame many documents
+docs = stream.load_documents(blob)                        # -> [{"id": 1}, {"id": 2}]
+
+msg  = stream.mux_dump([(1, b"hello"), (42, b"world")])   # multiplex channels
+print(stream.mux_load(msg))                               # [(1, b"hello"), (42, b"world")]
+```
+
 ## Links
 
 - Web: https://bovnar.io

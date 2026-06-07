@@ -51,6 +51,7 @@ from .units   import (
     convert_value,
 )
 from . import currency
+from . import stream
 # pint bridge: functions only; pint itself is imported lazily on first use, so
 # importing bovnar never requires pint to be installed.
 from ._pint_bridge import to_pint, to_pint_unit, from_pint, from_pint_unit
@@ -60,7 +61,7 @@ from ._numpy import (to_numpy, to_pint_array, from_numpy, from_pint_array,
 
 __all__ = [
     'loads', 'dumps', 'dom_parse',
-    'currency',
+    'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
     'write_array',
     'Quantity',

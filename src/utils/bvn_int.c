@@ -221,7 +221,18 @@ int32_t bvn_int_to_str(const bvn_int_t *n,
 			limbs[i] = (uint32_t)(cur / base);
 			rem      = cur % base;
 		}
+		/* nused starts at n->nused and only decreases here, and limbs holds
+		 * n->nused elements, so limbs[nused - 1] is in bounds for every
+		 * reachable state. GCC 16's -fanalyzer cannot model that invariant
+		 * (n->nused is unconstrained to it) and reports a phantom over-read. */
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wanalyzer-out-of-bounds"
+#endif
 		while (nused > 0 && limbs[nused - 1] == 0u) nused--;
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
 		uint32_t ch = bigint_digit_to_char((uint32_t)rem, base);
 		if (!ch) { free(limbs); free(tmp); return -1; }
 		tmp[ndigits++] = (char)ch;

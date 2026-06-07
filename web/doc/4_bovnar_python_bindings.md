@@ -178,6 +178,29 @@ with Writer.to_mem() as w:
 output: bytes = w.get_output()
 ```
 
+### Streaming / framing (`bovnar.stream`)
+
+Bindings for the streaming layer (see
+[Streaming, Framing & Multiplexing](10_bovnar_streaming.md) for the full
+treatment):
+
+```python
+from bovnar import stream
+
+# Multi-document record framing
+blob = stream.dump_documents([{"id": 1}, {"id": 2}])   # list[dict] -> bytes
+docs = stream.load_documents(blob)                      # bytes -> list[dict]
+docs = stream.load_documents(blob, continue_past_failed=True)  # bad docs -> None
+
+# Octet multiplexing: (channel, payload) of any size, interleaved & reassembled
+multiplexed = stream.mux_dump([(1, b"hello"), (42, b"world")])
+messages    = stream.mux_load(multiplexed)             # [(1, b"hello"), (42, b"world")]
+
+# Document-in-document
+outer = stream.embed_document(bovnar.dumps({"v": 1}), key="payload")
+inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
+```
+
 ---
 
 ## Unit helpers

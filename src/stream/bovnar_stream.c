@@ -214,7 +214,10 @@ bool bvnr_doc_stream_read(
 			result = false; break;
 		}
 		uint64_t len = bvn_get_u64le(hdr + 4);
-		if (cap != BVNR_FILESIZE_UNLIMITED && len > cap) {
+		/* cap is always nonzero here (explicit value or BVNR_DOC_DEFAULT_MAX).
+		 * To lift the per-frame guard, callers pass an explicit huge cap
+		 * (e.g. UINT64_MAX), which a 64-bit len can never exceed. */
+		if (len > cap) {
 			result = false; break;
 		}
 		/* SIZE_MAX guard for 32-bit hosts where uint64 len can exceed size_t. */

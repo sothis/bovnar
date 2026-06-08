@@ -1075,13 +1075,15 @@ All limits are configurable via `bvnr_read_flags_t`. Defaults are permissive.
 | `max_reference_length` | 65535 | 65535 |
 | `max_array_items` | 0 (→ 2 147 483 647 internal default) | application-defined |
 | `max_text_bytes` | 0 (→ 2 147 483 647 internal default) | application-defined |
-| `max_file_size` | 0 (→ 2 147 483 647 internal default) | `16777216` (16 MiB) |
+| `max_file_size` | 0 (→ unlimited / endless) | `16777216` (16 MiB) |
 | `max_array_nesting` | 0 (→ 64 internal default; hard cap 255) | 32 or less |
 | `max_struct_nesting` | 0 (→ 64 internal default; hard cap 255) | 32 or less |
 
 Setting a field to `0` causes the reader to substitute a finite internal
-default — **2 147 483 647** for the three byte/item counters and **64** for
-both nesting depths. Production deployments should set `max_file_size`
+default — **2 147 483 647** for `max_array_items`/`max_text_bytes` and **64**
+for both nesting depths. **`max_file_size` is the exception: `0` means
+unlimited / endless** (no byte-count cap), which is the default so endless
+streams work out of the box. Production deployments should set `max_file_size`
 explicitly at minimum. For untrusted input, set `max_array_items`,
 `max_text_bytes`, and the nesting limits as well.
 

@@ -138,7 +138,7 @@ typedef struct bvnr_read_flags_s {
     bool (*on_verified)  (void *userdata, bvnr_event_t, bvnr_data_t *);
     bool   continue_on_error;
     bvnr_on_error_fn on_error;
-    uint64_t max_file_size;        /* 0 → 2 147 483 647 internal default */
+    uint64_t max_file_size;        /* 0 → unlimited / endless (default); set positive to cap */
     uint8_t  max_struct_nesting;   /* 0 → 64 internal default; hard cap 255 */
     uint8_t  max_array_nesting;    /* 0 → 64 internal default; hard cap 255 */
     /* ... other size limits ... */
@@ -149,7 +149,7 @@ typedef struct bvnr_read_flags_s {
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
-**Reader default limits.** When a `bvnr_read_flags_t` field is set to `0`, the reader substitutes an internal default. For the nesting fields, the default is **64** (not 255); the hard maximum is 255. For `max_array_items`, `max_text_bytes`, and `max_file_size`, the default is **2 147 483 647** — permissive but finite. Setting `max_file_size` explicitly to `16777216` (16 MiB) is recommended for production.
+**Reader default limits.** When a `bvnr_read_flags_t` field is set to `0`, the reader substitutes an internal default. For the nesting fields, the default is **64** (not 255); the hard maximum is 255. For `max_array_items` and `max_text_bytes`, the default is **2 147 483 647** — permissive but finite. **`max_file_size` differs: `0` means unlimited / endless** (no byte-count cap accumulated), which is the default so endless streaming works out of the box. Setting `max_file_size` explicitly to `16777216` (16 MiB) is recommended for production.
 
 ```c
 static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)

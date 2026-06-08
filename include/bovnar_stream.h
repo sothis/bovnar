@@ -32,9 +32,10 @@
  * that sit at the same seam — *beside* the DOM, not inside the grammar — plus
  * the policy knob for unbounded streams:
  *
- *   1. Endless streaming      — BVNR_FILESIZE_UNLIMITED (declared in bovnar.h):
- *                               uncaps the byte counter so a single document or
- *                               octet stream can run to 2^64-1 bytes.
+ *   1. Endless streaming      — BVNR_FILESIZE_UNLIMITED (declared in bovnar.h;
+ *                               now 0, the zero-init default): uncaps the byte
+ *                               counter so a single document or octet stream can
+ *                               run to 2^64-1 bytes with no accumulated limit.
  *   2. Multi-document framing — a length-prefixed record codec carrying a
  *                               sequence of independent documents over one
  *                               transport (file/socket/pipe).
@@ -82,8 +83,10 @@ extern "C" {
 #define BVNR_FRAME_HEADER_SIZE  12u   /* 4 magic + 8 length */
 
 /* Default per-document size guard used when bvnr_doc_stream_opts_t.max_document_size
- * is 0. Use BVNR_FILESIZE_UNLIMITED to lift it (bounded only by available RAM,
- * since each frame payload is buffered before parsing). */
+ * is 0. Unlike max_file_size (where 0 means unlimited), this framing guard keeps a
+ * finite default because each frame payload is fully buffered before parsing, so a
+ * hostile frame header could otherwise force a huge allocation. To lift it, set an
+ * explicit huge cap (e.g. UINT64_MAX), which a 64-bit frame length can never exceed. */
 #define BVNR_DOC_DEFAULT_MAX    (256u * 1024u * 1024u)
 
 /*
@@ -119,7 +122,8 @@ typedef struct bvnr_doc_stream_opts_s {
 	 * frame. */
 	bool			continue_past_failed;
 	/* Reject any frame whose payload length exceeds this. 0 selects
-	 * BVNR_DOC_DEFAULT_MAX; BVNR_FILESIZE_UNLIMITED disables the guard. */
+	 * BVNR_DOC_DEFAULT_MAX (the framing guard is always finite by default);
+	 * set an explicit huge cap (e.g. UINT64_MAX) to effectively disable it. */
 	uint64_t		max_document_size;
 } bvnr_doc_stream_opts_t;
 

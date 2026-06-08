@@ -9349,7 +9349,7 @@ typedef enum bvn_limit_defaults_e {
 	max_array_nesting     = 64,
 	max_array_items       = 2147483647,
 	max_text_bytes        = 2147483647,
-	max_file_size         = 2147483647,
+	/* No max_file_size default: 0 == BVNR_FILESIZE_UNLIMITED (endless). */
 } bvn_limit_defaults_t;
 typedef struct bvnr_serializer_s {
 	bvnr_sink_t		sink;
@@ -11225,7 +11225,9 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	if (!l->max_array_nesting)		l->max_array_nesting		= max_array_nesting;
 	if (!l->max_array_items)		l->max_array_items			= max_array_items;
 	if (!l->max_text_bytes)			l->max_text_bytes			= max_text_bytes;
-	if (!l->max_file_size)			l->max_file_size			= max_file_size;
+	/* max_file_size is deliberately NOT defaulted: 0 means "unlimited / endless"
+	 * (BVNR_FILESIZE_UNLIMITED). The cap checks below are guarded by a nonzero
+	 * max_file_size, so a 0 here accumulates no byte-count limit. */
 	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
 	if (!l->arr_frames)
 		return false;
@@ -15809,7 +15811,10 @@ bool bvnr_doc_stream_read(
 			result = false; break;
 		}
 		uint64_t len = bvn_get_u64le(hdr + 4);
-		if (cap != BVNR_FILESIZE_UNLIMITED && len > cap) {
+		/* cap is always nonzero here (explicit value or BVNR_DOC_DEFAULT_MAX).
+		 * To lift the per-frame guard, callers pass an explicit huge cap
+		 * (e.g. UINT64_MAX), which a 64-bit len can never exceed. */
+		if (len > cap) {
 			result = false; break;
 		}
 		/* SIZE_MAX guard for 32-bit hosts where uint64 len can exceed size_t. */

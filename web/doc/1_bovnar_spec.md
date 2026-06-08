@@ -957,7 +957,7 @@ ev_octet_stream_end
 
 ### 9.5 Constraints
 
-- File size: `max_file_size` (0 → 2 147 483 647 internal default; set to `16777216` for the recommended 16 MiB cap)
+- File size: `max_file_size` (0 → **unlimited / endless**, the default — no accumulated size limit; set to `16777216` for the recommended 16 MiB cap)
 - Octet stream bytes contribute to the file size limit but not to `max_text_bytes`
 - EOF inside an octet stream region preserves the current error code instead of overwriting with `error_got_incomplete_bvnr_stream`
 
@@ -1274,11 +1274,11 @@ An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0
 | Reference length | Yes (`max_reference_length`) | 65535 | `error_reference_too_long` |
 | Array items | Yes (`max_array_items`) | 2 147 483 647 | `error_too_many_array_items` |
 | Text bytes | Yes (`max_text_bytes`) | 2 147 483 647 | `error_text_data_too_long` |
-| File size | Yes (`max_file_size`) | 2 147 483 647 | `error_file_too_long` |
+| File size | Yes (`max_file_size`) | 0 (→ unlimited / endless) | `error_file_too_long` |
 | Struct nesting | Yes (`max_struct_nesting`) | 0 (→64 internal) | `error_struct_nesting_too_high` |
 | Array nesting | Yes (`max_array_nesting`) | 0 (→64 internal, hard cap 255) | `error_array_nesting_too_high` |
 
-Setting any field to `0` in `bvnr_read_flags_t` substitutes an internal default — **64** for both nesting depths, and **2 147 483 647** (2³¹ − 1) for the three byte/item counters. These defaults apply to both the reader and the writer. The writer does not internally limit array items, text bytes, or file size.
+Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal default — **64** for both nesting depths, and **2 147 483 647** (2³¹ − 1) for `max_array_items` and `max_text_bytes`. **`max_file_size` is the exception: `0` means unlimited / endless** (no byte-count cap accumulated), so endless streams are the default; set a positive value to cap. These defaults apply to both the reader and the writer. The writer does not internally limit array items, text bytes, or file size.
 
 ### 12.3 Value Validation
 
@@ -1907,7 +1907,7 @@ typedef struct bvnr_read_flags_s {
     uint16_t  max_reference_length;   // default 65535
     uint64_t  max_array_items;        // 0 → 2 147 483 647 internal default
     uint64_t  max_text_bytes;         // 0 → 2 147 483 647 internal default
-    uint64_t  max_file_size;          // 0 → 2 147 483 647 internal default; 16 777 216 recommended
+    uint64_t  max_file_size;          // 0 → unlimited / endless (default); 16 777 216 recommended for a cap
     uint8_t   max_struct_nesting;     // 0 → 64 internal default; hard cap 255
     uint8_t   max_array_nesting;      // 0 → 64 internal default; hard cap 255
     void*     userdata;
@@ -2444,7 +2444,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 | writer default array nesting | 64 | Default applied by the writer when `max_array_nesting` is 0; hard cap is 255 |
 | reader default max_array_items | 2 147 483 647 | Default applied by the reader when `max_array_items` is 0 |
 | reader default max_text_bytes | 2 147 483 647 | Default applied by the reader when `max_text_bytes` is 0 |
-| reader default max_file_size | 2 147 483 647 | Default applied by the reader when `max_file_size` is 0; set to 16 777 216 (16 MiB) in production |
+| reader default max_file_size | 0 (unlimited / endless) | A `max_file_size` of 0 imposes no byte-count cap; set to 16 777 216 (16 MiB) in production |
 | recommended file size cap | 16 777 216 | Suggested explicit value for `max_file_size` (16 MiB) |
 | `BVNR_MAX_UNIT_COMPONENTS` | 8 | Maximum number of unit components in a compound unit |
 | `BVN_MAX_INT_WIDTH` | 32768 | Maximum bit-width for `uint` and `sint` types. The validator and writer reject any declared width exceeding this value with `error_illegal_value_type`. |

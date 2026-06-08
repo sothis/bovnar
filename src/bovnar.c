@@ -2255,7 +2255,9 @@ static int cmd_frames_list(const char *path)
 	opts.flags                = &fl;
 	opts.on_document          = frames_on_document;
 	opts.continue_past_failed = true;
-	opts.max_document_size    = BVNR_FILESIZE_UNLIMITED;
+	/* List every frame regardless of size: lift the per-frame guard with an
+	 * explicit huge cap (max_document_size==0 now selects BVNR_DOC_DEFAULT_MAX). */
+	opts.max_document_size    = UINT64_MAX;
 	uint64_t count = 0;
 	bool ok = bvnr_doc_stream_read(&src, &opts, &count);
 	if (!is_stdin) close(fd);

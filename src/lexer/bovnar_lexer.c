@@ -1793,7 +1793,9 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	if (!l->max_array_nesting)		l->max_array_nesting		= max_array_nesting;
 	if (!l->max_array_items)		l->max_array_items			= max_array_items;
 	if (!l->max_text_bytes)			l->max_text_bytes			= max_text_bytes;
-	if (!l->max_file_size)			l->max_file_size			= max_file_size;
+	/* max_file_size is deliberately NOT defaulted: 0 means "unlimited / endless"
+	 * (BVNR_FILESIZE_UNLIMITED). The cap checks below are guarded by a nonzero
+	 * max_file_size, so a 0 here accumulates no byte-count limit. */
 	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
 	if (!l->arr_frames)
 		return false;

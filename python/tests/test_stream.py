@@ -160,6 +160,6 @@ class TestDocumentInDocument:
 # Constants
 # ---------------------------------------------------------------------------
 def test_constants_present():
-    assert stream.BVNR_FILESIZE_UNLIMITED == (1 << 64) - 1
+    assert stream.BVNR_FILESIZE_UNLIMITED == 0
     assert stream.BVNR_DOC_DEFAULT_MAX == 256 * 1024 * 1024
     assert stream.BVNR_MUX_DEFAULT_MAX == 64 * 1024 * 1024

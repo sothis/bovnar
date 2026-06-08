@@ -25,7 +25,7 @@
 /*
  * Exercises the four streaming/framing capabilities layered on the lexer/
  * validator event API (include/bovnar_stream.h):
- *   1. endless mode      — BVNR_FILESIZE_UNLIMITED uncaps the byte counter
+ *   1. endless mode      — BVNR_FILESIZE_UNLIMITED (0, the default) uncaps the byte counter
  *   2. multi-document    — length-prefixed record framing round-trip
  *   3. octet multiplex   — out-of-band channel convention round-trip
  *   4. doc-in-document   — embed + recursive parse round-trip
@@ -159,7 +159,9 @@ static void test_endless_knob(void)
 		bvnr_reader_destroy(r);
 	}
 
-	/* BVNR_FILESIZE_UNLIMITED lifts the cap: same input now parses. */
+	/* BVNR_FILESIZE_UNLIMITED is 0 (the zero-initialised default): no byte-count
+	 * cap, so the same input parses. This locks the 0 == endless convention. */
+	ASSERT_EQ_UINT(BVNR_FILESIZE_UNLIMITED, 0u, "unlimited sentinel is 0");
 	{
 		doc_capture_t c = {0};
 		bvnr_read_flags_t fl = {
@@ -715,6 +717,46 @@ static void test_frames_oversized_declared(void)
 	ASSERT_EQ_UINT(count, 0, "no document completed");
 }
 
+/* The per-frame guard `max_document_size` is independent of max_file_size:
+ * unlike max_file_size (0 == unlimited), 0 here selects the finite
+ * BVNR_DOC_DEFAULT_MAX, and the guard is lifted with an explicit huge cap
+ * (NOT BVNR_FILESIZE_UNLIMITED, which is now 0 and merely selects the default).
+ * Locks the framing-guard decision behind the 0-means-unlimited file-size flip. */
+static void test_frames_max_document_size(void)
+{
+	printf("  test_frames_max_document_size...\n");
+	uint8_t big[2048];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, big, sizeof(big));
+	uint8_t doc[256];
+	uint64_t n = build_doc(doc, sizeof(doc), 1);
+	ASSERT_TRUE(bvnr_frame_write(&sink, doc, n), "frame written");
+	uint64_t total = bvnr_sink_bytes_written(&sink);
+
+	/* An explicit cap below the payload length rejects the frame as too large. */
+	{
+		bvnr_doc_stream_opts_t opts = { .max_document_size = n - 1u };
+		bvnr_source_t src;
+		bvnr_source_from_mem(&src, big, total);
+		uint64_t count = 0;
+		bool ok = bvnr_doc_stream_read(&src, &opts, &count);
+		ASSERT_TRUE(!ok, "frame exceeding max_document_size is rejected");
+		ASSERT_EQ_UINT(count, 0, "no document completed under tiny cap");
+	}
+
+	/* An explicit huge cap lifts the guard (the path that replaced the old
+	 * BVNR_FILESIZE_UNLIMITED==UINT64_MAX sentinel); the same frame now parses. */
+	{
+		bvnr_doc_stream_opts_t opts = { .max_document_size = UINT64_MAX };
+		bvnr_source_t src;
+		bvnr_source_from_mem(&src, big, total);
+		uint64_t count = 0;
+		bool ok = bvnr_doc_stream_read(&src, &opts, &count);
+		ASSERT_TRUE(ok, "explicit huge max_document_size lifts the guard");
+		ASSERT_EQ_UINT(count, 1, "one document parsed when guard lifted");
+	}
+}
+
 typedef struct { int n; bool ok_flags[4]; } md_err_ctx_t;
 static md_err_ctx_t g_mderr;
 static bool md_err_on_document(void *ud, uint64_t index, bool ok, error_code_t err)
@@ -919,6 +961,7 @@ int main(void)
 	test_octet_mux_random_roundtrip();
 	test_frames_truncated();
 	test_frames_oversized_declared();
+	test_frames_max_document_size();
 	test_frames_abort_on_error();
 	test_frames_continue_on_error();
 	test_frames_continue_past_failed();

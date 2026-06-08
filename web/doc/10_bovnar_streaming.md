@@ -28,16 +28,15 @@ limited only by one policy knob: `max_file_size` on `bvnr_read_flags_t` /
 `bvnr_write_flags_t`.
 
 ```c
-#define BVNR_FILESIZE_UNLIMITED  UINT64_MAX   /* in bovnar.h */
+#define BVNR_FILESIZE_UNLIMITED  0   /* in bovnar.h */
 ```
 
-Semantics, **note the asymmetry**:
+Semantics — **`0` is unlimited and the default**:
 
 | `max_file_size` value | Effect |
 |-----------------------|--------|
-| `0` | Conservative **2 GiB** internal default (spec §9.5) |
+| `0` (= `BVNR_FILESIZE_UNLIMITED`, the default) | **No cap** — endless, no accumulated size limit |
 | any positive N | Cap at N bytes (`error_file_too_long` beyond) |
-| `BVNR_FILESIZE_UNLIMITED` | **No cap** — endless |
 
 ```c
 bvnr_read_flags_t fl = {
@@ -99,7 +98,9 @@ returns false on a framing/IO error, or on the first per-document parse failure
 unless `continue_past_failed` is set. Each frame payload is buffered in RAM
 before parsing (the buffer grows with the bytes that actually arrive, so a
 crafted oversized length cannot force a large up-front allocation), bounded by
-`max_document_size` (set `BVNR_FILESIZE_UNLIMITED` to lift the guard).
+`max_document_size`. Unlike `max_file_size`, this framing guard stays finite when
+`0` (it then selects `BVNR_DOC_DEFAULT_MAX`, 256 MiB); set an explicit huge cap
+(e.g. `UINT64_MAX`) to lift it.
 
 Two **orthogonal** error controls — because each document occupies its own
 length-delimited frame, the two are independent:
@@ -251,9 +252,12 @@ outer = stream.embed_document(bovnar.dumps({"v": 1}), key="payload")
 inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 ```
 
-`stream.BVNR_FILESIZE_UNLIMITED` is available for the endless-mode `max_*`
-sentinels. See [Python Bindings](4_bovnar_python_bindings.md) and
-`python/tests/test_stream.py`.
+`stream.BVNR_FILESIZE_UNLIMITED` (`== 0`) selects endless mode for
+**`max_file_size`** only. Note it does **not** lift the framing/mux guards:
+for `max_document_size` and `max_message`, `0` selects their finite defaults
+(`BVNR_DOC_DEFAULT_MAX` / `BVNR_MUX_DEFAULT_MAX`), so pass an explicit large
+value there to raise them. See [Python Bindings](4_bovnar_python_bindings.md)
+and `python/tests/test_stream.py`.
 
 ## Composition
 
@@ -262,7 +266,8 @@ The four compose cleanly because they live at different layers:
 - A **frame stream** (2) can carry documents that each **embed** sub-documents (4).
 - A **multiplexed** octet stream (3) is itself just one value in a document, which
   can be one frame in a frame stream (2).
-- Any of the above can be **endless** (1) by setting `BVNR_FILESIZE_UNLIMITED`.
+- Any of the above is **endless** (1) by default (`max_file_size` 0 ==
+  `BVNR_FILESIZE_UNLIMITED`); set a positive `max_file_size` to impose a cap.
 
 Because each is a thin application over the public event API, you can also write
 your own consumer/producer at the same seam without touching the core.

@@ -367,14 +367,16 @@ extern "C" {
 #define BVN_MAX_INT_WIDTH			32768u
 /*
  * Sentinel for bvnr_read_flags_t.max_file_size and bvnr_write_flags_t.max_file_size:
- * removes the byte-count cap entirely, enabling unbounded ("endless") streaming
- * of up to 2^64-1 bytes through the lexer/validator. Every byte/offset/line/column
- * counter in the core is already 64-bit, so the only limit on a single never-ending
- * document (or octet stream) is this policy knob. NOTE the asymmetry: a *zero*
- * max_file_size selects the conservative 2 GiB internal default (spec 9.5); only
- * this explicit sentinel uncaps it.
+ * a value of 0 removes the byte-count cap entirely, enabling unbounded ("endless")
+ * streaming through the lexer/validator. This is the default for a zero-initialised
+ * flags struct, so endless streams accumulate no byte-count limit unless a cap is
+ * requested explicitly. Every byte/offset/line/column counter in the core is already
+ * 64-bit, so a single never-ending document (or octet stream) can run to 2^64-1 bytes;
+ * the only limit is this policy knob. To impose a cap, set max_file_size to a positive
+ * byte count (e.g. 16 MiB for production); once the processed byte count exceeds it the
+ * reader raises error_file_too_long.
  */
-#define BVNR_FILESIZE_UNLIMITED			UINT64_MAX
+#define BVNR_FILESIZE_UNLIMITED			0u
 typedef enum bvnr_event_e {
 	ev_stream_start,
 	ev_assignment_start,
@@ -1196,9 +1198,10 @@ BVN_API bvn_dom_node_t *bvn_dom_node_from_bigint(bvn_int_t     *bigint,
  * that sit at the same seam — *beside* the DOM, not inside the grammar — plus
  * the policy knob for unbounded streams:
  *
- *   1. Endless streaming      — BVNR_FILESIZE_UNLIMITED (declared in bovnar.h):
- *                               uncaps the byte counter so a single document or
- *                               octet stream can run to 2^64-1 bytes.
+ *   1. Endless streaming      — BVNR_FILESIZE_UNLIMITED (declared in bovnar.h;
+ *                               now 0, the zero-init default): uncaps the byte
+ *                               counter so a single document or octet stream can
+ *                               run to 2^64-1 bytes with no accumulated limit.
  *   2. Multi-document framing — a length-prefixed record codec carrying a
  *                               sequence of independent documents over one
  *                               transport (file/socket/pipe).
@@ -1243,8 +1246,10 @@ extern "C" {
 #define BVNR_FRAME_HEADER_SIZE  12u   /* 4 magic + 8 length */
 
 /* Default per-document size guard used when bvnr_doc_stream_opts_t.max_document_size
- * is 0. Use BVNR_FILESIZE_UNLIMITED to lift it (bounded only by available RAM,
- * since each frame payload is buffered before parsing). */
+ * is 0. Unlike max_file_size (where 0 means unlimited), this framing guard keeps a
+ * finite default because each frame payload is fully buffered before parsing, so a
+ * hostile frame header could otherwise force a huge allocation. To lift it, set an
+ * explicit huge cap (e.g. UINT64_MAX), which a 64-bit frame length can never exceed. */
 #define BVNR_DOC_DEFAULT_MAX    (256u * 1024u * 1024u)
 
 /*
@@ -1280,7 +1285,8 @@ typedef struct bvnr_doc_stream_opts_s {
 	 * frame. */
 	bool			continue_past_failed;
 	/* Reject any frame whose payload length exceeds this. 0 selects
-	 * BVNR_DOC_DEFAULT_MAX; BVNR_FILESIZE_UNLIMITED disables the guard. */
+	 * BVNR_DOC_DEFAULT_MAX (the framing guard is always finite by default);
+	 * set an explicit huge cap (e.g. UINT64_MAX) to effectively disable it. */
 	uint64_t		max_document_size;
 } bvnr_doc_stream_opts_t;
 

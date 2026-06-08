@@ -37,7 +37,7 @@ typedef enum bvn_limit_defaults_e {
 	max_array_nesting     = 64,
 	max_array_items       = 2147483647,
 	max_text_bytes        = 2147483647,
-	max_file_size         = 2147483647,
+	/* No max_file_size default: 0 == BVNR_FILESIZE_UNLIMITED (endless). */
 } bvn_limit_defaults_t;
 typedef struct bvnr_serializer_s {
 	bvnr_sink_t		sink;

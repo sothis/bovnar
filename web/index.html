@@ -962,7 +962,14 @@ section { position: relative; z-index: 1; }
 .demo-poster.is-launched { display: none; }
 
 /* ── COMPARISON ── */
-#comparison { border-top: 1px solid var(--border); }
+/* Demoted to a supporting reference below Quick Start: tighter padding, a smaller
+   muted heading, and a slightly recessed background so it reads as secondary. */
+#comparison { border-top: 1px solid var(--border); background: var(--sidebar-bg); }
+#comparison .section-inner { padding-top: 2rem; padding-bottom: 2rem; }
+#comparison .section-h2 { font-size: clamp(1.15rem, 1.8vw, 1.5rem); color: var(--text2); margin-bottom: 0.6rem; }
+#comparison .section-h2 em { color: var(--text2); }
+#comparison .section-p { font-size: 0.88rem; color: var(--text3); }
+#comparison .cmp-scroll { margin-top: 1.1rem; }
 
 .cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 1.6rem; }
 .comparison-table {
@@ -2436,6 +2443,8 @@ a[data-doc] { cursor: pointer; }
 
 #launch-demo {
   --editor-bg:   #1e1e1e;
+  --stream-bg:   #121d2e;   /* read-only decoded .bvnr stream — blue-tinted so it
+                               reads as output, never an editable surface */
   --sidebar-bg:  #252526;
   --panel-bg:    #252526;
   --panel-bg2:   #2d2d2d;
@@ -2495,6 +2504,7 @@ a[data-doc] { cursor: pointer; }
    backdrops; only the surrounding panels, code and controls go light. */
 html[data-theme="light"] #launch-demo {
   --editor-bg:   #ffffff;
+  --stream-bg:   #e4ecf7;   /* read-only decoded .bvnr stream (see dark scope) */
   --sidebar-bg:  #f3f3f3;
   --panel-bg:    #f3f3f3;
   --panel-bg2:   #ececec;
@@ -2714,7 +2724,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 
 /* frame source */
 #launch-demo pre.frame {
-  background: var(--editor-bg); border: 1px solid var(--border); border-radius: 4px;
+  background: var(--stream-bg); border: 1px solid var(--border); border-radius: 4px;
   font-family: var(--mono); font-size: 0.76rem; line-height: 1.55;
   padding: 0.5rem 0; overflow-x: auto; max-height: 340px; overflow-y: auto;
 }
@@ -2818,6 +2828,23 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 #launch-demo .exact-row.drift .lab { color: var(--text); }
 #launch-demo .exact-row.drift .val { color: var(--red); font-weight: 500; }
 #launch-demo .exact-note { font-family: var(--mono); font-size: 0.64rem; color: var(--text3); margin-top: 0.45rem; line-height: 1.5; }
+
+/* "How it works" expander — a native <details> styled to match the demo chrome.
+   One copy in the header explains the round-trip shared by all three demos. */
+#launch-demo .how { margin-top: 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg); overflow: hidden; }
+#launch-demo .how > summary { cursor: pointer; list-style: none; padding: 0.6rem 0.85rem; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.04em; color: var(--text2); display: flex; align-items: center; gap: 0.55rem; user-select: none; }
+#launch-demo .how > summary::-webkit-details-marker { display: none; }
+#launch-demo .how > summary::before { content: '▸'; color: var(--cyan); font-size: 0.68rem; transition: transform 0.15s ease; }
+#launch-demo .how[open] > summary::before { transform: rotate(90deg); }
+#launch-demo .how > summary:hover { color: var(--text); }
+#launch-demo .how-body { padding: 0.2rem 0.95rem 0.85rem; border-top: 1px solid var(--border); }
+#launch-demo .how-body ol { margin: 0.7rem 0 0; padding-left: 1.25rem; display: grid; gap: 0.5rem; }
+#launch-demo .how-body li { font-size: 0.83rem; line-height: 1.55; color: var(--text2); }
+#launch-demo .how-body li b { color: var(--text); font-weight: 600; }
+#launch-demo .how-body code { font-family: var(--mono); font-size: 0.9em; color: var(--cyan); }
+#launch-demo .how-flow { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); font-family: var(--mono); font-size: 0.72rem; color: var(--text3); line-height: 1.8; }
+#launch-demo .how-flow b { color: var(--teal); font-weight: 600; }
+#launch-demo .how-flow .arr { color: var(--text3); margin: 0 0.35rem; }
 </style>
 <section id="launch-demo" aria-label="Live Mission Control demo">
 <header class="intro">
@@ -2829,6 +2856,23 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
     <em>decoded</em> values, a full round-trip through the format. Units, bit-widths and types ride
     <em>inside the stream</em>; no schema required. Hover a gauge to jump to the line it decoded.
   </p>
+  <details class="how">
+    <summary>How it works — the full round-trip</summary>
+    <div class="how-body">
+      <ol>
+        <li>The config on the left isn't a form — it's a real <code>.bvnr</code> document you can edit freely. Nothing changes until you press <b>Apply</b>.</li>
+        <li>When you do, it's read straight from the text. If something doesn't make sense, you get a friendly error pointing at the line, and the live view <b>keeps running on the last good config</b> — a bad edit can't break it.</li>
+        <li>Those values set the scene, and the demo takes it from there.</li>
+        <li>From then on, every reading is <b>written out and read back as <code>.bvnr</code></b>, the same format you just edited — units and types travel right alongside the numbers.</li>
+        <li>So the gauges and charts show <b>only what came back through the format</b>, never a number taken on faith. Flip on the noise and you can watch it shrug off a garbled frame.</li>
+        <li><b>Hover any gauge</b> to light up the exact line it was read from.</li>
+      </ol>
+      <div class="how-flow">
+        every number you see travels:<br>
+        <b>edit</b><span class="arr">→</span><b>parse</b><span class="arr">→</span><b>simulate</b><span class="arr">→</span><b>encode</b><span class="arr">→</span><b>(corrupt?)</b><span class="arr">→</span><b>parse</b><span class="arr">→</span><b>display</b>
+      </div>
+    </div>
+  </details>
   <div class="demo-tabs" role="tablist">
     <button class="demo-tab active" data-demo="mc" role="tab">◐ Mission Control</button>
     <button class="demo-tab" data-demo="fin" role="tab">$ Trading Desk</button>
@@ -3160,97 +3204,6 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
       <code>float:64</code>), or add them for full parser validation. Both modes are unambiguous —
       and a <code>.bvnr</code> file stays UTF-8 prose you can read in any editor, no toolchain required.
     </p>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════════
-     COMPARISON
-══════════════════════════════════════════════ -->
-<section id="comparison">
-  <div class="section-inner">
-    <div class="section-label reveal">landscape</div>
-    <h2 class="section-h2 reveal reveal-delay-1">Where Bovnar <em>fits.</em></h2>
-    <p class="section-p reveal reveal-delay-2">
-      Every format is a set of trade-offs. Bovnar's are deliberate.
-    </p>
-    <div class="cmp-scroll reveal reveal-delay-2">
-    <table class="comparison-table">
-      <thead>
-        <tr>
-          <th>Format</th>
-          <th>Human readable</th>
-          <th>Type-precise</th>
-          <th>Physical units</th>
-          <th>Schema-free</th>
-          <th>Binary embed</th>
-          <th>Multi-dim arrays</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>JSON</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>YAML</td>
-          <td class="check">✓</td>
-          <td class="partial">partial</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>TOML</td>
-          <td class="check">✓</td>
-          <td class="partial">partial</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>CBOR</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>Protobuf</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td style="color:var(--blue);font-family:var(--mono);font-size:0.82rem;">BOVNAR</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="7">
-            <span class="bf-tag">Best for</span><span class="bf-text">Bovnar is the format to reach for when <b>units must travel with the data</b> and the receiver may not share a schema — <b>scientific instrumentation &amp; metrology, industrial telemetry &amp; control, IoT sensor networks, and long-term measurement archival</b>. Where a wrong unit is a failure, it is unit-safe by construction; for simple REST payloads reach for JSON, for minimal wire size reach for CBOR or Protobuf.</span>
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-    </div>
   </div>
 </section>
 
@@ -3613,6 +3566,97 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     COMPARISON (secondary — supporting reference under Quick Start)
+══════════════════════════════════════════════ -->
+<section id="comparison">
+  <div class="section-inner">
+    <div class="section-label reveal">landscape</div>
+    <h2 class="section-h2 reveal reveal-delay-1">Where Bovnar <em>fits.</em></h2>
+    <p class="section-p reveal reveal-delay-2">
+      Every format is a set of trade-offs. Bovnar's are deliberate.
+    </p>
+    <div class="cmp-scroll reveal reveal-delay-2">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Format</th>
+          <th>Human readable</th>
+          <th>Type-precise</th>
+          <th>Physical units</th>
+          <th>Schema-free</th>
+          <th>Binary embed</th>
+          <th>Multi-dim arrays</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>JSON</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+        </tr>
+        <tr>
+          <td>YAML</td>
+          <td class="check">✓</td>
+          <td class="partial">partial</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+        </tr>
+        <tr>
+          <td>TOML</td>
+          <td class="check">✓</td>
+          <td class="partial">partial</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+        </tr>
+        <tr>
+          <td>CBOR</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+        </tr>
+        <tr>
+          <td>Protobuf</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="cross">✗</td>
+        </tr>
+        <tr>
+          <td style="color:var(--blue);font-family:var(--mono);font-size:0.82rem;">BOVNAR</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="7">
+            <span class="bf-tag">Best for</span><span class="bf-text">Bovnar is the format to reach for when <b>units must travel with the data</b> and the receiver may not share a schema — <b>scientific instrumentation &amp; metrology, industrial telemetry &amp; control, IoT sensor networks, and long-term measurement archival</b>. Where a wrong unit is a failure, it is unit-safe by construction; for simple REST payloads reach for JSON, for minimal wire size reach for CBOR or Protobuf.</span>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
     </div>
   </div>
 </section>
@@ -5730,7 +5774,8 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.hist.push({ last: parseFloat(lastS), bid: parseFloat(bidS), ask: parseFloat(askS), ema: sim.ema });
     if (sim.hist.length > MAXHIST) { sim.hist.shift(); for (const t of sim.trades) t.i--; }
     while (sim.trades.length && sim.trades[0].i < 0) sim.trades.shift();
-    pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS, miss);
+    const lines = m ? { last: m.last && m.last.line, bid: m.bid && m.bid.line, ask: m.ask && m.ask.line } : {};
+    pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS, miss, lines);
     $('fs-seq').textContent = sim.seq; $('fs-drop').textContent = sim.dropped;
     const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
   }
@@ -5740,25 +5785,30 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   function renderFrame(text, errs) {
     const el = new Set(errs.map((e) => e.line));
-    $('fframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
+    $('fframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '" data-line="' + (i + 1) + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
+    applyHover();
   }
-  function renderBlotter(lastS, bidS, askS, miss) {
-    miss = miss || {};
+  function renderBlotter(lastS, bidS, askS, miss, lines) {
+    miss = miss || {}; lines = lines || {};
     const dp = sim.decimals, cur = sim.currency, last = parseFloat(lastS);
     const prev = sim.hist.length > 1 ? sim.hist[sim.hist.length - 2].last : last;
     const dir = last > prev ? 'up' : last < prev ? 'down' : '';
     const spread = parseFloat(askS) - parseFloat(bidS);
-    const g = (cls, k, v, u) => '<div class="gauge ' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
+    // `ln` (optional) links a tile to the frame line it decoded, so hovering the
+    // gauge highlights that source line and vice-versa (see wireHover below).
+    const dl = (ln) => (ln != null ? ' data-line="' + ln + '"' : '');
+    const g = (cls, k, v, u, ln) => '<div class="gauge ' + cls + '"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
     // a feed field that failed to decode shows a blank, red "no data" tile that
     // holds the same height as its value tile (matches the Mission Control gauges)
-    const ge = (cls, k) => '<div class="gauge ' + cls + ' err"><div class="k">' + k + '</div><div class="v">no data</div></div>';
+    const ge = (cls, k, ln) => '<div class="gauge ' + cls + ' err"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">no data</div></div>';
     const spreadMiss = miss.bid || miss.ask;
     $('fgauges').innerHTML =
-      (miss.last ? ge('span2 big', 'Last') : g('span2 big ' + dir, 'Last', last.toFixed(dp), cur)) +
-      (miss.bid ? ge('', 'Bid') : g('', 'Bid', parseFloat(bidS).toFixed(dp), cur)) +
-      (miss.ask ? ge('', 'Ask') : g('', 'Ask', parseFloat(askS).toFixed(dp), cur)) +
-      (spreadMiss ? ge('', 'Spread') : g('', 'Spread', spread.toFixed(dp), cur)) +
+      (miss.last ? ge('span2 big', 'Last', lines.last) : g('span2 big ' + dir, 'Last', last.toFixed(dp), cur, lines.last)) +
+      (miss.bid ? ge('', 'Bid', lines.bid) : g('', 'Bid', parseFloat(bidS).toFixed(dp), cur, lines.bid)) +
+      (miss.ask ? ge('', 'Ask', lines.ask) : g('', 'Ask', parseFloat(askS).toFixed(dp), cur, lines.ask)) +
+      (spreadMiss ? ge('', 'Spread', lines.bid) : g('', 'Spread', spread.toFixed(dp), cur, lines.bid)) +
       g('', 'Position', sim.pos, 'sh') + g('', 'Fills', sim.fills, '');
+    applyHover();
     const feeB = microsToNum(sim.feeMicros), feeF = sim.feeF;
     const pnlB = microsToNum(sim.cashMicros + BigInt(sim.pos) * toMicros(lastS));
     const pnlF = fr(sim.cashF + fr(sim.pos * last));
@@ -5867,6 +5917,21 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   $('fnoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
   $('fresync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
   if (window.ResizeObserver) new ResizeObserver(() => { sizeCanvas(); drawChart(); }).observe(cv);
+
+  /* Gauge ↔ frame-source hover coupling (mirrors Mission Control). hoverLine is
+     held in state and re-applied after every redraw so the ~6×/s rebuild can't
+     drop the highlight. Scoped to this demo's two containers. Declared before the
+     seed step() loop below so applyHover() isn't called in the let's TDZ. */
+  let hoverLine = null;
+  function applyHover() {
+    [$('fgauges'), $('fframesrc')].forEach((c) => c && c.querySelectorAll('[data-line]').forEach((n) =>
+      n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine)));
+  }
+  function wireHover(c) {
+    c.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-line]'); if (!el) return; const ln = el.getAttribute('data-line'); if (ln !== hoverLine) { hoverLine = ln; applyHover(); } });
+    c.addEventListener('mouseleave', () => { if (hoverLine != null) { hoverLine = null; applyHover(); } });
+  }
+  wireHover($('fgauges')); wireHover($('fframesrc'));
 
   $('fcfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig();
   for (let i = 0; i < 3; i++) step();   // seed a few ticks so the panel/chart aren't blank on first view
@@ -5997,7 +6062,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     }
     sim.hist.push({ temp: D.temp, set: D.set }); if (sim.hist.length > 180) sim.hist.shift();
 
-    pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D, miss);
+    const lines = m ? { temp: m.temp && m.temp.line, set: m.setpoint && m.setpoint.line, press: m.pressure && m.pressure.line,
+      level: m.level && m.level.line, flow: m.flow_in && m.flow_in.line, heat: m.heater && m.heater.line, agit: m.agitator && m.agitator.line } : {};
+    pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D, miss, lines);
     $('is-cyc').textContent = sim.cyc; $('is-drop').textContent = sim.dropped;
     const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
   }
@@ -6008,25 +6075,30 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   function renderFrame(text, errs) {
     const el = new Set(errs.map((e) => e.line));
-    $('iframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
+    $('iframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '" data-line="' + (i + 1) + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
+    applyHover();
   }
-  function renderHMI(D, miss) {
-    miss = miss || {};
+  function renderHMI(D, miss, lines) {
+    miss = miss || {}; lines = lines || {};
     const hiT = (D.status & 8), hiP = (D.status & 16), loL = (D.status & 32);
     $('ialarms').innerHTML = BITS.filter((b) => D.status & b.m).map((b) => '<span class="alarm-chip ' + b.cls + '">' + b.name + '</span>').join('') ||
       '<span class="alarm-chip ok">● NOMINAL</span>';
-    const g = (cls, k, v, u) => '<div class="gauge ' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
+    // `ln` (optional) links a tile to the frame line it decoded, so hovering the
+    // gauge highlights that source line and vice-versa (see wireHover below).
+    const dl = (ln) => (ln != null ? ' data-line="' + ln + '"' : '');
+    const g = (cls, k, v, u, ln) => '<div class="gauge ' + cls + '"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
     // a register that failed to decode shows a blank, red "no data" tile that
     // holds the same height as its value tile (matches the Mission Control gauges)
-    const ge = (cls, k) => '<div class="gauge ' + cls + ' err"><div class="k">' + k + '</div><div class="v">no data</div></div>';
+    const ge = (cls, k, ln) => '<div class="gauge ' + cls + ' err"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">no data</div></div>';
     $('igauges').innerHTML =
-      (miss.temp ? ge('span2 big', 'Temperature') : g('span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''), 'Temperature', D.temp.toFixed(2), '°C')) +
-      (miss.set ? ge('', 'Setpoint') : g('', 'Setpoint', D.set.toFixed(2), '°C')) +
-      (miss.press ? ge('', 'Pressure') : g(hiP ? 'down' : '', 'Pressure', D.press.toFixed(2), 'bar')) +
-      (miss.level ? ge('', 'Level') : g(loL ? 'down' : '', 'Level', D.level.toFixed(1), '%')) +
-      (miss.flow ? ge('', 'Flow in') : g('', 'Flow in', D.flow.toFixed(1), 'L/min')) +
-      (miss.heat ? ge('', 'Heater') : g('', 'Heater', D.heat.toFixed(0), '%')) +
-      (miss.agit ? ge('', 'Agitator') : g('', 'Agitator', D.agit, 'rpm'));
+      (miss.temp ? ge('span2 big', 'Temperature', lines.temp) : g('span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''), 'Temperature', D.temp.toFixed(2), '°C', lines.temp)) +
+      (miss.set ? ge('', 'Setpoint', lines.set) : g('', 'Setpoint', D.set.toFixed(2), '°C', lines.set)) +
+      (miss.press ? ge('', 'Pressure', lines.press) : g(hiP ? 'down' : '', 'Pressure', D.press.toFixed(2), 'bar', lines.press)) +
+      (miss.level ? ge('', 'Level', lines.level) : g(loL ? 'down' : '', 'Level', D.level.toFixed(1), '%', lines.level)) +
+      (miss.flow ? ge('', 'Flow in', lines.flow) : g('', 'Flow in', D.flow.toFixed(1), 'L/min', lines.flow)) +
+      (miss.heat ? ge('', 'Heater', lines.heat) : g('', 'Heater', D.heat.toFixed(0), '%', lines.heat)) +
+      (miss.agit ? ge('', 'Agitator', lines.agit) : g('', 'Agitator', D.agit, 'rpm', lines.agit));
+    applyHover();
     // raw register vs self-describing Bovnar
     const reg = Math.max(0, Math.min(65535, Math.round(D.temp * 256)));
     const naive = reg / (sim.mismatch ? 16 : 256);
@@ -6268,6 +6340,21 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   $('inoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
   $('iresync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
   if (window.ResizeObserver) new ResizeObserver(() => { sizeCanvas(); draw(); }).observe(cv);
+
+  /* Gauge ↔ frame-source hover coupling (mirrors Mission Control). hoverLine is
+     held in state and re-applied after every redraw so the ~6×/s rebuild can't
+     drop the highlight. Scoped to this demo's two containers. Declared before the
+     seed step() loop below so applyHover() isn't called in the let's TDZ. */
+  let hoverLine = null;
+  function applyHover() {
+    [$('igauges'), $('iframesrc')].forEach((c) => c && c.querySelectorAll('[data-line]').forEach((n) =>
+      n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine)));
+  }
+  function wireHover(c) {
+    c.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-line]'); if (!el) return; const ln = el.getAttribute('data-line'); if (ln !== hoverLine) { hoverLine = ln; applyHover(); } });
+    c.addEventListener('mouseleave', () => { if (hoverLine != null) { hoverLine = null; applyHover(); } });
+  }
+  wireHover($('igauges')); wireHover($('iframesrc'));
 
   $('icfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig();
   for (let i = 0; i < 3; i++) step();   // seed a few cycles so the HMI/trend aren't blank on first view

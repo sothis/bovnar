@@ -3141,12 +3141,12 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">01</span> Bit-width</div>
         <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span></div>
-        <div class="anat-pillar-d">Exact storage width, 8&ndash;64 bits. A <code>uint:16</code> can never silently widen into a 64-bit float.</div>
+        <div class="anat-pillar-d">Exact storage width, declared inline and never inferred &mdash; from a single bit to thousands. A <code>uint:16</code> stays exactly 16 bits: it can&rsquo;t silently widen to 64, nor be reinterpreted as a float.</div>
       </div>
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">02</span> Numeric base</div>
         <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_2</span><span class="c-ann">&gt;</span> <span class="c-val">11001010</span></div>
-        <div class="anat-pillar-d">Binary, hex, or decimal &mdash; the radix is declared, so <code>11001010</code> is never mistaken for a decimal.</div>
+        <div class="anat-pillar-d">Binary, hex, or decimal &mdash; the radix is declared, so <code>11001010</code> is never mistaken for a decimal. Values whose digits include letters (e.g. hex <code>ff</code>) are written as a quoted string: <code>&lt;uint:_16&gt; "ff"</code>.</div>
       </div>
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">03</span> Physical unit</div>

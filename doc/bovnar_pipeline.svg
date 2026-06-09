@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1020" viewBox="0 0 1000 1020" font-family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <defs>
+    <filter id="card" x="-20%" y="-40%" width="140%" height="180%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 Z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrR" markerWidth="10" markerHeight="10" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 Z" fill="#cbd5e1"/>
+    </marker>
+    <marker id="arrV" markerWidth="10" markerHeight="10" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 Z" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="1020" fill="#f8fafc"/>
+
+  <!-- Header -->
+  <text x="40" y="50" font-size="25" font-weight="700" fill="#0f172a">Bovnar — reference implementation</text>
+  <text x="40" y="76" font-size="13.5" fill="#64748b">The C99 read → event → write pipeline. Dashed blocks are application hook / consumption points where your code plugs in.</text>
+
+  <!-- ===== central spine ===== -->
+
+  <!-- input pill -->
+  <rect x="350" y="106" width="300" height="34" rx="17" fill="#e2e8f0" stroke="#cbd5e1"/>
+  <text x="500" y="128" text-anchor="middle" font-size="12.5" fill="#475569">input · file · fd · socket · memory</text>
+  <path d="M500,140 L500,160" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- IO Source -->
+  <g filter="url(#card)">
+    <rect x="350" y="162" width="300" height="56" rx="10" fill="#ffffff" stroke="#dbe4f0"/>
+    <rect x="350" y="162" width="6" height="56" rx="3" fill="#2563eb"/>
+  </g>
+  <text x="374" y="187" font-size="14.5" font-weight="600" fill="#0f172a">IO Source · pull</text>
+  <text x="374" y="206" font-size="11" fill="#64748b" font-family="ui-monospace, Menlo, monospace">src/io — from_fd / from_mem</text>
+
+  <path d="M500,218 L500,256" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Lexer -->
+  <g filter="url(#card)">
+    <rect x="350" y="258" width="300" height="56" rx="10" fill="#ffffff" stroke="#dbe4f0"/>
+    <rect x="350" y="258" width="6" height="56" rx="3" fill="#2563eb"/>
+  </g>
+  <text x="374" y="283" font-size="14.5" font-weight="600" fill="#0f172a">Lexer · tokeniser</text>
+  <text x="374" y="302" font-size="11" fill="#64748b" font-family="ui-monospace, Menlo, monospace">src/lexer — state table</text>
+
+  <path d="M500,314 L500,352" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="512" y="337" font-size="11" fill="#d97706">⚡ unverified events</text>
+
+  <!-- Validator -->
+  <g filter="url(#card)">
+    <rect x="350" y="354" width="300" height="56" rx="10" fill="#ffffff" stroke="#dbe4f0"/>
+    <rect x="350" y="354" width="6" height="56" rx="3" fill="#2563eb"/>
+  </g>
+  <text x="374" y="379" font-size="14.5" font-weight="600" fill="#0f172a">Validator</text>
+  <text x="374" y="398" font-size="11" fill="#64748b" font-family="ui-monospace, Menlo, monospace">src/validator — types · units · defaults</text>
+
+  <path d="M500,410 L500,448" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="512" y="433" font-size="11" fill="#059669">✓ verified events</text>
+
+  <!-- Reader -->
+  <g filter="url(#card)">
+    <rect x="350" y="450" width="300" height="56" rx="10" fill="#ffffff" stroke="#dbe4f0"/>
+    <rect x="350" y="450" width="6" height="56" rx="3" fill="#2563eb"/>
+  </g>
+  <text x="374" y="475" font-size="14.5" font-weight="600" fill="#0f172a">Reader · orchestrator</text>
+  <text x="374" y="494" font-size="11" fill="#64748b" font-family="ui-monospace, Menlo, monospace">drives pull → lex → validate · resync</text>
+
+  <path d="M500,506 L500,544" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Event API -->
+  <g filter="url(#card)">
+    <rect x="350" y="546" width="300" height="56" rx="10" fill="#fffbeb" stroke="#fcd9a3"/>
+    <rect x="350" y="546" width="6" height="56" rx="3" fill="#d97706"/>
+  </g>
+  <text x="374" y="571" font-size="14.5" font-weight="600" fill="#0f172a">Event API · SAX</text>
+  <text x="374" y="590" font-size="11" fill="#92744a" font-family="ui-monospace, Menlo, monospace">(event, data) callbacks</text>
+
+  <path d="M500,602 L500,640" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Canon observer -->
+  <g filter="url(#card)">
+    <rect x="350" y="642" width="300" height="56" rx="10" fill="#fff1f3" stroke="#f9c4ce"/>
+    <rect x="350" y="642" width="6" height="56" rx="3" fill="#e11d48"/>
+  </g>
+  <text x="374" y="667" font-size="14.5" font-weight="600" fill="#0f172a">Canon observer</text>
+  <text x="374" y="686" font-size="11" fill="#9f5563" font-family="ui-monospace, Menlo, monospace">src/writer — re-serialises the event stream</text>
+
+  <path d="M500,698 L500,736" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Writer -->
+  <g filter="url(#card)">
+    <rect x="350" y="738" width="300" height="56" rx="10" fill="#fff1f3" stroke="#f9c4ce"/>
+    <rect x="350" y="738" width="6" height="56" rx="3" fill="#e11d48"/>
+  </g>
+  <text x="374" y="763" font-size="14.5" font-weight="600" fill="#0f172a">Writer · serialiser</text>
+  <text x="374" y="782" font-size="11" fill="#9f5563" font-family="ui-monospace, Menlo, monospace">src/writer — pretty / canonical output</text>
+
+  <path d="M500,794 L500,832" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- IO Sink -->
+  <g filter="url(#card)">
+    <rect x="350" y="834" width="300" height="56" rx="10" fill="#ffffff" stroke="#dbe4f0"/>
+    <rect x="350" y="834" width="6" height="56" rx="3" fill="#2563eb"/>
+  </g>
+  <text x="374" y="859" font-size="14.5" font-weight="600" fill="#0f172a">IO Sink · push</text>
+  <text x="374" y="878" font-size="11" fill="#64748b" font-family="ui-monospace, Menlo, monospace">src/io — to_fd / to_mem</text>
+
+  <path d="M500,890 L500,910" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- output pill -->
+  <rect x="350" y="912" width="300" height="34" rx="17" fill="#e2e8f0" stroke="#cbd5e1"/>
+  <text x="500" y="934" text-anchor="middle" font-size="12.5" fill="#475569">output · file · fd · socket · memory</text>
+
+  <!-- ============ LEFT RAIL: application hooks (dashed violet) ============ -->
+  <!-- Custom source -->
+  <g filter="url(#card)">
+    <rect x="58" y="166" width="234" height="50" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-dasharray="5 3"/>
+    <rect x="58" y="166" width="6" height="50" rx="3" fill="#7c3aed"/>
+  </g>
+  <text x="80" y="188" font-size="13.5" font-weight="600" fill="#0f172a">Custom source</text>
+  <text x="80" y="205" font-size="10.5" fill="#6d3fc4" font-family="ui-monospace, Menlo, monospace">bvnr_pull_fn — your transport</text>
+  <path d="M292,191 L350,190" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrV)"/>
+
+  <!-- Error handler -->
+  <g filter="url(#card)">
+    <rect x="58" y="453" width="234" height="50" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-dasharray="5 3"/>
+    <rect x="58" y="453" width="6" height="50" rx="3" fill="#7c3aed"/>
+  </g>
+  <text x="80" y="475" font-size="13.5" font-weight="600" fill="#0f172a">Error handler</text>
+  <text x="80" y="492" font-size="10.5" fill="#6d3fc4" font-family="ui-monospace, Menlo, monospace">bvnr_on_error_fn · resync</text>
+  <path d="M292,478 L350,478" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrV)"/>
+
+  <!-- Custom sink -->
+  <g filter="url(#card)">
+    <rect x="58" y="837" width="234" height="50" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-dasharray="5 3"/>
+    <rect x="58" y="837" width="6" height="50" rx="3" fill="#7c3aed"/>
+  </g>
+  <text x="80" y="859" font-size="13.5" font-weight="600" fill="#0f172a">Custom sink</text>
+  <text x="80" y="876" font-size="10.5" fill="#6d3fc4" font-family="ui-monospace, Menlo, monospace">bvnr_push_fn — your transport</text>
+  <path d="M292,862 L350,862" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrV)"/>
+
+  <!-- ============ RIGHT: consumers + emit hook ============ -->
+  <!-- DOM builder (built-in consumer) -->
+  <g filter="url(#card)">
+    <rect x="710" y="512" width="248" height="50" rx="10" fill="#ecfdf5" stroke="#bbf0d4"/>
+    <rect x="710" y="512" width="6" height="50" rx="3" fill="#059669"/>
+  </g>
+  <text x="732" y="534" font-size="13.5" font-weight="600" fill="#0f172a">DOM builder</text>
+  <text x="732" y="551" font-size="10.5" fill="#3f7d63" font-family="ui-monospace, Menlo, monospace">src/dom — builds the tree</text>
+  <path d="M650,556 L678,556 L678,537 L710,537" stroke="#cbd5e1" stroke-width="1.6" fill="none" marker-end="url(#arrR)"/>
+
+  <!-- DOM query consumption (app) -->
+  <g filter="url(#card)">
+    <rect x="710" y="578" width="248" height="50" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-dasharray="5 3"/>
+    <rect x="710" y="578" width="6" height="50" rx="3" fill="#7c3aed"/>
+  </g>
+  <text x="732" y="600" font-size="13.5" font-weight="600" fill="#0f172a">Query the tree</text>
+  <text x="732" y="617" font-size="10.5" fill="#6d3fc4" font-family="ui-monospace, Menlo, monospace">lookup · array_at · getters</text>
+  <path d="M834,562 L834,578" stroke="#7c3aed" stroke-width="1.6" fill="none" stroke-dasharray="5 3" marker-end="url(#arrV)"/>
+
+  <!-- Consume events (app hook) -->
+  <g filter="url(#card)">
+    <rect x="710" y="644" width="248" height="50" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-dasharray="5 3"/>
+    <rect x="710" y="644" width="6" height="50" rx="3" fill="#7c3aed"/>
+  </g>
+  <text x="732" y="666" font-size="13.5" font-weight="600" fill="#0f172a">Consume events</text>
+  <text x="732" y="683" font-size="10.5" fill="#6d3fc4" font-family="ui-monospace, Menlo, monospace">on_verified / on_unverified</text>
+  <path d="M650,584 L678,584 L678,669 L710,669" stroke="#7c3aed" stroke-width="1.6" fill="none" stroke-dasharray="5 3" marker-end="url(#arrV)"/>
+
+  <!-- Emit values (app hook into writer) -->
+  <g filter="url(#card)">
+    <rect x="710" y="741" width="248" height="50" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-dasharray="5 3"/>
+    <rect x="710" y="741" width="6" height="50" rx="3" fill="#7c3aed"/>
+  </g>
+  <text x="732" y="763" font-size="13.5" font-weight="600" fill="#0f172a">Emit values</text>
+  <text x="732" y="780" font-size="10.5" fill="#6d3fc4" font-family="ui-monospace, Menlo, monospace">bvnr_write_uint / float / …</text>
+  <path d="M710,766 L650,766" stroke="#7c3aed" stroke-width="1.6" fill="none" stroke-dasharray="5 3" marker-end="url(#arrV)"/>
+
+  <!-- read / write lane labels -->
+  <text x="40" y="290" font-size="11" font-weight="600" letter-spacing="1.5" fill="#2563eb">READ</text>
+  <text x="40" y="700" font-size="11" font-weight="600" letter-spacing="1.5" fill="#e11d48">WRITE</text>
+
+  <!-- ===== legend ===== -->
+  <g font-size="11.5" fill="#475569">
+    <rect x="40" y="966" width="22" height="13" rx="3" fill="#ffffff" stroke="#2563eb"/>
+    <text x="70" y="977">read core</text>
+    <rect x="150" y="966" width="22" height="13" rx="3" fill="#fffbeb" stroke="#d97706"/>
+    <text x="180" y="977">event hinge</text>
+    <rect x="272" y="966" width="22" height="13" rx="3" fill="#fff1f3" stroke="#e11d48"/>
+    <text x="302" y="977">write core</text>
+    <rect x="392" y="966" width="22" height="13" rx="3" fill="#ecfdf5" stroke="#059669"/>
+    <text x="422" y="977">built-in consumer</text>
+    <rect x="556" y="966" width="22" height="13" rx="3" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="4 2"/>
+    <text x="586" y="977">application hook / consumption point</text>
+  </g>
+</svg>

@@ -9,7 +9,19 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#1e1e1e">
+<meta name="theme-color" content="#e8e8e8">
+<script>
+/* Apply the theme before first paint to avoid a flash. Light is the default;
+   dark only applies if the user explicitly toggled to it. */
+(function () {
+  try {
+    if (localStorage.getItem('bovnar-theme') !== 'dark')
+      document.documentElement.setAttribute('data-theme', 'light');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
 <meta name="description" content="Bovnar (BVNR) — unit-safe serialization for science, industry and finance. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/">
@@ -78,7 +90,127 @@
 
   --mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
   --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  color-scheme: dark;
 }
+
+/* ── Light theme ──
+   Redefining the same custom properties flips the whole site, since nearly
+   every rule reads through var(--*). The handful of hard-coded colours that
+   don't are corrected in the override block further down. The embedded demo
+   panels (#launch-demo et al.) scope their own variables and stay dark on
+   purpose — they emulate standalone dark application screens. */
+html[data-theme="light"] {
+  --editor-bg:   #ffffff;
+  --sidebar-bg:  #f3f3f3;
+  --panel-bg:    #f3f3f3;
+  --titlebar-bg: #e8e8e8;
+  --tabbar-bg:   #ececec;
+  --statusbar:   #007acc;
+  --border:      #d4d4d4;
+  --border-hi:   #007acc;
+  --select-bg:   #add6ff;
+
+  --text:   #1f1f1f;
+  --text2:  #444444;
+  --text3:  #6b6b6b;
+
+  --blue:    #0451a5;
+  --blue2:   #0066b8;
+  --teal:    #267f99;
+  --green:   #098658;
+  --green2:  #098658;
+  --yellow:  #9a7d0a;
+  --orange:  #b5670c;
+  --cyan:    #0070c1;
+  --red:     #cd3131;
+  --purple:  #a626a4;
+  --pink:    #c2185b;
+
+  /* Bovnar token colors — vivid high-contrast light counterparts */
+  --c-comment:  #5b6b7a;
+  --c-sigil:    #8200d6;
+  --c-key:      #0b5bd3;
+  --c-eq:       #d11b2b;
+  --c-ann:      #7a5c00;
+  --c-type:     #16191d;
+  --c-param:    #b1430a;
+  --c-val:      #a35200;
+  --c-unit:     #0a7a66;
+  --c-str:      #178021;
+  --c-semi:     #7a7a7a;
+  --c-struct:   #b1430a;
+
+  color-scheme: light;
+}
+
+/* Light overrides for the colours that don't go through var(--*) */
+html[data-theme="light"] ::-webkit-scrollbar-track { background: var(--editor-bg); }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c1c1c1; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+html[data-theme="light"] * { scrollbar-color: #c1c1c1 var(--editor-bg); }
+
+/* dark hairline borders → light */
+html[data-theme="light"] nav { border-bottom-color: var(--border); }
+
+/* hover wash flips from white-on-dark to black-on-light */
+html[data-theme="light"] .nav-links li a:hover { background: rgba(0,0,0,0.05); }
+html[data-theme="light"] .comparison-table tbody tr:hover td,
+html[data-theme="light"] #doc-content tr:hover td { background: rgba(0,0,0,0.03); }
+html[data-theme="light"] .pg-row:hover { background: rgba(0,0,0,0.04); }
+html[data-theme="light"] .feature-card:hover { background: #eaeaea; }
+
+/* dark inset code/quote panels → faint light tint */
+html[data-theme="light"] .feature-example { background: rgba(0,0,0,0.05); }
+html[data-theme="light"] .anat-chip { background: rgba(0,0,0,0.05); }
+
+/* C / Python / shell sample-code tokens (hard-coded neon for dark) */
+html[data-theme="light"] .cl-kw,
+html[data-theme="light"] .cl-op,
+html[data-theme="light"] .py-kw,
+html[data-theme="light"] .sh-cmd  { color: #0b39c4; }
+html[data-theme="light"] .cl-type,
+html[data-theme="light"] .py-bi   { color: #0a7a8c; }
+html[data-theme="light"] .cl-fn,
+html[data-theme="light"] .py-fn   { color: #8a5a00; }
+html[data-theme="light"] .cl-str,
+html[data-theme="light"] .py-str,
+html[data-theme="light"] .sh-flag { color: #b1102b; }
+html[data-theme="light"] .cl-num,
+html[data-theme="light"] .py-num  { color: #0a7d2c; }
+html[data-theme="light"] .cl-inc,
+html[data-theme="light"] .cl-pp   { color: #8200d6; }
+html[data-theme="light"] .cl-var,
+html[data-theme="light"] .sh-var  { color: #00228a; }
+
+/* highlight.js tokens (hard-coded neon for dark) */
+html[data-theme="light"] .hljs-keyword,
+html[data-theme="light"] .hljs-literal,
+html[data-theme="light"] .hljs-operator    { color: #0b39c4; }
+html[data-theme="light"] .hljs-built_in,
+html[data-theme="light"] .hljs-type,
+html[data-theme="light"] .hljs-name         { color: #0a7a8c; }
+html[data-theme="light"] .hljs-string,
+html[data-theme="light"] .hljs-symbol       { color: #b1102b; }
+html[data-theme="light"] .hljs-number       { color: #0a7d2c; }
+html[data-theme="light"] .hljs-comment      { color: #1a7a31; }
+html[data-theme="light"] .hljs-title,
+html[data-theme="light"] .hljs-function,
+html[data-theme="light"] .hljs-section      { color: #8a5a00; }
+html[data-theme="light"] .hljs-meta         { color: #8200d6; }
+html[data-theme="light"] .hljs-variable,
+html[data-theme="light"] .hljs-attr,
+html[data-theme="light"] .hljs-params,
+html[data-theme="light"] .hljs-property,
+html[data-theme="light"] .hljs-subst        { color: #00228a; }
+html[data-theme="light"] .hljs-punctuation  { color: #555555; }
+
+/* Bovnar tokens with hard-coded (non-var) colours */
+html[data-theme="light"] .hljs-bvn-special,
+html[data-theme="light"] .hljs-bvn-keyword  { color: #8200d6; }
+html[data-theme="light"] .hljs-bvn-esc      { color: #178021; }
+html[data-theme="light"] .hljs-bvn-refop    { color: #d11b2b; }
+html[data-theme="light"] .hljs-invalid      { color: #d11b2b; }
 
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -160,6 +292,31 @@ nav {
   letter-spacing: 0.01em;
 }
 .nav-links li a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+/* Theme toggle button */
+.theme-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 0.75rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--blue2); }
+.theme-toggle svg { width: 16px; height: 16px; display: block; }
+/* Show the icon that represents the theme you'd switch *to* */
+.theme-toggle .icon-sun  { display: none; }
+.theme-toggle .icon-moon { display: block; }
+html[data-theme="light"] .theme-toggle .icon-sun  { display: block; }
+html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
 
 .nav-cta {
   font-family: var(--mono);
@@ -1160,7 +1317,6 @@ section { position: relative; z-index: 1; }
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
   margin-top: 1.6rem;
-  background: var(--border);
 }
 .doc-card {
   display: flex;
@@ -1171,6 +1327,10 @@ section { position: relative; z-index: 1; }
   transition: background 0.15s;
   cursor: pointer;
   border-top: 2px solid transparent;
+  /* Hairline ring per card (fills the 1px grid gutters) so the separators
+     follow the real cards — empty trailing cells stay blank instead of
+     showing the grid background as darker panels. */
+  box-shadow: 0 0 0 1px var(--border);
 }
 .doc-card:hover {
   background: var(--panel-bg);
@@ -1278,7 +1438,7 @@ section { position: relative; z-index: 1; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
-  background: var(--border);
+  background: var(--sidebar-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
@@ -1293,11 +1453,12 @@ section { position: relative; z-index: 1; }
   color: var(--text2);
   text-decoration: none;
   transition: background 0.12s, color 0.12s;
+  /* Hairline ring per row (fills the 1px gutters) so the separators follow the
+     real entries — any leftover cell stays blank instead of showing the grid
+     background as a darker panel. */
+  box-shadow: 0 0 0 1px var(--border);
 }
 .doc-dl-list a:hover { background: var(--panel-bg); color: var(--blue); }
-/* odd item count: let the final entry fill the trailing column so no
-   empty (border-coloured) grid cell is left over */
-.doc-dl-list li:last-child { grid-column: 1 / -1; }
 .doc-dl-num { font-family: var(--mono); font-size: 0.62rem; color: var(--text3); flex-shrink: 0; }
 .doc-dl-ext {
   margin-left: auto;
@@ -2179,6 +2340,10 @@ a[data-doc] { cursor: pointer; }
     <li><a href="#docs">Docs</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>
+  <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme">
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+  </button>
 </nav>
 
 <!-- ══════════════════════════════════════════════
@@ -2324,6 +2489,69 @@ a[data-doc] { cursor: pointer; }
   --mono: 'JetBrains Mono', 'Consolas', monospace;
   --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
+/* Light theme for the demo — overrides the scoped dark variables above.
+   The <canvas> instrument screens (orbit globe / charts) keep their own dark
+   backdrops; only the surrounding panels, code and controls go light. */
+html[data-theme="light"] #launch-demo {
+  --editor-bg:   #ffffff;
+  --sidebar-bg:  #f3f3f3;
+  --panel-bg:    #f3f3f3;
+  --panel-bg2:   #ececec;
+  --titlebar-bg: #e8e8e8;
+  --border:      #d4d4d4;
+  --border-hi:   #007acc;
+  --select-bg:   #add6ff;
+  --up:          #0a7d2c;
+  --down:        #d11b2b;
+
+  --text:   #1f1f1f;
+  --text2:  #444444;
+  --text3:  #6b6b6b;
+
+  --blue:    #0b5bd3;
+  --blue2:   #0066b8;
+  --teal:    #0a7a66;
+  --green:   #178021;
+  --yellow:  #a35200;
+  --orange:  #b1430a;
+  --cyan:    #0070c1;
+  --red:     #d11b2b;
+
+  --c-comment:  #5b6b7a;
+  --c-sigil:    #8200d6;
+  --c-key:      #0b5bd3;
+  --c-eq:       #d11b2b;
+  --c-ann:      #7a5c00;
+  --c-type:     #16191d;
+  --c-width:    #c01a6b;
+  --c-base:     #0a7a66;
+  --c-param:    #b1430a;
+  --c-val:      #a35200;
+  --c-neg:      #d11b2b;
+  --c-unit:     #0a7a66;
+  --c-unitsep:  #7a7a7a;
+  --c-str:      #178021;
+  --c-semi:     #7a7a7a;
+  --c-sym:      #0b5bd3;
+  --c-bool:     #8200d6;
+  --c-null:     #8200d6;
+  --c-special:  #8200d6;
+  --c-refop:    #d11b2b;
+  --c-refpath:  #b31226;
+  --c-sep:      #7a7a7a;
+  --c-d1: #b1430a; --c-d2: #8200d6; --c-d3: #c01a6b; --c-d4: #bf6a02;
+  --c-d5: #178021; --c-d6: #0a7a66; --c-d7: #a35200; --c-d8: #0b5bd3;
+}
+html[data-theme="light"] #launch-demo ::-webkit-scrollbar-thumb { background: #c1c1c1; }
+html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; }
+html[data-theme="light"] #launch-demo nav { border-bottom-color: var(--border); }
+html[data-theme="light"] #launch-demo .ticker i { background: #c7e6c7; }
+html[data-theme="light"] #launch-demo .ticker i.ok { background: #2e9e3a; }
+html[data-theme="light"] #launch-demo .ticker i.bad { background: #d11b2b; }
+/* canvas wrappers — shown briefly during load/resize; match the light viz fill */
+html[data-theme="light"] #launch-demo .canvas-wrap { background: #141d31; }
+html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 
 #launch-demo *, #launch-demo *::before, #launch-demo *::after { box-sizing: border-box; margin: 0; padding: 0; }
 #launch-demo {
@@ -3525,18 +3753,12 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         </p>
       </div>
       <div>
-        <div class="footer-col-title">Documentation</div>
+        <div class="footer-col-title">Explore</div>
         <ul class="footer-links">
-          <li><a href="#" data-doc="0_bovnar_tutorial.md" data-doc-title="Tutorial">Tutorial</a></li>
-          <li><a href="#" data-doc="1_bovnar_spec.md" data-doc-title="Specification (v1.0)">Specification (v1.0)</a></li>
-          <li><a href="#" data-doc="2_bovnar_unit_system.md" data-doc-title="Unit System Reference">Unit System Reference</a></li>
-          <li><a href="#" data-doc="3_bovnar_readwrite_api.md" data-doc-title="Read &amp; Write API">Read &amp; Write API</a></li>
-          <li><a href="#" data-doc="4_bovnar_python_bindings.md" data-doc-title="Python Bindings">Python Bindings</a></li>
-          <li><a href="#" data-doc="5_bovnar.ebnf" data-doc-title="Formal EBNF Grammar">Formal EBNF Grammar</a></li>
-          <li><a href="#" data-doc="6_bovnar_faq.md" data-doc-title="FAQ">FAQ</a></li>
-          <li><a href="#" data-doc="7_bovnar_conformance.md" data-doc-title="Conformance Test Tool">Conformance Test Tool</a></li>
-          <li><a href="#" data-doc="8_unit_cheatsheet.md" data-doc-title="Units &amp; Currencies Reference">Units &amp; Currencies Reference</a></li>
-          <li><a href="#" data-doc="10_bovnar_streaming.md" data-doc-title="Streaming, Framing &amp; Multiplexing">Streaming, Framing &amp; Multiplexing</a></li>
+          <li><a href="#docs">Documentation</a></li>
+          <li><a href="#launch-demo">Live Demo</a></li>
+          <li><a href="#playground">Playground</a></li>
+          <li><a href="#quickstart">Quick Start</a></li>
         </ul>
       </div>
       <div>
@@ -3547,25 +3769,24 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <li><a href="https://github.com/sothis/bovnar/tree/main/include" target="_blank" rel="noopener">C Headers</a></li>
           <li><a href="https://github.com/sothis/bovnar/tree/main/python/bovnar" target="_blank" rel="noopener">Python Package</a></li>
           <li><a href="https://github.com/sothis/bovnar/tree/main/examples" target="_blank" rel="noopener">Examples (.bvnr)</a></li>
-          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vscode" target="_blank" rel="noopener">VS Code Highlighter</a></li>
-          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/geany" target="_blank" rel="noopener">Geany Highlighter</a></li>
         </ul>
       </div>
       <div>
-        <div class="footer-col-title">Legal</div>
+        <div class="footer-col-title">Editor Support</div>
         <ul class="footer-links">
-          <li><a href="impressum.html">Impressum</a></li>
-          <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
-          <li><a href="mailto:janos.priv@gmail.com?subject=Bovnar%20commercial%20license">Commercial License</a></li>
-          <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
-          <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vscode" target="_blank" rel="noopener">VS Code</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/sublime" target="_blank" rel="noopener">Sublime Text</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/vim" target="_blank" rel="noopener">Vim</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/highlighter/geany" target="_blank" rel="noopener">Geany</a></li>
         </ul>
         <div style="margin-top:2rem;">
-          <div class="footer-col-title">Format</div>
+          <div class="footer-col-title">Legal</div>
           <ul class="footer-links">
-            <li><a href="#">Extension: .bvnr</a></li>
-            <li><a href="#">Encoding: UTF-8</a></li>
-            <li><a href="#">MIME: text/vnd.bovnar</a></li>
+            <li><a href="impressum.html">Impressum</a></li>
+            <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+            <li><a href="mailto:janos.priv@gmail.com?subject=Bovnar%20commercial%20license">Commercial License</a></li>
+            <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
+            <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
           </ul>
         </div>
       </div>
@@ -3617,7 +3838,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
 <script src="bovnar_units.js?v=20260603"></script>
 <script src="bovnar_parser.js?v=20260603p"></script>
-<script src="bovnar_highlight.js?v=20260603"></script>
+<script src="bovnar_highlight.js?v=20260608"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
@@ -4270,6 +4491,69 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 });
 </script>
 
+<script id="bvnr-viz-theme">
+/* Shared palette for the demo's canvas visuals (orbit globe, trading chart,
+   industrial schematic). Only the *neutral chrome* — screen backdrop, grid,
+   axis/HUD labels, the cyan accent and tag backings — is themed; the data and
+   device colours (earth, candles, steel vessel, water, hot-glow) stay fixed so
+   they read on either backdrop. VIZ.pal() returns the active set live, so the
+   continuously-redrawing sims pick up a theme toggle on the next frame. */
+(function () {
+  var DARK = {
+    bg0: '#0c1020', bg1: '#05060d',          // orbit deep-space gradient
+    chartBg: '#0c0e14',                        // trading chart solid
+    indBg0: '#0d1018', indBg1: '#090b11',      // industrial gradient
+    grid: 'rgba(255,255,255,0.045)',
+    gridF: 'rgba(255,255,255,0.04)',
+    panel: 'rgba(255,255,255,0.025)',
+    axis: 'rgba(160,170,190,0.7)',
+    label: 'rgba(160,170,190,0.85)',
+    accent: '#7fd1ff', accentRGB: '127,209,255',
+    tagBg: 'rgba(10,14,20,0.9)',
+    starRGB: '205,215,255', starA: 1,
+    hud: 'rgba(156,220,254,0.92)',
+    hudDim: 'rgba(140,162,196,0.95)',
+    hudDim2: 'rgba(122,138,168,0.95)',
+    levelMark: 'rgba(255,255,255,0.16)',
+    steam: '220,230,245',
+    emaLine: 'rgba(140,156,176,0.75)',
+    areaFill: 'rgba(90,120,160,0.16)',
+    metalTick: 'rgba(255,255,255,0.22)',
+    gaugeTrack: 'rgba(255,255,255,0.09)',
+    hubDot: '#cfd6e0'
+  };
+  var LIGHT = {
+    // The orbit globe stays a dark *space* scene (stars + cyan HUD) in both
+    // themes — but the backdrop is brightened from the dark theme's near-black
+    // to a slate-navy so it sits more comfortably among the light panels.
+    bg0: '#27334e', bg1: '#141d31',
+    chartBg: '#f5f8fc',
+    indBg0: '#eef2f7', indBg1: '#e1e8f0',
+    grid: 'rgba(30,41,59,0.10)',
+    gridF: 'rgba(30,41,59,0.08)',
+    panel: 'rgba(30,41,59,0.05)',
+    axis: 'rgba(70,82,104,0.85)',
+    label: 'rgba(70,82,104,0.9)',
+    accent: '#0a6ebd', accentRGB: '10,110,189',
+    tagBg: 'rgba(255,255,255,0.92)',
+    starRGB: '205,215,255', starA: 1,          // keep the starfield (space, not sky)
+    hud: 'rgba(156,220,254,0.92)',
+    hudDim: 'rgba(140,162,196,0.95)',
+    hudDim2: 'rgba(122,138,168,0.95)',
+    levelMark: 'rgba(30,41,59,0.32)',
+    steam: '120,135,160',
+    emaLine: 'rgba(90,110,140,0.8)',
+    areaFill: 'rgba(70,110,160,0.14)',
+    metalTick: 'rgba(40,52,72,0.32)',
+    gaugeTrack: 'rgba(40,52,72,0.13)',
+    hubDot: '#475569'
+  };
+  window.VIZ = { pal: function () {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? LIGHT : DARK;
+  } };
+})();
+</script>
+
 <script id="bvnr-demo-sim">
 
 (function () {
@@ -4901,13 +5185,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const scale = (Math.min(w, h)/2 - 30) / pathExtent * 0.84;   // zoomed out a touch
     const SX = (x) => cx + x*scale, SY = (y) => cy - y*scale;
 
-    // deep-space background
+    // deep-space background (daylight sky in light theme)
+    const P = VIZ.pal();
     const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h)*0.7);
-    bg.addColorStop(0, '#0c1020'); bg.addColorStop(1, '#05060d');
+    bg.addColorStop(0, P.bg0); bg.addColorStop(1, P.bg1);
     ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
     for (const s of stars) {
       const tw = 0.6 + 0.4*Math.sin(s.tw + performance.now()*0.0016);
-      ctx.fillStyle = 'rgba(205,215,255,' + (s.b*tw) + ')';
+      ctx.fillStyle = 'rgba(' + P.starRGB + ',' + (s.b*tw*P.starA) + ')';
       ctx.beginPath(); ctx.arc(s.x*w, s.y*h, s.r, 0, 2*Math.PI); ctx.fill();
     }
 
@@ -4945,12 +5230,12 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
       // HUD
       ctx.font = '11px JetBrains Mono, monospace'; ctx.textAlign = 'left';
-      ctx.fillStyle = 'rgba(156,220,254,0.92)';
+      ctx.fillStyle = P.hud;
       ctx.fillText('ALT  ' + view.alt.toFixed(1) + ' km', 12, 20);
       ctx.fillText('VEL  ' + (view.speed/1000).toFixed(3) + ' km/s', 12, 34);
       let hudY = 48;
-      if (view.eclipse) { ctx.fillStyle = 'rgba(122,138,168,0.95)'; ctx.fillText('☾ ECLIPSE', 12, hudY); hudY += 14; }
-      if (occluded) { ctx.fillStyle = 'rgba(140,162,196,0.95)'; ctx.fillText('⊘ BEHIND EARTH', 12, hudY); }
+      if (view.eclipse) { ctx.fillStyle = P.hudDim2; ctx.fillText('☾ ECLIPSE', 12, hudY); hudY += 14; }
+      if (occluded) { ctx.fillStyle = P.hudDim; ctx.fillText('⊘ BEHIND EARTH', 12, hudY); }
       if (view.stale) { ctx.fillStyle = '#f44747'; ctx.fillText('▲ HOLDING — frame dropped', 12, h - 12); }
     }
   }
@@ -5020,10 +5305,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       if (r.dataKind === 'string') val = '"' + val + '"';
       const unit = r.unit ? '<span class="u">' + esc(r.unit) + '</span>' : '';
       const type = r.family ? (r.family + (r.width ? ':' + r.width : '')) : (r.dataKind === 'symbol' ? 'symbol' : '');
+      // Always emit the .t line (placeholder when a field has no type) so a tile
+      // keeps the same height whether it is showing data or the "no data" error
+      // state — otherwise the column jumps as fields flip on a noisy channel.
       return '<div class="' + cls.join(' ') + '" data-line="' + r.line + '">' +
              '<div class="k">' + esc(meta.label) + '</div>' +
              '<div class="v">' + esc(val) + unit + '</div>' +
-             (type ? '<div class="t">&lt;' + esc(type) + '&gt;</div>' : '') +
+             '<div class="t">' + (type ? '&lt;' + esc(type) + '&gt;' : '&nbsp;') + '</div>' +
              '</div>';
     }).join('');
     applyHover();
@@ -5418,12 +5706,19 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const dec = decode(text); const bad = dec.errs.length > 0; const drop = bad && !sim.resync;
     if (drop) sim.dropped++; sim.tframe++;
     const m = dec.map.tick && dec.map.tick.struct;
-    let bidS, askS, lastS;
-    if (drop || !m) { const g = sim.lastGood; if (g) { bidS = g.bid; askS = g.ask; lastS = g.last; } }
-    else {
-      lastS = gstr(m.last) || (sim.lastGood && sim.lastGood.last);
-      bidS = gstr(m.bid) || (sim.lastGood && sim.lastGood.bid);
-      askS = gstr(m.ask) || (sim.lastGood && sim.lastGood.ask);
+    let bidS, askS, lastS, miss;
+    if (drop || !m) {
+      // whole tick lost (resync off) → every feed field is unavailable
+      const g = sim.lastGood; if (g) { bidS = g.bid; askS = g.ask; lastS = g.last; }
+      miss = { last: true, bid: true, ask: true };
+    } else {
+      // a field absent from the decode (corrupt + skipped on resync) is flagged
+      // missing for the readout, even though the chart keeps holding its last value
+      const L = gstr(m.last), B = gstr(m.bid), A = gstr(m.ask);
+      miss = { last: !L, bid: !B, ask: !A };
+      lastS = L || (sim.lastGood && sim.lastGood.last);
+      bidS = B || (sim.lastGood && sim.lastGood.bid);
+      askS = A || (sim.lastGood && sim.lastGood.ask);
       sim.lastGood = { bid: bidS, ask: askS, last: lastS };
     }
     if (lastS == null) { lastS = sim.last.toFixed(sim.decimals); bidS = lastS; askS = lastS; }
@@ -5435,7 +5730,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.hist.push({ last: parseFloat(lastS), bid: parseFloat(bidS), ask: parseFloat(askS), ema: sim.ema });
     if (sim.hist.length > MAXHIST) { sim.hist.shift(); for (const t of sim.trades) t.i--; }
     while (sim.trades.length && sim.trades[0].i < 0) sim.trades.shift();
-    pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS);
+    pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS, miss);
     $('fs-seq').textContent = sim.seq; $('fs-drop').textContent = sim.dropped;
     const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
   }
@@ -5447,15 +5742,22 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const el = new Set(errs.map((e) => e.line));
     $('fframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
   }
-  function renderBlotter(lastS, bidS, askS) {
+  function renderBlotter(lastS, bidS, askS, miss) {
+    miss = miss || {};
     const dp = sim.decimals, cur = sim.currency, last = parseFloat(lastS);
     const prev = sim.hist.length > 1 ? sim.hist[sim.hist.length - 2].last : last;
     const dir = last > prev ? 'up' : last < prev ? 'down' : '';
     const spread = parseFloat(askS) - parseFloat(bidS);
     const g = (cls, k, v, u) => '<div class="gauge ' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
+    // a feed field that failed to decode shows a blank, red "no data" tile that
+    // holds the same height as its value tile (matches the Mission Control gauges)
+    const ge = (cls, k) => '<div class="gauge ' + cls + ' err"><div class="k">' + k + '</div><div class="v">no data</div></div>';
+    const spreadMiss = miss.bid || miss.ask;
     $('fgauges').innerHTML =
-      g('span2 big ' + dir, 'Last', last.toFixed(dp), cur) + g('', 'Bid', parseFloat(bidS).toFixed(dp), cur) +
-      g('', 'Ask', parseFloat(askS).toFixed(dp), cur) + g('', 'Spread', spread.toFixed(dp), cur) +
+      (miss.last ? ge('span2 big', 'Last') : g('span2 big ' + dir, 'Last', last.toFixed(dp), cur)) +
+      (miss.bid ? ge('', 'Bid') : g('', 'Bid', parseFloat(bidS).toFixed(dp), cur)) +
+      (miss.ask ? ge('', 'Ask') : g('', 'Ask', parseFloat(askS).toFixed(dp), cur)) +
+      (spreadMiss ? ge('', 'Spread') : g('', 'Spread', spread.toFixed(dp), cur)) +
       g('', 'Position', sim.pos, 'sh') + g('', 'Fills', sim.fills, '');
     const feeB = microsToNum(sim.feeMicros), feeF = sim.feeF;
     const pnlB = microsToNum(sim.cashMicros + BigInt(sim.pos) * toMicros(lastS));
@@ -5470,7 +5772,8 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
   function drawChart() {
     const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#0c0e14'; ctx.fillRect(0, 0, w, h);
+    const P = VIZ.pal();
+    ctx.fillStyle = P.chartBg; ctx.fillRect(0, 0, w, h);
     const A = sim.hist; if (A.length < 2) return;
     const padL = 6, padR = 58, padT = 12, padB = 14;
     let lo = Infinity, hi = -Infinity; for (const p of A) { if (p.bid < lo) lo = p.bid; if (p.ask > hi) hi = p.ask; }
@@ -5479,14 +5782,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const X = (i) => padL + (i / (MAXHIST - 1)) * (w - padL - padR);
     const Y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (h - padT - padB);
     ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'left';
-    for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = Y(v); ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillStyle = 'rgba(160,170,190,0.7)'; ctx.fillText(v.toFixed(sim.decimals), w - padR + 5, y + 3); }
+    for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = Y(v); ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillStyle = P.axis; ctx.fillText(v.toFixed(sim.decimals), w - padR + 5, y + 3); }
     ctx.beginPath();
     for (let i = 0; i < A.length; i++) { const x = X(i + off); i ? ctx.lineTo(x, Y(A[i].ask)) : ctx.moveTo(x, Y(A[i].ask)); }
     for (let i = A.length - 1; i >= 0; i--) ctx.lineTo(X(i + off), Y(A[i].bid));
-    ctx.closePath(); ctx.fillStyle = 'rgba(90,120,160,0.16)'; ctx.fill();
-    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(140,156,176,0.75)'; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.closePath(); ctx.fillStyle = P.areaFill; ctx.fill();
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = P.emaLine; ctx.lineWidth = 1; ctx.beginPath();
     for (let i = 0; i < A.length; i++) { const x = X(i + off), y = Y(A[i].ema); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.setLineDash([]);
-    ctx.strokeStyle = '#7fd1ff'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.beginPath();
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.beginPath();
     for (let i = 0; i < A.length; i++) { const x = X(i + off), y = Y(A[i].last); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
     for (const t of sim.trades) {
       if (t.i < 0 || t.i >= A.length) continue; const x = X(t.i + off), y = Y(t.price), up = t.side > 0; ctx.fillStyle = up ? '#3fb87f' : '#e0533d'; const s = 4; ctx.beginPath();
@@ -5494,9 +5797,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       ctx.closePath(); ctx.fill();
     }
     const lastP = A[A.length - 1].last, ly = Y(lastP), lx = X(MAXHIST - 1);
-    ctx.strokeStyle = 'rgba(127,209,255,0.35)'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(padL, ly); ctx.lineTo(w - padR, ly); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = '#7fd1ff'; ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = 'rgba(10,14,20,0.9)'; ctx.fillRect(w - padR + 1, ly - 8, padR - 2, 16); ctx.fillStyle = '#7fd1ff'; ctx.fillText(lastP.toFixed(sim.decimals), w - padR + 5, ly + 3);
+    ctx.strokeStyle = 'rgba(' + P.accentRGB + ',0.35)'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(padL, ly); ctx.lineTo(w - padR, ly); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = P.tagBg; ctx.fillRect(w - padR + 1, ly - 8, padR - 2, 16); ctx.fillStyle = P.accent; ctx.fillText(lastP.toFixed(sim.decimals), w - padR + 5, ly + 3);
   }
 
   let rafId = null, lastWall = null, acc = 0;
@@ -5667,9 +5970,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const dec = decode(text); const bad = dec.errs.length > 0; const drop = bad && !sim.resync;
     if (drop) sim.dropped++; sim.tframe++;
     const m = dec.map.reactor && dec.map.reactor.struct;
-    let D;
+    let D, miss;
     if (drop || !m) {
+      // whole frame lost (resync off) → every register is unavailable
       D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, press: sim.pressure, level: sim.level, flow: sim.flow, agit: sim.agitator, heat: sim.heater, status: sim.status };
+      miss = { temp: true, set: true, press: true, level: true, flow: true, heat: true, agit: true };
     } else {
       const num = (n, f) => (n ? parseFloat(n.value) : f);
       D = {
@@ -5679,6 +5984,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
         status: m.status ? parseInt(String(m.status.value).replace(/[^01]/g, '') || '0', 2) : sim.status,
       };
       sim.lastGood = D;
+      // a register absent from the decode (corrupt + skipped on resync) is flagged
+      // missing for the readout, even though the canvas keeps holding its last value
+      miss = { temp: !m.temp, set: !m.setpoint, press: !m.pressure, level: !m.level, flow: !m.flow_in, heat: !m.heater, agit: !m.agitator };
     }
     // PID runs on the DECODED temperature → next heater output (closed loop through the format)
     if (!drop) {
@@ -5689,7 +5997,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     }
     sim.hist.push({ temp: D.temp, set: D.set }); if (sim.hist.length > 180) sim.hist.shift();
 
-    pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D);
+    pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D, miss);
     $('is-cyc').textContent = sim.cyc; $('is-drop').textContent = sim.dropped;
     const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
   }
@@ -5702,16 +6010,23 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const el = new Set(errs.map((e) => e.line));
     $('iframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
   }
-  function renderHMI(D) {
+  function renderHMI(D, miss) {
+    miss = miss || {};
     const hiT = (D.status & 8), hiP = (D.status & 16), loL = (D.status & 32);
     $('ialarms').innerHTML = BITS.filter((b) => D.status & b.m).map((b) => '<span class="alarm-chip ' + b.cls + '">' + b.name + '</span>').join('') ||
       '<span class="alarm-chip ok">● NOMINAL</span>';
     const g = (cls, k, v, u) => '<div class="gauge ' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
+    // a register that failed to decode shows a blank, red "no data" tile that
+    // holds the same height as its value tile (matches the Mission Control gauges)
+    const ge = (cls, k) => '<div class="gauge ' + cls + ' err"><div class="k">' + k + '</div><div class="v">no data</div></div>';
     $('igauges').innerHTML =
-      g('span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''), 'Temperature', D.temp.toFixed(2), '°C') +
-      g('', 'Setpoint', D.set.toFixed(2), '°C') + g(hiP ? 'down' : '', 'Pressure', D.press.toFixed(2), 'bar') +
-      g(loL ? 'down' : '', 'Level', D.level.toFixed(1), '%') + g('', 'Flow in', D.flow.toFixed(1), 'L/min') +
-      g('', 'Heater', D.heat.toFixed(0), '%') + g('', 'Agitator', D.agit, 'rpm');
+      (miss.temp ? ge('span2 big', 'Temperature') : g('span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''), 'Temperature', D.temp.toFixed(2), '°C')) +
+      (miss.set ? ge('', 'Setpoint') : g('', 'Setpoint', D.set.toFixed(2), '°C')) +
+      (miss.press ? ge('', 'Pressure') : g(hiP ? 'down' : '', 'Pressure', D.press.toFixed(2), 'bar')) +
+      (miss.level ? ge('', 'Level') : g(loL ? 'down' : '', 'Level', D.level.toFixed(1), '%')) +
+      (miss.flow ? ge('', 'Flow in') : g('', 'Flow in', D.flow.toFixed(1), 'L/min')) +
+      (miss.heat ? ge('', 'Heater') : g('', 'Heater', D.heat.toFixed(0), '%')) +
+      (miss.agit ? ge('', 'Agitator') : g('', 'Agitator', D.agit, 'rpm'));
     // raw register vs self-describing Bovnar
     const reg = Math.max(0, Math.min(65535, Math.round(D.temp * 256)));
     const naive = reg / (sim.mismatch ? 16 : 256);
@@ -5732,20 +6047,21 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   function drawGauge(cx, cy, R, frac, redFrac, label, valTxt, alarm, tnow) {
     const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, sweep = a1 - a0;
     const over = alarm || frac >= redFrac;
-    let col = over ? ((Math.floor(tnow * 4) % 2 === 0) ? '#ff8870' : '#e0533d') : '#7fd1ff';
+    const P = VIZ.pal();
+    let col = over ? ((Math.floor(tnow * 4) % 2 === 0) ? '#ff8870' : '#e0533d') : P.accent;
     ctx.save(); ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = R * 0.16;
+    ctx.strokeStyle = P.gaugeTrack; ctx.lineWidth = R * 0.16;
     ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.stroke();
     ctx.strokeStyle = 'rgba(224,83,61,0.5)'; ctx.lineWidth = R * 0.16;
     ctx.beginPath(); ctx.arc(cx, cy, R, a0 + sweep * clamp(redFrac, 0, 1), a1); ctx.stroke();
     ctx.strokeStyle = col; ctx.lineWidth = R * 0.16; ctx.shadowColor = col; ctx.shadowBlur = over ? 12 : 6;
     ctx.beginPath(); ctx.arc(cx, cy, R, a0, a0 + sweep * clamp(frac, 0, 1)); ctx.stroke(); ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = P.metalTick; ctx.lineWidth = 1;
     for (let k = 0; k <= 10; k++) { const a = a0 + sweep * k / 10, c = Math.cos(a), s = Math.sin(a); ctx.beginPath(); ctx.moveTo(cx + c * R * 1.10, cy + s * R * 1.10); ctx.lineTo(cx + c * R * 1.18, cy + s * R * 1.18); ctx.stroke(); }
     const av = a0 + sweep * clamp(frac, 0, 1);
     ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(av) * R * 0.8, cy + Math.sin(av) * R * 0.8); ctx.stroke();
-    ctx.fillStyle = '#cfd6e0'; ctx.beginPath(); ctx.arc(cx, cy, R * 0.11, 0, 6.283); ctx.fill();
-    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(160,170,190,0.85)'; ctx.font = '9px JetBrains Mono, monospace'; ctx.fillText(label, cx, cy + R * 0.55);
+    ctx.fillStyle = P.hubDot; ctx.beginPath(); ctx.arc(cx, cy, R * 0.11, 0, 6.283); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = P.label; ctx.font = '9px JetBrains Mono, monospace'; ctx.fillText(label, cx, cy + R * 0.55);
     ctx.fillStyle = col; ctx.font = 'bold 13px JetBrains Mono, monospace'; ctx.fillText(valTxt, cx, cy + R * 0.82);
     ctx.restore();
   }
@@ -5756,7 +6072,8 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const tnow = performance.now() * 0.001;
     const dt = lastDraw == null ? 0.016 : Math.min(0.05, tnow - lastDraw); lastDraw = tnow;
     ctx.clearRect(0, 0, w, h);
-    const bgg = ctx.createLinearGradient(0, 0, 0, h); bgg.addColorStop(0, '#0d1018'); bgg.addColorStop(1, '#090b11');
+    const P = VIZ.pal();
+    const bgg = ctx.createLinearGradient(0, 0, 0, h); bgg.addColorStop(0, P.indBg0); bgg.addColorStop(1, P.indBg1);
     ctx.fillStyle = bgg; ctx.fillRect(0, 0, w, h);
 
     const D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, press: sim.pressure, level: sim.level, heat: sim.heater, flow: sim.flow, agit: sim.agitator };
@@ -5840,18 +6157,18 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     ctx.strokeStyle = (hiT && blink) ? '#e0533d' : '#5a6270'; ctx.lineWidth = (hiT && blink) ? 2.5 : 2; rrect(tx, ty, tankW, tankH, 7); ctx.stroke();
     ctx.fillStyle = '#3a4150'; ctx.fillRect(cxT - 9, ty - 23, 18, 9);
     // level reference mark (flashes on low-level alarm)
-    ctx.strokeStyle = (loL && blink) ? '#e0533d' : 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); line(tx + tankW + 3, fillTop, tx + tankW + 11, fillTop); ctx.setLineDash([]);
+    ctx.strokeStyle = (loL && blink) ? '#e0533d' : P.levelMark; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); line(tx + tankW + 3, fillTop, tx + tankW + 11, fillTop); ctx.setLineDash([]);
 
     // ── steam plume above the vessel when the batch runs hot ──
     const steamI = clamp((tt - 0.5) / 0.5, 0, 1);
     sim.steamAcc += dt * steamI * 24;
     while (sim.steamAcc >= 1 && sim.steam.length < 40) { sim.steamAcc -= 1; sim.steam.push({ x: cxT + (rnd() - 0.5) * tankW * 0.6, y: ty - 2, r: 3 + rnd() * 4, vy: 12 + rnd() * 16, life: 0, max: 1.3 + rnd() * 1.1, drift: (rnd() - 0.5) * 12 }); }
-    for (let i = sim.steam.length - 1; i >= 0; i--) { const s = sim.steam[i]; s.life += dt; if (s.life >= s.max) { sim.steam.splice(i, 1); continue; } s.y -= s.vy * dt; s.x += s.drift * dt; const a = 1 - s.life / s.max; ctx.fillStyle = 'rgba(220,230,245,' + (0.16 * a * steamI) + ')'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (1 + s.life), 0, 6.283); ctx.fill(); }
+    for (let i = sim.steam.length - 1; i >= 0; i--) { const s = sim.steam[i]; s.life += dt; if (s.life >= s.max) { sim.steam.splice(i, 1); continue; } s.y -= s.vy * dt; s.x += s.drift * dt; const a = 1 - s.life / s.max; ctx.fillStyle = 'rgba(' + P.steam + ',' + (0.16 * a * steamI) + ')'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (1 + s.life), 0, 6.283); ctx.fill(); }
 
     // ── thermometer (wide layouts only) ──
     if (w > 420) {
       const thX = Math.round(w * 0.52), thW = 9, thTop = ty + 6, thH = tankH - 34, bulbR = 9;
-      ctx.fillStyle = 'rgba(255,255,255,0.05)'; rrect(thX - thW / 2, thTop, thW, thH, thW / 2); ctx.fill();
+      ctx.fillStyle = P.panel; rrect(thX - thW / 2, thTop, thW, thH, thW / 2); ctx.fill();
       ctx.strokeStyle = '#5a6270'; ctx.lineWidth = 1.5; rrect(thX - thW / 2, thTop, thW, thH, thW / 2); ctx.stroke();
       const bulbY = thTop + thH + bulbR - 1, full = Math.max(40, sim.tempMax * 1.15);
       const tFrac = clamp((D.temp - sim.ambient) / (full - sim.ambient), 0, 1), mTop = thTop + thH * (1 - tFrac);
@@ -5860,7 +6177,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       rrect(thX - 2.5, mTop, 5, bulbY - mTop, 2.5); ctx.fill();
       const rlY = thTop + thH * (1 - clamp((sim.tempMax - sim.ambient) / (full - sim.ambient), 0, 1));
       ctx.strokeStyle = 'rgba(224,83,61,0.7)'; ctx.lineWidth = 1; line(thX - thW, rlY, thX + thW, rlY);
-      ctx.fillStyle = '#7fd1ff'; ctx.textAlign = 'center'; ctx.font = 'bold 11px JetBrains Mono, monospace'; ctx.fillText(D.temp.toFixed(1) + '°', thX, bulbY + bulbR + 12);
+      ctx.fillStyle = P.accent; ctx.textAlign = 'center'; ctx.font = 'bold 11px JetBrains Mono, monospace'; ctx.fillText(D.temp.toFixed(1) + '°', thX, bulbY + bulbR + 12);
     }
 
     // ── analog pressure dial ──
@@ -5870,25 +6187,25 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
     // ── trend strip ──
     const ty2 = splitY + 8, th2 = h - splitY - 14, x0 = 8, w0 = w - 16;
-    ctx.fillStyle = 'rgba(255,255,255,0.025)'; rrect(x0, ty2, w0, th2, 4); ctx.fill();
+    ctx.fillStyle = P.panel; rrect(x0, ty2, w0, th2, 4); ctx.fill();
     const A = sim.hist;
     if (A.length >= 2) {
       let lo = Infinity, hi = -Infinity; for (const p of A) { lo = Math.min(lo, p.temp, p.set); hi = Math.max(hi, p.temp, p.set); }
       const sp = (hi - lo) || 1; lo -= sp * 0.18; hi += sp * 0.18; const N = 180, off = N - A.length;
       const X = (i) => x0 + (i / (N - 1)) * w0, Y = (v) => ty2 + (1 - (v - lo) / (hi - lo)) * th2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) { const yy = ty2 + th2 * k / 4; line(x0, yy, x0 + w0, yy); }
+      ctx.strokeStyle = P.gridF; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) { const yy = ty2 + th2 * k / 4; line(x0, yy, x0 + w0, yy); }
       const sps = A[A.length - 1].set;
       ctx.fillStyle = 'rgba(110,122,134,0.12)'; const by = Y(sps + 0.8); ctx.fillRect(x0, by, w0, Math.max(1, Y(sps - 0.8) - by));
-      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(150,165,185,0.8)'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = P.label; ctx.lineWidth = 1; ctx.beginPath();
       for (let i = 0; i < A.length; i++) { const xx = X(i + off), yy = Y(A[i].set); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke(); ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(X(off), ty2 + th2);
       for (let i = 0; i < A.length; i++) ctx.lineTo(X(i + off), Y(A[i].temp));
       ctx.lineTo(X(A.length - 1 + off), ty2 + th2); ctx.closePath();
-      const ag = ctx.createLinearGradient(0, ty2, 0, ty2 + th2); ag.addColorStop(0, 'rgba(127,209,255,0.22)'); ag.addColorStop(1, 'rgba(127,209,255,0)'); ctx.fillStyle = ag; ctx.fill();
-      ctx.strokeStyle = '#7fd1ff'; ctx.lineWidth = 1.6; ctx.beginPath();
+      const ag = ctx.createLinearGradient(0, ty2, 0, ty2 + th2); ag.addColorStop(0, 'rgba(' + P.accentRGB + ',0.22)'); ag.addColorStop(1, 'rgba(' + P.accentRGB + ',0)'); ctx.fillStyle = ag; ctx.fill();
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 1.6; ctx.beginPath();
       for (let i = 0; i < A.length; i++) { const xx = X(i + off), yy = Y(A[i].temp); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke();
       const lt = A[A.length - 1].temp, ly = Y(lt);
-      ctx.fillStyle = '#7fd1ff'; ctx.shadowColor = '#7fd1ff'; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(X(N - 1), ly, 2.6, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = P.accent; ctx.shadowColor = P.accent; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(X(N - 1), ly, 2.6, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
       ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.fillText(lt.toFixed(1) + '°C', x0 + w0 - 3, Math.max(ty2 + 10, ly - 4));
     }
   }
@@ -6000,6 +6317,32 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   switchTo('mc');
   reserveBlurb();
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(reserveBlurb, 150); });
+})();
+</script>
+
+<script id="bvnr-theme-toggle">
+/* Theme toggle — persists the choice and keeps <meta theme-color> in sync.
+   The pre-paint script in <head> already applied the initial theme. */
+(function () {
+  var root = document.documentElement;
+  var btn  = document.getElementById('theme-toggle');
+  var meta = document.querySelector('meta[name="theme-color"]');
+  function isLight() { return root.getAttribute('data-theme') === 'light'; }
+  function sync() {
+    if (btn) btn.setAttribute('aria-label', isLight() ? 'Switch to dark theme' : 'Switch to light theme');
+    if (meta) meta.setAttribute('content', isLight() ? '#e8e8e8' : '#1e1e1e');
+  }
+  function apply(light) {
+    if (light) root.setAttribute('data-theme', 'light');
+    else root.removeAttribute('data-theme');
+    sync();
+  }
+  sync();
+  if (btn) btn.addEventListener('click', function () {
+    var next = isLight() ? 'dark' : 'light';
+    apply(next === 'light');
+    try { localStorage.setItem('bovnar-theme', next); } catch (e) {}
+  });
 })();
 </script>
 </body>

@@ -1,0 +1,290 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1520" height="1140" viewBox="0 0 1520 1140" font-family="'Cascadia Code', ui-monospace, 'SF Mono', Menlo, Consolas, monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b0e16"/>
+      <stop offset="1" stop-color="#0a0c12"/>
+    </linearGradient>
+    <linearGradient id="coreFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#10182a"/>
+      <stop offset="1" stop-color="#0d1422"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="aCy" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#22d3ee"/></marker>
+    <marker id="aAm" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#fbbf24"/></marker>
+    <marker id="aGn" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#34d399"/></marker>
+    <marker id="aPk" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f472b6"/></marker>
+    <marker id="aSl" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7c8aa5"/></marker>
+  </defs>
+
+  <rect width="1520" height="1140" fill="url(#bg)"/>
+
+  <!-- Header -->
+  <text x="34" y="42" font-size="27" font-weight="700" fill="#e6edf3">Bovnar<tspan fill="#22d3ee"> (BVNR)</tspan><tspan fill="#7c8aa5" font-size="16" font-weight="400">  ·  software architecture — building blocks</tspan></text>
+  <text x="34" y="66" font-size="13" fill="#8b98a9">Unit-safe, self-describing serialisation · C99 reference core (~16.9k LoC) · pure-ctypes Python bindings · browser playground · CLI</text>
+
+  <!-- ===================== ROW A : CLIENT SURFACES ===================== -->
+  <text x="34" y="98" font-size="12" letter-spacing="3" fill="#5eead4">CLIENT SURFACES &amp; CONSUMERS</text>
+
+  <!-- CLI -->
+  <g filter="url(#soft)">
+    <rect x="30" y="108" width="350" height="118" rx="9" fill="#101826" stroke="#3b82f6" stroke-opacity="0.55"/>
+    <text x="48" y="132" font-size="14" font-weight="700" fill="#cfe0ff">CLI · <tspan fill="#60a5fa">bovnar</tspan></text>
+    <text x="48" y="150" font-size="10.5" fill="#7c8aa5">src/bovnar.c — single static binary</text>
+    <text x="48" y="172" font-size="11" fill="#c9d4e0">validate · query &lt;path&gt; · pretty · events</text>
+    <text x="48" y="190" font-size="11" fill="#c9d4e0">json ⇄ bvnr · bench · frames · mux</text>
+    <text x="48" y="212" font-size="10.5" fill="#7c8aa5">resync, debug re-serialise, throughput bench</text>
+  </g>
+
+  <!-- Python -->
+  <g filter="url(#soft)">
+    <rect x="396" y="108" width="350" height="118" rx="9" fill="#101826" stroke="#fbbf24" stroke-opacity="0.55"/>
+    <text x="414" y="132" font-size="14" font-weight="700" fill="#ffe9b0">Python bindings</text>
+    <text x="414" y="150" font-size="10.5" fill="#7c8aa5">python/bovnar — pure ctypes, no C extension</text>
+    <text x="414" y="172" font-size="11" fill="#c9d4e0">loads/dumps (DOM) · Reader/Writer (SAX)</text>
+    <text x="414" y="190" font-size="11" fill="#c9d4e0">Quantity · units · currency · enums/structs</text>
+    <text x="414" y="212" font-size="11" fill="#c9d4e0">pint bridge · numpy bridge · _ffi loader</text>
+  </g>
+
+  <!-- Web -->
+  <g filter="url(#soft)">
+    <rect x="762" y="108" width="350" height="118" rx="9" fill="#101826" stroke="#f472b6" stroke-opacity="0.55"/>
+    <text x="780" y="132" font-size="14" font-weight="700" fill="#ffd0ea">Web playground</text>
+    <text x="780" y="150" font-size="10.5" fill="#7c8aa5">web/ — single file, dependency-free, in-browser</text>
+    <text x="780" y="172" font-size="11" fill="#c9d4e0">bovnar_parser.js — lenient event re-impl</text>
+    <text x="780" y="190" font-size="11" fill="#c9d4e0">bovnar_highlight.js · bovnar_units.js</text>
+    <text x="780" y="212" font-size="11" fill="#c9d4e0">index.html interactive playground</text>
+  </g>
+
+  <!-- Highlighters -->
+  <g filter="url(#soft)">
+    <rect x="1128" y="108" width="362" height="118" rx="9" fill="#101826" stroke="#a78bfa" stroke-opacity="0.55"/>
+    <text x="1146" y="132" font-size="14" font-weight="700" fill="#e2d8ff">Editor highlighting</text>
+    <text x="1146" y="150" font-size="10.5" fill="#7c8aa5">highlighter/ — shared "cyberpunk" theme</text>
+    <text x="1146" y="172" font-size="11" fill="#c9d4e0">VS Code · Sublime Text</text>
+    <text x="1146" y="190" font-size="11" fill="#c9d4e0">Geany · Vim</text>
+    <text x="1146" y="212" font-size="10.5" fill="#7c8aa5">depth-cycling brackets, one colour scheme</text>
+  </g>
+
+  <!-- connectors A -> B -->
+  <path d="M205,226 L205,250" stroke="#7c8aa5" stroke-width="1.4" marker-end="url(#aSl)"/>
+  <path d="M571,226 L571,250" stroke="#7c8aa5" stroke-width="1.4" marker-end="url(#aSl)"/>
+  <text x="220" y="244" font-size="10" fill="#7c8aa5">link / dlopen</text>
+
+  <!-- ===================== ROW B : PUBLIC C API ===================== -->
+  <g filter="url(#soft)">
+    <rect x="30" y="256" width="1460" height="64" rx="9" fill="#0e1420" stroke="#60a5fa" stroke-opacity="0.5"/>
+    <text x="46" y="280" font-size="12" letter-spacing="2" fill="#60a5fa">PUBLIC C API · ABI</text>
+    <text x="46" y="298" font-size="10.5" fill="#7c8aa5">include/ — the stable contract the CLI links and ctypes binds against</text>
+    <g font-size="11.5" fill="#cfe0ff">
+      <rect x="470" y="270" width="118" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="529" y="290" text-anchor="middle">bovnar.h</text>
+      <rect x="598" y="270" width="138" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="667" y="290" text-anchor="middle">bovnar_dom.h</text>
+      <rect x="746" y="270" width="150" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="821" y="290" text-anchor="middle">bovnar_stream.h</text>
+      <rect x="906" y="270" width="160" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="986" y="290" text-anchor="middle">bovnar_si_units.h</text>
+      <rect x="1076" y="270" width="166" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="1159" y="290" text-anchor="middle">bovnar_currency.h</text>
+      <rect x="1252" y="270" width="100" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="1302" y="290" text-anchor="middle">bvn_int.h</text>
+      <rect x="1362" y="270" width="116" height="32" rx="6" fill="#13203a" stroke="#60a5fa" stroke-opacity="0.4"/><text x="1420" y="290" text-anchor="middle">bvn_float.h</text>
+    </g>
+  </g>
+
+  <path d="M760,320 L760,338" stroke="#7c8aa5" stroke-width="1.4" marker-end="url(#aSl)"/>
+
+  <!-- ===================== ROW C : CORE ===================== -->
+  <g filter="url(#soft)">
+    <rect x="30" y="344" width="1460" height="358" rx="11" fill="url(#coreFill)" stroke="#22d3ee" stroke-opacity="0.55"/>
+  </g>
+  <text x="48" y="372" font-size="14" letter-spacing="2" font-weight="700" fill="#7ef0ff">libbvnr — C99 REFERENCE CORE</text>
+  <text x="300" y="372" font-size="10.5" fill="#7c8aa5">streaming, allocation-light, SAX event engine · static + shared library targets</text>
+
+  <!-- external IO in -->
+  <text x="46" y="402" font-size="10" fill="#22d3ee">file · fd · socket · memory</text>
+  <path d="M46,408 L46,418 L196,418" stroke="#22d3ee" stroke-width="1.4" fill="none" marker-end="url(#aCy)" stroke-opacity="0.8"/>
+
+  <!-- READ PATH column -->
+  <g>
+    <rect x="50" y="424" width="430" height="46" rx="8" fill="#0f2430" stroke="#22d3ee" stroke-opacity="0.7"/>
+    <text x="66" y="445" font-size="12.5" font-weight="700" fill="#a8f0ff">IO Source — pull</text>
+    <text x="66" y="462" font-size="10.5" fill="#86c7d6">src/io · from_fd / from_mem · bvnr_pull_fn</text>
+
+    <rect x="50" y="490" width="430" height="62" rx="8" fill="#0f2430" stroke="#22d3ee" stroke-opacity="0.7"/>
+    <text x="66" y="512" font-size="12.5" font-weight="700" fill="#a8f0ff">Lexer / tokeniser</text>
+    <text x="66" y="529" font-size="10.5" fill="#86c7d6">src/lexer · 802-line state table</text>
+    <text x="66" y="544" font-size="10.5" fill="#86c7d6">tokens, escapes, octet streams, arrays</text>
+
+    <rect x="50" y="572" width="430" height="62" rx="8" fill="#0f2430" stroke="#22d3ee" stroke-opacity="0.7"/>
+    <text x="66" y="594" font-size="12.5" font-weight="700" fill="#a8f0ff">Validator</text>
+    <text x="66" y="611" font-size="10.5" fill="#86c7d6">src/validator · type family · width · base</text>
+    <text x="66" y="626" font-size="10.5" fill="#86c7d6">unit match, default annotations, error_*</text>
+
+    <rect x="50" y="654" width="430" height="40" rx="8" fill="#0f2430" stroke="#22d3ee" stroke-opacity="0.7"/>
+    <text x="66" y="673" font-size="12.5" font-weight="700" fill="#a8f0ff">Reader — orchestrator</text>
+    <text x="66" y="688" font-size="10.5" fill="#86c7d6">drives pull→lex→validate · error line/col · resync recovery</text>
+
+    <path d="M265,470 L265,490" stroke="#22d3ee" stroke-width="1.6" marker-end="url(#aCy)"/>
+    <path d="M265,552 L265,572" stroke="#22d3ee" stroke-width="1.6" marker-end="url(#aCy)"/>
+    <path d="M265,634 L265,654" stroke="#22d3ee" stroke-width="1.6" marker-end="url(#aCy)"/>
+  </g>
+
+  <!-- EVENT BUS spine -->
+  <rect x="500" y="424" width="36" height="270" rx="8" fill="#2a230a" stroke="#fbbf24" stroke-opacity="0.8" filter="url(#glow)"/>
+  <text x="518" y="690" font-size="11.5" font-weight="700" fill="#fde68a" transform="rotate(-90 518 690)">EVENT API · SAX  (event, data) callbacks</text>
+  <!-- read into bus -->
+  <path d="M480,521 L500,521" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#aAm)"/>
+  <text x="484" y="514" font-size="9.5" fill="#fbbf24">⚡ unverified</text>
+  <path d="M480,603 L500,603" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#aAm)"/>
+  <text x="486" y="596" font-size="9.5" fill="#34d399">✓ verified</text>
+
+  <!-- CONSUMERS -->
+  <g>
+    <rect x="560" y="424" width="372" height="80" rx="8" fill="#0f2a20" stroke="#34d399" stroke-opacity="0.7"/>
+    <text x="576" y="446" font-size="12.5" font-weight="700" fill="#9af5c8">DOM builder → tree</text>
+    <text x="576" y="463" font-size="10.5" fill="#7fd9b0">src/dom · bvn_dom_doc / node · parse, lookup</text>
+    <text x="576" y="478" font-size="10.5" fill="#7fd9b0">struct_get · array_at · typed getters</text>
+    <text x="576" y="494" font-size="10.5" fill="#7fd9b0">value-in-base-units · unit string</text>
+
+    <rect x="560" y="512" width="372" height="76" rx="8" fill="#0f2a20" stroke="#34d399" stroke-opacity="0.7"/>
+    <text x="576" y="534" font-size="12.5" font-weight="700" fill="#9af5c8">Canon observer</text>
+    <text x="576" y="551" font-size="10.5" fill="#7fd9b0">src/writer · re-serialises the event stream</text>
+    <text x="576" y="566" font-size="10.5" fill="#7fd9b0">canonical / pretty round-trip</text>
+    <text x="576" y="581" font-size="10.5" fill="#7fd9b0">feeds the writer →</text>
+
+    <rect x="560" y="596" width="372" height="76" rx="8" fill="#0f2a20" stroke="#34d399" stroke-opacity="0.7"/>
+    <text x="576" y="618" font-size="12.5" font-weight="700" fill="#9af5c8">User callbacks</text>
+    <text x="576" y="635" font-size="10.5" fill="#7fd9b0">on_unverified / on_verified · return bool</text>
+    <text x="576" y="650" font-size="10.5" fill="#7fd9b0">app code, CLI events, JSON converters</text>
+    <text x="576" y="665" font-size="10.5" fill="#7fd9b0">Python ctypes trampolines</text>
+
+    <path d="M536,464 L560,464" stroke="#34d399" stroke-width="1.6" marker-end="url(#aGn)"/>
+    <path d="M536,550 L560,550" stroke="#34d399" stroke-width="1.6" marker-end="url(#aGn)"/>
+    <path d="M536,634 L560,634" stroke="#34d399" stroke-width="1.6" marker-end="url(#aGn)"/>
+  </g>
+
+  <!-- WRITE PATH column -->
+  <g>
+    <rect x="1000" y="424" width="420" height="62" rx="8" fill="#2b1422" stroke="#f472b6" stroke-opacity="0.7"/>
+    <text x="1016" y="446" font-size="12.5" font-weight="700" fill="#ffc4e3">Typed write helpers</text>
+    <text x="1016" y="463" font-size="10.5" fill="#e79bc1">write_uint/sint/float/_unit · arrays · octets</text>
+    <text x="1016" y="478" font-size="10.5" fill="#e79bc1">low-level bvnr_write_event</text>
+
+    <rect x="1000" y="506" width="420" height="86" rx="8" fill="#2b1422" stroke="#f472b6" stroke-opacity="0.7"/>
+    <text x="1016" y="528" font-size="12.5" font-weight="700" fill="#ffc4e3">Writer / serialiser</text>
+    <text x="1016" y="545" font-size="10.5" fill="#e79bc1">src/writer · 1077 LoC · pretty / canonical</text>
+    <text x="1016" y="560" font-size="10.5" fill="#e79bc1">write_utils · number &amp; unit formatting</text>
+    <text x="1016" y="575" font-size="10.5" fill="#e79bc1">size guard · max_file_size</text>
+
+    <rect x="1000" y="612" width="420" height="46" rx="8" fill="#2b1422" stroke="#f472b6" stroke-opacity="0.7"/>
+    <text x="1016" y="633" font-size="12.5" font-weight="700" fill="#ffc4e3">IO Sink — push</text>
+    <text x="1016" y="650" font-size="10.5" fill="#e79bc1">src/io · to_fd / to_mem · bvnr_push_fn / flush</text>
+
+    <path d="M1210,486 L1210,506" stroke="#f472b6" stroke-width="1.6" marker-end="url(#aPk)"/>
+    <path d="M1210,592 L1210,612" stroke="#f472b6" stroke-width="1.6" marker-end="url(#aPk)"/>
+    <!-- canon -> writer -->
+    <path d="M932,550 L966,550 L966,549 L1000,549" stroke="#f472b6" stroke-width="1.6" fill="none" marker-end="url(#aPk)"/>
+    <text x="936" y="543" font-size="9.5" fill="#f472b6">re-serialise</text>
+  </g>
+
+  <!-- external IO out -->
+  <path d="M1420,635 L1450,635 L1450,402" stroke="#f472b6" stroke-width="1.4" fill="none" marker-end="url(#aPk)" stroke-opacity="0.85"/>
+  <text x="1322" y="398" font-size="10" fill="#f472b6" text-anchor="end">file · fd · socket · memory</text>
+
+  <!-- ===================== ROW D : STREAMING ===================== -->
+  <g filter="url(#soft)">
+    <rect x="30" y="716" width="1460" height="96" rx="10" fill="#1a1206" stroke="#fb923c" stroke-opacity="0.6"/>
+    <text x="48" y="740" font-size="12" letter-spacing="2" fill="#fb923c">STREAMING &amp; FRAMING · src/stream</text>
+    <text x="372" y="740" font-size="10.5" fill="#8b7355">transport layer built on top of the event API — long-lived connections, multiplexing</text>
+    <g>
+      <rect x="48" y="752" width="344" height="48" rx="7" fill="#241808" stroke="#fb923c" stroke-opacity="0.5"/>
+      <text x="64" y="772" font-size="11.5" font-weight="600" fill="#ffd9b0">Octet-stream chunking</text>
+      <text x="64" y="789" font-size="10" fill="#b89066">offset counter inside one value</text>
+
+      <rect x="404" y="752" width="344" height="48" rx="7" fill="#241808" stroke="#fb923c" stroke-opacity="0.5"/>
+      <text x="420" y="772" font-size="11.5" font-weight="600" fill="#ffd9b0">Multi-document framing</text>
+      <text x="420" y="789" font-size="10" fill="#b89066">length-prefixed records · per-doc resync</text>
+
+      <rect x="760" y="752" width="344" height="48" rx="7" fill="#241808" stroke="#fb923c" stroke-opacity="0.5"/>
+      <text x="776" y="772" font-size="11.5" font-weight="600" fill="#ffd9b0">Octet multiplexing</text>
+      <text x="776" y="789" font-size="10" fill="#b89066">many channels interleaved per value</text>
+
+      <rect x="1116" y="752" width="358" height="48" rx="7" fill="#241808" stroke="#fb923c" stroke-opacity="0.5"/>
+      <text x="1132" y="772" font-size="11.5" font-weight="600" fill="#ffd9b0">Document-in-document</text>
+      <text x="1132" y="789" font-size="10" fill="#b89066">a full doc embedded as an octet value</text>
+    </g>
+  </g>
+
+  <!-- ===================== ROW E : CROSS-CUTTING ENGINES ===================== -->
+  <text x="34" y="838" font-size="12" letter-spacing="3" fill="#c4b5fd">CROSS-CUTTING ENGINES · src/utils</text>
+  <g filter="url(#soft)">
+    <rect x="30" y="848" width="282" height="92" rx="9" fill="#161427" stroke="#a78bfa" stroke-opacity="0.55"/>
+    <text x="46" y="872" font-size="12.5" font-weight="700" fill="#ddd2ff">SI / IEC units</text>
+    <text x="46" y="890" font-size="10" fill="#a99bd1">bovnar_si_units.c · base &amp; derived</text>
+    <text x="46" y="905" font-size="10" fill="#a99bd1">prefixes, dimension vectors</text>
+    <text x="46" y="920" font-size="10" fill="#a99bd1">compatibility &amp; conversion</text>
+
+    <rect x="324" y="848" width="282" height="92" rx="9" fill="#161427" stroke="#a78bfa" stroke-opacity="0.55"/>
+    <text x="340" y="872" font-size="12.5" font-weight="700" fill="#ddd2ff">Currency</text>
+    <text x="340" y="890" font-size="10" fill="#a99bd1">bovnar_currency.c</text>
+    <text x="340" y="905" font-size="10" fill="#a99bd1">164 ISO-4217 fiat + 50 crypto</text>
+    <text x="340" y="920" font-size="10" fill="#a99bd1">minor-units · $ sigil · prefix rules</text>
+
+    <rect x="618" y="848" width="282" height="92" rx="9" fill="#161427" stroke="#a78bfa" stroke-opacity="0.55"/>
+    <text x="634" y="872" font-size="12.5" font-weight="700" fill="#ddd2ff">Bignum integers</text>
+    <text x="634" y="890" font-size="10" fill="#a99bd1">bvn_int.c · arbitrary width</text>
+    <text x="634" y="905" font-size="10" fill="#a99bd1">up to 32768-bit values</text>
+    <text x="634" y="920" font-size="10" fill="#a99bd1">base 2 / 16 / 36 / 85 …</text>
+
+    <rect x="912" y="848" width="282" height="92" rx="9" fill="#161427" stroke="#a78bfa" stroke-opacity="0.55"/>
+    <text x="928" y="872" font-size="12.5" font-weight="700" fill="#ddd2ff">Decimal / float</text>
+    <text x="928" y="890" font-size="10" fill="#a99bd1">bvn_float.c · 2341 LoC</text>
+    <text x="928" y="905" font-size="10" fill="#a99bd1">float · float_fix · float_dec</text>
+    <text x="928" y="920" font-size="10" fill="#a99bd1">nan / inf / ninf handling</text>
+
+    <rect x="1206" y="848" width="284" height="92" rx="9" fill="#161427" stroke="#a78bfa" stroke-opacity="0.55"/>
+    <text x="1222" y="872" font-size="12.5" font-weight="700" fill="#ddd2ff">Shared utils</text>
+    <text x="1222" y="890" font-size="10" fill="#a99bd1">bovnar_utils.c · 2653 LoC</text>
+    <text x="1222" y="905" font-size="10" fill="#a99bd1">buffers, encoding, references</text>
+    <text x="1222" y="920" font-size="10" fill="#a99bd1">escapes, path lookup helpers</text>
+  </g>
+
+  <!-- ===================== ROW F : BUILD / QA / DOCS ===================== -->
+  <text x="34" y="966" font-size="12" letter-spacing="3" fill="#94a3b8">BUILD · QUALITY · DOCUMENTATION</text>
+  <g filter="url(#soft)">
+    <rect x="30" y="976" width="470" height="132" rx="9" fill="#0f1620" stroke="#64748b" stroke-opacity="0.55"/>
+    <text x="46" y="1000" font-size="12.5" font-weight="700" fill="#cbd5e1">Build &amp; packaging</text>
+    <text x="46" y="1020" font-size="10.5" fill="#94a3b8">CMake → bvnr_static · bvnr_shared · bovnar CLI</text>
+    <text x="46" y="1038" font-size="10.5" fill="#94a3b8">amalgamate.py → single-file C source</text>
+    <text x="46" y="1056" font-size="10.5" fill="#94a3b8">scikit-build-core (pyproject) → wheels</text>
+    <text x="46" y="1074" font-size="10.5" fill="#94a3b8">cibuildwheel → cp310–cp314 · linux/macOS</text>
+    <text x="46" y="1092" font-size="10.5" fill="#94a3b8">ships libbvnr_shared.* beside the package</text>
+
+    <rect x="516" y="976" width="470" height="132" rx="9" fill="#0f1620" stroke="#64748b" stroke-opacity="0.55"/>
+    <text x="532" y="1000" font-size="12.5" font-weight="700" fill="#cbd5e1">Quality &amp; tests</text>
+    <text x="532" y="1020" font-size="10.5" fill="#94a3b8">unit tests: reader/writer/dom/units/float/int</text>
+    <text x="532" y="1038" font-size="10.5" fill="#94a3b8">207-case conformance suite (IUT harness)</text>
+    <text x="532" y="1056" font-size="10.5" fill="#94a3b8">fuzz: reader · writer · dom · utils</text>
+    <text x="532" y="1074" font-size="10.5" fill="#94a3b8">socketpair round-trip · amalgam smoke</text>
+    <text x="532" y="1092" font-size="10.5" fill="#94a3b8">CTest labels · bovnar bench throughput</text>
+
+    <rect x="1002" y="976" width="488" height="132" rx="9" fill="#0f1620" stroke="#64748b" stroke-opacity="0.55"/>
+    <text x="1018" y="1000" font-size="12.5" font-weight="700" fill="#cbd5e1">Documentation</text>
+    <text x="1018" y="1020" font-size="10.5" fill="#94a3b8">spec 1.0 · tutorial · read/write API</text>
+    <text x="1018" y="1038" font-size="10.5" fill="#94a3b8">unit system · cheatsheet · streaming</text>
+    <text x="1018" y="1056" font-size="10.5" fill="#94a3b8">EBNF grammar · conformance · FAQ</text>
+    <text x="1018" y="1074" font-size="10.5" fill="#94a3b8">Python bindings guide · examples/</text>
+    <text x="1018" y="1092" font-size="10.5" fill="#94a3b8">gen_doc_pdfs.py → PDF doc set · web/doc</text>
+  </g>
+
+  <!-- Legend -->
+  <g font-size="10.5">
+    <text x="34" y="1130" fill="#7c8aa5">Flow:</text>
+    <line x1="78" y1="1126" x2="104" y2="1126" stroke="#22d3ee" stroke-width="2.4" marker-end="url(#aCy)"/><text x="110" y="1130" fill="#8b98a9">read path</text>
+    <line x1="186" y1="1126" x2="212" y2="1126" stroke="#fbbf24" stroke-width="2.4" marker-end="url(#aAm)"/><text x="218" y="1130" fill="#8b98a9">event bus</text>
+    <line x1="298" y1="1126" x2="324" y2="1126" stroke="#34d399" stroke-width="2.4" marker-end="url(#aGn)"/><text x="330" y="1130" fill="#8b98a9">event consumers</text>
+    <line x1="452" y1="1126" x2="478" y2="1126" stroke="#f472b6" stroke-width="2.4" marker-end="url(#aPk)"/><text x="484" y="1130" fill="#8b98a9">write path</text>
+    <text x="600" y="1130" fill="#5b6678">Bovnar v1.0.0 · spec frozen at 1.0 · MIT · github.com/sothis/bovnar</text>
+  </g>
+</svg>

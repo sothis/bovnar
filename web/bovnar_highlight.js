@@ -41,6 +41,35 @@
 .bvh-refpath{color:#d06070}
 .bvh-d1{color:#da844c}.bvh-d2{color:#c084fc}.bvh-d3{color:#ff2a7d}.bvh-d4{color:#ffa500}
 .bvh-d5{color:#87d88c}.bvh-d6{color:#5eead4}.bvh-d7{color:#f0c64e}.bvh-d8{color:#67d1f4}
+
+/* Light theme — vivid high-contrast counterparts (mirrors the page's light
+   --c-* palette). Selector outranks the base rules above by specificity, so
+   it wins regardless of stylesheet insertion order. */
+html[data-theme="light"] .bvh-comment{color:#5b6b7a}
+html[data-theme="light"] .bvh-sigil{color:#8200d6}
+html[data-theme="light"] .bvh-key{color:#0b5bd3}
+html[data-theme="light"] .bvh-eq{color:#d11b2b}
+html[data-theme="light"] .bvh-semi{color:#7a7a7a}
+html[data-theme="light"] .bvh-str{color:#178021}
+html[data-theme="light"] .bvh-num{color:#a35200}
+html[data-theme="light"] .bvh-neg{color:#d11b2b}
+html[data-theme="light"] .bvh-unit{color:#0a7a66}
+html[data-theme="light"] .bvh-unitsep{color:#7a7a7a}
+html[data-theme="light"] .bvh-sym{color:#0b5bd3}
+html[data-theme="light"] .bvh-bool{color:#8200d6}
+html[data-theme="light"] .bvh-null{color:#8200d6}
+html[data-theme="light"] .bvh-special{color:#8200d6}
+html[data-theme="light"] .bvh-sep{color:#7a7a7a}
+html[data-theme="light"] .bvh-adelim{color:#7a5c00}
+html[data-theme="light"] .bvh-type{color:#16191d}
+html[data-theme="light"] .bvh-tsep{color:#7a7a7a}
+html[data-theme="light"] .bvh-width{color:#c01a6b}
+html[data-theme="light"] .bvh-base{color:#0a7a66}
+html[data-theme="light"] .bvh-param{color:#b1430a}
+html[data-theme="light"] .bvh-refop{color:#d11b2b}
+html[data-theme="light"] .bvh-refpath{color:#b31226}
+html[data-theme="light"] .bvh-d1{color:#b1430a}html[data-theme="light"] .bvh-d2{color:#8200d6}html[data-theme="light"] .bvh-d3{color:#c01a6b}html[data-theme="light"] .bvh-d4{color:#bf6a02}
+html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{color:#0a7a66}html[data-theme="light"] .bvh-d7{color:#a35200}html[data-theme="light"] .bvh-d8{color:#0b5bd3}
 `;
   if (typeof document !== 'undefined' && !document.getElementById('bvh-style')) {
     const s = document.createElement('style');

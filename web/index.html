@@ -743,6 +743,29 @@ section { position: relative; z-index: 1; }
 }
 .anat-rich .anat-note { color: var(--text2); }
 .anat-note b { color: var(--teal); font-weight: 600; }
+/* Standout tip — accent left rule + faint tint, used to flag the ASCII caret
+   exponent form (easy to hand-type) next to the Unicode superscript examples. */
+.anat-tip {
+  margin-top: 1.4rem;
+  max-width: 760px;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--blue);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--blue) 8%, transparent);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--text2);
+}
+.anat-tip b { color: var(--text); font-weight: 600; }
+.anat-tip code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+}
+.anat-tip .tip-lead { color: var(--blue); font-weight: 600; }
 .anat-arrow {
   align-self: center;
   font-family: var(--mono);
@@ -751,23 +774,26 @@ section { position: relative; z-index: 1; }
 }
 
 /* the annotated, self-describing line — labels hang beneath their tokens */
-.anat-line { position: relative; padding-bottom: 2.9rem; font-size: 1.15rem; line-height: 1.5; }
+.anat-line { position: relative; padding-bottom: 3.7rem; font-size: 1.15rem; line-height: 1.5; }
 .tok-label { position: relative; }
+/* leader line ("dash") dropping from each annotated token's centre */
 .tok-label::before {
   content: '';
   position: absolute;
   left: 50%;
   top: 1.55em;
   width: 1px;
-  height: 1.15rem;
+  height: 1.0rem;
   background: var(--border-hi);
   opacity: 0.55;
 }
+/* the label text — all at one depth, sitting clearly *below* the end of the
+   dash (not overlapping it) */
 .tok-label::after {
   content: attr(data-label);
   position: absolute;
   left: 50%;
-  top: calc(1.55em + 1.25rem);
+  top: calc(1.55em + 2.05rem);
   transform: translateX(-50%);
   font-family: var(--mono);
   font-size: 0.56rem;
@@ -3194,9 +3220,18 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
       </div>
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">03</span> Physical unit</div>
-        <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g·m·s⁻²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span></div>
-        <div class="anat-pillar-d">SI base &amp; derived units, IEC prefixes, and compound expressions &mdash; validated by the parser, not the reader.</div>
+        <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g*m*s^-2</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span></div>
+        <div class="anat-pillar-d">SI base &amp; derived units, IEC prefixes, and compound expressions &mdash; validated by the parser, not the reader. Exponents accept a Unicode superscript (<code>s⁻²</code>) <em>or</em> a plain-ASCII caret (<code>s^-2</code>) interchangeably.</div>
       </div>
+    </div>
+
+    <div class="anat-tip reveal reveal-delay-3">
+      <span class="tip-lead">Typing it by hand?</span> <b>Both notations are first-class to the parser</b> &mdash; the
+      Unicode superscripts (<code>s⁻²</code>, <code>m²</code>) and an all-ASCII form that uses a caret for the
+      exponent and <code>*</code> in place of the <code>·</code> separator. <code>k~g*m*s^-2</code> and
+      <code>k~g·m·s⁻²</code> parse to exactly the same unit. The ASCII form needs no obscure glyphs, so it&rsquo;s the
+      <b>natural choice for hand-authoring <code>.bvnr</code></b>. The writer emits Unicode superscripts by default, or
+      the caret form when you set <code>BVN_UNIT_ASCII_EXP</code>.
     </div>
 
     <p class="section-p reveal reveal-delay-3" style="margin-top:1.6rem;max-width:760px;">
@@ -3232,7 +3267,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 <span class="c-comment"># Floats with SI units</span>
 <span class="c-sigil">.</span><span class="c-key">temp</span>    <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">°C</span><span class="c-ann">&gt;</span>  <span class="c-val">36.6</span><span class="c-semi">;</span>
 <span class="c-sigil">.</span><span class="c-key">speed</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">m/s</span><span class="c-ann">&gt;</span> <span class="c-val">9.81</span><span class="c-semi">;</span>
-<span class="c-sigil">.</span><span class="c-key">force</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g·m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span><span class="c-semi">;</span>
+<span class="c-sigil">.</span><span class="c-key">force</span>   <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g*m/s^2</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span><span class="c-semi">;</span>
 <span class="c-sigil">.</span><span class="c-key">buffer</span>  <span class="c-eq">=</span> <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">Mi~B</span><span class="c-ann">&gt;</span> <span class="c-val">16</span><span class="c-semi">;</span></div>
       </div>
       <div class="syntax-card reveal reveal-delay-1">
@@ -3263,7 +3298,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
         </div>
       </div>
       <div class="syntax-def reveal reveal-delay-1">
-        <div class="syntax-def-key">k~g·m·s⁻²</div>
+        <div class="syntax-def-key">k~g*m*s^-2</div>
         <div class="syntax-def-val">Compound Units</div>
         <div class="syntax-def-text">
           SI base and derived units, IEC binary prefixes, compound expressions.
@@ -3310,9 +3345,9 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
           All seven SI base units, 22 derived SI units, and IEC binary prefixes.
           Compound units, exponents, and prefix enforcement are built into the grammar.
         </div>
-        <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g·m·s⁻²</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span>
+        <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g*m*s^-2</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span>
 <span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">Gi~B</span><span class="c-ann">&gt;</span> <span class="c-val">16</span>
-<span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">m/s²</span><span class="c-ann">&gt;</span> <span class="c-val">9.807</span></div>
+<span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-unit">m/s^2</span><span class="c-ann">&gt;</span> <span class="c-val">9.807</span></div>
       </div>
 
       <div class="feature-card reveal reveal-delay-2" data-n="3">

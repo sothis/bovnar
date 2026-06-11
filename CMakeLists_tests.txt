@@ -23,6 +23,7 @@ if(NOT GMP_FOUND)
 endif()
 
 add_executable(bvnr_float_test           tests/bvn_float_test.c)
+add_executable(bvnr_datetime_test        tests/bvn_datetime_test.c)
 
 target_compile_options(bvnr_dom_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_dom_test PRIVATE bvnr_static m)
@@ -71,6 +72,11 @@ target_include_directories(bvnr_float_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(bvnr_float_test PRIVATE bvnr_static m)
+
+target_compile_options(bvnr_datetime_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_datetime_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(bvnr_datetime_test PRIVATE bvnr_static)
 
 add_executable(bvnr_float_fix_dec_test tests/bvn_float_fix_dec_test.c)
 target_compile_options(bvnr_float_fix_dec_test PRIVATE ${BVNR_C_FLAGS})
@@ -146,6 +152,12 @@ set_tests_properties(bvnr_int_test PROPERTIES
 add_test(NAME bvnr_float_test COMMAND bvnr_float_test)
 set_tests_properties(bvnr_float_test PROPERTIES
     LABELS "unit;float"
+    PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
+    FAIL_REGULAR_EXPRESSION "FAIL")
+
+add_test(NAME bvnr_datetime_test COMMAND bvnr_datetime_test)
+set_tests_properties(bvnr_datetime_test PROPERTIES
+    LABELS "unit;datetime;calendar"
     PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
     FAIL_REGULAR_EXPRESSION "FAIL")
 

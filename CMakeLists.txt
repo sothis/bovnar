@@ -124,6 +124,8 @@ set(BVNR_SOURCES_UTILS
     src/utils/bovnar_currency.c
     src/utils/bvn_int.c
     src/utils/bvn_float.c
+    src/utils/bvn_gregorian_date.c
+    src/utils/bvn_datetime.c
 )
 
 set(BVNR_SOURCES

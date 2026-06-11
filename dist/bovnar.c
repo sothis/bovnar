@@ -4126,6 +4126,907 @@ bool bvn_float_from_fix256(bvn_float_t *f, const uint32_t bits[8],
 }
 
 
+/* ==================== src/utils/bvn_gregorian_date.c ==================== */
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright (c) 2026 Janos Sonntag
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+
+/* ==================== src/utils/bvn_date_impl.h ==================== */
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright (c) 2026 Janos Sonntag
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/* Internal helpers shared by bvn_gregorian_date.c and bvn_datetime.c.
+ * Not installed; do not include from public headers.  Strictly C99. */
+
+#ifndef BVN_DATE_IMPL_H_
+#define BVN_DATE_IMPL_H_
+
+
+/* Overflow-checked int64_t arithmetic, C99 replacements for the C23
+ * <stdckdint.h> ckd_* intrinsics: compute *r = a OP b and return true iff
+ * the mathematical result does not fit in int64_t.  Exactly like ckd_*,
+ * *r always receives the result wrapped to int64_t, so chained checks may
+ * keep computing with it and only test the accumulated flag at the end.
+ * Only C99-guaranteed behavior is used: unsigned arithmetic wraps, the
+ * exact-width types are two's complement (so memcpy reinterpretation is
+ * well defined), division truncates toward zero, and the one hazardous
+ * division, INT64_MIN / -1, is excluded before dividing. */
+
+static inline int64_t bvn_wrap_i64(uint64_t u)
+{
+	int64_t r;
+	memcpy(&r, &u, sizeof r);
+	return r;
+}
+
+static inline bool bvn_ckd_add(int64_t* r, int64_t a, int64_t b)
+{
+	*r = bvn_wrap_i64((uint64_t)a + (uint64_t)b);
+	return (b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b);
+}
+
+static inline bool bvn_ckd_sub(int64_t* r, int64_t a, int64_t b)
+{
+	*r = bvn_wrap_i64((uint64_t)a - (uint64_t)b);
+	return (b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b);
+}
+
+static inline bool bvn_ckd_mul(int64_t* r, int64_t a, int64_t b)
+{
+	*r = bvn_wrap_i64((uint64_t)a * (uint64_t)b);
+	if (a == 0 || b == 0)
+		return false;
+	if (a == -1)		/* avoid INT64_MIN / -1 below */
+		return b == INT64_MIN;
+	if (b == -1)
+		return a == INT64_MIN;
+	if (a > 0) {
+		if (b > 0)
+			return a > INT64_MAX / b;
+		return b < INT64_MIN / a;
+	}
+	if (b > 0)
+		return a < INT64_MIN / b;
+	return a < INT64_MAX / b;
+}
+
+/* Floor division/modulo for int64_t (branch-free; C's / and % truncate
+ * toward zero, which is wrong for the negative operands that proleptic
+ * dates and pre-epoch timestamps produce). */
+static inline int64_t floor_div(int64_t a, int64_t b)
+{
+	int64_t q = a / b;
+	int64_t r = a % b;
+	int64_t needs_adj = (int64_t)((uint64_t)(r ^ b) >> 63) & -(int64_t)(r != 0);
+	return q - needs_adj;
+}
+
+static inline int64_t floor_mod(int64_t a, int64_t b)
+{
+	int64_t r = a % b;
+	int64_t needs_adj = -(int64_t)(((uint64_t)(r ^ b) >> 63)
+						& (uint64_t)(r != 0));
+	return r + (b & needs_adj);
+}
+
+/* n / d rounded to the nearest integer, halves away from zero.  Requires
+ * d > 0.  Free of intermediate overflow for every n including INT64_MIN:
+ * |r| < d, so 2*r fits, and the +/-1 adjustment only fires when |n| >= d/2,
+ * keeping q strictly inside the int64_t range. */
+static inline int64_t div_round_closest(int64_t n, int64_t d)
+{
+	int64_t q = n / d;
+	int64_t r = n % d;
+	if (r >= 0) {
+		if (2*r >= d)
+			q++;
+	} else {
+		if (-2*r >= d)
+			q--;
+	}
+	return q;
+}
+
+#endif /* BVN_DATE_IMPL_H_ */
+
+typedef struct {
+	int64_t era;
+	int64_t yoe;
+	int64_t doy;
+	int64_t m;
+} gdate_parts_t;
+
+/* Intended for internal use only. */
+static inline bool mjd_decompose(int64_t mjd, gdate_parts_t* p)
+{
+	if ((mjd < BVN_GDATE_MJD_MIN) || (mjd > BVN_GDATE_MJD_MAX))
+		return false;
+
+	int64_t shifted = mjd + BVN_MJD_OFFSET;
+	int64_t era = floor_div(shifted, 146097);
+	int64_t doe = shifted - era * 146097;
+	int64_t yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+	int64_t doy = doe - (365*yoe + yoe/4 - yoe/100);
+
+	p->era = era;
+	p->yoe = yoe;
+	p->doy = doy;
+	p->m   = (5 * doy + 2) / 153;
+	return true;
+}
+
+/* Intended for internal use only. Only valid for non-negative inputs.
+ * Do not use as generic leap year check. */
+static inline int64_t yoe_is_leap(int64_t yoe_cal)
+{
+	return (!(yoe_cal & 3)) & ((!!(yoe_cal % 100)) | !yoe_cal);
+}
+
+int64_t bvn_gregorian_date_to_mjd(const bvn_gregorian_date_t* gdate)
+{
+	if (!gdate)
+		return BVN_GDATE_OVF;
+
+	int64_t y = gdate->year, m, yy;
+	bool ov = false;
+
+	ov |= bvn_ckd_sub(&m, gdate->month, (int64_t)1);
+	ov |= bvn_ckd_add(&yy, y, floor_div(m, 12));
+	int64_t mm = floor_mod(m, 12) + 1;
+	int64_t is_jf = (mm < 3);
+	ov |= bvn_ckd_sub(&yy, yy, is_jf);
+	mm += 12*is_jf - 3;
+
+	int64_t era = floor_div(yy, 400);
+	int64_t era400, yoe, t, r;
+	ov |= bvn_ckd_mul(&era400, era, (int64_t)400);
+	ov |= bvn_ckd_sub(&yoe, yy, era400);
+	ov |= bvn_ckd_mul(&r, era, (int64_t)146097);
+	ov |= bvn_ckd_mul(&t, yoe, (int64_t)365);
+	ov |= bvn_ckd_add(&r, r, t);
+	ov |= bvn_ckd_add(&r, r, yoe / 4);
+	ov |= bvn_ckd_sub(&r, r, yoe / 100);
+	ov |= bvn_ckd_add(&r, r, (153*mm + 2) / 5);
+	ov |= bvn_ckd_add(&r, r, gdate->day);
+	ov |= bvn_ckd_sub(&r, r, (int64_t)1);
+	ov |= bvn_ckd_sub(&r, r, (int64_t)BVN_MJD_OFFSET);
+	ov |= (r < BVN_GDATE_MJD_MIN) | (r > BVN_GDATE_MJD_MAX);
+	return ov ? BVN_GDATE_OVF : r;
+}
+
+/* MJD of (y, m, d) */
+static inline int64_t ymd_to_mjd(int64_t y, int64_t m, int64_t d)
+{
+    bvn_gregorian_date_t t = { .year = y, .month = m, .day = d };
+    return bvn_gregorian_date_to_mjd(&t);
+}
+
+/* MJD of the last day of (y, m) == MJD of day 0 of (y, m+1). */
+static inline int64_t eom_mjd(int64_t y, int64_t m)
+{
+    int64_t m1;
+    if (bvn_ckd_add(&m1, m, (int64_t)1))
+        return BVN_GDATE_OVF;
+    return ymd_to_mjd(y, m1, 0);
+}
+
+static bool banking_day_canon(bvn_gregorian_date_t* c);
+
+typedef bool (*date_pred_t)(bvn_gregorian_date_t*);
+/* Returns false when the walk hits the supported MJD range boundary before
+ * the predicate is satisfied (stepping further would make
+ * bvn_gregorian_date_from_mjd() a no-op, leaving d stale and looping
+ * forever). */
+static bool walk_until(bvn_gregorian_date_t* d, int64_t* mjd,
+                       int step, date_pred_t pred)
+{
+    while (!pred(d)) {
+        int64_t next = *mjd + step;
+        if (next < BVN_GDATE_MJD_MIN || next > BVN_GDATE_MJD_MAX)
+            return false;
+        *mjd = next;
+        bvn_gregorian_date_from_mjd(d, next);
+    }
+    return true;
+}
+
+static bool pred_banking (bvn_gregorian_date_t* d) { return banking_day_canon(d); }
+static bool pred_sunday  (bvn_gregorian_date_t* d) { return d->wday == 0; }
+static bool pred_saturday(bvn_gregorian_date_t* d) { return d->wday == 6; }
+
+static inline bool same_day(const bvn_gregorian_date_t* a,
+                            const bvn_gregorian_date_t* b)
+{
+    return a->year == b->year && a->month == b->month && a->day == b->day;
+}
+
+int64_t bvn_gregorian_date_to_mjd_fast(const bvn_gregorian_date_t* gdate)
+{
+	int64_t y = gdate->year;
+	int64_t m = gdate->month - 1;
+	int64_t is_jan_feb;
+
+	y += floor_div(m, 12);
+	m  = floor_mod(m, 12) + 1;
+
+	is_jan_feb = (int64_t)((uint64_t)(m - 3) >> 63);
+	y -= is_jan_feb;
+	m += 12 * is_jan_feb - 3;
+
+	int64_t era = floor_div(y, 400);
+	int64_t yoe = y - era * 400;
+	return era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + (153 * m + 2) / 5
+			+ gdate->day - 1 - BVN_MJD_OFFSET;
+}
+
+int32_t bvn_gregorian_date_mjd_to_wday(int64_t mjd)
+{
+	int64_t r = floor_mod(mjd, 7) + 3;
+	return (int32_t)(r >= 7 ? r - 7 : r);
+}
+
+bool bvn_gregorian_date_mjd_in_leap_year(int64_t mjd)
+{
+	gdate_parts_t p;
+	if (!mjd_decompose(mjd, &p))
+		return false;
+
+	int64_t yoe_cal = p.yoe + (p.m >= 10);
+	yoe_cal -= 400 & -(int64_t)(yoe_cal == 400);
+	return (bool)yoe_is_leap(yoe_cal);
+}
+
+int32_t bvn_gregorian_date_mjd_to_yday(int64_t mjd)
+{
+	gdate_parts_t p;
+	if (!mjd_decompose(mjd, &p))
+		return -1;
+
+	int64_t is_jan_feb = (int64_t)(p.m >= 10);
+	int64_t leap = yoe_is_leap(p.yoe);
+	return (int32_t)(p.doy + 59 + leap - is_jan_feb * (365 + leap));
+}
+
+void bvn_gregorian_date_from_mjd(bvn_gregorian_date_t* gdate, int64_t mjd)
+{
+	if (!gdate)
+		return;
+
+	gdate_parts_t p;
+	if (!mjd_decompose(mjd, &p))
+		return;
+
+	int64_t is_jan_feb = (int64_t)(p.m >= 10);
+	int64_t yoe_cal = p.yoe + is_jan_feb;
+
+	yoe_cal -= 400 & -(int64_t)(yoe_cal == 400);
+
+	gdate->day   = p.doy - (153 * p.m + 2) / 5 + 1;
+	gdate->month = p.m + 3 - 12 * is_jan_feb;
+	gdate->year  = p.era * 400 + p.yoe + is_jan_feb;
+	gdate->wday  = bvn_gregorian_date_mjd_to_wday(mjd);
+
+	int64_t leap_yoe = yoe_is_leap(p.yoe);
+	gdate->yday  = (int32_t)(p.doy + 59 + leap_yoe - is_jan_feb
+							* (365 + leap_yoe));
+	gdate->leap  = (int32_t)yoe_is_leap(yoe_cal);
+}
+
+bool bvn_gregorian_date_normalize(bvn_gregorian_date_t* gdate)
+{
+	int64_t mjd = bvn_gregorian_date_to_mjd(gdate);
+	if (mjd == BVN_GDATE_OVF) {
+		return false;
+	}
+
+	bvn_gregorian_date_from_mjd(gdate, mjd);
+	return true;
+}
+
+int64_t bvn_gregorian_date_easter_sunday_mjd(int64_t year)
+{
+	if ((year < BVN_GDATE_YEAR_MIN) || (year > BVN_GDATE_YEAR_MAX)) {
+		return BVN_GDATE_OVF;
+	}
+
+	int64_t a = floor_mod(year, 19);
+	int64_t b = floor_div(year, 100);
+	int64_t c = floor_mod(year, 100);
+	int64_t d = floor_div(b, 4);
+	int64_t e = floor_mod(b, 4);
+	int64_t f = floor_div(b + 8, 25);
+	int64_t g = floor_div(b - f + 1, 3);
+	int64_t h = floor_mod(19*a + b - d - g + 15, 30);
+	int64_t i = floor_div(c, 4);
+	int64_t k = floor_mod(c, 4);
+	int64_t l = floor_mod(32 + 2*e + 2*i - h - k, 7);
+	int64_t m = floor_div(a + 11*h + 22*l, 451);
+	int64_t n = h + l - 7*m + 114;
+
+	bvn_gregorian_date_t tmp = {
+		.year  = year,
+		.month = n / 31,
+		.day   = (n % 31) + 1,
+	};
+
+	return bvn_gregorian_date_to_mjd_fast(&tmp);
+}
+
+/** higher level calendar functions **/
+
+static bool easter_plus(bvn_gregorian_date_t* g, int64_t year, int64_t offset)
+{
+    if (!g) return false;
+    int64_t mjd = bvn_gregorian_date_easter_sunday_mjd(year);
+    if (mjd == BVN_GDATE_OVF) return false;
+    bvn_gregorian_date_from_mjd(g, mjd + offset);
+    return true;
+}
+
+bool bvn_gregorian_date_calc_easter_sunday (bvn_gregorian_date_t* g, int64_t y) { return easter_plus(g, y,  0); }
+bool bvn_gregorian_date_calc_good_friday   (bvn_gregorian_date_t* g, int64_t y) { return easter_plus(g, y, -2); }
+bool bvn_gregorian_date_calc_easter_monday (bvn_gregorian_date_t* g, int64_t y) { return easter_plus(g, y,  1); }
+bool bvn_gregorian_date_calc_ascension_day (bvn_gregorian_date_t* g, int64_t y) { return easter_plus(g, y, 39); }
+bool bvn_gregorian_date_calc_whit_monday   (bvn_gregorian_date_t* g, int64_t y) { return easter_plus(g, y, 50); }
+
+/* Normalize *d into *c so the predicates below always see one canonical
+ * record; every check (fixed-date, weekday, easter-relative) then agrees
+ * on the same civil day.  Returns false for out-of-range input. */
+static bool canonicalize(bvn_gregorian_date_t* c, const bvn_gregorian_date_t* d)
+{
+    *c = *d;
+    return bvn_gregorian_date_normalize(c);
+}
+
+/* The *_canon helpers require a canonical record (as produced by
+ * bvn_gregorian_date_from_mjd()/_normalize()); the public wrappers
+ * canonicalize first, the walk predicates call them directly. */
+static bool federal_holiday_canon(bvn_gregorian_date_t* c)
+{
+    switch (c->month) {
+    case  1: if (c->day ==  1)                 return true; break; /* Neujahr */
+    case  5: if (c->day ==  1)                 return true; break; /* 1. Mai  */
+    case 10: if (c->day ==  3)                 return true; break; /* Einheit */
+    case 12: if (c->day == 25 || c->day == 26) return true; break; /* Weihn.  */
+    }
+
+    int64_t easter = bvn_gregorian_date_easter_sunday_mjd(c->year);
+    if (easter == BVN_GDATE_OVF) return false;
+
+    int64_t off = bvn_gregorian_date_to_mjd_fast(c) - easter;
+    return off == -2 || off == 1 || off == 39 || off == 50;
+}
+
+static bool banking_day_canon(bvn_gregorian_date_t* c)
+{
+    if (c->wday == 0 || c->wday == 6)                     return false;
+    if (c->month == 12 && (c->day == 24 || c->day == 31)) return false;
+    return !federal_holiday_canon(c);
+}
+
+bool bvn_gregorian_date_is_federal_holiday_in_germany(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t c;
+    return canonicalize(&c, d) && federal_holiday_canon(&c);
+}
+
+bool bvn_gregorian_date_is_banking_day_in_germany(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t c;
+    return canonicalize(&c, d) && banking_day_canon(&c);
+}
+
+bool bvn_gregorian_date_is_business_day_in_germany(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t c;
+    return canonicalize(&c, d)
+        && c.wday != 0
+        && !federal_holiday_canon(&c);
+}
+
+bool bvn_gregorian_date_is_equal(bvn_gregorian_date_t* a, bvn_gregorian_date_t* b)
+{
+	return (a->day == b->day) && (a->month == b->month) && (a->year == b->year)
+			&& (a->wday == b->wday) && (a->yday == b->yday)
+			&& (a->leap == b->leap);
+}
+
+/* Seed tmp/mjd for a walk.  Returns false when the seed is the BVN_GDATE_OVF
+ * sentinel or lies outside the supported MJD range, so every walk-based
+ * getter degrades to the documented leave-res-unchanged error behavior. */
+static bool seed_walk(bvn_gregorian_date_t* tmp, int64_t* mjd, int64_t seed)
+{
+    if (seed < BVN_GDATE_MJD_MIN || seed > BVN_GDATE_MJD_MAX)
+        return false;
+    *mjd = seed;
+    bvn_gregorian_date_from_mjd(tmp, seed);
+    return true;
+}
+
+/* Walk from seed in step direction until pred holds; assign *res only on
+ * success so failed walks honor the leave-res-untouched error contract. */
+static void get_walk_day(bvn_gregorian_date_t* res, int64_t seed,
+                         int step, date_pred_t pred)
+{
+    bvn_gregorian_date_t tmp;
+    int64_t mjd;
+    if (!seed_walk(&tmp, &mjd, seed))
+        return;
+    if (!walk_until(&tmp, &mjd, step, pred))
+        return;
+    *res = tmp;
+}
+
+void bvn_gregorian_date_get_last_banking_day_in_month(bvn_gregorian_date_t* res,
+                                                  bvn_gregorian_date_t* date)
+{
+    get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_banking);
+}
+
+void bvn_gregorian_date_get_penultimate_banking_day_in_month(bvn_gregorian_date_t* res,
+                                                         bvn_gregorian_date_t* date)
+{
+    bvn_gregorian_date_t tmp;
+    int64_t mjd;
+    if (!seed_walk(&tmp, &mjd, eom_mjd(date->year, date->month)))
+        return;
+    if (!walk_until(&tmp, &mjd, -1, pred_banking)) /* last banking day */
+        return;
+    if (!seed_walk(&tmp, &mjd, mjd - 1))           /* step past it ... */
+        return;
+    if (!walk_until(&tmp, &mjd, -1, pred_banking)) /* ... to the one before */
+        return;
+    *res = tmp;
+}
+
+void bvn_gregorian_date_get_first_banking_day_in_month(bvn_gregorian_date_t* res,
+                                                   bvn_gregorian_date_t* date)
+{
+    get_walk_day(res, ymd_to_mjd(date->year, date->month, 1), +1, pred_banking);
+}
+
+void bvn_gregorian_date_get_mid_banking_day_in_month(bvn_gregorian_date_t* res,
+                                                 bvn_gregorian_date_t* date)
+{
+    get_walk_day(res, ymd_to_mjd(date->year, date->month, 15), +1, pred_banking);
+}
+
+void bvn_gregorian_date_get_last_sunday_in_month(bvn_gregorian_date_t* res,
+                                             bvn_gregorian_date_t* date)
+{
+    get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_sunday);
+}
+
+void bvn_gregorian_date_get_last_saturday_in_month(bvn_gregorian_date_t* res,
+                                               bvn_gregorian_date_t* date)
+{
+    get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_saturday);
+}
+
+bool bvn_gregorian_date_is_last_banking_day_in_month(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t bd = {0};
+    bvn_gregorian_date_get_last_banking_day_in_month(&bd, d);
+    return same_day(&bd, d);
+}
+
+bool bvn_gregorian_date_is_penultimate_banking_day_in_month(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t bd = {0};
+    bvn_gregorian_date_get_penultimate_banking_day_in_month(&bd, d);
+    return same_day(&bd, d);
+}
+
+bool bvn_gregorian_date_is_first_banking_day_in_month(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t bd = {0};
+    bvn_gregorian_date_get_first_banking_day_in_month(&bd, d);
+    return same_day(&bd, d);
+}
+
+bool bvn_gregorian_date_is_mid_banking_day_in_month(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t bd = {0};
+    bvn_gregorian_date_get_mid_banking_day_in_month(&bd, d);
+    return same_day(&bd, d);
+}
+
+bool bvn_gregorian_date_is_last_banking_day_in_quarter(int q, bvn_gregorian_date_t* d)
+{
+    if (q < 1 || q > 4)
+        return false;
+    bvn_gregorian_date_t bd = {0};
+    bvn_gregorian_date_get_last_banking_day_in_quarter(q, &bd, d);
+    return same_day(&bd, d);
+}
+
+bool bvn_gregorian_date_is_first_banking_day_in_quarter(int q, bvn_gregorian_date_t* d)
+{
+    if (q < 1 || q > 4)
+        return false;
+    bvn_gregorian_date_t bd = {0};
+    bvn_gregorian_date_get_first_banking_day_in_quarter(q, &bd, d);
+    return same_day(&bd, d);
+}
+
+static inline int q_first_month(int q) { return 3 * (q - 1) + 1; } /* 1,4,7,10 */
+static inline int q_last_month (int q) { return 3 *  q;          } /* 3,6,9,12 */
+
+void bvn_gregorian_date_get_last_banking_day_in_quarter(int quarter,
+                                                    bvn_gregorian_date_t* res,
+                                                    bvn_gregorian_date_t* date)
+{
+    if (quarter < 1 || quarter > 4)
+        return;
+    get_walk_day(res, eom_mjd(date->year, q_last_month(quarter)),
+                 -1, pred_banking);
+}
+
+void bvn_gregorian_date_get_first_banking_day_in_quarter(int quarter,
+                                                     bvn_gregorian_date_t* res,
+                                                     bvn_gregorian_date_t* date)
+{
+    if (quarter < 1 || quarter > 4)
+        return;
+    get_walk_day(res, ymd_to_mjd(date->year, q_first_month(quarter), 1),
+                 +1, pred_banking);
+}
+
+bool bvn_gregorian_date_is_daylight_saving_switch_in_germany(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t c;
+    if (!canonicalize(&c, d)) return false;
+    return (c.month == 3 || c.month == 10) && c.day > 24 && c.wday == 0;
+}
+
+bool bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany(bvn_gregorian_date_t* d)
+{
+    bvn_gregorian_date_t c;
+    if (!canonicalize(&c, d)) return false;
+    return (c.month == 3 || c.month == 10)
+        && c.day >= 24 && c.day <= 30 && c.wday == 6;
+}
+
+/* ==================== src/utils/bvn_datetime.c ==================== */
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright (c) 2026 Janos Sonntag
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+
+/* TAI-UTC offset table.  utc_seconds is the UTC instant at which the offset
+ * takes effect, expressed as uniform seconds (86400 s/day) since the TAI
+ * epoch 1958-01-01 00:00:00.  Entries must stay sorted ascending; when IERS
+ * announces the next leap second, append one entry here — nothing else in
+ * the module needs to change. */
+typedef struct {
+	int64_t utc_seconds;
+	int64_t tai_minus_utc;
+} bvn_dt_leap_entry_t;
+
+static const bvn_dt_leap_entry_t bvn_dt_leap_table[] = {
+	{ INT64_C(  441763200), 10 }, /* 1972-01-01 */
+	{ INT64_C(  457488000), 11 }, /* 1972-07-01 */
+	{ INT64_C(  473385600), 12 }, /* 1973-01-01 */
+	{ INT64_C(  504921600), 13 }, /* 1974-01-01 */
+	{ INT64_C(  536457600), 14 }, /* 1975-01-01 */
+	{ INT64_C(  567993600), 15 }, /* 1976-01-01 */
+	{ INT64_C(  599616000), 16 }, /* 1977-01-01 */
+	{ INT64_C(  631152000), 17 }, /* 1978-01-01 */
+	{ INT64_C(  662688000), 18 }, /* 1979-01-01 */
+	{ INT64_C(  694224000), 19 }, /* 1980-01-01 */
+	{ INT64_C(  741484800), 20 }, /* 1981-07-01 */
+	{ INT64_C(  773020800), 21 }, /* 1982-07-01 */
+	{ INT64_C(  804556800), 22 }, /* 1983-07-01 */
+	{ INT64_C(  867715200), 23 }, /* 1985-07-01 */
+	{ INT64_C(  946684800), 24 }, /* 1988-01-01 */
+	{ INT64_C( 1009843200), 25 }, /* 1990-01-01 */
+	{ INT64_C( 1041379200), 26 }, /* 1991-01-01 */
+	{ INT64_C( 1088640000), 27 }, /* 1992-07-01 */
+	{ INT64_C( 1120176000), 28 }, /* 1993-07-01 */
+	{ INT64_C( 1151712000), 29 }, /* 1994-07-01 */
+	{ INT64_C( 1199145600), 30 }, /* 1996-01-01 */
+	{ INT64_C( 1246406400), 31 }, /* 1997-07-01 */
+	{ INT64_C( 1293840000), 32 }, /* 1999-01-01 */
+	{ INT64_C( 1514764800), 33 }, /* 2006-01-01 */
+	{ INT64_C( 1609459200), 34 }, /* 2009-01-01 */
+	{ INT64_C( 1719792000), 35 }, /* 2012-07-01 */
+	{ INT64_C( 1814400000), 36 }, /* 2015-07-01 */
+	{ INT64_C( 1861920000), 37 }, /* 2017-01-01 */
+};
+
+#define BVN_DT_LEAP_TABLE_LEN \
+	(sizeof(bvn_dt_leap_table) / sizeof(bvn_dt_leap_table[0]))
+
+/* TAI-UTC at the given UTC instant (uniform seconds since the TAI epoch).
+ * Instants before 1972 predate UTC leap seconds (rubber-second era) and are
+ * approximated with the first table entry. */
+static int64_t bvn_dt_tai_minus_utc_at(int64_t utc_seconds)
+{
+	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
+		if (utc_seconds >= bvn_dt_leap_table[i].utc_seconds)
+			return bvn_dt_leap_table[i].tai_minus_utc;
+	}
+	return bvn_dt_leap_table[0].tai_minus_utc;
+}
+
+void bvn_dt_epoch_seconds_to_datetime(bvn_datetime_t* dt, bvn_epoch_t epoch, int64_t seconds)
+{
+	/* Floor semantics: instants before the epoch must roll back into the
+	 * previous day, not produce negative time-of-day fields. */
+	int64_t u = floor_div(seconds, 86400);
+	int64_t s = floor_mod(seconds, 86400);
+
+	dt->submjd = div_round_closest(s * 100000, 86400);
+
+	dt->second = s % 60; s /= 60;
+	dt->minute = s % 60; s /= 60;
+	dt->hour = s;
+
+	dt->mjd = u + (int64_t)epoch;
+	bvn_gregorian_date_from_mjd(&dt->date, dt->mjd);
+}
+
+int64_t bvn_dt_datetime_to_epoch_seconds(bvn_datetime_t* dt, bvn_epoch_t epoch)
+{
+	if (!bvn_gregorian_date_normalize(&dt->date))
+		return BVN_GDATE_OVF;
+
+	/* normalize() succeeded, so the date is canonical and in range; the
+	 * fast converter is safe here. */
+	dt->mjd = bvn_gregorian_date_to_mjd_fast(&dt->date);
+
+	int64_t r, t;
+	bool ov = false;
+	ov |= bvn_ckd_sub(&r, dt->mjd, (int64_t)epoch);
+	ov |= bvn_ckd_mul(&r, r, (int64_t)86400);
+	ov |= bvn_ckd_mul(&t, dt->hour, (int64_t)3600);
+	ov |= bvn_ckd_add(&r, r, t);
+	ov |= bvn_ckd_mul(&t, dt->minute, (int64_t)60);
+	ov |= bvn_ckd_add(&r, r, t);
+	ov |= bvn_ckd_add(&r, r, dt->second);
+	/* INT64_MIN is reserved as the error sentinel; report the one
+	 * (absurd-input) computation that lands on it exactly as overflow so
+	 * a successful return can never collide with BVN_GDATE_OVF. */
+	if (ov || r == BVN_GDATE_OVF)
+		return BVN_GDATE_OVF;
+	return r;
+}
+
+int64_t bvn_dt_convert_epoch_seconds(bvn_epoch_t epoch_from, bvn_epoch_t epoch_to, int64_t seconds)
+{
+	/* The casts matter: enum arithmetic is done in the (32-bit) underlying
+	 * type and wraps for negative differences and wide epoch gaps.  The
+	 * epoch difference itself is bounded (< 54000 days), only the final
+	 * addition can overflow. */
+	int64_t r;
+	if (bvn_ckd_add(&r, 86400 * ((int64_t)epoch_from - (int64_t)epoch_to),
+			seconds))
+		return BVN_GDATE_OVF;
+	return r;
+}
+
+/* Shared GNSS week + time-of-week conversion; gnss_epoch is the MJD of the
+ * constellation's epoch.  Returns BVN_GDATE_OVF on overflow. */
+static int64_t bvn_dt_epoch_seconds_from_gnss_time(int64_t gnss_epoch,
+		int64_t timeofweek_ms, int64_t week, bvn_epoch_t epoch)
+{
+	int64_t timeofweek_s = div_round_closest(timeofweek_ms, 1000);
+	int64_t days, t, seconds;
+	bool ov = false;
+
+	ov |= bvn_ckd_mul(&days, week, (int64_t)7);
+	ov |= bvn_ckd_add(&days, days, gnss_epoch - (int64_t)epoch);
+	ov |= bvn_ckd_add(&days, days, timeofweek_s / 86400);
+	ov |= bvn_ckd_mul(&t, days, (int64_t)86400);
+	ov |= bvn_ckd_add(&seconds, t, timeofweek_s % 86400);
+	if (epoch == bvn_epoch_tai)
+		ov |= bvn_ckd_add(&seconds, seconds, (int64_t)19);
+	if (ov || seconds == BVN_GDATE_OVF)
+		return BVN_GDATE_OVF;
+	return seconds;
+}
+
+int64_t bvn_dt_epoch_seconds_from_gps_time(int64_t timeofweek_ms, int64_t gps_week, bvn_epoch_t epoch)
+{
+	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_gps,
+						   timeofweek_ms, gps_week, epoch);
+}
+
+int64_t bvn_dt_tai_seconds_from_gps_time(int64_t timeofweek_ms, int64_t gps_week)
+{
+	return bvn_dt_epoch_seconds_from_gps_time(timeofweek_ms, gps_week,
+						  bvn_epoch_tai);
+}
+
+int64_t bvn_dt_epoch_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t galileo_week, bvn_epoch_t epoch)
+{
+	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_galileo,
+						   timeofweek_ms, galileo_week, epoch);
+}
+
+int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
+{
+	int64_t utc_seconds = bvn_dt_datetime_to_epoch_seconds(dt, bvn_epoch_tai);
+	if (utc_seconds == BVN_GDATE_OVF)
+		return BVN_GDATE_OVF;
+
+	int64_t tai;
+	if (bvn_ckd_add(&tai, utc_seconds, bvn_dt_tai_minus_utc_at(utc_seconds))
+			|| tai == BVN_GDATE_OVF)
+		return BVN_GDATE_OVF;
+	return tai;
+}
+
+void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
+{
+	/* Pick the offset whose validity interval (in TAI) contains the
+	 * instant.  The inserted leap second itself (23:59:60) is not
+	 * representable and collapses onto 00:00:00 of the following day. */
+	int64_t off = bvn_dt_leap_table[0].tai_minus_utc;
+	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
+		const bvn_dt_leap_entry_t* e = &bvn_dt_leap_table[i];
+		if (tai_seconds >= e->utc_seconds + e->tai_minus_utc) {
+			off = e->tai_minus_utc;
+			break;
+		}
+	}
+
+	/* Underflows only within 37 s of INT64_MIN; leave *dt untouched then. */
+	int64_t utc_seconds;
+	if (bvn_ckd_sub(&utc_seconds, tai_seconds, off))
+		return;
+	bvn_dt_epoch_seconds_to_datetime(dt, bvn_epoch_tai, utc_seconds);
+}
+
+void bvn_dt_tai_seconds_to_local_time(bvn_datetime_t* dt, int64_t tai_seconds, int64_t timezone_offset_seconds, int dls_active)
+{
+	int64_t local = tai_seconds;
+	if (bvn_ckd_add(&local, local, timezone_offset_seconds))
+		return;	/* leave *dt untouched on overflow */
+	if (dls_active && bvn_ckd_add(&local, local, (int64_t)3600))
+		return;
+	bvn_dt_tai_seconds_to_utc(dt, local);
+}
+
+int bvn_dt_is_date_equal(bvn_datetime_t* a, bvn_datetime_t* b)
+{
+	return (a->date.day == b->date.day) && (a->date.month == b->date.month) && (a->date.year == b->date.year);
+}
+
+int bvn_dt_is_time_equal(bvn_datetime_t* a, bvn_datetime_t* b)
+{
+	return (a->hour == b->hour) && (a->minute == b->minute) && (a->second == b->second);
+}
+
+int bvn_dt_is_equal(bvn_datetime_t* a, bvn_datetime_t* b)
+{
+	return bvn_dt_is_date_equal(a, b) && bvn_dt_is_time_equal(a, b);
+}
+
+
+int bvn_dt_tai_second_is_dls_in_europe(int64_t tai_second)
+{
+	bvn_datetime_t dt = {{0}, 0, 0, 0, 0, 0};
+	int64_t tai_dls_on;
+	int64_t tai_dls_off;
+
+	/* Resolve the calendar year of the instant; the DST window (last Sunday
+	 * of March .. last Sunday of October) lies entirely within that year. */
+	bvn_dt_tai_seconds_to_utc(&dt, tai_second);
+
+	bvn_datetime_t dls_on = {
+		.date.year = dt.date.year,
+		.date.month = 3,
+		.hour = 1,
+	};
+
+	bvn_datetime_t dls_off = {
+		.date.year = dt.date.year,
+		.date.month = 10,
+		.hour = 1,
+	};
+
+	bvn_gregorian_date_get_last_sunday_in_month(&dls_on.date, &dls_on.date);
+	bvn_gregorian_date_get_last_sunday_in_month(&dls_off.date, &dls_off.date);
+
+	tai_dls_on = bvn_dt_utc_to_tai_seconds(&dls_on);
+	tai_dls_off = bvn_dt_utc_to_tai_seconds(&dls_off);
+
+	/* Unresolvable boundaries (int64 extremes) must not flow the error
+	 * sentinel into the comparisons; report them as "not DST".  The input is
+	 * already on the TAI scale, so compare it against the boundaries
+	 * directly instead of round-tripping it through UTC. */
+	if (tai_dls_on == BVN_GDATE_OVF || tai_dls_off == BVN_GDATE_OVF)
+		return 0;
+
+	return (tai_second >= tai_dls_on) && (tai_second < tai_dls_off);
+}
+
+void bvn_dt_dump(bvn_datetime_t* dt)
+{
+	printf("day        : %" PRIi64 "\n", dt->date.day);
+	printf("month      : %" PRIi64 "\n", dt->date.month);
+	printf("year       : %" PRIi64 "\n", dt->date.year);
+	printf("is leap    : %" PRIi32 "\n", dt->date.leap);
+	printf("day of week: %" PRIi32 "\n", dt->date.wday);
+	printf("day of year: %" PRIi32 "\n", dt->date.yday);
+	printf("hour       : %" PRIi64 "\n", dt->hour);
+	printf("minute     : %" PRIi64 "\n", dt->minute);
+	printf("second     : %" PRIi64 "\n", dt->second);
+	printf("mjd        : %" PRIi64 "\n", dt->mjd);
+	printf("submjd     : %" PRIi64 "\n", dt->submjd);
+}
+
+void bvn_dt_print(bvn_datetime_t* dt)
+{
+	printf("MJD %" PRIi64 ".%.5" PRIi64 " - %.2" PRIi64 ".%.2" PRIi64 ".%.4" PRIi64 " %.2" PRIi64 ":%.2" PRIi64 ":%.2" PRIi64 "\n",
+		dt->mjd, dt->submjd,
+		dt->date.day, dt->date.month, dt->date.year,
+		dt->hour, dt->minute, dt->second);
+}
+
 /* ==================== src/utils/bovnar_si_units.c ==================== */
 /*
  * SPDX-License-Identifier: MIT

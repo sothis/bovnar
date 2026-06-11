@@ -33,6 +33,7 @@ PUBLIC_HEADERS = [
     "bvn_int.h", "bvn_float.h", "bovnar.h",
     "bovnar_si_units.h", "bovnar_currency.h", "bovnar_dom.h",
     "bovnar_stream.h",
+    "bvn_gregorian_date.h", "bvn_datetime.h",
 ]
 
 # Implementation translation units (the CLI src/bovnar.c is intentionally
@@ -40,6 +41,8 @@ PUBLIC_HEADERS = [
 IMPL_SOURCES = [
     "src/utils/bvn_int.c",
     "src/utils/bvn_float.c",
+    "src/utils/bvn_gregorian_date.c",
+    "src/utils/bvn_datetime.c",
     "src/utils/bovnar_si_units.c",
     "src/utils/bovnar_currency.c",
     "src/utils/bovnar_utils.c",

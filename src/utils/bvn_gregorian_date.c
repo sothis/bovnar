@@ -399,50 +399,67 @@ void bvn_gregorian_date_get_last_saturday_in_month(bvn_gregorian_date_t* res,
     get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_saturday);
 }
 
+/* The is_*_banking_day predicates judge the civil day the input normalizes to
+ * (see the header contract).  They canonicalize a copy first so that both the
+ * getter and the same_day() comparison operate on that canonical day; comparing
+ * a normalized getter result against a raw, denormalized input would otherwise
+ * never match. */
 bool bvn_gregorian_date_is_last_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_last_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_last_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_penultimate_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_penultimate_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_penultimate_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_first_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_first_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_first_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_mid_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_mid_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_mid_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_last_banking_day_in_quarter(int q, bvn_gregorian_date_t* d)
 {
     if (q < 1 || q > 4)
         return false;
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_last_banking_day_in_quarter(q, &bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_last_banking_day_in_quarter(q, &bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_first_banking_day_in_quarter(int q, bvn_gregorian_date_t* d)
 {
     if (q < 1 || q > 4)
         return false;
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_first_banking_day_in_quarter(q, &bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_first_banking_day_in_quarter(q, &bd, &c);
+    return same_day(&bd, &c);
 }
 
 static inline int q_first_month(int q) { return 3 * (q - 1) + 1; } /* 1,4,7,10 */

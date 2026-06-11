@@ -192,19 +192,23 @@ int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
 	return tai;
 }
 
-void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
+/* TAI-UTC offset valid at the given TAI instant.  Picks the offset whose
+ * validity interval (in TAI) contains the instant.  The inserted leap second
+ * itself (23:59:60) is not representable and collapses onto 00:00:00 of the
+ * following UTC day. */
+static int64_t bvn_dt_tai_minus_utc_for_tai(int64_t tai_seconds)
 {
-	/* Pick the offset whose validity interval (in TAI) contains the
-	 * instant.  The inserted leap second itself (23:59:60) is not
-	 * representable and collapses onto 00:00:00 of the following day. */
-	int64_t off = bvn_dt_leap_table[0].tai_minus_utc;
 	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
 		const bvn_dt_leap_entry_t* e = &bvn_dt_leap_table[i];
-		if (tai_seconds >= e->utc_seconds + e->tai_minus_utc) {
-			off = e->tai_minus_utc;
-			break;
-		}
+		if (tai_seconds >= e->utc_seconds + e->tai_minus_utc)
+			return e->tai_minus_utc;
 	}
+	return bvn_dt_leap_table[0].tai_minus_utc;
+}
+
+void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
+{
+	int64_t off = bvn_dt_tai_minus_utc_for_tai(tai_seconds);
 
 	/* Underflows only within 37 s of INT64_MIN; leave *dt untouched then. */
 	int64_t utc_seconds;
@@ -215,12 +219,19 @@ void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
 
 void bvn_dt_tai_seconds_to_local_time(bvn_datetime_t* dt, int64_t tai_seconds, int64_t timezone_offset_seconds, int dls_active)
 {
+	/* The leap-second offset must be taken at the true instant: convert to
+	 * UTC first, then apply the zone/DST shift on the UTC scale.  Applying
+	 * the shift to TAI before the lookup would, near a leap second, push the
+	 * value across a table boundary and select the neighbouring offset,
+	 * skewing the rendered local time by one second. */
 	int64_t local = tai_seconds;
-	if (bvn_ckd_add(&local, local, timezone_offset_seconds))
+	if (bvn_ckd_sub(&local, local, bvn_dt_tai_minus_utc_for_tai(tai_seconds)))
 		return;	/* leave *dt untouched on overflow */
+	if (bvn_ckd_add(&local, local, timezone_offset_seconds))
+		return;
 	if (dls_active && bvn_ckd_add(&local, local, (int64_t)3600))
 		return;
-	bvn_dt_tai_seconds_to_utc(dt, local);
+	bvn_dt_epoch_seconds_to_datetime(dt, bvn_epoch_tai, local);
 }
 
 int bvn_dt_is_date_equal(bvn_datetime_t* a, bvn_datetime_t* b)

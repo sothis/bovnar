@@ -363,6 +363,22 @@ static void test_banking_getters(void)
 	  bvn_gregorian_date_normalize(&g);
 	  CHECK(!bvn_gregorian_date_is_last_banking_day_in_month(&g), "not last bd"); }
 
+	/* Predicates must judge the civil day a denormalized record normalizes to
+	 * (header contract).  {2024,11,60} == 2024-12-30 (last banking day of Dec);
+	 * {2024,13,2} == 2025-01-02 (first banking day of Jan). */
+	{ bvn_gregorian_date_t g = { .year = 2024, .month = 11, .day = 60 };
+	  CHECK(bvn_gregorian_date_is_last_banking_day_in_month(&g),
+		"denorm last bd in month"); }
+	{ bvn_gregorian_date_t g = { .year = 2024, .month = 13, .day = 2 };
+	  CHECK(bvn_gregorian_date_is_first_banking_day_in_month(&g),
+		"denorm first bd in month"); }
+	{ bvn_gregorian_date_t g = { .year = 2023, .month = 15, .day = 28 }; /* 2024-03-28 */
+	  CHECK(bvn_gregorian_date_is_last_banking_day_in_quarter(1, &g),
+		"denorm last bd in quarter"); }
+	{ bvn_gregorian_date_t g = { .year = 2024, .month = 12, .day = 27 }; /* not last */
+	  CHECK(!bvn_gregorian_date_is_last_banking_day_in_month(&g),
+		"penult is not last bd"); }
+
 	/* quarters: Q1 2024 ends Sun31/Sat30 weekend + Fri29 Good Friday -> Thu Mar 28 */
 	bvn_gregorian_date_t y = { .year = 2024, .month = 1, .day = 1 };
 	bvn_gregorian_date_get_last_banking_day_in_quarter(1, &r, &y);
@@ -516,6 +532,35 @@ static void test_tai_utc(void)
 		CHECK(loc.date.month == 7 && loc.date.day == 1 && loc.hour == 14,
 			"local time CEST got %lld-%lld %lld:00", (long long)loc.date.month,
 			(long long)loc.date.day, (long long)loc.hour);
+	}
+	/* Regression: the leap-second offset must come from the true instant,
+	 * not from the timezone-shifted value.  At 2016-12-31 23:59:59 UTC
+	 * (offset 36) an observer at UTC+1h reads 2017-01-01 00:59:59 local;
+	 * a naive shift-then-lookup would cross the 2017 boundary (offset 37)
+	 * and render 00:59:58. */
+	{
+		bvn_datetime_t utc = { .date = { .year = 2016, .month = 12, .day = 31 },
+		                       .hour = 23, .minute = 59, .second = 59 };
+		int64_t tai = bvn_dt_utc_to_tai_seconds(&utc);
+		bvn_datetime_t loc;
+		memset(&loc, 0, sizeof loc);
+		bvn_dt_tai_seconds_to_local_time(&loc, tai, 3600, 0);
+		CHECK(loc.date.year == 2017 && loc.date.month == 1 && loc.date.day == 1
+			&& loc.hour == 0 && loc.minute == 59 && loc.second == 59,
+			"local time across leap boundary got %lld-%lld-%lld %lld:%lld:%lld",
+			(long long)loc.date.year, (long long)loc.date.month,
+			(long long)loc.date.day, (long long)loc.hour,
+			(long long)loc.minute, (long long)loc.second);
+	}
+	/* Local time with a zero offset must match plain UTC rendering. */
+	{
+		bvn_datetime_t a, b;
+		memset(&a, 0, sizeof a);
+		memset(&b, 0, sizeof b);
+		int64_t tai = 1500000000;
+		bvn_dt_tai_seconds_to_utc(&a, tai);
+		bvn_dt_tai_seconds_to_local_time(&b, tai, 0, 0);
+		CHECK(bvn_dt_is_equal(&a, &b), "local time tz=0 matches UTC");
 	}
 }
 

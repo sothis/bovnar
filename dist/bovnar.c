@@ -4645,50 +4645,67 @@ void bvn_gregorian_date_get_last_saturday_in_month(bvn_gregorian_date_t* res,
     get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_saturday);
 }
 
+/* The is_*_banking_day predicates judge the civil day the input normalizes to
+ * (see the header contract).  They canonicalize a copy first so that both the
+ * getter and the same_day() comparison operate on that canonical day; comparing
+ * a normalized getter result against a raw, denormalized input would otherwise
+ * never match. */
 bool bvn_gregorian_date_is_last_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_last_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_last_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_penultimate_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_penultimate_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_penultimate_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_first_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_first_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_first_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_mid_banking_day_in_month(bvn_gregorian_date_t* d)
 {
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_mid_banking_day_in_month(&bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_mid_banking_day_in_month(&bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_last_banking_day_in_quarter(int q, bvn_gregorian_date_t* d)
 {
     if (q < 1 || q > 4)
         return false;
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_last_banking_day_in_quarter(q, &bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_last_banking_day_in_quarter(q, &bd, &c);
+    return same_day(&bd, &c);
 }
 
 bool bvn_gregorian_date_is_first_banking_day_in_quarter(int q, bvn_gregorian_date_t* d)
 {
     if (q < 1 || q > 4)
         return false;
-    bvn_gregorian_date_t bd = {0};
-    bvn_gregorian_date_get_first_banking_day_in_quarter(q, &bd, d);
-    return same_day(&bd, d);
+    bvn_gregorian_date_t c, bd = {0};
+    if (!canonicalize(&c, d))
+        return false;
+    bvn_gregorian_date_get_first_banking_day_in_quarter(q, &bd, &c);
+    return same_day(&bd, &c);
 }
 
 static inline int q_first_month(int q) { return 3 * (q - 1) + 1; } /* 1,4,7,10 */
@@ -4919,19 +4936,23 @@ int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
 	return tai;
 }
 
-void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
+/* TAI-UTC offset valid at the given TAI instant.  Picks the offset whose
+ * validity interval (in TAI) contains the instant.  The inserted leap second
+ * itself (23:59:60) is not representable and collapses onto 00:00:00 of the
+ * following UTC day. */
+static int64_t bvn_dt_tai_minus_utc_for_tai(int64_t tai_seconds)
 {
-	/* Pick the offset whose validity interval (in TAI) contains the
-	 * instant.  The inserted leap second itself (23:59:60) is not
-	 * representable and collapses onto 00:00:00 of the following day. */
-	int64_t off = bvn_dt_leap_table[0].tai_minus_utc;
 	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
 		const bvn_dt_leap_entry_t* e = &bvn_dt_leap_table[i];
-		if (tai_seconds >= e->utc_seconds + e->tai_minus_utc) {
-			off = e->tai_minus_utc;
-			break;
-		}
+		if (tai_seconds >= e->utc_seconds + e->tai_minus_utc)
+			return e->tai_minus_utc;
 	}
+	return bvn_dt_leap_table[0].tai_minus_utc;
+}
+
+void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
+{
+	int64_t off = bvn_dt_tai_minus_utc_for_tai(tai_seconds);
 
 	/* Underflows only within 37 s of INT64_MIN; leave *dt untouched then. */
 	int64_t utc_seconds;
@@ -4942,12 +4963,19 @@ void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
 
 void bvn_dt_tai_seconds_to_local_time(bvn_datetime_t* dt, int64_t tai_seconds, int64_t timezone_offset_seconds, int dls_active)
 {
+	/* The leap-second offset must be taken at the true instant: convert to
+	 * UTC first, then apply the zone/DST shift on the UTC scale.  Applying
+	 * the shift to TAI before the lookup would, near a leap second, push the
+	 * value across a table boundary and select the neighbouring offset,
+	 * skewing the rendered local time by one second. */
 	int64_t local = tai_seconds;
-	if (bvn_ckd_add(&local, local, timezone_offset_seconds))
+	if (bvn_ckd_sub(&local, local, bvn_dt_tai_minus_utc_for_tai(tai_seconds)))
 		return;	/* leave *dt untouched on overflow */
+	if (bvn_ckd_add(&local, local, timezone_offset_seconds))
+		return;
 	if (dls_active && bvn_ckd_add(&local, local, (int64_t)3600))
 		return;
-	bvn_dt_tai_seconds_to_utc(dt, local);
+	bvn_dt_epoch_seconds_to_datetime(dt, bvn_epoch_tai, local);
 }
 
 int bvn_dt_is_date_equal(bvn_datetime_t* a, bvn_datetime_t* b)

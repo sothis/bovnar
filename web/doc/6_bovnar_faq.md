@@ -163,6 +163,10 @@ Yes, since spec 1.1. Put a directive on the first line:
 .x = 42;
 ```
 
+A document with **no** directive is treated as spec **1.0** — the frozen
+baseline grammar — so existing files need no change. The directive only opts in
+to a newer version.
+
 It is recognised only as the very first comment (after an optional BOM and
 whitespace). A reader records the declared version
 (`bvnr_reader_get_declared_version`, `bovnar query`/`validate` report it, and

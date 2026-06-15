@@ -163,6 +163,16 @@ very first line:
 .x = 42;
 ```
 
+**An unversioned document is spec 1.0.** A document with no directive is treated
+as targeting spec **1.0** — the frozen baseline grammar. The directive only ever
+*opts in* to a newer version; its absence is never ambiguous. Consequently, any
+syntax introduced after 1.0 (a future minor revision) is available only to a
+document that declares the matching version: a 1.1-only construct in an
+unversioned (i.e. 1.0) document is invalid, exactly as it would be to a 1.0
+reader. `bvnr_reader_get_declared_version` returns `false` for such a document
+(there is nothing declared), and a consumer that wants a concrete number should
+default to 1.0.
+
 **Form.** `#` `!bovnar` followed by one or more spaces/tabs, a `<major>.<minor>`
 decimal version, optional trailing whitespace, then end-of-line (LF/CR) or EOF.
 Each component is a decimal integer with no leading zero (a bare `0` excepted)

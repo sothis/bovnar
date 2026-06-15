@@ -244,7 +244,9 @@ static bool bvn_validate_number_for_writer(bvnr_writer_t* w,
 	{
 		uint32_t base  = bvn_effective_base(vt);
 		uint32_t width = bvn_effective_width(vt);
-		if (vt.family == vt_uint && buf[0] == '-') {
+		/* In bases 64/85 a leading '-' is a digit, not a negative sign. */
+		if (vt.family == vt_uint && buf[0] == '-' &&
+		    base != 64u && base != 85u) {
 			ok = bvn_writer_set_error(w, error_value_out_of_range);
 			goto out;
 		}
@@ -318,7 +320,9 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 	{
 		uint32_t base  = bvn_effective_base(vt);
 		uint32_t width = bvn_effective_width(vt);
-		if (vt.family == vt_uint && buf[0] == '-') {
+		/* In bases 64/85 a leading '-' is a digit, not a negative sign. */
+		if (vt.family == vt_uint && buf[0] == '-' &&
+		    base != 64u && base != 85u) {
 			ok = bvn_writer_set_error(w, error_value_out_of_range);
 			goto out;
 		}
@@ -420,6 +424,10 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 {
 	if (vt.family == vt_uint || vt.family == vt_sint) {
 		if (vt.width > BVN_MAX_INT_WIDTH)
+			return bvn_writer_set_error(w, error_illegal_value_type);
+		/* Bases 64 and 85 use '+'/'-' as digit characters, leaving no sign
+		 * character, so they are unsigned-only: reject signed integers. */
+		if (vt.family == vt_sint && (vt.base == 64u || vt.base == 85u))
 			return bvn_writer_set_error(w, error_illegal_value_type);
 	}
 	if (vt.family == vt_float) {

@@ -366,6 +366,15 @@ double bvn_unit_to_si_factor(value_unit_t u,
 			}
 		}
 	}
+	/* Extreme prefix/exponent combinations (e.g. Q~m^9, or several huge
+	 * components multiplied together) can overflow the running product to ±inf,
+	 * or produce nan via 0*inf. Surfacing that as a failure — rather than handing
+	 * back a non-finite factor with *ok still true — mirrors how bvn_unit_reduce
+	 * flags isinf, and stops callers like bvn_dom_get_value_in_base_units from
+	 * silently emitting inf/nan values. */
+	if (!isfinite(f)) {
+		*ok = false;
+	}
 	return f;
 }
 /*

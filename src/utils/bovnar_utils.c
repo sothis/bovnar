@@ -125,7 +125,10 @@ bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 {
 	if (!s || !*s) return false;
 	uint32_t i = 0;
-	if (s[0] == '-' || s[0] == '+') i = 1;
+	/* In bases 64 and 85 '+'/'-' are digit characters, not signs, so the bases
+	 * are unsigned-only and no leading sign is consumed. Other bases accept one
+	 * optional leading sign. */
+	if (base != 64u && base != 85u && (s[0] == '-' || s[0] == '+')) i = 1;
 	if (!s[i]) return false;
 	for (; s[i]; i++) {
 		if (bvn_char_to_digit((uint8_t)s[i], base) >= base)
@@ -144,6 +147,14 @@ bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 bool bvn_validate_number_in_base(const char* s, uint32_t base)
 {
 	if (!s || !*s) return false;
+	/* Bases 64 and 85 are unsigned integer bases with fixed alphabets (standard
+	 * Base64, Ascii85) in which '+', '-', '.', and other punctuation are ordinary
+	 * digit characters — not sign, decimal-point, or exponent markers. They never
+	 * carry float syntax, so validate them as a pure unsigned digit string. This
+	 * also keeps this function in lock-step with bvn_validate_digits_for_base,
+	 * which the writer uses for the same values. */
+	if (base == 64u || base == 85u)
+		return bvn_validate_digits_for_base(s, base);
 	uint32_t i = 0;
 	if (s[0] == '-' || s[0] == '+') i = 1;
 	if (!s[i]) return false;
@@ -310,13 +321,17 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 {
 	if (!s) return true;
 	if (w == 0) return true;
+	/* In bases 64 and 85 '+'/'-' are digits, not signs; do not strip a leading
+	 * '+' nor reject a leading '-' (it is digit 12 in Ascii85, an invalid digit
+	 * in Base64 — either way the digit loop below decides). */
+	const bool uses_sign = (base != 64u && base != 85u);
 	uint8_t c0 = (uint8_t)s[0];
 	if ((c0 < '0' || c0 > '9') && c0 != '+') {
 		if (bvn_is_special_number_string(s)) return true;
-		if (c0 == '-') return false;
+		if (uses_sign && c0 == '-') return false;
 	}
 	const char* p = s;
-	if (*p == '+') p++;
+	if (uses_sign && *p == '+') p++;
 	if (w <= 64) {
 		uint64_t maxv = (w >= 64) ? UINT64_MAX : (1ULL << w) - 1ULL;
 		if (base == 10) {
@@ -2358,6 +2373,13 @@ value_type_spec_t bvn_parse_type_annotation(
 			*type_ok = false;
 			return r;
 		}
+		/* Bases 64 and 85 use '+'/'-' as digit characters, leaving no sign
+		 * character available, so they are unsigned-only: signed integers in
+		 * those bases are illegal. */
+		if (r.family == vt_sint && (r.base == 64u || r.base == 85u)) {
+			*type_ok = false;
+			return r;
+		}
 	}
 	if (r.family == vt_float) {
 		if (r.base != 0u && r.base != 10u && r.base != 16u) {
@@ -2524,6 +2546,10 @@ int32_t bvn_format_int64(char* buf, size_t bufsize, int64_t value,
 						 uint32_t base, uint32_t min_digits)
 {
 	bool neg = (value < 0);
+	/* Bases 64 and 85 use '+'/'-' as digits and so have no sign character; a
+	 * negative value cannot be represented (callers gate this via uint-only
+	 * type validation, but guard here too rather than emit a misreadable '-'). */
+	if (neg && (base == 64u || base == 85u)) return -1;
 	if (neg) {
 		if (bufsize < 2) return -1;
 		buf[0] = '-';
@@ -2663,6 +2689,15 @@ int32_t bvn_format_double(char* buf, size_t bufsize, double value,
 	bvn_float_t f;
 	uint32_t prec = bvn_effective_width(vt);
 	if (!prec || prec > 64u) prec = 64u;
+	/* `value` is a C double, which carries at most 53 significand bits. Loading
+	 * it into a wider float pads the mantissa with zero bits the value never
+	 * actually had; the shortest-round-trip search in bvn_float_to_str then has
+	 * to pin down that wider float and emits ~20 noise digits
+	 * (0.1 -> 1.0000000000000000555e-1). Capping the format precision at the
+	 * double's true 53 bits yields the canonical shortest decimal (0.1) that
+	 * still round-trips the double exactly, while a narrower declared width
+	 * (float:16/float:32) is preserved so its rounding intent is honoured. */
+	if (prec > 53u) prec = 53u;
 	bvn_float_init_buf(&f, prec, _dlimbs, BVN_FLOAT_NLIMBS(64u));
 	if (!bvn_float_from_double(&f, value)) return -1;
 	uint32_t base = bvn_effective_base(vt);

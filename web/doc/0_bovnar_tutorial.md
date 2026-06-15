@@ -186,7 +186,7 @@ For `sint` and `uint`, any positive integer is accepted as a width — `<uint:12
 
 #### Base
 
-The base parameter starts with `_` followed by a decimal number. For `uint` and `sint`, every base from `_2` through `_62` (consecutive) is allowed, plus `_64` and `_85`. It selects the numeral system used to interpret the value.
+The base parameter starts with `_` followed by a decimal number. For `uint` and `sint`, every base from `_2` through `_62` (consecutive) is allowed. Bases `_64` (standard Base64) and `_85` (Ascii85) are also available, but **only for `uint`**: their alphabets use `+` and `-` as digit characters, so no sign character remains and signed values are illegal (`error_illegal_value_type`). The base selects the numeral system used to interpret the value.
 
 This is the biggest surprise for newcomers: **non-decimal values must be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. Always quote non-decimal digits:
 

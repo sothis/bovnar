@@ -258,6 +258,8 @@ width-param  = DIGIT , {DIGIT} ;
 
 (* Base: underscore followed by one or more decimal digits.           *)
 (* Valid values: 2–62, 64 (standard Base64), 85 (Ascii85).           *)
+(* Bases 64 and 85 are uint-only: their alphabets use '+'/'-' as       *)
+(*   digits, leaving no sign character, so sint+64/85 is illegal.      *)
 (* "float" accepts only base 10 (or absent, → 10) or base 16;        *)
 (*   other bases → error_illegal_value_type.                          *)
 (* "float_fix" and "float_dec" reject the base parameter entirely:   *)

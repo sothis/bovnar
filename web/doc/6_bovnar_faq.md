@@ -461,10 +461,13 @@ For signed non-decimal values, the minus sign goes inside the string:
 
 **What base systems are supported?**
 
-For `uint` and `sint`: every base from `_2` through `_62` (consecutive), plus
-`_64` and `_85`. For `float`: `_10` (decimal, the default) and `_16`
-(hexadecimal) only. `float_fix` and `float_dec` do not accept a base parameter
-at all — specifying one is a hard error.
+For `uint` and `sint`: every base from `_2` through `_62` (consecutive). Bases
+`_64` (standard Base64) and `_85` (Ascii85) are also supported, but **for `uint`
+only** — their alphabets use `+`/`-` as digits, leaving no sign character, so a
+signed value in these bases is a hard error (`error_illegal_value_type`). For
+`float`: `_10` (decimal, the default) and `_16` (hexadecimal) only. `float_fix`
+and `float_dec` do not accept a base parameter at all — specifying one is a hard
+error.
 
 ---
 

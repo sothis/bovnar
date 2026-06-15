@@ -158,8 +158,13 @@ bool bvn_int_from_str(bvn_int_t *n, const char *s, uint32_t base)
 		(base >= 2u && base <= 62u) || base == 64u || base == 85u;
 	if (!valid_base) return false;
 	bool negative = false;
-	if      (*s == '-') { negative = true;  ++s; }
-	else if (*s == '+') {                   ++s; }
+	/* '+'/'-' are signs only in sign-bearing bases. In bases 64 and 85 they are
+	 * digit characters (Base64 '+' = 62; Ascii85 '+' = 10, '-' = 12), so those
+	 * bases are unsigned-only and every character is parsed as a digit. */
+	if (base != 64u && base != 85u) {
+		if      (*s == '-') { negative = true;  ++s; }
+		else if (*s == '+') {                   ++s; }
+	}
 	if (!*s) return false;
 	n->nused    = 0;
 	n->negative = false;
@@ -199,6 +204,9 @@ int32_t bvn_int_to_str(const bvn_int_t *n,
 	const bool valid_base =
 		(base >= 2u && base <= 62u) || base == 64u || base == 85u;
 	if (!valid_base) return -1;
+	/* Bases 64 and 85 use '+'/'-' as digits, so they have no sign character and
+	 * are unsigned-only: a negative value has no representation. */
+	if (n->negative && (base == 64u || base == 85u)) return -1;
 	if (bvn_int_is_zero(n)) {
 		uint32_t zch = bigint_digit_to_char(0u, base);
 		if (!zch) return -1;

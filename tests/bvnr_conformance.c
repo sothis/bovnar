@@ -888,6 +888,20 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("TYP-037", "types", "duplicate unit parameter",
 	           ".x = <float:64,m/s,kg> 1.0;",
 	           error_illegal_value_type),
+	/* Bases 64 (standard Base64) and 85 (Ascii85) use '+'/'-'/'.' etc. as
+	 * digit characters, so they carry no sign and are unsigned-only. The full
+	 * alphabet must round-trip for uint (TYP-038/039), and a signed integer in
+	 * these bases is an illegal type (TYP-040/041). */
+	VALID_KEY("TYP-038", "types", "uint base-64 with '+' digit (62)",
+	          ".x = <uint:64,_64> \"z+\";", "x", "z+"),
+	VALID_KEY("TYP-039", "types", "uint base-85 with '-' and '.' digits",
+	          ".x = <uint:64,_85> \"-.\";", "x", "-."),
+	ERROR_CASE("TYP-040", "types", "sint illegal in base 64 (no sign char)",
+	           ".x = <sint:8,_64> \"A\";",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-041", "types", "sint illegal in base 85 (no sign char)",
+	           ".x = <sint:16,_85> \"AB\";",
+	           error_illegal_value_type),
 
 	/* ── DEFAULT TYPE SYNTHESIS ──────────────────────────────────── */
 	VALID("DTS-001", "default_synthesis", "plain integer → uint:64",

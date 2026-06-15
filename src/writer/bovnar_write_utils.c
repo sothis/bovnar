@@ -396,6 +396,11 @@ bool bvnr_write_bvni_unit(bvnr_writer_t *w, const char *key,
 {
 	if (!n) return bvn_writer_set_error(w, error_invalid_argument);
 	uint32_t effective_base = base ? base : 10u;
+	/* Bases 64 and 85 are unsigned-only (they use '+'/'-' as digit characters,
+	 * leaving no sign character). A negative value would require a signed type,
+	 * which is illegal in those bases — reject it before emitting anything. */
+	if (n->negative && (effective_base == 64u || effective_base == 85u))
+		return bvn_writer_set_error(w, error_illegal_value_type);
 	if (!emit_key(w, key)) return false;
 	value_type_family_t fam = n->negative ? vt_sint : vt_uint;
 	value_type_spec_t vt;

@@ -410,7 +410,10 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 {
 	value_type_spec_t vt   = v->value_type;
 	uint32_t          base = bvn_effective_base_or_10(vt);
-	bool is_neg = (len > 0 && str[0] == '-');
+	/* In bases 64 and 85 '+'/'-' are digit characters (those bases are
+	 * unsigned-only), so a leading '-' is a digit to be accumulated, never a
+	 * negative sign. */
+	bool is_neg = (base != 64u && base != 85u && len > 0 && str[0] == '-');
 	if (vt.family == vt_uint && is_neg) {
 		v->last_error = error_value_out_of_range;
 		return false;
@@ -506,7 +509,9 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 	(void)tt;
 	value_type_spec_t vt   = v->value_type;
 	uint32_t          base = bvn_effective_base_or_10(vt);
-	bool is_neg = (str_len > 0 && str[0] == '-');
+	/* Bases 64/85 are unsigned-only and use '+'/'-' as digits, so a leading '-'
+	 * is never a negative sign there. */
+	bool is_neg = (base != 64u && base != 85u && str_len > 0 && str[0] == '-');
 	if (vt.family != vt_uint && vt.family != vt_sint)
 		return true;
 	if (str_len > 0) {

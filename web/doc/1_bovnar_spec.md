@@ -472,7 +472,7 @@ type-param = width-param    # decimal digits only, e.g. 32
 | Parameter | Syntax | Valid Values | Applies To |
 |-----------|--------|--------------|------------|
 | Width | `N` (decimal digits) | `0`, `16`, or any multiple of `32` up to `32768` for `float`; `0`,`16`,`32`,`64`,`128`,`256` for `float_fix`/`float_dec`; `0` to `BVN_MAX_INT_WIDTH` (32768) for `uint`/`sint` | uint, sint, float, float_fix, float_dec |
-| Base | `_N` (underscore + decimal digits) | `2–62`, `64`, `85`; `float` accepts only `10` or `16`; **forbidden** for `float_fix` and `float_dec` | uint, sint, float |
+| Base | `_N` (underscore + decimal digits) | `2–62` (uint/sint); `64`, `85` are **uint-only** (their Base64/Ascii85 alphabets use `+`/`-` as digits, so signed values are illegal — `error_illegal_value_type`); `float` accepts only `10` or `16`; **forbidden** for `float_fix` and `float_dec` | uint, sint, float |
 | Q (fractional bits) | `qN` (lowercase `q` + decimal digits) | `0 ≤ N < effective_width` | **float_fix only** |
 | Unit | unit-string | See [Units System](#11-units-system) — supports compound units | uint, sint, float, float_fix, float_dec |
 

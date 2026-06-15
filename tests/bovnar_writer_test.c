@@ -718,6 +718,80 @@ static void test_write_bvni_hex(void)
 	bvnr_writer_destroy(w);
 }
 
+/*
+ * Bases 64 and 85 use '+'/'-' as digit characters (Base64 '+'=62; Ascii85
+ * '+'=10, '-'=12). They carry no sign and are unsigned-only. Verify the full
+ * digit alphabet round-trips through writer->reader (a value whose digits
+ * include '+'/'-' is written and read back unchanged), and that a signed
+ * integer in these bases is rejected as an illegal type.
+ */
+static void test_write_bvni_base64_signchar(void)
+{
+	printf("  test_write_bvni_base64_signchar...\n");
+
+	bvn_int_t *n = bvn_int_alloc();
+	ASSERT_NOT_NULL(n, "bvn_int_alloc must succeed");
+	if (!n) return;
+
+	/* 3326 -> "z+" (digit 62 = '+'): writer emits it and the reader accepts. */
+	{
+		uint8_t output[4096];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer (b64) must succeed");
+		if (w) {
+			ASSERT_TRUE(bvn_int_from_str(n, "3326", 10), "parse 3326");
+			ASSERT_TRUE(bvnr_write_bvni(w, "v", n, 128u, 64u),
+						"uint base-64 with a '+' digit must write");
+			ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+			last_event_t le = {0};
+			ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+						"writer output must read back (no writer/reader skew)");
+			ASSERT_TRUE(strcmp(le.value, "z+") == 0,
+						"3326 must round-trip as base-64 \"z+\"");
+			bvnr_writer_destroy(w);
+		}
+	}
+
+	/* 12 -> "-" in Ascii85 (digit 12 = '-'): full alphabet round-trips. */
+	{
+		uint8_t output[4096];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer (b85) must succeed");
+		if (w) {
+			ASSERT_TRUE(bvn_int_from_str(n, "12", 10), "parse 12");
+			ASSERT_TRUE(bvnr_write_bvni(w, "v", n, 128u, 85u),
+						"uint base-85 with a '-' digit must write");
+			ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+			last_event_t le = {0};
+			ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+						"writer output must read back (no writer/reader skew)");
+			ASSERT_TRUE(strcmp(le.value, "-") == 0,
+						"12 must round-trip as base-85 \"-\"");
+			bvnr_writer_destroy(w);
+		}
+	}
+
+	/* A negative value forces family sint; sint is illegal for base 64/85. */
+	{
+		uint8_t output[4096];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer (sint) must succeed");
+		if (w) {
+			ASSERT_TRUE(bvn_int_from_str(n, "-5", 10), "parse -5");
+			ASSERT_TRUE(!bvnr_write_bvni(w, "bad", n, 128u, 64u),
+						"signed integer in base 64 must be rejected");
+			ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
+						  "rejection must report illegal_value_type");
+			bvnr_writer_destroy(w);
+		}
+	}
+
+	bvn_int_free(n);
+}
+
 static void test_write_streaming_flush(void)
 {
 	printf("  test_write_streaming_flush...\n");
@@ -1070,6 +1144,7 @@ int main(void)
 	test_write_bvnf_base16();
 	test_write_bvni_decimal();
 	test_write_bvni_hex();
+	test_write_bvni_base64_signchar();
 	test_write_streaming_flush();
 	test_validate_reference();
 	test_write_reference_roundtrip();

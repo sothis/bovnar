@@ -209,6 +209,62 @@ static void test_bases(void)
 	r = round_trip("Z9", 62); CHECK(r != NULL, "base62 round-trip non-null"); free(r);
 }
 
+/*
+ * Bases 64 and 85 use '+'/'-' as digit characters (Base64 '+'=62; Ascii85
+ * '+'=10, '-'=12), so those bases carry no sign and are unsigned-only. Verify
+ * the full digit alphabet round-trips (no leading '+'/'-' is mistaken for a
+ * sign), that a given value maps to the expected canonical literal, and that a
+ * negative value has no representation (to_str returns -1).
+ */
+static void check_b64_85_rt(const char *dec, uint32_t base, const char *expect)
+{
+	bvn_int_t *n = bvn_int_alloc();
+	CHECK(bvn_int_from_str(n, dec, 10), "b64/85: parse decimal source");
+	char emit[160];
+	CHECK(bvn_int_to_str(n, emit, sizeof(emit), base) > 0, "b64/85: emit");
+	CHECK(strcmp(emit, expect) == 0, "b64/85: canonical literal matches");
+	bvn_int_t *m = bvn_int_alloc();
+	CHECK(bvn_int_from_str(m, emit, base), "b64/85: re-parse emitted literal");
+	char d2[160];
+	CHECK(bvn_int_to_str(m, d2, sizeof(d2), 10) > 0, "b64/85: rt to decimal");
+	CHECK(strcmp(d2, dec) == 0, "b64/85: round-trip value preserved");
+	bvn_int_free(n);
+	bvn_int_free(m);
+}
+static void test_signchar_digits(void)
+{
+	puts("── base 64/85 sign-char digits are digits, not signs ─────────");
+	check_b64_85_rt("62",   64, "+");    /* digit 62 = '+'           */
+	check_b64_85_rt("63",   64, "/");    /* digit 63 = '/'           */
+	check_b64_85_rt("3326", 64, "z+");   /* 51*64 + 62 -> "z+"       */
+	check_b64_85_rt("10",   85, "+");    /* Ascii85 digit 10 = '+'   */
+	check_b64_85_rt("12",   85, "-");    /* Ascii85 digit 12 = '-'   */
+	check_b64_85_rt("865",  85, "+0");   /* 10*85 + 15 -> "+0"       */
+
+	/* from_str must treat a leading '+'/'-' as a digit, not strip it. */
+	bvn_int_t *n = bvn_int_alloc();
+	char d[64];
+	CHECK(bvn_int_from_str(n, "+", 64), "b64: '+' parses");
+	CHECK(bvn_int_to_str(n, d, sizeof(d), 10) > 0 && strcmp(d, "62") == 0,
+		  "b64: '+' is digit 62, not a positive sign");
+	CHECK(bvn_int_from_str(n, "-", 85), "b85: '-' parses");
+	CHECK(bvn_int_to_str(n, d, sizeof(d), 10) > 0 && strcmp(d, "12") == 0,
+		  "b85: '-' is digit 12, not a negative sign");
+	/* '-' is not in the Base64 alphabet at all. */
+	CHECK(!bvn_int_from_str(n, "-", 64), "b64: '-' is not a valid digit");
+
+	/* A negative value cannot be represented in an unsigned-only base. */
+	bvn_int_t *neg = bvn_int_alloc();
+	CHECK(bvn_int_from_str(neg, "-5", 10), "parse -5");
+	char buf[64];
+	CHECK(bvn_int_to_str(neg, buf, sizeof(buf), 64) == -1,
+		  "negative in base 64 must be rejected (-1)");
+	CHECK(bvn_int_to_str(neg, buf, sizeof(buf), 85) == -1,
+		  "negative in base 85 must be rejected (-1)");
+	bvn_int_free(n);
+	bvn_int_free(neg);
+}
+
 static void test_wide(void)
 {
 	puts("── wide integers (> 64 bits) ─────────────────────────────────");
@@ -372,6 +428,7 @@ int main(void)
 	test_native_getters();
 	test_native_setters();
 	test_bases();
+	test_signchar_digits();
 	test_wide();
 	test_invalid_input();
 	test_bufsize();

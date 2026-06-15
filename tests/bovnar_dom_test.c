@@ -679,6 +679,85 @@ static void test_reference_indexing(void)
 		bvn_dom_doc_destroy(d);
 	}
 }
+/*
+ * Broad coverage of index resolution across every array feature: deep /-row
+ * matrices, slash-rows whose cells are sub-arrays or structs, arrays nested in
+ * structs and vice versa, arbitrary nesting depth, null elements, and chained
+ * index/field navigation. Mirrors the manually-verified matrix of cases.
+ */
+static void test_reference_indexing_coverage(void)
+{
+	bvn_dom_doc_t *d;
+	int64_t v;
+
+	/* 3-row /-matrix: addressed [row][col] regardless of row count. */
+	d = parse_doc("#!bovnar 1.1\n.m = [10,20]/[30,40]/[50,60];\n");
+	if (d) {
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".m[2][1]"), &v) && v == 60,
+					"3-row matrix .m[2][1] resolves to 60");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".m[0][0]"), &v) && v == 10,
+					"3-row matrix .m[0][0] resolves to 10");
+		ASSERT_NULL(bvn_dom_lookup(d, ".m[3][0]"), "row past the last is NULL");
+		bvn_dom_doc_destroy(d);
+	}
+	/* /-rows whose cells are themselves arrays: descend [row][col] then [k]. */
+	d = parse_doc("#!bovnar 1.1\n.m = [[1,2],[3,4]]/[[5,6],[7,8]];\n");
+	if (d) {
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".m[1][0][1]"), &v) && v == 6,
+					".m[1][0][1] resolves to 6");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".m[0][1][0]"), &v) && v == 3,
+					".m[0][1][0] resolves to 3");
+		bvn_dom_doc_destroy(d);
+	}
+	/* struct in a flat array; /-matrix of structs; array inside a struct. */
+	d = parse_doc("#!bovnar 1.1\n.r = [{.a=1;},{.a=2;}];\n"
+				  ".g = [{.a=1;},{.a=2;}]/[{.a=3;},{.a=4;}];\n"
+				  ".s = {.arr=[7,8,9];};\n");
+	if (d) {
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".r[1].a"), &v) && v == 2,
+					"struct-in-array .r[1].a resolves to 2");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".g[1][0].a"), &v) && v == 3,
+					"/-matrix of structs .g[1][0].a resolves to 3");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".s.arr[2]"), &v) && v == 9,
+					"array-in-struct .s.arr[2] resolves to 9");
+		bvn_dom_doc_destroy(d);
+	}
+	/* array of arrays of structs; index -> field -> index chain; 3-deep nest. */
+	d = parse_doc("#!bovnar 1.1\n.z = [[{.x=1;}]];\n"
+				  ".g = [{.rows=[7,8];}];\n.d = [[[1,2]]];\n");
+	if (d) {
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".z[0][0].x"), &v) && v == 1,
+					"array-of-arrays-of-structs .z[0][0].x resolves to 1");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".g[0].rows[1]"), &v) && v == 8,
+					"index->field->index .g[0].rows[1] resolves to 8");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".d[0][0][1]"), &v) && v == 2,
+					"3-deep nested .d[0][0][1] resolves to 2");
+		bvn_dom_doc_destroy(d);
+	}
+	/* null array element resolves to a null node (not a missing path). */
+	d = parse_doc("#!bovnar 1.1\n.n = [1,,3];\n");
+	if (d) {
+		bvn_dom_node_t *e = bvn_dom_lookup(d, ".n[1]");
+		ASSERT_NOT_NULL(e, ".n[1] (a null element) is a resolvable node");
+		ASSERT_TRUE(bvn_dom_is_null(e), ".n[1] is the null placeholder");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".n[2]"), &v) && v == 3,
+					".n[2] resolves to 3");
+		bvn_dom_doc_destroy(d);
+	}
+	/* a comma-nested row IS addressable as a sub-array; a /-matrix row is not. */
+	d = parse_doc("#!bovnar 1.1\n.c = [[1,2],[3,4]];\n.m = [1,2]/[3,4];\n");
+	if (d) {
+		bvn_dom_node_t *row = bvn_dom_lookup(d, ".c[0]");
+		ASSERT_NOT_NULL(row, "comma-nested row .c[0] resolves");
+		ASSERT_EQ_UINT(bvn_dom_node_type(row), BVN_DOM_ARRAY,
+					   ".c[0] is itself an array");
+		ASSERT_EQ_UINT(bvn_dom_array_count(row), 2,
+					   ".c[0] has two elements");
+		ASSERT_NULL(bvn_dom_lookup(d, ".m[0]"),
+					"a /-matrix row is not addressable as a sub-array");
+		bvn_dom_doc_destroy(d);
+	}
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -696,6 +775,7 @@ int main(void)
 	test_struct_unique_keys();
 	test_references();
 	test_reference_indexing();
+	test_reference_indexing_coverage();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

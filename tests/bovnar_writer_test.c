@@ -1289,6 +1289,36 @@ static void test_write_datetime(void)
 	ASSERT_EQ_INT(bvnr_datetime_epoch_index("tai"), 1, "epoch index tai == 1");
 	ASSERT_EQ_INT(bvnr_datetime_epoch_index(NULL), 0, "NULL epoch == unix (0)");
 	ASSERT_EQ_INT(bvnr_datetime_epoch_index("bogus"), -1, "unknown epoch == -1");
+
+	/* the writer must reject a datetime the reader would reject (no
+	 * writer/reader asymmetry): out-of-range value and over-wide carrier. */
+	{
+		uint8_t b2[128]; bvnr_sink_t s2;
+		struct { uint32_t w; const char *ep; int64_t v; const char *why; } bad[] = {
+			{ 8,  NULL,   300,   "datetime:8 300 over signed range" },
+			{ 8,  "unix", -200,  "datetime:8 -200 under signed range" },
+			{ 16, NULL,   32768, "datetime:16 32768 over signed range" },
+			{ 33000, NULL, 1,    "datetime:33000 width over BVN_MAX_INT_WIDTH" },
+		};
+		for (size_t i = 0; i < sizeof(bad)/sizeof(bad[0]); i++) {
+			bvnr_sink_to_mem(&s2, b2, sizeof(b2));
+			bvnr_writer_t *w2 = bvnr_writer_create();
+			if (!w2) continue;
+			bvnr_open_write_sink(w2, &s2, false, NULL);
+			ASSERT_FALSE(bvnr_write_datetime(w2, "x", bad[i].w, bad[i].ep, bad[i].v),
+				bad[i].why);
+			bvnr_writer_destroy(w2);
+		}
+		/* in-range still accepted */
+		bvnr_sink_to_mem(&s2, b2, sizeof(b2));
+		bvnr_writer_t *w3 = bvnr_writer_create();
+		if (w3) {
+			bvnr_open_write_sink(w3, &s2, false, NULL);
+			ASSERT_TRUE(bvnr_write_datetime(w3, "x", 8, NULL, 127),
+				"datetime:8 127 is in range");
+			bvnr_writer_destroy(w3);
+		}
+	}
 }
 
 int main(void)

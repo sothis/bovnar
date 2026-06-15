@@ -280,7 +280,8 @@ static bool bvn_validate_number_for_writer(bvnr_writer_t* w,
 					error_value_out_of_range);
 				goto out;
 			}
-		} else if (vt.family == vt_sint && vt.width) {
+		} else if ((vt.family == vt_sint || vt.family == vt_datetime) && vt.width) {
+			/* datetime carrier is a signed integer (base 10); range-check like sint */
 			if (!bvn_validate_sint_range(buf, width, base)) {
 				ok = bvn_writer_set_error(w,
 					error_value_out_of_range);
@@ -347,7 +348,8 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 					error_value_out_of_range);
 				goto out;
 			}
-		} else if (vt.family == vt_sint && vt.width) {
+		} else if ((vt.family == vt_sint || vt.family == vt_datetime) && vt.width) {
+			/* datetime carrier is a signed integer (base 10); range-check like sint */
 			if (!bvn_validate_sint_range(buf, width, base)) {
 				ok = bvn_writer_set_error(w,
 					error_value_out_of_range);
@@ -443,6 +445,10 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 		if (vt.family == vt_sint && (vt.base == 64u || vt.base == 85u))
 			return bvn_writer_set_error(w, error_illegal_value_type);
 	}
+	/* datetime carrier width has the same bound as an integer (base holds the
+	 * epoch index, not a numeric base, so it is not range-checked here). */
+	if (vt.family == vt_datetime && vt.width > BVN_MAX_INT_WIDTH)
+		return bvn_writer_set_error(w, error_illegal_value_type);
 	if (vt.family == vt_float) {
 		if (vt.base != 0 && vt.base != 10 && vt.base != 16) {
 			return bvn_writer_set_error(w,

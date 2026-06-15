@@ -96,3 +96,44 @@ def test_invalid_datetimes(doc, code):
     with pytest.raises(BovnarParseError) as ei:
         bovnar.loads(doc)
     assert ei.value.code == code
+
+
+# ── ISO-8601 datetime literals (spec 1.1) ───────────────────────────────────
+@needs_lib
+@pytest.mark.parametrize("doc,expected", [
+    ('#!bovnar 1.1\n.t = 2026-06-15;',                          1781481600),
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;',                1781524800),
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00;',                 1781524800),
+    ('#!bovnar 1.1\n.t = 1970-01-01T00:00:00Z;',                0),
+    ('#!bovnar 1.1\n.t = 1960-01-01;',                          -315619200),
+    ('#!bovnar 1.1\n.t = <datetime> 2026-06-15;',               1781481600),
+    # tai is leap-second correct: 2017-01-01 carries +37 leap seconds
+    ('#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T00:00:00Z;', 1861920037),
+])
+def test_iso_literal_values(doc, expected):
+    # loads goes through the C reader; an ISO literal decodes to its epoch
+    # seconds carrier exactly like the equivalent integer would.
+    assert bovnar.loads(doc)['t'] == expected
+
+
+@needs_lib
+def test_iso_literal_array_is_homogeneous():
+    assert bovnar.loads('#!bovnar 1.1\n.ts = [2026-01-01, 2026-01-02];')['ts'] == \
+        [1767225600, 1767312000]
+
+
+@needs_lib
+@pytest.mark.parametrize("doc,code", [
+    ('#!bovnar 1.1\n.t = 2026-13-01;',                ErrorCode.INVALID_DATETIME_LITERAL),
+    ('#!bovnar 1.1\n.t = 2026-06-31;',                ErrorCode.INVALID_DATETIME_LITERAL),
+    ('#!bovnar 1.1\n.t = 2025-02-29;',                ErrorCode.INVALID_DATETIME_LITERAL),
+    ('#!bovnar 1.1\n.t = 2026-006-15;',               ErrorCode.INVALID_DATETIME_LITERAL),
+    ('#!bovnar 1.1\n.t = <datetime:64,gps> 2026-01-01;',
+                                                      ErrorCode.DATETIME_LITERAL_UNSUPPORTED_EPOCH),
+    ('#!bovnar 1.1\n.t = <sint:32> 2026-06-15;',      ErrorCode.TYPE_VALUE_MISMATCH),
+    ('.t = 2026-06-15;',                              ErrorCode.ILLEGAL_VALUE_TYPE),  # 1.0 gate
+])
+def test_invalid_iso_literals(doc, code):
+    with pytest.raises(BovnarParseError) as ei:
+        bovnar.loads(doc)
+    assert ei.value.code == code

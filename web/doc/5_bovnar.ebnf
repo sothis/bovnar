@@ -170,12 +170,29 @@ value        = [type-annotation , ws] , raw-value ;
 raw-value    = null-value
              | bool-value
              | special-number
+             | datetime-literal               (* spec 1.1 *)
              | ( number | string ) , [ ws-mandatory , inline-unit ]
              | symbol
              | reference
              | array
              | struct
              | octet-stream ;
+
+(* datetime-literal (spec 1.1): an ISO-8601 UTC timestamp accepted in     *)
+(* place of the integer epoch-seconds carrier.  The lexer accumulates the *)
+(* shape (dtlit_* states, entered from a digit run followed by "-"); the  *)
+(* validator strictly range-checks the fields and converts the UTC civil  *)
+(* instant to the integer carrier on the declared epoch (unix when a bare *)
+(* literal infers <datetime:64,unix>).  Whole-second resolution; the      *)
+(* atomic GNSS epochs (gps/galileo/glonass/beidou) reject a literal.      *)
+datetime-literal = year , "-" , month , "-" , day ,
+                   [ "T" , hour , ":" , minute , ":" , second , [ "Z" ] ] ;
+year         = digit , digit , digit , digit ;
+month        = digit , digit ;   (* 01..12                             *)
+day          = digit , digit ;   (* 01..28/29/30/31 per month          *)
+hour         = digit , digit ;   (* 00..23                             *)
+minute       = digit , digit ;   (* 00..59                             *)
+second       = digit , digit ;   (* 00..59                             *)
 
 (* null-value: either the reserved keyword "null" or the empty        *)
 (* production.                                                        *)

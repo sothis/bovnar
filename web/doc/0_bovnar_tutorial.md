@@ -148,7 +148,7 @@ There are seven core type families (spec 1.0), plus `datetime` added in spec 1.1
 | `float_dec` | IEEE 754-2008 decimal floating-point |
 | `utf8` | UTF-8 string |
 | `bool` | Boolean (`true`/`false`); takes no parameters |
-| `datetime` | Timestamp: signed epoch-seconds (spec 1.1; needs a `#!bovnar 1.1` directive) |
+| `datetime` | Timestamp: signed epoch-seconds, or an ISO-8601 literal like `2026-06-15T12:00:00Z` (spec 1.1; needs a `#!bovnar 1.1` directive) |
 
 ### Parameters
 

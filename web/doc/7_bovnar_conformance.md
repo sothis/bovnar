@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (267 cases) ──→ for each test case:                │
+│  Test corpus (287 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -442,7 +442,7 @@ specifies:
 | `version` | 13 | `#!bovnar M.N` directive: valid, malformed, strictness (spec 1.1) |
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 33 | Escapes, concatenation, UTF-8, limits |
-| `datetime` | 12 | Timestamp family: epochs, signed range, gating (spec 1.1) |
+| `datetime` | 32 | Timestamp family: epochs, signed range, gating, ISO-8601 literals (spec 1.1) |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
 | `types` | 52 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
@@ -459,7 +459,7 @@ specifies:
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 15 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **267** | |
+| **Total** | **287** | |
 
 ---
 
@@ -470,7 +470,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..267
+1..287
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

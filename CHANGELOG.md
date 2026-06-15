@@ -38,6 +38,17 @@ such a document is an error, exactly as a 1.0 reader reports.
   `bvnr_datetime_epoch_mjd` and converted to civil time with the `bvn_datetime.h`
   helpers. In an array, datetime is its own kind and its epoch is a dimension
   (mixing epochs, or datetime with a plain number, is `error_array_element_type_mismatch`).
+- **ISO-8601 datetime literals** — a value may be written as `YYYY-MM-DD`,
+  `YYYY-MM-DDTHH:MM:SS` or the trailing-`Z` (UTC) form instead of a raw integer;
+  it is converted to the epoch-seconds carrier at parse time (the integer is
+  what is stored and re-emitted, so round-trips stay idempotent). A bare literal
+  with no annotation infers `<datetime:64,unix>`. The UTC→epoch conversion is
+  leap-second correct: civil epochs (`unix`/`mjd`/`ntp`/`y2000`) use the uniform
+  scale and `tai` applies the IERS leap-second table; the atomic GNSS epochs
+  (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
+  (`error_datetime_literal_unsupported_epoch`) because there is no
+  round-trippable civil⇄seconds inverse for them — use an integer carrier there.
+  A malformed or out-of-range literal is `error_invalid_datetime_literal`.
 - **Reference array indexing** — a reference path may index arrays,
   `&.matrix[0][1]`. The index is stored verbatim/unresolved at the byte layer and
   interpreted by `bvn_dom_lookup` (which also backs `bovnar query`): a flat
@@ -50,7 +61,8 @@ such a document is an error, exactly as a 1.0 reader reports.
   `bvnr_read_flags_t.strict_version` and `bvnr_write_flags_t.emit_version` flags;
   the `BVNR_SPEC_VERSION_MAJOR`/`MINOR` macros; the `vt_datetime` family; and
   error codes `error_invalid_spec_version` (42), `error_unsupported_spec_version`
-  (43), `error_invalid_codepoint` (44).
+  (43), `error_invalid_codepoint` (44), `error_invalid_datetime_literal` (45),
+  `error_datetime_literal_unsupported_epoch` (46).
 - **Python bindings** — `bovnar.version()`, `spec_version()`, `peek_version()`,
   `Reader.declared_version`, `Quantity.epoch_name`/`epoch_mjd`,
   `ValueTypeFamily.DATETIME`; `dumps()` automatically prepends `#!bovnar 1.1`
@@ -58,8 +70,9 @@ such a document is an error, exactly as a 1.0 reader reports.
   round-trips are lossless.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
-  **267 cases** (groups `version`, `datetime`, plus escape/reference additions),
-  passing in both self-test and `--iut` modes.
+  **287 cases** (groups `version`, `datetime` — including the ISO-literal
+  `DTLIT` cases — plus escape/reference additions), passing in both self-test
+  and `--iut` modes.
 
 ### Changed
 
@@ -83,8 +96,14 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
 
 ### Known gaps / deferred
 
-- First-class ISO-8601 datetime *literals* are deferred; the annotation-over-a-
-  number form ships in 1.1.
+- ISO-8601 datetime literals cover the UTC forms (`YYYY-MM-DD`,
+  `YYYY-MM-DDTHH:MM:SS`, `…Z`) at whole-second resolution; fractional seconds,
+  numeric `±hh:mm` offsets, and literals for the atomic GNSS epochs are not yet
+  supported.
+- ISO-8601 literals are implemented in the C library (and so the Python
+  bindings, which parse via it); the browser playground parser
+  (`web/bovnar_parser.js`) does not yet recognise them and still reports a parse
+  error on a literal — a follow-up.
 - The numpy bridge cannot map a datetime array to a dtype yet (raises a clean
   error rather than guessing `datetime64`).
 

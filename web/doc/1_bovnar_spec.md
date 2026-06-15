@@ -570,6 +570,38 @@ requires a `#!bovnar 1.1` declaration (§3.4) — in a 1.0/unversioned document
 .before  = <datetime>         -100;          # 100 s before 1970-01-01Z
 ```
 
+**ISO-8601 literals (spec 1.1).** Instead of a raw integer, a `datetime` value
+may be written as an ISO-8601 literal in one of these UTC forms:
+
+* `YYYY-MM-DD` — a calendar date (interpreted at `00:00:00Z`)
+* `YYYY-MM-DDTHH:MM:SS` — a date and time (UTC)
+* `YYYY-MM-DDTHH:MM:SSZ` — the explicit-`Z` (UTC) form
+
+The literal is converted at parse time to the integer epoch-seconds carrier;
+that integer is what is stored and re-emitted, so a pretty-print round-trip is
+idempotent (`2026-06-15` becomes `<datetime:64> 1781481600`). A **bare** literal
+with no annotation infers `<datetime:64,unix>`, so `.t = 2026-06-15;` is a
+timestamp without any annotation. Fields are strictly validated (month `01`–`12`,
+a valid day-of-month, hour `00`–`23`, minute/second `00`–`59`); a malformed or
+out-of-range literal is `error_invalid_datetime_literal`.
+
+The UTC→epoch conversion is **leap-second correct**: the civil epochs (`unix`,
+`mjd`, `ntp`, `y2000`) use the uniform 86 400 s/day scale (so `unix` is ordinary
+POSIX time) and `tai` applies the IERS leap-second table. The atomic GNSS epochs
+(`gps`, `galileo`, `glonass`, `beidou`) reject a literal with
+`error_datetime_literal_unsupported_epoch` — those scales have no
+round-trippable civil⇄seconds inverse in this implementation, so supply an
+integer epoch-seconds carrier for them. A literal carries no unit, and an ISO
+literal under a non-`datetime` annotation is `error_type_value_mismatch`.
+Fractional seconds and numeric `±hh:mm` offsets are not yet supported.
+
+```bovnar
+#!bovnar 1.1
+.a = 2026-06-15;                                  # bare -> <datetime:64,unix>
+.b = 2026-06-15T12:00:00Z;                        # date-time, UTC
+.c = <datetime:64,tai> 2017-01-01T00:00:00Z;      # tai: leap-second correct
+```
+
 **Parameter syntax:**
 
 ```
@@ -2291,6 +2323,12 @@ typedef enum error_code_e {
     /* spec 1.1 — a \u{…} escape names a non-scalar value (a surrogate, or a
      * code point above U+10FFFF). */
     error_invalid_codepoint             = 44,
+    /* spec 1.1 — an ISO-8601 datetime literal is malformed or has an
+     * out-of-range field (bad width, separator, month/day/time component). */
+    error_invalid_datetime_literal      = 45,
+    /* spec 1.1 — an ISO-8601 literal was given for an atomic GNSS epoch
+     * (gps/galileo/glonass/beidou), which has no round-trippable inverse. */
+    error_datetime_literal_unsupported_epoch = 46,
 } error_code_t;
 ```
 
@@ -2335,7 +2373,9 @@ revisions:
   *absent*);
 - **new error codes** appended after the current maximum (existing numeric values
   never change) — 1.1 appends `error_invalid_spec_version` (42),
-  `error_unsupported_spec_version` (43), and `error_invalid_codepoint` (44);
+  `error_unsupported_spec_version` (43), `error_invalid_codepoint` (44),
+  `error_invalid_datetime_literal` (45), and
+  `error_datetime_literal_unsupported_epoch` (46);
 - the **optional version directive** (§3.4), added in 1.1: it is an ordinary
   comment to any 1.0 reader, so adding one never invalidates a document;
 - new optional reader/writer flags and limits whose defaults preserve current

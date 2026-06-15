@@ -583,6 +583,14 @@ if(Python3_FOUND)
         "datetime"
         120)
 
+    # numpy bridge (incl. the spec-1.1 datetime64 mapping). The module skips
+    # cleanly via pytest.importorskip("numpy") when numpy is absent, so this
+    # target passes (all-skipped) in numpy-less environments too.
+    _bvnr_pytest_lib(bvnr_py_numpy
+        test_numpy_bridge.py
+        "numpy"
+        60)
+
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.

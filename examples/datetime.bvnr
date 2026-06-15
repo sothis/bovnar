@@ -15,13 +15,20 @@
 .gps_t      = <datetime:64,tai>  1400000000;
 .before     = <datetime>         -100;          # 100 s before 1970-01-01Z
 
-# ISO-8601 literals (UTC). A bare literal infers <datetime:64,unix>.
+# ISO-8601 literals. A bare literal infers <datetime:64,unix>.
 .date_only  = 2026-06-15;
 .timestamp  = 2026-06-15T12:00:00Z;
 .no_zone    = 2026-06-15T12:00:00;              # absent zone = UTC
 .epoch0     = 1970-01-01T00:00:00Z;             # = 0
 .pre_epoch  = 1960-01-01;                       # negative carrier
 .tai_lit    = <datetime:64,tai> 2017-01-01T00:00:00Z;  # leap-second correct
+
+# Time-zone offset (±HH:MM) and fractional seconds (spec 1.1). The offset folds
+# the written civil time to true UTC before conversion; a fraction is accepted
+# but truncated to the whole second (the carrier is integer seconds).
+.with_offset = 2026-06-15T12:00:00+02:00;       # folds to 10:00:00Z
+.neg_offset  = 2026-06-15T12:00:00-05:00;       # folds to 17:00:00Z
+.with_frac   = 2026-06-15T12:00:00.123Z;        # .123 dropped -> 12:00:00Z
 
 # Arrays: every element shares the datetime kind and epoch (homogeneous). The
 # canonical form annotates only the first element; the bare integers after it

@@ -21,8 +21,9 @@
 
 
 # ── 3. Escape sequences ───────────────────────────────────────────────────────
-# All recognised escapes: \t \n \v \f \r \" \\
-# Any other byte after \ is error_illegal_escape_sequence.
+# Named escapes (all specs): \t \n \v \f \r \" \\
+# Spec 1.1 also adds \u{1-6 hex} (a Unicode scalar, UTF-8 encoded) and \xHH
+# (one raw byte). Any other byte after \ is error_illegal_escape_sequence.
 
 .tab_char    = "column1\tcolumn2";      # horizontal tab (0x09)
 .newline     = "line1\nline2";          # line feed (0x0A)
@@ -32,6 +33,11 @@
 .dquote      = "she said \"hi\"";       # escaped double-quote
 .backslash   = "path\\to\\file";        # escaped backslash
 .all_escapes = "\t\n\v\f\r\"\\";        # one of each
+
+# Spec 1.1 escapes (enabled by the #!bovnar 1.1 directive at the top):
+.uni_scalar  = "caf\u{e9}";             # é via \u{...} Unicode scalar
+.uni_astral  = "\u{1F600}";             # 😀 astral-plane scalar (4-byte UTF-8)
+.hex_bytes   = "\xC3\xA9";              # "é" written as its two UTF-8 bytes
 
 
 # ── 4. Raw whitespace inside string literals ──────────────────────────────────

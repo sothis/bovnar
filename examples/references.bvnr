@@ -6,8 +6,11 @@
 #
 # Syntax:
 #   reference    = "&" ref-segment { ref-segment }
-#   ref-segment  = "." id-start { ref-body-char }
+#   ref-segment  = ( "." id-start { ref-body-char } ) | ( "[" digits "]" )
 #   ref-body-char = same as symbol body | "."
+#
+# Spec 1.1 adds the "[i]" index segment so a reference may address an array
+# element (see section 10).
 #
 # The stored token text includes the leading dot and all intermediate dots.
 # References are a token type; the parser does NOT resolve them — resolution
@@ -130,3 +133,20 @@
 
 .optional_override = ;      # null — no reference; application uses default
 .active_override   = &.timeout_s;  # non-null — application follows this ref
+
+
+# ── 10. Reference array indexing (spec 1.1) ──────────────────────────────────
+# A reference path may index into arrays: "[i]" selects an element. A flat
+# /-row matrix is addressed [row][col]; a 1-D array [i]; nested arrays descend
+# one index per level. Resolution is by bvn_dom_lookup (also backing
+# `bovnar query`); the index is stored verbatim at the byte layer.
+
+.matrix     = [1, 2, 3]/[4, 5, 6];
+.cell_1_2   = &.matrix[1][2];      # row 1, col 2  -> 6
+.cell_0_0   = &.matrix[0][0];      # row 0, col 0  -> 1
+
+.vector     = [10, 20, 30];
+.v_second   = &.vector[1];         # 1-D index     -> 20
+
+.nested     = [[7, 8], [9, 10]];
+.n_1_0      = &.nested[1][0];      # nested arrays  -> 9

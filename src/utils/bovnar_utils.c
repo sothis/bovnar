@@ -1781,10 +1781,29 @@ static int32_t bvn_write_unit_component_ex(
 	return pos;
 }
 /*
- * Structural equality of two units (component-wise, order-sensitive). Used to
- * reconcile an inline unit against an annotation unit — note this is exact
- * identity, not dimensional equivalence, so "m/s" and "m·s^-1" written
- * differently would not compare equal here even though they mean the same.
+ * Exact identity of a single unit component (base, exponent, prefix). Helper
+ * for the order-insensitive bvn_unit_equal below.
+ */
+static bool bvn_unit_component_identical(const value_unit_component_t *ca,
+                                         const value_unit_component_t *cb)
+{
+	if (ca->base     != cb->base)     return false;
+	if (ca->exponent != cb->exponent) return false;
+	if (ca->prefix.system != cb->prefix.system) return false;
+	if (ca->prefix.system == prefix_si)
+		return ca->prefix.id.si == cb->prefix.id.si;
+	return ca->prefix.id.iec == cb->prefix.id.iec;
+}
+/*
+ * Structural equality of two units. This is exact component identity (base,
+ * exponent, prefix) — not dimensional equivalence — but it is ORDER-INSENSITIVE:
+ * unit multiplication is commutative, so "s³·m⁻⁵" and "m⁻⁵·s³" denote the same
+ * unit and must compare equal. The parser preserves source order in the
+ * value_unit_t component array, so a positional comparison would wrongly reject
+ * two spellings of the same unit (e.g. an annotation unit vs an inline unit in a
+ * different order), violating the spec rule that logically equivalent notations
+ * compare as equal. We therefore match components as multisets: every component
+ * of a must pair with a distinct, identical component of b.
  */
 bool bvn_unit_equal(value_unit_t a, value_unit_t b)
 {
@@ -1792,17 +1811,21 @@ bool bvn_unit_equal(value_unit_t a, value_unit_t b)
 		return false;
 	uint32_t n = a.num_components < BVNR_MAX_UNIT_COMPONENTS
 	           ? a.num_components : BVNR_MAX_UNIT_COMPONENTS;
+	bool matched[BVNR_MAX_UNIT_COMPONENTS] = { false };
 	for (uint32_t i = 0; i < n; i++) {
-		const value_unit_component_t *ca = &a.components[i];
-		const value_unit_component_t *cb = &b.components[i];
-		if (ca->base     != cb->base)     return false;
-		if (ca->exponent != cb->exponent) return false;
-		if (ca->prefix.system != cb->prefix.system) return false;
-		if (ca->prefix.system == prefix_si) {
-			if (ca->prefix.id.si != cb->prefix.id.si) return false;
-		} else {
-			if (ca->prefix.id.iec != cb->prefix.id.iec) return false;
+		bool found = false;
+		for (uint32_t j = 0; j < n; j++) {
+			if (matched[j])
+				continue;
+			if (bvn_unit_component_identical(&a.components[i],
+			                                 &b.components[j])) {
+				matched[j] = true;
+				found = true;
+				break;
+			}
 		}
+		if (!found)
+			return false;
 	}
 	return true;
 }
@@ -2205,6 +2228,13 @@ value_type_spec_t bvn_parse_type_annotation(
 			return r;
 		}
 	}
+	/* Each parameter class (width, base, q-fraction, unit) may appear at most
+	 * once; a repeated class is error_illegal_value_type. Without these guards
+	 * a later occurrence silently overwrites the earlier one (last-wins), which
+	 * makes acceptance order-dependent and can mask a real violation — e.g.
+	 * "<uint:8,16> 300" would otherwise be accepted with width 16, hiding that
+	 * 300 does not fit uint:8. */
+	bool have_width = false, have_base = false, have_q = false, have_unit = false;
 	bool need_comma = false;
 	while (pos < len) {
 		if (need_comma) {
@@ -2228,6 +2258,8 @@ value_type_spec_t bvn_parse_type_annotation(
 		}
 		uint8_t c = str[pos];
 		if (c >= '0' && c <= '9') {
+			if (have_width) { *type_ok = false; return r; }
+			have_width = true;
 			uint64_t w = 0;
 			while (pos < len && str[pos] >= '0' && str[pos] <= '9') {
 				uint32_t d = (uint32_t)(str[pos] - '0');
@@ -2244,6 +2276,8 @@ value_type_spec_t bvn_parse_type_annotation(
 			}
 			r.width = (uint32_t)w;
 		} else if (c == '_') {
+			if (have_base) { *type_ok = false; return r; }
+			have_base = true;
 			pos++;
 			if (pos >= len || str[pos] < '0' || str[pos] > '9') {
 				*type_ok = false;
@@ -2277,6 +2311,8 @@ value_type_spec_t bvn_parse_type_annotation(
 				*type_ok = false;
 				return r;
 			}
+			if (have_q) { *type_ok = false; return r; }
+			have_q = true;
 			pos++;
 			uint32_t q = 0;
 			while (pos < len && str[pos] >= '0' && str[pos] <= '9') {
@@ -2293,6 +2329,8 @@ value_type_spec_t bvn_parse_type_annotation(
 			}
 			r.base = q;
 		} else {
+			if (have_unit) { *type_ok = false; return r; }
+			have_unit = true;
 			uint32_t ustart = pos;
 			while (pos < len && str[pos] != ',')
 				pos++;

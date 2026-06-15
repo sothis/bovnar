@@ -510,6 +510,50 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     _write_event_data(w, d)
 
 
+def _array_int_annotation(rows):
+    """
+    For an array whose leaves are ALL plain ints, return a ValueTypeSpec giving a
+    width wide enough to hold the largest element — but only when that width
+    exceeds 64 bits (otherwise the default needs no annotation). Returns None for
+    empty / non-integer / mixed arrays, or when 64 bits already suffice, so normal
+    arrays are written exactly as before. The annotation is emitted once at the
+    array level (per-element widths are not serialised), so all elements share it;
+    a single negative element promotes the whole array to sint.
+    """
+    saw_int   = False
+    any_neg   = False
+    max_pos_b = 0
+    max_neg_b = 0
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, bool):
+                return None
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif isinstance(e, int):
+                saw_int = True
+                if e < 0:
+                    any_neg = True
+                    if (-e).bit_length() > max_neg_b:
+                        max_neg_b = (-e).bit_length()
+                elif e.bit_length() > max_pos_b:
+                    max_pos_b = e.bit_length()
+            else:
+                return None
+    if not saw_int:
+        return None
+    if any_neg:
+        width = max(max_pos_b + 1, max_neg_b + 1)
+        if width <= 64:
+            return None
+        return make_type_spec(ValueTypeFamily.SINT, width, 10)
+    if max_pos_b <= 64:
+        return None
+    return make_type_spec(ValueTypeFamily.UINT, max_pos_b, 10)
+
+
 def _emit_value(w: Writer, key: str, value) -> None:
     if value is None:
         w.write_null(key)
@@ -518,10 +562,18 @@ def _emit_value(w: Writer, key: str, value) -> None:
     elif isinstance(value, Quantity):
         _emit_quantity(w, key, value)
     elif isinstance(value, int):
-        if value >= 0:
+        # write_uint/write_sint pass the value through a 64-bit ctypes argument,
+        # which SILENTLY truncates a Python int that exceeds 64 bits (e.g. 2**100
+        # would be written as 0). Route anything outside the 64-bit range to the
+        # arbitrary-precision writer with a width wide enough to hold it.
+        if 0 <= value <= 0xFFFFFFFFFFFFFFFF:
             w.write_uint(key, value)
-        else:
+        elif -0x8000000000000000 <= value < 0:
             w.write_sint(key, value)
+        else:
+            width = (value.bit_length() if value >= 0
+                     else (-value).bit_length() + 1)
+            w.write_bvni(key, value, width=width)
     elif isinstance(value, float):
         w.write_float(key, value)
     elif isinstance(value, str):
@@ -531,7 +583,7 @@ def _emit_value(w: Writer, key: str, value) -> None:
         _emit_dict(w, value)
         w.end_struct()
     elif isinstance(value, (list, tuple)):
-        write_array(w, key, value)
+        write_array(w, key, value, vt=_array_int_annotation(value))
     else:
         raise BovnarArgumentError(
             f"Cannot serialise value of type {type(value).__name__!r} "
@@ -560,8 +612,18 @@ def _emit_array_element(w: Writer, elem) -> None:
         _write_event_data(w, d)
 
     elif isinstance(elem, int):
-        vt  = make_type_spec(ValueTypeFamily.UINT if elem >= 0
-                             else ValueTypeFamily.SINT, 64, 10)
+        # The per-element value_type is NOT serialised (array elements are written
+        # bare), but the writer DOES range-check the value text against it, so the
+        # width must be wide enough for this element or the write is rejected. The
+        # element's own bit length always fits. Re-parse width comes from the
+        # array-level annotation (_array_int_annotation) chosen in _emit_value.
+        if elem >= 0:
+            family = ValueTypeFamily.UINT
+            width  = max(64, elem.bit_length())
+        else:
+            family = ValueTypeFamily.SINT
+            width  = max(64, (-elem).bit_length() + 1)
+        vt  = make_type_spec(family, width, 10)
         raw = str(elem).encode('ascii')
         d = BvnrData()
         d.type       = _TOKEN_IS_ARRAY_NUMBER

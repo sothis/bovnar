@@ -872,6 +872,22 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("TYP-030", "types", "bare colon with empty param list",
 	           ".x = <uint:> 5;",
 	           error_illegal_value_type),
+	/* Each parameter class may appear at most once (EBNF type-param-list,
+	 * spec §501). A repeated class is rejected rather than silently taking
+	 * the last occurrence — last-wins could otherwise mask a real range
+	 * violation, e.g. "<uint:8,16> 300" accepting 300 under width 16. */
+	ERROR_CASE("TYP-034", "types", "duplicate width parameter",
+	           ".x = <uint:8,16> 300;",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-035", "types", "duplicate base parameter",
+	           ".x = <uint:8,_2,_16> \"ff\";",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-036", "types", "duplicate q parameter",
+	           ".x = <float_fix:16,q4,q8> 1.0;",
+	           error_illegal_value_type),
+	ERROR_CASE("TYP-037", "types", "duplicate unit parameter",
+	           ".x = <float:64,m/s,kg> 1.0;",
+	           error_illegal_value_type),
 
 	/* ── DEFAULT TYPE SYNTHESIS ──────────────────────────────────── */
 	VALID("DTS-001", "default_synthesis", "plain integer → uint:64",
@@ -1038,6 +1054,14 @@ static const cf_case_t g_cases[] = {
 	      ".v = 9.81 m/s;"),
 	VALID("UNT-011", "units", "annotation unit matches inline unit",
 	      ".d = <float:64,m> 1.5 m;"),
+	/* Unit multiplication is commutative: an annotation unit and an inline
+	 * unit that list the same components in a different order denote the
+	 * same unit and must reconcile (spec doc/2_bovnar_unit_system.md). A
+	 * positional comparison wrongly rejected these. */
+	VALID("UNT-011a", "units", "annotation vs inline unit reordered (m/s vs s^-1 m)",
+	      ".d = <float:64,m/s> 1.0 s⁻¹·m;"),
+	VALID("UNT-011b", "units", "annotation vs inline unit reordered (multi-component)",
+	      ".d = <float:64,s³·m⁻⁵> 1.0 m⁻⁵·s³;"),
 	VALID("UNT-012", "units", "pascal pressure unit",
 	      ".p = <float:64,Pa> 101325;"),
 	VALID("UNT-013", "units", "kelvin temperature",

@@ -1309,8 +1309,15 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	bvnr_writer_destroy(w);
 	if (out_len <= (uint64_t)UINT32_MAX) {
 		bvn_dom_doc_t *chk = bvn_dom_parse(out, (uint32_t)out_len);
-		error_code_t herr = chk ? bvn_dom_doc_get_parse_error(chk) : error_none;
-		if (chk) bvn_dom_doc_destroy(chk);
+		if (!chk) {
+			/* Out of memory re-parsing our own output: do NOT fall through
+			 * and emit it, or an unvalidated (possibly non-homogeneous)
+			 * document would be written as if it had passed the check. */
+			fprintf(stderr, "convert: out of memory validating output\n");
+			free(out); json_free_node(root); free(buf); return 1;
+		}
+		error_code_t herr = bvn_dom_doc_get_parse_error(chk);
+		bvn_dom_doc_destroy(chk);
 		if (herr != error_none) {
 			const char *hint;
 			switch (herr) {

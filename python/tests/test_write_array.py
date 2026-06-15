@@ -257,6 +257,40 @@ class TestWriteArrayInDumps:
 
 
 @needs_lib
+class TestDumpsBigInt:
+    """Regression: integers exceeding 64 bits must not be silently truncated.
+
+    Before the fix dumps({'x': 2**100}) emitted '<uint:64> 0' (2**100 mod 2**64),
+    and bignums inside arrays raised value_out_of_range.
+    """
+
+    @pytest.mark.parametrize('v', [
+        2**64, 2**64 - 1, 2**100, -(2**63) - 1, -(2**100),
+        2**255, -(2**255), 0, 42, -7,
+    ])
+    def test_scalar_bigint_roundtrip(self, v):
+        assert bovnar.loads(bovnar.dumps({'x': v}))['x'] == v
+
+    def test_scalar_bigint_not_truncated_to_zero(self):
+        # 2**100 mod 2**64 == 0 — the exact pre-fix corruption.
+        assert bovnar.loads(bovnar.dumps({'x': 2**100}))['x'] == 2**100
+
+    @pytest.mark.parametrize('arr', [
+        [1, 2, 2**70],
+        [2**100, -(2**99)],
+        [-1, -2, 2**70],
+        [[1, 2**80], [3, 4]],
+        [9223372036854775808, 2**101],
+    ])
+    def test_array_bigint_roundtrip(self, arr):
+        assert bovnar.loads(bovnar.dumps({'a': arr}))['a'] == arr
+
+    def test_plain_int_arrays_unannotated(self):
+        # Values that fit 64 bits keep the unannotated form (no regression).
+        assert bovnar.dumps({'a': [1, 2, 3]}, pretty=False) == b'.a=[1,2,3];'
+
+
+@needs_lib
 class TestWriteArraySpecialFloats:
     """Regression tests for Bug 2: float inf/nan must be encoded as bovnar
     special-number keywords (inf, ninf, nan), not as Python

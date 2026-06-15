@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (264 cases) ──→ for each test case:                │
+│  Test corpus (267 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -458,8 +458,8 @@ specifies:
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
-| `homogeneity` | 12 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **264** | |
+| `homogeneity` | 15 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
+| **Total** | **267** | |
 
 ---
 
@@ -470,7 +470,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..264
+1..267
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

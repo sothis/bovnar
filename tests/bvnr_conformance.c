@@ -1326,6 +1326,16 @@ static const cf_case_t g_cases[] = {
 	DOM_ERROR("HOM-012", "homogeneity", "duplicate key within a struct scope",
 	          ".s = {.x = 1; .x = 2;};",
 	          error_duplicate_struct_key),
+	/* datetime (spec 1.1) is its own kind for homogeneity, and its epoch is a
+	 * dimension (like a currency) — mirrors HOM-006/HOM-007. */
+	DOM_VALID("HOM-013", "homogeneity", "homogeneous same-epoch datetime array",
+	          "#!bovnar 1.1\n.a = [<datetime:64,tai> 1, <datetime:64,tai> 2];"),
+	DOM_ERROR("HOM-014", "homogeneity", "datetime does not mix with a plain number",
+	          "#!bovnar 1.1\n.a = [<datetime:64,unix> 1, <sint:64> 2];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-015", "homogeneity", "datetimes on different epochs do not mix",
+	          "#!bovnar 1.1\n.a = [<datetime:64,unix> 1, <datetime:64,tai> 2];",
+	          error_array_element_type_mismatch),
 };
 
 #define NUM_CASES ((int)(sizeof(g_cases) / sizeof(g_cases[0])))

@@ -709,6 +709,32 @@ static void test_datetime_dom_decode(void)
 					"epoch MJD matches bvn_datetime.h");
 		bvn_dom_doc_destroy(d);
 	}
+	/* datetime is its own kind for array homogeneity, and epoch is a dimension */
+	{
+		bvn_dom_doc_t *ok2 = parse_doc(
+			"#!bovnar 1.1\n.a = [<datetime:64,tai> 1, <datetime:64,tai> 2];\n");
+		if (ok2) {
+			ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(ok2), error_none,
+				"homogeneous same-epoch datetime array is accepted");
+			bvn_dom_doc_destroy(ok2);
+		}
+		bvn_dom_doc_t *mix = parse_doc(
+			"#!bovnar 1.1\n.a = [<datetime:64,unix> 1, <sint:64> 2];\n");
+		if (mix) {
+			ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(mix),
+				error_array_element_type_mismatch,
+				"datetime does not mix with a plain number");
+			bvn_dom_doc_destroy(mix);
+		}
+		bvn_dom_doc_t *ep = parse_doc(
+			"#!bovnar 1.1\n.a = [<datetime:64,unix> 1, <datetime:64,tai> 2];\n");
+		if (ep) {
+			ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(ep),
+				error_array_element_type_mismatch,
+				"datetimes on different epochs do not mix");
+			bvn_dom_doc_destroy(ep);
+		}
+	}
 	/* negative (pre-epoch) instant decodes as a signed value */
 	bvn_dom_doc_t *neg = parse_doc("#!bovnar 1.1\n.t = <datetime> -100;\n");
 	if (neg) {

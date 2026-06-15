@@ -264,7 +264,7 @@
     <rect x="516" y="976" width="470" height="132" rx="9" fill="#0f1620" stroke="#64748b" stroke-opacity="0.55"/>
     <text x="532" y="1000" font-size="12.5" font-weight="700" fill="#cbd5e1">Quality &amp; tests</text>
     <text x="532" y="1020" font-size="10.5" fill="#94a3b8">unit tests: reader/writer/dom/units/float/int</text>
-    <text x="532" y="1038" font-size="10.5" fill="#94a3b8">264-case conformance suite (IUT harness)</text>
+    <text x="532" y="1038" font-size="10.5" fill="#94a3b8">267-case conformance suite (IUT harness)</text>
     <text x="532" y="1056" font-size="10.5" fill="#94a3b8">fuzz: reader · writer · dom · utils</text>
     <text x="532" y="1074" font-size="10.5" fill="#94a3b8">socketpair round-trip · amalgam smoke</text>
     <text x="532" y="1092" font-size="10.5" fill="#94a3b8">CTest labels · bovnar bench throughput</text>

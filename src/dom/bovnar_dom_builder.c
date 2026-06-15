@@ -717,6 +717,17 @@ static error_code_t bvn_dom_shape_equal(
 	if (a_num && b_num) {
 		/* Both numeric: kinds match (encodings may mix). Dimension only when
 		 * comparing array/matrix elements, not struct fields. */
+		/* datetime (spec 1.1) is its own kind: a timestamp does not mix with a
+		 * plain count/measurement (spec §7.4 lists the mixable encodings; datetime
+		 * is not among them), and — like a currency — its epoch is a dimension, so
+		 * two datetimes on different epochs (time scales) may not share an array. */
+		bool a_dt = (a->value_type.family == vt_datetime);
+		bool b_dt = (b->value_type.family == vt_datetime);
+		if (a_dt != b_dt)
+			return error_array_element_type_mismatch;
+		if (a_dt && b_dt && check_dim &&
+			a->value_type.base != b->value_type.base)
+			return error_array_element_type_mismatch;
 		if (check_dim &&
 			!bvn_dom_same_dimension(bvn_dom_get_unit(a), bvn_dom_get_unit(b)))
 			return error_array_element_type_mismatch;

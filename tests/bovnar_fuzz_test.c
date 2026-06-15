@@ -48,11 +48,19 @@ static size_t       g_crash_len;
 static unsigned     g_crash_iter;
 static const char  *g_crash_harness = "?";
 
+/* Signal-safe write that consumes the result, silencing -Wunused-result.
+   Nothing useful can be done about a short/failed write from a crash handler. */
+static void sig_write(int fd, const void *buf, size_t n)
+{
+	ssize_t r = write(fd, buf, n);
+	(void)r;
+}
+
 static void sig_puts(int fd, const char *s)
 {
 	size_t n = 0;
 	while (s[n]) n++;
-	write(fd, s, n);
+	sig_write(fd, s, n);
 }
 
 static void sig_putu(int fd, unsigned long v)
@@ -69,7 +77,7 @@ static void sig_puthex(int fd, uint8_t b)
 {
 	static const char h[] = "0123456789abcdef";
 	char buf[3] = { h[b >> 4], h[b & 0xF], ' ' };
-	write(fd, buf, 3);
+	sig_write(fd, buf, 3);
 }
 
 static void crash_handler(int sig)
@@ -88,14 +96,14 @@ static void crash_handler(int sig)
 	size_t limit = g_crash_len < 256u ? g_crash_len : 256u;
 	for (size_t i = 0; i < limit; i++) {
 		sig_puthex(err, g_crash_buf[i]);
-		if ((i & 15u) == 15u) write(err, "\n", 1);
+		if ((i & 15u) == 15u) sig_write(err, "\n", 1);
 	}
-	write(err, "\n", 1);
+	sig_write(err, "\n", 1);
 
 	int fd = open("bvnr_crash_input.bin",
 				  O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd >= 0) {
-		write(fd, g_crash_buf, g_crash_len);
+		sig_write(fd, g_crash_buf, g_crash_len);
 		close(fd);
 		sig_puts(err, "Reproducer saved to: bvnr_crash_input.bin\n");
 	}

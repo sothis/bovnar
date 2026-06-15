@@ -85,12 +85,23 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 	};
 	if (!bvnr_write_event(w, ev_type_annotation_start,       &d)) return false;
 	if (!bvnr_write_event(w, ev_type_annotation_type_family, &d)) return false;
-	/* Only numeric families carry a width; utf8/bool are parameterless and
-	 * a width on them is rejected up front by the type-spec validator. */
-	if (bvn_type_is_numeric(vt) && vt.width != 0) {
+	/* Only numeric families and datetime carry a width; utf8/bool are
+	 * parameterless and a width on them is rejected by the type-spec validator. */
+	if ((bvn_type_is_numeric(vt) || vt.family == vt_datetime) && vt.width != 0) {
 		d.type   = token_is_type_width;
 		d.data   = NULL;
 		d.length = 0;
+		if (!bvnr_write_event(w,
+				ev_type_annotation_type_family_parameter, &d))
+			return false;
+	}
+	/* datetime's epoch is carried as a named parameter (base holds the epoch
+	 * index; 0 = unix is the default and stays implicit). */
+	if (vt.family == vt_datetime && vt.base != 0u) {
+		const char *ep = bvnr_datetime_epoch_name(vt);
+		d.type   = token_is_unit;
+		d.data   = (const void *)ep;
+		d.length = (uint32_t)strlen(ep);
 		if (!bvnr_write_event(w,
 				ev_type_annotation_type_family_parameter, &d))
 			return false;
@@ -249,6 +260,24 @@ bool bvnr_write_sint_unit(bvnr_writer_t *w, const char *key,
 		return false;
 	}
 	return emit_numeric(w, vt, unit, buf);
+}
+bool bvnr_write_datetime(bvnr_writer_t *w, const char *key,
+			 uint32_t width, const char *epoch, int64_t value)
+{
+	if (!emit_key(w, key)) return false;
+	int32_t ei = bvnr_datetime_epoch_index(epoch);
+	if (ei < 0) return bvn_writer_set_error(w, error_invalid_argument);
+	value_type_spec_t vt = { .family = vt_datetime,
+				 .width = width, .base = (uint32_t)ei };
+	char buf[32];
+	if (bvn_format_int64(buf, sizeof(buf), value, 10, 0) < 0)
+	{
+		w->val.last_error   = error_number_too_long;
+		w->val.error_offset = bvnr_sink_bytes_written(&w->ser.sink)
+		                    + (uint64_t)w->ser.wbuf_pos;
+		return false;
+	}
+	return emit_numeric(w, vt, BVN_UNIT_NONE, buf);
 }
 bool bvnr_write_float(bvnr_writer_t *w, const char *key,
 			  uint32_t width, double value)

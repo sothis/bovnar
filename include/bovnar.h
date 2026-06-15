@@ -614,6 +614,10 @@ BVN_API bvn_unit_flags_t bvnr_writer_unit_flags(const bvnr_writer_t* w);
  */
 BVN_API const char* bvnr_datetime_epoch_name(value_type_spec_t vt);
 BVN_API int32_t     bvnr_datetime_epoch_mjd(value_type_spec_t vt);
+/* Dense epoch index for an epoch name ("unix", "tai", …) — the value stored in
+ * value_type_spec_t.base for a vt_datetime spec. NULL/empty → 0 (unix); an
+ * unknown name → -1. Inverse of bvnr_datetime_epoch_name(). */
+BVN_API int32_t     bvnr_datetime_epoch_index(const char* name);
 BVN_API value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,
@@ -658,6 +662,13 @@ BVN_API bool bvnr_write_sint(bvnr_writer_t* w, const char* key,
 			 uint32_t width, int64_t value);
 BVN_API bool bvnr_write_float(bvnr_writer_t* w, const char* key,
 			  uint32_t width, double value);
+/* Write a timestamp (spec 1.1). `epoch` is an epoch name ("unix", "tai", "gps",
+ * "mjd", "ntp", "galileo", "glonass", "y2000", "beidou") or NULL for unix; an
+ * unknown name is error_invalid_argument. `value` is signed seconds since the
+ * epoch. Emits a <datetime:width,epoch> annotation (the epoch is implicit when
+ * it is the default unix). The document must declare #!bovnar 1.1 to be re-read. */
+BVN_API bool bvnr_write_datetime(bvnr_writer_t* w, const char* key,
+			  uint32_t width, const char* epoch, int64_t value);
 BVN_API bool bvnr_write_float_fix(bvnr_writer_t* w, const char* key,
 			   uint32_t width, uint32_t q, double value);
 BVN_API bool bvnr_write_float_dec(bvnr_writer_t* w, const char* key,

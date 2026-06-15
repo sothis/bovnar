@@ -2253,6 +2253,12 @@ int32_t bvnr_datetime_epoch_mjd(value_type_spec_t vt)
 		? vt.base : 0u;
 	return bvn_epoch_table[i].mjd;
 }
+int32_t bvnr_datetime_epoch_index(const char* name)
+{
+	if (!name || !*name)
+		return 0;                /* default epoch: unix */
+	return bvn_epoch_index_of((const uint8_t*)name, (uint32_t)strlen(name));
+}
 value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,

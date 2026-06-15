@@ -376,7 +376,7 @@ Strings are enclosed in double quotes. The `<utf8>` annotation is optional — a
 
 ### Escape Sequences
 
-Only seven escape sequences are defined:
+Seven escape sequences are defined in spec 1.0:
 
 | Escape | Meaning |
 |---|---|
@@ -388,7 +388,7 @@ Only seven escape sequences are defined:
 | `\"` | Double quote |
 | `\\` | Backslash |
 
-Any other character after a backslash is immediately a hard error — there is no `\uXXXX`, no `\xNN`, no `\0`. If you need to embed arbitrary bytes in a Bovnar document, use an octet stream (see below).
+In spec 1.0 any other character after a backslash is a hard error. A document that declares `#!bovnar 1.1` additionally gets `\xHH` (one byte) and `\u{H…}` (a Unicode scalar, UTF-8 encoded) — but a control byte (other than the whitespace ones above) is still rejected, so for arbitrary binary use an octet stream (see below). In a 1.0/unversioned document `\x`/`\u` remain hard errors.
 
 Raw whitespace bytes (HT, LF, VT, FF, CR) are accepted unescaped inside string literals, so a multi-line string is valid:
 

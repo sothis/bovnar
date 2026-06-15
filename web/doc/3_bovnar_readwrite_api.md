@@ -287,8 +287,11 @@ version automatically.
 ### 7b. Datetime family (spec 1.1)
 
 ```c
-const char *bvnr_datetime_epoch_name(value_type_spec_t vt);
-int32_t     bvnr_datetime_epoch_mjd (value_type_spec_t vt);
+const char *bvnr_datetime_epoch_name (value_type_spec_t vt);
+int32_t     bvnr_datetime_epoch_mjd  (value_type_spec_t vt);
+int32_t     bvnr_datetime_epoch_index(const char *name);
+bool        bvnr_write_datetime(bvnr_writer_t *w, const char *key,
+                                uint32_t width, const char *epoch, int64_t value);
 ```
 
 A `<datetime:width,epoch>` value (family `vt_datetime`) is a **signed integer
@@ -308,6 +311,18 @@ int64_t secs;  bvn_parse_int64((const char *)d->data, d->value_type, &secs);
 bvn_datetime_t civil;
 bvn_dt_epoch_seconds_to_datetime(&civil,
     (bvn_epoch_t)bvnr_datetime_epoch_mjd(d->value_type), secs);
+```
+
+To **write** a datetime, use the typed helper `bvnr_write_datetime` — `epoch` is
+an epoch name (or `NULL` for unix; an unknown name is `error_invalid_argument`),
+`value` is signed seconds. `bvnr_datetime_epoch_index` maps a name to the index
+stored in `value_type_spec_t.base` (the inverse of `bvnr_datetime_epoch_name`),
+for building a spec by hand. The document must declare `#!bovnar 1.1` to be
+re-read (emit the directive with `bvnr_write_version`).
+
+```c
+bvnr_write_version(w, 1, 1);
+bvnr_write_datetime(w, "created", 64, "gps", 1750000000);  /* <datetime:64,gps> */
 ```
 
 The family is spec 1.1: it requires a `#!bovnar 1.1` declaration, and in a

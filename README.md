@@ -223,7 +223,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 | `bovnar query <path> <file>` | Print a single value by dotted path, e.g. `.sensor.temperature`. |
 | `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
 | `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |
-| `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. |
+| `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream only — it does not re-emit the `#!bovnar` version directive, which is not an event, so its debug output may not re-parse for spec-1.1-gated values; use `pretty-print` for a faithful round-trip.) |
 | `bovnar bench [options]` | Benchmark parsing throughput across profiles and payload sizes; `--json` for machine-readable output. |
 
 ```bash
@@ -267,9 +267,12 @@ one null element — so an empty JSON array round-trips faithfully as `[]`.
 since JSON has no equivalent:
 
 - type annotations — bit-width, base, and **physical unit / currency** — are
-  dropped (a `<float:64,m/s> 9.81` becomes a bare `9.81`);
-- symbols and references are emitted as strings; octet streams as a lowercase
-  hex string;
+  dropped (a `<float:64,m/s> 9.81` becomes a bare `9.81`); a `datetime` likewise
+  becomes a bare number — its **epoch** (e.g. `gps` vs `unix`) is dropped, so
+  the seconds count alone is emitted;
+- symbols and references are emitted as strings (an indexed reference path such
+  as `&.matrix[0][1]` becomes the string `".matrix[0][1]"` — it is not resolved);
+  octet streams as a lowercase hex string;
 - integers wider than 64 bits are emitted as decimal strings (JSON cannot hold
   them as numbers safely);
 - `nan` and `inf` become `null` (JSON has no non-finite numbers).

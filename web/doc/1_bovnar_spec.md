@@ -98,13 +98,15 @@ Each assignment is:
 | Number | `[-]digits[.digits][e[+/-]digits]` | `42`, `-3.14`, `1e6` |
 | Special number | `nan`, `inf`, `ninf` | `.x = inf;` |
 | Boolean | `true` / `false` / `on` / `off` | `.b = true;`, `.b = off;` |
-| String | `"…"` with escapes | `.s = "hello\nworld";` |
+| String | `"…"` with escapes (`\u{…}`/`\xHH` in spec 1.1) | `.s = "hello\nworld";`, `.s = "caf\u{e9}";` |
 | Symbol | bare identifier (no quotes) | `.s = ok;`, `.day = Monday;` |
-| Reference | `&.path.to.key` | `.ref = &.config.host;` |
+| Reference | `&.path.to.key`; array indexing `&.path[i][j]` (spec 1.1) | `.ref = &.config.host;`, `.c = &.m[0][1];` |
 | Array | `[ … ]` rows separated by `/` | `.a = [1,2,3]/[4,5,6];` |
 | Struct | `{ … }` | `.s = {.x = 1; .y = 2;};` |
 | Octet stream | `\x00` … binary … `\x00` | binary escape |
 | Null value | absent token or `null` keyword | `.x = ;`, `.x = null;`, `[,1,]` |
+| Version directive (spec 1.1) | `#!bovnar <major>.<minor>` on the first line | `#!bovnar 1.1` |
+| Datetime (spec 1.1) | `<datetime:width,epoch>` — signed epoch seconds | `.t = <datetime:64,unix> 1750000000;` |
 | Unit (type annotation) | inside `<…>` as a type param | `<float:64,m/s>` |
 | Unit (inline suffix) | after scalar value, before `;` | `.speed = 9.81 m/s;` |
 | Fixed-point type | `<float_fix:[width,]qN[,unit]>` | `<float_fix:32,q16>`, `<float_fix:q8>` |

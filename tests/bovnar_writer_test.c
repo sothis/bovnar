@@ -1249,11 +1249,54 @@ static void test_write_version_directive(void)
 	bvnr_writer_destroy(w);
 }
 
+static void test_write_datetime(void)
+{
+	printf("  test_write_datetime...\n");
+	uint8_t out[512];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, sizeof(out));
+	bvnr_writer_t *w = bvnr_writer_create();
+	ASSERT_NOT_NULL(w, "writer create");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL), "open");
+	ASSERT_TRUE(bvnr_write_version(w, 1, 1), "version directive");
+	/* the epoch must survive the direct write API (regression: it was dropped) */
+	ASSERT_TRUE(bvnr_write_datetime(w, "a", 64, "gps", 1750000000),
+		"write datetime gps");
+	ASSERT_TRUE(bvnr_write_datetime(w, "b", 0, NULL, -100),
+		"write datetime unix default, negative");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish");
+	uint64_t n = bvnr_writer_bytes_written(w);
+	out[n < sizeof(out) ? n : sizeof(out) - 1] = '\0';
+	ASSERT_TRUE(strstr((char *)out, "<datetime:64,gps>") != NULL,
+		"epoch 'gps' is emitted in the annotation");
+	ASSERT_TRUE(strstr((char *)out, "<datetime>") != NULL,
+		"unix default epoch stays implicit");
+	/* the produced document re-parses (annotation + directive are consistent) */
+	last_event_t le = {0};
+	ASSERT_TRUE(roundtrip(out, n, &le), "datetime document round-trips");
+	bvnr_writer_destroy(w);
+
+	/* an unknown epoch name is rejected */
+	bvnr_sink_to_mem(&sink, out, sizeof(out));
+	w = bvnr_writer_create();
+	if (w) {
+		bvnr_open_write_sink(w, &sink, false, NULL);
+		ASSERT_FALSE(bvnr_write_datetime(w, "x", 64, "nope", 1),
+			"unknown epoch name is rejected");
+		bvnr_writer_destroy(w);
+	}
+	ASSERT_EQ_INT(bvnr_datetime_epoch_index("tai"), 1, "epoch index tai == 1");
+	ASSERT_EQ_INT(bvnr_datetime_epoch_index(NULL), 0, "NULL epoch == unix (0)");
+	ASSERT_EQ_INT(bvnr_datetime_epoch_index("bogus"), -1, "unknown epoch == -1");
+}
+
 int main(void)
 {
 	printf("Running bovnar_writer_test regression suite...\n");
 
 	test_write_version_directive();
+	test_write_datetime();
 
 	test_write_simple_strings();
 	test_write_typed_integers();

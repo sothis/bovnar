@@ -48,7 +48,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) approximates the C reference event stream (lenient: it does not synthesise default type annotations or perform type/value validation) and powers an interactive single-file web playground.
-- **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, and Vim, all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
+- **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
 - **Extensively tested** — Unit tests, socket-pair round-trip tests, a 207-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
@@ -134,7 +134,8 @@ bovnar/
 │   ├── vscode/              # VS Code TextMate grammar + theme
 │   ├── sublime/             # Sublime Text syntax + colour scheme
 │   ├── geany/               # Geany filetype definition
-│   └── vim/                 # Vim syntax + filetype plugin
+│   ├── vim/                 # Vim syntax + filetype plugin
+│   └── clion/               # CLion / JetBrains TextMate-bundle installer (reuses the VS Code grammar)
 ├── web/                     # Single-file browser playground
 │   ├── index.html           # Playground + landing page
 │   └── bovnar_parser.js     # Dependency-free JavaScript parser
@@ -487,6 +488,21 @@ cd highlighter/geany && ./install.sh
 ```bash
 cd highlighter/vim && ./install.sh
 ```
+
+### CLion (JetBrains)
+
+Quit CLion first — it rewrites its config on exit and would discard the change —
+then run:
+
+```bash
+cd highlighter/clion && ./install.sh
+```
+
+This registers the shared VS Code grammar (`highlighter/vscode/bovnar-highlight/`)
+as a TextMate bundle in every detected CLion config, giving full `source.bovnar`
+highlighting. Start CLion and open a `.bvnr` file. The bundle is read live from
+that path, so keep it in place. Works in other JetBrains IDEs (IntelliJ IDEA,
+PyCharm, GoLand, …) too.
 
 ---
 

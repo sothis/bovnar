@@ -3,6 +3,7 @@ build*/*
 __pycache__/*
 .claude/
 .cache/
+.idea/
 bovnar_merged.txt
 *.pyc
 bovnar_merged_conly.txt

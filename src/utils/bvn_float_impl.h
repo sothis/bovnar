@@ -44,6 +44,10 @@ static inline bvn_int_t bvni_local_init(uint32_t *buf, uint32_t words)
 	r.nused    = 0;
 	r.negative = false;
 	r.heap     = false;
+	r._reserved[0] = 0;   /* zero the reserved tail so the by-value return copies
+	                       * no indeterminate bytes (matches bvn_int's other
+	                       * initializers; keeps reserved fields 0 for future use) */
+	r._reserved[1] = 0;
 	return r;
 }
 #define BVN_INT_LOCAL(name)                                         \

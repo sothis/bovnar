@@ -1241,7 +1241,11 @@ static bool bvn_read_octet_stream(
 	uint32_t* out_leftover)
 {
 	octet_source_t src = { .p = p, .resid = resid, .resid_left = resid_len };
-	uint8_t  tag, lenbuf[2];
+	/* Zero-init the framing scratch: bvn_os_read_exact fills these on every
+	 * success path for the library's own sources, but pull is a caller-supplied
+	 * callback (bvnr_open_read_source) — a buggy one returning true without
+	 * writing must not leave us reading an indeterminate tag/length. */
+	uint8_t  tag = 0, lenbuf[2] = { 0, 0 };
 	uint32_t chunklen;
 	for (;;) {
 		if (!bvn_os_read_exact(&src, &tag, 1))

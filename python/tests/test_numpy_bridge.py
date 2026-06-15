@@ -195,3 +195,84 @@ class TestPintArray:
             from_pint_array(w, 'a', q)
         a, unit = to_numpy(loads(w.get_output(), typed=True)['a'], return_unit=True)
         assert np.array_equal(a, [2, 4, 6]) and unit == 'm~s'
+
+
+# --------------------------------------------------------------------------- #
+#  datetime64 bridge (spec 1.1)
+# --------------------------------------------------------------------------- #
+@needs_lib
+class TestDatetime64:
+    _V = b'#!bovnar 1.1\n'
+
+    def test_to_numpy_unix_array_is_datetime64(self):
+        # bovnar unix-epoch datetime carrier -> datetime64[s]
+        a = to_numpy(loads(self._V + b'.t = [2026-01-01, 2026-01-02, 2026-01-03];',
+                           typed=True)['t'])
+        assert a.dtype == np.dtype('datetime64[s]')
+        assert a[0] == np.datetime64('2026-01-01T00:00:00')
+        # carrier seconds match
+        assert a.astype('int64').tolist() == [1767225600, 1767312000, 1767398400]
+
+    def test_to_numpy_integer_carrier_array(self):
+        a = to_numpy(loads(self._V + b'.t = [<datetime:64> 100, 200, 300];',
+                           typed=True)['t'])
+        assert a.dtype == np.dtype('datetime64[s]')
+        assert a.astype('int64').tolist() == [100, 200, 300]
+
+    def test_to_numpy_2d_datetime(self):
+        a = to_numpy(loads(self._V + b'.t = [2026-01-01,2026-01-02]/[2026-01-03,2026-01-04];',
+                           typed=True)['t'])
+        assert a.dtype == np.dtype('datetime64[s]') and a.shape == (2, 2)
+
+    def test_to_numpy_non_unix_epoch_refused_by_default(self):
+        # tai/gps/... are not unix-relative; default inference refuses
+        with pytest.raises(BovnarArgumentError) as ei:
+            to_numpy(loads(self._V + b'.t = [<datetime:64,tai> 100, 200];',
+                           typed=True)['t'])
+        assert 'unix' in str(ei.value)
+
+    def test_to_numpy_non_unix_epoch_explicit_int64(self):
+        # explicit dtype='int64' yields the raw carrier seconds on that scale
+        a = to_numpy(loads(self._V + b'.t = [<datetime:64,tai> 100, 200];',
+                           typed=True)['t'], dtype='int64')
+        assert a.tolist() == [100, 200]
+
+    def test_from_numpy_into_writer_emits_datetime(self):
+        with Writer.to_mem(pretty=False) as w:
+            w.write_version(1, 1)
+            from_numpy(w, 't', np.array(['2026-01-01', '2026-01-02'],
+                                        dtype='datetime64[s]'))
+        out = w.get_output()
+        assert b'<datetime' in out
+        assert loads(out)['t'] == [1767225600, 1767312000]
+
+    def test_from_numpy_rejects_unit(self):
+        with pytest.raises(BovnarArgumentError):
+            with Writer.to_mem(pretty=False) as w:
+                from_numpy(w, 't', np.array(['2026-01-01'], dtype='datetime64[s]'),
+                           unit='s')
+
+    def test_from_numpy_rejects_nat(self):
+        with pytest.raises(BovnarArgumentError) as ei:
+            array_to_bvnr('t', np.array(['2026-01-01', 'NaT'], dtype='datetime64[s]'))
+        assert 'NaT' in str(ei.value)
+
+    def test_array_to_bvnr_is_self_contained_and_reparses(self):
+        # datetime64 -> array_to_bvnr must prepend the #!bovnar 1.1 directive
+        raw = array_to_bvnr('t', np.array(['2026-06-15T12:00:00', '1970-01-01T00:00:00'],
+                                          dtype='datetime64[s]'), pretty=False)
+        assert raw.startswith(b'#!bovnar 1.1')
+        assert b'<datetime' in raw
+        assert loads(raw)['t'] == [1781524800, 0]
+
+    def test_roundtrip_resolution_coarsened_to_seconds(self):
+        # finer resolutions truncate to whole seconds (the bovnar carrier)
+        arr = np.array(['2026-06-15T12:00:00.123456789'], dtype='datetime64[ns]')
+        raw = array_to_bvnr('t', arr, pretty=False)
+        assert loads(raw)['t'] == [1781524800]
+
+    def test_roundtrip_bovnar_to_numpy_to_bovnar(self):
+        src = self._V + b'.t = [2026-01-01, 2026-06-15, 1970-01-01];'
+        a = to_numpy(loads(src, typed=True)['t'])
+        raw = array_to_bvnr('t', a, pretty=False)
+        assert loads(raw)['t'] == loads(src)['t']

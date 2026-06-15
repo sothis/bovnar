@@ -77,10 +77,25 @@ _INT_DTYPE = {
 _FLOAT_DTYPE = {16: 'float16', 32: 'float32', 64: 'float64', 128: 'float128'}
 
 
-def _family_width_dtype(family: int, width: int):
-    """bovnar (family,width) -> numpy dtype name, or None to infer (PLAIN)."""
+def _family_width_dtype(family: int, width: int, base: int = 0):
+    """bovnar (family,width[,base]) -> numpy dtype name, or None to infer (PLAIN).
+
+    ``base`` is the datetime epoch index (0 = unix); it is ignored for every
+    other family.
+    """
     family = int(family)
     width = int(width) or 64                    # bovnar default width is 64
+    if family == int(F.DATETIME):
+        # numpy datetime64 counts seconds from the unix epoch. The unix-epoch
+        # carrier maps directly; any other epoch (tai, gps, …) is on a
+        # different origin/timescale, so mapping it to datetime64 would
+        # silently mis-date every value — refuse and point at the int escape.
+        if int(base) == 0:
+            return 'datetime64[s]'
+        raise BovnarArgumentError(
+            "datetime epoch index {} is not the unix epoch; numpy datetime64 is "
+            "unix-based, so this would mis-date the values — pass dtype='int64' "
+            "for the raw epoch seconds, or convert to unix first".format(int(base)))
     if family == int(F.BOOL):
         return 'bool'
     if family == int(F.UTF8):
@@ -116,6 +131,8 @@ def _dtype_to_family_width(dt):
         return F.BOOL, 0
     if kind in ('U', 'S'):
         return F.UTF8, 0
+    if kind == 'M':                               # datetime64[*] -> unix epoch
+        return F.DATETIME, 64
     raise BovnarArgumentError(
         f"numpy dtype {dt!r} (kind {kind!r}) has no bovnar equivalent")
 
@@ -144,17 +161,18 @@ def _walk(obj, acc):
     return _leaf(obj, acc)
 
 
-def _gather_dtype(acc, family, width):
+def _gather_dtype(acc, family, width, base=0):
     """Best-effort dtype hint for inference (dtype=None).
 
     A width with no native numpy dtype — a >64-bit integer (bigint) or a float
     width other than 16/32/64/128 — is *recorded* as unmappable rather than
     raised here, so an explicit ``dtype=`` (e.g. ``object`` for bigints, or
     ``float``) can still coerce the array. Strict inference reports it later in
-    ``_extract`` only when no dtype was supplied.
+    ``_extract`` only when no dtype was supplied. A non-unix datetime epoch is
+    likewise recorded (it maps only with an explicit dtype='int64').
     """
     try:
-        return _family_width_dtype(family, width)
+        return _family_width_dtype(family, width, base)
     except BovnarArgumentError as e:
         acc['unmappable'] = True
         acc.setdefault('unmappable_reason', str(e))
@@ -166,7 +184,7 @@ def _leaf(obj, acc):
         acc['null'] = True
         return None
     if isinstance(obj, Quantity):
-        dt = _gather_dtype(acc, obj.vtype.family, obj.vtype.width)
+        dt = _gather_dtype(acc, obj.vtype.family, obj.vtype.width, obj.vtype.base)
         if dt:
             acc['dtypes'].add(dt)
         us = obj.unit_str()
@@ -181,7 +199,8 @@ def _leaf(obj, acc):
             dt = {DomType.INT: 'int64', DomType.FLOAT: 'float64',
                   DomType.BOOL: 'bool', DomType.STRING: 'str'}.get(obj.dom_type)
         else:
-            dt = _gather_dtype(acc, obj.value_type.family, obj.value_type.width)
+            dt = _gather_dtype(acc, obj.value_type.family, obj.value_type.width,
+                               obj.value_type.base)
         if dt:
             acc['dtypes'].add(dt)
         us = obj.unit_str
@@ -308,10 +327,28 @@ def from_numpy(writer, key: str, arr, *, unit=None) -> None:
         raise BovnarArgumentError(
             "from_numpy needs a 1-D+ array; write a 0-D value with the scalar API")
     family, width = _dtype_to_family_width(arr.dtype)
-    rows = arr.tolist()
     vu = _resolve_unit_arg(unit)
 
     from . import write_array
+    if family == F.DATETIME:
+        # datetime64[*] -> the unix-epoch integer-seconds carrier. A unit makes
+        # no sense on a timestamp. astype('datetime64[s]') truncates sub-second
+        # resolution; NaT has no bovnar representation, so reject it rather than
+        # emit the INT64_MIN sentinel as a bogus instant. The caller's writer is
+        # responsible for the #!bovnar 1.1 directive (datetime is spec 1.1);
+        # array_to_bvnr emits it automatically.
+        if vu is not None:
+            raise BovnarArgumentError("a unit is not applicable to a datetime array")
+        secs = arr.astype('datetime64[s]')
+        if np.isnat(secs).any():
+            raise BovnarArgumentError(
+                "NaT (not-a-time) has no bovnar datetime value; mask or fill it "
+                "before converting")
+        write_array(writer, key, secs.astype('int64').tolist(),
+                    vt=make_type_spec(F.DATETIME, 64, 0), vu=None)
+        return
+
+    rows = arr.tolist()
     if family in (F.BOOL, F.UTF8):
         if vu is not None:
             raise BovnarArgumentError(
@@ -334,10 +371,14 @@ def array_to_bvnr(key: str, arr, *, unit=None, pretty: bool = True) -> bytes:
     from .writer import Writer
     from .exceptions import BovnarWriteError
     from .enums import ErrorCode
+    np = _np()
+    needs_v11 = np.asarray(arr).dtype.kind == 'M'   # datetime64 -> spec 1.1
     cap = 4 * 1024 * 1024
     while True:
         try:
             with Writer.to_mem(cap=cap, pretty=pretty) as w:
+                if needs_v11:
+                    w.write_version(1, 1)           # directive must lead the doc
                 from_numpy(w, key, arr, unit=unit)
             return w.get_output()
         except BovnarWriteError as e:

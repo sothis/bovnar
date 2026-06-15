@@ -67,7 +67,10 @@ such a document is an error, exactly as a 1.0 reader reports.
   `Reader.declared_version`, `Quantity.epoch_name`/`epoch_mjd`,
   `ValueTypeFamily.DATETIME`; `dumps()` automatically prepends `#!bovnar 1.1`
   (and emits the `<datetime>` annotation) when the value tree needs it, so typed
-  round-trips are lossless.
+  round-trips are lossless. The numpy bridge maps a unix-epoch datetime array
+  to/from `datetime64[s]` (`to_numpy`/`from_numpy`/`array_to_bvnr`); a non-unix
+  epoch is refused with a pointer to `dtype='int64'` for the raw seconds, NaT is
+  rejected, and `array_to_bvnr` prepends the `#!bovnar 1.1` directive.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
   **289 cases** (groups `version`, `datetime` — including the ISO-literal
@@ -104,8 +107,6 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
   bindings, which parse via it); the browser playground parser
   (`web/bovnar_parser.js`) does not yet recognise them and still reports a parse
   error on a literal — a follow-up.
-- The numpy bridge cannot map a datetime array to a dtype yet (raises a clean
-  error rather than guessing `datetime64`).
 
 ## [1.0.1]
 

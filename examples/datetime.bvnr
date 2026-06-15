@@ -1,0 +1,33 @@
+#!bovnar 1.1
+# datetime.bvnr — spec 1.1 native time family and ISO-8601 datetime literals.
+#
+# A datetime is a signed integer count of seconds since a named epoch. The
+# value may be written as a raw integer (<datetime:width,epoch> N) or, since
+# spec 1.1, as an ISO-8601 UTC literal that the parser converts to that carrier
+# at parse time. A bare literal with no annotation infers <datetime:64,unix>.
+#
+# This file is part of the CLI example suite: it must validate, pretty-print
+# idempotently, and its canonical form must re-parse at the DOM tier (every
+# array stays a homogeneous datetime array — see bvnr_cli_dom_canonical_datetime).
+
+# Integer carriers, explicit epoch.
+.created    = <datetime:64,unix> 1750000000;
+.gps_t      = <datetime:64,tai>  1400000000;
+.before     = <datetime>         -100;          # 100 s before 1970-01-01Z
+
+# ISO-8601 literals (UTC). A bare literal infers <datetime:64,unix>.
+.date_only  = 2026-06-15;
+.timestamp  = 2026-06-15T12:00:00Z;
+.no_zone    = 2026-06-15T12:00:00;              # absent zone = UTC
+.epoch0     = 1970-01-01T00:00:00Z;             # = 0
+.pre_epoch  = 1960-01-01;                       # negative carrier
+.tai_lit    = <datetime:64,tai> 2017-01-01T00:00:00Z;  # leap-second correct
+
+# Arrays: every element shares the datetime kind and epoch (homogeneous). The
+# canonical form annotates only the first element; the bare integers after it
+# inherit the datetime type, so the array re-parses at the DOM tier.
+.flat_lit   = [2026-01-01, 2026-01-02, 2026-01-03];
+.flat_int   = [<datetime:64> 100, 200, 300];
+.nested     = [[2026-01-01], [2026-01-02]];
+.matrix     = [2026-01-01, 2026-01-02]/[2026-01-03, 2026-01-04];
+.signed     = [<datetime:64> -5, 0, 5];

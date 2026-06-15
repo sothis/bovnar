@@ -578,6 +578,11 @@ if(Python3_FOUND)
         "datetime"
         60)
 
+    _bvnr_pytest_lib(bvnr_py_datetime_oracle
+        test_datetime_oracle.py
+        "datetime"
+        120)
+
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.
@@ -700,6 +705,22 @@ _bvnr_cli_example(units)
 _bvnr_cli_example(financial)
 _bvnr_cli_example(crypto_portfolio)
 _bvnr_cli_example(versioned)
+_bvnr_cli_example(datetime)
+
+# Cross-tier regression: the canonical (pretty-printed) form of a datetime
+# document — whose arrays annotate only the first element and leave the rest
+# bare — must re-parse at the DOM tier as homogeneous datetime arrays. The
+# streaming-only idempotency check above does not exercise the DOM.
+add_test(
+    NAME    bvnr_cli_dom_canonical_datetime
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DBVNR_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/datetime.bvnr
+            -DTMP_FILE=${CMAKE_CURRENT_BINARY_DIR}/domcanon_datetime.bvnr
+            -DKEY=.matrix
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pretty_print_dom_valid.cmake)
+set_tests_properties(bvnr_cli_dom_canonical_datetime PROPERTIES
+    LABELS  "cli;examples;datetime;idempotent" TIMEOUT 30)
 
 # ── json <-> bvnr converter ──────────────────────────────────────────────────
 # Round-trip fidelity: json -> bvnr -> json must reproduce the input (modulo

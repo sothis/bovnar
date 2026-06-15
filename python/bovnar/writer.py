@@ -297,6 +297,7 @@ class Writer:
             int(ValueTypeFamily.FLOAT),
             int(ValueTypeFamily.FLOAT_FIX),
             int(ValueTypeFamily.FLOAT_DEC),
+            int(ValueTypeFamily.DATETIME),
         }
         fam = int(vt.family)
 
@@ -333,6 +334,24 @@ class Writer:
             if not ok:
                 self._raise_error()
 
+        # datetime epoch (spec 1.1): emitted as a named parameter (e.g. "tai").
+        # base holds the epoch index; 0 (unix) is the default and stays implicit.
+        if fam == int(ValueTypeFamily.DATETIME) and vt.base != 0:
+            epoch = self._lib.bvnr_datetime_epoch_name(vt)
+            if epoch:
+                _keep_epoch = epoch
+                d_ep = BvnrData()
+                d_ep.type = self._TOKEN_IS_UNIT
+                d_ep.value_type = vt
+                d_ep.data = ctypes.cast(
+                    ctypes.c_char_p(epoch), ctypes.c_void_p)
+                d_ep.length = len(epoch)
+                ok = self._lib.bvnr_write_event(
+                    self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
+                    ctypes.byref(d_ep))
+                if not ok:
+                    self._raise_error()
+
         if vu.num_components > 0:
             lib = self._lib
             ubuf = ctypes.create_string_buffer(256)
@@ -359,6 +378,12 @@ class Writer:
         ok = self._lib.bvnr_write_event(
             self._ptr, int(Event.TYPE_ANNOTATION_END), ctypes.byref(d_end))
         if not ok:
+            self._raise_error()
+
+    def write_version(self, major: int = 1, minor: int = 1) -> None:
+        """Emit a leading ``#!bovnar <major>.<minor>`` directive. Must be called
+        before any value is written (else error_invalid_argument)."""
+        if not self._lib.bvnr_write_version(self._ptr, major, minor):
             self._raise_error()
 
     def write_uint(self,

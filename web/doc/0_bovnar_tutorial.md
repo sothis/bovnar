@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — A Practical Tutorial
 
-**Format version:** 1.0
+**Format version:** 1.1 (draft)
 **Audience:** Developers already comfortable with JSON or similar text formats.
 
 ---
@@ -137,7 +137,7 @@ Placing the annotation anywhere else is a hard error:
 
 ### Type Families
 
-There are seven type families:
+There are seven core type families (spec 1.0), plus `datetime` added in spec 1.1:
 
 | Keyword | Description |
 |---|---|
@@ -148,6 +148,7 @@ There are seven type families:
 | `float_dec` | IEEE 754-2008 decimal floating-point |
 | `utf8` | UTF-8 string |
 | `bool` | Boolean (`true`/`false`); takes no parameters |
+| `datetime` | Timestamp: signed epoch-seconds (spec 1.1; needs a `#!bovnar 1.1` directive) |
 
 ### Parameters
 

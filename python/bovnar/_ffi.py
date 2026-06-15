@@ -202,6 +202,12 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_write_version.restype  = c_bool
     lib.bvnr_write_version.argtypes = [c_void_p, c_uint16, c_uint16]
 
+    lib.bvnr_datetime_epoch_name.restype  = c_char_p
+    lib.bvnr_datetime_epoch_name.argtypes = [ValueTypeSpec]
+
+    lib.bvnr_datetime_epoch_mjd.restype  = c_int32
+    lib.bvnr_datetime_epoch_mjd.argtypes = [ValueTypeSpec]
+
     lib.bvnr_writer_create.restype  = c_void_p
     lib.bvnr_writer_create.argtypes = []
 

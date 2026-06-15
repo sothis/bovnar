@@ -499,7 +499,12 @@ static inline uint32_t bvn_effective_width(value_type_spec_t s)
 }
 static inline uint32_t bvn_effective_base(value_type_spec_t s)
 {
-	if (s.family == vt_float_fix || s.family == vt_float_dec)
+	/* float_fix/dec are always decimal. datetime's base field holds an epoch
+	 * index, NOT a numeric base, and its carrier is decimal epoch-seconds — so
+	 * it must report base 10, or DOM/parse paths (bvn_parse_int64, the DOM
+	 * builder) would decode the seconds in the bogus "base" and corrupt it. */
+	if (s.family == vt_float_fix || s.family == vt_float_dec ||
+	    s.family == vt_datetime)
 		return 10u;
 	return s.base ? s.base : 10u;
 }

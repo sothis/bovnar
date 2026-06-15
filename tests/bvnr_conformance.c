@@ -1058,6 +1058,9 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("REF-009", "references", "index in a reference needs spec 1.1",
 	           ".r = &.a[0];",
 	           error_unexpected_input_byte),
+	ERROR_CASE("REF-010", "references", "an empty reference index is rejected",
+	           "#!bovnar 1.1\n.r = &.a[];",
+	           error_unexpected_input_byte),
 
 	/* ── NULL VALUES ─────────────────────────────────────────────── */
 	VALID("NUL-001", "null_values", "null scalar value",

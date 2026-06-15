@@ -35,6 +35,30 @@ def test_family_and_epoch_on_event():
 
 
 @needs_lib
+def test_typed_epoch_recoverable_and_roundtrips():
+    doc = bovnar.loads('#!bovnar 1.1\n.t = <datetime:64,gps> 1750000000;',
+                       typed=True)
+    q = doc['t']
+    assert q.value == 1750000000
+    assert q.epoch_name == 'gps'
+    assert q.epoch_mjd == 44244
+    # dumps emits the annotation + epoch AND the #!bovnar 1.1 directive, so it
+    # round-trips losslessly
+    out = bovnar.dumps(doc)
+    assert out.startswith(b'#!bovnar 1.1\n')
+    assert b'<datetime:64,gps>' in out
+    doc2 = bovnar.loads(out, typed=True)
+    assert doc2['t'].value == 1750000000
+    assert doc2['t'].epoch_name == 'gps'
+
+
+@needs_lib
+def test_plain_dumps_has_no_version_directive():
+    # documents that use no 1.1 feature must not gain a directive
+    assert not bovnar.dumps({'a': 1}).startswith(b'#!bovnar')
+
+
+@needs_lib
 def test_gated_on_version():
     with pytest.raises(BovnarParseError) as ei:
         bovnar.loads('.t = <datetime> 1;')

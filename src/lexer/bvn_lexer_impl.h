@@ -75,6 +75,7 @@ typedef enum state_e {
 	reference_intro,
 	reference_segment_intro,
 	reference_segment_body,
+	reference_index_first,
 	reference_index,
 	reference_outro,
 	copy_string_byte,

@@ -223,8 +223,12 @@
           if (ESC[e] !== undefined) {
             s += ESC[e];
           } else if (e === 'x') {
-            /* \xHH (spec 1.1) — one byte. Lenient: not gated on a version
-               directive here (this parser does not validate). */
+            /* \xHH (spec 1.1). Lenient/approximate, as elsewhere in this parser:
+               not gated on a version directive, and decoded as a single U+00HH
+               code unit rather than a raw UTF-8 byte. So the reference C reader's
+               byte semantics are NOT reproduced — a multi-byte sequence like
+               \xC3\xA9 shows as two chars (not "é"), and an invalid-UTF-8 \xFF is
+               accepted here though the C reader rejects it at finalize. */
             const h1 = advance(), h2 = advance();
             if (isHex(h1) && isHex(h2)) s += String.fromCharCode(parseInt(h1 + h2, 16));
             else emitErr('error_illegal_escape_sequence', escPos);

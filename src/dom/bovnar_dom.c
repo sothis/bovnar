@@ -536,7 +536,8 @@ char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base)
 	}
 	char    tmp[128];
 	int32_t slen;
-	if (node->value_type.family == vt_sint)
+	if (node->value_type.family == vt_sint ||
+	    node->value_type.family == vt_datetime)   /* datetime carrier is signed */
 		slen = bvn_format_int64(tmp, sizeof(tmp),
 								node->val.int_val, base, 0u);
 	else

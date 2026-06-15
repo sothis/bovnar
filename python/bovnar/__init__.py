@@ -149,13 +149,29 @@ def loads(data: bytes | bytearray | str | memoryview,
     return parser.result()
 
 
+def _uses_spec_1_1(obj) -> bool:
+    """True if serialising obj would emit a spec-1.1-only construct (currently:
+    a datetime Quantity), so dumps() must prepend a #!bovnar 1.1 directive for
+    the output to round-trip."""
+    if isinstance(obj, Quantity):
+        return obj.vtype.family == int(ValueTypeFamily.DATETIME)
+    if isinstance(obj, dict):
+        return any(_uses_spec_1_1(v) for v in obj.values())
+    if isinstance(obj, (list, tuple)):
+        return any(_uses_spec_1_1(v) for v in obj)
+    return False
+
+
 def dumps(obj: dict, *, pretty: bool = True) -> bytes:
     if not isinstance(obj, dict):
         raise BovnarArgumentError("dumps() requires a dict at the top level")
+    need_version = _uses_spec_1_1(obj)
     cap = 4 * 1024 * 1024
     while True:
         try:
             with Writer.to_mem(cap=cap, pretty=pretty) as w:
+                if need_version:
+                    w.write_version(1, 1)
                 _emit_dict(w, obj)
             return w.get_output()
         except BovnarWriteError as e:
@@ -237,6 +253,7 @@ def write_array(w: Writer,
             int(ValueTypeFamily.FLOAT_FIX): 'float_fix',
             int(ValueTypeFamily.FLOAT_DEC): 'float_dec',
             int(ValueTypeFamily.UTF8):      'utf8',
+            int(ValueTypeFamily.DATETIME):  'datetime',
         }
         name = fam_names.get(int(vt.family), 'uint')
         w._emit_annotation(name, vt, vu if vu is not None else make_unit_none())
@@ -554,6 +571,7 @@ _FAM_NAMES = {
     int(ValueTypeFamily.FLOAT):     'float',
     int(ValueTypeFamily.FLOAT_FIX): 'float_fix',
     int(ValueTypeFamily.FLOAT_DEC): 'float_dec',
+    int(ValueTypeFamily.DATETIME):  'datetime',
 }
 
 

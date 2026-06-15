@@ -680,6 +680,45 @@ static void test_reference_indexing(void)
 	}
 }
 /*
+ * datetime values must decode through the DOM as plain decimal signed integers
+ * regardless of epoch — a regression guard for the bug where the epoch index
+ * stored in value_type.base was misread as a numeric base (so <datetime:gps>
+ * 1010 decoded as base-2 "1010" = 10).
+ */
+static void test_datetime_dom_decode(void)
+{
+	static const struct { const char *epoch; int idx; int32_t mjd; } eps[] = {
+		{"unix",0,40587}, {"tai",1,36204}, {"gps",2,44244}, {"mjd",3,0},
+		{"ntp",4,15020}, {"galileo",5,51412}, {"glonass",6,50083},
+		{"y2000",7,51544}, {"beidou",8,53736},
+	};
+	for (size_t i = 0; i < sizeof(eps)/sizeof(eps[0]); i++) {
+		char src[96];
+		snprintf(src, sizeof(src),
+			"#!bovnar 1.1\n.t = <datetime:%s> 1750000000;\n", eps[i].epoch);
+		bvn_dom_doc_t *d = parse_doc(src);
+		if (!d) continue;
+		int64_t v = 0;
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".t"), &v) &&
+					v == 1750000000,
+					"datetime epoch-seconds decode as decimal regardless of epoch");
+		value_type_spec_t vt = bvn_dom_get_value_type(bvn_dom_lookup(d, ".t"));
+		ASSERT_TRUE(strcmp(bvnr_datetime_epoch_name(vt), eps[i].epoch) == 0,
+					"epoch name round-trips through the spec");
+		ASSERT_EQ_INT(bvnr_datetime_epoch_mjd(vt), eps[i].mjd,
+					"epoch MJD matches bvn_datetime.h");
+		bvn_dom_doc_destroy(d);
+	}
+	/* negative (pre-epoch) instant decodes as a signed value */
+	bvn_dom_doc_t *neg = parse_doc("#!bovnar 1.1\n.t = <datetime> -100;\n");
+	if (neg) {
+		int64_t v = 0;
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(neg, ".t"), &v) && v == -100,
+					"negative datetime decodes as -100");
+		bvn_dom_doc_destroy(neg);
+	}
+}
+/*
  * Broad coverage of index resolution across every array feature: deep /-row
  * matrices, slash-rows whose cells are sub-arrays or structs, arrays nested in
  * structs and vice versa, arbitrary nesting depth, null elements, and chained
@@ -774,6 +813,7 @@ int main(void)
 	test_empty_array_semantics();
 	test_struct_unique_keys();
 	test_references();
+	test_datetime_dom_decode();
 	test_reference_indexing();
 	test_reference_indexing_coverage();
 

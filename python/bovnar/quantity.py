@@ -52,6 +52,25 @@ class Quantity:
         return _decode_value(raw_bytes, ValueTypeFamily(self.vtype.family),
                              self.vtype, self._tok_type)
 
+    @property
+    def epoch_name(self):
+        """For a `datetime` quantity, the epoch name (`"unix"`, `"tai"`, …);
+        `None` for any other family. The integer `value` is seconds since this
+        epoch."""
+        if self.vtype.family != int(ValueTypeFamily.DATETIME):
+            return None
+        from ._ffi import get_library
+        return get_library().bvnr_datetime_epoch_name(self.vtype).decode('ascii')
+
+    @property
+    def epoch_mjd(self):
+        """For a `datetime` quantity, the epoch's Modified Julian Day (the
+        `bvn_epoch_t` value); `None` otherwise."""
+        if self.vtype.family != int(ValueTypeFamily.DATETIME):
+            return None
+        from ._ffi import get_library
+        return int(get_library().bvnr_datetime_epoch_mjd(self.vtype))
+
     def unit_str(self) -> str:
         """Return the canonical unit string, or '' if dimensionless."""
         if not any(self.unit.components[i].base != 0

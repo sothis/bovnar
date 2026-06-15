@@ -958,7 +958,10 @@ bool bvn_action_reference_index_open(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_unexpected_input_byte);
 		return false;
 	}
-	return bvn_push_reference_byte(p, reference_index);
+	/* require at least one digit before ']' (reference_index_first has no ']'
+	 * transition), so an empty "[]" is rejected — the lexer then accepts exactly
+	 * what bvn_dom_lookup / bvn_validate_reference accept on the resolve/write side. */
+	return bvn_push_reference_byte(p, reference_index_first);
 }
 bool bvn_action_reference_index_byte(bvnr_reader_t* p)
 {

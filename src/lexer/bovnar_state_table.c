@@ -570,6 +570,11 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x7c] = ACT_NONE, [0x7e] = ACT_NONE,
 		[0xc2] = ACT_NONE,
 	},
+	[reference_index_first] = {
+		/* the first byte after '[' MUST be a digit (no ']' here), so an empty
+		 * "[]" is rejected; a digit advances to reference_index. */
+		BVN_DIGITS(ACT_reference_index_byte),
+	},
 	[reference_index] = {
 		/* inside &.path[...]: digits accumulate the index; ']' closes it and
 		 * returns to the segment body (where another '[' or '.' may follow).

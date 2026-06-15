@@ -410,11 +410,14 @@ types are unknown to the parser).
 
 **Array indexing (spec 1.1).** A reference path may address array elements with
 `[N]` index suffixes (`&.matrix[0][1]`). Like the rest of the path the index is
-captured **verbatim and unresolved** at the byte layer; it is interpreted only
-when an application resolves the path against the materialised tree
-(`bvn_dom_lookup`, which the CLI `query` command also uses). The index syntax is
-a 1.1 feature: in a 1.0/unversioned document a `[` in a reference is
-`error_unexpected_input_byte`, exactly as a 1.0 reader reports.
+captured **verbatim and unresolved** at the byte layer — the library never
+dereferences a reference, so `bvn_dom_lookup` on the *reference* node returns its
+stored path string, not the target. The index is interpreted only when an
+application itself resolves that path string against the tree by calling
+`bvn_dom_lookup(doc, ".matrix[0][1]")` directly (this is the same path-walker the
+CLI `query` command exposes — `bovnar query .matrix[0][1]` → the element).
+The index syntax is a 1.1 feature: in a 1.0/unversioned document a `[` in a
+reference is `error_unexpected_input_byte`, exactly as a 1.0 reader reports.
 
 Resolution semantics follow the array model (§7): a flat `/`-row matrix
 (`[10,20,30]/[40,50,60]`) is addressed as `[row][col]` — `&.matrix[0][1]` → `20`
@@ -1469,7 +1472,9 @@ Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal defaul
 
 | Check | Error |
 |-------|-------|
-| Unknown escape sequence | `error_illegal_escape_sequence` |
+| Unknown escape sequence (incl. `\x`/`\u` outside spec 1.1) | `error_illegal_escape_sequence` |
+| `\u{…}` surrogate or value `> U+10FFFF` (spec 1.1) | `error_invalid_codepoint` |
+| `\x` byte(s) that break the string's UTF-8 validity (spec 1.1) | `error_invalid_utf8_byte` |
 | Control byte in string | `error_unexpected_input_byte` |
 | String length exceeded | `error_string_too_long` |
 
@@ -2278,6 +2283,9 @@ typedef enum error_code_e {
     /* spec 1.1 — the declared version exceeds what the reader supports and
      * strict_version was set. */
     error_unsupported_spec_version      = 43,
+    /* spec 1.1 — a \u{…} escape names a non-scalar value (a surrogate, or a
+     * code point above U+10FFFF). */
+    error_invalid_codepoint             = 44,
 } error_code_t;
 ```
 
@@ -2321,8 +2329,8 @@ revisions:
   crypto currency codes may be added (a document never depends on a code being
   *absent*);
 - **new error codes** appended after the current maximum (existing numeric values
-  never change) — 1.1 appends `error_invalid_spec_version` (42) and
-  `error_unsupported_spec_version` (43);
+  never change) — 1.1 appends `error_invalid_spec_version` (42),
+  `error_unsupported_spec_version` (43), and `error_invalid_codepoint` (44);
 - the **optional version directive** (§3.4), added in 1.1: it is an ordinary
   comment to any 1.0 reader, so adding one never invalidates a document;
 - new optional reader/writer flags and limits whose defaults preserve current

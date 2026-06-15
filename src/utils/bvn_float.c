@@ -917,6 +917,20 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
  * input length, in either the normal or subnormal range -- which is the bug the
  * old parse-into-128-bits-then-narrow path had.
  */
+/*
+ * Validate a caller-supplied IEEE binary field geometry against the word
+ * buffer it must fit in. Guards two hazards on the public {to,from,strto}ieee_bin
+ * entry points, whose exp_bits/man_bits/bits32 are caller-controlled: a shift
+ * 1u << exp_bits with exp_bits >= 32 is undefined behaviour, and a field whose
+ * total bit count exceeds bits32*32 would index bits[] out of bounds. The
+ * bundled bin16..bin256 wrappers always pass conforming geometries, so this only
+ * rejects misuse of the arbitrary-width API.
+ */
+static bool bvnf_ieee_geom_ok(uint32_t exp_bits, uint32_t man_bits, int bits32)
+{
+	return exp_bits < 32u && bits32 > 0 &&
+		   1L + (long)exp_bits + (long)man_bits <= (long)bits32 * 32L;
+}
 void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 		uint32_t exp_bits, uint32_t man_bits, int32_t bias,
 		uint32_t *bits, int bits32)
@@ -924,6 +938,7 @@ void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 	if (!bits) return;
 	for (int i = 0; i < bits32; i++) bits[i] = 0;
 	if (!s || (base != 10u && base != 16u)) return;
+	if (!bvnf_ieee_geom_ok(exp_bits, man_bits, bits32)) return;
 	int total = 1 + (int)exp_bits + (int)man_bits;
 	bvn_int_t num, den;
 	uint32_t hint = bvnf_hint_limbs(man_bits + 64u);
@@ -1521,6 +1536,7 @@ void bvn_float_to_ieee_bin(const bvn_float_t *f,
 	if (!bits) return;
 	for (int i = 0; i < bits32; i++) bits[i] = 0;
 	if (!f) return;                                /* NULL handle -> all-zero field */
+	if (!bvnf_ieee_geom_ok(exp_bits, man_bits, bits32)) return;
 	if (bvn_float_is_nan(f)) {
 		for (uint32_t i = 0; i < exp_bits; i++)
 			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
@@ -1555,7 +1571,7 @@ bool bvn_float_from_ieee_bin(bvn_float_t *f,
 							  const uint32_t *bits, int bits32)
 {
 	if (!f || !bits) return false;
-	(void)bits32;
+	if (!bvnf_ieee_geom_ok(exp_bits, man_bits, bits32)) return false;
 	int total     = 1 + (int)exp_bits + (int)man_bits;
 	uint32_t eall = (1u << exp_bits) - 1u;
 	uint32_t raw_exp = 0;

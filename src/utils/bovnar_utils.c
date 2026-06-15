@@ -214,7 +214,8 @@ static int bvn_pow2m1_dec(uint32_t n, char* buf, size_t cap)
 			dig[j] = (uint8_t)(v % 10);
 			carry  = v / 10;
 		}
-		while (carry && nd < BVN_DEC_SCRATCH_SIZE) {
+		while (carry) {
+			if (nd >= BVN_DEC_SCRATCH_SIZE) { free(dig); return -1; }
 			dig[nd++] = (uint8_t)(carry % 10);
 			carry /= 10;
 		}
@@ -227,7 +228,7 @@ static int bvn_pow2m1_dec(uint32_t n, char* buf, size_t cap)
 	}
 	while (nd > 1 && dig[nd - 1] == 0) nd--;
 	uint32_t len = nd;
-	if (len + 1 > cap) len = (uint32_t)cap - 1;
+	if (len + 1u > cap) { free(dig); return -1; }   /* too long to fit: caller rejects */
 	for (uint32_t j = 0; j < len; j++)
 		buf[j] = (char)('0' + dig[nd - 1 - j]);
 	buf[len] = '\0';

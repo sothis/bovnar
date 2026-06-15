@@ -131,6 +131,7 @@ static void builder_pop(bvn_builder_t *b)
 static bool builder_set_key(bvn_builder_t *b, const char *data,
 							uint32_t len)
 {
+	if (len == UINT32_MAX) return false;   /* len + 1u would wrap to 0 */
 	if (len + 1u > b->key_cap) {
 		uint32_t nc = len + 1u;
 		char *nk = realloc(b->key, nc);

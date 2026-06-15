@@ -852,6 +852,12 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		bvn_ser_mark_value_done(s);
 		break;
 	case ev_array_row_start: {
+		/* Self-protect the fixed-size depth arrays. The validating writer path
+		 * already rejects over-deep nesting (bvn_writer_validate_event), but the
+		 * canon-observer path drives this serializer directly with no validation,
+		 * so the bound is enforced here too rather than trusting the event source. */
+		if (s->array_depth >= s->max_array_nesting)
+			return false;
 		if (!s->had_type_annotation) {
 			if (!bvn_ser_emit_pending_comma(s))
 				return false;

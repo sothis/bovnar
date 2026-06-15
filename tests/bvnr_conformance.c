@@ -886,6 +886,14 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("DTLIT-111", "datetime", "a unit on a datetime literal is rejected",
 	           "#!bovnar 1.1\n.t = 2026-06-15 kg;",
 	           error_unit_illegal),
+	/* A datetime array's canonical form annotates only the first element; the
+	 * bare integers after it must inherit datetime so the DOM accepts the
+	 * re-read array as homogeneous (regression: bare elements used to infer
+	 * uint, making datetime/uint mix that the DOM rejected). */
+	DOM_VALID("DTLIT-112", "datetime", "datetime array with bare trailing elements is homogeneous",
+	          "#!bovnar 1.1\n.t = [<datetime:64> 100, 200, 300];"),
+	DOM_VALID("DTLIT-113", "datetime", "bare ISO-literal array is a homogeneous datetime array",
+	          "#!bovnar 1.1\n.t = [2026-01-01, 2026-01-02, 2026-01-03];"),
 
 	/* ── NUMBERS ─────────────────────────────────────────────────── */
 	VALID_KEY("NUM-001", "numbers", "plain unsigned integer",

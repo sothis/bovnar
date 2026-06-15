@@ -233,6 +233,19 @@ static inline bool bvn_str_is_iso_datetime(const uint8_t* s, uint32_t n)
 			return true;
 	return false;
 }
+/* A plain signed/unsigned decimal integer: optional '-' then all digits, with
+ * no '.', exponent or other character. Used to decide whether a bare value in a
+ * datetime array context can inherit the established datetime type. */
+static inline bool bvn_str_is_plain_integer(const uint8_t* s, uint32_t n)
+{
+	uint32_t i = (n > 0 && s[0] == '-') ? 1u : 0u;
+	if (i >= n)
+		return false;
+	for (; i < n; i++)
+		if (s[i] < '0' || s[i] > '9')
+			return false;
+	return true;
+}
 static bool bvn_iso_two_digit(const uint8_t* s, int* out)
 {
 	if (s[0] < '0' || s[0] > '9' || s[1] < '0' || s[1] > '9')
@@ -365,6 +378,22 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		default_type.family = vt_datetime;
 		default_type.width  = 64;
 		default_type.base   = 0;
+		family_name     = "datetime";
+		family_name_len = 8;
+		emit_width = true;
+		emit_base  = false;
+		emit_unit  = false;
+	} else if ((tt == token_is_number || tt == token_is_array_number) &&
+	           v->inferred_default_vtype.family == vt_datetime &&
+	           bvn_str_is_plain_integer(str, str_len)) {
+		/* A bare integer inside a datetime array (the established element
+		 * type is datetime) inherits that datetime type — width and epoch —
+		 * rather than inferring uint/sint. Without this the canonical form of
+		 * a datetime array (annotation on the first element, bare integers
+		 * after) would re-read as a datetime/uint mix and the DOM tier would
+		 * reject it as non-homogeneous. inferred_default_vtype resets per
+		 * assignment, so this only ever fires within one array. */
+		default_type    = v->inferred_default_vtype;
 		family_name     = "datetime";
 		family_name_len = 8;
 		emit_width = true;

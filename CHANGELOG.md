@@ -70,7 +70,7 @@ such a document is an error, exactly as a 1.0 reader reports.
   round-trips are lossless.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
-  **287 cases** (groups `version`, `datetime` — including the ISO-literal
+  **289 cases** (groups `version`, `datetime` — including the ISO-literal
   `DTLIT` cases — plus escape/reference additions), passing in both self-test
   and `--iut` modes.
 

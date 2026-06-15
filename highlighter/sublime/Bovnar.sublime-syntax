@@ -12,10 +12,19 @@ scope: source.bovnar
 
 contexts:
   main:
+    - include: directive
     - include: comment
     - include: assignment
     - include: type_annotation
     - include: value
+
+  # Spec version directive (spec 1.1): #!bovnar <major>.<minor>. Only meaningful
+  # as the very first line; lexically a plain comment anywhere else.
+  directive:
+    - match: '^(#!bovnar)([ \t]+)(\d+\.\d+)[ \t]*$'
+      captures:
+        1: keyword.control.directive.bovnar
+        3: constant.numeric.version.bovnar
 
   comment:
     - match: '#[^\n\r]*'
@@ -44,6 +53,7 @@ contexts:
       scope: keyword.operator.assignment.bovnar
     - include: type_annotation
     - include: special_number
+    - include: datetime_literal
     - include: number
     - include: string
     - include: inline_unit
@@ -181,6 +191,7 @@ contexts:
   value:
     - include: comment
     - include: special_number
+    - include: datetime_literal
     - include: number
     - include: string
     - include: inline_unit
@@ -206,6 +217,13 @@ contexts:
     - match: '(?<![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])null(?![A-Za-z0-9_+\-\p{L}\p{N}\p{M}])'
       scope: constant.language.null.bovnar
 
+  # ISO-8601 datetime literal (spec 1.1): YYYY-MM-DD with an optional T time,
+  # fractional seconds, and a Z or ±HH:MM offset. Must be included before
+  # `number` so the leading YYYY is not consumed as an integer.
+  datetime_literal:
+    - match: '(?<![A-Za-z0-9_])\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})?)?(?![0-9])'
+      scope: constant.numeric.datetime.bovnar
+
   number:
     # Leading-dot float:  .5  -.5  .7e+3
     - match: '-?\.\d+(?:[eE][+\-]?\d+)?'
@@ -217,7 +235,8 @@ contexts:
     - match: '-?\d+(?:[eE][+\-]?\d+)?'
       scope: constant.numeric.integer.bovnar
 
-  # Double-quoted string. Only seven escapes are legal: \t \n \v \f \r \" \\.
+  # Double-quoted string. Named escapes \t \n \v \f \r \" \\ ; spec 1.1 adds
+  # \u{1-6 hex} (a Unicode scalar) and \xHH (one byte).
   string:
     - match: '"'
       scope: punctuation.definition.string.begin.bovnar
@@ -228,6 +247,10 @@ contexts:
           pop: true
         - match: '\\[tnvfr"\\]'
           scope: constant.character.escape.bovnar
+        - match: '\\u\{[0-9A-Fa-f]{1,6}\}'      # spec 1.1: Unicode scalar
+          scope: constant.character.escape.unicode.bovnar
+        - match: '\\x[0-9A-Fa-f]{2}'            # spec 1.1: single byte
+          scope: constant.character.escape.byte.bovnar
         - match: '\\.'
           scope: invalid.illegal.escape.bovnar
 
@@ -245,9 +268,10 @@ contexts:
     - match: '[A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*'
       scope: variable.other.symbol.bovnar
 
-  # Reference literal: '&' sigil followed by one or more '.segment' path parts.
+  # Reference literal: '&' sigil, one or more '.segment' path parts, and
+  # (spec 1.1) optional '[i]' array indices, e.g. &.matrix[0][1].
   reference:
-    - match: '(&)((?:\.[A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*)+)'
+    - match: '(&)((?:\.[A-Za-z_\p{L}][A-Za-z0-9_+\-\p{L}\p{N}\p{M}]*|\[[0-9]+\])+)'
       captures:
         1: keyword.operator.reference.bovnar
         2: variable.other.reference-path.bovnar
@@ -257,6 +281,7 @@ contexts:
     - include: comment
     - include: type_annotation
     - include: special_number
+    - include: datetime_literal
     - include: number
     - include: string
     - include: keyword

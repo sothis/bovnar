@@ -22,6 +22,8 @@ hi BovnarInvalidEsc   ctermfg=203 guifg=#f47067 gui=undercurl
 hi BovnarSymbol       ctermfg=39  guifg=#67d1f4 gui=none
 hi BovnarRefOp        ctermfg=203 guifg=#f47067 gui=bold
 hi BovnarRefPath      ctermfg=214 guifg=#d06070 gui=none
+hi BovnarDirective    ctermfg=170 guifg=#c084fc gui=bold
+hi BovnarDateTime     ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarArrayDelim1  ctermfg=209 guifg=#da844c gui=none
 hi BovnarArrayDelim2  ctermfg=135 guifg=#c084fc gui=none
 hi BovnarArrayDelim3  ctermfg=200 guifg=#ff2a7d gui=none
@@ -54,6 +56,10 @@ hi BovnarStructDelim8 ctermfg=39  guifg=#67d1f4 gui=none
 syn match   BovnarOctetData    '\\x[0-9A-Fa-f]\{2\}'
 
 syn region  BovnarComment start=/#/ end=/$/
+" Spec version directive (spec 1.1): #!bovnar <major>.<minor>. Defined AFTER the
+" comment region so vim's last-defined-wins rule picks it over the '#' comment at
+" the start of a directive line. Only meaningful as the first line.
+syn match   BovnarDirective '^#!bovnar\s\+\d\+\.\d\+\s*$'
 
 syn match   BovnarArraySep    ','
 syn match   BovnarRowSep      '/'
@@ -65,6 +71,11 @@ syn match   BovnarAssign    '='
 syn match   BovnarSemicolon ';'
 
 syn match   BovnarNull '=\s*;'
+
+" ISO-8601 datetime literal (spec 1.1): YYYY-MM-DD with an optional T time,
+" fractional seconds, and a Z or ±HH:MM offset. The longer match wins over
+" BovnarInteger for the leading YYYY.
+syn match   BovnarDateTime '\d\{4}-\d\{2}-\d\{2}\(T\d\{2}:\d\{2}:\d\{2}\(\.\d\+\)\=\(Z\|[+-]\d\{2}:\d\{2}\)\=\)\='
 
 syn match   BovnarInteger '\d\+' nextgroup=BovnarInlineUnit skipwhite
 syn match   BovnarFloat   '\d\+\.\d*\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
@@ -81,13 +92,19 @@ syn region  BovnarString
 " sequences (e.g. \q) fall through to BovnarInvalidEsc.
 syn match   BovnarInvalidEsc '\\.'
 syn match   BovnarEscape     '\\[tnvfr"\\]'
+" spec 1.1 escapes: \u{1-6 hex} (Unicode scalar) and \xHH (one byte). Marked
+" `contained` so they only apply inside strings and never shadow the global
+" BovnarOctetData '\xHH' octet-stream delimiter.
+syn match   BovnarEscape     '\\u{[0-9A-Fa-f]\{1,6}}' contained
+syn match   BovnarEscape     '\\x[0-9A-Fa-f]\{2}' contained
 
 syn match   BovnarRefOp   '&'
 " The whole '&.seg.seg' is matched as one item (the '&' included) so it wins over
 " BovnarKeyName, which would otherwise grab each '.seg' and colour the path like a
 " key. (A '&\zs' split leaves the path exposed to BovnarKeyName, so the sigil is
 " kept inside the path match here; web/sublime/vscode split it via captures.)
-syn match   BovnarRefPath '&\(\.[A-Za-z_\d192-\d65535][A-Za-z0-9_+\-\d128-\d65535]*\)\+'
+" spec 1.1: a reference path may carry array indices, e.g. &.matrix[0][1].
+syn match   BovnarRefPath '&\(\.[A-Za-z_\d192-\d65535][A-Za-z0-9_+\-\d128-\d65535]*\|\[\d\+\]\)\+'
 
 syn region  BovnarTypeAnn
       \ start=/</ end=/>/

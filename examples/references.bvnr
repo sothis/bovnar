@@ -1,3 +1,4 @@
+#!bovnar 1.1
 # references.bvnr — demonstrates every reference feature in BVNR
 #
 # A reference names another key in the document via a dotted path

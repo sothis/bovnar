@@ -324,6 +324,16 @@
       "name": "Bovnar Array/Row Separators",
       "scope": "punctuation.separator.array-row.bovnar",
       "settings": { "foreground": "#6e7a86" }
+    },
+    {
+      "name": "Bovnar Version Directive (spec 1.1)",
+      "scope": "keyword.control.directive.bovnar",
+      "settings": { "foreground": "#c084fc", "fontStyle": "bold" }
+    },
+    {
+      "name": "Bovnar ISO-8601 Datetime Literal (spec 1.1)",
+      "scope": "constant.numeric.datetime.bovnar",
+      "settings": { "foreground": "#5eead4" }
     }
   ]
 }

@@ -1,3 +1,4 @@
+#!bovnar 1.1
 # numpy_roundtrip.bvnr
 #
 # A spacecraft-telemetry snapshot for the bovnar <-> numpy bridge: complex,

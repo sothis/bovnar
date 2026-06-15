@@ -1,3 +1,4 @@
+#!bovnar 1.1
 # symbols.bvnr — demonstrates every symbol feature in BVNR
 #
 # A symbol is an unquoted bare-word token in value position.

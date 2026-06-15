@@ -1,3 +1,4 @@
+#!bovnar 1.1
 # strings.bvnr — demonstrates every string feature in BVNR
 #
 # Type annotation:  <utf8>  (the only string type family)

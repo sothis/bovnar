@@ -1,3 +1,4 @@
+#!bovnar 1.1
 # integers.bvnr — demonstrates every integer feature in BVNR
 #
 # Type families:  uint (unsigned), sint (signed)

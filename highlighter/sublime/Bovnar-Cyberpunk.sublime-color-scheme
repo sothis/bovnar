@@ -272,6 +272,17 @@
       "name": "Bovnar Array/Row Separators",
       "scope": "punctuation.separator.array-row.bovnar",
       "foreground": "#6e7a86"
+    },
+    {
+      "name": "Bovnar Version Directive (spec 1.1)",
+      "scope": "keyword.control.directive.bovnar",
+      "foreground": "#c084fc",
+      "font_style": "bold"
+    },
+    {
+      "name": "Bovnar ISO-8601 Datetime Literal (spec 1.1)",
+      "scope": "constant.numeric.datetime.bovnar",
+      "foreground": "#5eead4"
     }
   ]
 }

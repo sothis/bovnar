@@ -310,6 +310,46 @@ static void test_getter_semantics(void)
 }
 
 /*
+ * Regression: bvn_dom_int_to_str must render an unsigned 64-bit value with the
+ * high bit set (>= 2^63, stored as a negative int64 bit pattern) through the
+ * UNSIGNED formatter. A prior bug gated the signed path on
+ * `family == vt_sint || int_val < 0`, so any uint64 in the upper half came out
+ * sign-flipped (18446744073709551615 -> "-1"). The signed path must depend on
+ * the family alone.
+ */
+static void test_int_to_str_uint64_highbit(void)
+{
+	const char *bvn =
+		".big = <uint:64> 18446744073709551615;\n"  /* UINT64_MAX */
+		".mid = <uint:64> 9223372036854775809;\n"   /* 2^63 + 1   */
+		".neg = <sint:64> -5;\n"
+		".pos = <sint:64> 42;\n";
+
+	bvn_dom_doc_t *doc = parse_doc(bvn);
+	if (!doc) return;
+
+	struct { const char *path; uint32_t base; const char *want; } cases[] = {
+		{ ".big", 10u, "18446744073709551615" },
+		{ ".big", 16u, "ffffffffffffffff"     },
+		{ ".mid", 10u, "9223372036854775809"  },
+		{ ".neg", 10u, "-5"                    },
+		{ ".pos", 10u, "42"                    },
+	};
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		bvn_dom_node_t *n = bvn_dom_lookup(doc, cases[i].path);
+		ASSERT_NOT_NULL(n, "lookup must succeed");
+		if (!n) continue;
+		char *s = bvn_dom_int_to_str(n, cases[i].base);
+		ASSERT_NOT_NULL(s, "int_to_str must return a string");
+		if (s) {
+			ASSERT_EQ_STR(s, cases[i].want, "int_to_str rendering");
+			bvn_dom_free_string(s);
+		}
+	}
+	bvn_dom_doc_destroy(doc);
+}
+
+/*
  * Regression: an array whose elements are themselves arrays (the
  * "[[1,2],[3,4]]" bracket-nested form) produces back-to-back array_row_end
  * events. The builder's deferred array pop must close the inner array at the
@@ -591,6 +631,7 @@ int main(void)
 	test_bom_and_parse_errors();
 	test_lookup_edge_cases();
 	test_getter_semantics();
+	test_int_to_str_uint64_highbit();
 	test_nested_array_elements();
 	test_array_row_size_model();
 	test_array_homogeneity();

@@ -473,7 +473,7 @@ char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base)
 	}
 	char    tmp[128];
 	int32_t slen;
-	if (node->value_type.family == vt_sint || node->val.int_val < 0)
+	if (node->value_type.family == vt_sint)
 		slen = bvn_format_int64(tmp, sizeof(tmp),
 								node->val.int_val, base, 0u);
 	else

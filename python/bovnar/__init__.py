@@ -422,6 +422,49 @@ _TOKEN_IS_SYMBOL = 3
 _TOKEN_IS_BOOL   = 15
 
 
+def _char_to_digit(c: int, base: int) -> int:
+    """Mirror of the C bvn_char_to_digit: ordinal -> digit value, or `base`
+    to signal "not a digit". Bases 64/85 use the standard Base64 / Ascii85
+    alphabets; bases up to 36 are case-insensitive, 37..62 case-sensitive."""
+    if base == 64:
+        if 0x41 <= c <= 0x5A: return c - 0x41          # A-Z -> 0..25
+        if 0x61 <= c <= 0x7A: return c - 0x61 + 26     # a-z -> 26..51
+        if 0x30 <= c <= 0x39: return c - 0x30 + 52     # 0-9 -> 52..61
+        if c == 0x2B: return 62                         # '+'
+        if c == 0x2F: return 63                         # '/'
+        return base
+    if base == 85:
+        if 0x21 <= c <= 0x75: return c - 0x21          # '!'..'u' -> 0..84
+        return base
+    if 0x30 <= c <= 0x39:   d = c - 0x30
+    elif 0x61 <= c <= 0x7A: d = 10 + (c - 0x61)
+    elif 0x41 <= c <= 0x5A: d = (36 + (c - 0x41)) if base > 36 else (10 + (c - 0x41))
+    else:                   return base
+    return d if d < base else base
+
+
+def _int_from_base(text: str, base: int) -> int:
+    """Parse an integer in any bovnar base (2..62, 64, 85). Python's built-in
+    int(text, base) only supports bases 2..36, so high bases are decoded here
+    with the same alphabet the C reader/writer use. Bases 64/85 are unsigned
+    (their '+'/'-' are digits, not signs)."""
+    s = text
+    neg = False
+    i = 0
+    if base not in (64, 85) and s[:1] in ('+', '-'):
+        neg = s[0] == '-'
+        i = 1
+    if i >= len(s):
+        raise ValueError(f"no digits in {text!r} for base {base}")
+    val = 0
+    for ch in s[i:]:
+        d = _char_to_digit(ord(ch), base)
+        if d >= base:
+            raise ValueError(f"invalid digit {ch!r} for base {base}")
+        val = val * base + d
+    return -val if neg else val
+
+
 def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> object:
     if not raw:
         if tok_type in (1, 6):
@@ -438,8 +481,10 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
         return text
 
     if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
+        base = vt.base if vt and vt.base > 1 else 10
         try:
-            return int(text, vt.base if vt and vt.base > 1 else 10)
+            # int() only handles bases 2..36; high bases need the custom decoder.
+            return int(text, base) if base <= 36 else _int_from_base(text, base)
         except ValueError:
             return text
 

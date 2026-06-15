@@ -85,7 +85,9 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 	};
 	if (!bvnr_write_event(w, ev_type_annotation_start,       &d)) return false;
 	if (!bvnr_write_event(w, ev_type_annotation_type_family, &d)) return false;
-	if ((bvn_type_is_numeric(vt) || vt.family == vt_utf8) && vt.width != 0) {
+	/* Only numeric families carry a width; utf8/bool are parameterless and
+	 * a width on them is rejected up front by the type-spec validator. */
+	if (bvn_type_is_numeric(vt) && vt.width != 0) {
 		d.type   = token_is_type_width;
 		d.data   = NULL;
 		d.length = 0;

@@ -385,6 +385,19 @@ static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 	bool ok = true;
 	if (!bvn_validate_symbol(buf))
 		ok = bvn_writer_set_error(w, error_type_value_mismatch);
+	/* A symbol whose text is a reserved keyword (null/true/false/on/off/
+	 * nan/inf/ninf) is emitted bare and would be reclassified by the reader
+	 * into a null/bool/float value, silently losing the symbol type. Symbols
+	 * have no quoted form, so the only correct option is to reject it. */
+	else if ((length == 4 && memcmp(buf, "null", 4) == 0) ||
+	         (length == 4 && memcmp(buf, "true", 4) == 0) ||
+	         (length == 2 && memcmp(buf, "on",   2) == 0) ||
+	         (length == 5 && memcmp(buf, "false",5) == 0) ||
+	         (length == 3 && memcmp(buf, "off",  3) == 0) ||
+	         (length == 3 && memcmp(buf, "nan",  3) == 0) ||
+	         (length == 3 && memcmp(buf, "inf",  3) == 0) ||
+	         (length == 4 && memcmp(buf, "ninf", 4) == 0))
+		ok = bvn_writer_set_error(w, error_type_value_mismatch);
 	if (need_free) free(buf);
 	return ok;
 }
@@ -472,7 +485,10 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 				error_illegal_value_type);
 		}
 	}
-	if (vt.family == vt_bool) {
+	if (vt.family == vt_bool || vt.family == vt_utf8) {
+		/* bool and utf8 are parameterless families; the reader rejects a
+		 * width or base on them (error_illegal_value_type), so the writer
+		 * must too, or it would emit e.g. <utf8:40> that it can't read back. */
 		if (vt.width != 0 || vt.base != 0)
 			return bvn_writer_set_error(w, error_illegal_value_type);
 	}

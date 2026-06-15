@@ -289,13 +289,14 @@ class Writer:
         if not ok:
             self._raise_error()
 
+        # Only numeric families carry a width; utf8/bool are parameterless
+        # (a width on them is rejected by the C type-spec validator).
         _width_families = {
             int(ValueTypeFamily.UINT),
             int(ValueTypeFamily.SINT),
             int(ValueTypeFamily.FLOAT),
             int(ValueTypeFamily.FLOAT_FIX),
             int(ValueTypeFamily.FLOAT_DEC),
-            int(ValueTypeFamily.UTF8),
         }
         fam = int(vt.family)
 

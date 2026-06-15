@@ -559,7 +559,10 @@ class TestWriteFloatDec:
 class TestAnnotationRegressions:
     """Regression tests for annotation roundtrip bugs.
 
-    Bug 1 – UTF8 width was never emitted in the annotation.
+    Bug 1 – utf8 is a parameterless family (spec §"param-type": any
+             parameter → error_illegal_value_type). Emitting <utf8:N>
+             produced output the reader rejects; the writer must reject a
+             width on utf8 instead.
     Bug 2 – width was emitted even when vt.width == 0 (emitting :64 via
              bvn_effective_width(0)=64 instead of no width at all).
     Bug 3 – base/Q emission was nested inside the width block so a type with
@@ -568,15 +571,16 @@ class TestAnnotationRegressions:
              of base, causing hex values to be written unquoted (invalid BVNR).
     """
 
-    def test_utf8_typed_width_appears_in_annotation(self):
+    def test_utf8_typed_width_rejected(self):
         from bovnar.enums import ValueTypeFamily
         from bovnar.structs import make_type_spec, make_unit_none
+        from bovnar.exceptions import BovnarWriteError
         vt = make_type_spec(ValueTypeFamily.UTF8, 8, 0)
+        # utf8 takes no parameters; a width must be rejected so the writer
+        # never emits <utf8:8>, which the reader rejects (illegal_value_type).
         with Writer.to_mem() as w:
-            w._emit_annotation('utf8', vt, make_unit_none())
-        out = w.get_output()
-        assert b'utf8:8' in out, \
-            "UTF8 annotation with width=8 must contain 'utf8:8'"
+            with pytest.raises(BovnarWriteError):
+                w._emit_annotation('utf8', vt, make_unit_none())
 
     def test_utf8_typed_width_zero_omitted_from_annotation(self):
         from bovnar.enums import ValueTypeFamily
@@ -937,3 +941,49 @@ class TestEmptyStringRoundtrip:
         result = loads(raw)
         assert result['k'] == '', \
             "typed empty string <utf8> \"\" must decode as ''"
+
+
+@needs_lib
+class TestHighBaseIntDecode:
+    """Regression tests for high-base integer decoding in _decode_value.
+
+    Bug – _decode_value used int(text, base), which only supports bases 2..36.
+    For the bovnar bases 37..62, 64, and 85 (all accepted by the C reader) it
+    raised ValueError and silently returned the raw string instead of the int,
+    corrupting the value's type. The fix routes high bases through a custom
+    decoder using the same alphabet the C reader/writer use.
+    """
+
+    def test_base62_uint(self):
+        from bovnar import loads
+        # base 62: A-Z -> 36..61, a-z -> 10..35, 0-9 -> 0..9
+        v = loads(b'.a = <uint:64,_62> "Zz9";')['a']
+        assert v == 61 * 62 * 62 + 35 * 62 + 9, f"got {v!r}"
+        assert isinstance(v, int)
+
+    def test_base64_uint(self):
+        from bovnar import loads
+        # standard Base64: A-Z 0..25, a-z 26..51, 0-9 52..61, + 62, / 63
+        v = loads(b'.a = <uint:32,_64> "Az+";')['a']
+        assert v == 0 * 64 * 64 + 51 * 64 + 62, f"got {v!r}"
+        assert isinstance(v, int)
+
+    def test_base85_uint(self):
+        from bovnar import loads
+        # Ascii85: '!' (0x21) -> 0 ... 'u' (0x75) -> 84
+        v = loads(b'.a = <uint:32,_85> "st";')['a']
+        assert v == (ord('s') - 0x21) * 85 + (ord('t') - 0x21), f"got {v!r}"
+        assert isinstance(v, int)
+
+    def test_base50_sint_negative(self):
+        from bovnar import loads
+        # base 50: 0-9, a-z 10..35, A-N 36..49.  '-mn' = -(22*50 + 23)
+        v = loads(b'.a = <sint:64,_50> "-mn";')['a']
+        assert v == -((10 + ord('m') - ord('a')) * 50 + (10 + ord('n') - ord('a'))), f"got {v!r}"
+        assert v == -1123 and isinstance(v, int)
+
+    def test_low_base_still_works(self):
+        from bovnar import loads
+        assert loads(b'.a = <uint:32,_16> "ff";')['a'] == 255
+        assert loads(b'.a = <sint:32,_2> "-101";')['a'] == -5
+        assert loads(b'.a = <uint:64> 12345;')['a'] == 12345

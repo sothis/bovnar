@@ -428,6 +428,82 @@ static void test_write_type_annotation_direct(void)
 	bvnr_writer_destroy(w);
 }
 
+/*
+ * Regression: a symbol (bare plain value) whose text equals a reserved keyword
+ * (null/true/false/on/off/nan/inf/ninf) is emitted bare and would be
+ * reclassified by the reader into a null/bool/float value, silently losing the
+ * symbol type. Symbols have no quoted form, so the writer must reject them.
+ */
+static void test_write_keyword_symbol_rejected(void)
+{
+	printf("  test_write_keyword_symbol_rejected...\n");
+
+	const char *keywords[] = { "null", "true", "false", "on",
+				   "off", "nan", "inf", "ninf" };
+	const char *valid[]    = { "hello", "null_", "true1", "Inf", "onoff" };
+
+	for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+		uint8_t output[256];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed");
+		if (!w) continue;
+		ASSERT_FALSE(bvnr_write_plain(w, "k", keywords[i]),
+					 "keyword-valued symbol must be rejected");
+		bvnr_writer_destroy(w);
+	}
+	for (size_t i = 0; i < sizeof(valid) / sizeof(valid[0]); i++) {
+		uint8_t output[256];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed");
+		if (!w) continue;
+		ASSERT_TRUE(bvnr_write_plain(w, "k", valid[i]),
+					"non-keyword symbol must be accepted");
+		bvnr_writer_destroy(w);
+	}
+}
+
+/*
+ * Regression: utf8 is a parameterless family (spec: any parameter ->
+ * error_illegal_value_type). The writer must reject a width on utf8, or it
+ * would emit <utf8:N> that its own reader rejects. A bare <utf8> is fine.
+ */
+static void test_write_utf8_width_rejected(void)
+{
+	printf("  test_write_utf8_width_rejected...\n");
+
+	uint8_t output[256];
+	bvnr_sink_t sink;
+	bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+	ASSERT_NOT_NULL(w, "make_writer must succeed");
+	if (!w) return;
+
+	const char *key = "k";
+	bvnr_data_t d = {
+		.type   = token_is_identifier,
+		.data   = (const void *)key,
+		.length = 1u,
+	};
+	ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &d),
+				"assignment_start must succeed");
+
+	value_type_spec_t utf8_w = { .family = vt_utf8, .width = 8u, .base = 0u };
+	ASSERT_FALSE(bvnr_write_type_annotation(w, utf8_w, BVN_UNIT_NONE),
+				 "utf8 with width must be rejected");
+	bvnr_writer_destroy(w);
+
+	/* A bare <utf8> annotation must still be accepted. */
+	w = make_writer(output, sizeof(output), &sink);
+	ASSERT_NOT_NULL(w, "make_writer must succeed");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &d),
+				"assignment_start must succeed");
+	ASSERT_TRUE(bvnr_write_type_annotation(w, BVN_TYPE_UTF8, BVN_UNIT_NONE),
+				"bare utf8 annotation must be accepted");
+	bvnr_writer_destroy(w);
+}
+
 static void test_write_buffer_exhaustion(void)
 {
 	printf("  test_write_buffer_exhaustion...\n");
@@ -1137,6 +1213,8 @@ int main(void)
 	test_write_struct();
 	test_write_nested_struct();
 	test_write_type_annotation_direct();
+	test_write_keyword_symbol_rejected();
+	test_write_utf8_width_rejected();
 	test_write_buffer_exhaustion();
 	test_write_multiple_assignments();
 	test_write_sint_negative();

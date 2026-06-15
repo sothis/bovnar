@@ -489,6 +489,17 @@ bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d)
 		return true;
 	case ev_octet_stream_end:
 		dm->in_octet = false;
+		/* A message always completes within a single octet stream (mux_send
+		 * never splits one across stream boundaries), so any channel still
+		 * mid-reassembly here is a truncated stream. Drop that partial state
+		 * rather than letting it bleed into the next stream on a reused demux,
+		 * where it would mis-frame the next message as a continuation. The
+		 * buffer itself is kept for reuse; only the progress is reset. */
+		for (uint32_t i = 0; i < dm->nchans; i++) {
+			dm->chans[i].active = false;
+			dm->chans[i].have   = 0;
+			dm->chans[i].need   = 0;
+		}
 		return true;
 	case ev_data:
 		if (dm->in_octet && d && d->type == token_is_octet_stream) {

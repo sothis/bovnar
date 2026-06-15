@@ -103,10 +103,11 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
   `YYYY-MM-DDTHH:MM:SS`, `…Z`) at whole-second resolution; fractional seconds,
   numeric `±hh:mm` offsets, and literals for the atomic GNSS epochs are not yet
   supported.
-- ISO-8601 literals are implemented in the C library (and so the Python
-  bindings, which parse via it); the browser playground parser
-  (`web/bovnar_parser.js`) does not yet recognise them and still reports a parse
-  error on a literal — a follow-up.
+- The browser playground parser (`web/bovnar_parser.js`) recognises ISO-8601
+  literals and displays them as written, but — by its lenient design (it does
+  not synthesise annotations or validate types) — it does not convert them to
+  epoch seconds or strictly validate the calendar fields; the C reader remains
+  the authority for both.
 
 ## [1.0.1]
 

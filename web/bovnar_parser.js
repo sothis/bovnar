@@ -105,6 +105,7 @@
     let line = 1;
     let col  = 1;
     let inlineUnitStart = null;   /* start position of the last inline unit read */
+    let lastValueWasDatetime = false;  /* readNumber sets this for an ISO-8601 literal (spec 1.1) */
     let halted = false;           /* a hard (non-recoverable) error — e.g. an octet
                                      framing error — stops the parse, as the C core does */
     let valResync = false;        /* a recoverable error inside a value (e.g. a stray
@@ -258,9 +259,24 @@
 
     /* Read a number literal (leading - already peeked). */
     function readNumber() {
-      let s = '', mantDigits = 0;
-      if (!eof() && cur() === '-') { s += '-'; advance(); }
+      let s = '', mantDigits = 0, neg = false;
+      lastValueWasDatetime = false;
+      if (!eof() && cur() === '-') { s += '-'; advance(); neg = true; }
       while (!eof() && /\d/.test(cur())) { s += cur(); advance(); mantDigits++; }
+      /* ISO-8601 datetime literal (spec 1.1): a digit run followed by '-' (the
+         date separator) can only begin a date — a number's '-' is leading
+         (negative) or follows 'e' (exponent), never after a digit. The
+         playground is LENIENT: it recognises and displays the literal exactly
+         as written, and does NOT convert it to epoch seconds or strictly
+         validate the calendar fields. The C reader does both (and is the
+         authority); doing a leap-second-correct conversion here would only risk
+         disagreeing with it. The accepted character set (digits, '-', 'T', ':',
+         'Z') mirrors the C lexer's dtlit_* states. */
+      if (!neg && mantDigits > 0 && !eof() && cur() === '-') {
+        lastValueWasDatetime = true;
+        while (!eof() && /[-:TZ0-9]/.test(cur())) { s += cur(); advance(); }
+        return s;
+      }
       if (!eof() && cur() === '.') {
         s += '.'; advance();
         while (!eof() && /\d/.test(cur())) { s += cur(); advance(); mantDigits++; }
@@ -565,8 +581,11 @@
       if (cur() === '-' || cur() === '.' || /\d/.test(cur())) {
         const st = { line, col, offset: pos };
         const numStr = readNumber();
-        const unit   = insideArray ? null : tryInlineUnit();
-        emit(EV.DATA, { kind: 'number', value: numStr, text: numStr, unit,
+        const isDt   = lastValueWasDatetime;
+        /* a timestamp carries no unit (the C reader rejects one), so don't
+           consume a following token as an inline unit for a datetime literal. */
+        const unit   = (insideArray || isDt) ? null : tryInlineUnit();
+        emit(EV.DATA, { kind: isDt ? 'datetime' : 'number', value: numStr, text: numStr, unit,
           start: st, unitStart: unit ? inlineUnitStart : null, endPos: peekTermPos() });
         return;
       }
@@ -1030,7 +1049,8 @@
       case 'string':  return 'token_is_string';
       case 'bool':    return 'token_is_bool';
       case 'number':
-      case 'special': return 'token_is_number';
+      case 'special':
+      case 'datetime': return 'token_is_number';  /* ISO literal lexes as a number (spec 1.1) */
       case 'reference': return 'token_is_reference';
       case 'symbol':  return 'token_is_symbol';
       default:        return 'token_is_null_value';
@@ -1038,7 +1058,8 @@
   }
   function arrTok(v) {
     if (v.kind === 'string') return 'token_is_array_string';
-    if (v.kind === 'number' || v.kind === 'special') return 'token_is_array_number';
+    if (v.kind === 'number' || v.kind === 'special' || v.kind === 'datetime')
+      return 'token_is_array_number';
     return 'token_is_null_value';
   }
 

@@ -163,6 +163,9 @@ bool bvn_dom_struct_add(bvn_dom_node_t *s,
 						bvn_dom_node_t *val)
 {
 	if (s->members.count == s->members.cap) {
+		if (s->members.cap > UINT32_MAX / 2u) {
+			bvn_dom_node_destroy(val); return false;
+		}
 		uint32_t nc = s->members.cap ? s->members.cap * 2u : 8u;
 		bvn_dom_entry_t *ne = realloc(s->members.entries,
 									  nc * sizeof(*ne));
@@ -182,6 +185,9 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 					 bvn_dom_node_t *val)
 {
 	if (d->count == d->cap) {
+		if (d->cap > UINT32_MAX / 2u) {
+			bvn_dom_node_destroy(val); return false;
+		}
 		uint32_t nc = d->cap ? d->cap * 2u : 8u;
 		bvn_dom_entry_t *ne = realloc(d->entries, nc * sizeof(*ne));
 		if (!ne) { bvn_dom_node_destroy(val); return false; }
@@ -198,6 +204,9 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem)
 {
 	if (a->arr.count == a->arr.cap) {
+		if (a->arr.cap > UINT32_MAX / 2u) {
+			bvn_dom_node_destroy(elem); return false;
+		}
 		uint32_t nc = a->arr.cap ? a->arr.cap * 2u : 8u;
 		bvn_dom_node_t **ni = realloc(a->arr.items,
 									  nc * sizeof(*ni));

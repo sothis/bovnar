@@ -111,6 +111,7 @@ static bool builder_push(bvn_builder_t *b, bvn_scope_kind_t kind,
 						 bvn_dom_node_t *node)
 {
 	if (b->scope_count == b->scope_cap) {
+		if (b->scope_cap > UINT32_MAX / 2u) return false;
 		uint32_t nc = b->scope_cap ? b->scope_cap * 2u : 16u;
 		bvn_scope_t *ns = realloc(b->scopes, nc * sizeof(*ns));
 		if (!ns) return false;

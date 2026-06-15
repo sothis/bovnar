@@ -440,6 +440,7 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x2e] = ACT_fraction_intro,
 		BVN_DIGITS(ACT_copy_number_byte),
 		[0x2c] = ACT_new_array_value,
+		[0x2d] = ACT_dtlit_after_y,   /* '-' begins an ISO-8601 literal (1.1) */
 		[0x3b] = ACT_value_outro,
 		[0x5d] = ACT_array_outro,
 		[0x45] = ACT_exp_intro,
@@ -450,6 +451,7 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x2e] = ACT_fraction_intro,
 		BVN_DIGITS(ACT_copy_number_byte),
 		[0x2c] = ACT_new_array_value,
+		[0x2d] = ACT_dtlit_after_y,   /* '-' begins an ISO-8601 literal (1.1) */
 		[0x3b] = ACT_value_outro,
 		[0x5d] = ACT_array_outro,
 		[0x45] = ACT_exp_intro,
@@ -511,6 +513,62 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 	[copy_exp_byte] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
 		BVN_DIGITS(ACT_copy_exp_byte),
+		[0x2c] = ACT_new_array_value,
+		[0x3b] = ACT_value_outro,
+		[0x5d] = ACT_array_outro,
+	},
+	/* ISO-8601 datetime literal states (spec 1.1). Bytes accumulate into
+	 * str_data via ACT_dtlit_* (-> bvn_action_dtlit_byte); dtlit_day/_sec/
+	 * _zulu are complete-value states that accept the number terminators
+	 * (whitespace -> number_outro, ',' ';' ']'), the rest require the next
+	 * structural byte ('-', 'T', ':', 'Z') or a digit. The lexer is
+	 * deliberately permissive about digit counts — the validator strictly
+	 * range-checks each field and the YYYY-MM-DD widths. */
+	[dtlit_after_y] = {
+		BVN_DIGITS(ACT_dtlit_month),
+	},
+	[dtlit_month] = {
+		BVN_DIGITS(ACT_dtlit_month),
+		[0x2d] = ACT_dtlit_after_m,
+	},
+	[dtlit_after_m] = {
+		BVN_DIGITS(ACT_dtlit_day),
+	},
+	[dtlit_day] = {
+		BVN_WHITESPACE(ACT_to_number_outro),
+		BVN_DIGITS(ACT_dtlit_day),
+		[0x54] = ACT_dtlit_after_T,   /* 'T' date/time separator */
+		[0x2c] = ACT_new_array_value,
+		[0x3b] = ACT_value_outro,
+		[0x5d] = ACT_array_outro,
+	},
+	[dtlit_after_T] = {
+		BVN_DIGITS(ACT_dtlit_hour),
+	},
+	[dtlit_hour] = {
+		BVN_DIGITS(ACT_dtlit_hour),
+		[0x3a] = ACT_dtlit_after_h,   /* ':' */
+	},
+	[dtlit_after_h] = {
+		BVN_DIGITS(ACT_dtlit_min),
+	},
+	[dtlit_min] = {
+		BVN_DIGITS(ACT_dtlit_min),
+		[0x3a] = ACT_dtlit_after_mi,  /* ':' */
+	},
+	[dtlit_after_mi] = {
+		BVN_DIGITS(ACT_dtlit_sec),
+	},
+	[dtlit_sec] = {
+		BVN_WHITESPACE(ACT_to_number_outro),
+		BVN_DIGITS(ACT_dtlit_sec),
+		[0x5a] = ACT_dtlit_zulu,      /* 'Z' UTC designator */
+		[0x2c] = ACT_new_array_value,
+		[0x3b] = ACT_value_outro,
+		[0x5d] = ACT_array_outro,
+	},
+	[dtlit_zulu] = {
+		BVN_WHITESPACE(ACT_to_number_outro),
 		[0x2c] = ACT_new_array_value,
 		[0x3b] = ACT_value_outro,
 		[0x5d] = ACT_array_outro,
@@ -831,6 +889,17 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_copy_inline_unit_byte]     = bvn_action_copy_inline_unit_byte,
 	[ACT_to_inline_unit_outro]      = bvn_action_to_inline_unit_outro,
 	[ACT_to_string_outro]           = bvn_action_set_state,
+	[ACT_dtlit_after_y]             = bvn_action_dtlit_byte,
+	[ACT_dtlit_month]               = bvn_action_dtlit_byte,
+	[ACT_dtlit_after_m]             = bvn_action_dtlit_byte,
+	[ACT_dtlit_day]                 = bvn_action_dtlit_byte,
+	[ACT_dtlit_after_T]             = bvn_action_dtlit_byte,
+	[ACT_dtlit_hour]                = bvn_action_dtlit_byte,
+	[ACT_dtlit_after_h]             = bvn_action_dtlit_byte,
+	[ACT_dtlit_min]                 = bvn_action_dtlit_byte,
+	[ACT_dtlit_after_mi]            = bvn_action_dtlit_byte,
+	[ACT_dtlit_sec]                 = bvn_action_dtlit_byte,
+	[ACT_dtlit_zulu]                = bvn_action_dtlit_byte,
 };
 const state_t bvn_action_target_state[ACT__count] = {
 	[ACT_ignore_comment_byte]       = ignore_comment_byte,
@@ -849,6 +918,17 @@ const state_t bvn_action_target_state[ACT__count] = {
 	[ACT_tf_to_d]                   = tf_d,
 	[ACT_tf_u_to_ui]                = tf_ui,
 	[ACT_tf_u_to_ut]                = tf_ut,
+	[ACT_dtlit_after_y]             = dtlit_after_y,
+	[ACT_dtlit_month]               = dtlit_month,
+	[ACT_dtlit_after_m]             = dtlit_after_m,
+	[ACT_dtlit_day]                 = dtlit_day,
+	[ACT_dtlit_after_T]             = dtlit_after_T,
+	[ACT_dtlit_hour]                = dtlit_hour,
+	[ACT_dtlit_after_h]             = dtlit_after_h,
+	[ACT_dtlit_min]                 = dtlit_min,
+	[ACT_dtlit_after_mi]            = dtlit_after_mi,
+	[ACT_dtlit_sec]                 = dtlit_sec,
+	[ACT_dtlit_zulu]                = dtlit_zulu,
 };
 const state_t bvn_kw_advance_state[dimension_state] = {
 	[tf_ui]      = tf_uin,

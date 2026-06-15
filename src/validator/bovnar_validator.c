@@ -30,6 +30,8 @@
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 #include "bovnar_currency.h"
+#include "bvn_gregorian_date.h"
+#include "bvn_datetime.h"
 /*
  * ===========================================================================
  * Validator (semantic layer)
@@ -211,6 +213,124 @@ static inline bool bvn_default_type_equiv(
 	       bvn_effective_base(a)  == bvn_effective_base(b)  &&
 	       bvn_effective_q(a)     == bvn_effective_q(b);
 }
+/*
+ * ISO-8601 datetime literal support (spec 1.1).
+ *
+ * The lexer accumulates a literal such as 2026-06-15T12:00:00Z into the number
+ * scratch buffer (see the dtlit_* states); these helpers recognise that shape,
+ * strictly validate the calendar fields, and convert the UTC civil instant to a
+ * signed integer count of seconds on the declared epoch's timescale. The result
+ * is rendered as a decimal string and fed back through the ordinary
+ * datetime-integer path, so range checking and emission are shared verbatim.
+ */
+static inline bool bvn_str_is_iso_datetime(const uint8_t* s, uint32_t n)
+{
+	/* A '-' that immediately follows a digit can only be the date separator
+	 * of an ISO literal: a number never contains it (a negative sign is at
+	 * index 0, an exponent sign follows 'e'/'E'). */
+	for (uint32_t i = 1; i < n; i++)
+		if (s[i] == '-' && s[i - 1] >= '0' && s[i - 1] <= '9')
+			return true;
+	return false;
+}
+static bool bvn_iso_two_digit(const uint8_t* s, int* out)
+{
+	if (s[0] < '0' || s[0] > '9' || s[1] < '0' || s[1] > '9')
+		return false;
+	*out = (s[0] - '0') * 10 + (s[1] - '0');
+	return true;
+}
+static int bvn_iso_days_in_month(int64_t y, int m)
+{
+	static const int dim[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+	if (m == 2 && ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0))
+		return 29;
+	return dim[m - 1];
+}
+/* Strict parse of YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS or …Z into *dt (UTC civil).
+ * Returns false on a wrong-width field, a misplaced separator or an
+ * out-of-range component. */
+static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* dt)
+{
+	if (n != 10 && n != 19 && n != 20)
+		return false;
+	for (int i = 0; i < 4; i++)
+		if (s[i] < '0' || s[i] > '9')
+			return false;
+	int64_t year = (s[0]-'0')*1000 + (s[1]-'0')*100 + (s[2]-'0')*10 + (s[3]-'0');
+	int month, day, hour = 0, minute = 0, second = 0;
+	if (s[4] != '-' || s[7] != '-')
+		return false;
+	if (!bvn_iso_two_digit(s + 5, &month) || !bvn_iso_two_digit(s + 8, &day))
+		return false;
+	if (month < 1 || month > 12)
+		return false;
+	if (day < 1 || day > bvn_iso_days_in_month(year, month))
+		return false;
+	if (n >= 19) {
+		if (s[10] != 'T' || s[13] != ':' || s[16] != ':')
+			return false;
+		if (!bvn_iso_two_digit(s + 11, &hour) ||
+		    !bvn_iso_two_digit(s + 14, &minute) ||
+		    !bvn_iso_two_digit(s + 17, &second))
+			return false;
+		if (n == 20 && s[19] != 'Z')
+			return false;
+		if (hour > 23 || minute > 59 || second > 59)
+			return false;
+	}
+	memset(dt, 0, sizeof *dt);
+	dt->date.year = year; dt->date.month = month; dt->date.day = day;
+	dt->hour = hour; dt->minute = minute; dt->second = second;
+	return true;
+}
+/* Convert an ISO literal to epoch seconds on vt's declared epoch. Civil epochs
+ * (unix/mjd/ntp/y2000) use the uniform conversion; tai applies the leap-second
+ * table; the atomic GNSS epochs are rejected (no round-trippable inverse). */
+static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
+	value_type_spec_t vt, int64_t* out, error_code_t* err)
+{
+	bvn_datetime_t dt;
+	if (!bvn_iso_parse_fields(s, n, &dt)) {
+		*err = error_invalid_datetime_literal;
+		return false;
+	}
+	const char* ep = bvnr_datetime_epoch_name(vt);   /* vt.base = epoch index */
+	int64_t secs;
+	if (strcmp(ep, "tai") == 0) {
+		secs = bvn_dt_utc_to_tai_seconds(&dt);
+	} else if (strcmp(ep, "gps") == 0 || strcmp(ep, "galileo") == 0 ||
+	           strcmp(ep, "glonass") == 0 || strcmp(ep, "beidou") == 0) {
+		*err = error_datetime_literal_unsupported_epoch;
+		return false;
+	} else {
+		/* civil epoch; the bvn_epoch_t enum value is the epoch's MJD. */
+		secs = bvn_dt_datetime_to_epoch_seconds(&dt,
+			(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt));
+	}
+	if (secs == BVN_GDATE_OVF) {
+		*err = error_value_out_of_range;
+		return false;
+	}
+	*out = secs;
+	return true;
+}
+/* Render an int64 as a decimal string (NUL-terminated); returns the length.
+ * INT64_MIN-safe (magnitude computed in unsigned). */
+static uint32_t bvn_i64_to_decimal(uint8_t* buf, int64_t value)
+{
+	uint8_t  tmp[24];
+	uint32_t ti = 0;
+	uint64_t mag = (value < 0) ? (uint64_t)(-(value + 1)) + 1u : (uint64_t)value;
+	do { tmp[ti++] = (uint8_t)('0' + mag % 10u); mag /= 10u; } while (mag);
+	uint32_t bi = 0;
+	if (value < 0)
+		buf[bi++] = '-';
+	while (ti)
+		buf[bi++] = tmp[--ti];
+	buf[bi] = 0;
+	return bi;
+}
 static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	token_type_t tt, const uint8_t* str, uint32_t str_len,
 	bool is_currency_unit,
@@ -237,6 +357,19 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		default_type    = BVN_TYPE_UTF8;
 		family_name     = "utf8";
 		family_name_len = 4;
+	} else if ((tt == token_is_number || tt == token_is_array_number) &&
+	           bvn_str_is_iso_datetime(str, str_len)) {
+		/* Bare ISO-8601 literal (spec 1.1) infers <datetime:64,unix>; the
+		 * unix epoch is index 0 and stays implicit (no epoch param), so the
+		 * synthesised annotation round-trips as <datetime:64>. */
+		default_type.family = vt_datetime;
+		default_type.width  = 64;
+		default_type.base   = 0;
+		family_name     = "datetime";
+		family_name_len = 8;
+		emit_width = true;
+		emit_base  = false;
+		emit_unit  = false;
 	} else if (tt == token_is_number || tt == token_is_array_number) {
 		bool has_dot = v->acc_has_dot;
 		bool has_exp = v->acc_has_exp;
@@ -906,6 +1039,25 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		}
 		iu_have = true;
 	}
+	const uint8_t* val_str = raw->str_data;
+	uint32_t       val_len = raw->str_len;
+	uint8_t        dt_numbuf[24];
+	bool           is_iso_dt =
+		(tt == token_is_number || tt == token_is_array_number) &&
+		bvn_str_is_iso_datetime(raw->str_data, raw->str_len);
+	if (is_iso_dt) {
+		/* spec 1.1: an ISO-8601 literal is not a recognised value in a
+		 * 1.0/unversioned document — mirror the datetime-family gating. */
+		if (!bvn_lex_supports_1_1(&r->lex)) {
+			v->last_error = error_illegal_value_type;
+			return false;
+		}
+		/* a timestamp carries no unit. */
+		if (iu_have) {
+			v->last_error = error_unit_illegal;
+			return false;
+		}
+	}
 	if (bvn_type_is_plain(v->value_type) &&
 		(tt == token_is_number || tt == token_is_array_number ||
 		 tt == token_is_string || tt == token_is_array_string)) {
@@ -930,15 +1082,29 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 				fold_unit_str, fold_unit_len, fold_unit_val))
 			return false;
 	}
+	if (is_iso_dt) {
+		/* The annotation — explicit, or the <datetime:64,unix> just
+		 * inferred above — must be datetime; convert the UTC civil literal
+		 * to epoch seconds and substitute the decimal integer so the range
+		 * check and emission below run the ordinary datetime-integer path. */
+		if (v->value_type.family != vt_datetime) {
+			v->last_error = error_type_value_mismatch;
+			return false;
+		}
+		int64_t secs;
+		if (!bvn_iso_to_epoch_seconds(raw->str_data, raw->str_len,
+				v->value_type, &secs, &v->last_error))
+			return false;
+		val_len = bvn_i64_to_decimal(dt_numbuf, secs);
+		val_str = dt_numbuf;
+	}
 	if (tt == token_is_number || tt == token_is_array_number ||
 		tt == token_is_string || tt == token_is_array_string) {
 		bvn_acc_reset(v);
-		if (!bvn_acc_parse_number(v, raw->str_data,
-								  raw->str_len, tt))
+		if (!bvn_acc_parse_number(v, val_str, val_len, tt))
 			return false;
 	}
-	if (!bvn_validate_type_value_compat(r, tt,
-										raw->str_data, raw->str_len))
+	if (!bvn_validate_type_value_compat(r, tt, val_str, val_len))
 		return false;
 	if (iu_have) {
 		if (!iu_ok) {
@@ -959,8 +1125,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	d.value_type = v->value_type;
 	d.value_unit = v->parsed_unit;
 	if (tt != token_is_null_value) {
-		d.data   = raw->str_data;
-		d.length = raw->str_len;
+		d.data   = val_str;
+		d.length = val_len;
 	} else {
 		d.data   = NULL;
 		d.length = 0;

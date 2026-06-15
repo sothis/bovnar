@@ -195,7 +195,19 @@ typedef enum error_code_e {
 	 * (a surrogate U+D800–U+DFFF, or a code point above U+10FFFF), or the
 	 * braced digits are missing/too many. Malformed \x / \u *structure*
 	 * (bad hex, missing brace) stays error_illegal_escape_sequence. */
-	error_invalid_codepoint             = 44
+	error_invalid_codepoint             = 44,
+	/* spec 1.1 — an ISO-8601 datetime literal (e.g. 2026-06-15T12:00:00Z) is
+	 * malformed: a field has the wrong width, a separator is misplaced, or a
+	 * component is out of range (month 1–12, a valid day-of-month, hour 0–23,
+	 * minute/second 0–59). Accepted shapes are YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS
+	 * and …Z (UTC). */
+	error_invalid_datetime_literal      = 45,
+	/* spec 1.1 — an ISO-8601 datetime literal was given for an atomic GNSS
+	 * epoch (gps, galileo, glonass, beidou). Those scales have no
+	 * round-trippable civil⇄seconds inverse in this build, so a literal there
+	 * is rejected; supply an integer epoch-seconds carrier instead. Civil
+	 * epochs (unix, mjd, ntp, y2000) and tai accept literals. */
+	error_datetime_literal_unsupported_epoch = 46
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,

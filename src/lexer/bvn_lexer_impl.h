@@ -69,6 +69,22 @@ typedef enum state_e {
 		exp_intro,
 		exp_sign_intro,
 		copy_exp_byte,
+		/* ISO-8601 datetime literal scanning (spec 1.1). Entered from
+		 * copy_number_byte/zero_intro when a digit run is followed by '-'
+		 * (illegal in any number, so it never shadows a 1.0 token). The
+		 * bytes accumulate into str_data exactly like a number; the
+		 * validator detects the ISO shape and converts to epoch seconds. */
+		dtlit_after_y,
+		dtlit_month,
+		dtlit_after_m,
+		dtlit_day,
+		dtlit_after_T,
+		dtlit_hour,
+		dtlit_after_h,
+		dtlit_min,
+		dtlit_after_mi,
+		dtlit_sec,
+		dtlit_zulu,
 	symbol_intro,
 	symbol_body,
 	symbol_outro,
@@ -199,6 +215,20 @@ enum action_id {
 	ACT_copy_inline_unit_byte,
 	ACT_to_inline_unit_outro,
 	ACT_to_string_outro,
+	/* ISO-8601 datetime literal byte-accumulation (spec 1.1). All share the
+	 * bvn_action_dtlit_byte handler; each carries its own target state via
+	 * bvn_action_target_state, mirroring the bvn_action_set_state idiom. */
+	ACT_dtlit_after_y,
+	ACT_dtlit_month,
+	ACT_dtlit_after_m,
+	ACT_dtlit_day,
+	ACT_dtlit_after_T,
+	ACT_dtlit_hour,
+	ACT_dtlit_after_h,
+	ACT_dtlit_min,
+	ACT_dtlit_after_mi,
+	ACT_dtlit_sec,
+	ACT_dtlit_zulu,
 	ACT__count
 };
 typedef bool (*action_t)(bvnr_reader_t* p);
@@ -347,6 +377,7 @@ bool bvn_action_array_dim_sep             (bvnr_reader_t* p);
 bool bvn_action_exp_intro                 (bvnr_reader_t* p);
 bool bvn_action_exp_sign_intro            (bvnr_reader_t* p);
 bool bvn_action_copy_exp_byte             (bvnr_reader_t* p);
+bool bvn_action_dtlit_byte                (bvnr_reader_t* p);
 bool bvn_action_string_intro              (bvnr_reader_t* p);
 bool bvn_action_copy_string_byte          (bvnr_reader_t* p);
 bool bvn_action_replace_escaped_byte      (bvnr_reader_t* p);

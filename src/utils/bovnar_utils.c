@@ -541,6 +541,9 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_invalid_spec_version:      return "invalid_spec_version";
 	case error_unsupported_spec_version:  return "unsupported_spec_version";
 	case error_invalid_codepoint:         return "invalid_codepoint";
+	case error_invalid_datetime_literal:  return "invalid_datetime_literal";
+	case error_datetime_literal_unsupported_epoch:
+	                                      return "datetime_literal_unsupported_epoch";
 	default:                              return "unknown_error";
 	}
 }

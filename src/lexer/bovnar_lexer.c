@@ -886,6 +886,20 @@ bool bvn_action_copy_exp_byte(bvnr_reader_t* p)
 {
 	return bvn_push_number_byte(p, copy_exp_byte);
 }
+/*
+ * ISO-8601 datetime literal accumulation (spec 1.1). Shared by every dtlit_*
+ * transition: append the current byte to str_data (the number scratch buffer,
+ * so the byte/length cap is the number cap) and advance to the per-cell target
+ * state recorded in bvn_action_target_state — exactly the bvn_action_set_state
+ * idiom, but copying the byte. The token keeps the number/array-number type set
+ * by copy_number_byte on the year digits; the validator recognises the ISO
+ * shape in str_data and converts it to epoch seconds.
+ */
+bool bvn_action_dtlit_byte(bvnr_reader_t* p)
+{
+	uint8_t idx = bvn_after_state_idx_table[p->lex.next_state][p->lex.byte];
+	return bvn_push_number_byte(p, bvn_action_target_state[idx]);
+}
 bool bvn_action_kw_advance(bvnr_reader_t* p)
 {
 	p->lex.next_state = bvn_kw_advance_state[p->lex.next_state];

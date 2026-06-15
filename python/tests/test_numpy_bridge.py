@@ -66,6 +66,16 @@ class TestToNumpy:
         a = to_numpy(dom_parse(b'.a=<sint:16>[10,-20,30]/[40,-50,60];')['a'])
         assert a.dtype == np.int16 and a.shape == (2, 3) and a[1, 1] == -50
 
+    def test_slash_matrix_more_than_8_rows(self):
+        # Regression: the DOM previously capped the recorded /-row count at 8,
+        # so matrices with >8 rows lost (or mis-grouped) their shape. A 10x2
+        # matrix must reshape to (10, 2), not flatten or fold into (8, ...).
+        rows = '/'.join('[%d,%d]' % (i, i + 1) for i in range(10))
+        src = ('.a=<uint:16>' + rows + ';').encode()
+        a = to_numpy(loads(src, typed=True)['a'])
+        assert a.shape == (10, 2)
+        assert a[9].tolist() == [9, 10]
+
     def test_null_in_float_becomes_nan(self):
         a = to_numpy(loads(b'.a=<float:32>[1,,3];', typed=True)['a'])
         assert a.dtype == np.float32 and np.isnan(a[1]) and a[0] == 1.0

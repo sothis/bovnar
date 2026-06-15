@@ -221,6 +221,18 @@ class TestDomNodeType:
         doc = DomDoc.parse(_ARRAY_1D)
         assert doc['arr'].dom_type == DomType.ARRAY
 
+    def test_slash_matrix_row_count_uncapped(self):
+        # Regression: the DOM used to clamp the recorded /-row count (num_dims)
+        # at 8, so a matrix with more than 8 rows reported the wrong shape and
+        # convert/numpy silently flattened or mis-grouped it. array_dims() must
+        # report the true number of rows.
+        rows = '/'.join('[%d,%d]' % (i, i + 1) for i in range(10))
+        doc = DomDoc.parse(('.m=<uint:16>' + rows + ';').encode())
+        node = doc['m']
+        assert node.dom_type == DomType.ARRAY
+        assert node.array_dims() == 10          # 10 rows, not capped to 8
+        assert len(node) == 20                  # 10 rows x 2 columns, flat
+
     def test_repr_contains_type(self):
         doc  = DomDoc.parse(_SCALAR_INT)
         node = doc['x']

@@ -154,7 +154,7 @@ The inline unit uses the **same character set** and **same semantic parser** (`b
 | Annotation unit **differs** from inline unit | `error_unit_mismatch` |
 | Inline unit inside an array element | `error_unexpected_input_byte` |
 
-When both are present, equality is checked after parsing via `memcmp` on the complete `value_unit_t` structure. Two strings match if and only if `bvn_parse_unit` produces bit-for-bit identical `value_unit_t` values — so logically equivalent notations (e.g. `m·s⁻¹` vs `m/s`) compare as equal.
+When both are present, equality is checked after parsing via `bvn_unit_equal`, a structural comparison of the parsed `value_unit_t` values: the two units must have the same number of components and the same *set* of components (matching base, exponent, and prefix). The comparison is **order-insensitive** — unit multiplication is commutative, so components are matched as multisets and reordered spellings such as `N·m` and `m·N` (or `m·s⁻¹` and `m/s`) compare as equal. (It is *not* a raw `memcmp`, which would wrongly reject reordered components.)
 
 ```bovnar
 .v = <float:64,m/s> 9.81 m·s⁻¹;   # OK: both parse to m/s

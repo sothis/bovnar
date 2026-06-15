@@ -660,7 +660,7 @@ static const cf_case_t g_cases[] = {
 	          ".foo123 = 1;", "foo123", "1"),
 	ERROR_CASE("ID-008", "identifiers", "empty identifier after dot",
 	           ". = 1;",
-	           error_unexpected_input_byte),
+	           error_empty_identifier),
 	ERROR_CASE("ID-009", "identifiers", "identifier starting with digit",
 	           ".123foo = 1;",
 	           error_unexpected_input_byte),

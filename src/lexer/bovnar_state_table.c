@@ -219,6 +219,14 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5f] = ACT_copy_identifier_byte,
 		BVN_UTF8_LEADER(ACT_copy_identifier_byte),
 		[0xc2] = ACT_NONE,
+		/* A '.' followed immediately by whitespace or '=' is an EMPTY key. Mirror
+		 * identifier_body's transitions so the (zero-length) identifier token gets
+		 * finalized via value_intro/identifier_outro; bvn_lex_finalize then reports
+		 * error_empty_identifier, as the spec (§4.2, §12.6) documents for ".=" and
+		 * ". =". Other non-identifier-start bytes (digits, punctuation) stay at the
+		 * ACT_NONE default and remain error_unexpected_input_byte. */
+		BVN_WHITESPACE(ACT_to_identifier_outro),
+		[0x3d] = ACT_value_intro,
 	},
 	[identifier_body] = {
 		BVN_EACH_256(ACT_copy_identifier_byte),

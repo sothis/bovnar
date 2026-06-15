@@ -2015,11 +2015,13 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
    this predicate internally before writing. */
 bool bvn_unit_valid(value_unit_t u);
 
-/* Structural equality of two units: same num_components and, component
-   for component, the same base, exponent, and prefix.  This is the
-   strict, order-sensitive comparison the validator uses to match an
-   inline unit suffix against a type-annotation unit (error_unit_mismatch
-   on disagreement).  For dimensional equivalence — units that measure
+/* Structural equality of two units: same num_components and the same set
+   of components (matching base, exponent, and prefix).  The comparison is
+   ORDER-INSENSITIVE — unit multiplication is commutative, so components are
+   matched as multisets and "N·m" equals "m·N".  This is the comparison the
+   validator uses to match an inline unit suffix against a type-annotation
+   unit (error_unit_mismatch on disagreement).  For dimensional equivalence
+   — units that measure
    the same physical quantity but differ in spelling or factoring (e.g.
    W vs VA, or the two no_unit forms) — use bvn_units_compatible from
    bovnar_si_units.h (§11.8) instead. */

@@ -548,7 +548,13 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		b->array_dim_continue = true;
 		bvn_scope_t *top = builder_top(b);
 		if (top && top->kind == BVN_SCOPE_ARRAY) {
-			if (top->node->arr.num_dims < 8)
+			/* num_dims is the array's row count (one per '/' separator) and is
+			 * read back by bvn_dom_array_dims to reconstruct the matrix shape
+			 * (JSON convert, numpy bridge). It must track the true row count, so
+			 * it is NOT clamped to the rows_per_dim[8] bound; saturate only to
+			 * avoid a wrap to 0 (which would divide-by-zero in the shape emitter)
+			 * on a pathologically large number of rows. */
+			if (top->node->arr.num_dims < UINT32_MAX)
 				top->node->arr.num_dims++;
 		}
 		break;

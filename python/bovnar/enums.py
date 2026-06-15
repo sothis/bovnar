@@ -591,3 +591,4 @@ class ErrorCode(IntEnum):
     DUPLICATE_STRUCT_KEY        = 41
     INVALID_SPEC_VERSION        = 42
     UNSUPPORTED_SPEC_VERSION    = 43
+    INVALID_CODEPOINT           = 44

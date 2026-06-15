@@ -564,6 +564,13 @@ if(Python3_FOUND)
         "version"
         60)
 
+    # Spec 1.1 richer string escapes (\u{...}, \xHH): decoding, UTF-8 guard,
+    # invalid code points, version gating.
+    _bvnr_pytest_lib(bvnr_py_escapes
+        test_escapes.py
+        "escapes"
+        60)
+
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.

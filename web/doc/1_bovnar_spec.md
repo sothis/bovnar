@@ -297,7 +297,26 @@ string         = string-literal { ws string-literal }   # concatenation
 | `\"` | Double Quote | `0x22` |
 | `\\` | Backslash | `0x5C` |
 
-Any byte other than `t`, `n`, `v`, `f`, `r`, `"`, `\` after `\` causes `error_illegal_escape_sequence`.
+In a **spec 1.1** document (one declaring `#!bovnar 1.1` or newer — see §3.4) two
+further escapes are available:
+
+| Escape | Meaning |
+|--------|---------|
+| `\xHH` | the single byte `HH` (exactly two hex digits) |
+| `\u{H…}` | the Unicode scalar value `U+H…` (1–6 hex digits), UTF-8 encoded |
+
+- `\u{…}` rejects surrogates (`U+D800`–`U+DFFF`) and values above `U+10FFFF`
+  with `error_invalid_codepoint`; a missing/empty/over-long brace group or a
+  non-hex digit is `error_illegal_escape_sequence`.
+- `\x` writes a raw byte, but a string's contents must still be valid UTF-8 (the
+  `utf8` family guarantee). So `"\xC3\xA9"` is `"é"`, whereas a lone `"\xFF"` is
+  `error_invalid_utf8_byte`. Use an octet stream for arbitrary, non-textual bytes.
+- **Gating.** `\x` and `\u` are 1.1-only. In a 1.0 or unversioned document
+  (§3.4) the `x`/`u` after a backslash is not a recognised escape and yields
+  `error_illegal_escape_sequence`, exactly as a 1.0 reader reports.
+
+Any byte other than `t`, `n`, `v`, `f`, `r`, `"`, `\` (plus `x`, `u` in 1.1)
+after `\` causes `error_illegal_escape_sequence`.
 
 **String concatenation:** Two or more adjacent string literals (separated only by whitespace/comments) are concatenated into a single token:
 

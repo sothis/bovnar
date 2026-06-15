@@ -77,6 +77,10 @@ typedef enum state_e {
 	reference_outro,
 	copy_string_byte,
 	escape_from_copy,
+	esc_x1,
+	esc_x2,
+	esc_u_open,
+	esc_u_hex,
 	string_intro,
 	string_outro_nosp,
 	string_outro,
@@ -146,6 +150,12 @@ enum action_id {
 	ACT_copy_string_byte,
 	ACT_replace_escaped_byte,
 	ACT_escape_from_copy,
+	ACT_escape_x_intro,
+	ACT_escape_u_intro,
+	ACT_escape_x_d1,
+	ACT_escape_x_d2,
+	ACT_escape_u_open,
+	ACT_escape_u_hex,
 	ACT_arr_string_intro,
 	ACT_symbol_intro,
 	ACT_copy_symbol_byte,
@@ -264,6 +274,14 @@ typedef struct bvnr_lexer_s {
 	uint16_t		declared_minor;
 	uint8_t			ver_len;
 	uint8_t			ver_buf[32];
+	/* \x / \u escape decoding (spec 1.1). esc_x_hi holds the first \x hex
+	 * nibble; esc_u_acc/esc_u_digits accumulate a \u{...} code point. When a
+	 * \x byte is emitted, str_has_raw_escape flags the string for a final
+	 * whole-string UTF-8 validation (so \x can spell UTF-8 but never break it). */
+	uint8_t			esc_x_hi;
+	uint8_t			esc_u_digits;
+	bool			str_has_raw_escape;
+	uint32_t		esc_u_acc;
 } bvnr_lexer_t;
 extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];
@@ -314,6 +332,12 @@ bool bvn_action_copy_exp_byte             (bvnr_reader_t* p);
 bool bvn_action_string_intro              (bvnr_reader_t* p);
 bool bvn_action_copy_string_byte          (bvnr_reader_t* p);
 bool bvn_action_replace_escaped_byte      (bvnr_reader_t* p);
+bool bvn_action_escape_x_intro            (bvnr_reader_t* p);
+bool bvn_action_escape_u_intro            (bvnr_reader_t* p);
+bool bvn_action_escape_x_d1               (bvnr_reader_t* p);
+bool bvn_action_escape_x_d2               (bvnr_reader_t* p);
+bool bvn_action_escape_u_open             (bvnr_reader_t* p);
+bool bvn_action_escape_u_hex              (bvnr_reader_t* p);
 bool bvn_action_arr_string_intro          (bvnr_reader_t* p);
 bool bvn_action_symbol_intro              (bvnr_reader_t* p);
 bool bvn_action_copy_symbol_byte          (bvnr_reader_t* p);

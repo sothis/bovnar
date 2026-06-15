@@ -539,6 +539,7 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_duplicate_struct_key:      return "duplicate_struct_key";
 	case error_invalid_spec_version:      return "invalid_spec_version";
 	case error_unsupported_spec_version:  return "unsupported_spec_version";
+	case error_invalid_codepoint:         return "invalid_codepoint";
 	default:                              return "unknown_error";
 	}
 }

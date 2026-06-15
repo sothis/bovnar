@@ -583,6 +583,23 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		 * bytes at ACT_NONE) is what makes that error reachable instead
 		 * of the generic error_unexpected_input_byte. */
 		BVN_EACH_256(ACT_replace_escaped_byte),
+		/* spec 1.1: \xHH and \u{...}. The intro actions gate on a declared
+		 * spec >= 1.1 — in a 1.0/unversioned document they fall back to
+		 * error_illegal_escape_sequence, so 'x'/'u' stay non-escapes there. */
+		[0x78] = ACT_escape_x_intro,   /* x */
+		[0x75] = ACT_escape_u_intro,   /* u */
+	},
+	[esc_x1] = {
+		BVN_EACH_256(ACT_escape_x_d1),
+	},
+	[esc_x2] = {
+		BVN_EACH_256(ACT_escape_x_d2),
+	},
+	[esc_u_open] = {
+		BVN_EACH_256(ACT_escape_u_open),
+	},
+	[esc_u_hex] = {
+		BVN_EACH_256(ACT_escape_u_hex),
 	},
 	[string_intro] = {
 		BVN_EACH_256(ACT_copy_string_byte),
@@ -748,6 +765,12 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_copy_string_byte]           = bvn_action_copy_string_byte,
 	[ACT_replace_escaped_byte]       = bvn_action_replace_escaped_byte,
 	[ACT_escape_from_copy]           = bvn_action_set_state,
+	[ACT_escape_x_intro]             = bvn_action_escape_x_intro,
+	[ACT_escape_u_intro]             = bvn_action_escape_u_intro,
+	[ACT_escape_x_d1]                = bvn_action_escape_x_d1,
+	[ACT_escape_x_d2]                = bvn_action_escape_x_d2,
+	[ACT_escape_u_open]              = bvn_action_escape_u_open,
+	[ACT_escape_u_hex]               = bvn_action_escape_u_hex,
 	[ACT_arr_string_intro]           = bvn_action_arr_string_intro,
 	[ACT_symbol_intro]               = bvn_action_symbol_intro,
 	[ACT_copy_symbol_byte]           = bvn_action_copy_symbol_byte,

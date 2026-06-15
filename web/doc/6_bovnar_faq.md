@@ -561,9 +561,22 @@ Exactly seven:
 | `\"` | Double quote |
 | `\\` | Backslash |
 
-Any other character after a backslash is `error_illegal_escape_sequence`. There
-is no `\uXXXX`, no `\xNN`, and no `\0`. If you need to embed arbitrary binary
-data, use an octet stream.
+In **spec 1.0** that is all — any other character after a backslash is
+`error_illegal_escape_sequence`.
+
+A **spec 1.1** document (declaring `#!bovnar 1.1`, see §3.4) adds two more:
+
+| Escape | Meaning |
+|---|---|
+| `\xHH` | the single byte `HH` (two hex digits) |
+| `\u{H…}` | Unicode scalar `U+H…` (1–6 hex digits), UTF-8 encoded |
+
+`\u{…}` rejects surrogates and values above `U+10FFFF` (`error_invalid_codepoint`).
+`\x` writes a raw byte but the string must stay valid UTF-8, so `"\xC3\xA9"` is
+`"é"` while a lone `"\xFF"` is `error_invalid_utf8_byte` — for arbitrary binary
+data, still use an octet stream. Both `\x` and `\u` are **1.1-only**: in a
+1.0/unversioned document they remain `error_illegal_escape_sequence`, so existing
+documents are unaffected.
 
 ---
 
@@ -894,7 +907,8 @@ Semantically equivalent notations that parse to the same internal representation
 | Empty unit component (`m//s`) | `error_unit_illegal` |
 | More than 8 unit components | `error_unit_illegal` |
 | Inline unit suffix inside an array | `error_unexpected_input_byte` |
-| Unknown escape sequence (`\x`, `\0`, `\uXXXX`) | `error_illegal_escape_sequence` |
+| Unknown escape sequence (`\0`, `\uXXXX`; `\x`/`\u{}` outside spec 1.1) | `error_illegal_escape_sequence` |
+| `\u{…}` surrogate or `> U+10FFFF` (spec 1.1) | `error_invalid_codepoint` |
 | Unmatched `}` | `error_illegal_struct_close` |
 | Empty key (`.= value;`) | `error_empty_identifier` |
 

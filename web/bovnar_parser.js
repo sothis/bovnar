@@ -219,8 +219,31 @@
           const escPos = here();      /* the escape letter itself (\< here >) */
           const e = advance();
           const ESC = { t:'\t', n:'\n', v:'\v', f:'\f', r:'\r', '"':'"', '\\':'\\' };
-          if (ESC[e] !== undefined) s += ESC[e];
-          else { emitErr('error_illegal_escape_sequence', escPos); s += e; }
+          const isHex = (ch) => ch !== undefined && /[0-9a-fA-F]/.test(ch);
+          if (ESC[e] !== undefined) {
+            s += ESC[e];
+          } else if (e === 'x') {
+            /* \xHH (spec 1.1) — one byte. Lenient: not gated on a version
+               directive here (this parser does not validate). */
+            const h1 = advance(), h2 = advance();
+            if (isHex(h1) && isHex(h2)) s += String.fromCharCode(parseInt(h1 + h2, 16));
+            else emitErr('error_illegal_escape_sequence', escPos);
+          } else if (e === 'u') {
+            /* \u{1-6 hex} (spec 1.1) — a Unicode scalar. */
+            let hex = '';
+            if (advance() !== '{') { emitErr('error_illegal_escape_sequence', escPos); }
+            else {
+              while (isHex(cur()) && hex.length < 6) hex += advance();
+              if (advance() !== '}' || hex.length === 0) {
+                emitErr('error_illegal_escape_sequence', escPos);
+              } else {
+                const cp = parseInt(hex, 16);
+                if (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+                  emitErr('error_invalid_codepoint', escPos);
+                else s += String.fromCodePoint(cp);
+              }
+            }
+          } else { emitErr('error_illegal_escape_sequence', escPos); s += e; }
         } else {
           s += c;
         }
@@ -862,6 +885,7 @@
     error_illegal_value_type: 25, error_unit_illegal: 32,
     error_type_value_mismatch: 34, error_value_out_of_range: 35,
     error_digit_not_in_base: 36, error_unit_mismatch: 38,
+    error_invalid_codepoint: 44,
   };
   const NUMERIC_FAMILIES = ['uint', 'sint', 'float', 'float_fix', 'float_dec'];
 

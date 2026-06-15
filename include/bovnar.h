@@ -184,7 +184,12 @@ typedef enum error_code_e {
 	 * bvnr_read_flags_t.strict_version was set. Without strict_version the
 	 * declared version is stored but not enforced (the parse continues and only
 	 * fails if it actually meets syntax the build does not implement). */
-	error_unsupported_spec_version      = 43
+	error_unsupported_spec_version      = 43,
+	/* spec 1.1 — a \u{…} escape names a value that is not a Unicode scalar
+	 * (a surrogate U+D800–U+DFFF, or a code point above U+10FFFF), or the
+	 * braced digits are missing/too many. Malformed \x / \u *structure*
+	 * (bad hex, missing brace) stays error_illegal_escape_sequence. */
+	error_invalid_codepoint             = 44
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,

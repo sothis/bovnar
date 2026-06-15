@@ -437,8 +437,20 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
                      | "f"   (* \f = 0x0C FF  *)
                      | "r"   (* \r = 0x0D CR  *)
                      | '"'   (* \"            *)
-                     | "\" ) ;  (* \\           *)
+                     | "\"   (* \\            *)
+                     | byte-escape       (* spec 1.1, see below *)
+                     | unicode-escape ) ; (* spec 1.1, see below *)
 (* All other bytes after "\" are error_illegal_escape_sequence.       *)
+(* spec 1.1 only — available when the document declares "#!bovnar 1.1"  *)
+(* or newer; in a 1.0/unversioned document "x"/"u" after "\" stay       *)
+(* error_illegal_escape_sequence.                                       *)
+byte-escape    = "x" , hex-digit , hex-digit ;       (* one byte 0xHH    *)
+unicode-escape = "u" , "{" , hex-digit , {hex-digit} , "}" ;
+(* 1..6 hex digits naming a Unicode scalar; surrogates (D800..DFFF) and  *)
+(* values > 10FFFF are error_invalid_codepoint, UTF-8 encoded otherwise. *)
+(* A \x byte must leave the whole string valid UTF-8 (else               *)
+(* error_invalid_utf8_byte).                                            *)
+hex-digit      = DIGIT | "a".."f" | "A".."F" ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)

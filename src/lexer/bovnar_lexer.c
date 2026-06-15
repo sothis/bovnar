@@ -311,6 +311,135 @@ static bool bvn_replace_escaped_byte_impl(
 	p->lex.next_state = after;
 	return true;
 }
+/*
+ * Richer string escapes (spec 1.1): \xHH (one byte) and \u{1-6 hex} (a Unicode
+ * scalar, UTF-8 encoded). Both are gated on the document declaring spec >= 1.1;
+ * in a 1.0 (or unversioned) document the 'x'/'u' after a backslash is not a
+ * recognised escape, so it stays error_illegal_escape_sequence exactly as a 1.0
+ * reader would report. \x preserves the "strings are valid UTF-8" guarantee by
+ * flagging the string for a whole-string UTF-8 check at finalize (see
+ * bvn_lex_finalize): \xC3\xA9 spells "é", but \xFF alone is rejected there.
+ */
+static inline bool bvn_doc_supports_1_1(const bvnr_lexer_t* l)
+{
+	return l->has_declared_version &&
+		(l->declared_major > 1u ||
+		 (l->declared_major == 1u && l->declared_minor >= 1u));
+}
+static inline int bvn_hexval(int32_t c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+static inline bool bvn_string_push_byte(bvnr_reader_t* p, uint8_t b)
+{
+	if (p->lex.str_len == p->lex.max_string_length) {
+		bvn_lexer_set_error(p, error_string_too_long);
+		return false;
+	}
+	p->lex.str_data[p->lex.str_len++] = b;
+	return true;
+}
+bool bvn_action_escape_x_intro(bvnr_reader_t* p)
+{
+	if (!bvn_doc_supports_1_1(&p->lex)) {
+		bvn_lexer_set_error(p, error_illegal_escape_sequence);
+		return false;
+	}
+	p->lex.next_state = esc_x1;
+	return true;
+}
+bool bvn_action_escape_u_intro(bvnr_reader_t* p)
+{
+	if (!bvn_doc_supports_1_1(&p->lex)) {
+		bvn_lexer_set_error(p, error_illegal_escape_sequence);
+		return false;
+	}
+	p->lex.next_state = esc_u_open;
+	return true;
+}
+bool bvn_action_escape_x_d1(bvnr_reader_t* p)
+{
+	int v = bvn_hexval(p->lex.byte);
+	if (v < 0) {
+		bvn_lexer_set_error(p, error_illegal_escape_sequence);
+		return false;
+	}
+	p->lex.esc_x_hi = (uint8_t)v;
+	p->lex.next_state = esc_x2;
+	return true;
+}
+bool bvn_action_escape_x_d2(bvnr_reader_t* p)
+{
+	int v = bvn_hexval(p->lex.byte);
+	if (v < 0) {
+		bvn_lexer_set_error(p, error_illegal_escape_sequence);
+		return false;
+	}
+	if (!bvn_string_push_byte(p, (uint8_t)((p->lex.esc_x_hi << 4) | v)))
+		return false;
+	p->lex.str_has_raw_escape = true;
+	p->lex.next_state = copy_string_byte;
+	return true;
+}
+bool bvn_action_escape_u_open(bvnr_reader_t* p)
+{
+	if (p->lex.byte != '{') {
+		bvn_lexer_set_error(p, error_illegal_escape_sequence);
+		return false;
+	}
+	p->lex.esc_u_acc    = 0;
+	p->lex.esc_u_digits = 0;
+	p->lex.next_state   = esc_u_hex;
+	return true;
+}
+bool bvn_action_escape_u_hex(bvnr_reader_t* p)
+{
+	if (p->lex.byte == '}') {
+		if (p->lex.esc_u_digits == 0) {       /* empty \u{} */
+			bvn_lexer_set_error(p, error_illegal_escape_sequence);
+			return false;
+		}
+		uint32_t cp = p->lex.esc_u_acc;
+		if (cp > 0x10FFFFu || (cp >= 0xD800u && cp <= 0xDFFFu)) {
+			bvn_lexer_set_error(p, error_invalid_codepoint);
+			return false;
+		}
+		uint8_t buf[4];
+		uint32_t n;
+		if (cp < 0x80u) {
+			buf[0] = (uint8_t)cp; n = 1;
+		} else if (cp < 0x800u) {
+			buf[0] = (uint8_t)(0xC0u | (cp >> 6));
+			buf[1] = (uint8_t)(0x80u | (cp & 0x3Fu)); n = 2;
+		} else if (cp < 0x10000u) {
+			buf[0] = (uint8_t)(0xE0u | (cp >> 12));
+			buf[1] = (uint8_t)(0x80u | ((cp >> 6) & 0x3Fu));
+			buf[2] = (uint8_t)(0x80u | (cp & 0x3Fu)); n = 3;
+		} else {
+			buf[0] = (uint8_t)(0xF0u | (cp >> 18));
+			buf[1] = (uint8_t)(0x80u | ((cp >> 12) & 0x3Fu));
+			buf[2] = (uint8_t)(0x80u | ((cp >> 6) & 0x3Fu));
+			buf[3] = (uint8_t)(0x80u | (cp & 0x3Fu)); n = 4;
+		}
+		for (uint32_t i = 0; i < n; i++)
+			if (!bvn_string_push_byte(p, buf[i]))
+				return false;
+		p->lex.next_state = copy_string_byte;
+		return true;
+	}
+	int v = bvn_hexval(p->lex.byte);
+	if (v < 0 || p->lex.esc_u_digits >= 6u) {
+		bvn_lexer_set_error(p, error_illegal_escape_sequence);
+		return false;
+	}
+	p->lex.esc_u_acc = (p->lex.esc_u_acc << 4) | (uint32_t)v;
+	p->lex.esc_u_digits++;
+	p->lex.next_state = esc_u_hex;
+	return true;
+}
 static inline bool bvn_lex_number_begin(bvnr_reader_t* p, bool is_array)
 {
 	if (p->lex.str_len)
@@ -349,6 +478,16 @@ static bool bvn_lex_finalize(bvnr_reader_t* p, bvn_lex_sink_fn sink)
 		bvn_lexer_set_error(p, error_empty_identifier);
 		return false;
 	}
+	/* A \x escape (spec 1.1) can emit an arbitrary byte; the text-layer UTF-8
+	 * check in the main loop only sees the raw input, not decoded escape output,
+	 * so re-validate the assembled string here. This keeps the utf8-family
+	 * guarantee intact: \xC3\xA9 is "é", but a lone \xFF is error_invalid_utf8_byte. */
+	if (l->str_has_raw_escape &&
+	    (tt == token_is_string || tt == token_is_array_string) &&
+	    !bvn_validate_string(l->str_data, l->str_len)) {
+		bvn_lexer_set_error(p, error_invalid_utf8_byte);
+		return false;
+	}
 	bvnr_raw_token_t raw = {
 		.type            = tt,
 		.event           = (tt == token_is_identifier)
@@ -365,6 +504,7 @@ static bool bvn_lex_finalize(bvnr_reader_t* p, bvn_lex_sink_fn sink)
 	l->type_len          = 0;
 	l->str_len           = 0;
 	l->inline_unit_len   = 0;
+	l->str_has_raw_escape = false;
 	l->token_type        = token_is_unknown;
 	return true;
 }

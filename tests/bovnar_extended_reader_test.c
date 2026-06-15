@@ -201,6 +201,50 @@ static void test_parse_string_escapes(void)
 	ASSERT_TRUE(!ctx.has_errors, "string with form-feed escape must parse");
 }
 
+static void test_parse_v11_escapes(void)
+{
+	printf("  test_parse_v11_escapes...\n");
+
+	parse_ctx_t ctx;
+
+	/* valid \u / \x in a declared 1.1 document */
+	parse_payload("#!bovnar 1.1\n.s = \"\\u{41}\";", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "\\u{41} parses in a 1.1 document");
+
+	parse_payload("#!bovnar 1.1\n.s = \"caf\\xC3\\xA9\";", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "\\xC3\\xA9 (UTF-8 é) parses in a 1.1 document");
+
+	parse_payload("#!bovnar 1.1\n.s = \"\\u{1F600}\";", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "astral \\u{1F600} parses in a 1.1 document");
+
+	/* a lone \xFF is not valid UTF-8 */
+	parse_payload("#!bovnar 1.1\n.s = \"\\xFF\";", false, &ctx);
+	ASSERT_TRUE(ctx.has_errors, "lone \\xFF must be rejected");
+	ASSERT_EQ_INT(ctx.last_error, error_invalid_utf8_byte,
+		"lone \\xFF is error_invalid_utf8_byte");
+
+	/* surrogate / out-of-range code points */
+	parse_payload("#!bovnar 1.1\n.s = \"\\u{D800}\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_invalid_codepoint,
+		"\\u{D800} surrogate is error_invalid_codepoint");
+	parse_payload("#!bovnar 1.1\n.s = \"\\u{110000}\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_invalid_codepoint,
+		"\\u{110000} is error_invalid_codepoint");
+
+	/* malformed structure */
+	parse_payload("#!bovnar 1.1\n.s = \"\\u{ZZ}\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_illegal_escape_sequence,
+		"\\u{ZZ} is error_illegal_escape_sequence");
+
+	/* gating: the same escapes are illegal without a 1.1 declaration */
+	parse_payload(".s = \"\\u{41}\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_illegal_escape_sequence,
+		"\\u is illegal in an unversioned document");
+	parse_payload(".s = \"\\x41\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_illegal_escape_sequence,
+		"\\x is illegal in an unversioned document");
+}
+
 static void test_parse_negative_numbers(void)
 {
 	printf("  test_parse_negative_numbers...\n");
@@ -709,6 +753,7 @@ int main(void)
 
 	test_parse_various_integer_bases();
 	test_parse_string_escapes();
+	test_parse_v11_escapes();
 	test_parse_negative_numbers();
 	test_parse_scientific_notation();
 	test_parse_arrays_2d();

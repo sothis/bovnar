@@ -268,7 +268,7 @@ bool bvn_gregorian_date_calc_whit_monday   (bvn_gregorian_date_t* g, int64_t y) 
 /* Normalize *d into *c so the predicates below always see one canonical
  * record; every check (fixed-date, weekday, easter-relative) then agrees
  * on the same civil day.  Returns false for out-of-range input. */
-static bool canonicalize(bvn_gregorian_date_t* c, const bvn_gregorian_date_t* d)
+static bool gdate_canonicalize(bvn_gregorian_date_t* c, const bvn_gregorian_date_t* d)
 {
     *c = *d;
     return bvn_gregorian_date_normalize(c);
@@ -303,19 +303,19 @@ static bool banking_day_canon(bvn_gregorian_date_t* c)
 bool bvn_gregorian_date_is_federal_holiday_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
-    return canonicalize(&c, d) && federal_holiday_canon(&c);
+    return gdate_canonicalize(&c, d) && federal_holiday_canon(&c);
 }
 
 bool bvn_gregorian_date_is_banking_day_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
-    return canonicalize(&c, d) && banking_day_canon(&c);
+    return gdate_canonicalize(&c, d) && banking_day_canon(&c);
 }
 
 bool bvn_gregorian_date_is_business_day_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
-    return canonicalize(&c, d)
+    return gdate_canonicalize(&c, d)
         && c.wday != 0
         && !federal_holiday_canon(&c);
 }
@@ -407,7 +407,7 @@ void bvn_gregorian_date_get_last_saturday_in_month(bvn_gregorian_date_t* res,
 bool bvn_gregorian_date_is_last_banking_day_in_month(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c, bd = {0};
-    if (!canonicalize(&c, d))
+    if (!gdate_canonicalize(&c, d))
         return false;
     bvn_gregorian_date_get_last_banking_day_in_month(&bd, &c);
     return same_day(&bd, &c);
@@ -416,7 +416,7 @@ bool bvn_gregorian_date_is_last_banking_day_in_month(bvn_gregorian_date_t* d)
 bool bvn_gregorian_date_is_penultimate_banking_day_in_month(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c, bd = {0};
-    if (!canonicalize(&c, d))
+    if (!gdate_canonicalize(&c, d))
         return false;
     bvn_gregorian_date_get_penultimate_banking_day_in_month(&bd, &c);
     return same_day(&bd, &c);
@@ -425,7 +425,7 @@ bool bvn_gregorian_date_is_penultimate_banking_day_in_month(bvn_gregorian_date_t
 bool bvn_gregorian_date_is_first_banking_day_in_month(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c, bd = {0};
-    if (!canonicalize(&c, d))
+    if (!gdate_canonicalize(&c, d))
         return false;
     bvn_gregorian_date_get_first_banking_day_in_month(&bd, &c);
     return same_day(&bd, &c);
@@ -434,7 +434,7 @@ bool bvn_gregorian_date_is_first_banking_day_in_month(bvn_gregorian_date_t* d)
 bool bvn_gregorian_date_is_mid_banking_day_in_month(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c, bd = {0};
-    if (!canonicalize(&c, d))
+    if (!gdate_canonicalize(&c, d))
         return false;
     bvn_gregorian_date_get_mid_banking_day_in_month(&bd, &c);
     return same_day(&bd, &c);
@@ -445,7 +445,7 @@ bool bvn_gregorian_date_is_last_banking_day_in_quarter(int q, bvn_gregorian_date
     if (q < 1 || q > 4)
         return false;
     bvn_gregorian_date_t c, bd = {0};
-    if (!canonicalize(&c, d))
+    if (!gdate_canonicalize(&c, d))
         return false;
     bvn_gregorian_date_get_last_banking_day_in_quarter(q, &bd, &c);
     return same_day(&bd, &c);
@@ -456,7 +456,7 @@ bool bvn_gregorian_date_is_first_banking_day_in_quarter(int q, bvn_gregorian_dat
     if (q < 1 || q > 4)
         return false;
     bvn_gregorian_date_t c, bd = {0};
-    if (!canonicalize(&c, d))
+    if (!gdate_canonicalize(&c, d))
         return false;
     bvn_gregorian_date_get_first_banking_day_in_quarter(q, &bd, &c);
     return same_day(&bd, &c);
@@ -488,14 +488,14 @@ void bvn_gregorian_date_get_first_banking_day_in_quarter(int quarter,
 bool bvn_gregorian_date_is_daylight_saving_switch_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
-    if (!canonicalize(&c, d)) return false;
+    if (!gdate_canonicalize(&c, d)) return false;
     return (c.month == 3 || c.month == 10) && c.day > 24 && c.wday == 0;
 }
 
 bool bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
-    if (!canonicalize(&c, d)) return false;
+    if (!gdate_canonicalize(&c, d)) return false;
     return (c.month == 3 || c.month == 10)
         && c.day >= 24 && c.day <= 30 && c.wday == 6;
 }

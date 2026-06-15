@@ -562,13 +562,48 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 	[dtlit_sec] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
 		BVN_DIGITS(ACT_dtlit_sec),
+		[0x2e] = ACT_dtlit_frac,      /* '.' fractional seconds (spec 1.1) */
 		[0x5a] = ACT_dtlit_zulu,      /* 'Z' UTC designator */
+		[0x2b] = ACT_dtlit_off_sign,  /* '+' tz offset (spec 1.1) */
+		[0x2d] = ACT_dtlit_off_sign,  /* '-' tz offset (spec 1.1) */
 		[0x2c] = ACT_new_array_value,
 		[0x3b] = ACT_value_outro,
 		[0x5d] = ACT_array_outro,
 	},
 	[dtlit_zulu] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
+		[0x2c] = ACT_new_array_value,
+		[0x3b] = ACT_value_outro,
+		[0x5d] = ACT_array_outro,
+	},
+	/* Fractional seconds (spec 1.1): digits after '.', then an optional 'Z' or
+	 * ±HH:MM tz offset. The validator truncates the fraction to the whole
+	 * second (the carrier is integer seconds). */
+	[dtlit_frac] = {
+		BVN_WHITESPACE(ACT_to_number_outro),
+		BVN_DIGITS(ACT_dtlit_frac),
+		[0x5a] = ACT_dtlit_zulu,      /* 'Z' */
+		[0x2b] = ACT_dtlit_off_sign,  /* '+' */
+		[0x2d] = ACT_dtlit_off_sign,  /* '-' */
+		[0x2c] = ACT_new_array_value,
+		[0x3b] = ACT_value_outro,
+		[0x5d] = ACT_array_outro,
+	},
+	/* tz offset (spec 1.1): ±HH:MM. The validator strictly checks the widths
+	 * and ranges and folds the offset to true UTC before converting. */
+	[dtlit_off_sign] = {
+		BVN_DIGITS(ACT_dtlit_off_hour),
+	},
+	[dtlit_off_hour] = {
+		BVN_DIGITS(ACT_dtlit_off_hour),
+		[0x3a] = ACT_dtlit_off_colon,  /* ':' */
+	},
+	[dtlit_off_colon] = {
+		BVN_DIGITS(ACT_dtlit_off_min),
+	},
+	[dtlit_off_min] = {
+		BVN_WHITESPACE(ACT_to_number_outro),
+		BVN_DIGITS(ACT_dtlit_off_min),
 		[0x2c] = ACT_new_array_value,
 		[0x3b] = ACT_value_outro,
 		[0x5d] = ACT_array_outro,
@@ -900,6 +935,11 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_dtlit_after_mi]            = bvn_action_dtlit_byte,
 	[ACT_dtlit_sec]                 = bvn_action_dtlit_byte,
 	[ACT_dtlit_zulu]                = bvn_action_dtlit_byte,
+	[ACT_dtlit_frac]                = bvn_action_dtlit_byte,
+	[ACT_dtlit_off_sign]            = bvn_action_dtlit_byte,
+	[ACT_dtlit_off_hour]            = bvn_action_dtlit_byte,
+	[ACT_dtlit_off_colon]           = bvn_action_dtlit_byte,
+	[ACT_dtlit_off_min]             = bvn_action_dtlit_byte,
 };
 const state_t bvn_action_target_state[ACT__count] = {
 	[ACT_ignore_comment_byte]       = ignore_comment_byte,
@@ -929,6 +969,11 @@ const state_t bvn_action_target_state[ACT__count] = {
 	[ACT_dtlit_after_mi]            = dtlit_after_mi,
 	[ACT_dtlit_sec]                 = dtlit_sec,
 	[ACT_dtlit_zulu]                = dtlit_zulu,
+	[ACT_dtlit_frac]                = dtlit_frac,
+	[ACT_dtlit_off_sign]            = dtlit_off_sign,
+	[ACT_dtlit_off_hour]            = dtlit_off_hour,
+	[ACT_dtlit_off_colon]           = dtlit_off_colon,
+	[ACT_dtlit_off_min]             = dtlit_off_min,
 };
 const state_t bvn_kw_advance_state[dimension_state] = {
 	[tf_ui]      = tf_uin,

@@ -85,6 +85,11 @@ typedef enum state_e {
 		dtlit_after_mi,
 		dtlit_sec,
 		dtlit_zulu,
+		dtlit_frac,        /* fractional seconds after '.' (spec 1.1) */
+		dtlit_off_sign,    /* just consumed '+'/'-' of a tz offset    */
+		dtlit_off_hour,
+		dtlit_off_colon,   /* just consumed ':' of a tz offset        */
+		dtlit_off_min,
 	symbol_intro,
 	symbol_body,
 	symbol_outro,
@@ -229,6 +234,11 @@ enum action_id {
 	ACT_dtlit_after_mi,
 	ACT_dtlit_sec,
 	ACT_dtlit_zulu,
+	ACT_dtlit_frac,
+	ACT_dtlit_off_sign,
+	ACT_dtlit_off_hour,
+	ACT_dtlit_off_colon,
+	ACT_dtlit_off_min,
 	ACT__count
 };
 typedef bool (*action_t)(bvnr_reader_t* p);

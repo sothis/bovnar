@@ -183,10 +183,15 @@ raw-value    = null-value
 (* shape (dtlit_* states, entered from a digit run followed by "-"); the  *)
 (* validator strictly range-checks the fields and converts the UTC civil  *)
 (* instant to the integer carrier on the declared epoch (unix when a bare *)
-(* literal infers <datetime:64,unix>).  Whole-second resolution; the      *)
-(* atomic GNSS epochs (gps/galileo/glonass/beidou) reject a literal.      *)
+(* literal infers <datetime:64,unix>).  Whole-second resolution: a        *)
+(* fractional part is accepted but truncated to the written second.  A    *)
+(* "+HH:MM" / "-HH:MM" offset is folded to true UTC before conversion.    *)
+(* The atomic GNSS epochs (gps/galileo/glonass/beidou) reject a literal.  *)
 datetime-literal = year , "-" , month , "-" , day ,
-                   [ "T" , hour , ":" , minute , ":" , second , [ "Z" ] ] ;
+                   [ "T" , hour , ":" , minute , ":" , second ,
+                     [ "." , dt-fraction ] , [ dt-zone ] ] ;
+dt-fraction  = digit , { digit } ;          (* truncated to whole seconds *)
+dt-zone      = "Z" | ( "+" | "-" ) , hour , ":" , minute ;  (* tz offset *)
 year         = digit , digit , digit , digit ;
 month        = digit , digit ;   (* 01..12                             *)
 day          = digit , digit ;   (* 01..28/29/30/31 per month          *)

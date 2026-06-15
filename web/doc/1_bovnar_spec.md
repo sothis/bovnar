@@ -571,19 +571,34 @@ requires a `#!bovnar 1.1` declaration (§3.4) — in a 1.0/unversioned document
 ```
 
 **ISO-8601 literals (spec 1.1).** Instead of a raw integer, a `datetime` value
-may be written as an ISO-8601 literal in one of these UTC forms:
+may be written as an ISO-8601 literal:
+
+```
+datetime-literal = YYYY-MM-DD [ "T" HH:MM:SS [ "." fraction ] [ zone ] ]
+zone             = "Z" | ( "+" | "-" ) HH:MM
+```
 
 * `YYYY-MM-DD` — a calendar date (interpreted at `00:00:00Z`)
-* `YYYY-MM-DDTHH:MM:SS` — a date and time (UTC)
-* `YYYY-MM-DDTHH:MM:SSZ` — the explicit-`Z` (UTC) form
+* `YYYY-MM-DDTHH:MM:SS` — a date and time (UTC when no zone is given)
+* a trailing `Z` (UTC) or a numeric `±HH:MM` time-zone offset
+* an optional `.fraction` (one or more digits) after the seconds
 
 The literal is converted at parse time to the integer epoch-seconds carrier;
 that integer is what is stored and re-emitted, so a pretty-print round-trip is
 idempotent (`2026-06-15` becomes `<datetime:64> 1781481600`). A **bare** literal
 with no annotation infers `<datetime:64,unix>`, so `.t = 2026-06-15;` is a
 timestamp without any annotation. Fields are strictly validated (month `01`–`12`,
-a valid day-of-month, hour `00`–`23`, minute/second `00`–`59`); a malformed or
-out-of-range literal is `error_invalid_datetime_literal`.
+a valid day-of-month, hour `00`–`23`, minute/second `00`–`59`, offset `±HH:MM`
+with two-digit components); a malformed or out-of-range literal is
+`error_invalid_datetime_literal`.
+
+A **`±HH:MM` offset** shifts the written civil time to true UTC before the
+conversion (`12:00:00+02:00` is `10:00:00Z`); for `tai` the offset is applied
+*before* the leap-second lookup, so the atomic value stays correct. **Fractional
+seconds** are accepted but the carrier is whole seconds, so the fraction is
+truncated to the written second (`12:00:00.999Z` and `12:00:00Z` store the same
+value) — write an integer carrier if you need sub-second precision. The `.`,
+`Z`, and `±HH:MM` parts are valid only after a full `HH:MM:SS` time.
 
 The UTC→epoch conversion is **leap-second correct**: the civil epochs (`unix`,
 `mjd`, `ntp`, `y2000`) use the uniform 86 400 s/day scale (so `unix` is ordinary
@@ -593,13 +608,14 @@ POSIX time) and `tai` applies the IERS leap-second table. The atomic GNSS epochs
 round-trippable civil⇄seconds inverse in this implementation, so supply an
 integer epoch-seconds carrier for them. A literal carries no unit, and an ISO
 literal under a non-`datetime` annotation is `error_type_value_mismatch`.
-Fractional seconds and numeric `±hh:mm` offsets are not yet supported.
 
 ```bovnar
 #!bovnar 1.1
 .a = 2026-06-15;                                  # bare -> <datetime:64,unix>
 .b = 2026-06-15T12:00:00Z;                        # date-time, UTC
 .c = <datetime:64,tai> 2017-01-01T00:00:00Z;      # tai: leap-second correct
+.d = 2026-06-15T12:00:00+02:00;                   # offset -> 10:00:00Z
+.e = 2026-06-15T12:00:00.5Z;                      # fraction truncated to :00
 ```
 
 **Parameter syntax:**

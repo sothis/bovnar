@@ -263,9 +263,20 @@ static int bvn_iso_days_in_month(int64_t y, int m)
 /* Strict parse of YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS or …Z into *dt (UTC civil).
  * Returns false on a wrong-width field, a misplaced separator or an
  * out-of-range component. */
-static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* dt)
+/* Strict parse of an ISO-8601 literal into *dt (the civil time exactly as
+ * written) and *offset_seconds (the tz offset in seconds; 0 for `Z` or no
+ * zone). Accepted forms:
+ *   YYYY-MM-DD
+ *   YYYY-MM-DDTHH:MM:SS[.frac][Z | ±HH:MM]
+ * A fractional part (`.` then 1+ digits) is accepted and dropped — the carrier
+ * is whole seconds, so the value floors to the written second. Returns false on
+ * a wrong-width field, a misplaced separator, an out-of-range component, a
+ * malformed offset, or any trailing junk. */
+static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* dt,
+	int64_t* offset_seconds)
 {
-	if (n != 10 && n != 19 && n != 20)
+	*offset_seconds = 0;
+	if (n < 10)
 		return false;
 	for (int i = 0; i < 4; i++)
 		if (s[i] < '0' || s[i] > '9')
@@ -280,18 +291,53 @@ static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* d
 		return false;
 	if (day < 1 || day > bvn_iso_days_in_month(year, month))
 		return false;
-	if (n >= 19) {
-		if (s[10] != 'T' || s[13] != ':' || s[16] != ':')
+
+	uint32_t p = 10;
+	if (p < n) {
+		/* a time part must follow: 'T' HH:MM:SS */
+		if (n < 19 || s[10] != 'T' || s[13] != ':' || s[16] != ':')
 			return false;
 		if (!bvn_iso_two_digit(s + 11, &hour) ||
 		    !bvn_iso_two_digit(s + 14, &minute) ||
 		    !bvn_iso_two_digit(s + 17, &second))
 			return false;
-		if (n == 20 && s[19] != 'Z')
-			return false;
 		if (hour > 23 || minute > 59 || second > 59)
 			return false;
+		p = 19;
+		/* optional fractional seconds: '.' then 1+ digits (dropped) */
+		if (p < n && s[p] == '.') {
+			uint32_t f0 = ++p;
+			while (p < n && s[p] >= '0' && s[p] <= '9')
+				p++;
+			if (p == f0)
+				return false;            /* '.' with no digit */
+		}
+		/* optional zone: 'Z', or ±HH:MM */
+		if (p < n) {
+			if (s[p] == 'Z') {
+				p++;
+			} else if (s[p] == '+' || s[p] == '-') {
+				int sign = (s[p] == '-') ? -1 : 1;
+				p++;
+				int oh, om;
+				if (n - p != 5u || s[p + 2] != ':')
+					return false;        /* require exactly HH:MM */
+				if (!bvn_iso_two_digit(s + p, &oh) ||
+				    !bvn_iso_two_digit(s + p + 3, &om))
+					return false;
+				if (oh > 23 || om > 59)
+					return false;
+				*offset_seconds = sign *
+					((int64_t)oh * 3600 + (int64_t)om * 60);
+				p = n;
+			} else {
+				return false;
+			}
+		}
 	}
+	if (p != n)
+		return false;                            /* trailing junk */
+
 	memset(dt, 0, sizeof *dt);
 	dt->date.year = year; dt->date.month = month; dt->date.day = day;
 	dt->hour = hour; dt->minute = minute; dt->second = second;
@@ -304,10 +350,16 @@ static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
 	value_type_spec_t vt, int64_t* out, error_code_t* err)
 {
 	bvn_datetime_t dt;
-	if (!bvn_iso_parse_fields(s, n, &dt)) {
+	int64_t offset_seconds;
+	if (!bvn_iso_parse_fields(s, n, &dt, &offset_seconds)) {
 		*err = error_invalid_datetime_literal;
 		return false;
 	}
+	/* Fold a tz offset to true UTC: the written civil time is at UTC+offset, so
+	 * UTC = civil - offset. Done before the conversion so tai's leap-second
+	 * lookup is evaluated at the true UTC instant; the conversion formula
+	 * absorbs the now-out-of-range seconds (mktime-style). */
+	dt.second -= offset_seconds;
 	const char* ep = bvnr_datetime_epoch_name(vt);   /* vt.base = epoch index */
 	int64_t secs;
 	if (strcmp(ep, "tai") == 0) {

@@ -39,13 +39,17 @@ such a document is an error, exactly as a 1.0 reader reports.
   helpers. In an array, datetime is its own kind and its epoch is a dimension
   (mixing epochs, or datetime with a plain number, is `error_array_element_type_mismatch`).
 - **ISO-8601 datetime literals** — a value may be written as `YYYY-MM-DD`,
-  `YYYY-MM-DDTHH:MM:SS` or the trailing-`Z` (UTC) form instead of a raw integer;
-  it is converted to the epoch-seconds carrier at parse time (the integer is
-  what is stored and re-emitted, so round-trips stay idempotent). A bare literal
-  with no annotation infers `<datetime:64,unix>`. The UTC→epoch conversion is
-  leap-second correct: civil epochs (`unix`/`mjd`/`ntp`/`y2000`) use the uniform
-  scale and `tai` applies the IERS leap-second table; the atomic GNSS epochs
-  (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
+  `YYYY-MM-DDTHH:MM:SS`, with an optional trailing `Z`, a numeric `±HH:MM`
+  time-zone offset, and/or a fractional second, instead of a raw integer; it is
+  converted to the epoch-seconds carrier at parse time (the integer is what is
+  stored and re-emitted, so round-trips stay idempotent). A bare literal with no
+  annotation infers `<datetime:64,unix>`. A `±HH:MM` offset folds the written
+  civil time to true UTC before the conversion (and before `tai`'s leap-second
+  lookup, so atomic values stay correct); a fractional part is accepted but
+  truncated to the whole second (the carrier is integer seconds). The UTC→epoch
+  conversion is leap-second correct: civil epochs (`unix`/`mjd`/`ntp`/`y2000`)
+  use the uniform scale and `tai` applies the IERS leap-second table; the atomic
+  GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
   (`error_datetime_literal_unsupported_epoch`) because there is no
   round-trippable civil⇄seconds inverse for them — use an integer carrier there.
   A malformed or out-of-range literal is `error_invalid_datetime_literal`.
@@ -73,7 +77,7 @@ such a document is an error, exactly as a 1.0 reader reports.
   rejected, and `array_to_bvnr` prepends the `#!bovnar 1.1` directive.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
-  **289 cases** (groups `version`, `datetime` — including the ISO-literal
+  **301 cases** (groups `version`, `datetime` — including the ISO-literal
   `DTLIT` cases — plus escape/reference additions), passing in both self-test
   and `--iut` modes.
 
@@ -99,10 +103,9 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
 
 ### Known gaps / deferred
 
-- ISO-8601 datetime literals cover the UTC forms (`YYYY-MM-DD`,
-  `YYYY-MM-DDTHH:MM:SS`, `…Z`) at whole-second resolution; fractional seconds,
-  numeric `±hh:mm` offsets, and literals for the atomic GNSS epochs are not yet
-  supported.
+- ISO-8601 datetime literals are whole-second resolution (a fractional part is
+  accepted but truncated) and cover `Z` and numeric `±HH:MM` offsets; literals
+  for the atomic GNSS epochs are still rejected (no round-trippable inverse).
 - The browser playground parser (`web/bovnar_parser.js`) recognises ISO-8601
   literals and displays them as written, but — by its lenient design (it does
   not synthesise annotations or validate types) — it does not convert them to

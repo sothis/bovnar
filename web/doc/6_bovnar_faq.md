@@ -231,20 +231,26 @@ requires a `#!bovnar 1.1` declaration. Convert to civil time with the
 `bvn_datetime.h` helpers.
 
 You can also write the value as an **ISO-8601 literal** instead of a raw
-integer — `2026-06-15`, `2026-06-15T12:00:00` or `…Z` (UTC, whole seconds):
+integer — `2026-06-15`, `2026-06-15T12:00:00`, a trailing `Z`, or a numeric
+`±HH:MM` offset, with an optional fractional second:
 
 ```bovnar
 #!bovnar 1.1
-.created = 2026-06-15T12:00:00Z;   # bare literal infers <datetime:64,unix>
+.created = 2026-06-15T12:00:00Z;        # bare literal infers <datetime:64,unix>
+.local   = 2026-06-15T12:00:00+02:00;   # offset folds to 10:00:00Z
+.logline = 2026-06-15T12:00:00.123Z;    # fraction truncated to the whole second
 ```
 
 It is converted to the epoch-seconds carrier at parse time (the integer is what
 is stored, so round-trips are idempotent). A bare literal with no annotation
-infers `<datetime:64,unix>`. The UTC→epoch conversion is leap-second correct for
-the civil epochs and `tai`; the atomic GNSS epochs (`gps`/`galileo`/`glonass`/
-`beidou`) reject a literal (`error_datetime_literal_unsupported_epoch`) — give
-those an integer carrier. A malformed or out-of-range literal is
-`error_invalid_datetime_literal`.
+infers `<datetime:64,unix>`. A `±HH:MM` offset shifts the time to true UTC before
+the conversion; a fractional part is accepted but truncated to the whole second
+(the carrier is integer seconds — use an integer carrier for sub-second
+precision). The UTC→epoch conversion is leap-second correct for the civil epochs
+and `tai` (the offset is folded before `tai`'s leap-second lookup); the atomic
+GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
+(`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. A
+malformed or out-of-range literal is `error_invalid_datetime_literal`.
 
 **Timestamp vs. duration — don't confuse them.** A *timestamp* (an instant) is a
 `datetime`; a *duration* (an elapsed amount) is a plain number with a time unit,

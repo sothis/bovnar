@@ -109,6 +109,16 @@ def test_invalid_datetimes(doc, code):
     ('#!bovnar 1.1\n.t = <datetime> 2026-06-15;',               1781481600),
     # tai is leap-second correct: 2017-01-01 carries +37 leap seconds
     ('#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T00:00:00Z;', 1861920037),
+    # fractional seconds truncate to the whole second (carrier is integer seconds)
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.999Z;',            1781524800),
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000000123;',       1781524800),
+    # ±HH:MM offset folds to true UTC
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00+02:00;',           1781517600),
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00-05:00;',           1781542800),
+    ('#!bovnar 1.1\n.t = 2026-06-15T01:00:00+02:00;',           1781478000),
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.5+02:00;',         1781517600),
+    # tai offset is folded before the leap lookup -> stays leap-correct
+    ('#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T02:00:00+02:00;', 1861920037),
 ])
 def test_iso_literal_values(doc, expected):
     # loads goes through the C reader; an ISO literal decodes to its epoch
@@ -132,6 +142,12 @@ def test_iso_literal_array_is_homogeneous():
                                                       ErrorCode.DATETIME_LITERAL_UNSUPPORTED_EPOCH),
     ('#!bovnar 1.1\n.t = <sint:32> 2026-06-15;',      ErrorCode.TYPE_VALUE_MISMATCH),
     ('.t = 2026-06-15;',                              ErrorCode.ILLEGAL_VALUE_TYPE),  # 1.0 gate
+    # fractional/offset edge cases
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.Z;',     ErrorCode.INVALID_DATETIME_LITERAL),  # '.' no digit
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00+2:00;',  ErrorCode.INVALID_DATETIME_LITERAL),  # 1-digit hour
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00+0200;',  ErrorCode.UNEXPECTED_INPUT_BYTE),     # no colon
+    ('#!bovnar 1.1\n.t = 2026-06-15+02:00;',          ErrorCode.UNEXPECTED_INPUT_BYTE),     # offset on date-only
+    ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z+02:00;', ErrorCode.UNEXPECTED_INPUT_BYTE),    # Z and offset
 ])
 def test_invalid_iso_literals(doc, code):
     with pytest.raises(BovnarParseError) as ei:

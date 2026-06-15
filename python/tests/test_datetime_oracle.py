@@ -43,8 +43,9 @@ def _leap_at(uniform_tai):
     return off
 
 
-def _oracle(y, mo, d, H, M, S, epoch):
-    unix_s = calendar.timegm((y, mo, d, H, M, S, 0, 0, 0))
+def _oracle(y, mo, d, H, M, S, epoch, offset_s=0):
+    # fold the tz offset to true UTC: UTC = civil - offset
+    unix_s = calendar.timegm((y, mo, d, H, M, S, 0, 0, 0)) - offset_s
     if epoch == "tai":
         uniform_tai = unix_s + (40587 - 36204) * 86400
         return uniform_tai + _leap_at(uniform_tai)
@@ -92,3 +93,32 @@ def test_date_only_literal_is_midnight_utc():
             for d in (1, _dim(y, mo)):
                 doc = f"#!bovnar 1.1\n.t = {y:04d}-{mo:02d}-{d:02d};\n"
                 assert bovnar.loads(doc)["t"] == _oracle(y, mo, d, 0, 0, 0, "unix")
+
+
+@needs_lib
+def test_fractional_seconds_truncate_to_whole_second():
+    # the carrier is whole seconds: a fractional part is dropped (floor)
+    base = bovnar.loads("#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;")["t"]
+    for frac in (".0", ".5", ".999", ".000000123", ".123456789"):
+        doc = f"#!bovnar 1.1\n.t = 2026-06-15T12:00:00{frac}Z;\n"
+        assert bovnar.loads(doc)["t"] == base
+
+
+@needs_lib
+def test_tz_offset_folds_to_utc():
+    # ±HH:MM offsets, incl. half-hour (India), -12, +14, and tai (leap-correct
+    # because the offset is folded before the leap-second lookup). Verified
+    # against the independent reference with the offset folded to true UTC.
+    OFFS = [(0, "+00:00"), (7200, "+02:00"), (-18000, "-05:00"),
+            (19800, "+05:30"), (-43200, "-12:00"), (50400, "+14:00")]
+    n = 0
+    for y in (1972, 2000, 2017, 2026):
+        for (H, M, S) in ((0, 0, 0), (12, 30, 15), (23, 59, 59)):
+            for off_s, zone in OFFS:
+                for ep in _EPOCHS:
+                    n += 1
+                    ann = "" if ep == "unix" else f"<datetime:64,{ep}> "
+                    doc = (f"#!bovnar 1.1\n.t = {ann}"
+                           f"{y:04d}-06-15T{H:02d}:{M:02d}:{S:02d}{zone};\n")
+                    assert bovnar.loads(doc)["t"] == _oracle(y, 6, 15, H, M, S, ep, off_s)
+    assert n > 200

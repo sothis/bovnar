@@ -271,10 +271,11 @@
          validate the calendar fields. The C reader does both (and is the
          authority); doing a leap-second-correct conversion here would only risk
          disagreeing with it. The accepted character set (digits, '-', 'T', ':',
-         'Z') mirrors the C lexer's dtlit_* states. */
+         'Z', and '.'/'+' for spec-1.1 fractional seconds and ±HH:MM offsets)
+         mirrors the C lexer's dtlit_* states. */
       if (!neg && mantDigits > 0 && !eof() && cur() === '-') {
         lastValueWasDatetime = true;
-        while (!eof() && /[-:TZ0-9]/.test(cur())) { s += cur(); advance(); }
+        while (!eof() && /[-:TZ0-9.+]/.test(cur())) { s += cur(); advance(); }
         return s;
       }
       if (!eof() && cur() === '.') {

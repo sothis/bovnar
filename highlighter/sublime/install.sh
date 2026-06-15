@@ -1,12 +1,15 @@
 #!/bin/bash
 # Install the Bovnar syntax definition and colour scheme for Sublime Text.
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
 
-# Locate the Sublime Text user Packages directory (ST4, then ST3 / macOS).
+dest=""
+
+# Locate the Sublime Text user Packages directory (ST4, then ST3 / Flatpak / macOS).
 for base in \
-    "$HOME/.config/sublime-text/Packages" \
-    "$HOME/.config/sublime-text-3/Packages" \
+    "${XDG_CONFIG_HOME:-$HOME/.config}/sublime-text/Packages" \
+    "${XDG_CONFIG_HOME:-$HOME/.config}/sublime-text-3/Packages" \
+    "$HOME/.var/app/com.sublimetext.three/config/sublime-text-3/Packages" \
     "$HOME/Library/Application Support/Sublime Text/Packages" \
     "$HOME/Library/Application Support/Sublime Text 3/Packages"; do
     if [ -d "$base" ]; then

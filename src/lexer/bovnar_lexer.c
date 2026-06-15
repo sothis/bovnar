@@ -1416,6 +1416,23 @@ static inline uint32_t bvn_string_ext_end(
 	return need ? last_complete : i;
 }
 /*
+ * Count UTF-8 code-point starts (non-continuation bytes) in data[0..n).
+ * The bulk paths advance l->column by this, not by the raw byte count, so a
+ * run containing multibyte characters advances the column exactly as the
+ * per-byte path does (which only ++column on bytes with saved_need == 0).
+ * Bulk runs are only entered with l->utf8_need == 0 (see bvn_lex_run), so the
+ * run always starts on a code-point boundary; a clamp that truncates the run
+ * mid-sequence still yields the correct count because column tracks code-point
+ * starts, exactly the bytes counted here.
+ */
+static inline uint32_t bvn_utf8_count_starts(const uint8_t* data, uint32_t n)
+{
+	uint32_t cols = 0;
+	for (uint32_t i = 0; i < n; ++i)
+		cols += ((data[i] & 0xc0u) != 0x80u);
+	return cols;
+}
+/*
  * Bulk fast path. If the machine is sitting in one of the "copy byte" states,
  * find the longest run of bytes from `start` that all stay in that state and
  * memcpy them into the target buffer in a single call, returning how many
@@ -1447,7 +1464,7 @@ static inline uint32_t bvn_try_bulk_run(
 		memcpy(l->str_data + l->str_len, data + start, n);
 		l->str_len     = (uint16_t)(l->str_len + n);
 		l->text_bytes += n;
-		l->column     += n;
+		l->column     += bvn_utf8_count_starts(data + start, n);
 		l->byte        = data[start + n - 1u];
 		l->prev_byte   = data[start + n - 1u];
 		return n;
@@ -1556,7 +1573,7 @@ static inline uint32_t bvn_try_bulk_run(
 		l->inline_unit_len = (uint8_t)(dst_len + n);
 	}
 	l->text_bytes += n;
-	l->column     += n;
+	l->column     += bvn_utf8_count_starts(data + start, n);
 	l->byte        = data[start + n - 1u];
 	l->prev_byte   = data[start + n - 1u];
 	return n;

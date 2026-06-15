@@ -725,17 +725,7 @@ _bvnr_convert_fail(nul_in_string    bad_nul.json              "NUL")
 _bvnr_convert_fail(dup_key          bad_dupkey.json           "duplicate key")
 _bvnr_convert_fail(diff_key_records bad_diffkeys.json         "differing key sets")
 
-# ── Single-file amalgamation: regenerate dist/, compile, and smoke-test ─────
-# Guards against the amalgamation drifting/breaking (static-symbol collisions,
-# stray include forms) as the sources evolve. Needs Python for amalgamate.py.
-if(Python3_FOUND)
-    add_test(
-        NAME    bvnr_amalgam
-        COMMAND "${CMAKE_COMMAND}"
-                -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-                -DPYTHON=${Python3_EXECUTABLE}
-                -DCC=${CMAKE_C_COMPILER}
-                -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/amalgam_smoke.cmake)
-    set_tests_properties(bvnr_amalgam PROPERTIES LABELS "amalgam" TIMEOUT 120)
-endif()
+# ── Single-file amalgamation ────────────────────────────────────────────────
+# The amalgamation is currently not shipped in dist/, so its regenerate-and-
+# smoke-test (bvnr_amalgam) is disabled.  The tooling stays in the tree
+# (amalgamate.py, cmake/amalgam_smoke.cmake) for when it is reinstated.

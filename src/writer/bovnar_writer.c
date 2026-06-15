@@ -1049,7 +1049,9 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 		bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
 		if (si->flush) {
 			if (!si->flush(&w->ser.sink))
-				return false;
+				return bvn_writer_set_error(w, si->is_mem
+					? error_sink_buffer_exhausted
+					: error_writing_to_sink);
 		}
 	}
 	w->ser.finished = true;

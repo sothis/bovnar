@@ -253,7 +253,8 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 	memcpy(buf, str, (size_t)len);
 	buf[len] = '\0';
 	bool parse_ok = false;
-	if (vt.family == vt_sint || (vt.family == vt_plain && buf[0] == '-')) {
+	if (vt.family == vt_sint || vt.family == vt_datetime ||
+	    (vt.family == vt_plain && buf[0] == '-')) {
 		int64_t v = 0;
 		if (bvn_parse_int64(buf, vt, &v)) {
 			n->val.int_val = v;

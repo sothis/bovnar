@@ -1136,7 +1136,7 @@ Before the sigil, several uppercase tokens *looked* like they could be either a 
 | `cup`           | US cup      | `bu_cup`   | 2.365882365×10⁻⁴ m³ |
 | `cups`          | US cup (long form) | `bu_cup` | 2.365882365×10⁻⁴ m³ |
 | `CUP`           | *(error)* — bare uppercase is not a physical unit | — | `error_unit_illegal` |
-| `$CUP`          | Cuban Peso  | `bu_cup` *(currency enum)* | — (monetary, no SI factor) |
+| `$CUP`          | Cuban Peso  | `CUP_` *(currency enum, ISO 4217:192)* | — (monetary, no SI factor) |
 
 ```bovnar
 .recipe_volume = <float_dec:32,cup>  2.0;    # 2 US cups (volume)
@@ -1720,12 +1720,12 @@ ev_data   data="9.81"
 Input: .price = <float_dec:64,$USD> 19.99;
 
 ev_assignment_start          data = "price"
-ev_type_annotation_start     data = "float_dec:64,USD"
+ev_type_annotation_start     data = "float_dec:64,$USD"
 ev_type_annotation_type_family  data = "float_dec"
 ev_type_annotation_type_family_parameter   ← width=64
 ev_type_annotation_type_family_parameter   ← unit:
     value_unit = { num_components=1,
-      [0] bu_usd, exp_linear, {prefix_si, si_none} }
+      [0] USD, exp_linear, {prefix_si, si_none} }
 ev_type_annotation_end
 ev_data   data="19.99"
 ```
@@ -1940,4 +1940,4 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.0.*
+*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1 (draft).*

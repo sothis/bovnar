@@ -78,6 +78,38 @@ def test_typed_array_dumps_does_not_crash():
 
 
 @needs_lib
+def test_datetime_array_roundtrips_family():
+    # a datetime ARRAY must keep its family through dumps, like the scalar path —
+    # otherwise it silently reloads as plain uint (regression: the array-level
+    # annotation was not chosen for datetime Quantity leaves)
+    doc = bovnar.loads('#!bovnar 1.1\n.t = [2026-01-01, 2026-01-02];', typed=True)
+    out = bovnar.dumps(doc)
+    assert b'datetime' in out
+    fams = [int(q.vtype.family) for q in bovnar.loads(out, typed=True)['t']]
+    assert fams == [int(bovnar.ValueTypeFamily.DATETIME)] * 2
+
+
+@needs_lib
+def test_datetime_array_preserves_non_unix_epoch():
+    doc = bovnar.loads('#!bovnar 1.1\n.t = [<datetime:64,tai> 100, 200];', typed=True)
+    out = bovnar.dumps(doc)
+    assert b'tai' in out
+    assert all(q.epoch_name == 'tai' for q in bovnar.loads(out, typed=True)['t'])
+
+
+@needs_lib
+def test_datetime_array_mixed_epochs_rejected():
+    # no single array-level annotation can express two epochs; reject rather than
+    # silently dropping one
+    doc = bovnar.loads(
+        '#!bovnar 1.1\n.t = [<datetime:64,tai> 1];', typed=True)
+    doc['t'].append(bovnar.loads(
+        '#!bovnar 1.1\n.u = <datetime:64,unix> 2;', typed=True)['u'])
+    with pytest.raises(bovnar.BovnarArgumentError):
+        bovnar.dumps(doc)
+
+
+@needs_lib
 def test_gated_on_version():
     with pytest.raises(BovnarParseError) as ei:
         bovnar.loads('.t = <datetime> 1;')

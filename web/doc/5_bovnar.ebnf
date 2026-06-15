@@ -225,8 +225,8 @@ bool-value   = "true" | "false" | "on" | "off" ;
 (*  4. Type annotations                                                *)
 (* ─────────────────────────────────────────────────────────────────  *)
 
-(* Lexer: a keyword state machine (tf_* states) recognises the seven  *)
-(* family names via five keyword paths (float_fix / float_dec share    *)
+(* Lexer: a keyword state machine (tf_* states) recognises the eight  *)
+(* family names via six keyword paths (float_fix / float_dec share     *)
 (* the "float" prefix; see §4 below).  After the family keyword the    *)
 (* raw bytes of the ":…"                                              *)
 (* parameter string are accumulated into type_data by copy_type_byte. *)

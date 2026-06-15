@@ -249,9 +249,11 @@ bvn_dom_node_t *bvn_dom_struct_get(const bvn_dom_node_t *node,
 }
 /*
  * Descend an array node by a run of [N] indices (spec 1.1). A flat /-row matrix
- * stores its cells row-major with arr.num_dims rows of arr.rows_per_dim[0]
- * columns, so it consumes TWO indices ([row][col] -> items[row*cols + col]); a
- * 1-D array (num_dims == 1) consumes ONE ([i] -> items[i]). Genuine nested
+ * stores its cells row-major with arr.num_dims rows whose individual widths are
+ * arr.rows_per_dim[] (the first 8 rows), so it consumes TWO indices
+ * ([row][col] -> items[sum(widths before row) + col]); for a rectangular matrix
+ * this reduces to items[row*cols + col]. A 1-D array (num_dims == 1) consumes
+ * ONE ([i] -> items[i]). Genuine nested
  * arrays (the [[..],[..]] form) are 1-D at each level, so they descend one index
  * per level. A partial index of a matrix (only [row]) has no node to return and
  * yields NULL, as does any out-of-range index. Returns the addressed node, or
@@ -266,10 +268,32 @@ static bvn_dom_node_t *bvn_dom_apply_indices(
 		uint32_t nd = cur->arr.num_dims;
 		if (nd >= 2u) {
 			if (k + 2u > nidx) return NULL;       /* matrix needs [row][col] */
-			uint32_t cols = cur->arr.rows_per_dim[0];
 			uint32_t r = idx[k], c = idx[k + 1u];
-			if (cols == 0u || r >= nd || c >= cols) return NULL;
-			uint32_t off = r * cols + c;
+			if (r >= nd) return NULL;
+			/* rows_per_dim records the width of each of the first 8 rows.
+			 * For r < 8 the row base is the exact sum of the preceding row
+			 * widths (this is correct for jagged rows, and equals r*cols for
+			 * a rectangular matrix); the row's own width is rows_per_dim[r].
+			 * For r >= 8 the per-row widths are no longer recorded, so we can
+			 * only resolve a matrix whose recorded rows are all uniform, in
+			 * which case it is rectangular and base = r*cols. */
+			uint64_t base, cols;
+			if (r < 8u) {
+				cols = cur->arr.rows_per_dim[r];
+				base = 0;
+				for (uint32_t i = 0; i < r; i++)
+					base += cur->arr.rows_per_dim[i];
+			} else {
+				uint32_t w0 = cur->arr.rows_per_dim[0];
+				bool uniform = (w0 != 0u);
+				for (uint32_t i = 1; i < 8u; i++)
+					if (cur->arr.rows_per_dim[i] != w0) { uniform = false; break; }
+				if (!uniform) return NULL;
+				cols = w0;
+				base = (uint64_t)r * w0;
+			}
+			if (cols == 0u || (uint64_t)c >= cols) return NULL;
+			uint64_t off = base + c;
 			if (off >= cur->arr.count) return NULL;
 			cur = cur->arr.items[off];
 			k += 2u;

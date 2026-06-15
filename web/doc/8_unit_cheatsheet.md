@@ -254,7 +254,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
 | `Torr` | `torr` | torr | `bu_torr` | 101 325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168361 Pa |
-| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640 Pa |
+| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
 
 > `at ≠ atm`: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
@@ -268,7 +268,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `thm`   | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
 | `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
 
-> `BTU` (all-caps) is a valid alias: the currency lookup fails first (no ISO 4217 match), then the physical unit table matches `bu_btu`. `Btu` and `btu` are also accepted.
+> `BTU` (all-caps) is a valid alias: with no `$` sigil the token is a physical-unit lookup (the currency table is only consulted for `$`-prefixed tokens), and it matches `bu_btu`. `Btu` and `btu` are also accepted.
 
 ### 4.9 Power
 
@@ -572,7 +572,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 | `JOD` |  400 | **3** | Jordanian Dinar |
 | `JPY` |  392 | **0** | Japanese Yen |
 | `KES` |  404 |   2 | Kenyan Shilling |
-| `KGS` |  417 |   2 | Kyrgystani Som |
+| `KGS` |  417 |   2 | Kyrgyzstani Som |
 | `KHR` |  116 |   2 | Cambodian Riel |
 | `KMF` |  174 | **0** | Comorian Franc |
 | `KPW` |  408 |   2 | North Korean Won |

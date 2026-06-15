@@ -319,7 +319,7 @@ class BaseUnit(IntEnum):
     JOD = 200   # Jordanian Dinar         - minor unit: 3
     JPY = 201   # Japanese Yen            - minor unit: 0
     KES = 202   # Kenyan Shilling         - minor unit: 2
-    KGS = 203   # Kyrgystani Som          - minor unit: 2
+    KGS = 203   # Kyrgyzstani Som         - minor unit: 2
     KHR = 204   # Cambodian Riel          - minor unit: 2
     KMF = 205   # Comorian Franc          - minor unit: 0
     KPW = 206   # North Korean Won        - minor unit: 2

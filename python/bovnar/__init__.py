@@ -661,6 +661,44 @@ def _array_int_annotation(rows):
     return make_type_spec(ValueTypeFamily.UINT, max_pos_b, 10)
 
 
+def _array_datetime_annotation(rows):
+    """
+    If every leaf of *rows* is a datetime Quantity, return a ValueTypeSpec that
+    annotates the whole array as datetime so the family (and epoch) survive a
+    dumps() round-trip; otherwise return None so the caller falls back to the
+    plain-integer path. Array elements carry no per-element annotation, so the
+    datetime type is emitted once at the array level — every leaf must therefore
+    share one epoch; a mixed-epoch array has no valid single annotation and is
+    rejected. The widest element width wins (all elements are range-checked
+    against it; their own value always fits).
+    """
+    saw_dt = False
+    width  = 0
+    base   = None
+    stack  = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif (isinstance(e, Quantity)
+                  and e.vtype.family == int(ValueTypeFamily.DATETIME)):
+                saw_dt = True
+                if e.vtype.width > width:
+                    width = e.vtype.width
+                if base is None:
+                    base = e.vtype.base
+                elif e.vtype.base != base:
+                    raise BovnarArgumentError(
+                        "Cannot serialise a datetime array whose elements use "
+                        "different epochs; split it into one array per epoch.")
+            else:
+                return None
+    if not saw_dt:
+        return None
+    return make_type_spec(ValueTypeFamily.DATETIME, width or 64, base or 0)
+
+
 def _emit_value(w: Writer, key: str, value) -> None:
     if value is None:
         w.write_null(key)
@@ -690,7 +728,10 @@ def _emit_value(w: Writer, key: str, value) -> None:
         _emit_dict(w, value)
         w.end_struct()
     elif isinstance(value, (list, tuple)):
-        write_array(w, key, value, vt=_array_int_annotation(value))
+        vt = _array_datetime_annotation(value)
+        if vt is None:
+            vt = _array_int_annotation(value)
+        write_array(w, key, value, vt=vt)
     else:
         raise BovnarArgumentError(
             f"Cannot serialise value of type {type(value).__name__!r} "

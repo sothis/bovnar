@@ -32,7 +32,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 .created      = <datetime:64,unix> 1750000000;   # a timestamp (spec 1.1)
 .payload      = \x00 … binary stream … \x00;
 .matrix       = [1, 2, 3]/[4, 5, 6];
-.cell         = &.matrix[0][1];             # reference indexing (spec 1.1) → 20
+.cell         = &.matrix[0][1];             # reference indexing (spec 1.1) → 2
 ```
 
 ---

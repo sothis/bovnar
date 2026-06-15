@@ -1160,5 +1160,6 @@ unversioned document is treated as 1.0) are exposed as:
   resolved by `DomDoc.lookup("matrix[0][1]")` at the DOM layer.
 
 `ErrorCode` adds `INVALID_SPEC_VERSION` (42), `UNSUPPORTED_SPEC_VERSION` (43),
-and `INVALID_CODEPOINT` (44).
+`INVALID_CODEPOINT` (44), `INVALID_DATETIME_LITERAL` (45), and
+`DATETIME_LITERAL_UNSUPPORTED_EPOCH` (46).
 

@@ -114,7 +114,7 @@ static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   { "JOD", 400, 3, false, "Jordanian Dinar" },
   { "JPY", 392, 0, false, "Japanese Yen" },
   { "KES", 404, 2, false, "Kenyan Shilling" },
-  { "KGS", 417, 2, false, "Kyrgystani Som" },
+  { "KGS", 417, 2, false, "Kyrgyzstani Som" },
   { "KHR", 116, 2, false, "Cambodian Riel" },
   { "KMF", 174, 0, false, "Comorian Franc" },
   { "KPW", 408, 2, false, "North Korean Won" },

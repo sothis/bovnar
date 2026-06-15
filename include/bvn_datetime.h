@@ -105,6 +105,7 @@ BVN_API int64_t bvn_dt_epoch_seconds_from_gps_time(int64_t timeofweek_ms, int64_
 BVN_API int64_t bvn_dt_tai_seconds_from_gps_time(int64_t timeofweek_ms, int64_t gps_week);
 
 BVN_API int64_t bvn_dt_epoch_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t galileo_week, bvn_epoch_t epoch);
+BVN_API int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t galileo_week);
 
 
 /* UTC <-> TAI with the full IERS leap-second table (1972 .. 2017+).

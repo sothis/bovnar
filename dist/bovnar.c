@@ -4878,8 +4878,12 @@ int64_t bvn_dt_convert_epoch_seconds(bvn_epoch_t epoch_from, bvn_epoch_t epoch_t
 	 * epoch difference itself is bounded (< 54000 days), only the final
 	 * addition can overflow. */
 	int64_t r;
+	/* INT64_MIN is reserved as the error sentinel; an input whose shifted
+	 * value lands on it exactly must be reported as overflow so a successful
+	 * return can never collide with BVN_GDATE_OVF (matching the guard in
+	 * bvn_dt_datetime_to_epoch_seconds() and the GNSS helper). */
 	if (bvn_ckd_add(&r, 86400 * ((int64_t)epoch_from - (int64_t)epoch_to),
-			seconds))
+			seconds) || r == BVN_GDATE_OVF)
 		return BVN_GDATE_OVF;
 	return r;
 }
@@ -4921,6 +4925,12 @@ int64_t bvn_dt_epoch_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t ga
 {
 	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_galileo,
 						   timeofweek_ms, galileo_week, epoch);
+}
+
+int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t galileo_week)
+{
+	return bvn_dt_epoch_seconds_from_galileo_time(timeofweek_ms, galileo_week,
+						      bvn_epoch_tai);
 }
 
 int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)

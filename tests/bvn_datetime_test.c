@@ -626,6 +626,18 @@ static void test_gnss(void)
 		CHECK(tai - unix_in_tai == 19, "gps tai is +19s, got %lld",
 			(long long)(tai - unix_in_tai));
 	}
+	/* Galileo->TAI helper mirrors the GPS one: also +19 s ahead of the plain
+	 * TAI-epoch relabeling (GST runs at a constant 19 s behind TAI). */
+	{
+		int64_t tai   = bvn_dt_tai_seconds_from_galileo_time(123, 7);
+		int64_t plain = bvn_dt_epoch_seconds_from_galileo_time(123, 7, bvn_epoch_tai);
+		CHECK(tai == plain, "galileo->tai helper consistent");
+		int64_t unixs = bvn_dt_epoch_seconds_from_galileo_time(123, 7, bvn_epoch_unix);
+		int64_t unix_in_tai =
+			bvn_dt_convert_epoch_seconds(bvn_epoch_unix, bvn_epoch_tai, unixs);
+		CHECK(tai - unix_in_tai == 19, "galileo tai is +19s, got %lld",
+			(long long)(tai - unix_in_tai));
+	}
 	/* time-of-week milliseconds round to the nearest second */
 	{
 		int64_t a = bvn_dt_epoch_seconds_from_gps_time(1499, 0, bvn_epoch_gps);

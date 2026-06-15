@@ -1140,6 +1140,12 @@ When a number or string value carries **no explicit** type annotation (i.e. the 
 | Number with `.` or `e`/`E` (float literal) | `<float:64,_10,no_unit>` |
 | Negative integer | `<sint:64,_10,no_unit>` |
 | Plain integer | `<uint:64,_10,no_unit>` |
+| ISO-8601 datetime literal, no annotation (spec 1.1) | `<datetime:64,unix>` |
+
+> **A bare integer inside a `datetime` array** inherits the array's `datetime`
+> type (width and epoch) rather than synthesising `uint`/`sint`, so a datetime
+> array's canonical form — annotation on the first element, bare integers after
+> — stays homogeneous.
 
 > **`float_fix` and `float_dec` are never auto-synthesised.** `float_fix`
 > requires a Q parameter that cannot be inferred from the value literal;
@@ -1453,10 +1459,12 @@ Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal defaul
 | Negative number with `uint` type | `error_value_out_of_range` |
 | Mismatched type family for value token | `error_type_value_mismatch` |
 | Dot or exponent in integer-typed value | `error_type_value_mismatch` |
+| Malformed or out-of-range ISO-8601 datetime literal (spec 1.1) | `error_invalid_datetime_literal` |
+| ISO-8601 literal for an atomic GNSS epoch — `gps`/`galileo`/`glonass`/`beidou` (spec 1.1) | `error_datetime_literal_unsupported_epoch` |
 | Invalid unit string | `error_unit_illegal` |
 | Empty parameter component — `<uint:>`, `<uint:8,>`, `<uint:8,,>`, `<uint:,_16>` (§5.3) | `error_illegal_value_type` |
 | Wholly empty annotation `<>` / `< >` (no family keyword) | `error_unexpected_input_byte` |
-| UTF-8 string / ISO 8601 / IP socket with number value | `error_type_value_mismatch` |
+| `utf8` (string) type given a number value | `error_type_value_mismatch` |
 | Non-decimal base for float type | `error_illegal_value_type` |
 | Base `_N` (N≠10, N≠16) for `float` | `error_illegal_value_type` |
 | Base param (`_N`) used with `float_fix` or `float_dec` | `error_illegal_value_type` |

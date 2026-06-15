@@ -549,6 +549,16 @@ The bovnar `(family, width)` maps directly to the numpy dtype (`uint:8` →
 `uint8`, `float:32` → `float32`, …); `FLOAT_FIX` / `FLOAT_DEC` fall back to
 `float64`. Pass `dtype=` to coerce.
 
+A **`datetime`** array on the **unix** epoch (spec 1.1) maps to/from
+`datetime64[s]` — the integer epoch-seconds carrier is unix-relative, so it
+round-trips losslessly. A non-unix epoch (`tai`, `gps`, …) is *not*
+unix-relative, so `to_numpy` refuses it (mapping it to `datetime64` would
+mis-date every value) and points you at `dtype='int64'` for the raw seconds.
+On the write side a `datetime64[*]` array is coarsened to whole seconds and
+written as `<datetime:64,unix>`; `NaT` has no bovnar representation and is
+rejected, and `array_to_bvnr` prepends the `#!bovnar 1.1` directive so its
+output re-parses.
+
 **Strict by default:**
 
 * an array that mixes numeric encodings (e.g. `uint:8` and `float:64`) raises

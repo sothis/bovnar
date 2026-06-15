@@ -176,7 +176,7 @@ Options:
 | `version` | `#!bovnar M.N` directive parsing and strictness |
 | `identifiers` | Key syntax, length limits |
 | `strings` | Escape sequences, concatenation, length limits |
-| `datetime` | Timestamp family: epochs, range, version gating |
+| `datetime` | Timestamp family: epochs, range, version gating, ISO-8601 literals (spec 1.1) |
 | `numbers` | Integer and float literals, scientific notation |
 | `types` | All type families, widths, bases |
 | `default_synthesis` | Automatic type annotation inference |

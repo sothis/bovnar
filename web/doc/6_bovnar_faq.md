@@ -264,6 +264,7 @@ on the literal:
 - Literal containing `.` or `e` → `float:64`
 - Quoted string → `utf8`
 - Boolean keyword (`true`/`false`/`on`/`off`) → `bool`
+- ISO-8601 datetime literal (spec 1.1) → `datetime:64,unix`
 
 This is called default type synthesis and is convenient for configuration files
 and quick hand-authored data. For precision-sensitive use cases, always write an

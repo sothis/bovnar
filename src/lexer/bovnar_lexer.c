@@ -945,6 +945,30 @@ bool bvn_action_copy_reference_byte(bvnr_reader_t* p)
 	return bvn_push_reference_byte(p, reference_segment_body);
 }
 /*
+ * Array indexing inside a reference path (spec 1.1): &.matrix[0][1]. The bytes
+ * are captured verbatim into the path string — references are stored unresolved,
+ * so the index is only interpreted later by bvn_dom_lookup at the DOM layer. A
+ * '[' is gated on a declared spec >= 1.1; in a 1.0/unversioned document it stays
+ * the error_unexpected_input_byte a 1.0 reader reports. The reference_index
+ * sub-state is what lets a ']' that closes an index be told apart from a ']'
+ * that closes an enclosing array (which still ends the reference). */
+bool bvn_action_reference_index_open(bvnr_reader_t* p)
+{
+	if (!bvn_lex_supports_1_1(&p->lex)) {
+		bvn_lexer_set_error(p, error_unexpected_input_byte);
+		return false;
+	}
+	return bvn_push_reference_byte(p, reference_index);
+}
+bool bvn_action_reference_index_byte(bvnr_reader_t* p)
+{
+	return bvn_push_reference_byte(p, reference_index);
+}
+bool bvn_action_reference_index_close(bvnr_reader_t* p)
+{
+	return bvn_push_reference_byte(p, reference_segment_body);
+}
+/*
  * Entry to a binary octet stream. This only flips the state and signals the
  * validator; the actual length-prefixed binary framing is read out-of-band by
  * bvn_read_octet_stream because that data is not text and must bypass the

@@ -248,11 +248,47 @@ bvn_dom_node_t *bvn_dom_struct_get(const bvn_dom_node_t *node,
 	return NULL;
 }
 /*
- * Resolve a dotted path like ".a.b.c" to a node, walking struct members from
- * the document root. A leading dot is optional. Each segment is matched by key;
- * descending requires the current node to be a struct, so a path that tries to
- * descend into a scalar returns NULL. Segment length is capped at the local
- * buffer size, which also bounds key length for lookups.
+ * Descend an array node by a run of [N] indices (spec 1.1). A flat /-row matrix
+ * stores its cells row-major with arr.num_dims rows of arr.rows_per_dim[0]
+ * columns, so it consumes TWO indices ([row][col] -> items[row*cols + col]); a
+ * 1-D array (num_dims == 1) consumes ONE ([i] -> items[i]). Genuine nested
+ * arrays (the [[..],[..]] form) are 1-D at each level, so they descend one index
+ * per level. A partial index of a matrix (only [row]) has no node to return and
+ * yields NULL, as does any out-of-range index. Returns the addressed node, or
+ * NULL; *cur is advanced as indices are consumed.
+ */
+static bvn_dom_node_t *bvn_dom_apply_indices(
+	bvn_dom_node_t *cur, const uint32_t *idx, uint32_t nidx)
+{
+	uint32_t k = 0;
+	while (k < nidx) {
+		if (!cur || cur->type != BVN_DOM_ARRAY) return NULL;
+		uint32_t nd = cur->arr.num_dims;
+		if (nd >= 2u) {
+			if (k + 2u > nidx) return NULL;       /* matrix needs [row][col] */
+			uint32_t cols = cur->arr.rows_per_dim[0];
+			uint32_t r = idx[k], c = idx[k + 1u];
+			if (cols == 0u || r >= nd || c >= cols) return NULL;
+			uint32_t off = r * cols + c;
+			if (off >= cur->arr.count) return NULL;
+			cur = cur->arr.items[off];
+			k += 2u;
+		} else {
+			if (idx[k] >= cur->arr.count) return NULL;
+			cur = cur->arr.items[idx[k]];
+			k += 1u;
+		}
+	}
+	return cur;
+}
+/*
+ * Resolve a path like ".a.b.c" — or ".matrix[0][1]" / ".rows[2].name" with array
+ * indexing (spec 1.1) — to a node, walking struct members and array elements
+ * from the document root. A leading dot is optional. Descending into a struct
+ * member requires a struct; a [N] run requires an array (see
+ * bvn_dom_apply_indices). Any missing key, non-array index, out-of-range index,
+ * or malformed [N] returns NULL. This is also what the CLI `query` command and
+ * application-driven reference resolution use, so indexing works there too.
  */
 bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc,
 							   const char *path)
@@ -260,30 +296,57 @@ bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc,
 	if (!doc || !path) return NULL;
 	const char *p = path;
 	if (*p == '.') p++;
-	if (!*p) return NULL;
+	if (!*p || *p == '[') return NULL;     /* must start with a key */
 	bvn_dom_node_t *cur = NULL;
-	for (;;) {
-		const char *dot = strchr(p, '.');
-		uint32_t seg_len = dot ? (uint32_t)(dot - p) : (uint32_t)strlen(p);
+	bool first = true;
+	while (*p) {
+		/* a key segment runs up to the next '.', '[', or end */
+		const char *start = p;
+		while (*p && *p != '.' && *p != '[') p++;
+		uint32_t seg_len = (uint32_t)(p - start);
 		if (!seg_len) return NULL;
 		char segment[256];
 		if (seg_len >= sizeof(segment)) return NULL;
-		memcpy(segment, p, seg_len);
+		memcpy(segment, start, seg_len);
 		segment[seg_len] = '\0';
-		if (!cur) {
+		if (first) {
+			cur = NULL;
 			for (uint32_t i = 0; i < doc->count; i++) {
 				if (strcmp(doc->entries[i].key, segment) == 0) {
 					cur = doc->entries[i].value;
 					break;
 				}
 			}
+			first = false;
 		} else {
+			if (cur->type != BVN_DOM_STRUCT) return NULL;
 			cur = bvn_dom_struct_get(cur, segment);
 		}
 		if (!cur) return NULL;
-		if (!dot) break;
-		p = dot + 1;
-		if (cur->type != BVN_DOM_STRUCT) return NULL;
+		/* a run of [N] indices addressing the segment's array value */
+		if (*p == '[') {
+			uint32_t idx[32];
+			uint32_t nidx = 0;
+			while (*p == '[') {
+				p++;
+				if (*p < '0' || *p > '9') return NULL;
+				uint64_t v = 0;
+				while (*p >= '0' && *p <= '9') {
+					v = v * 10u + (uint64_t)(*p - '0');
+					if (v > UINT32_MAX) return NULL;
+					p++;
+				}
+				if (*p != ']') return NULL;
+				p++;
+				if (nidx >= 32u) return NULL;
+				idx[nidx++] = (uint32_t)v;
+			}
+			cur = bvn_dom_apply_indices(cur, idx, nidx);
+			if (!cur) return NULL;
+		}
+		if (*p == '.') { p++; if (!*p) return NULL; continue; }
+		if (*p == '\0') break;
+		return NULL;                       /* unexpected trailing byte */
 	}
 	return cur;
 }

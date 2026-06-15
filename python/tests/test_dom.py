@@ -190,6 +190,23 @@ class TestDomDocLookup:
         assert node is not None
         assert node.dom_type == DomType.STRUCT
 
+    def test_lookup_array_index(self):
+        doc = DomDoc.parse(b'#!bovnar 1.1\n.matrix = [10, 20, 30]/[40, 50, 60];\n')
+        assert doc.lookup('matrix[0][1]').as_i64() == 20
+        assert doc.lookup('matrix[1][0]').as_i64() == 40
+        assert doc.lookup('matrix[0]') is None       # partial index of a matrix
+        assert doc.lookup('matrix[0][9]') is None     # out of range
+
+    def test_lookup_1d_and_nested_index(self):
+        doc = DomDoc.parse(b'#!bovnar 1.1\n.a = [1, 2, 3];\n.n = [[1, 2], [3, 4]];\n')
+        assert doc.lookup('a[2]').as_i64() == 3
+        assert doc.lookup('n[0][1]').as_i64() == 2
+
+    def test_lookup_index_then_field(self):
+        doc = DomDoc.parse(
+            b'#!bovnar 1.1\n.rows = [{.name = "a";}, {.name = "b";}];\n')
+        assert doc.lookup('rows[1].name').as_str() == 'b'
+
 
 @needs_lib
 class TestDomNodeType:

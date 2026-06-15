@@ -561,8 +561,18 @@ sym-body-char = id-body-char ;
 (* library never dereferences it, so the target need not exist and    *)
 (* cycles are not detected. Resolution is the application's job.       *)
 
-reference    = "&" , ref-segment , {ref-segment} ;
+reference    = "&" , ref-segment , {ref-segment | ref-index} ;
 ref-segment  = "." , id-start , {ref-body-char} ;
+
+(* ref-index (spec 1.1): array indexing in a reference path, e.g.      *)
+(* &.matrix[0][1].  The bytes are captured verbatim into the path      *)
+(* string (references are stored unresolved); bvn_dom_lookup           *)
+(* interprets them at the DOM layer.  Gated on a "#!bovnar 1.1"         *)
+(* declaration — in a 1.0/unversioned document "[" in a reference is   *)
+(* error_unexpected_input_byte.  The reference_index sub-state          *)
+(* distinguishes a "]" that closes an index from one that closes an    *)
+(* enclosing array (which ends the reference).                         *)
+ref-index    = "[" , DIGIT , {DIGIT} , "]" ;
 
 (* ref-body-char: same byte set as sym-body-char, except that         *)
 (* "." (0x2E) is ACT_copy_reference_dot, which pushes the dot into   *)

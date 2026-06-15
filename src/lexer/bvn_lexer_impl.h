@@ -75,6 +75,7 @@ typedef enum state_e {
 	reference_intro,
 	reference_segment_intro,
 	reference_segment_body,
+	reference_index,
 	reference_outro,
 	copy_string_byte,
 	escape_from_copy,
@@ -166,6 +167,9 @@ enum action_id {
 	ACT_reference_intro,
 	ACT_copy_reference_dot,
 	ACT_copy_reference_byte,
+	ACT_reference_index_open,
+	ACT_reference_index_byte,
+	ACT_reference_index_close,
 	ACT_to_reference_outro,
 	ACT_octet_stream_intro,
 	ACT_struct_intro,
@@ -357,6 +361,9 @@ bool bvn_action_copy_symbol_byte          (bvnr_reader_t* p);
 bool bvn_action_reference_intro           (bvnr_reader_t* p);
 bool bvn_action_copy_reference_dot        (bvnr_reader_t* p);
 bool bvn_action_copy_reference_byte       (bvnr_reader_t* p);
+bool bvn_action_reference_index_open      (bvnr_reader_t* p);
+bool bvn_action_reference_index_byte      (bvnr_reader_t* p);
+bool bvn_action_reference_index_close     (bvnr_reader_t* p);
 bool bvn_action_octet_stream_intro        (bvnr_reader_t* p);
 bool bvn_action_struct_intro              (bvnr_reader_t* p);
 bool bvn_action_struct_outro              (bvnr_reader_t* p);

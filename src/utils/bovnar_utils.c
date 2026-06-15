@@ -2543,10 +2543,22 @@ bool bvn_validate_reference(const char* link)
 		p++;
 		while (*p && *p != '.') {
 			unsigned char c = (unsigned char)*p;
+			/* Array index suffix (spec 1.1): "[" digit+ "]" captured into the
+			 * path verbatim. A bare "]" (not closing an index) never appears in
+			 * a stored path — at the lexer it closes an enclosing array — so it
+			 * stays forbidden below. */
+			if (c == '[') {
+				p++;
+				if (*p < '0' || *p > '9') return false;
+				while (*p >= '0' && *p <= '9') p++;
+				if (*p != ']') return false;
+				p++;
+				continue;
+			}
 			if (c <= 0x20 || c == 0x7f || c == 0xc2) return false;
 			if (c == '"' || c == '#' || c == ',' || c == '/' ||
 				c == ';' || c == '<' || c == '=' || c == '>' ||
-				c == '[' || c == ']' || c == '{' || c == '}' ||
+				c == ']' || c == '{' || c == '}' ||
 				c == '!' || c == '$' || c == '%' || c == '&' ||
 				c == '\''|| c == '(' || c == ')' || c == '*' ||
 				c == ':' || c == '?' || c == '@' || c == '\\' ||

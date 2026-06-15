@@ -1045,6 +1045,19 @@ static const cf_case_t g_cases[] = {
 	ERROR_REF("REF-004", "references", "reference too long",
 	          ".r = &.abcdefghijklmno;",
 	          error_reference_too_long, 5),
+	/* Array indexing in a reference path (spec 1.1); stored unresolved, the
+	 * index syntax is captured verbatim into the path string. */
+	VALID_KEY("REF-005", "references", "single array index",
+	          "#!bovnar 1.1\n.r = &.a[0];", "r", ".a[0]"),
+	VALID_KEY("REF-006", "references", "two-dimensional index",
+	          "#!bovnar 1.1\n.r = &.matrix[0][1];", "r", ".matrix[0][1]"),
+	VALID_KEY("REF-007", "references", "index then field",
+	          "#!bovnar 1.1\n.r = &.rows[2].name;", "r", ".rows[2].name"),
+	VALID("REF-008", "references", "reference with an index inside an array",
+	      "#!bovnar 1.1\n.r = [&.a[0]];"),
+	ERROR_CASE("REF-009", "references", "index in a reference needs spec 1.1",
+	           ".r = &.a[0];",
+	           error_unexpected_input_byte),
 
 	/* ── NULL VALUES ─────────────────────────────────────────────── */
 	VALID("NUL-001", "null_values", "null scalar value",

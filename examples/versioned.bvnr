@@ -21,3 +21,16 @@
 .spec    = "bovnar 1.1";
 .reading = <float:64,m/s> 9.81;
 .count   = <uint:32> 1024;
+
+# ── spec 1.1 features (only available once the directive above is present) ──
+
+# richer string escapes: \u{...} for code points, \xHH for UTF-8 bytes
+.label   = "caf\u{e9} \u{2192} \xE2\x9C\x93";   # "café → ✓"
+
+# native time family: a timestamp (signed epoch seconds), not a duration
+.created = <datetime:64,unix> 1750000000;       # an instant
+.uptime  = <float:64,s> 3600.0;                 # a duration, for contrast
+
+# reference path indexing into arrays (resolved at the DOM layer)
+.matrix  = [10, 20, 30]/[40, 50, 60];
+.row0c1  = &.matrix[0][1];                       # resolves to 20

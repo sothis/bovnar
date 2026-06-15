@@ -622,6 +622,63 @@ static void test_references(void)
 	expect_parse(".i = 1; .s = \"x\"; .arr = [&.i, &.s];\n", error_none,
 				 "array of references is homogeneous by kind");
 }
+static void test_reference_indexing(void)
+{
+	bvn_dom_doc_t *d;
+	int64_t v;
+
+	/* The in-document &.matrix[0][1] literal lexes (1.1) and is stored verbatim. */
+	d = parse_doc("#!bovnar 1.1\n.matrix = [10, 20, 30]/[40, 50, 60];\n"
+				  ".row0c1 = &.matrix[0][1];\n");
+	if (d) {
+		ASSERT_EQ_UINT(bvn_dom_doc_get_parse_error(d), error_none,
+					   "indexed reference parses in a 1.1 document");
+		const char *path; uint32_t pl;
+		bvn_dom_node_t *r = bvn_dom_lookup(d, ".row0c1");
+		ASSERT_TRUE(bvn_dom_get_reference(r, &path, &pl) &&
+					pl == 13u && memcmp(path, ".matrix[0][1]", 13) == 0,
+					"indexed reference stores '.matrix[0][1]' unresolved");
+		/* resolve the index path at the DOM layer */
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".matrix[0][1]"), &v) &&
+					v == 20, ".matrix[0][1] resolves to 20");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".matrix[1][0]"), &v) &&
+					v == 40, ".matrix[1][0] resolves to 40");
+		ASSERT_NULL(bvn_dom_lookup(d, ".matrix[0]"),
+					"partial index of a flat matrix returns NULL");
+		ASSERT_NULL(bvn_dom_lookup(d, ".matrix[0][9]"),
+					"out-of-range column returns NULL");
+		ASSERT_NULL(bvn_dom_lookup(d, ".matrix[2][0]"),
+					"out-of-range row returns NULL");
+		bvn_dom_doc_destroy(d);
+	}
+	/* 1-D array: a single index; nested arrays descend one index per level. */
+	d = parse_doc("#!bovnar 1.1\n.a = [1, 2, 3];\n.n = [[1, 2], [3, 4]];\n");
+	if (d) {
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".a[2]"), &v) && v == 3,
+					".a[2] resolves to 3");
+		ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".n[0][1]"), &v) && v == 2,
+					".n[0][1] resolves to 2 (nested)");
+		ASSERT_NULL(bvn_dom_lookup(d, ".a[3]"), "1-D out-of-range returns NULL");
+		bvn_dom_doc_destroy(d);
+	}
+	/* index then struct field: .rows[1].name */
+	d = parse_doc("#!bovnar 1.1\n.rows = [{.name = \"a\";}, {.name = \"b\";}];\n");
+	if (d) {
+		bvn_dom_node_t *nm = bvn_dom_lookup(d, ".rows[1].name");
+		const char *s; uint32_t sl;
+		ASSERT_TRUE(bvn_dom_get_string(nm, &s, &sl) &&
+					sl == 1u && s[0] == 'b',
+					".rows[1].name resolves to \"b\"");
+		bvn_dom_doc_destroy(d);
+	}
+	/* indexing a non-array, and a malformed index, both fail to resolve. */
+	d = parse_doc("#!bovnar 1.1\n.x = 7;\n");
+	if (d) {
+		ASSERT_NULL(bvn_dom_lookup(d, ".x[0]"), "indexing a scalar returns NULL");
+		ASSERT_NULL(bvn_dom_lookup(d, ".x[a]"), "non-numeric index returns NULL");
+		bvn_dom_doc_destroy(d);
+	}
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -638,6 +695,7 @@ int main(void)
 	test_empty_array_semantics();
 	test_struct_unique_keys();
 	test_references();
+	test_reference_indexing();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

@@ -520,11 +520,24 @@
           else emitErr('error_unexpected_input_byte', here());
         }
         let ref = '', refTooLong = false;
-        while (!eof() && !/[ \t\r\n\v\f;,\[\]{}#]/.test(cur())) {
+        while (!eof()) {
+          const rc = cur();
+          if (/[ \t\r\n\v\f;,{}#]/.test(rc) || rc === ']') break;
+          /* Array index in a reference path (spec 1.1): &.matrix[0][1]. A '['
+             begins a [digits] group captured verbatim; a ']' inside it is part
+             of the path, whereas a ']' outside closes an enclosing array (above).
+             Lenient: not gated on a version directive here. */
+          if (rc === '[') {
+            ref += '['; advance();
+            while (!eof() && /\d/.test(cur())) { ref += cur(); advance(); }
+            if (!eof() && cur() === ']') { ref += ']'; advance(); }
+            else { emitErr('error_unexpected_input_byte', here()); break; }
+            continue;
+          }
           /* reference path cap (max_reference_length = 65535): the C reader
              errors when it would push the 65536th path byte */
           if (!refTooLong && ref.length >= 65535) { emitErr('error_reference_too_long', here()); refTooLong = true; }
-          ref += cur(); advance();
+          ref += rc; advance();
         }
         emit(EV.DATA, { kind: 'reference', value: ref, text: '&' + ref, start: st, endPos: peekTermPos() });
         return;

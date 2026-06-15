@@ -556,7 +556,7 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x2e] = ACT_copy_reference_dot, [0x2f] = ACT_NONE,
 		[0x3b] = ACT_value_outro, [0x3c] = ACT_NONE,
 		[0x3d] = ACT_NONE, [0x3e] = ACT_NONE,
-		[0x5b] = ACT_NONE, [0x5d] = ACT_array_outro,
+		[0x5b] = ACT_reference_index_open, [0x5d] = ACT_array_outro,
 		[0x7b] = ACT_NONE, [0x7d] = ACT_NONE,
 		[0x21] = ACT_NONE, [0x24] = ACT_NONE,
 		[0x25] = ACT_NONE, [0x26] = ACT_NONE,
@@ -569,6 +569,13 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5e] = ACT_NONE, [0x60] = ACT_NONE,
 		[0x7c] = ACT_NONE, [0x7e] = ACT_NONE,
 		[0xc2] = ACT_NONE,
+	},
+	[reference_index] = {
+		/* inside &.path[...]: digits accumulate the index; ']' closes it and
+		 * returns to the segment body (where another '[' or '.' may follow).
+		 * Everything else is illegal — the index is [digits]. */
+		BVN_DIGITS(ACT_reference_index_byte),
+		[0x5d] = ACT_reference_index_close,
 	},
 	[reference_outro] = {
 		BVN_WHITESPACE(ACT_ignore_whitespace),
@@ -788,6 +795,9 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_reference_intro]            = bvn_action_reference_intro,
 	[ACT_copy_reference_dot]         = bvn_action_copy_reference_dot,
 	[ACT_copy_reference_byte]        = bvn_action_copy_reference_byte,
+	[ACT_reference_index_open]       = bvn_action_reference_index_open,
+	[ACT_reference_index_byte]       = bvn_action_reference_index_byte,
+	[ACT_reference_index_close]      = bvn_action_reference_index_close,
 	[ACT_to_reference_outro]         = bvn_action_set_state,
 	[ACT_octet_stream_intro]         = bvn_action_octet_stream_intro,
 	[ACT_struct_intro]               = bvn_action_struct_intro,

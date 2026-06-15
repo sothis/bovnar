@@ -368,9 +368,10 @@ A **reference** is a dotted path to another key, introduced by `&`.
 **Syntax:**
 
 ```
-reference     = "&" ref-segment { ref-segment }
+reference     = "&" ref-segment { ref-segment | index }
 ref-segment   = "." id-start { ref-body-char }
 ref-body-char = same as symbol-body-char | "."
+index         = "[" digit { digit } "]"        (* spec 1.1 *)
 ```
 
 The stored text includes the leading dot and all intermediate dots:
@@ -406,6 +407,27 @@ A reference path is bounded by `max_reference_length` (`error_reference_too_long
 otherwise). In an array, references are homogeneous by **kind** — an array of
 references is uniform regardless of what its targets resolve to (their target
 types are unknown to the parser).
+
+**Array indexing (spec 1.1).** A reference path may address array elements with
+`[N]` index suffixes (`&.matrix[0][1]`). Like the rest of the path the index is
+captured **verbatim and unresolved** at the byte layer; it is interpreted only
+when an application resolves the path against the materialised tree
+(`bvn_dom_lookup`, which the CLI `query` command also uses). The index syntax is
+a 1.1 feature: in a 1.0/unversioned document a `[` in a reference is
+`error_unexpected_input_byte`, exactly as a 1.0 reader reports.
+
+Resolution semantics follow the array model (§7): a flat `/`-row matrix
+(`[10,20,30]/[40,50,60]`) is addressed as `[row][col]` — `&.matrix[0][1]` → `20`
+— and a 1-D array as `[i]`; genuine nested arrays (`[[1,2],[3,4]]`) descend one
+index per level. A partial index of a flat matrix (`&.matrix[0]`), an
+out-of-range index, or indexing a non-array does not resolve (the application
+sees no node).
+
+```bovnar
+#!bovnar 1.1
+.matrix  = [10, 20, 30]/[40, 50, 60];
+.row0c1  = &.matrix[0][1];   # resolves to 20
+```
 
 ### 4.6 Numbers
 

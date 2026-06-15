@@ -830,6 +830,26 @@ entirely to the application:
 
 ---
 
+**Can a reference index into an array?**
+
+Yes, since spec 1.1: a reference path may carry `[N]` index suffixes.
+
+```bovnar
+#!bovnar 1.1
+.matrix  = [10, 20, 30]/[40, 50, 60];
+.row0c1  = &.matrix[0][1];        # stored as ".matrix[0][1]"
+```
+
+As with the rest of a reference, the index is stored **verbatim and unresolved**;
+it is interpreted only when the application resolves the path against the
+materialised tree (`bvn_dom_lookup`, also used by the CLI `query` command), where
+`&.matrix[0][1]` resolves to `20`. A flat `/`-row matrix is addressed
+`[row][col]`, a 1-D array `[i]`, and nested arrays descend one index per level; a
+partial/out-of-range index simply doesn't resolve. Being a 1.1 feature, a `[` in
+a reference is `error_unexpected_input_byte` in a 1.0/unversioned document.
+
+---
+
 ## 10. Octet Streams
 
 **When should I use an octet stream?**

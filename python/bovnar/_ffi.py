@@ -180,6 +180,28 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_reader_get_recovery_count.restype  = c_uint64
     lib.bvnr_reader_get_recovery_count.argtypes = [c_void_p]
 
+    lib.bvnr_reader_get_declared_version.restype  = c_bool
+    lib.bvnr_reader_get_declared_version.argtypes = [
+        c_void_p, P(c_uint16), P(c_uint16),
+    ]
+
+    lib.bvnr_peek_version.restype  = c_bool
+    lib.bvnr_peek_version.argtypes = [
+        c_void_p, c_uint64, P(c_uint16), P(c_uint16),
+    ]
+
+    lib.bvnr_version.restype  = c_uint32
+    lib.bvnr_version.argtypes = []
+
+    lib.bvnr_version_string.restype  = c_char_p
+    lib.bvnr_version_string.argtypes = []
+
+    lib.bvnr_spec_version.restype  = None
+    lib.bvnr_spec_version.argtypes = [P(c_uint16), P(c_uint16)]
+
+    lib.bvnr_write_version.restype  = c_bool
+    lib.bvnr_write_version.argtypes = [c_void_p, c_uint16, c_uint16]
+
     lib.bvnr_writer_create.restype  = c_void_p
     lib.bvnr_writer_create.argtypes = []
 

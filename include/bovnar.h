@@ -42,18 +42,30 @@
 extern "C" {
 #endif
 /*
- * Library/format version. The spec is frozen at 1.0; the reference
- * implementation versions in lockstep with the Python package (pyproject.toml,
- * bovnar.__version__). BVNR_VERSION is an int that increases monotonically and
- * is safe for #if comparison, e.g. #if BVNR_VERSION >= 10000.
+ * Library/format version. The reference implementation versions in lockstep
+ * with the Python package (pyproject.toml, bovnar.__version__). BVNR_VERSION is
+ * an int that increases monotonically and is safe for #if comparison, e.g.
+ * #if BVNR_VERSION >= 10100.
  */
 #define BVNR_VERSION_MAJOR		1
-#define BVNR_VERSION_MINOR		0
+#define BVNR_VERSION_MINOR		1
 #define BVNR_VERSION_PATCH		0
 #define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
 					 (BVNR_VERSION_MINOR) * 100 + \
 					 (BVNR_VERSION_PATCH))
-#define BVNR_VERSION_STRING		"1.0.0"
+#define BVNR_VERSION_STRING		"1.1.0"
+/*
+ * Highest bovnar *spec* version this build understands. A document may declare
+ * the spec version it targets with a leading "#!bovnar <major>.<minor>"
+ * directive (see the spec, §"Version directive"); the reader parses it, exposes
+ * it via bvnr_reader_get_declared_version(), and — when bvnr_read_flags_t
+ * .strict_version is set — refuses a document whose declared version exceeds
+ * what this build supports. The spec version tracks the language; it is bumped
+ * only when the grammar/type system grows, independently of the release patch
+ * level above.
+ */
+#define BVNR_SPEC_VERSION_MAJOR		1
+#define BVNR_SPEC_VERSION_MINOR		1
 #define BVNR_MAX_UNIT_COMPONENTS		8
 #define BVN_MAX_INT_WIDTH			32768u
 /*
@@ -163,7 +175,16 @@ typedef enum error_code_e {
 	error_struct_shape_mismatch         = 40,
 	/* A struct (or the top-level document) repeats a key. Keys must be unique
 	 * within one scope so lookup, references and iteration always agree. */
-	error_duplicate_struct_key          = 41
+	error_duplicate_struct_key          = 41,
+	/* A leading "#!bovnar …" version directive is present but malformed — the
+	 * "!bovnar" prefix is followed by something that is not a "<major>.<minor>"
+	 * decimal version (bad digits, missing dot, trailing junk, overlong). */
+	error_invalid_spec_version          = 42,
+	/* The document declares a spec version newer than this build supports, and
+	 * bvnr_read_flags_t.strict_version was set. Without strict_version the
+	 * declared version is stored but not enforced (the parse continues and only
+	 * fails if it actually meets syntax the build does not implement). */
+	error_unsupported_spec_version      = 43
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,
@@ -327,6 +348,13 @@ typedef struct bvnr_read_flags_s {
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bool		continue_on_error;
 	bvnr_on_error_fn	on_error;
+	/* When true, a leading "#!bovnar <major>.<minor>" directive declaring a
+	 * spec version newer than this build supports (BVNR_SPEC_VERSION_*) is a
+	 * hard error_unsupported_spec_version. When false (the zero-init default)
+	 * the declared version is recorded — query it with
+	 * bvnr_reader_get_declared_version() — but not enforced. Production
+	 * consumers that must not silently misread a future document should set it. */
+	bool		strict_version;
 	uint64_t	_reserved[4];
 } bvnr_read_flags_t;
 typedef uint32_t bvn_unit_flags_t;
@@ -350,6 +378,12 @@ typedef struct bvnr_write_flags_s {
 	bool		continue_on_error;
 	bvnr_on_error_fn	on_error;
 	bvn_unit_flags_t	unit_flags;
+	/* When true, bvnr_open_write_* emits a leading
+	 * "#!bovnar <BVNR_SPEC_VERSION_MAJOR>.<BVNR_SPEC_VERSION_MINOR>" directive
+	 * before any value, so the produced document self-declares its spec
+	 * version. Equivalent to calling bvnr_write_version() right after open.
+	 * Off by default (zero-init). */
+	bool		emit_version;
 	uint64_t	_reserved[4];
 } bvnr_write_flags_t;
 typedef struct bvnr_source_s bvnr_source_t;
@@ -500,6 +534,27 @@ BVN_API uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);
 BVN_API uint32_t     bvnr_reader_get_error_byte  (const bvnr_reader_t* r);
 BVN_API uint64_t     bvnr_reader_get_error_offset(const bvnr_reader_t* r);
 BVN_API uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t* r);
+/*
+ * Spec version a document declared via a leading "#!bovnar <major>.<minor>"
+ * directive. Returns true and fills major/minor when the document carried a
+ * (well-formed) directive; returns false (leaving the outputs untouched) when
+ * it did not. Valid only after bvnr_read(). Either out pointer may be NULL.
+ */
+BVN_API bool bvnr_reader_get_declared_version(
+	const bvnr_reader_t* r, uint16_t* major, uint16_t* minor);
+/*
+ * Scan a buffer for a leading "#!bovnar <major>.<minor>" directive without a
+ * full parse (an optional UTF-8 BOM and leading whitespace are skipped).
+ * Returns true and fills major/minor on a well-formed directive, false
+ * otherwise. Either out pointer may be NULL.
+ */
+BVN_API bool bvnr_peek_version(
+	const void* buf, uint64_t len, uint16_t* major, uint16_t* minor);
+/* Runtime library version (BVNR_VERSION / BVNR_VERSION_STRING). */
+BVN_API uint32_t    bvnr_version(void);
+BVN_API const char* bvnr_version_string(void);
+/* Highest bovnar spec version this build understands (BVNR_SPEC_VERSION_*). */
+BVN_API void        bvnr_spec_version(uint16_t* major, uint16_t* minor);
 BVN_API bvnr_writer_t* bvnr_writer_create(void);
 BVN_API void           bvnr_writer_destroy(bvnr_writer_t* w);
 BVN_API bool bvnr_open_write_sink(
@@ -510,6 +565,15 @@ BVN_API bool bvnr_open_write_mem(
 	bool pretty, bvnr_write_flags_t* options);
 BVN_API bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data);
+/*
+ * Emit a leading "#!bovnar <major>.<minor>" version directive. Must be called
+ * immediately after bvnr_open_write_* and before any value is written; doing so
+ * later (once output has begun) is error_invalid_argument. Use it to round-trip
+ * a directive read from a source document, or pass BVNR_SPEC_VERSION_MAJOR /
+ * BVNR_SPEC_VERSION_MINOR to stamp the current spec version.
+ */
+BVN_API bool bvnr_write_version(
+	bvnr_writer_t* w, uint16_t major, uint16_t minor);
 BVN_API bool bvnr_write_finish(bvnr_writer_t* w);
 BVN_API error_code_t bvnr_writer_get_error(const bvnr_writer_t* w);
 BVN_API uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t* w);

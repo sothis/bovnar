@@ -61,6 +61,7 @@ from ._numpy import (to_numpy, to_pint_array, from_numpy, from_pint_array,
 
 __all__ = [
     'loads', 'dumps', 'dom_parse',
+    'version', 'spec_version', 'peek_version',
     'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
     'write_array',
@@ -98,7 +99,36 @@ __all__ = [
     'MAX_FILESIZE_BYTES',
 ]
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
+
+
+def version() -> str:
+    """Runtime library version string of the loaded shared library."""
+    from ._ffi import get_library
+    return get_library().bvnr_version_string().decode('ascii')
+
+
+def spec_version() -> tuple[int, int]:
+    """Highest bovnar spec version (major, minor) this build understands."""
+    import ctypes
+    from ._ffi import get_library
+    maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
+    get_library().bvnr_spec_version(ctypes.byref(maj), ctypes.byref(mn))
+    return (maj.value, mn.value)
+
+
+def peek_version(data: bytes | bytearray | str | memoryview):
+    """Return the (major, minor) spec version a document declares via a leading
+    ``#!bovnar M.N`` directive, or ``None`` if it carries no such directive."""
+    import ctypes
+    from ._ffi import get_library
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    buf = bytes(data)
+    maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
+    ok = get_library().bvnr_peek_version(buf, len(buf),
+                                         ctypes.byref(maj), ctypes.byref(mn))
+    return (maj.value, mn.value) if ok else None
 
 
 def loads(data: bytes | bytearray | str | memoryview,

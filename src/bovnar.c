@@ -577,6 +577,8 @@ static int cmd_validate(const char *filename)
 		close(fd);
 		return 1;
 	}
+	uint16_t vmaj = 0, vmin = 0;
+	bool has_version = bvnr_reader_get_declared_version(r, &vmaj, &vmin);
 	bvnr_reader_destroy(r);
 	close(fd);
 	/*
@@ -599,7 +601,10 @@ static int cmd_validate(const char *filename)
 		fprintf(stderr, "Validation failed: %s\n", bvn_error_to_string(herr));
 		return 1;
 	}
-	printf("%s: OK\n", filename);
+	if (has_version)
+		printf("%s: OK (declares bovnar %u.%u)\n", filename, vmaj, vmin);
+	else
+		printf("%s: OK\n", filename);
 	return 0;
 }
 static int cmd_query(const char *path, const char *filename)
@@ -672,6 +677,14 @@ static int cmd_pretty(const char *filename)
 	bvnr_write_flags_t wflags = {0};
 	if (!bvnr_open_write_sink(w, &sink, true, &wflags)) {
 		bvnr_writer_destroy(w); free(buf); return 1;
+	}
+	/* Preserve a leading "#!bovnar M.N" directive across the canonical
+	 * re-serialisation (ev_stream_start fires before the directive is parsed,
+	 * so peek the raw buffer and re-emit it up front). */
+	{
+		uint16_t vmaj = 0, vmin = 0;
+		if (bvnr_peek_version(buf, (uint64_t)size, &vmaj, &vmin))
+			bvnr_write_version(w, vmaj, vmin);
 	}
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (!r) { bvnr_writer_destroy(w); free(buf); return 1; }
@@ -2431,6 +2444,7 @@ static void usage(const char *prog)
 		"                  Multiplex files onto channels in one octet stream (stdout).\n"
 		"  mux list <file|->\n"
 		"                  List the channel/message sizes in a multiplexed stream.\n"
+		"  version       Print library and supported spec version\n"
 		"  bench [opts]\n"
 		"                  Run parsing throughput benchmark.\n"
 		"                  Options:\n"
@@ -2496,6 +2510,13 @@ int main(int argc, char **argv)
 		return cmd_mux(argc - 2, argv + 2);
 	} else if (strcmp(cmd, "bench") == 0) {
 		return cmd_bench(argc - 2, argv + 2);
+	} else if (strcmp(cmd, "version") == 0 ||
+	           strcmp(cmd, "--version") == 0) {
+		uint16_t smaj = 0, smin = 0;
+		bvnr_spec_version(&smaj, &smin);
+		printf("bovnar %s (spec %u.%u)\n",
+			bvnr_version_string(), smaj, smin);
+		return 0;
 	} else if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {
 		usage(argv[0]);
 		return 0;

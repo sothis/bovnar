@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (207 cases) ──→ for each test case:                │
+│  Test corpus (230 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -173,6 +173,7 @@ Options:
 | Group | Description |
 |-------|-------------|
 | `encoding` | UTF-8, BOM handling, byte class enforcement |
+| `version` | `#!bovnar M.N` directive parsing and strictness |
 | `identifiers` | Key syntax, length limits |
 | `strings` | Escape sequences, concatenation, length limits |
 | `numbers` | Integer and float literals, scientific notation |
@@ -437,10 +438,11 @@ specifies:
 | Group | Cases | What is tested |
 |-------|-------|---------------|
 | `encoding` | 9 | UTF-8 validity, BOM placement, byte classes |
+| `version` | 13 | `#!bovnar M.N` directive: valid, malformed, strictness (spec 1.1) |
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 17 | Escapes, concatenation, UTF-8, limits |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
-| `types` | 44 | All seven type families, widths, bases, errors |
+| `types` | 52 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
 | `symbols` | 6 | Bare-word values and limits |
 | `references` | 4 | Dotted paths and limits |
@@ -448,14 +450,14 @@ specifies:
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
-| `units` | 23 | SI/IEC prefixes, compound, inline, errors |
+| `units` | 25 | SI/IEC prefixes, compound, inline, errors |
 | `special_numbers` | 5 | `nan`, `inf`, `ninf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 12 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **207** | |
+| **Total** | **230** | |
 
 ---
 
@@ -466,7 +468,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..207
+1..230
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

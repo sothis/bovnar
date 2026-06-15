@@ -252,11 +252,30 @@ typedef struct bvnr_lexer_s {
 	uint32_t		resync_struct_depth;
 	uint8_t			resync_saved_struct_nesting;
 	uint64_t		recovery_count;
+	/* Leading "#!bovnar <major>.<minor>" version directive. The first comment's
+	 * bytes (those after '#') are captured into ver_buf as it is lexed, then
+	 * parsed once at first_comment_outro. ver_checked latches after that single
+	 * attempt so a *second* leading comment is never mistaken for a directive. */
+	bool			strict_version;
+	bool			ver_checked;
+	bool			ver_overflow;
+	bool			has_declared_version;
+	uint16_t		declared_major;
+	uint16_t		declared_minor;
+	uint8_t			ver_len;
+	uint8_t			ver_buf[32];
 } bvnr_lexer_t;
 extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];
 extern const state_t  bvn_action_target_state[ACT__count];
 extern const state_t  bvn_kw_advance_state[dimension_state];
+typedef enum bvn_verdir_e {
+	BVN_VERDIR_NONE,
+	BVN_VERDIR_INVALID,
+	BVN_VERDIR_OK
+} bvn_verdir_t;
+bvn_verdir_t bvn_parse_version_directive(
+	const uint8_t* s, uint32_t len, uint16_t* major, uint16_t* minor);
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src, const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
 void bvn_lex_destroy(bvnr_lexer_t* l);
 bool bvn_lex_run(bvnr_reader_t* r);

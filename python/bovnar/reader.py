@@ -108,7 +108,8 @@ class Reader:
                      on_verified,
                      on_unverified,
                      max_file_size: int,
-                     continue_on_error: bool) -> tuple:
+                     continue_on_error: bool,
+                     strict_version: bool = False) -> tuple:
 
         flags    = BvnrReadFlags()
         cb_refs  = []
@@ -133,6 +134,7 @@ class Reader:
             flags.on_unverified = cb
 
         flags.continue_on_error = continue_on_error
+        flags.strict_version    = strict_version
         return flags, cb_refs
 
     @staticmethod
@@ -191,7 +193,8 @@ class Reader:
                  on_verified: Callable | None = None,
                  on_unverified: Callable | None = None,
                  max_file_size: int = 0,
-                 continue_on_error: bool = False) -> None:
+                 continue_on_error: bool = False,
+                 strict_version: bool = False) -> None:
 
         self._check_open()
         if isinstance(data, memoryview):
@@ -200,7 +203,8 @@ class Reader:
             raise BovnarArgumentError("data must be bytes, bytearray, or memoryview")
 
         flags, cb_refs = self._build_flags(
-            on_verified, on_unverified, max_file_size, continue_on_error
+            on_verified, on_unverified, max_file_size, continue_on_error,
+            strict_version
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
@@ -234,14 +238,16 @@ class Reader:
                 on_verified: Callable | None = None,
                 on_unverified: Callable | None = None,
                 max_file_size: int = 0,
-                continue_on_error: bool = False) -> None:
+                continue_on_error: bool = False,
+                strict_version: bool = False) -> None:
 
         self._check_open()
         if not isinstance(fd, int) or fd < 0:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
 
         flags, cb_refs = self._build_flags(
-            on_verified, on_unverified, max_file_size, continue_on_error
+            on_verified, on_unverified, max_file_size, continue_on_error,
+            strict_version
         )
 
         src = BvnrSource()
@@ -342,5 +348,18 @@ class Reader:
     def recovery_count(self) -> int:
         self._check_open()
         return self._lib.bvnr_reader_get_recovery_count(self._ptr)
+
+    @property
+    def declared_version(self):
+        """The (major, minor) spec version declared by a leading
+        ``#!bovnar M.N`` directive, or ``None`` if the document carried none.
+        Valid after a read."""
+        import ctypes
+        self._check_open()
+        maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
+        if self._lib.bvnr_reader_get_declared_version(
+                self._ptr, ctypes.byref(maj), ctypes.byref(mn)):
+            return (maj.value, mn.value)
+        return None
 
 

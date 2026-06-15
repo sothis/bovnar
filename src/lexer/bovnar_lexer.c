@@ -845,20 +845,80 @@ bool bvn_action_struct_outro(bvnr_reader_t* p)
 	p->lex.next_state = struct_outro;
 	return true;
 }
+/*
+ * Parse the content of a leading version directive — the bytes *after* the
+ * leading '#', e.g. "!bovnar 1.1". Returns:
+ *   BVN_VERDIR_NONE    — no "!bovnar" prefix; this is an ordinary comment.
+ *   BVN_VERDIR_INVALID — the prefix matched but the version is malformed.
+ *   BVN_VERDIR_OK      — well-formed; major/minor are filled.
+ * The grammar is: "!bovnar" ws+ uint "." uint ws* (end). Each uint is decimal
+ * with no leading zero (except a bare "0") and must fit in uint16.
+ */
+bvn_verdir_t bvn_parse_version_directive(
+	const uint8_t* s, uint32_t len, uint16_t* major, uint16_t* minor)
+{
+	static const char pfx[] = "!bovnar";
+	const uint32_t pfx_len = 7u;
+	if (len < pfx_len || memcmp(s, pfx, pfx_len) != 0)
+		return BVN_VERDIR_NONE;
+	uint32_t i = pfx_len;
+	/* the prefix must be followed by whitespace, else it is a different word
+	 * (e.g. "#!bovnarish") and not our directive at all */
+	if (i >= len || (s[i] != ' ' && s[i] != '\t'))
+		return BVN_VERDIR_NONE;
+	while (i < len && (s[i] == ' ' || s[i] == '\t')) i++;
+	uint16_t out[2] = { 0, 0 };
+	for (int part = 0; part < 2; part++) {
+		if (i >= len || s[i] < '0' || s[i] > '9')
+			return BVN_VERDIR_INVALID;
+		bool leading_zero = (s[i] == '0');
+		uint32_t acc = 0, digits = 0;
+		while (i < len && s[i] >= '0' && s[i] <= '9') {
+			acc = acc * 10u + (uint32_t)(s[i] - '0');
+			if (acc > 0xffffu) return BVN_VERDIR_INVALID;
+			i++; digits++;
+		}
+		if (leading_zero && digits > 1) return BVN_VERDIR_INVALID;
+		out[part] = (uint16_t)acc;
+		if (part == 0) {
+			if (i >= len || s[i] != '.') return BVN_VERDIR_INVALID;
+			i++;
+		}
+	}
+	while (i < len && (s[i] == ' ' || s[i] == '\t')) i++;
+	if (i != len) return BVN_VERDIR_INVALID;   /* trailing junk */
+	if (major) *major = out[0];
+	if (minor) *minor = out[1];
+	return BVN_VERDIR_OK;
+}
+static inline void bvn_first_comment_capture(bvnr_lexer_t* l)
+{
+	if (l->ver_checked) return;
+	if (l->ver_len < (uint8_t)sizeof(l->ver_buf))
+		l->ver_buf[l->ver_len++] = (uint8_t)l->byte;
+	else
+		l->ver_overflow = true;
+}
 bool bvn_action_first_comment_intro(bvnr_reader_t* p)
 {
 	p->lex.last_state = p->lex.next_state;
 	p->lex.next_state = first_comment_intro;
+	if (!p->lex.ver_checked) {
+		p->lex.ver_len      = 0;
+		p->lex.ver_overflow = false;
+	}
 	return true;
 }
 bool bvn_action_first_comment_byte(bvnr_reader_t* p)
 {
+	bvn_first_comment_capture(&p->lex);
 	p->lex.next_state = (p->lex.byte == 0xefu)
 		? first_comment_after_ef : first_comment_intro;
 	return true;
 }
 bool bvn_action_first_comment_after_ef(bvnr_reader_t* p)
 {
+	bvn_first_comment_capture(&p->lex);
 	if (p->lex.byte == 0xbbu)      p->lex.next_state = first_comment_after_ef_bb;
 	else if (p->lex.byte == 0xefu) p->lex.next_state = first_comment_after_ef;
 	else                           p->lex.next_state = first_comment_intro;
@@ -870,14 +930,68 @@ bool bvn_action_first_comment_after_ef_bb(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_invalid_byte_order_mark);
 		return false;
 	}
+	bvn_first_comment_capture(&p->lex);
 	p->lex.next_state = (p->lex.byte == 0xefu)
 		? first_comment_after_ef : first_comment_intro;
 	return true;
 }
 bool bvn_action_first_comment_outro(bvnr_reader_t* p)
 {
+	bvnr_lexer_t* l = &p->lex;
 	p->lex.next_state = first_bom;
+	if (l->ver_checked)
+		return true;
+	l->ver_checked = true;
+	uint16_t major = 0, minor = 0;
+	bvn_verdir_t r = bvn_parse_version_directive(
+		l->ver_buf, l->ver_len, &major, &minor);
+	/* An overflowed capture that still begins with the directive prefix is an
+	 * over-long (therefore malformed) directive; one that does not is just a
+	 * long ordinary comment. */
+	if (l->ver_overflow) {
+		if (r == BVN_VERDIR_NONE)
+			return true;
+		bvn_lexer_set_error(p, error_invalid_spec_version);
+		return false;
+	}
+	if (r == BVN_VERDIR_NONE)
+		return true;
+	if (r == BVN_VERDIR_INVALID) {
+		bvn_lexer_set_error(p, error_invalid_spec_version);
+		return false;
+	}
+	l->has_declared_version = true;
+	l->declared_major       = major;
+	l->declared_minor       = minor;
+	bool supported = (major == BVNR_SPEC_VERSION_MAJOR &&
+	                  minor <= BVNR_SPEC_VERSION_MINOR);
+	if (l->strict_version && !supported) {
+		bvn_lexer_set_error(p, error_unsupported_spec_version);
+		return false;
+	}
 	return true;
+}
+bool bvnr_peek_version(
+	const void* buf, uint64_t len, uint16_t* major, uint16_t* minor)
+{
+	const uint8_t* b = (const uint8_t*)buf;
+	if (!b) return false;
+	uint64_t i = 0;
+	if (len >= 3 && b[0] == 0xefu && b[1] == 0xbbu && b[2] == 0xbfu)
+		i = 3;                                   /* skip UTF-8 BOM */
+	while (i < len && (b[i] == ' ' || b[i] == '\t' ||
+	                   b[i] == '\n' || b[i] == '\r'))
+		i++;
+	if (i >= len || b[i] != '#')
+		return false;
+	i++;                                         /* consume '#' */
+	uint64_t start = i;
+	while (i < len && b[i] != '\n' && b[i] != '\r')
+		i++;
+	uint64_t clen = i - start;
+	if (clen > UINT32_MAX) clen = UINT32_MAX;
+	return bvn_parse_version_directive(
+		b + start, (uint32_t)clen, major, minor) == BVN_VERDIR_OK;
 }
 bool bvn_action_type_null_then_value_outro(bvnr_reader_t* p)
 {
@@ -1804,6 +1918,7 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 		l->max_struct_nesting    = opts->max_struct_nesting;
 		l->max_array_nesting     = opts->max_array_nesting;
 		l->continue_on_error     = opts->continue_on_error;
+		l->strict_version        = opts->strict_version;
 	}
 	if (!l->max_identifier_length)	l->max_identifier_length	= max_identifier_length;
 	if (!l->max_number_length)		l->max_number_length		= max_number_length;

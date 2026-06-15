@@ -537,8 +537,23 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_array_element_type_mismatch: return "array_element_type_mismatch";
 	case error_struct_shape_mismatch:     return "struct_shape_mismatch";
 	case error_duplicate_struct_key:      return "duplicate_struct_key";
+	case error_invalid_spec_version:      return "invalid_spec_version";
+	case error_unsupported_spec_version:  return "unsupported_spec_version";
 	default:                              return "unknown_error";
 	}
+}
+uint32_t bvnr_version(void)
+{
+	return (uint32_t)BVNR_VERSION;
+}
+const char* bvnr_version_string(void)
+{
+	return BVNR_VERSION_STRING;
+}
+void bvnr_spec_version(uint16_t* major, uint16_t* minor)
+{
+	if (major) *major = (uint16_t)BVNR_SPEC_VERSION_MAJOR;
+	if (minor) *minor = (uint16_t)BVNR_SPEC_VERSION_MINOR;
 }
 typedef struct { const char* a; uint32_t len; value_base_unit_t u; } bu_entry_t;
 typedef struct { const char* a; uint32_t len; si_prefix_id_t   p; } si_entry_t;

@@ -231,6 +231,7 @@ class BvnrReadFlags(ctypes.Structure):
         ('on_verified',           EVENT_CALLBACK_FUNC),
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
+        ('strict_version',        ctypes.c_bool),
         ('_reserved',             ctypes.c_uint64 * 4),
     ]
 
@@ -251,6 +252,7 @@ class BvnrWriteFlags(ctypes.Structure):
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
         ('unit_flags',            ctypes.c_uint32),
+        ('emit_version',          ctypes.c_bool),
         ('_reserved',             ctypes.c_uint64 * 4),
     ]
 

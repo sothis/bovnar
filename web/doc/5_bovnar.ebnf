@@ -64,10 +64,29 @@
 (*   sequence. Struct values do NOT produce ev_data; they are          *)
 (*   signaled by ev_struct_start and ev_struct_end.                   *)
 
-stream       = [utf8-bom] , ws , {assignment , ws} ;
+stream       = [utf8-bom] , ws , [version-directive , ws] ,
+               {assignment , ws} ;
 
 (* UTF-8 BOM: legal only as the very first three bytes of the stream. *)
 utf8-bom     = "\xEF\xBB\xBF" ;
+
+(* Version directive (spec 1.1): an OPTIONAL leading comment of the    *)
+(* form "#!bovnar <major>.<minor>" declaring the spec version the      *)
+(* document targets. It is recognised only as the very first comment   *)
+(* (after the optional BOM and whitespace); a "#!bovnar …" on any       *)
+(* later line is an ordinary comment. Lexically it IS a comment, so a   *)
+(* spec-1.0 reader skips it transparently — the declaration is purely   *)
+(* additive. A 1.1+ reader parses it, exposes the version, and (in      *)
+(* strict mode) rejects a version it does not support. Each component   *)
+(* is a decimal integer with no leading zero (a bare "0" excepted).     *)
+(* A malformed version after the "!bovnar" prefix is                    *)
+(* error_invalid_spec_version.                                          *)
+version-directive = "#" , "!bovnar" , ws-mandatory ,
+                    version-int , "." , version-int ,
+                    {ws-char} , ("\x0D" | "\x0A" | (* eof *)) ;
+(* version-int: DIGIT , {DIGIT} with no leading zero (a bare "0" is the *)
+(* only form starting with "0"); each component must fit in a uint16.   *)
+version-int  = DIGIT , {DIGIT} ;
 
 (* Whitespace: blank characters and comments, freely intermixed.     *)
 ws           = {ws-char | comment} ;

@@ -46,6 +46,7 @@ typedef struct bvnr_serializer_s {
 	bool			need_semi;
 	bool			finished;
 	bool			stream_begun;
+	bool			version_emitted;
 	uint32_t		array_depth;
 	uint8_t			max_array_nesting;
 	uint8_t			max_struct_nesting;

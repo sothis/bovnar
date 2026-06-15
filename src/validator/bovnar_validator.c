@@ -1054,6 +1054,15 @@ uint64_t bvnr_reader_get_recovery_count(const bvnr_reader_t* r)
 {
 	return r ? r->lex.recovery_count : 0;
 }
+bool bvnr_reader_get_declared_version(
+	const bvnr_reader_t* r, uint16_t* major, uint16_t* minor)
+{
+	if (!r || !r->lex.has_declared_version)
+		return false;
+	if (major) *major = r->lex.declared_major;
+	if (minor) *minor = r->lex.declared_minor;
+	return true;
+}
 /*
  * Bind a reader to a source and arm it for bvnr_read. Tears down any previous
  * lexer state first so a single reader can be reused for many documents.

@@ -1018,6 +1018,10 @@ bool bvnr_open_write_sink(
 	bvn_writer_init(w, options);
 	w->ser.sink   = *sink;
 	w->ser.pretty = pretty;
+	if (options && options->emit_version)
+		return bvnr_write_version(w,
+			(uint16_t)BVNR_SPEC_VERSION_MAJOR,
+			(uint16_t)BVNR_SPEC_VERSION_MINOR);
 	return true;
 }
 bool bvnr_open_write_mem(
@@ -1055,6 +1059,31 @@ bool bvnr_write_event(
 		if (!w->ser.on_event(w->ser.event_userdata, ev, data))
 			return bvn_writer_set_error(w, error_scanner_callback_failed);
 	}
+	return true;
+}
+/*
+ * Emit a leading "#!bovnar <major>.<minor>" version directive. Legal only before
+ * any output has begun (right after open); afterwards it is error_invalid_argument.
+ * The directive is a single comment line, so it never affects separator
+ * bookkeeping — it is written straight through ahead of the value stream.
+ */
+bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)
+{
+	if (!w) return false;
+	if (w->val.last_error != error_none)
+		return false;
+	if (w->ser.finished || w->ser.stream_begun || w->ser.version_emitted)
+		return bvn_writer_set_error(w, error_invalid_argument);
+	char line[48];
+	int n = snprintf(line, sizeof(line), "#!bovnar %u.%u\n",
+		(unsigned)major, (unsigned)minor);
+	if (n <= 0 || (size_t)n >= sizeof(line))
+		return bvn_writer_set_error(w, error_invalid_argument);
+	if (!bvn_ser_push(&w->ser, line, (uint32_t)n))
+		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
+			? error_sink_buffer_exhausted
+			: error_writing_to_sink);
+	w->ser.version_emitted = true;
 	return true;
 }
 /*

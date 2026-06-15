@@ -1197,9 +1197,63 @@ static void test_write_string_vf_escapes(void)
 	bvnr_writer_destroy(w);
 }
 
+static void test_write_version_directive(void)
+{
+	printf("  test_write_version_directive...\n");
+
+	/* explicit bvnr_write_version before any value, round-tripped through the reader */
+	uint8_t out[4096];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, sizeof(out));
+	bvnr_writer_t *w = bvnr_writer_create();
+	ASSERT_NOT_NULL(w, "writer create");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, true, NULL), "open");
+	ASSERT_TRUE(bvnr_write_version(w, 1, 1), "write_version before any value");
+	ASSERT_TRUE(bvnr_write_uint(w, "x", 8, 7), "write a value after the directive");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish");
+	uint64_t n = bvnr_writer_bytes_written(w);
+	ASSERT_TRUE(n > 13 && memcmp(out, "#!bovnar 1.1\n", 13) == 0,
+		"output begins with the version directive");
+	uint16_t maj = 0, min = 0;
+	ASSERT_TRUE(bvnr_peek_version(out, n, &maj, &min) && maj == 1 && min == 1,
+		"emitted directive is re-readable");
+	bvnr_writer_destroy(w);
+
+	/* calling bvnr_write_version once output has begun is rejected */
+	bvnr_sink_to_mem(&sink, out, sizeof(out));
+	w = bvnr_writer_create();
+	ASSERT_NOT_NULL(w, "writer create 2");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, true, NULL), "open 2");
+	ASSERT_TRUE(bvnr_write_uint(w, "x", 8, 1), "write a value first");
+	ASSERT_FALSE(bvnr_write_version(w, 1, 1), "write_version after output is rejected");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
+		"late write_version sets error_invalid_argument");
+	bvnr_writer_destroy(w);
+
+	/* emit_version write flag stamps the current spec version on open */
+	bvnr_sink_to_mem(&sink, out, sizeof(out));
+	w = bvnr_writer_create();
+	ASSERT_NOT_NULL(w, "writer create 3");
+	if (!w) return;
+	bvnr_write_flags_t wf = {0};
+	wf.emit_version = true;
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, true, &wf), "open with emit_version");
+	ASSERT_TRUE(bvnr_write_uint(w, "x", 8, 1), "write a value");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish 3");
+	maj = min = 0;
+	ASSERT_TRUE(bvnr_peek_version(out, bvnr_writer_bytes_written(w), &maj, &min) &&
+		maj == BVNR_SPEC_VERSION_MAJOR && min == BVNR_SPEC_VERSION_MINOR,
+		"emit_version stamps the current spec version");
+	bvnr_writer_destroy(w);
+}
+
 int main(void)
 {
 	printf("Running bovnar_writer_test regression suite...\n");
+
+	test_write_version_directive();
 
 	test_write_simple_strings();
 	test_write_typed_integers();

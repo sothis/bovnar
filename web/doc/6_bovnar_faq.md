@@ -154,6 +154,38 @@ A BOM appearing inside any *subsequent* comment is valid UTF-8 and accepted with
 
 ---
 
+**Can a document declare which bovnar version it uses?**
+
+Yes, since spec 1.1. Put a directive on the first line:
+
+```bovnar
+#!bovnar 1.1
+.x = 42;
+```
+
+It is recognised only as the very first comment (after an optional BOM and
+whitespace). A reader records the declared version
+(`bvnr_reader_get_declared_version`, `bovnar query`/`validate` report it, and
+the Python `Reader.declared_version` / `bovnar.peek_version()` expose it), and a
+reader opened with `strict_version` rejects a version it does not support with
+`error_unsupported_spec_version`. A malformed directive is
+`error_invalid_spec_version`.
+
+---
+
+**Wait — isn't a comment supposed to be meaningless? How can `#!bovnar …` matter?**
+
+The version directive is the single, deliberate exception. Everywhere else a
+comment is semantically inert. The directive is *shaped* like a comment on
+purpose: that is exactly what makes it backward compatible — a spec-1.0 reader
+(which knows nothing about versions) skips it as a plain comment and parses the
+rest of the document normally, while a 1.1+ reader additionally recognises the
+`#!bovnar` prefix on the first line and acts on it. Nothing else about comment
+semantics changes, and a `#!bovnar …` on any line other than the first is still
+just a comment.
+
+---
+
 ## 3. Type System and Annotations
 
 **What are the seven type families?**

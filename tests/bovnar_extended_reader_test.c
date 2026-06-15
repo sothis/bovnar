@@ -598,9 +598,114 @@ static void test_parse_type_variations(void)
 	ASSERT_TRUE(!ctx.has_errors, "float:64 must parse");
 }
 
+/* Parse `payload` with an optional strict_version flag, reporting the latched
+ * error and the declared version (the reader is queried before destruction). */
+static error_code_t parse_with_version(const char *payload, bool strict,
+	bool *has_ver, uint16_t *maj, uint16_t *min)
+{
+	parse_ctx_t ctx = {0};
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata       = &ctx;
+	flags.on_verified    = on_verified;
+	flags.on_error       = on_error;
+	flags.strict_version = strict;
+	bvnr_reader_t *r = bvnr_reader_create();
+	if (!r) return error_invalid_argument;
+	error_code_t err = error_none;
+	if (bvnr_open_read_mem(r, payload, (uint32_t)strlen(payload), NULL, 0, &flags)) {
+		bvnr_read(r);
+		err = bvnr_reader_get_error(r);
+		bool h = bvnr_reader_get_declared_version(r, maj, min);
+		if (has_ver) *has_ver = h;
+	}
+	bvnr_reader_destroy(r);
+	return err;
+}
+
+static void test_version_directive(void)
+{
+	printf("  test_version_directive...\n");
+	bool has_ver; uint16_t maj, min;
+
+	/* declared version is captured and exposed */
+	has_ver = false; maj = min = 0;
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 1.0\n.x = 1;", false,
+			&has_ver, &maj, &min), error_none,
+		"supported directive parses");
+	ASSERT_TRUE(has_ver && maj == 1 && min == 0,
+		"declared version 1.0 is reported");
+
+	/* no directive -> no declared version */
+	has_ver = true; maj = min = 99;
+	ASSERT_EQ_INT(parse_with_version(".x = 1;", false, &has_ver, &maj, &min),
+		error_none, "document without a directive parses");
+	ASSERT_TRUE(!has_ver, "no declared version when there is no directive");
+
+	/* lenient (default): a newer version is accepted but still recorded */
+	has_ver = false; maj = min = 0;
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 2.5\n.x = 1;", false,
+			&has_ver, &maj, &min), error_none,
+		"newer version accepted in lenient mode");
+	ASSERT_TRUE(has_ver && maj == 2 && min == 5,
+		"newer declared version still recorded in lenient mode");
+
+	/* strict: newer major rejected */
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 2.0\n.x = 1;", true,
+			NULL, NULL, NULL), error_unsupported_spec_version,
+		"strict mode rejects a newer major");
+
+	/* strict: newer minor rejected */
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 1.99\n.x = 1;", true,
+			NULL, NULL, NULL), error_unsupported_spec_version,
+		"strict mode rejects a newer minor");
+
+	/* strict: supported version still accepted */
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 1.1\n.x = 1;", true,
+			NULL, NULL, NULL), error_none,
+		"strict mode accepts a supported version");
+
+	/* malformed directives are hard errors regardless of strictness */
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 1\n.x = 1;", false,
+			NULL, NULL, NULL), error_invalid_spec_version,
+		"missing minor is invalid");
+	ASSERT_EQ_INT(parse_with_version("#!bovnar 1.x\n.x = 1;", false,
+			NULL, NULL, NULL), error_invalid_spec_version,
+		"non-numeric minor is invalid");
+
+	/* a prefix lookalike and a 2nd-line directive are ordinary comments */
+	has_ver = true;
+	ASSERT_EQ_INT(parse_with_version("#!bovnarish 9.9\n.x = 1;", false,
+			&has_ver, NULL, NULL), error_none,
+		"prefix lookalike is an ordinary comment");
+	ASSERT_TRUE(!has_ver, "lookalike yields no declared version");
+	has_ver = true;
+	ASSERT_EQ_INT(parse_with_version("# c\n#!bovnar 9.9\n.x = 1;", false,
+			&has_ver, NULL, NULL), error_none,
+		"second-line directive is an ordinary comment");
+	ASSERT_TRUE(!has_ver, "second-line directive yields no declared version");
+
+	/* bvnr_peek_version mirrors the reader on a raw buffer */
+	maj = min = 0;
+	ASSERT_TRUE(bvnr_peek_version("#!bovnar 1.0\nrest", 17, &maj, &min) &&
+		maj == 1 && min == 0, "peek finds a leading directive");
+	ASSERT_TRUE(!bvnr_peek_version(".x = 1;", 7, NULL, NULL),
+		"peek returns false without a directive");
+
+	/* runtime version accessors */
+	ASSERT_TRUE(bvnr_version() == (uint32_t)BVNR_VERSION,
+		"bvnr_version matches the macro");
+	maj = min = 0;
+	bvnr_spec_version(&maj, &min);
+	ASSERT_TRUE(maj == BVNR_SPEC_VERSION_MAJOR && min == BVNR_SPEC_VERSION_MINOR,
+		"bvnr_spec_version matches the macros");
+}
+
 int main(void)
 {
 	printf("Running bovnar_extended_reader_test regression suite...\n");
+
+	test_version_directive();
 
 	test_parse_various_integer_bases();
 	test_parse_string_escapes();

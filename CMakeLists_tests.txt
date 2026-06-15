@@ -557,6 +557,13 @@ if(Python3_FOUND)
         "stream"
         60)
 
+    # Spec version directive (#!bovnar M.N): runtime/spec version accessors,
+    # peek_version, Reader.declared_version, strict-mode rejection.
+    _bvnr_pytest_lib(bvnr_py_version
+        test_version.py
+        "version"
+        60)
+
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.
@@ -678,6 +685,7 @@ _bvnr_cli_example(test)
 _bvnr_cli_example(units)
 _bvnr_cli_example(financial)
 _bvnr_cli_example(crypto_portfolio)
+_bvnr_cli_example(versioned)
 
 # ── json <-> bvnr converter ──────────────────────────────────────────────────
 # Round-trip fidelity: json -> bvnr -> json must reproduce the input (modulo

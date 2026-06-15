@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name            = "bovnar"
-version         = "1.0.0"
+version         = "1.1.0"
 description     = "Python bindings for the Bovnar (BVNR) typed, unit-aware serialisation format"
 readme          = "python/README.md"
 license         = "MIT"

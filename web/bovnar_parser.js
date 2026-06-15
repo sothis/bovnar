@@ -81,6 +81,24 @@
     ERROR:               'ev_error',
   };
 
+  /* Scan a leading "#!bovnar <major>.<minor>" version directive (spec 1.1),
+     mirroring the C bvnr_peek_version. Returns {major, minor} or null. The
+     directive is otherwise an ordinary comment, so the parsers below simply
+     skip it — this is a convenience for the playground UI, not a parse step. */
+  function peekVersion(text) {
+    let i = 0;
+    if (text.charCodeAt(0) === 0xfeff) i = 1;               /* BOM as one char */
+    while (i < text.length && /[ \t\r\n]/.test(text[i])) i++;
+    if (text[i] !== '#') return null;
+    let end = i + 1;
+    while (end < text.length && text[end] !== '\n' && text[end] !== '\r') end++;
+    const m = /^!bovnar[ \t]+(\d+)\.(\d+)[ \t]*$/.exec(text.slice(i + 1, end));
+    if (!m) return null;
+    if ((m[1].length > 1 && m[1][0] === '0') ||
+        (m[2].length > 1 && m[2][0] === '0')) return null;  /* no leading zero */
+    return { major: parseInt(m[1], 10), minor: parseInt(m[2], 10) };
+  }
+
   /* ── Main parser function ──────────────────────────────────────────── */
   function parseBovnar(text, cb) {
     let pos  = 0;
@@ -1439,9 +1457,9 @@
 
   /* ── Export ────────────────────────────────────────────────────────── */
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { parseBovnar, parseFaithful, EV };
+    module.exports = { parseBovnar, parseFaithful, peekVersion, EV };
   } else {
-    global.BovnarParser = { parseBovnar, parseFaithful, EV };
+    global.BovnarParser = { parseBovnar, parseFaithful, peekVersion, EV };
   }
 
 }(typeof window !== 'undefined' ? window : this));

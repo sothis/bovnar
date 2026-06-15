@@ -1,8 +1,8 @@
 # Bovnar Specification
 
-> **Version:** 1.0
-> **Status:** Stable
-> **Last updated:** 2026-06-01
+> **Version:** 1.1
+> **Status:** Draft (1.x development line; 1.0 remains the stable baseline)
+> **Last updated:** 2026-06-15
 
 ---
 
@@ -152,6 +152,53 @@ A BOM appearing **inside** any later comment or string is **valid UTF-8** and ac
 | Control (rejected) | `0x00–0x08`, `0x0E–0x1F`, `0x7F` (DEL) | Hard errors outside strings |
 | Safe ASCII | `0x20–0x7E` except reserved punctuation | Identifier/symbol/reference bodies |
 | High bytes | `0x80–0xFF` | UTF-8 multi-byte sequences |
+
+### 3.4 Version Directive (spec 1.1)
+
+A document **may** declare the spec version it targets with a directive on its
+very first line:
+
+```bovnar
+#!bovnar 1.1
+.x = 42;
+```
+
+**Form.** `#` `!bovnar` followed by one or more spaces/tabs, a `<major>.<minor>`
+decimal version, optional trailing whitespace, then end-of-line (LF/CR) or EOF.
+Each component is a decimal integer with no leading zero (a bare `0` excepted)
+and must fit in 16 bits.
+
+**Backward compatible by construction.** Lexically the directive *is* a comment
+(`#…`), so a spec-1.0 reader skips it transparently — declaring a version never
+breaks an older parser. This is the one place where a comment carries meaning;
+everywhere else comments remain semantically inert.
+
+**Recognition rules.**
+
+- It is recognised only as the **very first comment**, after an optional BOM and
+  leading whitespace. A `#!bovnar …` appearing on any later line is an ordinary
+  comment and is ignored.
+- `#!bovnar` not followed by whitespace (e.g. `#!bovnarish`) is an ordinary
+  comment, not a directive.
+- A directive prefix followed by a malformed version (missing component,
+  non-numeric, leading zero, or trailing junk) is `error_invalid_spec_version`.
+
+**Enforcement.** A 1.1+ reader records the declared version and exposes it
+(`bvnr_reader_get_declared_version`). By default a version newer than the reader
+supports is **accepted leniently** — recorded, but not rejected up front; the
+parse only fails if it later meets syntax the reader does not implement. A reader
+opened with `strict_version` instead rejects any unsupported version
+(`error_unsupported_spec_version`) at the directive. A reader supports spec
+`<major>.<minor>` when `major` equals its own and `minor` is ≤ its own
+(`BVNR_SPEC_VERSION_*`).
+
+```bovnar
+#!bovnar 1.1        # current — accepted
+#!bovnar 1.0        # older minor — accepted
+#!bovnar 1.9        # newer minor — lenient: accepted; strict: error
+#!bovnar 2.0        # newer major — lenient: accepted; strict: error
+#!bovnar 1          # malformed (no minor) — error_invalid_spec_version
+```
 
 ---
 
@@ -2149,6 +2196,11 @@ typedef enum error_code_e {
     /* A struct (or the top-level document) repeats a key. Keys must be unique
      * within one scope so lookup, references and iteration always agree. */
     error_duplicate_struct_key          = 41,
+    /* spec 1.1 — a leading "#!bovnar …" directive is present but malformed. */
+    error_invalid_spec_version          = 42,
+    /* spec 1.1 — the declared version exceeds what the reader supports and
+     * strict_version was set. */
+    error_unsupported_spec_version      = 43,
 } error_code_t;
 ```
 
@@ -2163,11 +2215,19 @@ implementation's version.
 version, which tracks the format version but may advance independently for
 implementation-only fixes. The C header defines `BVNR_VERSION_MAJOR`,
 `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the comparable integer
-`BVNR_VERSION` (`major*10000 + minor*100 + patch`, so `#if BVNR_VERSION >= 10000`
-tests "≥ 1.0.0"), and `BVNR_VERSION_STRING` (`"1.0.0"`). The Python package
-mirrors this as `bovnar.__version__`. These name the *implementation* release,
-not the frozen *format* version (which is 1.0); both read `1.0.0` for this
-release.
+`BVNR_VERSION` (`major*10000 + minor*100 + patch`, so `#if BVNR_VERSION >= 10100`
+tests "≥ 1.1.0"), and `BVNR_VERSION_STRING` (`"1.1.0"`). The Python package
+mirrors this as `bovnar.__version__`. Separately, `BVNR_SPEC_VERSION_MAJOR` /
+`BVNR_SPEC_VERSION_MINOR` name the highest **spec** version the build
+understands (`1.1`); `bvnr_version()`, `bvnr_version_string()` and
+`bvnr_spec_version()` expose both at runtime.
+
+**Declaring a document's version.** Since 1.1 a document may state which spec
+version it targets with a leading `#!bovnar <major>.<minor>` directive (§3.4).
+Because the directive is lexically a comment, this is fully backward compatible:
+a 1.0 reader ignores it. A 1.1+ reader records it
+(`bvnr_reader_get_declared_version`) and, in `strict_version` mode, rejects a
+version it does not support.
 
 **What 1.0 freezes.** The grammar is stable. A `.bvnr` document that is valid
 under spec 1.0 will remain valid, and will decode to the same values, under every
@@ -2184,7 +2244,10 @@ revisions:
   crypto currency codes may be added (a document never depends on a code being
   *absent*);
 - **new error codes** appended after the current maximum (existing numeric values
-  never change);
+  never change) — 1.1 appends `error_invalid_spec_version` (42) and
+  `error_unsupported_spec_version` (43);
+- the **optional version directive** (§3.4), added in 1.1: it is an ordinary
+  comment to any 1.0 reader, so adding one never invalidates a document;
 - new optional reader/writer flags and limits whose defaults preserve current
   behaviour.
 

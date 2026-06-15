@@ -1,0 +1,23 @@
+#!bovnar 1.1
+# versioned.bvnr — demonstrates the spec 1.1 version directive
+#
+# The first line above is a VERSION DIRECTIVE, not an ordinary comment:
+#
+#   #!bovnar <major>.<minor>
+#
+#   • It must be the very first line (an optional UTF-8 BOM and leading
+#     whitespace may precede it).
+#   • It declares the bovnar spec version this document targets.
+#   • Lexically it is still a comment, so a spec-1.0 reader skips it and parses
+#     the rest of the document unchanged — declaring a version never breaks an
+#     older parser.
+#   • A 1.1+ reader records it (bvnr_reader_get_declared_version /
+#     bovnar validate reports it / Python Reader.declared_version) and, in
+#     strict mode, refuses a version it does not support.
+#
+# A #!bovnar line anywhere other than the first line is an ordinary comment.
+
+.title   = "sensor frame";
+.spec    = "bovnar 1.1";
+.reading = <float:64,m/s> 9.81;
+.count   = <uint:32> 1024;

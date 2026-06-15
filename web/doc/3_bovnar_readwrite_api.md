@@ -247,6 +247,43 @@ if (!bvnr_read(r)) {
 
 ---
 
+### 7a. Version directive (spec 1.1)
+
+```c
+bool        bvnr_reader_get_declared_version(
+                const bvnr_reader_t *r, uint16_t *major, uint16_t *minor);
+bool        bvnr_peek_version(
+                const void *buf, uint64_t len, uint16_t *major, uint16_t *minor);
+uint32_t    bvnr_version(void);
+const char *bvnr_version_string(void);
+void        bvnr_spec_version(uint16_t *major, uint16_t *minor);
+```
+
+A document may begin with a `#!bovnar <major>.<minor>` directive (see spec §3.4).
+After `bvnr_read`, `bvnr_reader_get_declared_version` returns `true` and fills
+`major`/`minor` when the document carried one (either out pointer may be NULL).
+Set `bvnr_read_flags_t.strict_version` to reject a version newer than this build
+supports with `error_unsupported_spec_version`; by default such a version is
+recorded but accepted. A malformed directive is always
+`error_invalid_spec_version`.
+
+`bvnr_peek_version` scans a raw buffer for the directive without a full parse
+(handy before opening a writer to round-trip it). `bvnr_version` /
+`bvnr_version_string` return the library version; `bvnr_spec_version` returns the
+highest spec version this build understands (`BVNR_SPEC_VERSION_*`).
+
+```c
+uint16_t maj, min;
+if (bvnr_reader_get_declared_version(r, &maj, &min))
+    printf("document declares bovnar %u.%u\n", maj, min);
+```
+
+To emit a directive, call `bvnr_write_version` right after opening the writer
+(see §13), or set `bvnr_write_flags_t.emit_version` to stamp the current spec
+version automatically.
+
+---
+
 ### 8. `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`
 
 ```c
@@ -394,6 +431,7 @@ typedef struct bvnr_write_flags_s {
     void    *userdata;
     bool   (*on_event)(void *userdata, bvnr_event_t, bvnr_data_t *);
     bvn_unit_flags_t unit_flags;      /* controls unit annotation format */
+    bool     emit_version;            /* emit a leading "#!bovnar M.N" on open */
 
     /* ── Present for API symmetry with bvnr_read_flags_t;          ─
        the writer does not read or enforce these fields. Set to 0. */
@@ -579,6 +617,29 @@ static bool write_struct_end(bvnr_writer_t *w)
 {
     return bvnr_write_event(w, ev_struct_end, &(bvnr_data_t){0});
 }
+```
+
+---
+
+### 15a. `bvnr_write_version`
+
+```c
+bool bvnr_write_version(bvnr_writer_t *w, uint16_t major, uint16_t minor);
+```
+
+Emit a leading `#!bovnar <major>.<minor>` version directive (spec §3.4). Must be
+called immediately after `bvnr_open_write_*` and before any value; calling it
+once output has begun is `error_invalid_argument`. Use it to round-trip a
+directive read from a source document, or pass `BVNR_SPEC_VERSION_MAJOR` /
+`BVNR_SPEC_VERSION_MINOR` to stamp the current spec version. Setting
+`bvnr_write_flags_t.emit_version` is equivalent to calling it with the current
+spec version right after open.
+
+```c
+bvnr_open_write_sink(w, &sink, true, NULL);
+bvnr_write_version(w, 1, 1);          /* "#!bovnar 1.1\n" */
+bvnr_write_uint(w, "port", 16, 443);
+bvnr_write_finish(w);
 ```
 
 ---

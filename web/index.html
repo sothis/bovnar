@@ -3294,7 +3294,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
         <div class="syntax-def-key">&lt;family:width,unit&gt;</div>
         <div class="syntax-def-val">Type Annotation</div>
         <div class="syntax-def-text">
-          Six families: <span style="font-family:var(--mono);color:var(--cyan);font-size:0.85em">uint sint float float_fix float_dec utf8</span>. Width in bits. Unit in SI notation. All are optional.
+          Eight families: <span style="font-family:var(--mono);color:var(--cyan);font-size:0.85em">uint sint float float_fix float_dec utf8 bool datetime</span> (datetime is spec 1.1). Width in bits. Unit in SI notation. All are optional.
         </div>
       </div>
       <div class="syntax-def reveal reveal-delay-1">
@@ -3330,7 +3330,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
         <div class="feature-tag">Type System</div>
         <div class="feature-title">Strong, optional typing</div>
         <div class="feature-desc">
-          Six type families with explicit bit-width and numeric base. Defaults are defined,
+          Eight type families with explicit bit-width and (for numbers) a numeric base. Defaults are defined,
           not guessed. Annotate when precision matters; omit when it doesn't.
         </div>
         <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span>

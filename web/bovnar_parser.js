@@ -94,12 +94,15 @@
                                      the C reader emits ONE error and resyncs to the
                                      enclosing statement ';', so we unwind without
                                      emitting further cascade errors */
-    /* The C lexer caps struct and array nesting independently at 64 levels
-       (bvn_val_impl.h max_struct_nesting/max_array_nesting); past that it emits
-       error_struct_nesting_too_high / error_array_nesting_too_high. Without a
-       counter the recursive descent below would throw an uncaught RangeError on
-       deeply nested input (a pasteable string of '[' or '{'). */
-    const MAX_NESTING = 64;
+    /* The C reader caps struct and array nesting independently; past the cap it
+       emits error_struct_nesting_too_high / error_array_nesting_too_high. The
+       bare default (an unset flag) is 64, but every bundled entry point — the
+       CLI, the DOM builder, the canon writer and the Python binding — raises it
+       to the uint8_t maximum of 255, which is the limit a playground user
+       actually experiences (and what the examples document). Match 255 here.
+       The counter also prevents an uncaught RangeError from the recursive
+       descent below on deeply nested input (a pasteable string of '[' or '{'). */
+    const MAX_NESTING = 255;
     let arrayDepth = 0, structDepth = 0;
 
     function emit(type, data, posOverride) {

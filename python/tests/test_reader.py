@@ -271,6 +271,32 @@ class TestNestedStructures:
         structs = [e for e in events if e == Event.STRUCT_START]
         assert len(structs) == 4
 
+    def test_reader_nesting_matches_cli_limit(self):
+        # Regression: _build_flags left the nesting limit at the reader's bare
+        # 64 default, so loads()/read_mem rejected depth-65..255 documents that
+        # the CLI, dom_parse() and stream.py (all 255) accept. The Reader must
+        # use the same 255 hard cap; 256 is still rejected.
+        def depth_ok(builder, d):
+            src = builder(d).encode()
+            cnt = [0]
+            def cb(ev, _d):
+                if ev == Event.STRUCT_START or ev == Event.ARRAY_ROW_START:
+                    cnt[0] += 1
+                return True
+            try:
+                with Reader() as r:
+                    r.read_mem(src, on_verified=cb)
+                return True
+            except BovnarParseError:
+                return False
+
+        struct = lambda d: '.a = ' + '{.b = ' * d + '1' + ';}' * d + ';'
+        array  = lambda d: '.a = ' + '[' * d + '1' + ']' * d + ';'
+        for builder in (struct, array):
+            assert depth_ok(builder, 65)
+            assert depth_ok(builder, 255)
+            assert not depth_ok(builder, 256)
+
     def test_array_element_count(self, array_1d):
         data_events = []
         def cb(ev, d):

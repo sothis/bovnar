@@ -114,6 +114,13 @@ class Reader:
         cb_refs  = []
 
         flags.max_file_size = max_file_size
+        # Match the nesting limit used by the CLI, the DOM builder and stream.py
+        # (the uint8_t hard cap, 255) rather than the reader's bare 64 default,
+        # so loads()/read_mem accept the same documents those paths do. Leaving
+        # these at 0 would default to 64 and surprise users with a rejection at
+        # depth 65 for a document the CLI and dom_parse() accept.
+        flags.max_struct_nesting = 255
+        flags.max_array_nesting  = 255
 
         if on_verified is not None:
             cb = self._wrap_callback(on_verified)

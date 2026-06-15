@@ -389,8 +389,8 @@ Attach `sink` to the writer and configure it. Must be called before any `bvnr_wr
 ```c
 typedef struct bvnr_write_flags_s {
     /* ── Writer enforces these ─────────────────────────────────── */
-    uint8_t  max_struct_nesting;      /* 0 → 255 (UINT8_MAX) internal default */
-    uint8_t  max_array_nesting;       /* 0 → 255 (UINT8_MAX) internal default */
+    uint8_t  max_struct_nesting;      /* 0 → 64 internal default; hard cap 255 */
+    uint8_t  max_array_nesting;       /* 0 → 64 internal default; hard cap 255 */
     void    *userdata;
     bool   (*on_event)(void *userdata, bvnr_event_t, bvnr_data_t *);
     bvn_unit_flags_t unit_flags;      /* controls unit annotation format */

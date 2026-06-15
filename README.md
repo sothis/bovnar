@@ -552,6 +552,8 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 
+See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1 draft).
+
 ---
 
 ## License

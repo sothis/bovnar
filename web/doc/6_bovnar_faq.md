@@ -1311,4 +1311,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification (v1.0)*
+*End of Bovnar FAQ — Specification (v1.1, draft)*

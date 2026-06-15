@@ -940,5 +940,5 @@ nan  inf  ninf
 
 ---
 
-*Bovnar Specification (v1.0) — format by the Bovnar project.*
+*Bovnar Specification (v1.1, draft) — format by the Bovnar project.*
 

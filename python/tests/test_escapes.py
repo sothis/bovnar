@@ -49,3 +49,21 @@ def test_gated_on_version(doc):
     with pytest.raises(BovnarParseError) as ei:
         bovnar.loads(doc)
     assert ei.value.code == ErrorCode.ILLEGAL_ESCAPE_SEQUENCE
+
+
+@needs_lib
+@pytest.mark.parametrize("doc", [
+    '#!bovnar 1.1\n.s = "\\u{0}";',   # NUL
+    '#!bovnar 1.1\n.s = "\\x01";',    # control byte
+    '#!bovnar 1.1\n.s = "\\x7f";',    # DEL
+])
+def test_control_bytes_rejected(doc):
+    # a control byte may not be smuggled into a string via an escape
+    with pytest.raises(BovnarParseError) as ei:
+        bovnar.loads(doc)
+    assert ei.value.code == ErrorCode.UNEXPECTED_INPUT_BYTE
+
+
+@needs_lib
+def test_whitespace_control_allowed():
+    assert bovnar.loads('#!bovnar 1.1\n.s = "a\\x09b";') == {"s": "a\tb"}

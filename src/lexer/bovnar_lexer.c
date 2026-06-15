@@ -355,6 +355,18 @@ bool bvn_action_escape_u_intro(bvnr_reader_t* p)
 	p->lex.next_state = esc_u_open;
 	return true;
 }
+/*
+ * A `\x`/`\u{}` escape may not smuggle an ASCII control byte into a string that
+ * a raw byte could not — the lexer rejects raw 0x00–0x08, 0x0E–0x1F and 0x7F in
+ * strings (BVN_REJECT_ASCII_CTRL), and the canonical writer cannot emit them, so
+ * accepting them via an escape would be an un-serialisable round-trip break.
+ * The whitespace controls 0x09–0x0D stay allowed (they are exactly what the
+ * named escapes \t \n \v \f \r produce). For arbitrary bytes, use an octet stream.
+ */
+static inline bool bvn_is_string_ctrl_reject(uint32_t b)
+{
+	return b <= 0x08u || (b >= 0x0Eu && b <= 0x1Fu) || b == 0x7Fu;
+}
 bool bvn_action_escape_x_d1(bvnr_reader_t* p)
 {
 	int v = bvn_hexval(p->lex.byte);
@@ -373,7 +385,12 @@ bool bvn_action_escape_x_d2(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_illegal_escape_sequence);
 		return false;
 	}
-	if (!bvn_string_push_byte(p, (uint8_t)((p->lex.esc_x_hi << 4) | v)))
+	uint8_t b = (uint8_t)((p->lex.esc_x_hi << 4) | v);
+	if (bvn_is_string_ctrl_reject(b)) {
+		bvn_lexer_set_error(p, error_unexpected_input_byte);
+		return false;
+	}
+	if (!bvn_string_push_byte(p, b))
 		return false;
 	p->lex.str_has_raw_escape = true;
 	p->lex.next_state = copy_string_byte;
@@ -400,6 +417,12 @@ bool bvn_action_escape_u_hex(bvnr_reader_t* p)
 		uint32_t cp = p->lex.esc_u_acc;
 		if (cp > 0x10FFFFu || (cp >= 0xD800u && cp <= 0xDFFFu)) {
 			bvn_lexer_set_error(p, error_invalid_codepoint);
+			return false;
+		}
+		/* an ASCII control scalar (other than the whitespace controls) is no
+		 * more legal in a string via \u than as a raw byte */
+		if (bvn_is_string_ctrl_reject(cp)) {
+			bvn_lexer_set_error(p, error_unexpected_input_byte);
 			return false;
 		}
 		uint8_t buf[4];

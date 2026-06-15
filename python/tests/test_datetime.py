@@ -59,6 +59,25 @@ def test_plain_dumps_has_no_version_directive():
 
 
 @needs_lib
+def test_unix_epoch_datetime_roundtrips():
+    # the default (unix) epoch must still emit a <datetime> annotation, else the
+    # value reloads as a plain int and loses its family
+    doc = bovnar.loads('#!bovnar 1.1\n.t = <datetime:64,unix> 100;', typed=True)
+    out = bovnar.dumps(doc)
+    assert b'datetime' in out and out.startswith(b'#!bovnar 1.1\n')
+    doc2 = bovnar.loads(out, typed=True)
+    assert int(doc2['t'].vtype.family) == int(bovnar.ValueTypeFamily.DATETIME)
+    assert doc2['t'].value == 100
+
+
+@needs_lib
+def test_typed_array_dumps_does_not_crash():
+    # loads(typed=True) yields Quantity elements; dumps must handle them
+    assert bovnar.loads(bovnar.dumps(bovnar.loads('.a = [1, 2, 3];',
+                                                  typed=True))) == {'a': [1, 2, 3]}
+
+
+@needs_lib
 def test_gated_on_version():
     with pytest.raises(BovnarParseError) as ei:
         bovnar.loads('.t = <datetime> 1;')

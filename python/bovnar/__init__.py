@@ -584,6 +584,11 @@ def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit) -> bool:
     fam = int(vt.family)
     if fam == int(ValueTypeFamily.PLAIN):
         return False
+    # datetime is its own family — it must always be annotated (else the value
+    # reloads as a plain integer, losing the timestamp semantics), even for the
+    # default unix epoch / width 64.
+    if fam == int(ValueTypeFamily.DATETIME):
+        return True
     if fam in (int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.FLOAT_DEC)):
         return True
     if _has_real_unit(vu):
@@ -699,6 +704,13 @@ def _emit_array_element(w: Writer, elem) -> None:
     _TOKEN_IS_ARRAY_STRING = 6
     _TOKEN_IS_BOOL         = 15
     _TOKEN_IS_NULL_VALUE   = 9
+
+    # A typed load (loads(typed=True)) yields Quantity elements. Array elements
+    # are written bare (bovnar arrays carry no per-element type annotation), so
+    # emit the decoded scalar; the element's own annotation is not preserved.
+    if isinstance(elem, Quantity):
+        _emit_array_element(w, elem.value)
+        return
 
     if elem is None:
         d = BvnrData()

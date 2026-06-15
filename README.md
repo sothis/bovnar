@@ -15,6 +15,7 @@ In scientific and industrial systems, the expensive failures are rarely bad synt
 Bovnar closes that gap. Every value in a `.bvnr` document carries its own type family, bit-width, numeric base, and **physical unit** — inline, in the byte stream, with no external schema. The unit is not a comment or a naming convention; it is part of the value and is validated by the parser. Annotate a measurement as `m/s` and write a mismatched inline unit, and parsing fails with `error_unit_mismatch`. Hand the file to anyone and they have everything required to interpret — and to dimensionally trust — every reading.
 
 ```bovnar
+#!bovnar 1.1                                 # optional spec-version directive
 # A self-describing configuration document
 .config = {
     .host      = "api.example.com";
@@ -28,8 +29,10 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 .velocity     = <float:64,m/s> 9.81;
 .price        = <float_dec:64,$USD> 19.99;
 .btc_balance  = <uint:64,$BTC> 547820000;   # satoshis
+.created      = <datetime:64,unix> 1750000000;   # a timestamp (spec 1.1)
 .payload      = \x00 … binary stream … \x00;
 .matrix       = [1, 2, 3]/[4, 5, 6];
+.cell         = &.matrix[0][1];             # reference indexing (spec 1.1) → 20
 ```
 
 ---
@@ -49,7 +52,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) approximates the C reference event stream (lenient: it does not synthesise default type annotations or perform type/value validation) and powers an interactive single-file web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 259-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 264-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -64,13 +67,15 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 | Float | `[-]digits[.digits][e[±]digits]` | `3.14`, `1e-6` |
 | Special float | `nan` `inf` `ninf` | `.x = nan;` |
 | Boolean | `true` `false` `on` `off` (`<bool>`) | `.b = on;` |
-| String | `"…"` with C-style escapes | `"hello\nworld"` |
+| String | `"…"` with C-style escapes (`\u{…}`/`\xHH` in spec 1.1) | `"hello\nworld"`, `"caf\u{e9}"` |
 | Symbol | bare identifier (no quotes) | `ok`, `Monday` |
-| Reference | `&.path.to.key` | `&.config.host` |
+| Reference | `&.path.to.key`; array indexing `&.path[i][j]` (spec 1.1) | `&.config.host`, `&.matrix[0][1]` |
 | Array | `[ … ]` rows separated by `/` | `[1,2]/[3,4]` |
 | Struct | `{ .key = val; … }` | `{.x = 1; .y = 2;}` |
 | Null | empty slot or `null` keyword | `.x = ;`, `.x = null;` |
 | Octet stream | `\x00 … binary … \x00` | raw bytes |
+| Version directive (spec 1.1) | `#!bovnar <major>.<minor>` (first line) | `#!bovnar 1.1` |
+| Datetime (spec 1.1) | `<datetime:width,epoch>` signed epoch seconds | `<datetime:64,unix> 1750000000` |
 
 ---
 
@@ -312,7 +317,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 259-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 264-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -540,7 +545,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (259 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (264 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 

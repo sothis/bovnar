@@ -717,6 +717,7 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 | `vt_float` | Number or string (may have `.`, `e`/`E`; base 16 strings use `p`/`P`) — only base 10 or 16 |
 | `vt_float_fix` | Number or string (may have `.`, `e`/`E`) — base 10 only |
 | `vt_float_dec` | Number or string (may have `.`, `e`/`E`) — base 10 only |
+| `vt_datetime` (spec 1.1) | Number only — a decimal signed integer (epoch seconds); `.`/`e` and string carriers are rejected |
 
 ### 6.2 Validation Rules per Numeric Type
 
@@ -1890,6 +1891,7 @@ typedef enum value_type_family_e {
     vt_float_fix,  /* fixed-point binary, Q-format; Q stored in value_type_spec_t.base */
     vt_float_dec,  /* IEEE 754-2008 decimal floating-point                               */
     vt_bool,       /* boolean (true/false/on/off); see §4.4 and §6.1                     */
+    vt_datetime,   /* spec 1.1 — timestamp: signed epoch-seconds; see §5                  */
     vt_illegal
 } value_type_family_t;
 

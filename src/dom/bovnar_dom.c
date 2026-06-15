@@ -325,7 +325,7 @@ bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc,
 		if (!cur) return NULL;
 		/* a run of [N] indices addressing the segment's array value */
 		if (*p == '[') {
-			uint32_t idx[32];
+			uint32_t idx[32] = {0};
 			uint32_t nidx = 0;
 			while (*p == '[') {
 				p++;

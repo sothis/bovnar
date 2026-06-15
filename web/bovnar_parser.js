@@ -315,7 +315,7 @@
 
     /* The seven type families, as a DFA: the C lexer accepts only a prefix that
        can still complete one of these, rejecting the first deviating byte. */
-    const FAMILIES = ['uint', 'sint', 'float', 'float_fix', 'float_dec', 'utf8', 'bool'];
+    const FAMILIES = ['uint', 'sint', 'float', 'float_fix', 'float_dec', 'utf8', 'bool', 'datetime'];
     const isFamPrefix = (s) => FAMILIES.some((f) => f.indexOf(s) === 0);
 
     /* Parse a type annotation body (opening '<' already consumed). */
@@ -369,6 +369,10 @@
           } else if (/^q\d+$/.test(raw)) {
             hasQ = true; q = parseInt(raw.slice(1), 10);
             emit(EV.TYPE_ANN_PARAM, { kind: 'q', value: q, text: raw });
+          } else if (family === 'datetime') {
+            /* datetime's bare-word parameter is an epoch name (unix/tai/…),
+               not a physical unit — accept it leniently without unit parsing. */
+            emit(EV.TYPE_ANN_PARAM, { kind: 'epoch', text: raw });
           } else {
             emit(EV.TYPE_ANN_PARAM, { kind: 'unit', text: raw });
             unitCount++; unitText = raw;
@@ -407,6 +411,11 @@
         const wEff = (hasWidth && width > 0) ? width : 64;
         if (hasWidth && width !== 0 && [16, 32, 64, 128, 256].indexOf(width) < 0) specOk = false;
         else if (hasQ && (q >= wEff || q > 256)) specOk = false;
+      } else if (family === 'datetime') {
+        /* datetime (spec 1.1): signed-int carrier with width (<=32768) and one
+           epoch-name parameter; a numeric base/q/unit is illegal. */
+        if (hasBase || hasQ || unitCount > 0) specOk = false;
+        else if (hasWidth && width > 32768) specOk = false;
       }
 
       let annErr = false;
@@ -533,8 +542,11 @@
              Lenient: not gated on a version directive here. */
           if (rc === '[') {
             ref += '['; advance();
-            while (!eof() && /\d/.test(cur())) { ref += cur(); advance(); }
-            if (!eof() && cur() === ']') { ref += ']'; advance(); }
+            let nd = 0;
+            while (!eof() && /\d/.test(cur())) { ref += cur(); advance(); nd++; }
+            /* the C lexer requires >=1 digit (reference_index_first), so an
+               empty "[]" is rejected with unexpected_input_byte at the ']' */
+            if (nd > 0 && !eof() && cur() === ']') { ref += ']'; advance(); }
             else { emitErr('error_unexpected_input_byte', here()); break; }
             continue;
           }

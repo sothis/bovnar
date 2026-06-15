@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (259 cases) ──→ for each test case:                │
+│  Test corpus (264 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -441,13 +441,13 @@ specifies:
 | `encoding` | 9 | UTF-8 validity, BOM placement, byte classes |
 | `version` | 13 | `#!bovnar M.N` directive: valid, malformed, strictness (spec 1.1) |
 | `identifiers` | 11 | Syntax, body characters, length limits |
-| `strings` | 29 | Escapes, concatenation, UTF-8, limits |
+| `strings` | 33 | Escapes, concatenation, UTF-8, limits |
 | `datetime` | 12 | Timestamp family: epochs, signed range, gating (spec 1.1) |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
 | `types` | 52 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
 | `symbols` | 6 | Bare-word values and limits |
-| `references` | 9 | Dotted paths, array indexing (spec 1.1), limits |
+| `references` | 10 | Dotted paths, array indexing (spec 1.1), limits |
 | `null_values` | 5 | Null in all positions |
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
@@ -459,7 +459,7 @@ specifies:
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 12 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **259** | |
+| **Total** | **264** | |
 
 ---
 
@@ -470,7 +470,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..259
+1..264
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

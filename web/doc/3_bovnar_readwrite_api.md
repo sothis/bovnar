@@ -284,6 +284,37 @@ version automatically.
 
 ---
 
+### 7b. Datetime family (spec 1.1)
+
+```c
+const char *bvnr_datetime_epoch_name(value_type_spec_t vt);
+int32_t     bvnr_datetime_epoch_mjd (value_type_spec_t vt);
+```
+
+A `<datetime:width,epoch>` value (family `vt_datetime`) is a **signed integer
+count of seconds since a named epoch** — a timestamp, distinct from a *duration*
+(a number with a time unit, e.g. `<float:64,s>`). The carrier is validated like
+`sint`; the epoch is stored as a small dense index in `value_type_spec_t.base`
+(not a numeric base — the carrier is always decimal). These two helpers recover
+the epoch from a spec: `bvnr_datetime_epoch_name` returns its lowercase name
+(`"unix"` — the default — `"tai"`, `"gps"`, `"mjd"`, `"ntp"`, `"galileo"`,
+`"glonass"`, `"y2000"`, `"beidou"`), and `bvnr_datetime_epoch_mjd` returns its
+Modified Julian Day (the `bvn_epoch_t` value from `bvn_datetime.h`). Pass that to
+`bvn_dt_epoch_seconds_to_datetime()` to convert to a civil date/time.
+
+```c
+/* on a datetime data event: */
+int64_t secs;  bvn_parse_int64((const char *)d->data, d->value_type, &secs);
+bvn_datetime_t civil;
+bvn_dt_epoch_seconds_to_datetime(&civil,
+    (bvn_epoch_t)bvnr_datetime_epoch_mjd(d->value_type), secs);
+```
+
+The family is spec 1.1: it requires a `#!bovnar 1.1` declaration, and in a
+1.0/unversioned document a `datetime` annotation is `error_illegal_value_type`.
+
+---
+
 ### 8. `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`
 
 ```c

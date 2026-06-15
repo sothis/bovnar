@@ -1125,12 +1125,30 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ---
 
-## Spec version
+## Spec 1.1 additions
 
-These bindings target the **Bovnar spec (v1.0)**.  The
-`ErrorCode.UNIT_MISMATCH` member (value 38) and
-`ErrorCode.ARRAY_NESTING_TOO_HIGH` (value 6) are present in the current
-implementation.  The reference C library implementation is under active
-development; the FFI declarations in `_ffi.py` may need updating as the
-ABI stabilises.
+These bindings target the **Bovnar spec (v1.1, draft)**; spec 1.0 remains the
+frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
+unversioned document is treated as 1.0) are exposed as:
+
+- **Version:** `bovnar.version()` (library version string), `bovnar.spec_version()`
+  → `(major, minor)` of the highest spec understood, and
+  `bovnar.peek_version(data)` → the `(major, minor)` a document declares, or
+  `None`. `Reader.declared_version` gives the same after a read; `read_mem`/
+  `read_fd`/`loads` accept `strict_version=True` to reject a too-new version
+  (`ErrorCode.UNSUPPORTED_SPEC_VERSION`).
+- **Richer escapes:** `\u{…}` and `\xHH` in string literals are decoded by the C
+  reader, so `loads` returns the resulting text transparently. A surrogate /
+  out-of-range `\u` is `ErrorCode.INVALID_CODEPOINT`.
+- **Datetime family:** `loads` decodes a `<datetime:width,epoch>` value to a
+  plain `int` (signed epoch seconds). With `typed=True` it is a `Quantity` whose
+  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch.
+  `dumps()` emits the `<datetime:…>` annotation and prepends `#!bovnar 1.1`
+  automatically when the object contains a datetime, so typed round-trips are
+  lossless. `ValueTypeFamily.DATETIME` is the family enum member.
+- **Reference array indexing:** `&.matrix[0][1]` paths are stored verbatim and
+  resolved by `DomDoc.lookup("matrix[0][1]")` at the DOM layer.
+
+`ErrorCode` adds `INVALID_SPEC_VERSION` (42), `UNSUPPORTED_SPEC_VERSION` (43),
+and `INVALID_CODEPOINT` (44).
 

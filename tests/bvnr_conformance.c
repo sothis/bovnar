@@ -780,6 +780,17 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("STR-029", "strings", "\\x is illegal in an unversioned (1.0) document",
 	           ".s = \"\\x41\";",
 	           error_illegal_escape_sequence),
+	ERROR_CASE("STR-030", "strings", "\\u{0} (NUL) control byte is rejected",
+	           "#!bovnar 1.1\n.s = \"\\u{0}\";",
+	           error_unexpected_input_byte),
+	ERROR_CASE("STR-031", "strings", "\\x01 control byte is rejected",
+	           "#!bovnar 1.1\n.s = \"\\x01\";",
+	           error_unexpected_input_byte),
+	ERROR_CASE("STR-032", "strings", "\\x7f (DEL) is rejected",
+	           "#!bovnar 1.1\n.s = \"\\x7f\";",
+	           error_unexpected_input_byte),
+	VALID_KEY("STR-033", "strings", "\\x09 (a whitespace control) is allowed",
+	          "#!bovnar 1.1\n.s = \"a\\x09b\";", "s", "a\tb"),
 
 	/* ── DATETIME family (spec 1.1) ──────────────────────────────── */
 	VALID_KEY("DT-001", "datetime", "unix epoch seconds",

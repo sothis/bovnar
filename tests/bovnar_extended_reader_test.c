@@ -243,6 +243,20 @@ static void test_parse_v11_escapes(void)
 	parse_payload(".s = \"\\x41\";", false, &ctx);
 	ASSERT_EQ_INT(ctx.last_error, error_illegal_escape_sequence,
 		"\\x is illegal in an unversioned document");
+
+	/* control bytes may not be smuggled in via an escape (un-serialisable) —
+	 * but the whitespace controls 0x09-0x0D stay allowed */
+	parse_payload("#!bovnar 1.1\n.s = \"\\u{0}\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_unexpected_input_byte,
+		"\\u{0} NUL is rejected");
+	parse_payload("#!bovnar 1.1\n.s = \"\\x01\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_unexpected_input_byte,
+		"\\x01 control byte is rejected");
+	parse_payload("#!bovnar 1.1\n.s = \"\\x7f\";", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_unexpected_input_byte,
+		"\\x7f DEL is rejected");
+	parse_payload("#!bovnar 1.1\n.s = \"a\\x09b\";", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "\\x09 (tab, a whitespace control) is allowed");
 }
 
 static void test_parse_datetime(void)

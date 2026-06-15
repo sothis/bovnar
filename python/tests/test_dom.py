@@ -276,6 +276,28 @@ class TestDomNodeIntAccessors:
         s   = doc['x'].as_int_str(16)
         assert s.lower() in ('ff', '0xff')
 
+    def test_to_python_uint64_high_bit(self):
+        # Regression: to_python() called get_i64 first, which succeeds (unchecked)
+        # for a width<=64 value, so a uint64 >= 2**63 came back as a negative
+        # two's-complement number. It must read by declared signedness.
+        cases = {
+            18446744073709551615: b".x = <uint:64> 18446744073709551615;\n",  # 2**64-1
+            9223372036854775808:  b".x = <uint:64> 9223372036854775808;\n",   # 2**63
+            9223372036854775809:  b".x = <uint:64> 9223372036854775809;\n",   # 2**63+1
+        }
+        for want, src in cases.items():
+            doc = DomDoc.parse(src)
+            assert doc['x'].to_python() == want, f"to_python {src!r}"
+            assert doc.to_dict()['x'] == want, f"to_dict {src!r}"
+
+    def test_to_python_sint_and_bignum(self):
+        # Signed values and >64-bit bignums must still round-trip through to_python.
+        assert DomDoc.parse(b".x = <sint:64> -5;\n")['x'].to_python() == -5
+        big = DomDoc.parse(bovnar.dumps({'x': 2**100}))['x'].to_python()
+        assert big == 2**100
+        neg = DomDoc.parse(bovnar.dumps({'x': -(2**70)}))['x'].to_python()
+        assert neg == -(2**70)
+
 
 @needs_lib
 class TestDomNodeFloatAccessor:

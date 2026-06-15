@@ -314,6 +314,52 @@ static void test_octet_mux(void)
 	}
 }
 
+/* Regression (deep-review pass 4): a message that is truncated when its octet
+ * stream ends must NOT bleed into the next octet stream on a reused demux.
+ * ev_octet_stream_end now resets every channel's reassembly progress. */
+static uint32_t test_varint_encode(uint64_t v, uint8_t *o)
+{
+	uint32_t i = 0;
+	do { uint8_t b = v & 0x7fu; v >>= 7; if (v) b |= 0x80u; o[i++] = b; } while (v);
+	return i;
+}
+static void test_demux_truncated_stream_reset(void)
+{
+	printf("  test_demux_truncated_stream_reset...\n");
+	mux_capture_t mc = {0};
+	bvnr_demux_t *dm = bvnr_demux_create(mux_on_msg, &mc, 0);
+	bvnr_data_t empty = {0};
+	uint8_t frag[64];
+	uint32_t off;
+
+	/* Stream 1: a truncated message on channel 0 (declares 100 bytes, sends 10). */
+	bvnr_demux_on_event(dm, ev_octet_stream_start, &empty);
+	off  = test_varint_encode(0u,   frag);        /* channel 0 */
+	off += test_varint_encode(100u, frag + off);  /* declared length 100 */
+	memset(frag + off, 0xAB, 10u); off += 10u;    /* only 10 bytes of payload */
+	bvnr_data_t d = { .type = token_is_octet_stream, .data = frag, .length = off };
+	bvnr_demux_on_event(dm, ev_data, &d);
+	bvnr_demux_on_event(dm, ev_octet_stream_end, &empty);   /* truncated → must reset */
+
+	/* Stream 2: a fresh complete 3-byte message on the same channel 0. */
+	bvnr_demux_on_event(dm, ev_octet_stream_start, &empty);
+	off  = test_varint_encode(0u, frag);          /* channel 0 */
+	off += test_varint_encode(3u, frag + off);    /* declared length 3 */
+	frag[off++] = 'X'; frag[off++] = 'Y'; frag[off++] = 'Z';
+	d.data = frag; d.length = off;
+	bvnr_demux_on_event(dm, ev_data, &d);
+	bvnr_demux_on_event(dm, ev_octet_stream_end, &empty);
+
+	ASSERT_EQ_UINT(mc.n, 1, "only the fresh stream-2 message is delivered");
+	if (mc.n >= 1) {
+		ASSERT_EQ_UINT(mc.channels[0], 0, "fresh message channel");
+		ASSERT_EQ_UINT(mc.lens[0], 3, "fresh message length (no bleed)");
+		ASSERT_TRUE(strcmp(mc.payloads[0], "XYZ") == 0, "fresh message payload");
+	}
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_none, "no desync after truncated stream");
+	bvnr_demux_destroy(dm);
+}
+
 /* Large messages that span many octet chunks, interleaved across channels,
  * must reassemble byte-exact. */
 typedef struct {
@@ -954,6 +1000,7 @@ int main(void)
 	test_endless_knob();
 	test_multidoc();
 	test_octet_mux();
+	test_demux_truncated_stream_reset();
 	test_octet_mux_large();
 	test_octet_mux_boundaries();
 	test_octet_mux_empty();

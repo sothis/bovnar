@@ -278,12 +278,23 @@ class DomNode:
         if dt == DomType.NULL:
             return None
         if dt == DomType.INT:
+            # get_i64 succeeds for any width<=64 value (the C extractor does an
+            # unchecked reinterpret), so for an unsigned family a uint64 >= 2**63
+            # would come back as a negative two's-complement number. Read with the
+            # accessor matching the declared signedness first; fall back to the
+            # arbitrary-width string for values that fit neither 64-bit type.
             v64 = ctypes.c_int64()
-            if lib.bvn_dom_get_i64(self._ptr, ctypes.byref(v64)):
-                return int(v64.value)
             u64 = ctypes.c_uint64()
-            if lib.bvn_dom_get_u64(self._ptr, ctypes.byref(u64)):
-                return int(u64.value)
+            if self.value_type.family == ValueTypeFamily.SINT:
+                if lib.bvn_dom_get_i64(self._ptr, ctypes.byref(v64)):
+                    return int(v64.value)
+                if lib.bvn_dom_get_u64(self._ptr, ctypes.byref(u64)):
+                    return int(u64.value)
+            else:
+                if lib.bvn_dom_get_u64(self._ptr, ctypes.byref(u64)):
+                    return int(u64.value)
+                if lib.bvn_dom_get_i64(self._ptr, ctypes.byref(v64)):
+                    return int(v64.value)
             return int(self.as_int_str(10))
         if dt == DomType.FLOAT:
             return self.as_float()

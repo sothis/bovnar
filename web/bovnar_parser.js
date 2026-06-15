@@ -94,6 +94,13 @@
                                      the C reader emits ONE error and resyncs to the
                                      enclosing statement ';', so we unwind without
                                      emitting further cascade errors */
+    /* The C lexer caps struct and array nesting independently at 64 levels
+       (bvn_val_impl.h max_struct_nesting/max_array_nesting); past that it emits
+       error_struct_nesting_too_high / error_array_nesting_too_high. Without a
+       counter the recursive descent below would throw an uncaught RangeError on
+       deeply nested input (a pasteable string of '[' or '{'). */
+    const MAX_NESTING = 64;
+    let arrayDepth = 0, structDepth = 0;
 
     function emit(type, data, posOverride) {
       const p = posOverride || { line, col, offset: pos };
@@ -342,6 +349,9 @@
       else if (hasBase && !((base >= 2 && base <= 62) || base === 64 || base === 85)) specOk = false;
       else if (family === 'uint' || family === 'sint') {
         if (hasWidth && width > 32768) specOk = false;
+        /* bases 64/85 use '+'/'-' as digits (no sign char) so they are
+           unsigned-only: a signed integer in base 64/85 is illegal. */
+        else if (family === 'sint' && hasBase && (base === 64 || base === 85)) specOk = false;
       } else if (family === 'float') {
         if (hasBase && base !== 10 && base !== 16) specOk = false;
         else if (hasWidth && !((width === 16 || width % 32 === 0) && width <= 32768)) specOk = false;
@@ -402,14 +412,21 @@
 
       /* Struct */
       if (cur() === '{') {
+        if (structDepth >= MAX_NESTING) {
+          emitErr('error_struct_nesting_too_high', here());
+          halted = true;
+          return;
+        }
         advance();
         emit(EV.STRUCT_START, {});
+        structDepth++;
         skipWsComments();
         while (!eof() && cur() !== '}') {
           if (!parseAssignment(true)) break;
           if (halted) break;
           skipWsComments();
         }
+        structDepth--;
         if (!halted && !eof() && cur() === '}') advance();
         emit(EV.STRUCT_END, {});
         return;
@@ -417,7 +434,14 @@
 
       /* Array */
       if (cur() === '[') {
+        if (arrayDepth >= MAX_NESTING) {
+          emitErr('error_array_nesting_too_high', here());
+          halted = true;
+          return;
+        }
+        arrayDepth++;
         readArray();
+        arrayDepth--;
         return;
       }
 
@@ -574,7 +598,7 @@
         /* Remaining elements separated by ',' */
         for (;;) {
           skipWsComments();
-          if (valResync || eof() || cur() !== ',') break;
+          if (valResync || halted || eof() || cur() !== ',') break;
           /* over-count: the C reader flags the mismatch at the ',' that pushes
              this row past the width established by the first row */
           if (expected >= 0 && !flagged && count + 1 > expected) {
@@ -587,9 +611,9 @@
       }
 
       skipWsComments();
-      if (valResync) {
-        /* an inner value already errored and we are unwinding to the statement
-           ';' — emit no further errors, just close the row */
+      if (valResync || halted) {
+        /* an inner value already errored (or a hard nesting-limit halt) and we
+           are unwinding — emit no further errors, just close the row */
       } else if (!eof() && cur() === ']') {
         /* under-count: flagged at the ']' that closes a too-narrow row */
         if (expected >= 0 && !flagged && count < expected) {
@@ -622,7 +646,7 @@
            the width established by the first row */
         const count = readArrayRow(firstCount);
         if (firstCount < 0) firstCount = count;
-        if (valResync) break;   /* unwinding to the statement ';' */
+        if (valResync || halted) break;   /* unwinding to the statement ';' */
 
         /* Additional dimension rows separated by '/'.
            Tentatively consume '/' then skip ws+comments; backtrack fully
@@ -807,6 +831,7 @@
   /* error_code_e names → numeric code (subset the JS layer can detect) */
   const ERR_CODE = {
     error_unknown_token_type: 1, error_array_row_size_mismatch: 2,
+    error_struct_nesting_too_high: 5, error_array_nesting_too_high: 6,
     error_identifier_too_long: 3, error_empty_identifier: 4, error_string_too_long: 8,
     error_illegal_escape_sequence: 9, error_number_too_long: 10,
     error_symbol_too_long: 11, error_reference_too_long: 12,
@@ -868,6 +893,11 @@
      with optional dot, optional base-aware exponent) is parseable in the base. */
   function validateNumberInBase(s, base) {
     if (!s) return false;
+    /* Bases 64/85 are unsigned fixed-alphabet integer bases (standard Base64,
+       Ascii85) in which '+','-','.' are ordinary digits, not sign/dot/exponent
+       markers. Validate them as a pure unsigned digit string, matching the C
+       reference (bvn_validate_number_in_base delegates to digits-for-base). */
+    if (base === 64 || base === 85) return digitsValidForBase(s, base);
     let i = 0;
     if (s[0] === '-' || s[0] === '+') i = 1;
     if (i >= s.length) return false;
@@ -889,14 +919,18 @@
     return hasMant && (!hasExp || hasExpDigit);
   }
   function digitsValidForBase(t, base) {
-    const s = (t[0] === '-' || t[0] === '+') ? t.slice(1) : t;
+    /* In bases 64/85 '+'/'-' are digits, not a leading sign (uint-only). */
+    const signed = base !== 64 && base !== 85;
+    const s = (signed && (t[0] === '-' || t[0] === '+')) ? t.slice(1) : t;
     if (!s.length) return false;
     for (const ch of s) if (charToDigit(ch, base) >= base) return false;
     return true;
   }
   function toBigInt(t, base) {
-    const neg = t[0] === '-';
-    const s = (neg || t[0] === '+') ? t.slice(1) : t;
+    /* Bases 64/85 are unsigned; their '+'/'-' are digits, not a sign. */
+    const signed = base !== 64 && base !== 85;
+    const neg = signed && t[0] === '-';
+    const s = (signed && (neg || t[0] === '+')) ? t.slice(1) : t;
     let v = 0n; const B = BigInt(base);
     for (const ch of s) v = v * B + BigInt(charToDigit(ch, base));
     return neg ? -v : v;
@@ -1115,7 +1149,8 @@
       const kind = v.kind;                          /* number|string|bool|special|symbol|reference */
       const text = v.text || '';
       const isNumberTok = kind === 'number', isStringTok = kind === 'string', isSpecial = kind === 'special';
-      const isNeg = text[0] === '-';
+      /* In bases 64/85 a leading '-' is a digit, not a sign (uint-only bases). */
+      const isNeg = (base !== 64 && base !== 85) && text[0] === '-';
 
       /* ── phase 1: bvn_acc_parse_number (number/string tokens only) ── */
       let accDot = false, accExp = false;

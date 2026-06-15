@@ -161,7 +161,7 @@ contexts:
           scope: punctuation.definition.type.end.bovnar
           pop: true
         - include: comment
-        - match: '\b(float_fix|float_dec|float|uint|sint|utf8|bool)\b'
+        - match: '\b(float_fix|float_dec|float|uint|sint|utf8|bool|datetime)\b'
           scope: storage.type.family.bovnar
         - match: '\bno_unit\b'
           scope: support.constant.no-unit.bovnar

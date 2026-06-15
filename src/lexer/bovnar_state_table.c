@@ -257,6 +257,7 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		['s'] = ACT_tf_to_s,
 		['f'] = ACT_tf_to_f,
 		['b'] = ACT_tf_to_b,
+		['d'] = ACT_tf_to_d,
 	},
 	[type_noparams] = {
 		BVN_WHITESPACE(ACT_ignore_whitespace),
@@ -278,6 +279,13 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 	[tf_b]    = { ['o'] = ACT_kw_advance },
 	[tf_bo]   = { ['o'] = ACT_kw_advance },
 	[tf_boo]  = { ['l'] = ACT_tf_bool_done },
+	[tf_d]       = { ['a'] = ACT_kw_advance },
+	[tf_da]      = { ['t'] = ACT_kw_advance },
+	[tf_dat]     = { ['e'] = ACT_kw_advance },
+	[tf_date]    = { ['t'] = ACT_kw_advance },
+	[tf_datet]   = { ['i'] = ACT_kw_advance },
+	[tf_dateti]  = { ['m'] = ACT_kw_advance },
+	[tf_datetim] = { ['e'] = ACT_tf_datetime_done },
 	[copy_type_byte] = {
 		BVN_WHITESPACE(ACT_to_type_body_outro),
 		[0x24] = ACT_copy_type_byte,
@@ -745,6 +753,8 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_tf_to_s]                    = bvn_action_set_state,
 	[ACT_tf_to_f]                    = bvn_action_set_state,
 	[ACT_tf_to_b]                    = bvn_action_set_state,
+	[ACT_tf_to_d]                    = bvn_action_set_state,
+	[ACT_tf_datetime_done]           = bvn_action_tf_datetime_done,
 	[ACT_tf_u_to_ui]                 = bvn_action_set_state,
 	[ACT_tf_u_to_ut]                 = bvn_action_set_state,
 	[ACT_tf_uint_done]               = bvn_action_tf_uint_done,
@@ -821,6 +831,7 @@ const state_t bvn_action_target_state[ACT__count] = {
 	[ACT_tf_to_s]                   = tf_s,
 	[ACT_tf_to_f]                   = tf_f,
 	[ACT_tf_to_b]                   = tf_b,
+	[ACT_tf_to_d]                   = tf_d,
 	[ACT_tf_u_to_ui]                = tf_ui,
 	[ACT_tf_u_to_ut]                = tf_ut,
 };
@@ -830,4 +841,7 @@ const state_t bvn_kw_advance_state[dimension_state] = {
 	[tf_s]       = tf_si,   [tf_si]      = tf_sin,
 	[tf_f]       = tf_fl,   [tf_fl]      = tf_flo,  [tf_flo]     = tf_floa,
 	[tf_b]       = tf_bo,   [tf_bo]      = tf_boo,
+	[tf_d]       = tf_da,   [tf_da]      = tf_dat,  [tf_dat]     = tf_date,
+	[tf_date]    = tf_datet,[tf_datet]   = tf_dateti,
+	[tf_dateti]  = tf_datetim,
 };

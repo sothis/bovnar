@@ -35,6 +35,7 @@
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 #include "bvn_float.h"
+#include "bvn_datetime.h"
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
@@ -2213,6 +2214,45 @@ int32_t bvn_unit_prefix_exponent(value_unit_t u)
  * Returning these separately is what lets the validator produce precise
  * error_unit_illegal vs error_unit_too_long vs error_illegal_value_type codes.
  */
+/*
+ * Datetime epoch table (spec 1.1). For a vt_datetime spec the selected epoch is
+ * stored as this array index in value_type_spec_t.base; index 0 (unix) is the
+ * default. `mjd` is the bvn_epoch_t value — the Modified Julian Day of the
+ * epoch's instant — handed to the bvn_dt_* converters.
+ */
+typedef struct { const char* name; uint8_t len; int32_t mjd; } bvn_epoch_entry_t;
+static const bvn_epoch_entry_t bvn_epoch_table[] = {
+	{ "unix",    4, bvn_epoch_unix    },
+	{ "tai",     3, bvn_epoch_tai     },
+	{ "gps",     3, bvn_epoch_gps     },
+	{ "mjd",     3, bvn_epoch_mjd     },
+	{ "ntp",     3, bvn_epoch_ntp     },
+	{ "galileo", 7, bvn_epoch_galileo },
+	{ "glonass", 7, bvn_epoch_glonass },
+	{ "y2000",   5, bvn_epoch_2000    },
+	{ "beidou",  6, bvn_epoch_beidou  },
+};
+#define BVN_EPOCH_COUNT (sizeof(bvn_epoch_table) / sizeof(bvn_epoch_table[0]))
+static int bvn_epoch_index_of(const uint8_t* s, uint32_t n)
+{
+	for (uint32_t i = 0; i < BVN_EPOCH_COUNT; i++)
+		if (bvn_epoch_table[i].len == n &&
+		    memcmp(s, bvn_epoch_table[i].name, n) == 0)
+			return (int)i;
+	return -1;
+}
+const char* bvnr_datetime_epoch_name(value_type_spec_t vt)
+{
+	uint32_t i = (vt.family == vt_datetime && vt.base < BVN_EPOCH_COUNT)
+		? vt.base : 0u;
+	return bvn_epoch_table[i].name;
+}
+int32_t bvnr_datetime_epoch_mjd(value_type_spec_t vt)
+{
+	uint32_t i = (vt.family == vt_datetime && vt.base < BVN_EPOCH_COUNT)
+		? vt.base : 0u;
+	return bvn_epoch_table[i].mjd;
+}
 value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,
@@ -2241,6 +2281,9 @@ value_type_spec_t bvn_parse_type_annotation(
 		r.family = vt_bool; pos += 4;
 	} else if (pos + 4 <= len && memcmp(str + pos, "sint", 4) == 0) {
 		r.family = vt_sint; pos += 4;
+	} else if (pos + 8 <= len && memcmp(str + pos, "datetime", 8) == 0) {
+		/* base carries the epoch index (0 = unix, the default). */
+		r.family = vt_datetime; pos += 8;
 	} else {
 		*type_ok = false;
 		return r;
@@ -2309,6 +2352,9 @@ value_type_spec_t bvn_parse_type_annotation(
 			r.width = (uint32_t)w;
 		} else if (c == '_') {
 			if (have_base) { *type_ok = false; return r; }
+			/* datetime carries a decimal epoch-seconds value; a numeric base
+			 * parameter is meaningless (the only parameter is the epoch name). */
+			if (r.family == vt_datetime) { *type_ok = false; return r; }
 			have_base = true;
 			pos++;
 			if (pos >= len || str[pos] < '0' || str[pos] > '9') {
@@ -2360,6 +2406,16 @@ value_type_spec_t bvn_parse_type_annotation(
 				return r;
 			}
 			r.base = q;
+		} else if (r.family == vt_datetime) {
+			/* The non-width parameter of a datetime is its epoch name. */
+			if (have_unit) { *type_ok = false; return r; }
+			have_unit = true;
+			uint32_t estart = pos;
+			while (pos < len && str[pos] != ',')
+				pos++;
+			int ei = bvn_epoch_index_of(str + estart, pos - estart);
+			if (ei < 0) { *type_ok = false; return r; }
+			r.base = (uint32_t)ei;
 		} else {
 			if (have_unit) { *type_ok = false; return r; }
 			have_unit = true;
@@ -2397,6 +2453,10 @@ value_type_spec_t bvn_parse_type_annotation(
 			*type_ok = false;
 			return r;
 		}
+	}
+	if (r.family == vt_datetime && r.width > BVN_MAX_INT_WIDTH) {
+		*type_ok = false;
+		return r;
 	}
 	if (r.family == vt_float) {
 		if (r.base != 0u && r.base != 10u && r.base != 16u) {

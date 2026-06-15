@@ -507,7 +507,7 @@ In all cases the annotation comes **before** the value it describes.
 .key<uint:32> = 42;    # ERROR: type annotation must follow '=', not the key
 ```
 
-Seven type families are recognized:
+Seven type families are recognized in spec 1.0, plus `datetime` in spec 1.1:
 
 | Family | Keyword | Parameter syntax | Default Width |
 |--------|---------|-----------------|---------------|
@@ -518,13 +518,38 @@ Seven type families are recognized:
 | Decimal floating-point (IEEE 754-2008) | `float_dec` | `:width,unit` | 64 |
 | UTF-8 string | `utf8` | none (any parameter → `error_illegal_value_type`) | — |
 | Boolean | `bool` | none (any parameter → `error_illegal_value_type`) | — |
+| Timestamp (spec 1.1) | `datetime` | `:width,epoch` (no numeric base/unit) | 64 |
+
+**The `datetime` family (spec 1.1).** A `datetime` value is a **signed integer
+count of seconds** since a named epoch — a timestamp, as distinct from a
+*duration* (which is just a number with a time unit, e.g. `<float:64,s>`). The
+carrier is validated exactly like `sint` (signed, decimal, range per width;
+negative values denote instants before the epoch). Its one family-specific
+parameter is the **epoch name**, one of:
+
+`unix` (default), `tai`, `gps`, `mjd`, `ntp`, `galileo`, `glonass`, `y2000`, `beidou`.
+
+A numeric base, `q`, or physical unit parameter is `error_illegal_value_type`; a
+fractional or exponent value is `error_type_value_mismatch`. As a 1.1 feature it
+requires a `#!bovnar 1.1` declaration (§3.4) — in a 1.0/unversioned document
+`datetime` is `error_illegal_value_type`. Recover the civil date/time with the
+`bvn_datetime.h` helpers (`bvnr_datetime_epoch_mjd()` → the epoch, then
+`bvn_dt_epoch_seconds_to_datetime()`).
+
+```bovnar
+#!bovnar 1.1
+.created = <datetime:64,unix> 1750000000;   # 2025-06-15T...Z
+.gps_t   = <datetime:tai>     1400000000;
+.before  = <datetime>         -100;          # 100 s before 1970-01-01Z
+```
 
 **Parameter syntax:**
 
 ```
 type-spec = param-type [ ":" type-param-list ]
 
-param-type = "uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8" | "bool"
+param-type = "uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
+           | "bool" | "datetime"            (* datetime: spec 1.1 *)
 
 type-param-list = type-param { "," type-param }
 
@@ -534,6 +559,7 @@ type-param = width-param    # decimal digits only, e.g. 32
            | q~param        # "q" followed by digits, e.g. q8, q16
                             #   (only valid for float_fix)
            | unit-param     # unit string, e.g. m/s, k~g·m/s²
+           | epoch-param    # datetime epoch name, e.g. unix, tai (spec 1.1)
 ```
 
 > **Lexer note on `float_fix` / `float_dec`:** The lexer keyword state machine
@@ -1495,7 +1521,7 @@ The complete grammar is maintained as a standalone file:
 The grammar uses ISO/IEC 14977:1996 notation and is derived from and verified against the reference implementation. It covers:
 
 - Top-level stream and assignment structure
-- Type annotations (all seven families: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool`)
+- Type annotations (seven core families: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool`; plus `datetime` in spec 1.1)
 - Value forms: numbers, special numbers, booleans, strings, symbols, references, arrays, structs, octet streams, inline unit suffixes
 - Lexical primitives and UTF-8 byte class definitions
 - Unit sub-grammar (SI/IEC prefixes, base units, compound units, exponents)

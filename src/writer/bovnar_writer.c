@@ -775,6 +775,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		case vt_float_dec: fname = "float_dec"; break;
 		case vt_utf8:      fname = "utf8";      break;
 		case vt_bool:      fname = "bool";      break;
+		case vt_datetime:  fname = "datetime";  break;
 		default:           fname = "plain";     break;
 		}
 		if (!bvn_ser_push_str(s, fname))

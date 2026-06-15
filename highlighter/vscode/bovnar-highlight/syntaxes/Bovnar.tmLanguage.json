@@ -180,7 +180,7 @@
         { "include": "#comment" },
 
         { "comment": "Type-family keywords. Longer names (float_fix, float_dec) must appear before float.",
-          "match": "\\b(float_fix|float_dec|float|uint|sint|utf8|bool)\\b",
+          "match": "\\b(float_fix|float_dec|float|uint|sint|utf8|bool|datetime)\\b",
           "name": "storage.type.family.bovnar" },
 
         { "comment": "Explicitly-dimensionless keyword.",

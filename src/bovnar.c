@@ -208,6 +208,7 @@ static const char *evt_vtf_str(value_type_family_t f)
 	case vt_float_fix: return "float_fix";
 	case vt_float_dec: return "float_dec";
 	case vt_bool:      return "bool";
+	case vt_datetime:  return "datetime";
 	case vt_illegal:   return "ILLEGAL";
 	}
 	return "?";

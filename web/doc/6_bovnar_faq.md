@@ -204,6 +204,33 @@ just a comment.
 | `utf8` | UTF-8 string |
 | `bool` | Boolean (`true`/`false`); takes no parameters |
 
+Spec 1.1 adds an eighth, `datetime` (see below).
+
+---
+
+**Is there a date/time type?**
+
+Yes, since spec 1.1: the `datetime` family. A `datetime` value is a **signed
+integer count of seconds since a named epoch** — a timestamp:
+
+```bovnar
+#!bovnar 1.1
+.created = <datetime:64,unix> 1750000000;
+```
+
+The epoch parameter is one of `unix` (default), `tai`, `gps`, `mjd`, `ntp`,
+`galileo`, `glonass`, `y2000`, `beidou`. The value validates like `sint`
+(negative = before the epoch); a numeric base/unit/`q` is `error_illegal_value_type`
+and a fractional value is `error_type_value_mismatch`. Being a 1.1 feature it
+requires a `#!bovnar 1.1` declaration. Convert to civil time with the
+`bvn_datetime.h` helpers.
+
+**Timestamp vs. duration — don't confuse them.** A *timestamp* (an instant) is a
+`datetime`; a *duration* (an elapsed amount) is a plain number with a time unit,
+e.g. `<float:64,s> 2.5` (2.5 seconds) or `<uint:32,h> 8` (8 hours). The time
+*units* (`s`, `min`, `h`, `d`, …) measure spans; the `datetime` *family* names a
+point on a timeline.
+
 ---
 
 **What is default type synthesis?**

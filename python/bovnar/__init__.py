@@ -510,6 +510,15 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
     if tok_type == _TOKEN_IS_SYMBOL:
         return text
 
+    if fam == ValueTypeFamily.DATETIME:
+        # epoch seconds — a decimal signed integer (base holds the epoch index,
+        # not a numeric base). Use bovnar.peek/units helpers or bvn_datetime to
+        # convert to civil time.
+        try:
+            return int(text, 10)
+        except ValueError:
+            return text
+
     if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
         base = vt.base if vt and vt.base > 1 else 10
         try:

@@ -140,7 +140,7 @@ syn match   BovnarUnitExp   '\^[+-]\=\d\+' contained
 syn match BovnarInlineUnit '[^ \t\r;,#0-9+*/^()~\-\]}][^ \t\r;,#\]}]*' contained contains=BovnarUnitPrefix,BovnarTypeUnit,BovnarUnitSep,BovnarUnitExp,BovnarUnitTilde
 hi link BovnarInlineUnit BovnarTypeUnit
 
-syn match   BovnarType     '\v(float_fix|float_dec|float|uint|sint|utf8|bool)'
+syn match   BovnarType     '\v(float_fix|float_dec|float|uint|sint|utf8|bool|datetime)'
 syn match   BovnarNoUnit   'no_unit'
 syn match   BovnarTypeDelim '[<>]' contained
 syn match   BovnarTypeSep  ':' contained

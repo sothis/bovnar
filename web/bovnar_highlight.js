@@ -112,7 +112,7 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
       if (c === '<' || c === '>') { out += span('adelim', c); i++; continue; }
       if (c === ':') { out += span('tsep', ':'); i++; continue; }
       if (c === ',') { out += span('sep', ','); i++; continue; }
-      if ((m = /^(?:float_fix|float_dec|float|uint|sint|utf8|bool|no_unit)\b/.exec(r))) { out += span(m[0] === 'no_unit' ? 'unit' : 'type', m[0]); i += m[0].length; continue; }
+      if ((m = /^(?:float_fix|float_dec|float|uint|sint|utf8|bool|datetime|no_unit)\b/.exec(r))) { out += span(m[0] === 'no_unit' ? 'unit' : 'type', m[0]); i += m[0].length; continue; }
       if ((m = /^q\d+/.exec(r))) { out += span('param', m[0]); i += m[0].length; continue; }
       if ((m = /^_\d+/.exec(r))) { out += span('base', m[0]); i += m[0].length; continue; }
       if ((m = /^\d+/.exec(r))) { out += span('width', m[0]); i += m[0].length; continue; }

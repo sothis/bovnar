@@ -320,12 +320,7 @@ static bool bvn_replace_escaped_byte_impl(
  * flagging the string for a whole-string UTF-8 check at finalize (see
  * bvn_lex_finalize): \xC3\xA9 spells "é", but \xFF alone is rejected there.
  */
-static inline bool bvn_doc_supports_1_1(const bvnr_lexer_t* l)
-{
-	return l->has_declared_version &&
-		(l->declared_major > 1u ||
-		 (l->declared_major == 1u && l->declared_minor >= 1u));
-}
+#define bvn_doc_supports_1_1(l) bvn_lex_supports_1_1(l)
 static inline int bvn_hexval(int32_t c)
 {
 	if (c >= '0' && c <= '9') return c - '0';
@@ -899,6 +894,8 @@ bool bvn_action_tf_utf8_done(bvnr_reader_t* p)
 	{ return bvn_tf_family_done(p, "utf8",      4, type_body_outro); }
 bool bvn_action_tf_bool_done(bvnr_reader_t* p)
 	{ return bvn_tf_family_done(p, "bool",      4, type_body_outro); }
+bool bvn_action_tf_datetime_done(bvnr_reader_t* p)
+	{ return bvn_tf_family_done(p, "datetime",  8, type_body_outro); }
 bool bvn_action_string_intro(bvnr_reader_t* p)
 {
 	p->lex.token_type = p->lex.in_array_element

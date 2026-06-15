@@ -106,6 +106,12 @@ typedef enum value_type_family_e {
 	vt_float_fix,
 	vt_float_dec,
 	vt_bool,
+	/* Timestamp (spec 1.1). Carried as a signed integer count of seconds since
+	 * a named epoch; the epoch is selected by an annotation parameter and stored
+	 * as a small dense index in value_type_spec_t.base (0 = unix, the default).
+	 * Use bvnr_datetime_epoch_name() / bvnr_datetime_epoch_mjd() to recover the
+	 * epoch, then the bvn_dt_* helpers in bvn_datetime.h to convert to civil time. */
+	vt_datetime,
 	vt_illegal
 } value_type_family_t;
 typedef enum token_type_e {
@@ -594,6 +600,15 @@ BVN_API bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
 BVN_API double       bvn_unit_prefix_factor(value_unit_t u);
 BVN_API int32_t      bvn_unit_prefix_exponent(value_unit_t u);
 BVN_API bvn_unit_flags_t bvnr_writer_unit_flags(const bvnr_writer_t* w);
+/*
+ * Datetime epoch helpers (spec 1.1). For a vt_datetime spec, return the epoch's
+ * lowercase name ("unix", "tai", "gps", "mjd", "ntp", "galileo", "glonass",
+ * "y2000", "beidou") and its epoch day number (the bvn_epoch_t value from
+ * bvn_datetime.h, i.e. the MJD of the epoch's instant). For a non-datetime spec
+ * the name is "unix" and the day number is the unix epoch, by convention.
+ */
+BVN_API const char* bvnr_datetime_epoch_name(value_type_spec_t vt);
+BVN_API int32_t     bvnr_datetime_epoch_mjd(value_type_spec_t vt);
 BVN_API value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,

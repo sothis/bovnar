@@ -172,7 +172,10 @@ void bvn_acc_digit(bvnr_validator_t* v, uint32_t dv, uint32_t base)
 }
 static inline uint32_t bvn_effective_base_or_10(value_type_spec_t vt)
 {
-	if (vt.family == vt_float_fix || vt.family == vt_float_dec)
+	/* float_fix/dec are always decimal; datetime's base field holds an epoch
+	 * index (not a numeric base) and its carrier is decimal epoch-seconds. */
+	if (vt.family == vt_float_fix || vt.family == vt_float_dec ||
+	    vt.family == vt_datetime)
 		return 10u;
 	return vt.base ? vt.base : 10u;
 }
@@ -508,11 +511,14 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 {
 	(void)tt;
 	value_type_spec_t vt   = v->value_type;
-	uint32_t          base = bvn_effective_base_or_10(vt);
+	/* datetime carries a decimal epoch-seconds value (base holds the epoch
+	 * index, not a numeric base), validated as a signed integer. */
+	uint32_t          base = (vt.family == vt_datetime)
+		? 10u : bvn_effective_base_or_10(vt);
 	/* Bases 64/85 are unsigned-only and use '+'/'-' as digits, so a leading '-'
 	 * is never a negative sign there. */
 	bool is_neg = (base != 64u && base != 85u && str_len > 0 && str[0] == '-');
-	if (vt.family != vt_uint && vt.family != vt_sint)
+	if (vt.family != vt_uint && vt.family != vt_sint && vt.family != vt_datetime)
 		return true;
 	if (str_len > 0) {
 		uint8_t c0 = str[0];
@@ -584,10 +590,17 @@ bool bvn_validate_type_value_compat(bvnr_reader_t* r,
 		}
 		return true;
 	}
-	if (!bvn_type_is_numeric(vt))
+	if (!bvn_type_is_numeric(vt) && vt.family != vt_datetime)
 		return true;
 	if (tt != token_is_number    && tt != token_is_array_number &&
 		tt != token_is_string    && tt != token_is_array_string) {
+		v->last_error = error_type_value_mismatch;
+		return false;
+	}
+	/* A datetime is a bare decimal epoch-seconds integer; a string carrier
+	 * (the base-in-a-string form, e.g. <uint:_16> "ff") does not apply. */
+	if (vt.family == vt_datetime &&
+	    (tt == token_is_string || tt == token_is_array_string)) {
 		v->last_error = error_type_value_mismatch;
 		return false;
 	}
@@ -717,6 +730,14 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			v->last_error = error_illegal_value_type;
 			return false;
 		}
+		/* The datetime family is spec 1.1; in a 1.0/unversioned document it is
+		 * not a recognised type (error_illegal_value_type), preserving the
+		 * unversioned==1.0 contract. */
+		if (v->value_type.family == vt_datetime &&
+		    !bvn_lex_supports_1_1(&r->lex)) {
+			v->last_error = error_illegal_value_type;
+			return false;
+		}
 		/*
 		 * Prime the default-annotation suppression state so a following
 		 * bare array element of the same effective type is suppressed
@@ -745,7 +766,22 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 					&d))
 				return false;
 		}
-		if (v->value_type.base != 0) {
+		if (v->value_type.family == vt_datetime) {
+			/* base holds the epoch index; emit it as a named parameter
+			 * (e.g. "tai") rather than a numeric base. Index 0 (unix) is the
+			 * default and is left implicit so <datetime> round-trips. */
+			if (v->value_type.base != 0) {
+				const char* ep =
+					bvnr_datetime_epoch_name(v->value_type);
+				d.type   = token_is_unit;
+				d.data   = ep;
+				d.length = (uint32_t)strlen(ep);
+				if (!bvn_emit_both(r,
+						ev_type_annotation_type_family_parameter,
+						&d))
+					return false;
+			}
+		} else if (v->value_type.base != 0) {
 			d.type = (v->value_type.family == vt_float_fix)
 				? token_is_type_q
 				: token_is_type_base;

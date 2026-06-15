@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (242 cases) ──→ for each test case:                │
+│  Test corpus (254 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -176,6 +176,7 @@ Options:
 | `version` | `#!bovnar M.N` directive parsing and strictness |
 | `identifiers` | Key syntax, length limits |
 | `strings` | Escape sequences, concatenation, length limits |
+| `datetime` | Timestamp family: epochs, range, version gating |
 | `numbers` | Integer and float literals, scientific notation |
 | `types` | All type families, widths, bases |
 | `default_synthesis` | Automatic type annotation inference |
@@ -441,6 +442,7 @@ specifies:
 | `version` | 13 | `#!bovnar M.N` directive: valid, malformed, strictness (spec 1.1) |
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 29 | Escapes, concatenation, UTF-8, limits |
+| `datetime` | 12 | Timestamp family: epochs, signed range, gating (spec 1.1) |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
 | `types` | 52 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
@@ -457,7 +459,7 @@ specifies:
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 12 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **242** | |
+| **Total** | **254** | |
 
 ---
 
@@ -468,7 +470,7 @@ consumed natively by CTest and many CI systems.
 
 ```
 TAP version 13
-1..242
+1..254
 ok 1 - [ENC-001] empty stream
 ok 2 - [ENC-002] UTF-8 BOM at byte 0
 not ok 3 - [ENC-003] UTF-8 BOM after first comment

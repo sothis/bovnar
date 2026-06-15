@@ -245,6 +245,49 @@ static void test_parse_v11_escapes(void)
 		"\\x is illegal in an unversioned document");
 }
 
+static void test_parse_datetime(void)
+{
+	printf("  test_parse_datetime...\n");
+
+	parse_ctx_t ctx;
+
+	parse_payload("#!bovnar 1.1\n.t = <datetime:64,unix> 1750000000;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "<datetime:64,unix> parses");
+
+	parse_payload("#!bovnar 1.1\n.t = <datetime> -100;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "bare <datetime> with a negative instant parses");
+
+	parse_payload("#!bovnar 1.1\n.t = <datetime:tai> 42;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "<datetime:tai> (epoch first param) parses");
+
+	/* gating: datetime requires a 1.1 declaration */
+	parse_payload(".t = <datetime> 1;", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_illegal_value_type,
+		"datetime is illegal in an unversioned document");
+
+	parse_payload("#!bovnar 1.1\n.t = <datetime> 1.5;", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_type_value_mismatch,
+		"a fractional datetime is rejected");
+
+	parse_payload("#!bovnar 1.1\n.t = <datetime:xyz> 1;", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_illegal_value_type,
+		"an unknown epoch is rejected");
+
+	parse_payload("#!bovnar 1.1\n.t = <datetime:8> 300;", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_value_out_of_range,
+		"a value beyond the declared width is rejected");
+
+	/* epoch helpers map the base index back to a name and epoch day */
+	value_type_spec_t unix_dt = { .family = vt_datetime, .width = 64, .base = 0 };
+	value_type_spec_t tai_dt  = { .family = vt_datetime, .width = 64, .base = 1 };
+	ASSERT_TRUE(strcmp(bvnr_datetime_epoch_name(unix_dt), "unix") == 0,
+		"epoch index 0 names unix");
+	ASSERT_TRUE(strcmp(bvnr_datetime_epoch_name(tai_dt), "tai") == 0,
+		"epoch index 1 names tai");
+	ASSERT_EQ_INT(bvnr_datetime_epoch_mjd(unix_dt), 40587,
+		"unix epoch MJD is 40587");
+}
+
 static void test_parse_negative_numbers(void)
 {
 	printf("  test_parse_negative_numbers...\n");
@@ -754,6 +797,7 @@ int main(void)
 	test_parse_various_integer_bases();
 	test_parse_string_escapes();
 	test_parse_v11_escapes();
+	test_parse_datetime();
 	test_parse_negative_numbers();
 	test_parse_scientific_notation();
 	test_parse_arrays_2d();

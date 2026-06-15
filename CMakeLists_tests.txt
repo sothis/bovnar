@@ -571,6 +571,13 @@ if(Python3_FOUND)
         "escapes"
         60)
 
+    # Spec 1.1 native time family (<datetime:width,epoch>): epoch parsing,
+    # signed-int validation, version gating.
+    _bvnr_pytest_lib(bvnr_py_datetime
+        test_datetime.py
+        "datetime"
+        60)
+
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.

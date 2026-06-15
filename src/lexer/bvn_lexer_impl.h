@@ -53,6 +53,7 @@ typedef enum state_e {
 	tf_s, tf_si, tf_sin,
 	tf_f, tf_fl, tf_flo, tf_floa,
 	tf_b, tf_bo, tf_boo,
+	tf_d, tf_da, tf_dat, tf_date, tf_datet, tf_dateti, tf_datetim,
 	value_intro,
 		array_intro,
 		new_array_value,
@@ -129,6 +130,8 @@ enum action_id {
 	ACT_tf_to_u,
 	ACT_tf_to_s,
 	ACT_tf_to_f,
+	ACT_tf_to_d,
+	ACT_tf_datetime_done,
 	ACT_tf_u_to_ui,
 	ACT_tf_u_to_ut,
 	ACT_tf_to_b,
@@ -287,6 +290,15 @@ extern const uint8_t  bvn_after_state_idx_table[dimension_state][256];
 extern const action_t bvn_action_table[ACT__count];
 extern const state_t  bvn_action_target_state[ACT__count];
 extern const state_t  bvn_kw_advance_state[dimension_state];
+/* True when the document declared a spec version >= 1.1 (gates 1.1-only
+ * syntax such as \x/\u escapes and the datetime family). Shared by the lexer
+ * and the validator. */
+static inline bool bvn_lex_supports_1_1(const bvnr_lexer_t* l)
+{
+	return l->has_declared_version &&
+		(l->declared_major > 1u ||
+		 (l->declared_major == 1u && l->declared_minor >= 1u));
+}
 typedef enum bvn_verdir_e {
 	BVN_VERDIR_NONE,
 	BVN_VERDIR_INVALID,
@@ -321,6 +333,7 @@ bool bvn_action_tf_sint_done              (bvnr_reader_t* p);
 bool bvn_action_tf_float_done             (bvnr_reader_t* p);
 bool bvn_action_tf_utf8_done              (bvnr_reader_t* p);
 bool bvn_action_tf_bool_done              (bvnr_reader_t* p);
+bool bvn_action_tf_datetime_done          (bvnr_reader_t* p);
 bool bvn_action_array_intro               (bvnr_reader_t* p);
 bool bvn_action_array_outro               (bvnr_reader_t* p);
 bool bvn_action_array_outro_empty         (bvnr_reader_t* p);

@@ -933,7 +933,7 @@
   const FAMILY_ENUM = {
     uint: 'vt_uint', sint: 'vt_sint', float: 'vt_float',
     float_fix: 'vt_float_fix', float_dec: 'vt_float_dec',
-    utf8: 'vt_utf8', bool: 'vt_bool', plain: 'vt_plain',
+    utf8: 'vt_utf8', bool: 'vt_bool', datetime: 'vt_datetime', plain: 'vt_plain',
   };
   /* error_code_e names → numeric code (subset the JS layer can detect) */
   const ERR_CODE = {
@@ -971,7 +971,9 @@
   }
 
   function defaultWidth(fam) {
-    return NUMERIC_FAMILIES.indexOf(fam) >= 0 ? 64 : null;
+    /* datetime carries a bit-width like the numeric families (its carrier is a
+       signed integer), defaulting to 64 — spec 1.1. */
+    return (NUMERIC_FAMILIES.indexOf(fam) >= 0 || fam === 'datetime') ? 64 : null;
   }
   function normUnit(u) { return (u || '').trim(); }
   /* Port of bvn_char_to_digit (src/utils/bovnar_utils.c) — the exact per-base
@@ -1210,6 +1212,13 @@
         return { synthesized: true, familyName: 'utf8', family: 'vt_utf8', params: [] };
       if (v.kind === 'bool')
         return { synthesized: true, familyName: 'bool', family: 'vt_bool', params: [] };
+      if (v.kind === 'datetime')
+        /* a bare ISO-8601 literal infers <datetime:64,unix> — spec 1.1. The epoch
+           is a bare-word parameter (not a unit), mirroring the C reader's
+           synthesised default for an un-annotated datetime literal. */
+        return { synthesized: true, familyName: 'datetime', family: 'vt_datetime',
+          params: [ { kind: 'width', value: 64, text: '64' },
+                    { kind: 'epoch', text: 'unix' } ] };
       let fam = 'uint';
       if (v.kind === 'special') fam = 'float';
       else {
@@ -1251,6 +1260,21 @@
          is a lexer error, not a verified-layer one */
       if (v.endPos && (v.endPos.eof || ';,]}'.indexOf(v.endPos.delim) < 0)) return;
       if (!FAMILY_ENUM[fam] || fam === 'plain') return;  /* bad family: lexer already reported it */
+
+      /* datetime (spec 1.1): the value is either an ISO-8601 literal (kind
+         'datetime') or a signed-integer count of epoch-seconds (kind 'number').
+         The carrier validates like sint at the annotated width; an ISO literal is
+         accepted as written — the lenient layer leaves the leap-second-correct
+         range/calendar check to the C reader, which is the authority. */
+      if (fam === 'datetime') {
+        const wpd = ann.params.find((p) => p.kind === 'width');
+        const Wd = wpd ? wpd.value : 64;
+        if (v.kind === 'datetime') return;                 /* ISO literal — accepted verbatim */
+        if (v.kind !== 'number') { err('error_type_value_mismatch', at); return; }
+        if (digitsValidForBase(v.text || '', 10) && !intInRange(toBigInt(v.text || '', 10), 'sint', Wd))
+          err('error_value_out_of_range', at);
+        return;
+      }
 
       const numeric = NUMERIC_FAMILIES.indexOf(fam) >= 0;
       const isFloat = fam === 'float' || fam === 'float_fix' || fam === 'float_dec';
@@ -1339,6 +1363,12 @@
         v.valueType = { familyName: ann.familyName, family: ann.family,
           width: wp ? wp.value : defaultWidth(ann.familyName),
           base: numeric ? (bp ? bp.value : 10) : null };
+        /* datetime carries an epoch parameter (unix default) in place of a base —
+           surface it so the inline type badge reads ‹datetime:64,unix› (spec 1.1) */
+        if (ann.familyName === 'datetime') {
+          const ep = ann.params.find((p) => p.kind === 'epoch');
+          v.valueType.epoch = ep ? ep.text : 'unix';
+        }
         v.valueUnit = (up && up.text !== 'no_unit') ? up.text : (v.unit || null);
       } else {
         v.valueType = { familyName: 'plain', family: 'vt_plain', width: null, base: null };
@@ -1371,7 +1401,7 @@
             let ea = el.ann || outerAnn;
             if (!ea) {
               if (el.type === 'reference') continue;
-              if (['number', 'string', 'bool', 'special'].indexOf(el.kind) < 0) continue;
+              if (['number', 'string', 'bool', 'special', 'datetime'].indexOf(el.kind) < 0) continue;
               ea = synthScalarAnn(el);
             }
             /* a parse-time error already stands for this element's annotation
@@ -1391,7 +1421,7 @@
         /* synthesise the default annotation first, then validate — the C
            validator range-checks synthesised uint64/sint64 defaults too. A
            malformed annotation aborts validation (its error already stands). */
-        if (!a.ann && ['number', 'string', 'bool', 'special'].indexOf(v.kind) >= 0)
+        if (!a.ann && ['number', 'string', 'bool', 'special', 'datetime'].indexOf(v.kind) >= 0)
           a.ann = synthScalarAnn(v);
         if (a.ann && !a.ann.errored) validateExplicit(a.ann, v);
         resolve(a.ann, v);
@@ -1409,7 +1439,7 @@
              sint64/float64 while a string/bool element passes independently. */
           validateArrayEls(v, null);
           const fe = firstScalar(v);          /* a representative type for the tree */
-          if (fe && ['number', 'string', 'bool', 'special'].indexOf(fe.kind) >= 0) {
+          if (fe && ['number', 'string', 'bool', 'special', 'datetime'].indexOf(fe.kind) >= 0) {
             a.ann = synthScalarAnn(fe);
             /* the C reader keeps the no_unit param on a synthesised array type */
           }
@@ -1483,7 +1513,7 @@
           let effAnn = null, explicit = false;
           if (el.ann) { effAnn = el.ann; explicit = true; }
           else if (defaultAnn) effAnn = defaultAnn;
-          else if (['number', 'string', 'bool', 'special'].indexOf(el.kind) >= 0) effAnn = synthScalarAnn(el);
+          else if (['number', 'string', 'bool', 'special', 'datetime'].indexOf(el.kind) >= 0) effAnn = synthScalarAnn(el);
           if (effAnn) {
             const s = annSig(effAnn);
             if (explicit || s !== st.lastSig) { flattenAnn(effAnn); st.lastSig = s; }

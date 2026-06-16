@@ -3819,8 +3819,8 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </div>
 
 <script src="bovnar_units.js?v=20260603"></script>
-<script src="bovnar_parser.js?v=20260603p"></script>
-<script src="bovnar_highlight.js?v=20260608"></script>
+<script src="bovnar_parser.js?v=20260616"></script>
+<script src="bovnar_highlight.js?v=20260616"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
@@ -3997,6 +3997,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   function vtStr(vt, unit) {
     if (vt && vt.familyName && vt.familyName !== 'plain') {
       let s = vt.familyName + (vt.width != null ? ':' + vt.width : '');
+      if (vt.epoch) s += ',' + vt.epoch;     /* datetime epoch (spec 1.1) */
       if (unit) s += ', ' + unit;
       return ` <span class="pg-vt">‹${esc(s)}›</span>`;
     }
@@ -4573,6 +4574,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
           if (d.kind === 'width') ann.width = d.value;
           else if (d.kind === 'base') ann.base = d.value;
           else if (d.kind === 'q') ann.q = d.value;
+          else if (d.kind === 'epoch') ann.epoch = d.text;   /* datetime epoch (spec 1.1) */
           else if (d.kind === 'unit') ann.unit = d.text;
           break;
         }
@@ -4603,11 +4605,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
           } else {
             const unit = (ann && ann.unit) || ev.data.unit || null;
             const node = { value: ev.data.value, dataKind: ev.data.kind, unit,
-                           family: ann && ann.family, width: ann && ann.width, line: ev.line };
+                           family: ann && ann.family, width: ann && ann.width,
+                           epoch: ann && ann.epoch, line: ev.line };
             if (key != null) top.obj[key] = node;
             rows.push({ depth: stack.length - 1, key, kind: 'value',
                         valueText: ev.data.text, dataKind: ev.data.kind,
-                        unit, family: node.family, width: node.width, line: ev.line });
+                        unit, family: node.family, width: node.width,
+                        epoch: node.epoch, line: ev.line });
             ann = null;
           }
           break;
@@ -4705,16 +4709,18 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
 
   const f = (n, d) => Number(n).toFixed(d);
-  // The downlink carries TAI only (no UTC). TAI = UTC + 37 leap seconds (constant
-  // since 2017); the trailing 'Z' is dropped because TAI is not a UTC wall-clock.
-  const TAI_OFFSET_MS = 37000;
-  const isoTAI = (ms) => new Date(ms + TAI_OFFSET_MS).toISOString().replace(/\.\d+Z$/, '');
-  // Recover Mission Elapsed Time from a decoded TAI stamp: treat it as the TAI
-  // instant (append 'Z'), back out the 37 s leap offset to UTC, then subtract the
-  // UTC epoch. Returns NaN if the stamp can't be parsed (e.g. a corrupt frame).
-  function metFromTAI(tai) {
-    const t = Date.parse(tai + 'Z');
-    return isNaN(t) ? NaN : (t - TAI_OFFSET_MS - sim.epochMs) / 1000;
+  // The downlink stamp is a native spec-1.1 datetime: written as a civil UTC
+  // literal but annotated `<datetime:64,tai>`, so the format stores a leap-second-
+  // correct count of TAI seconds while the wire stays human-readable. (Spec 1.1
+  // folds an ISO literal to true UTC and applies the IERS leap-second table for
+  // the tai epoch — the +37 s offset that used to be hand-rolled here is now the
+  // format's job, carried by the epoch annotation.)
+  const isoStamp = (ms) => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
+  // Recover Mission Elapsed Time from the decoded UTC stamp: parse it and subtract
+  // the orbit epoch. Returns NaN if the stamp can't be parsed (e.g. a corrupt frame).
+  function metFromStamp(iso) {
+    const t = Date.parse(iso);
+    return isNaN(t) ? NaN : (t - sim.epochMs) / 1000;
   }
 
   // Minor, realistic deviations layered onto the clean Kepler state for the
@@ -4745,9 +4751,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // vectors keep full type annotations (inline units aren't allowed in arrays).
     // Telemetry units use Unicode notation (m·s⁻¹, °C) — vs the ASCII config.
     return [
+      '#!bovnar 1.1',
       '.tm = {',
       row('mission_time', f(sim.met, 1) + ' s'),
-      row('tai', '"' + isoTAI(utcMs) + '"'),
+      row('tai', '<datetime:64,tai> ' + isoStamp(utcMs)),
       row('eclipse', st.eclipse ? 'true' : 'false'),
       row('pos', '<float:64,k~m> [' + f(st.pos[0],2) + ', ' + f(st.pos[1],2) + ', ' + f(st.pos[2],2) + ']'),
       row('vel', '<float:64,m·s⁻¹> [' + f(vel[0],1) + ', ' + f(vel[1],1) + ', ' + f(vel[2],1) + ']'),
@@ -5293,7 +5300,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       let val = r.valueText;
       if (r.dataKind === 'string') val = '"' + val + '"';
       const unit = r.unit ? '<span class="u">' + esc(r.unit) + '</span>' : '';
-      const type = r.family ? (r.family + (r.width ? ':' + r.width : '')) : (r.dataKind === 'symbol' ? 'symbol' : '');
+      const type = r.family ? (r.family + (r.width ? ':' + r.width : '') + (r.epoch ? ',' + r.epoch : '')) : (r.dataKind === 'symbol' ? 'symbol' : '');
       // Always emit the .t line (placeholder when a field has no type) so a tile
       // keeps the same height whether it is showing data or the "no data" error
       // state — otherwise the column jumps as fields flip on a noisy channel.
@@ -5412,11 +5419,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       renderFrame(text, dec.errs, badKeys);
       renderGauges(dec.rows, drop, badKeys);
       $('s-frame').textContent = sim.tframe;
-      // MET is recovered from the decoded TAI stamp (with the leap-second offset
-      // backed out), so the status clock is driven by the stream like everything
-      // else; fall back to the sim clock if this frame's TAI didn't decode.
+      // MET is recovered from the decoded downlink stamp, so the status clock is
+      // driven by the stream like everything else; fall back to the sim clock if
+      // this frame's stamp didn't decode.
       const tmm = dec.map.tm && dec.map.tm.struct;
-      const metTAI = tmm && tmm.tai && tmm.tai.value ? metFromTAI(tmm.tai.value) : NaN;
+      const metTAI = tmm && tmm.tai && tmm.tai.value ? metFromStamp(tmm.tai.value) : NaN;
       $('s-met').textContent = fmtClock(isNaN(metTAI) ? sim.met : metTAI);
       $('s-orb').textContent = (sim.met / sim.period).toFixed(2);
       $('s-drop').textContent = sim.dropped;
@@ -5462,14 +5469,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // the orbit live. Self-describing: each value carries its own type + unit
   // inline (ASCII notation; SI prefixes take a '~', e.g. k~m).
   const DEFAULT_CFG =
-`.spacecraft = {
+`#!bovnar 1.1
+.spacecraft = {
     # orbit-updated badge
     .name = "NYX-1";
 };
 
 .orbit = {
-    # TAI downlink stamp
-    .epoch           = "2026-05-28T00:00:00Z";
+    # orbit epoch — native datetime (infers <datetime:64,unix>)
+    .epoch           = 2026-05-28T00:00:00Z;
     # R_earth + altitude
     .altitude        = <float:64,k~m> 900.0;
     # orbital-plane tilt
@@ -5664,7 +5672,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const dp = sim.decimals, half = sim.spread / 2;
     const bid = (sim.last - half).toFixed(dp), ask = (sim.last + half).toFixed(dp), last = sim.last.toFixed(dp), cur = sim.currency;
     const row = (k, v) => '    .' + k.padEnd(7) + ' = ' + v + ';';
-    return ['.tick = {', row('seq', '<uint:32> ' + sim.seq), row('ts', '"' + isoUTC(sim.tms) + '"'),
+    return ['#!bovnar 1.1', '.tick = {', row('seq', '<uint:32> ' + sim.seq), row('ts', isoUTC(sim.tms)),
       row('bid', '<float_dec:64,$' + cur + '> ' + bid), row('ask', '<float_dec:64,$' + cur + '> ' + ask),
       row('last', '<float_dec:64,$' + cur + '> ' + last), row('volume', '<uint:64> ' + sim.vol), '};'].join('\n');
   }

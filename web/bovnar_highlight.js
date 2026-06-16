@@ -95,6 +95,13 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
   // Bovnar bare number literals have no digit-group separators (the grammar's
   // int-led / dot-led are plain DIGIT runs), so no '_' inside the digit class.
   const NUM = /^-?(?:\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)/;
+  // ISO-8601 datetime literal (spec 1.1): a date, optionally a full time with a
+  // fractional second and/or a 'Z' or ±HH:MM offset. The leading YYYY-MM-DD shape
+  // (a digit run immediately followed by '-' then a digit) never begins a plain
+  // number — a number's '-' is a leading sign or follows 'e' — so this is safe to
+  // try before NUM. Mirrors the parser's dtlit_* character set; coloured as a
+  // single cohesive value token (like the C reader's integer carrier).
+  const DT = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?/;
 
   // Split a unit so '~', '*' and '/' read as separators (vim BovnarUnitTilde /
   // UnitSep) and the rest as the unit body (BovnarTypeUnit / UnitExp).
@@ -152,6 +159,7 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
       }
       if (c === '&' && (m = /^&(?:\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*|\[[0-9]+\])+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if (c === '.' && (m = /^\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*/.exec(r))) { out += span('sigil', '.') + span('key', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
+      if (!afterNum && (m = DT.exec(r))) { out += span('num', m[0]); i += m[0].length; afterNum = false; continue; }  // ISO-8601 datetime literal (spec 1.1)
       if ((m = NUM.exec(r)) && /\d/.test(m[0])) { let s = m[0]; if (s[0] === '-') { out += span('neg', '-'); s = s.slice(1); } out += span('num', s); i += m[0].length; afterNum = true; continue; }
       if (afterNum && (m = ID.exec(r))) {              // inline unit suffix after a number (broad unit charset)
         out += unit(m[0]); i += m[0].length; afterNum = false; continue;

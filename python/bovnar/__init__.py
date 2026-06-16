@@ -20,6 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from decimal import Decimal
+from fractions import Fraction
+
 from .enums import (
     Event, ValueTypeFamily, PrefixSystem,
     SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
@@ -58,8 +61,10 @@ from ._pint_bridge import to_pint, to_pint_unit, from_pint, from_pint_unit
 # numpy bridge: likewise numpy is imported lazily, only when these are called.
 from ._numpy import (to_numpy, to_pint_array, from_numpy, from_pint_array,
                      array_to_bvnr)
+from ._bvnfloat import BvnFloat
 
 __all__ = [
+    'BvnFloat',
     'loads', 'dumps', 'dom_parse',
     'version', 'spec_version', 'peek_version',
     'currency', 'stream',
@@ -721,6 +726,11 @@ def _emit_value(w: Writer, key: str, value) -> None:
             w.write_bvni(key, value, width=width)
     elif isinstance(value, float):
         w.write_float(key, value)
+    elif isinstance(value, Decimal):
+        # exact -> a decimal-float (float_dec:64) literal, never via a C double
+        _emit_quantity(w, key, Quantity.from_number(value))
+    elif isinstance(value, Fraction):
+        _emit_quantity(w, key, Quantity.from_number(value))
     elif isinstance(value, str):
         w.write_string(key, value)
     elif isinstance(value, dict):
@@ -790,6 +800,7 @@ def _emit_array_element(w: Writer, elem) -> None:
 
     elif isinstance(elem, float):
         import math as _math
+        elem = float(elem)                  # normalise numpy float scalars
         vt  = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
         if _math.isinf(elem):
             _s = 'ninf' if elem < 0 else 'inf'
@@ -801,6 +812,21 @@ def _emit_array_element(w: Writer, elem) -> None:
         d = BvnrData()
         d.type       = _TOKEN_IS_ARRAY_NUMBER
         d.value_type = vt
+        d.value_unit = make_unit_dimensionless()
+        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.length     = len(raw)
+        _write_event_data(w, d)
+
+    elif isinstance(elem, (Decimal, Fraction)):
+        # Exact decimal/fraction element: emit the verbatim literal as a number.
+        # The array-level annotation (set by from_numpy) supplies the real
+        # family/width; FLOAT_DEC:64 here is only the lenient per-element
+        # range-check carrier (magnitude, not digit count).
+        from .quantity import _exact_number_text
+        raw = _exact_number_text(elem).encode('ascii')
+        d = BvnrData()
+        d.type       = _TOKEN_IS_ARRAY_NUMBER
+        d.value_type = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
         d.value_unit = make_unit_dimensionless()
         d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
         d.length     = len(raw)
@@ -836,8 +862,23 @@ def _emit_array_element(w: Writer, elem) -> None:
             w.end_array_row()
 
     else:
-        raise BovnarArgumentError(
-            f"Cannot serialise array element of type {type(elem).__name__!r}")
+        import numbers
+        if isinstance(elem, (numbers.Integral, numbers.Real)):
+            # any other real numeric scalar (e.g. np.float32, np.int64) reaching
+            # an object array: format it exactly and emit as a bare number. The
+            # array-level annotation supplies the real family/width.
+            from .quantity import _exact_number_text
+            raw = _exact_number_text(elem).encode('ascii')
+            d = BvnrData()
+            d.type       = _TOKEN_IS_ARRAY_NUMBER
+            d.value_type = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
+            d.value_unit = make_unit_dimensionless()
+            d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.length     = len(raw)
+            _write_event_data(w, d)
+        else:
+            raise BovnarArgumentError(
+                f"Cannot serialise array element of type {type(elem).__name__!r}")
 
 
 def _write_event_data(w: Writer, d: BvnrData) -> None:

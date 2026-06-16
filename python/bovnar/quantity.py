@@ -20,8 +20,94 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from .structs import ValueTypeSpec, ValueUnit, make_unit_none
+from .structs import ValueTypeSpec, ValueUnit, make_type_spec, make_unit_none
 from .enums   import ValueTypeFamily
+from .exceptions import BovnarArgumentError
+
+_F = ValueTypeFamily
+_FLOATISH = (int(_F.FLOAT), int(_F.FLOAT_DEC), int(_F.FLOAT_FIX))
+
+# IEEE interchange widths that map to a bvn_float bit encoding (binary & decimal).
+_IEEE_WIDTHS = (16, 32, 64, 128, 256)
+
+
+def _validate_float_width(family, width: int) -> None:
+    """Reject a width bovnar would refuse, early and with a clear message.
+
+    Binary float accepts any power-of-two width >= 16 (it stores the verbatim
+    literal at that declared precision); decimal and fixed-point are limited to
+    the IEEE interchange set 16/32/64/128/256.
+    """
+    fam, w = int(family), int(width)
+    if fam in (int(_F.FLOAT_DEC), int(_F.FLOAT_FIX)):
+        if w not in _IEEE_WIDTHS:
+            raise BovnarArgumentError(
+                f"{_F(fam).name.lower()} width must be one of 16/32/64/128/256, "
+                f"not {w}")
+    elif fam == int(_F.FLOAT):
+        if w < 16 or (w & (w - 1)) != 0:
+            raise BovnarArgumentError(
+                f"binary float width must be a power of two >= 16, not {w}")
+
+
+def _decimal_to_text(d) -> str:
+    """A bovnar-parseable numeric literal for a finite-or-special Decimal."""
+    if d.is_nan():
+        return 'nan'
+    if d.is_infinite():
+        return 'ninf' if d.is_signed() else 'inf'
+    # str(Decimal) is exact; normalise the exponent marker to bovnar's 'e'.
+    return str(d).replace('E', 'e')
+
+
+def _fraction_to_text(fr) -> str:
+    """Exact decimal literal for a *terminating* Fraction, else raise.
+
+    A Fraction is exactly a finite decimal iff its reduced denominator factors
+    into only 2s and 5s (e.g. the m/2**q of a fixed-point value). 1/3 cannot be
+    written as an exact decimal — the caller must round it to a Decimal first.
+    """
+    from decimal import Decimal
+    num, den = fr.numerator, fr.denominator
+    a = b = 0
+    d = den
+    while d % 2 == 0:
+        d //= 2; a += 1
+    while d % 5 == 0:
+        d //= 5; b += 1
+    if d != 1:
+        raise BovnarArgumentError(
+            f"{fr} is not a terminating decimal; round it to a Decimal first")
+    k = max(a, b)
+    scaled = num * (10 ** k // den)              # exact: den divides 10**k
+    return _decimal_to_text(Decimal(scaled).scaleb(-k))
+
+
+def _exact_number_text(value) -> str:
+    """Format a Python number as an exact bovnar numeric literal.
+
+    Decimal/Fraction are exact; int is exact; a float (incl. a numpy float
+    scalar) is only as precise as the underlying binary float. numpy scalar
+    types are coerced through ``numbers`` so e.g. np.float64 does not stringify
+    as ``'np.float64(1.5)'`` (its repr under numpy 2.x).
+    """
+    import numbers
+    from decimal import Decimal
+    from fractions import Fraction
+    if isinstance(value, bool):
+        raise BovnarArgumentError("bool is not a numeric value")
+    if isinstance(value, str):
+        return value                             # caller-supplied literal, verbatim
+    if isinstance(value, Fraction):
+        return _fraction_to_text(value)
+    if isinstance(value, Decimal):
+        return _decimal_to_text(value)
+    if isinstance(value, numbers.Integral):      # Python int, numpy ints, ...
+        return str(int(value))
+    if isinstance(value, numbers.Real):          # Python/numpy floats
+        return repr(float(value))                # shortest round-tripping decimal
+    raise BovnarArgumentError(
+        f"cannot format {type(value).__name__} as a bovnar number")
 
 
 class Quantity:
@@ -43,6 +129,41 @@ class Quantity:
         self.vtype     = vtype
         self.unit      = unit if unit is not None else make_unit_none()
         self._tok_type = tok_type
+
+    @classmethod
+    def from_number(cls, value, *, family=ValueTypeFamily.FLOAT_DEC,
+                    width: int = 64, frac: int | None = None,
+                    unit: ValueUnit | None = None) -> 'Quantity':
+        """Build a typed float Quantity from an exact Python number.
+
+        *value* may be a :class:`~decimal.Decimal`, :class:`~fractions.Fraction`,
+        ``int``, ``str`` (a verbatim literal), or ``float`` (only as precise as
+        the double). The value is stored as an exact decimal literal, so writing
+        the Quantity with :func:`dumps` is lossless to the format's precision.
+
+        *family* is one of FLOAT, FLOAT_DEC (default), or FLOAT_FIX; *frac* (the
+        number of fractional bits) is required for FLOAT_FIX.
+        """
+        fam = int(family)
+        if fam == int(_F.FLOAT_FIX):
+            if frac is None:
+                raise BovnarArgumentError("float_fix requires frac=<fractional bits>")
+            base = int(frac)
+        elif fam in (int(_F.FLOAT), int(_F.FLOAT_DEC)):
+            base = 0
+        else:
+            raise BovnarArgumentError(
+                "from_number: family must be FLOAT, FLOAT_DEC, or FLOAT_FIX")
+        _validate_float_width(family, width)
+        text = _exact_number_text(value)
+        if fam == int(_F.FLOAT_FIX):
+            from ._ffi import get_library
+            if not get_library().bvn_float_str_fits_fix(
+                    text.encode('ascii'), 10, int(width) or 64, base):
+                raise BovnarArgumentError(
+                    f"{text} does not fit a signed float_fix:{width},q{base}")
+        vt = make_type_spec(family, int(width), base)
+        return cls(text, vt, unit, tok_type=2)
 
     @property
     def value(self):
@@ -70,6 +191,179 @@ class Quantity:
             return None
         from ._ffi import get_library
         return int(get_library().bvnr_datetime_epoch_mjd(self.vtype))
+
+    # ── lossless numeric access ────────────────────────────────────────────
+    # ``value`` decodes through a C double and loses precision for float_dec,
+    # float_fix, and float:128/256. These accessors instead use the verbatim
+    # literal text (``raw``) and bovnar's arbitrary-precision float, so the full
+    # precision the format carries is reachable from Python.
+
+    def _numeric_base(self) -> int:
+        """Numeric radix of the literal (10 for the decimal families)."""
+        if int(self.vtype.family) == int(_F.FLOAT):
+            return int(self.vtype.base) or 10
+        return 10                                # float_dec / float_fix are decimal
+
+    def _nonfinite_decimal(self):
+        """Decimal('NaN'/±Infinity') if raw is a non-finite token, else None."""
+        from decimal import Decimal
+        low = (self.raw or '').strip().lower()
+        if low == 'nan':
+            return Decimal('NaN')
+        if low in ('inf', '+inf', 'infinity', '+infinity'):
+            return Decimal('Infinity')
+        if low in ('ninf', '-inf', '-infinity'):
+            return Decimal('-Infinity')
+        return None
+
+    def decimal(self):
+        """Exact value as :class:`decimal.Decimal`, from the verbatim literal.
+
+        Lossless for every numeric family (``uint``/``sint`` and all three float
+        families). Raises for non-numeric families (bool/utf8/datetime).
+        """
+        from decimal import Decimal
+        fam = int(self.vtype.family)
+        if fam in (int(_F.UINT), int(_F.SINT)):
+            v = self.value
+            if v is None:
+                return None
+            return Decimal(v)
+        if fam in _FLOATISH:
+            nf = self._nonfinite_decimal()
+            if nf is not None:
+                return nf
+            if self.raw is None:
+                return None
+            base = self._numeric_base()
+            if base in (0, 10):
+                return Decimal(self.raw)
+            from ._bvnfloat import BvnFloat
+            return BvnFloat.from_str(self.raw, base).to_decimal()
+        raise BovnarArgumentError(
+            f"decimal() is not defined for a {_F(fam).name} value")
+
+    def fraction(self):
+        """Exact value as :class:`fractions.Fraction`.
+
+        For a ``float_fix`` value this is the exact Q-format datum
+        ``mantissa / 2**frac_bits``; for the others it is the exact literal.
+        """
+        from fractions import Fraction
+        if int(self.vtype.family) == int(_F.FLOAT_FIX):
+            m, q = self.fixed_point()
+            return Fraction(m, 1 << q)
+        d = self.decimal()
+        if d is None:
+            return None
+        return Fraction(d)
+
+    def fixed_point(self) -> tuple:
+        """``(mantissa, frac_bits)`` for a ``float_fix`` value; the exact value
+        is ``mantissa / 2**frac_bits``. Raises for any other family."""
+        if int(self.vtype.family) != int(_F.FLOAT_FIX):
+            raise BovnarArgumentError("fixed_point() is only valid for float_fix")
+        from ._bvnfloat import BvnFloat
+        q = int(self.vtype.base)
+        width = int(self.vtype.width) or 64
+        f = BvnFloat.from_str(self.raw, 10)
+        return f.to_fixed_mantissa(width, q), q
+
+    def _parser_saturated(self, f, lit) -> bool:
+        """True when bovnar's C parser collapsed a finite, nonzero literal to
+        0/inf because its exact rational exceeds the 32768-bit intermediate cap
+        (decimal exponent beyond ~1e±9865)."""
+        return (lit is not None and lit.is_finite() and lit != 0
+                and (f.is_zero or f.is_inf))
+
+    def _decimal_bits(self) -> bytes:
+        """IEEE decimal interchange bytes for this (float_dec) value, over the
+        full range. Uses bovnar's C encoder normally, falling back to the pure-
+        Python encoder only when the C parser saturates an extreme exponent
+        (beyond its ~1e9865 intermediate cap)."""
+        from ._bvnfloat import BvnFloat, decimal_to_interchange_bits
+        width = int(self.vtype.width) or 64
+        f = BvnFloat.from_str(self.raw, 10)
+        lit = self.decimal()
+        if self._parser_saturated(f, lit):
+            return decimal_to_interchange_bits(lit, width)
+        return f.to_decimal_bits(width)
+
+    def _decimal_stored(self):
+        """The materialised float_dec value as an exact Decimal, full range
+        (C encoder normally; pure-Python encoder past the parser's cap)."""
+        from ._bvnfloat import BvnFloat, decimal_stored_value
+        width = int(self.vtype.width) or 64
+        f = BvnFloat.from_str(self.raw, 10)
+        lit = self.decimal()
+        if self._parser_saturated(f, lit):
+            return decimal_stored_value(lit, width)
+        return BvnFloat.from_decimal_bits(width, f.to_decimal_bits(width)).to_decimal()
+
+    def _binary_bits(self) -> bytes:
+        """IEEE binary interchange bytes for this (binary float) value, over the
+        full representable range. Uses bovnar's C encoder, falling back to the
+        pure-Python correctly-rounded encoder when the C parser saturates an
+        extreme decimal exponent."""
+        from ._bvnfloat import BvnFloat, fraction_to_binary_bits
+        width = int(self.vtype.width) or 64
+        base = self._numeric_base()
+        f = BvnFloat.from_str(self.raw, base)
+        lit = self.decimal()
+        if base in (0, 10) and self._parser_saturated(f, lit):
+            from fractions import Fraction
+            return fraction_to_binary_bits(Fraction(lit), width)
+        return f.to_binary_bits(width)
+
+    def stored_value(self):
+        """The value as actually materialised into the declared IEEE/fixed
+        format (round-to-nearest-even), as an exact :class:`decimal.Decimal`.
+
+        This differs from :meth:`decimal` only when the literal carries more
+        precision than the format holds (e.g. a 40-digit ``float_dec:64``
+        literal rounds to 16 significant digits here). Supported for
+        ``float:128``/``float:256``, every ``float_dec`` width, and every
+        ``float_fix`` width.
+        """
+        from decimal import Decimal
+        from ._bvnfloat import BvnFloat
+        fam = int(self.vtype.family)
+        width = int(self.vtype.width) or 64
+        nf = self._nonfinite_decimal()
+        if nf is not None and fam != int(_F.FLOAT_FIX):
+            return nf
+        if fam == int(_F.FLOAT_FIX):
+            m, q = self.fixed_point()
+            return Decimal(m) / Decimal(1 << q)
+        if fam == int(_F.FLOAT) and width not in _IEEE_WIDTHS:
+            raise BovnarArgumentError(
+                f"stored_value() materialises IEEE 16/32/64/128/256-bit floats; "
+                f"float:{width} has no such encoding — use .decimal() for the "
+                f"exact literal value")
+        if fam == int(_F.FLOAT):
+            return BvnFloat.from_binary_bits(width, self._binary_bits()).to_decimal()
+        if fam == int(_F.FLOAT_DEC):
+            return self._decimal_stored()
+        raise BovnarArgumentError(
+            f"stored_value() is not defined for a {_F(fam).name} value")
+
+    def ieee_bits(self) -> bytes:
+        """The raw IEEE-754 interchange bytes of the materialised value
+        (little-endian word order): binary128/256 for ``float``, the decimal
+        interchange encoding for ``float_dec``. Raises otherwise."""
+        from ._bvnfloat import BvnFloat
+        fam = int(self.vtype.family)
+        width = int(self.vtype.width) or 64
+        if fam == int(_F.FLOAT) and width not in _IEEE_WIDTHS:
+            raise BovnarArgumentError(
+                f"ieee_bits() materialises IEEE 16/32/64/128/256-bit floats; "
+                f"float:{width} has no such encoding — use .decimal() instead")
+        if fam == int(_F.FLOAT):
+            return self._binary_bits()
+        if fam == int(_F.FLOAT_DEC):
+            return self._decimal_bits()
+        raise BovnarArgumentError(
+            "ieee_bits() is only valid for float (16..256) and float_dec values")
 
     def unit_str(self) -> str:
         """Return the canonical unit string, or '' if dimensionless."""

@@ -158,6 +158,14 @@ class TestPintRoundTrip:
         with pytest.raises(BovnarArgumentError):
             from_pint_unit(expr, ureg=reg)
 
+    @pytest.mark.parametrize("bad", [__import__('numpy').array([1.0, 2.0]),
+                                     ['m'], 5, 3.5])
+    def test_non_pint_input_clean_error(self, bad, reg):
+        # a non-pint value must give a clear message, not a cryptic AttributeError
+        # from deep inside (`'ndarray' object has no attribute '_units'`).
+        with pytest.raises(BovnarArgumentError, match="expected a pint"):
+            from_pint_unit(bad, ureg=reg)
+
 
 @needs_lib
 class TestCurrencyDimensions:
@@ -181,3 +189,25 @@ class TestCurrencyDimensions:
         vu = make_unit_si(bu, SIPrefix.NONE, Exponent.LINEAR)
         back = from_pint_unit(to_pint_unit(vu, ureg=reg), ureg=reg)
         assert unit_to_str(back) == unit_to_str(vu)
+
+
+@needs_lib
+class TestReverseCacheLifetime:
+    """The per-registry reverse map is keyed on the registry object via a
+    WeakKeyDictionary, so a transient registry's cache entry is evicted when it
+    is collected — no unbounded leak and no id() reuse aliasing a stale map onto
+    an unrelated new registry."""
+
+    def test_transient_registry_cache_is_evicted(self):
+        import gc
+        from bovnar import _pint_bridge as pb
+
+        reg = build_registry()
+        from_pint_unit('newton*meter', ureg=reg)        # populate its cache
+        assert reg in pb._reverse_cache
+        before = len(pb._reverse_cache)
+
+        del reg
+        gc.collect()
+        # the dropped registry's entry is gone; nothing else removed.
+        assert len(pb._reverse_cache) == before - 1

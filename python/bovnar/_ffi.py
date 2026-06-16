@@ -487,3 +487,96 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvnr_parse_embedded.restype  = c_bool
     lib.bvnr_parse_embedded.argtypes = [c_void_p, c_uint64, P(BvnrReadFlags)]
+
+    # ── bvn_float.h: arbitrary-precision decimal float + IEEE/fixed encoders ──
+    # The bvn_float_t* handle is treated as an opaque c_void_p (allocated by
+    # bvn_float_alloc, released by bvn_float_free); no struct layout is mirrored.
+    c_u32_4 = c_uint32 * 4
+    c_u32_8 = c_uint32 * 8
+    lib.bvn_float_alloc.restype  = c_void_p
+    lib.bvn_float_alloc.argtypes = [c_uint32]
+    lib.bvn_float_free.restype  = None
+    lib.bvn_float_free.argtypes = [c_void_p]
+    lib.bvn_float_from_str.restype  = c_bool
+    lib.bvn_float_from_str.argtypes = [c_void_p, c_char_p, c_uint32]
+    lib.bvn_float_to_str.restype  = c_int32
+    lib.bvn_float_to_str.argtypes = [c_void_p, c_char_p, c_size_t, c_uint32]
+    lib.bvn_float_str_bufsize.restype  = c_size_t
+    lib.bvn_float_str_bufsize.argtypes = [c_uint32, c_uint32]
+    lib.bvn_float_to_double.restype  = c_bool
+    lib.bvn_float_to_double.argtypes = [c_void_p, P(c_double)]
+    for _p in ('nan', 'inf', 'zero', 'neg'):
+        fn = getattr(lib, 'bvn_float_is_' + _p)
+        fn.restype = c_bool
+        fn.argtypes = [c_void_p]
+    # string -> IEEE-754 binary interchange bits, single correctly-rounded step
+    lib.bvn_float_strtoieee_bin.restype  = None
+    lib.bvn_float_strtoieee_bin.argtypes = [
+        c_char_p, c_uint32, c_uint32, c_uint32, c_int32, P(c_uint32), c_int]
+    # IEEE binary16/32/64 (scalar) and binary128/256 (4 / 8 uint32 words)
+    lib.bvn_float_to_bin16.restype  = None
+    lib.bvn_float_to_bin16.argtypes = [c_void_p, P(c_uint16)]
+    lib.bvn_float_to_bin32.restype  = None
+    lib.bvn_float_to_bin32.argtypes = [c_void_p, P(c_uint32)]
+    lib.bvn_float_to_bin64.restype  = None
+    lib.bvn_float_to_bin64.argtypes = [c_void_p, P(c_uint64)]
+    lib.bvn_float_from_bin16.restype  = c_bool
+    lib.bvn_float_from_bin16.argtypes = [c_void_p, c_uint16]
+    lib.bvn_float_from_bin32.restype  = c_bool
+    lib.bvn_float_from_bin32.argtypes = [c_void_p, c_uint32]
+    lib.bvn_float_from_bin64.restype  = c_bool
+    lib.bvn_float_from_bin64.argtypes = [c_void_p, c_uint64]
+    lib.bvn_float_to_bin128.restype  = None
+    lib.bvn_float_to_bin128.argtypes = [c_void_p, c_u32_4]
+    lib.bvn_float_to_bin256.restype  = None
+    lib.bvn_float_to_bin256.argtypes = [c_void_p, c_u32_8]
+    lib.bvn_float_from_bin128.restype  = c_bool
+    lib.bvn_float_from_bin128.argtypes = [c_void_p, c_u32_4]
+    lib.bvn_float_from_bin256.restype  = c_bool
+    lib.bvn_float_from_bin256.argtypes = [c_void_p, c_u32_8]
+    # IEEE decimal interchange dec16/32/64 (scalar) and dec128/256 (word arrays)
+    lib.bvn_float_to_dec16.restype  = None
+    lib.bvn_float_to_dec16.argtypes = [c_void_p, P(c_uint16)]
+    lib.bvn_float_to_dec32.restype  = None
+    lib.bvn_float_to_dec32.argtypes = [c_void_p, P(c_uint32)]
+    lib.bvn_float_to_dec64.restype  = None
+    lib.bvn_float_to_dec64.argtypes = [c_void_p, P(c_uint64)]
+    lib.bvn_float_to_dec128.restype  = None
+    lib.bvn_float_to_dec128.argtypes = [c_void_p, c_u32_4]
+    lib.bvn_float_to_dec256.restype  = None
+    lib.bvn_float_to_dec256.argtypes = [c_void_p, c_u32_8]
+    lib.bvn_float_from_dec16.restype  = c_bool
+    lib.bvn_float_from_dec16.argtypes = [c_void_p, c_uint16]
+    lib.bvn_float_from_dec32.restype  = c_bool
+    lib.bvn_float_from_dec32.argtypes = [c_void_p, c_uint32]
+    lib.bvn_float_from_dec64.restype  = c_bool
+    lib.bvn_float_from_dec64.argtypes = [c_void_p, c_uint64]
+    lib.bvn_float_from_dec128.restype  = c_bool
+    lib.bvn_float_from_dec128.argtypes = [c_void_p, c_u32_4]
+    lib.bvn_float_from_dec256.restype  = c_bool
+    lib.bvn_float_from_dec256.argtypes = [c_void_p, c_u32_8]
+    # fixed-point Q-format fix16/32/64 (scalar) and fix128/256 (word arrays)
+    lib.bvn_float_to_fix16.restype  = c_int16
+    lib.bvn_float_to_fix16.argtypes = [c_void_p, c_uint32]
+    lib.bvn_float_to_fix32.restype  = c_int32
+    lib.bvn_float_to_fix32.argtypes = [c_void_p, c_uint32]
+    lib.bvn_float_to_fix64.restype  = c_int64
+    lib.bvn_float_to_fix64.argtypes = [c_void_p, c_uint32]
+    lib.bvn_float_to_fix128.restype  = None
+    lib.bvn_float_to_fix128.argtypes = [c_void_p, c_uint32, c_u32_4]
+    lib.bvn_float_to_fix256.restype  = None
+    lib.bvn_float_to_fix256.argtypes = [c_void_p, c_uint32, c_u32_8]
+    lib.bvn_float_from_fix16.restype  = c_bool
+    lib.bvn_float_from_fix16.argtypes = [c_void_p, c_int16, c_uint32]
+    lib.bvn_float_from_fix32.restype  = c_bool
+    lib.bvn_float_from_fix32.argtypes = [c_void_p, c_int32, c_uint32]
+    lib.bvn_float_from_fix64.restype  = c_bool
+    lib.bvn_float_from_fix64.argtypes = [c_void_p, c_int64, c_uint32]
+    lib.bvn_float_from_fix128.restype  = c_bool
+    lib.bvn_float_from_fix128.argtypes = [c_void_p, c_u32_4, c_uint32]
+    lib.bvn_float_from_fix256.restype  = c_bool
+    lib.bvn_float_from_fix256.argtypes = [c_void_p, c_u32_8, c_uint32]
+    lib.bvn_float_fix_in_range.restype  = c_bool
+    lib.bvn_float_fix_in_range.argtypes = [c_void_p, c_uint32, c_uint32]
+    lib.bvn_float_str_fits_fix.restype  = c_bool
+    lib.bvn_float_str_fits_fix.argtypes = [c_char_p, c_uint32, c_uint32, c_uint32]

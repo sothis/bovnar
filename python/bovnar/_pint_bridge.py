@@ -38,6 +38,8 @@ one registry across calls; otherwise a module-level default is built on first us
 """
 from __future__ import annotations
 
+import weakref
+
 from .enums import BaseUnit, SIPrefix, IECPrefix, Exponent, PrefixSystem
 from .structs import ValueUnit, make_unit_dimensionless, make_unit_compound
 from .exceptions import BovnarArgumentError
@@ -68,7 +70,12 @@ _AFFINE_BASES = frozenset(int(b) for b in (
     BaseUnit.DELISLE, BaseUnit.NEWTON_TEMP, BaseUnit.ROMER))
 
 _default_reg = None
-_reverse_cache: dict = {}
+# Keyed on the registry object itself (not id(reg)): a WeakKeyDictionary auto-
+# evicts when a registry is garbage-collected, so a transient registry can never
+# leak its map, nor have a recycled id() alias a stale map onto an unrelated new
+# registry (id() is reused after GC). The cached map holds only str->int, so it
+# keeps no strong reference back to the registry.
+_reverse_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 def _registry(ureg):
@@ -133,7 +140,7 @@ def to_pint(value, vu: ValueUnit, *, ureg=None):
 # --------------------------------------------------------------------------- #
 def _reverse_map(reg) -> dict:
     """canonical-pint-name -> bovnar base-unit code (cached per registry)."""
-    m = _reverse_cache.get(id(reg))
+    m = _reverse_cache.get(reg)
     if m is not None:
         return m
     m = {}
@@ -143,7 +150,7 @@ def _reverse_map(reg) -> dict:
             m[reg.get_name(tok)] = code     # pint's canonical spelling (e.g. degree_Celsius)
         except Exception:
             pass
-    _reverse_cache[id(reg)] = m
+    _reverse_cache[reg] = m
     return m
 
 
@@ -173,6 +180,10 @@ def from_pint_unit(unit, *, ureg=None, validate: bool = True) -> ValueUnit:
         unit = unit.units
     if isinstance(unit, str):
         unit = reg.Unit(unit)
+    if not hasattr(unit, '_units'):         # not a pint Unit/Quantity/str
+        raise BovnarArgumentError(
+            f"expected a pint Unit/Quantity or unit string, "
+            f"not {type(unit).__name__}")
     items = list(unit._units.items())       # {canonical_name: exponent}
     if not items:
         return make_unit_dimensionless()

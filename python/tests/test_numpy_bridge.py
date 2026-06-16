@@ -89,7 +89,7 @@ class TestToNumpy:
 @needs_lib
 class TestUnmappableWidthEscapeHatch:
     """A width with no native numpy dtype (>64-bit integer, or a float width
-    other than 16/32/64/128) must be rejected only under strict inference
+    other than 16/32/64) must be rejected only under strict inference
     (dtype=None) — an explicit dtype= must still coerce it. Regression: the
     inference probe used to raise before the caller's dtype was consulted, so
     the advertised dtype=object / dtype=float remedies did not work."""
@@ -118,6 +118,77 @@ class TestUnmappableWidthEscapeHatch:
         a = to_numpy(dom_parse(b'.a=<float:256>[1.5,2.5];')['a'], dtype='float64')
         assert a.dtype == np.float64 and a.tolist() == [1.5, 2.5]
 
+    def test_float128_dom_default_raises(self):
+        # The DOM path has only a lossy C double for <float:128>; it must point
+        # at the lossless typed path or the explicit float64 opt-in, not map to
+        # the (mismatched, 80-bit) np.float128.
+        with pytest.raises(BovnarArgumentError, match="lossless numpy dtype"):
+            to_numpy(dom_parse(b'.a=<float:128>[1.5,2.5];')['a'])
+
+    def test_float128_coerces_to_float64(self):
+        a = to_numpy(dom_parse(b'.a=<float:128>[1.5,2.5];')['a'], dtype='float64')
+        assert a.dtype == np.float64 and a.tolist() == [1.5, 2.5]
+
+    @pytest.mark.skipif(not hasattr(np, 'float128'),
+                        reason="platform has no float128/longdouble")
+    def test_float128_array_write_rejected(self):
+        # a user-built np.float128 (x86 80-bit, not IEEE binary128) array must
+        # give a clear message, not a cryptic "cannot serialise longdouble".
+        with pytest.raises(BovnarArgumentError, match="no faithful bovnar mapping"):
+            array_to_bvnr('a', np.array([1.5, 2.5], dtype=np.float128))
+
+    @pytest.mark.skipif(not hasattr(np, 'float128'),
+                        reason="platform has no float128/longdouble")
+    def test_float128_array_write_after_cast(self):
+        raw = array_to_bvnr('a', np.array([1.5, 2.5], dtype=np.float128).astype('float64'),
+                            pretty=False)
+        assert to_numpy(loads(raw, typed=True)['a']).tolist() == [1.5, 2.5]
+
+
+@needs_lib
+class TestRawPythonIntRange:
+    """Raw Python lists are an accepted source. An int past 2**63-1 must not
+    raise a bare numpy OverflowError: it is widened to uint64 when it fits and
+    nothing is negative (bovnar's own default for a bare non-negative integer),
+    routed to the object escape when it is a true bigint, and a genuine
+    signed/unsigned conflict gives a clean, actionable message."""
+
+    _U = 2 ** 63 + 5            # past int64, fits uint64
+    _BIG = 10 ** 30             # past uint64
+
+    def test_uint64_band_widens(self):
+        a = to_numpy([self._U, 1])
+        assert a.dtype == np.uint64 and a.tolist() == [self._U, 1]
+
+    def test_signed_unsigned_conflict_is_clean(self):
+        with pytest.raises(BovnarArgumentError, match="mixes element dtypes"):
+            to_numpy([-1, self._U])
+
+    def test_conflict_object_escape(self):
+        a = to_numpy([-1, self._U], dtype=object)
+        assert a.tolist() == [-1, self._U]
+
+    def test_bigint_clean_error(self):
+        with pytest.raises(BovnarArgumentError, match="64-bit range"):
+            to_numpy([self._BIG, 1])
+
+    def test_bigint_object_exact(self):
+        a = to_numpy([self._BIG, 1], dtype=object)
+        assert a[0] == self._BIG and a[1] == 1
+
+    def test_explicit_narrow_dtype_overflow_is_clean(self):
+        with pytest.raises(BovnarArgumentError, match="out of range"):
+            to_numpy([self._U, 1], dtype='int64')
+
+    def test_plain_small_ints_stay_int64(self):
+        assert to_numpy([1, 2, 3]).dtype == np.int64
+
+    def test_typed_signed_unsigned_nonnegative_reconciles(self):
+        # mixed <sint:64>/<uint:64> leaves, all non-negative -> uint64
+        a = to_numpy(loads(
+            b'.a=[<sint:64>5,<uint:64>9223372036854775813];', typed=True)['a'])
+        assert a.dtype == np.uint64 and a.tolist() == [5, 9223372036854775813]
+
 
 @needs_lib
 class TestToNumpyStrict:
@@ -130,6 +201,76 @@ class TestToNumpyStrict:
     def test_rejected(self, payload):
         with pytest.raises(BovnarArgumentError):
             to_numpy(loads(payload, typed=True)['a'])
+
+
+@needs_lib
+class TestNullCoercionStrict:
+    """A null in a dtype with no null slot must raise, not be coerced. numpy
+    silently turns None into False (bool) or the literal string 'None' (str),
+    which is data corruption; only the integer case was guarded before."""
+
+    @pytest.mark.parametrize("payload", [
+        b'.a=<bool>[true,,false];',  # None -> False
+        b'.a=["x",,"y"];',           # None -> 'None'
+        b'.a=<sint:16>[1,,3];',      # None -> TypeError historically
+    ])
+    def test_inferred_null_rejected(self, payload):
+        with pytest.raises(BovnarArgumentError, match="null"):
+            to_numpy(loads(payload, typed=True)['a'])
+
+    @pytest.mark.parametrize("payload,dt", [
+        (b'.a=<bool>[true,,false];', 'bool'),
+        (b'.a=["x",,"y"];', 'str'),
+    ])
+    def test_explicit_lossy_dtype_still_rejected(self, payload, dt):
+        # An explicit but null-incapable dtype must not silently coerce either.
+        with pytest.raises(BovnarArgumentError, match="null"):
+            to_numpy(loads(payload, typed=True)['a'], dtype=dt)
+
+    def test_object_dtype_preserves_null(self):
+        a = to_numpy(loads(b'.a=["x",,"y"];', typed=True)['a'], dtype=object)
+        assert a.tolist() == ['x', None, 'y']
+
+    def test_bool_null_object_dtype_preserves_null(self):
+        a = to_numpy(loads(b'.a=<bool>[true,,false];', typed=True)['a'],
+                     dtype=object)
+        assert a.tolist() == [True, None, False]
+
+
+@needs_lib
+class TestMixedUnitDimensionless:
+    """A numpy array carries one whole-array unit. Mixing a dimensioned numeric
+    element with a dimensionless one must raise — silently labelling the bare
+    value with the other's unit invents a dimension it does not have (the same
+    conflict class as two distinct units, which is already rejected)."""
+
+    @pytest.mark.parametrize("payload", [
+        b'.a=[<float:32,m>1,<float:32>2];',   # unit then dimensionless
+        b'.a=[<float:32>1,<float:32,m>2];',   # dimensionless then unit
+    ])
+    def test_inferred_conflict_rejected(self, payload):
+        with pytest.raises(BovnarArgumentError, match="dimensionless"):
+            to_numpy(loads(payload, typed=True)['a'])
+
+    def test_conflict_rejected_even_with_explicit_dtype(self):
+        # the unit ambiguity is independent of the element dtype coercion.
+        with pytest.raises(BovnarArgumentError, match="dimensionless"):
+            to_numpy(loads(b'.a=[<float:32,m>1,<float:32>2];', typed=True)['a'],
+                     dtype='float64')
+
+    def test_uniform_unit_still_ok_typed(self):
+        a, u = to_numpy(loads(b'.a=<float:32,m/s>[1,2,3];', typed=True)['a'],
+                        return_unit=True)
+        assert u == 'm/s' and a.tolist() == [1.0, 2.0, 3.0]
+
+    def test_uniform_unit_still_ok_dom(self):
+        a, u = to_numpy(dom_parse(b'.a=<float:32,m/s>[1,2,3];')['a'],
+                        return_unit=True)
+        assert u == 'm/s'
+
+    def test_all_dimensionless_ok(self):
+        a, u = to_numpy(loads(b'.a=[1,2,3];', typed=True)['a'], return_unit=True)
+        assert u == '' and a.tolist() == [1, 2, 3]
 
 
 @needs_lib
@@ -178,6 +319,28 @@ class TestFromNumpy:
         with pytest.raises(BovnarArgumentError):
             array_to_bvnr('a', np.array([True, False]), unit='m')
 
+    def test_masked_array_with_masked_entries_rejected(self):
+        # np.asarray drops the mask and exposes the underlying value, so a masked
+        # entry must not be silently serialized.
+        m = np.ma.array([1.0, 2.0, 3.0], mask=[0, 1, 0])
+        with pytest.raises(BovnarArgumentError, match="masked"):
+            array_to_bvnr('a', m)
+
+    def test_masked_array_without_masked_entries_ok(self):
+        m = np.ma.array([1.0, 2.0, 3.0], mask=[0, 0, 0])
+        raw = array_to_bvnr('a', m, pretty=False)
+        assert to_numpy(loads(raw, typed=True)['a']).tolist() == [1.0, 2.0, 3.0]
+
+    def test_masked_array_filled_escape(self):
+        m = np.ma.array([1.0, 2.0, 3.0], mask=[0, 1, 0])
+        raw = array_to_bvnr('a', m.filled(0.0), pretty=False)
+        assert to_numpy(loads(raw, typed=True)['a']).tolist() == [1.0, 0.0, 3.0]
+
+    @pytest.mark.parametrize("bad", [5, ['m'], 3.5, object()])
+    def test_invalid_unit_type_rejected(self, bad):
+        with pytest.raises(BovnarArgumentError, match="unit must be"):
+            array_to_bvnr('a', np.array([1.0, 2.0]), unit=bad)
+
 
 @needs_lib
 @needs_pint
@@ -195,6 +358,22 @@ class TestPintArray:
             from_pint_array(w, 'a', q)
         a, unit = to_numpy(loads(w.get_output(), typed=True)['a'], return_unit=True)
         assert np.array_equal(a, [2, 4, 6]) and unit == 'm~s'
+
+    def test_datetime_array_to_pint_rejected(self):
+        # pint has no absolute-timestamp concept; wrapping datetime64 would
+        # silently present it as a meaningless dimensionless quantity.
+        src = loads(b'#!bovnar 1.1\n.t = [2026-01-01, 2026-01-02];', typed=True)['t']
+        with pytest.raises(BovnarArgumentError, match="datetime"):
+            to_pint_array(src)
+
+    def test_datetime_array_to_pint_int64_escape(self):
+        # explicit dtype='int64' yields the raw epoch seconds as a dimensionless
+        # count — a meaningful result, so it stays allowed.
+        src = loads(b'#!bovnar 1.1\n.t = [<datetime:64,tai> 100, 200];',
+                    typed=True)['t']
+        q = to_pint_array(src, dtype='int64')
+        assert q.magnitude.tolist() == [100, 200]
+        assert str(q.units) == 'dimensionless'
 
 
 # --------------------------------------------------------------------------- #

@@ -26,13 +26,12 @@
 
 ## 1. General
 
-**What problem does Bovnar solve that JSON or Protobuf do not?**
+**What problem does Bovnar solve?**
 
-JSON loses type precision. `9.81` tells you nothing about whether the value is
-a float or an integer, 32-bit or 64-bit, and it carries no physical meaning.
-Protobuf recovers type precision but requires a `.proto` schema file and a
-code-generation step. YAML carries richer semantics but is notoriously
-error-prone to parse correctly.
+A bare `9.81` tells you nothing about whether the value is a float or an
+integer, 32-bit or 64-bit, and it carries no physical meaning. The type and the
+unit live outside the data — in an external schema, a naming convention, or
+documentation — and that gap is where unit-confusion failures hide.
 
 Bovnar is self-describing at the per-value level: every value in a `.bvnr`
 stream carries its type family, bit-width, numeric base, and physical unit

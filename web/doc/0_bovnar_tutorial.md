@@ -1,7 +1,7 @@
 # Bovnar (BVNR) — A Practical Tutorial
 
 **Format version:** 1.1 (draft)
-**Audience:** Developers already comfortable with JSON or similar text formats.
+**Audience:** Developers building systems where data carries physical measurements.
 
 ---
 
@@ -9,7 +9,7 @@
 
 Bovnar is **unit-safe serialization for scientific and industrial systems**. In those domains, the expensive failures are rarely bad syntax — they are unit confusion. A thrust value sent in pounds-force and read as newtons. An altitude in feet read as meters. The number parsed perfectly; the dimension was wrong, and nothing in the data said otherwise.
 
-Most formats make a quiet trade-off: either they are easy for humans to read, or they carry precise machine-readable semantics — rarely both, and almost never including the *unit*. JSON tells you that `9.81` is a number; it does not tell you whether it is meters per second, volts, or a dimensionless ratio. Protobuf tells you the field type, but you need a `.proto` file and a compiler to interpret it, and units are outside its scope entirely. YAML is expressive but has notoriously sharp edges.
+A bare `9.81` carries no dimension on its own: it could be meters per second, volts, or a dimensionless ratio, and the receiving application has no way to know without an external schema, a naming convention, or documentation. The unit lives outside the data, and that gap is where the expensive failures hide.
 
 Bovnar makes a different choice: every value in a Bovnar document is **self-describing and unit-safe**. The type family (signed integer, float, string…), the bit-width, the numeric base, and the physical unit all travel *with* the value, in the same byte stream, without any external schema — and the unit is validated by the parser rather than assumed. Annotate a value as `m/s` and write a mismatched inline unit, and parsing fails. Hand a `.bvnr` file to anyone, and they have everything needed to interpret *and dimensionally trust* it: a 64-bit signed integer measured in kilopascals looks different from a 32-bit unsigned integer measured in mebibytes, and the format makes that difference explicit.
 
@@ -531,7 +531,7 @@ suffixes are rejected in a 1.0 or unversioned document.
 
 ## Arrays
 
-An array is enclosed in square brackets. A single row looks like JSON:
+An array is enclosed in square brackets. A single row is a comma-separated list of values:
 
 ```bovnar
 .primes = [2, 3, 5, 7, 11, 13];

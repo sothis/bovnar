@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DOC_DIR = os.path.join(ROOT, "web", "doc")
 OUT_DIR = os.path.join(DOC_DIR, "pdf")
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # source filename -> (output slug, short label used in the footer/header)
 DOCS = [
@@ -41,8 +41,17 @@ DOCS = [
     ("10_bovnar_streaming.md",      "bovnar-streaming",        "Streaming, Framing & Multiplexing"),
 ]
 
-PYGMENTS_CSS = HtmlFormatter(style="friendly").get_style_defs(".codehilite")
+PYGMENTS_CSS = HtmlFormatter(style="default").get_style_defs(".codehilite")
 
+# ── Brand palette (matches the website: blue logo gradient + teal accent) ──
+#   --brand      primary blue  (logo gradient deep stop)
+#   --brand-dk   darker blue   (rules, links on white — AA contrast)
+#   --teal       secondary accent (code rail, callout rail)
+#   --ink        heading/near-black text
+#   --body       body text
+#   --muted      captions, page furniture
+#   --hair       hairline borders
+#   --tint       light blue-grey fills (table head, zebra, callouts)
 CSS = r"""
 @page {
     size: A4;
@@ -50,19 +59,19 @@ CSS = r"""
     @top-right {
         content: "BOVNAR";
         font-family: 'DejaVu Sans Mono', monospace;
-        font-size: 8pt;
-        letter-spacing: 2px;
-        color: #b14a86;
+        font-size: 7.5pt;
+        letter-spacing: 2.5px;
+        color: #0a6cb0;
     }
-    @bottom-center {
+    @bottom-left {
         content: "Bovnar v__VERSION__  ·  __LABEL__";
-        font-size: 8pt;
-        color: #8a8f98;
+        font-size: 7.5pt;
+        color: #8a929c;
     }
     @bottom-right {
         content: counter(page) " / " counter(pages);
-        font-size: 8pt;
-        color: #8a8f98;
+        font-size: 7.5pt;
+        color: #8a929c;
     }
 }
 @page :first { @top-right { content: ""; } }
@@ -71,72 +80,101 @@ html { font-size: 10.5pt; }
 body {
     font-family: 'DejaVu Sans', 'Helvetica Neue', Arial, sans-serif;
     color: #1c2128;
-    line-height: 1.5;
+    line-height: 1.55;
     hyphens: auto;
+    text-rendering: optimizeLegibility;
 }
+
+/* ── Cover block ─────────────────────────────────────────────── */
 .cover {
-    border-bottom: 3px solid #d6428a;
-    margin-bottom: 1.4em;
-    padding-bottom: 0.7em;
+    border-bottom: 2.5px solid #0a6cb0;
+    margin-bottom: 1.6em;
+    padding-bottom: 0.9em;
 }
 .cover .mark {
     font-family: 'DejaVu Sans Mono', monospace;
-    font-size: 10pt;
-    letter-spacing: 4px;
-    color: #d6428a;
-    margin: 0 0 0.2em 0;
+    font-size: 9pt;
+    font-weight: bold;
+    letter-spacing: 3.5px;
+    color: #0a6cb0;
+    margin: 0 0 0.45em 0;
+    text-transform: uppercase;
 }
-.cover .subtitle { color: #57606a; font-size: 10pt; margin: 0.3em 0 0 0; }
+.cover h1 { margin: 0; }
+.cover .subtitle {
+    color: #57606a;
+    font-size: 9.5pt;
+    margin: 0.55em 0 0 0;
+    letter-spacing: 0.2px;
+}
 
-h1 { font-size: 22pt; color: #11151c; margin: 0; line-height: 1.15; }
-h2 { font-size: 15pt; color: #11151c; margin: 1.4em 0 0.4em;
-     border-bottom: 1px solid #e2e6ea; padding-bottom: 0.2em; }
-h3 { font-size: 12.5pt; color: #24292f; margin: 1.1em 0 0.3em; }
-h4 { font-size: 11pt; color: #24292f; margin: 0.9em 0 0.2em; }
+/* ── Headings ────────────────────────────────────────────────── */
+h1 { font-size: 23pt; color: #0f1722; margin: 0; line-height: 1.12;
+     font-weight: bold; letter-spacing: -0.3pt; }
+h2 { font-size: 15pt; color: #0f1722; margin: 1.55em 0 0.5em;
+     border-bottom: 1px solid #dfe3e8; padding-bottom: 0.22em;
+     letter-spacing: -0.2pt; }
+h3 { font-size: 12.5pt; color: #16324a; margin: 1.15em 0 0.32em; }
+h4 { font-size: 10.8pt; color: #16324a; margin: 0.95em 0 0.22em;
+     letter-spacing: 0.2px; }
 h2, h3, h4 { break-after: avoid; }
+h1 + *, h2 + *, h3 + *, h4 + * { break-before: avoid; }
 
 p, li { orphans: 2; widows: 2; }
-a { color: #b14a86; text-decoration: none; }
+ul, ol { padding-left: 1.5em; }
+li { margin: 0.18em 0; }
+li > ul, li > ol { margin-top: 0.18em; }
+strong, b { color: #11202e; }
+a { color: #0a5e9c; text-decoration: none; }
 
+/* ── Code ────────────────────────────────────────────────────── */
 code {
     font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
     font-size: 8.8pt;
-    background: #f3f1f5;
-    border: 1px solid #e7e2ec;
+    background: #eef2f6;
+    border: 1px solid #dce3ea;
     border-radius: 3px;
-    padding: 0.05em 0.3em;
+    padding: 0.05em 0.32em;
+    color: #143247;
 }
 pre {
-    background: #f7f6f9;
-    border: 1px solid #e3dfe9;
-    border-left: 3px solid #d6428a;
+    background: #f6f8fa;
+    border: 1px solid #dde4ea;
+    border-left: 3px solid #1f9e86;
     border-radius: 4px;
-    padding: 0.7em 0.9em;
+    padding: 0.75em 0.95em;
     font-size: 8.5pt;
-    line-height: 1.4;
+    line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
     break-inside: avoid;
 }
-pre code { background: none; border: none; padding: 0; font-size: inherit; }
+pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
 
+/* ── Tables (zebra-striped for the large unit/currency listings) ─ */
 table {
     border-collapse: collapse;
     width: 100%;
-    margin: 0.7em 0;
+    margin: 0.8em 0;
     font-size: 8.8pt;
     break-inside: auto;
 }
-th, td { border: 1px solid #dfe3e8; padding: 4px 7px; text-align: left;
+th, td { border: 1px solid #e3e8ee; padding: 4.5px 8px; text-align: left;
          vertical-align: top; word-break: break-word; }
-th { background: #f3eef6; color: #2a2230; }
+th { background: #e9f1f8; color: #0f1722; font-weight: bold;
+     border-bottom: 1.5px solid #b9d4e8; }
+tbody tr:nth-child(even) td { background: #f5f8fb; }
 tr { break-inside: avoid; }
+thead { display: table-header-group; }
 
+/* ── Callouts / metadata blockquotes ─────────────────────────── */
 blockquote {
-    margin: 0.7em 0; padding: 0.3em 0.9em;
-    border-left: 3px solid #d6c7da; color: #4a515a; background: #faf8fc;
+    margin: 0.8em 0; padding: 0.45em 1em;
+    border-left: 3px solid #0a6cb0; color: #44505c; background: #f1f6fb;
+    border-radius: 0 4px 4px 0;
 }
-hr { border: none; border-top: 1px solid #e2e6ea; margin: 1.4em 0; }
+blockquote p { margin: 0.2em 0; }
+hr { border: none; border-top: 1px solid #dfe3e8; margin: 1.5em 0; }
 img { max-width: 100%; }
 """ + "\n" + PYGMENTS_CSS
 

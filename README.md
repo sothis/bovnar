@@ -82,21 +82,11 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 
 ## Where Bovnar Fits
 
-The serialisation landscape already contains well-established tools, each shaped by a specific set of trade-offs.
+Bovnar is built for one thing: data where the **meaning must travel with the value**. Every value is annotated with its type family, bit-width, numeric base, and physical unit — inline, in the byte stream, without any external schema. A `.bvnr` file is self-describing at the individual value level: `<float:64,m/s> 9.81` carries more information than `9.81` can ever carry on its own. The format additionally supports native binary embedding through octet streams, avoiding the size and entropy cost of Base64, and first-class multi-dimensional array syntax that does not reduce to nested lists.
 
-JSON and TOML excel as human-writable configuration and API interchange formats. Their strength is ubiquity and tooling saturation. Their weakness is that they carry no semantic type information: a bare `9.81` could be meters per second, volts, or a dimensionless ratio, and the receiving application has no way to know without consulting an external schema, a naming convention, or documentation.
+This makes Bovnar suited to contexts where dimensional correctness matters, where the receiving party may not share the sender's schema, or where text readability and binary payloads must coexist in the same document. It is built for the place where a wrong unit is a failure: scientific instrumentation and metrology, industrial telemetry and control, IoT sensor networks, long-term measurement archival, and mixed text-binary log streams.
 
-YAML extends JSON's expressiveness with references, block syntax, and multi-document streams, but at the cost of well-known parsing ambiguity. That ambiguity is not a curiosity; it is evidence of a design that prioritises human brevity over machine predictability.
-
-CBOR and MessagePack are binary-first formats optimised for compact wire encoding. They carry type tags and represent binary data efficiently, but the output is opaque: you cannot inspect a CBOR frame with a text editor, and physical units are entirely outside their scope.
-
-Protocol Buffers and FlatBuffers anchor the strongly-typed, schema-driven end of the spectrum. They deliver excellent performance and language-neutral interoperability, but every consumer of the data must have access to the `.proto` or `.fbs` schema file. The data is not self-describing: stripped of its schema, a Protobuf payload is uninterpretable.
-
-Bovnar occupies a different position. It is text-based and human-readable in the same sense that JSON is, but every value is annotated with its type family, bit-width, numeric base, and physical unit — inline, in the byte stream, without any external schema. A `.bvnr` file is self-describing at the individual value level: `<float:64,m/s> 9.81` carries more information than `9.81` can ever carry on its own. The format additionally supports native binary embedding through octet streams, avoiding the size and entropy cost of Base64, and first-class multi-dimensional array syntax that does not reduce to nested lists.
-
-This combination makes Bovnar particularly suited to contexts where dimensional correctness matters, where the receiving party may not share the sender's schema, or where text readability and binary payloads must coexist in the same document. It is not a replacement for JSON in simple REST APIs, nor for Protobuf in performance-critical RPC. It is built for the place where a wrong unit is a failure: scientific instrumentation and metrology, industrial telemetry and control, IoT sensor networks, long-term measurement archival, and mixed text-binary log streams.
-
-If you only need simple key-value interchange, JSON remains the pragmatic choice. If minimal wire size is the overriding constraint, CBOR or Protobuf will outperform any text format. Bovnar is the right tool when unit-safety, precision, and self-description are requirements rather than nice-to-haves.
+Reach for Bovnar when unit-safety, precision, and self-description are requirements rather than nice-to-haves — when a value must mean exactly the same thing to its writer, its reader, and an archive opened decades later.
 
 ---
 
@@ -546,7 +536,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | Document | Description |
 |---|---|
 | [Specification (v1.1, draft)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
-| [Tutorial](doc/0_bovnar_tutorial.md) | Practical introduction for developers familiar with JSON or similar formats. |
+| [Tutorial](doc/0_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
 | [Unit System Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |

@@ -1,6 +1,6 @@
 # Bovnar Specification
 
-> **Version:** 1.1
+> **Version:** 1.1 (draft)
 > **Status:** Draft (1.x development line; 1.0 remains the stable baseline)
 > **Last updated:** 2026-06-15
 

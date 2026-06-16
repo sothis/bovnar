@@ -11,11 +11,16 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#e8e8e8">
 <script>
-/* Light is the default; dark only applies if the user explicitly toggled to it. */
+/* Apply the theme before first paint to avoid a flash. An explicit toggle wins;
+   otherwise we follow the visitor's desktop theme. Light stays the default —
+   it is what we fall back to when no dark preference can be detected. */
 (function () {
   try {
-    if (localStorage.getItem('bovnar-theme') !== 'dark')
-      document.documentElement.setAttribute('data-theme', 'light');
+    var stored = localStorage.getItem('bovnar-theme');
+    var dark = stored === 'dark' ||
+      (stored !== 'light' && window.matchMedia &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (!dark) document.documentElement.setAttribute('data-theme', 'light');
   } catch (e) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
@@ -62,7 +67,7 @@ html[data-theme="light"] {
   transition: color 0.15s, border-color 0.15s;
 }
 .theme-toggle:hover { color: var(--text); border-color: var(--blue2); }
-.theme-toggle svg { width: 15px; height: 15px; display: block; }
+.theme-toggle svg { width: 16px; height: 16px; display: block; }
 .theme-toggle .icon-sun  { display: none; }
 .theme-toggle .icon-moon { display: block; }
 html[data-theme="light"] .theme-toggle .icon-sun  { display: block; }
@@ -122,7 +127,7 @@ footer a { color: var(--text2); }
   <span class="sep">/</span>
   <span class="tag">IMPRESSUM</span>
   <span class="spacer"></span>
-  <a class="link" href="index.html">&larr; Startseite</a>
+  <a class="link" href="index.html">&larr; Home</a>
   <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme">
     <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -140,7 +145,7 @@ footer a { color: var(--text2); }
 
   <h2>Kontakt</h2>
   <p class="addr">
-    E-Mail: <a href="mailto:janos.priv@gmail.com">janos.priv@gmail.com</a>
+    E-Mail: <a href="mailto:bovnar@mail.de">bovnar@mail.de</a>
   </p>
 
   <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
@@ -210,6 +215,18 @@ footer a { color: var(--text2); }
     apply(next === 'light');
     try { localStorage.setItem('bovnar-theme', next); } catch (e) {}
   });
+  /* Follow the desktop theme live, but only until the visitor makes an
+     explicit choice — after that their toggle takes precedence. */
+  try {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onPref = function (e) {
+      var stored = localStorage.getItem('bovnar-theme');
+      if (stored === 'dark' || stored === 'light') return;
+      apply(!e.matches);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onPref);
+    else if (mq.addListener) mq.addListener(onPref);
+  } catch (e) {}
 })();
 </script>
 </body>

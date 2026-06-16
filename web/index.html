@@ -11,36 +11,40 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#e8e8e8">
 <script>
-/* Apply the theme before first paint to avoid a flash. Light is the default;
-   dark only applies if the user explicitly toggled to it. */
+/* Apply the theme before first paint to avoid a flash. An explicit toggle wins;
+   otherwise we follow the visitor's desktop theme. Light stays the default —
+   it is what we fall back to when no dark preference can be detected. */
 (function () {
   try {
-    if (localStorage.getItem('bovnar-theme') !== 'dark')
-      document.documentElement.setAttribute('data-theme', 'light');
+    var stored = localStorage.getItem('bovnar-theme');
+    var dark = stored === 'dark' ||
+      (stored !== 'light' && window.matchMedia &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (!dark) document.documentElement.setAttribute('data-theme', 'light');
   } catch (e) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
 })();
 </script>
-<meta name="description" content="Bovnar (BVNR) — unit-safe serialization for science, industry and finance. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
+<meta name="description" content="Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:url" content="https://www.bovnar.io/">
-<meta property="og:title" content="Bovnar — Unit-safe serialization for science, industry and finance">
+<meta property="og:title" content="Bovnar — Unit-safe serialization for science and industry">
 <meta property="og:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error. Built for instrumentation, telemetry, and control systems.">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Bovnar — unit-safe serialization for science, industry and finance">
+<meta property="og:image:alt" content="Bovnar — unit-safe serialization for science and industry">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Bovnar — Unit-safe serialization for science, industry and finance">
+<meta name="twitter:title" content="Bovnar — Unit-safe serialization for science and industry">
 <meta name="twitter:description" content="Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
-<meta name="twitter:image:alt" content="Bovnar — unit-safe serialization for science, industry and finance">
-<title>Bovnar — Unit-safe serialization for science, industry and finance</title>
+<meta name="twitter:image:alt" content="Bovnar — unit-safe serialization for science and industry">
+<title>Bovnar — Unit-safe serialization for science and industry</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
@@ -155,7 +159,6 @@ html[data-theme="light"] nav { border-bottom-color: var(--border); }
 
 /* hover wash flips from white-on-dark to black-on-light */
 html[data-theme="light"] .nav-links li a:hover { background: rgba(0,0,0,0.05); }
-html[data-theme="light"] .comparison-table tbody tr:hover td,
 html[data-theme="light"] #doc-content tr:hover td { background: rgba(0,0,0,0.03); }
 html[data-theme="light"] .pg-row:hover { background: rgba(0,0,0,0.04); }
 html[data-theme="light"] .feature-card:hover { background: #eaeaea; }
@@ -987,79 +990,38 @@ section { position: relative; z-index: 1; }
 }
 .demo-poster.is-launched { display: none; }
 
-/* ── COMPARISON ── */
-/* Demoted to a supporting reference below Quick Start: tighter padding, a smaller
-   muted heading, and a slightly recessed background so it reads as secondary. */
+/* ── BEST FOR ── */
+/* A focused hook for the niche Bovnar is built for — no format comparisons. */
 #comparison { border-top: 1px solid var(--border); background: var(--sidebar-bg); }
-#comparison .section-inner { padding-top: 2rem; padding-bottom: 2rem; }
-#comparison .section-h2 { font-size: clamp(1.15rem, 1.8vw, 1.5rem); color: var(--text2); margin-bottom: 0.6rem; }
-#comparison .section-h2 em { color: var(--text2); }
-#comparison .section-p { font-size: 0.88rem; color: var(--text3); }
-#comparison .cmp-scroll { margin-top: 1.1rem; }
+#comparison .section-h2 em { color: var(--blue); }
+#comparison .section-p b { color: var(--blue); font-weight: 500; }
 
-.cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 1.6rem; }
-.comparison-table {
-  width: 100%;
-  min-width: 640px;             /* 7 columns stay readable; the wrapper scrolls on narrow screens */
-  border-collapse: collapse;
-  font-size: 0.88rem;
+.bf-grid {
+  margin-top: 2.2rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
 }
-.comparison-table th {
+.bf-card {
+  background: var(--editor-bg);
+  padding: 1.5rem 1.6rem;
+}
+.bf-card-h {
   font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text3);
-  text-align: left;
-  padding: 0.65rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  font-weight: 400;
-  background: var(--sidebar-bg);
-}
-.comparison-table td {
-  padding: 0.85rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--text2);
-  vertical-align: middle;
-}
-.comparison-table td:first-child {
-  font-family: var(--mono);
-  color: var(--text);
   font-size: 0.82rem;
-}
-.comparison-table tbody tr:hover td { background: rgba(255,255,255,0.018); }
-
-/* "Best for" summary row */
-.comparison-table tfoot td {
-  background: rgba(0,122,204,0.06);
-  border-bottom: none;
-  border-top: 1px solid var(--blue2);
-  padding: 1.1rem 1.25rem 1.1rem 3.2rem;
-}
-.comparison-table .bf-tag {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--blue);
-  border: 1px solid var(--blue2);
-  padding: 0.18rem 0.55rem;
-  margin-right: 0.85rem;
-  white-space: nowrap;
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.01em;
 }
-.comparison-table .bf-text {
+.bf-card p {
   font-family: var(--sans);
-  font-weight: 400;
+  font-size: 0.9rem;
+  line-height: 1.65;
   color: var(--text2);
-  font-size: 0.92rem;
-  line-height: 1.7;
+  margin: 0;
 }
-.comparison-table .bf-text b { color: var(--blue); font-weight: 400; }
-
-.check   { color: var(--teal); font-weight: 500; }
-.cross   { color: var(--red); }
-.partial { color: var(--text3); font-style: italic; }
 
 /* ── SYNTAX ── */
 #syntax {
@@ -2276,7 +2238,7 @@ a[data-doc] { cursor: pointer; }
   .qs-pane-inner { grid-template-columns: 1fr; }
   .docs-grid { grid-template-columns: repeat(2, 1fr); }
 .footer-inner { grid-template-columns: 1fr 1fr; }
-  .comparison-table { font-size: 0.78rem; }
+  .bf-grid { grid-template-columns: 1fr; }
 
   #doc-drawer { width: 100vw; }
   #doc-content-wrap { padding: 1.5rem 1.25rem 3rem; }
@@ -2296,8 +2258,7 @@ a[data-doc] { cursor: pointer; }
   #hero { padding: 6rem 1.2rem 3rem; }
   .section-inner { padding: 3rem 1.1rem; }
   .docs-grid { grid-template-columns: 1fr; }
-  .comparison-table { font-size: 0.8rem; }
-  .comparison-table th, .comparison-table td { padding: 0.6rem 0.8rem; }
+  .bf-card { padding: 1.25rem 1.2rem; }
 
   /* footer: single column + tighter padding */
   .footer-inner { grid-template-columns: 1fr; gap: 1.75rem; padding: 2.25rem 1.2rem; }
@@ -2392,7 +2353,7 @@ a[data-doc] { cursor: pointer; }
         <span class="hl-sep">/</span>
         <span>c99</span>
       </div>
-      <h1 class="hero-h1">Unit-safe serialization<br>for <em>science, industry and finance.</em></h1>
+      <h1 class="hero-h1">Unit-safe serialization<br>for <em>science and industry.</em></h1>
       <p class="hero-sub">
         Every value carries its width, base, and physical unit inline — no schema, just
         human-readable text. A bare <code>9.81</code> is never ambiguous, and a mismatched
@@ -3607,92 +3568,34 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </section>
 
 <!-- ══════════════════════════════════════════════
-     COMPARISON (secondary — supporting reference under Quick Start)
+     BEST FOR (the niche Bovnar is built for)
 ══════════════════════════════════════════════ -->
 <section id="comparison">
   <div class="section-inner">
-    <div class="section-label reveal">landscape</div>
-    <h2 class="section-h2 reveal reveal-delay-1">Where Bovnar <em>fits.</em></h2>
+    <div class="section-label reveal">best for</div>
+    <h2 class="section-h2 reveal reveal-delay-1">When a wrong unit is a <em>failure.</em></h2>
     <p class="section-p reveal reveal-delay-2">
-      Every format is a set of trade-offs. Bovnar's are deliberate.
+      Reach for Bovnar when <b>units must travel with the data</b> and the receiver may not
+      share a schema. Every measurement is unit-safe by construction — a mismatched unit is a
+      parse error, not a silent bug discovered in production.
     </p>
-    <div class="cmp-scroll reveal reveal-delay-2">
-    <table class="comparison-table">
-      <thead>
-        <tr>
-          <th>Format</th>
-          <th>Human readable</th>
-          <th>Type-precise</th>
-          <th>Physical units</th>
-          <th>Schema-free</th>
-          <th>Binary embed</th>
-          <th>Multi-dim arrays</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>JSON</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>YAML</td>
-          <td class="check">✓</td>
-          <td class="partial">partial</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>TOML</td>
-          <td class="check">✓</td>
-          <td class="partial">partial</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>CBOR</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td>Protobuf</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-          <td class="cross">✗</td>
-          <td class="check">✓</td>
-          <td class="cross">✗</td>
-        </tr>
-        <tr>
-          <td style="color:var(--blue);font-family:var(--mono);font-size:0.82rem;">BOVNAR</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-          <td class="check">✓</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="7">
-            <span class="bf-tag">Best for</span><span class="bf-text">Bovnar is the format to reach for when <b>units must travel with the data</b> and the receiver may not share a schema — <b>scientific instrumentation &amp; metrology, industrial telemetry &amp; control, IoT sensor networks, and long-term measurement archival</b>. Where a wrong unit is a failure, it is unit-safe by construction; for simple REST payloads reach for JSON, for minimal wire size reach for CBOR or Protobuf.</span>
-          </td>
-        </tr>
-      </tfoot>
-    </table>
+    <div class="bf-grid reveal reveal-delay-2">
+      <div class="bf-card">
+        <div class="bf-card-h">Scientific instrumentation &amp; metrology</div>
+        <p>Readings stay self-describing from the lab bench to the published dataset — width, base, and physical unit ride along with every value.</p>
+      </div>
+      <div class="bf-card">
+        <div class="bf-card-h">Industrial telemetry &amp; control</div>
+        <p>Pressures, flows, and temperatures cross process boundaries without a shared contract, and dimensional mismatches are caught at the parse step.</p>
+      </div>
+      <div class="bf-card">
+        <div class="bf-card-h">IoT sensor networks</div>
+        <p>Heterogeneous devices emit human-readable, type-precise records that any consumer can validate on its own, no central registry required.</p>
+      </div>
+      <div class="bf-card">
+        <div class="bf-card-h">Long-term measurement archival</div>
+        <p>Data written today still means exactly the same thing decades from now — the meaning lives in the file, not in lost tooling.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -3713,7 +3616,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">00</div>
         <div>
           <div class="doc-card-title">Tutorial</div>
-          <div class="doc-card-desc">Practical introduction for developers familiar with JSON or similar formats. Get productive in minutes.</div>
+          <div class="doc-card-desc">Practical introduction for developers. Get productive with Bovnar in minutes.</div>
           <div class="doc-card-tag">Start here</div>
         </div>
       </a>
@@ -3825,11 +3728,11 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     <div class="footer-inner">
       <div>
         <div class="footer-brand-name" style="display:flex;align-items:center;gap:.55rem"><svg width="24" height="24" viewBox="0 0 256 256" aria-hidden="true" style="flex:none"><use href="#bvnr-mk"/></svg>BOVNAR</div>
-        <div class="footer-brand-sub">Spec v1.1 (draft) · MIT + commercial · C99</div>
+        <div class="footer-brand-sub">Spec v1.1 (draft) · MIT · C99</div>
         <p class="footer-desc">
-          Unit-safe serialization for science, industry and finance. Every measurement
-          carries a validated physical unit, inline. C99 reference implementation, dual-licensed:
-          MIT for open use, with a commercial license available for closed embedding and indemnification.
+          Unit-safe serialization for science and industry. Every measurement
+          carries a validated physical unit, inline. C99 reference implementation,
+          MIT-licensed for open use.
         </p>
       </div>
       <div>
@@ -3864,7 +3767,6 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <ul class="footer-links">
             <li><a href="impressum.html">Impressum</a></li>
             <li><a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
-            <li><a href="mailto:janos.priv@gmail.com?subject=Bovnar%20commercial%20license">Commercial License</a></li>
             <li><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0 (docs)</a></li>
             <li><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0 (examples)</a></li>
           </ul>
@@ -3875,12 +3777,12 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   <div class="vs-statusbar">
     <div class="vsb-left">
       <span class="vsb-item vsb-source">⎇ main</span>
-      <span class="vsb-item">◷ bovnar spec v1.1</span>
+      <span class="vsb-item">◷ bovnar spec v1.1 (draft)</span>
     </div>
     <div class="vsb-right">
       <span class="vsb-item">© 2026 Janos Sonntag</span>
       <span class="vsb-divider"></span>
-      <span class="vsb-item">MIT + commercial</span>
+      <span class="vsb-item">MIT</span>
       <span class="vsb-divider"></span>
       <span class="vsb-item">C99</span>
       <span class="vsb-divider"></span>
@@ -6473,6 +6375,18 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     apply(next === 'light');
     try { localStorage.setItem('bovnar-theme', next); } catch (e) {}
   });
+  /* Follow the desktop theme live, but only until the visitor makes an
+     explicit choice — after that their toggle takes precedence. */
+  try {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onPref = function (e) {
+      var stored = localStorage.getItem('bovnar-theme');
+      if (stored === 'dark' || stored === 'light') return;
+      apply(!e.matches);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onPref);
+    else if (mq.addListener) mq.addListener(onPref);
+  } catch (e) {}
 })();
 </script>
 </body>

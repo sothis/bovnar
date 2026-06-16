@@ -32,8 +32,8 @@ The weaknesses are not bugs; they are **scope and layering** issues:
 2. The **unit sub-grammar is written in comments**, so the most distinctive part
    of the language is not machine-checkable and cannot drive a generated parser.
 3. A handful of **ergonomic gaps** (escapes, radix literals, quoted keys,
-   top-level scalars, exponent range) make lossless interchange — including your
-   own JSON round-trip — awkward or impossible.
+   top-level scalars, exponent range) make lossless interchange awkward or
+   impossible.
 
 The good news for v2: **almost every extension I propose occupies syntactic
 space that is currently a hard error.** That means v2 can be a strict superset —
@@ -215,15 +215,14 @@ Legend for compatibility:
 
 ### P1 — Quoted keys and a bare top-level value (superset) — highest interop value
 
-**Motivation.** Two restrictions block lossless interchange, including your own
-`convert_json_roundtrip` path:
+**Motivation.** Two restrictions block lossless interchange:
 
-- Keys must be identifiers: `key = id-start , {id-body-char}`. A JSON object key
-  like `"first name"`, `"2024"`, or `""` has no Bovnar spelling. JSON→Bovnar is
-  therefore lossy for any non-identifier key.
+- Keys must be identifiers: `key = id-start , {id-body-char}`. A non-identifier
+  key like `"first name"`, `"2024"`, or `""` has no Bovnar spelling, so any data
+  source that uses such keys cannot round-trip losslessly.
 - The document root must be a sequence of assignments
-  (`stream = [utf8-bom] , ws , {assignment , ws}`). A JSON document whose root is
-  `[1,2,3]` or `42` or `"hi"` cannot be represented at all.
+  (`stream = [utf8-bom] , ws , {assignment , ws}`). A document whose root is a
+  bare value like `[1,2,3]`, `42`, or `"hi"` cannot be represented at all.
 
 **EBNF sketch.**
 
@@ -241,10 +240,10 @@ document-value = value , ws ;     (* note: no trailing ";" for a root value *)
 **Example.**
 
 ```bovnar
-# v2: quoted keys round-trip arbitrary JSON object names
+# v2: quoted keys round-trip arbitrary key names
 ."first name" = "Ada";
 ."2024"       = <uint:16> 42;
-.""           = "empty key is legal in JSON, now legal here";
+.""           = "empty key, now legal here";
 
 # v2: a document whose root is a bare value
 [1, 2, 3]/[4, 5, 6]
@@ -497,7 +496,7 @@ doc-sep   = ws , "---" , ( "\x0A" | "\x0D" ) ;   (* a line of exactly --- *)
 document  = {assignment , ws} ;                   (* or document-value, see P1 *)
 ```
 
-(YAML's `---` is the obvious precedent and reads naturally in logs.)
+(A line of exactly `---` as a document separator reads naturally in logs.)
 
 **Example.**
 

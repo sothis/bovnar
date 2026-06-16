@@ -5,7 +5,11 @@
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
-(*  Updated: 2026-06-15 — spec 1.1 (additive over the frozen 1.0):     *)
+(*  Updated: 2026-06-16 — consistency pass vs the implementation:      *)
+(*    allow ws/comments before the assignment ";"; move the inline     *)
+(*    unit to a value-only scalar-with-unit rule so array elements are  *)
+(*    correctly excluded; inline the redundant type-spec rule.          *)
+(*  2026-06-15 — spec 1.1 (additive over the frozen 1.0):              *)
 (*    version directive (#!bovnar M.N), datetime type family,         *)
 (*    \xHH / \u{…} string escapes, reference array indexing.          *)
 (*  Earlier (2026-05-29): null/true/false/on/off keywords, bool       *)
@@ -87,9 +91,10 @@ utf8-bom     = "\xEF\xBB\xBF" ;
 version-directive = "#" , "!bovnar" , ws-mandatory ,
                     version-int , "." , version-int ,
                     {ws-char} , ("\x0D" | "\x0A" | (* eof *)) ;
-(* version-int: DIGIT , {DIGIT} with no leading zero (a bare "0" is the *)
-(* only form starting with "0"); each component must fit in a uint16.   *)
-version-int  = DIGIT , {DIGIT} ;
+(* version-int: a decimal integer with no leading zero (a bare "0" is the *)
+(* only form starting with "0"); each component must fit in a uint16.     *)
+version-int  = "0"
+             | ( ("1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9") , {DIGIT} ) ;
 
 (* Whitespace: blank characters and comments, freely intermixed.     *)
 ws           = {ws-char | comment} ;
@@ -124,7 +129,7 @@ comment-char = "\x09"                               (* HT             *)
 (* ".=" is error_empty_identifier.                                    *)
 (* Comments are permitted between the last key character and "=".     *)
 
-assignment   = "." , key , ws , "=" , ws , value , ";" ;
+assignment   = "." , key , ws , "=" , ws , value , ws , ";" ;
 
 key          = id-start , {id-body-char} ;
 
@@ -165,13 +170,20 @@ id-body-char = "+" | "-"
 (* ACT_type_null_then_array_outro, and ACT_type_null_then_value_outro  *)
 (* from the type_outro state.                                         *)
 
-value        = [type-annotation , ws] , raw-value ;
+value        = [type-annotation , ws] , ( scalar-with-unit | raw-value ) ;
+
+(* A bare number or string scalar may carry an inline unit suffix — but ONLY  *)
+(* at value position, never inside an array element (array-elem uses raw-      *)
+(* value, which has no unit option).  The lexer reaches the inline-unit state  *)
+(* only from number_outro / string_outro, so no other value form takes one.    *)
+scalar-with-unit = ( number | string ) , ws-mandatory , inline-unit ;
 
 raw-value    = null-value
              | bool-value
              | special-number
              | datetime-literal               (* spec 1.1 *)
-             | ( number | string ) , [ ws-mandatory , inline-unit ]
+             | number
+             | string
              | symbol
              | reference
              | array
@@ -247,9 +259,7 @@ bool-value   = "true" | "false" | "on" | "off" ;
 (* The full type-annotation event sequence is always emitted for      *)
 (* number and string values, whether annotated explicitly or not.     *)
 
-type-annotation = "<" , ws , type-spec , ws , ">" ;
-
-type-spec    = param-type ;
+type-annotation = "<" , ws , param-type , ws , ">" ;
 
 (* Types with an optional parameter list after ":".                   *)
 (* Parameters are identified by class and may appear in any order;    *)
@@ -477,11 +487,15 @@ escape-seq   = "\" , ( "t"   (* \t = 0x09 HT  *)
 (* or newer; in a 1.0/unversioned document "x"/"u" after "\" stay       *)
 (* error_illegal_escape_sequence.                                       *)
 byte-escape    = "x" , hex-digit , hex-digit ;       (* one byte 0xHH    *)
-unicode-escape = "u" , "{" , hex-digit , {hex-digit} , "}" ;
-(* 1..6 hex digits naming a Unicode scalar; surrogates (D800..DFFF) and  *)
-(* values > 10FFFF are error_invalid_codepoint, UTF-8 encoded otherwise. *)
-(* A \x byte must leave the whole string valid UTF-8 (else               *)
-(* error_invalid_utf8_byte).                                            *)
+unicode-escape = "u" , "{" , hex-digit ,
+                 [hex-digit] , [hex-digit] , [hex-digit] ,
+                 [hex-digit] , [hex-digit] , "}" ;
+(* 1 to 6 hex digits naming a Unicode scalar.  A 7th hex digit before "}"  *)
+(* (or an empty "{}") is error_illegal_escape_sequence — a structural       *)
+(* check made before the value is examined.  A value that is a surrogate    *)
+(* (D800..DFFF) or above 10FFFF is error_invalid_codepoint; otherwise the   *)
+(* scalar is UTF-8 encoded.  A \x byte must leave the whole string valid     *)
+(* UTF-8 (else error_invalid_utf8_byte).                                    *)
 hex-digit      = DIGIT | "a".."f" | "A".."F" ;
 
 
@@ -493,8 +507,11 @@ hex-digit      = DIGIT | "a".."f" | "A".."F" ;
 (* a special-number keyword — give its unit via the type annotation).  *)
 (* At least one whitespace character (ws-mandatory) is the sole        *)
 (* required separator between the value literal and the unit.          *)
-(* Inline units are forbidden inside array elements (enforced at the  *)
-(* action level; not expressible in context-free EBNF).               *)
+(* Inline units attach only at value position: the value rule has a   *)
+(* scalar-with-unit alternative, while an array element (array-elem)   *)
+(* uses raw-value, which has no unit option.  At the action level the  *)
+(* lexer additionally rejects ACT_inline_unit_intro when the           *)
+(* in_array_element flag is set (a redundant guard).                   *)
 (*                                                                     *)
 (* INVALID (no whitespace before the unit):                           *)
 (*   .bad = 9.81m/s;     (* no separator at all — hard error *)       *)
@@ -513,7 +530,8 @@ hex-digit      = DIGIT | "a".."f" | "A".."F" ;
 (*      Special numbers (nan, inf, ninf) are lexed as symbols and      *)
 (*      take no inline unit (give the unit via the type annotation).   *)
 (*   2. From number_outro / string_outro (whitespace already seen):   *)
-(*        alpha / "_" / UTF-8 leader → ACT_inline_unit_intro          *)
+(*        alpha / "_" / "$" / "%" / "(" / UTF-8 leader (0xC2–0xF4)     *)
+(*        → ACT_inline_unit_intro                                      *)
 (*   3. ACT_inline_unit_intro pushes the first byte and enters        *)
 (*      inline_unit_body directly.                                     *)
 (*   4. inline_unit_body accumulates unit characters (including ":"  *)
@@ -614,7 +632,8 @@ ref-body-char = sym-body-char | "." ;
 (* An array is one or more bracket-enclosed rows separated by "/":   *)
 (*   .a = [1, 2, 3]/[4, 5, 6];                                       *)
 (* "/" emits ev_array_dim_start; the next "[" opens the next row.         *)
-(* Only whitespace/comments between "/" and "[" are permitted.        *)
+(* Whitespace/comments are permitted on both sides of "/" (between the *)
+(* closing "]" and "/", and between "/" and the next "[").            *)
 (*                                                                    *)
 (* The former adjacent-row syntax "[1,2][3,4]" and the comma-between- *)
 (* rows form "[1,2],[3,4]" are hard errors at the assignment level.   *)
@@ -647,7 +666,7 @@ ref-body-char = sym-body-char | "." ;
 (*        [[1,2]/[3,4], [5,6]/[7,8]] → accepted (same-shape blocks)    *)
 (*   b) Array nesting depth ≤ max_array_nesting (default 64, cap 255).*)
 
-array        = array-row , {"/" , ws , array-row} ;
+array        = array-row , {ws , "/" , ws , array-row} ;
 
 array-row    = "[" , ws , [row-content] , ws , "]" ;
 
@@ -659,7 +678,9 @@ array-row    = "[" , ws , [row-content] , ws , "]" ;
 (* has width 0, a valid row width for /-dimension consistency.          *)
 row-content  = array-elem , {ws , "," , ws , array-elem} ;
 
-(* array-elem has the same structure as a top-level value.            *)
+(* array-elem has the same structure as a top-level value, except that an  *)
+(* inline unit suffix is not permitted: it uses raw-value (no unit option), *)
+(* not the value rule's scalar-with-unit alternative (see §6.5).            *)
 array-elem   = [type-annotation , ws] , raw-value ;
 
 
@@ -887,7 +908,8 @@ byte         = (* any single byte 0x00–0xFF *) ;
           also counts as whitespace (comment_outro promotes string_outro_nosp
           → string_outro).
        2. From number_outro / string_outro (at least one ws consumed):
-            alpha / "_" / UTF-8-leader → ACT_inline_unit_intro
+            alpha / "_" / "$" / "%" / "(" / UTF-8-leader (0xC2-0xF4)
+            → ACT_inline_unit_intro
        3. ACT_inline_unit_intro pushes the first byte and enters
           inline_unit_body directly.
        4. inline_unit_body accumulates unit characters (including ":"

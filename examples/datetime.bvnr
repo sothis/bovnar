@@ -24,11 +24,12 @@
 .tai_lit    = <datetime:64,tai> 2017-01-01T00:00:00Z;  # leap-second correct
 
 # Time-zone offset (±HH:MM) and fractional seconds (spec 1.1). The offset folds
-# the written civil time to true UTC before conversion; a fraction is accepted
-# but truncated to the whole second (the carrier is integer seconds).
+# the written civil time to true UTC before conversion. The carrier stays whole
+# seconds, but a fraction's digits are preserved verbatim and the value round-
+# trips: a datetime carrying a fraction pretty-prints back as an ISO literal.
 .with_offset = 2026-06-15T12:00:00+02:00;       # folds to 10:00:00Z
 .neg_offset  = 2026-06-15T12:00:00-05:00;       # folds to 17:00:00Z
-.with_frac   = 2026-06-15T12:00:00.123Z;        # .123 dropped -> 12:00:00Z
+.with_frac   = 2026-06-15T12:00:00.123Z;        # carrier 12:00:00Z; .123 kept, round-trips
 
 # Arrays: every element shares the datetime kind and epoch (homogeneous). The
 # canonical form annotates only the first element; the bare integers after it

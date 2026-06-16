@@ -1155,8 +1155,14 @@ unversioned document is treated as 1.0) are exposed as:
   plain `int` (signed epoch seconds). With `typed=True` it is a `Quantity` whose
   `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch.
   `dumps()` emits the `<datetime:…>` annotation and prepends `#!bovnar 1.1`
-  automatically when the object contains a datetime, so typed round-trips are
-  lossless. `ValueTypeFamily.DATETIME` is the family enum member.
+  automatically when the object contains a datetime, so the **carrier**
+  round-trips losslessly. Note the high-level value is only the whole-second
+  carrier: the sub-second fraction of an ISO-8601 literal (spec 1.1) is *not*
+  part of the `int`/`Quantity` value, so `loads`→`dumps` drops it. To read or
+  round-trip the fraction use the DOM tier (`DomNode.datetime_fraction`) or the
+  streaming reader (`bvnr_data_t.frac_data` via a callback) — the C
+  pretty-printer preserves it because it re-serialises the event stream, not a
+  materialised value. `ValueTypeFamily.DATETIME` is the family enum member.
 - **Reference array indexing:** `&.matrix[0][1]` paths are stored verbatim and
   resolved by `DomDoc.lookup("matrix[0][1]")` at the DOM layer.
 

@@ -195,9 +195,10 @@ class Quantity:
 
     # ── lossless numeric access ────────────────────────────────────────────
     # ``value`` decodes through a C double and loses precision for float_dec,
-    # float_fix, and float:128/256. These accessors instead use the verbatim
-    # literal text (``raw``) and bovnar's arbitrary-precision float, so the full
-    # precision the format carries is reachable from Python.
+    # float_fix, and the wide binary floats (float:128 and wider). These
+    # accessors instead use the verbatim literal text (``raw``) and bovnar's
+    # arbitrary-precision float, so the full precision the format carries is
+    # reachable from Python.
 
     def _numeric_base(self) -> int:
         """Numeric radix of the literal (10 for the decimal families)."""
@@ -322,9 +323,10 @@ class Quantity:
 
         This differs from :meth:`decimal` only when the literal carries more
         precision than the format holds (e.g. a 40-digit ``float_dec:64``
-        literal rounds to 16 significant digits here). Supported for
-        ``float:128``/``float:256``, every ``float_dec`` width, and every
-        ``float_fix`` width.
+        literal rounds to 16 significant digits here). Supported for the IEEE
+        binary widths ``float:16/32/64/128/256``, every ``float_dec`` width, and
+        every ``float_fix`` width. A binary ``float`` width with no IEEE
+        encoding (e.g. ``float:96``/``512``) raises; use :meth:`decimal`.
         """
         from decimal import Decimal
         from ._bvnfloat import BvnFloat
@@ -350,8 +352,10 @@ class Quantity:
 
     def ieee_bits(self) -> bytes:
         """The raw IEEE-754 interchange bytes of the materialised value
-        (little-endian word order): binary128/256 for ``float``, the decimal
-        interchange encoding for ``float_dec``. Raises otherwise."""
+        (little-endian word order): binary16/32/64/128/256 for ``float``, the
+        decimal16…256 interchange encoding for ``float_dec``. A binary ``float``
+        width with no IEEE encoding (e.g. ``float:96``/``512``) raises, as does
+        any non-``float``/``float_dec`` family."""
         from ._bvnfloat import BvnFloat
         fam = int(self.vtype.family)
         width = int(self.vtype.width) or 64

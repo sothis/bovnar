@@ -211,10 +211,10 @@ def _gather_dtype(acc, family, width, base=0):
 
 
 # Families whose value cannot be held in a native numpy float without loss:
-# decimal floats, fixed-point, and the wide binary floats (128/256). On the
-# typed-load path (Quantity, which keeps the verbatim literal) these decode to
-# exact decimal.Decimal in an object array; pass dtype='float64' to opt into the
-# lossy native conversion instead.
+# decimal floats, fixed-point, and the wide binary floats (float:128 and wider).
+# On the typed-load path (Quantity, which keeps the verbatim literal) these
+# decode to exact decimal.Decimal in an object array; pass dtype='float64' to
+# opt into the lossy native conversion instead.
 def _is_exact_decimal_quantity(q) -> bool:
     fam = int(q.vtype.family)
     if fam in (int(F.FLOAT_DEC), int(F.FLOAT_FIX)):

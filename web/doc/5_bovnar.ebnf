@@ -6,9 +6,14 @@
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
 (*  Updated: 2026-06-16 — consistency pass vs the implementation:      *)
-(*    allow ws/comments before the assignment ";"; move the inline     *)
-(*    unit to a value-only scalar-with-unit rule so array elements are  *)
-(*    correctly excluded; inline the redundant type-spec rule.          *)
+(*    allow ws/comments before the assignment ";" and the "/" array    *)
+(*    separator; move the inline unit to a value-only scalar-with-unit  *)
+(*    rule so array elements are correctly excluded; bound \u{…} to 1–6 *)
+(*    hex digits and version-int to no-leading-zero; inline type-spec;  *)
+(*    split the array-homogeneity / duplicate-key constraints into the  *)
+(*    LEXER/VALIDATOR tier (the streaming reader) vs the DOM-BUILDER     *)
+(*    tier (only a DOM parse rejects ragged siblings, mixed kinds, and  *)
+(*    duplicate keys; the streaming reader accepts them).               *)
 (*  2026-06-15 — spec 1.1 (additive over the frozen 1.0):              *)
 (*    version directive (#!bovnar M.N), datetime type family,         *)
 (*    \xHH / \u{…} string escapes, reference array indexing.          *)
@@ -647,24 +652,38 @@ ref-body-char = sym-body-char | "." ;
 (* Leading and trailing commas produce null elements:                 *)
 (*   [,1,2,]  →  four elements: null, 1, 2, null.                   *)
 (*                                                                    *)
-(* Semantic constraints (enforced by the lexer/validator):            *)
-(*   a) The "/"-separated dimension rows of a SINGLE array must all    *)
-(*      have the same element count; a mismatch is                     *)
+(* Semantic constraints — two distinct tiers:                          *)
+(*                                                                    *)
+(*   a) Enforced by the LEXER/VALIDATOR (the streaming reader): the    *)
+(*      "/"-separated dimension rows of a SINGLE array must all have   *)
+(*      the same element count; a mismatch is                          *)
 (*      error_array_row_size_mismatch (code 2).  The lexer checks each *)
 (*      row as it closes, so the error fires at the earliest byte (the *)
 (*      overshooting element, or the closing "]" of a short row).      *)
 (*      The per-bracket-pair context save/restore mechanism keeps this *)
 (*      check scoped to one array instance: a "/"-row width never      *)
 (*      leaks across a "," boundary or into a sibling branch.          *)
-(*      Beyond /-row consistency, array elements must be HOMOGENEOUS   *)
-(*      (spec 1.0, enforced above the grammar): same kind, same        *)
-(*      dimension for bare scalar arrays, and rectangular sibling      *)
-(*      sub-arrays.  Examples:                                         *)
-(*        [1,2,3]/[4,5]        → error (one array's /-rows: 3 vs 2)    *)
-(*        [[1,2]/[3,4,5]]      → error (inner /-array's rows: 2 vs 3)  *)
-(*        [[1,2],[3,4,5]]      → error (ragged sibling sub-arrays)     *)
+(*        [1,2,3]/[4,5]   → error (one array's /-rows: 3 vs 2)         *)
+(*        [[1,2]/[3,4,5]] → error (inner /-array's rows: 2 vs 3)       *)
+(*                                                                    *)
+(*   b) Enforced by the DOM BUILDER ONLY (bvn_dom_parse), NOT by the   *)
+(*      streaming reader — `loads`/the SAX callbacks accept these and  *)
+(*      deliver every element; only a DOM parse rejects them.  Array   *)
+(*      elements must be HOMOGENEOUS (spec 1.0): the same kind         *)
+(*      throughout, `,`-separated sibling sub-arrays must be           *)
+(*      rectangular (match in length), and sibling structs must share  *)
+(*      the same shape.  A ragged sibling set is                       *)
+(*      error_array_row_size_mismatch (code 2); a mix of element kinds *)
+(*      (e.g. a scalar beside a sub-array) is                          *)
+(*      error_array_element_type_mismatch (code 39); sibling structs   *)
+(*      with differing shapes is error_struct_shape_mismatch (code 40).*)
+(*        [[1,2],[3,4,5]] → DOM error (ragged sibling sub-arrays)      *)
+(*        [1,[2,3]]       → DOM error (scalar mixed with a sub-array)  *)
+(*        [{.x=1;},{.y=2;}] → DOM error (sibling structs, differing    *)
+(*                            shapes)                                  *)
 (*        [[1,2]/[3,4], [5,6]/[7,8]] → accepted (same-shape blocks)    *)
-(*   b) Array nesting depth ≤ max_array_nesting (default 64, cap 255).*)
+(*                                                                    *)
+(*   c) Array nesting depth ≤ max_array_nesting (default 64, cap 255).*)
 
 array        = array-row , {ws , "/" , ws , array-row} ;
 
@@ -693,9 +712,12 @@ array-elem   = [type-annotation , ws] , raw-value ;
 (* completed value: followed by ";" at the top level, or "," / "]" in  *)
 (* array context.                                                      *)
 (*                                                                    *)
-(* Keys must be UNIQUE within one scope (a struct, or the top-level    *)
-(* document); a repeat is error_duplicate_struct_key (enforced above   *)
-(* the grammar). The same key in different scopes is unrelated.        *)
+(* Key uniqueness is a DOM-BUILDER constraint, NOT a grammar one: the   *)
+(* lexer/validator (the streaming reader) accepts a repeated key and    *)
+(* delivers BOTH assignments.  A DOM parse (bvn_dom_parse) is stricter — *)
+(* a duplicate key within one scope (a struct, or the top-level         *)
+(* document) is error_duplicate_struct_key.  The same key in different  *)
+(* scopes is always unrelated.                                          *)
 (* Nesting depth: struct_nesting_level ≤ max_struct_nesting           *)
 (* (default 64 when the flag is 0; hard cap 255).                      *)
 (* An unmatched "}" is error_illegal_struct_close.                    *)
@@ -814,16 +836,25 @@ byte         = (* any single byte 0x00–0xFF *) ;
      Bare number literals only accept "e"/"E" as exponent markers
      (exp_intro state).
 
-  g) Array row-size consistency
+  g) Array row-size consistency (LEXER/VALIDATOR — the streaming reader)
      The "/"-separated dimension rows of a single array must all have
      the same element count; the lexer checks each row as it closes, so
      the violation is reported at the earliest offending byte. The
      per-bracket-pair context save/restore mechanism keeps the /-row
-     check scoped to one array instance. In addition, array elements must
-     be homogeneous (spec 1.0, enforced above the grammar): sibling
-     sub-arrays must match in length, so a bare array/matrix is rectangular.
+     check scoped to one array instance.
      Violation: error_array_row_size_mismatch
-       (e.g. [1,2,3]/[4,5], [[1,2]/[3,4,5]], or [[1,2],[3,4,5]]).
+       (e.g. [1,2,3]/[4,5], or [[1,2]/[3,4,5]]).
+
+     Sibling homogeneity (DOM BUILDER ONLY — bvn_dom_parse; the streaming
+     reader accepts these). Array elements must be the same kind throughout,
+     `,`-separated sibling sub-arrays must be rectangular (match in length,
+     so a bare array/matrix is rectangular), and sibling structs must share
+     the same shape. A ragged sibling set is error_array_row_size_mismatch
+     (e.g. [[1,2],[3,4,5]]); a mix of element kinds is
+     error_array_element_type_mismatch (code 39, e.g. [1,[2,3]]); sibling
+     structs with differing shapes is error_struct_shape_mismatch (code 40,
+     e.g. [{.x=1;},{.y=2;}]). loads()/the SAX callbacks deliver such arrays
+     unchanged; only a DOM parse rejects them.
 
   h) Array and struct nesting limits
      Array nesting (bracket depth): max_array_nesting (default 64 when

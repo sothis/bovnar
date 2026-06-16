@@ -78,8 +78,46 @@ int main(void)
 	ABI_FIELD(bvnr_data_t, frac_data);
 	ABI_FIELD(bvnr_data_t, frac_length);
 
+	/* The flags structs are field-mirrored in the bindings and carry the
+	 * callback function pointers a binding installs for C to invoke, so their
+	 * field offsets matter as much as the total size — emit every field. */
 	ABI_STRUCT(bvnr_read_flags_t);
+	ABI_FIELD(bvnr_read_flags_t, max_identifier_length);
+	ABI_FIELD(bvnr_read_flags_t, max_string_length);
+	ABI_FIELD(bvnr_read_flags_t, max_number_length);
+	ABI_FIELD(bvnr_read_flags_t, max_symbol_length);
+	ABI_FIELD(bvnr_read_flags_t, max_reference_length);
+	ABI_FIELD(bvnr_read_flags_t, max_array_items);
+	ABI_FIELD(bvnr_read_flags_t, max_text_bytes);
+	ABI_FIELD(bvnr_read_flags_t, max_file_size);
+	ABI_FIELD(bvnr_read_flags_t, max_struct_nesting);
+	ABI_FIELD(bvnr_read_flags_t, max_array_nesting);
+	ABI_FIELD(bvnr_read_flags_t, userdata);
+	ABI_FIELD(bvnr_read_flags_t, on_unverified);
+	ABI_FIELD(bvnr_read_flags_t, on_verified);
+	ABI_FIELD(bvnr_read_flags_t, continue_on_error);
+	ABI_FIELD(bvnr_read_flags_t, on_error);
+	ABI_FIELD(bvnr_read_flags_t, strict_version);
+	ABI_FIELD(bvnr_read_flags_t, _reserved);
+
 	ABI_STRUCT(bvnr_write_flags_t);
+	ABI_FIELD(bvnr_write_flags_t, max_identifier_length);
+	ABI_FIELD(bvnr_write_flags_t, max_string_length);
+	ABI_FIELD(bvnr_write_flags_t, max_number_length);
+	ABI_FIELD(bvnr_write_flags_t, max_symbol_length);
+	ABI_FIELD(bvnr_write_flags_t, max_reference_length);
+	ABI_FIELD(bvnr_write_flags_t, max_array_items);
+	ABI_FIELD(bvnr_write_flags_t, max_text_bytes);
+	ABI_FIELD(bvnr_write_flags_t, max_file_size);
+	ABI_FIELD(bvnr_write_flags_t, max_struct_nesting);
+	ABI_FIELD(bvnr_write_flags_t, max_array_nesting);
+	ABI_FIELD(bvnr_write_flags_t, userdata);
+	ABI_FIELD(bvnr_write_flags_t, on_event);
+	ABI_FIELD(bvnr_write_flags_t, continue_on_error);
+	ABI_FIELD(bvnr_write_flags_t, on_error);
+	ABI_FIELD(bvnr_write_flags_t, unit_flags);
+	ABI_FIELD(bvnr_write_flags_t, emit_version);
+	ABI_FIELD(bvnr_write_flags_t, _reserved);
 
 	/* opaque pass-through blobs: size only (a binding may over-allocate) */
 	ABI_STRUCT(bvnr_source_t);

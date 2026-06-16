@@ -517,7 +517,20 @@ if(Python3_FOUND)
         TIMEOUT     60
         LABELS      "python;python_pure;abi"
         ENVIRONMENT "BVNR_ABI_DUMP=$<TARGET_FILE:bvnr_abi_dump>"
+        FIXTURES_REQUIRED abi_dump_fixture
     )
+    # ctest does not build targets, so on its own bvnr_py_abi could compare the
+    # ctypes mirrors against a STALE generator binary (built before a header
+    # change). This setup fixture rebuilds bvnr_abi_dump first — a no-op when up
+    # to date, a refresh when a struct header changed — so the manifest the test
+    # reads always reflects the current C layout.
+    add_test(
+        NAME    bvnr_abi_dump_build
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target bvnr_abi_dump
+    )
+    set_tests_properties(bvnr_abi_dump_build PROPERTIES
+        FIXTURES_SETUP abi_dump_fixture
+        LABELS         "abi")
 
     # Array state-machine tests: exercises all six fixes in _DictParser
     # (flat/multi-row/nested arrays, struct elements, seal timing, parent_key).

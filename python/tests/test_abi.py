@@ -43,12 +43,14 @@ _MIRRORS = {
 }
 
 # Structs whose ctypes _fields_ are a faithful field-by-field mirror of the C
-# struct (so we can check per-field offsets). read/write flags carry function
-# pointers and packed small ints whose exact ctypes field decomposition is not
-# 1:1 with the C source; their total size is checked, which is what matters.
+# struct, so per-field offsets are checked (not just total size). This includes
+# the read/write flags structs: they carry the callback function pointers a
+# binding installs for C to invoke, so a same-size field reorder there would be
+# a serious bug that a size-only check could miss.
 _FIELD_CHECKED = {
     "value_type_spec_t", "value_unit_prefix_t", "value_unit_component_t",
     "value_unit_t", "bvnr_data_t", "bvnr_doc_stream_opts_t", "bvn_dom_entry_t",
+    "bvnr_read_flags_t", "bvnr_write_flags_t",
 }
 
 
@@ -120,7 +122,12 @@ def test_field_offsets_match_c(cls, cname, c_abi):
     assert len(pyfields) == len(cfields), (
         f"{cls.__name__} has {len(pyfields)} ctypes fields but C {cname} has "
         f"{len(cfields)} — fields added/removed without updating the mirror")
-    # compared in declaration order (names may differ, e.g. a union member)
+    # Compared in declaration order (names may differ, e.g. a union member).
+    # Note: this checks (offset, size), not C type identity — two same-width
+    # fields (e.g. a void* and a uint64, both 8 B) are indistinguishable here.
+    # Total-size + per-offset agreement catches the realistic desync (a field
+    # added/removed/resized, like the frac_* fields); a same-width type-pun is
+    # an accepted residual gap.
     for (pyname, _pytype), (cn, coff, csz) in zip(pyfields, cfields):
         fld = getattr(cls, pyname)
         assert fld.offset == coff, (
@@ -131,14 +138,21 @@ def test_field_offsets_match_c(cls, cname, c_abi):
 
 def test_all_ctypes_structures_are_covered():
     # Guard against a NEW ctypes Structure being added to the binding without a
-    # corresponding entry here (which would leave it unchecked against C).
+    # corresponding entry here (which would leave it unchecked against C). Scans
+    # every loaded `bovnar` module, not just structs.py, so one defined elsewhere
+    # is caught too. (ctypes.Union mirrors — e.g. the prefix-id union — are not
+    # Structure subclasses and are validated transitively via their containers.)
     import inspect
-    declared = {obj for _, obj in inspect.getmembers(S)
-                if inspect.isclass(obj)
-                and issubclass(obj, ctypes.Structure)
-                and obj.__module__ == S.__name__}
-    covered = set(_MIRRORS)
-    missing = declared - covered
+    import sys
+    declared = set()
+    for modname, mod in list(sys.modules.items()):
+        if mod is None or not (modname == "bovnar" or modname.startswith("bovnar.")):
+            continue
+        for _, obj in inspect.getmembers(mod, inspect.isclass):
+            if (issubclass(obj, ctypes.Structure)
+                    and str(getattr(obj, "__module__", "")).startswith("bovnar")):
+                declared.add(obj)
+    missing = declared - set(_MIRRORS)
     assert not missing, (
         f"ctypes Structures not covered by the ABI sweep: "
         f"{sorted(c.__name__ for c in missing)} — add them to _MIRRORS")

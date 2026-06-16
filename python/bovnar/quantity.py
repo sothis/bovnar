@@ -34,9 +34,9 @@ _IEEE_WIDTHS = (16, 32, 64, 128, 256)
 def _validate_float_width(family, width: int) -> None:
     """Reject a width bovnar would refuse, early and with a clear message.
 
-    Binary float accepts any power-of-two width >= 16 (it stores the verbatim
-    literal at that declared precision); decimal and fixed-point are limited to
-    the IEEE interchange set 16/32/64/128/256.
+    Binary float accepts width 16 or any multiple of 32 up to 32768 (it stores
+    the verbatim literal at that declared precision); decimal and fixed-point
+    are limited to the IEEE interchange set 16/32/64/128/256.
     """
     fam, w = int(family), int(width)
     if fam in (int(_F.FLOAT_DEC), int(_F.FLOAT_FIX)):
@@ -45,9 +45,10 @@ def _validate_float_width(family, width: int) -> None:
                 f"{_F(fam).name.lower()} width must be one of 16/32/64/128/256, "
                 f"not {w}")
     elif fam == int(_F.FLOAT):
-        if w < 16 or (w & (w - 1)) != 0:
+        if not (w == 16 or (w >= 32 and w % 32 == 0 and w <= 32768)):
             raise BovnarArgumentError(
-                f"binary float width must be a power of two >= 16, not {w}")
+                f"binary float width must be 16 or a multiple of 32 "
+                f"(up to 32768), not {w}")
 
 
 def _decimal_to_text(d) -> str:

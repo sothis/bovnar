@@ -335,8 +335,13 @@ class TestAllWidths:
             q.stored_value()
 
     @pytest.mark.parametrize("family,width,frac,ok", [
+        # binary float: 16 or any multiple of 32 (incl. non-powers-of-2), to 32768
         (F.FLOAT, 48, None, False), (F.FLOAT, 512, None, True),
+        (F.FLOAT, 96, None, True), (F.FLOAT, 192, None, True),
+        (F.FLOAT, 24, None, False), (F.FLOAT, 65536, None, False),
+        # decimal/fixed: only the IEEE interchange set 16/32/64/128/256
         (F.FLOAT_DEC, 512, None, False), (F.FLOAT_DEC, 128, None, True),
+        (F.FLOAT_DEC, 96, None, False),
         (F.FLOAT_FIX, 200, 4, False), (F.FLOAT_FIX, 64, 4, True),
     ])
     def test_width_validated_early(self, family, width, frac, ok):

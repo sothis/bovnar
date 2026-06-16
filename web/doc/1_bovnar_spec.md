@@ -594,11 +594,23 @@ with two-digit components); a malformed or out-of-range literal is
 
 A **`±HH:MM` offset** shifts the written civil time to true UTC before the
 conversion (`12:00:00+02:00` is `10:00:00Z`); for `tai` the offset is applied
-*before* the leap-second lookup, so the atomic value stays correct. **Fractional
-seconds** are accepted but the carrier is whole seconds, so the fraction is
-truncated to the written second (`12:00:00.999Z` and `12:00:00Z` store the same
-value) — write an integer carrier if you need sub-second precision. The `.`,
+*before* the leap-second lookup, so the atomic value stays correct. The `.`,
 `Z`, and `±HH:MM` parts are valid only after a full `HH:MM:SS` time.
+
+**Fractional seconds** (`.` then one or more digits — ISO 8601 sets no upper
+bound on the digit count) are accepted. The integer carrier is still **whole
+seconds**, so the fraction takes no part in the value's arithmetic or
+comparison (`<datetime:64> 1781524800` and a literal flooring to that second
+compare equal at the carrier). But the verbatim digits are **preserved**:
+they are surfaced to consumers as a string (the streaming `bvnr_data_t.frac_data`
+/ `.frac_length`, or `bvn_dom_get_datetime_fraction()` on a DOM node) and are
+re-emitted so the value **round-trips**. A datetime that carries a fraction is
+pretty-printed back as an ISO literal — `2026-06-15T12:00:00.5Z` canonicalises
+to `<datetime:64> 2026-06-15T12:00:00.5Z` (always normalised to UTC `Z`, with
+the annotation made explicit) and re-printing that is idempotent; a datetime
+written as a bare integer carrier still canonicalises to the integer. The
+fraction is informational only — for sub-second values that participate in
+computation, use a finer integer carrier (e.g. milliseconds since the epoch).
 
 The UTC→epoch conversion is **leap-second correct**: the civil epochs (`unix`,
 `mjd`, `ntp`, `y2000`) use the uniform 86 400 s/day scale (so `unix` is ordinary
@@ -615,7 +627,7 @@ literal under a non-`datetime` annotation is `error_type_value_mismatch`.
 .b = 2026-06-15T12:00:00Z;                        # date-time, UTC
 .c = <datetime:64,tai> 2017-01-01T00:00:00Z;      # tai: leap-second correct
 .d = 2026-06-15T12:00:00+02:00;                   # offset -> 10:00:00Z
-.e = 2026-06-15T12:00:00.5Z;                      # fraction truncated to :00
+.e = 2026-06-15T12:00:00.5Z;                      # fraction preserved; round-trips as a literal
 ```
 
 **Parameter syntax:**

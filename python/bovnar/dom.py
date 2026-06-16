@@ -202,6 +202,22 @@ class DomNode:
             lib.bvn_dom_free_string(ctypes.c_void_p(raw_ptr))
         return s
 
+    @property
+    def datetime_fraction(self) -> "str | None":
+        """
+        The verbatim ISO sub-second digits (without the leading '.') of a
+        datetime written as a literal with a fractional part (spec 1.1), or
+        ``None`` for a non-datetime node, a datetime given as an integer
+        carrier, or a literal with no fraction. The carrier value (whole epoch
+        seconds) is unchanged and still read via ``to_python()`` / ``as_int_str``;
+        this exposes the fraction the integer carrier cannot hold.
+        """
+        lib = get_library()
+        ptr = lib.bvn_dom_get_datetime_fraction(self._ptr, None)
+        if not ptr:
+            return None
+        return ptr.decode('ascii')
+
     def __len__(self) -> int:
         lib = get_library()
         dt  = self.dom_type

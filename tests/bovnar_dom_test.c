@@ -743,6 +743,34 @@ static void test_datetime_dom_decode(void)
 					"negative datetime decodes as -100");
 		bvn_dom_doc_destroy(neg);
 	}
+	/* spec 1.1 — an ISO literal's fractional seconds are visible to DOM
+	 * consumers as a verbatim string, while the carrier stays whole seconds. */
+	bvn_dom_doc_t *fr = parse_doc(
+		"#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000000123Z;\n");
+	if (fr) {
+		bvn_dom_node_t *n = bvn_dom_lookup(fr, ".t");
+		int64_t v = 0;
+		ASSERT_TRUE(bvn_dom_get_i64(n, &v) && v == 1781524800,
+					"fractional literal carrier is the whole second");
+		uint32_t flen = 0;
+		const char *f = bvn_dom_get_datetime_fraction(n, &flen);
+		ASSERT_NOT_NULL(f, "DOM exposes the datetime fraction string");
+		if (f) {
+			ASSERT_EQ_STR(f, "000000123", "fraction digits stored verbatim");
+			ASSERT_EQ_UINT(flen, 9u, "fraction length is the digit count");
+		}
+		bvn_dom_doc_destroy(fr);
+	}
+	/* a datetime given as an integer carrier (or no fraction) exposes none */
+	bvn_dom_doc_t *nofr = parse_doc("#!bovnar 1.1\n.t = <datetime:64> 42;\n");
+	if (nofr) {
+		uint32_t flen = 7;
+		const char *f = bvn_dom_get_datetime_fraction(
+			bvn_dom_lookup(nofr, ".t"), &flen);
+		ASSERT_TRUE(f == NULL && flen == 0u,
+					"integer-carrier datetime has no fraction");
+		bvn_dom_doc_destroy(nofr);
+	}
 }
 /*
  * Broad coverage of index resolution across every array feature: deep /-row

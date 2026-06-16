@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_datetime.h"
 #include "bvn_float.h"
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
@@ -738,6 +739,41 @@ static void bvn_ser_mark_value_done(bvnr_serializer_t* s)
  * suppresses the pending comma between a value's annotation and the value
  * itself, since they form one element.
  */
+/*
+ * spec 1.1 — decide whether a datetime value carrying captured ISO sub-second
+ * digits should be re-emitted as an ISO literal (so the fraction, which the
+ * whole-second integer carrier cannot hold, survives the round-trip), and if so
+ * compute the civil UTC fields. Pure: produces no output, so the path is chosen
+ * before the serializer writes any bytes.
+ *
+ * Returns false (caller emits the plain integer carrier) when the value is not a
+ * datetime, has no fraction, the carrier text can't be parsed, or the civil year
+ * falls outside the 0000..9999 an ISO literal's 4-digit year allows — the last
+ * guard matters because the public writer API could be handed a fraction with an
+ * out-of-literal-range carrier. The atomic GNSS epochs never reach here: they
+ * reject ISO literals at read time and so never carry a fraction.
+ */
+static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt)
+{
+	if (d->value_type.family != vt_datetime ||
+	    d->frac_data == NULL || d->frac_length == 0 || d->data == NULL)
+		return false;
+	char numbuf[24];
+	if (d->length == 0 || d->length >= sizeof numbuf)
+		return false;
+	memcpy(numbuf, d->data, d->length);
+	numbuf[d->length] = '\0';
+	int64_t secs;
+	if (!bvn_parse_int64(numbuf, d->value_type, &secs))
+		return false;
+	const char* ep = bvnr_datetime_epoch_name(d->value_type);
+	if (ep && strcmp(ep, "tai") == 0)
+		bvn_dt_tai_seconds_to_utc(dt, secs);
+	else
+		bvn_dt_epoch_seconds_to_datetime(dt,
+			(bvn_epoch_t)bvnr_datetime_epoch_mjd(d->value_type), secs);
+	return dt->date.year >= 0 && dt->date.year <= 9999;
+}
 bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 	bvnr_event_t ev, bvnr_data_t* d)
 {
@@ -932,7 +968,25 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			}
 		} else if (d->type == token_is_number ||
 				   d->type == token_is_array_number) {
-			if (d->data && d->length) {
+			bvn_datetime_t dt;
+			if (bvn_ser_datetime_to_civil(d, &dt)) {
+				/* spec 1.1 — re-emit as an ISO literal so the captured
+				 * sub-second digits round-trip:
+				 * YYYY-MM-DDTHH:MM:SS.<frac>Z (always UTC). */
+				char head[24];
+				int hn = snprintf(head, sizeof head,
+					"%04lld-%02lld-%02lldT%02lld:%02lld:%02lld",
+					(long long)dt.date.year, (long long)dt.date.month,
+					(long long)dt.date.day, (long long)dt.hour,
+					(long long)dt.minute, (long long)dt.second);
+				if (hn < 0 || (size_t)hn >= sizeof head)
+					return false;
+				if (!bvn_ser_push(s, head, (uint32_t)hn)) return false;
+				if (!bvn_ser_push_byte(s, '.')) return false;
+				if (!bvn_ser_push(s, d->frac_data, d->frac_length))
+					return false;
+				if (!bvn_ser_push_byte(s, 'Z')) return false;
+			} else if (d->data && d->length) {
 				/* Special floats (nan/inf/ninf) are emitted as the
 				 * bare keyword, exactly like any other number token —
 				 * no sigil. */

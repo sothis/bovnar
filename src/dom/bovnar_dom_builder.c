@@ -600,6 +600,19 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 				nd = make_float(str, len, vt, vu);
 			else
 				nd = make_int(str, len, vt, vu);
+			/* spec 1.1 — keep a datetime literal's verbatim sub-second
+			 * digits so DOM consumers can read them and the value can
+			 * round-trip as an ISO literal. */
+			if (nd && vt.family == vt_datetime &&
+			    d->frac_data && d->frac_length) {
+				nd->dt_frac = bvn_dom_strdup(
+					(const char *)d->frac_data, d->frac_length);
+				if (!nd->dt_frac) {
+					bvn_dom_node_destroy(nd);
+					return false;
+				}
+				nd->dt_frac_len = d->frac_length;
+			}
 			if (!nd && b->last_error == error_none)
 				b->last_error = error_value_out_of_range;
 			break;

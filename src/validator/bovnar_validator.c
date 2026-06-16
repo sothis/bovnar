@@ -268,14 +268,19 @@ static int bvn_iso_days_in_month(int64_t y, int m)
  * zone). Accepted forms:
  *   YYYY-MM-DD
  *   YYYY-MM-DDTHH:MM:SS[.frac][Z | ±HH:MM]
- * A fractional part (`.` then 1+ digits) is accepted and dropped — the carrier
- * is whole seconds, so the value floors to the written second. Returns false on
- * a wrong-width field, a misplaced separator, an out-of-range component, a
- * malformed offset, or any trailing junk. */
+ * A fractional part (`.` then 1+ digits) is accepted: the whole-second carrier
+ * floors to the written second, but the verbatim fraction digits are reported
+ * via *frac / *frac_len (the digits only, without the leading '.') so the
+ * caller can surface them to consumers and round-trip them. When no fraction is
+ * present *frac is NULL and *frac_len is 0. Returns false on a wrong-width
+ * field, a misplaced separator, an out-of-range component, a malformed offset,
+ * or any trailing junk. */
 static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* dt,
-	int64_t* offset_seconds)
+	int64_t* offset_seconds, const uint8_t** frac, uint32_t* frac_len)
 {
 	*offset_seconds = 0;
+	*frac     = NULL;
+	*frac_len = 0;
 	if (n < 10)
 		return false;
 	for (int i = 0; i < 4; i++)
@@ -304,13 +309,16 @@ static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* d
 		if (hour > 23 || minute > 59 || second > 59)
 			return false;
 		p = 19;
-		/* optional fractional seconds: '.' then 1+ digits (dropped) */
+		/* optional fractional seconds: '.' then 1+ digits. The carrier stays
+		 * whole seconds, but the digits are captured verbatim for the caller. */
 		if (p < n && s[p] == '.') {
 			uint32_t f0 = ++p;
 			while (p < n && s[p] >= '0' && s[p] <= '9')
 				p++;
 			if (p == f0)
 				return false;            /* '.' with no digit */
+			*frac     = s + f0;
+			*frac_len = p - f0;
 		}
 		/* optional zone: 'Z', or ±HH:MM */
 		if (p < n) {
@@ -347,11 +355,12 @@ static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* d
  * (unix/mjd/ntp/y2000) use the uniform conversion; tai applies the leap-second
  * table; the atomic GNSS epochs are rejected (no round-trippable inverse). */
 static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
-	value_type_spec_t vt, int64_t* out, error_code_t* err)
+	value_type_spec_t vt, int64_t* out, error_code_t* err,
+	const uint8_t** frac, uint32_t* frac_len)
 {
 	bvn_datetime_t dt;
 	int64_t offset_seconds;
-	if (!bvn_iso_parse_fields(s, n, &dt, &offset_seconds)) {
+	if (!bvn_iso_parse_fields(s, n, &dt, &offset_seconds, frac, frac_len)) {
 		*err = error_invalid_datetime_literal;
 		return false;
 	}
@@ -557,7 +566,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	v->parsed_unit   = have_inline_unit ? inline_unit_val : default_unit;
 	v->unit_data_len = have_inline_unit ? (uint8_t)inline_unit_len
 	                 : (emit_unit ? 7u : 0u);
-	bvnr_data_t d;
+	bvnr_data_t d = {0};
 	d.type       = token_is_type;
 	d.value_type = BVN_TYPE_PLAIN;
 	d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
@@ -883,7 +892,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
 		uint8_t unit_buf[UINT8_MAX + 1];
 		uint8_t ulen = 0;
-		bvnr_data_t d;
+		bvnr_data_t d = {0};
 		d.type       = token_is_type;
 		d.value_type = BVN_TYPE_PLAIN;
 		d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
@@ -1063,7 +1072,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 				v->last_error = error_type_value_mismatch;
 				return false;
 			}
-			bvnr_data_t d;
+			bvnr_data_t d = {0};
 			d.type       = token_is_bool;
 			d.value_type = v->value_type;
 			d.value_unit = v->parsed_unit;
@@ -1073,7 +1082,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		}
 	}
 	if (tt == token_is_null_value) {
-		bvnr_data_t d;
+		bvnr_data_t d = {0};
 		d.type       = tt;
 		d.value_type = v->value_type;
 		d.value_unit = v->parsed_unit;
@@ -1123,6 +1132,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	const uint8_t* val_str = raw->str_data;
 	uint32_t       val_len = raw->str_len;
 	uint8_t        dt_numbuf[24];
+	const uint8_t* dt_frac     = NULL;   /* ISO sub-second digits (spec 1.1) */
+	uint32_t       dt_frac_len = 0;
 	bool           is_iso_dt =
 		(tt == token_is_number || tt == token_is_array_number) &&
 		bvn_str_is_iso_datetime(raw->str_data, raw->str_len);
@@ -1174,7 +1185,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		}
 		int64_t secs;
 		if (!bvn_iso_to_epoch_seconds(raw->str_data, raw->str_len,
-				v->value_type, &secs, &v->last_error))
+				v->value_type, &secs, &v->last_error,
+				&dt_frac, &dt_frac_len))
 			return false;
 		val_len = bvn_i64_to_decimal(dt_numbuf, secs);
 		val_str = dt_numbuf;
@@ -1201,7 +1213,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		if (!BVN_UNIT_IS_NO_UNIT(iu_unit))
 			v->parsed_unit_serial++;
 	}
-	bvnr_data_t d;
+	bvnr_data_t d = {0};
 	d.type       = tt;
 	d.value_type = v->value_type;
 	d.value_unit = v->parsed_unit;
@@ -1212,6 +1224,10 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		d.data   = NULL;
 		d.length = 0;
 	}
+	/* spec 1.1 — carry the verbatim ISO sub-second digits (NULL/0 unless this
+	 * is a datetime literal that had a `.frac` part). */
+	d.frac_data   = dt_frac;
+	d.frac_length = dt_frac_len;
 	return bvn_emit_both(r, raw->event, &d);
 }
 /*

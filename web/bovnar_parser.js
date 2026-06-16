@@ -106,6 +106,7 @@
     let col  = 1;
     let inlineUnitStart = null;   /* start position of the last inline unit read */
     let lastValueWasDatetime = false;  /* readNumber sets this for an ISO-8601 literal (spec 1.1) */
+    let lastValueDatetimeFrac = null;  /* its verbatim sub-second digits, if any (spec 1.1) */
     let halted = false;           /* a hard (non-recoverable) error — e.g. an octet
                                      framing error — stops the parse, as the C core does */
     let valResync = false;        /* a recoverable error inside a value (e.g. a stray
@@ -261,6 +262,7 @@
     function readNumber() {
       let s = '', mantDigits = 0, neg = false;
       lastValueWasDatetime = false;
+      lastValueDatetimeFrac = null;
       if (!eof() && cur() === '-') { s += '-'; advance(); neg = true; }
       while (!eof() && /\d/.test(cur())) { s += cur(); advance(); mantDigits++; }
       /* ISO-8601 datetime literal (spec 1.1): a digit run followed by '-' (the
@@ -272,10 +274,21 @@
          authority); doing a leap-second-correct conversion here would only risk
          disagreeing with it. The accepted character set (digits, '-', 'T', ':',
          'Z', and '.'/'+' for spec-1.1 fractional seconds and ±HH:MM offsets)
-         mirrors the C lexer's dtlit_* states. */
+         mirrors the C lexer's dtlit_* states.
+
+         Fractional seconds are preserved verbatim: they stay part of the
+         displayed literal, and the digits (only, sans '.') are surfaced
+         separately on the DATA event as `frac`, mirroring the C reader's
+         bvnr_data_t.frac_data. The C reader keeps a whole-second integer
+         carrier but preserves these digits and round-trips the value as an ISO
+         literal — it no longer truncates them. */
       if (!neg && mantDigits > 0 && !eof() && cur() === '-') {
         lastValueWasDatetime = true;
         while (!eof() && /[-:TZ0-9.+]/.test(cur())) { s += cur(); advance(); }
+        /* the fraction is valid only after a full HH:MM:SS time, exactly as the
+           C reader requires; capture its digits for the DATA event. */
+        const fm = s.match(/T\d{2}:\d{2}:\d{2}\.(\d+)/);
+        lastValueDatetimeFrac = fm ? fm[1] : null;
         return s;
       }
       if (!eof() && cur() === '.') {
@@ -587,6 +600,7 @@
            consume a following token as an inline unit for a datetime literal. */
         const unit   = (insideArray || isDt) ? null : tryInlineUnit();
         emit(EV.DATA, { kind: isDt ? 'datetime' : 'number', value: numStr, text: numStr, unit,
+          frac: isDt ? lastValueDatetimeFrac : null,
           start: st, unitStart: unit ? inlineUnitStart : null, endPos: peekTermPos() });
         return;
       }

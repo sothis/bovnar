@@ -98,6 +98,14 @@ BVN_API char *bvn_dom_strdup(const char *s, uint32_t len);
 BVN_API const bvn_int_t *bvn_dom_get_bigint(const bvn_dom_node_t *node);
 BVN_API char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base);
 BVN_API void  bvn_dom_free_string(char *s);
+/* spec 1.1 — verbatim ISO sub-second digits of a datetime node written as a
+ * literal with a `.frac` part (the digits only, NUL-terminated, owned by the
+ * node — do NOT free). Returns NULL for a non-datetime node, a datetime given
+ * as an integer carrier, or a literal with no fraction; *len_out (when non-NULL)
+ * receives the digit count (0 when NULL is returned). The node's integer value
+ * is still the whole-second epoch count read via bvn_dom_get_i64(). */
+BVN_API const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node,
+		uint32_t *len_out);
 BVN_API bool bvn_dom_get_i64(const bvn_dom_node_t *node, int64_t  *out);
 BVN_API bool bvn_dom_get_u64(const bvn_dom_node_t *node, uint64_t *out);
 BVN_API bool bvn_dom_get_i32(const bvn_dom_node_t *node, int32_t  *out);

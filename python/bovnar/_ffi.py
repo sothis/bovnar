@@ -390,6 +390,11 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_dom_get_value_type.restype  = ValueTypeSpec
     lib.bvn_dom_get_value_type.argtypes = [c_void_p]
 
+    # spec 1.1 — verbatim ISO sub-second digits of a datetime literal (NULL when
+    # the value has none); the node owns the storage, so the result is read-only.
+    lib.bvn_dom_get_datetime_fraction.restype  = c_char_p
+    lib.bvn_dom_get_datetime_fraction.argtypes = [c_void_p, P(c_uint32)]
+
     lib.bvn_dom_get_unit.restype  = ValueUnit
     lib.bvn_dom_get_unit.argtypes = [c_void_p]
 

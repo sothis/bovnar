@@ -238,15 +238,18 @@ integer — `2026-06-15`, `2026-06-15T12:00:00`, a trailing `Z`, or a numeric
 #!bovnar 1.1
 .created = 2026-06-15T12:00:00Z;        # bare literal infers <datetime:64,unix>
 .local   = 2026-06-15T12:00:00+02:00;   # offset folds to 10:00:00Z
-.logline = 2026-06-15T12:00:00.123Z;    # fraction truncated to the whole second
+.logline = 2026-06-15T12:00:00.123Z;    # fraction preserved as a string; round-trips
 ```
 
 It is converted to the epoch-seconds carrier at parse time (the integer is what
 is stored, so round-trips are idempotent). A bare literal with no annotation
 infers `<datetime:64,unix>`. A `±HH:MM` offset shifts the time to true UTC before
-the conversion; a fractional part is accepted but truncated to the whole second
-(the carrier is integer seconds — use an integer carrier for sub-second
-precision). The UTC→epoch conversion is leap-second correct for the civil epochs
+the conversion. A fractional part (any number of digits) does not change the
+whole-second carrier, but the digits are kept verbatim — consumers read them as
+a string (`bvnr_data_t.frac_data`, or `bvn_dom_get_datetime_fraction()`), and a
+value carrying a fraction is pretty-printed back as an ISO literal so it
+round-trips. For sub-second values you compute on, use a finer integer carrier
+(e.g. milliseconds). The UTC→epoch conversion is leap-second correct for the civil epochs
 and `tai` (the offset is folded before `tai`'s leap-second lookup); the atomic
 GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
 (`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. A

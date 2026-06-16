@@ -348,6 +348,15 @@ typedef struct bvnr_data_s {
 	value_unit_t		value_unit;
 	const void*		data;
 	uint32_t		length;
+	/* spec 1.1 — sub-second digits of an ISO-8601 datetime literal, captured
+	 * verbatim (no leading "0.", no trailing-zero trimming) so consumers can
+	 * see fractional seconds the integer carrier cannot hold. NULL/0 for every
+	 * value except a vt_datetime that was written as a literal with a `.frac`
+	 * part. The carrier in `data` is still the whole-second epoch integer; the
+	 * fraction is informational (not used in arithmetic) and survives a
+	 * pretty-print round-trip via re-emission of the ISO literal. */
+	const void*		frac_data;
+	uint32_t		frac_length;
 } bvnr_data_t;
 typedef void (*bvnr_on_error_fn)(
 	void* userdata, error_code_t err,

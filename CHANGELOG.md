@@ -45,8 +45,12 @@ such a document is an error, exactly as a 1.0 reader reports.
   stored and re-emitted, so round-trips stay idempotent). A bare literal with no
   annotation infers `<datetime:64,unix>`. A `±HH:MM` offset folds the written
   civil time to true UTC before the conversion (and before `tai`'s leap-second
-  lookup, so atomic values stay correct); a fractional part is accepted but
-  truncated to the whole second (the carrier is integer seconds). The UTC→epoch
+  lookup, so atomic values stay correct). A fractional second (any digit count —
+  ISO 8601 sets no limit) leaves the whole-second carrier unchanged, but the
+  verbatim digits are preserved: consumers read them as a string
+  (`bvnr_data_t.frac_data`/`frac_length`, or `bvn_dom_get_datetime_fraction()`),
+  and a value carrying a fraction is pretty-printed back as an ISO literal
+  (`<datetime:64> 2026-06-15T12:00:00.5Z`) so it round-trips idempotently. The UTC→epoch
   conversion is leap-second correct: civil epochs (`unix`/`mjd`/`ntp`/`y2000`)
   use the uniform scale and `tai` applies the IERS leap-second table; the atomic
   GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal

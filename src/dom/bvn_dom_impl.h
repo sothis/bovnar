@@ -41,6 +41,12 @@ struct bvn_dom_node_s {
 		struct { char    *data; uint32_t len; } str;
 		struct { uint8_t *data; uint32_t len; } octets;
 	} val;
+	/* spec 1.1 — verbatim ISO sub-second digits for a datetime node (the digits
+	 * only, no leading '.', NUL-terminated; NULL when the literal had no
+	 * fraction). The val.int_val carrier still holds the whole epoch seconds;
+	 * this is informational and used to round-trip the literal. */
+	char    *dt_frac;
+	uint32_t dt_frac_len;
 	struct {
 		bvn_dom_entry_t *entries;
 		uint32_t         count;

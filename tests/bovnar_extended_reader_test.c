@@ -68,6 +68,12 @@ typedef struct {
 	uint32_t error_count;
 	error_code_t last_error;
 	bool has_errors;
+	/* last value event's carrier + ISO sub-second digits (spec 1.1) */
+	char     last_value[64];
+	uint32_t last_value_len;
+	char     last_frac[64];
+	uint32_t last_frac_len;
+	bool     last_had_frac;
 } parse_ctx_t;
 
 static bool on_unverified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
@@ -80,7 +86,22 @@ static bool on_unverified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
 
 static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
 {
-	(void)userdata; (void)ev; (void)data;
+	parse_ctx_t *ctx = (parse_ctx_t*)userdata;
+	(void)ev;
+	if (data && (data->type == token_is_number ||
+	             data->type == token_is_array_number)) {
+		uint32_t n = data->length;
+		if (n >= sizeof ctx->last_value) n = sizeof ctx->last_value - 1;
+		if (data->data) memcpy(ctx->last_value, data->data, n);
+		ctx->last_value[n] = '\0';
+		ctx->last_value_len = data->length;
+		ctx->last_had_frac = (data->frac_data != NULL);
+		uint32_t fn = data->frac_length;
+		if (fn >= sizeof ctx->last_frac) fn = sizeof ctx->last_frac - 1;
+		if (data->frac_data) memcpy(ctx->last_frac, data->frac_data, fn);
+		ctx->last_frac[fn] = '\0';
+		ctx->last_frac_len = data->frac_length;
+	}
 	return true;
 }
 
@@ -290,6 +311,30 @@ static void test_parse_datetime(void)
 	parse_payload("#!bovnar 1.1\n.t = <datetime:8> 300;", false, &ctx);
 	ASSERT_EQ_INT(ctx.last_error, error_value_out_of_range,
 		"a value beyond the declared width is rejected");
+
+	/* spec 1.1 — an ISO literal's fractional seconds are delivered verbatim to
+	 * the consumer while the carrier stays the whole-second epoch integer. */
+	parse_payload("#!bovnar 1.1\n.t = 2026-06-15T12:00:00.5Z;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "fractional ISO literal parses");
+	ASSERT_TRUE(strcmp(ctx.last_value, "1781524800") == 0,
+		"carrier is the whole-second epoch integer");
+	ASSERT_TRUE(ctx.last_had_frac, "consumer sees a fraction was present");
+	ASSERT_TRUE(strcmp(ctx.last_frac, "5") == 0,
+		"fraction digits delivered verbatim ('5')");
+
+	parse_payload("#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000000123Z;", false, &ctx);
+	ASSERT_TRUE(strcmp(ctx.last_frac, "000000123") == 0,
+		"long fraction delivered without trimming");
+	ASSERT_EQ_UINT(ctx.last_frac_len, 9u, "fraction length is the digit count");
+
+	/* a non-fractional literal reports no fraction */
+	parse_payload("#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;", false, &ctx);
+	ASSERT_TRUE(!ctx.last_had_frac, "no fraction => frac_data is NULL");
+	ASSERT_EQ_UINT(ctx.last_frac_len, 0u, "no fraction => frac_length 0");
+
+	/* a date-only literal likewise carries no fraction */
+	parse_payload("#!bovnar 1.1\n.t = 2026-06-15;", false, &ctx);
+	ASSERT_TRUE(!ctx.last_had_frac, "date-only literal has no fraction");
 
 	/* epoch helpers map the base index back to a name and epoch day */
 	value_type_spec_t unix_dt = { .family = vt_datetime, .width = 64, .base = 0 };

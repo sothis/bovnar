@@ -118,6 +118,7 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 		case BVN_DOM_INT:
 			if (cur->value_type.width > 64u && cur->val.bigint)
 				bvn_int_free(cur->val.bigint);
+			free(cur->dt_frac);   /* spec 1.1 datetime sub-second digits */
 			break;
 		case BVN_DOM_STRING:
 		case BVN_DOM_SYMBOL:
@@ -576,6 +577,16 @@ char *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base)
 void bvn_dom_free_string(char *s)
 {
 	free(s);
+}
+const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node,
+		uint32_t *len_out)
+{
+	if (len_out) *len_out = 0;
+	if (!node || node->type != BVN_DOM_INT ||
+	    node->value_type.family != vt_datetime || !node->dt_frac)
+		return NULL;
+	if (len_out) *len_out = node->dt_frac_len;
+	return node->dt_frac;
 }
 /*
  * The two raw integer extractors behind every bvn_dom_get_iN / get_uN

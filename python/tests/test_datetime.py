@@ -141,7 +141,8 @@ def test_invalid_datetimes(doc, code):
     ('#!bovnar 1.1\n.t = <datetime> 2026-06-15;',               1781481600),
     # tai is leap-second correct: 2017-01-01 carries +37 leap seconds
     ('#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T00:00:00Z;', 1861920037),
-    # fractional seconds truncate to the whole second (carrier is integer seconds)
+    # fractional seconds floor to the whole-second carrier (the digits are
+    # preserved separately; see test_iso_fraction_is_visible_and_roundtrips)
     ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.999Z;',            1781524800),
     ('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000000123;',       1781524800),
     # ±HH:MM offset folds to true UTC
@@ -162,6 +163,23 @@ def test_iso_literal_values(doc, expected):
 def test_iso_literal_array_is_homogeneous():
     assert bovnar.loads('#!bovnar 1.1\n.ts = [2026-01-01, 2026-01-02];')['ts'] == \
         [1767225600, 1767312000]
+
+
+@needs_lib
+def test_iso_fraction_is_visible_and_roundtrips():
+    # spec 1.1: the carrier stays whole seconds, but a DOM consumer can read the
+    # verbatim sub-second digits as a string.
+    from bovnar.dom import DomDoc
+    doc = DomDoc.parse(b'#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000000123Z;\n')
+    node = doc.lookup('t')
+    assert node.to_python() == 1781524800           # carrier = whole second
+    assert node.datetime_fraction == '000000123'    # fraction preserved verbatim
+
+    # a datetime given as an integer carrier (or with no fraction) exposes none
+    plain = DomDoc.parse(b'#!bovnar 1.1\n.t = <datetime:64> 42;\n')
+    assert plain.lookup('t').datetime_fraction is None
+    none2 = DomDoc.parse(b'#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;\n')
+    assert none2.lookup('t').datetime_fraction is None
 
 
 @needs_lib

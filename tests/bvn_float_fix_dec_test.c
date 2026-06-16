@@ -549,6 +549,32 @@ static void test_bvn_float_dec_api(void)
 	bvn_float_to_dec16(&f, &dec16_bits);
 	bvn_float_from_dec16(&f, dec16_bits);
 	CHECK(bvn_float_is_nan(&f), "dec16 NaN round-trip");
+
+	/* Regression: a full-coefficient value just under decimal128's Emax must
+	 * keep ALL 34 significant digits through to_dec128. A coarse 302/1000
+	 * log10(2) estimate in bvnf_dec_render_roundodd once overshot the decimal
+	 * exponent for large binary exponents, shortening the rendered quotient so
+	 * decimal128's 34-nine maximum encoded to only ~20 significant digits. */
+	{
+		bvn_float_t *big = bvn_float_alloc(4096u);
+		CHECK(big != NULL, "alloc 4096-bit float for near-Emax test");
+		bool pok = bvn_float_from_str(
+			big, "9999999999999999999999999999999999e6111", 10u);
+		CHECK(pok, "parse decimal128 34-nine near-Emax value");
+		uint32_t d128[4];
+		bvn_float_to_dec128(big, d128);
+		bvn_float_t *back = bvn_float_alloc(4096u);
+		CHECK(bvn_float_from_dec128(back, d128), "from_dec128 near-Emax");
+		char rbuf[160];
+		int rn = bvn_float_to_str(back, rbuf, sizeof rbuf, 10u);
+		CHECK(rn > 0, "to_str of decoded near-Emax value");
+		int nines = 0;
+		for (const char *p = rbuf; *p && *p != 'e' && *p != 'E'; p++)
+			if (*p == '9') nines++;
+		CHECK(nines == 34, "decimal128 near-Emax keeps all 34 nines");
+		bvn_float_free(big);
+		bvn_float_free(back);
+	}
 }
 
 /* ── bvn_float_t ↔ fix conversion API ─────────────────────────────── */

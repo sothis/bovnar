@@ -2029,8 +2029,21 @@ static bool bvnf_dec_render_roundodd(const bvn_float_t *f, int D,
 {
 	long e2  = (long)f->_exp - (long)f->_prec;
 	long ep  = (long)f->_exp - 1L;
-	long E10est = (ep >= 0) ? (ep * 302L + 999L) / 1000L
-							 : -(((-ep) * 301L) / 1000L);
+	/*
+	 * Estimate the decimal exponent E10 ~= ep*log10(2). The scale s below offsets
+	 * by it so the quotient carries a few more than D digits; if E10est OVER-
+	 * estimates the true exponent the quotient comes out SHORT and digits are
+	 * silently lost. The old 302/1000 (=0.302) approximation of log10(2) overshot
+	 * by ~1e-3 per unit, which past ~2000 binary digits of exponent exceeded the
+	 * +2 safety margin and truncated full-coefficient values near a format's Emax
+	 * (e.g. decimal128's 34-nine maximum rendered to ~20 digits). 30103/100000
+	 * (=0.30103) is within 5e-9 of log10(2), keeping E10est within 1 ulp of the
+	 * truth across the whole exponent range. The multiply is done in 64-bit to
+	 * stay exact for the largest representable exponents.
+	 */
+	long E10est = (ep >= 0)
+		? (long)(((int64_t)ep * 30103 + 99999) / 100000)
+		: -(long)(((int64_t)(-ep) * 30103) / 100000);
 	long s = (long)D + 2L - E10est;          /* guarantees quotient has > D digits */
 	long mag = (long)f->_prec + (e2 < 0 ? -e2 : e2) + (s < 0 ? -s : s) * 4L + 64L;
 	if (mag < 64L) mag = 64L;

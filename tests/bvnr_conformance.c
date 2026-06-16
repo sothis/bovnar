@@ -894,11 +894,12 @@ static const cf_case_t g_cases[] = {
 	          "#!bovnar 1.1\n.t = [<datetime:64> 100, 200, 300];"),
 	DOM_VALID("DTLIT-113", "datetime", "bare ISO-literal array is a homogeneous datetime array",
 	          "#!bovnar 1.1\n.t = [2026-01-01, 2026-01-02, 2026-01-03];"),
-	/* Fractional seconds (spec 1.1): accepted, truncated to the whole second. */
-	VALID_KEY("DTLIT-114", "datetime", "fractional seconds truncate to the whole second",
+	/* Fractional seconds (spec 1.1): the whole-second carrier is unchanged; the
+	 * fraction digits are preserved separately (and round-trip as a literal). */
+	VALID_KEY("DTLIT-114", "datetime", "fractional seconds floor to the whole-second carrier",
 	          "#!bovnar 1.1\n.t = 2026-06-15T12:00:00.999Z;",
 	          "t", "1781524800"),
-	VALID_KEY("DTLIT-115", "datetime", "nanosecond fraction truncates to the whole second",
+	VALID_KEY("DTLIT-115", "datetime", "nanosecond fraction floors to the whole-second carrier",
 	          "#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000000123;",
 	          "t", "1781524800"),
 	/* tz offsets (spec 1.1): folded to true UTC. */

@@ -557,7 +557,9 @@ parameter is the **epoch name**, one of:
 `unix` (default), `tai`, `gps`, `mjd`, `ntp`, `galileo`, `glonass`, `y2000`, `beidou`.
 
 A numeric base, `q`, or physical unit parameter is `error_illegal_value_type`; a
-fractional or exponent value is `error_type_value_mismatch`. As a 1.1 feature it
+fractional or exponent *numeric carrier* (e.g. `1.5` or `1e3` — as opposed to the
+sub-second fraction of an ISO-8601 literal, covered below) is
+`error_type_value_mismatch`. As a 1.1 feature it
 requires a `#!bovnar 1.1` declaration (§3.4) — in a 1.0/unversioned document
 `datetime` is `error_illegal_value_type`. Recover the civil date/time with the
 `bvn_datetime.h` helpers (`bvnr_datetime_epoch_mjd()` → the epoch, then

@@ -758,6 +758,14 @@ static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt)
 	if (d->value_type.family != vt_datetime ||
 	    d->frac_data == NULL || d->frac_length == 0 || d->data == NULL)
 		return false;
+	/* The fraction is spliced verbatim into the reconstructed ISO literal, so it
+	 * must be pure ASCII digits. The reader only ever captures digits, but the
+	 * public bvnr_write_event() API could hand us anything; reject (and fall back
+	 * to the integer carrier) rather than emit a literal that will not re-parse. */
+	const uint8_t* fd = (const uint8_t*)d->frac_data;
+	for (uint32_t i = 0; i < d->frac_length; i++)
+		if (fd[i] < '0' || fd[i] > '9')
+			return false;
 	char numbuf[24];
 	if (d->length == 0 || d->length >= sizeof numbuf)
 		return false;
@@ -767,12 +775,31 @@ static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt)
 	if (!bvn_parse_int64(numbuf, d->value_type, &secs))
 		return false;
 	const char* ep = bvnr_datetime_epoch_name(d->value_type);
-	if (ep && strcmp(ep, "tai") == 0)
+	/* Only the epochs whose ISO literal the reader accepts may be re-emitted as a
+	 * literal. The atomic GNSS epochs reject literals at read time, so they never
+	 * carry a reader-captured fraction; one supplied via the writer API falls back
+	 * to the integer carrier rather than producing a literal the reader rejects. */
+	if (ep == NULL ||
+	    strcmp(ep, "gps") == 0 || strcmp(ep, "galileo") == 0 ||
+	    strcmp(ep, "glonass") == 0 || strcmp(ep, "beidou") == 0)
+		return false;
+	/* Zero-init so the validity guard is deterministic even when a converter
+	 * leaves *dt untouched: bvn_dt_tai_seconds_to_utc() does so on the tai
+	 * underflow near INT64_MIN, and bvn_dt_epoch_seconds_to_datetime() leaves
+	 * dt->date untouched when the MJD is outside the gregorian range. The fields
+	 * then stay zero (month 0) and the guard below rejects them. */
+	memset(dt, 0, sizeof *dt);
+	if (strcmp(ep, "tai") == 0)
 		bvn_dt_tai_seconds_to_utc(dt, secs);
 	else
 		bvn_dt_epoch_seconds_to_datetime(dt,
 			(bvn_epoch_t)bvnr_datetime_epoch_mjd(d->value_type), secs);
-	return dt->date.year >= 0 && dt->date.year <= 9999;
+	/* A well-formed civil time the reader can round-trip has month 1..12, a valid
+	 * day, and a 4-digit year; reject anything else (including the untouched-zero
+	 * case above) and emit the plain integer carrier instead. */
+	return dt->date.month >= 1 && dt->date.month <= 12 &&
+	       dt->date.day   >= 1 && dt->date.day   <= 31 &&
+	       dt->date.year  >= 0 && dt->date.year  <= 9999;
 }
 bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 	bvnr_event_t ev, bvnr_data_t* d)

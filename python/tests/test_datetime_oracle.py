@@ -96,8 +96,9 @@ def test_date_only_literal_is_midnight_utc():
 
 
 @needs_lib
-def test_fractional_seconds_truncate_to_whole_second():
-    # the carrier is whole seconds: a fractional part is dropped (floor)
+def test_fractional_seconds_floor_to_whole_second_carrier():
+    # the carrier is whole seconds, so the value floors to the written second
+    # (the fraction digits are preserved separately; the carrier is unaffected)
     base = bovnar.loads("#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;")["t"]
     for frac in (".0", ".5", ".999", ".000000123", ".123456789"):
         doc = f"#!bovnar 1.1\n.t = 2026-06-15T12:00:00{frac}Z;\n"

@@ -107,9 +107,10 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
 
 ### Known gaps / deferred
 
-- ISO-8601 datetime literals are whole-second resolution (a fractional part is
-  accepted but truncated) and cover `Z` and numeric `±HH:MM` offsets; literals
-  for the atomic GNSS epochs are still rejected (no round-trippable inverse).
+- ISO-8601 datetime literals carry a whole-second integer (a fractional part is
+  preserved verbatim and round-tripped, but does not participate in the value's
+  arithmetic) and cover `Z` and numeric `±HH:MM` offsets; literals for the atomic
+  GNSS epochs are still rejected (no round-trippable inverse).
 - The browser playground parser (`web/bovnar_parser.js`) recognises ISO-8601
   literals and displays them as written, but — by its lenient design (it does
   not synthesise annotations or validate types) — it does not convert them to

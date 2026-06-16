@@ -1321,12 +1321,75 @@ static void test_write_datetime(void)
 	}
 }
 
+/*
+ * spec 1.1 — the writer re-emits a datetime carrying captured ISO sub-second
+ * digits (bvnr_data_t.frac_data) as an ISO literal so it round-trips. These
+ * cases drive the raw event API directly to cover the hardening guards that the
+ * reader path can never reach: a fraction with non-digit bytes, an atomic GNSS
+ * epoch (which rejects literals), and a near-INT64_MIN tai carrier whose civil
+ * conversion overflows (the converter leaves *dt untouched). All three must
+ * fall back to the plain integer carrier — never a corrupt literal or a crash.
+ */
+static void emit_dt_value(uint8_t *out, uint32_t cap, uint32_t *outlen,
+	uint32_t epoch_base, const char *carrier,
+	const char *frac, uint32_t frac_len)
+{
+	bvnr_sink_t sink;
+	bvnr_writer_t *w = make_writer(out, cap, &sink);
+	if (!w) { *outlen = 0; return; }
+	const char *key = "t";
+	bvnr_data_t d = { .type = token_is_identifier,
+	                  .data = key, .length = 1 };
+	bvnr_write_event(w, ev_assignment_start, &d);
+	value_type_spec_t vt = { .family = vt_datetime, .width = 64,
+	                         .base = epoch_base };
+	d = (bvnr_data_t){ .type = token_is_number, .value_type = vt,
+	                   .data = carrier, .length = (uint32_t)strlen(carrier),
+	                   .frac_data = frac, .frac_length = frac_len };
+	bvnr_write_event(w, ev_data, &d);
+	bvnr_write_finish(w);
+	*outlen = (uint32_t)bvnr_writer_bytes_written(w);
+	if (*outlen < cap) out[*outlen] = '\0';
+	bvnr_writer_destroy(w);
+}
+static void test_write_datetime_fraction_guards(void)
+{
+	printf("  test_write_datetime_fraction_guards...\n");
+	uint8_t out[4096];
+	uint32_t n;
+
+	/* 1. valid unix fractional datetime -> re-emitted as an ISO literal */
+	emit_dt_value(out, sizeof out, &n, 0, "1781524800", "5", 1);
+	ASSERT_TRUE(strstr((char *)out, "2026-06-15T12:00:00.5Z") != NULL,
+		"valid fraction re-emits as an ISO literal");
+
+	/* 2. a fraction with non-digit bytes must NOT produce a corrupt literal;
+	 *    fall back to the integer carrier. */
+	emit_dt_value(out, sizeof out, &n, 0, "1781524800", "5Z", 2);
+	ASSERT_TRUE(strstr((char *)out, "1781524800") != NULL &&
+	            strstr((char *)out, "2026-") == NULL,
+		"non-digit fraction falls back to the integer carrier");
+
+	/* 3. an atomic GNSS epoch (gps=2) rejects literals on read, so a fraction
+	 *    must fall back to the integer carrier rather than emit one. */
+	emit_dt_value(out, sizeof out, &n, 2, "1781524800", "5", 1);
+	ASSERT_TRUE(strstr((char *)out, "1781524800") != NULL &&
+	            strstr((char *)out, "2026-") == NULL,
+		"GNSS-epoch fraction falls back to the integer carrier");
+
+	/* 4. a near-INT64_MIN tai carrier whose civil conversion overflows must not
+	 *    read uninitialised civil fields; it falls back to the integer carrier. */
+	emit_dt_value(out, sizeof out, &n, 1, "-9223372036854775808", "5", 1);
+	ASSERT_TRUE(strstr((char *)out, "-9223372036854775808") != NULL,
+		"tai overflow falls back to the integer carrier (no UB)");
+}
 int main(void)
 {
 	printf("Running bovnar_writer_test regression suite...\n");
 
 	test_write_version_directive();
 	test_write_datetime();
+	test_write_datetime_fraction_guards();
 
 	test_write_simple_strings();
 	test_write_typed_integers();

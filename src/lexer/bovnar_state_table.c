@@ -577,8 +577,9 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5d] = ACT_array_outro,
 	},
 	/* Fractional seconds (spec 1.1): digits after '.', then an optional 'Z' or
-	 * ±HH:MM tz offset. The validator truncates the fraction to the whole
-	 * second (the carrier is integer seconds). */
+	 * ±HH:MM tz offset. The carrier stays whole seconds, but the validator keeps
+	 * the fraction digits verbatim (surfaced as bvnr_data_t.frac_data and
+	 * re-emitted on round-trip) — it does not discard them. */
 	[dtlit_frac] = {
 		BVN_WHITESPACE(ACT_to_number_outro),
 		BVN_DIGITS(ACT_dtlit_frac),

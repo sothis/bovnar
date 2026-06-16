@@ -330,6 +330,25 @@ bvnr_write_datetime(w, "created", 64, "gps", 1750000000);  /* <datetime:64,gps> 
 The family is spec 1.1: it requires a `#!bovnar 1.1` declaration, and in a
 1.0/unversioned document a `datetime` annotation is `error_illegal_value_type`.
 
+**ISO-8601 literals and fractional seconds.** A datetime may be written as an
+ISO-8601 literal (`2026-06-15T12:00:00.5Z`) instead of a raw integer; the reader
+converts it to the whole-second carrier you receive in `d->data`. When the
+literal carries a fractional second, the verbatim digits (no leading `.`) are
+delivered alongside the carrier in two `bvnr_data_t` fields, `frac_data` and
+`frac_length` — `NULL`/`0` for every other value. The carrier is unchanged (the
+value floors to the written second), so the fraction is informational, but it
+lets a consumer see sub-second precision the integer cannot hold, and the writer
+re-emits it: a datetime data event whose `frac_data` is set is serialised back as
+an ISO literal so the value round-trips. Like `d->data`, `frac_data` is **not
+NUL-terminated** — bound the read by `frac_length`.
+
+```c
+/* on a datetime data event: */
+if (d->frac_data && d->frac_length) {
+    /* d->frac_data[0 .. frac_length) are the sub-second digits, e.g. "5" */
+}
+```
+
 ---
 
 ### 8. `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`

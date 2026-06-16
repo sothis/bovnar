@@ -889,6 +889,7 @@ for as long as any derived `DomNode` is in use.
 | `node.as_str()` | Python `str` for `STRING`, `SYMBOL`, or `REFERENCE` nodes |
 | `node.as_bytes()` | `bytes` for `OCTET_STREAM` nodes |
 | `node.as_int_str(base=10)` | Integer value as a string in the given base; result C string is freed before return |
+| `node.datetime_fraction` | `str` of the verbatim ISO sub-second digits for a `datetime` written as a literal with a fraction (spec 1.1), else `None`; the carrier value is unchanged and still read via `to_python()` |
 | `node[key]` | Child `DomNode` by string key (STRUCT) or integer index (ARRAY) |
 | `key in node` | Membership test for STRUCT nodes |
 | `len(node)` | Element count for STRUCT or ARRAY nodes |

@@ -5,6 +5,17 @@ cross-checked against `src/lexer/` (state table + `bvn_escape_lut`),
 `src/validator/bovnar_validator.c`, `src/utils/bovnar_si_units.c`, and the spec.
 Everything below is verified against the implementation, not just the EBNF text.
 
+> **Update — several "v2 proposals" below shipped in spec 1.1.** This review was
+> written against 1.0. Spec 1.1 (now drafted) implemented three of the proposals
+> as 1.1-gated, opt-in features, so their "currently a hard error" framing is no
+> longer accurate for a `#!bovnar 1.1` document:
+> - **P3 (richer escapes)** — `\xHH` and `\u{…}` are now valid in 1.1 strings.
+> - **P5 (time family)** — the `datetime` family (`<datetime:width,epoch>`) plus
+>   ISO-8601 datetime literals now exist.
+> - **P10 (reference array indexing)** — `&.matrix[0][1]` now resolves at the DOM
+>   layer.
+> See `doc/1_bovnar_spec.md` / `doc/5_bovnar.ebnf` for the shipped syntax.
+
 ---
 
 ## 0. TL;DR
@@ -168,14 +179,13 @@ it at parse time.
 
 ### 2.5 Documentation drift
 
-- The EBNF header still says `Updated: 2026-05-29`, but the substance matches the
-  newer (June) lexer in everything I checked. Update the banner or you train
-  readers to distrust it.
-- Exponent notation disagrees between layers: spec §11.5 table says the caret
+- ~~The EBNF header still says `Updated: 2026-05-29`~~ — **resolved**: the EBNF
+  banner now reads `Updated: 2026-06-15 — spec 1.1`.
+- Exponent notation disagreed between layers: spec §11.5 table said the caret
   form is `^[+-]?[0-9]` (which would admit `^0`), while the EBNF comment says
   `"^" ["-"|"+"] ASCII-digit` *and* "`^0` is not a valid exponent." The
   implementation (the `exp_*` enum) confirms the EBNF: magnitude 1–9, no zero.
-  Fix the spec table to `^[+-]?[1-9]`.
+  **Resolved**: the spec §11.5 table now reads `^[+-]?[1-9]`.
 
 ### 2.6 Octet chunk length encoding wart
 

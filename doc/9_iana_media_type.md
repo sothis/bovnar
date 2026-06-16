@@ -31,11 +31,16 @@ RFC or IETF standards action.
 SHOULD NOT be used.
 
 **Encoding considerations:**
-8bit. A Bovnar document is UTF-8 text and may contain non-ASCII octets in string
-values, identifiers, and unit symbols (e.g. `m/s²`, `µ`). Embedded binary data is
-carried as *escaped octet streams* (`\xNN …`), so the byte stream remains text;
-no transfer encoding is required for 8-bit-clean transports. Over 7-bit-only
-transports, use quoted-printable or base64.
+binary. A Bovnar document is primarily UTF-8 text — string values, identifiers,
+and unit symbols may contain non-ASCII octets (e.g. `m/s²`, `µ`). However, a
+document may embed one or more raw *octet streams* (spec §9, "Binary Mode"):
+a region delimited by `0x00` bytes carrying length-prefixed `0x01` chunks of
+arbitrary bytes, **including NUL and other control bytes**, with the UTF-8
+validator suspended for its duration. A document that contains an octet stream
+is therefore not 7-bit-safe, not line-oriented, and not in general valid text,
+so the encoding is "binary". A document with no octet stream is 8-bit UTF-8
+text. Over transports that are not binary-clean, apply base64 or
+quoted-printable.
 
 **Security considerations:**
 A Bovnar document is passive data. It carries no scripting, macros, external

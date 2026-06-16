@@ -1380,7 +1380,7 @@ Exponents can be written in two forms:
 | Form | Example | Meaning |
 |------|---------|---------|
 | Unicode superscript | `m²`, `m⁻³` | Using U+00B2/00B3 etc. |
-| ASCII caret | `m^2`, `m^-3`, `m^+2` | Using `^[+-]?[0-9]` |
+| ASCII caret | `m^2`, `m^-3`, `m^+2` | Using `^[+-]?[1-9]` (single digit; `^0` is not a valid exponent) |
 
 **Superscript mapping:**
 

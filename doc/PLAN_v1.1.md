@@ -1,8 +1,29 @@
 # Bovnar 1.1 — Implementation Plan
 
-Status: Draft
+Status: Historical planning snapshot — superseded by the shipped 1.1 draft.
 Author: planning pass, 2026-06-15
 Scope: the four items in the repo-root `TODO` file.
+
+> **Outcome note (what actually shipped vs. this plan).** This document records
+> the original pre-implementation intent; the shipped spec-1.1 draft diverged on
+> several points. Treat `doc/1_bovnar_spec.md`, `doc/5_bovnar.ebnf`, and
+> `include/bovnar.h` as the source of truth, not this plan:
+> - **First-class ISO-8601 datetime literals shipped** (e.g.
+>   `2026-06-15T12:00:00Z`), reversing Locked decision 2 / Item 3 §Deferred's
+>   "no new value-literal grammar in 1.1." They carry the new error codes
+>   `error_invalid_datetime_literal` (45) and
+>   `error_datetime_literal_unsupported_epoch` (46).
+> - **Nine datetime epochs** ship (`unix, tai, gps, mjd, ntp, galileo, glonass,
+>   y2000, beidou`), not the short `unix/tai/gps/mjd` set sketched in Item 3.
+> - **Escape error codes:** only `error_invalid_codepoint` (44) was added of the
+>   three the plan proposed; malformed `\x` hex and lone surrogates reuse
+>   `error_illegal_escape_sequence` / `error_invalid_codepoint` rather than the
+>   planned `error_invalid_escape_hex` / `error_invalid_surrogate`.
+> - **Version policy:** an unknown *major* is rejected only when the reader's
+>   `strict_version` flag is set (off by default), not unconditionally as Item 1
+>   describes.
+> - The conformance suite is now **301 cases** (the plan still quotes the old
+>   207 baseline below).
 
 > All four items are **additive** to the frozen v1.0 grammar (old documents
 > still parse unchanged), so this is a **semver-minor bump to spec 1.1**.

@@ -2,7 +2,7 @@
 
 **Unit-safe serialization for scientific and industrial systems — with a C99 reference implementation.**
 
-[![Spec version](https://img.shields.io/badge/spec-1.1%20draft-orange)](doc/1_bovnar_spec.md)
+[![Spec version](https://img.shields.io/badge/spec-1.1-blue)](doc/1_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
 
@@ -137,7 +137,7 @@ bovnar/
 │   └── bovnar_parser.js     # Dependency-free JavaScript parser
 ├── doc/
 │   ├── 0_bovnar_tutorial.md
-│   ├── 1_bovnar_spec.md            # Format specification (v1.1, draft)
+│   ├── 1_bovnar_spec.md            # Format specification (v1.1)
 │   ├── 2_bovnar_unit_system.md
 │   ├── 3_bovnar_readwrite_api.md
 │   ├── 4_bovnar_python_bindings.md
@@ -535,7 +535,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 
 | Document | Description |
 |---|---|
-| [Specification (v1.1, draft)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
+| [Specification (v1.1)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Tutorial](doc/0_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
 | [Unit System Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
@@ -546,7 +546,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 
-See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1 draft).
+See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
 
 ---
 

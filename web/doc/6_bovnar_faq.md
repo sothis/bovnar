@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Frequently Asked Questions
 
-> **Applies to:** Bovnar specification v1.1 (draft)
+> **Applies to:** Bovnar specification v1.1
 
 ---
 
@@ -69,7 +69,7 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Spec 1.1 (draft) — the additive features documented here (the `#!bovnar`
+Spec 1.1 — the additive features documented here (the `#!bovnar`
 version directive, `\u`/`\x` escapes, the `datetime` family, and reference array
 indexing). Spec 1.0 remains the frozen, stable baseline: a document that declares
 no `#!bovnar` directive is treated as 1.0, and every 1.0 document parses
@@ -1337,4 +1337,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification (v1.1, draft)*
+*End of Bovnar FAQ — Specification (v1.1)*

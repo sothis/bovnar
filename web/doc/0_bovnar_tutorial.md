@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — A Practical Tutorial
 
-**Format version:** 1.1 (draft)
+**Format version:** 1.1
 **Audience:** Developers building systems where data carries physical measurements.
 
 ---
@@ -957,5 +957,5 @@ nan  inf  ninf
 
 ---
 
-*Bovnar Specification (v1.1, draft) — format by the Bovnar project.*
+*Bovnar Specification (v1.1) — format by the Bovnar project.*
 

@@ -1,9 +1,9 @@
 # Bovnar Python Bindings
 
-> **Version:** 1.1 (draft)
+> **Version:** 1.1
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (spec v1.1, draft).
+library (spec v1.1).
 
 No compiled extension module is needed — the bindings load `libbvnr_shared.so` at
 import time via the standard `ctypes.CDLL` machinery.
@@ -1138,7 +1138,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ## Spec 1.1 additions
 
-These bindings target the **Bovnar spec (v1.1, draft)**; spec 1.0 remains the
+These bindings target the **Bovnar spec (v1.1)**; spec 1.0 remains the
 frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
 unversioned document is treated as 1.0) are exposed as:
 

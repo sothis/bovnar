@@ -1,7 +1,7 @@
 # Bovnar Specification
 
-> **Version:** 1.1 (draft)
-> **Status:** Draft (1.x development line; 1.0 remains the stable baseline)
+> **Version:** 1.1
+> **Status:** Released (1.x line; additive over the frozen 1.0 baseline)
 > **Last updated:** 2026-06-15
 
 ---
@@ -2686,7 +2686,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar Specification (v1.1, draft)*
+*End of Bovnar Specification (v1.1)*
 
 
 

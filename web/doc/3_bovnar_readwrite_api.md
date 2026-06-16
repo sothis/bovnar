@@ -1,7 +1,7 @@
 
 # Bovnar — Read & Write API
 
-> **Spec version:** 1.1 (draft)
+> **Spec version:** 1.1
 
 This document covers every function you need to read and write Bovnar streams, in the order you call them. Nothing else is included.
 
@@ -1242,4 +1242,4 @@ int main(void)
 
 ---
 
-*End of Bovnar Read & Write API Reference (v1.1, draft)*
+*End of Bovnar Read & Write API Reference (v1.1)*

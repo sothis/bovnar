@@ -1,6 +1,6 @@
 # Bovnar Quantity Annotation System — Unit and Currency Reference
 
-> **Applies to:** Bovnar (BVNR) specification version 1.1 (draft)
+> **Applies to:** Bovnar (BVNR) specification version 1.1
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
 ---
@@ -1942,4 +1942,4 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1 (draft).*
+*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1.*

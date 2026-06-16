@@ -363,6 +363,24 @@ q  = Quantity('101325.0', vt)          # dimensionless
 q2 = Quantity('9.81',     vt, vu)      # vu is a ValueUnit, e.g. from parse_unit
 ```
 
+For exact numeric input there is also the `Quantity.from_number` constructor,
+which stores the value as an exact decimal literal (so writing it with `dumps`
+is lossless to the format's precision):
+
+```python
+from decimal import Decimal
+from fractions import Fraction
+
+Quantity.from_number(Decimal('19.99'))                          # float_dec:64
+Quantity.from_number(Decimal('1.1'), family=ValueTypeFamily.FLOAT, width=128)
+Quantity.from_number(Fraction(837, 256),
+                     family=ValueTypeFamily.FLOAT_FIX, width=32, frac=8)
+```
+
+It accepts a `Decimal`, `Fraction` (must be a terminating decimal), `int`,
+`str` (a verbatim literal), or `float` (only as precise as the double), and
+validates the width for the chosen family.
+
 ### Properties and methods
 
 | Name | Type | Description |
@@ -370,8 +388,40 @@ q2 = Quantity('9.81',     vt, vu)      # vu is a ValueUnit, e.g. from parse_unit
 | `q.raw` | `str \| None` | Original text token as it appeared in the BVNR stream |
 | `q.vtype` | `ValueTypeSpec` | Type family, bit width, and numeral base |
 | `q.unit` | `ValueUnit` | Physical unit (`BVN_UNIT_NONE` when dimensionless) |
-| `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) |
+| `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) — **lossy** for `float_dec` / `float_fix` / `float:128`+ (goes through a C `double`) |
 | `q.unit_str()` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
+| `q.decimal()` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
+| `q.fraction()` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
+| `q.fixed_point()` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
+| `q.stored_value()` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal()` only when the literal carries more precision than the format holds |
+| `q.ieee_bits()` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
+| `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
+| `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+
+### Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
+
+`q.value` decodes through a C `double`, which loses precision for the
+decimal-float, fixed-point, and wide binary-float families. The accessors above
+instead use the verbatim literal text (and bovnar's arbitrary-precision
+`bvn_float`), so the full precision the format carries is reachable from Python:
+
+```python
+q = bovnar.loads(b'.p=<float_dec:64> 3.141592653589793238462643383279503;',
+                 typed=True)['p']
+q.value          # 3.141592653589793   (lossy C double)
+q.decimal()      # Decimal('3.141592653589793238462643383279503')  (exact literal)
+q.stored_value() # Decimal('3.141592653589793')  (the decimal64-rounded value)
+
+f = bovnar.loads(b'.x=<float_fix:32,q8> 3.27;', typed=True)['x']
+f.fraction()     # Fraction(837, 256)
+f.fixed_point()  # (837, 8)
+```
+
+These materialise over the **full** representable range, including exponents the
+C parser cannot otherwise reach (beyond ~1e9865). `decimal()` / `fraction()`
+work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
+the bit-exact `stored_value()` / `ieee_bits()` apply to the IEEE encodings
+(`float:16/32/64/128/256`), which are also exposed directly as `bovnar.BvnFloat`.
 
 ### `dumps()` integration
 
@@ -389,6 +439,10 @@ assert out.strip() == bvnr.strip()
 The annotation is suppressed when `_needs_annotation` returns `False` — i.e.
 when the type is `FLOAT:64` with no unit and no non-decimal base (matching the
 C library's own default-annotation omission rules).
+
+`dumps()` also accepts bare `decimal.Decimal` (written as an exact
+`float_dec:64` literal) and terminating `fractions.Fraction` values directly —
+a non-terminating fraction (e.g. `Fraction(1, 3)`) raises `BovnarArgumentError`.
 
 ---
 
@@ -519,9 +573,9 @@ All five functions are exported from the top-level `bovnar` namespace (and from
 |---|---|---|
 | `to_numpy(src, *, dtype=None, return_unit=False)` | bovnar → numpy | Array → `ndarray` (optionally `(ndarray, unit_str)`) |
 | `to_pint_array(src, *, dtype=None, ureg=None)` | bovnar → pint | Array → pint `Quantity` (ndarray data + unit) |
-| `from_numpy(writer, key, arr, *, unit=None)` | numpy → bovnar | Write an `ndarray` into a `Writer` |
+| `from_numpy(writer, key, arr, *, unit=None, float_format=None)` | numpy → bovnar | Write an `ndarray` into a `Writer` |
 | `from_pint_array(writer, key, qty)` | pint → bovnar | Write a pint `Quantity` (magnitude + unit) into a `Writer` |
-| `array_to_bvnr(key, arr, *, unit=None, pretty=True)` | numpy → bovnar | `ndarray` → bovnar bytes (convenience) |
+| `array_to_bvnr(key, arr, *, unit=None, pretty=True, float_format=None)` | numpy → bovnar | `ndarray` → bovnar bytes (convenience) |
 
 ### Reading: `to_numpy`
 
@@ -546,8 +600,16 @@ arr = bovnar.to_numpy(bovnar.dom_parse(b'.a=<sint:16>[10,-20,30];')['a'])
 ```
 
 The bovnar `(family, width)` maps directly to the numpy dtype (`uint:8` →
-`uint8`, `float:32` → `float32`, …); `FLOAT_FIX` / `FLOAT_DEC` fall back to
-`float64`. Pass `dtype=` to coerce.
+`uint8`, `float:32` → `float32`, …). Pass `dtype=` to coerce.
+
+The families with no exact native numpy dtype — `float_dec`, `float_fix`, and
+the wide binary floats `float:128`/`256` (and any width above 64) — decode to
+an **object array of exact `decimal.Decimal`** on the typed
+(`loads(..., typed=True)`) path, which is lossless; pass `dtype='float64'` for
+the lossy native conversion. The DOM (`dom_parse`) path only has a C `double`
+for these, so it raises and points you at the typed path or `dtype='float64'`.
+Integers wider than 64 bits likewise come back as an object array of Python
+ints (`dtype=object`), which is exact.
 
 A **`datetime`** array on the **unix** epoch (spec 1.1) maps to/from
 `datetime64[s]` — the integer epoch-seconds carrier is unix-relative, so it
@@ -565,9 +627,12 @@ output re-parses.
   unless you pass `dtype=` to coerce to one;
 * bovnar 1.0 arrays are rectangular and homogeneous, so the result is always a
   regular ndarray — there is no ragged case to handle;
-* a `null` element cannot fill an integer array (`dtype=float` or `dtype=object`);
+* a `null` element cannot fill a dtype with no null slot — integer, `bool`, or
+  string (which would otherwise silently become `0`/`False`/`'None'`); pass
+  `dtype=float` (→ `NaN`) or `dtype=object` (→ `None`);
 * the unit is a whole-array property (numpy has one dtype per array) — mixed
-  units raise; it is returned alongside the data, never baked into elements.
+  units raise, as does mixing a dimensioned element with a dimensionless one;
+  the unit is returned alongside the data, never baked into elements.
 
 ### Writing: `from_numpy` / `array_to_bvnr`
 
@@ -583,13 +648,27 @@ out = w.get_output()
 
 # one-shot convenience
 raw = bovnar.array_to_bvnr("matrix", np.arange(8).reshape(2, 2, 2))
+
+# exact decimal/fixed/wide-binary float arrays via float_format
+from decimal import Decimal
+prices = np.array([Decimal("19.99"), Decimal("0.01")], dtype=object)
+bovnar.array_to_bvnr("p", prices, unit="$USD")            # -> <float_dec:64,$USD>
+bovnar.array_to_bvnr("a", prices, float_format=("float", 128))   # binary128
 ```
 
 * `from_numpy` requires a 1-D-or-higher array; write a 0-D scalar with the
   scalar `Writer` API instead.
-* *unit* may be a bovnar unit string, a `ValueUnit`, or a pint `Unit`/`Quantity`.
+* *unit* may be a bovnar unit string, a `ValueUnit`, or a pint `Unit`/`Quantity`
+  (anything else raises `BovnarArgumentError`).
 * Units apply to **numeric** arrays only — a unit on a `bool` or string array
   raises `BovnarArgumentError`.
+* An **object array of `Decimal`/`Fraction`** is written as an exact
+  decimal/fixed/wide-binary float. `float_format=(family, width[, frac])` —
+  family `'float'`, `'float_dec'` (the default for a Decimal object array), or
+  `'float_fix'` — selects the target; it is required to disambiguate an object
+  array that is not purely `Decimal`/`Fraction`.
+* A **masked array** with any masked entry is rejected (it would otherwise
+  serialise the underlying value of a masked cell); fill or unmask it first.
 * `array_to_bvnr` grows its write buffer like `dumps()` (4 MiB, doubling up to
   256 MiB).
 
@@ -606,6 +685,10 @@ q = bovnar.to_pint_array(
 with Writer.to_mem() as w:
     bovnar.from_pint_array(w, "dist", q)
 ```
+
+A `datetime` array has no pint unit, so `to_pint_array` rejects it rather than
+wrap it as a meaningless dimensionless quantity — use `to_numpy` for the
+`datetime64` array (or `dtype='int64'` for the raw epoch seconds).
 
 ---
 
@@ -935,6 +1018,7 @@ are skipped automatically when `numpy` / `pint` is not installed. Install
 bovnar/
 ├── __init__.py      # loads() / dumps() / dom_parse() / unit helpers — public API
 ├── _ffi.py          # ctypes FFI: library discovery + argtypes/restype
+├── _bvnfloat.py     # BvnFloat: arbitrary-precision float + IEEE binary/decimal/fixed encoders
 ├── _numpy.py        # NumPy bridge: to_numpy/from_numpy/to_pint_array/array_to_bvnr (numpy optional)
 ├── _pint_bridge.py  # pint bridge: to_pint/from_pint/to_pint_unit/from_pint_unit (pint optional)
 ├── _pint_units.py   # verified bovnar↔pint unit table + build_registry()
@@ -956,6 +1040,7 @@ tests/
 ├── test_dom.py                   # DOM API integration tests (needs_lib)
 ├── test_enums.py                 # pure-Python enum tests
 ├── test_example_numpy_roundtrip.py # NumPy bridge end-to-end example (needs_lib + numpy)
+├── test_lossless_floats.py       # exact decimal/fixed/float128-256 round-trips (needs_lib)
 ├── test_numpy_bridge.py          # NumPy bridge tests (needs_lib + numpy)
 ├── test_pint_bridge.py           # pint bridge + unit-table integrity (needs_lib + pint)
 ├── test_reader.py                # integration: Reader (needs_lib)

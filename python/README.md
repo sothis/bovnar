@@ -13,7 +13,7 @@ parser.
 ```bovnar
 .velocity     = <float:64,m/s> 9.81;
 .max_packet   = <uint:64,Mi~B> 16;
-.price        = <float_dec:64,USD> 19.99;
+.price        = <float_dec:64,$USD> 19.99;
 .matrix       = [1, 2, 3]/[4, 5, 6];
 ```
 

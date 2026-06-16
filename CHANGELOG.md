@@ -9,6 +9,35 @@ it in lockstep. The highest spec a build understands is reported by
 
 ## [Unreleased]
 
+### Added
+
+- **Python — lossless access to decimal, fixed-point and wide binary floats.**
+  `Quantity` gains `.decimal()` / `.fraction()` (exact value from the verbatim
+  literal), `.stored_value()` / `.ieee_bits()` / `.fixed_point()` (bit-exact
+  IEEE materialisation for the 16/32/64/128/256 encodings), and a `from_number`
+  constructor; `dumps()` accepts `Decimal` / terminating `Fraction`. The NumPy
+  bridge decodes `float_dec` / `float_fix` / `float:128`+ to exact `Decimal`
+  object arrays (typed path; `dtype='float64'` is the lossy escape) and
+  `from_numpy` gains `float_format=` to write them. The arbitrary-precision
+  `bvn_float` API is exposed as `bovnar.BvnFloat`. Materialisation covers the
+  full representable range via pure-Python encoders past the parser's cap.
+
+### Fixed
+
+- **`to_dec*` lost precision when encoding a decimal float near a format's Emax.**
+  `bvnf_dec_render_roundodd` estimated the decimal exponent with a coarse
+  `log10(2)` approximation (`0.302`) whose error, past ~2000 bits of binary
+  exponent, exceeded the digit-count safety margin and truncated the rendered
+  coefficient — decimal128's 34-digit maximum encoded to ~20 significant digits.
+  Now uses `0.30103`, exact across the whole exponent range.
+- **Python NumPy/pint bridge hardening:** reject `null` elements that a
+  `bool`/`str` dtype would silently coerce; key the pint reverse-map cache on the
+  registry (`WeakKeyDictionary`) to avoid `id()`-reuse aliasing and a leak;
+  `to_pint_array` rejects datetime arrays; raw Python ints past int64 widen to
+  uint64/object instead of raising a bare `OverflowError`; `from_numpy` rejects
+  masked arrays; clearer errors for invalid `unit=` / non-pint / mixed
+  unit-and-dimensionless inputs.
+
 ## [1.1.0]
 
 Spec 1.1 is **purely additive** over the frozen 1.0 baseline: every spec-1.0

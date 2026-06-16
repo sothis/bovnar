@@ -161,13 +161,27 @@ class ValueTypeSpec(ctypes.Structure):
         return f"ValueTypeSpec(family={f.name}, width={self.width}, base={self.base})"
 
 class BvnrData(ctypes.Structure):
+    # Must mirror the C `bvnr_data_t` layout exactly: the writer path allocates
+    # this and passes &d to bvnr_write_event(), and the reader path receives a
+    # C-allocated pointer. The spec-1.1 frac_* fields are appended last, matching
+    # the C struct — omitting them makes the struct 16 bytes short, so C would
+    # read frac_data/frac_length out of bounds when (de)serialising a datetime.
     _fields_ = [
-        ('type',       ctypes.c_int),
-        ('value_type', ValueTypeSpec),
-        ('value_unit', ValueUnit),
-        ('data',       ctypes.c_void_p),
-        ('length',     ctypes.c_uint32),
+        ('type',        ctypes.c_int),
+        ('value_type',  ValueTypeSpec),
+        ('value_unit',  ValueUnit),
+        ('data',        ctypes.c_void_p),
+        ('length',      ctypes.c_uint32),
+        ('frac_data',   ctypes.c_void_p),    # spec 1.1 — ISO datetime sub-second digits, else NULL
+        ('frac_length', ctypes.c_uint32),    # spec 1.1 — length of frac_data, else 0
     ]
+
+    def frac_str(self) -> "str | None":
+        """The verbatim ISO sub-second digits (spec 1.1), or None when absent."""
+        if not self.frac_data or self.frac_length == 0:
+            return None
+        return (ctypes.c_char * self.frac_length).from_address(
+            self.frac_data).raw.decode('ascii')
 
     def raw_bytes(self) -> bytes:
         if not self.data or self.length == 0:

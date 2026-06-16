@@ -183,6 +183,24 @@ def test_iso_fraction_is_visible_and_roundtrips():
 
 
 @needs_lib
+def test_datetime_write_path_struct_layout():
+    # Writing a datetime drives Writer._write_scalar, which passes &BvnrData to
+    # the C bvnr_write_event; the C serializer reads bvnr_data_t.frac_data. If the
+    # ctypes BvnrData mirror is short (missing the spec-1.1 frac_* fields) C reads
+    # out of bounds and crashes. Load a typed datetime and write it back to
+    # exercise that path end to end (under the ASAN build this catches the OOB).
+    for src in ('#!bovnar 1.1\n.t = <datetime:64,tai> 1750000000;\n',
+                '#!bovnar 1.1\n.t = <datetime:64,unix> 1781524800;\n',
+                '#!bovnar 1.1\n.t = <datetime:64> -100;\n'):
+        out = bovnar.dumps(bovnar.loads(src, typed=True))
+        assert b'datetime' in out
+    # round-trip preserves the carrier value
+    rt = bovnar.loads(bovnar.dumps(
+        bovnar.loads('#!bovnar 1.1\n.t = <datetime:64> 1781524800;\n', typed=True)))
+    assert rt['t'] == 1781524800
+
+
+@needs_lib
 @pytest.mark.parametrize("doc,code", [
     ('#!bovnar 1.1\n.t = 2026-13-01;',                ErrorCode.INVALID_DATETIME_LITERAL),
     ('#!bovnar 1.1\n.t = 2026-06-31;',                ErrorCode.INVALID_DATETIME_LITERAL),

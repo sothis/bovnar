@@ -2023,6 +2023,8 @@ typedef struct bvnr_data_s {
     value_unit_t      value_unit;
     const void*       data;
     uint32_t          length;
+    const void*       frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
+    uint32_t          frac_length;  /* spec 1.1 — length of frac_data, else 0 */
 } bvnr_data_t;
 ```
 

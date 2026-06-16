@@ -164,6 +164,12 @@ class Reader:
                                    unit_size)
                     snap.length = src.length
                     snap.data   = src.data
+                    # spec 1.1 — an ISO datetime literal's sub-second digits.
+                    # Like d.data, frac_data references the lexer's internal
+                    # buffer (valid only during the callback); read it now via
+                    # snap.frac_str() if you need to retain it.
+                    snap.frac_data   = src.frac_data
+                    snap.frac_length = src.frac_length
                     data = snap
                 result = py_fn(ev, data)
                 return bool(result) if result is not None else True

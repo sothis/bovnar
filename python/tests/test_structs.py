@@ -163,6 +163,21 @@ class TestBvnrData:
         d = BvnrData()
         assert 'BvnrData' in repr(d)
 
+    def test_has_spec_1_1_frac_fields(self):
+        # The C bvnr_data_t (spec 1.1) ends with frac_data/frac_length. The
+        # writer path passes &BvnrData to bvnr_write_event, so a missing field
+        # makes the struct short and C reads frac_data out of bounds when
+        # (de)serialising a datetime — a real crash. Guard the layout.
+        names = [n for n, _ in BvnrData._fields_]
+        assert names[-2:] == ['frac_data', 'frac_length'], names
+        d = BvnrData()
+        assert (d.frac_data == 0 or d.frac_data is None)
+        assert d.frac_length == 0
+        assert d.frac_str() is None
+        # frac_data must sit AFTER data/length (appended, not inserted)
+        assert BvnrData.frac_data.offset > BvnrData.length.offset
+        assert BvnrData.frac_length.offset > BvnrData.frac_data.offset
+
 class TestOpaqueTypes:
     def test_source_size(self):
         assert ctypes.sizeof(BvnrSource) == OPAQUE_BYTES

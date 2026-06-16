@@ -224,6 +224,13 @@ class TestDatetime64:
                            typed=True)['t'])
         assert a.dtype == np.dtype('datetime64[s]') and a.shape == (2, 2)
 
+    def test_to_numpy_pre_1970_via_domnode(self):
+        # Regression: the DomNode read path decoded a negative (pre-1970)
+        # datetime as a huge uint64, which then overflowed datetime64[s].
+        a = to_numpy(dom_parse(self._V + b'.t = [1960-01-01, 2020-01-01];')['t'])
+        assert a.dtype == np.dtype('datetime64[s]')
+        assert a.astype('int64').tolist() == [-315619200, 1577836800]
+
     def test_to_numpy_non_unix_epoch_refused_by_default(self):
         # tai/gps/... are not unix-relative; default inference refuses
         with pytest.raises(BovnarArgumentError) as ei:

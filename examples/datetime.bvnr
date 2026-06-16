@@ -12,7 +12,7 @@
 
 # Integer carriers, explicit epoch.
 .created    = <datetime:64,unix> 1750000000;
-.gps_t      = <datetime:64,tai>  1400000000;
+.tai_t      = <datetime:64,tai>  1400000000;
 .before     = <datetime>         -100;          # 100 s before 1970-01-01Z
 
 # ISO-8601 literals. A bare literal infers <datetime:64,unix>.

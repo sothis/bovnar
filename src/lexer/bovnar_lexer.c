@@ -218,7 +218,29 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	l->resync_array_depth  = 0;
 	l->resync_struct_depth = 0;
 	l->array_items         = 0;
-	l->next_state          = resync;
+	/*
+	 * If the error fired while inside a string body or an escape sequence
+	 * (incl. the spec-1.1 \x / \u escapes), the broken string's closing '"'
+	 * is still ahead in the stream. Skip in the resync_string sub-machine so
+	 * that '"' is consumed as the close — entering plain resync instead would
+	 * treat it as the OPEN of a new string-to-skip and swallow every following
+	 * good assignment up to the next quote (or EOF). An error inside a string
+	 * never lands on the closing quote itself, so the next '"' is always the
+	 * real terminator.
+	 */
+	switch (l->next_state) {
+	case copy_string_byte:
+	case escape_from_copy:
+	case esc_x1:
+	case esc_x2:
+	case esc_u_open:
+	case esc_u_hex:
+		l->next_state = resync_string;
+		break;
+	default:
+		l->next_state = resync;
+		break;
+	}
 	++l->recovery_count;
 	l->in_array_element    = false;
 	l->curr_row_size       = 0;

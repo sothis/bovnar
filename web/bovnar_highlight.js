@@ -150,7 +150,7 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
         // (e.g. "FF" m), so arm the inline-unit scanner for the next word.
         i = j; afterNum = true; continue;
       }
-      if (c === '&' && (m = /^&(?:\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*)+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
+      if (c === '&' && (m = /^&(?:\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*|\[[0-9]+\])+/.exec(r))) { out += span('refop', '&') + span('refpath', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if (c === '.' && (m = /^\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*/.exec(r))) { out += span('sigil', '.') + span('key', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if ((m = NUM.exec(r)) && /\d/.test(m[0])) { let s = m[0]; if (s[0] === '-') { out += span('neg', '-'); s = s.slice(1); } out += span('num', s); i += m[0].length; afterNum = true; continue; }
       if (afterNum && (m = ID.exec(r))) {              // inline unit suffix after a number (broad unit charset)

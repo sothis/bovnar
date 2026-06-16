@@ -512,6 +512,21 @@ A reference is not a null. If a field is optional and currently has no referent,
 # .override = &.config.x; # or, non-null — follow this reference
 ```
 
+**Array indexing (spec 1.1).** In a `#!bovnar 1.1` document a reference may end
+with one or more `[N]` index suffixes to address an array element. For a flat
+`/`-row matrix the two indices are `[row][col]`:
+
+```bovnar
+#!bovnar 1.1
+.matrix = [10, 20, 30]/[40, 50, 60];
+.cell   = &.matrix[1][2];   # the element at row 1, column 2 → 60
+.first  = &.vector[0];      # a 1-D array takes a single [i]
+```
+
+The path (including the indices) is stored verbatim; the DOM layer
+(`bvn_dom_lookup` / the CLI `query`) is what resolves it to a value. Index
+suffixes are rejected in a 1.0 or unversioned document.
+
 ---
 
 ## Arrays
@@ -774,8 +789,10 @@ Understanding the error codes is essential for debugging. The parser reports lin
 
 **Unknown escape sequence:**
 ```bovnar
-.x = "\x41";   # error_illegal_escape_sequence (\x is not defined)
+.x = "\q";   # error_illegal_escape_sequence (\q is not a defined escape)
 ```
+(`\xHH` and `\u{…}` *are* defined in spec 1.1 — see the escapes section above;
+they are rejected only in a 1.0 or unversioned document.)
 
 **Unmatched struct close:**
 ```bovnar

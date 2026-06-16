@@ -566,7 +566,7 @@ requires a `#!bovnar 1.1` declaration (§3.4) — in a 1.0/unversioned document
 ```bovnar
 #!bovnar 1.1
 .created = <datetime:64,unix> 1750000000;   # 2025-06-15T...Z
-.gps_t   = <datetime:tai>     1400000000;
+.tai_t   = <datetime:tai>     1400000000;
 .before  = <datetime>         -100;          # 100 s before 1970-01-01Z
 ```
 

@@ -192,9 +192,9 @@ typedef enum error_code_e {
 	 * fails if it actually meets syntax the build does not implement). */
 	error_unsupported_spec_version      = 43,
 	/* spec 1.1 — a \u{…} escape names a value that is not a Unicode scalar
-	 * (a surrogate U+D800–U+DFFF, or a code point above U+10FFFF), or the
-	 * braced digits are missing/too many. Malformed \x / \u *structure*
-	 * (bad hex, missing brace) stays error_illegal_escape_sequence. */
+	 * (a surrogate U+D800–U+DFFF, or a code point above U+10FFFF). Malformed
+	 * \x / \u *structure* (bad hex, missing brace, empty or over-long braces)
+	 * stays error_illegal_escape_sequence. */
 	error_invalid_codepoint             = 44,
 	/* spec 1.1 — an ISO-8601 datetime literal (e.g. 2026-06-15T12:00:00Z) is
 	 * malformed: a field has the wrong width, a separator is misplaced, or a

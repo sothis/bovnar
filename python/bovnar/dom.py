@@ -283,9 +283,13 @@ class DomNode:
             # would come back as a negative two's-complement number. Read with the
             # accessor matching the declared signedness first; fall back to the
             # arbitrary-width string for values that fit neither 64-bit type.
+            # datetime carries a SIGNED epoch-seconds value (pre-1970 timestamps
+            # are negative), so it reads as signed like sint — otherwise a
+            # negative datetime decodes as a huge unsigned int.
             v64 = ctypes.c_int64()
             u64 = ctypes.c_uint64()
-            if self.value_type.family == ValueTypeFamily.SINT:
+            if self.value_type.family in (ValueTypeFamily.SINT,
+                                          ValueTypeFamily.DATETIME):
                 if lib.bvn_dom_get_i64(self._ptr, ctypes.byref(v64)):
                     return int(v64.value)
                 if lib.bvn_dom_get_u64(self._ptr, ctypes.byref(u64)):

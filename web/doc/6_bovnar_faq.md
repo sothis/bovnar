@@ -311,9 +311,10 @@ position. The following three are equivalent:
 | `float` | `0` (→64), `16`, and any multiple of `32` up to `32768` |
 | `float_fix` | `0` (→64), `16`, `32`, `64`, `128`, `256` |
 | `float_dec` | `0` (→64), `16`, `32`, `64`, `128`, `256` |
+| `datetime` | Same as `sint` — any positive integer up to `BVN_MAX_INT_WIDTH` (the carrier is a signed epoch-seconds integer); `0` →64 |
 
 Width `0` always means "use the default," which is 64 bits for all families.
-Width `8` is legal for `uint`/`sint` but is a hard error for all float families.
+Width `8` is legal for `uint`/`sint`/`datetime` but is a hard error for all float families.
 A non-multiple-of-32 (other than 16) width for `float` is `error_illegal_value_type`.
 
 ---

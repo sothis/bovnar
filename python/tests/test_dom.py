@@ -327,6 +327,16 @@ class TestDomNodeIntAccessors:
         neg = DomDoc.parse(bovnar.dumps({'x': -(2**70)}))['x'].to_python()
         assert neg == -(2**70)
 
+    def test_to_python_datetime_is_signed(self):
+        # Regression: datetime is a SIGNED epoch-seconds carrier, but to_python()
+        # routed non-sint families through the unsigned accessor, so a pre-1970
+        # (negative) datetime decoded as a huge uint64 instead of a negative int.
+        doc = DomDoc.parse(b"#!bovnar 1.1\n.t = 1960-01-01;\n")
+        assert doc['t'].to_python() == -315619200
+        # positive epoch and the matching loads() path agree
+        doc2 = DomDoc.parse(b"#!bovnar 1.1\n.t = <datetime:64,unix> 1750000000;\n")
+        assert doc2['t'].to_python() == 1750000000
+
 
 @needs_lib
 class TestDomNodeFloatAccessor:

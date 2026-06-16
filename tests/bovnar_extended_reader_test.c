@@ -656,6 +656,32 @@ static void test_parse_error_recovery_multiple(void)
 	ASSERT_TRUE(ctx.error_count > 0, "error_count must be incremented");
 }
 
+static void test_parse_error_recovery_in_string(void)
+{
+	printf("  test_parse_error_recovery_in_string...\n");
+
+	parse_ctx_t ctx;
+
+	/* Regression: a bad escape inside a string body must resync at the
+	 * string's closing quote, not treat that quote as the OPEN of a new
+	 * string-to-skip and swallow the following good assignment up to EOF
+	 * (which ended the parse with error_got_incomplete_bvnr_stream). After
+	 * the fix exactly one error is reported (the escape) and '.good' parses.
+	 * The spec-1.1 \x escape is one of several new mid-string failure modes. */
+	const char *payload =
+		"#!bovnar 1.1\n"
+		".bad  = \"\\xZZ\";\n"
+		".good = 42;\n";
+
+	parse_payload(payload, true, &ctx);
+	ASSERT_TRUE(ctx.has_errors, "broken \\x escape must trigger an error");
+	ASSERT_EQ_UINT(ctx.error_count, 1u,
+		"exactly one error — must not also fail with incomplete stream");
+	ASSERT_EQ_UINT((uint64_t)ctx.last_error,
+		(uint64_t)error_illegal_escape_sequence,
+		"last error is the escape error, not incomplete_bvnr_stream");
+}
+
 static void test_parse_empty_stream(void)
 {
 	printf("  test_parse_empty_stream...\n");
@@ -829,6 +855,7 @@ int main(void)
 	test_parse_inline_unit_array_rejected();
 	test_parse_identifier_edge_cases();
 	test_parse_error_recovery_multiple();
+	test_parse_error_recovery_in_string();
 	test_parse_empty_stream();
 	test_parse_only_comments();
 	test_parse_type_variations();

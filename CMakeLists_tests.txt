@@ -777,6 +777,7 @@ _bvnr_convert_fail(dup_key          bad_dupkey.json           "duplicate key")
 _bvnr_convert_fail(diff_key_records bad_diffkeys.json         "differing key sets")
 
 # ── Single-file amalgamation ────────────────────────────────────────────────
-# The amalgamation is currently not shipped in dist/, so its regenerate-and-
-# smoke-test (bvnr_amalgam) is disabled.  The tooling stays in the tree
-# (amalgamate.py, cmake/amalgam_smoke.cmake) for when it is reinstated.
+# The amalgamation is currently not shipped in dist/ (dist/bovnar.{c,h} are
+# git-ignored), so its regenerate-and-smoke-test (bvnr_amalgam) is disabled.
+# The tooling stays in the tree (amalgamate.py, cmake/amalgam_smoke.cmake) for
+# when it is reinstated.

@@ -182,7 +182,7 @@ bool bvnr_open_read_mem(bvnr_reader_t     *r,
                          const void        *buf,
                          uint64_t           len,
                          void              *mirror_buf,
-                         uint32_t           mirror_cap,
+                         uint64_t           mirror_cap,
                          bvnr_read_flags_t *options);
 ```
 
@@ -428,7 +428,7 @@ bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 ### 11. `bvnr_sink_to_mem`
 
 ```c
-void bvnr_sink_to_mem(bvnr_sink_t *s, void *buf, uint32_t cap);
+void bvnr_sink_to_mem(bvnr_sink_t *s, void *buf, uint64_t cap);
 ```
 
 Initialise sink `s` to write into a caller-provided memory buffer of `cap` bytes. Writing beyond `cap` produces `error_sink_buffer_exhausted`. Use `bvnr_sink_bytes_written` to query how many bytes were actually written.
@@ -530,7 +530,7 @@ if (!bvnr_open_write_sink(w, &sink, /*pretty=*/true, &opts))
 ```c
 bool bvnr_open_write_mem(bvnr_writer_t      *w,
                            void               *buf,
-                           uint32_t            cap,
+                           uint64_t            cap,
                            bool                pretty,
                            bvnr_write_flags_t *options);
 ```
@@ -572,6 +572,7 @@ The `BVN_TYPE_*` macros build `value_type_spec_t` literals conveniently:
 ```c
 #define BVN_TYPE_PLAIN          ((value_type_spec_t){ .family = vt_plain })
 #define BVN_TYPE_UTF8           ((value_type_spec_t){ .family = vt_utf8  })
+#define BVN_TYPE_BOOL           ((value_type_spec_t){ .family = vt_bool  })
 #define BVN_TYPE_UINT(w)        ((value_type_spec_t){ .family = vt_uint,      .width = (w) })
 #define BVN_TYPE_SINT(w)        ((value_type_spec_t){ .family = vt_sint,      .width = (w) })
 #define BVN_TYPE_FLOAT(w)       ((value_type_spec_t){ .family = vt_float,     .width = (w) })

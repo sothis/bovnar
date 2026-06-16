@@ -67,7 +67,7 @@ BVNR_BUILD_TESTS = "OFF"
 BVNR_ANALYZER = "OFF"
 # LTO is not worth a compiler bug for a ctypes-loaded .so: GCC 14 in the
 # manylinux_2_28 image ICEs during the LTO link (copy_bb, tree-inline.cc:2380).
-BVNR_LTO = "ON"
+BVNR_LTO = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]

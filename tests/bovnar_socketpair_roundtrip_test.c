@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 #include "bovnar.h"
 
@@ -746,6 +747,86 @@ static void test_rt_many_assignments(void)
 					  vt_uint, 32, "item199");
 }
 
+/*
+ * spec 1.1 — a fractional ISO datetime literal read from an fd source whose
+ * bytes trickle in (so the '.', the fraction digits, and the 'Z' land in
+ * separate read() chunks) must still deliver the complete fraction. The lexer
+ * accumulates the literal into its scratch buffer across reads, and frac_data is
+ * computed only once the whole token is present. The writer builders can't reach
+ * this path (bvnr_write_datetime takes no fraction), so it is otherwise untested.
+ */
+typedef struct { char carrier[64]; char frac[64]; bool got; } dtfrac_ctx_t;
+
+static bool dtfrac_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	dtfrac_ctx_t *c = ud;
+	if (ev == ev_data && d->type == token_is_number &&
+	    d->value_type.family == vt_datetime) {
+		uint32_t n = d->length < sizeof c->carrier - 1
+		             ? d->length : (uint32_t)(sizeof c->carrier - 1);
+		if (d->data) memcpy(c->carrier, d->data, n);
+		c->carrier[n] = '\0';
+		c->frac[0] = '\0';
+		if (d->frac_data && d->frac_length) {
+			uint32_t f = d->frac_length < sizeof c->frac - 1
+			             ? d->frac_length : (uint32_t)(sizeof c->frac - 1);
+			memcpy(c->frac, d->frac_data, f);
+			c->frac[f] = '\0';
+		}
+		c->got = true;
+	}
+	return true;
+}
+
+static void *byte_pacer_thread(void *arg)
+{
+	int fd = *(int *)arg;
+	static const char doc[] =
+		"#!bovnar 1.1\n.t = 2026-06-15T12:00:00.000123Z;\n";
+	for (size_t i = 0; i < sizeof doc - 1; i++) {
+		if (write(fd, doc + i, 1) != 1)
+			break;
+		/* let the blocked reader consume this byte before the next arrives, so
+		 * the literal really is split across read() boundaries. */
+		nanosleep(&(struct timespec){ 0, 50000 }, NULL);   /* 50 us */
+	}
+	close(fd);
+	return NULL;
+}
+
+static void test_rt_datetime_fraction_streamed(void)
+{
+	printf("  test_rt_datetime_fraction_streamed...\n");
+	int sv[2];
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+		ASSERT_TRUE(false, "socketpair must succeed");
+		return;
+	}
+	pthread_t wt;
+	if (pthread_create(&wt, NULL, byte_pacer_thread, &sv[0]) != 0) {
+		ASSERT_TRUE(false, "pthread_create must succeed");
+		close(sv[0]); close(sv[1]);
+		return;
+	}
+
+	dtfrac_ctx_t ctx = {0};
+	bvnr_source_t src;
+	bvnr_source_from_fd(&src, sv[1]);
+	bvnr_read_flags_t fl = { .on_verified = dtfrac_cb, .userdata = &ctx };
+	bvnr_reader_t *r = bvnr_reader_create();
+	bool ok = r && bvnr_open_read_source(r, &src, NULL, &fl) && bvnr_read(r);
+	if (r) bvnr_reader_destroy(r);
+	pthread_join(wt, NULL);
+	close(sv[1]);
+
+	ASSERT_TRUE(ok, "streamed fractional datetime parses");
+	ASSERT_TRUE(ctx.got, "datetime value event captured");
+	ASSERT_STR_EQ(ctx.carrier, "1781524800",
+		"carrier is the whole-second epoch integer");
+	ASSERT_STR_EQ(ctx.frac, "000123",
+		"fraction reassembled across read boundaries");
+}
+
 int main(void)
 {
 	printf("Running bovnar_socketpair_roundtrip_test suite...\n");
@@ -757,6 +838,7 @@ int main(void)
 	test_rt_pretty_vs_compact();
 	test_rt_write_plain_quirk();
 	test_rt_many_assignments();
+	test_rt_datetime_fraction_streamed();
 
 	if (g_failures == 0) {
 		printf("PASSED %d tests\n", g_tests);

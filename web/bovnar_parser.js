@@ -1127,6 +1127,9 @@
       return { type: 'scalar', kind: dat.kind,
         text: dat.text != null ? dat.text : String(dat.value),
         value: dat.value, unit: dat.unit || null,
+        /* spec 1.1 — carry an ISO datetime literal's sub-second digits (or null)
+           so the faithful tree exposes them exactly as the parseBovnar event does */
+        frac: dat.frac != null ? dat.frac : null,
         line: ev.line, col: ev.col, start: start, unitStart: unitStart, endPos: endPos };
     }
     function parseArray() {

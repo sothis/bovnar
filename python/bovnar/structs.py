@@ -26,6 +26,15 @@ from .enums import (
     BaseUnit, Exponent, ErrorCode,
 )
 
+# Reserved size for the opaque pass-through structs (BvnrSource / BvnrSink).
+# These are black boxes the C side owns entirely: Python only allocates them and
+# hands &struct to C (bvnr_source_from_fd, bvnr_open_read_source, ...). C uses
+# BVNR_SOURCE_RESERVED_SIZE / BVNR_SINK_RESERVED_SIZE bytes (64 each as of this
+# writing). We deliberately over-allocate (256) as a forward-compatibility
+# margin: a binding may be LARGER than the C struct (C writes within its own
+# bounds) but must never be SMALLER. test_abi.py enforces `python_size >= c_size`
+# against the live C layout, so if the C reserve ever grows past 256 the build
+# fails loudly here instead of under-allocating and corrupting memory.
 OPAQUE_BYTES = 256
 # Use 64-bit words so the ctypes struct's alignment matches the C
 # struct's (pointer-aligned).  c_uint8 arrays have alignment 1.

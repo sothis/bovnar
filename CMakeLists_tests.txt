@@ -25,6 +25,11 @@ endif()
 add_executable(bvnr_float_test           tests/bvn_float_test.c)
 add_executable(bvnr_datetime_test        tests/bvn_datetime_test.c)
 
+# ABI manifest generator: prints the C compiler's struct sizes/offsets, the
+# source of truth the Python ctypes mirrors are checked against (test_abi.py).
+add_executable(bvnr_abi_dump             tests/bvnr_abi_dump.c)
+target_link_libraries(bvnr_abi_dump PRIVATE bvnr_static)
+
 target_compile_options(bvnr_dom_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_dom_test PRIVATE bvnr_static m)
 
@@ -497,6 +502,22 @@ if(Python3_FOUND)
         test_structs.py
         "structs"
         30)
+
+    # ABI-consistency sweep: assert every ctypes Structure mirrors the C struct
+    # layout reported by the bvnr_abi_dump generator (the C compiler is the
+    # source of truth). Needs no shared library — only the generator binary,
+    # passed via BVNR_ABI_DUMP (the test self-compiles it as a fallback).
+    add_test(
+        NAME    bvnr_py_abi
+        COMMAND ${Python3_EXECUTABLE} -m pytest "${_py_tests}/test_abi.py"
+                    --tb=short
+        WORKING_DIRECTORY "${_py_src}"
+    )
+    set_tests_properties(bvnr_py_abi PROPERTIES
+        TIMEOUT     60
+        LABELS      "python;python_pure;abi"
+        ENVIRONMENT "BVNR_ABI_DUMP=$<TARGET_FILE:bvnr_abi_dump>"
+    )
 
     # Array state-machine tests: exercises all six fixes in _DictParser
     # (flat/multi-row/nested arrays, struct elements, seal timing, parent_key).

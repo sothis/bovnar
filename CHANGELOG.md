@@ -7,7 +7,9 @@ versioning of the format (spec)**; the reference implementation
 it in lockstep. The highest spec a build understands is reported by
 `bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`.
 
-## [Unreleased] — spec 1.1 (draft)
+## [Unreleased]
+
+## [1.1.0]
 
 Spec 1.1 is **purely additive** over the frozen 1.0 baseline: every spec-1.0
 document parses unchanged and decodes to the same values. The new constructs are
@@ -87,8 +89,9 @@ such a document is an error, exactly as a 1.0 reader reports.
 
 ### Changed
 
-- Library/package version bumped to **1.1.0**; spec and companion docs labelled
-  **1.1 (draft)** while 1.0 remains the frozen, stable baseline.
+- Library/package version bumped to **1.1.0**; spec 1.1 ships as the additive
+  successor to the frozen 1.0 baseline, which remains the stable floor every 1.x
+  release must honour.
 
 ### Fixed
 
@@ -112,10 +115,12 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
   arithmetic) and cover `Z` and numeric `±HH:MM` offsets; literals for the atomic
   GNSS epochs are still rejected (no round-trippable inverse).
 - The browser playground parser (`web/bovnar_parser.js`) recognises ISO-8601
-  literals and displays them as written, but — by its lenient design (it does
-  not synthesise annotations or validate types) — it does not convert them to
-  epoch seconds or strictly validate the calendar fields; the C reader remains
-  the authority for both.
+  literals, infers the `<datetime:64,unix>` default for a bare literal, and
+  surfaces the epoch — but, by its lenient design, it still displays literals as
+  written without converting them to epoch seconds or leap-second/calendar-
+  validating them; the C reader remains the authority for both.
+
+See [`RELEASE_NOTES_v1.1.0.md`](RELEASE_NOTES_v1.1.0.md) for the full notes.
 
 ## [1.0.1]
 
@@ -131,6 +136,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
-[Unreleased]: https://github.com/sothis/bovnar/tree/1.x
+[Unreleased]: https://github.com/sothis/bovnar/compare/v1.1.0...1.x
+[1.1.0]: https://github.com/sothis/bovnar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/sothis/bovnar/releases/tag/v1.0.1
 [1.0.0]: https://github.com/sothis/bovnar/releases/tag/v1.0.0

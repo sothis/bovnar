@@ -186,6 +186,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Cache the downloaded .deb archives so repeat runs skip the (often very
+      # slow) Azure apt mirror entirely. apt's archive dir is redirected to a
+      # workspace-local path (Dir::Cache::archives below) so it is owned by the
+      # runner user and this action can read it. Keyed on the workflow file, so
+      # editing the package list invalidates the cache; the prefix restore-key
+      # reuses the newest cache across unrelated workflow edits.
+      - name: Cache apt packages
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.apt-cache
+          key: apt-cross-wine-${{ runner.os }}-${{ hashFiles('.github/workflows/windows.yml') }}
+          restore-keys: apt-cross-wine-${{ runner.os }}-
+
       - name: Install mingw-w64 cross toolchain, Wine and Ninja
         # Minimal set — the Azure apt mirror throughput on the runners is highly
         # variable, so every saved MB helps:
@@ -198,15 +211,22 @@ jobs:
         #     wine: we only run a 64-bit console .exe.
         #   * --no-install-recommends drops Wine's GUI/audio recommends;
         #     Acquire::Retries rides out transient mirror blips.
-        # The distro exposes wine via update-alternatives (libwine's wine.collection
-        # group), which is NOT reliably configured in a minimal install, so
-        # /usr/bin/wine64 can be absent. Put the concrete wine64 binary on PATH
-        # ourselves (name varies: wine64-stable / -development), where the
-        # toolchain's find_program(wine64) picks it up as the test emulator.
+        # Dir::Cache::archives points apt at the cached .deb dir above (a cache hit
+        # then needs no download). The distro exposes wine via update-alternatives
+        # (libwine's wine.collection group), which is NOT reliably configured in a
+        # minimal install, so /usr/bin/wine64 can be absent. Put the concrete
+        # wine64 binary on PATH ourselves (name varies: wine64-stable /
+        # -development), where the toolchain's find_program(wine64) picks it up as
+        # the test emulator.
         run: |
+          mkdir -p "$GITHUB_WORKSPACE/.apt-cache"
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+            -o Dir::Cache::archives="$GITHUB_WORKSPACE/.apt-cache" \
             gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build wine64
+          # apt ran as root, so the cached .deb files are root-owned; hand them
+          # back to the runner user so the actions/cache post-step can archive them.
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/.apt-cache"
           if ! command -v wine64 >/dev/null 2>&1; then
             for c in /usr/bin/wine64-stable /usr/bin/wine64-development /usr/lib/wine/wine64; do
               if [ -x "$c" ]; then sudo ln -sf "$c" /usr/local/bin/wine64; break; fi

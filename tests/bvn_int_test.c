@@ -29,10 +29,6 @@
 #include <limits.h>
 #include "bvn_int.h"
 
-#ifdef WITH_GMP
-#  include <gmp.h>
-#endif
-
 static int g_fails = 0;
 static int g_pass  = 0;
 
@@ -44,16 +40,6 @@ static int g_pass  = 0;
 		g_pass++;                                                \
 	}                                                            \
 } while (0)
-
-#define CHECKSTR(a, b) do {                                               \
-	if (strcmp((a),(b)) != 0) {                                           \
-		fprintf(stderr, "FAIL  line %d: got \"%s\", want \"%s\"\n",       \
-				__LINE__, (a), (b));                                       \
-		g_fails++;                                                         \
-	} else {                                                               \
-		g_pass++;                                                          \
-	}                                                                      \
-} while(0)
 
 static char *round_trip(const char *s, uint32_t base)
 {
@@ -344,52 +330,6 @@ static void test_bufsize(void)
 	bvn_int_free(n);
 }
 
-#ifdef WITH_GMP
-static void test_gmp_roundtrip(void)
-{
-	puts("── GMP round-trip compatibility ──────────────────────────────");
-
-	static const struct { const char *s; int base; } cases[] = {
-		{ "0",                    10 },
-		{ "-1",                   10 },
-		{ "18446744073709551615", 10 },
-		{ "-9223372036854775808", 10 },
-		{ "340282366920938463463374607431768211455", 10 },
-		{ "ffffffffffffffffffffffffffffffff", 16 },
-		{ "deadbeef", 16 },
-		{ "-deadbeef", 16 },
-		{ "z", 36 },
-		{ "zzzzzzzzzzzzzzzzzzzzzzzz", 36 },
-	};
-
-	bvn_int_t *n = bvn_int_alloc();
-	mpz_t gmp;
-	mpz_init(gmp);
-
-	for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-		const char *s    = cases[i].s;
-		int         base = cases[i].base;
-
-		CHECK(bvn_int_from_str(n, s, (uint32_t)base), "gmp_rt: bvn parse");
-		size_t bsz = bvn_int_str_bufsize(n->nused * 32u, (uint32_t)base);
-		char  *bvn_str = malloc(bsz);
-		CHECK(bvn_str != NULL, "gmp_rt: malloc");
-		int32_t blen = bvn_int_to_str(n, bvn_str, bsz, (uint32_t)base);
-		CHECK(blen >= 0, "gmp_rt: bvn to_str");
-
-		CHECK(mpz_set_str(gmp, bvn_str, base) == 0, "gmp_rt: mpz_set_str");
-		char *gmp_str = mpz_get_str(NULL, base, gmp);
-		CHECKSTR(bvn_str, gmp_str);
-
-		free(bvn_str);
-		free(gmp_str);
-	}
-
-	mpz_clear(gmp);
-	bvn_int_free(n);
-}
-#endif
-
 static void test_32768_bit(void)
 {
 	puts("── 32768-bit round-trip in base 16 ──────────────────────────");
@@ -433,10 +373,6 @@ int main(void)
 	test_invalid_input();
 	test_bufsize();
 	test_32768_bit();
-
-#ifdef WITH_GMP
-	test_gmp_roundtrip();
-#endif
 
 	printf("\n%s  %d passed, %d failed\n",
 		   g_fails ? "FAIL" : "PASS", g_pass, g_fails);

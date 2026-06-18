@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(bovnar VERSION 1.1.0 LANGUAGES C)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -171,7 +169,7 @@ target_link_options(bovnar PRIVATE -pie)
 target_link_libraries(bovnar PRIVATE bvnr_static)
 
 # The test suite spins up dozens of executables at configure time and pulls in
-# CTest/GMP/pytest wiring.  Skip it when building the Python wheel
+# CTest/pytest wiring.  Skip it when building the Python wheel
 # (scikit-build-core defines SKBUILD) so `pip install` only compiles the lib.
 if(BVNR_BUILD_TESTS AND NOT SKBUILD)
     include(CMakeLists_tests.txt)

@@ -158,8 +158,7 @@ bovnar/
 
 - CMake ≥ 3.21
 - A C99-conforming compiler (GCC or Clang recommended)
-- No runtime library dependencies beyond the C standard library (not even `libm`)
-- `libgmp` — optional; enables the arbitrary-precision integer cross-check sections of `bvnr_int_test`. If absent, that test still builds and runs — only the GMP comparison sections are skipped.
+- No external library dependencies, at build time or runtime, beyond the C standard library (not even `libm`)
 
 ### Build the library and CLI tool
 
@@ -312,7 +311,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_unit_ext_test` | Extended unit symbols, long-name aliases, prefix enforcement |
 | `bvnr_currency_test` | Fiat and crypto currency lookup, minor units, prefix rules |
 | `bvnr_utils_test` | Utility functions |
-| `bvnr_int_test` | Arbitrary-precision integer arithmetic (GMP cross-check sections skipped when libgmp is absent) |
+| `bvnr_int_test` | Arbitrary-precision integer arithmetic |
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_high_severity_test` | Robustness under malformed input |

@@ -16,12 +16,7 @@ add_executable(bvnr_stream_test          tests/bovnar_stream_test.c)
 add_executable(bvnr_high_severity_test   tests/bovnar_high_severity_test.c)
 add_executable(bvnr_currency_test        tests/bovnar_currency_test.c)
 
-find_package(GMP QUIET)
 add_executable(bvnr_int_test          tests/bvn_int_test.c)
-if(NOT GMP_FOUND)
-    message(STATUS "GMP not found - bvnr_int_test will run without the GMP cross-check sections.")
-endif()
-
 add_executable(bvnr_float_test           tests/bvn_float_test.c)
 add_executable(bvnr_datetime_test        tests/bvn_datetime_test.c)
 
@@ -67,10 +62,6 @@ target_link_libraries(bvnr_currency_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_int_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_int_test PRIVATE bvnr_static)
-if(GMP_FOUND)
-    target_compile_definitions(bvnr_int_test PRIVATE WITH_GMP)
-    target_link_libraries(bvnr_int_test PRIVATE GMP::GMP)
-endif()
 
 target_compile_options(bvnr_float_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_float_test PRIVATE

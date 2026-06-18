@@ -107,6 +107,11 @@ such a document is an error, exactly as a 1.0 reader reports.
   exactly-representable range. The remaining `<math.h>` uses (`fabs`, `isfinite`,
   `isinf`, `isnan`, `signbit`) are compiler builtins that need no runtime library.
   Consumers no longer have to add `-lm` when linking `libbvnr_static`.
+- **Dropped the optional `libgmp` build-time dependency.** It was used only by an
+  `#ifdef WITH_GMP` cross-check in `bvnr_int_test`; the bignum tests already cover
+  parsing, formatting, and a 32768-bit round-trip without it. The cross-check, the
+  `FindGMP.cmake` module, and its CMake wiring are removed, so the project now has
+  no external library dependencies at build time or runtime.
 
 ### Fixed
 

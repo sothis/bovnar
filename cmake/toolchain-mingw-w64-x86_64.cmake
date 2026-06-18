@@ -26,3 +26,16 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
+# Run cross-built executables (the CLI in the smoke tests, the cross-built unit
+# test binaries) through Wine when it is installed. CTest honours
+# CMAKE_CROSSCOMPILING_EMULATOR for add_test() targets automatically, and the
+# shared cmake/*.cmake CLI test helpers pick it up via -DEMULATOR=. When Wine is
+# absent the variable stays empty: the library/CLI still cross-compile, but the
+# test executables cannot be run here (CTest will report them as failures, so
+# build with -DBVNR_BUILD_TESTS=OFF in that case).
+find_program(BVNR_WINE NAMES wine64 wine)
+if(BVNR_WINE)
+    set(CMAKE_CROSSCOMPILING_EMULATOR "${BVNR_WINE}" CACHE FILEPATH
+        "Emulator used to run cross-compiled Windows executables under CTest")
+endif()

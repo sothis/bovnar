@@ -48,6 +48,12 @@ static size_t       g_crash_len;
 static unsigned     g_crash_iter;
 static const char  *g_crash_harness = "?";
 
+/* The crash handler installs POSIX signal handlers (sigaction) to dump the
+ * offending input on SIGSEGV/SIGABRT/etc. None of that exists on Windows, so on
+ * the MinGW cross build install_crash_handler() is a no-op stub and the fuzz
+ * loop runs unchanged (a genuine crash there simply aborts without the dump). */
+#ifndef _WIN32
+
 /* Signal-safe write that consumes the result, silencing -Wunused-result.
    Nothing useful can be done about a short/failed write from a crash handler. */
 static void sig_write(int fd, const void *buf, size_t n)
@@ -121,6 +127,12 @@ static void install_crash_handler(void)
 	for (size_t i = 0; i < sizeof(sigs)/sizeof(sigs[0]); i++)
 		sigaction(sigs[i], &sa, NULL);
 }
+
+#else /* _WIN32: no POSIX signals — crash dumping is unavailable. */
+
+static void install_crash_handler(void) { }
+
+#endif /* !_WIN32 */
 
 static void set_crash_context(const char *harness, unsigned iter,
 							  const uint8_t *buf, size_t len)

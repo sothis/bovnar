@@ -30,9 +30,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+/* IUT mode (--iut) drives an external binary via fork/exec + pipes; these
+ * headers and the iut_run/run_iut_test code below are POSIX-only. The default
+ * self-test mode needs none of them, so the suite still builds (and runs under
+ * Wine) on the MinGW Windows cross build. */
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 #include "bovnar.h"
 #include "bovnar_dom.h"
 
@@ -382,6 +388,7 @@ typedef struct cf_case_t {
 /* =========================================================================
  * IUT invocation (fork/exec + pipes)
  * ========================================================================= */
+#ifndef _WIN32
 
 #define IUT_BUF_CAP (1u << 20)
 
@@ -501,6 +508,8 @@ static iut_result_t iut_run(const char *iut_path,
 	res.ok = true;
 	return res;
 }
+
+#endif /* !_WIN32 (IUT invocation) */
 
 /* =========================================================================
  * TAP output
@@ -1743,6 +1752,7 @@ static void run_self_test(const cf_case_t *tc)
 /* =========================================================================
  * IUT test runner
  * ========================================================================= */
+#ifndef _WIN32
 
 static void run_iut_test(const cf_case_t *tc, const char *iut_path)
 {
@@ -1860,6 +1870,8 @@ cleanup:
 	iut_result_free(&iut);
 }
 
+#endif /* !_WIN32 (IUT test runner) */
+
 /* =========================================================================
  * Main
  * ========================================================================= */
@@ -1916,6 +1928,16 @@ int main(int argc, char **argv)
 		}
 	}
 
+#ifdef _WIN32
+	if (iut_path) {
+		fprintf(stderr,
+		        "--iut (external IUT mode) is not supported on Windows: it "
+		        "requires POSIX fork/exec. Run without --iut for the "
+		        "self-test against the built-in reference implementation.\n");
+		return 2;
+	}
+#endif
+
 	if (list_only) {
 		printf("%-12s %-20s %s\n", "ID", "GROUP", "DESCRIPTION");
 		for (int i = 0; i < NUM_CASES; i++) {
@@ -1949,9 +1971,11 @@ int main(int argc, char **argv)
 			const cf_case_t *tc = &g_cases[i];
 			if (strcmp(tc->group, groups[g]) != 0)
 				continue;
+#ifndef _WIN32
 			if (iut_path)
 				run_iut_test(tc, iut_path);
 			else
+#endif
 				run_self_test(tc);
 		}
 		tap_subtest_end(groups[g]);

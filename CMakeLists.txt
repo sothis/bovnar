@@ -249,13 +249,13 @@ target_link_libraries(bovnar PRIVATE bvnr_static)
 # CTest/pytest wiring.  Skip it when building the Python wheel
 # (scikit-build-core defines SKBUILD) so `pip install` only compiles the lib.
 #
-# It is also skipped on Windows: the harness is POSIX (the conformance driver
-# forks/execs the IUT, the round-trip test uses socketpair + pthread, the fuzz
-# runner uses sigaction). The Windows build target is the library + DLL + CLI;
-# the Windows CI smoke-tests the CLI end-to-end (which drives the full
-# read/write/DOM paths). Porting the test harness to Windows is tracked
-# separately.
-if(BVNR_BUILD_TESTS AND NOT SKBUILD AND NOT WIN32)
+# On Windows (incl. the MinGW cross build) the portable subset still builds and
+# runs: CMakeLists_tests.txt guards the POSIX-only pieces (socketpair+pthread
+# round-trip, fork/exec IUT mode, sigaction fuzz crash handler) and the Python
+# bindings (host interpreter cannot load a PE DLL) behind NOT WIN32. The
+# cross-built test exes run under Wine via CMAKE_CROSSCOMPILING_EMULATOR (set by
+# the toolchain file). The native MSVC CI still passes -DBVNR_BUILD_TESTS=OFF.
+if(BVNR_BUILD_TESTS AND NOT SKBUILD)
     include(CMakeLists_tests.txt)
     # Python test registration lives entirely in CMakeLists_tests.txt
     # (granular per-file targets with proper labels and library injection).
@@ -321,7 +321,9 @@ if(BVNR_CROSS_MINGW
             CMAKE_ARGS
                 -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain-mingw-w64-x86_64.cmake
                 -DCMAKE_BUILD_TYPE=${_bvnr_cross_build_type}
-                -DBVNR_BUILD_TESTS=OFF
+                # Build the portable test subset too; it runs under Wine via the
+                # toolchain's CMAKE_CROSSCOMPILING_EMULATOR (ctest -C in build-mingw).
+                -DBVNR_BUILD_TESTS=${BVNR_BUILD_TESTS}
                 -DBVNR_CROSS_MINGW=OFF
             BUILD_ALWAYS TRUE       # pick up source edits on every "build all"
             INSTALL_COMMAND ""      # cross artifacts stay in build-mingw/

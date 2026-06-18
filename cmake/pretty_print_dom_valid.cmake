@@ -21,7 +21,7 @@ endforeach()
 
 # Canonicalise via the streaming serialiser.
 execute_process(
-    COMMAND           "${BOVNAR}" pretty-print "${BVNR_FILE}"
+    COMMAND           ${EMULATOR} "${BOVNAR}" pretty-print "${BVNR_FILE}"
     OUTPUT_VARIABLE   canonical
     ERROR_VARIABLE    err1
     RESULT_VARIABLE   rc1)
@@ -33,7 +33,7 @@ file(WRITE "${TMP_FILE}" "${canonical}")
 # query uses bvn_dom_parse: it materialises (and homogeneity-checks) the whole
 # document before the lookup, so a successful query proves DOM acceptance.
 execute_process(
-    COMMAND           "${BOVNAR}" query "${KEY}" "${TMP_FILE}"
+    COMMAND           ${EMULATOR} "${BOVNAR}" query "${KEY}" "${TMP_FILE}"
     OUTPUT_VARIABLE   qout
     ERROR_VARIABLE    qerr
     RESULT_VARIABLE   rcq)

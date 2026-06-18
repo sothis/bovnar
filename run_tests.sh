@@ -18,6 +18,29 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Cross (MinGW) build detection: if the build dir holds Windows binaries, run
+# every test executable — and the shared cmake -P helper scripts — through Wine.
+# Native builds leave RUNNER/EXE_SUFFIX/EMULATOR_ARG empty, so the logic below is
+# byte-for-byte unchanged there.
+EXE_SUFFIX=""
+RUNNER=()
+EMULATOR_ARG=()
+WIN_BUILD=0
+if [[ -e "${BUILD_DIR}/bovnar.exe" ]]; then
+    WIN_BUILD=1
+    EXE_SUFFIX=".exe"
+    if command -v wine64 > /dev/null 2>&1; then
+        RUNNER=(wine64)
+    elif command -v wine > /dev/null 2>&1; then
+        RUNNER=(wine)
+    else
+        echo "Windows build in ${BUILD_DIR} but Wine is not installed;" \
+             "cannot run the .exe tests." >&2
+        exit 1
+    fi
+    EMULATOR_ARG=("-DEMULATOR=${RUNNER[0]}")
+fi
+
 PASS=0
 FAIL=0
 SKIP=0
@@ -42,16 +65,16 @@ _bold()   { printf '\033[1m%s\033[0m\n'    "$*"; }
 run_test() {
 
     local label="$1"; shift
-    local exe="$1";   shift
+    local exe="$1${EXE_SUFFIX}"; shift
 
-    if [[ ! -x "$exe" ]]; then
+    if [[ ! -e "$exe" ]]; then
         _yellow "  SKIP  $label  (not built: $exe)"
         (( SKIP++ )) || true
         return
     fi
 
     printf '  %-52s ' "$label"
-    if "$exe" "$@"; then
+    if "${RUNNER[@]}" "$exe" "$@"; then
         _green "PASS"
         (( PASS++ )) || true
     else
@@ -87,8 +110,14 @@ echo
 _bold "=== Conformance tests ==="
 
 run_test "bvnr_conformance (self)"        "$TESTS_DIR/bvnr_conformance"
-run_test "bvnr_conformance (iut self)"    "$TESTS_DIR/bvnr_conformance" \
-    --iut "$TESTS_DIR/bvnr_conformance_iut"
+# IUT mode forks/execs the adapter — POSIX-only, so skip it on a Windows build.
+if [[ $WIN_BUILD -eq 0 ]]; then
+    run_test "bvnr_conformance (iut self)"    "$TESTS_DIR/bvnr_conformance" \
+        --iut "$TESTS_DIR/bvnr_conformance_iut"
+else
+    _yellow "  SKIP  bvnr_conformance (iut self)  (POSIX fork/exec; N/A on Windows)"
+    (( SKIP++ )) || true
+fi
 
 echo
 
@@ -121,20 +150,20 @@ fi
 
 _bold "=== CLI example smoke tests ==="
 
-BOVNAR_BIN="${BUILD_DIR}/bovnar"
+BOVNAR_BIN="${BUILD_DIR}/bovnar${EXE_SUFFIX}"
 EXAMPLES_DIR="./examples"
 
 run_cli_test() {
     local label="$1"; shift
 
-    if [[ ! -x "${BOVNAR_BIN}" ]]; then
+    if [[ ! -e "${BOVNAR_BIN}" ]]; then
         _yellow "  SKIP  $label  (not built: ${BOVNAR_BIN})"
         (( SKIP++ )) || true
         return
     fi
 
     printf '  %-52s ' "$label"
-    if "$@" > /dev/null 2>&1; then
+    if "${RUNNER[@]}" "$@" > /dev/null 2>&1; then
         _green "PASS"
         (( PASS++ )) || true
     else
@@ -149,14 +178,14 @@ run_cli_test() {
 run_cmake_check() {
     local label="$1"; shift
 
-    if [[ ! -x "${BOVNAR_BIN}" ]]; then
+    if [[ ! -e "${BOVNAR_BIN}" ]]; then
         _yellow "  SKIP  $label  (not built: ${BOVNAR_BIN})"
         (( SKIP++ )) || true
         return
     fi
 
     printf '  %-52s ' "$label"
-    if "${CMAKE_BIN}" "$@" > /dev/null 2>&1; then
+    if "${CMAKE_BIN}" "${EMULATOR_ARG[@]}" "$@" > /dev/null 2>&1; then
         _green "PASS"
         (( PASS++ )) || true
     else
@@ -265,7 +294,12 @@ PY_SRC="${SRC_DIR}/python"
 PY_TESTS="${PY_SRC}/tests"
 SHARED_LIB="$(ls "${BUILD_DIR}"/libbvnr.so* "${BUILD_DIR}"/libbvnr.dylib 2>/dev/null | head -1 || true)"
 
-if ! command -v "${PY_BIN}" > /dev/null 2>&1; then
+if [[ $WIN_BUILD -eq 1 ]]; then
+    # The bindings load libbvnr via ctypes from the host interpreter, which
+    # cannot load the Windows PE DLL; the C suite is the Windows coverage.
+    _yellow "  SKIP  python suite  (Windows build: host Python cannot load a PE DLL)"
+    (( SKIP++ )) || true
+elif ! command -v "${PY_BIN}" > /dev/null 2>&1; then
     _yellow "  SKIP  python suite  (no ${PY_BIN})"
     (( SKIP++ )) || true
 elif ! "${PY_BIN}" -m pytest --version > /dev/null 2>&1; then

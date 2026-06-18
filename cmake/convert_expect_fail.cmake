@@ -34,7 +34,7 @@ foreach(_var INPUT_FILE FROM TO)
 endforeach()
 
 execute_process(
-    COMMAND         "${BOVNAR}" convert --from "${FROM}" --to "${TO}" "${INPUT_FILE}"
+    COMMAND         ${EMULATOR} "${BOVNAR}" convert --from "${FROM}" --to "${TO}" "${INPUT_FILE}"
     OUTPUT_VARIABLE out
     ERROR_VARIABLE  err
     RESULT_VARIABLE rc)

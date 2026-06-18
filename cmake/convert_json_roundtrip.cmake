@@ -23,7 +23,7 @@ endforeach()
 
 # json -> bvnr
 execute_process(
-    COMMAND         "${BOVNAR}" convert --from json --to bvnr "${JSON_FILE}"
+    COMMAND         ${EMULATOR} "${BOVNAR}" convert --from json --to bvnr "${JSON_FILE}"
     OUTPUT_VARIABLE bvnr_out
     ERROR_VARIABLE  err1
     RESULT_VARIABLE rc1)
@@ -34,7 +34,7 @@ file(WRITE "${TMP_FILE}" "${bvnr_out}")
 
 # bvnr -> json
 execute_process(
-    COMMAND         "${BOVNAR}" convert --from bvnr --to json "${TMP_FILE}"
+    COMMAND         ${EMULATOR} "${BOVNAR}" convert --from bvnr --to json "${TMP_FILE}"
     OUTPUT_VARIABLE json_out
     ERROR_VARIABLE  err2
     RESULT_VARIABLE rc2)

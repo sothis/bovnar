@@ -20,7 +20,7 @@ endforeach()
 # ── multi-document framing ───────────────────────────────────────────────────
 set(_frame_file "${TMP_DIR}/cli_docs.bvf")
 execute_process(
-    COMMAND "${BOVNAR}" frames pack
+    COMMAND ${EMULATOR} "${BOVNAR}" frames pack
             "${EX_DIR}/integers.bvnr" "${EX_DIR}/floats.bvnr" "${EX_DIR}/strings.bvnr"
     OUTPUT_FILE     "${_frame_file}"
     RESULT_VARIABLE _rc
@@ -30,7 +30,7 @@ if(NOT _rc EQUAL 0)
 endif()
 
 execute_process(
-    COMMAND         "${BOVNAR}" frames list "${_frame_file}"
+    COMMAND         ${EMULATOR} "${BOVNAR}" frames list "${_frame_file}"
     OUTPUT_VARIABLE _list
     RESULT_VARIABLE _rc)
 if(NOT _rc EQUAL 0)
@@ -46,7 +46,7 @@ endforeach()
 # ── octet multiplexing ───────────────────────────────────────────────────────
 set(_mux_file "${TMP_DIR}/cli_mux.bvnr")
 execute_process(
-    COMMAND "${BOVNAR}" mux pack
+    COMMAND ${EMULATOR} "${BOVNAR}" mux pack
             "1:${EX_DIR}/integers.bvnr" "42:${EX_DIR}/strings.bvnr"
     OUTPUT_FILE     "${_mux_file}"
     RESULT_VARIABLE _rc
@@ -56,7 +56,7 @@ if(NOT _rc EQUAL 0)
 endif()
 
 execute_process(
-    COMMAND         "${BOVNAR}" mux list "${_mux_file}"
+    COMMAND         ${EMULATOR} "${BOVNAR}" mux list "${_mux_file}"
     OUTPUT_VARIABLE _mlist
     RESULT_VARIABLE _rc)
 if(NOT _rc EQUAL 0)

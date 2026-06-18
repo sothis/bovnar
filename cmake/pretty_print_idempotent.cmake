@@ -19,7 +19,7 @@ endforeach()
 
 # Pass 1: canonicalise the original document.
 execute_process(
-    COMMAND           "${BOVNAR}" pretty-print "${BVNR_FILE}"
+    COMMAND           ${EMULATOR} "${BOVNAR}" pretty-print "${BVNR_FILE}"
     OUTPUT_VARIABLE   pass1
     ERROR_VARIABLE    err1
     RESULT_VARIABLE   rc1)
@@ -32,7 +32,7 @@ file(WRITE "${TMP_FILE}" "${pass1}")
 
 # Pass 2: canonicalise the canonical output. This also proves pass 1 re-parses.
 execute_process(
-    COMMAND           "${BOVNAR}" pretty-print "${TMP_FILE}"
+    COMMAND           ${EMULATOR} "${BOVNAR}" pretty-print "${TMP_FILE}"
     OUTPUT_VARIABLE   pass2
     ERROR_VARIABLE    err2
     RESULT_VARIABLE   rc2)

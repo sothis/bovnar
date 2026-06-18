@@ -17,7 +17,7 @@ foreach(_var BOVNAR FILE QPATH NEEDLE)
 endforeach()
 
 execute_process(
-    COMMAND         "${BOVNAR}" query "${QPATH}" "${FILE}"
+    COMMAND         ${EMULATOR} "${BOVNAR}" query "${QPATH}" "${FILE}"
     OUTPUT_VARIABLE out
     ERROR_VARIABLE  err
     RESULT_VARIABLE rc)

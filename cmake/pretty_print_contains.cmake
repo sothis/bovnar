@@ -19,7 +19,7 @@ foreach(_var BOVNAR BVNR_FILE REQUIRE)
 endforeach()
 
 execute_process(
-    COMMAND           "${BOVNAR}" pretty-print "${BVNR_FILE}"
+    COMMAND           ${EMULATOR} "${BOVNAR}" pretty-print "${BVNR_FILE}"
     OUTPUT_VARIABLE   out
     ERROR_VARIABLE    err
     RESULT_VARIABLE   rc)

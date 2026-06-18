@@ -189,6 +189,8 @@ def test_iso_fraction_is_visible_and_roundtrips():
     '#!bovnar 1.1\n.t = 1969-12-31T23:59:59.5Z;\n',                  # pre-epoch (floored) + frac
     '#!bovnar 1.1\n.t = <datetime:64,tai> 2026-05-28T00:00:00.25Z;\n',  # tai + frac
     '#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;\n',                    # bare literal, no frac
+    '#!bovnar 1.1\n.t = [2026-06-15T12:00:00.5Z, 2026-06-16T00:00:00.25Z];\n',  # frac array
+    '#!bovnar 1.1\n.t = <datetime:64,tai> [2026-05-28T00:00:00.5Z, 2026-05-29T00:00:00.25Z];\n',  # tai frac array
 ])
 def test_typed_datetime_roundtrips_losslessly(src):
     # Regression: the dict-based typed loads/dumps path once (a) dropped a
@@ -207,6 +209,19 @@ def test_typed_datetime_fraction_survives_dumps():
                      typed=True)['t']
     assert q.datetime_fraction == '123'                      # captured on the Quantity
     assert b'2026-06-15T12:00:00.123Z' in bovnar.dumps({'t': q})  # re-emitted verbatim
+
+
+@needs_lib
+def test_typed_datetime_array_fraction_survives_dumps():
+    # An array element's fraction must survive too (a separate emit path from the
+    # scalar one): re-emit must contain the ISO literals, not the bare carriers.
+    src = '#!bovnar 1.1\n.t = [2026-06-15T12:00:00.5Z, 2026-06-16T00:00:00.25Z];\n'
+    out = bovnar.dumps(bovnar.loads(src, typed=True)).decode()
+    assert '2026-06-15T12:00:00.5Z' in out and '2026-06-16T00:00:00.25Z' in out
+    assert '1781524800' not in out                           # not the dropped-fraction carrier
+    # the captured fractions are visible on the element Quantities
+    fracs = [q.datetime_fraction for q in bovnar.loads(src, typed=True)['t']]
+    assert fracs == ['5', '25']
 
 
 @needs_lib

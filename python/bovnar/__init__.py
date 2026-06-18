@@ -800,6 +800,25 @@ def _emit_array_element(w: Writer, elem) -> None:
     # are written bare (bovnar arrays carry no per-element type annotation), so
     # emit the decoded scalar; the element's own annotation is not preserved.
     if isinstance(elem, Quantity):
+        # A datetime element carries its sub-second fraction on the Quantity, not
+        # in .value (the whole-second carrier). Emit it directly with the fraction
+        # so the C writer reconstructs the ISO literal (the array-number path
+        # supports it) — otherwise an array would drop fractions the scalar path
+        # keeps. The array-level <datetime> annotation supplies width/epoch.
+        if (int(elem.vtype.family) == int(ValueTypeFamily.DATETIME)
+                and elem._frac):
+            raw  = elem.raw.encode('utf-8') if elem.raw else b''
+            frac = elem._frac.encode('ascii')
+            d = BvnrData()
+            d.type        = _TOKEN_IS_ARRAY_NUMBER
+            d.value_type  = elem.vtype
+            d.value_unit  = make_unit_none()
+            d.data        = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.length      = len(raw)
+            d.frac_data   = _ct.cast(_ct.c_char_p(frac), _ct.c_void_p)
+            d.frac_length = len(frac)
+            _write_event_data(w, d)
+            return
         _emit_array_element(w, elem.value)
         return
 

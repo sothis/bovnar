@@ -205,6 +205,32 @@ Both libraries share the base name `bvnr` (`libbvnr.a`, `libbvnr.so`), so `-lbvn
 links the shared object when both are present. To link the static archive
 instead, use `-l:libbvnr.a` (GNU ld) or static-link flags.
 
+### Install (system / distro)
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release .
+cmake --build build
+cmake --install build --prefix /usr/local
+```
+
+This installs the shared and static libraries (with the versioned `libbvnr.so.1`
+soname chain), the `bovnar` CLI, all public headers, a **pkg-config** file, and a
+**CMake package**. Downstream projects can then use either:
+
+```bash
+# pkg-config
+gcc my_app.c $(pkg-config --cflags --libs bvnr) -o my_app
+```
+
+```cmake
+# CMake
+find_package(bovnar REQUIRED)
+target_link_libraries(my_app PRIVATE bovnar::bvnr)        # or bovnar::bvnr_static
+```
+
+The freedesktop MIME entry is installed too (disable with `-DBVNR_INSTALL_MIME=OFF`);
+after install, run `update-mime-database <datadir>/mime` to register the `.bvnr` type.
+
 ### Windows (64-bit)
 
 Both 64-bit toolchains are supported; the same `cmake` invocation works:

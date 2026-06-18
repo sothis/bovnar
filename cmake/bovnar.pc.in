@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: bovnar
+Description: Unit-safe binary serialization format — reference C library (libbvnr)
+URL: https://www.bovnar.io
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lbvnr
+Cflags: -I${includedir}

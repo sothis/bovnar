@@ -210,6 +210,10 @@ target_include_directories(bvnr_objects
 # Both libraries share the base name "bvnr", differentiated only by extension:
 # the static archive is libbvnr.a and the shared object is libbvnr.so (the CMake
 # target names stay distinct because two targets cannot share a name).
+# Standard install layout (CMAKE_INSTALL_INCLUDEDIR/LIBDIR/BINDIR). Needed here so
+# the exported targets below can carry an $<INSTALL_INTERFACE:> include path.
+include(GNUInstallDirs)
+
 add_library(bvnr_static STATIC $<TARGET_OBJECTS:bvnr_objects>)
 # On MSVC the static archive and the DLL's import library are both "<name>.lib",
 # so they would collide if both were named "bvnr". Give the static archive a
@@ -221,10 +225,15 @@ else()
     set_target_properties(bvnr_static PROPERTIES OUTPUT_NAME bvnr)
 endif()
 target_include_directories(bvnr_static
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 add_library(bvnr_shared SHARED $<TARGET_OBJECTS:bvnr_objects>)
 set_target_properties(bvnr_shared PROPERTIES OUTPUT_NAME bvnr)
+# Clean names for the exported CMake package: bovnar::bvnr / bovnar::bvnr_static.
+set_target_properties(bvnr_shared PROPERTIES EXPORT_NAME bvnr)
+set_target_properties(bvnr_static PROPERTIES EXPORT_NAME bvnr_static)
 # Export every API symbol from the DLL the same way the ELF/Mach-O builds export
 # every extern symbol. The shared OBJECT library is also linked into the static
 # archive, so a baked-in __declspec(dllexport) cannot be used (it would be wrong
@@ -233,7 +242,9 @@ set_target_properties(bvnr_shared PROPERTIES OUTPUT_NAME bvnr)
 set_target_properties(bvnr_shared PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 target_compile_options(bvnr_shared PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_shared
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 # Self-contained DLL on MinGW: fold in the GCC runtime so the shipped library
 # has no libgcc_s_seh / libwinpthread sidecar dependency.
 if(MINGW)
@@ -298,11 +309,66 @@ if(SKBUILD)
         RUNTIME DESTINATION bovnar)   # bvnr.dll (Windows)
 endif()
 
+# System / distro install of the C library, the CLI, the public headers, a CMake
+# package (find_package(bovnar) -> bovnar::bvnr / bovnar::bvnr_static) and a
+# pkg-config file (pkg-config --cflags --libs bvnr). Skipped for the Python wheel
+# build, which installs only the bundled shared library above. GNUInstallDirs was
+# already pulled in next to the targets so the $<INSTALL_INTERFACE:> paths resolve.
+if(NOT SKBUILD)
+    include(CMakePackageConfigHelpers)
+
+    install(TARGETS bvnr_shared bvnr_static
+        EXPORT bovnarTargets
+        ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}   # bvnr.dll on Windows
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    install(TARGETS bovnar
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    install(FILES
+        include/bovnar.h
+        include/bovnar_currency.h
+        include/bovnar_dom.h
+        include/bovnar_si_units.h
+        include/bovnar_stream.h
+        include/bvn_datetime.h
+        include/bvn_float.h
+        include/bvn_gregorian_date.h
+        include/bvn_int.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    install(EXPORT bovnarTargets
+        FILE      bovnarTargets.cmake
+        NAMESPACE bovnar::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bovnar)
+
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bovnarConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/bovnarConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bovnar)
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/bovnarConfigVersion.cmake
+        VERSION       ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion)
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/bovnarConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/bovnarConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bovnar)
+
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bovnar.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/bvnr.pc
+        @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/bvnr.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+endif()
+
 # System integration for the Bovnar media type (text/vnd.bovnar) and the .bvnr
 # extension. Skipped for the Python wheel build (SKBUILD). After `make install`
 # run `update-mime-database <datadir>/mime` to refresh the desktop database.
 if(NOT SKBUILD)
-    include(GNUInstallDirs)
     option(BVNR_INSTALL_MIME
         "Install the freedesktop shared-mime-info entry + file(1) magic for *.bvnr"
         ON)

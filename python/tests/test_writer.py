@@ -120,6 +120,19 @@ class TestWriteUint:
                                    unit_str='Ti~B'))
         assert b'storage' in out
 
+    def test_uint_out_of_range_raises_not_truncates(self):
+        # A value beyond 64 bits used to silently wrap through the c_uint64 FFI
+        # argument (2**64 + 5 -> 5), emitting a corrupt document. It must raise.
+        with Writer.to_mem() as w:
+            with pytest.raises(BovnarWriteError):
+                w.write_uint("big", 2**64 + 5)
+        with Writer.to_mem() as w:
+            with pytest.raises(BovnarWriteError):
+                w.write_uint("neg", -1)
+        # the exact 64-bit boundary is still accepted
+        out = self._write_and_read(lambda w: w.write_uint("max", 2**64 - 1))
+        assert b'max' in out
+
 @needs_lib
 class TestWriteSint:
     def test_negative_value(self):
@@ -133,6 +146,18 @@ class TestWriteSint:
         with Writer.to_mem() as w:
             w.write_sint("zero", 0)
         assert b'0' in w.get_output()
+
+    def test_sint_out_of_range_raises_not_truncates(self):
+        # c_int64 silently wraps an out-of-range Python int; must raise instead.
+        for bad in (2**63, -(2**63) - 1):
+            with Writer.to_mem() as w:
+                with pytest.raises(BovnarWriteError):
+                    w.write_sint("k", bad)
+        # the 64-bit boundaries are accepted
+        with Writer.to_mem() as w:
+            w.write_sint("lo", -(2**63))
+            w.write_sint("hi", 2**63 - 1)
+        assert b'lo' in w.get_output()
 
     def test_sint_min_8(self):
         with Writer.to_mem() as w:

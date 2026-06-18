@@ -586,6 +586,14 @@ class Writer:
         return make_unit_none()
 
     def _format_uint(self, value: int, base: int, width: int) -> str:
+        # The value crosses the FFI boundary as a c_uint64, which silently wraps
+        # an out-of-range Python int (emitting a corrupt document). Reject here;
+        # values beyond 64 bits must go through the bigint path (write_bvni).
+        if not 0 <= value < (1 << 64):
+            raise BovnarWriteError(
+                ErrorCode.NONE,
+                message=f"uint value {value} does not fit a 64-bit field "
+                        "(use write_bvni for arbitrary-precision integers)")
         lib = get_library()
         buf = ctypes.create_string_buffer(128)
         n   = lib.bvn_format_uint64(buf, 128, value, base, 0)
@@ -594,6 +602,12 @@ class Writer:
         return buf.value.decode('ascii')
 
     def _format_sint(self, value: int, base: int) -> str:
+        # See _format_uint: c_int64 silently wraps an out-of-range Python int.
+        if not -(1 << 63) <= value < (1 << 63):
+            raise BovnarWriteError(
+                ErrorCode.NONE,
+                message=f"sint value {value} does not fit a 64-bit field "
+                        "(use write_bvni for arbitrary-precision integers)")
         lib = get_library()
         buf = ctypes.create_string_buffer(128)
         n   = lib.bvn_format_int64(buf, 128, value, base, 0)

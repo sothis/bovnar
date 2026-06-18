@@ -168,6 +168,14 @@ bool bvn_dom_struct_add(bvn_dom_node_t *s,
 			bvn_dom_node_destroy(val); return false;
 		}
 		uint32_t nc = s->members.cap ? s->members.cap * 2u : 8u;
+#if SIZE_MAX <= 0xFFFFFFFFu
+		/* nc fits uint32_t (guard above), but nc * sizeof(entry) is computed in
+		 * size_t and would wrap on a 32-bit size_t; reject as bvn_dom_stack_reserve
+		 * does. Compiled out on 64-bit, where the product cannot overflow. */
+		if ((size_t)nc > SIZE_MAX / sizeof(bvn_dom_entry_t)) {
+			bvn_dom_node_destroy(val); return false;
+		}
+#endif
 		bvn_dom_entry_t *ne = realloc(s->members.entries,
 									  nc * sizeof(*ne));
 		if (!ne) { bvn_dom_node_destroy(val); return false; }
@@ -190,6 +198,11 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 			bvn_dom_node_destroy(val); return false;
 		}
 		uint32_t nc = d->cap ? d->cap * 2u : 8u;
+#if SIZE_MAX <= 0xFFFFFFFFu
+		if ((size_t)nc > SIZE_MAX / sizeof(bvn_dom_entry_t)) {   /* 32-bit wrap guard */
+			bvn_dom_node_destroy(val); return false;
+		}
+#endif
 		bvn_dom_entry_t *ne = realloc(d->entries, nc * sizeof(*ne));
 		if (!ne) { bvn_dom_node_destroy(val); return false; }
 		d->entries = ne;
@@ -209,6 +222,11 @@ bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem)
 			bvn_dom_node_destroy(elem); return false;
 		}
 		uint32_t nc = a->arr.cap ? a->arr.cap * 2u : 8u;
+#if SIZE_MAX <= 0xFFFFFFFFu
+		if ((size_t)nc > SIZE_MAX / sizeof(bvn_dom_node_t *)) {   /* 32-bit wrap guard */
+			bvn_dom_node_destroy(elem); return false;
+		}
+#endif
 		bvn_dom_node_t **ni = realloc(a->arr.items,
 									  nc * sizeof(*ni));
 		if (!ni) { bvn_dom_node_destroy(elem); return false; }

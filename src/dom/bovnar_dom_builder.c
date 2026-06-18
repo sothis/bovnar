@@ -730,9 +730,21 @@ static const bvn_dom_node_t *bvn_dom_first_nonnull_elem(
  * length in each record (e.g. per-record argument lists). So struct-field
  * recursion passes check_dim = false, freeing both dimension and array length.
  */
+/*
+ * Hard recursion-depth guard for the post-parse structural validators below.
+ * The reader caps array and struct nesting at 255 *each*, so a materialised tree
+ * reaching these checks is at most ~510 levels deep; this ceiling sits well above
+ * that yet stops any pathological tree (or a future caller that bypasses the
+ * reader caps) from exhausting the C stack. The destructor is iterative for the
+ * same reason (see bovnar_dom.c); these checks fail closed instead.
+ */
+#define BVN_DOM_CHECK_MAX_DEPTH 4096u
 static error_code_t bvn_dom_shape_equal(
-	const bvn_dom_node_t *a, const bvn_dom_node_t *b, bool check_dim)
+	const bvn_dom_node_t *a, const bvn_dom_node_t *b, bool check_dim,
+	unsigned depth)
 {
+	if (depth > BVN_DOM_CHECK_MAX_DEPTH)
+		return error_array_nesting_too_high;
 	bvn_dom_type_t ta = bvn_dom_node_type(a);
 	bvn_dom_type_t tb = bvn_dom_node_type(b);
 	if (ta == BVN_DOM_NULL || tb == BVN_DOM_NULL)
@@ -783,7 +795,8 @@ static error_code_t bvn_dom_shape_equal(
 		const bvn_dom_node_t *ra = bvn_dom_first_nonnull_elem(a);
 		const bvn_dom_node_t *rb = bvn_dom_first_nonnull_elem(b);
 		if (ra && rb)
-			return bvn_dom_shape_equal(ra, rb, check_dim);   /* matrices stay uniform */
+			return bvn_dom_shape_equal(ra, rb, check_dim,
+				depth + 1u);   /* matrices stay uniform */
 		return error_none;
 	}
 	case BVN_DOM_STRUCT: {
@@ -798,7 +811,8 @@ static error_code_t bvn_dom_shape_equal(
 				return error_struct_shape_mismatch;
 			/* fields free: compare kind/shape, not dimension. */
 			error_code_t e =
-				bvn_dom_shape_equal(ea[i].value, eb[i].value, false);
+				bvn_dom_shape_equal(ea[i].value, eb[i].value, false,
+					depth + 1u);
 			if (e != error_none)
 				return e;
 		}
@@ -862,17 +876,22 @@ static error_code_t bvn_dom_keys_unique(
 	free(keys);
 	return r;
 }
-static error_code_t bvn_dom_check_homogeneous(const bvn_dom_node_t *node)
+static error_code_t bvn_dom_check_homogeneous(
+	const bvn_dom_node_t *node, unsigned depth)
 {
 	if (!node)
 		return error_none;
+	if (depth > BVN_DOM_CHECK_MAX_DEPTH)
+		return bvn_dom_node_type(node) == BVN_DOM_STRUCT
+			? error_struct_nesting_too_high
+			: error_array_nesting_too_high;
 	switch (bvn_dom_node_type(node)) {
 	case BVN_DOM_ARRAY: {
 		uint32_t n = bvn_dom_array_count(node);
 		const bvn_dom_node_t *ref = NULL;
 		for (uint32_t i = 0; i < n; i++) {
 			const bvn_dom_node_t *e = bvn_dom_array_at(node, i);
-			error_code_t sub = bvn_dom_check_homogeneous(e);
+			error_code_t sub = bvn_dom_check_homogeneous(e, depth + 1u);
 			if (sub != error_none)
 				return sub;
 			if (!e || bvn_dom_node_type(e) == BVN_DOM_NULL)
@@ -882,7 +901,7 @@ static error_code_t bvn_dom_check_homogeneous(const bvn_dom_node_t *node)
 			else {
 				/* array elements: dimension is enforced (bare arrays and
 				 * matrices are uniform). */
-				error_code_t cmp = bvn_dom_shape_equal(ref, e, true);
+				error_code_t cmp = bvn_dom_shape_equal(ref, e, true, depth + 1u);
 				if (cmp != error_none)
 					return cmp;
 			}
@@ -896,7 +915,8 @@ static error_code_t bvn_dom_check_homogeneous(const bvn_dom_node_t *node)
 		if (dup != error_none)
 			return dup;
 		for (uint32_t i = 0; i < n; i++) {
-			error_code_t sub = bvn_dom_check_homogeneous(ent[i].value);
+			error_code_t sub =
+				bvn_dom_check_homogeneous(ent[i].value, depth + 1u);
 			if (sub != error_none)
 				return sub;
 		}
@@ -954,7 +974,7 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 		 * element homogeneity. */
 		error_code_t herr = bvn_dom_keys_unique(doc->entries, doc->count);
 		for (uint32_t i = 0; herr == error_none && i < doc->count; i++)
-			herr = bvn_dom_check_homogeneous(doc->entries[i].value);
+			herr = bvn_dom_check_homogeneous(doc->entries[i].value, 0u);
 		if (herr != error_none)
 			doc->parse_error = herr;
 	}

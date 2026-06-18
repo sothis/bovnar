@@ -1,13 +1,13 @@
 # Changelog
 
 All notable changes to Bovnar are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/1.1.0/). Versioning is **semantic
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning is **semantic
 versioning of the format (spec)**; the reference implementation
 (`BVNR_VERSION_STRING`, `bovnar.__version__`, the CMake project version) tracks
 it in lockstep. The highest spec a build understands is reported by
 `bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`.
 
-## [1.1.0]
+## [1.1.0] - 2026-06-19
 
 Spec 1.1 is **purely additive** over the frozen 1.0 baseline: every spec-1.0
 document parses unchanged and decodes to the same values. The new constructs are
@@ -142,6 +142,12 @@ non-version remainder is reported as a malformed directive rather than ignored.
   appended so offsets are preserved but requiring consumers to recompile against
   the 1.1 headers rather than mixing a 1.0-compiled object with the new library.
   The Python wheel keeps the unversioned `libbvnr.so` it loads by name.
+- **Installable build (`cmake --install`).** A non-wheel build now installs the
+  shared and static libraries (with the `libbvnr.so.1` soname chain), the `bovnar`
+  CLI, and all public headers, plus a **pkg-config** file (`pkg-config --cflags
+  --libs bvnr`) and a **CMake package** (`find_package(bovnar)` →
+  `bovnar::bvnr` / `bovnar::bvnr_static`). Previously only the freedesktop MIME
+  entry was installed, so the soname/headers were built but never laid down.
 - **Conformance output upgraded to TAP version 14.** The 303 cases are now grouped
   into TAP 14 *subtests* — one indented child stream per case group (21 groups),
   each with its own plan and rolled up into a parent test point — so the report is

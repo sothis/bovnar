@@ -194,6 +194,11 @@ static bool bvn_validate_id_for_writer(bvnr_writer_t* w,
 	char *buf = static_buf;
 	bool  need_free = false;
 	if (length >= sizeof(static_buf)) {
+		/* (size_t)length + 1u would wrap to 0 only when size_t is 32-bit and
+		 * length == UINT32_MAX; reject before allocating so memcpy below can
+		 * never run against a 0-byte buffer. Harmless on 64-bit (no wrap). */
+		if (length == UINT32_MAX)
+			return bvn_writer_set_error(w, error_invalid_argument);
 		buf = malloc((size_t)length + 1u);
 		if (!buf)
 			return bvn_writer_set_error(w, error_invalid_argument);
@@ -227,6 +232,8 @@ static bool bvn_validate_number_for_writer(bvnr_writer_t* w,
 	char *buf = static_buf;
 	bool need_free = false;
 	if (length >= sizeof(static_buf)) {
+		if (length == UINT32_MAX)   /* see bvn_validate_id_for_writer */
+			return bvn_writer_set_error(w, error_number_too_long);
 		buf = malloc((size_t)length + 1u);
 		if (!buf)
 			return bvn_writer_set_error(w, error_number_too_long);
@@ -311,6 +318,8 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 	char *buf = static_buf;
 	bool need_free = false;
 	if (length >= sizeof(static_buf)) {
+		if (length == UINT32_MAX)   /* see bvn_validate_id_for_writer */
+			return bvn_writer_set_error(w, error_string_too_long);
 		buf = malloc((size_t)length + 1u);
 		if (!buf)
 			return bvn_writer_set_error(w, error_string_too_long);
@@ -378,6 +387,8 @@ static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 	char *buf = static_buf;
 	bool  need_free = false;
 	if (length >= sizeof(static_buf)) {
+		if (length == UINT32_MAX)   /* see bvn_validate_id_for_writer */
+			return bvn_writer_set_error(w, error_symbol_too_long);
 		buf = malloc((size_t)length + 1u);
 		if (!buf)
 			return bvn_writer_set_error(w, error_symbol_too_long);
@@ -413,6 +424,8 @@ static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 	char *buf = static_buf;
 	bool need_free = false;
 	if (length >= sizeof(static_buf)) {
+		if (length == UINT32_MAX)   /* see bvn_validate_id_for_writer */
+			return bvn_writer_set_error(w, error_reference_too_long);
 		buf = malloc((size_t)length + 1u);
 		if (!buf)
 			return bvn_writer_set_error(w, error_reference_too_long);

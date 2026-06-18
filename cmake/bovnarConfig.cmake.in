@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+# Imported targets:
+#   bovnar::bvnr         — shared library (libbvnr.so / .dylib / bvnr.dll)
+#   bovnar::bvnr_static  — static archive (libbvnr.a / bvnr_static.lib)
+include("${CMAKE_CURRENT_LIST_DIR}/bovnarTargets.cmake")
+
+check_required_components(bovnar)

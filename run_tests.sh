@@ -103,6 +103,7 @@ run_test "bvnr_high_severity_test"        "$TESTS_DIR/bvnr_high_severity_test"
 run_test "bvnr_int_test"                  "$TESTS_DIR/bvnr_int_test"
 run_test "bvnr_float_test"                "$TESTS_DIR/bvnr_float_test"
 run_test "bvnr_float_fix_dec_test"        "$TESTS_DIR/bvnr_float_fix_dec_test"
+run_test "bvnr_datetime_test"             "$TESTS_DIR/bvnr_datetime_test"
 run_test "bvnr_currency_test"             "$TESTS_DIR/bvnr_currency_test"
 
 echo

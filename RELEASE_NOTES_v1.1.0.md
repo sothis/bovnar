@@ -37,6 +37,9 @@ aarch64) and **macOS** (arm64, x86_64); an sdist is available for other targets.
 build understands the highest spec it supports via `bvnr_spec_version()` /
 `BVNR_SPEC_VERSION_MAJOR`·`MINOR` (now `1`·`1`).
 
+**Windows:** the library and CLI now build natively on 64-bit Windows with both
+MinGW64 and MSVC — see *Windows build support* below.
+
 ## What's new in 1.1
 
 - **Version directive** — an optional first-line `#!bovnar <major>.<minor>`
@@ -78,6 +81,14 @@ build understands the highest spec it supports via `bvnr_spec_version()` /
   `float:128`+ to exact `Decimal` object arrays (with `from_numpy(float_format=)`
   to write them), and the arbitrary-precision `bvn_float` API is exposed as
   `bovnar.BvnFloat`.
+- **Windows build support (64-bit MinGW64 and MSVC)** — the library (`bvnr.dll`
+  plus import lib and a static archive) and the `bovnar` CLI now build natively
+  on Windows. A portability shim (`src/utils/bvn_port.h`) maps the fd I/O onto the
+  CRT and — critically for a binary format — forces binary mode on files and on
+  stdin/stdout/stderr so no CRLF translation can corrupt the byte stream. On MSVC
+  the static archive is `bvnr_static.lib` (the DLL import lib takes `bvnr.lib`);
+  MinGW keeps the unified `libbvnr` names. A new `Windows` CI workflow builds both
+  toolchains and smoke-tests the CLI.
 - **Tooling** — a `bovnar version` subcommand; the `datetime` keyword in all five
   syntax highlighters and the web playground; and a conformance suite grown to
   **303 cases** (up from 207), adding the `version` and `datetime` groups —

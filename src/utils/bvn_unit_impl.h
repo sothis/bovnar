@@ -69,6 +69,48 @@ static inline double bvni_prefix_factor(value_unit_component_t c)
 		return bvni_si_pfx_table[c.prefix.id.si].factor;
 	return 1.0;
 }
+/*
+ * Integer power of a double, base^exp, by exponentiation-by-squaring. Replaces
+ * pow() (and the libm dependency it dragged in) for the only way this library
+ * ever raised to a power: an integer exponent. For base 2.0 every intermediate
+ * is an exact power of two, so the result is bit-exact (matching what ldexp/pow
+ * produced); for other bases it is a product of exp multiplications, within a
+ * ulp of a correctly-rounded pow over the small exponents used here.
+ */
+static inline double bvni_ipow(double base, int32_t exp)
+{
+	if (exp == 0)
+		return 1.0;
+	uint32_t n = (exp < 0) ? (uint32_t)(-(int64_t)exp) : (uint32_t)exp;
+	double result = 1.0;
+	double b = base;
+	while (n > 0u) {
+		if (n & 1u)
+			result *= b;
+		n >>= 1;
+		if (n)
+			b *= b;
+	}
+	return (exp < 0) ? 1.0 / result : result;
+}
+/*
+ * 10^n as a double. Powers of ten up to 10^22 are exactly representable, so the
+ * table (and the reciprocal of an exact value for n<0) reproduces pow(10.0,n)
+ * bit-for-bit over that range; beyond it both this and pow round, and the
+ * squaring fallback is used.
+ */
+static inline double bvni_pow10(int32_t n)
+{
+	static const double tab[] = {
+		1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,
+		1e8,  1e9,  1e10, 1e11, 1e12, 1e13, 1e14, 1e15,
+		1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+	};
+	const int32_t max = (int32_t)(sizeof(tab) / sizeof(tab[0])) - 1;
+	if (n >= 0)
+		return (n <= max) ? tab[n] : bvni_ipow(10.0, n);
+	return (n >= -max) ? 1.0 / tab[-n] : bvni_ipow(10.0, n);
+}
 static inline bool bvni_is_neg_exp(unit_exponent_t e)
 {
 	return e == exp_neg_linear  || e == exp_neg_square  ||

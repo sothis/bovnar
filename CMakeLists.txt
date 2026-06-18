@@ -152,13 +152,11 @@ target_include_directories(bvnr_objects
 add_library(bvnr_static STATIC $<TARGET_OBJECTS:bvnr_objects>)
 target_include_directories(bvnr_static
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(bvnr_static PUBLIC m)
 
 add_library(bvnr_shared SHARED $<TARGET_OBJECTS:bvnr_objects>)
 target_compile_options(bvnr_shared PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(bvnr_shared PUBLIC m)
 
 add_executable(bovnar src/bovnar.c)
 target_compile_options(bovnar PRIVATE ${BVNR_C_FLAGS})
@@ -170,7 +168,7 @@ if(BVNR_HARDEN)
 endif()
 set_target_properties(bovnar PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_options(bovnar PRIVATE -pie)
-target_link_libraries(bovnar PRIVATE bvnr_static m)
+target_link_libraries(bovnar PRIVATE bvnr_static)
 
 # The test suite spins up dozens of executables at configure time and pulls in
 # CTest/GMP/pytest wiring.  Skip it when building the Python wheel

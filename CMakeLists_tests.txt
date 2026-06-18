@@ -31,15 +31,15 @@ add_executable(bvnr_abi_dump             tests/bvnr_abi_dump.c)
 target_link_libraries(bvnr_abi_dump PRIVATE bvnr_static)
 
 target_compile_options(bvnr_dom_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_dom_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_dom_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_si_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_si_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
-target_link_libraries(bvnr_si_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_si_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_unit_ext_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_unit_ext_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
-target_link_libraries(bvnr_unit_ext_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_unit_ext_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_reader_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_reader_test PRIVATE bvnr_static)
@@ -51,22 +51,22 @@ target_compile_options(bvnr_extended_reader_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_extended_reader_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_utils_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_utils_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_utils_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_socketpair_roundtrip_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_socketpair_roundtrip_test PRIVATE bvnr_static pthread)
 
 target_compile_options(bvnr_stream_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_stream_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_stream_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_currency_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_currency_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_int_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_int_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_int_test PRIVATE bvnr_static)
 if(GMP_FOUND)
     target_compile_definitions(bvnr_int_test PRIVATE WITH_GMP)
     target_link_libraries(bvnr_int_test PRIVATE GMP::GMP)
@@ -76,7 +76,7 @@ target_compile_options(bvnr_float_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_float_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(bvnr_float_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_float_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_datetime_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_datetime_test PRIVATE
@@ -85,7 +85,7 @@ target_link_libraries(bvnr_datetime_test PRIVATE bvnr_static)
 
 add_executable(bvnr_float_fix_dec_test tests/bvn_float_fix_dec_test.c)
 target_compile_options(bvnr_float_fix_dec_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_float_fix_dec_test PRIVATE bvnr_static m)
+target_link_libraries(bvnr_float_fix_dec_test PRIVATE bvnr_static)
 
 add_test(NAME bvnr_float_fix_dec_test COMMAND bvnr_float_fix_dec_test)
 set_tests_properties(bvnr_float_fix_dec_test PROPERTIES
@@ -183,10 +183,10 @@ add_executable(bvnr_conformance     tests/bvnr_conformance.c)
 add_executable(bvnr_conformance_iut tests/bvnr_conformance_iut.c)
 
 target_compile_options(bvnr_conformance PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_conformance PRIVATE bvnr_static m)
+target_link_libraries(bvnr_conformance PRIVATE bvnr_static)
 
 target_compile_options(bvnr_conformance_iut PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_conformance_iut PRIVATE bvnr_static m)
+target_link_libraries(bvnr_conformance_iut PRIVATE bvnr_static)
 
 # Self-test: conformance suite exercised against the built-in reference impl.
 add_test(NAME bvnr_conformance_self
@@ -228,7 +228,7 @@ if (BVNR_FUZZ_TEST)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
-    target_link_libraries(bvnr_fuzz_test PRIVATE bvnr_static m)
+    target_link_libraries(bvnr_fuzz_test PRIVATE bvnr_static)
 
     target_compile_options(bvnr_fuzz_test PRIVATE
         -Wall -Wextra -Wno-override-init -g
@@ -273,7 +273,7 @@ if (BVNR_FUZZ_TEST)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
-    target_link_libraries(bvnr_fuzz_writer_test PRIVATE bvnr_static m)
+    target_link_libraries(bvnr_fuzz_writer_test PRIVATE bvnr_static)
 
     target_compile_options(bvnr_fuzz_writer_test PRIVATE
         -Wall -Wextra -Wno-override-init -g
@@ -391,7 +391,6 @@ if (BVNR_FUZZ_EXTERNAL)
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
         target_link_options(bvnr_fuzz_ext_${name} PRIVATE ${_ext_lf})
-        target_link_libraries(bvnr_fuzz_ext_${name} PRIVATE m)
     endmacro()
 
     _bvnr_fuzz_external(reader tests/bovnar_fuzz_reader.c)

@@ -32,7 +32,7 @@ execute_process(
             "-I${gen}"
             "${SRC_DIR}/tests/amalgam_smoke.c"
             "${gen}/bovnar.c"
-            -lm -o "${exe}"
+            -o "${exe}"
     RESULT_VARIABLE rc
     OUTPUT_VARIABLE out ERROR_VARIABLE err)
 if(NOT rc EQUAL 0)

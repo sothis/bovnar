@@ -341,13 +341,13 @@ double bvn_unit_to_si_factor(value_unit_t u,
 			return f;
 		}
 		int32_t abs_exp = bvni_exp_abs(c->exponent);
-		double prefix_contrib = pow(bvni_prefix_factor(*c), (double)abs_exp);
+		double prefix_contrib = bvni_ipow(bvni_prefix_factor(*c), abs_exp);
 		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
 		if (!conv) {
 			*ok = false;
 			return f;
 		}
-		double bu_contrib = pow(conv->to_si_factor, (double)abs_exp);
+		double bu_contrib = bvni_ipow(conv->to_si_factor, abs_exp);
 		double comp_total = prefix_contrib * bu_contrib;
 		if (uexp < 0)
 			comp_total = 1.0 / comp_total;
@@ -536,12 +536,12 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	for (uint32_t ai = 0; ai < acc_count; ai++) {
 		accum_t *a = &acc[ai];
 		if (a->si_pexp_sum != 0) {
-			*scale *= pow(10.0, (double)a->si_pexp_sum);
+			*scale *= bvni_pow10(a->si_pexp_sum);
 			if (isinf(*scale) && overflow)
 				*overflow = true;
 		}
 		if (a->iec_pexp_sum != 0) {
-			*scale *= pow(2.0,  (double)a->iec_pexp_sum);
+			*scale *= bvni_ipow(2.0, a->iec_pexp_sum);
 			if (isinf(*scale) && overflow)
 				*overflow = true;
 		}
@@ -559,7 +559,7 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 			const bvn_si_conv_entry_t *conv =
 			        bvn_find_si_conv(a->base);
 			if (conv) {
-				double contrib = pow(conv->to_si_factor, (double)abs_sum);
+				double contrib = bvni_ipow(conv->to_si_factor, abs_sum);
 				if (a->exp_sum < 0)
 					*scale /= contrib;
 				else

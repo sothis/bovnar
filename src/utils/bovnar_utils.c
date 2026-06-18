@@ -1939,9 +1939,26 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 		}
 		if (!dim_match)
 			continue;
-		double log_ratio = log10(net_si);
-		int32_t pexp = (int32_t)round(log_ratio);
-		if (fabs(log_ratio - (double)pexp) > 1e-6)
+		/*
+		 * Only an (almost-)exact power of ten maps onto a single SI
+		 * prefix. Find that integer power by matching net_si against the
+		 * exact power-of-ten ladder spanning the SI prefix range, rather
+		 * than taking a logarithm — net_si is a product of exact prefix
+		 * factors, so a genuine match is within a few ulp while anything
+		 * else is off by orders of magnitude. The 1e-6 relative window
+		 * mirrors the old fabs(log10(net_si) - pexp) > 1e-6 gate.
+		 */
+		int32_t pexp  = 0;
+		bool    is_p10 = false;
+		for (int32_t e = -30; e <= 30; e++) {
+			double p = bvni_pow10(e);
+			if (fabs(net_si - p) <= 1e-6 * p) {
+				pexp   = e;
+				is_p10 = true;
+				break;
+			}
+		}
+		if (!is_p10)
 			continue;
 		int32_t pfx_id = bvni_pexp_to_si_prefix_id(pexp);
 		if (pfx_id < 0)
@@ -2171,7 +2188,7 @@ static double bvn_single_component_factor(value_unit_component_t c)
 {
 	double pf      = bvni_prefix_factor(c);
 	int32_t abs_exp = bvni_exp_abs(c.exponent);
-	double result  = pow(pf, (double)abs_exp);
+	double result  = bvni_ipow(pf, abs_exp);
 	if (bvni_is_neg_exp(c.exponent))
 		result = 1.0 / result;
 	return result;

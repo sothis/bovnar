@@ -158,7 +158,7 @@ bovnar/
 
 - CMake ≥ 3.21
 - A C99-conforming compiler (GCC or Clang recommended)
-- `libm` (math library, standard on all POSIX systems)
+- No runtime library dependencies beyond the C standard library (not even `libm`)
 - `libgmp` — optional; enables the arbitrary-precision integer cross-check sections of `bvnr_int_test`. If absent, that test still builds and runs — only the GMP comparison sections are skipped.
 
 ### Build the library and CLI tool
@@ -199,7 +199,7 @@ cmake -B build -DBVNR_WERROR=ON .
 ### Link against the library
 
 ```bash
-gcc my_app.c -I include -L build -lbvnr_static -lm -o my_app
+gcc my_app.c -I include -L build -lbvnr_static -o my_app
 ```
 
 ---

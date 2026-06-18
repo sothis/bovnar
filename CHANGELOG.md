@@ -100,6 +100,13 @@ such a document is an error, exactly as a 1.0 reader reports.
 - Library/package version bumped to **1.1.0**; spec 1.1 ships as the additive
   successor to the frozen 1.0 baseline, which remains the stable floor every 1.x
   release must honour.
+- **Dropped the `libm` dependency.** The library never used a transcendental
+  function — every `pow()`/`log10()` call raised to or recovered an *integer*
+  power, so they are replaced with integer exponentiation helpers (`bvni_ipow`,
+  `bvni_pow10`) that are bit-exact for powers of two and for powers of ten in the
+  exactly-representable range. The remaining `<math.h>` uses (`fabs`, `isfinite`,
+  `isinf`, `isnan`, `signbit`) are compiler builtins that need no runtime library.
+  Consumers no longer have to add `-lm` when linking `libbvnr_static`.
 
 ### Fixed
 

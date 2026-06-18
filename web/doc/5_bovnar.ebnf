@@ -7,7 +7,7 @@
 (*    "…"  = literal terminal   (*…*) = comment                       *)
 (*  Updated: 2026-06-17 — drop the residual "1.1 (draft)" label (spec   *)
 (*    1.1 is released); note datetime also accepts a width parameter;    *)
-(*    reframe base-unit as a lookup into the full 163-unit / 480-spelling *)
+(*    reframe base-unit as a lookup into the full 163-unit / 487-spelling *)
 (*    table (NOT the closed SI subset it previously claimed).             *)
 (*  2026-06-16 — consistency pass vs the implementation:               *)
 (*    allow ws/comments before the assignment ";" and the "/" array    *)
@@ -80,7 +80,10 @@
 (*   sequence. Struct values do NOT produce ev_data; they are          *)
 (*   signaled by ev_struct_start and ev_struct_end.                   *)
 
-stream       = [utf8-bom] , ws , [version-directive , ws] ,
+(* Only blank characters — NOT comments — may precede the version      *)
+(* directive: it is recognised solely as the very first comment, so an  *)
+(* earlier comment would demote it to an ordinary one (see below).      *)
+stream       = [utf8-bom] , {ws-char} , [version-directive] , ws ,
                {assignment , ws} ;
 
 (* UTF-8 BOM: legal only as the very first three bytes of the stream. *)
@@ -97,9 +100,12 @@ utf8-bom     = "\xEF\xBB\xBF" ;
 (* is a decimal integer with no leading zero (a bare "0" excepted).     *)
 (* A malformed version after the "!bovnar" prefix is                    *)
 (* error_invalid_spec_version.                                          *)
-version-directive = "#" , "!bovnar" , ws-mandatory ,
+(* The directive accepts ONLY horizontal whitespace (HT or SP) around   *)
+(* its components — not the LF/CR/VT/FF that "ws-char" also covers.      *)
+version-directive = "#" , "!bovnar" , hspace , {hspace} ,
                     version-int , "." , version-int ,
-                    {ws-char} , ("\x0D" | "\x0A" | (* eof *)) ;
+                    {hspace} , ("\x0D" | "\x0A" | (* eof *)) ;
+hspace       = "\x09" (* HT *) | "\x20" (* SP *) ;
 (* version-int: a decimal integer with no leading zero (a bare "0" is the *)
 (* only form starting with "0"); each component must fit in a uint16.     *)
 version-int  = "0"
@@ -384,7 +390,7 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* nesting is bounded at 16.                                           *)
 (*                                                                     *)
 (* Empty components or groups (e.g. "m//s", "()", "m*·s"), unmatched   *)
-(* parentheses, and more than BVN_MAX_UNIT_COMPONENTS = 8 total        *)
+(* parentheses, and more than BVNR_MAX_UNIT_COMPONENTS = 8 total       *)
 (* components per unit string all produce error_unit_illegal.          *)
 (*                                                                     *)
 (* unit-component = [prefix "~"] base-unit [unit-exponent] ;          *)
@@ -401,7 +407,7 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*                                                                     *)
 (* base-unit  = a symbol looked up in the fixed unit table by              *)
 (*   bvn_parse_unit (src/utils/bovnar_si_units.c): 163 named units with     *)
-(*   480 accepted spellings (canonical symbols plus long-form and plural    *)
+(*   487 accepted spellings (canonical symbols plus long-form and plural    *)
 (*   aliases), spanning SI, imperial / US customary, CGS, radiation,        *)
 (*   surveying, culinary, Old German and digital-storage quantities.        *)
 (*   Doc 2 (the unit-system spec) is the authoritative registry; the SI     *)

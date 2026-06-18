@@ -131,6 +131,12 @@ non-version remainder is reported as a malformed directive rather than ignored.
   appended so offsets are preserved but requiring consumers to recompile against
   the 1.1 headers rather than mixing a 1.0-compiled object with the new library.
   The Python wheel keeps the unversioned `libbvnr.so` it loads by name.
+- **Conformance output upgraded to TAP version 14.** The 303 cases are now grouped
+  into TAP 14 *subtests* — one indented child stream per case group (21 groups),
+  each with its own plan and rolled up into a parent test point — so the report is
+  hierarchical instead of a flat list. The parent plan counts groups (`1..21`);
+  individual case points and YAML failure diagnostics are emitted inside each
+  subtest. Self-test and `--iut` modes and the exit-code contract are unchanged.
 
 ### Fixed
 

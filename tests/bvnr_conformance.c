@@ -506,37 +506,73 @@ static iut_result_t iut_run(const char *iut_path,
  * TAP output
  * ========================================================================= */
 
-static int g_tap_next     = 1;
+/*
+ * TAP version 14 output. The suite is emitted as a parent stream whose test
+ * points are the case groups; each group is a 4-space-indented subtest (a child
+ * TAP stream) carrying its individual cases, a trailing child plan, and a leading
+ * "# Subtest:" comment, then a parent-level roll-up point per the TAP 14 subtest
+ * convention. tap_ok/tap_fail/tap_skip emit the child (case) points; the suite/
+ * subtest framing is driven from main().
+ */
+/* Parent (suite) level. */
+static int g_grp_next     = 1;   /* next parent test-point number          */
+static int g_grp_total    = 0;   /* groups (subtests) emitted              */
+static int g_grp_failures = 0;   /* groups with at least one failed case   */
+/* Child (current subtest) level. */
+static int g_sub_next     = 1;   /* next case point within the group       */
+static int g_sub_failures = 0;   /* failed cases in the current group       */
+/* Overall case tallies (drive the summary line; semantics unchanged). */
 static int g_tap_failures = 0;
 static int g_tap_total    = 0;
 static bool g_verbose     = false;
 static const char *g_filter_group = NULL;
 
-static void tap_begin(int count)
+static void tap_begin(int group_count)
 {
-	printf("TAP version 13\n1..%d\n", count);
+	printf("TAP version 14\n1..%d\n", group_count);
+}
+
+static void tap_subtest_begin(const char *group)
+{
+	printf("# Subtest: %s\n", group);
+	g_sub_next     = 1;
+	g_sub_failures = 0;
+}
+
+static void tap_subtest_end(const char *group)
+{
+	/* Trailing child plan, then the parent-level roll-up point. */
+	printf("    1..%d\n", g_sub_next - 1);
+	if (g_sub_failures > 0) {
+		printf("not ok %d - %s\n", g_grp_next++, group);
+		g_grp_failures++;
+	} else {
+		printf("ok %d - %s\n", g_grp_next++, group);
+	}
+	g_grp_total++;
 }
 
 static void tap_ok(const char *id, const char *desc)
 {
-	printf("ok %d - [%s] %s\n", g_tap_next++, id, desc);
+	printf("    ok %d - [%s] %s\n", g_sub_next++, id, desc);
 	g_tap_total++;
 	if (g_verbose)
-		printf("  # PASS\n");
+		printf("    # PASS\n");
 }
 
 static void tap_fail(const char *id, const char *desc, const char *detail)
 {
-	printf("not ok %d - [%s] %s\n", g_tap_next++, id, desc);
+	printf("    not ok %d - [%s] %s\n", g_sub_next++, id, desc);
 	if (detail && *detail)
-		printf("  ---\n  message: %s\n  ...\n", detail);
+		printf("      ---\n      message: %s\n      ...\n", detail);
 	g_tap_total++;
 	g_tap_failures++;
+	g_sub_failures++;
 }
 
 static void tap_skip(const char *id, const char *desc, const char *reason)
 {
-	printf("ok %d - [%s] %s # SKIP %s\n", g_tap_next++, id, desc, reason);
+	printf("    ok %d - [%s] %s # SKIP %s\n", g_sub_next++, id, desc, reason);
 	g_tap_total++;
 }
 
@@ -1863,26 +1899,35 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	int active_count = 0;
-	for (int i = 0; i < NUM_CASES; i++) {
-		if (g_filter_group &&
-		    strcmp(g_cases[i].group, g_filter_group) != 0)
-			continue;
-		active_count++;
-	}
-
-	tap_begin(active_count);
-
+	/* Collect the distinct groups (honouring --filter) in first-appearance
+	 * order; each becomes one TAP 14 subtest. */
+	const char *groups[NUM_CASES];
+	int ngroups = 0;
 	for (int i = 0; i < NUM_CASES; i++) {
 		const cf_case_t *tc = &g_cases[i];
-		if (g_filter_group &&
-		    strcmp(tc->group, g_filter_group) != 0)
+		if (g_filter_group && strcmp(tc->group, g_filter_group) != 0)
 			continue;
+		bool seen = false;
+		for (int g = 0; g < ngroups; g++)
+			if (strcmp(groups[g], tc->group) == 0) { seen = true; break; }
+		if (!seen)
+			groups[ngroups++] = tc->group;
+	}
 
-		if (iut_path)
-			run_iut_test(tc, iut_path);
-		else
-			run_self_test(tc);
+	tap_begin(ngroups);
+
+	for (int g = 0; g < ngroups; g++) {
+		tap_subtest_begin(groups[g]);
+		for (int i = 0; i < NUM_CASES; i++) {
+			const cf_case_t *tc = &g_cases[i];
+			if (strcmp(tc->group, groups[g]) != 0)
+				continue;
+			if (iut_path)
+				run_iut_test(tc, iut_path);
+			else
+				run_self_test(tc);
+		}
+		tap_subtest_end(groups[g]);
 	}
 
 	if (g_tap_failures > 0) {

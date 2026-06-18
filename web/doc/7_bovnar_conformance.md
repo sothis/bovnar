@@ -465,21 +465,34 @@ specifies:
 
 ## 9. Output Format (TAP)
 
-The tool emits **TAP version 13** (Test Anything Protocol), which is
-consumed natively by CTest and many CI systems.
+The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
+natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
+a 4-space-indented child stream of the individual cases, a trailing child plan,
+and a leading `# Subtest:` comment, rolled up into one parent test point. The
+parent plan therefore counts the groups (currently 21), not the 303 cases.
 
 ```
-TAP version 13
-1..303
-ok 1 - [ENC-001] empty stream
-ok 2 - [ENC-002] UTF-8 BOM at byte 0
-not ok 3 - [ENC-003] UTF-8 BOM after first comment
-  ---
-  message: expected error invalid_byte_order_mark but got none
-  ...
+TAP version 14
+1..21
+# Subtest: encoding
+    ok 1 - [ENC-001] empty stream
+    ok 2 - [ENC-002] UTF-8 BOM at byte 0
+    not ok 3 - [ENC-003] UTF-8 BOM after first comment
+      ---
+      message: expected error invalid_byte_order_mark but got none
+      ...
+    1..9
+not ok 1 - encoding
+# Subtest: version
+    ok 1 - [VER-001] directive declaring the current spec version
+    ...
+    1..13
+ok 2 - version
 ```
 
-Exit code is **0** when all tests pass, **1** when any test fails.
+A group's parent point is `not ok` if any of its cases failed. Exit code is **0**
+when all tests pass, **1** when any test fails. (`--filter <group>` restricts the
+run to a single group; the parent plan is then `1..1`.)
 
 ---
 

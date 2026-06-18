@@ -102,12 +102,19 @@ static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 	}
 }
 /*
- * Populate all run LUTs plus the whitespace-accepting-state table. Marked as a
- * constructor so the tables are ready before main() even if the library is
- * used without an explicit init call; bvn_lex_init also calls it (guarded by
- * bvn_run_luts_inited) so static-init order is never relied upon.
+ * Populate all run LUTs plus the whitespace-accepting-state table. On GCC/Clang
+ * it runs before main() so the tables are ready even without an explicit init
+ * call. MSVC has no equivalent attribute, and none is needed: bvn_lex_init()
+ * calls this (guarded by bvn_run_luts_inited) before any lexing, so the tables
+ * are always populated — the constructor is only a redundant "before main()"
+ * guarantee, never relied upon for correctness or static-init order.
  */
-__attribute__((constructor))
+#if defined(__GNUC__) || defined(__clang__)
+#  define BVN_LEX_CONSTRUCTOR __attribute__((constructor))
+#else
+#  define BVN_LEX_CONSTRUCTOR
+#endif
+BVN_LEX_CONSTRUCTOR
 static void bvn_init_run_luts(void)
 {
 	if (bvn_run_luts_inited) return;

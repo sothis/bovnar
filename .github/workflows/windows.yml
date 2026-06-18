@@ -14,7 +14,9 @@ concurrency:
 # Builds the library (static + DLL) and the CLI on the two supported 64-bit
 # Windows toolchains, MSVC and MinGW64, and smoke-tests the CLI end to end.
 # The POSIX test harness (fork/exec IUT, socketpair/pthread, sigaction fuzz) is
-# not built on Windows; the CLI smoke test exercises the read/write/DOM paths.
+# not built on Windows; the CLI smoke tests exercise the read/write/DOM paths.
+# Smoke checks are split into one step per command so a failure pinpoints the
+# offending command from the step status alone.
 
 jobs:
   msvc:
@@ -23,34 +25,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (Visual Studio, x64)
-        run: cmake -B build -A x64 -DBVNR_BUILD_TESTS=OFF .
+      - name: Set up MSVC x64 environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Register MSVC problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/msvc.json"
+
+      - name: Configure (Ninja)
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build
 
-      - name: List artifacts + check DLL exports
+      - name: Check artifacts + DLL exports
         shell: cmd
         run: |
-          dir build\Release
-          dumpbin /exports build\Release\bvnr.dll | findstr /i "bvnr_version bvnr_read bvnr_write_event"
-          if not exist build\Release\bvnr_static.lib exit /b 1
-          if not exist build\Release\bvnr.lib exit /b 1
-          if not exist build\Release\bvnr.dll exit /b 1
+          dir build
+          if not exist build\bvnr.dll exit /b 1
+          if not exist build\bvnr.lib exit /b 1
+          if not exist build\bvnr_static.lib exit /b 1
+          if not exist build\bovnar.exe exit /b 1
+          dumpbin /exports build\bvnr.dll | findstr /i "bvnr_version bvnr_read"
 
-      - name: CLI smoke test
+      - name: Prepare sample document
+        shell: pwsh
+        run: Set-Content -NoNewline -Encoding ascii smoke.bvnr ".a = <uint:8> 7;`n.b = <float:64> 3.5;`n"
+
+      - name: smoke - validate (file)
         shell: pwsh
         run: |
-          Set-Content -NoNewline -Encoding ascii smoke.bvnr ".a = <uint:8> 7;`n.b = <float:64> 3.5;`n"
-          & build\Release\bovnar.exe validate smoke.bvnr
-          if ($LASTEXITCODE -ne 0) { throw "validate failed" }
-          $out = & build\Release\bovnar.exe pretty-print smoke.bvnr
-          if ($LASTEXITCODE -ne 0) { throw "pretty-print failed" }
+          & build\bovnar.exe validate smoke.bvnr
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: smoke - pretty-print (file)
+        shell: pwsh
+        run: |
+          $out = & build\bovnar.exe pretty-print smoke.bvnr
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host $out
-          if ($out -notmatch '<uint:8>') { throw "unexpected pretty-print output" }
-          # stdin path (exercises Windows binary-mode stdin via '-').
-          Get-Content -Raw smoke.bvnr | & build\Release\bovnar.exe events -
-          if ($LASTEXITCODE -ne 0) { throw "events stdin failed" }
+          if ($out -notmatch '<uint:8>') { Write-Error 'missing <uint:8> in output'; exit 1 }
+
+      - name: smoke - events (binary-mode stdin)
+        shell: pwsh
+        run: |
+          Get-Content -Raw smoke.bvnr | & build\bovnar.exe events -
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
   mingw:
     name: MinGW64
@@ -76,23 +97,28 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: List artifacts + check DLL is self-contained
+      - name: Check artifacts + DLL is self-contained
         run: |
           ls -l build
           test -f build/libbvnr.a
           test -f build/libbvnr.dll
           test -f build/libbvnr.dll.a
+          test -f build/bovnar.exe
           # No GCC runtime sidecar dependency (we link -static-libgcc -static).
           if objdump -p build/libbvnr.dll | grep -iE 'libgcc_s|libwinpthread|libstdc\+\+'; then
             echo "DLL has an unexpected GCC runtime dependency" && exit 1
           fi
-          objdump -p build/libbvnr.dll | grep -i 'DLL Name' || true
 
-      - name: CLI smoke test
+      - name: Prepare sample document
+        run: printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
+
+      - name: smoke - validate (file)
+        run: ./build/bovnar.exe validate smoke.bvnr
+
+      - name: smoke - pretty-print (file)
         run: |
-          printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
-          ./build/bovnar.exe validate smoke.bvnr
           ./build/bovnar.exe pretty-print smoke.bvnr | tee out.txt
           grep -q '<uint:8>' out.txt
-          # stdin path (exercises Windows binary-mode stdin via '-').
-          printf '.x = "hi";\n' | ./build/bovnar.exe events -
+
+      - name: smoke - events (binary-mode stdin)
+        run: printf '.x = "hi";\n' | ./build/bovnar.exe events -

@@ -142,6 +142,10 @@ non-version remainder is reported as a malformed directive rather than ignored.
 
 Hardening uncovered while developing 1.1:
 
+- Python `dumps()` spec-1.1 directive detection (`_uses_spec_1_1`) now reads a
+  Quantity's `vtype.family` defensively, so a Quantity built (via the low-level
+  constructor) with an unexpected `vtype` reports "not a datetime" instead of
+  raising `AttributeError` mid-serialisation.
 - The datetime epoch index was misread as a numeric base in the DOM/parse layer
   (`<datetime:gps> 1010` decoded as base-2); now always decimal.
 - Reader/writer validation symmetry for datetime: the writer now emits the

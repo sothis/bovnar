@@ -173,7 +173,12 @@ def _uses_spec_1_1(obj) -> bool:
     Quantity, or a reference whose path indexes an array (&.a[0]) — so dumps()
     must prepend a #!bovnar 1.1 directive for the output to round-trip."""
     if isinstance(obj, Quantity):
-        if obj.vtype.family == int(ValueTypeFamily.DATETIME):
+        # vtype is normally a ValueTypeSpec, but the constructor does not enforce
+        # it; read .family defensively so a Quantity built with an unexpected
+        # vtype reports "not a datetime" rather than raising AttributeError mid
+        # serialisation (the directive-detection pass must not be the thing that
+        # crashes dumps()).
+        if getattr(obj.vtype, 'family', None) == int(ValueTypeFamily.DATETIME):
             return True
         # A reference is re-emitted as &.path; array indexing in that path
         # (&.a[0][1]) is spec 1.1, so its '[' requires the directive.

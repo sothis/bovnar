@@ -455,7 +455,11 @@ class _TypedDictParser(_DictParser):
             return _decode_value(raw, fam, vt, tok_type)
         text = raw.decode('utf-8', errors='replace') if raw else None
         vu   = data.value_unit if data is not None else make_unit_none()
-        return Quantity(text, vt, vu, tok_type)
+        # spec 1.1 — a datetime literal's sub-second digits live on the event,
+        # not in `raw` (the whole-second carrier); carry them so dumps() can
+        # round-trip the fraction losslessly.
+        frac = data.frac_str() if data is not None else None
+        return Quantity(text, vt, vu, tok_type, frac=frac)
 
 
 def _seal_array(arr: _ArrScope):
@@ -619,6 +623,13 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     d.value_unit = q.unit
     d.data       = _ct.cast(_ct.c_char_p(raw_bytes), _ct.c_void_p)
     d.length     = len(raw_bytes)
+    # spec 1.1 — pass a datetime's verbatim sub-second digits so the C writer
+    # re-emits the ISO literal (else the whole-second carrier alone would
+    # silently drop the fraction). frac_bytes must outlive the write call.
+    frac_bytes = q._frac.encode('ascii') if q._frac else None
+    if frac_bytes:
+        d.frac_data   = _ct.cast(_ct.c_char_p(frac_bytes), _ct.c_void_p)
+        d.frac_length = len(frac_bytes)
     _write_event_data(w, d)
 
 

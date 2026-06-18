@@ -352,7 +352,12 @@ class Writer:
                 if not ok:
                     self._raise_error()
 
-        if vu.num_components > 0:
+        # A datetime carries no unit — its only annotation parameter is the epoch
+        # (emitted above). Its value_unit can still be the (1 × bu_none) no-unit
+        # sentinel (e.g. for a bare ISO literal whose annotation is inferred),
+        # which bvn_unit_to_string_ex renders as the literal "no_unit"; emitting
+        # that as a unit produces an illegal "<datetime:…,no_unit>" annotation.
+        if vu.num_components > 0 and fam != int(ValueTypeFamily.DATETIME):
             lib = self._lib
             ubuf = ctypes.create_string_buffer(256)
             unit_flags = lib.bvnr_writer_unit_flags(self._ptr)

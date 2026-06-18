@@ -119,17 +119,28 @@ class Quantity:
     enable exact round-trips: numeric precision, integer base, and physical
     units are all preserved across a load/dump cycle.
     """
-    __slots__ = ('raw', 'vtype', 'unit', '_tok_type')
+    __slots__ = ('raw', 'vtype', 'unit', '_tok_type', '_frac')
 
     def __init__(self,
                  raw:      str | None,
                  vtype:    ValueTypeSpec,
                  unit:     ValueUnit | None = None,
-                 tok_type: int = 2) -> None:
+                 tok_type: int = 2,
+                 frac:     str | None = None) -> None:
         self.raw       = raw
         self.vtype     = vtype
         self.unit      = unit if unit is not None else make_unit_none()
         self._tok_type = tok_type
+        # spec 1.1 — verbatim ISO sub-second digits of a datetime carrier (the
+        # whole-second value is `raw`). None for any other value or a datetime
+        # with no fraction. Carried through dumps() so a fractional datetime
+        # round-trips losslessly via the C writer's ISO-literal reconstruction.
+        self._frac     = frac
+
+    @property
+    def datetime_fraction(self) -> str | None:
+        """Verbatim ISO sub-second digits of a datetime value, or None."""
+        return self._frac
 
     @classmethod
     def from_number(cls, value, *, family=ValueTypeFamily.FLOAT_DEC,

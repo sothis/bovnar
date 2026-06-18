@@ -183,6 +183,33 @@ def test_iso_fraction_is_visible_and_roundtrips():
 
 
 @needs_lib
+@pytest.mark.parametrize("src", [
+    '#!bovnar 1.1\n.t = <datetime:64> 2026-06-15T12:00:00.123Z;\n',  # explicit ann + frac
+    '#!bovnar 1.1\n.t = 2026-06-15T12:00:00.123Z;\n',                # bare literal + frac
+    '#!bovnar 1.1\n.t = 1969-12-31T23:59:59.5Z;\n',                  # pre-epoch (floored) + frac
+    '#!bovnar 1.1\n.t = <datetime:64,tai> 2026-05-28T00:00:00.25Z;\n',  # tai + frac
+    '#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;\n',                    # bare literal, no frac
+])
+def test_typed_datetime_roundtrips_losslessly(src):
+    # Regression: the dict-based typed loads/dumps path once (a) dropped a
+    # datetime's sub-second fraction (Quantity carried no fraction) and (b) emitted
+    # an illegal "<datetime:…,no_unit>" annotation for a bare ISO literal (the
+    # no-unit sentinel rendered as a unit). Both must now round-trip losslessly.
+    d = bovnar.loads(src, typed=True)
+    out = bovnar.dumps(d)
+    assert bovnar.loads(out, typed=True) is not None        # re-parses cleanly
+    assert bovnar.dumps(bovnar.loads(out, typed=True)) == out   # stable / idempotent
+
+
+@needs_lib
+def test_typed_datetime_fraction_survives_dumps():
+    q = bovnar.loads('#!bovnar 1.1\n.t = 2026-06-15T12:00:00.123Z;\n',
+                     typed=True)['t']
+    assert q.datetime_fraction == '123'                      # captured on the Quantity
+    assert b'2026-06-15T12:00:00.123Z' in bovnar.dumps({'t': q})  # re-emitted verbatim
+
+
+@needs_lib
 def test_datetime_write_path_struct_layout():
     # Writing a datetime drives Writer._write_scalar, which passes &BvnrData to
     # the C bvnr_write_event; the C serializer reads bvnr_data_t.frac_data. If the

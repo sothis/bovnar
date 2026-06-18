@@ -560,11 +560,38 @@ static void tap_ok(const char *id, const char *desc)
 		printf("    # PASS\n");
 }
 
+/*
+ * Emit `s` on a single physical line, escaping the control bytes — newlines in
+ * particular — that would otherwise break out of the indented YAML diagnostic
+ * block and produce malformed TAP. IUT failure details embed raw event-log bytes
+ * (e.g. "STREAM_START\n…"), so this keeps the `message:` scalar well-formed for
+ * strict TAP parsers.
+ */
+static void tap_print_escaped(const char *s)
+{
+	for (; *s; s++) {
+		unsigned char c = (unsigned char)*s;
+		switch (c) {
+		case '\n': fputs("\\n", stdout); break;
+		case '\r': fputs("\\r", stdout); break;
+		case '\t': fputs("\\t", stdout); break;
+		default:
+			if (c < 0x20u || c == 0x7fu)
+				printf("\\x%02x", c);
+			else
+				putchar((int)c);
+		}
+	}
+}
+
 static void tap_fail(const char *id, const char *desc, const char *detail)
 {
 	printf("    not ok %d - [%s] %s\n", g_sub_next++, id, desc);
-	if (detail && *detail)
-		printf("      ---\n      message: %s\n      ...\n", detail);
+	if (detail && *detail) {
+		fputs("      ---\n      message: ", stdout);
+		tap_print_escaped(detail);
+		fputs("\n      ...\n", stdout);
+	}
 	g_tap_total++;
 	g_tap_failures++;
 	g_sub_failures++;

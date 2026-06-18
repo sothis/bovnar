@@ -141,6 +141,20 @@ def loads(data: bytes | bytearray | str | memoryview,
           typed: bool = False,
           max_file_size: int = 0,
           continue_on_error: bool = False) -> dict:
+    """Parse a BVNR document into a dict.
+
+    With ``typed=True`` each scalar is returned as a :class:`Quantity` (its
+    type, unit, base, and — for a datetime — epoch and sub-second fraction are
+    preserved, so ``dumps()`` round-trips losslessly); otherwise scalars decode
+    to native Python values (a symbol or reference becomes a ``str``).
+
+    This is a single-pass *streaming* parse: it enforces the lexical grammar and
+    per-value type/unit/range rules, but NOT the whole-document (DOM-tier)
+    constraints — duplicate struct keys, cross-sibling array homogeneity, and
+    matrix rectangularity. A document that ``bovnar validate`` (the CLI) or
+    :func:`dom_parse` would reject for one of those can still load here, mirroring
+    the C streaming reader. Use :func:`dom_parse` when you need full validation.
+    """
     if isinstance(data, str):
         data = data.encode('utf-8')
     parser = _TypedDictParser() if typed else _DictParser()
@@ -155,11 +169,17 @@ def loads(data: bytes | bytearray | str | memoryview,
 
 
 def _uses_spec_1_1(obj) -> bool:
-    """True if serialising obj would emit a spec-1.1-only construct (currently:
-    a datetime Quantity), so dumps() must prepend a #!bovnar 1.1 directive for
-    the output to round-trip."""
+    """True if serialising obj would emit a spec-1.1-only construct — a datetime
+    Quantity, or a reference whose path indexes an array (&.a[0]) — so dumps()
+    must prepend a #!bovnar 1.1 directive for the output to round-trip."""
     if isinstance(obj, Quantity):
-        return obj.vtype.family == int(ValueTypeFamily.DATETIME)
+        if obj.vtype.family == int(ValueTypeFamily.DATETIME):
+            return True
+        # A reference is re-emitted as &.path; array indexing in that path
+        # (&.a[0][1]) is spec 1.1, so its '[' requires the directive.
+        if obj._tok_type == _TOKEN_IS_REFERENCE and obj.raw and '[' in obj.raw:
+            return True
+        return False
     if isinstance(obj, dict):
         return any(_uses_spec_1_1(v) for v in obj.values())
     if isinstance(obj, (list, tuple)):
@@ -452,6 +472,14 @@ class _TypedDictParser(_DictParser):
     def _decode_data(self, raw: bytes, fam: ValueTypeFamily, vt,
                      tok_type: int, data) -> object:
         if fam == ValueTypeFamily.PLAIN:
+            # A symbol or reference carries no family, but its KIND (tok_type)
+            # must survive a typed round-trip: dumps() re-emits a symbol as a
+            # bare word and a reference as &.path, not as a quoted string. Wrap
+            # it in a Quantity carrying the tok_type (the writer already honours
+            # it). Other PLAIN values (null) decode to a native Python value.
+            if tok_type in (_TOKEN_IS_SYMBOL, _TOKEN_IS_REFERENCE):
+                text = raw.decode('utf-8', errors='replace') if raw else None
+                return Quantity(text, vt, make_unit_none(), tok_type)
             return _decode_value(raw, fam, vt, tok_type)
         text = raw.decode('utf-8', errors='replace') if raw else None
         vu   = data.value_unit if data is not None else make_unit_none()
@@ -474,8 +502,9 @@ def _seal_array(arr: _ArrScope):
     return arr.rows
 
 
-_TOKEN_IS_SYMBOL = 3
-_TOKEN_IS_BOOL   = 15
+_TOKEN_IS_SYMBOL    = 3
+_TOKEN_IS_REFERENCE = 4
+_TOKEN_IS_BOOL      = 15
 
 
 def _char_to_digit(c: int, base: int) -> int:

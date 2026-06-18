@@ -438,3 +438,45 @@ class TestFfiDeclarations:
         if not loaded:
             import pytest
             pytest.skip("shared library not found on this system")
+
+
+@needs_lib
+class TestTypedRoundtripFidelity:
+    """High-level loads(typed=True)/dumps fidelity and the streaming-vs-DOM
+    validation boundary."""
+
+    def test_symbol_and_reference_keep_kind(self):
+        # A symbol and a (plain) reference must survive a typed round-trip as a
+        # symbol / &.path, not be downgraded to a quoted string.
+        src = '.target = 1;\n.ref = &.target;\n.sym = tcp;\n'
+        out = bovnar.dumps(bovnar.loads(src, typed=True)).decode()
+        assert '.ref = &.target;' in out
+        assert '.sym = tcp;' in out
+        assert '"' not in out                      # nothing got quoted
+        # stable / idempotent
+        assert bovnar.dumps(bovnar.loads(out, typed=True)).decode() == out
+
+    def test_reference_indexing_roundtrips_with_directive(self):
+        # &.m[0][1] is spec 1.1; dumps must prepend #!bovnar 1.1 so it re-parses.
+        src = '#!bovnar 1.1\n.m = [1,2,3]/[4,5,6];\n.cell = &.m[0][1];\n'
+        out = bovnar.dumps(bovnar.loads(src, typed=True)).decode()
+        assert out.startswith('#!bovnar 1.1')
+        assert '&.m[0][1]' in out
+        assert bovnar.dumps(bovnar.loads(out, typed=True)).decode() == out
+
+    def test_untyped_symbol_reference_stay_str(self):
+        # the dict model maps a symbol/reference to a plain str (unchanged)
+        d = bovnar.loads('.sym = tcp;\n.ref = &.sym;\n')
+        assert d == {'sym': 'tcp', 'ref': '.sym'}
+
+    @pytest.mark.parametrize("src", [
+        '.a = 1;\n.a = 2;\n',            # duplicate top-level key
+        '.m = [[1, 2], [3, 4, 5]];\n',   # non-rectangular matrix
+        '.a = [1, "two"];\n',            # heterogeneous array
+    ])
+    def test_loads_is_streaming_not_dom_validation(self, src):
+        # loads() is a single-pass streaming parse: DOM-tier checks (duplicate
+        # keys, homogeneity, rectangularity) are NOT enforced — dom_parse() is.
+        bovnar.loads(src)                                  # accepted (no raise)
+        with pytest.raises(BovnarParseError):
+            bovnar.dom_parse(src.encode())                 # rejected by full validation

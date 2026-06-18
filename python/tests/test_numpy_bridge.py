@@ -129,6 +129,26 @@ class TestUnmappableWidthEscapeHatch:
         a = to_numpy(dom_parse(b'.a=<float:128>[1.5,2.5];')['a'], dtype='float64')
         assert a.dtype == np.float64 and a.tolist() == [1.5, 2.5]
 
+    def test_dom_decimal_object_dtype_raises_not_silently_lossy(self):
+        # dtype=object on a DOM decimal/wide float must NOT silently fill an
+        # object array with lossy C doubles (the DOM keeps no exact value). It
+        # errors, pointing at the lossless typed route — the typed (Quantity)
+        # path with dtype=object stays exact.
+        for src in (b'.a=<float_dec:64>[3.333333333333333333,2.5];',
+                    b'.a=<float:128>[1.5,2.5];'):
+            with pytest.raises(BovnarArgumentError, match="loads.typed=True."):
+                to_numpy(dom_parse(src)['a'], dtype=object)
+        # the typed path is exact with dtype=object
+        from decimal import Decimal
+        typed = to_numpy(loads(b'.a=<float_dec:64>[3.333333333333333333,2.5];',
+                               typed=True)['a'], dtype=object)
+        assert typed.tolist() == [Decimal('3.333333333333333333'), Decimal('2.5')]
+        # a DOM bigint object array is exact (not a float) and still works
+        big = to_numpy(dom_parse(
+            b'.a=<uint:128>[340282366920938463463374607431768211455];')['a'],
+            dtype=object)
+        assert big.tolist() == [340282366920938463463374607431768211455]
+
     @pytest.mark.skipif(not hasattr(np, 'float128'),
                         reason="platform has no float128/longdouble")
     def test_float128_array_write_rejected(self):

@@ -215,13 +215,16 @@ def _gather_dtype(acc, family, width, base=0):
 # On the typed-load path (Quantity, which keeps the verbatim literal) these
 # decode to exact decimal.Decimal in an object array; pass dtype='float64' to
 # opt into the lossy native conversion instead.
-def _is_exact_decimal_quantity(q) -> bool:
-    fam = int(q.vtype.family)
-    if fam in (int(F.FLOAT_DEC), int(F.FLOAT_FIX)):
+def _is_exact_decimal_family(family: int, width: int) -> bool:
+    if family in (int(F.FLOAT_DEC), int(F.FLOAT_FIX)):
         return True
     # any binary float wider than float64 (128/256/512/...) — numpy has no
     # lossless native dtype, so it decodes to an exact Decimal from the literal.
-    return fam == int(F.FLOAT) and int(q.vtype.width or 64) not in (16, 32, 64)
+    return family == int(F.FLOAT) and int(width or 64) not in (16, 32, 64)
+
+
+def _is_exact_decimal_quantity(q) -> bool:
+    return _is_exact_decimal_family(int(q.vtype.family), int(q.vtype.width or 64))
 
 
 def _leaf(obj, acc):
@@ -260,6 +263,18 @@ def _leaf(obj, acc):
             dt = {DomType.INT: 'int64', DomType.FLOAT: 'float64',
                   DomType.BOOL: 'bool', DomType.STRING: 'str'}.get(obj.dom_type)
         else:
+            if _is_exact_decimal_family(int(obj.value_type.family),
+                                        int(obj.value_type.width or 64)):
+                # The DOM stores every float as a C double, so a decimal / wide
+                # binary float has ALREADY lost precision here — unlike the typed
+                # (Quantity) path, which keeps the verbatim literal. Record it so
+                # an exactness-implying dtype=object errors (below) instead of
+                # silently handing back lossy doubles in an object array.
+                acc['dom_inexact_float'] = (
+                    f"{F(int(obj.value_type.family)).name.lower()} read from a "
+                    "DOM node is a lossy C double, not an exact value; read it "
+                    "with loads(typed=True) for exact Decimals, or pass "
+                    "dtype='float64' for the lossy double")
             dt = _gather_dtype(acc, obj.value_type.family, obj.value_type.width,
                                obj.value_type.base)
         if dt:
@@ -345,6 +360,15 @@ def _extract(src, dtype):
             np_dtype = np.dtype(resolved)
         except TypeError as e:
             raise BovnarArgumentError(f"unknown dtype {resolved!r}: {e}") from e
+
+    # dtype=object on a DOM decimal / wide-binary float would silently fill the
+    # object array with lossy C doubles (the DOM keeps no exact value), defeating
+    # the point of an object array. Match the dtype=None path and refuse, pointing
+    # at the lossless typed route. (dtype='float64' is the explicit lossy opt-in
+    # and still works; a bigint object array is exact and never sets this flag.)
+    if (np_dtype is not None and np_dtype.kind == 'O'
+            and acc.get('dom_inexact_float')):
+        raise BovnarArgumentError(acc['dom_inexact_float'])
 
     # A null element survives only in a dtype that has a null/NaN slot: float
     # (NaN), complex, datetime64/timedelta64 (NaT) or object (None). For any

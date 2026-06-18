@@ -187,26 +187,31 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install mingw-w64 cross toolchain, Wine and Ninja
-        # Keep the download small — the Azure apt mirror throughput on the runners
-        # is highly variable, so every saved MB helps:
+        # Minimal set — the Azure apt mirror throughput on the runners is highly
+        # variable, so every saved MB helps:
         #   * gcc-mingw-w64-x86-64-win32 (+ the dev headers) instead of the
         #     gcc-mingw-w64-x86-64 metapackage, which also pulls the unused posix
         #     GCC variant (~50 MB). win32 is the variant the local toolchain uses.
-        #   * wine64 + wine-common (for wine.inf, needed to populate the prefix);
-        #     no 32-bit wine — we only run a 64-bit console .exe.
-        #   * --no-install-recommends drops Wine's GUI/audio recommends.
-        # The distro exposes wine through update-alternatives (the wine.collection
-        # group set up by libwine), which is NOT reliably configured in a minimal
-        # install — /usr/bin/wine64 ends up absent. Bypass it: symlink the concrete
-        # wine64-stable binary the wine64 package ships onto PATH, where the
-        # toolchain's find_program(wine64) picks it up as
-        # CMAKE_CROSSCOMPILING_EMULATOR. Acquire::Retries rides out mirror blips.
+        #   * wine64 only — it Depends on libwine, which ships both the loader and
+        #     wine.inf (used to populate the prefix). No `wine`/`wine-common`
+        #     (the latter does not even exist on this runner's Ubuntu), no 32-bit
+        #     wine: we only run a 64-bit console .exe.
+        #   * --no-install-recommends drops Wine's GUI/audio recommends;
+        #     Acquire::Retries rides out transient mirror blips.
+        # The distro exposes wine via update-alternatives (libwine's wine.collection
+        # group), which is NOT reliably configured in a minimal install, so
+        # /usr/bin/wine64 can be absent. Put the concrete wine64 binary on PATH
+        # ourselves (name varies: wine64-stable / -development), where the
+        # toolchain's find_program(wine64) picks it up as the test emulator.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
-            gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build \
-            wine64 wine-common
-          sudo ln -sf /usr/bin/wine64-stable /usr/local/bin/wine64
+            gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build wine64
+          if ! command -v wine64 >/dev/null 2>&1; then
+            for c in /usr/bin/wine64-stable /usr/bin/wine64-development /usr/lib/wine/wine64; do
+              if [ -x "$c" ]; then sudo ln -sf "$c" /usr/local/bin/wine64; break; fi
+            done
+          fi
           wine64 --version
 
       - name: Initialize Wine prefix

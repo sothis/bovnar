@@ -72,15 +72,18 @@ syn match   BovnarSemicolon ';'
 
 syn match   BovnarNull '=\s*;'
 
-" ISO-8601 datetime literal (spec 1.1): YYYY-MM-DD with an optional T time,
-" fractional seconds, and a Z or ±HH:MM offset. The longer match wins over
-" BovnarInteger for the leading YYYY.
-syn match   BovnarDateTime '\d\{4}-\d\{2}-\d\{2}\(T\d\{2}:\d\{2}:\d\{2}\(\.\d\+\)\=\(Z\|[+-]\d\{2}:\d\{2}\)\=\)\='
-
 syn match   BovnarInteger '\d\+' nextgroup=BovnarInlineUnit skipwhite
 syn match   BovnarFloat   '\d\+\.\d*\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
 syn match   BovnarFloat   '\d\+[eE][+-]\=\d\+' nextgroup=BovnarInlineUnit skipwhite
 syn match   BovnarFloat   '\.\d\+\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
+
+" ISO-8601 datetime literal (spec 1.1): YYYY-MM-DD with an optional T time,
+" fractional seconds, and a Z or ±HH:MM offset. Defined AFTER BovnarInteger on
+" purpose: at the shared leading-YYYY position vim resolves equal-start matches
+" in favour of the item defined LAST (not the longest), so this more specific
+" match must come after BovnarInteger to win — otherwise a date highlights as a
+" bare integer (and, inside arrays/structs, splits into integer-dash-integer).
+syn match   BovnarDateTime '\d\{4}-\d\{2}-\d\{2}\(T\d\{2}:\d\{2}:\d\{2}\(\.\d\+\)\=\(Z\|[+-]\d\{2}:\d\{2}\)\=\)\='
 
 syn region  BovnarString
       \ start=/"/ skip=/\\./ end=/"/
@@ -179,7 +182,7 @@ syn match   BovnarKeyName '\.[A-Za-z_\d192-\d65535][A-Za-z0-9_+\-\d128-\d65535]*
 syn cluster BovnarContent contains=
       \ BovnarComment,BovnarKeySigil,BovnarKeyName,
       \ BovnarSemicolon,BovnarAssign,BovnarTypeAnn,
-      \ BovnarNegative,BovnarFloat,BovnarInteger,
+      \ BovnarNegative,BovnarFloat,BovnarInteger,BovnarDateTime,
       \ BovnarString,BovnarEscape,BovnarInvalidEsc,
       \ BovnarSymbol,BovnarBoolean,BovnarNullKw,
       \ BovnarRefOp,BovnarRefPath,

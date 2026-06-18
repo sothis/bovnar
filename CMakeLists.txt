@@ -286,3 +286,54 @@ if(NOT SKBUILD)
             RENAME magic)
     endif()
 endif()
+
+# Convenience: also drive the MinGW-w64 Windows cross-build as part of the
+# default ("all") target, so a single "build all" on a Linux host that has the
+# cross toolchain installed produces the Windows artifacts (build-mingw/) too.
+# This is wired ON for the VSCode workspace (.vscode/settings.json passes
+# -DBVNR_CROSS_MINGW=ON) and is OFF by default everywhere else, so CI, the
+# Python wheel build, and plain command-line builds are unaffected. It is a
+# no-op (with a STATUS message) when the toolchain is not installed, and the
+# NOT CMAKE_CROSSCOMPILING guard stops the cross build from recursing into
+# itself. See cmake/toolchain-mingw-w64-x86_64.cmake.
+option(BVNR_CROSS_MINGW
+    "On a Linux host, also build the MinGW-w64 Windows target into build-mingw/ \
+as part of 'all' when the cross toolchain is installed"
+    OFF)
+if(BVNR_CROSS_MINGW
+        AND NOT CMAKE_CROSSCOMPILING
+        AND NOT WIN32
+        AND NOT SKBUILD
+        AND CMAKE_HOST_UNIX)
+    find_program(BVNR_MINGW_GCC x86_64-w64-mingw32-gcc)
+    if(BVNR_MINGW_GCC)
+        include(ExternalProject)
+        # Mirror the host build's config into the cross build (Release if the
+        # host build is config-less, e.g. a single-config generator with no
+        # CMAKE_BUILD_TYPE set).
+        set(_bvnr_cross_build_type "${CMAKE_BUILD_TYPE}")
+        if(NOT _bvnr_cross_build_type)
+            set(_bvnr_cross_build_type Release)
+        endif()
+        ExternalProject_Add(bvnr_mingw_cross
+            SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}
+            BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build-mingw
+            CMAKE_ARGS
+                -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain-mingw-w64-x86_64.cmake
+                -DCMAKE_BUILD_TYPE=${_bvnr_cross_build_type}
+                -DBVNR_BUILD_TESTS=OFF
+                -DBVNR_CROSS_MINGW=OFF
+            BUILD_ALWAYS TRUE       # pick up source edits on every "build all"
+            INSTALL_COMMAND ""      # cross artifacts stay in build-mingw/
+            USES_TERMINAL_CONFIGURE TRUE
+            USES_TERMINAL_BUILD TRUE)
+        message(STATUS
+            "BVNR_CROSS_MINGW: cross toolchain found (${BVNR_MINGW_GCC}); "
+            "'all' will also build the Windows target into build-mingw/")
+    else()
+        message(STATUS
+            "BVNR_CROSS_MINGW is ON but x86_64-w64-mingw32-gcc was not found; "
+            "skipping the Windows cross-build "
+            "(install the mingw-w64 toolchain to enable it)")
+    endif()
+endif()

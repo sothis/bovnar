@@ -1,0 +1,11 @@
+{
+  // Also build the MinGW-w64 Windows target (build-mingw/) whenever the native
+  // build is configured/built in VSCode (e.g. "CMake: Clean Reconfigure All
+  // Projects" + "Build All Projects"). The CMakeLists.txt block gated on this
+  // option auto-skips when the cross toolchain (x86_64-w64-mingw32-gcc) is not
+  // installed, so this is safe on machines without it. Default is OFF outside
+  // VSCode, so CI / wheel / command-line builds are unaffected.
+  "cmake.configureSettings": {
+    "BVNR_CROSS_MINGW": true
+  }
+}

@@ -826,12 +826,14 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		s->need_semi = false;
 		s->had_type_annotation = false;
 		s->emitted_type_param = false;
+		s->emitted_unit = false;
 		break;
 	case ev_type_annotation_start:
 		if (!bvn_ser_emit_pending_comma(s))
 			return false;
 		s->had_type_annotation = true;
 		s->emitted_type_param = false;
+		s->emitted_unit = false;
 		if (!bvn_ser_push_byte(s, '<')) return false;
 		break;
 	case ev_type_annotation_type_family: {
@@ -890,6 +892,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					return false;
 			}
 			s->emitted_type_param = true;
+			s->emitted_unit = true;
 		}
 		break;
 	}
@@ -1025,6 +1028,24 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				 * no sigil. */
 				if (!bvn_ser_push(s, d->data, d->length))
 					return false;
+			}
+			/* An inline unit ("<float:64> 9.81 m/s") lives on the value, not
+			 * the annotation, so it was NOT emitted as a type parameter above.
+			 * Append it after the number so the unit — and thus the decoded
+			 * value — survives canonicalisation. A unit given in the annotation
+			 * set emitted_unit (skip, else it would double); datetime carries no
+			 * unit (value_unit is no_unit, so this is skipped). */
+			if (!s->emitted_unit &&
+			    d->value_unit.num_components > 0u &&
+			    !BVN_UNIT_IS_NO_UNIT(d->value_unit)) {
+				char ubuf[256];
+				int32_t un = bvn_unit_to_string(d->value_unit,
+					ubuf, sizeof ubuf);
+				if (un > 0) {
+					if (!bvn_ser_push_byte(s, ' ')) return false;
+					if (!bvn_ser_push(s, ubuf, (uint32_t)un))
+						return false;
+				}
 			}
 		} else if (d->type == token_is_string ||
 				   d->type == token_is_array_string) {

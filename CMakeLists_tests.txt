@@ -725,6 +725,21 @@ add_test(
 set_tests_properties(bvnr_cli_inline_unit_preserved PROPERTIES
     LABELS "cli;examples;units" TIMEOUT 30)
 
+# An inline unit on a value that ALSO carries an explicit (unit-less) annotation
+# must survive too. The annotation is emitted before the value's unit is known,
+# so it is appended inline ("<float:64> 9.81 m/s"); emitting "<float:64> 9.81"
+# alone would silently drop the unit (and change the decoded value). .speed_b in
+# floats.bvnr exercises exactly this; the idempotency test cannot catch it.
+add_test(
+    NAME    bvnr_cli_inline_unit_with_annotation_preserved
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DBVNR_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/floats.bvnr
+            "-DREQUIRE=<float:64> 9.81 m/s"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pretty_print_contains.cmake)
+set_tests_properties(bvnr_cli_inline_unit_with_annotation_preserved PROPERTIES
+    LABELS "cli;examples;units" TIMEOUT 30)
+
 add_test(
     NAME    bvnr_cli_inline_currency_preserved
     COMMAND "${CMAKE_COMMAND}"

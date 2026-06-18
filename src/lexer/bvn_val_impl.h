@@ -56,6 +56,9 @@ typedef struct bvnr_serializer_s {
 	uint32_t		struct_depth_at_array_start[UINT8_MAX+1];
 	bool			had_type_annotation;
 	bool			emitted_type_param;
+	bool			emitted_unit;	/* a unit was emitted in the annotation,
+						 * so an inline unit on the value need
+						 * not (and must not) be re-appended */
 	void*			event_userdata;
 	bool			(*on_event)(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bvn_unit_flags_t	unit_flags;

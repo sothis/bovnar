@@ -189,6 +189,15 @@ run_cmake_check "inline units preserved (units.bvnr)" \
     "-DREQUIRE=<float:64,_10,m/s> 9.81|<float:64,_10,k~g> 70.5|<uint:64,_10,Gi~B> 4|<uint:64,_10,B> 1500|<sint:64,_10,°C> -40|<float:64,_10,Pa> 101325.0" \
     -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
 
+# An inline unit on a value that ALSO has an explicit (unit-less) annotation must
+# be kept too — it is appended inline since the annotation was already emitted.
+# (.speed_b in floats.bvnr; "<float:64> 9.81" alone would be a silent unit drop.)
+run_cmake_check "inline unit kept with explicit annotation (floats.bvnr)" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DBVNR_FILE="${SRC_DIR}/examples/floats.bvnr" \
+    "-DREQUIRE=<float:64> 9.81 m/s" \
+    -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
+
 run_cmake_check "inline currency preserved (financial.bvnr)" \
     -DBOVNAR="${BOVNAR_BIN}" \
     -DBVNR_FILE="${SRC_DIR}/examples/financial.bvnr" \

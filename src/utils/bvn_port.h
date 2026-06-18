@@ -105,6 +105,17 @@ static inline int bvn_port_write(int fd, const void *buf, size_t n)
 #    define STDERR_FILENO 2
 #  endif
 
+/* Console code-page control for the CLI's human-readable output (see
+ * bvn_set_binary_stdio). Forward-declared here so this header need not drag
+ * <windows.h> into the I/O translation units; the signatures match the Win32
+ * headers exactly, so the later <windows.h> include (under BVN_PORT_TIMING)
+ * re-declares them identically without conflict. */
+#  ifndef CP_UTF8
+#    define CP_UTF8 65001
+#  endif
+__declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int wCodePageID);
+__declspec(dllimport) int __stdcall SetConsoleCP(unsigned int wCodePageID);
+
 #else  /* POSIX */
 
 #  include <unistd.h>
@@ -121,8 +132,8 @@ static inline int bvn_port_write(int fd, const void *buf, size_t n)
 
 /*
  * Put the standard streams into binary mode so the CLI's byte stream is not
- * mangled by CRLF translation. No-op on POSIX. Call once at program start,
- * before any fd or stdio I/O.
+ * mangled by CRLF translation, and switch the Windows console to UTF-8. No-op
+ * on POSIX. Call once at program start, before any fd or stdio I/O.
  */
 static inline void bvn_set_binary_stdio(void)
 {
@@ -130,6 +141,17 @@ static inline void bvn_set_binary_stdio(void)
 	(void)_setmode(_fileno(stdin),  _O_BINARY);
 	(void)_setmode(_fileno(stdout), _O_BINARY);
 	(void)_setmode(_fileno(stderr), _O_BINARY);
+	/* The CLI's human-readable output (the events table, bench headers, the
+	 * box-drawing rules) is emitted as raw UTF-8 bytes. A Windows console
+	 * defaults to its OEM code page (CP437/CP850), which renders each UTF-8
+	 * byte as a separate glyph -- e.g. "=" (U+2550) shows up as "GtO". Pin
+	 * the console's input and output code pages to UTF-8 so those bytes are
+	 * decoded correctly. Harmless when the streams are redirected to a file
+	 * or pipe (SetConsoleOutputCP simply fails on a non-console handle), and
+	 * it composes with the binary mode set above: the CRT passes the bytes
+	 * through untouched and the console decodes them as UTF-8. */
+	(void)SetConsoleOutputCP(CP_UTF8);
+	(void)SetConsoleCP(CP_UTF8);
 #endif
 }
 

@@ -1389,7 +1389,9 @@ static void test_write_datetime_fraction_guards(void)
  * matching ev_struct_start, so struct_depth is 0 — must be self-rejected: without
  * the guard in bvn_ser_serialize_event, indent/struct_depth would underflow and
  * the next bvn_ser_indent would emit ~4 billion tab bytes. This is the only path
- * that reaches that guard, so it is exercised here directly.
+ * that reaches that guard, so it is exercised here directly. Pretty mode is on so
+ * indentation is actually emitted: without the guard the run would flood the
+ * sink, so bytes_written==0 (not the on_event return alone) is what pins it.
  */
 static void test_canon_observer_unbalanced_struct_end_rejected(void)
 {
@@ -1397,7 +1399,7 @@ static void test_canon_observer_unbalanced_struct_end_rejected(void)
 	bvnr_sink_t sink;
 	bvnr_sink_to_mem(&sink, buf, sizeof buf);
 
-	bvnr_canon_observer_t *obs = bvnr_canon_observer_create(&sink, false);
+	bvnr_canon_observer_t *obs = bvnr_canon_observer_create(&sink, true);
 	ASSERT_NOT_NULL(obs, "canon observer create");
 	if (!obs) return;
 

@@ -910,6 +910,12 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		s->struct_depth++;
 		break;
 	case ev_struct_end:
+		/* Self-protect against an unbalanced struct-end, mirroring the array-depth
+		 * guard below: the canon-observer path drives this serializer with no
+		 * validation, so without a matching struct-start indent/struct_depth would
+		 * underflow and the next bvn_ser_indent would emit ~4 billion tab bytes. */
+		if (s->struct_depth == 0)
+			return false;
 		s->indent--;
 		if (s->need_semi) {
 			if (!bvn_ser_push_byte(s, ';')) return false;

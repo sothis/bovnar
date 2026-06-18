@@ -810,6 +810,19 @@ _bvnr_convert_fail(nul_in_string    bad_nul.json              "NUL")
 _bvnr_convert_fail(dup_key          bad_dupkey.json           "duplicate key")
 _bvnr_convert_fail(diff_key_records bad_diffkeys.json         "differing key sets")
 
+# bvnr -> json must refuse a datetime with sub-second digits rather than
+# silently truncate the fraction the integer carrier cannot hold.
+add_test(
+    NAME    bvnr_cli_convert_fail_datetime_fraction
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/frac_datetime.bvnr
+            -DFROM=bvnr -DTO=json
+            "-DNEEDLE=sub-second"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/convert_expect_fail.cmake)
+set_tests_properties(bvnr_cli_convert_fail_datetime_fraction PROPERTIES
+    LABELS "cli;convert" TIMEOUT 30)
+
 # ── Single-file amalgamation ────────────────────────────────────────────────
 # The amalgamation is currently not shipped in dist/ (dist/bovnar.{c,h} are
 # git-ignored), so its regenerate-and-smoke-test (bvnr_amalgam) is disabled.

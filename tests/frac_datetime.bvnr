@@ -1,0 +1,6 @@
+#!bovnar 1.1
+# A datetime carrying sub-second digits: the whole-second epoch count is the
+# carrier and the ".123" is preserved verbatim in bovnar, but JSON has only the
+# integer carrier, so converting this to JSON must be a hard error rather than a
+# silent truncation of the fraction (regression fixture for cmd_convert).
+.t = <datetime:64> 2026-06-15T12:00:00.123Z;

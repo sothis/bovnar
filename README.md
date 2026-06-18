@@ -263,7 +263,9 @@ since JSON has no equivalent:
 - type annotations — bit-width, base, and **physical unit / currency** — are
   dropped (a `<float:64,m/s> 9.81` becomes a bare `9.81`); a `datetime` likewise
   becomes a bare number — its **epoch** (e.g. `gps` vs `unix`) is dropped, so
-  the seconds count alone is emitted;
+  the seconds count alone is emitted, but a datetime written with a **sub-second
+  fraction** (e.g. `…:00.123Z`) has no integer-carrier JSON representation and is
+  a hard error rather than a silent truncation of the fraction;
 - symbols and references are emitted as strings (an indexed reference path such
   as `&.matrix[0][1]` becomes the string `".matrix[0][1]"` — it is not resolved);
   octet streams as a lowercase hex string;

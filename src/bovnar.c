@@ -1523,6 +1523,41 @@ static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 	}
 	}
 }
+/* spec 1.1: a datetime written with sub-second digits (e.g. ...:00.123Z) stores
+ * the whole-second epoch count as its carrier plus the verbatim fraction. JSON
+ * has only the integer carrier to offer, so emitting it would silently drop the
+ * fraction — a value change, not just metadata loss. Per the converter's
+ * "anything it cannot represent is a hard error" contract, scan for any such
+ * value up front and refuse before writing partial output. Returns the first
+ * offending node, or NULL if the subtree has none. */
+static const bvn_dom_node_t *find_fractional_datetime(const bvn_dom_node_t *node)
+{
+	if (!node) return NULL;
+	switch (bvn_dom_node_type(node)) {
+	case BVN_DOM_INT:
+		return bvn_dom_get_datetime_fraction(node, NULL) ? node : NULL;
+	case BVN_DOM_STRUCT: {
+		uint32_t cnt = bvn_dom_struct_count(node);
+		const bvn_dom_entry_t *e = bvn_dom_struct_entries(node);
+		for (uint32_t i = 0; i < cnt; i++) {
+			const bvn_dom_node_t *hit = find_fractional_datetime(e[i].value);
+			if (hit) return hit;
+		}
+		return NULL;
+	}
+	case BVN_DOM_ARRAY: {
+		uint32_t cnt = bvn_dom_array_count(node);
+		for (uint32_t i = 0; i < cnt; i++) {
+			const bvn_dom_node_t *hit =
+				find_fractional_datetime(bvn_dom_array_at(node, i));
+			if (hit) return hit;
+		}
+		return NULL;
+	}
+	default:
+		return NULL;
+	}
+}
 static int cmd_convert_bvnr_to_json(const char *file)
 {
 	int fd = open(file, O_RDONLY);
@@ -1544,6 +1579,19 @@ static int cmd_convert_bvnr_to_json(const char *file)
 	}
 	uint32_t cnt = bvn_dom_doc_count(doc);
 	const bvn_dom_entry_t *entries = bvn_dom_doc_entries(doc);
+	/* Refuse before emitting anything if a datetime carries a sub-second
+	 * fraction JSON cannot represent (see find_fractional_datetime). */
+	for (uint32_t i = 0; i < cnt; i++) {
+		if (find_fractional_datetime(entries[i].value)) {
+			fprintf(stderr,
+				"convert: %s: a datetime with sub-second digits cannot be "
+				"represented in JSON without dropping the fraction; refusing "
+				"rather than silently truncating (under top-level key '%s')\n",
+				file, entries[i].key);
+			bvn_dom_doc_destroy(doc);
+			return 1;
+		}
+	}
 	putchar('{');
 	if (cnt) putchar('\n');
 	for (uint32_t i = 0; i < cnt; i++) {

@@ -219,6 +219,15 @@ run_convert_fail "convert rejects bad_overflow.json" bad_overflow.json "out of r
 run_convert_fail "convert rejects bad_trailing.json" bad_trailing.json "trailing content"
 run_convert_fail "convert rejects bad_nul.json"      bad_nul.json      "NUL"
 
+# bvnr -> json must refuse a datetime carrying sub-second digits (the integer
+# carrier cannot hold the fraction) rather than silently truncate it.
+run_cmake_check "convert rejects bvnr->json datetime fraction" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DINPUT_FILE="${SRC_DIR}/tests/frac_datetime.bvnr" \
+    -DFROM=bvnr -DTO=json \
+    "-DNEEDLE=sub-second" \
+    -P "${SRC_DIR}/cmake/convert_expect_fail.cmake"
+
 echo
 
 _bold "=== Streaming CLI (frames + mux) ==="

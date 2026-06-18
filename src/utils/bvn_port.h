@@ -141,15 +141,15 @@ static inline void bvn_set_binary_stdio(void)
 	(void)_setmode(_fileno(stdin),  _O_BINARY);
 	(void)_setmode(_fileno(stdout), _O_BINARY);
 	(void)_setmode(_fileno(stderr), _O_BINARY);
-	/* The CLI's human-readable output (the events table, bench headers, the
-	 * box-drawing rules) is emitted as raw UTF-8 bytes. A Windows console
-	 * defaults to its OEM code page (CP437/CP850), which renders each UTF-8
-	 * byte as a separate glyph -- e.g. "=" (U+2550) shows up as "GtO". Pin
-	 * the console's input and output code pages to UTF-8 so those bytes are
-	 * decoded correctly. Harmless when the streams are redirected to a file
-	 * or pipe (SetConsoleOutputCP simply fails on a non-console handle), and
-	 * it composes with the binary mode set above: the CRT passes the bytes
-	 * through untouched and the console decodes them as UTF-8. */
+	/* The CLI's decorative UTF-8 UI (events table, bench tables, box-drawing
+	 * rules) goes to a real console via WriteConsoleW (see cw_write in
+	 * bovnar.c), which is code-page independent and renders correctly on both
+	 * Windows and Wine. Pinning the console code pages to UTF-8 here is a
+	 * best-effort fallback for the *data* subcommands that still write raw
+	 * bytes with stdio (e.g. a UTF-8 string printed by `query` straight to a
+	 * console): a console otherwise defaults to its OEM code page (CP437/CP850)
+	 * and would garble those bytes. Harmless when the streams are redirected
+	 * (SetConsoleOutputCP simply fails on a non-console handle). */
 	(void)SetConsoleOutputCP(CP_UTF8);
 	(void)SetConsoleCP(CP_UTF8);
 #endif

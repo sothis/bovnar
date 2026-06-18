@@ -111,6 +111,10 @@ non-version remainder is reported as a malformed directive rather than ignored.
   import lib takes `bvnr.lib`); MinGW keeps the unified `libbvnr` names. A new
   `Windows` CI workflow builds both toolchains and smoke-tests the CLI. The POSIX
   test harness (fork/exec IUT, socketpair, sigaction) is not built on Windows.
+  The CLI's decorative UTF-8 UI (events/bench tables, box-drawing rules) renders
+  on a real Windows console via `WriteConsoleW` — the CRT's byte path garbles
+  multi-byte UTF-8 even with the console code page set to UTF-8 — while piped or
+  redirected output stays byte-exact raw UTF-8.
 
 ### Changed
 
@@ -159,6 +163,14 @@ non-version remainder is reported as a malformed directive rather than ignored.
 
 Hardening uncovered while developing 1.1:
 
+- CLI `query` now prints every byte of an octet stream as `\xHH` instead of only
+  the first byte (it was silently truncating the value).
+- CLI `convert` now reports a usage error when `--from`/`--to` is given without a
+  value (previously the flag was misread as the input filename), and refuses to
+  emit output larger than 4 GiB rather than skipping the homogeneity/unique-key
+  re-validation that backs its "no unrepresentable output" contract.
+- CLI `bench --size` rejects a zero or out-of-range value instead of letting the
+  benchmark buffer's size arithmetic overflow.
 - Python `dumps()` spec-1.1 directive detection (`_uses_spec_1_1`) now reads a
   Quantity's `vtype.family` defensively, so a Quantity built (via the low-level
   constructor) with an unexpected `vtype` reports "not a datetime" instead of

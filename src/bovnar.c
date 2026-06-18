@@ -38,6 +38,103 @@
 #include "bovnar_dom.h"
 #include "bovnar_stream.h"
 #include "bvn_datetime.h"
+#include <stdarg.h>
+
+/*
+ * Console-aware UTF-8 output for the human-readable CLI display (the events
+ * table, the bench tables, and the box-drawing rules / status glyphs).
+ *
+ * On Windows the CRT's path to a console mangles UTF-8 even with the console
+ * output code page pinned to UTF-8: the bytes reach the console via WriteFile,
+ * and that decode is unreliable (Wine renders each multi-byte rune as U+FFFD
+ * replacement characters). The robust route is the native wide API: convert the
+ * UTF-8 to UTF-16 and call WriteConsoleW. When the stream is redirected to a
+ * file or a pipe (GetConsoleMode fails), or on POSIX, we emit the raw UTF-8
+ * bytes unchanged — so piped/redirected output and the data subcommands stay
+ * byte-exact. These helpers are used only by the decorative/diagnostic display;
+ * value/data output keeps using stdio directly.
+ */
+/* Use the gnu_printf archetype on MinGW so the checker accepts %zu / %lld /
+ * PRIu64 — the same ANSI stdio the build links via __USE_MINGW_ANSI_STDIO. The
+ * default ms_printf archetype would reject them. */
+#if defined(__MINGW32__) || defined(__MINGW64__)
+#  define BVN_CLI_FMT(a, b) __attribute__((format(gnu_printf, a, b)))
+#elif defined(__GNUC__) || defined(__clang__)
+#  define BVN_CLI_FMT(a, b) __attribute__((format(printf, a, b)))
+#else
+#  define BVN_CLI_FMT(a, b)
+#endif
+static void cw_vprint(FILE *f, const char *fmt, va_list ap) BVN_CLI_FMT(2, 0);
+static void cwf(const char *fmt, ...) BVN_CLI_FMT(1, 2);
+static void cwe(const char *fmt, ...) BVN_CLI_FMT(1, 2);
+static void cw_write(FILE *f, const char *s, size_t n)
+{
+#if defined(_WIN32)
+	HANDLE h = (f == stderr) ? GetStdHandle(STD_ERROR_HANDLE)
+							 : GetStdHandle(STD_OUTPUT_HANDLE);
+	DWORD cmode;
+	if (h && h != INVALID_HANDLE_VALUE && GetConsoleMode(h, &cmode) && n > 0) {
+		/* Flush any buffered stdio first so console writes stay in order. */
+		fflush(f);
+		int wn = MultiByteToWideChar(CP_UTF8, 0, s, (int)n, NULL, 0);
+		if (wn > 0) {
+			wchar_t *w = (wchar_t *)malloc((size_t)wn * sizeof(wchar_t));
+			if (w) {
+				MultiByteToWideChar(CP_UTF8, 0, s, (int)n, w, wn);
+				DWORD off = 0;
+				while (off < (DWORD)wn) {
+					DWORD wrote = 0;
+					if (!WriteConsoleW(h, w + off, (DWORD)wn - off,
+									   &wrote, NULL) || wrote == 0)
+						break;
+					off += wrote;
+				}
+				free(w);
+				return;
+			}
+		}
+		/* conversion/alloc failure: fall through to raw bytes */
+	}
+#endif
+	fwrite(s, 1, n, f);
+}
+static void cw_vprint(FILE *f, const char *fmt, va_list ap)
+{
+	char stackbuf[1024];
+	va_list ap2;
+	va_copy(ap2, ap);
+	int need = vsnprintf(stackbuf, sizeof(stackbuf), fmt, ap2);
+	va_end(ap2);
+	if (need < 0)
+		return;
+	if ((size_t)need < sizeof(stackbuf)) {
+		cw_write(f, stackbuf, (size_t)need);
+		return;
+	}
+	char *heap = (char *)malloc((size_t)need + 1u);
+	if (!heap) {                       /* emit the truncated prefix rather than nothing */
+		cw_write(f, stackbuf, sizeof(stackbuf) - 1u);
+		return;
+	}
+	vsnprintf(heap, (size_t)need + 1u, fmt, ap);
+	cw_write(f, heap, (size_t)need);
+	free(heap);
+}
+/* printf to stdout / stderr, console-aware (see cw_write). */
+static void cwf(const char *fmt, ...)
+{
+	va_list ap; va_start(ap, fmt); cw_vprint(stdout, fmt, ap); va_end(ap);
+}
+static void cwe(const char *fmt, ...)
+{
+	va_list ap; va_start(ap, fmt); cw_vprint(stderr, fmt, ap); va_end(ap);
+}
+/* puts() to stdout (appends a newline), console-aware (see cw_write). */
+static void cwputs(const char *s)
+{
+	cw_write(stdout, s, strlen(s));
+	cw_write(stdout, "\n", 1u);
+}
 static void print_indent(uint32_t level, bool pretty)
 {
 	if (!pretty) return;
@@ -192,9 +289,14 @@ static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 	case BVN_DOM_OCTET_STREAM: {
 		const uint8_t *b; uint32_t l;
 		bvn_dom_get_octets(node, &b, &l);
-		putchar('\\');
-		putchar('x');
-		printf("%02x", l ? b[0] : 0);
+		/* Octet streams are binary-mode and have no round-trippable text
+		 * literal; print every byte as \xHH for inspection rather than
+		 * silently dropping all but the first. */
+		if (l == 0)
+			fputs("\\x", stdout);
+		else
+			for (uint32_t i = 0; i < l; i++)
+				printf("\\x%02x", b[i]);
 		break;
 	}
 	}
@@ -416,7 +518,7 @@ static bool evt_on_verified(void *ud, bvnr_event_t e, bvnr_data_t *d)
 	char verified_str[512];
 	evt_format_token(d, e, verified_str, sizeof(verified_str));
 	if (match_idx >= 0) {
-		printf("  %-*s │ %s\n", EVT_COL_WIDTH,
+		cwf("  %-*s │ %s\n", EVT_COL_WIDTH,
 			   ctx->log[match_idx].formatted, verified_str);
 		memmove(&ctx->log[match_idx],
 				&ctx->log[match_idx + 1],
@@ -424,7 +526,7 @@ static bool evt_on_verified(void *ud, bvnr_event_t e, bvnr_data_t *d)
 				* sizeof(ctx->log[0]));
 		ctx->log_used--;
 	} else {
-		printf("  %-*s │ %s\n", EVT_COL_WIDTH, "(unmatched)", verified_str);
+		cwf("  %-*s │ %s\n", EVT_COL_WIDTH, "(unmatched)", verified_str);
 	}
 	return true;
 }
@@ -433,7 +535,7 @@ static void evt_on_error(void *ud, error_code_t err,
 						 uint32_t byte, uint64_t offset)
 {
 	(void)ud;
-	fprintf(stderr,
+	cwe(
 			"  ⚠ RECOVERY at line %" PRIu64 " col %" PRIu64
 			": %s (byte 0x%02" PRIx32 " offset %" PRIu64 ")\n",
 			line, column,
@@ -532,17 +634,17 @@ static int cmd_events(int argc, char **argv)
 		if (!from_stdin) close(fd);
 		return 1;
 	}
-	puts("═══════════════════════════════════════════════════════════════════"
+	cwputs("═══════════════════════════════════════════════════════════════════"
 		 "════════════════════════════════════════════════════════════════");
-	printf("  Parsing: %s", from_stdin ? "<stdin>" : filename);
+	cwf("  Parsing: %s", from_stdin ? "<stdin>" : filename);
 	if (enable_debug)
-		printf("  [debug %s]", debug_pretty ? "pretty" : "compact");
-	putchar('\n');
-	puts("═══════════════════════════════════════════════════════════════════"
+		cwf("  [debug %s]", debug_pretty ? "pretty" : "compact");
+	cwf("\n");
+	cwputs("═══════════════════════════════════════════════════════════════════"
 		 "════════════════════════════════════════════════════════════════");
-	putchar('\n');
-	printf("  %-80s │ %s\n", "LEXER (unverified)", "VALIDATOR (verified)");
-	puts("  ────────────────────────────────────────────────────────────────"
+	cwf("\n");
+	cwf("  %-80s │ %s\n", "LEXER (unverified)", "VALIDATOR (verified)");
+	cwputs("  ────────────────────────────────────────────────────────────────"
 		 "────────────────┼────────────────────────────────────────────────"
 		 "────────────────────────────────────");
 	bool ok = bvnr_read(rd);
@@ -553,55 +655,55 @@ static int cmd_events(int argc, char **argv)
 		ctx->canon = NULL;
 	}
 	for (uint32_t i = 0; i < ctx->log_used; i++)
-		printf("  %-*s │ —\n", EVT_COL_WIDTH, ctx->log[i].formatted);
-	puts("\n───────────────────────────────────────────────────────────────────"
+		cwf("  %-*s │ —\n", EVT_COL_WIDTH, ctx->log[i].formatted);
+	cwputs("\n───────────────────────────────────────────────────────────────────"
 		 "────────────────────────────────────────────────────────────────");
-	puts("  Summary");
-	puts("───────────────────────────────────────────────────────────────────"
+	cwputs("  Summary");
+	cwputs("───────────────────────────────────────────────────────────────────"
 		 "────────────────────────────────────────────────────────────────");
-	printf("  Lexer tokens     : %" PRIu64 "\n", ctx->unverified_count);
-	printf("  Validated tokens : %" PRIu64 "\n", ctx->verified_count);
+	cwf("  Lexer tokens     : %" PRIu64 "\n", ctx->unverified_count);
+	cwf("  Validated tokens : %" PRIu64 "\n", ctx->verified_count);
 	uint64_t recoveries = bvnr_reader_get_recovery_count(rd);
 	if (recoveries > 0)
-		printf("\n  ⚠ %" PRIu64 " error(s) recovered from via resync.\n",
+		cwf("\n  ⚠ %" PRIu64 " error(s) recovered from via resync.\n",
 			   recoveries);
 	if (!ok) {
 		error_code_t err = bvnr_reader_get_error(rd);
-		printf("\n  ✗ PARSE ERROR\n");
-		printf("  ┌──────────────────────────────────────────────────────────"
+		cwf("\n  ✗ PARSE ERROR\n");
+		cwf("  ┌──────────────────────────────────────────────────────────"
 			   "──────────────────────\n");
-		printf("  │ code   : %d (%s)\n", err, bvn_error_to_string(err));
-		printf("  │ line   : %" PRIu64 "\n", bvnr_reader_get_error_line(rd));
-		printf("  │ column : %" PRIu64 "\n", bvnr_reader_get_error_column(rd));
-		printf("  │ byte   : 0x%02" PRIx32 "\n", bvnr_reader_get_error_byte(rd));
-		printf("  │ offset : %" PRIu64 "\n", bvnr_reader_get_error_offset(rd));
-		printf("  └──────────────────────────────────────────────────────────"
+		cwf("  │ code   : %d (%s)\n", err, bvn_error_to_string(err));
+		cwf("  │ line   : %" PRIu64 "\n", bvnr_reader_get_error_line(rd));
+		cwf("  │ column : %" PRIu64 "\n", bvnr_reader_get_error_column(rd));
+		cwf("  │ byte   : 0x%02" PRIx32 "\n", bvnr_reader_get_error_byte(rd));
+		cwf("  │ offset : %" PRIu64 "\n", bvnr_reader_get_error_offset(rd));
+		cwf("  └──────────────────────────────────────────────────────────"
 			   "──────────────────────\n");
 	}
 	uint64_t unmatched = ctx->unverified_count - ctx->verified_count;
 	if (unmatched > 0) {
-		printf("\n  ⚠ %" PRIu64 " token(s) emitted by the lexer but never "
+		cwf("\n  ⚠ %" PRIu64 " token(s) emitted by the lexer but never "
 			   "validated.\n", unmatched);
 		if (ctx->log_used > 0) {
-			puts("\n  ╔══════════════════════════════════════════════════════"
+			cwputs("\n  ╔══════════════════════════════════════════════════════"
 				 "══════════════════════════╗");
-			puts("  ║       UNVALIDATED TOKENS                              "
+			cwputs("  ║       UNVALIDATED TOKENS                              "
 				 "                           ║");
-			puts("  ╠══════════════════════════════════════════════════════"
+			cwputs("  ╠══════════════════════════════════════════════════════"
 				 "══════════════════════════╣");
 			for (uint32_t i = 0; i < ctx->log_used; i++) {
 				const evt_logged_tok_t *e = &ctx->log[i];
-				printf("  ║  #%-5" PRIu64 " %-15s %-13s",
+				cwf("  ║  #%-5" PRIu64 " %-15s %-13s",
 					   e->seq, evt_event_str(e->event), evt_tok_str(e->type));
 				if (e->text[0])
-					printf(" \"%s\"", e->text);
-				putchar('\n');
+					cwf(" \"%s\"", e->text);
+				cwf("\n");
 			}
-			puts("  ╚══════════════════════════════════════════════════════"
+			cwputs("  ╚══════════════════════════════════════════════════════"
 				 "══════════════════════════╝");
 		}
 	} else if (ok) {
-		puts("\n  ✓ All tokens validated successfully.");
+		cwputs("\n  ✓ All tokens validated successfully.");
 	}
 	bvnr_reader_destroy(rd);
 	if (!from_stdin) close(fd);
@@ -696,7 +798,7 @@ static int cmd_pretty(const char *filename)
 	if (fd < 0) { perror(filename); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
 	if (sz < 0) {
-		fprintf(stderr, "pretty-print: %s: cannot seek — not a regular file?\n",
+		cwe("pretty-print: %s: cannot seek — not a regular file?\n",
 		        filename);
 		close(fd);
 		return 1;
@@ -1303,7 +1405,7 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	if (fd < 0) { perror(file); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
 	if (sz < 0) {
-		fprintf(stderr, "convert: %s: cannot seek — not a regular file?\n", file);
+		cwe("convert: %s: cannot seek — not a regular file?\n", file);
 		close(fd); return 1;
 	}
 	if (lseek(fd, 0, SEEK_SET) != 0) { perror(file); close(fd); return 1; }
@@ -1383,7 +1485,15 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	}
 	uint64_t out_len = bvnr_writer_bytes_written(w);
 	bvnr_writer_destroy(w);
-	if (out_len <= (uint64_t)UINT32_MAX) {
+	if (out_len > (uint64_t)UINT32_MAX) {
+		/* bvn_dom_parse caps at 4 GiB, so we cannot re-validate a larger
+		 * output. Refuse rather than emit a document that skipped the
+		 * homogeneity / unique-key check the converter contract promises. */
+		fprintf(stderr, "convert: output too large to validate "
+			"(%" PRIu64 " bytes exceeds the 4 GiB limit)\n", out_len);
+		free(out); json_free_node(root); free(buf); return 1;
+	}
+	{
 		bvn_dom_doc_t *chk = bvn_dom_parse(out, (uint32_t)out_len);
 		if (!chk) {
 			/* Out of memory re-parsing our own output: do NOT fall through
@@ -1411,7 +1521,7 @@ static int cmd_convert_json_to_bvnr(const char *file)
 					"arrays are homogeneous; model mixed data as a struct";
 				break;
 			}
-			fprintf(stderr, "convert: the JSON has no bovnar "
+			cwe("convert: the JSON has no bovnar "
 				"representation: %s (%s)\n",
 				bvn_error_to_string(herr), hint);
 			free(out); json_free_node(root); free(buf); return 1;
@@ -2123,7 +2233,7 @@ static void bmark_print_header(void)
 	printf("%-10s %8s %8s %12s %12s %12s %10s %10s\n",
 	       "Profile", "Bytes", "Assigns", "Wall (ms)", "CPU (ms)",
 	       "MB/s", "Ass/s", "Ev/s");
-	printf("────────── ──────── ──────── ──────────── "
+	cwf("────────── ──────── ──────── ──────────── "
 	       "──────────── ──────────── ────────── ──────────\n");
 }
 static void bmark_print_result(const bmark_result_t *r, uint32_t iterations)
@@ -2186,8 +2296,14 @@ static void bmark_parse_size_list(const char *list)
 	if (!copy) return;
 	char *token = strtok(copy, ",");
 	while (token && bmark_cfg.num_sizes < 64) {
-		bmark_cfg.sizes[bmark_cfg.num_sizes++] =
-		    (size_t)strtoul(token, NULL, 10);
+		unsigned long long v = strtoull(token, NULL, 10);
+		/* bmark_run allocates size + 1280; reject 0 and any value that would
+		 * wrap that addition (or overflow size_t on a 32-bit host) so the
+		 * generator can never be handed a buffer smaller than it writes. */
+		if (v != 0 && v <= (unsigned long long)(SIZE_MAX - 4096u))
+			bmark_cfg.sizes[bmark_cfg.num_sizes++] = (size_t)v;
+		else
+			fprintf(stderr, "bench: ignoring out-of-range --size '%s'\n", token);
 		token = strtok(NULL, ",");
 	}
 	free(copy);
@@ -2244,12 +2360,12 @@ static int cmd_bench(int argc, char **argv)
 		       bmark_cfg.iterations, bmark_cfg.warmup,
 		       bmark_cfg.min_overhead ? "true" : "false");
 	} else {
-		printf("═════════════════════════════════════════════════════════════\n");
+		cwf("═════════════════════════════════════════════════════════════\n");
 		printf("  Bovnar Parsing Throughput Benchmark\n");
 		printf("  Iterations: %u   Warmup: %u   Min-overhead: %s\n",
 		       bmark_cfg.iterations, bmark_cfg.warmup,
 		       bmark_cfg.min_overhead ? "yes" : "no");
-		printf("═════════════════════════════════════════════════════════════\n");
+		cwf("═════════════════════════════════════════════════════════════\n");
 		bmark_print_header();
 	}
 	bool first = true;
@@ -2269,7 +2385,7 @@ static int cmd_bench(int argc, char **argv)
 			first = false;
 			bmark_print_result(&r, bmark_cfg.iterations);
 			if (bmark_cfg.verbose && !bmark_cfg.json) {
-				printf("  ── detail: profile=%s, size=%zu bytes, "
+				cwf("  ── detail: profile=%s, size=%zu bytes, "
 				       "assignments=%zu, events=%zu, "
 				       "avg_cost=%.3f us/assign\n",
 				       bmark_profile_names[p], r.payload_size,
@@ -2601,9 +2717,21 @@ int main(int argc, char **argv)
 	} else if (strcmp(cmd, "convert") == 0) {
 		const char *from = NULL, *to = NULL, *file = NULL;
 		for (int i = 2; i < argc; i++) {
-			if (strcmp(argv[i], "--from") == 0 && i+1 < argc) from = argv[++i];
-			else if (strcmp(argv[i], "--to") == 0 && i+1 < argc) to = argv[++i];
-			else file = argv[i];
+			if (strcmp(argv[i], "--from") == 0) {
+				if (i+1 >= argc) {
+					fprintf(stderr, "convert: --from needs a value\n");
+					return 1;
+				}
+				from = argv[++i];
+			} else if (strcmp(argv[i], "--to") == 0) {
+				if (i+1 >= argc) {
+					fprintf(stderr, "convert: --to needs a value\n");
+					return 1;
+				}
+				to = argv[++i];
+			} else {
+				file = argv[i];
+			}
 		}
 		if (!file) {
 			fprintf(stderr,

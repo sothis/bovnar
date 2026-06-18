@@ -128,6 +128,45 @@ Hardening uncovered while developing 1.1:
   instead of raising a bare `OverflowError`; `from_numpy` rejects masked arrays;
   clearer errors for invalid `unit=` / non-pint / mixed unit-and-dimensionless
   inputs.
+- **Base-10 rendering of a wide-magnitude float looped forever.** The same coarse
+  `log10(2)` (`0.302`) estimate also drove the sibling renderer `bvnf_to_str_dec`;
+  once the binary exponent dwarfed the precision it placed the whole digit window
+  above the value, and the leading-zero strip then rotated zeros without
+  terminating — an infinite loop reachable through `bvn_float_to_str` /
+  `bvnr_write_bvnf` (e.g. `to_str(1e4900)` at 16-bit precision). Now uses
+  `0.30103` and bounds the strip loop.
+- **A `datetime` wrongly accepted an inline unit.** `<datetime:64> 100 m` parsed
+  (the "no unit" check was gated on the ISO-literal form only) and the unit was
+  then silently dropped on emit; an inline unit on any datetime carrier is now
+  `error_unit_illegal`.
+- **Non-rectangular sibling arrays of equal cell count were accepted.** A 2×3 and
+  a 3×2 block (both six cells) compared equal because the DOM shape check used
+  only the flattened cell count; it now also compares the row geometry, so the
+  mismatch is caught (`error_array_row_size_mismatch`).
+- **An inline unit was dropped when the value also had an explicit (unit-less)
+  annotation.** `<float:64> 9.81 m/s` canonicalised to `<float:64> 9.81`, silently
+  changing the decoded value; the serializer now re-appends the inline unit.
+- **An unbalanced `ev_struct_end` on the canon-observer path** underflowed the
+  indent depth, amplifying the next indent to ~4 billion tab bytes; it is now
+  rejected, matching the array-depth guard.
+- **The JSON converter silently dropped a datetime's sub-second fraction.**
+  `bovnar convert` to JSON now refuses a fractional datetime (the integer carrier
+  cannot represent it) with a diagnostic rather than truncating, and `bovnar
+  query` emits the faithful ISO literal instead of the bare carrier.
+- **Python — lossless typed datetime/symbol/reference round-trips.**
+  `loads(typed=True)`→`dumps()` dropped a datetime's sub-second fraction, emitted
+  an illegal `<datetime:…,no_unit>` annotation for a bare ISO literal, and
+  downgraded a symbol or reference to a quoted string; all now round-trip, and
+  `dumps()` prepends `#!bovnar 1.1` for a reference that indexes an array
+  (`&.a[0][1]`). The numpy bridge no longer silently truncates a DOM
+  decimal/wide-binary float under `dtype=object` — it errors, pointing at
+  `loads(typed=True)` for exact `Decimal`s (the lossy `dtype='float64'` opt-in is
+  unchanged).
+- **Tooling** — the Vim highlighter now colours ISO-8601 datetime literals (it
+  mis-tokenised them as `YYYY`-dash-`MM` integers, and not at all inside arrays
+  or structs); the cibuildwheel test phase now hard-fails if a built wheel cannot
+  load its bundled library (the lib-dependent tests are skipif, so they would
+  otherwise pass-as-skipped).
 
 ### Known gaps / deferred
 

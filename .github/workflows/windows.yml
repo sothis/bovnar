@@ -187,13 +187,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install mingw-w64 cross toolchain, Wine and Ninja
-        # --no-install-recommends keeps Wine's heavy GUI/audio recommends
-        # (gstreamer, cups, pulseaudio, ...) out: we only run a console .exe, and
-        # the slim set installs far faster.
+        # Install BOTH wine and wine64: the wine64 package only ships
+        # /usr/bin/wine64-stable; the /usr/bin/wine64 command is an
+        # update-alternatives link registered by the `wine` package, so without
+        # it `wine64` is not on PATH. --no-install-recommends keeps Wine's heavy
+        # GUI/audio recommends (incl. 32-bit wine32) out — we only run a 64-bit
+        # console .exe — and the slim set installs far faster.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            gcc-mingw-w64-x86-64 ninja-build wine64
+            gcc-mingw-w64-x86-64 ninja-build wine wine64
 
       - name: Initialize Wine prefix
         # Invoke wineboot via wine64 (the standalone /usr/bin/wineboot wrapper is

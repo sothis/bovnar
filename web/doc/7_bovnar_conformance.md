@@ -291,7 +291,7 @@ OCTET_STREAM_END
 |------|--------|-------|
 | `STREAM_START` | — | Always first |
 | `ASSIGNMENT_START <key>` | key: raw key bytes, safe-escaped | |
-| `TYPE_ANN_START <family>` | family: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool` | |
+| `TYPE_ANN_START <family>` | family: `uint`, `sint`, `float`, `float_fix`, `float_dec`, `utf8`, `bool`, `datetime` | |
 | `TYPE_FAMILY <family>` | Same as TYPE_ANN_START | |
 | `TYPE_PARAM_WIDTH <N>` | N: effective width (0 → 64) | Only for numeric types |
 | `TYPE_PARAM_BASE <N>` | N: effective base (0 → 10) | Only for numeric types |

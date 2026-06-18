@@ -1232,9 +1232,9 @@ valid only for the duration of the callback invocation.
 **What throughput can I expect from the parser?**
 
 Performance depends heavily on the input profile (scalars, typed values, structs,
-arrays, units) and hardware. The included benchmark tool (`bvnr_benchmark`) can
+arrays, units) and hardware. The CLI's benchmark subcommand (`bovnar bench`) can
 measure MB/s, assignments/s, and events/s across configurable profiles and
-payload sizes. Run it with `--profile all --size 1024,65536 --iterations 200`
+payload sizes. Run `bovnar bench --profile all --size 1024,65536 --iterations 200`
 for a representative baseline. Use `--min-overhead` to isolate raw lexer
 throughput by skipping the `on_verified` callback.
 

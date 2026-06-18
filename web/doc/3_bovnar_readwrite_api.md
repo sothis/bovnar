@@ -231,7 +231,7 @@ uint32_t     bvnr_reader_get_error_byte   (const bvnr_reader_t *r);
 uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t *r);
 ```
 
-All four location functions are only meaningful when `bvnr_read` returned `false` (or after a recoverable error when `continue_on_error` is set). `bvnr_reader_get_error_byte` returns the raw byte value that triggered the error. `bvnr_reader_get_recovery_count` returns how many errors triggered entry into resync mode in `continue_on_error` mode. This count is incremented at error entry, not when resync completes at `";".
+All five error/location getters above (everything except `bvnr_reader_get_recovery_count`) are only meaningful when `bvnr_read` returned `false` (or after a recoverable error when `continue_on_error` is set). `bvnr_reader_get_error_byte` returns the raw byte value that triggered the error. `bvnr_reader_get_recovery_count` is the exception: it returns how many errors triggered entry into resync mode in `continue_on_error` mode (and so is meaningful even when `bvnr_read` ultimately returned `true`). This count is incremented at error entry, not when resync completes at `";".
 
 ```c
 if (!bvnr_read(r)) {
@@ -773,7 +773,7 @@ Produce the value string that goes into `bvnr_data_t.data` when writing numeric 
 
 - `base` — numeric base (2–62, 64, 85). Use `10` for the common case.
 - `min_digits` — zero-pad to at least this many digits. Pass `0` for no padding.
-- For `bvn_format_double`, the type spec `vt` controls the output precision according to `vt.width` (16/32/64/128 bits).
+- For `bvn_format_double`, the type spec `vt` controls the output precision according to `vt.width`. Because the input is a C `double`, the effective precision is capped at the 64-bit format (a wider `vt.width` yields no extra digits); render the full precision of a 128/256-bit value with the arbitrary-precision writer `bvnr_write_bvnf_base` instead.
 
 ```c
 char buf[32];

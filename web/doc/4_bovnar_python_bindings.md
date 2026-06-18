@@ -5,7 +5,7 @@
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
 library (spec v1.1).
 
-No compiled extension module is needed — the bindings load `libbvnr_shared.so` at
+No compiled extension module is needed — the bindings load `libbvnr.so` at
 import time via the standard `ctypes.CDLL` machinery.
 
 ---
@@ -15,7 +15,7 @@ import time via the standard `ctypes.CDLL` machinery.
 | Requirement | Notes |
 |---|---|
 | Python ≥ 3.10 | `dataclasses`, `enum.IntEnum`, union-type annotations (`X \| Y`) |
-| `libbvnr_shared.so` | Runtime only; see *Library discovery* below |
+| `libbvnr.so` | Runtime only; see *Library discovery* below |
 | `numpy` ≥ 1.24 | **Optional** — only for the NumPy bridge (`pip install bovnar[numpy]`) |
 | `pint` ≥ 0.22 | **Optional** — only for the pint bridge (`pip install bovnar[pint]`) |
 | pytest ≥ 7 | Test suite only (`pip install bovnar[dev]`) |
@@ -44,11 +44,11 @@ pip install "bovnar[all]"     # both numpy and pint
 
 ## Library discovery
 
-The bindings search for `libbvnr_shared.so` in this order:
+The bindings search for `libbvnr.so` in this order:
 
 1. **`LIBBOVNAR_PATH`** — absolute path to the `.so` file, e.g.
    ```bash
-   export LIBBOVNAR_PATH=/opt/bovnar/lib/libbvnr_shared.so
+   export LIBBOVNAR_PATH=/opt/bovnar/lib/libbvnr.so
    ```
 2. **`LIBBOVNAR_DIR`** — directory that *contains* the `.so`, e.g.
    ```bash
@@ -993,13 +993,13 @@ REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 ## Running the test suite
 
 ```bash
-# Run everything (library-dependent tests are skipped when libbvnr_shared.so is absent)
+# Run everything (library-dependent tests are skipped when libbvnr.so is absent)
 pytest
 
 # Run only the pure-Python tests (no library required)
 pytest -m "not needs_lib"
 
-# Run only integration tests (requires libbvnr_shared.so)
+# Run only integration tests (requires libbvnr.so)
 pytest -m needs_lib
 
 # Verbose with short tracebacks (already the default via pyproject.toml)
@@ -1059,7 +1059,7 @@ All errors surface as subclasses of `BovnarError`:
 
 | Exception | When raised |
 |---|---|
-| `BovnarLibraryNotFound` | `libbvnr_shared.so` not found at import |
+| `BovnarLibraryNotFound` | `libbvnr.so` not found at import |
 | `BovnarParseError` | Parse error in `Reader` (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error in `Writer` (carries `code`, `offset`) |
 | `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer) |

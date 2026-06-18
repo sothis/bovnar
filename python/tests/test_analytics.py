@@ -23,7 +23,7 @@
 """
 Tests for bovnar.analytics.
 
-Pure-Python tests (no libbvnr_shared.so dependency):
+Pure-Python tests (no libbvnr.so dependency):
   - dim_label
   - filter_by_dim_name
   - benchmark_df / run_benchmark error paths
@@ -32,7 +32,7 @@ Pure-Python tests (no libbvnr_shared.so dependency):
   - dom_summary with mock DomDoc
   - _human_bytes formatting (via benchmark_df indirectly)
 
-Integration tests (require libbvnr_shared.so, marked needs_lib):
+Integration tests (require libbvnr.so, marked needs_lib):
   - doc_to_dataframe with a real parsed document
   - assert_node against real DomNode objects
   - dom_summary against a real DomDoc
@@ -447,7 +447,7 @@ class TestDomSummary:
 
 
 # ---------------------------------------------------------------------------
-# Integration tests — require libbvnr_shared.so
+# Integration tests — require libbvnr.so
 # ---------------------------------------------------------------------------
 
 try:

@@ -37,15 +37,15 @@ from .exceptions import BovnarLibraryNotFound
 
 _lib: ctypes.CDLL | None = None
 
-_LIBRARY_BASE = 'bovnar'
+_LIBRARY_BASE = 'bvnr'
 
 def _library_name() -> str:
-    """Platform-specific filename of the bvnr_shared CMake target."""
+    """Platform-specific filename of the bvnr_shared CMake target (base name 'bvnr')."""
     if sys.platform == 'darwin':
-        return 'libbvnr_shared.dylib'
+        return 'libbvnr.dylib'
     if sys.platform in ('win32', 'cygwin'):
-        return 'bvnr_shared.dll'
-    return 'libbvnr_shared.so'
+        return 'bvnr.dll'
+    return 'libbvnr.so'
 
 _LIBRARY_NAME = _library_name()
 

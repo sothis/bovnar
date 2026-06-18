@@ -147,11 +147,16 @@ target_include_directories(bvnr_objects
         ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 )
 
+# Both libraries share the base name "bvnr", differentiated only by extension:
+# the static archive is libbvnr.a and the shared object is libbvnr.so (the CMake
+# target names stay distinct because two targets cannot share a name).
 add_library(bvnr_static STATIC $<TARGET_OBJECTS:bvnr_objects>)
+set_target_properties(bvnr_static PROPERTIES OUTPUT_NAME bvnr)
 target_include_directories(bvnr_static
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_library(bvnr_shared SHARED $<TARGET_OBJECTS:bvnr_objects>)
+set_target_properties(bvnr_shared PROPERTIES OUTPUT_NAME bvnr)
 target_compile_options(bvnr_shared PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -161,8 +166,8 @@ target_include_directories(bvnr_shared
 # by-value struct such as bvnr_data_t grew) run against a newer shared library.
 # SOVERSION is the ABI-compatibility major; bump it on any incompatible ABI change.
 # The wheel (SKBUILD) deliberately keeps the plain unversioned filename: _ffi.py
-# loads libbvnr_shared.so by exact name via ctypes, and wheel archives do not
-# preserve the symlink chain a versioned soname creates.
+# loads libbvnr.so by exact name via ctypes, and wheel archives do not preserve
+# the symlink chain a versioned soname creates.
 if(NOT SKBUILD)
     set_target_properties(bvnr_shared PROPERTIES
         VERSION   ${PROJECT_VERSION}
@@ -195,8 +200,8 @@ endif()
 # with no LIBBOVNAR_PATH or system install required.
 if(SKBUILD)
     install(TARGETS bvnr_shared
-        LIBRARY DESTINATION bovnar    # libbvnr_shared.so / .dylib
-        RUNTIME DESTINATION bovnar)   # bvnr_shared.dll (Windows)
+        LIBRARY DESTINATION bovnar    # libbvnr.so / libbvnr.dylib
+        RUNTIME DESTINATION bovnar)   # bvnr.dll (Windows)
 endif()
 
 # System integration for the Bovnar media type (text/vnd.bovnar) and the .bvnr

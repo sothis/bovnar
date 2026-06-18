@@ -1097,7 +1097,7 @@ apply to `max_struct_nesting`.
 
 **Do the Python bindings require a compiled extension module?**
 
-No. The bindings are pure `ctypes` and load `libbvnr_shared.so` at import time
+No. The bindings are pure `ctypes` and load `libbvnr.so` at import time
 via `ctypes.CDLL`. No compilation step beyond building the C library is needed.
 
 ---
@@ -1175,7 +1175,7 @@ the order `[m, kg, s, A, K, mol, cd]`.
 
 | Exception | Trigger |
 |---|---|
-| `BovnarLibraryNotFound` | `libbvnr_shared.so` not found at import |
+| `BovnarLibraryNotFound` | `libbvnr.so` not found at import |
 | `BovnarParseError` | Parse error (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error (carries `code`, `offset`) |
 | `BovnarArgumentError` | Invalid argument to a helper function |

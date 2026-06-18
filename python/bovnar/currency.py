@@ -26,7 +26,7 @@ bovnar.currency — Currency and cryptocurrency utilities for Bovnar.
 This module provides pure-Python metadata queries over the currency range of
 BaseUnit without requiring the shared library.  It is deliberately standalone
 so that tools (linters, validators, code generators) can import it without a
-libbvnr_shared.so present.
+libbvnr.so present.
 
 Usage
 -----

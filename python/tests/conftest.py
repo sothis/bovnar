@@ -35,7 +35,7 @@ LIB_AVAILABLE = _lib_available()
 
 needs_lib = pytest.mark.skipif(
     not LIB_AVAILABLE,
-    reason="libbvnr_shared.so not found — set LIBBOVNAR_PATH to enable integration tests",
+    reason="libbvnr.so not found — set LIBBOVNAR_PATH to enable integration tests",
 )
 
 @pytest.fixture

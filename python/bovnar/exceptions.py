@@ -32,7 +32,7 @@ class BovnarLibraryNotFound(BovnarError):
         self.search_paths = search_paths
         paths = ', '.join(search_paths) if search_paths else '(none)'
         super().__init__(
-            f"Cannot find libbvnr_shared.so.  Searched: {paths}.  "
+            f"Cannot find libbvnr.so.  Searched: {paths}.  "
             "Set LIBBOVNAR_PATH or install the library where ldconfig can find it."
         )
 

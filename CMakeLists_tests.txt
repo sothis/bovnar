@@ -400,13 +400,13 @@ endif()
 # ── Python binding tests (requires Python3 and pytest) ───────────────────────
 #
 # Generator expressions in ENVIRONMENT require CMake >= 3.22.
-# Pure tests run without libbvnr_shared.so; integration tests inject the
+# Pure tests run without libbvnr.so; integration tests inject the
 # library path via LIBBOVNAR_PATH.
 #
 # Label taxonomy
 #   python            – all Python tests
 #   python_pure       – no shared library required
-#   python_integration – requires libbvnr_shared.so
+#   python_integration – requires libbvnr.so
 #   python_arrays     – array parser / writer tests
 #   python_dom        – DOM layer tests
 #   python_physics    – SI unit physics API tests
@@ -424,7 +424,7 @@ if(Python3_FOUND)
     set(_py_src   "${CMAKE_CURRENT_SOURCE_DIR}/python")
     set(_py_tests "${CMAKE_CURRENT_SOURCE_DIR}/python/tests")
 
-    # Resolve the path to libbvnr_shared.so for injecting into LIBBOVNAR_PATH.
+    # Resolve the path to libbvnr.so for injecting into LIBBOVNAR_PATH.
     # The generator expression is evaluated at test time, so the target must
     # exist when the tests are run (i.e. build bvnr_shared before ctest).
     if(TARGET bvnr_shared)
@@ -465,7 +465,7 @@ if(Python3_FOUND)
         )
     endmacro()
 
-    # _bvnr_pytest_lib: a test that requires libbvnr_shared.so.
+    # _bvnr_pytest_lib: a test that requires libbvnr.so.
     macro(_bvnr_pytest_lib _name _file _labels _timeout)
         add_test(
             NAME    ${_name}
@@ -535,7 +535,7 @@ if(Python3_FOUND)
         "currency"
         30)
 
-    # ── integration tests (require libbvnr_shared.so) ────────────────────────
+    # ── integration tests (require libbvnr.so) ────────────────────────
 
     _bvnr_pytest_lib(bvnr_py_reader
         test_reader.py
@@ -632,7 +632,7 @@ if(Python3_FOUND)
         ENVIRONMENT "${_bvnr_lib_env}"
     )
 
-    # Library-free gate: safe to run in environments without libbvnr_shared.so
+    # Library-free gate: safe to run in environments without libbvnr.so
     # (e.g. documentation builds, pure static analysis CI jobs).
     add_test(
         NAME    bvnr_py_pure_all

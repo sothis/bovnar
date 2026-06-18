@@ -50,7 +50,7 @@ TestBvnrFormatExamples      — .bvnr snippet strings are syntactically plausibl
 
 The last two test classes validate the *contract* of the C functions as
 documented, using the Python metadata table as the source of truth.  They do
-NOT load libbvnr_shared.so and are therefore runnable without the native library
+NOT load libbvnr.so and are therefore runnable without the native library
 (useful in CI environments that only build documentation or run lint).
 """
 

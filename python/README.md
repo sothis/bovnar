@@ -17,7 +17,7 @@ parser.
 .matrix       = [1, 2, 3]/[4, 5, 6];
 ```
 
-The wheel bundles the compiled `libbvnr_shared` library, so there is nothing to
+The wheel bundles the compiled `libbvnr` library, so there is nothing to
 build and no system dependency to install — the bindings load it in-process via
 `ctypes`.
 

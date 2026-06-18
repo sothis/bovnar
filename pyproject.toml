@@ -53,7 +53,7 @@ Issues        = "https://github.com/sothis/bovnar/issues"
 # ── scikit-build-core (CMake-driven build) ──────────────────────────────────
 # pyproject.toml lives at the repo root so the build can reach the C sources in
 # src/ and include/.  The pure-Python package stays under python/bovnar and is
-# mapped to `bovnar` in the wheel; CMake installs libbvnr_shared.* alongside it.
+# mapped to `bovnar` in the wheel; CMake installs libbvnr.* alongside it.
 [tool.scikit-build]
 build-dir        = "build/skbuild/{wheel_tag}"
 wheel.packages   = ["python/bovnar"]
@@ -72,7 +72,7 @@ BVNR_LTO = "OFF"
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
 markers = [
-    "needs_lib: integration test that requires libbvnr_shared.so (deselect with -m 'not needs_lib')",
+    "needs_lib: integration test that requires libbvnr.so (deselect with -m 'not needs_lib')",
 ]
 
 # ── cibuildwheel (binary wheels for PyPI) ───────────────────────────────────
@@ -81,7 +81,7 @@ markers = [
 build         = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip          = "*-musllinux*"
 build-frontend = "build"
-# The bundled libbvnr_shared.* makes every test that touches the C library
+# The bundled libbvnr.* makes every test that touches the C library
 # runnable straight from the installed wheel. The leading assertion hard-fails
 # the build if the wheel did not bundle a loadable library: lib-dependent tests
 # are `needs_lib`-skipif (they would silently pass-as-skipped otherwise), so

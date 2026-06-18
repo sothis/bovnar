@@ -112,19 +112,25 @@ non-version remainder is reported as a malformed directive rather than ignored.
   `bvni_pow10`) that are bit-exact for powers of two and for powers of ten in the
   exactly-representable range. The remaining `<math.h>` uses (`fabs`, `isfinite`,
   `isinf`, `isnan`, `signbit`) are compiler builtins that need no runtime library.
-  Consumers no longer have to add `-lm` when linking `libbvnr_static`.
+  Consumers no longer have to add `-lm` when linking `libbvnr`.
 - **Dropped the optional `libgmp` build-time dependency.** It was used only by an
   `#ifdef WITH_GMP` cross-check in `bvnr_int_test`; the bignum tests already cover
   parsing, formatting, and a 32768-bit round-trip without it. The cross-check, the
   `FindGMP.cmake` module, and its CMake wiring are removed, so the project now has
   no external library dependencies at build time or runtime.
+- **Unified library artifact name.** Both libraries now share the base name
+  `bvnr`, differentiated only by extension: the static archive is `libbvnr.a`
+  and the shared object is `libbvnr.so` (was `libbvnr_static.a` /
+  `libbvnr_shared.so`). Link with `-lbvnr` (this resolves to the shared object
+  when both are present; force the archive with `-l:libbvnr.a` or static-link
+  flags). The CMake target names `bvnr_static`/`bvnr_shared` are unchanged.
 - **Versioned soname for the shared library.** A system/distro build now installs
-  `libbvnr_shared.so.1` (SOVERSION 1) so the dynamic loader can detect an ABI
+  `libbvnr.so.1` (SOVERSION 1) so the dynamic loader can detect an ABI
   mismatch — relevant because public by-value structs grew this release
   (`bvnr_data_t` gained `frac_*`, `bvnr_read_flags_t` gained `strict_version`),
   appended so offsets are preserved but requiring consumers to recompile against
   the 1.1 headers rather than mixing a 1.0-compiled object with the new library.
-  The Python wheel keeps the unversioned `libbvnr_shared.so` it loads by name.
+  The Python wheel keeps the unversioned `libbvnr.so` it loads by name.
 
 ### Fixed
 

@@ -263,7 +263,7 @@ _bold "=== Python binding tests ==="
 PY_BIN="${PYTHON:-python3}"
 PY_SRC="${SRC_DIR}/python"
 PY_TESTS="${PY_SRC}/tests"
-SHARED_LIB="$(ls "${BUILD_DIR}"/libbvnr_shared.* 2>/dev/null | head -1 || true)"
+SHARED_LIB="$(ls "${BUILD_DIR}"/libbvnr.so* "${BUILD_DIR}"/libbvnr.dylib 2>/dev/null | head -1 || true)"
 
 if ! command -v "${PY_BIN}" > /dev/null 2>&1; then
     _yellow "  SKIP  python suite  (no ${PY_BIN})"

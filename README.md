@@ -171,8 +171,8 @@ This produces:
 
 | Target | Path |
 |---|---|
-| Static library | `build/libbvnr_static.a` |
-| Shared library | `build/libbvnr_shared.so` |
+| Static library | `build/libbvnr.a` |
+| Shared library | `build/libbvnr.so` |
 | CLI binary | `build/bovnar` |
 
 Build types: `Debug` (`-O0 -g3`), `Release` (`-O3 -flto`), `MinSizeRel` (`-Os`), `RelWithDebInfo` (`-O3 -g3 -flto`). `Release` and `RelWithDebInfo` enable link-time optimisation.
@@ -198,8 +198,12 @@ cmake -B build -DBVNR_WERROR=ON .
 ### Link against the library
 
 ```bash
-gcc my_app.c -I include -L build -lbvnr_static -o my_app
+gcc my_app.c -I include -L build -lbvnr -o my_app
 ```
+
+Both libraries share the base name `bvnr` (`libbvnr.a`, `libbvnr.so`), so `-lbvnr`
+links the shared object when both are present. To link the static archive
+instead, use `-l:libbvnr.a` (GNU ld) or static-link flags.
 
 ---
 
@@ -331,10 +335,10 @@ cmake --build build
 cd build && ctest -L python --output-on-failure
 ```
 
-Pure-Python tests (`ctest -L python_pure`) run without the shared library; integration tests (`ctest -L python_integration`) need `libbvnr_shared.so`, whose path CTest injects automatically. To run pytest directly instead:
+Pure-Python tests (`ctest -L python_pure`) run without the shared library; integration tests (`ctest -L python_integration`) need `libbvnr.so`, whose path CTest injects automatically. To run pytest directly instead:
 
 ```bash
-export LIBBOVNAR_PATH=$(pwd)/build/libbvnr_shared.so
+export LIBBOVNAR_PATH=$(pwd)/build/libbvnr.so
 cd python && pip install -e ".[dev]"
 pytest tests -v
 ```
@@ -417,14 +421,14 @@ See [doc/3_bovnar_readwrite_api.md](doc/3_bovnar_readwrite_api.md) for the compl
 ### Requirements
 
 - **Python ≥ 3.10**
-- The shared library `libbvnr_shared.so` (built as shown above)
+- The shared library `libbvnr.so` (built as shown above)
 
 ### Installation
 
 ```bash
 cmake -B build . && cmake --build build
 
-export LIBBOVNAR_PATH=$(pwd)/build/libbvnr_shared.so
+export LIBBOVNAR_PATH=$(pwd)/build/libbvnr.so
 
 cd python
 pip install -e ".[dev]"

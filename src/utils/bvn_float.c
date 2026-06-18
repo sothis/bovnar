@@ -1181,8 +1181,12 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 {
 	if (f->_prec > BVN_FLOAT_MAX_PREC) return -1;
 	if (f->_exp  >  1000000000L || f->_exp < -1000000000L) return -1;
-	long prec = f->_prec;
-	long exp2 = f->_exp;
+	/* Explicit casts: long is 64-bit on LP64 (Linux) but 32-bit on Windows
+	 * (LLP64). _prec (<= BVN_FLOAT_MAX_PREC) and _exp (guarded to +-1e9 above)
+	 * both fit a 32-bit long, so the value is identical on every target; the
+	 * casts only document the intended (bounded) narrowing for -Wconversion. */
+	long prec = (long)f->_prec;
+	long exp2 = (long)f->_exp;
 	long e2   = exp2 - prec;
 	long E10;
 	{
@@ -1360,7 +1364,7 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 	f->_sign = neg ? -1 : 1;
 	f->_exp  = exp2;
 	memset(f->_d, 0, (size_t)f->_nlimbs * sizeof(bvn_limb_t));
-	long prec = f->_prec;
+	long prec = (long)f->_prec;   /* bounded; see bvnf_to_str_dec cast note */
 	int shift = (int)prec - 53;
 #if BVN_LIMB_BITS == 64
 	if (shift >= 0) {
@@ -1487,7 +1491,7 @@ static void bvnf_to_ieee_bin_direct(const bvn_float_t *f,
 	for (int i = 0; i < bits32; i++) bits[i] = 0;
 	if (f->_sign < 0)
 		bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
-	long be   = f->_exp - 1L + (long)bias;
+	long be   = (long)f->_exp - 1L + (long)bias;
 	long drop = (long)f->_prec - ((long)man_bits + 1L);
 	if (be <= 0) { drop += (1L - be); be = 0; }
 	uint32_t shint = bvnf_hint_limbs(f->_prec > (man_bits + 1u) ? f->_prec : (man_bits + 1u));

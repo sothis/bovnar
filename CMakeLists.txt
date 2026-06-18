@@ -84,6 +84,16 @@ else()
         # CLI executable (where user input enters via argv / files) instead
         # of the inner library translation units — see the bovnar target below.
     endif()
+    if(MINGW)
+        # MinGW's <math.h> isfinite/isinf/signbit are macros whose float-typed
+        # branch contains a double->float cast; -Wfloat-conversion (pulled in by
+        # -Wconversion) flags it at our call sites. glibc uses true builtins, so
+        # the Linux build is clean. The cast lives in the system macro, not our
+        # code, so drop just this sub-warning while keeping the rest of
+        # -Wconversion identical to the Linux build. Must come AFTER -Wconversion,
+        # so it lives in BVNR_C_FLAGS rather than the global block below.
+        list(APPEND BVNR_C_FLAGS -Wno-float-conversion)
+    endif()
 endif()
 if(BVNR_WERROR)
     if(MSVC)
@@ -91,6 +101,24 @@ if(BVNR_WERROR)
     else()
         list(APPEND BVNR_C_FLAGS -Werror)
     endif()
+endif()
+
+# MinGW printf maps onto the CRT, whose msvcrt printf lacks the C99 conversions
+# (%zu, %lld, ...). Apply these to EVERY translation unit (library, CLI, and the
+# tests — including the fuzz harnesses that use their own warning set) so the
+# choice of stdio implementation is uniform:
+#   * __USE_MINGW_ANSI_STDIO=1 selects MinGW's own ANSI-stdio implementation,
+#     which handles %zu/%lld correctly at runtime.
+#   * -fno-builtin-{printf,fprintf,snprintf} stops GCC from format-checking these
+#     calls against its ms_printf builtin archetype; with the builtins off it
+#     uses the header's gnu_printf attribute instead, so %zu/%lld no longer warn
+#     under -Wformat even though they were already correct at runtime. Only
+#     printf/fprintf/snprintf are used in the tree.
+# Order-independent (these flags are never overridden), so the global scope is
+# fine; unlike -Wno-float-conversion which must follow -Wconversion.
+if(MINGW)
+    add_compile_definitions(__USE_MINGW_ANSI_STDIO=1)
+    add_compile_options(-fno-builtin-printf -fno-builtin-fprintf -fno-builtin-snprintf)
 endif()
 
 # LTO tuning uses GCC-only spellings (-flto=auto, -fno-semantic-interposition).

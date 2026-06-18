@@ -606,11 +606,13 @@ static void tap_fail(const char *id, const char *desc, const char *detail)
 	g_sub_failures++;
 }
 
+#ifndef _WIN32  /* only the IUT runner emits SKIPs; unused on the Windows build */
 static void tap_skip(const char *id, const char *desc, const char *reason)
 {
 	printf("    ok %d - [%s] %s # SKIP %s\n", g_sub_next++, id, desc, reason);
 	g_tap_total++;
 }
+#endif
 
 /* =========================================================================
  * Test case definitions
@@ -1549,10 +1551,12 @@ static bool evlog_contains(const evlog_t *l, const char *needle)
 	return found;
 }
 
+#ifndef _WIN32  /* only the IUT runner compares logs; unused on the Windows build */
 static bool evlog_equal(const evlog_t *a, const char *b_buf, size_t b_len)
 {
 	return a->used == b_len && memcmp(a->buf, b_buf, b_len) == 0;
 }
+#endif
 
 static bool check_key_in_log(const evlog_t *log, const char *key)
 {

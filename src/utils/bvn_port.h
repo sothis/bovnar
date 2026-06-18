@@ -70,10 +70,26 @@ typedef __int64 off_t;     /* MSVC has no off_t; 64-bit to match _lseeki64 and
  * The library calls lseek only to size a file (SEEK_END/SEEK_SET), so remapping
  * it to _lseeki64 is safe. */
 #    include <unistd.h>
+#    include <limits.h>
 #    undef  off_t
 #    define off_t __int64
 #    undef  lseek
 #    define lseek _lseeki64
+/* MinGW's read()/write() take an unsigned int byte count, but the library
+ * passes a size_t. Wrap them so the (buffer-bounded) count converts explicitly
+ * — matching the MSVC _read/_write signature and silencing -Wconversion without
+ * weakening it for the rest of the code. static inline, so an unused copy in a
+ * TU that never does fd I/O does not warn. */
+static inline int bvn_port_read(int fd, void *buf, size_t n)
+{
+	return _read(fd, buf, n > (size_t)UINT_MAX ? UINT_MAX : (unsigned int)n);
+}
+static inline int bvn_port_write(int fd, const void *buf, size_t n)
+{
+	return _write(fd, buf, n > (size_t)UINT_MAX ? UINT_MAX : (unsigned int)n);
+}
+#    define read  bvn_port_read
+#    define write bvn_port_write
 #  endif
 
 #  ifndef O_BINARY

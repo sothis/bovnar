@@ -50,7 +50,9 @@
 
 #  if defined(_MSC_VER)
 #    include <basetsd.h>
-typedef SSIZE_T ssize_t;  /* MSVC has no ssize_t */
+typedef SSIZE_T ssize_t;   /* MSVC has no ssize_t */
+typedef __int64 off_t;     /* MSVC has no off_t; 64-bit to match _lseeki64 and
+                            * keep the CLI's 4 GiB file-size check honest. */
 /* MSVC spells the POSIX fd calls with a leading underscore. All call sites in
  * this library use the bare names as plain libc calls (no member/identifier
  * collisions), so remapping them here is safe and keeps the I/O code single
@@ -59,6 +61,7 @@ typedef SSIZE_T ssize_t;  /* MSVC has no ssize_t */
 #    define read  _read
 #    define write _write
 #    define close _close
+#    define lseek _lseeki64
 #  else
 #    include <unistd.h>
 #  endif

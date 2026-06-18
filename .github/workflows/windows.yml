@@ -59,13 +59,17 @@ jobs:
           & build\bovnar.exe validate smoke.bvnr
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: smoke - pretty-print (file)
+      - name: smoke - pretty-print runs (file)
         shell: pwsh
         run: |
-          $out = & build\bovnar.exe pretty-print smoke.bvnr
+          & build\bovnar.exe pretty-print smoke.bvnr > pp.txt
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          Write-Host $out
-          if ($out -notmatch '<uint:8>') { Write-Error 'missing <uint:8> in output'; exit 1 }
+
+      - name: smoke - pretty-print output
+        shell: pwsh
+        run: |
+          Get-Content pp.txt
+          if (-not (Select-String -Path pp.txt -Pattern '<uint:8>' -Quiet)) { Write-Error 'missing <uint:8>'; exit 1 }
 
       - name: smoke - events (binary-mode stdin)
         shell: pwsh
@@ -115,10 +119,13 @@ jobs:
       - name: smoke - validate (file)
         run: ./build/bovnar.exe validate smoke.bvnr
 
-      - name: smoke - pretty-print (file)
+      - name: smoke - pretty-print runs (file)
+        run: ./build/bovnar.exe pretty-print smoke.bvnr > pp.txt
+
+      - name: smoke - pretty-print output
         run: |
-          ./build/bovnar.exe pretty-print smoke.bvnr | tee out.txt
-          grep -q '<uint:8>' out.txt
+          cat pp.txt
+          grep -q '<uint:8>' pp.txt
 
       - name: smoke - events (binary-mode stdin)
         run: printf '.x = "hi";\n' | ./build/bovnar.exe events -

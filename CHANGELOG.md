@@ -91,7 +91,7 @@ such a document is an error, exactly as a 1.0 reader reports.
   full representable range via pure-Python encoders past the parser's cap.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
-  **301 cases** (groups `version`, `datetime` — including the ISO-literal
+  **303 cases** (groups `version`, `datetime` — including the ISO-literal
   `DTLIT` cases — plus escape/reference additions), passing in both self-test
   and `--iut` modes.
 

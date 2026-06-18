@@ -75,7 +75,7 @@ build understands the highest spec it supports via `bvnr_spec_version()` /
   `bovnar.BvnFloat`.
 - **Tooling** — a `bovnar version` subcommand; the `datetime` keyword in all five
   syntax highlighters and the web playground; and a conformance suite grown to
-  **301 cases** (up from 207), adding the `version` and `datetime` groups —
+  **303 cases** (up from 207), adding the `version` and `datetime` groups —
   including the ISO-literal `DTLIT` cases — passing in both self-test and `--iut`
   modes.
 

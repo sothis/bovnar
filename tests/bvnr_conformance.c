@@ -825,6 +825,12 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("DT-012", "datetime", "string carrier is rejected",
 	           "#!bovnar 1.1\n.t = <datetime> \"x\";",
 	           error_type_value_mismatch),
+	/* A datetime carries no unit in ANY form. DTLIT-111 rejects the ISO-literal
+	 * form; this rejects the plain integer carrier, which the validator once
+	 * accepted (silently dropping the unit on emit). */
+	ERROR_CASE("DT-013", "datetime", "a unit on the integer carrier is rejected",
+	           "#!bovnar 1.1\n.t = <datetime:64> 100 m;",
+	           error_unit_illegal),
 
 	/* ── ISO-8601 datetime literals (spec 1.1) ───────────────────── */
 	VALID_KEY("DTLIT-001", "datetime", "bare date-only literal infers unix midnight",
@@ -1444,6 +1450,13 @@ static const cf_case_t g_cases[] = {
 	DOM_ERROR("HOM-015", "homogeneity", "datetimes on different epochs do not mix",
 	          "#!bovnar 1.1\n.a = [<datetime:64,unix> 1, <datetime:64,tai> 2];",
 	          error_array_element_type_mismatch),
+	/* Stronger than HOM-008 (ragged, differing cell counts): sibling matrices
+	 * with the SAME total cell count but a DIFFERENT shape (2x3 vs 3x2) must be
+	 * rejected. A flat-stored matrix once compared only its flattened cell count,
+	 * so this geometry slipped through. */
+	DOM_ERROR("HOM-016", "homogeneity", "sibling matrices, equal cell count, different shape",
+	          ".a = [[1,2,3]/[4,5,6], [7,8]/[9,10]/[11,12]];",
+	          error_array_row_size_mismatch),
 };
 
 #define NUM_CASES ((int)(sizeof(g_cases) / sizeof(g_cases[0])))

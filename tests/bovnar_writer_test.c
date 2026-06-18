@@ -1383,6 +1383,33 @@ static void test_write_datetime_fraction_guards(void)
 	ASSERT_TRUE(strstr((char *)out, "-9223372036854775808") != NULL,
 		"tai overflow falls back to the integer carrier (no UB)");
 }
+/*
+ * The canon-observer path drives the serializer with no validation (unlike the
+ * bvnr_write_* API, which validates first). An unbalanced ev_struct_end — no
+ * matching ev_struct_start, so struct_depth is 0 — must be self-rejected: without
+ * the guard in bvn_ser_serialize_event, indent/struct_depth would underflow and
+ * the next bvn_ser_indent would emit ~4 billion tab bytes. This is the only path
+ * that reaches that guard, so it is exercised here directly.
+ */
+static void test_canon_observer_unbalanced_struct_end_rejected(void)
+{
+	uint8_t buf[256];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, buf, sizeof buf);
+
+	bvnr_canon_observer_t *obs = bvnr_canon_observer_create(&sink, false);
+	ASSERT_NOT_NULL(obs, "canon observer create");
+	if (!obs) return;
+
+	bvnr_data_t data;
+	memset(&data, 0, sizeof data);
+	ASSERT_FALSE(bvnr_canon_observer_on_event(obs, ev_struct_end, &data),
+		"unbalanced struct_end must be rejected, not underflow");
+	ASSERT_TRUE(bvnr_sink_bytes_written(&sink) == 0,
+		"rejected struct_end must not emit any bytes");
+
+	bvnr_canon_observer_destroy(obs);
+}
 int main(void)
 {
 	printf("Running bovnar_writer_test regression suite...\n");
@@ -1419,6 +1446,7 @@ int main(void)
 	test_write_reference_without_dot_rejected();
 	test_write_reference_dot_only_rejected();
 	test_write_string_vf_escapes();
+	test_canon_observer_unbalanced_struct_end_rejected();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

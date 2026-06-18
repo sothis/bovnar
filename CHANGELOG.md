@@ -100,6 +100,17 @@ non-version remainder is reported as a malformed directive rather than ignored.
   **303 cases** (groups `version`, `datetime` — including the ISO-literal
   `DTLIT` cases — plus escape/reference additions), passing in both self-test
   and `--iut` modes.
+- **Windows build support (64-bit MinGW64 and MSVC).** The library (`bvnr.dll` +
+  import lib, plus a static archive) and the `bovnar` CLI now build on Windows.
+  A portability shim (`src/utils/bvn_port.h`) maps the fd I/O onto the CRT and —
+  critically for a binary format — forces binary mode on opened files and on
+  stdin/stdout/stderr so no CRLF translation can corrupt the byte stream; the
+  bench timing uses `QueryPerformanceCounter`/`GetThreadTimes`. DLL symbols are
+  exported via CMake `WINDOWS_EXPORT_ALL_SYMBOLS` (matching the export-all-extern
+  behaviour on ELF). On MSVC the static archive is `bvnr_static.lib` (the DLL
+  import lib takes `bvnr.lib`); MinGW keeps the unified `libbvnr` names. A new
+  `Windows` CI workflow builds both toolchains and smoke-tests the CLI. The POSIX
+  test harness (fork/exec IUT, socketpair, sigaction) is not built on Windows.
 
 ### Changed
 

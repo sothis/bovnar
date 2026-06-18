@@ -23,10 +23,9 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
-#include <unistd.h>
+#include "bvn_port.h"
 #include "bovnar.h"
 #include "bvn_io_impl.h"
 /*

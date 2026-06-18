@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.21)
 project(bovnar VERSION 1.1.0 LANGUAGES C)
 
+# Windows builds are 64-bit only (MinGW64 and MSVC x64). CMAKE_SIZEOF_VOID_P is
+# populated by the compiler probe that project() just ran.
+if(WIN32 AND CMAKE_SIZEOF_VOID_P AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR
+        "Bovnar on Windows supports 64-bit builds only "
+        "(detected ${CMAKE_SIZEOF_VOID_P}-byte pointers — use an x64 toolchain).")
+endif()
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -23,46 +31,66 @@ option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
     ON)
 
-set(BVNR_C_FLAGS
-    -std=c99
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wshadow
-    -Wcast-qual
-    -Wconversion
-    -Wno-override-init
-    -Wno-missing-field-initializers
-    -pedantic
-    $<$<AND:$<BOOL:${BVNR_ANALYZER}>,$<C_COMPILER_ID:GNU>>:-fanalyzer>
-    -fPIC
-    -fvisibility=hidden
-    # bvnr_source_t / bvnr_sink_t are opaque storage that the
-    # library reinterprets via an internal impl struct.  Strict
-    # aliasing would mis-optimise those accesses, so disable it.
-    # NOTE: this only protects *this* build.  The impl structs are
-    # also tagged __may_alias__ (see src/io/bvn_io_impl.h) so the
-    # single-file amalgamation stays correct when a consumer compiles
-    # dist/bovnar.c at -O2/-O3 without this flag.
-    -fno-strict-aliasing
-)
-if(BVNR_HARDEN)
-    # -Wformat=2 / -Wformat-security: compile-time only, zero runtime cost.
-    list(APPEND BVNR_C_FLAGS
-        -Wformat=2
-        -Wformat-security
+if(MSVC)
+    # MSVC (x64). /utf-8 so the UTF-8 string literals in the sources (unit
+    # symbols such as "·"/"µ") compile correctly regardless of the active code
+    # page; the _CRT_*_NO_WARNINGS defines silence the deprecation of the POSIX
+    # CRT names (open/read/write/close) that the bvn_port.h shim maps, rather
+    # than littering the source with underscores.
+    set(BVNR_C_FLAGS
+        /std:c11        # MSVC has no /std:c99; c11 enables the C99 features the
+                        # sources use (mixed declarations, designated inits).
+        /W3
+        /utf-8
+        /D_CRT_SECURE_NO_WARNINGS
+        /D_CRT_NONSTDC_NO_WARNINGS
     )
-    # FORTIFY_SOURCE: cheap runtime checks on libc string/io calls; needs
-    # optimisation to be active, so silently no-op in Debug.
-    list(APPEND BVNR_C_FLAGS
-        $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
-    # Stack protector: ~10-15% slowdown on the parser hot path because the
-    # state-machine functions touch local arrays.  Apply it only to the
-    # CLI executable (where user input enters via argv / files) instead
-    # of the inner library translation units — see the bovnar target below.
+else()
+    set(BVNR_C_FLAGS
+        -std=c99
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wshadow
+        -Wcast-qual
+        -Wconversion
+        -Wno-override-init
+        -Wno-missing-field-initializers
+        -pedantic
+        $<$<AND:$<BOOL:${BVNR_ANALYZER}>,$<C_COMPILER_ID:GNU>>:-fanalyzer>
+        -fPIC
+        -fvisibility=hidden
+        # bvnr_source_t / bvnr_sink_t are opaque storage that the
+        # library reinterprets via an internal impl struct.  Strict
+        # aliasing would mis-optimise those accesses, so disable it.
+        # NOTE: this only protects *this* build.  The impl structs are
+        # also tagged __may_alias__ (see src/io/bvn_io_impl.h) so the
+        # single-file amalgamation stays correct when a consumer compiles
+        # dist/bovnar.c at -O2/-O3 without this flag.
+        -fno-strict-aliasing
+    )
+    if(BVNR_HARDEN)
+        # -Wformat=2 / -Wformat-security: compile-time only, zero runtime cost.
+        list(APPEND BVNR_C_FLAGS
+            -Wformat=2
+            -Wformat-security
+        )
+        # FORTIFY_SOURCE: cheap runtime checks on libc string/io calls; needs
+        # optimisation to be active, so silently no-op in Debug.
+        list(APPEND BVNR_C_FLAGS
+            $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+        # Stack protector: ~10-15% slowdown on the parser hot path because the
+        # state-machine functions touch local arrays.  Apply it only to the
+        # CLI executable (where user input enters via argv / files) instead
+        # of the inner library translation units — see the bovnar target below.
+    endif()
 endif()
 if(BVNR_WERROR)
-    list(APPEND BVNR_C_FLAGS -Werror)
+    if(MSVC)
+        list(APPEND BVNR_C_FLAGS /WX)
+    else()
+        list(APPEND BVNR_C_FLAGS -Werror)
+    endif()
 endif()
 
 # LTO tuning uses GCC-only spellings (-flto=auto, -fno-semantic-interposition).
@@ -75,10 +103,14 @@ else()
     set(BVNR_LTO_CFLAGS "")
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
-set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for Release"         FORCE)
-set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
+# These are GCC/Clang flag spellings; on MSVC let CMake supply its own
+# per-config defaults (/Od /Zi, /O2, etc.).
+if(NOT MSVC)
+    set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
+    set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for Release"         FORCE)
+    set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
+    set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
+endif()
 
 if(BVNR_LTO
         AND (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
@@ -151,15 +183,34 @@ target_include_directories(bvnr_objects
 # the static archive is libbvnr.a and the shared object is libbvnr.so (the CMake
 # target names stay distinct because two targets cannot share a name).
 add_library(bvnr_static STATIC $<TARGET_OBJECTS:bvnr_objects>)
-set_target_properties(bvnr_static PROPERTIES OUTPUT_NAME bvnr)
+# On MSVC the static archive and the DLL's import library are both "<name>.lib",
+# so they would collide if both were named "bvnr". Give the static archive a
+# distinct name there. MinGW (libbvnr.a vs the libbvnr.dll.a import lib) and
+# POSIX (.a vs .so) disambiguate by extension, so they keep the unified "bvnr".
+if(MSVC)
+    set_target_properties(bvnr_static PROPERTIES OUTPUT_NAME bvnr_static)
+else()
+    set_target_properties(bvnr_static PROPERTIES OUTPUT_NAME bvnr)
+endif()
 target_include_directories(bvnr_static
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_library(bvnr_shared SHARED $<TARGET_OBJECTS:bvnr_objects>)
 set_target_properties(bvnr_shared PROPERTIES OUTPUT_NAME bvnr)
+# Export every API symbol from the DLL the same way the ELF/Mach-O builds export
+# every extern symbol. The shared OBJECT library is also linked into the static
+# archive, so a baked-in __declspec(dllexport) cannot be used (it would be wrong
+# for the static objects); CMake's auto-export generates the .def instead. All
+# public symbols are functions, which this exports cleanly.
+set_target_properties(bvnr_shared PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 target_compile_options(bvnr_shared PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# Self-contained DLL on MinGW: fold in the GCC runtime so the shipped library
+# has no libgcc_s_seh / libwinpthread sidecar dependency.
+if(MINGW)
+    target_link_options(bvnr_shared PRIVATE -static-libgcc -static)
+endif()
 
 # Versioned soname for system/distro installs so the dynamic loader can refuse an
 # ABI mismatch — e.g. a consumer compiled against 1.0 headers (before a public
@@ -176,20 +227,35 @@ endif()
 
 add_executable(bovnar src/bovnar.c)
 target_compile_options(bovnar PRIVATE ${BVNR_C_FLAGS})
-if(BVNR_HARDEN)
+# The CLI TU includes the internal portability shim (bvn_port.h, src/utils).
+target_include_directories(bovnar PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+if(BVNR_HARDEN AND NOT MSVC)
     # Stack protector is applied to the CLI binary's own TU (where argv
     # and stdin are first touched).  Library TUs are exempt so the
-    # parser hot path stays fast.
+    # parser hot path stays fast.  MSVC enables /GS by default.
     target_compile_options(bovnar PRIVATE -fstack-protector-strong)
 endif()
 set_target_properties(bovnar PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_options(bovnar PRIVATE -pie)
+if(NOT WIN32)
+    # -pie is an ELF executable concept; not applicable to PE/Windows.
+    target_link_options(bovnar PRIVATE -pie)
+endif()
+if(MINGW)
+    target_link_options(bovnar PRIVATE -static-libgcc -static)
+endif()
 target_link_libraries(bovnar PRIVATE bvnr_static)
 
 # The test suite spins up dozens of executables at configure time and pulls in
 # CTest/pytest wiring.  Skip it when building the Python wheel
 # (scikit-build-core defines SKBUILD) so `pip install` only compiles the lib.
-if(BVNR_BUILD_TESTS AND NOT SKBUILD)
+#
+# It is also skipped on Windows: the harness is POSIX (the conformance driver
+# forks/execs the IUT, the round-trip test uses socketpair + pthread, the fuzz
+# runner uses sigaction). The Windows build target is the library + DLL + CLI;
+# the Windows CI smoke-tests the CLI end-to-end (which drives the full
+# read/write/DOM paths). Porting the test harness to Windows is tracked
+# separately.
+if(BVNR_BUILD_TESTS AND NOT SKBUILD AND NOT WIN32)
     include(CMakeLists_tests.txt)
     # Python test registration lives entirely in CMakeLists_tests.txt
     # (granular per-file targets with proper labels and library injection).

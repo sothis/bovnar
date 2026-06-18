@@ -25,7 +25,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
@@ -33,8 +32,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
+#define BVN_PORT_TIMING   /* pull in bvn_monotonic_sec / bvn_cpu_sec for cmd_bench */
+#include "bvn_port.h"
 #include "bovnar.h"
 #include "bovnar_dom.h"
 #include "bovnar_stream.h"
@@ -475,7 +474,7 @@ static int cmd_events(int argc, char **argv)
 	if (from_stdin) {
 		fd = STDIN_FILENO;
 	} else {
-		fd = open(filename, O_RDONLY);
+		fd = open(filename, BVN_O_RDONLY);
 		if (fd < 0) { perror(filename); return 1; }
 	}
 	bvnr_reader_t *rd = bvnr_reader_create();
@@ -607,7 +606,7 @@ static int cmd_events(int argc, char **argv)
 }
 static int cmd_validate(const char *filename)
 {
-	int fd = open(filename, O_RDONLY);
+	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (!r) { close(fd); return 1; }
@@ -637,7 +636,7 @@ static int cmd_validate(const char *filename)
 	 * property, enforced over the materialised DOM — so run a second pass
 	 * through bvn_dom_parse_fd and surface any homogeneity error.
 	 */
-	int fd2 = open(filename, O_RDONLY);
+	int fd2 = open(filename, BVN_O_RDONLY);
 	if (fd2 < 0) { perror(filename); return 1; }
 	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd2);
 	close(fd2);
@@ -659,7 +658,7 @@ static int cmd_validate(const char *filename)
 }
 static int cmd_query(const char *path, const char *filename)
 {
-	int fd = open(filename, O_RDONLY);
+	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd);
 	close(fd);
@@ -689,7 +688,7 @@ static int cmd_query(const char *path, const char *filename)
 }
 static int cmd_pretty(const char *filename)
 {
-	int fd = open(filename, O_RDONLY);
+	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
 	if (sz < 0) {
@@ -1293,7 +1292,7 @@ static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *n
 }
 static int cmd_convert_json_to_bvnr(const char *file)
 {
-	int fd = open(file, O_RDONLY);
+	int fd = open(file, BVN_O_RDONLY);
 	if (fd < 0) { perror(file); return 1; }
 	off_t sz = lseek(fd, 0, SEEK_END);
 	if (sz < 0) {
@@ -1609,7 +1608,7 @@ static const bvn_dom_node_t *find_fractional_datetime(const bvn_dom_node_t *node
 }
 static int cmd_convert_bvnr_to_json(const char *file)
 {
-	int fd = open(file, O_RDONLY);
+	int fd = open(file, BVN_O_RDONLY);
 	if (fd < 0) { perror(file); return 1; }
 	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd);
 	close(fd);
@@ -1733,24 +1732,21 @@ static bmark_cfg_t bmark_cfg = {
 	.json       = false,
 	.min_overhead = false,
 };
-typedef struct timespec bmark_wall_clock_t;
+/* Monotonic wall clock as a double (seconds); the platform source is in
+ * bvn_port.h (clock_gettime on POSIX, QueryPerformanceCounter on Windows). */
+typedef double bmark_wall_clock_t;
 static bmark_wall_clock_t bmark_timer_now(void)
 {
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts;
+	return bvn_monotonic_sec();
 }
 static double bmark_timer_sec(const bmark_wall_clock_t *start,
                               const bmark_wall_clock_t *end)
 {
-	return (double)(end->tv_sec - start->tv_sec)
-	     + (double)(end->tv_nsec - start->tv_nsec) * 1e-9;
+	return *end - *start;
 }
 static double bmark_cpu_sec(void)
 {
-	struct timespec ts;
-	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-	return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+	return bvn_cpu_sec();
 }
 typedef struct {
 	size_t      event_count;
@@ -2317,7 +2313,7 @@ static int slurp(const char *path, uint8_t **out, uint64_t *outlen)
 {
 	if (strcmp(path, "-") == 0)
 		return read_all_fd(STDIN_FILENO, out, outlen);
-	int fd = open(path, O_RDONLY);
+	int fd = open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return -1; }
 	int rc = read_all_fd(fd, out, outlen);
 	close(fd);
@@ -2358,7 +2354,7 @@ static bool frames_on_document(void *ud, uint64_t index, bool ok, error_code_t e
 static int cmd_frames_list(const char *path)
 {
 	bool is_stdin = (strcmp(path, "-") == 0);
-	int fd = is_stdin ? STDIN_FILENO : open(path, O_RDONLY);
+	int fd = is_stdin ? STDIN_FILENO : open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return 1; }
 	bvnr_source_t src;
 	bvnr_source_from_fd(&src, fd);
@@ -2470,7 +2466,7 @@ static bool mux_print_msg(void *ud, uint64_t channel, const uint8_t *data, uint6
 static int cmd_mux_list(const char *path)
 {
 	bool is_stdin = (strcmp(path, "-") == 0);
-	int fd = is_stdin ? STDIN_FILENO : open(path, O_RDONLY);
+	int fd = is_stdin ? STDIN_FILENO : open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return 1; }
 	bvnr_demux_t *dm = bvnr_demux_create(mux_print_msg, NULL, 0);
 	bvnr_reader_t *r = bvnr_reader_create();
@@ -2574,6 +2570,9 @@ static void usage(const char *prog)
 }
 int main(int argc, char **argv)
 {
+	/* A binary format must not be mangled by the Windows CRT's CRLF text
+	 * translation on stdin/stdout/stderr; no-op on POSIX. */
+	bvn_set_binary_stdio();
 	if (argc < 2) { usage(argv[0]); return 1; }
 	const char *cmd = argv[1];
 	if (strcmp(cmd, "validate") == 0) {

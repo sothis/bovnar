@@ -28,7 +28,7 @@
 #include <stdint.h>
 #ifndef BVN_API
 #  if defined(_WIN32) || defined(__CYGWIN__)
-#    define BVN_API __declspec(dllexport)
+#    define BVN_API  /* DLL symbols exported via CMake WINDOWS_EXPORT_ALL_SYMBOLS */
 #  elif defined(__GNUC__) || defined(__clang__)
 #    define BVN_API __attribute__((visibility("default")))
 #  else

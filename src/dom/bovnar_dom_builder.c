@@ -23,7 +23,6 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -31,7 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "bvn_port.h"
 #include "bovnar.h"
 #include "bovnar_dom.h"
 #include "bovnar_si_units.h"

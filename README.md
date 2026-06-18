@@ -157,7 +157,7 @@ bovnar/
 ### Requirements
 
 - CMake ≥ 3.21
-- A C99-conforming compiler (GCC or Clang recommended)
+- A C99-conforming compiler (GCC or Clang on Linux/macOS; **64-bit** MinGW64 or MSVC on Windows)
 - No external library dependencies, at build time or runtime, beyond the C standard library (not even `libm`)
 
 ### Build the library and CLI tool
@@ -204,6 +204,26 @@ gcc my_app.c -I include -L build -lbvnr -o my_app
 Both libraries share the base name `bvnr` (`libbvnr.a`, `libbvnr.so`), so `-lbvnr`
 links the shared object when both are present. To link the static archive
 instead, use `-l:libbvnr.a` (GNU ld) or static-link flags.
+
+### Windows (64-bit)
+
+Both 64-bit toolchains are supported; the same `cmake` invocation works:
+
+```bash
+# MSVC (x64 Developer environment, or the Visual Studio generator)
+cmake -B build -A x64 .
+cmake --build build --config Release   # -> bvnr.dll + bvnr.lib, bvnr_static.lib, bovnar.exe
+
+# MinGW64
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release .
+cmake --build build                    # -> libbvnr.dll + libbvnr.dll.a, libbvnr.a, bovnar.exe
+```
+
+On MSVC the static archive is `bvnr_static.lib` because the DLL's import library
+already takes `bvnr.lib`. The C/Python test suite is POSIX-only and not built on
+Windows; the `Windows` CI workflow builds both toolchains and smoke-tests the CLI.
+Consumers passing their own file descriptors to the fd source/sink on Windows
+must open them in binary mode (`_O_BINARY`); the `bovnar` CLI does this itself.
 
 ---
 

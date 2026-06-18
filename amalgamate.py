@@ -63,6 +63,16 @@ IMPL_SOURCES = [
 INC_SYS = re.compile(r'^\s*#\s*include\s*<([^>]+)>(.*)$')
 INC_PRJ = re.compile(r'^\s*#\s*include\s*"([^"]+)"(.*)$')
 
+# Preprocessor conditional tracking. A system include sitting inside a
+# platform-conditional block (e.g. `#if defined(_WIN32)` in bvn_port.h) must NOT
+# be hoisted to the top of the amalgamation — doing so strips its guard and the
+# header (<io.h>, <windows.h>, …) then gets included on the wrong platform. Such
+# includes are kept inline so their #if/#else/#endif structure is preserved;
+# only unconditional and plain include-guard'd system includes are hoisted.
+COND_OPEN  = re.compile(r'^\s*#\s*(?:if|ifdef|ifndef)\b(.*)$')
+COND_CLOSE = re.compile(r'^\s*#\s*endif\b')
+PLATFORM_MACRO = re.compile(r'_WIN32|_WIN64|__CYGWIN__|_MSC_VER|__MINGW|\bWIN32\b')
+
 
 def resolve(name):
     base = os.path.basename(name)
@@ -73,29 +83,48 @@ def resolve(name):
     return None
 
 
-def expand(path, inlined, sys_inc, out):
+def expand(path, inlined, sys_inc, out, in_platform_cond=False):
     """Append `path`'s content to out, inlining project headers once and
-    collecting system includes into sys_inc (ordered, deduped)."""
+    collecting unconditional system includes into sys_inc (ordered, deduped).
+    System includes guarded by a platform conditional are kept inline so their
+    guard survives. `in_platform_cond` carries that context across inlining when
+    a header is itself included from inside a platform conditional."""
     rel = os.path.relpath(path, ROOT)
     out.append(f"\n/* ==================== {rel} ==================== */\n")
+    # Stack of bools: does this open #if level reference a platform macro?
+    cond_platform = []
     with open(path, encoding="utf-8") as f:
         for line in f:
+            co = COND_OPEN.match(line)
+            if co:
+                cond_platform.append(bool(PLATFORM_MACRO.search(co.group(1))))
+                out.append(line)
+                continue
+            if COND_CLOSE.match(line):
+                if cond_platform:
+                    cond_platform.pop()
+                out.append(line)
+                continue
             ms, mp = INC_SYS.match(line), INC_PRJ.match(line)
             if ms or mp:
                 m = ms or mp
                 name, trailing = m.group(1), m.group(2)
+                platform_ctx = in_platform_cond or any(cond_platform)
                 # An include that resolves to a project file (quote form, or the
                 # <...> form bvn_float.c uses for <bvn_float.h>) is inlined once;
-                # a genuine <system> header is hoisted; an unresolved quote
-                # include is dropped. Any trailing content (e.g. a comment that
-                # opens a multi-line block) is always preserved.
+                # an unconditional <system> header is hoisted; a platform-guarded
+                # <system> header is kept inline (its #if guard must survive); an
+                # unresolved quote include is dropped. Any trailing content (e.g.
+                # a comment opening a multi-line block) is always preserved.
                 tgt = resolve(name)
                 if tgt:
                     if tgt not in inlined:
                         inlined.add(tgt)
-                        expand(tgt, inlined, sys_inc, out)
+                        expand(tgt, inlined, sys_inc, out, platform_ctx)
                 elif ms:
-                    if name not in sys_inc:
+                    if platform_ctx:
+                        out.append(line)
+                    elif name not in sys_inc:
                         sys_inc.append(name)
                 if trailing.strip():
                     out.append(trailing + "\n")

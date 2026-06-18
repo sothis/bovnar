@@ -697,7 +697,7 @@ static int cmd_pretty(const char *filename)
 		close(fd);
 		return 1;
 	}
-	if (sz > (off_t)UINT32_MAX) {
+	if ((uint64_t)sz > UINT32_MAX) {
 		fprintf(stderr, "pretty-print: file exceeds 4 GiB limit\n");
 		close(fd);
 		return 1;
@@ -1300,7 +1300,7 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		close(fd); return 1;
 	}
 	if (lseek(fd, 0, SEEK_SET) != 0) { perror(file); close(fd); return 1; }
-	if (sz > (off_t)UINT32_MAX) {
+	if ((uint64_t)sz > UINT32_MAX) {
 		fprintf(stderr, "convert: file exceeds 4 GiB limit\n");
 		close(fd); return 1;
 	}

@@ -169,6 +169,14 @@ jobs:
   mingw-cross-wine:
     name: MinGW64 cross (Ubuntu + Wine)
     runs-on: ubuntu-latest
+    # Non-blocking: the native MinGW64 (tests) job is the required Windows test
+    # signal. This job adds coverage of the local-dev cross path but depends on
+    # apt-installing Wine + the mingw toolchain from the runners' Azure mirror,
+    # whose throughput is sometimes pathologically slow; continue-on-error keeps a
+    # bad-mirror day from gating the whole workflow. (The apt cache makes this
+    # rare once warm.) Inspect its result manually when the cross path itself
+    # changes.
+    continue-on-error: true
     # Cross-compiles the Windows target from Linux with the mingw-w64 toolchain
     # and runs the test suite under Wine — the local-dev path. Unlike the native
     # MSYS2 jobs, this is what exercises cmake/toolchain-mingw-w64-x86_64.cmake,

@@ -823,6 +823,19 @@ add_test(
 set_tests_properties(bvnr_cli_convert_fail_datetime_fraction PROPERTIES
     LABELS "cli;convert" TIMEOUT 30)
 
+# query must print a sub-second datetime as the faithful ISO literal, not the
+# fraction-dropping integer carrier.
+add_test(
+    NAME    bvnr_cli_query_datetime_fraction
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar>
+            -DFILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/frac_datetime.bvnr
+            -DQPATH=.t
+            "-DNEEDLE=2026-06-15T12:00:00.123Z"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/query_expect.cmake)
+set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
+    LABELS "cli;query" TIMEOUT 30)
+
 # ── Single-file amalgamation ────────────────────────────────────────────────
 # The amalgamation is currently not shipped in dist/ (dist/bovnar.{c,h} are
 # git-ignored), so its regenerate-and-smoke-test (bvnr_amalgam) is disabled.

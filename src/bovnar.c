@@ -38,6 +38,7 @@
 #include "bovnar.h"
 #include "bovnar_dom.h"
 #include "bovnar_stream.h"
+#include "bvn_datetime.h"
 static void print_indent(uint32_t level, bool pretty)
 {
 	if (!pretty) return;
@@ -51,6 +52,50 @@ static bool on_verified_write(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 	pp_callback_ctx_t *ctx = (pp_callback_ctx_t *)ud;
 	return bvnr_write_event(ctx->writer, ev, d);
 }
+/* spec 1.1: a datetime carrying sub-second digits stores the whole-second epoch
+ * count plus the verbatim fraction. Printing the bare carrier would silently
+ * drop the fraction — and because the carrier is FLOORED, "carrier.frac" also
+ * misreads a pre-epoch value (1969-12-31T23:59:59.5Z stores carrier -1, frac
+ * "5"; the instant is -0.5, not -1.5). So reconstruct the faithful ISO literal
+ * YYYY-MM-DDTHH:MM:SS.<frac>Z, the same form pretty-print emits. Returns false
+ * (caller prints the integer carrier) for a non-fractional datetime, an atomic
+ * GNSS epoch, or a carrier whose civil time falls outside the 0000..9999 an ISO
+ * literal allows. Mirrors bvn_ser_datetime_to_civil in the writer. */
+static bool print_datetime_iso_literal(const bvn_dom_node_t *node)
+{
+	value_type_spec_t vt = bvn_dom_get_value_type(node);
+	if (vt.family != vt_datetime)
+		return false;
+	uint32_t fraclen = 0;
+	const char *frac = bvn_dom_get_datetime_fraction(node, &fraclen);
+	if (!frac || fraclen == 0)
+		return false;
+	int64_t secs = 0;
+	if (!bvn_dom_get_i64(node, &secs))
+		return false;
+	const char *ep = bvnr_datetime_epoch_name(vt);
+	if (ep == NULL ||
+	    strcmp(ep, "gps") == 0 || strcmp(ep, "galileo") == 0 ||
+	    strcmp(ep, "glonass") == 0 || strcmp(ep, "beidou") == 0)
+		return false;
+	bvn_datetime_t dt;
+	memset(&dt, 0, sizeof dt);
+	if (strcmp(ep, "tai") == 0)
+		bvn_dt_tai_seconds_to_utc(&dt, secs);
+	else
+		bvn_dt_epoch_seconds_to_datetime(&dt,
+			(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt), secs);
+	if (!(dt.date.month >= 1 && dt.date.month <= 12 &&
+	      dt.date.day   >= 1 && dt.date.day   <= 31 &&
+	      dt.date.year  >= 0 && dt.date.year  <= 9999))
+		return false;
+	printf("%04lld-%02lld-%02lldT%02lld:%02lld:%02lld.%.*sZ",
+		(long long)dt.date.year, (long long)dt.date.month,
+		(long long)dt.date.day, (long long)dt.hour,
+		(long long)dt.minute, (long long)dt.second,
+		(int)fraclen, frac);
+	return true;
+}
 static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 {
 	if (!node) { printf("null"); return; }
@@ -59,6 +104,10 @@ static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 		printf("null");
 		break;
 	case BVN_DOM_INT: {
+		/* datetime with sub-second digits -> faithful ISO literal, not the
+		 * fraction-dropping integer carrier. */
+		if (print_datetime_iso_literal(node))
+			break;
 		value_type_spec_t vt = bvn_dom_get_value_type(node);
 		if (vt.width > 64u) {
 			char *s = bvn_dom_int_to_str(node, 10u);

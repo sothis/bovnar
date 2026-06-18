@@ -228,6 +228,15 @@ run_cmake_check "convert rejects bvnr->json datetime fraction" \
     "-DNEEDLE=sub-second" \
     -P "${SRC_DIR}/cmake/convert_expect_fail.cmake"
 
+# query must print a sub-second datetime as the faithful ISO literal rather than
+# the fraction-dropping integer carrier.
+run_cmake_check "query shows datetime fraction (ISO literal)" \
+    -DBOVNAR="${BOVNAR_BIN}" \
+    -DFILE="${SRC_DIR}/tests/frac_datetime.bvnr" \
+    -DQPATH=.t \
+    "-DNEEDLE=2026-06-15T12:00:00.123Z" \
+    -P "${SRC_DIR}/cmake/query_expect.cmake"
+
 echo
 
 _bold "=== Streaming CLI (frames + mux) ==="

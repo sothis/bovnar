@@ -262,7 +262,16 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 			char *end = NULL;
 			errno = 0;
 			long long ll = strtoll(buf, &end, 10);
-			if (errno == 0 && end && *end == '\0') {
+			/* Defensive: the validator already range-checks a width-typed
+			 * literal before it reaches the builder, but never store a value
+			 * that does not fit the declared signed width, so the node's tag
+			 * and payload can never disagree. (width 0 / >= 64 always fit.) */
+			bool fits = !(vt.width >= 1u && vt.width < 64u);
+			if (!fits) {
+				int64_t lim = (int64_t)1 << (vt.width - 1u);
+				fits = ((int64_t)ll >= -lim && (int64_t)ll <= lim - 1);
+			}
+			if (errno == 0 && end && *end == '\0' && fits) {
 				n->val.int_val = (int64_t)ll;
 				parse_ok = true;
 			}
@@ -276,7 +285,10 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 			char *end = NULL;
 			errno = 0;
 			unsigned long long ull = strtoull(buf, &end, 10);
-			if (errno == 0 && end && *end == '\0') {
+			/* Same defensive width clamp as the signed path above. */
+			bool fits = !(vt.width >= 1u && vt.width < 64u) ||
+			            ((uint64_t)ull < ((uint64_t)1 << vt.width));
+			if (errno == 0 && end && *end == '\0' && fits) {
 				v = (uint64_t)ull;
 				n->val.int_val = (int64_t)v;
 				parse_ok = true;
@@ -819,8 +831,22 @@ static error_code_t bvn_dom_keys_unique(
 	if (n < 2u)
 		return error_none;
 	const char **keys = malloc((size_t)n * sizeof(*keys));
-	if (!keys)
-		return error_none;   /* OOM: skip rather than reject a valid document */
+	if (!keys) {
+		/* OOM: fall back to an in-place O(n^2) compare rather than skipping
+		 * the check, which would let a document with duplicate keys pass
+		 * validation under memory pressure. Slow for a huge scope, but a
+		 * scope that large is unlikely to coexist with a failed small malloc,
+		 * and correctness must not depend on available memory. */
+		for (uint32_t i = 0; i < n; i++) {
+			if (!(ent[i].key && ent[i].key[0]))
+				continue;
+			for (uint32_t j = i + 1u; j < n; j++)
+				if (ent[j].key && ent[j].key[0] &&
+				    strcmp(ent[i].key, ent[j].key) == 0)
+					return error_duplicate_struct_key;
+		}
+		return error_none;
+	}
 	uint32_t m = 0;
 	for (uint32_t i = 0; i < n; i++)
 		if (ent[i].key && ent[i].key[0])   /* only real, non-empty keys */

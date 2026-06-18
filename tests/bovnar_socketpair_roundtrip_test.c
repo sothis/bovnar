@@ -24,6 +24,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 
+#include <fcntl.h>
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -827,6 +828,78 @@ static void test_rt_datetime_fraction_streamed(void)
 		"fraction reassembled across read boundaries");
 }
 
+/*
+ * A reader whose fd source is left in non-blocking mode must still parse a
+ * complete document: read() returning EAGAIN/EWOULDBLOCK is a "no data yet"
+ * signal, not a hard error. We pace the writer one byte at a time so the
+ * non-blocking reader is guaranteed to hit EAGAIN repeatedly mid-stream and
+ * must wait for readiness instead of aborting. Without the fd backend's
+ * poll-on-EAGAIN handling the very first read (before any byte arrives) fails
+ * the whole parse.
+ */
+static void *byte_pacer_doc_thread(void *arg)
+{
+	int fd = *(int *)arg;
+	static const char doc[] =
+		"#!bovnar 1.1\n.host = \"api.example.com\";\n"
+		".port = <uint:16> 443;\n.speed = <float:64,m/s> 9.81;\n";
+	for (size_t i = 0; i < sizeof doc - 1; i++) {
+		if (write(fd, doc + i, 1) != 1)
+			break;
+		nanosleep(&(struct timespec){ 0, 50000 }, NULL);   /* 50 us */
+	}
+	close(fd);
+	return NULL;
+}
+
+static void test_rt_nonblocking_source(void)
+{
+	printf("  test_rt_nonblocking_source...\n");
+	int sv[2];
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+		ASSERT_TRUE(false, "socketpair must succeed");
+		return;
+	}
+	/* Put the reader's end into non-blocking mode. */
+	int fl = fcntl(sv[1], F_GETFL, 0);
+	ASSERT_TRUE(fl != -1 && fcntl(sv[1], F_SETFL, fl | O_NONBLOCK) == 0,
+				"reader fd set non-blocking");
+
+	pthread_t wt;
+	if (pthread_create(&wt, NULL, byte_pacer_doc_thread, &sv[0]) != 0) {
+		ASSERT_TRUE(false, "pthread_create must succeed");
+		close(sv[0]); close(sv[1]);
+		return;
+	}
+
+	capture_ctx_t ctx;
+	memset(&ctx, 0, sizeof ctx);
+	bvnr_source_t src;
+	bvnr_source_from_fd(&src, sv[1]);
+	bvnr_read_flags_t flags = {
+		.on_verified = capture_callback,
+		.on_error    = on_error_capture,
+		.userdata    = &ctx,
+	};
+	bvnr_reader_t *r = bvnr_reader_create();
+	bool ok = r && bvnr_open_read_source(r, &src, NULL, &flags) && bvnr_read(r);
+	if (r) bvnr_reader_destroy(r);
+	pthread_join(wt, NULL);
+	close(sv[1]);
+
+	ASSERT_TRUE(ok, "non-blocking fd source parses the full document");
+	ASSERT_TRUE(!ctx.error && !ctx.overflow, "no parse error over a non-blocking fd");
+	ASSERT_EQ_INT(ctx.count, 3, "all three assignments delivered");
+	if (ctx.count >= 3) {
+		verify_assignment(&ctx.entries[0], "host", "api.example.com",
+						  vt_illegal, 0, "nonblock host");
+		verify_assignment(&ctx.entries[1], "port", "443",
+						  vt_uint, 16, "nonblock port");
+		verify_assignment(&ctx.entries[2], "speed", "9.81",
+						  vt_float, 64, "nonblock speed");
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_socketpair_roundtrip_test suite...\n");
@@ -839,6 +912,7 @@ int main(void)
 	test_rt_write_plain_quirk();
 	test_rt_many_assignments();
 	test_rt_datetime_fraction_streamed();
+	test_rt_nonblocking_source();
 
 	if (g_failures == 0) {
 		printf("PASSED %d tests\n", g_tests);

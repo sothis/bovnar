@@ -28,6 +28,30 @@
 #include "bvn_port.h"
 #include "bovnar.h"
 #include "bvn_io_impl.h"
+
+#if !defined(_WIN32)
+#  include <poll.h>
+/*
+ * Block until `fd` is ready for `events` (POLLIN/POLLOUT), retrying across
+ * signals. This turns a non-blocking fd's EAGAIN/EWOULDBLOCK into a wait, so a
+ * socket source/sink left in non-blocking mode still makes progress instead of
+ * failing the whole parse/emit. Returns false only on a hard poll error or
+ * POLLERR/POLLNVAL. On Windows the fd backend drives file descriptors (which
+ * block), so no equivalent is needed there.
+ */
+static bool bvn_fd_wait(int fd, short events)
+{
+	struct pollfd pfd;
+	int r;
+	pfd.fd      = fd;
+	pfd.events  = events;
+	pfd.revents = 0;
+	do {
+		r = poll(&pfd, 1, -1);
+	} while (r < 0 && errno == EINTR);
+	return r > 0 && !(pfd.revents & (POLLERR | POLLNVAL));
+}
+#endif
 /*
  * Source/sink backends.
  *
@@ -51,10 +75,18 @@ static bool pull_fd(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
 	bvn_source_impl_t* impl = bvn_source_impl(s);
 	ssize_t n;
-	do {
+	for (;;) {
 		n = read(impl->fd, buf, want);
-	} while (n < 0 && errno == EINTR);
-	if (n < 0) { *got = 0; return false; }
+		if (n >= 0) break;
+		if (errno == EINTR) continue;
+#if !defined(_WIN32)
+		if ((errno == EAGAIN || errno == EWOULDBLOCK) &&
+		    bvn_fd_wait(impl->fd, POLLIN))
+			continue;
+#endif
+		*got = 0;
+		return false;
+	}
 	*got = (uint32_t)n;
 	return true;
 }
@@ -93,6 +125,11 @@ static bool push_fd(bvnr_sink_t* s, const void* buf, uint32_t len)
 		ssize_t n = write(impl->fd, buf, len);
 		if (n < 0) {
 			if (errno == EINTR) continue;
+#if !defined(_WIN32)
+			if ((errno == EAGAIN || errno == EWOULDBLOCK) &&
+			    bvn_fd_wait(impl->fd, POLLOUT))
+				continue;
+#endif
 			return false;
 		}
 		if (n == 0) {

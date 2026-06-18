@@ -1302,6 +1302,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			l->array_row_size    = f->saved_row;
 			p->val.value_type    = f->saved_vtype;
 			p->val.parsed_unit   = f->saved_vunit;
+			p->val.parsed_unit_serial = f->saved_unit_serial;
 			l->in_array_element  = (l->array_nesting_level > 0);
 			l->next_state        = resync;
 		} else {
@@ -1322,6 +1323,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 					bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
 					p->val.value_type  = f->saved_vtype;
 					p->val.parsed_unit = f->saved_vunit;
+					p->val.parsed_unit_serial = f->saved_unit_serial;
 				}
 			}
 			l->curr_row_size    = 0;

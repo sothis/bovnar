@@ -220,6 +220,39 @@ Hardening uncovered while developing 1.1:
   load its bundled library (the lib-dependent tests are skipif, so they would
   otherwise pass-as-skipped).
 
+Second release-review pass:
+
+- **Error recovery dropped a value's unit serial when unwinding an array.** The
+  `]` and `}` resync paths restored the parent frame's type and unit but not its
+  `parsed_unit_serial`, so a later element boundary could mis-decide unit
+  restoration and emit wrong unit metadata on recovered (`continue_on_error`)
+  output; both paths now restore it, matching the `;` resync and normal
+  array-outro paths.
+- **MinGW64 file I/O used a 32-bit `off_t`/`lseek`.** Only the MSVC shim widened
+  them, so the CLI's 4 GiB file-size guard could never fire on MinGW (and a
+  >2 GiB seek wrapped); both Windows toolchains now share the 64-bit `off_t` /
+  `_lseeki64` remap.
+- **A non-blocking socket source/sink failed the whole parse on `EAGAIN`.** The
+  fd backend now waits for readiness via `poll()` (POSIX) on
+  `EAGAIN`/`EWOULDBLOCK` instead of treating a would-block as a hard error.
+- **Duplicate-key enforcement was skipped under memory pressure.** When the
+  temporary key array could not be allocated, `bvn_dom_keys_unique` returned
+  "OK"; it now falls back to an in-place O(n²) compare so a document with
+  duplicate keys is rejected regardless of available memory.
+- **A value-side inline unit ignored the writer's unit flags and was dropped
+  silently when over-long.** The serializer now renders it with
+  `bvn_unit_to_string_ex` (honouring reduce / ASCII-exponent, as the annotation
+  path does) and treats an overflow as an error rather than emitting the value
+  without its unit.
+- **Hardening:** the streaming varint decoder now rejects an overlong 10th byte
+  instead of truncating it; the DOM integer `strtoll`/`strtoull` fallback
+  width-clamps its result so a node's tag and payload cannot disagree; the GNSS
+  week→epoch helper takes the TAI offset as a parameter (no longer assumes
+  GPS/Galileo's +19 for any future constellation); Easter-relative holiday dates
+  near the maximum supported year no longer return a stale date with success; and
+  the JSON converter guards its output-size multiply against overflow on a 32-bit
+  `size_t`.
+
 ### Known gaps / deferred
 
 - ISO-8601 datetime literals carry a whole-second integer (a fractional part is

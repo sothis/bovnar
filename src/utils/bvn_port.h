@@ -56,14 +56,24 @@ typedef __int64 off_t;     /* MSVC has no off_t; 64-bit to match _lseeki64 and
 /* MSVC spells the POSIX fd calls with a leading underscore. All call sites in
  * this library use the bare names as plain libc calls (no member/identifier
  * collisions), so remapping them here is safe and keeps the I/O code single
- * source. MinGW provides the POSIX names directly, so it needs no remap. */
+ * source. */
 #    define open  _open
 #    define read  _read
 #    define write _write
 #    define close _close
 #    define lseek _lseeki64
 #  else
+/* MinGW supplies the POSIX fd names directly, but its default off_t/lseek are
+ * 32-bit (long), so a >2 GiB seek wraps or fails and the CLI's 4 GiB file-size
+ * guard ((uint64_t)sz > UINT32_MAX) can never fire — diverging from the MSVC
+ * path. Force a 64-bit off_t and the wide seek so both Windows toolchains agree.
+ * The library calls lseek only to size a file (SEEK_END/SEEK_SET), so remapping
+ * it to _lseeki64 is safe. */
 #    include <unistd.h>
+#    undef  off_t
+#    define off_t __int64
+#    undef  lseek
+#    define lseek _lseeki64
 #  endif
 
 #  ifndef O_BINARY

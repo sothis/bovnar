@@ -1039,13 +1039,19 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			    d->value_unit.num_components > 0u &&
 			    !BVN_UNIT_IS_NO_UNIT(d->value_unit)) {
 				char ubuf[256];
-				int32_t un = bvn_unit_to_string(d->value_unit,
-					ubuf, sizeof ubuf);
-				if (un > 0) {
-					if (!bvn_ser_push_byte(s, ' ')) return false;
-					if (!bvn_ser_push(s, ubuf, (uint32_t)un))
-						return false;
-				}
+				/* Honour the writer's unit_flags (reduce / ASCII-exponent)
+				 * so a value-side inline unit canonicalises identically to
+				 * one given in the annotation, which uses
+				 * bvn_unit_to_string_ex too. A unit that overflows ubuf is a
+				 * hard error, not a silent drop, or the value would lose its
+				 * unit (and thus its meaning) on round-trip. */
+				int32_t un = bvn_unit_to_string_ex(d->value_unit,
+					ubuf, sizeof ubuf, s->unit_flags);
+				if (un <= 0)
+					return false;
+				if (!bvn_ser_push_byte(s, ' ')) return false;
+				if (!bvn_ser_push(s, ubuf, (uint32_t)un))
+					return false;
 			}
 		} else if (d->type == token_is_string ||
 				   d->type == token_is_array_string) {

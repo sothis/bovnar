@@ -145,8 +145,12 @@ int64_t bvn_dt_convert_epoch_seconds(bvn_epoch_t epoch_from, bvn_epoch_t epoch_t
 }
 
 /* Shared GNSS week + time-of-week conversion; gnss_epoch is the MJD of the
- * constellation's epoch.  Returns BVN_GDATE_OVF on overflow. */
-static int64_t bvn_dt_epoch_seconds_from_gnss_time(int64_t gnss_epoch,
+ * constellation's epoch and tai_offset is its TAI minus constellation-time
+ * offset in seconds (the caller supplies it rather than this helper assuming a
+ * single value, so a future constellation with a different offset — GLONASS is
+ * UTC-steered, BeiDou is TAI-33 — cannot silently inherit GPS/Galileo's +19).
+ * Returns BVN_GDATE_OVF on overflow. */
+static int64_t bvn_dt_epoch_seconds_from_gnss_time(int64_t gnss_epoch, int64_t tai_offset,
 		int64_t timeofweek_ms, int64_t week, bvn_epoch_t epoch)
 {
 	int64_t timeofweek_s = div_round_closest(timeofweek_ms, 1000);
@@ -159,7 +163,7 @@ static int64_t bvn_dt_epoch_seconds_from_gnss_time(int64_t gnss_epoch,
 	ov |= bvn_ckd_mul(&t, days, (int64_t)86400);
 	ov |= bvn_ckd_add(&seconds, t, timeofweek_s % 86400);
 	if (epoch == bvn_epoch_tai)
-		ov |= bvn_ckd_add(&seconds, seconds, (int64_t)19);
+		ov |= bvn_ckd_add(&seconds, seconds, tai_offset);
 	if (ov || seconds == BVN_GDATE_OVF)
 		return BVN_GDATE_OVF;
 	return seconds;
@@ -167,7 +171,7 @@ static int64_t bvn_dt_epoch_seconds_from_gnss_time(int64_t gnss_epoch,
 
 int64_t bvn_dt_epoch_seconds_from_gps_time(int64_t timeofweek_ms, int64_t gps_week, bvn_epoch_t epoch)
 {
-	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_gps,
+	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_gps, (int64_t)19,
 						   timeofweek_ms, gps_week, epoch);
 }
 
@@ -179,7 +183,7 @@ int64_t bvn_dt_tai_seconds_from_gps_time(int64_t timeofweek_ms, int64_t gps_week
 
 int64_t bvn_dt_epoch_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t galileo_week, bvn_epoch_t epoch)
 {
-	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_galileo,
+	return bvn_dt_epoch_seconds_from_gnss_time((int64_t)bvn_epoch_galileo, (int64_t)19,
 						   timeofweek_ms, galileo_week, epoch);
 }
 

@@ -255,7 +255,15 @@ static bool easter_plus(bvn_gregorian_date_t* g, int64_t year, int64_t offset)
     if (!g) return false;
     int64_t mjd = bvn_gregorian_date_easter_sunday_mjd(year);
     if (mjd == BVN_GDATE_OVF) return false;
-    bvn_gregorian_date_from_mjd(g, mjd + offset);
+    /* Easter sits well inside the MJD range, but a positive offset (up to +50
+     * for Whit Monday) can push past BVN_GDATE_MJD_MAX in the last supported
+     * year. bvn_gregorian_date_from_mjd() is a no-op out of range, which would
+     * otherwise leave *g stale yet still return true. (mjd + offset cannot
+     * overflow int64: mjd is a valid in-range MJD and |offset| <= 50.) */
+    int64_t target = mjd + offset;
+    if (target < BVN_GDATE_MJD_MIN || target > BVN_GDATE_MJD_MAX)
+        return false;
+    bvn_gregorian_date_from_mjd(g, target);
     return true;
 }
 

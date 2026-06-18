@@ -360,6 +360,32 @@ static void test_demux_truncated_stream_reset(void)
 	bvnr_demux_destroy(dm);
 }
 
+/* An overlong channel varint — 10 bytes whose 10th byte carries a value bit
+ * beyond bit 63 — does not fit a uint64 and must be rejected, not silently
+ * truncated. The 10th byte (0x02) has its continuation bit clear, so a decoder
+ * that did not guard the final byte would accept the run and wrap the channel
+ * to 0; the guard makes it a demux desync instead. */
+static void test_demux_overlong_varint_rejected(void)
+{
+	printf("  test_demux_overlong_varint_rejected...\n");
+	mux_capture_t mc = {0};
+	bvnr_demux_t *dm = bvnr_demux_create(mux_on_msg, &mc, 0);
+	bvnr_data_t empty = {0};
+	uint8_t frag[10];
+
+	bvnr_demux_on_event(dm, ev_octet_stream_start, &empty);
+	for (int i = 0; i < 9; i++) frag[i] = 0x80u;   /* continuation, value 0 */
+	frag[9] = 0x02u;                                /* 10th byte: value bit > 63 */
+	bvnr_data_t d = { .type = token_is_octet_stream, .data = frag, .length = 10u };
+	bool fed = bvnr_demux_on_event(dm, ev_data, &d);
+
+	ASSERT_TRUE(!fed, "overlong channel varint aborts the feed");
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_octet_stream_out_of_sync,
+		"overlong varint is reported as a desync, not silently truncated");
+	ASSERT_EQ_UINT(mc.n, 0, "no message delivered from an overlong varint");
+	bvnr_demux_destroy(dm);
+}
+
 /* Large messages that span many octet chunks, interleaved across channels,
  * must reassemble byte-exact. */
 typedef struct {
@@ -1001,6 +1027,7 @@ int main(void)
 	test_multidoc();
 	test_octet_mux();
 	test_demux_truncated_stream_reset();
+	test_demux_overlong_varint_rejected();
 	test_octet_mux_large();
 	test_octet_mux_boundaries();
 	test_octet_mux_empty();

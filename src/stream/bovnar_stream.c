@@ -69,6 +69,12 @@ static uint32_t bvn_varint_decode(const uint8_t* buf, uint32_t len, uint64_t* ou
 	uint32_t shift = 0, i = 0;
 	while (i < len && i < 10u) {
 		uint8_t byte = buf[i++];
+		/* The 10th byte (shift == 63) may carry only one value bit; any
+		 * higher payload bit (0x7E) or a continuation bit (0x80) means the
+		 * value does not fit 64 bits, so reject the overlong encoding rather
+		 * than silently truncating it. */
+		if (shift == 63u && (byte & 0xFEu))
+			return 0;
 		v |= (uint64_t)(byte & 0x7Fu) << shift;
 		if (!(byte & 0x80u)) { *out = v; return i; }
 		shift += 7;

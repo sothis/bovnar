@@ -865,6 +865,9 @@ static char *parse_json_string(const char **p)
 	}
 	if (**p != '"') return NULL;
 	const char *end = *p;
+	/* Each input unit decodes to at most 4 UTF-8 bytes; guard the size_t
+	 * multiply against overflow on a 32-bit size_t. Always false on 64-bit. */
+	if (raw_len > (SIZE_MAX - 1u) / 4u) return NULL;
 	char *str = malloc(raw_len * 4u + 1u);
 	if (!str) return NULL;
 	char *out = str;
@@ -1342,6 +1345,13 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	 * instead (no silent lossy output). Re-using bvn_dom_parse keeps the
 	 * converter's notion of "valid" identical to the library's.
 	 */
+	/* Guard the size_t multiply before it reaches malloc: on a 32-bit size_t
+	 * a multi-hundred-MB input would wrap to a small allocation while the sink
+	 * is handed the untruncated 64-bit cap. Always false on a 64-bit build. */
+	if (size > (SIZE_MAX - 65536u) / 8u) {
+		fprintf(stderr, "convert: input too large\n");
+		json_free_node(root); free(buf); return 1;
+	}
 	uint64_t out_cap = (uint64_t)size * 8u + 65536u;
 	char *out = malloc(out_cap);
 	if (!out) { json_free_node(root); free(buf); return 1; }

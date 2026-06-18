@@ -426,6 +426,12 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 			if (need > dm->max_message) {
 				dm->error = error_value_out_of_range; return false;
 			}
+			/* SIZE_MAX guard for 32-bit hosts where the uint64 declared length
+			 * can exceed size_t (parity with the doc-stream path); a caller may
+			 * have set max_message above SIZE_MAX. */
+			if (need > (uint64_t)SIZE_MAX) {
+				dm->error = error_value_out_of_range; return false;
+			}
 			pos += used;
 			c->need   = need;
 			c->have   = 0;

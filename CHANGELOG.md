@@ -171,6 +171,16 @@ Hardening uncovered while developing 1.1:
   re-validation that backs its "no unrepresentable output" contract.
 - CLI `bench --size` rejects a zero or out-of-range value instead of letting the
   benchmark buffer's size arithmetic overflow.
+- Thread-safety: the lexer's run-LUT initialisation now runs before `main()` on
+  MSVC too (via a `.CRT$XCU` registration), matching the GCC/Clang constructor.
+  Previously the MSVC build initialised the tables lazily on first reader use,
+  which could race if two threads created their first reader concurrently.
+- The streaming demux now rejects a declared message length exceeding `SIZE_MAX`
+  on 32-bit hosts, mirroring the document-stream path.
+- Documented the ownership and error contracts in `bovnar_dom.h` and `bvn_int.h`
+  (which functions consume/borrow/own their arguments and results, and the
+  "returns false, leaves out-param unchanged" convention) — the previous headers
+  left several leak/double-free traps undocumented.
 - Python `dumps()` spec-1.1 directive detection (`_uses_spec_1_1`) now reads a
   Quantity's `vtype.family` defensively, so a Quantity built (via the low-level
   constructor) with an unexpected `vtype` reports "not a datetime" instead of

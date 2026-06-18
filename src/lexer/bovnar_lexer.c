@@ -102,12 +102,17 @@ static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
 	}
 }
 /*
- * Populate all run LUTs plus the whitespace-accepting-state table. On GCC/Clang
- * it runs before main() so the tables are ready even without an explicit init
- * call. MSVC has no equivalent attribute, and none is needed: bvn_lex_init()
- * calls this (guarded by bvn_run_luts_inited) before any lexing, so the tables
- * are always populated — the constructor is only a redundant "before main()"
- * guarantee, never relied upon for correctness or static-init order.
+ * Populate all run LUTs plus the whitespace-accepting-state table.
+ *
+ * This runs before main() on every supported toolchain — via the constructor
+ * attribute on GCC/Clang, and via a .CRT$XCU registration on MSVC (just below
+ * the definition) — so the tables are fully built single-threaded, before any
+ * thread can be created, before the first lexer is ever used. That pre-main
+ * guarantee is what makes the init data-race-free: distinct readers on distinct
+ * threads never concurrently run this (a non-atomic `bvn_run_luts_inited` flag
+ * would otherwise race on first concurrent use). The guard in bvn_lex_init()
+ * is a belt-and-suspenders fallback for the (unreachable) case where neither
+ * pre-main hook fired; it must not be the sole initialiser under threads.
  */
 #if defined(__GNUC__) || defined(__clang__)
 #  define BVN_LEX_CONSTRUCTOR __attribute__((constructor))
@@ -149,6 +154,21 @@ static void bvn_init_run_luts(void)
 		) ? 1u : 0u;
 	bvn_run_luts_inited = true;
 }
+#if defined(_MSC_VER)
+/*
+ * MSVC has no constructor attribute. Place a pointer to the initialiser in the
+ * CRT's C-initialiser section (.CRT$XCU); the CRT runs every function pointer in
+ * that range before main(), giving the same single-threaded, pre-any-thread
+ * guarantee as __attribute__((constructor)) above. The /include linker directive
+ * keeps the pointer (and thus the .CRT$XCU entry) from being stripped when the
+ * library is linked statically. The build targets x64, whose symbols carry no
+ * leading underscore.
+ */
+#  pragma section(".CRT$XCU", read)
+__declspec(allocate(".CRT$XCU"))
+void (*bvn_init_run_luts_ctor)(void) = bvn_init_run_luts;
+#  pragma comment(linker, "/include:bvn_init_run_luts_ctor")
+#endif
 static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
 	uint64_t offset)
 {

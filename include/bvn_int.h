@@ -49,12 +49,29 @@ typedef struct bvn_int_s {
 	bool      heap;
 	uint64_t  _reserved[2];
 } bvn_int_t;
+/*
+ * Arbitrary-precision integer (magnitude bounded by BVN_INT_MAX_BITS). General
+ * conventions for this API:
+ *  - bvn_int_alloc() returns a heap value the CALLER OWNS and must release with
+ *    bvn_int_free() (NULL on allocation failure); bvn_int_free(NULL) is a no-op.
+ *  - Functions returning bool return false on failure — chiefly a capacity
+ *    overflow past BVN_INT_MAX_BITS, or a NULL/invalid argument — and otherwise
+ *    leave their destination in a defined state (see each function).
+ */
 BVN_API bvn_int_t *bvn_int_alloc(void);
 BVN_API void       bvn_int_free(bvn_int_t *n);
+/* Parse `s` in `base` into `n` (already allocated). Returns false on a malformed
+ * literal, an unsupported base, or a value exceeding the capacity, leaving `n`
+ * unspecified-but-valid (safe to free / reassign). */
 BVN_API bool    bvn_int_from_str(bvn_int_t *n, const char *s, uint32_t base);
+/* Render `n` in `base` into the caller's buffer. Returns the written length
+ * excluding the NUL, or -1 if the buffer is too small (size it with
+ * bvn_int_str_bufsize) or an argument/base is invalid. */
 BVN_API int32_t bvn_int_to_str(const bvn_int_t *n,
 						char *buf, size_t bufsize,
 						uint32_t base);
+/* Buffer size (including NUL and a sign) sufficient for bvn_int_to_str of any
+ * `bits`-wide magnitude in `base`. */
 BVN_API size_t  bvn_int_str_bufsize(uint32_t bits, uint32_t base);
 BVN_API bool bvn_int_is_zero(const bvn_int_t *n);
 BVN_API bool bvn_int_from_int64 (bvn_int_t *n, int64_t  v);
@@ -65,6 +82,9 @@ BVN_API bool bvn_int_from_int16 (bvn_int_t *n, int16_t  v);
 BVN_API bool bvn_int_from_uint16(bvn_int_t *n, uint16_t v);
 BVN_API bool bvn_int_from_int8  (bvn_int_t *n, int8_t   v);
 BVN_API bool bvn_int_from_uint8 (bvn_int_t *n, uint8_t  v);
+/* Narrow to a fixed-width type. Return false (leaving *out UNCHANGED — no
+ * clamping or truncation) when the value does not fit the target type; the
+ * unsigned variants also fail for a negative value. Always check the return. */
 BVN_API bool bvn_int_to_int64 (const bvn_int_t *n, int64_t  *out);
 BVN_API bool bvn_int_to_uint64(const bvn_int_t *n, uint64_t *out);
 BVN_API bool bvn_int_to_int32 (const bvn_int_t *n, int32_t  *out);

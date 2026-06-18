@@ -106,8 +106,6 @@ defined for this media type.
 
 **Person & email address to contact for further information:**
 Janos Sonntag <janos.priv@gmail.com>
-<!-- Confirm or replace with a preferred role address before submitting; this
-     contact is published in the IANA registry. -->
 
 **Intended usage:** COMMON
 

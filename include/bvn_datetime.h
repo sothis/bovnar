@@ -64,9 +64,9 @@ typedef enum bvn_epoch_t {
 	bvn_epoch_mjd		= 0,     /* MJD 17.11.1858 00:00:00 */
 	bvn_epoch_ntp		= 15020, /* MJD 01.01.1900 00:00:00 */
 	bvn_epoch_tai		= 36204, /* MJD 01.01.1958 00:00:00 */
-//	bvn_epoch_dcf77		= 36569, /* MJD 01.01.1959 00:00:00 */ /* just for information, DCF is not a monotonic time scale */
+	/* DCF77 (MJD 36569) and UTC (MJD 41317) are intentionally omitted: they are
+	 * not monotonic time scales and so have no fixed-length-day epoch here. */
 	bvn_epoch_unix		= 40587, /* MJD 01.01.1970 00:00:00 */
-//	bvn_epoch_utc		= 41317, /* MJD 01.01.1972 00:00:00 */ /* just for information, UTC is not a monotonic time scale */
 	bvn_epoch_gps		= 44244, /* MJD 06.01.1980 00:00:00 */
 	bvn_epoch_glonass	= 50083, /* MJD 01.01.1996 00:00:00 */
 	bvn_epoch_galileo	= 51412, /* MJD 22.08.1999 00:00:00 */

@@ -1648,6 +1648,7 @@ static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
 	case BVN_DOM_STRUCT: {
 		uint32_t cnt = bvn_dom_struct_count(node);
 		const bvn_dom_entry_t *e = bvn_dom_struct_entries(node);
+		if (!e) cnt = 0;   /* defensive: match print_dom_node's NULL-entries guard */
 		putchar('{');
 		if (cnt && pretty) putchar('\n');
 		for (uint32_t i = 0; i < cnt; i++) {

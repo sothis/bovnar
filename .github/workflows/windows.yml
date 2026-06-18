@@ -187,29 +187,32 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install mingw-w64 cross toolchain, Wine and Ninja
-        # Keep the download small — the Azure apt mirror throughput on the
-        # runners is highly variable, so every saved MB helps:
+        # Keep the download small — the Azure apt mirror throughput on the runners
+        # is highly variable, so every saved MB helps:
         #   * gcc-mingw-w64-x86-64-win32 (+ the dev headers) instead of the
         #     gcc-mingw-w64-x86-64 metapackage, which also pulls the unused posix
         #     GCC variant (~50 MB). win32 is the variant the local toolchain uses.
-        #   * --no-install-recommends drops Wine's GUI/audio recommends and 32-bit
-        #     wine32 (we only run a 64-bit console .exe).
-        # Install BOTH wine and wine64: the wine64 package ships only
-        # /usr/bin/wine64-stable; the /usr/bin/wine64 command is an
-        # update-alternatives link registered via the `wine` package.
-        # Acquire::Retries rides out transient mirror blips.
+        #   * wine64 + wine-common (for wine.inf, needed to populate the prefix);
+        #     no 32-bit wine — we only run a 64-bit console .exe.
+        #   * --no-install-recommends drops Wine's GUI/audio recommends.
+        # The distro exposes wine through update-alternatives (the wine.collection
+        # group set up by libwine), which is NOT reliably configured in a minimal
+        # install — /usr/bin/wine64 ends up absent. Bypass it: symlink the concrete
+        # wine64-stable binary the wine64 package ships onto PATH, where the
+        # toolchain's find_program(wine64) picks it up as
+        # CMAKE_CROSSCOMPILING_EMULATOR. Acquire::Retries rides out mirror blips.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
-            gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build wine wine64
+            gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build \
+            wine64 wine-common
+          sudo ln -sf /usr/bin/wine64-stable /usr/local/bin/wine64
+          wine64 --version
 
       - name: Initialize Wine prefix
-        # Invoke wineboot via wine64 (the standalone /usr/bin/wineboot wrapper is
-        # not part of the wine64 package) so the win64 prefix is created up front,
-        # before the parallel ctest run touches it.
-        run: |
-          wine64 wineboot --init
-          wineserver -w
+        # Create the win64 prefix up front (wineboot is a Wine builtin, run via
+        # wine64) so the parallel ctest run does not race on first-run creation.
+        run: wine64 wineboot --init
 
       - name: Configure (cross toolchain, Ninja, tests on)
         run: |

@@ -229,8 +229,14 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/.apt-cache"
           sudo apt-get update
+          # APT::Sandbox::User=root: the workspace-local archive dir is not
+          # writable by the unprivileged _apt sandbox user, so apt would otherwise
+          # print a "Download is performed unsandboxed as root ... Permission
+          # denied" warning for every package. Downloading as root (we are already
+          # root via sudo) is fine here and silences that noise.
           sudo apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
             -o Dir::Cache::archives="$GITHUB_WORKSPACE/.apt-cache" \
+            -o APT::Sandbox::User=root \
             gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build wine64
           # apt ran as root, so the cached .deb files are root-owned; hand them
           # back to the runner user so the actions/cache post-step can archive them.

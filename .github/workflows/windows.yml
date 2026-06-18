@@ -23,7 +23,7 @@ jobs:
     name: MSVC (x64)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up MSVC x64 environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -84,7 +84,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -144,7 +144,7 @@ jobs:
     # suite, the conformance self-test, the standalone fuzz smoke, and the CLI
     # example/convert/query/stream checks.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -184,7 +184,7 @@ jobs:
       # Skip the wine-mono / wine-gecko installers; the CLI is a plain console app.
       WINEDLLOVERRIDES: "mscoree,mshtml="
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install mingw-w64 cross toolchain, Wine and Ninja
         # Minimal set — the Azure apt mirror throughput on the runners is highly

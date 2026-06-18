@@ -47,6 +47,7 @@
 #  include <io.h>
 #  include <fcntl.h>
 #  include <stdio.h>     /* _fileno */
+#  include <limits.h>    /* UINT_MAX for the read/write count clamp below */
 
 #  if defined(_MSC_VER)
 #    include <basetsd.h>
@@ -56,10 +57,8 @@ typedef __int64 off_t;     /* MSVC has no off_t; 64-bit to match _lseeki64 and
 /* MSVC spells the POSIX fd calls with a leading underscore. All call sites in
  * this library use the bare names as plain libc calls (no member/identifier
  * collisions), so remapping them here is safe and keeps the I/O code single
- * source. */
+ * source. read/write go through the casting wrappers below. */
 #    define open  _open
-#    define read  _read
-#    define write _write
 #    define close _close
 #    define lseek _lseeki64
 #  else
@@ -70,16 +69,18 @@ typedef __int64 off_t;     /* MSVC has no off_t; 64-bit to match _lseeki64 and
  * The library calls lseek only to size a file (SEEK_END/SEEK_SET), so remapping
  * it to _lseeki64 is safe. */
 #    include <unistd.h>
-#    include <limits.h>
 #    undef  off_t
 #    define off_t __int64
 #    undef  lseek
 #    define lseek _lseeki64
-/* MinGW's read()/write() take an unsigned int byte count, but the library
- * passes a size_t. Wrap them so the (buffer-bounded) count converts explicitly
- * — matching the MSVC _read/_write signature and silencing -Wconversion without
- * weakening it for the rest of the code. static inline, so an unused copy in a
- * TU that never does fd I/O does not warn. */
+#  endif
+
+/* Both Windows CRTs spell low-level read/write with a leading underscore and
+ * take an unsigned int byte count, while the library passes a size_t. Wrap them
+ * so the (buffer-bounded) count converts explicitly — silencing the MSVC C4267
+ * and GCC -Wconversion "size_t -> unsigned int" warnings without weakening the
+ * check for the rest of the code. static inline, so an unused copy in a TU that
+ * never does fd I/O does not warn. */
 static inline int bvn_port_read(int fd, void *buf, size_t n)
 {
 	return _read(fd, buf, n > (size_t)UINT_MAX ? UINT_MAX : (unsigned int)n);
@@ -88,9 +89,8 @@ static inline int bvn_port_write(int fd, const void *buf, size_t n)
 {
 	return _write(fd, buf, n > (size_t)UINT_MAX ? UINT_MAX : (unsigned int)n);
 }
-#    define read  bvn_port_read
-#    define write bvn_port_write
-#  endif
+#  define read  bvn_port_read
+#  define write bvn_port_write
 
 #  ifndef O_BINARY
 #    define O_BINARY _O_BINARY

@@ -856,6 +856,31 @@ static void test_bvnf_to_str(void)
 	      "to_str(-Inf) is bovnar keyword \"ninf\"");
 }
 
+static void test_bvnf_to_str_wide_magnitude(void)
+{
+	/* Regression: bvnf_to_str_dec estimated the decimal exponent with a coarse
+	 * log10(2) approximation (0.302) whose error, once the binary exponent
+	 * dwarfed the precision, placed the whole extraction window above the value's
+	 * leading digit — every extracted digit was '0', and the leading-zero strip
+	 * then rotated zeros forever (an infinite loop reachable via the public
+	 * bvn_float_to_str / bvnr_write_bvnf for any wide-magnitude base-10 render).
+	 * A low-precision float at a large +/- decimal exponent must now terminate
+	 * with a non-empty rendering. */
+	bvn_limb_t buf[BVN_FLOAT_NLIMBS(16u)];
+	bvn_float_t f;
+	char strbuf[256];
+	bvn_float_init_buf(&f, 16u, buf, BVN_FLOAT_NLIMBS(16u));
+
+	const char *vals[] = { "1e4900", "1e3000", "-2.5e-5000", "9.99e6000" };
+	for (size_t i = 0; i < sizeof(vals)/sizeof(vals[0]); i++) {
+		CHECK(bvn_float_from_str(&f, vals[i], 10), "wide-magnitude parse");
+		CHECK(!bvn_float_is_inf(&f) && !bvn_float_is_zero(&f),
+		      "wide-magnitude value is finite (below saturation cap)");
+		int32_t n = bvn_float_to_str(&f, strbuf, sizeof(strbuf), 10);
+		CHECK(n > 0, "wide-magnitude to_str(base10) terminates with output");
+	}
+}
+
 static void test_bvnf_ieee_roundtrip(void)
 {
 	bvn_limb_t buf[BVN_FLOAT_NLIMBS(64u)];
@@ -904,6 +929,7 @@ int main(void)
 	RUN(test_bvnf_from_str_base10);
 	RUN(test_bvnf_from_str_base16);
 	RUN(test_bvnf_to_str);
+	RUN(test_bvnf_to_str_wide_magnitude);
 	RUN(test_bvnf_ieee_roundtrip);
 
 	printf("\n%s  %d passed, %d failed\n",

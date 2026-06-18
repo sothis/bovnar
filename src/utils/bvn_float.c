@@ -1186,9 +1186,21 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	long e2   = exp2 - prec;
 	long E10;
 	{
+		/*
+		 * Estimate E10 ~= (exp2-1)*log10(2). The old 302/1000 (=0.302)
+		 * approximation overshot log10(2) by ~1e-3 per unit, so past ~ndigits*1000
+		 * of binary exponent it placed the whole ndigits-wide extraction window
+		 * ABOVE the value's true leading digit: every extracted digit came out
+		 * zero, and the leading-zero strip below — which rotates a '0' into the
+		 * tail without shrinking the digit count — then spun forever (a hang on
+		 * e.g. to_str(1e4900) at 16-bit precision). 30103/100000 (=0.30103) is
+		 * within 5e-9 of log10(2), matching bvnf_dec_render_roundodd; the strip
+		 * loop is additionally bounded so a residual 1-ulp estimate error can
+		 * never re-introduce the spin.
+		 */
 		long ep = exp2 - 1L;
-		if (ep >= 0)  E10 = (ep * 302L + 999L) / 1000L;
-		else          E10 = -( (-ep * 301L) / 1000L );
+		if (ep >= 0)  E10 =  (long)(((int64_t)ep * 30103 + 99999) / 100000);
+		else          E10 = -(long)(((int64_t)(-ep) * 30103) / 100000);
 	}
 	long ndigits = (prec * 302L + 999L) / 1000L + 4L;
 	long k = ndigits - 1L - E10;
@@ -1218,10 +1230,22 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	for (long i = 0, j = ndigits - 1; i < j; i++, j--) {
 		char t = digs[i]; digs[i] = digs[j]; digs[j] = t;
 	}
-	while (ndigits > 1 && digs[0] == '0') {
-		memmove(digs, digs + 1, (size_t)(ndigits - 1));
-		digs[ndigits - 1] = '0';
-		E10--;
+	{
+		/*
+		 * Strip leading zeros, lowering E10 to track the leading digit. The guard
+		 * `lead < ndigits` is essential: if the exponent estimate overshot far
+		 * enough that EVERY extracted digit is zero, digs[0] never becomes
+		 * non-zero and the unbounded form of this loop never terminates. Bounding
+		 * it by the digit count makes a degenerate all-zero window collapse to the
+		 * single digit "0" instead of hanging.
+		 */
+		long lead = 0;
+		while (lead < ndigits - 1 && digs[lead] == '0') lead++;
+		if (lead > 0) {
+			memmove(digs, digs + lead, (size_t)(ndigits - lead));
+			for (long i = ndigits - lead; i < ndigits; i++) digs[i] = '0';
+			E10 -= lead;
+		}
 	}
 	long last = ndigits - 1;
 	while (last > 0 && digs[last] == '0') last--;

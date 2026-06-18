@@ -7,37 +7,6 @@ versioning of the format (spec)**; the reference implementation
 it in lockstep. The highest spec a build understands is reported by
 `bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`.
 
-## [Unreleased]
-
-### Added
-
-- **Python — lossless access to decimal, fixed-point and wide binary floats.**
-  `Quantity` gains `.decimal()` / `.fraction()` (exact value from the verbatim
-  literal), `.stored_value()` / `.ieee_bits()` / `.fixed_point()` (bit-exact
-  IEEE materialisation for the 16/32/64/128/256 encodings), and a `from_number`
-  constructor; `dumps()` accepts `Decimal` / terminating `Fraction`. The NumPy
-  bridge decodes `float_dec` / `float_fix` / `float:128`+ to exact `Decimal`
-  object arrays (typed path; `dtype='float64'` is the lossy escape) and
-  `from_numpy` gains `float_format=` to write them. The arbitrary-precision
-  `bvn_float` API is exposed as `bovnar.BvnFloat`. Materialisation covers the
-  full representable range via pure-Python encoders past the parser's cap.
-
-### Fixed
-
-- **`to_dec*` lost precision when encoding a decimal float near a format's Emax.**
-  `bvnf_dec_render_roundodd` estimated the decimal exponent with a coarse
-  `log10(2)` approximation (`0.302`) whose error, past ~2000 bits of binary
-  exponent, exceeded the digit-count safety margin and truncated the rendered
-  coefficient — decimal128's 34-digit maximum encoded to ~20 significant digits.
-  Now uses `0.30103`, exact across the whole exponent range.
-- **Python NumPy/pint bridge hardening:** reject `null` elements that a
-  `bool`/`str` dtype would silently coerce; key the pint reverse-map cache on the
-  registry (`WeakKeyDictionary`) to avoid `id()`-reuse aliasing and a leak;
-  `to_pint_array` rejects datetime arrays; raw Python ints past int64 widen to
-  uint64/object instead of raising a bare `OverflowError`; `from_numpy` rejects
-  masked arrays; clearer errors for invalid `unit=` / non-pint / mixed
-  unit-and-dimensionless inputs.
-
 ## [1.1.0]
 
 Spec 1.1 is **purely additive** over the frozen 1.0 baseline: every spec-1.0
@@ -110,6 +79,16 @@ such a document is an error, exactly as a 1.0 reader reports.
   to/from `datetime64[s]` (`to_numpy`/`from_numpy`/`array_to_bvnr`); a non-unix
   epoch is refused with a pointer to `dtype='int64'` for the raw seconds, NaT is
   rejected, and `array_to_bvnr` prepends the `#!bovnar 1.1` directive.
+- **Python — lossless access to decimal, fixed-point and wide binary floats.**
+  `Quantity` gains `.decimal()` / `.fraction()` (exact value from the verbatim
+  literal), `.stored_value()` / `.ieee_bits()` / `.fixed_point()` (bit-exact
+  IEEE materialisation for the 16/32/64/128/256 encodings), and a `from_number`
+  constructor; `dumps()` accepts `Decimal` / terminating `Fraction`. The NumPy
+  bridge decodes `float_dec` / `float_fix` / `float:128`+ to exact `Decimal`
+  object arrays (typed path; `dtype='float64'` is the lossy escape) and
+  `from_numpy` gains `float_format=` to write them. The arbitrary-precision
+  `bvn_float` API is exposed as `bovnar.BvnFloat`. Materialisation covers the
+  full representable range via pure-Python encoders past the parser's cap.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
   **301 cases** (groups `version`, `datetime` — including the ISO-literal
@@ -124,7 +103,7 @@ such a document is an error, exactly as a 1.0 reader reports.
 
 ### Fixed
 
-Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
+Hardening uncovered while developing 1.1:
 
 - The datetime epoch index was misread as a numeric base in the DOM/parse layer
   (`<datetime:gps> 1010` decoded as base-2); now always decimal.
@@ -136,6 +115,19 @@ Hardening uncovered while developing 1.1 (all in new or newly-reachable paths):
 - Restored the `-DBVNR_WERROR=ON` (`-fanalyzer`) build.
 - Python `dumps()` no longer drops a datetime annotation or crashes on a typed
   array; exposes the epoch helpers.
+- `to_dec*` lost precision when encoding a decimal float near a format's Emax:
+  `bvnf_dec_render_roundodd` estimated the decimal exponent with a coarse
+  `log10(2)` approximation (`0.302`) whose error, past ~2000 bits of binary
+  exponent, exceeded the digit-count safety margin and truncated the rendered
+  coefficient — decimal128's 34-digit maximum encoded to ~20 significant digits.
+  Now uses `0.30103`, exact across the whole exponent range.
+- Python NumPy/pint bridge hardening: reject `null` elements that a `bool`/`str`
+  dtype would silently coerce; key the pint reverse-map cache on the registry
+  (`WeakKeyDictionary`) to avoid `id()`-reuse aliasing and a leak; `to_pint_array`
+  rejects datetime arrays; raw Python ints past int64 widen to uint64/object
+  instead of raising a bare `OverflowError`; `from_numpy` rejects masked arrays;
+  clearer errors for invalid `unit=` / non-pint / mixed unit-and-dimensionless
+  inputs.
 
 ### Known gaps / deferred
 
@@ -165,7 +157,6 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
-[Unreleased]: https://github.com/sothis/bovnar/compare/v1.1.0...1.x
 [1.1.0]: https://github.com/sothis/bovnar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/sothis/bovnar/releases/tag/v1.0.1
 [1.0.0]: https://github.com/sothis/bovnar/releases/tag/v1.0.0

@@ -65,6 +65,14 @@ build understands the highest spec it supports via `bvnr_spec_version()` /
   `<datetime>` annotation) only when the value tree needs it, so typed
   round-trips stay lossless. The numpy bridge maps a unix-epoch datetime array
   to/from `datetime64[s]`.
+- **Python — lossless wide/decimal/fixed-point floats** — `Quantity` gains
+  `.decimal()`/`.fraction()` (the exact value from the verbatim literal) and
+  `.stored_value()`/`.ieee_bits()`/`.fixed_point()` (bit-exact materialisation of
+  the 16/32/64/128/256 encodings), plus a `from_number` constructor; `dumps()`
+  accepts `Decimal`/`Fraction`. The numpy bridge decodes `float_dec`/`float_fix`/
+  `float:128`+ to exact `Decimal` object arrays (with `from_numpy(float_format=)`
+  to write them), and the arbitrary-precision `bvn_float` API is exposed as
+  `bovnar.BvnFloat`.
 - **Tooling** — a `bovnar version` subcommand; the `datetime` keyword in all five
   syntax highlighters and the web playground; and a conformance suite grown to
   **301 cases** (up from 207), adding the `version` and `datetime` groups —

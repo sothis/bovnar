@@ -15,6 +15,12 @@ document parses unchanged and decodes to the same values. The new constructs are
 document with no directive is treated as spec 1.0, and a 1.1-only construct in
 such a document is an error, exactly as a 1.0 reader reports.
 
+The one reserved-prefix exception to "parses unchanged": the `#!bovnar ` prefix
+on a first-line comment is now read as a version directive, so a 1.0 document
+whose first line is a comment beginning literally with `#!bovnar ` followed by a
+non-version remainder is reported as a malformed directive rather than ignored.
+`#!bovnar` was never a 1.0 convention, so this affects no realistic document.
+
 ### Added
 
 - **Version directive** — an optional first-line `#!bovnar <major>.<minor>`
@@ -112,6 +118,13 @@ such a document is an error, exactly as a 1.0 reader reports.
   parsing, formatting, and a 32768-bit round-trip without it. The cross-check, the
   `FindGMP.cmake` module, and its CMake wiring are removed, so the project now has
   no external library dependencies at build time or runtime.
+- **Versioned soname for the shared library.** A system/distro build now installs
+  `libbvnr_shared.so.1` (SOVERSION 1) so the dynamic loader can detect an ABI
+  mismatch — relevant because public by-value structs grew this release
+  (`bvnr_data_t` gained `frac_*`, `bvnr_read_flags_t` gained `strict_version`),
+  appended so offsets are preserved but requiring consumers to recompile against
+  the 1.1 headers rather than mixing a 1.0-compiled object with the new library.
+  The Python wheel keeps the unversioned `libbvnr_shared.so` it loads by name.
 
 ### Fixed
 

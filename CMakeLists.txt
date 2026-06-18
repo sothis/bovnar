@@ -156,6 +156,19 @@ target_compile_options(bvnr_shared PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# Versioned soname for system/distro installs so the dynamic loader can refuse an
+# ABI mismatch — e.g. a consumer compiled against 1.0 headers (before a public
+# by-value struct such as bvnr_data_t grew) run against a newer shared library.
+# SOVERSION is the ABI-compatibility major; bump it on any incompatible ABI change.
+# The wheel (SKBUILD) deliberately keeps the plain unversioned filename: _ffi.py
+# loads libbvnr_shared.so by exact name via ctypes, and wheel archives do not
+# preserve the symlink chain a versioned soname creates.
+if(NOT SKBUILD)
+    set_target_properties(bvnr_shared PROPERTIES
+        VERSION   ${PROJECT_VERSION}
+        SOVERSION 1)
+endif()
+
 add_executable(bovnar src/bovnar.c)
 target_compile_options(bovnar PRIVATE ${BVNR_C_FLAGS})
 if(BVNR_HARDEN)

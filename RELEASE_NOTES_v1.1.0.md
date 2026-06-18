@@ -16,7 +16,12 @@ values; the new constructs are **opt-in**, enabled per document by a leading
 
 This is an **additive 1.x release**: per the §17 stability contract, it only
 adds new constructs, appends new error codes after the previous maximum, and
-adds optional reader/writer flags. No 1.0 document is invalidated.
+adds optional reader/writer flags. No 1.0 document is invalidated — with one
+reserved-prefix exception: because `#!bovnar ` on a first-line comment is now a
+version directive, a 1.0 document whose first line is a comment beginning
+literally with `#!bovnar ` followed by non-version text is now reported as a
+malformed directive rather than skipped. `#!bovnar` was never a 1.0 convention,
+so no realistic document is affected.
 
 ## Install
 

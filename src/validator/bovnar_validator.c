@@ -1200,6 +1200,15 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	if (!bvn_validate_type_value_compat(r, tt, val_str, val_len))
 		return false;
 	if (iu_have) {
+		/* No datetime carries a unit: a timestamp is a count of seconds since an
+		 * epoch, not a dimensioned quantity. The ISO-literal form is rejected
+		 * above; this also rejects the plain integer carrier, e.g.
+		 * <datetime:64> 100 m, which would otherwise be accepted (and the unit
+		 * then silently dropped on emit). */
+		if (v->value_type.family == vt_datetime) {
+			v->last_error = error_unit_illegal;
+			return false;
+		}
 		if (!iu_ok) {
 			v->last_error = error_unit_illegal;
 			return false;

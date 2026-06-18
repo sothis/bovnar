@@ -851,6 +851,39 @@ static void test_reference_indexing_coverage(void)
 		bvn_dom_doc_destroy(d);
 	}
 }
+/*
+ * Regression for two wrong-acceptance bugs:
+ *  - A '/'-row matrix is stored flat with its geometry in num_dims +
+ *    rows_per_dim[], so two sibling matrices with the SAME total cell count but
+ *    a DIFFERENT shape (2x3 vs 3x2, flat-4 vs 2x2) must still be rejected;
+ *    bvn_dom_shape_equal once compared only the flattened cell count.
+ *  - A datetime carrier takes no unit in ANY form. The ISO-literal form was
+ *    rejected, but the plain integer carrier (<datetime:64> 100 m) was accepted
+ *    and the unit then silently dropped on emit.
+ */
+static void test_shape_count_and_datetime_unit_regression(void)
+{
+	/* equal total cell count, different shape -> reject */
+	expect_parse(".a = [[1,2,3]/[4,5,6], [7,8]/[9,10]/[11,12]];\n",
+				 error_array_row_size_mismatch, "2x3 vs 3x2 siblings (6 cells each)");
+	expect_parse(".a = [[1,2,3,4]/[5,6,7,8], [1,2]/[3,4]/[5,6]/[7,8]];\n",
+				 error_array_row_size_mismatch, "2x4 vs 4x2 siblings (8 cells each)");
+	expect_parse(".a = [[1,2,3,4], [1,2]/[3,4]];\n",
+				 error_array_row_size_mismatch, "flat-4 vs 2x2 (4 cells each)");
+	/* genuinely same shape -> valid */
+	expect_parse(".a = [[1,2]/[3,4], [5,6]/[7,8]];\n", error_none,
+				 "2x2 vs 2x2 siblings valid");
+	expect_parse(".a = [[1,2,3]/[4,5,6], [7,8,9]/[10,11,12]];\n", error_none,
+				 "2x3 vs 2x3 siblings valid");
+
+	/* a datetime carrier takes no unit, in either carrier form */
+	expect_parse("#!bovnar 1.1\n.t = <datetime:64> 100 m;\n",
+				 error_unit_illegal, "datetime integer carrier + inline unit");
+	expect_parse("#!bovnar 1.1\n.t = <datetime:64,unix> 100 k~m;\n",
+				 error_unit_illegal, "datetime integer carrier + compound unit");
+	expect_parse("#!bovnar 1.1\n.t = <datetime:64> 100;\n", error_none,
+				 "datetime integer carrier without unit valid");
+}
 int main(void)
 {
 	printf("Running bovnar_dom_test regression suite...\n");
@@ -870,6 +903,7 @@ int main(void)
 	test_datetime_dom_decode();
 	test_reference_indexing();
 	test_reference_indexing_coverage();
+	test_shape_count_and_datetime_unit_regression();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

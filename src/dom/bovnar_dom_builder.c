@@ -753,9 +753,22 @@ static error_code_t bvn_dom_shape_equal(
 	case BVN_DOM_ARRAY: {
 		/* rectangular only in the bare array / matrix context; list fields of
 		 * records may vary in length (check_dim == false). */
-		if (check_dim &&
-			bvn_dom_array_count(a) != bvn_dom_array_count(b))
-			return error_array_row_size_mismatch;
+		if (check_dim) {
+			if (bvn_dom_array_count(a) != bvn_dom_array_count(b))
+				return error_array_row_size_mismatch;
+			/* A '/'-row matrix stores its cells flat, with the row geometry in
+			 * num_dims + rows_per_dim[]. Equal total cell count is NOT enough to
+			 * mean equal shape: a 2x3 block and a 3x2 block (or a flat 4-element
+			 * array and a 2x2 matrix) both hold the same number of cells but are
+			 * different shapes, so the row geometry must match too. */
+			if (a->arr.num_dims != b->arr.num_dims)
+				return error_array_row_size_mismatch;
+			uint32_t nd = a->arr.num_dims;
+			if (nd > 8u) nd = 8u;   /* rows_per_dim records only the first 8 rows */
+			for (uint32_t i = 0; i < nd; i++)
+				if (a->arr.rows_per_dim[i] != b->arr.rows_per_dim[i])
+					return error_array_row_size_mismatch;
+		}
 		const bvn_dom_node_t *ra = bvn_dom_first_nonnull_elem(a);
 		const bvn_dom_node_t *rb = bvn_dom_first_nonnull_elem(b);
 		if (ra && rb)

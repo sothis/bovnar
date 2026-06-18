@@ -129,3 +129,82 @@ jobs:
 
       - name: smoke - events (binary-mode stdin)
         run: printf '.x = "hi";\n' | ./build/bovnar.exe events -
+
+  mingw-tests:
+    name: MinGW64 (tests)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    # Builds the portable test subset with the MinGW toolchain and runs it
+    # natively on the Windows runner (no Wine needed here — these are native
+    # Windows .exe). The POSIX-only pieces (socketpair+pthread round-trip,
+    # conformance --iut fork/exec, sigaction fuzz handler) and the Python
+    # bindings are guarded out of the Windows build; this exercises the C unit
+    # suite, the conformance self-test, the standalone fuzz smoke, and the CLI
+    # example/convert/query/stream checks.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+
+      - name: Configure (Ninja, tests on)
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test (ctest)
+        # Exclude the deep/thorough fuzz variants (long-running stress versions of
+        # the fuzz_smoke harnesses, which still run) to keep CI snappy.
+        run: ctest --test-dir build --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"
+
+  mingw-cross-wine:
+    name: MinGW64 cross (Ubuntu + Wine)
+    runs-on: ubuntu-latest
+    # Cross-compiles the Windows target from Linux with the mingw-w64 toolchain
+    # and runs the test suite under Wine — the local-dev path. Unlike the native
+    # MSYS2 jobs, this is what exercises cmake/toolchain-mingw-w64-x86_64.cmake,
+    # its CMAKE_CROSSCOMPILING_EMULATOR=wine wiring (ctest runs each .exe through
+    # Wine), and the -DEMULATOR= plumbing in the shared cmake/*.cmake CLI helpers.
+    env:
+      WINEARCH: win64
+      WINEPREFIX: ${{ github.workspace }}/.wine
+      WINEDEBUG: "-all"
+      # Skip the wine-mono / wine-gecko installers; the CLI is a plain console app.
+      WINEDLLOVERRIDES: "mscoree,mshtml="
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mingw-w64 cross toolchain, Wine and Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 ninja-build wine64
+
+      - name: Initialize Wine prefix
+        run: |
+          wineboot --init
+          wineserver -w
+
+      - name: Configure (cross toolchain, Ninja, tests on)
+        run: |
+          cmake -B build-mingw -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
+            -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
+          # Fail loudly if the toolchain did not pick Wine up as the test emulator.
+          grep -q '^CMAKE_CROSSCOMPILING_EMULATOR.*wine' build-mingw/CMakeCache.txt
+
+      - name: Build
+        run: cmake --build build-mingw
+
+      - name: Test (ctest under Wine)
+        # Same fuzz exclusion as the native job; ctest runs each .exe via the
+        # CMAKE_CROSSCOMPILING_EMULATOR (wine) set by the toolchain file.
+        run: ctest --test-dir build-mingw --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"

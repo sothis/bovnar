@@ -55,8 +55,10 @@ typedef struct bvn_int_s {
  *  - bvn_int_alloc() returns a heap value the CALLER OWNS and must release with
  *    bvn_int_free() (NULL on allocation failure); bvn_int_free(NULL) is a no-op.
  *  - Functions returning bool return false on failure — chiefly a capacity
- *    overflow past BVN_INT_MAX_BITS, or a NULL/invalid argument — and otherwise
- *    leave their destination in a defined state (see each function).
+ *    overflow past BVN_INT_MAX_BITS — and otherwise leave their destination in
+ *    a defined state (see each function). The constructor/parse/convert helpers
+ *    (bvn_int_from_*, bvn_int_to_*) tolerate a NULL argument and report failure;
+ *    the in-place arithmetic helpers require non-NULL operands.
  */
 BVN_API bvn_int_t *bvn_int_alloc(void);
 BVN_API void       bvn_int_free(bvn_int_t *n);

@@ -116,7 +116,7 @@ MinGW64 and MSVC — see *Windows build support* below.
 Full docs — tutorial, specification, unit/currency reference, C and Python API,
 formal EBNF grammar, FAQ, conformance protocol, and cheat sheet — are available
 at **https://www.bovnar.io** (each also downloadable as **PDF**), and in the
-[`doc/`](https://github.com/sothis/bovnar/tree/1.x/doc) directory. See
+[`doc/`](https://github.com/sothis/bovnar/tree/main/doc) directory. See
 [`CHANGELOG.md`](CHANGELOG.md) for the complete change list.
 
 ## License

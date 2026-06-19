@@ -194,7 +194,9 @@ typedef enum error_code_e {
 	/* spec 1.1 — a \u{…} escape names a value that is not a Unicode scalar
 	 * (a surrogate U+D800–U+DFFF, or a code point above U+10FFFF). Malformed
 	 * \x / \u *structure* (bad hex, missing brace, empty or over-long braces)
-	 * stays error_illegal_escape_sequence. */
+	 * stays error_illegal_escape_sequence; a \u{…} or \xHH that decodes to a
+	 * disallowed raw ASCII control byte is rejected by the control-byte rule as
+	 * error_unexpected_input_byte, not here. */
 	error_invalid_codepoint             = 44,
 	/* spec 1.1 — an ISO-8601 datetime literal (e.g. 2026-06-15T12:00:00Z) is
 	 * malformed: a field has the wrong width, a separator is misplaced, or a
@@ -394,6 +396,17 @@ typedef uint32_t bvn_unit_flags_t;
 #define BVN_UNIT_FLAGS_NONE ((bvn_unit_flags_t)0u)
 #define BVN_UNIT_REDUCE     ((bvn_unit_flags_t)(1u << 0))
 #define BVN_UNIT_ASCII_EXP  ((bvn_unit_flags_t)(1u << 1))
+/*
+ * Write options. The fields mirror bvnr_read_flags_t for symmetry, but the
+ * writer consults only: max_array_nesting and max_struct_nesting (enforced),
+ * userdata + on_event (the post-serialize observer callback), unit_flags, and
+ * emit_version. The byte/length/count caps (the max_*_length fields,
+ * max_array_items, max_text_bytes, max_file_size), continue_on_error, and
+ * on_error are accepted for struct symmetry but are NOT consulted on the write
+ * path: the writer emits already-validated values and latches any failure into
+ * the writer (query it with bvnr_writer_get_error). Those input caps and the
+ * resync/error-callback behaviour apply to the reader (bvnr_read_flags_t).
+ */
 typedef struct bvnr_write_flags_s {
 	uint16_t	max_identifier_length;
 	uint16_t	max_string_length;

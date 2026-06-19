@@ -737,7 +737,7 @@ with Reader() as r:
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
 
-### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error)`
+### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -748,13 +748,14 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `on_unverified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for raw pre-validation events |
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
+| `strict_version` | `bool` | `False` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
 
-### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error)`
+### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version)`
 
 Parse BVNR from an open POSIX file descriptor. Parameters identical to
 `read_mem` except the first argument is a non-negative `int` fd.
 
-### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error)`
+### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version)`
 
 Convenience wrapper: opens `path` with `os.O_RDONLY`, calls `read_fd`, closes
 the fd in a `finally` block. The `max_file_size` default is `MAX_FILESIZE_BYTES`

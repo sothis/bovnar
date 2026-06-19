@@ -305,13 +305,14 @@ BVN_API bool bvn_gregorian_date_calc_easter_monday(bvn_gregorian_date_t *gdate, 
 BVN_API bool bvn_gregorian_date_calc_ascension_day(bvn_gregorian_date_t *gdate, int64_t year);
 BVN_API bool bvn_gregorian_date_calc_whit_monday(bvn_gregorian_date_t *gdate, int64_t year);
 
-/* Returns 1 if given date is a federal holiday in Germany. Returns 0 otherwise. */
+/* Returns true if given date is a federal holiday in Germany, false otherwise. */
 BVN_API bool bvn_gregorian_date_is_federal_holiday_in_germany(bvn_gregorian_date_t* date);
 
-/* Returns 1 if given date is a banking day in Germany. Returns 0 otherwise. */
+/* Returns true if given date is a banking day in Germany, false otherwise (banking
+ * days exclude Saturdays and Dec 24/31, which count as business days). */
 BVN_API bool bvn_gregorian_date_is_banking_day_in_germany(bvn_gregorian_date_t* date);
 
-/* Returns 1 if given date is a business day in Germany. Returns 0 otherwise. Regional holidays are not taken into account. */
+/* Returns true if given date is a business day in Germany, false otherwise. Regional holidays are not taken into account. */
 BVN_API bool bvn_gregorian_date_is_business_day_in_germany(bvn_gregorian_date_t* date);
 
 /* Saves the last banking day of the month and year given by 'date' into 'res' */

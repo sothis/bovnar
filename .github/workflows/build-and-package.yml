@@ -19,6 +19,10 @@ concurrency:
 # Each job smoke-tests the CLI end to end (split one step per command so a
 # failure pinpoints the offending command from the step status alone). The full
 # C/Python test suite is not run here — it runs via run_tests.sh / CTest.
+#
+# It also builds the Python wheels + sdist (cibuildwheel matrix) and publishes
+# them to PyPI on a v* tag. Those heavier jobs are gated (see their `if:`) to
+# pull requests, main, and tags — not every release-* push.
 
 jobs:
   msvc:
@@ -193,3 +197,82 @@ jobs:
           ./build/bovnar validate smoke.bvnr
           ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
           printf '.x = "hi";\n' | ./build/bovnar events -
+
+  # ── Python distribution ──────────────────────────────────────────────────
+  # The wheel/sdist jobs are heavy (cibuildwheel across Linux x86_64 + arm64 and
+  # macOS), so — unlike the C build/package jobs above — they do NOT run on every
+  # release-* push. The `if:` keeps them to their prior triggers: pull requests,
+  # workflow_dispatch, pushes to main, and v* tags. Publishing to PyPI stays
+  # gated to v* tags only (the `publish` job's own `if:`).
+  build_wheels:
+    name: Wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    if: >-
+      github.event_name != 'push' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest      # manylinux x86_64
+          - ubuntu-24.04-arm   # manylinux aarch64 (native runner)
+          - macos-14           # arm64 native + x86_64 cross-compiled
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheels
+        # v3.x ships CPython 3.14 final support (cp314); needed for the
+        # cp314-* entry in [tool.cibuildwheel].build.
+        uses: pypa/cibuildwheel@v3.1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'push' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build sdist
+        # `pipx run build` no longer resolves (the package's executable is
+        # `pyproject-build`); name it explicitly so the sdist is actually built.
+        run: pipx run --spec build pyproject-build --sdist
+
+      - name: Check metadata
+        # Only the built sdist — the repo has a committed dist/ (registration
+        # assets: dist/README.md, dist/mime/, …), so a bare dist/* glob feeds
+        # those to twine and errors "Unknown distribution format: 'README.md'".
+        run: pipx run twine check dist/*.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cibw-sdist
+          path: ./dist/*.tar.gz
+
+  publish:
+    name: Publish to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    # Only publish on a version tag (e.g. v1.1.0).
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bovnar
+    permissions:
+      id-token: write   # OIDC token for PyPI Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

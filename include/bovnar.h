@@ -561,6 +561,14 @@ BVN_API bool bvnr_read(bvnr_reader_t* r);
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
 BVN_API bvnr_canon_observer_t* bvnr_canon_observer_create(
 	const bvnr_sink_t* sink, bool pretty);
+/* Prepend a "#!bovnar <major>.<minor>" version directive to the canonical
+ * output (emitted lazily before the first event). Call it before any event is
+ * fed — e.g. from a reader's on_verified callback once
+ * bvnr_reader_get_declared_version() resolves — so canonicalising a spec-1.1
+ * document keeps the directive its constructs require to re-read. A version of
+ * 0.0, or a call after output has begun, is ignored. */
+BVN_API void bvnr_canon_observer_set_version(
+	bvnr_canon_observer_t* obs, uint16_t major, uint16_t minor);
 BVN_API void bvnr_canon_observer_destroy(bvnr_canon_observer_t* obs);
 BVN_API bool bvnr_canon_observer_on_event(
 	void* obs, bvnr_event_t ev, bvnr_data_t* data);

@@ -134,6 +134,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_canon_observer_create.restype  = c_void_p
     lib.bvnr_canon_observer_create.argtypes = [P(BvnrSink), c_bool]
 
+    lib.bvnr_canon_observer_set_version.restype  = None
+    lib.bvnr_canon_observer_set_version.argtypes = [c_void_p, c_uint16, c_uint16]
+
     lib.bvnr_canon_observer_destroy.restype  = None
     lib.bvnr_canon_observer_destroy.argtypes = [c_void_p]
 

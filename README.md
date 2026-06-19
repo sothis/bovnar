@@ -593,7 +593,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (303 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (306 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 164 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 

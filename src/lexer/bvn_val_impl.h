@@ -150,5 +150,6 @@ bool bvn_ser_serialize_event(
 	bvnr_serializer_t* s, bvnr_event_t ev, bvnr_data_t* d);
 bool bvn_ser_flush_wbuf(bvnr_serializer_t* s);
 bool bvn_ser_finish_stream(bvnr_serializer_t* s);
+bool bvn_ser_emit_version(bvnr_serializer_t* s, uint16_t major, uint16_t minor);
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err);
 #endif

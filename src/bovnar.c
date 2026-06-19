@@ -389,6 +389,7 @@ typedef struct {
 	evt_logged_tok_t log[EVT_LOG_CAP];
 	uint32_t         log_used;
 	bvnr_canon_observer_t *canon;
+	bvnr_reader_t        *rd;   /* source of the declared version for the tee */
 } evt_ctx_t;
 static void evt_format_token(const bvnr_data_t *d, bvnr_event_t e,
 					  char *buf, size_t bufsize)
@@ -474,6 +475,13 @@ static bool evt_on_unverified(void *ud, bvnr_event_t e, bvnr_data_t *d);
 static bool evt_on_unverified_tee(void *ud, bvnr_event_t e, bvnr_data_t *d)
 {
 	evt_ctx_t *ctx = (evt_ctx_t *)ud;
+	/* The reader resolves the document's declared version while parsing the
+	 * leading directive (before any value event), so forward it to the
+	 * observer here — idempotent and a no-op once output has begun — so the
+	 * canonical debug dump carries the directive a 1.1 document needs. */
+	uint16_t vmaj = 0, vmin = 0;
+	if (ctx->rd && bvnr_reader_get_declared_version(ctx->rd, &vmaj, &vmin))
+		bvnr_canon_observer_set_version(ctx->canon, vmaj, vmin);
 	if (!bvnr_canon_observer_on_event(ctx->canon, e, d)) return false;
 	return evt_on_unverified(ud, e, d);
 }
@@ -624,6 +632,7 @@ static int cmd_events(int argc, char **argv)
 			return 1;
 		}
 		ctx->canon = canon;
+		ctx->rd    = rd;
 		flags.on_unverified = evt_on_unverified_tee;
 	}
 	if (!bvnr_open_read_source(rd, &src, NULL, &flags)) {
@@ -735,17 +744,17 @@ static int cmd_validate(const char *filename)
 	uint16_t vmaj = 0, vmin = 0;
 	bool has_version = bvnr_reader_get_declared_version(r, &vmaj, &vmin);
 	bvnr_reader_destroy(r);
-	close(fd);
 	/*
 	 * The streaming pass above validated per-value syntax, types and units.
 	 * Array element homogeneity (spec 1.0) is a cross-element, whole-array
 	 * property, enforced over the materialised DOM — so run a second pass
-	 * through bvn_dom_parse_fd and surface any homogeneity error.
+	 * through bvn_dom_parse_fd and surface any homogeneity error. Rewind and
+	 * reuse the one descriptor rather than reopening, so both passes see the
+	 * same bytes (no reopen TOCTOU) and there is a single fd to manage.
 	 */
-	int fd2 = open(filename, BVN_O_RDONLY);
-	if (fd2 < 0) { perror(filename); return 1; }
-	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd2);
-	close(fd2);
+	if (lseek(fd, 0, SEEK_SET) != 0) { perror(filename); close(fd); return 1; }
+	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd);
+	close(fd);
 	if (!doc) {
 		fprintf(stderr, "Validation failed: out of memory\n");
 		return 1;

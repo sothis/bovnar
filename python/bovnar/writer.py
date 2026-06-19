@@ -35,7 +35,6 @@ from .structs import (
     ValueTypeSpec, ValueUnit,
     make_type_spec, make_unit_dimensionless, make_unit_none,
     make_unit_si, make_unit_iec,
-    make_data_key, make_data_typed, make_data_value,
 )
 
 DEFAULT_MEM_CAP = 4 * 1024 * 1024

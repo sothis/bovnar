@@ -225,7 +225,7 @@ month        = digit , digit ;   (* 01..12                             *)
 day          = digit , digit ;   (* 01..28/29/30/31 per month          *)
 hour         = digit , digit ;   (* 00..23                             *)
 minute       = digit , digit ;   (* 00..59                             *)
-second       = digit , digit ;   (* 00..59                             *)
+second       = digit , digit ;   (* 00..60 (60 = UTC leap second)       *)
 
 (* null-value: either the reserved keyword "null" or the empty        *)
 (* production.                                                        *)

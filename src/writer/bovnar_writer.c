@@ -1201,6 +1201,28 @@ bool bvnr_write_event(
  * The directive is a single comment line, so it never affects separator
  * bookkeeping — it is written straight through ahead of the value stream.
  */
+/*
+ * Format and push a leading "#!bovnar <major>.<minor>" directive straight to
+ * the serializer's sink, bypassing the event/separator bookkeeping (the
+ * directive is a lexical comment). Shared by bvnr_write_version (the writer
+ * entry point) and the canonicalising observer. Returns false if a stream or
+ * version was already begun, or the sink push fails; the caller maps that to
+ * its own error space.
+ */
+bool bvn_ser_emit_version(bvnr_serializer_t* s, uint16_t major, uint16_t minor)
+{
+	if (s->finished || s->stream_begun || s->version_emitted)
+		return false;
+	char line[48];
+	int n = snprintf(line, sizeof(line), "#!bovnar %u.%u\n",
+		(unsigned)major, (unsigned)minor);
+	if (n <= 0 || (size_t)n >= sizeof(line))
+		return false;
+	if (!bvn_ser_push(s, line, (uint32_t)n))
+		return false;
+	s->version_emitted = true;
+	return true;
+}
 bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)
 {
 	if (!w) return false;
@@ -1208,16 +1230,10 @@ bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)
 		return false;
 	if (w->ser.finished || w->ser.stream_begun || w->ser.version_emitted)
 		return bvn_writer_set_error(w, error_invalid_argument);
-	char line[48];
-	int n = snprintf(line, sizeof(line), "#!bovnar %u.%u\n",
-		(unsigned)major, (unsigned)minor);
-	if (n <= 0 || (size_t)n >= sizeof(line))
-		return bvn_writer_set_error(w, error_invalid_argument);
-	if (!bvn_ser_push(&w->ser, line, (uint32_t)n))
+	if (!bvn_ser_emit_version(&w->ser, major, minor))
 		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
 			? error_sink_buffer_exhausted
 			: error_writing_to_sink);
-	w->ser.version_emitted = true;
 	return true;
 }
 /*

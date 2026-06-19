@@ -590,9 +590,12 @@ that integer is what is stored and re-emitted, so a pretty-print round-trip is
 idempotent (`2026-06-15` becomes `<datetime:64> 1781481600`). A **bare** literal
 with no annotation infers `<datetime:64,unix>`, so `.t = 2026-06-15;` is a
 timestamp without any annotation. Fields are strictly validated (month `01`–`12`,
-a valid day-of-month, hour `00`–`23`, minute/second `00`–`59`, offset `±HH:MM`
-with two-digit components); a malformed or out-of-range literal is
-`error_invalid_datetime_literal`.
+a valid day-of-month, hour `00`–`23`, minute `00`–`59`, second `00`–`60`, offset
+`±HH:MM` with two-digit components); a malformed or out-of-range literal is
+`error_invalid_datetime_literal`. A second of `60` is a **UTC leap second** and
+is accepted; because the carrier is whole epoch-seconds it normalises onto the
+following second (so `2016-12-31T23:59:60Z` and `2017-01-01T00:00:00Z` store the
+same `unix` value), which is the correct POSIX reading.
 
 A **`±HH:MM` offset** shifts the written civil time to true UTC before the
 conversion (`12:00:00+02:00` is `10:00:00Z`); for `tai` the offset is applied

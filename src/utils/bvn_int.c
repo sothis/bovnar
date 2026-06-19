@@ -507,6 +507,7 @@ int bvn_int_bitlen(const bvn_int_t *n)
 }
 int bvn_int_getbit(const bvn_int_t *n, int i)
 {
+	if (i < 0) return 0;               /* no negative bit positions */
 	uint32_t wi = (uint32_t)i / 32u;
 	int      bi = i % 32;
 	if (wi >= n->nused) return 0;
@@ -514,6 +515,7 @@ int bvn_int_getbit(const bvn_int_t *n, int i)
 }
 bool bvn_int_setbit(bvn_int_t *n, int i)
 {
+	if (i < 0) return false;           /* no negative bit positions */
 	uint32_t wi = (uint32_t)i / 32u;
 	int      bi = i % 32;
 	if (!bigint_ensure_cap(n, wi + 1u)) return false;

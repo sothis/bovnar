@@ -1412,6 +1412,63 @@ static void test_canon_observer_unbalanced_struct_end_rejected(void)
 
 	bvnr_canon_observer_destroy(obs);
 }
+/*
+ * A canonicalising observer must be able to re-emit a document's version
+ * directive, or a spec-1.1 document (datetime, the new escapes, …)
+ * canonicalises to output a reader then rejects as 1.0. The realistic timing
+ * (mirrored here) is that the driver learns the declared version only AFTER the
+ * leading ev_stream_start event — a reader resolves it while parsing the
+ * directive line — but still before any value bytes; the observer emits the
+ * directive lazily ahead of the first event that follows.
+ */
+static void test_canon_observer_emits_version(void)
+{
+	printf("  test_canon_observer_emits_version...\n");
+	uint8_t out[256];
+	memset(out, 0, sizeof out);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, sizeof out);
+	bvnr_canon_observer_t *obs = bvnr_canon_observer_create(&sink, false);
+	ASSERT_NOT_NULL(obs, "observer create");
+	if (!obs) return;
+
+	bvnr_data_t data;
+	memset(&data, 0, sizeof data);
+
+	/* The observer copies the sink, so its byte counter lives on its private
+	 * copy; read the shared output buffer directly instead. ev_stream_start
+	 * emits no value bytes, so the buffer holds only the directive (ASCII, no
+	 * embedded NUL), which makes strlen a valid length here. */
+
+	/* stream-start arrives before the version is known: nothing is emitted */
+	ASSERT_TRUE(bvnr_canon_observer_on_event(obs, ev_stream_start, &data),
+		"stream-start accepted");
+	ASSERT_TRUE(out[0] == 0, "no output before the version is known");
+
+	/* the driver now learns the declared version (still ahead of any value) */
+	bvnr_canon_observer_set_version(obs, 1, 1);
+	ASSERT_TRUE(bvnr_canon_observer_on_event(obs, ev_stream_start, &data),
+		"next event accepted");
+	ASSERT_TRUE(memcmp(out, "#!bovnar 1.1\n", 13) == 0,
+		"observer prepends the version directive ahead of the first event");
+	size_t n = strlen((const char *)out);
+	ASSERT_TRUE(n == 13, "directive is exactly the one line");
+	uint16_t maj = 0, min = 0;
+	ASSERT_TRUE(bvnr_peek_version(out, (uint64_t)n, &maj, &min) && maj == 1 && min == 1,
+		"emitted directive re-reads as 1.1");
+
+	/* the directive is emitted exactly once even across further events */
+	ASSERT_TRUE(bvnr_canon_observer_on_event(obs, ev_stream_start, &data),
+		"further event accepted");
+	ASSERT_TRUE(strlen((const char *)out) == 13, "directive emitted exactly once");
+
+	/* a late set_version (after the directive went out) is a harmless no-op */
+	bvnr_canon_observer_set_version(obs, 2, 0);
+	ASSERT_TRUE(strlen((const char *)out) == 13,
+		"set_version after emission does not re-emit");
+
+	bvnr_canon_observer_destroy(obs);
+}
 int main(void)
 {
 	printf("Running bovnar_writer_test regression suite...\n");
@@ -1449,6 +1506,7 @@ int main(void)
 	test_write_reference_dot_only_rejected();
 	test_write_string_vf_escapes();
 	test_canon_observer_unbalanced_struct_end_rejected();
+	test_canon_observer_emits_version();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

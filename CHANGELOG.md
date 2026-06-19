@@ -62,7 +62,10 @@ non-version remainder is reported as a malformed directive rather than ignored.
   GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
   (`error_datetime_literal_unsupported_epoch`) because there is no
   round-trippable civil⇄seconds inverse for them — use an integer carrier there.
-  A malformed or out-of-range literal is `error_invalid_datetime_literal`.
+  A second of `60` is accepted as a UTC leap second; since the carrier is whole
+  epoch-seconds it normalises onto the following second (`2016-12-31T23:59:60Z`
+  and `2017-01-01T00:00:00Z` store the same `unix` value), the correct POSIX
+  reading. A malformed or out-of-range literal is `error_invalid_datetime_literal`.
 - **Reference array indexing** — a reference path may index arrays,
   `&.matrix[0][1]`. The index is stored verbatim/unresolved at the byte layer and
   interpreted by `bvn_dom_lookup` (which also backs `bovnar query`): a flat
@@ -71,7 +74,9 @@ non-version remainder is reported as a malformed directive rather than ignored.
 - **C API** — `bvnr_version()`, `bvnr_version_string()`, `bvnr_spec_version()`,
   `bvnr_reader_get_declared_version()`, `bvnr_peek_version()`,
   `bvnr_write_version()`, `bvnr_write_datetime()`, `bvnr_datetime_epoch_name()`,
-  `bvnr_datetime_epoch_mjd()`, `bvnr_datetime_epoch_index()`; the
+  `bvnr_datetime_epoch_mjd()`, `bvnr_datetime_epoch_index()`,
+  `bvnr_canon_observer_set_version()` (so a canonicalising observer can re-emit
+  the source's version directive); the
   `bvnr_read_flags_t.strict_version` and `bvnr_write_flags_t.emit_version` flags;
   the `BVNR_SPEC_VERSION_MAJOR`/`MINOR` macros; the `vt_datetime` family; and
   error codes `error_invalid_spec_version` (42), `error_unsupported_spec_version`
@@ -247,6 +252,19 @@ Hardening uncovered while developing 1.1:
   or structs); the cibuildwheel test phase now hard-fails if a built wheel cannot
   load its bundled library (the lib-dependent tests are skipif, so they would
   otherwise pass-as-skipped).
+- **The canonicalising observer dropped the version directive.**
+  `bvnr_canon_observer_*` re-emitted only the value stream, so canonicalising a
+  spec-1.1 document (datetime, the new escapes, …) produced output a reader then
+  rejected as 1.0. It can now be told the source's declared version
+  (`bvnr_canon_observer_set_version`, wired into the `events -d` debug dump), and
+  emits the directive ahead of the first event so the canonical form re-reads.
+- **CLI `validate` reopened the input file for its second (DOM homogeneity)
+  pass.** It now rewinds and reuses the one descriptor, so both passes see the
+  same bytes (closing a reopen TOCTOU window) and there is a single fd to manage.
+- **`bvn_int_getbit`/`bvn_int_setbit`** now reject a negative bit index up front
+  instead of relying on word-index bounds to mask the otherwise-undefined shift.
+- **Python** — `make_data_key`'s return annotation was `BvnrData` though it
+  returns a `(data, raw)` tuple; corrected, and an unused writer import dropped.
 
 Second release-review pass:
 

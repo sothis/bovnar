@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (303 cases) ──→ for each test case:                │
+│  Test corpus (306 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -469,7 +469,7 @@ The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
 natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading `# Subtest:` comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 21), not the 303 cases.
+parent plan therefore counts the groups (currently 21), not the 306 cases.
 
 ```
 TAP version 14

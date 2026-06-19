@@ -1013,6 +1013,18 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("DTLIT-125", "datetime", "both Z and an offset is rejected",
 	           "#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z+02:00;",
 	           error_unexpected_input_byte),
+	/* Leap seconds (spec 1.1): :60 is accepted for UTC. The whole-second
+	 * carrier collapses it onto the following second, so the unix value equals
+	 * the next-day midnight (1483228800 = 2017-01-01T00:00:00Z). */
+	VALID_KEY("DTLIT-126", "datetime", "a UTC leap second (:60) is accepted",
+	          "#!bovnar 1.1\n.t = 2016-12-31T23:59:60Z;",
+	          "t", "1483228800"),
+	VALID_KEY("DTLIT-127", "datetime", "tai leap second is leap-correct (2017: +37)",
+	          "#!bovnar 1.1\n.t = <datetime:64,tai> 2016-12-31T23:59:60Z;",
+	          "t", "1861920037"),
+	ERROR_CASE("DTLIT-128", "datetime", "second 61 is still rejected",
+	           "#!bovnar 1.1\n.t = 2026-06-15T12:00:61Z;",
+	           error_invalid_datetime_literal),
 
 	/* ── NUMBERS ─────────────────────────────────────────────────── */
 	VALID_KEY("NUM-001", "numbers", "plain unsigned integer",

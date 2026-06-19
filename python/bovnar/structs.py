@@ -295,7 +295,7 @@ class BvnDomEntry(ctypes.Structure):
         ('value', ctypes.c_void_p),
     ]
 
-def make_data_key(key: str) -> BvnrData:
+def make_data_key(key: str) -> tuple:
     raw = key.encode('utf-8')
     d = BvnrData()
     d.data = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)

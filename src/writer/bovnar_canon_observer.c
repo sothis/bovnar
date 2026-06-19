@@ -44,6 +44,10 @@ bool bvn_ser_finish_stream(bvnr_serializer_t *s);
  */
 struct bvnr_canon_observer_s {
 	bvnr_serializer_t ser;
+	uint16_t          version_major;
+	uint16_t          version_minor;
+	bool              emit_version;  /* a directive is pending, emit it lazily
+					  * before the first serialized event */
 };
 /*
  * max_array_nesting is set to the maximum because the event source (a reader)
@@ -66,11 +70,38 @@ void bvnr_canon_observer_destroy(bvnr_canon_observer_t *obs)
 {
 	free(obs);
 }
+/*
+ * Record a "#!bovnar <major>.<minor>" directive to prepend to the canonical
+ * output. The directive is emitted lazily, just before the first event is
+ * serialized — a caller driving the observer from a reader only learns the
+ * source's declared version after the directive line is parsed (mid-stream),
+ * which is still ahead of the first value event, so it can inject it here. A
+ * version of 0.0, or a call after output has begun, is ignored. Without this
+ * the observer reproduces only the value stream, so a spec-1.1 document (one
+ * using datetime, the new escapes, …) would canonicalise to output a reader
+ * then rejects as 1.0.
+ */
+void bvnr_canon_observer_set_version(bvnr_canon_observer_t *obs,
+	uint16_t major, uint16_t minor)
+{
+	if (!obs) return;
+	if (obs->ser.stream_begun || obs->ser.version_emitted) return;
+	if (major == 0u && minor == 0u) return;
+	obs->version_major = major;
+	obs->version_minor = minor;
+	obs->emit_version  = true;
+}
 bool bvnr_canon_observer_on_event(void *ud,
 	bvnr_event_t ev, bvnr_data_t *data)
 {
 	bvnr_canon_observer_t *obs = (bvnr_canon_observer_t *)ud;
 	if (!obs) return true;
+	if (obs->emit_version && !obs->ser.version_emitted) {
+		if (!bvn_ser_emit_version(&obs->ser, obs->version_major,
+				obs->version_minor))
+			return false;
+		obs->emit_version = false;
+	}
 	return bvn_ser_serialize_event(&obs->ser, ev, data);
 }
 bool bvnr_canon_observer_finish(bvnr_canon_observer_t *obs)

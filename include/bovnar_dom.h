@@ -65,7 +65,9 @@ BVN_API bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len);
  * failure (allocation, I/O/read error, or input exceeding the size cap) with no
  * distinguishing code; a non-NULL result may still carry a parse error retrieved
  * via bvn_dom_doc_get_parse_error(). bvn_dom_parse_fd uses the default cap;
- * parse_fd_ex caps the accumulated input at max_bytes (0 = unlimited). Free with
+ * parse_fd_ex caps the accumulated input at max_bytes, but only DOWNWARD: a
+ * max_bytes of 0, or any value above the built-in hard cap (BVN_DOM_FD_MAX_BYTES,
+ * 256 MiB), is clamped to that hard cap — there is no unlimited mode. Free with
  * bvn_dom_doc_destroy. */
 BVN_API bvn_dom_doc_t *bvn_dom_parse_fd(int fd);
 BVN_API bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes);
@@ -83,7 +85,9 @@ BVN_API bool bvn_dom_get_bool(const bvn_dom_node_t *node, bool *out);
 /* Accessors: return false (leaving the out-params unchanged) when the node is NULL or
  * not of the requested kind. The returned pointer is BORROWED — it points into
  * the node and is valid only until the owning document is destroyed; do not free
- * it. The string/symbol/reference data is NUL-terminated; *len excludes the NUL. */
+ * it. The string/symbol/reference data is NUL-terminated; *len excludes the NUL.
+ * Octet-stream data (bvn_dom_get_octets) is raw bytes and is NOT NUL-terminated;
+ * use *len exactly. */
 BVN_API bool bvn_dom_get_string(const bvn_dom_node_t *node,
 						const char **out, uint32_t *len);
 BVN_API bool bvn_dom_get_symbol(const bvn_dom_node_t *node,
@@ -121,7 +125,9 @@ BVN_API bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 					 bvn_dom_node_t *val);
 BVN_API bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem);
 BVN_API char *bvn_dom_strdup(const char *s, uint32_t len);
-/* Borrowed bigint view, owned by the node (do not free); NULL if not an integer. */
+/* Borrowed bigint view, owned by the node (do not free). Returns NULL unless the
+ * node is an integer WIDER than 64 bits; narrow integers are stored inline, so
+ * read those with bvn_dom_get_i64/u64 (etc.), not this. */
 BVN_API const bvn_int_t *bvn_dom_get_bigint(const bvn_dom_node_t *node);
 /* Render an integer node in `base`. Returns a heap string the CALLER OWNS and
  * must release with bvn_dom_free_string() (NULL on a non-integer node or alloc

@@ -306,7 +306,12 @@ static bool bvn_iso_parse_fields(const uint8_t* s, uint32_t n, bvn_datetime_t* d
 		    !bvn_iso_two_digit(s + 14, &minute) ||
 		    !bvn_iso_two_digit(s + 17, &second))
 			return false;
-		if (hour > 23 || minute > 59 || second > 59)
+		/* second == 60 is a UTC leap second. It is accepted; because the
+		 * carrier is whole epoch-seconds it normalises onto the following
+		 * second (the leap-second-collapse convention shared with
+		 * bvn_datetime.c), which is the correct POSIX value for the civil
+		 * epochs and stays consistent for tai. :61 and beyond are rejected. */
+		if (hour > 23 || minute > 59 || second > 60)
 			return false;
 		p = 19;
 		/* optional fractional seconds: '.' then 1+ digits. The carrier stays

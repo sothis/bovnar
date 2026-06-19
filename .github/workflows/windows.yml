@@ -11,12 +11,14 @@ concurrency:
   group: windows-${{ github.ref }}
   cancel-in-progress: true
 
-# Builds the library (static + DLL) and the CLI on the two supported 64-bit
-# Windows toolchains, MSVC and MinGW64, and smoke-tests the CLI end to end.
-# The POSIX test harness (fork/exec IUT, socketpair/pthread, sigaction fuzz) is
-# not built on Windows; the CLI smoke tests exercise the read/write/DOM paths.
-# Smoke checks are split into one step per command so a failure pinpoints the
-# offending command from the step status alone.
+# Builds the library (static + shared) and the CLI on the supported 64-bit
+# targets and publishes each as a downloadable release artifact:
+#   * Windows MSVC  -> bovnar-windows-msvc
+#   * Windows MinGW -> bovnar-windows-mingw
+#   * Linux x64     -> bovnar-linux (+ the cross-platform bovnar-amalgamate)
+# Each job smoke-tests the CLI end to end (split one step per command so a
+# failure pinpoints the offending command from the step status alone). The full
+# C/Python test suite is not run here — it runs via run_tests.sh / CTest.
 
 jobs:
   msvc:
@@ -151,141 +153,43 @@ jobs:
       - name: smoke - events (binary-mode stdin)
         run: printf '.x = "hi";\n' | ./build/mingw/bovnar.exe events -
 
-  mingw-tests:
-    name: MinGW64 (tests)
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
-    # Builds the portable test subset with the MinGW toolchain and runs it
-    # natively on the Windows runner (no Wine needed here — these are native
-    # Windows .exe). The POSIX-only pieces (socketpair+pthread round-trip,
-    # conformance --iut fork/exec, sigaction fuzz handler) and the Python
-    # bindings are guarded out of the Windows build; this exercises the C unit
-    # suite, the conformance self-test, the standalone fuzz smoke, and the CLI
-    # example/convert/query/stream checks.
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-
-      - name: Configure (Ninja, tests on)
-        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON -DBVNR_PACKAGE=OFF .
-
-      - name: Build
-        run: cmake --build build/mingw
-
-      - name: Test (ctest)
-        # Exclude the deep/thorough fuzz variants (long-running stress versions of
-        # the fuzz_smoke harnesses, which still run) to keep CI snappy.
-        run: ctest --test-dir build/mingw --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"
-
-  mingw-cross-wine:
-    name: MinGW64 cross (Ubuntu + Wine)
+  linux:
+    name: Linux (x64)
     runs-on: ubuntu-latest
-    # Non-blocking: the native MinGW64 (tests) job is the required Windows test
-    # signal. This job adds coverage of the local-dev cross path but depends on
-    # apt-installing Wine + the mingw toolchain from the runners' Azure mirror,
-    # whose throughput is sometimes pathologically slow; continue-on-error keeps a
-    # bad-mirror day from gating the whole workflow. (The apt cache makes this
-    # rare once warm.) Inspect its result manually when the cross path itself
-    # changes.
-    continue-on-error: true
-    # Cross-compiles the Windows target from Linux with the mingw-w64 toolchain
-    # and runs the test suite under Wine — the local-dev path. Unlike the native
-    # MSYS2 jobs, this is what exercises cmake/toolchain-mingw-w64-x86_64.cmake,
-    # its CMAKE_CROSSCOMPILING_EMULATOR=wine wiring (ctest runs each .exe through
-    # Wine), and the -DEMULATOR= plumbing in the shared cmake/*.cmake CLI helpers.
-    env:
-      # noninteractive so a debconf prompt from a Wine dependency cannot hang the
-      # apt install (apt-get -y does not suppress debconf on its own).
-      DEBIAN_FRONTEND: noninteractive
-      WINEARCH: win64
-      WINEPREFIX: ${{ github.workspace }}/.wine
-      WINEDEBUG: "-all"
-      # Skip the wine-mono / wine-gecko installers; the CLI is a plain console app.
-      WINEDLLOVERRIDES: "mscoree,mshtml="
+    # Native 64-bit Linux build (this is the Ubuntu runner that previously ran
+    # the MinGW cross + Wine job). It builds the library + CLI and publishes the
+    # packed Linux release tarball — and the cross-platform amalgamation — as
+    # downloadable artifacts, mirroring the Windows jobs. gcc, make, cmake and
+    # python3 are preinstalled on the runner, so no apt install is needed.
     steps:
       - uses: actions/checkout@v5
-
-      # Cache the downloaded .deb archives so repeat runs skip the (often very
-      # slow) Azure apt mirror entirely. apt's archive dir is redirected to a
-      # workspace-local path (Dir::Cache::archives below) so it is owned by the
-      # runner user and this action can read it. Keyed on the workflow file, so
-      # editing the package list invalidates the cache; the prefix restore-key
-      # reuses the newest cache across unrelated workflow edits.
-      - name: Cache apt packages
-        uses: actions/cache@v5
         with:
-          path: ${{ github.workspace }}/.apt-cache
-          key: apt-cross-wine-${{ runner.os }}-${{ hashFiles('.github/workflows/windows.yml') }}
-          restore-keys: apt-cross-wine-${{ runner.os }}-
+          # Full history so the packed artifact's build count is meaningful.
+          fetch-depth: 0
 
-      - name: Install mingw-w64 cross toolchain, Wine and Ninja
-        # Minimal set — the Azure apt mirror throughput on the runners is highly
-        # variable, so every saved MB helps:
-        #   * gcc-mingw-w64-x86-64-win32 (+ the dev headers) instead of the
-        #     gcc-mingw-w64-x86-64 metapackage, which also pulls the unused posix
-        #     GCC variant (~50 MB). win32 is the variant the local toolchain uses.
-        #   * wine64 only — it Depends on libwine, which ships both the loader and
-        #     wine.inf (used to populate the prefix). No `wine`/`wine-common`
-        #     (the latter does not even exist on this runner's Ubuntu), no 32-bit
-        #     wine: we only run a 64-bit console .exe.
-        #   * --no-install-recommends drops Wine's GUI/audio recommends;
-        #     Acquire::Retries rides out transient mirror blips.
-        # Dir::Cache::archives points apt at the cached .deb dir above (a cache hit
-        # then needs no download). The distro exposes wine via update-alternatives
-        # (libwine's wine.collection group), which is NOT reliably configured in a
-        # minimal install, so /usr/bin/wine64 can be absent. Put the concrete
-        # wine64 binary on PATH ourselves (name varies: wine64-stable /
-        # -development), where the toolchain's find_program(wine64) picks it up as
-        # the test emulator.
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/.apt-cache"
-          sudo apt-get update
-          # APT::Sandbox::User=root: the workspace-local archive dir is not
-          # writable by the unprivileged _apt sandbox user, so apt would otherwise
-          # print a "Download is performed unsandboxed as root ... Permission
-          # denied" warning for every package. Downloading as root (we are already
-          # root via sudo) is fine here and silences that noise.
-          sudo apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
-            -o Dir::Cache::archives="$GITHUB_WORKSPACE/.apt-cache" \
-            -o APT::Sandbox::User=root \
-            gcc-mingw-w64-x86-64-win32 mingw-w64-x86-64-dev ninja-build wine64
-          # apt ran as root, so the cached .deb files are root-owned; hand them
-          # back to the runner user so the actions/cache post-step can archive them.
-          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/.apt-cache"
-          if ! command -v wine64 >/dev/null 2>&1; then
-            for c in /usr/bin/wine64-stable /usr/bin/wine64-development /usr/lib/wine/wine64; do
-              if [ -x "$c" ]; then sudo ln -sf "$c" /usr/local/bin/wine64; break; fi
-            done
-          fi
-          wine64 --version
-
-      - name: Initialize Wine prefix
-        # Create the win64 prefix up front (wineboot is a Wine builtin, run via
-        # wine64) so the parallel ctest run does not race on first-run creation.
-        run: wine64 wineboot --init
-
-      - name: Configure (cross toolchain, Ninja, tests on)
-        run: |
-          cmake -B build/mingw -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
-            -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON -DBVNR_PACKAGE=OFF .
-          # Fail loudly if the toolchain did not pick Wine up as the test emulator.
-          grep -q '^CMAKE_CROSSCOMPILING_EMULATOR.*wine' build/mingw/CMakeCache.txt
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
 
       - name: Build
-        run: cmake --build build/mingw
+        run: cmake --build build -j"$(nproc)"
 
-      - name: Test (ctest under Wine)
-        # Same fuzz exclusion as the native job; ctest runs each .exe via the
-        # CMAKE_CROSSCOMPILING_EMULATOR (wine) set by the toolchain file.
-        run: ctest --test-dir build/mingw --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bovnar-linux
+          path: build/bovnar-linux-*.tar.xz
+          if-no-files-found: error
+
+      - name: Upload amalgamation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bovnar-amalgamate
+          path: build/bovnar-*-amalgamate.tar.xz
+          if-no-files-found: error
+
+      - name: smoke - validate + pretty-print + events
+        run: |
+          printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
+          ./build/bovnar validate smoke.bvnr
+          ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
+          printf '.x = "hi";\n' | ./build/bovnar events -

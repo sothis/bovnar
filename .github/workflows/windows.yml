@@ -1,4 +1,4 @@
-name: Windows
+name: Build & Package
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: windows-${{ github.ref }}
+  group: build-package-${{ github.ref }}
   cancel-in-progress: true
 
 # Builds the library (static + shared) and the CLI on the supported 64-bit

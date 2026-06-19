@@ -26,7 +26,11 @@
     <!-- Back-compat with the pre-registration unofficial name. -->
     <alias type="text/x-bovnar"/>
     <glob pattern="*.bvnr"/>
-    <!-- Heuristic only: a top-level assignment line ".<ident> = ..." appearing
+    <!-- Strong heuristic: the spec-1.1 version directive on the first line. -->
+    <magic priority="50">
+      <match type="string" value="#!bovnar " offset="0"/>
+    </magic>
+    <!-- Weaker heuristic: a top-level assignment line ".<ident> = ..." appearing
          near the start of the file. Low priority so the glob and any stronger
          match win. -->
     <magic priority="20">

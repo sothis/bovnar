@@ -94,10 +94,12 @@ fraction for programmatic access); it has no re-serialiser of its own.
   sweep (`tests/bvnr_abi_dump.c` is the C source of truth, `python/tests/test_abi.py`
   asserts every ctypes Structure matches it). Any future struct change that
   desyncs a binding now fails the build instead of corrupting memory at runtime.
-- **The high-level Python value drops the fraction.** `loads()` returns an `int`
-  (or a `Quantity` with `typed=True`) holding only the carrier, so
-  `loads`→`dumps` does **not** round-trip the fraction. Use the DOM accessor or
-  the streaming reader. (Documented in `4_bovnar_python_bindings.md`.)
+- **The non-typed Python value drops the fraction.** Plain `loads()` returns an
+  `int` holding only the whole-second carrier, so a non-typed `loads`→`dumps`
+  drops the fraction. With `typed=True` the `Quantity` preserves the verbatim
+  fraction and re-emits it, so `loads(typed=True)`→`dumps` round-trips it
+  losslessly; the DOM accessor and the streaming reader expose it explicitly.
+  (Documented in `4_bovnar_python_bindings.md`.)
 - **The atomic GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) never carry a
   fraction** — they reject ISO literals at read time (no round-trippable
   civil⇄seconds inverse). `bvn_ser_datetime_to_civil` also refuses to

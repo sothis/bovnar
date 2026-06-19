@@ -97,8 +97,10 @@ defined for this media type.
 - *Deprecated alias names for this type:* `text/x-bovnar` (an unofficial,
   unregistered name used before this registration; consumers MAY accept it as an
   alias).
-- *Magic number(s):* None. Bovnar is a text format with no fixed signature; a
-  document typically begins with a `#` comment or a `.identifier` assignment.
+- *Magic number(s):* None required. A spec-1.1 document may begin with a
+  `#!bovnar <major>.<minor>` version directive on the first line, which is a
+  strong distinguishing signal; otherwise a document typically begins with a
+  `#` comment or a `.identifier` assignment.
   Identification relies on the `.bvnr` file extension and the media type label.
 - *File extension(s):* `.bvnr`
 - *Macintosh file type code(s):* `TEXT`

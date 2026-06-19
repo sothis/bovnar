@@ -2,9 +2,10 @@
 #
 # The *.bvnr extension is the AUTHORITATIVE signal (see the shared-mime-info
 # glob); this content magic is a best-effort fallback for extension-less files.
-# It matches a top-level assignment line — ".<identifier> = ..." at column 0,
-# i.e. preceded by a newline — within the first 256 lines, skipping leading
-# "#" comments and blank lines.
+# Two signals: (1) the spec-1.1 "#!bovnar <major>.<minor>" version directive at
+# the very start of the file (strong); (2) a top-level assignment line —
+# ".<identifier> = ..." at column 0, i.e. preceded by a newline — within the
+# first 256 lines, skipping leading "#" comments and blank lines.
 #
 # Heuristic limitations (acceptable because the extension is authoritative):
 #   * A document whose very first byte begins the assignment (no comment/blank
@@ -24,6 +25,11 @@
 #     cat bovnar.magic >> /etc/magic && (cd /etc && file -C)   # or
 #     install -Dm644 bovnar.magic ~/.magic && file -C -m ~/.magic
 #
+# (1) The spec-1.1 version directive at offset 0 — a strong, unambiguous signal.
+0	string	#!bovnar\ 	Bovnar document
+!:mime	text/vnd.bovnar
+!:ext	bvnr
+# (2) Fallback: a top-level ".<identifier> = ..." assignment within 256 lines.
 0	regex/256l	\n\\.[A-Za-z_][A-Za-z0-9_]*[[:blank:]]*=	Bovnar document
 !:mime	text/vnd.bovnar
 !:ext	bvnr

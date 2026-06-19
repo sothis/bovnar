@@ -99,22 +99,26 @@ function(_stage_bin top kind dir)
 endfunction()
 
 # --- 1) amalgamation: regenerate into BIN_DIR/amalgamate, then pack ---------
+# Best-effort: a missing Python or a generator hiccup must not fail the build —
+# the amalgamation is a convenience artifact and the platform archives below do
+# not depend on it.
 if(PYTHON)
     file(MAKE_DIRECTORY "${BIN_DIR}/amalgamate")
     execute_process(
         COMMAND "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${BIN_DIR}/amalgamate"
         RESULT_VARIABLE _r OUTPUT_QUIET)
     if(NOT _r EQUAL 0)
-        message(FATAL_ERROR "pack_artifacts: amalgamate.py failed")
+        message(WARNING "pack_artifacts: amalgamate.py failed; skipping the amalgamation archive")
+    else()
+        set(_atop "bovnar-${TAG}-amalgamate")
+        file(MAKE_DIRECTORY "${STAGE}/${_atop}")
+        file(COPY "${BIN_DIR}/amalgamate/bovnar.h" "${BIN_DIR}/amalgamate/bovnar.c"
+             "${SRC_DIR}/LICENSE" DESTINATION "${STAGE}/${_atop}")
+        if(EXISTS "${SRC_DIR}/dist/README.md")
+            file(COPY "${SRC_DIR}/dist/README.md" DESTINATION "${STAGE}/${_atop}")
+        endif()
+        _pack("${_atop}" "bovnar-${TAG}-amalgamate.tar.xz" xz)
     endif()
-    set(_atop "bovnar-${TAG}-amalgamate")
-    file(MAKE_DIRECTORY "${STAGE}/${_atop}")
-    file(COPY "${BIN_DIR}/amalgamate/bovnar.h" "${BIN_DIR}/amalgamate/bovnar.c"
-         "${SRC_DIR}/LICENSE" DESTINATION "${STAGE}/${_atop}")
-    if(EXISTS "${SRC_DIR}/dist/README.md")
-        file(COPY "${SRC_DIR}/dist/README.md" DESTINATION "${STAGE}/${_atop}")
-    endif()
-    _pack("${_atop}" "bovnar-${TAG}-amalgamate.tar.xz" xz)
 else()
     message(WARNING "pack_artifacts: Python not found; skipping the amalgamation archive")
 endif()

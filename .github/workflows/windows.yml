@@ -24,6 +24,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history so the packed artifact's build count (git commit count)
+          # is meaningful rather than 1 from a shallow clone.
+          fetch-depth: 0
 
       - name: Set up MSVC x64 environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -38,6 +42,13 @@ jobs:
 
       - name: Build
         run: cmake --build build\msvc
+
+      - name: Upload Windows artifact (MSVC)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bovnar-windows-msvc
+          path: build/msvc/bovnar-windows-*.zip
+          if-no-files-found: error
 
       - name: Check artifacts + DLL exports
         shell: cmd
@@ -85,6 +96,9 @@ jobs:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history so the packed artifact's build count is meaningful.
+          fetch-depth: 0
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -100,6 +114,13 @@ jobs:
 
       - name: Build
         run: cmake --build build/mingw
+
+      - name: Upload Windows artifact (MinGW)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bovnar-windows-mingw
+          path: build/mingw/bovnar-windows-*.zip
+          if-no-files-found: error
 
       - name: Check artifacts + DLL is self-contained
         run: |
@@ -156,7 +177,7 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Configure (Ninja, tests on)
-        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
+        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON -DBVNR_PACKAGE=OFF .
 
       - name: Build
         run: cmake --build build/mingw
@@ -257,7 +278,7 @@ jobs:
         run: |
           cmake -B build/mingw -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
-            -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
+            -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON -DBVNR_PACKAGE=OFF .
           # Fail loudly if the toolchain did not pick Wine up as the test emulator.
           grep -q '^CMAKE_CROSSCOMPILING_EMULATOR.*wine' build/mingw/CMakeCache.txt
 

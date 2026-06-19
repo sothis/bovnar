@@ -34,20 +34,20 @@ jobs:
         run: echo "::add-matcher::.github/problem-matchers/msvc.json"
 
       - name: Configure (Ninja)
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
+        run: cmake -B build\msvc -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build\msvc
 
       - name: Check artifacts + DLL exports
         shell: cmd
         run: |
-          dir build
-          if not exist build\bvnr.dll exit /b 1
-          if not exist build\bvnr.lib exit /b 1
-          if not exist build\bvnr_static.lib exit /b 1
-          if not exist build\bovnar.exe exit /b 1
-          dumpbin /exports build\bvnr.dll | findstr /i "bvnr_version bvnr_read"
+          dir build\msvc
+          if not exist build\msvc\bvnr.dll exit /b 1
+          if not exist build\msvc\bvnr.lib exit /b 1
+          if not exist build\msvc\bvnr_static.lib exit /b 1
+          if not exist build\msvc\bovnar.exe exit /b 1
+          dumpbin /exports build\msvc\bvnr.dll | findstr /i "bvnr_version bvnr_read"
 
       - name: Prepare sample document
         shell: pwsh
@@ -56,13 +56,13 @@ jobs:
       - name: smoke - validate (file)
         shell: pwsh
         run: |
-          & build\bovnar.exe validate smoke.bvnr
+          & build\msvc\bovnar.exe validate smoke.bvnr
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: smoke - pretty-print runs (file)
         shell: pwsh
         run: |
-          & build\bovnar.exe pretty-print smoke.bvnr > pp.txt
+          & build\msvc\bovnar.exe pretty-print smoke.bvnr > pp.txt
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: smoke - pretty-print output
@@ -74,7 +74,7 @@ jobs:
       - name: smoke - events (binary-mode stdin)
         shell: pwsh
         run: |
-          Get-Content -Raw smoke.bvnr | & build\bovnar.exe events -
+          Get-Content -Raw smoke.bvnr | & build\msvc\bovnar.exe events -
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   mingw:
@@ -96,20 +96,20 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Configure (Ninja)
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
+        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build/mingw
 
       - name: Check artifacts + DLL is self-contained
         run: |
-          ls -l build
-          test -f build/libbvnr.a
-          test -f build/libbvnr.dll
-          test -f build/libbvnr.dll.a
-          test -f build/bovnar.exe
+          ls -l build/mingw
+          test -f build/mingw/libbvnr.a
+          test -f build/mingw/libbvnr.dll
+          test -f build/mingw/libbvnr.dll.a
+          test -f build/mingw/bovnar.exe
           # No GCC runtime sidecar dependency (we link -static-libgcc -static).
-          if objdump -p build/libbvnr.dll | grep -iE 'libgcc_s|libwinpthread|libstdc\+\+'; then
+          if objdump -p build/mingw/libbvnr.dll | grep -iE 'libgcc_s|libwinpthread|libstdc\+\+'; then
             echo "DLL has an unexpected GCC runtime dependency" && exit 1
           fi
 
@@ -117,10 +117,10 @@ jobs:
         run: printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
 
       - name: smoke - validate (file)
-        run: ./build/bovnar.exe validate smoke.bvnr
+        run: ./build/mingw/bovnar.exe validate smoke.bvnr
 
       - name: smoke - pretty-print runs (file)
-        run: ./build/bovnar.exe pretty-print smoke.bvnr > pp.txt
+        run: ./build/mingw/bovnar.exe pretty-print smoke.bvnr > pp.txt
 
       - name: smoke - pretty-print output
         run: |
@@ -128,7 +128,7 @@ jobs:
           grep -q '<uint:8>' pp.txt
 
       - name: smoke - events (binary-mode stdin)
-        run: printf '.x = "hi";\n' | ./build/bovnar.exe events -
+        run: printf '.x = "hi";\n' | ./build/mingw/bovnar.exe events -
 
   mingw-tests:
     name: MinGW64 (tests)
@@ -156,15 +156,15 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Configure (Ninja, tests on)
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
+        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build/mingw
 
       - name: Test (ctest)
         # Exclude the deep/thorough fuzz variants (long-running stress versions of
         # the fuzz_smoke harnesses, which still run) to keep CI snappy.
-        run: ctest --test-dir build --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"
+        run: ctest --test-dir build/mingw --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"
 
   mingw-cross-wine:
     name: MinGW64 cross (Ubuntu + Wine)
@@ -255,16 +255,16 @@ jobs:
 
       - name: Configure (cross toolchain, Ninja, tests on)
         run: |
-          cmake -B build-mingw -G Ninja \
+          cmake -B build/mingw -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
             -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
           # Fail loudly if the toolchain did not pick Wine up as the test emulator.
-          grep -q '^CMAKE_CROSSCOMPILING_EMULATOR.*wine' build-mingw/CMakeCache.txt
+          grep -q '^CMAKE_CROSSCOMPILING_EMULATOR.*wine' build/mingw/CMakeCache.txt
 
       - name: Build
-        run: cmake --build build-mingw
+        run: cmake --build build/mingw
 
       - name: Test (ctest under Wine)
         # Same fuzz exclusion as the native job; ctest runs each .exe via the
         # CMAKE_CROSSCOMPILING_EMULATOR (wine) set by the toolchain file.
-        run: ctest --test-dir build-mingw --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"
+        run: ctest --test-dir build/mingw --output-on-failure --parallel "$(nproc)" -LE "fuzz_deep|fuzz_thorough"

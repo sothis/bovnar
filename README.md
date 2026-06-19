@@ -233,16 +233,17 @@ after install, run `update-mime-database <datadir>/mime` to register the `.bvnr`
 
 ### Windows (64-bit)
 
-Both 64-bit toolchains are supported; the same `cmake` invocation works:
+Both 64-bit toolchains are supported with the same `cmake` invocation; each
+builds into its own subdirectory so the two can coexist in one checkout:
 
 ```bash
 # MSVC (x64 Developer environment, or the Visual Studio generator)
-cmake -B build -A x64 .
-cmake --build build --config Release   # -> bvnr.dll + bvnr.lib, bvnr_static.lib, bovnar.exe
+cmake -B build/msvc -A x64 .
+cmake --build build/msvc --config Release   # -> bvnr.dll + bvnr.lib, bvnr_static.lib, bovnar.exe
 
 # MinGW64
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release .
-cmake --build build                    # -> libbvnr.dll + libbvnr.dll.a, libbvnr.a, bovnar.exe
+cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release .
+cmake --build build/mingw                   # -> libbvnr.dll + libbvnr.dll.a, libbvnr.a, bovnar.exe
 ```
 
 On MSVC the static archive is `bvnr_static.lib` because the DLL's import library
@@ -263,7 +264,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 | `bovnar query <path> <file>` | Print a single value by dotted path, e.g. `.sensor.temperature`. |
 | `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
 | `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |
-| `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream only — it does not re-emit the `#!bovnar` version directive, which is not an event, so its debug output may not re-parse for spec-1.1-gated values; use `pretty-print` for a faithful round-trip.) |
+| `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream and re-emits the source's `#!bovnar` version directive, so its debug output round-trips even for spec-1.1-gated values.) |
 | `bovnar frames pack\|list <file…\|->` | Wrap each document in a length-prefixed frame, or list the documents in a frame stream. |
 | `bovnar mux pack\|list <chan:file…\|->` | Multiplex files onto channels in one octet stream, or list the channel/message sizes in a multiplexed stream. |
 | `bovnar version` | Print the library version and supported spec version. |

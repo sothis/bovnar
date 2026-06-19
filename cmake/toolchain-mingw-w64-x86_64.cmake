@@ -2,9 +2,9 @@
 # from a Linux host (mirrors the MINGW64 leg of .github/workflows/windows.yml,
 # which builds natively under MSYS2). Use it for a local cross-build:
 #
-#   cmake -B build-mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
+#   cmake -B build/mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
 #         -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
-#   cmake --build build-mingw
+#   cmake --build build/mingw
 #
 # Produces libbvnr.a, libbvnr.dll (+ libbvnr.dll.a import lib) and bovnar.exe.
 # Tests stay OFF: the harness is POSIX (fork/exec, socketpair/pthread, sigaction)

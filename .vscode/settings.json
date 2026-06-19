@@ -1,5 +1,5 @@
 {
-  // Also build the MinGW-w64 Windows target (build-mingw/) whenever the native
+  // Also build the MinGW-w64 Windows target (build/mingw/) whenever the native
   // build is configured/built in VSCode (e.g. "CMake: Clean Reconfigure All
   // Projects" + "Build All Projects"). The CMakeLists.txt block gated on this
   // option auto-skips when the cross toolchain (x86_64-w64-mingw32-gcc) is not

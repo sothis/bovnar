@@ -383,7 +383,7 @@ endif()
 
 # Convenience: also drive the MinGW-w64 Windows cross-build as part of the
 # default ("all") target, so a single "build all" on a Linux host that has the
-# cross toolchain installed produces the Windows artifacts (build-mingw/) too.
+# cross toolchain installed produces the Windows artifacts (build/mingw/) too.
 # This is wired ON for the VSCode workspace (.vscode/settings.json passes
 # -DBVNR_CROSS_MINGW=ON) and is OFF by default everywhere else, so CI, the
 # Python wheel build, and plain command-line builds are unaffected. It is a
@@ -391,7 +391,7 @@ endif()
 # NOT CMAKE_CROSSCOMPILING guard stops the cross build from recursing into
 # itself. See cmake/toolchain-mingw-w64-x86_64.cmake.
 option(BVNR_CROSS_MINGW
-    "On a Linux host, also build the MinGW-w64 Windows target into build-mingw/ \
+    "On a Linux host, also build the MinGW-w64 Windows target into build/mingw/ \
 as part of 'all' when the cross toolchain is installed"
     OFF)
 if(BVNR_CROSS_MINGW
@@ -411,21 +411,21 @@ if(BVNR_CROSS_MINGW
         endif()
         ExternalProject_Add(bvnr_mingw_cross
             SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}
-            BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build-mingw
+            BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/mingw
             CMAKE_ARGS
                 -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain-mingw-w64-x86_64.cmake
                 -DCMAKE_BUILD_TYPE=${_bvnr_cross_build_type}
                 # Build the portable test subset too; it runs under Wine via the
-                # toolchain's CMAKE_CROSSCOMPILING_EMULATOR (ctest -C in build-mingw).
+                # toolchain's CMAKE_CROSSCOMPILING_EMULATOR (ctest -C in build/mingw).
                 -DBVNR_BUILD_TESTS=${BVNR_BUILD_TESTS}
                 -DBVNR_CROSS_MINGW=OFF
             BUILD_ALWAYS TRUE       # pick up source edits on every "build all"
-            INSTALL_COMMAND ""      # cross artifacts stay in build-mingw/
+            INSTALL_COMMAND ""      # cross artifacts stay in build/mingw/
             USES_TERMINAL_CONFIGURE TRUE
             USES_TERMINAL_BUILD TRUE)
         message(STATUS
             "BVNR_CROSS_MINGW: cross toolchain found (${BVNR_MINGW_GCC}); "
-            "'all' will also build the Windows target into build-mingw/")
+            "'all' will also build the Windows target into build/mingw/")
     else()
         message(STATUS
             "BVNR_CROSS_MINGW is ON but x86_64-w64-mingw32-gcc was not found; "

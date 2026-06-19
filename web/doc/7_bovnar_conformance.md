@@ -84,7 +84,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 │  │ verify key presence │            │ reference event log      │  │
 │  └─────────────────────┘            └──────────────────────────┘  │
 │                                                                   │
-│  Output: TAP v13 stream                                           │
+│  Output: TAP v14 stream                                           │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -442,7 +442,7 @@ specifies:
 | `version` | 13 | `#!bovnar M.N` directive: valid, malformed, strictness (spec 1.1) |
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 33 | Escapes, concatenation, UTF-8, limits |
-| `datetime` | 47 | Timestamp family: epochs, signed range, gating, ISO-8601 literals (spec 1.1) |
+| `datetime` | 50 | Timestamp family: epochs, signed range, gating, ISO-8601 literals (spec 1.1) |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
 | `types` | 52 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
@@ -459,7 +459,7 @@ specifies:
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 16 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **303** | |
+| **Total** | **306** | |
 
 ---
 

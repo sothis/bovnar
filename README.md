@@ -52,7 +52,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) approximates the C reference event stream (lenient: it does not synthesise default type annotations or perform type/value validation) and powers an interactive single-file web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 303-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 306-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -261,7 +261,8 @@ cmake --build build/mingw                   # -> libbvnr.dll + libbvnr.dll.a, li
 
 On MSVC the static archive is `bvnr_static.lib` because the DLL's import library
 already takes `bvnr.lib`. The C/Python test suite is POSIX-only and not built on
-Windows; the `Windows` CI workflow builds both toolchains and smoke-tests the CLI.
+Windows; the `Build & Package` CI workflow builds both Windows toolchains and a
+native Linux target, smoke-tests the CLI, and publishes the artifacts.
 Consumers passing their own file descriptors to the fd source/sink on Windows
 must open them in binary mode (`_O_BINARY`); the `bovnar` CLI does this itself.
 
@@ -379,7 +380,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 303-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 306-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 

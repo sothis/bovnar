@@ -173,7 +173,7 @@ to a newer version.
 
 It is recognised only as the very first comment (after an optional BOM and
 whitespace). A reader records the declared version
-(`bvnr_reader_get_declared_version`, `bovnar query`/`validate` report it, and
+(`bvnr_reader_get_declared_version`, `bovnar validate` reports it, and
 the Python `Reader.declared_version` / `bovnar.peek_version()` expose it), and a
 reader opened with `strict_version` rejects a version it does not support with
 `error_unsupported_spec_version`. A malformed directive is

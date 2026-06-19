@@ -808,7 +808,7 @@ Default `max_file_size` cap used by `Reader.read_file`.
 
 | Method | Description |
 |---|---|
-| `Writer.to_mem(buf=None, cap=262144, *, pretty=True)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
+| `Writer.to_mem(buf=None, cap=4194304, *, pretty=True)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
 | `Writer.to_fd(fd, *, pretty=True)` | Write to an open POSIX file descriptor. |
 | `Writer.to_file(path, *, pretty=True)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
 
@@ -1240,14 +1240,14 @@ unversioned document is treated as 1.0) are exposed as:
   plain `int` (signed epoch seconds). With `typed=True` it is a `Quantity` whose
   `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch.
   `dumps()` emits the `<datetime:…>` annotation and prepends `#!bovnar 1.1`
-  automatically when the object contains a datetime, so the **carrier**
-  round-trips losslessly. Note the high-level value is only the whole-second
-  carrier: the sub-second fraction of an ISO-8601 literal (spec 1.1) is *not*
-  part of the `int`/`Quantity` value, so `loads`→`dumps` drops it. To read or
-  round-trip the fraction use the DOM tier (`DomNode.datetime_fraction`) or the
-  streaming reader (`bvnr_data_t.frac_data` via a callback) — the C
-  pretty-printer preserves it because it re-serialises the event stream, not a
-  materialised value. `ValueTypeFamily.DATETIME` is the family enum member.
+  automatically when the object contains a datetime. With `typed=True` the
+  sub-second fraction of an ISO-8601 literal (spec 1.1) is preserved on the
+  `Quantity` and re-emitted, so a `loads(typed=True)`→`dumps()` round-trip is
+  lossless (`…T12:00:00.5Z` survives verbatim). The plain (non-typed) value is
+  only the whole-second `int` carrier, so a non-typed `loads`→`dumps` drops the
+  fraction; to read it explicitly use the DOM tier (`DomNode.datetime_fraction`)
+  or the streaming reader (`bvnr_data_t.frac_data` via a callback).
+  `ValueTypeFamily.DATETIME` is the family enum member.
 - **Reference array indexing:** `&.matrix[0][1]` paths are stored verbatim and
   resolved by `DomDoc.lookup("matrix[0][1]")` at the DOM layer.
 

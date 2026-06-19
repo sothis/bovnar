@@ -87,11 +87,12 @@ MinGW64 and MSVC — see *Windows build support* below.
   CRT and — critically for a binary format — forces binary mode on files and on
   stdin/stdout/stderr so no CRLF translation can corrupt the byte stream. On MSVC
   the static archive is `bvnr_static.lib` (the DLL import lib takes `bvnr.lib`);
-  MinGW keeps the unified `libbvnr` names. A new `Windows` CI workflow builds both
-  toolchains and smoke-tests the CLI.
+  MinGW keeps the unified `libbvnr` names. A new `Build & Package` CI workflow
+  builds both Windows toolchains and a native Linux target, smoke-tests the CLI,
+  and publishes the build + amalgamation artifacts.
 - **Tooling** — a `bovnar version` subcommand; the `datetime` keyword in all five
   syntax highlighters and the web playground; and a conformance suite grown to
-  **303 cases** (up from 207), adding the `version` and `datetime` groups —
+  **306 cases** (up from 207), adding the `version` and `datetime` groups —
   including the ISO-literal `DTLIT` cases — passing in both self-test and `--iut`
   modes.
 

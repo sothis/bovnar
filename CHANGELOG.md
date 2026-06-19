@@ -26,7 +26,7 @@ non-version remainder is reported as a malformed directive rather than ignored.
 - **Version directive** — an optional first-line `#!bovnar <major>.<minor>`
   comment declaring the spec version a document targets. Lexically it is a
   comment, so a 1.0 reader skips it; a 1.1+ reader records it
-  (`bvnr_reader_get_declared_version`, surfaced by `bovnar validate`/`query` and
+  (`bvnr_reader_get_declared_version`, surfaced by `bovnar validate` and
   the CLI `bovnar version`) and, with the `strict_version` read flag, rejects a
   version it does not support (`error_unsupported_spec_version`). A malformed
   directive is `error_invalid_spec_version`.
@@ -102,7 +102,7 @@ non-version remainder is reported as a malformed directive rather than ignored.
   full representable range via pure-Python encoders past the parser's cap.
 - **Tooling** — `bovnar version` subcommand; `datetime` keyword in all five
   syntax highlighters and the web playground; the conformance suite grew to
-  **303 cases** (groups `version`, `datetime` — including the ISO-literal
+  **306 cases** (groups `version`, `datetime` — including the ISO-literal
   `DTLIT` cases — plus escape/reference additions), passing in both self-test
   and `--iut` modes.
 - **Windows build support (64-bit MinGW64 and MSVC).** The library (`bvnr.dll` +
@@ -114,8 +114,10 @@ non-version remainder is reported as a malformed directive rather than ignored.
   exported via CMake `WINDOWS_EXPORT_ALL_SYMBOLS` (matching the export-all-extern
   behaviour on ELF). On MSVC the static archive is `bvnr_static.lib` (the DLL
   import lib takes `bvnr.lib`); MinGW keeps the unified `libbvnr` names. A new
-  `Windows` CI workflow builds both toolchains and smoke-tests the CLI. The POSIX
-  test harness (fork/exec IUT, socketpair, sigaction) is not built on Windows.
+  `Build & Package` CI workflow builds both Windows toolchains and a native Linux
+  target, smoke-tests the CLI, and publishes the build + amalgamation artifacts.
+  The POSIX test harness (fork/exec IUT, socketpair, sigaction) is not built on
+  Windows.
   The CLI's decorative UTF-8 UI (events/bench tables, box-drawing rules) renders
   on a real Windows console via `WriteConsoleW` — the CRT's byte path garbles
   multi-byte UTF-8 even with the console code page set to UTF-8 — while piped or
@@ -157,7 +159,7 @@ non-version remainder is reported as a malformed directive rather than ignored.
   --libs bvnr`) and a **CMake package** (`find_package(bovnar)` →
   `bovnar::bvnr` / `bovnar::bvnr_static`). Previously only the freedesktop MIME
   entry was installed, so the soname/headers were built but never laid down.
-- **Conformance output upgraded to TAP version 14.** The 303 cases are now grouped
+- **Conformance output upgraded to TAP version 14.** The 306 cases are now grouped
   into TAP 14 *subtests* — one indented child stream per case group (21 groups),
   each with its own plan and rolled up into a parent test point — so the report is
   hierarchical instead of a flat list. The parent plan counts groups (`1..21`);

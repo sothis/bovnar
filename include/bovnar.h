@@ -199,8 +199,9 @@ typedef enum error_code_e {
 	/* spec 1.1 — an ISO-8601 datetime literal (e.g. 2026-06-15T12:00:00Z) is
 	 * malformed: a field has the wrong width, a separator is misplaced, or a
 	 * component is out of range (month 1–12, a valid day-of-month, hour 0–23,
-	 * minute/second 0–59). Accepted shapes are YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS
-	 * and …Z (UTC). */
+	 * minute 0–59, second 0–60 — 60 is a UTC leap second). Accepted shapes are
+	 * YYYY-MM-DD and YYYY-MM-DDTHH:MM:SS, each with an optional fractional second
+	 * and an optional trailing `Z` (UTC) or numeric `±HH:MM` offset. */
 	error_invalid_datetime_literal      = 45,
 	/* spec 1.1 — an ISO-8601 datetime literal was given for an atomic GNSS
 	 * epoch (gps, galileo, glonass, beidou). Those scales have no

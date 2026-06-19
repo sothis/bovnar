@@ -419,6 +419,9 @@ if(BVNR_CROSS_MINGW
                 # toolchain's CMAKE_CROSSCOMPILING_EMULATOR (ctest -C in build/mingw).
                 -DBVNR_BUILD_TESTS=${BVNR_BUILD_TESTS}
                 -DBVNR_CROSS_MINGW=OFF
+                # The outer (native) build packs the cross artifacts from
+                # build/mingw; the inner build must not recurse into packaging.
+                -DBVNR_PACKAGE=OFF
             BUILD_ALWAYS TRUE       # pick up source edits on every "build all"
             INSTALL_COMMAND ""      # cross artifacts stay in build/mingw/
             USES_TERMINAL_CONFIGURE TRUE
@@ -431,5 +434,55 @@ if(BVNR_CROSS_MINGW
             "BVNR_CROSS_MINGW is ON but x86_64-w64-mingw32-gcc was not found; "
             "skipping the Windows cross-build "
             "(install the mingw-w64 toolchain to enable it)")
+    endif()
+endif()
+
+# On every build, regenerate the single-file amalgamation into
+# <build>/amalgamate and pack release archives into <build>:
+#   bovnar-<version>-<count>-amalgamate.tar.xz   (the amalgamation)
+#   bovnar-linux-<version>-<count>.tar.xz        (Linux artifacts)
+#   bovnar-windows-<version>-<count>.zip         (native or cross MinGW artifacts)
+# <count> is the git commit count. The platform archive matches the current
+# build; on a Linux host the Windows .zip is packed from the BVNR_CROSS_MINGW
+# build (build/mingw) when present. Skipped for the Python wheel build (SKBUILD)
+# and disabled in the inner cross build (BVNR_PACKAGE=OFF above). See
+# cmake/pack_artifacts.cmake.
+option(BVNR_PACKAGE
+    "On each build, regenerate the amalgamation and pack release archives into the build dir"
+    ON)
+if(BVNR_PACKAGE AND NOT SKBUILD)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    set(_bvnr_pkg_py "")
+    if(Python3_FOUND)
+        set(_bvnr_pkg_py "${Python3_EXECUTABLE}")
+    endif()
+    if(MSVC)
+        set(_bvnr_pkg_kind msvc)
+    elseif(WIN32)
+        set(_bvnr_pkg_kind mingw)
+    else()
+        set(_bvnr_pkg_kind linux)
+    endif()
+    # On a Linux host the BVNR_CROSS_MINGW superbuild drops Windows artifacts in
+    # build/mingw; point the packer at them so it can also emit the .zip.
+    set(_bvnr_pkg_cross "")
+    if(BVNR_CROSS_MINGW AND NOT WIN32 AND NOT CMAKE_CROSSCOMPILING)
+        set(_bvnr_pkg_cross "${CMAKE_CURRENT_SOURCE_DIR}/build/mingw")
+    endif()
+    add_custom_target(bvnr_package ALL
+        COMMAND ${CMAKE_COMMAND}
+            -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DBIN_DIR=${CMAKE_BINARY_DIR}
+            -DVERSION=${PROJECT_VERSION}
+            -DPYTHON=${_bvnr_pkg_py}
+            -DNATIVE_KIND=${_bvnr_pkg_kind}
+            -DCROSS_DIR=${_bvnr_pkg_cross}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pack_artifacts.cmake
+        VERBATIM
+        COMMENT "Regenerating amalgamation + packing release archives")
+    # Pack only after the artifacts exist.
+    add_dependencies(bvnr_package bvnr_static bvnr_shared bovnar)
+    if(TARGET bvnr_mingw_cross)
+        add_dependencies(bvnr_package bvnr_mingw_cross)
     endif()
 endif()

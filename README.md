@@ -182,6 +182,18 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release .
 cmake --build build
 ```
 
+Every build also regenerates the single-file amalgamation into `build/amalgamate/`
+(`bovnar.h` + `bovnar.c`) and packs release archives into the build directory
+(`<count>` is the git commit count):
+
+| Archive | Contents |
+|---|---|
+| `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`) |
+| `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers |
+| `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host) |
+
+Disable with `-DBVNR_PACKAGE=OFF`.
+
 ### Build options
 
 | Option | Default | Effect |
@@ -190,6 +202,7 @@ cmake --build build
 | `BVNR_WERROR` | `OFF` | Promote all warnings to errors (for CI). |
 | `BVNR_FUZZ_TEST` | `ON` | Build the self-contained fuzz harnesses and register them as CTest tests. |
 | `BVNR_FUZZ_EXTERNAL` | `OFF` | Build libFuzzer / AFL++ targets (requires clang or afl-clang-fast). |
+| `BVNR_PACKAGE` | `ON` | On each build, regenerate the amalgamation into `build/amalgamate/` and pack release archives into the build dir. |
 
 ```bash
 cmake -B build -DBVNR_WERROR=ON .

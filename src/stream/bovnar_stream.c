@@ -240,12 +240,19 @@ bool bvnr_doc_stream_read(
 		error_code_t err = bvnr_reader_get_error(r);
 		free(buf);
 
+		/* Count the document the moment it has been read and parsed, *before*
+		 * any abort path. This keeps *out_count consistent across both ways a
+		 * sequence can stop: a parse failure and an on_document veto now both
+		 * include the document they acted on, so the count is "documents seen"
+		 * regardless of which abort fired. */
+		uint64_t doc_index = index;
+		index++;
+
 		if (opts && opts->on_document) {
-			if (!opts->on_document(opts->userdata, index, ok, err)) {
+			if (!opts->on_document(opts->userdata, doc_index, ok, err)) {
 				result = false; break;
 			}
 		}
-		index++;
 
 		/* A failed document aborts the sequence unless the caller opted into
 		 * inter-document resilience. This is orthogonal to the inner reader's

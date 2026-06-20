@@ -31,6 +31,13 @@
  *   4. doc-in-document   — embed + recursive parse round-trip
  */
 
+/* Must precede every system header (glibc latches feature-test macros on the
+ * first include): selects the POSIX 2008 surface the fd-framing test needs
+ * (fork/pipe/waitpid/nanosleep). Ignored by MSVC, where that test is excluded. */
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#  define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -38,6 +45,15 @@
 #include <string.h>
 #include "bovnar.h"
 #include "bovnar_stream.h"
+
+/* The framing-over-a-real-fd test drives bvnr_doc_stream_read across forced
+ * short reads, which needs fork(2)/pipe(2)/usleep(3) — POSIX only. On Windows it
+ * is compiled out (the in-memory framing tests still cover the codec there). */
+#if !defined(_WIN32)
+#  include <time.h>
+#  include <unistd.h>
+#  include <sys/wait.h>
+#endif
 
 static int g_failures = 0;
 static int g_tests    = 0;
@@ -1020,6 +1036,161 @@ static void test_doc_in_doc(void)
 				"inner document name recovered");
 }
 
+/* A single octet chunk may carry more than one complete message (a future
+ * "packed" producer); bvnr_mux_send never packs, so this path is otherwise
+ * unexercised. demux_feed must loop within the fragment, delivering each
+ * message in order. Hand-build one fragment holding two messages on one channel. */
+static void test_demux_packed_messages(void)
+{
+	printf("  test_demux_packed_messages...\n");
+	mux_capture_t mc = {0};
+	bvnr_demux_t *dm = bvnr_demux_create(mux_on_msg, &mc, 0);
+	bvnr_data_t empty = {0};
+	uint8_t frag[64];
+	uint32_t off = 0;
+
+	/* channel 3, then msg "AB" (len 2), then msg "CDE" (len 3) — all packed. */
+	off  = test_varint_encode(3u, frag);
+	off += test_varint_encode(2u, frag + off); frag[off++] = 'A'; frag[off++] = 'B';
+	off += test_varint_encode(3u, frag + off);
+	frag[off++] = 'C'; frag[off++] = 'D'; frag[off++] = 'E';
+
+	bvnr_demux_on_event(dm, ev_octet_stream_start, &empty);
+	bvnr_data_t d = { .type = token_is_octet_stream, .data = frag, .length = off };
+	bool fed = bvnr_demux_on_event(dm, ev_data, &d);
+	bvnr_demux_on_event(dm, ev_octet_stream_end, &empty);
+
+	ASSERT_TRUE(fed, "packed fragment feeds cleanly");
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_none, "no desync from packed messages");
+	ASSERT_EQ_UINT(mc.n, 2, "both packed messages delivered");
+	if (mc.n == 2) {
+		ASSERT_EQ_UINT(mc.channels[0], 3, "packed msg0 channel");
+		ASSERT_TRUE(strcmp(mc.payloads[0], "AB") == 0, "packed msg0 payload");
+		ASSERT_EQ_UINT(mc.channels[1], 3, "packed msg1 channel");
+		ASSERT_TRUE(strcmp(mc.payloads[1], "CDE") == 0, "packed msg1 payload");
+	}
+	bvnr_demux_destroy(dm);
+}
+
+/* Regression: a document the on_document callback vetoes (returns false) must
+ * still be counted in *out_count — the same as a parse-failure abort, which
+ * counts the document it stops on. Pins the counting consistency between the two
+ * abort paths. */
+static bool veto_first_on_document(void *ud, uint64_t index, bool ok, error_code_t err)
+{
+	(void)ud; (void)ok; (void)err;
+	return index != 0;   /* veto the very first document */
+}
+static void test_frames_on_document_veto_counts(void)
+{
+	printf("  test_frames_on_document_veto_counts...\n");
+	uint8_t big[2048], doc[256];
+	uint64_t n = build_doc(doc, sizeof(doc), 1);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, big, sizeof(big));
+	(void)(bvnr_frame_write(&sink, doc, n) && bvnr_frame_write(&sink, doc, n));
+	uint64_t total = bvnr_sink_bytes_written(&sink);
+
+	bvnr_doc_stream_opts_t opts = { .on_document = veto_first_on_document };
+	bvnr_source_t src;
+	bvnr_source_from_mem(&src, big, total);
+	uint64_t count = 0;
+	bool ok = bvnr_doc_stream_read(&src, &opts, &count);
+
+	ASSERT_TRUE(!ok, "on_document veto aborts the sequence");
+	ASSERT_EQ_UINT(count, 1, "the vetoed document is counted (parity with parse-fail abort)");
+}
+
+#if !defined(_WIN32)
+/* Drive the multi-document framing over a real pipe fd with forced short reads:
+ * a child dribbles the framed stream 3 bytes at a time, so bvn_src_read_exact
+ * and the geometric grow-buffer must loop over partial pulls across both the
+ * frame header and the payload. The in-memory tests cannot exercise this because
+ * the memory source returns every requested byte in one pull. */
+typedef struct { int n; uint32_t ids[8]; char pend[32]; } fd_ctx_t;
+static bool fd_outer_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	fd_ctx_t *c = ud;
+	if (ev == ev_assignment_start) {
+		memset(c->pend, 0, sizeof(c->pend));
+		if (d->length && d->length < sizeof(c->pend)) {
+			memcpy(c->pend, d->data, d->length);
+			c->pend[d->length] = '\0';
+		}
+	} else if (ev == ev_data && strcmp(c->pend, "id") == 0 && d->data && d->length) {
+		char tmp[16];
+		uint32_t k = d->length < 15u ? d->length : 15u;
+		memcpy(tmp, d->data, k); tmp[k] = '\0';
+		if (c->n < 8) c->ids[c->n] = (uint32_t)strtoul(tmp, NULL, 10);
+	}
+	return true;
+}
+static bool fd_on_document(void *ud, uint64_t index, bool ok, error_code_t err)
+{
+	(void)index; (void)err;
+	fd_ctx_t *c = ud;
+	if (ok && c->n < 8) c->n++;
+	return true;
+}
+static void test_frames_over_fd_short_reads(void)
+{
+	printf("  test_frames_over_fd_short_reads...\n");
+	const uint32_t ids[4] = { 11, 22, 33, 44 };
+
+	uint8_t stream[4096];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, stream, sizeof(stream));
+	bool built = true;
+	for (int i = 0; i < 4; i++) {
+		uint8_t doc[256];
+		uint64_t dn = build_doc(doc, sizeof(doc), ids[i]);
+		built = built && dn > 0 && bvnr_frame_write(&sink, doc, dn);
+	}
+	ASSERT_TRUE(built, "four documents framed for the fd test");
+	uint64_t total = bvnr_sink_bytes_written(&sink);
+
+	int p[2];
+	ASSERT_TRUE(pipe(p) == 0, "pipe created");
+	pid_t pid = fork();
+	ASSERT_TRUE(pid >= 0, "fork succeeds");
+	if (pid == 0) {                       /* child: dribble 3 bytes at a time */
+		close(p[0]);
+		for (uint64_t off = 0; off < total; ) {
+			uint64_t step = total - off < 3u ? total - off : 3u;
+			ssize_t wn = write(p[1], stream + off, (size_t)step);
+			if (wn <= 0) _exit(1);
+			off += (uint64_t)wn;
+			/* Widen the short-read window so the parent's read() loop sees
+			 * partial frames. nanosleep (not usleep, which POSIX 2008 dropped). */
+			nanosleep(&(struct timespec){ .tv_nsec = 200000 }, NULL);
+		}
+		close(p[1]);
+		_exit(0);
+	}
+	close(p[1]);
+
+	fd_ctx_t c = {0};
+	bvnr_read_flags_t fl = { .on_verified = fd_outer_cb, .on_error = on_err, .userdata = &c };
+	bvnr_doc_stream_opts_t opts = { .flags = &fl, .on_document = fd_on_document, .userdata = &c };
+	bvnr_source_t src;
+	bvnr_source_from_fd(&src, p[0]);
+	uint64_t count = 0;
+	bool ok = bvnr_doc_stream_read(&src, &opts, &count);
+	close(p[0]);
+	int st = 0;
+	waitpid(pid, &st, 0);
+
+	ASSERT_TRUE(ok, "framing reassembles across forced short reads");
+	ASSERT_EQ_UINT(count, 4, "all four frames read over the dribbled pipe");
+	ASSERT_EQ_UINT(c.n, 4, "all four documents parsed over the pipe");
+	for (int i = 0; i < 4 && i < c.n; i++) {
+		char msg[40];
+		snprintf(msg, sizeof(msg), "fd doc %d id == %u", i, ids[i]);
+		ASSERT_EQ_UINT(c.ids[i], ids[i], msg);
+	}
+}
+#endif /* !_WIN32 */
+
 int main(void)
 {
 	printf("Running bovnar_stream_test suite...\n");
@@ -1028,6 +1199,7 @@ int main(void)
 	test_octet_mux();
 	test_demux_truncated_stream_reset();
 	test_demux_overlong_varint_rejected();
+	test_demux_packed_messages();
 	test_octet_mux_large();
 	test_octet_mux_boundaries();
 	test_octet_mux_empty();
@@ -1039,6 +1211,10 @@ int main(void)
 	test_frames_abort_on_error();
 	test_frames_continue_on_error();
 	test_frames_continue_past_failed();
+	test_frames_on_document_veto_counts();
+#if !defined(_WIN32)
+	test_frames_over_fd_short_reads();
+#endif
 	test_doc_in_doc();
 
 	if (g_failures == 0) {

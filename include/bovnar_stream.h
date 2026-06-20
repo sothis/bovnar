@@ -106,9 +106,11 @@ typedef struct bvnr_doc_stream_opts_s {
 	 * continue_past_failed below, which controls *inter*-document behaviour. */
 	bvnr_read_flags_t*	flags;
 	void*			userdata;
-	/* Invoked after each document is parsed (may be NULL). `ok` is the parse
-	 * result and `err` the reader's error code. Return false to abort the
-	 * sequence early. */
+	/* Invoked after each document is parsed (may be NULL). `index` is the
+	 * document's 0-based position, `ok` the parse result and `err` the reader's
+	 * error code. Return false to abort the sequence early; a document the
+	 * callback vetoes is still counted in *out_count (it was seen), matching the
+	 * parse-failure abort path. */
 	bool			(*on_document)(void* userdata, uint64_t index,
 					bool ok, error_code_t err);
 	/* Inter-document resilience. Because each document occupies its own

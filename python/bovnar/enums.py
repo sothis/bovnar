@@ -436,7 +436,7 @@ class BaseUnit(IntEnum):
     TRX  = 312  # TRON                - minor unit: 6
     EOS  = 313  # EOS                 - minor unit: 4
     VET  = 314  # VeChain             - minor unit: 18
-    NEO  = 315  # Neo                 - minor unit: 8
+    NEO  = 315  # Neo                 - minor unit: 0
     ZEC  = 316  # Zcash               - minor unit: 8
     UNI  = 317  # Uniswap             - minor unit: 18
     ARB  = 318  # Arbitrum            - minor unit: 18
@@ -512,7 +512,14 @@ class BaseUnit(IntEnum):
     PPM                = 376
     PPB                = 377
 
-    _SENTINEL = 378
+    # Appended currencies (378-379). Placed after the unit block, not inside the
+    # 134-347 currency region, so adding them shifts no existing enum value
+    # (ABI-stable). Recognised as fiat via CURRENCY_EXT_* below.
+
+    ZWG  = 378  # Zimbabwe Gold       - minor unit: 2
+    XCG  = 379  # Caribbean Guilder   - minor unit: 2
+
+    _SENTINEL = 380
 
 
 # Currency-range sentinels (mirrors C #defines)
@@ -521,6 +528,8 @@ CURRENCY_FIAT_FIRST   = BaseUnit.AED
 CURRENCY_FIAT_LAST    = BaseUnit.ZWL
 CURRENCY_CRYPTO_FIRST = BaseUnit.BTC
 CURRENCY_CRYPTO_LAST  = BaseUnit.RUNE
+CURRENCY_EXT_FIRST    = BaseUnit.ZWG
+CURRENCY_EXT_LAST     = BaseUnit.XCG
 
 
 class Exponent(IntEnum):

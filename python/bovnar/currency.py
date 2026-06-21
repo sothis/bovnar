@@ -57,7 +57,8 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from .enums import BaseUnit, CURRENCY_FIAT_FIRST, CURRENCY_FIAT_LAST, \
-                   CURRENCY_CRYPTO_FIRST, CURRENCY_CRYPTO_LAST
+                   CURRENCY_CRYPTO_FIRST, CURRENCY_CRYPTO_LAST, \
+                   CURRENCY_EXT_FIRST, CURRENCY_EXT_LAST
 
 
 # ── Metadata record ────────────────────────────────────────────────────────
@@ -254,6 +255,12 @@ _row(BaseUnit.ZAR, "ZAR", 710, 2, False, "South African Rand")
 _row(BaseUnit.ZMW, "ZMW", 967, 2, False, "Zambian Kwacha")
 _row(BaseUnit.ZWL, "ZWL", 932, 2, False, "Zimbabwean Dollar")
 
+# Appended fiat currencies (enum 378-379, see CURRENCY_EXT_* in enums.py).
+# Added after the 134-347 block was frozen, so they live past the unit block to
+# keep existing enum values stable.  XCG inherits ANG's numeric code 532.
+_row(BaseUnit.ZWG, "ZWG", 924, 2, False, "Zimbabwe Gold")
+_row(BaseUnit.XCG, "XCG", 532, 2, False, "Caribbean Guilder")
+
 # Cryptocurrencies
 _row(BaseUnit.BTC,  "BTC",  0,  8, True, "Bitcoin")
 _row(BaseUnit.ETH,  "ETH",  0, 18, True, "Ethereum")
@@ -272,7 +279,7 @@ _row(BaseUnit.ICP,  "ICP",  0,  8, True, "Internet Computer")
 _row(BaseUnit.TRX,  "TRX",  0,  6, True, "TRON")
 _row(BaseUnit.EOS,  "EOS",  0,  4, True, "EOS")
 _row(BaseUnit.VET,  "VET",  0, 18, True, "VeChain")
-_row(BaseUnit.NEO,  "NEO",  0,  8, True, "Neo")
+_row(BaseUnit.NEO,  "NEO",  0,  0, True, "Neo")
 _row(BaseUnit.ZEC,  "ZEC",  0,  8, True, "Zcash")
 _row(BaseUnit.UNI,  "UNI",  0, 18, True, "Uniswap")
 _row(BaseUnit.ARB,  "ARB",  0, 18, True, "Arbitrum")
@@ -311,12 +318,14 @@ _row(BaseUnit.RUNE, "RUNE", 0,  8, True, "THORChain")
 
 def is_currency(base: BaseUnit) -> bool:
     """True if base is any fiat, precious metal, or crypto currency."""
-    return int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_CRYPTO_LAST)
+    return (int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_CRYPTO_LAST)
+            or int(CURRENCY_EXT_FIRST) <= int(base) <= int(CURRENCY_EXT_LAST))
 
 
 def is_fiat(base: BaseUnit) -> bool:
     """True if base is an ISO 4217 fiat currency or precious metal."""
-    return int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_FIAT_LAST)
+    return (int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_FIAT_LAST)
+            or int(CURRENCY_EXT_FIRST) <= int(base) <= int(CURRENCY_EXT_LAST))
 
 
 def is_crypto(base: BaseUnit) -> bool:

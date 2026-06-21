@@ -65,6 +65,8 @@ from bovnar.enums import (
     CURRENCY_FIAT_LAST,
     CURRENCY_CRYPTO_FIRST,
     CURRENCY_CRYPTO_LAST,
+    CURRENCY_EXT_FIRST,
+    CURRENCY_EXT_LAST,
 )
 from bovnar.currency import (
     CurrencyInfo,
@@ -85,8 +87,9 @@ from bovnar.currency import (
 # ── helpers ────────────────────────────────────────────────────────────────
 
 def _all_currency_bases() -> list[BaseUnit]:
-    return [b for b in BaseUnit if int(b) in range(
-        int(CURRENCY_FIAT_FIRST), int(CURRENCY_CRYPTO_LAST) + 1)]
+    main = range(int(CURRENCY_FIAT_FIRST), int(CURRENCY_CRYPTO_LAST) + 1)
+    ext = range(int(CURRENCY_EXT_FIRST), int(CURRENCY_EXT_LAST) + 1)
+    return [b for b in BaseUnit if int(b) in main or int(b) in ext]
 
 
 # ── TestEnumContiguity ─────────────────────────────────────────────────────
@@ -105,7 +108,7 @@ class TestEnumContiguity:
         assert int(CURRENCY_CRYPTO_LAST) == 347
 
     def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 378
+        assert int(BaseUnit._SENTINEL) == 380
 
     def test_fiat_range_size(self):
         assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 164
@@ -114,7 +117,7 @@ class TestEnumContiguity:
         assert int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_CRYPTO_FIRST) + 1 == 50
 
     def test_total_currency_count(self):
-        assert len(_all_currency_bases()) == 214
+        assert len(_all_currency_bases()) == 216  # 214 main block + 2 ext
 
     def test_no_gap_between_fiat_and_crypto(self):
         assert int(CURRENCY_CRYPTO_FIRST) == int(CURRENCY_FIAT_LAST) + 1
@@ -122,6 +125,19 @@ class TestEnumContiguity:
     def test_physical_units_end_before_fiat(self):
         assert int(BaseUnit.BUSHEL) == 133
         assert int(CURRENCY_FIAT_FIRST) == 134
+
+    def test_ext_currency_values(self):
+        assert int(BaseUnit.ZWG) == 378
+        assert int(BaseUnit.XCG) == 379
+        assert int(CURRENCY_EXT_FIRST) == 378
+        assert int(CURRENCY_EXT_LAST) == 379
+
+    def test_ext_segment_follows_unit_block(self):
+        # The extension segment sits just past the last unit (PPB=377), not
+        # inside the 134-347 currency region — that placement is what keeps every
+        # existing enum value stable when a currency is added.
+        assert int(BaseUnit.PPB) == 377
+        assert int(CURRENCY_EXT_FIRST) == int(BaseUnit.PPB) + 1
 
 
 # ── TestFiatMetadata ───────────────────────────────────────────────────────
@@ -148,6 +164,8 @@ class TestFiatMetadata:
         ("XPT", 962, 0, "Platinum"),
         ("XPD", 964, 0, "Palladium"),
         ("XDR", 960, 0, "Drawing"),
+        ("ZWG", 924, 2, "Zimbabwe"),   # ext segment (enum 378)
+        ("XCG", 532, 2, "Caribbean"),  # ext segment (enum 379); shares ANG's 532
     ])
     def test_fiat_metadata(self, code, num, mu, name_fragment):
         base = from_code(code)
@@ -304,13 +322,13 @@ class TestReverseCodeLookup:
 
 class TestIterators:
     def test_all_fiat_count(self):
-        assert sum(1 for _ in all_fiat()) == 164
+        assert sum(1 for _ in all_fiat()) == 166  # 164 main + ZWG + XCG
 
     def test_all_crypto_count(self):
         assert sum(1 for _ in all_crypto()) == 50
 
     def test_all_currencies_count(self):
-        assert sum(1 for _ in all_currencies()) == 214
+        assert sum(1 for _ in all_currencies()) == 216
 
     def test_all_fiat_are_not_crypto(self):
         for info in all_fiat():
@@ -383,6 +401,12 @@ class TestCryptoMinorUnits:
 
     def test_eos_four_decimals(self):
         assert minor_unit(BaseUnit.EOS) == 4
+
+    def test_neo_is_indivisible(self):
+        # NEO is the lone crypto with 0 minor units: it cannot be held or
+        # transferred fractionally (1 NEO is the smallest unit). The 8 decimals
+        # belong to its companion gas token, not NEO itself.
+        assert minor_unit(BaseUnit.NEO) == 0
 
     def test_usdt_six_decimals(self):
         assert minor_unit(BaseUnit.USDT) == 6
@@ -474,18 +498,18 @@ class TestCurrencyCodeUnique:
 class TestEnumCoverageComplete:
     def test_every_currency_base_has_table_entry(self):
         missing = []
-        for base in BaseUnit:
-            if int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_CRYPTO_LAST):
-                try:
-                    currency_info(base)
-                except KeyError:
-                    missing.append(base)
+        for base in _all_currency_bases():
+            try:
+                currency_info(base)
+            except KeyError:
+                missing.append(base)
         assert not missing, f"Missing table entries: {missing}"
 
     def test_table_size_matches_enum_range(self):
-        n_enum = int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_FIAT_FIRST) + 1
+        n_main = int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_FIAT_FIRST) + 1
+        n_ext = int(CURRENCY_EXT_LAST) - int(CURRENCY_EXT_FIRST) + 1
         n_table = sum(1 for _ in all_currencies())
-        assert n_table == n_enum
+        assert n_table == n_main + n_ext
 
 
 # ── TestPhysicalUnitCollisions ─────────────────────────────────────────────
@@ -551,11 +575,13 @@ class TestPhysicalUnitCollisions:
 
 
 class TestBaseUnitSentinel:
-    def test_sentinel_is_378(self):
-        assert int(BaseUnit._SENTINEL) == 378
+    def test_sentinel_is_380(self):
+        assert int(BaseUnit._SENTINEL) == 380
 
-    def test_sentinel_is_one_past_last_unit(self):
-        assert int(BaseUnit._SENTINEL) == int(BaseUnit.PPB) + 1
+    def test_sentinel_is_one_past_last_enum_member(self):
+        # XCG (the last appended currency) is now the final real enumerator,
+        # past the unit block; the sentinel is one beyond it.
+        assert int(BaseUnit._SENTINEL) == int(BaseUnit.XCG) + 1
 
 
 # ── TestPrefixRulesC ───────────────────────────────────────────────────────

@@ -474,6 +474,8 @@ CURRENCY_TOKENS: dict[int, str] = {
     345: 'JUP',
     346: 'PYTH',
     347: 'RUNE',
+    378: 'ZWG',
+    379: 'XCG',
 }
 
 # One independent pint dimension per currency => members are non-convertible.
@@ -692,6 +694,9 @@ CURRENCY_DEFINITIONS: list[str] = [
     'JUP = [currency_JUP]',
     'PYTH = [currency_PYTH]',
     'RUNE = [currency_RUNE]',
+    # Appended fiat (enum 378-379)
+    'ZWG = [currency_ZWG]',
+    'XCG = [currency_XCG]',
 ]
 
 
@@ -708,7 +713,7 @@ def build_registry(reg=None, *, with_currencies: bool = True):
     """Return a pint UnitRegistry with bovnar's custom units registered.
 
     Pass an existing registry to extend it, or None to create a fresh one.
-    Set with_currencies=False to skip the 214 currency dimensions (e.g. when
+    Set with_currencies=False to skip the 216 currency dimensions (e.g. when
     the caller prefers to reject currency-typed data in the pint path).
     """
     import pint

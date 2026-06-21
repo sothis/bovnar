@@ -27,7 +27,9 @@
 #include <string.h>
 #define N_FIAT   (BVN_CURRENCY_FIAT_LAST  - BVN_CURRENCY_FIAT_FIRST  + 1)
 #define N_CRYPTO (BVN_CURRENCY_CRYPTO_LAST - BVN_CURRENCY_CRYPTO_FIRST + 1)
-#define N_TOTAL  (N_FIAT + N_CRYPTO)
+#define N_MAIN   (N_FIAT + N_CRYPTO)
+#define N_EXT    (BVN_CURRENCY_EXT_LAST    - BVN_CURRENCY_EXT_FIRST   + 1)
+#define N_TOTAL  (N_MAIN + N_EXT)
 /*
  * ===========================================================================
  * Currency catalogue
@@ -35,14 +37,18 @@
  *
  * bovnar treats currencies as base units, so a money value carries its currency
  * the way a length carries metres. This table is the catalogue: ISO 4217 fiat
- * currencies first, then a list of crypto assets. CRITICAL INVARIANT: the
- * table is laid out so that a currency's value_base_unit_t enum value equals
- * BVN_CURRENCY_FIAT_FIRST + its index here. Every lookup below is therefore a
- * direct O(1) index (base - BVN_CURRENCY_FIAT_FIRST) rather than a search — so
- * the ordering of this array must stay in lockstep with the enum. Each entry
- * records the ISO numeric code (0 for crypto), the minor-unit digit count (e.g.
- * 2 for cents, 0 for yen, 18 for ether — used by float_dec/currency formatting),
- * whether it is crypto, and a human name.
+ * currencies first, then a list of crypto assets, then an appended "extension"
+ * segment for currencies added after the main block was frozen. CRITICAL
+ * INVARIANT: for the first N_MAIN entries a currency's value_base_unit_t enum
+ * value equals BVN_CURRENCY_FIAT_FIRST + its index here, so a lookup is a direct
+ * O(1) index (base - BVN_CURRENCY_FIAT_FIRST). The trailing N_EXT entries break
+ * that 1:1 relation (their enum values are BVN_CURRENCY_EXT_FIRST..,placed past
+ * the unit block for ABI stability), so all index math goes through
+ * bvn_currency_index() below. The ordering of this array must stay in lockstep
+ * with the enum within each segment. Each entry records the ISO numeric code (0
+ * for crypto), the minor-unit digit count (e.g. 2 for cents, 0 for yen, 18 for
+ * ether — used by float_dec/currency formatting), whether it is crypto, and a
+ * human name.
  */
 static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   { "AED", 784, 2, false, "UAE Dirham" },
@@ -226,7 +232,7 @@ static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   { "TRX",   0,  6, true,  "TRON" },
   { "EOS",   0,  4, true,  "EOS" },
   { "VET",   0, 18, true,  "VeChain" },
-  { "NEO",   0,  8, true,  "Neo" },
+  { "NEO",   0,  0, true,  "Neo" },
   { "ZEC",   0,  8, true,  "Zcash" },
   { "UNI",   0, 18, true,  "Uniswap" },
   { "ARB",   0, 18, true,  "Arbitrum" },
@@ -259,45 +265,71 @@ static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   { "JUP",   0,  6, true,  "Jupiter" },
   { "PYTH",  0,  6, true,  "Pyth Network" },
   { "RUNE",  0,  8, true,  "THORChain" },
+  /*
+   * Extension segment (enum BVN_CURRENCY_EXT_FIRST..). Appended here rather than
+   * inserted alphabetically so existing enum values never shift. XCG inherits
+   * ANG's ISO numeric code 532 by design (it replaced ANG).
+   */
+  { "ZWG", 924, 2, false, "Zimbabwe Gold" },
+  { "XCG", 532, 2, false, "Caribbean Guilder" },
 };
 /*
- * Range predicates over the currency enum block. Because fiat and crypto occupy
- * contiguous enum ranges, "is this base a currency / fiat / crypto" is just a
- * bounds check — no table access needed.
+ * Range predicates over the currency enum block. Fiat and crypto occupy
+ * contiguous enum ranges, and the extension segment (EXT_FIRST..EXT_LAST, all
+ * fiat) is a second small range past the unit block; "is this base a currency /
+ * fiat / crypto" is therefore a bounds check — no table access needed.
  */
 bool bvn_unit_is_currency(int base)
 {
-    return (base >= BVN_CURRENCY_FIAT_FIRST && base <= BVN_CURRENCY_CRYPTO_LAST);
+    return (base >= BVN_CURRENCY_FIAT_FIRST && base <= BVN_CURRENCY_CRYPTO_LAST) ||
+           (base >= BVN_CURRENCY_EXT_FIRST  && base <= BVN_CURRENCY_EXT_LAST);
 }
 bool bvn_unit_is_fiat(int base)
 {
-    return (base >= BVN_CURRENCY_FIAT_FIRST && base <= BVN_CURRENCY_FIAT_LAST);
+    return (base >= BVN_CURRENCY_FIAT_FIRST && base <= BVN_CURRENCY_FIAT_LAST) ||
+           (base >= BVN_CURRENCY_EXT_FIRST  && base <= BVN_CURRENCY_EXT_LAST);
 }
 bool bvn_unit_is_crypto(int base)
 {
     return (base >= BVN_CURRENCY_CRYPTO_FIRST && base <= BVN_CURRENCY_CRYPTO_LAST);
 }
+/*
+ * Map a currency base-unit enum value to its g_currency_table index. The main
+ * block (134-347) indexes directly; the extension segment maps onto the table
+ * slots that follow it. Returns -1 if base is not a currency.
+ */
+static int bvn_currency_index(int base)
+{
+    if (base >= BVN_CURRENCY_FIAT_FIRST && base <= BVN_CURRENCY_CRYPTO_LAST)
+        return base - BVN_CURRENCY_FIAT_FIRST;
+    if (base >= BVN_CURRENCY_EXT_FIRST && base <= BVN_CURRENCY_EXT_LAST)
+        return N_MAIN + (base - BVN_CURRENCY_EXT_FIRST);
+    return -1;
+}
 uint8_t bvn_currency_minor_unit(int base, bool *ok)
 {
-    if (!bvn_unit_is_currency(base)) {
+    int idx = bvn_currency_index(base);
+    if (idx < 0) {
         if (ok) *ok = false;
         return 0;
     }
     if (ok) *ok = true;
-    return g_currency_table[base - BVN_CURRENCY_FIAT_FIRST].minor_unit;
+    return g_currency_table[idx].minor_unit;
 }
 const bvn_currency_info_t *bvn_currency_info(int base)
 {
-    if (!bvn_unit_is_currency(base))
+    int idx = bvn_currency_index(base);
+    if (idx < 0)
         return NULL;
-    return &g_currency_table[base - BVN_CURRENCY_FIAT_FIRST];
+    return &g_currency_table[idx];
 }
 /*
  * Resolve a 3-4 letter uppercase code (e.g. "USD", "USDT") to its base-unit
  * enum value, or 0 if unknown. Rejects non-uppercase input up front, then does
- * a linear scan of the catalogue. Returns the enum value (index +
- * BVN_CURRENCY_FIAT_FIRST), the inverse of the indexing used by the info
- * lookups above. 0 is a safe "not a currency" sentinel since it is bu_none.
+ * a linear scan of the catalogue. Returns the enum value, the inverse of the
+ * indexing used by the info lookups above: main-block slots map back to
+ * index + BVN_CURRENCY_FIAT_FIRST, extension slots to BVN_CURRENCY_EXT_FIRST +
+ * their offset. 0 is a safe "not a currency" sentinel since it is bu_none.
  */
 int bvn_parse_currency_str(const uint8_t *s, uint32_t len)
 {
@@ -309,8 +341,11 @@ int bvn_parse_currency_str(const uint8_t *s, uint32_t len)
     }
     for (int idx = 0; idx < N_TOTAL; idx++) {
         const char *code = g_currency_table[idx].code;
-        if ((uint32_t)strlen(code) == len && memcmp(code, s, len) == 0)
-            return idx + BVN_CURRENCY_FIAT_FIRST;
+        if ((uint32_t)strlen(code) == len && memcmp(code, s, len) == 0) {
+            if (idx < N_MAIN)
+                return idx + BVN_CURRENCY_FIAT_FIRST;
+            return BVN_CURRENCY_EXT_FIRST + (idx - N_MAIN);
+        }
     }
     return 0;
 }

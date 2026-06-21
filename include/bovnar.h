@@ -301,7 +301,16 @@ typedef enum value_base_unit_e {
 	bu_quintal, bu_scruple, bu_baud,
 	bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
 	bu_percent, bu_per_mille, bu_per_myriad,
-	bu_per_cent_mille, bu_ppm, bu_ppb
+	bu_per_cent_mille, bu_ppm, bu_ppb,
+	/*
+	 * Appended currencies. New fiat currencies are added here, after the unit
+	 * block, rather than inside the 134-347 currency region, so that adding one
+	 * never shifts an existing enum value (ABI stability). They are recognised
+	 * as currencies via the BVN_CURRENCY_EXT_* range in bovnar_currency.h, not
+	 * by the contiguous 134-347 bounds. Keep the final enumerator here last: the
+	 * BVN_VALUE_BASE_UNIT_COUNT check in bvn_internal_dims.h depends on it.
+	 */
+	bu_zwg = 378, bu_xcg
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,

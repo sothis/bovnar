@@ -30,7 +30,7 @@
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
-#define BVN_VALUE_BASE_UNIT_COUNT  378
+#define BVN_VALUE_BASE_UNIT_COUNT  380
 typedef char bvn_internal_dims_event_check[
 	(ev_stream_end + 1 == BVN_EVENT_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_error_check[
@@ -42,5 +42,5 @@ typedef char bvn_internal_dims_si_prefix_check[
 typedef char bvn_internal_dims_iec_prefix_check[
 	(iec_quebi + 1 == BVN_IEC_PREFIX_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_value_base_unit_check[
-	(bu_ppb + 1 == BVN_VALUE_BASE_UNIT_COUNT) ? 1 : -1];
+	(bu_xcg + 1 == BVN_VALUE_BASE_UNIT_COUNT) ? 1 : -1];
 #endif

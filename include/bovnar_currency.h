@@ -43,6 +43,16 @@ extern "C" {
 #define BVN_CURRENCY_CRYPTO_FIRST  298
 #define BVN_CURRENCY_CRYPTO_LAST   347
 #define BVN_VALUE_BASE_UNIT_COUNT_CURRENCY  348
+/*
+ * Currency extension range. Currencies added after the 134-347 block was frozen
+ * live here, appended past the unit block (see value_base_unit_t in bovnar.h),
+ * so that adding one shifts no existing enum value. They are fiat and counted as
+ * currencies, but reached via bvn_currency_index() rather than the O(1) 134-base
+ * indexing used for the main block. Keep these two macros in lockstep with
+ * bu_zwg/bu_xcg.
+ */
+#define BVN_CURRENCY_EXT_FIRST     378
+#define BVN_CURRENCY_EXT_LAST      379
 typedef struct {
     char     code[5];
     uint16_t numeric_code;

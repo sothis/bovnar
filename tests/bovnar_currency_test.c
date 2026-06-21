@@ -291,6 +291,52 @@ static void test_cup_collision(void)
     ASSERT_TRUE(parse("CUP") != (int)bu_cup, "CUP currency != bu_cup physical");
 }
 
+static void test_extension_currencies(void)
+{
+    printf("  extension segment (ZWG/XCG appended past the unit block)...\n");
+    /* Enum values are appended after the unit block, so no existing value moved. */
+    ASSERT_EQ_INT(BVN_CURRENCY_EXT_FIRST, 378, "EXT_FIRST == 378");
+    ASSERT_EQ_INT(BVN_CURRENCY_EXT_LAST,  379, "EXT_LAST  == 379");
+    ASSERT_EQ_INT((int)bu_zwg, 378, "bu_zwg == 378");
+    ASSERT_EQ_INT((int)bu_xcg, 379, "bu_xcg == 379");
+    ASSERT_EQ_INT((int)bu_zwg, BVN_CURRENCY_EXT_FIRST, "bu_zwg == EXT_FIRST");
+
+    /* Recognised as fiat currencies despite living outside the 134-347 block. */
+    ASSERT_TRUE( bvn_unit_is_currency((int)bu_zwg), "ZWG is currency");
+    ASSERT_TRUE( bvn_unit_is_currency((int)bu_xcg), "XCG is currency");
+    ASSERT_TRUE( bvn_unit_is_fiat((int)bu_zwg),     "ZWG is fiat");
+    ASSERT_TRUE( bvn_unit_is_fiat((int)bu_xcg),     "XCG is fiat");
+    ASSERT_TRUE(!bvn_unit_is_crypto((int)bu_zwg),   "ZWG not crypto");
+    ASSERT_TRUE(!bvn_unit_is_crypto((int)bu_xcg),   "XCG not crypto");
+    /* The gap between CRYPTO_LAST and EXT_FIRST is not currency space. */
+    ASSERT_TRUE(!bvn_unit_is_currency((int)bu_pfund), "bu_pfund not currency");
+    ASSERT_TRUE(!bvn_unit_is_currency((int)bu_ppb),   "bu_ppb not currency");
+
+    /* Round-trip parse -> enum value. */
+    ASSERT_EQ_INT(parse("ZWG"), 378, "ZWG==378");
+    ASSERT_EQ_INT(parse("XCG"), 379, "XCG==379");
+
+    bool ok;
+    ASSERT_EQ_INT(bvn_currency_minor_unit(parse("ZWG"),&ok), 2, "ZWG minor=2"); ASSERT_TRUE(ok,"ZWG ok");
+    ASSERT_EQ_INT(bvn_currency_minor_unit(parse("XCG"),&ok), 2, "XCG minor=2"); ASSERT_TRUE(ok,"XCG ok");
+
+    const bvn_currency_info_t *ci = bvn_currency_info(parse("ZWG"));
+    ASSERT_TRUE(ci != NULL,                "ZWG non-null");
+    ASSERT_STR(ci->code, "ZWG",            "ZWG code");
+    ASSERT_EQ_INT(ci->numeric_code, 924,   "ZWG numeric 924");
+    ASSERT_TRUE(!ci->is_crypto,            "ZWG not crypto");
+
+    ci = bvn_currency_info(parse("XCG"));
+    ASSERT_TRUE(ci != NULL,                "XCG non-null");
+    ASSERT_STR(ci->code, "XCG",            "XCG code");
+    ASSERT_EQ_INT(ci->numeric_code, 532,   "XCG numeric 532 (inherited from ANG)");
+    ASSERT_TRUE(!ci->is_crypto,            "XCG not crypto");
+
+    /* SI prefixes allowed on the new fiat; IEC prefixes rejected like all money. */
+    ASSERT_TRUE( bvn_currency_prefix_valid((int)bu_zwg, 0), "SI prefix ZWG valid");
+    ASSERT_TRUE(!bvn_currency_prefix_valid((int)bu_xcg, 1), "IEC prefix XCG invalid");
+}
+
 int main(void)
 {
     printf("bovnar_currency_test\n");
@@ -305,6 +351,7 @@ int main(void)
     test_prefix_valid();
     test_contiguity();
     test_cup_collision();
+    test_extension_currencies();
     printf("\n--------------------------------------\n");
     printf("  Results: %d tests, %d failures\n", tests, failures);
     printf("--------------------------------------\n");

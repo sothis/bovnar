@@ -579,7 +579,7 @@ typedef struct { const char* a; uint32_t len; iec_prefix_id_t  p; } iec_entry_t;
  * index; the self-check test will flag it.
  */
 static const uint16_t bu_first_for_len[BU_LEN_INDEX_SIZE] = {
-	487, 462, 383, 341, 277, 205, 150,  57,
+	489, 463, 384, 341, 277, 205, 150,  57,
 	 57,  57,  30,  11,  11,  11,  10,   8,
 	  4,   1,   1,   1,   0,   0,   0,   0,
 	  0,   0,   0,   0,   0,   0,   0,   0,
@@ -811,7 +811,7 @@ static const bu_entry_t bu_table[] = {
 	{"bsh",              3, bu_bushel},        {"rev",             3, bu_revolution},
 	{"Pfd",              3, bu_pfund},         {"prz",             3, bu_prussian_zoll},
 	{"prf",              3, bu_prussian_fuss}, {"Ztr",             3, bu_zentner},
-	{"lot",              3, bu_lot},
+	{"lot",              3, bu_lot},           {"amu",             3, bu_dalton},
 	{"ch",               2, bu_chain},         {"rd",              2, bu_rod},
 	{"gi",               2, bu_gill},          {"dr",              2, bu_dram},
 	{"\xc2\xb0""N",     3, bu_newton_temp},
@@ -876,6 +876,7 @@ static const bu_entry_t bu_table[] = {
 	{"d",                1, bu_day},           {"g",               1, bu_gram},
 	{"h",                1, bu_hour},          {"m",               1, bu_meter},
 	{"s",                1, bu_second},        {"t",               1, bu_tonne},
+	{"u",                1, bu_dalton},
 	{NULL, 0, bu_none}
 };
 static const si_entry_t si_table[] = {
@@ -1421,7 +1422,7 @@ static const char* base_unit_str(value_base_unit_t b)
 	case bu_rem:               return "rem";
 	case bu_neper:             return "Np";
 	case bu_decibel:           return "dB";
-	case bu_rankine:           return "\xc2\xb0Ra";
+	case bu_rankine:           return "\xc2\xb0""Ra";
 	case bu_delisle:           return "\xc2\xb0""De";
 	case bu_newton_temp:       return "\xc2\xb0""N";
 	case bu_reaumur:           return "\xc2\xb0""Re";

@@ -250,6 +250,23 @@ class TestUnitParsing:
         assert vu.num_components == 2
         assert vu.components[1].exp == Exponent.NEG_SQUARE
 
+    @pytest.mark.parametrize("tok", ["Da", "dalton", "amu", "u"])
+    def test_dalton_aliases(self, tok):
+        # Da is the canonical symbol; dalton/amu/u are accepted input aliases
+        # (amu and u = unified atomic mass unit). All resolve to bu_dalton and
+        # serialise back to "Da".
+        vu = self._parse(tok)
+        assert vu.num_components == 1
+        assert vu.components[0].base_unit == BaseUnit.DALTON
+        assert bovnar.unit_to_str(vu) == "Da"
+
+    def test_single_char_u_does_not_shadow_longer_units(self):
+        # Guard: adding the 1-char "u" alias must not preempt longest-suffix
+        # matching — "au" is still the astronomical unit, "mol" still the mole.
+        assert self._parse("au").components[0].base_unit == BaseUnit.ASTRONOMICAL_UNIT
+        assert self._parse("mol").components[0].base_unit == BaseUnit.MOL
+        assert self._parse("µ~u").components[0].base_unit == BaseUnit.DALTON  # micro-dalton
+
     def test_force_kgms2(self):
         vu = self._parse("k~g\u00b7m/s\u00b2")
         assert vu.num_components == 3

@@ -974,7 +974,14 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		 */
 		v->inferred_default_vtype = v->value_type;
 		v->parsed_unit   = parsed_unit;
-		if (!BVN_UNIT_IS_NO_UNIT(parsed_unit))
+		/*
+		 * Bump the serial only for a genuinely dimensioned unit. "No unit" has
+		 * two encodings here: bvn_parse_type_annotation yields BVN_UNIT_NONE
+		 * (num_components == 0) for an absent/no_unit annotation, while
+		 * BVN_UNIT_IS_NO_UNIT matches the single-component bu_none shape. Test
+		 * both so a unitless annotation never spuriously advances the serial.
+		 */
+		if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit))
 			v->parsed_unit_serial++;
 		v->unit_data_len = ulen;
 		if (ulen > 0)

@@ -23,6 +23,7 @@
  */
 
 #include "bovnar_currency.h"
+#include "bovnar.h"   /* prefix_system_t (prefix_iec) for the prefix-validity rule */
 #include <stddef.h>
 #include <string.h>
 #define N_FIAT   (BVN_CURRENCY_FIAT_LAST  - BVN_CURRENCY_FIAT_FIRST  + 1)
@@ -351,13 +352,13 @@ int bvn_parse_currency_str(const uint8_t *s, uint32_t len)
 }
 /*
  * Which prefix systems may attach to a currency. Binary IEC prefixes
- * (prefix_system == 1, e.g. "Ki") are nonsensical on money, so they are
- * rejected; SI prefixes (kEUR, etc.) are allowed. Non-currency bases are not
- * this function's concern and pass through.
+ * (prefix_iec, e.g. "Ki") are nonsensical on money, so they are rejected; SI
+ * prefixes (kEUR, etc.) are allowed. Non-currency bases are not this function's
+ * concern and pass through.
  */
 bool bvn_currency_prefix_valid(int base, int prefix_system)
 {
     if (!bvn_unit_is_currency(base))
         return true;
-    return (prefix_system != 1);
+    return (prefix_system != prefix_iec);
 }

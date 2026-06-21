@@ -752,7 +752,18 @@ static int cmd_validate(const char *filename)
 	 * reuse the one descriptor rather than reopening, so both passes see the
 	 * same bytes (no reopen TOCTOU) and there is a single fd to manage.
 	 */
-	if (lseek(fd, 0, SEEK_SET) != 0) { perror(filename); close(fd); return 1; }
+	if (lseek(fd, 0, SEEK_SET) != 0) {
+		/* The homogeneity pass re-reads from the start via the DOM, which only
+		 * accepts an fd. A non-seekable input (FIFO/pipe/char device) was
+		 * already consumed by the streaming pass and cannot be rewound; report
+		 * that clearly rather than leaking a bare "Illegal seek". */
+		if (errno == ESPIPE)
+			cwe("validate: %s: not a regular file; validate needs a seekable "
+			    "file for the array-homogeneity pass\n", filename);
+		else
+			perror(filename);
+		close(fd); return 1;
+	}
 	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd);
 	close(fd);
 	if (!doc) {
@@ -1418,7 +1429,10 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		close(fd); return 1;
 	}
 	if (lseek(fd, 0, SEEK_SET) != 0) { perror(file); close(fd); return 1; }
-	if ((uint64_t)sz > UINT32_MAX) {
+	/* Reject >= UINT32_MAX (not just >) so that size + 1 below cannot wrap to 0
+	 * on a 32-bit size_t and hand malloc a zero-byte buffer the read loop then
+	 * overflows. A no-op on the 64-bit primary target. */
+	if ((uint64_t)sz >= UINT32_MAX) {
 		fprintf(stderr, "convert: file exceeds 4 GiB limit\n");
 		close(fd); return 1;
 	}
@@ -1990,7 +2004,11 @@ static size_t bmark_gen_structs(uint8_t *buf, size_t cap, size_t *out_assignment
 			int n = snprintf(tmp, sizeof(tmp),
 			                 ".s%zu={.a=%zu;.b=%zu;.c=%zu;",
 			                 serial, serial, serial + 1, serial + 2);
-			if (n < 0) { done = true; break; }
+			/* Guard truncation as well as error: a truncated snprintf returns
+			 * the would-be length (>= sizeof tmp), and the memcpy below would
+			 * then over-read tmp. Unreachable with the cap-bounded serial here,
+			 * but cheap to make safe. */
+			if (n < 0 || (size_t)n >= sizeof(tmp)) { done = true; break; }
 			size_t close_needed = (depth + 1) * 3;
 			if (pos + (size_t)n + close_needed > cap) { done = true; break; }
 			memcpy(buf + pos, tmp, (size_t)n);

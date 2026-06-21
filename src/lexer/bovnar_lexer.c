@@ -1803,6 +1803,23 @@ static inline uint32_t bvn_utf8_count_starts(const uint8_t* data, uint32_t n)
 	return cols;
 }
 /*
+ * A capacity/byte-budget clamp can cut a run length `n` short of the UTF-8
+ * code-point boundary the scanner stopped on, landing `start + n` on a
+ * continuation byte. The per-byte path would then resume with utf8_need == 0 on
+ * that continuation byte and raise error_invalid_utf8_byte instead of the
+ * correct *_too_long cap error. Walk `n` back to the previous code-point
+ * boundary so the per-byte path resumes on a leader byte and the real cap error
+ * surfaces. Only steps when a clamp truncated the run: an unclamped `n` already
+ * ends on a boundary (and the `start + n < len` guard keeps the read in range).
+ */
+static inline uint32_t bvn_clamp_to_utf8_boundary(
+	const uint8_t* data, uint32_t start, uint32_t n, uint32_t len)
+{
+	while (n > 0u && (start + n) < len && (data[start + n] & 0xc0u) == 0x80u)
+		--n;
+	return n;
+}
+/*
  * Bulk fast path. If the machine is sitting in one of the "copy byte" states,
  * find the longest run of bytes from `start` that all stay in that state and
  * memcpy them into the target buffer in a single call, returning how many
@@ -1831,6 +1848,8 @@ static inline uint32_t bvn_try_bulk_run(
 			if (!tb) return 0;
 			if ((uint64_t)n > tb) n = (uint32_t)tb;
 		}
+		n = bvn_clamp_to_utf8_boundary(data, start, n, len);
+		if (!n) return 0;
 		memcpy(l->str_data + l->str_len, data + start, n);
 		l->str_len     = (uint16_t)(l->str_len + n);
 		l->text_bytes += n;
@@ -1934,6 +1953,8 @@ static inline uint32_t bvn_try_bulk_run(
 		if (!tb) return 0;
 		if ((uint64_t)n > tb) n = (uint32_t)tb;
 	}
+	n = bvn_clamp_to_utf8_boundary(data, start, n, len);
+	if (!n) return 0;
 	memcpy(dst + dst_len, data + start, n);
 	if (is_str_buf) {
 		l->str_len = (uint16_t)(dst_len + n);

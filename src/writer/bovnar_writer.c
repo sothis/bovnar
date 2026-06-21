@@ -1105,6 +1105,14 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					return false;
 			}
 		}
+		/*
+		 * NB: emitted_unit is intentionally NOT reset here. A single annotation
+		 * applies to every element of an array (<float:64,m/s> [1, 2, 3]), and
+		 * each element is its own ev_data — the flag must persist across them so
+		 * the unit is emitted once (in the annotation) and not re-appended inline
+		 * to element 2+. It is correctly re-scoped by ev_assignment_start /
+		 * ev_type_annotation_start when the next value context begins.
+		 */
 		s->need_semi = true;
 		bvn_ser_mark_value_done(s);
 		break;

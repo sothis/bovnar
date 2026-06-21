@@ -349,6 +349,8 @@ typedef struct demux_channel_s {
 	uint64_t	have;		/* bytes accumulated for the current message */
 	uint64_t	need;		/* declared length of the current message */
 	bool		active;		/* a message is in progress */
+	uint8_t		lvbuf[10];	/* partial message-length varint (cross-chunk) */
+	uint8_t		lvhave;		/* bytes accumulated into lvbuf so far */
 } demux_channel_t;
 
 struct bvnr_demux_s {
@@ -360,6 +362,15 @@ struct bvnr_demux_s {
 	demux_channel_t*	chans;
 	uint32_t		nchans;
 	uint32_t		chans_cap;
+	/* Optional key scope (bvnr_demux_set_key). When key is non-NULL the demux
+	 * only treats octet streams opened under a matching assignment key as
+	 * multiplexed; any other octet stream in the same document is ignored, so a
+	 * document may freely mix a mux stream with ordinary binary octet payloads.
+	 * key == NULL (the default) demuxes every octet stream. key_match tracks
+	 * whether the current assignment key matches. */
+	char*			key;
+	uint32_t		key_len;
+	bool			key_match;
 };
 
 #define BVNR_DEMUX_MAX_CHANNELS  4096u
@@ -382,7 +393,34 @@ void bvnr_demux_destroy(bvnr_demux_t* dm)
 	for (uint32_t i = 0; i < dm->nchans; i++)
 		free(dm->chans[i].buf);
 	free(dm->chans);
+	free(dm->key);
 	free(dm);
+}
+
+bool bvnr_demux_set_key(bvnr_demux_t* dm, const char* key)
+{
+	if (!dm) return false;
+	free(dm->key);
+	dm->key       = NULL;
+	dm->key_len   = 0;
+	/* No filter (NULL) restores the demux-every-octet-stream default; with a
+	 * filter set, octet streams default to "not ours" until a matching key. */
+	dm->key_match = false;
+	if (!key)
+		return true;
+	size_t n = strlen(key);
+	if (n > UINT32_MAX) {
+		dm->error = error_invalid_argument;
+		return false;
+	}
+	dm->key = (char*)malloc(n + 1u);
+	if (!dm->key) {
+		dm->error = error_invalid_argument;
+		return false;
+	}
+	memcpy(dm->key, key, n + 1u);
+	dm->key_len = (uint32_t)n;
+	return true;
 }
 
 error_code_t bvnr_demux_error(const bvnr_demux_t* dm)
@@ -426,10 +464,33 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 	uint32_t pos = 0;
 	while (pos < fraglen) {
 		if (!c->active) {
+			/* Accumulate the message-length varint, which may itself span
+			 * chunk boundaries: pull continuation bytes into the per-channel
+			 * lvbuf until a terminator (high bit clear) arrives, then decode
+			 * the whole varint. (The channel varint, by contrast, must be
+			 * whole within one chunk — it is the routing prefix and is read by
+			 * the caller before this function; see bvnr_demux_on_event.) */
+			bool terminated = false;
+			while (pos < fraglen) {
+				uint8_t b = frag[pos++];
+				if (c->lvhave >= 10u) {   /* >10 bytes can't fit a uint64 */
+					dm->error = error_octet_stream_out_of_sync;
+					return false;
+				}
+				c->lvbuf[c->lvhave++] = b;
+				if (!(b & 0x80u)) { terminated = true; break; }
+			}
+			if (!terminated)
+				return true;   /* fragment ended mid-varint: resume next chunk */
 			uint64_t need = 0;
-			uint32_t used = bvn_varint_decode(frag + pos,
-				fraglen - pos, &need);
-			if (!used) { dm->error = error_octet_stream_out_of_sync; return false; }
+			uint32_t used = bvn_varint_decode(c->lvbuf, c->lvhave, &need);
+			/* The accumulated run ends exactly at the terminator, so a clean
+			 * varint consumes every buffered byte; any mismatch (used==0 from an
+			 * overlong 10th byte, or a short decode) is a malformed encoding. */
+			if (used != c->lvhave) {
+				dm->error = error_octet_stream_out_of_sync; return false;
+			}
+			c->lvhave = 0;
 			if (need > dm->max_message) {
 				dm->error = error_value_out_of_range; return false;
 			}
@@ -439,7 +500,6 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 			if (need > (uint64_t)SIZE_MAX) {
 				dm->error = error_value_out_of_range; return false;
 			}
-			pos += used;
 			c->need   = need;
 			c->have   = 0;
 			c->active = true;
@@ -503,8 +563,18 @@ bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d)
 	bvnr_demux_t* dm = (bvnr_demux_t*)demux;
 	if (!dm) return false;
 	switch (ev) {
+	case ev_assignment_start:
+		/* Track whether the key now being opened is in scope. With no filter
+		 * (dm->key == NULL) every octet stream is ours; with a filter, only a
+		 * stream under the exact key is. Recomputed per assignment so a non-mux
+		 * key clears the match before its octet stream (if any) arrives. */
+		dm->key_match = dm->key && d &&
+			d->length == dm->key_len &&
+			(dm->key_len == 0 ||
+			 memcmp(d->data, dm->key, dm->key_len) == 0);
+		return true;
 	case ev_octet_stream_start:
-		dm->in_octet = true;
+		dm->in_octet = (dm->key == NULL) || dm->key_match;
 		return true;
 	case ev_octet_stream_end:
 		dm->in_octet = false;
@@ -513,11 +583,13 @@ bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d)
 		 * mid-reassembly here is a truncated stream. Drop that partial state
 		 * rather than letting it bleed into the next stream on a reused demux,
 		 * where it would mis-frame the next message as a continuation. The
-		 * buffer itself is kept for reuse; only the progress is reset. */
+		 * buffer itself is kept for reuse; only the progress (including a
+		 * partial length varint) is reset. */
 		for (uint32_t i = 0; i < dm->nchans; i++) {
 			dm->chans[i].active = false;
 			dm->chans[i].have   = 0;
 			dm->chans[i].need   = 0;
+			dm->chans[i].lvhave = 0;
 		}
 		return true;
 	case ev_data:

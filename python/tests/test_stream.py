@@ -117,6 +117,15 @@ class TestMultiplexing:
         msgs = [(1, b"a"), (2, b"bb"), (1, b"ccc"), (3, b"dddd"), (2, b"e")]
         assert stream.mux_load(stream.mux_dump(msgs)) == msgs
 
+    def test_key_scope(self):
+        # A mux stream under "data": scoping to the right key round-trips, a
+        # non-matching key ignores the stream, and no scope is the default.
+        msgs = [(1, b"hi"), (2, b"there")]
+        blob = stream.mux_dump(msgs, key="data")
+        assert stream.mux_load(blob, key="data") == msgs
+        assert stream.mux_load(blob, key="other") == []
+        assert stream.mux_load(blob) == msgs
+
 
 # ---------------------------------------------------------------------------
 # Document-in-document

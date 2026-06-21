@@ -226,9 +226,14 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
             w.destroy()
 
 
-def mux_load(data, *, max_message: int = 0) -> list:
+def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
     """Demultiplex an octet-stream document, returning a list of
-    ``(channel:int, payload:bytes)`` in arrival order."""
+    ``(channel:int, payload:bytes)`` in arrival order.
+
+    By default every octet stream in the document is treated as multiplexed.
+    Pass ``key`` to scope the demux to streams opened under that key only, so a
+    document mixing a mux stream with ordinary binary octet payloads ignores the
+    latter (mirrors ``bvnr_demux_set_key``)."""
     lib  = get_library()
     data = _as_bytes(data)
 
@@ -249,6 +254,9 @@ def mux_load(data, *, max_message: int = 0) -> list:
     dm = lib.bvnr_demux_create(cb_msg, None, max_message)
     if not dm:
         raise MemoryError("bvnr_demux_create() returned NULL")
+    if key is not None and not lib.bvnr_demux_set_key(dm, key.encode('utf-8')):
+        lib.bvnr_demux_destroy(dm)
+        raise MemoryError("bvnr_demux_set_key() failed")
     rptr = lib.bvnr_reader_create()
     if not rptr:
         lib.bvnr_demux_destroy(dm)

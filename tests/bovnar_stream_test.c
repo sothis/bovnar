@@ -402,6 +402,115 @@ static void test_demux_overlong_varint_rejected(void)
 	bvnr_demux_destroy(dm);
 }
 
+/* A message-length varint split across two octet chunks must be reassembled,
+ * not rejected: the demux accumulates the partial varint per channel across
+ * chunks. Hand-build channel 5 with length varint 0xC8 0x01 (= 200) where the
+ * first varint byte rides chunk 1 and the second rides chunk 2 with the data. */
+static void test_demux_split_length_varint(void)
+{
+	printf("  test_demux_split_length_varint...\n");
+	mux_capture_t mc = {0};
+	bvnr_demux_t *dm = bvnr_demux_create(mux_on_msg, &mc, 0);
+	bvnr_data_t empty = {0};
+	uint8_t frag[300];
+	uint32_t off;
+
+	bvnr_demux_on_event(dm, ev_octet_stream_start, &empty);
+
+	/* Chunk 1: channel 5, then only the FIRST byte of the length varint. */
+	off = test_varint_encode(5u, frag);       /* channel 5 */
+	frag[off++] = 0xC8u;                       /* len varint byte 1 (continuation) */
+	bvnr_data_t d1 = { .type = token_is_octet_stream, .data = frag, .length = off };
+	bool fed1 = bvnr_demux_on_event(dm, ev_data, &d1);
+	ASSERT_TRUE(fed1, "chunk with a partial length varint feeds cleanly");
+	ASSERT_EQ_UINT(mc.n, 0, "no message yet (length varint incomplete)");
+
+	/* Chunk 2: channel 5, the SECOND varint byte, then 200 data bytes. */
+	uint8_t frag2[256];
+	off = test_varint_encode(5u, frag2);      /* channel 5 again */
+	frag2[off++] = 0x01u;                      /* len varint byte 2 -> len = 200 */
+	for (int i = 0; i < 200; i++) frag2[off++] = (uint8_t)(i + 1);
+	bvnr_data_t d2 = { .type = token_is_octet_stream, .data = frag2, .length = off };
+	bool fed2 = bvnr_demux_on_event(dm, ev_data, &d2);
+	bvnr_demux_on_event(dm, ev_octet_stream_end, &empty);
+
+	ASSERT_TRUE(fed2, "chunk completing the split varint feeds cleanly");
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_none, "no desync from a split length varint");
+	ASSERT_EQ_UINT(mc.n, 1, "the cross-chunk-varint message is delivered");
+	if (mc.n == 1) {
+		ASSERT_EQ_UINT(mc.channels[0], 5, "split-varint message channel");
+		ASSERT_EQ_UINT(mc.lens[0], 200, "split-varint message length (= 200)");
+	}
+	bvnr_demux_destroy(dm);
+}
+
+/* Key scoping: a document may carry one multiplexed octet stream alongside an
+ * ordinary binary octet payload. With bvnr_demux_set_key the demux ignores octet
+ * streams under other keys, so the plain payload — whose raw bytes would
+ * otherwise be misread as channel/length framing — does not perturb the demux. */
+static void test_demux_key_scope(void)
+{
+	printf("  test_demux_key_scope...\n");
+	uint8_t buf[512];
+
+	/* Producer: a plain octet payload under ".bin" (bytes 0x00 0x00, which an
+	 * unscoped demux would misread as an empty message on channel 0), then a
+	 * real mux stream under ".mux". */
+	bvnr_writer_t *w = bvnr_writer_create();
+	bvnr_data_t hdr = {0};
+	bvnr_data_t binkey = { .data = "bin", .length = 3 };
+	bvnr_data_t empty  = {0};
+	uint8_t rawbytes[2] = { 0x00, 0x00 };
+	bvnr_data_t rawchunk = { .type = token_is_octet_stream, .data = rawbytes, .length = 2 };
+	bool wok = bvnr_open_write_mem(w, buf, sizeof(buf), false, NULL)
+		&& bvnr_write_event(w, ev_stream_start, &hdr)
+		&& bvnr_write_event(w, ev_assignment_start, &binkey)
+		&& bvnr_write_event(w, ev_octet_stream_start, &empty)
+		&& bvnr_write_event(w, ev_data, &rawchunk)
+		&& bvnr_write_event(w, ev_octet_stream_end, &empty)
+		&& bvnr_mux_begin(w, "mux")
+		&& bvnr_mux_send(w, 1, "hello", 5)
+		&& bvnr_mux_end(w)
+		&& bvnr_write_finish(w);
+	ASSERT_TRUE(wok, "mixed plain+mux producer writes cleanly");
+	uint64_t total = bvnr_writer_bytes_written(w);
+	bvnr_writer_destroy(w);
+
+	/* Consumer scoped to ".mux": the ".bin" stream is ignored. */
+	mux_capture_t mc = {0};
+	bvnr_demux_t *demux = bvnr_demux_create(mux_on_msg, &mc, 0);
+	ASSERT_TRUE(bvnr_demux_set_key(demux, "mux"), "set_key succeeds");
+	bvnr_read_flags_t fl = {
+		.on_verified = bvnr_demux_on_event, .on_error = on_err, .userdata = demux,
+	};
+	bvnr_reader_t *r = bvnr_reader_create();
+	bool rok = bvnr_open_read_mem(r, buf, total, NULL, 0, &fl) && bvnr_read(r);
+	ASSERT_TRUE(rok, "scoped consumer parses the mixed document cleanly");
+	ASSERT_EQ_UINT(bvnr_demux_error(demux), error_none, "no desync from the ignored plain stream");
+	bvnr_reader_destroy(r);
+	bvnr_demux_destroy(demux);
+
+	ASSERT_EQ_UINT(mc.n, 1, "only the in-scope mux message is delivered");
+	if (mc.n == 1) {
+		ASSERT_EQ_UINT(mc.channels[0], 1, "scoped message channel");
+		ASSERT_TRUE(strcmp(mc.payloads[0], "hello") == 0, "scoped message payload");
+	}
+
+	/* Control: an unscoped demux over the same bytes also sees the plain
+	 * stream, proving the scoping above is what suppressed it. */
+	mux_capture_t mc2 = {0};
+	bvnr_demux_t *demux2 = bvnr_demux_create(mux_on_msg, &mc2, 0);
+	bvnr_read_flags_t fl2 = {
+		.on_verified = bvnr_demux_on_event, .on_error = on_err, .userdata = demux2,
+	};
+	bvnr_reader_t *r2 = bvnr_reader_create();
+	bool rok2 = bvnr_open_read_mem(r2, buf, total, NULL, 0, &fl2) && bvnr_read(r2);
+	ASSERT_TRUE(rok2, "unscoped consumer parses too");
+	bvnr_reader_destroy(r2);
+	bvnr_demux_destroy(demux2);
+	ASSERT_EQ_UINT(mc2.n, 2, "unscoped demux also picks up the plain stream (control)");
+}
+
 /* Large messages that span many octet chunks, interleaved across channels,
  * must reassemble byte-exact. */
 typedef struct {
@@ -1199,6 +1308,8 @@ int main(void)
 	test_octet_mux();
 	test_demux_truncated_stream_reset();
 	test_demux_overlong_varint_rejected();
+	test_demux_split_length_varint();
+	test_demux_key_scope();
 	test_demux_packed_messages();
 	test_octet_mux_large();
 	test_octet_mux_boundaries();

@@ -137,6 +137,12 @@ non-version remainder is reported as a malformed directive rather than ignored.
   on a real Windows console via `WriteConsoleW` — the CRT's byte path garbles
   multi-byte UTF-8 even with the console code page set to UTF-8 — while piped or
   redirected output stays byte-exact raw UTF-8.
+- **Streaming — octet-demux key scoping.** `bvnr_demux_set_key()` (Python:
+  `stream.mux_load(..., key=…)`) restricts the demultiplexer to octet streams
+  opened under a given key, so a document may mix one multiplexed stream with
+  ordinary binary octet payloads (those under other keys are ignored rather than
+  misread as channel/length framing). With no key set the demux behaves as before
+  (every octet stream is demuxed).
 
 ### Changed
 
@@ -199,6 +205,12 @@ Hardening uncovered while developing 1.1:
   which could race if two threads created their first reader concurrently.
 - The streaming demux now rejects a declared message length exceeding `SIZE_MAX`
   on 32-bit hosts, mirroring the document-stream path.
+- The streaming demux now reassembles a message-length varint that is split
+  across two octet chunks (it previously treated a partial length varint as a
+  desync); this makes the consumer fully general for the documented varint-
+  prefixed wire convention — data *and* length varints may span chunks, with only
+  the per-chunk channel-routing varint required to be whole. `bvnr_mux_send` was
+  already conformant, so this changes no produced byte stream.
 - Documented the ownership and error contracts in `bovnar_dom.h` and `bvn_int.h`
   (which functions consume/borrow/own their arguments and results, and the
   "returns false, leaves out-param unchanged" convention) — the previous headers

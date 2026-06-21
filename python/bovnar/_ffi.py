@@ -479,6 +479,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_demux_destroy.restype  = None
     lib.bvnr_demux_destroy.argtypes = [c_void_p]
 
+    lib.bvnr_demux_set_key.restype  = c_bool
+    lib.bvnr_demux_set_key.argtypes = [c_void_p, c_char_p]
+
     lib.bvnr_demux_on_event.restype  = c_bool
     lib.bvnr_demux_on_event.argtypes = [c_void_p, c_int, P(BvnrData)]
 

@@ -160,13 +160,22 @@ BVN_API bool bvnr_doc_stream_read(
  *
  * Because a message is length-prefixed it may span any number of octet chunks,
  * and channels may interleave freely at chunk granularity — the demultiplexer
- * reassembles each channel independently. Messages of any size up to a caller-
- * set cap are supported; a message that fits BVNR_MUX_MAX_MESSAGE travels in a
- * single chunk (the fast path). The only framing constraint a producer must
- * respect (and bvnr_mux_send does): a message's length varint is never split
- * across two chunks.
+ * reassembles each channel independently. Both the per-message data *and* its
+ * length varint may straddle chunk boundaries: the demultiplexer accumulates a
+ * partial length varint per channel across chunks. The one wire requirement a
+ * producer must respect is that the per-chunk *channel* varint — the routing
+ * prefix the demultiplexer needs to attribute the chunk — is whole within its
+ * chunk (bvnr_mux_send always satisfies this; the channel id is <=10 bytes and
+ * leads every chunk). Messages of any size up to a caller-set cap are supported.
+ *
+ * BVNR_MUX_MAX_MESSAGE is a conservative single-chunk *guarantee*, not an
+ * enforced cap: any message of at most this many bytes is emitted by
+ * bvnr_mux_send in one octet chunk regardless of the channel id or length
+ * magnitude (the bound subtracts the maximum 10+10 varint bytes from the 65536
+ * chunk size). Larger messages are simply split across chunks; nothing rejects
+ * them.
  */
-#define BVNR_MUX_MAX_MESSAGE   (65536u - 20u)  /* fits one chunk: channel + len varints + data */
+#define BVNR_MUX_MAX_MESSAGE   (65536u - 20u)  /* <=this fits one chunk: channel + len varints + data */
 
 /* Default reassembly cap for bvnr_demux_create's max_message=0. */
 #define BVNR_MUX_DEFAULT_MAX   (64u * 1024u * 1024u)
@@ -187,10 +196,24 @@ typedef struct bvnr_demux_s bvnr_demux_t;
 
 /* Create a demultiplexer. on_message is invoked with each fully reassembled
  * message. max_message bounds a single reassembled message (0 selects
- * BVNR_MUX_DEFAULT_MAX); a larger declared length is rejected as a desync. */
+ * BVNR_MUX_DEFAULT_MAX); a larger declared length is rejected as a desync.
+ *
+ * The demultiplexer owns one reassembly buffer per channel it has seen; each
+ * buffer grows to that channel's largest message and is retained for reuse until
+ * bvnr_demux_destroy, so steady-state memory is the sum of per-channel high-water
+ * marks (bounded by 4096 channels). Channels are not reclaimed individually. */
 BVN_API bvnr_demux_t* bvnr_demux_create(bvnr_mux_on_msg_fn on_message,
 	void* userdata, uint64_t max_message);
 BVN_API void bvnr_demux_destroy(bvnr_demux_t* dm);
+
+/*
+ * Restrict the demultiplexer to octet streams opened under `key`. By default a
+ * demux installed on on_verified treats *every* octet stream in the document as
+ * multiplexed; set a key so a document can mix one mux stream with ordinary
+ * binary octet payloads (those under other keys are ignored). Pass key == NULL
+ * to clear the filter and restore the demux-every-stream default. The key string
+ * is copied. Returns false on a NULL demux or an allocation failure. */
+BVN_API bool bvnr_demux_set_key(bvnr_demux_t* dm, const char* key);
 
 /*
  * Event callback that demultiplexes channels. Install it as
@@ -198,7 +221,10 @@ BVN_API void bvnr_demux_destroy(bvnr_demux_t* dm);
  * varint channel off each octet chunk, reassembles per-channel messages and
  * routes each complete message to on_message. Returns false (aborting the read)
  * if a handler returns false or the stream desyncs (malformed varint,
- * oversized message, allocation failure).
+ * oversized message, allocation failure). When on_message itself returns false,
+ * the read is aborted and bvnr_demux_error reports error_scanner_callback_failed
+ * (the library's standard "a callback asked to stop" code) — distinct from the
+ * desync code, so a caller can tell a deliberate stop from a framing error.
  */
 BVN_API bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d);
 

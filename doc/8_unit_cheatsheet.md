@@ -92,6 +92,7 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 | `P`  | poise (`bu_poise`)    | peta   |
 | `R`  | röntgen (`bu_roentgen`) | ronna |
 | `f`  | farad (`bu_farad`)    | femto  |
+| `u`  | dalton (`bu_dalton`)  | micro (ASCII alias for `µ`) |
 | `S`  | siemens (`bu_siemens`) | *(not a prefix — `S` has no prefix role)* |
 
 Examples: bare `m` = metre; `m~s` = millisecond. Bare `d` = day; `d~s` = decisecond.
@@ -191,7 +192,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `t`   | `tonne` | tonne | `bu_tonne` | 10³ kg |
 | `bar` | — | bar | `bu_bar` | 10⁵ Pa |
 | `eV`  | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
-| `Da`  | `dalton` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
+| `Da`  | `dalton`, `amu`, `u` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
 | `au`  | — | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
 | `ha`  | `hectare` | hectare | `bu_hectare` | 10⁴ m² |
 

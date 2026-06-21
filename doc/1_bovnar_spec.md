@@ -1286,7 +1286,7 @@ The unit system supports **163 named base units** across SI, IEC-binary, Imperia
 | `t` | tonne | `bu_tonne` |
 | `bar` | bar | `bu_bar` |
 | `eV` | electronvolt | `bu_electronvolt` |
-| `Da` | dalton | `bu_dalton` |
+| `Da`, `dalton`, `amu`, `u` | dalton | `bu_dalton` |
 | `au` | astronomical unit | `bu_astronomical_unit` |
 | `ha` | hectare | `bu_hectare` |
 
@@ -1311,7 +1311,7 @@ The unit system supports **163 named base units** across SI, IEC-binary, Imperia
 | deci | `d` | 10⁻¹ | `si_deci` |
 | centi | `c` | 10⁻² | `si_centi` |
 | milli | `m` | 10⁻³ | `si_milli` |
-| micro | `µ` | 10⁻⁶ | `si_micro` |
+| micro | `µ` (or `u`) | 10⁻⁶ | `si_micro` |
 | nano | `n` | 10⁻⁹ | `si_nano` |
 | pico | `p` | 10⁻¹² | `si_pico` |
 | femto | `f` | 10⁻¹⁵ | `si_femto` |
@@ -1321,7 +1321,7 @@ The unit system supports **163 named base units** across SI, IEC-binary, Imperia
 | ronto | `r` | 10⁻²⁷ | `si_ronto` |
 | quecto | `q` | 10⁻³⁰ | `si_quecto` |
 
-> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8.
+> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8. ASCII `u` is accepted as an input-only alias for the micro prefix (`u~m` = `µ~m`); the canonical output is always `µ`.
 
 ### 11.3 IEC Binary Prefixes
 

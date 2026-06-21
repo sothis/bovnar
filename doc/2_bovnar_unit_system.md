@@ -237,7 +237,7 @@ Bovnar supports 163 named physical base units. Currency codes are a separate nam
 | `t`    | `tonne` | tonne | `bu_tonne` | 10³ kg |
 | `bar`  | — | bar | `bu_bar` | 10⁵ Pa |
 | `eV`   | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
-| `Da`   | `dalton` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
+| `Da`   | `dalton`, `amu`, `u` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
 | `au`   | — | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
 | `ha`   | `hectare` | hectare | `bu_hectare` | 10⁴ m² |
 
@@ -589,6 +589,7 @@ Several prefix symbols overlap with base unit symbols. The `~` separator is the 
 | `T`    | tera      | tesla        |
 | `f`    | femto     | farad        |
 | `a`    | atto      | *(none)*     |
+| `u`    | micro (ASCII alias for `µ`) | dalton |
 | `S`    | *(none)*  | siemens      |
 
 `d~s` = decisecond; `d` alone = day.

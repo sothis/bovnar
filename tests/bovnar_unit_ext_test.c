@@ -598,7 +598,7 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_per_cent_mille     == 375, "bu_per_cent_mille == 375");
 	ASSERT_TRUE((int)bu_ppm                == 376, "bu_ppm == 376");
 	ASSERT_TRUE((int)bu_ppb                == 377, "bu_ppb == 377");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 378, "sentinel == 378");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 380, "sentinel == 380");
 }
 
 static void test_nonsi_si_factors(void)

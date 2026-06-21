@@ -92,7 +92,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 Two distinct namespaces share the annotation slot:
 
 - **Physical units** — 163 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
-- **Currency codes** — 214 monetary denominations: 164 ISO 4217 alphabetic codes (including precious-metal X-codes; 2 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022) and 50 cryptocurrency tickers.
+- **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
 
@@ -786,7 +786,7 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 ## 9. Currency Codes
 
-Currency amounts are dimensional quantities in financial computing. `$19.99 USD` carries a denomination dimension just as `9.81 m/s²` carries an acceleration dimension. Bovnar extends the unit system with 214 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.
+Currency amounts are dimensional quantities in financial computing. `$19.99 USD` carries a denomination dimension just as `9.81 m/s²` carries an acceleration dimension. Bovnar extends the unit system with 216 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.
 
 ### 9.1 The `$` Sigil Rule
 
@@ -801,7 +801,7 @@ Because the sigil is mandatory, a bare uppercase code can never collide with a p
 
 ### 9.2 ISO 4217 Fiat Currencies and Precious Metals
 
-166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. The original 164 occupy the `value_base_unit_t` slot range **134 … 297** alphabetically (AED first, ZWL last), and — unlike physical units — have **no named `bu_*` enumerators**: such a currency is resolved from its `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value (the currency catalogue in `bovnar_currency.c` is index-aligned to these slots). Currencies added after that range was frozen are **appended past the unit block** at slots **378 … 379** — an *extension segment* (`bu_zwg`, `bu_xcg`) reached via `bvn_currency_index` rather than the direct 134-based indexing — so that adding a currency never shifts an existing enum value (ABI stability). Three codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022), and `ZWL` (Zimbabwean Dollar, superseded by `ZWG` Zimbabwe Gold in 2024); `ANG` (Netherlands Antillean Guilder) likewise coexists with its successor `XCG` (Caribbean Guilder, which inherits ANG's numeric code 532).
+166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. The original 164 occupy the `value_base_unit_t` slot range **134 … 297** alphabetically (AED first, ZWL last), and — unlike physical units — have **no named `bu_*` enumerators**: such a currency is resolved from its `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value (the currency catalogue in `bovnar_currency.c` is index-aligned to these slots). Currencies added after that range was frozen are **appended past the unit block** at slots **378 … 379** — an *extension segment* (`bu_zwg`, `bu_xcg`) reached via `bvn_currency_index` rather than the direct 134-based indexing — so that adding a currency never shifts an existing enum value (ABI stability). Four codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022), `ZWL` (Zimbabwean Dollar, superseded by `ZWG` Zimbabwe Gold in 2024), and `BGN` (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); `ANG` (Netherlands Antillean Guilder) likewise coexists with its successor `XCG` (Caribbean Guilder, which inherits ANG's numeric code 532).
 
 The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. `<uint:64,$KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift. Minor units are **bold** below when they differ from 2. `Num` is the ISO 4217 numeric identifier.
 
@@ -820,7 +820,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 | `BAM` |  977 |   2 | Bosnia-Herzegovina Convertible Mark |
 | `BBD` |   52 |   2 | Barbados Dollar |
 | `BDT` |   50 |   2 | Bangladeshi Taka |
-| `BGN` |  975 |   2 | Bulgarian Lev |
+| `BGN` |  975 |   2 | Bulgarian Lev *(historical; retired 2026-01-01)* |
 | `BHD` |   48 | **3** | Bahraini Dinar |
 | `BIF` |  108 | **0** | Burundian Franc |
 | `BMD` |   60 |   2 | Bermudian Dollar |
@@ -972,9 +972,9 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 | `ZAR` |  710 |   2 | South African Rand |
 | `ZMW` |  967 |   2 | Zambian Kwacha |
 | `ZWG` |  924 |   2 | Zimbabwe Gold |
-| `ZWL` |  932 |   2 | Zimbabwean Dollar |
+| `ZWL` |  932 |   2 | Zimbabwean Dollar *(historical; superseded by ZWG 2024)* |
 
-> `CLF` (Unidad de Fomento) is the only currency with 4 minor units. The two historical codes `HRK` and `SLL` are retained for compatibility but should not be used for new data.
+> `CLF` (Unidad de Fomento) is the only currency with 4 minor units. The four historical codes `HRK`, `SLL`, `ZWL`, and `BGN` are retained for compatibility but should not be used for new data.
 
 ### 9.3 Cryptocurrencies
 
@@ -1685,7 +1685,7 @@ assert info.minor_unit == 2
 btc = from_code("BTC")
 assert btc == BaseUnit.BTC
 
-fiat_count   = sum(1 for _ in all_fiat())    # 164
+fiat_count   = sum(1 for _ in all_fiat())    # 166
 crypto_count = sum(1 for _ in all_crypto())  # 50
 ```
 

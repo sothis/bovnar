@@ -516,7 +516,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 | `BAM` |  977 |   2 | Bosnia-Herzegovina Convertible Mark |
 | `BBD` |   52 |   2 | Barbados Dollar |
 | `BDT` |   50 |   2 | Bangladeshi Taka |
-| `BGN` |  975 |   2 | Bulgarian Lev |
+| `BGN` |  975 |   2 | Bulgarian Lev *(historical; retired 2026-01-01)* |
 | `BHD` |   48 | **3** | Bahraini Dinar |
 | `BIF` |  108 | **0** | Burundian Franc |
 | `BMD` |   60 |   2 | Bermudian Dollar |
@@ -559,7 +559,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 | `GYD` |  328 |   2 | Guyanese Dollar |
 | `HKD` |  344 |   2 | Hong Kong Dollar |
 | `HNL` |  340 |   2 | Honduran Lempira |
-| `HRK` |  191 |   2 | Croatian Kuna |
+| `HRK` |  191 |   2 | Croatian Kuna *(historical; retired 2023-01-01)* |
 | `HTG` |  332 |   2 | Haitian Gourde |
 | `HUF` |  348 |   2 | Hungarian Forint |
 | `IDR` |  360 |   2 | Indonesian Rupiah |
@@ -627,7 +627,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 | `SGD` |  702 |   2 | Singapore Dollar |
 | `SHP` |  654 |   2 | Saint Helena Pound |
 | `SLE` |  925 |   2 | Sierra Leonean Leone |
-| `SLL` |  694 |   2 | Sierra Leonean Leone (old) |
+| `SLL` |  694 |   2 | Sierra Leonean Leone (old) *(historical; replaced by SLE 2022)* |
 | `SOS` |  706 |   2 | Somali Shilling |
 | `SSP` |  728 |   2 | South Sudanese Pound |
 | `SRD` |  968 |   2 | Surinamese Dollar |
@@ -668,7 +668,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 | `ZAR` |  710 |   2 | South African Rand |
 | `ZMW` |  967 |   2 | Zambian Kwacha |
 | `ZWG` |  924 |   2 | Zimbabwe Gold |
-| `ZWL` |  932 |   2 | Zimbabwean Dollar |
+| `ZWL` |  932 |   2 | Zimbabwean Dollar *(historical; superseded by ZWG 2024)* |
 
 > `CLF` is the only currency with 4 minor units.
 > `XTS` is the ISO 4217 testing code; present in the table but should not appear in production data.

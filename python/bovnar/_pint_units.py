@@ -7,7 +7,7 @@
 #   3 units (byte, decibel, neper) map to pint natives with documented semantic
 #   differences (see SEMANTIC_CAVEATS).
 #
-# 214 currencies (fiat + crypto + precious metals) have no pint dimension, so each
+# 216 currencies (fiat + crypto + precious metals) have no pint dimension, so each
 # is registered as its OWN independent dimension [currency_<CODE>] with the ISO/
 # crypto code as the reference unit. Consequences (all verified):
 #   * cross-currency .to() raises pint.DimensionalityError — never a silent 1:1

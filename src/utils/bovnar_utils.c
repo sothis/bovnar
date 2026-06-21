@@ -885,7 +885,7 @@ static const si_entry_t si_table[] = {
 	{"T",  1, si_tera},   {"G",  1, si_giga},   {"M",  1, si_mega},
 	{"k",  1, si_kilo},   {"h",  1, si_hecto},  {"da", 2, si_deca},
 	{"d",  1, si_deci},   {"c",  1, si_centi},  {"m",  1, si_milli},
-	{"\xc2\xb5", 2, si_micro},
+	{"\xc2\xb5", 2, si_micro}, {"u", 1, si_micro},  /* "u" = ASCII alias for micro (input only; canonical output is µ) */
 	{"n",  1, si_nano},   {"p",  1, si_pico},   {"f",  1, si_femto},
 	{"a",  1, si_atto},   {"z",  1, si_zepto},  {"y",  1, si_yocto},
 	{"r",  1, si_ronto},  {"q",  1, si_quecto},

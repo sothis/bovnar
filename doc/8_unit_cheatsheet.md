@@ -67,7 +67,7 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 | deci   | `d`    | 10⁻¹   | `si_deci`   |
 | centi  | `c`    | 10⁻²   | `si_centi`  |
 | milli  | `m`    | 10⁻³   | `si_milli`  |
-| micro  | `µ`    | 10⁻⁶   | `si_micro`  |
+| micro  | `µ` *(or `u`)* | 10⁻⁶ | `si_micro`  |
 | nano   | `n`    | 10⁻⁹   | `si_nano`   |
 | pico   | `p`    | 10⁻¹²  | `si_pico`   |
 | femto  | `f`    | 10⁻¹⁵  | `si_femto`  |
@@ -77,7 +77,7 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 | ronto  | `r`    | 10⁻²⁷  | `si_ronto`  |
 | quecto | `q`    | 10⁻³⁰  | `si_quecto` |
 
-> `µ` is U+00B5 MICRO SIGN (UTF-8 `0xC2 0xB5`). U+03BC (Greek small letter mu) is **not** accepted.
+> `µ` is U+00B5 MICRO SIGN (UTF-8 `0xC2 0xB5`). U+03BC (Greek small letter mu) is **not** accepted. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` = `µ~m`); the canonical output is always `µ`.
 > `da` is a two-character prefix: `da~m` = decametre.
 
 **Prefix–base ambiguities** — resolved by the mandatory `~`:

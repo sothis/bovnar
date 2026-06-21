@@ -565,7 +565,7 @@ All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10
 | deci   | `d`    | 10⁻¹   | `si_deci`   |
 | centi  | `c`    | 10⁻²   | `si_centi`  |
 | milli  | `m`    | 10⁻³   | `si_milli`  |
-| micro  | `µ`    | 10⁻⁶   | `si_micro`  |
+| micro  | `µ` *(or `u`)* | 10⁻⁶ | `si_micro`  |
 | nano   | `n`    | 10⁻⁹   | `si_nano`   |
 | pico   | `p`    | 10⁻¹²  | `si_pico`   |
 | femto  | `f`    | 10⁻¹⁵  | `si_femto`  |
@@ -575,7 +575,7 @@ All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10
 | ronto  | `r`    | 10⁻²⁷  | `si_ronto`  |
 | quecto | `q`    | 10⁻³⁰  | `si_quecto` |
 
-> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point and is **not** accepted.
+> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point and is **not** accepted. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` parses as `µ~m`); the canonical output form is always `µ`. Note `u` is also the bare symbol for the dalton, but the two never collide — a prefix only appears before `~`, a base only bare or after `~`.
 
 #### Prefix–Symbol Ambiguities
 

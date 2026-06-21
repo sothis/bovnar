@@ -267,6 +267,24 @@ class TestUnitParsing:
         assert self._parse("mol").components[0].base_unit == BaseUnit.MOL
         assert self._parse("µ~u").components[0].base_unit == BaseUnit.DALTON  # micro-dalton
 
+    @pytest.mark.parametrize("ascii_form,canonical", [
+        ("u~m", "µ~m"), ("u~s", "µ~s"), ("u~Pa", "µ~Pa"),
+    ])
+    def test_ascii_u_micro_prefix(self, ascii_form, canonical):
+        # "u" is accepted as an ASCII input alias for the micro prefix "µ";
+        # canonical output always normalises back to "µ".
+        vu = self._parse(ascii_form)
+        assert vu.components[0].si_prefix == SIPrefix.MICRO
+        assert bovnar.unit_to_str(vu) == canonical
+
+    def test_u_micro_prefix_and_dalton_base_coexist(self):
+        # "u" is BOTH the micro prefix (before ~) and the dalton base (bare or
+        # after ~); the mandatory ~ keeps them unambiguous. "u~u" = micro-dalton.
+        vu = self._parse("u~u")
+        assert vu.components[0].si_prefix == SIPrefix.MICRO
+        assert vu.components[0].base_unit == BaseUnit.DALTON
+        assert bovnar.unit_to_str(vu) == "µ~Da"
+
     def test_force_kgms2(self):
         vu = self._parse("k~g\u00b7m/s\u00b2")
         assert vu.num_components == 3

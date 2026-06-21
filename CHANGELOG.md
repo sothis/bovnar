@@ -128,6 +128,17 @@ non-version remainder is reported as a malformed directive rather than ignored.
   ordinary binary octet payloads (those under other keys are ignored rather than
   misread as channel/length framing). With no key set the demux behaves as before
   (every octet stream is demuxed).
+- **Currency catalogue — ZWG and XCG.** The Zimbabwe Gold (`$ZWG`) and Caribbean
+  guilder (`$XCG`) join the fiat catalogue as an **ABI-stable extension segment**
+  (`bu_zwg = 378`, `bu_xcg`), appended after the unit block rather than inside the
+  frozen 134–347 currency region so no existing enum value shifts. They are
+  recognised as currencies via the `BVN_CURRENCY_EXT_*` range; XCG carries ISO
+  numeric 532 (inherited from ANG, which it replaces).
+- **Unit aliases and symbol fixes.** The dalton accepts `amu` and `u` as input
+  aliases (canonical output stays `Da`); the micro SI prefix accepts an ASCII `u`
+  on input (canonical output stays `µ`); and the Rankine symbol is normalised
+  (absolute scale, factor 5⁄9, no affine offset). These are additive input
+  conveniences — canonical serialisation is unchanged.
 
 ### Changed
 

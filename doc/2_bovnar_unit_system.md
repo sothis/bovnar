@@ -484,7 +484,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **378** (verified by static assert `bu_ppb + 1 == 378`). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **380** (verified by static assert `bu_xcg + 1 == 380`). Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -1353,10 +1353,13 @@ typedef enum value_base_unit_e {
     /* Dimensionless ratio units */
     bu_percent, bu_per_mille, bu_per_myriad,
     bu_per_cent_mille, bu_ppm, bu_ppb,  /* = 377 */
+
+    /* ABI-stable currency extension segment, appended after the unit block. */
+    bu_zwg = 378, bu_xcg,               /* = 378, 379 */
 } value_base_unit_t;
 
 /* Total slot count — defined separately, not an enum member: */
-/* #define BVN_VALUE_BASE_UNIT_COUNT 378  (bu_ppb + 1) */
+/* #define BVN_VALUE_BASE_UNIT_COUNT 380  (bu_xcg + 1) */
 ```
 
 #### `unit_exponent_t`

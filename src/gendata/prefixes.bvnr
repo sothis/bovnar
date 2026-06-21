@@ -1,0 +1,266 @@
+#!bovnar 1.1
+# prefixes.bvnr — single source of truth for the SI and IEC prefixes.
+#
+# HOW THIS WORKS
+#   Hand-edited. gen_prefixes.py (at the repo root) regenerates the C prefix
+#   tables from this file on every build; never edit the generated
+#   *.gen.{h,inc}. To add, remove, or change a prefix, edit a record below and
+#   rebuild. Two lists: .si_prefixes and .iec_prefixes.
+#
+# STABLE IDS (ABI)
+#   .id is the si_prefix_id_t / iec_prefix_id_t enum value. Append-only: NEVER
+#   renumber or reuse an id. Each list is numbered from 1 (si_quecto.., iec_
+#   kibi..); the identity prefixes si_none/iec_none are id 0 and stay in C.
+#
+# FIELDS (one record per prefix)
+#   .id       enum value (stable); the C constant is  si_<name> / iec_<name>
+#   .name     enumerator suffix (e.g. "kilo", "kibi")
+#   .symbol   canonical OUTPUT symbol, real UTF-8 (e.g. "µ", "Ki")
+#   .exp      power of 10 (SI) or power of 2 (IEC); the scale factor is derived
+#   .aliases  every accepted INPUT spelling (e.g. micro: ["µ", "u"])
+
+.schema_version = <uint:16> 1;
+
+.si_prefixes = [
+  {
+    .id      = <uint:16>   1;
+    .name    = "quecto";
+    .symbol  = "q";
+    .exp     = -30;
+    .aliases = ["q"];
+  },
+  {
+    .id      = <uint:16>   2;
+    .name    = "ronto";
+    .symbol  = "r";
+    .exp     = -27;
+    .aliases = ["r"];
+  },
+  {
+    .id      = <uint:16>   3;
+    .name    = "yocto";
+    .symbol  = "y";
+    .exp     = -24;
+    .aliases = ["y"];
+  },
+  {
+    .id      = <uint:16>   4;
+    .name    = "zepto";
+    .symbol  = "z";
+    .exp     = -21;
+    .aliases = ["z"];
+  },
+  {
+    .id      = <uint:16>   5;
+    .name    = "atto";
+    .symbol  = "a";
+    .exp     = -18;
+    .aliases = ["a"];
+  },
+  {
+    .id      = <uint:16>   6;
+    .name    = "femto";
+    .symbol  = "f";
+    .exp     = -15;
+    .aliases = ["f"];
+  },
+  {
+    .id      = <uint:16>   7;
+    .name    = "pico";
+    .symbol  = "p";
+    .exp     = -12;
+    .aliases = ["p"];
+  },
+  {
+    .id      = <uint:16>   8;
+    .name    = "nano";
+    .symbol  = "n";
+    .exp     = -9;
+    .aliases = ["n"];
+  },
+  {
+    .id      = <uint:16>   9;
+    .name    = "micro";
+    .symbol  = "µ";
+    .exp     = -6;
+    .aliases = ["µ", "u"];
+  },
+  {
+    .id      = <uint:16>  10;
+    .name    = "milli";
+    .symbol  = "m";
+    .exp     = -3;
+    .aliases = ["m"];
+  },
+  {
+    .id      = <uint:16>  11;
+    .name    = "centi";
+    .symbol  = "c";
+    .exp     = -2;
+    .aliases = ["c"];
+  },
+  {
+    .id      = <uint:16>  12;
+    .name    = "deci";
+    .symbol  = "d";
+    .exp     = -1;
+    .aliases = ["d"];
+  },
+  {
+    .id      = <uint:16>  13;
+    .name    = "deca";
+    .symbol  = "da";
+    .exp     = 1;
+    .aliases = ["da"];
+  },
+  {
+    .id      = <uint:16>  14;
+    .name    = "hecto";
+    .symbol  = "h";
+    .exp     = 2;
+    .aliases = ["h"];
+  },
+  {
+    .id      = <uint:16>  15;
+    .name    = "kilo";
+    .symbol  = "k";
+    .exp     = 3;
+    .aliases = ["k"];
+  },
+  {
+    .id      = <uint:16>  16;
+    .name    = "mega";
+    .symbol  = "M";
+    .exp     = 6;
+    .aliases = ["M"];
+  },
+  {
+    .id      = <uint:16>  17;
+    .name    = "giga";
+    .symbol  = "G";
+    .exp     = 9;
+    .aliases = ["G"];
+  },
+  {
+    .id      = <uint:16>  18;
+    .name    = "tera";
+    .symbol  = "T";
+    .exp     = 12;
+    .aliases = ["T"];
+  },
+  {
+    .id      = <uint:16>  19;
+    .name    = "peta";
+    .symbol  = "P";
+    .exp     = 15;
+    .aliases = ["P"];
+  },
+  {
+    .id      = <uint:16>  20;
+    .name    = "exa";
+    .symbol  = "E";
+    .exp     = 18;
+    .aliases = ["E"];
+  },
+  {
+    .id      = <uint:16>  21;
+    .name    = "zetta";
+    .symbol  = "Z";
+    .exp     = 21;
+    .aliases = ["Z"];
+  },
+  {
+    .id      = <uint:16>  22;
+    .name    = "yotta";
+    .symbol  = "Y";
+    .exp     = 24;
+    .aliases = ["Y"];
+  },
+  {
+    .id      = <uint:16>  23;
+    .name    = "ronna";
+    .symbol  = "R";
+    .exp     = 27;
+    .aliases = ["R"];
+  },
+  {
+    .id      = <uint:16>  24;
+    .name    = "quetta";
+    .symbol  = "Q";
+    .exp     = 30;
+    .aliases = ["Q"];
+  }
+];
+
+.iec_prefixes = [
+  {
+    .id      = <uint:16>   1;
+    .name    = "kibi";
+    .symbol  = "Ki";
+    .exp     = 10;
+    .aliases = ["Ki"];
+  },
+  {
+    .id      = <uint:16>   2;
+    .name    = "mebi";
+    .symbol  = "Mi";
+    .exp     = 20;
+    .aliases = ["Mi"];
+  },
+  {
+    .id      = <uint:16>   3;
+    .name    = "gibi";
+    .symbol  = "Gi";
+    .exp     = 30;
+    .aliases = ["Gi"];
+  },
+  {
+    .id      = <uint:16>   4;
+    .name    = "tebi";
+    .symbol  = "Ti";
+    .exp     = 40;
+    .aliases = ["Ti"];
+  },
+  {
+    .id      = <uint:16>   5;
+    .name    = "pebi";
+    .symbol  = "Pi";
+    .exp     = 50;
+    .aliases = ["Pi"];
+  },
+  {
+    .id      = <uint:16>   6;
+    .name    = "exbi";
+    .symbol  = "Ei";
+    .exp     = 60;
+    .aliases = ["Ei"];
+  },
+  {
+    .id      = <uint:16>   7;
+    .name    = "zebi";
+    .symbol  = "Zi";
+    .exp     = 70;
+    .aliases = ["Zi"];
+  },
+  {
+    .id      = <uint:16>   8;
+    .name    = "yobi";
+    .symbol  = "Yi";
+    .exp     = 80;
+    .aliases = ["Yi"];
+  },
+  {
+    .id      = <uint:16>   9;
+    .name    = "robi";
+    .symbol  = "Ri";
+    .exp     = 90;
+    .aliases = ["Ri"];
+  },
+  {
+    .id      = <uint:16>  10;
+    .name    = "quebi";
+    .symbol  = "Qi";
+    .exp     = 100;
+    .aliases = ["Qi"];
+  }
+];

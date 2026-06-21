@@ -36,27 +36,11 @@ typedef struct {
 } bvni_pfx_t;
 static const bvni_pfx_t bvni_si_pfx_table[] = {
 	[si_none]   = {1e0,   0},
-	[si_quecto] = {1e-30,-30}, [si_ronto]  = {1e-27,-27}, [si_yocto] = {1e-24,-24},
-	[si_zepto]  = {1e-21,-21}, [si_atto]   = {1e-18,-18}, [si_femto] = {1e-15,-15},
-	[si_pico]   = {1e-12,-12}, [si_nano]   = {1e-9,  -9}, [si_micro] = {1e-6,  -6},
-	[si_milli]  = {1e-3,  -3}, [si_centi]  = {1e-2,  -2}, [si_deci]  = {1e-1,  -1},
-	[si_deca]   = {1e1,    1}, [si_hecto]  = {1e2,    2}, [si_kilo]  = {1e3,    3},
-	[si_mega]   = {1e6,    6}, [si_giga]   = {1e9,    9}, [si_tera]  = {1e12,  12},
-	[si_peta]   = {1e15,  15}, [si_exa]    = {1e18,  18}, [si_zetta] = {1e21,  21},
-	[si_yotta]  = {1e24,  24}, [si_ronna]  = {1e27,  27}, [si_quetta]= {1e30,  30},
+#include "bovnar_si_pfx_table.gen.inc"
 };
 static const bvni_pfx_t bvni_iec_pfx_table[] = {
 	[iec_none]  = {1.0,                                            0},
-	[iec_kibi]  = {(double)(1ull << 10),                          10},
-	[iec_mebi]  = {(double)(1ull << 20),                          20},
-	[iec_gibi]  = {(double)(1ull << 30),                          30},
-	[iec_tebi]  = {(double)(1ull << 40),                          40},
-	[iec_pebi]  = {(double)(1ull << 50),                          50},
-	[iec_exbi]  = {(double)(1ull << 60),                          60},
-	[iec_zebi]  = {(double)(1ull << 35) * (double)(1ull << 35),   70},
-	[iec_yobi]  = {(double)(1ull << 40) * (double)(1ull << 40),   80},
-	[iec_robi]  = {(double)(1ull << 45) * (double)(1ull << 45),   90},
-	[iec_quebi] = {(double)(1ull << 50) * (double)(1ull << 50),  100},
+#include "bovnar_iec_pfx_table.gen.inc"
 };
 static inline double bvni_prefix_factor(value_unit_component_t c)
 {

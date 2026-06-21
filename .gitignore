@@ -10,6 +10,5 @@ bovnar_merged_conly.txt
 bovnar_merged_all.txt
 bovnar.zip
 *.mgc
-# Generated single-file amalgamation (not shipped for now; regen: python3 amalgamate.py)
-dist/bovnar.c
-dist/bovnar.h
+# The single-file amalgamation regenerates into build/amalgamate/ (covered by
+# the build*/* rules above); it is not produced under dist/ anymore.

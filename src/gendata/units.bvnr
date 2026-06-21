@@ -1,0 +1,1825 @@
+#!bovnar 1.1
+# units.bvnr — single source of truth for all 163 physical base units.
+#
+# HOW THIS WORKS
+#   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
+#   from this file on every build; never edit the generated *.gen.{h,inc}. To
+#   add, remove, or change a unit, edit a record below and rebuild.
+#
+# STABLE IDS (ABI)
+#   .id is the value_base_unit_t enum value. Append-only: NEVER renumber or
+#   reuse an id — downstream C and the Python bindings are pinned to these
+#   integers. Physical units occupy 1..133 and 348..377; the gap 134..347
+#   belongs to currencies (see currencies.bvnr).
+#
+# FIELDS (one record per unit)
+#   .id       value_base_unit_t enum value (stable; see above)
+#   .name     enumerator suffix; the C constant is  bu_<name>
+#   .symbol   canonical OUTPUT symbol, real UTF-8 (e.g. "Ω", "°C")
+#   .factor   to_si_factor: value of one unit in coherent SI (bare float)
+#   .dims     SI dimension exponents as a NAMED struct with zeros omitted, so a
+#             dimensionless unit is .dims = {}. Field names: length mass time
+#             current temperature amount luminosity
+#   .affine   true for offset scales (e.g. °C); else false
+#   .offset   affine offset (bare float; 0.0 when .affine is false)
+#   .prefix   prefix policy: default | info | german | ratio | none
+#   .aliases  every accepted INPUT spelling, real UTF-8 (matched exactly);
+#             include the canonical symbol when it is itself parseable
+
+.schema_version = <uint:16> 1;
+
+.units = [
+  {
+    .id      = <uint:16>   1;
+    .name    = "bit";
+    .symbol  = "b";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = info;
+    .aliases = ["bits", "bit", "b"];
+  },
+  {
+    .id      = <uint:16>   2;
+    .name    = "byte";
+    .symbol  = "B";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = info;
+    .aliases = ["Bytes", "bytes", "Byte", "byte", "B"];
+  },
+  {
+    .id      = <uint:16>   3;
+    .name    = "second";
+    .symbol  = "s";
+    .factor  = 1.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["seconds", "second", "sec", "s"];
+  },
+  {
+    .id      = <uint:16>   4;
+    .name    = "meter";
+    .symbol  = "m";
+    .factor  = 1.0;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["metres", "meters", "metre", "meter", "m"];
+  },
+  {
+    .id      = <uint:16>   5;
+    .name    = "gram";
+    .symbol  = "g";
+    .factor  = 0.001;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["grams", "gram", "g"];
+  },
+  {
+    .id      = <uint:16>   6;
+    .name    = "ampere";
+    .symbol  = "A";
+    .factor  = 1.0;
+    .dims    = { .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["amperes", "ampere", "amps", "amp", "A"];
+  },
+  {
+    .id      = <uint:16>   7;
+    .name    = "kelvin";
+    .symbol  = "K";
+    .factor  = 1.0;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["kelvins", "kelvin", "K"];
+  },
+  {
+    .id      = <uint:16>   8;
+    .name    = "mol";
+    .symbol  = "mol";
+    .factor  = 1.0;
+    .dims    = { .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["moles", "mole", "mol"];
+  },
+  {
+    .id      = <uint:16>   9;
+    .name    = "candela";
+    .symbol  = "cd";
+    .factor  = 1.0;
+    .dims    = { .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["candelas", "candela", "cd"];
+  },
+  {
+    .id      = <uint:16>  10;
+    .name    = "hertz";
+    .symbol  = "Hz";
+    .factor  = 1.0;
+    .dims    = { .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["hertz", "Hz"];
+  },
+  {
+    .id      = <uint:16>  11;
+    .name    = "newton";
+    .symbol  = "N";
+    .factor  = 1.0;
+    .dims    = { .length = 1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["newtons", "newton", "N"];
+  },
+  {
+    .id      = <uint:16>  12;
+    .name    = "pascal";
+    .symbol  = "Pa";
+    .factor  = 1.0;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pascals", "pascal", "Pa"];
+  },
+  {
+    .id      = <uint:16>  13;
+    .name    = "joule";
+    .symbol  = "J";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["joules", "joule", "J"];
+  },
+  {
+    .id      = <uint:16>  14;
+    .name    = "watt";
+    .symbol  = "W";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["watts", "watt", "W"];
+  },
+  {
+    .id      = <uint:16>  15;
+    .name    = "volt";
+    .symbol  = "V";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -3; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["volts", "volt", "V"];
+  },
+  {
+    .id      = <uint:16>  16;
+    .name    = "ohm";
+    .symbol  = "Ω";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -3; .current = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["ohms", "Ω", "ohm", "Ohm"];
+  },
+  {
+    .id      = <uint:16>  17;
+    .name    = "farad";
+    .symbol  = "F";
+    .factor  = 1.0;
+    .dims    = { .length = -2; .mass = -1; .time = 4; .current = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["farads", "farad", "F"];
+  },
+  {
+    .id      = <uint:16>  18;
+    .name    = "coulomb";
+    .symbol  = "C";
+    .factor  = 1.0;
+    .dims    = { .time = 1; .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["coulombs", "coulomb", "C"];
+  },
+  {
+    .id      = <uint:16>  19;
+    .name    = "siemens";
+    .symbol  = "S";
+    .factor  = 1.0;
+    .dims    = { .length = -2; .mass = -1; .time = 3; .current = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["siemens", "S"];
+  },
+  {
+    .id      = <uint:16>  20;
+    .name    = "weber";
+    .symbol  = "Wb";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["webers", "weber", "Wb"];
+  },
+  {
+    .id      = <uint:16>  21;
+    .name    = "tesla";
+    .symbol  = "T";
+    .factor  = 1.0;
+    .dims    = { .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["teslas", "tesla", "T"];
+  },
+  {
+    .id      = <uint:16>  22;
+    .name    = "henry";
+    .symbol  = "H";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -2; .current = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["henries", "henrys", "henry", "H"];
+  },
+  {
+    .id      = <uint:16>  23;
+    .name    = "lumen";
+    .symbol  = "lm";
+    .factor  = 1.0;
+    .dims    = { .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["lumens", "lumen", "lm"];
+  },
+  {
+    .id      = <uint:16>  24;
+    .name    = "lux";
+    .symbol  = "lx";
+    .factor  = 1.0;
+    .dims    = { .length = -2; .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["lux", "lx"];
+  },
+  {
+    .id      = <uint:16>  25;
+    .name    = "becquerel";
+    .symbol  = "Bq";
+    .factor  = 1.0;
+    .dims    = { .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["becquerels", "becquerel", "Bq"];
+  },
+  {
+    .id      = <uint:16>  26;
+    .name    = "gray";
+    .symbol  = "Gy";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["grays", "gray", "Gy"];
+  },
+  {
+    .id      = <uint:16>  27;
+    .name    = "sievert";
+    .symbol  = "Sv";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["sieverts", "sievert", "Sv"];
+  },
+  {
+    .id      = <uint:16>  28;
+    .name    = "katal";
+    .symbol  = "kat";
+    .factor  = 1.0;
+    .dims    = { .time = -1; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["katals", "katal", "kat"];
+  },
+  {
+    .id      = <uint:16>  29;
+    .name    = "liter";
+    .symbol  = "L";
+    .factor  = 0.001;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["litres", "liters", "litre", "liter", "L", "l"];
+  },
+  {
+    .id      = <uint:16>  30;
+    .name    = "minute";
+    .symbol  = "min";
+    .factor  = 60.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["minutes", "minute", "min"];
+  },
+  {
+    .id      = <uint:16>  31;
+    .name    = "hour";
+    .symbol  = "h";
+    .factor  = 3600.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["hours", "hour", "h"];
+  },
+  {
+    .id      = <uint:16>  32;
+    .name    = "day";
+    .symbol  = "d";
+    .factor  = 86400.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["days", "day", "d"];
+  },
+  {
+    .id      = <uint:16>  33;
+    .name    = "degree";
+    .symbol  = "°";
+    .factor  = 0.017453292519943295;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["degrees", "degree", "degr", "deg", "°"];
+  },
+  {
+    .id      = <uint:16>  34;
+    .name    = "celsius";
+    .symbol  = "°C";
+    .factor  = 1.0;
+    .dims    = { .temperature = 1; };
+    .affine  = true;
+    .offset  = 273.15;
+    .prefix  = default;
+    .aliases = ["degreesC", "celsius", "degreeC", "degrC", "degC", "°C"];
+  },
+  {
+    .id      = <uint:16>  35;
+    .name    = "radian";
+    .symbol  = "rad";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["radians", "radian", "rad"];
+  },
+  {
+    .id      = <uint:16>  36;
+    .name    = "steradian";
+    .symbol  = "sr";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["steradians", "steradian", "sr"];
+  },
+  {
+    .id      = <uint:16>  37;
+    .name    = "tonne";
+    .symbol  = "t";
+    .factor  = 1000.0;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["tonnes", "tonne", "t"];
+  },
+  {
+    .id      = <uint:16>  38;
+    .name    = "bar";
+    .symbol  = "bar";
+    .factor  = 100000.0;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["bars", "bar"];
+  },
+  {
+    .id      = <uint:16>  39;
+    .name    = "electronvolt";
+    .symbol  = "eV";
+    .factor  = 1.602176634e-19;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["electronvolts", "electronvolt", "eV"];
+  },
+  {
+    .id      = <uint:16>  40;
+    .name    = "dalton";
+    .symbol  = "Da";
+    .factor  = 1.6605390666e-27;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["daltons", "dalton", "amu", "Da", "u"];
+  },
+  {
+    .id      = <uint:16>  41;
+    .name    = "astronomical_unit";
+    .symbol  = "au";
+    .factor  = 149597870700.0;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["au"];
+  },
+  {
+    .id      = <uint:16>  42;
+    .name    = "hectare";
+    .symbol  = "ha";
+    .factor  = 10000.0;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["hectares", "hectare", "ha"];
+  },
+  {
+    .id      = <uint:16>  43;
+    .name    = "week";
+    .symbol  = "wk";
+    .factor  = 604800.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["weeks", "week", "wk"];
+  },
+  {
+    .id      = <uint:16>  44;
+    .name    = "year";
+    .symbol  = "yr";
+    .factor  = 31557600.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["years", "year", "yr"];
+  },
+  {
+    .id      = <uint:16>  45;
+    .name    = "inch";
+    .symbol  = "in";
+    .factor  = 0.0254;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["inches", "inch", "in"];
+  },
+  {
+    .id      = <uint:16>  46;
+    .name    = "foot";
+    .symbol  = "ft";
+    .factor  = 0.3048;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["foot", "feet", "ft"];
+  },
+  {
+    .id      = <uint:16>  47;
+    .name    = "yard";
+    .symbol  = "yd";
+    .factor  = 0.9144;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["yards", "yard", "yd"];
+  },
+  {
+    .id      = <uint:16>  48;
+    .name    = "mile";
+    .symbol  = "mi";
+    .factor  = 1609.344;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["miles", "mile", "mi"];
+  },
+  {
+    .id      = <uint:16>  49;
+    .name    = "nautical_mile";
+    .symbol  = "nmi";
+    .factor  = 1852.0;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["nautical_miles", "nautical_mile", "nmi"];
+  },
+  {
+    .id      = <uint:16>  50;
+    .name    = "angstrom";
+    .symbol  = "Å";
+    .factor  = 1e-10;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["angstroms", "angstrom", "Å", "Å"];
+  },
+  {
+    .id      = <uint:16>  51;
+    .name    = "light_year";
+    .symbol  = "ly";
+    .factor  = 9460730472580800.0;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["light_years", "light_year", "ly"];
+  },
+  {
+    .id      = <uint:16>  52;
+    .name    = "parsec";
+    .symbol  = "pc";
+    .factor  = 3.085677581491367e+16;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["parsecs", "parsec", "pc"];
+  },
+  {
+    .id      = <uint:16>  53;
+    .name    = "furlong";
+    .symbol  = "fur";
+    .factor  = 201.168;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["furlongs", "furlong", "fur"];
+  },
+  {
+    .id      = <uint:16>  54;
+    .name    = "fathom";
+    .symbol  = "fath";
+    .factor  = 1.8288;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["fathoms", "fathom", "fath"];
+  },
+  {
+    .id      = <uint:16>  55;
+    .name    = "pound";
+    .symbol  = "lb";
+    .factor  = 0.45359237;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pounds", "pound", "lbs", "lb"];
+  },
+  {
+    .id      = <uint:16>  56;
+    .name    = "ounce";
+    .symbol  = "oz";
+    .factor  = 0.028349523125;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["ounces", "ounce", "oz"];
+  },
+  {
+    .id      = <uint:16>  57;
+    .name    = "grain";
+    .symbol  = "gr";
+    .factor  = 6.479891e-05;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["grains", "grain", "gr"];
+  },
+  {
+    .id      = <uint:16>  58;
+    .name    = "stone";
+    .symbol  = "st";
+    .factor  = 6.35029318;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["stones", "stone", "st"];
+  },
+  {
+    .id      = <uint:16>  59;
+    .name    = "short_ton";
+    .symbol  = "tn_sh";
+    .factor  = 907.18474;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["short_tons", "short_ton", "tn_sh"];
+  },
+  {
+    .id      = <uint:16>  60;
+    .name    = "long_ton";
+    .symbol  = "tn_l";
+    .factor  = 1016.0469088;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["long_tons", "long_ton", "tn_l"];
+  },
+  {
+    .id      = <uint:16>  61;
+    .name    = "troy_ounce";
+    .symbol  = "oz_t";
+    .factor  = 0.0311034768;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["troy_ounces", "troy_ounce", "oz_t"];
+  },
+  {
+    .id      = <uint:16>  62;
+    .name    = "carat";
+    .symbol  = "ct";
+    .factor  = 0.0002;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["carats", "carat", "ct"];
+  },
+  {
+    .id      = <uint:16>  63;
+    .name    = "fahrenheit";
+    .symbol  = "°F";
+    .factor  = 0.5555555555555556;
+    .dims    = { .temperature = 1; };
+    .affine  = true;
+    .offset  = 255.37222222222223;
+    .prefix  = default;
+    .aliases = ["fahrenheit", "degreesF", "degreeF", "degrF", "degF", "°F"];
+  },
+  {
+    .id      = <uint:16>  64;
+    .name    = "atmosphere";
+    .symbol  = "atm";
+    .factor  = 101325.0;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["atmospheres", "atmosphere", "atm"];
+  },
+  {
+    .id      = <uint:16>  65;
+    .name    = "mmhg";
+    .symbol  = "mmHg";
+    .factor  = 133.322387415;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["mmHg"];
+  },
+  {
+    .id      = <uint:16>  66;
+    .name    = "torr";
+    .symbol  = "Torr";
+    .factor  = 133.32236842105263;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["Torr", "torr"];
+  },
+  {
+    .id      = <uint:16>  67;
+    .name    = "psi";
+    .symbol  = "psi";
+    .factor  = 6894.757293168361;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["psi"];
+  },
+  {
+    .id      = <uint:16>  68;
+    .name    = "calorie";
+    .symbol  = "cal";
+    .factor  = 4.184;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["calories", "calorie", "cal"];
+  },
+  {
+    .id      = <uint:16>  69;
+    .name    = "btu";
+    .symbol  = "Btu";
+    .factor  = 1055.05585262;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["Btu", "BTU", "btu"];
+  },
+  {
+    .id      = <uint:16>  70;
+    .name    = "erg";
+    .symbol  = "erg";
+    .factor  = 1e-07;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["ergs", "erg"];
+  },
+  {
+    .id      = <uint:16>  71;
+    .name    = "therm";
+    .symbol  = "thm";
+    .factor  = 105480400.0;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["therms", "therm", "thm"];
+  },
+  {
+    .id      = <uint:16>  72;
+    .name    = "horsepower";
+    .symbol  = "hp";
+    .factor  = 745.69987158227;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["horsepower", "hp"];
+  },
+  {
+    .id      = <uint:16>  73;
+    .name    = "pound_force";
+    .symbol  = "lbf";
+    .factor  = 4.4482216152605;
+    .dims    = { .length = 1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pound_force", "lbf"];
+  },
+  {
+    .id      = <uint:16>  74;
+    .name    = "dyne";
+    .symbol  = "dyn";
+    .factor  = 1e-05;
+    .dims    = { .length = 1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["dynes", "dyne", "dyn"];
+  },
+  {
+    .id      = <uint:16>  75;
+    .name    = "kip";
+    .symbol  = "kip";
+    .factor  = 4448.2216152605;
+    .dims    = { .length = 1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["kips", "kip"];
+  },
+  {
+    .id      = <uint:16>  76;
+    .name    = "knot";
+    .symbol  = "kn";
+    .factor  = 0.5144444444444445;
+    .dims    = { .length = 1; .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["knots", "knot", "kn"];
+  },
+  {
+    .id      = <uint:16>  77;
+    .name    = "gallon";
+    .symbol  = "gal";
+    .factor  = 0.003785411784;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gallons", "gallon", "gal"];
+  },
+  {
+    .id      = <uint:16>  78;
+    .name    = "gallon_uk";
+    .symbol  = "gal_uk";
+    .factor  = 0.00454609;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gallons_uk", "gallon_uk", "gal_uk"];
+  },
+  {
+    .id      = <uint:16>  79;
+    .name    = "quart";
+    .symbol  = "qt";
+    .factor  = 0.000946352946;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["quarts", "quart", "qt"];
+  },
+  {
+    .id      = <uint:16>  80;
+    .name    = "pint";
+    .symbol  = "pt";
+    .factor  = 0.000473176473;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pints", "pint", "pt"];
+  },
+  {
+    .id      = <uint:16>  81;
+    .name    = "cup";
+    .symbol  = "cup";
+    .factor  = 0.0002365882365;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["cups", "cup"];
+  },
+  {
+    .id      = <uint:16>  82;
+    .name    = "fluid_ounce";
+    .symbol  = "fl_oz";
+    .factor  = 2.95735295625e-05;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["fluid_ounces", "fluid_ounce", "fl_oz"];
+  },
+  {
+    .id      = <uint:16>  83;
+    .name    = "tablespoon";
+    .symbol  = "tbsp";
+    .factor  = 1.478676478125e-05;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["tablespoons", "tablespoon", "tbsp"];
+  },
+  {
+    .id      = <uint:16>  84;
+    .name    = "teaspoon";
+    .symbol  = "tsp";
+    .factor  = 4.92892159375e-06;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["teaspoons", "teaspoon", "tsp"];
+  },
+  {
+    .id      = <uint:16>  85;
+    .name    = "barrel";
+    .symbol  = "bbl";
+    .factor  = 0.158987294928;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["barrels", "barrel", "bbl"];
+  },
+  {
+    .id      = <uint:16>  86;
+    .name    = "acre";
+    .symbol  = "ac";
+    .factor  = 4046.8564224;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["acres", "acre", "ac"];
+  },
+  {
+    .id      = <uint:16>  87;
+    .name    = "barn";
+    .symbol  = "barn";
+    .factor  = 1e-28;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["barns", "barn"];
+  },
+  {
+    .id      = <uint:16>  88;
+    .name    = "arcminute";
+    .symbol  = "arcmin";
+    .factor  = 0.0002908882086657216;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["arcminutes", "arcminute", "arcmin"];
+  },
+  {
+    .id      = <uint:16>  89;
+    .name    = "arcsecond";
+    .symbol  = "arcsec";
+    .factor  = 4.84813681109536e-06;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["arcseconds", "arcsecond", "arcsec"];
+  },
+  {
+    .id      = <uint:16>  90;
+    .name    = "grad";
+    .symbol  = "grad";
+    .factor  = 0.015707963267948967;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gradians", "gradian", "grad", "gon"];
+  },
+  {
+    .id      = <uint:16>  91;
+    .name    = "poise";
+    .symbol  = "P";
+    .factor  = 0.1;
+    .dims    = { .length = -1; .mass = 1; .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["poises", "poise", "P"];
+  },
+  {
+    .id      = <uint:16>  92;
+    .name    = "stokes";
+    .symbol  = "St";
+    .factor  = 0.0001;
+    .dims    = { .length = 2; .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["stokes", "stoke", "St"];
+  },
+  {
+    .id      = <uint:16>  93;
+    .name    = "gauss";
+    .symbol  = "G";
+    .factor  = 0.0001;
+    .dims    = { .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gauss", "G"];
+  },
+  {
+    .id      = <uint:16>  94;
+    .name    = "maxwell";
+    .symbol  = "Mx";
+    .factor  = 1e-08;
+    .dims    = { .length = 2; .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["maxwells", "maxwell", "Mx"];
+  },
+  {
+    .id      = <uint:16>  95;
+    .name    = "oersted";
+    .symbol  = "Oe";
+    .factor  = 79.57747154594767;
+    .dims    = { .length = -1; .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["oersteds", "oersted", "Oe"];
+  },
+  {
+    .id      = <uint:16>  96;
+    .name    = "stilb";
+    .symbol  = "sb";
+    .factor  = 10000.0;
+    .dims    = { .length = -2; .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["stilbs", "stilb", "sb"];
+  },
+  {
+    .id      = <uint:16>  97;
+    .name    = "phot";
+    .symbol  = "ph";
+    .factor  = 10000.0;
+    .dims    = { .length = -2; .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["phots", "phot", "ph"];
+  },
+  {
+    .id      = <uint:16>  98;
+    .name    = "galileo";
+    .symbol  = "Gal";
+    .factor  = 0.01;
+    .dims    = { .length = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["galileos", "galileo", "Gal"];
+  },
+  {
+    .id      = <uint:16>  99;
+    .name    = "curie";
+    .symbol  = "Ci";
+    .factor  = 37000000000.0;
+    .dims    = { .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["curies", "curie", "Ci"];
+  },
+  {
+    .id      = <uint:16> 100;
+    .name    = "roentgen";
+    .symbol  = "R";
+    .factor  = 0.000258;
+    .dims    = { .mass = -1; .time = 1; .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["roentgens", "roentgen", "R"];
+  },
+  {
+    .id      = <uint:16> 101;
+    .name    = "rem";
+    .symbol  = "rem";
+    .factor  = 0.01;
+    .dims    = { .length = 2; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["rems", "rem"];
+  },
+  {
+    .id      = <uint:16> 102;
+    .name    = "neper";
+    .symbol  = "Np";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["nepers", "neper", "Np"];
+  },
+  {
+    .id      = <uint:16> 103;
+    .name    = "decibel";
+    .symbol  = "dB";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["decibels", "decibel", "dB"];
+  },
+  {
+    .id      = <uint:16> 104;
+    .name    = "rankine";
+    .symbol  = "°Ra";
+    .factor  = 0.5555555555555556;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["degreesRa", "degreeRa", "rankine", "degrRa", "degRa", "°Ra", "Ra"];
+  },
+  {
+    .id      = <uint:16> 105;
+    .name    = "slug";
+    .symbol  = "slug";
+    .factor  = 14.593902937;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["slugs", "slug"];
+  },
+  {
+    .id      = <uint:16> 106;
+    .name    = "thou";
+    .symbol  = "thou";
+    .factor  = 2.54e-05;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["thou", "mils", "mil"];
+  },
+  {
+    .id      = <uint:16> 107;
+    .name    = "pint_uk";
+    .symbol  = "pt_uk";
+    .factor  = 0.00056826125;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pints_uk", "pint_uk", "pt_uk"];
+  },
+  {
+    .id      = <uint:16> 108;
+    .name    = "fluid_ounce_uk";
+    .symbol  = "fl_oz_uk";
+    .factor  = 2.84130625e-05;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["fluid_ounces_uk", "fluid_ounce_uk", "fl_oz_uk"];
+  },
+  {
+    .id      = <uint:16> 109;
+    .name    = "quart_uk";
+    .symbol  = "qt_uk";
+    .factor  = 0.0011365225;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["quarts_uk", "quart_uk", "qt_uk"];
+  },
+  {
+    .id      = <uint:16> 110;
+    .name    = "var";
+    .symbol  = "var";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["vars", "var"];
+  },
+  {
+    .id      = <uint:16> 111;
+    .name    = "volt_ampere";
+    .symbol  = "VA";
+    .factor  = 1.0;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["volt_amperes", "volt_ampere", "VA"];
+  },
+  {
+    .id      = <uint:16> 112;
+    .name    = "kilogram_force";
+    .symbol  = "kgf";
+    .factor  = 9.80665;
+    .dims    = { .length = 1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["kilogram_force", "kgf"];
+  },
+  {
+    .id      = <uint:16> 113;
+    .name    = "inch_hg";
+    .symbol  = "inHg";
+    .factor  = 3386.388645;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["inch_mercury", "inch_hg", "inHg"];
+  },
+  {
+    .id      = <uint:16> 114;
+    .name    = "rpm";
+    .symbol  = "rpm";
+    .factor  = 0.016666666666666666;
+    .dims    = { .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["rpm"];
+  },
+  {
+    .id      = <uint:16> 115;
+    .name    = "foot_pound";
+    .symbol  = "ft_lb";
+    .factor  = 1.3558179483;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["foot_pounds", "foot_pound", "ft_lb"];
+  },
+  {
+    .id      = <uint:16> 116;
+    .name    = "dram";
+    .symbol  = "dr";
+    .factor  = 0.0017718451953125;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["drams", "dram", "dr"];
+  },
+  {
+    .id      = <uint:16> 117;
+    .name    = "pennyweight";
+    .symbol  = "dwt";
+    .factor  = 0.00155517384;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pennyweights", "pennyweight", "dwt"];
+  },
+  {
+    .id      = <uint:16> 118;
+    .name    = "chain";
+    .symbol  = "ch";
+    .factor  = 20.1168;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["chains", "chain", "ch"];
+  },
+  {
+    .id      = <uint:16> 119;
+    .name    = "rod";
+    .symbol  = "rd";
+    .factor  = 5.0292;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["rods", "rod", "rd"];
+  },
+  {
+    .id      = <uint:16> 120;
+    .name    = "gill";
+    .symbol  = "gi";
+    .factor  = 0.00011829411825;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gills", "gill", "gi"];
+  },
+  {
+    .id      = <uint:16> 121;
+    .name    = "gill_uk";
+    .symbol  = "gi_uk";
+    .factor  = 0.0001420653125;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gill_uk", "gills_uk", "gi_uk"];
+  },
+  {
+    .id      = <uint:16> 122;
+    .name    = "standard_gravity";
+    .symbol  = "gn";
+    .factor  = 9.80665;
+    .dims    = { .length = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["standard_gravity", "gn"];
+  },
+  {
+    .id      = <uint:16> 123;
+    .name    = "metric_horsepower";
+    .symbol  = "PS";
+    .factor  = 735.49875;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["metric_horsepower", "PS", "CV"];
+  },
+  {
+    .id      = <uint:16> 124;
+    .name    = "revolution";
+    .symbol  = "rev";
+    .factor  = 6.283185307179586;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["revolutions", "revolution", "turns", "turn", "rev"];
+  },
+  {
+    .id      = <uint:16> 125;
+    .name    = "month";
+    .symbol  = "mo";
+    .factor  = 2629800.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["months", "month", "mo"];
+  },
+  {
+    .id      = <uint:16> 126;
+    .name    = "fortnight";
+    .symbol  = "fn";
+    .factor  = 1209600.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["fortnights", "fortnight", "fn"];
+  },
+  {
+    .id      = <uint:16> 127;
+    .name    = "atmosphere_technical";
+    .symbol  = "at";
+    .factor  = 98066.5;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["atmosphere_technical", "at"];
+  },
+  {
+    .id      = <uint:16> 128;
+    .name    = "tex";
+    .symbol  = "tex";
+    .factor  = 1e-06;
+    .dims    = { .length = -1; .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["tex"];
+  },
+  {
+    .id      = <uint:16> 129;
+    .name    = "denier";
+    .symbol  = "den";
+    .factor  = 1.1111111111111111e-07;
+    .dims    = { .length = -1; .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["deniers", "denier", "den"];
+  },
+  {
+    .id      = <uint:16> 130;
+    .name    = "fluid_dram";
+    .symbol  = "fl_dr";
+    .factor  = 3.6966911953125e-06;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["fluid_drams", "fluid_dram", "fl_drams", "fl_dr"];
+  },
+  {
+    .id      = <uint:16> 131;
+    .name    = "minim";
+    .symbol  = "minim";
+    .factor  = 6.1611519921875e-08;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["minims", "minim"];
+  },
+  {
+    .id      = <uint:16> 132;
+    .name    = "peck";
+    .symbol  = "pk";
+    .factor  = 0.00880976754172;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["pecks", "peck", "pk"];
+  },
+  {
+    .id      = <uint:16> 133;
+    .name    = "bushel";
+    .symbol  = "bsh";
+    .factor  = 0.03523907016688;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["bushels", "bushel", "bsh"];
+  },
+  {
+    .id      = <uint:16> 348;
+    .name    = "pfund";
+    .symbol  = "Pfd";
+    .factor  = 0.5;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["pfunds", "pfund", "Pfd"];
+  },
+  {
+    .id      = <uint:16> 349;
+    .name    = "zentner";
+    .symbol  = "Ztr";
+    .factor  = 50.0;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["zentner", "Ztr"];
+  },
+  {
+    .id      = <uint:16> 350;
+    .name    = "doppelzentner";
+    .symbol  = "dz";
+    .factor  = 100.0;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["doppelzentner", "dz"];
+  },
+  {
+    .id      = <uint:16> 351;
+    .name    = "lot";
+    .symbol  = "lot";
+    .factor  = 0.015625;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["lots", "lot"];
+  },
+  {
+    .id      = <uint:16> 352;
+    .name    = "prussian_line";
+    .symbol  = "prln";
+    .factor  = 0.002179534722222222;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["prussian_line", "linie", "prln"];
+  },
+  {
+    .id      = <uint:16> 353;
+    .name    = "prussian_zoll";
+    .symbol  = "prz";
+    .factor  = 0.026154416666666666;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["prussian_zoll", "zoll", "prz"];
+  },
+  {
+    .id      = <uint:16> 354;
+    .name    = "prussian_fuss";
+    .symbol  = "prf";
+    .factor  = 0.313853;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["preussischer_fuss", "prussian_fuss", "prf"];
+  },
+  {
+    .id      = <uint:16> 355;
+    .name    = "prussian_elle";
+    .symbol  = "elle";
+    .factor  = 0.66716;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["preussische_elle", "prussian_elle", "elle"];
+  },
+  {
+    .id      = <uint:16> 356;
+    .name    = "prussian_rute";
+    .symbol  = "rute";
+    .factor  = 3.76624;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["preussische_rute", "prussian_rute", "rute"];
+  },
+  {
+    .id      = <uint:16> 357;
+    .name    = "klafter";
+    .symbol  = "klafter";
+    .factor  = 1.88312;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["prussian_klafter", "klafter"];
+  },
+  {
+    .id      = <uint:16> 358;
+    .name    = "german_mile";
+    .symbol  = "dt_mi";
+    .factor  = 7420.44;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["german_mile", "deutsche_meile", "dt_mi"];
+  },
+  {
+    .id      = <uint:16> 359;
+    .name    = "morgen";
+    .symbol  = "morgen";
+    .factor  = 2553.22;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["prussian_morgen", "morgen"];
+  },
+  {
+    .id      = <uint:16> 360;
+    .name    = "scheffel";
+    .symbol  = "schffl";
+    .factor  = 0.054961;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = german;
+    .aliases = ["prussian_scheffel", "scheffel", "schffl"];
+  },
+  {
+    .id      = <uint:16> 361;
+    .name    = "survey_foot";
+    .symbol  = "ftUS";
+    .factor  = 0.3048006096012192;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["survey_foot", "ftUS"];
+  },
+  {
+    .id      = <uint:16> 362;
+    .name    = "league";
+    .symbol  = "lea";
+    .factor  = 4828.032;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["leagues", "league", "lea"];
+  },
+  {
+    .id      = <uint:16> 363;
+    .name    = "cable";
+    .symbol  = "cbl";
+    .factor  = 185.2;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["cables", "cable", "cbl"];
+  },
+  {
+    .id      = <uint:16> 364;
+    .name    = "hand";
+    .symbol  = "hand";
+    .factor  = 0.1016;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["hands", "hand"];
+  },
+  {
+    .id      = <uint:16> 365;
+    .name    = "quintal";
+    .symbol  = "qntl";
+    .factor  = 100.0;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["quintals", "quintal", "qntl"];
+  },
+  {
+    .id      = <uint:16> 366;
+    .name    = "scruple";
+    .symbol  = "sc";
+    .factor  = 0.0012959782;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["scruples", "scruple", "sc"];
+  },
+  {
+    .id      = <uint:16> 367;
+    .name    = "baud";
+    .symbol  = "Bd";
+    .factor  = 1.0;
+    .dims    = { .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["bauds", "baud", "Bd"];
+  },
+  {
+    .id      = <uint:16> 368;
+    .name    = "delisle";
+    .symbol  = "°De";
+    .factor  = -0.6666666666666666;
+    .dims    = { .temperature = 1; };
+    .affine  = true;
+    .offset  = 373.15;
+    .prefix  = default;
+    .aliases = ["degreesDe", "degreeDe", "delisle", "degrDe", "degDe", "°De"];
+  },
+  {
+    .id      = <uint:16> 369;
+    .name    = "newton_temp";
+    .symbol  = "°N";
+    .factor  = 3.0303030303030303;
+    .dims    = { .temperature = 1; };
+    .affine  = true;
+    .offset  = 273.15;
+    .prefix  = default;
+    .aliases = ["newton_temperature", "degreesN", "degreeN", "degrN", "degN", "°N"];
+  },
+  {
+    .id      = <uint:16> 370;
+    .name    = "reaumur";
+    .symbol  = "°Re";
+    .factor  = 1.25;
+    .dims    = { .temperature = 1; };
+    .affine  = true;
+    .offset  = 273.15;
+    .prefix  = default;
+    .aliases = ["degreesRe", "degreeRe", "reaumur", "degrRe", "degRe", "°Re"];
+  },
+  {
+    .id      = <uint:16> 371;
+    .name    = "romer";
+    .symbol  = "°Ro";
+    .factor  = 1.9047619047619047;
+    .dims    = { .temperature = 1; };
+    .affine  = true;
+    .offset  = 258.8642857142857;
+    .prefix  = default;
+    .aliases = ["degreesRo", "degreeRo", "degrRo", "degRo", "romer", "°Ro"];
+  },
+  {
+    .id      = <uint:16> 372;
+    .name    = "percent";
+    .symbol  = "%";
+    .factor  = 0.01;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["percent", "%"];
+  },
+  {
+    .id      = <uint:16> 373;
+    .name    = "per_mille";
+    .symbol  = "‰";
+    .factor  = 0.001;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["per_mille", "‰"];
+  },
+  {
+    .id      = <uint:16> 374;
+    .name    = "per_myriad";
+    .symbol  = "‱";
+    .factor  = 0.0001;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["per_myriad", "‱"];
+  },
+  {
+    .id      = <uint:16> 375;
+    .name    = "per_cent_mille";
+    .symbol  = "pcm";
+    .factor  = 1e-05;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["per_cent_mille", "pcm"];
+  },
+  {
+    .id      = <uint:16> 376;
+    .name    = "ppm";
+    .symbol  = "ppm";
+    .factor  = 1e-06;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["ppm"];
+  },
+  {
+    .id      = <uint:16> 377;
+    .name    = "ppb";
+    .symbol  = "ppb";
+    .factor  = 1e-09;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["ppb"];
+  }
+];

@@ -30,6 +30,12 @@ OFF for wheel builds; GCC 14's LTO ICEs on bvn_init_run_luts under manylinux)"
 option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
     ON)
+option(BVNR_REGEN_TABLES
+    "Force-regenerate the unit + prefix + currency tables from src/gendata/*.bvnr. \
+The *.gen.inc snippets are build artifacts in <build>/generated (not committed): \
+they are regenerated automatically when missing, and unconditionally when this is \
+ON. Generation uses a small built-in reader and needs only Python 3 (no bovnar)."
+    OFF)
 
 if(MSVC)
     # MSVC (x64). /utf-8 so the UTF-8 string literals in the sources (unit
@@ -198,6 +204,11 @@ set(BVNR_SOURCES
 
 add_library(bvnr_objects OBJECT ${BVNR_SOURCES})
 target_compile_options(bvnr_objects PRIVATE ${BVNR_C_FLAGS})
+# The generated *.gen.inc snippets are build artifacts (not committed); they are
+# produced into BVNR_GENERATED_DIR by the generation step below and found via the
+# private include path here. The public *.gen.h enum headers stay in include/.
+set(BVNR_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${BVNR_GENERATED_DIR})
 target_include_directories(bvnr_objects
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -205,7 +216,30 @@ target_include_directories(bvnr_objects
         ${CMAKE_CURRENT_SOURCE_DIR}/src/io
         ${CMAKE_CURRENT_SOURCE_DIR}/src/lexer
         ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+        ${BVNR_GENERATED_DIR}
 )
+
+# Generate the *.gen.inc snippets into BVNR_GENERATED_DIR. They are build
+# artifacts (not committed), so they must be produced before the library
+# compiles: regenerate when missing, or unconditionally when BVNR_REGEN_TABLES is
+# ON. The generators parse the src/gendata/*.bvnr documents with a small built-in
+# reader (bvnr_data.py) — only Python 3 is needed, no bovnar library.
+if(BVNR_REGEN_TABLES OR NOT EXISTS ${BVNR_GENERATED_DIR}/bovnar_si_conv_table.gen.inc)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    foreach(_gen gen_units gen_prefixes gen_currencies)
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E env
+                    BVNR_GENERATED_DIR=${BVNR_GENERATED_DIR}
+                    ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${_gen}.py
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            RESULT_VARIABLE _bvnr_gen_rc)
+        if(NOT _bvnr_gen_rc EQUAL 0)
+            message(FATAL_ERROR
+                "Failed to generate the unit/prefix/currency tables (${_gen}.py). "
+                "These need only Python 3 — check that ${Python3_EXECUTABLE} runs.")
+        endif()
+    endforeach()
+endif()
 
 # Both libraries share the base name "bvnr", differentiated only by extension:
 # the static archive is libbvnr.a and the shared object is libbvnr.so (the CMake
@@ -329,6 +363,9 @@ if(NOT SKBUILD)
 
     install(FILES
         include/bovnar.h
+        include/bovnar_units.gen.h
+        include/bovnar_si_prefix.gen.h
+        include/bovnar_iec_prefix.gen.h
         include/bovnar_currency.h
         include/bovnar_dom.h
         include/bovnar_si_units.h

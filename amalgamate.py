@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Generate a single-file amalgamation of the Bovnar library into dist/:
+Generate a single-file amalgamation of the Bovnar library into build/amalgamate/:
 
-    dist/bovnar.h   -- the complete public API (all include/*.h, deduped)
-    dist/bovnar.c   -- the complete implementation (all src/**/*.{c,h} except
-                       the CLI src/bovnar.c), which #include "bovnar.h"
+    build/amalgamate/bovnar.h  -- the complete public API (all include/*.h)
+    build/amalgamate/bovnar.c  -- the complete implementation (all src/**/*.{c,h}
+                                  except the CLI src/bovnar.c), #include "bovnar.h"
 
 A consumer then needs only those two files:
 
@@ -21,8 +21,12 @@ import os, re, sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
-# Directories searched to resolve a project `#include "name"`.
+# Directories searched to resolve a project `#include "name"`. The generated
+# *.gen.inc snippets are build artifacts (not committed); they live in
+# BVNR_GENERATED_DIR (passed by the build, default build/generated), which is
+# searched first so the amalgamation can inline them.
 SEARCH_DIRS = [
+    os.environ.get("BVNR_GENERATED_DIR", os.path.join(ROOT, "build", "generated")),
     "include",
     "src", "src/dom", "src/io", "src/lexer",
     "src/stream", "src/utils", "src/validator", "src/writer",
@@ -177,7 +181,7 @@ USAGE = (
     "usage: amalgamate.py [OUT_DIR]\n"
     "\n"
     "Generate the single-file amalgamation (bovnar.h + bovnar.c).\n"
-    "OUT_DIR defaults to the repository's dist/ directory.\n"
+    "OUT_DIR defaults to the repository's build/amalgamate/ directory.\n"
 )
 
 
@@ -189,7 +193,7 @@ def main():
     if len(args) > 1:
         sys.stderr.write("error: too many arguments\n\n" + USAGE)
         sys.exit(2)
-    out_dir = args[0] if args else os.path.join(ROOT, "dist")
+    out_dir = args[0] if args else os.path.join(ROOT, "build", "amalgamate")
     os.makedirs(out_dir, exist_ok=True)
     hdr, header_inlined = build_header()
     impl = build_impl(header_inlined)

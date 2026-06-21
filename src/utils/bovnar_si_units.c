@@ -121,170 +121,12 @@ typedef struct {
  */
 static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	[bu_none]               = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_bit]                = { bu_bit,                1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_byte]               = { bu_byte,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_second]             = { bu_second,             1.0,        {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_meter]              = { bu_meter,              1.0,        {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gram]               = { bu_gram,               1e-3,       {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_ampere]             = { bu_ampere,             1.0,        {0, 0, 0, 1, 0, 0, 0}, false, 0.0    },
-	[bu_kelvin]             = { bu_kelvin,             1.0,        {0, 0, 0, 0, 1, 0, 0}, false, 0.0    },
-	[bu_mol]                = { bu_mol,                1.0,        {0, 0, 0, 0, 0, 1, 0}, false, 0.0    },
-	[bu_candela]            = { bu_candela,            1.0,        {0, 0, 0, 0, 0, 0, 1}, false, 0.0    },
-	[bu_hertz]              = { bu_hertz,              1.0,        {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_newton]             = { bu_newton,             1.0,        {1, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pascal]             = { bu_pascal,             1.0,        {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_joule]              = { bu_joule,              1.0,        {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_watt]               = { bu_watt,               1.0,        {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
-	[bu_volt]               = { bu_volt,               1.0,        {2, 1,-3,-1, 0, 0, 0}, false, 0.0    },
-	[bu_ohm]                = { bu_ohm,                1.0,        {2, 1,-3,-2, 0, 0, 0}, false, 0.0    },
-	[bu_farad]              = { bu_farad,              1.0,        {-2,-1, 4, 2, 0, 0, 0}, false, 0.0   },
-	[bu_coulomb]            = { bu_coulomb,            1.0,        {0, 0, 1, 1, 0, 0, 0}, false, 0.0    },
-	[bu_siemens]            = { bu_siemens,            1.0,        {-2,-1, 3, 2, 0, 0, 0}, false, 0.0   },
-	[bu_weber]              = { bu_weber,              1.0,        {2, 1,-2,-1, 0, 0, 0}, false, 0.0    },
-	[bu_tesla]              = { bu_tesla,              1.0,        {0, 1,-2,-1, 0, 0, 0}, false, 0.0    },
-	[bu_henry]              = { bu_henry,              1.0,        {2, 1,-2,-2, 0, 0, 0}, false, 0.0    },
-	[bu_lumen]              = { bu_lumen,              1.0,        {0, 0, 0, 0, 0, 0, 1}, false, 0.0    },
-	[bu_lux]                = { bu_lux,                1.0,        {-2, 0, 0, 0, 0, 0, 1}, false, 0.0   },
-	[bu_becquerel]          = { bu_becquerel,          1.0,        {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gray]               = { bu_gray,               1.0,        {2, 0,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_sievert]            = { bu_sievert,            1.0,        {2, 0,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_katal]              = { bu_katal,              1.0,        {0, 0,-1, 0, 0, 1, 0}, false, 0.0    },
-	[bu_liter]              = { bu_liter,              1e-3,       {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_minute]             = { bu_minute,             60.0,       {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_hour]               = { bu_hour,               3600.0,     {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_day]                = { bu_day,                86400.0,    {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_degree]             = { bu_degree,             3.14159265358979323846/180.0,
-	                                                               {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_celsius]            = { bu_celsius,            1.0,        {0, 0, 0, 0, 1, 0, 0}, true,  273.15 },
-	[bu_radian]             = { bu_radian,             1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_steradian]          = { bu_steradian,          1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_tonne]              = { bu_tonne,              1e3,        {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_bar]                = { bu_bar,                1e5,        {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_electronvolt]       = { bu_electronvolt,       1.602176634e-19, {2, 1,-2, 0, 0, 0, 0}, false, 0.0 },
-	[bu_dalton]             = { bu_dalton,             1.66053906660e-27, {0, 1, 0, 0, 0, 0, 0}, false, 0.0 },
-	[bu_astronomical_unit]  = { bu_astronomical_unit,  1.495978707e11, {1, 0, 0, 0, 0, 0, 0}, false, 0.0 },
-	[bu_hectare]            = { bu_hectare,            1e4,        {2, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_week]               = { bu_week,               604800.0,   {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_year]               = { bu_year,               31557600.0, {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_inch]               = { bu_inch,               0.0254,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_foot]               = { bu_foot,               0.3048,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_yard]               = { bu_yard,               0.9144,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_mile]               = { bu_mile,               1609.344,                 {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_nautical_mile]      = { bu_nautical_mile,      1852.0,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_angstrom]           = { bu_angstrom,           1e-10,                    {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_light_year]         = { bu_light_year,         9.4607304725808e15,       {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_parsec]             = { bu_parsec,             3.085677581491367e16,     {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_furlong]            = { bu_furlong,            201.168,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_fathom]             = { bu_fathom,             1.8288,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pound]              = { bu_pound,              0.45359237,               {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_ounce]              = { bu_ounce,              0.028349523125,           {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_grain]              = { bu_grain,              6.479891e-5,              {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_stone]              = { bu_stone,              6.35029318,               {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_short_ton]          = { bu_short_ton,          907.18474,                {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_long_ton]           = { bu_long_ton,           1016.0469088,             {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_troy_ounce]         = { bu_troy_ounce,         0.0311034768,             {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_carat]              = { bu_carat,              2e-4,                     {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_fahrenheit]         = { bu_fahrenheit,         5.0/9.0,                  {0, 0, 0, 0, 1, 0, 0}, true,  459.67*(5.0/9.0) },
-	[bu_atmosphere]         = { bu_atmosphere,         101325.0,                 {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_mmhg]               = { bu_mmhg,               133.322387415,            {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_torr]               = { bu_torr,               101325.0/760.0,           {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_psi]                = { bu_psi,                6894.757293168361,        {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_calorie]            = { bu_calorie,            4.184,                    {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_btu]                = { bu_btu,                1055.05585262,            {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_erg]                = { bu_erg,                1e-7,                     {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_therm]              = { bu_therm,              1.05480400e8,             {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_horsepower]         = { bu_horsepower,         745.69987158227,          {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pound_force]        = { bu_pound_force,        4.4482216152605,          {1, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_dyne]               = { bu_dyne,               1e-5,                     {1, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_kip]                = { bu_kip,                4448.2216152605,          {1, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_knot]               = { bu_knot,               1852.0/3600.0,            {1, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gallon]             = { bu_gallon,             3.785411784e-3,           {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gallon_uk]          = { bu_gallon_uk,          4.54609e-3,               {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_quart]              = { bu_quart,              9.46352946e-4,            {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pint]               = { bu_pint,               4.73176473e-4,            {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_cup]                = { bu_cup,                2.365882365e-4,           {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_fluid_ounce]        = { bu_fluid_ounce,        2.95735295625e-5,         {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_tablespoon]         = { bu_tablespoon,         1.478676478125e-5,        {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_teaspoon]           = { bu_teaspoon,           4.92892159375e-6,         {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_barrel]             = { bu_barrel,             0.158987294928,           {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_acre]               = { bu_acre,               4046.8564224,             {2, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_barn]               = { bu_barn,               1e-28,                    {2, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_arcminute]          = { bu_arcminute,          3.14159265358979323846/10800.0,  {0, 0, 0, 0, 0, 0, 0}, false, 0.0 },
-	[bu_arcsecond]          = { bu_arcsecond,          3.14159265358979323846/648000.0, {0, 0, 0, 0, 0, 0, 0}, false, 0.0 },
-	[bu_grad]               = { bu_grad,               3.14159265358979323846/200.0,    {0, 0, 0, 0, 0, 0, 0}, false, 0.0 },
-	[bu_poise]              = { bu_poise,              0.1,                      {-1, 1,-1, 0, 0, 0, 0}, false, 0.0   },
-	[bu_stokes]             = { bu_stokes,             1e-4,                     {2, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gauss]              = { bu_gauss,              1e-4,                     {0, 1,-2,-1, 0, 0, 0}, false, 0.0    },
-	[bu_maxwell]            = { bu_maxwell,            1e-8,                     {2, 1,-2,-1, 0, 0, 0}, false, 0.0    },
-	[bu_oersted]            = { bu_oersted,            1000.0/(4.0*3.14159265358979323846), {-1, 0, 0, 1, 0, 0, 0}, false, 0.0 },
-	[bu_stilb]              = { bu_stilb,              1e4,                      {-2, 0, 0, 0, 0, 0, 1}, false, 0.0   },
-	[bu_phot]               = { bu_phot,               1e4,                      {-2, 0, 0, 0, 0, 0, 1}, false, 0.0   },
-	[bu_galileo]            = { bu_galileo,            1e-2,                     {1, 0,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_curie]              = { bu_curie,              3.7e10,                   {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_roentgen]           = { bu_roentgen,           2.58e-4,                  {0,-1, 1, 1, 0, 0, 0}, false, 0.0    },
-	[bu_rem]                = { bu_rem,                1e-2,                     {2, 0,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_neper]              = { bu_neper,              1.0,                      {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_decibel]            = { bu_decibel,            1.0,                      {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_rankine]            = { bu_rankine,            5.0/9.0,                  {0, 0, 0, 0, 1, 0, 0}, false, 0.0    },
-	[bu_slug]               = { bu_slug,               14.593902937,             {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_thou]               = { bu_thou,               2.54e-5,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pint_uk]            = { bu_pint_uk,            5.6826125e-4,             {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_fluid_ounce_uk]     = { bu_fluid_ounce_uk,     2.84130625e-5,            {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_quart_uk]           = { bu_quart_uk,           1.1365225e-3,             {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_var]                = { bu_var,                1.0,                      {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
-	[bu_volt_ampere]        = { bu_volt_ampere,        1.0,                      {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
-	[bu_kilogram_force]     = { bu_kilogram_force,     9.80665,                  {1, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_inch_hg]            = { bu_inch_hg,            3386.388645,              {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_rpm]                = { bu_rpm,                1.0/60.0,                 {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_foot_pound]         = { bu_foot_pound,         1.3558179483,             {2, 1,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_dram]               = { bu_dram,               1.7718451953125e-3,       {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pennyweight]        = { bu_pennyweight,        1.55517384e-3,            {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_chain]              = { bu_chain,              20.1168,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_rod]                = { bu_rod,                5.0292,                   {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gill]               = { bu_gill,               1.18294118250e-4,         {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_gill_uk]            = { bu_gill_uk,            1.420653125e-4,           {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_standard_gravity]   = { bu_standard_gravity,   9.80665,                  {1, 0,-2, 0, 0, 0, 0}, false, 0.0    },
-	[bu_metric_horsepower]  = { bu_metric_horsepower,  735.49875,                {2, 1,-3, 0, 0, 0, 0}, false, 0.0    },
-	[bu_revolution]         = { bu_revolution,         6.283185307179586,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_month]              = { bu_month,              2629800.0,                {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_fortnight]          = { bu_fortnight,          1209600.0,                {0, 0, 1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_atmosphere_technical] = { bu_atmosphere_technical, 98066.5,              {-1, 1,-2, 0, 0, 0, 0}, false, 0.0   },
-	[bu_tex]                = { bu_tex,                1e-6,                     {-1, 1, 0, 0, 0, 0, 0}, false, 0.0   },
-	[bu_denier]             = { bu_denier,             1.0/9000000.0,            {-1, 1, 0, 0, 0, 0, 0}, false, 0.0   },
-	[bu_fluid_dram]         = { bu_fluid_dram,         3.6966911953125e-6,       {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_minim]              = { bu_minim,              6.16115199218750e-8,      {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_peck]               = { bu_peck,               8.80976754172e-3,         {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_bushel]             = { bu_bushel,             3.523907016688e-2,        {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_pfund]              = { bu_pfund,              0.5,                      {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_zentner]            = { bu_zentner,            50.0,                     {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_doppelzentner]      = { bu_doppelzentner,      100.0,                    {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_lot]                = { bu_lot,                15.625e-3,                {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_prussian_line]      = { bu_prussian_line,      3.13853e-1/144.0,         {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_prussian_zoll]      = { bu_prussian_zoll,      3.13853e-1/12.0,          {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_prussian_fuss]      = { bu_prussian_fuss,      3.13853e-1,               {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_prussian_elle]      = { bu_prussian_elle,      6.67160e-1,               {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_prussian_rute]      = { bu_prussian_rute,      3.76624,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_klafter]            = { bu_klafter,            1.88312,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_german_mile]        = { bu_german_mile,        7420.44,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_morgen]             = { bu_morgen,             2553.22,                  {2, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_scheffel]           = { bu_scheffel,           54.961e-3,                {3, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_survey_foot]        = { bu_survey_foot,        1200.0/3937.0,            {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_league]             = { bu_league,             4828.032,                 {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_cable]              = { bu_cable,              185.2,                    {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_hand]               = { bu_hand,               0.1016,                  {1, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_quintal]            = { bu_quintal,            100.0,                    {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_scruple]            = { bu_scruple,            1.2959782e-3,             {0, 1, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_baud]               = { bu_baud,               1.0,                     {0, 0,-1, 0, 0, 0, 0}, false, 0.0    },
-	[bu_delisle]            = { bu_delisle,            -2.0/3.0,                {0, 0, 0, 0, 1, 0, 0}, true,  373.15           },
-	[bu_newton_temp]        = { bu_newton_temp,        100.0/33.0,              {0, 0, 0, 0, 1, 0, 0}, true,  273.15           },
-	[bu_reaumur]            = { bu_reaumur,            5.0/4.0,                 {0, 0, 0, 0, 1, 0, 0}, true,  273.15           },
-	[bu_romer]              = { bu_romer,              40.0/21.0,               {0, 0, 0, 0, 1, 0, 0}, true,  273.15-100.0/7.0 },
-	[bu_percent]            = { bu_percent,            1e-2,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_per_mille]          = { bu_per_mille,          1e-3,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_per_myriad]         = { bu_per_myriad,         1e-4,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_per_cent_mille]     = { bu_per_cent_mille,     1e-5,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_ppm]                = { bu_ppm,                1e-6,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
-	[bu_ppb]                = { bu_ppb,                1e-9,                    {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	/*
+	 * Physical-unit conversion entries — generated from src/gendata/units.bvnr
+	 * by gen_units.py. Indexed by enum value; the [bu_none] row above
+	 * and the currency slots keep the table's zero defaults.
+	 */
+#include "bovnar_si_conv_table.gen.inc"
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))
@@ -604,13 +446,25 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	return result;
 }
 /*
+ * Per-unit prefix policy, generated from the .prefix field in
+ * src/gendata/units.bvnr — which units take which prefixes is now data, not code.
+ * Unlisted slots (currencies, bu_none) default to BVN_PFX_DEFAULT; currencies
+ * are handled by the currency rule before this table is consulted.
+ */
+typedef enum {
+	BVN_PFX_DEFAULT = 0, BVN_PFX_INFO, BVN_PFX_GERMAN, BVN_PFX_RATIO, BVN_PFX_NONE
+} bvn_prefix_policy_t;
+static const uint8_t bu_prefix_policy[BVN_VALUE_BASE_UNIT_COUNT] = {
+#include "bovnar_prefix_policy.gen.inc"
+};
+/*
  * Enforce which prefixes may legally attach to which base unit — the rule set
  * that makes "kg" and "Kib" valid but "Ks" (binary prefix on seconds) or
  * "kPfund" (prefix on a historical German unit) invalid. Currencies defer to
  * the currency rule; information units (bit/byte) accept IEC binary prefixes and
  * only SI prefixes >= kilo; German historical and ratio units (%/ppm/...) accept
- * no prefix at all; everything else accepts any SI prefix. Called everywhere a
- * unit is validated so the policy lives in exactly one place.
+ * no prefix at all; everything else accepts any SI prefix. The per-unit class is
+ * read from bu_prefix_policy (generated); the rule logic below is fixed.
  */
 bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 {
@@ -620,12 +474,9 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 		return false;
 	if (bvn_unit_is_currency((int)base))
 		return bvn_currency_prefix_valid((int)base, (int)prefix.system);
-	bool is_info = (base == bu_bit || base == bu_byte);
-	bool is_german = ((uint32_t)base >= (uint32_t)bu_pfund &&
-	                  (uint32_t)base <= (uint32_t)bu_scheffel);
-	bool is_ratio = ((uint32_t)base >= (uint32_t)bu_percent &&
-	                 (uint32_t)base <= (uint32_t)bu_ppb);
-	if (is_german || is_ratio) {
+	bvn_prefix_policy_t pol = (bvn_prefix_policy_t)bu_prefix_policy[base];
+	bool is_info = (pol == BVN_PFX_INFO);
+	if (pol == BVN_PFX_GERMAN || pol == BVN_PFX_RATIO || pol == BVN_PFX_NONE) {
 		if (prefix.system == prefix_iec)
 			return prefix.id.iec == iec_none;
 		return prefix.id.si == si_none;

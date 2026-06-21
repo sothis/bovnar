@@ -218,90 +218,22 @@ typedef enum prefix_system_e {
 } prefix_system_t;
 typedef enum si_prefix_id_e {
 	si_none = 0,
-	si_quecto, si_ronto, si_yocto, si_zepto, si_atto,
-	si_femto, si_pico, si_nano, si_micro, si_milli,
-	si_centi, si_deci,
-	si_deca, si_hecto, si_kilo, si_mega, si_giga,
-	si_tera, si_peta, si_exa, si_zetta, si_yotta,
-	si_ronna, si_quetta
+	/* SI prefixes (si_quecto..si_quetta) — generated from src/gendata/prefixes.bvnr. */
+#include "bovnar_si_prefix.gen.h"
 } si_prefix_id_t;
 typedef enum iec_prefix_id_e {
 	iec_none = 0,
-	iec_kibi, iec_mebi, iec_gibi, iec_tebi, iec_pebi,
-	iec_exbi, iec_zebi, iec_yobi, iec_robi, iec_quebi
+	/* IEC prefixes (iec_kibi..iec_quebi) — generated from src/gendata/prefixes.bvnr. */
+#include "bovnar_iec_prefix.gen.h"
 } iec_prefix_id_t;
 typedef enum value_base_unit_e {
 	bu_none = 0,
-	bu_bit, bu_byte,
-	bu_second, bu_meter, bu_gram, bu_ampere, bu_kelvin,
-	bu_mol, bu_candela,
-	bu_hertz, bu_newton, bu_pascal, bu_joule, bu_watt,
-	bu_volt, bu_ohm, bu_farad, bu_coulomb, bu_siemens,
-	bu_weber, bu_tesla, bu_henry, bu_lumen, bu_lux,
-	bu_becquerel, bu_gray, bu_sievert, bu_katal,
-	bu_liter, bu_minute, bu_hour, bu_day, bu_degree, bu_celsius,
-	bu_radian, bu_steradian,
-	bu_tonne, bu_bar,
-	bu_electronvolt, bu_dalton, bu_astronomical_unit,
-	bu_hectare,
-	bu_week, bu_year,
-	bu_inch, bu_foot, bu_yard, bu_mile, bu_nautical_mile,
-	bu_angstrom, bu_light_year, bu_parsec, bu_furlong, bu_fathom,
-	bu_pound, bu_ounce, bu_grain, bu_stone, bu_short_ton,
-	bu_long_ton, bu_troy_ounce, bu_carat,
-	bu_fahrenheit,
-	bu_atmosphere, bu_mmhg, bu_torr, bu_psi,
-	bu_calorie, bu_btu, bu_erg, bu_therm,
-	bu_horsepower,
-	bu_pound_force, bu_dyne, bu_kip,
-	bu_knot,
-	bu_gallon, bu_gallon_uk, bu_quart, bu_pint, bu_cup,
-	bu_fluid_ounce, bu_tablespoon, bu_teaspoon, bu_barrel,
-	bu_acre, bu_barn,
-	bu_arcminute, bu_arcsecond, bu_grad,
-	bu_poise, bu_stokes, bu_gauss, bu_maxwell, bu_oersted,
-	bu_stilb, bu_phot, bu_galileo,
-	bu_curie, bu_roentgen, bu_rem,
-	bu_neper,
-	bu_decibel,
-	bu_rankine,
-	bu_slug,
-	bu_thou,
-	bu_pint_uk, bu_fluid_ounce_uk, bu_quart_uk,
-	bu_var,
-	bu_volt_ampere,
-	bu_kilogram_force,
-	bu_inch_hg,
-	bu_rpm,
-	bu_foot_pound,
-	bu_dram,
-	bu_pennyweight,
-	bu_chain,
-	bu_rod,
-	bu_gill,
-	bu_gill_uk,
-	bu_standard_gravity,
-	bu_metric_horsepower,
-	bu_revolution,
-	bu_month,
-	bu_fortnight,
-	bu_atmosphere_technical,
-	bu_tex,
-	bu_denier,
-	bu_fluid_dram,
-	bu_minim,
-	bu_peck,
-	bu_bushel,
-	bu_pfund = 348, bu_zentner, bu_doppelzentner, bu_lot,
-	bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss, bu_prussian_elle,
-	bu_prussian_rute, bu_klafter, bu_german_mile,
-	bu_morgen,
-	bu_scheffel,
-	bu_survey_foot, bu_league, bu_cable, bu_hand,
-	bu_quintal, bu_scruple, bu_baud,
-	bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
-	bu_percent, bu_per_mille, bu_per_myriad,
-	bu_per_cent_mille, bu_ppm, bu_ppb,
+	/*
+	 * Physical base units (enum ids 1..133, 348..377) — generated from
+	 * src/gendata/units.bvnr by gen_units.py. Currencies occupy the gap
+	 * 134..347 (bovnar_currency.c); the explicit ids here preserve it.
+	 */
+#include "bovnar_units.gen.h"
 	/*
 	 * Appended currencies. New fiat currencies are added here, after the unit
 	 * block, rather than inside the 134-347 currency region, so that adding one

@@ -113,8 +113,11 @@ endfunction()
 # not depend on it.
 if(PYTHON)
     file(MAKE_DIRECTORY "${BIN_DIR}/amalgamate")
+    # The generated *.gen.inc snippets live in the build dir; point amalgamate at
+    # them so it can inline them into the single-file output.
     execute_process(
-        COMMAND "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${BIN_DIR}/amalgamate"
+        COMMAND "${CMAKE_COMMAND}" -E env "BVNR_GENERATED_DIR=${BIN_DIR}/generated"
+                "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${BIN_DIR}/amalgamate"
         RESULT_VARIABLE _r OUTPUT_QUIET)
     if(NOT _r EQUAL 0)
         message(WARNING "pack_artifacts: amalgamate.py failed; skipping the amalgamation archive")

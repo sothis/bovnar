@@ -7,6 +7,21 @@ versioning of the format (spec)**; the reference implementation
 it in lockstep. The highest spec a build understands is reported by
 `bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`.
 
+## [Unreleased]
+
+### Changed
+
+- **Website publishing is now scripted, and the docs/PDFs are no longer
+  duplicated or committed as build artifacts.** The Markdown documents are
+  canonical under `doc/`; `web/doc` is a symlink to `../doc` (previously the real
+  files lived under `web/doc/` and `doc/` held symlinks). `gen_doc_pdfs.py`
+  renders the per-document PDFs and the `bovnar-docs-pdf.zip` bundle under
+  `build/doc/pdf/` (git-ignored) instead of committing them into the tree. A new
+  `publish_web.sh` deploys everything under `web/` to the live web root with
+  `rsync`, resolving the `web/doc` symlink so the docs land as real files under
+  `<webroot>/doc`; `--pdf` (re)builds the PDFs first and `--delete` prunes files
+  removed locally.
+
 ## [1.1.0] - 2026-06-19
 
 Spec 1.1 is **purely additive** over the frozen 1.0 baseline: every spec-1.0

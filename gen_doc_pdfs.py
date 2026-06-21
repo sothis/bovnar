@@ -2,8 +2,13 @@
 """
 Generate downloadable PDF versions of the Bovnar documentation.
 
-Renders each Markdown doc in web/doc/ (plus the EBNF grammar) to a styled,
-print-ready PDF in web/doc/pdf/, branded to match the website.
+Renders each Markdown doc in doc/ (plus the EBNF grammar) to a styled,
+print-ready PDF under build/doc/pdf/, branded to match the website, and
+bundles them all into build/doc/pdf/bovnar-docs-pdf.zip.
+
+All output goes under build/ (git-ignored); the canonical sources are the
+Markdown files in doc/. The PDFs are not kept in the repository — publish_web.sh
+copies them into the site's doc/pdf/ path at upload time (use --pdf to rebuild).
 
 Dependencies (not part of the library/Python-package requirements; install in a
 throwaway venv to run this):
@@ -17,13 +22,15 @@ Usage:  python gen_doc_pdfs.py
 import os
 import re
 import datetime
+import zipfile
 import markdown
 from weasyprint import HTML
 from pygments.formatters import HtmlFormatter
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DOC_DIR = os.path.join(ROOT, "web", "doc")
-OUT_DIR = os.path.join(DOC_DIR, "pdf")
+DOC_DIR = os.path.join(ROOT, "doc")
+OUT_DIR = os.path.join(ROOT, "build", "doc", "pdf")
+ZIP_NAME = "bovnar-docs-pdf.zip"
 
 VERSION = "1.1"
 
@@ -201,6 +208,7 @@ def build_html(title, subtitle, body_html, label):
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     today = datetime.date.today().isoformat()
+    written = []
     for src, slug, label in DOCS:
         path = os.path.join(DOC_DIR, src)
         text = open(path, encoding="utf-8").read()
@@ -218,8 +226,18 @@ def main():
         html = build_html(title, subtitle, body, label)
         out = os.path.join(OUT_DIR, slug + ".pdf")
         HTML(string=html, base_url=DOC_DIR).write_pdf(out)
+        written.append(out)
         kb = os.path.getsize(out) // 1024
         print(f"  {slug + '.pdf':32s} {kb:5d} KB   <- {src}")
+
+    # Bundle every generated PDF into a single flat zip for the "download all"
+    # link on the website. Sorted by name so the archive is reproducible.
+    zip_path = os.path.join(OUT_DIR, ZIP_NAME)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for pdf in sorted(written, key=os.path.basename):
+            zf.write(pdf, arcname=os.path.basename(pdf))
+    kb = os.path.getsize(zip_path) // 1024
+    print(f"  {ZIP_NAME:32s} {kb:5d} KB   <- {len(written)} PDFs")
 
 
 if __name__ == "__main__":

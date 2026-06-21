@@ -108,7 +108,12 @@ for rel in "${EXCLUDES[@]}"; do
 done
 
 # ── 3. Upload with rsync ────────────────────────────────────────────────────
-RSYNC_OPTS=(-az --human-readable)
+# --chmod normalises permissions on the destination: directories 755, files 644.
+# Without it, `-a` (which implies -p) would copy the staging dir's own mode onto
+# the web root — and `mktemp -d` makes that 0700, leaving /var/www/html
+# un-traversable by the web server (403). Forcing world-readable/-traversable
+# perms here is both the fix and idempotent on every subsequent publish.
+RSYNC_OPTS=(-az --human-readable --chmod=D755,F644)
 [ "$RSYNC_DELETE" -eq 1 ] && RSYNC_OPTS+=(--delete)
 [ "$DRY_RUN" -eq 1 ] && RSYNC_OPTS+=(--dry-run --itemize-changes)
 

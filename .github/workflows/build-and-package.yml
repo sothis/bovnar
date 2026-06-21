@@ -16,6 +16,9 @@ concurrency:
 #   * Windows MSVC  -> bovnar-windows-msvc
 #   * Windows MinGW -> bovnar-windows-mingw
 #   * Linux x64     -> bovnar-linux (+ the cross-platform bovnar-amalgamate)
+# Each platform archive (packed by cmake/pack_artifacts.cmake) bundles the
+# documentation (doc/), runnable examples (examples/) and editor syntax
+# highlighters (highlighter/) alongside the headers, libs and CLI.
 # Each job smoke-tests the CLI end to end (split one step per command so a
 # failure pinpoints the offending command from the step status alone). The full
 # C/Python test suite is not run here — it runs via run_tests.sh / CTest.

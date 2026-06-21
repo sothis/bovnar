@@ -100,6 +100,8 @@ bovnar/
 │   ├── bovnar_si_units.h    # SI / IEC unit API
 │   ├── bovnar_currency.h    # Fiat + crypto currency API
 │   ├── bovnar_stream.h      # Framing, multiplexing & document-in-document
+│   ├── bvn_datetime.h       # Datetime / epoch helpers (spec 1.1)
+│   ├── bvn_gregorian_date.h # Gregorian calendar conversions (spec 1.1)
 │   ├── bvn_float.h
 │   └── bvn_int.h
 ├── src/
@@ -110,7 +112,7 @@ bovnar/
 │   ├── io/                  # FD / memory source & sink
 │   ├── dom/                 # DOM builder and traversal
 │   ├── stream/              # Framing / multiplexing on the event API
-│   └── utils/               # SI units, currency, integer, float utilities
+│   └── utils/               # SI units, currency, datetime, integer, float utilities
 ├── tests/                   # C unit, integration, conformance, and fuzz tests
 ├── python/
 │   └── bovnar/              # Pure-ctypes Python bindings
@@ -118,13 +120,16 @@ bovnar/
 │       ├── reader.py
 │       ├── writer.py
 │       ├── dom.py
+│       ├── stream.py        # Framing / multiplexing streaming API
 │       ├── units.py
 │       ├── currency.py
 │       ├── quantity.py
 │       ├── structs.py
 │       ├── enums.py
 │       ├── exceptions.py
-│       └── _ffi.py
+│       ├── _ffi.py          # ctypes FFI layer
+│       ├── _bvnfloat.py     # float16 / decimal-float helpers
+│       └── _numpy.py, _pint_bridge.py, _pint_units.py   # optional NumPy / Pint bridges
 ├── examples/                # Annotated .bvnr example files
 ├── highlighter/
 │   ├── vscode/              # VS Code TextMate grammar + theme
@@ -145,6 +150,7 @@ bovnar/
 │   ├── 6_bovnar_faq.md             # Frequently asked questions
 │   ├── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
 │   ├── 8_unit_cheatsheet.md        # Units & currencies quick reference
+│   ├── 9_iana_media_type.md        # IANA media-type registration (text/vnd.bovnar)
 │   └── 10_bovnar_streaming.md      # Streaming, framing & multiplexing
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
@@ -188,9 +194,9 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 
 | Archive | Contents |
 |---|---|
-| `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`) |
-| `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers |
-| `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host) |
+| `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `README.md`, `doc/` and `examples/` |
+| `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host), plus `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 
@@ -292,61 +298,6 @@ bovnar convert data.bvnr          # bvnr -> json
 cat data.bvnr | bovnar events -
 ```
 
-### JSON conversion: what is and isn't preserved
-
-The two data models do not fully overlap, so conversion is faithful in one
-direction and necessarily lossy in the other. The converter never silently
-drops or corrupts data — anything it cannot represent is a hard error with a
-diagnostic, not a quietly mangled result.
-
-**`json → bvnr`** is value-preserving for the data bovnar can represent. Integers
-keep full 64-bit range in both signs (including unsigned values above
-`INT64_MAX`); homogeneous JSON arrays — flat lists, rectangular nested arrays,
-arrays of same-shaped objects — map to bovnar arrays element-for-element, and
-nested objects become structs. It rejects, rather than mauls:
-
-- a top-level value that is not an object (bovnar documents are sets of
-  assignments);
-- object keys that are not valid bovnar identifiers (spaces, leading digits,
-  punctuation, empty);
-- integer literals that exceed 64 bits, and malformed JSON (leading zeros,
-  invalid escapes, unescaped control characters, lone surrogates, trailing
-  content);
-- nesting deeper than the writer's array/struct limit (errors cleanly);
-- **heterogeneous or ragged arrays** — bovnar 1.0 arrays are homogeneous (see the
-  spec's §7.4), so a JSON array that mixes element kinds (`[1, "two", {…}]`) or
-  whose sub-arrays differ in length (`[[1,2],[3,4,5]]`) has no bovnar
-  representation and is a hard error. Model such data as an object/struct.
-
-bovnar's `[]` is a genuine zero-length array — distinct from `[null]`, which is
-one null element — so an empty JSON array round-trips faithfully as `[]`.
-
-**`bvnr → json`** keeps every value but cannot carry bovnar's extra semantics,
-since JSON has no equivalent:
-
-- type annotations — bit-width, base, and **physical unit / currency** — are
-  dropped (a `<float:64,m/s> 9.81` becomes a bare `9.81`); a `datetime` likewise
-  becomes a bare number — its **epoch** (e.g. `gps` vs `unix`) is dropped, so
-  the seconds count alone is emitted, but a datetime written with a **sub-second
-  fraction** (e.g. `…:00.123Z`) has no integer-carrier JSON representation and is
-  a hard error rather than a silent truncation of the fraction;
-- symbols and references are emitted as strings (an indexed reference path such
-  as `&.matrix[0][1]` becomes the string `".matrix[0][1]"` — it is not resolved);
-  octet streams as a lowercase hex string;
-- integers wider than 64 bits are emitted as decimal strings (JSON cannot hold
-  them as numbers safely);
-- `nan` and `inf` become `null` (JSON has no non-finite numbers).
-
-Consequently `json → bvnr → json` preserves every value. Integers, booleans,
-null, strings, and array/object structure also
-reproduce *textually*; floating-point values reproduce their exact `double`
-value but not necessarily their original spelling. Floats are re-emitted as the
-**shortest decimal that round-trips** to the same `double`, so `0.1` comes back
-as `0.1` — but the lexical form is lost when the literal is parsed, so `2.0`
-comes back as `2` and `1e10` as `1e+10`. The reverse path, `bvnr → json → bvnr`,
-is lossy whenever the document uses units, symbols, references, octets, or wide
-integers.
-
 ---
 
 ## Running the Tests
@@ -371,6 +322,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_extended_reader_test` | Edge cases, resync, error recovery |
 | `bvnr_writer_test` | Serialiser output |
 | `bvnr_socketpair_roundtrip_test` | Full round-trip over a POSIX socketpair |
+| `bvnr_stream_test` | Framing, multiplexing, and document-in-document streaming |
 | `bvnr_dom_test` | DOM builder and traversal |
 | `bvnr_si_test` | SI/IEC unit parsing and formatting |
 | `bvnr_unit_ext_test` | Extended unit symbols, long-name aliases, prefix enforcement |
@@ -379,6 +331,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_int_test` | Arbitrary-precision integer arithmetic |
 | `bvnr_float_test` | Floating-point representation |
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
+| `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
 | `bvnr_conformance` | 306-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
@@ -610,6 +563,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
 | [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (306 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
+| [IANA Media-Type Registration](doc/9_iana_media_type.md) | Registration application for `text/vnd.bovnar` (RFC 6838 vendor tree). |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).

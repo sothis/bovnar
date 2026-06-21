@@ -59,12 +59,21 @@ function(_pack topdir outfile fmt)
     message(STATUS "pack_artifacts: wrote ${outfile}")
 endfunction()
 
-# Headers + LICENSE + README, common to every binary archive.
+# Headers + LICENSE + README, plus the documentation, examples and editor
+# highlighters — common to every binary archive.
 function(_stage_common top)
     file(MAKE_DIRECTORY "${STAGE}/${top}/include")
     file(GLOB _hdrs "${SRC_DIR}/include/*.h")
     file(COPY ${_hdrs} DESTINATION "${STAGE}/${top}/include")
     file(COPY "${SRC_DIR}/LICENSE" "${SRC_DIR}/README.md" DESTINATION "${STAGE}/${top}")
+    # Ship the docs, runnable examples and syntax highlighters alongside the
+    # binaries. Each is a committed source directory; guard with EXISTS so a
+    # trimmed checkout still packs a valid (if leaner) archive.
+    foreach(_extra doc examples highlighter)
+        if(EXISTS "${SRC_DIR}/${_extra}")
+            file(COPY "${SRC_DIR}/${_extra}" DESTINATION "${STAGE}/${top}")
+        endif()
+    endforeach()
 endfunction()
 
 # Stage one platform's built artifacts (libs under lib/, runtime under bin/).
@@ -112,11 +121,16 @@ if(PYTHON)
     else()
         set(_atop "bovnar-${TAG}-amalgamate")
         file(MAKE_DIRECTORY "${STAGE}/${_atop}")
+        # Repo-root README (not dist/README.md) so the amalgamation ships the
+        # project's main readme, matching the platform archives.
         file(COPY "${BIN_DIR}/amalgamate/bovnar.h" "${BIN_DIR}/amalgamate/bovnar.c"
-             "${SRC_DIR}/LICENSE" DESTINATION "${STAGE}/${_atop}")
-        if(EXISTS "${SRC_DIR}/dist/README.md")
-            file(COPY "${SRC_DIR}/dist/README.md" DESTINATION "${STAGE}/${_atop}")
-        endif()
+             "${SRC_DIR}/LICENSE" "${SRC_DIR}/README.md" DESTINATION "${STAGE}/${_atop}")
+        # Bundle the docs and runnable examples with the single-file drop.
+        foreach(_extra doc examples)
+            if(EXISTS "${SRC_DIR}/${_extra}")
+                file(COPY "${SRC_DIR}/${_extra}" DESTINATION "${STAGE}/${_atop}")
+            endif()
+        endforeach()
         _pack("${_atop}" "bovnar-${TAG}-amalgamate.tar.xz" xz)
     endif()
 else()

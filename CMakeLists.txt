@@ -442,6 +442,7 @@ endif()
 #   bovnar-<version>-<count>-amalgamate.tar.xz   (the amalgamation)
 #   bovnar-linux-<version>-<count>.tar.xz        (Linux artifacts)
 #   bovnar-windows-<version>-<count>.zip         (native or cross MinGW artifacts)
+# The platform archives also bundle doc/, examples/ and highlighter/.
 # <count> is the git commit count. The platform archive matches the current
 # build; on a Linux host the Windows .zip is packed from the BVNR_CROSS_MINGW
 # build (build/mingw) when present. Skipped for the Python wheel build (SKBUILD)

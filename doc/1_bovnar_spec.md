@@ -2,7 +2,7 @@
 
 > **Version:** 1.1
 > **Status:** Released (1.x line; additive over the frozen 1.0 baseline)
-> **Last updated:** 2026-06-15
+> **Last updated:** 2026-06-21
 
 ---
 

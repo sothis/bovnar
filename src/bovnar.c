@@ -2434,7 +2434,7 @@ static int cmd_bench(int argc, char **argv)
  * ---------------------------------------------------------------------------
  * Thin CLI drivers over the bovnar_stream layer so the multi-document framing
  * and octet-multiplexing conventions can be produced and consumed from the
- * shell. See doc/10_bovnar_streaming.md for the wire conventions.
+ * shell. See doc/9_bovnar_streaming.md for the wire conventions.
  */
 
 /* Read everything available on `fd` into a freshly malloc'd buffer. Does not

@@ -150,8 +150,7 @@ bovnar/
 │   ├── 6_bovnar_faq.md             # Frequently asked questions
 │   ├── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
 │   ├── 8_unit_cheatsheet.md        # Units & currencies quick reference
-│   ├── 9_iana_media_type.md        # IANA media-type registration (text/vnd.bovnar)
-│   └── 10_bovnar_streaming.md      # Streaming, framing & multiplexing
+│   └── 9_bovnar_streaming.md       # Streaming, framing & multiplexing
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
 ```
@@ -563,8 +562,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
 | [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (306 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
-| [IANA Media-Type Registration](doc/9_iana_media_type.md) | Registration application for `text/vnd.bovnar` (RFC 6838 vendor tree). |
-| [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
+| [Streaming, Framing & Multiplexing](doc/9_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
 

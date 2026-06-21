@@ -181,7 +181,7 @@ output: bytes = w.get_output()
 ### Streaming / framing (`bovnar.stream`)
 
 Bindings for the streaming layer (see
-[Streaming, Framing & Multiplexing](10_bovnar_streaming.md) for the full
+[Streaming, Framing & Multiplexing](9_bovnar_streaming.md) for the full
 treatment):
 
 ```python

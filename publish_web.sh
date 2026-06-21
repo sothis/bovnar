@@ -41,7 +41,7 @@ PDF_BUILD_DIR="$ROOT/build/doc/pdf"   # where gen_doc_pdfs.py writes its output
 # documents and dev helpers that live under web/ or under doc/ (the symlink
 # target) but are not part of the public site.
 EXCLUDES=(
-    "doc/9_iana_media_type.md"
+    "doc/iana_media_type.md"
     "doc/datetime_fractional_seconds.md"
     "doc/bovnar_pipeline.svg"
     "httpd.sh"

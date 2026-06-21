@@ -40,7 +40,7 @@ relevant authorities and systems.
   override, which activates once the language ships upstream.
 
 ### IANA (formal media-type registration)
-- The application is **`doc/9_iana_media_type.md`** — a complete RFC 6838
+- The application is **`doc/iana_media_type.md`** — a complete RFC 6838
   vendor-tree template. Submit via <https://www.iana.org/form/media-types>.
   Confirm the contact e-mail before submitting; approval is an external
   ~2-week Expert Review.

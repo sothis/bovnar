@@ -3819,12 +3819,19 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </div>
 
 <script src="bovnar_units.js?v=20260603"></script>
-<script src="bovnar_parser.js?v=20260616"></script>
+<script src="bovnar_parser_wasm.js?v=20260630"></script>
 <script src="bovnar_highlight.js?v=20260616"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
   const parseF = BovnarParser.parseFaithful;
+
+  /* parseF resolves through BovnarParser, which bovnar_parser_wasm.js upgrades
+     to the real WASM parser once it loads; re-render when that happens so the
+     tree, event count, and errors all reflect the reference implementation. */
+  window.addEventListener('bovnar-wasm-ready', function () {
+    if (editor && editor.value.trim()) schedParse();
+  });
 
   const editor   = document.getElementById('pg-editor');
   const hlDiv    = document.getElementById('pg-highlight');
@@ -4090,11 +4097,15 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
     countEl.textContent = res.events.length + ' event' + (res.events.length !== 1 ? 's' : '');
 
-    if (res.errors.length) {
+    /* errors come straight from parseF — which is the real WASM parser once
+       bovnar_parser_wasm.js has loaded (lenient JS approximation before that). */
+    const errs = res.errors;
+
+    if (errs.length) {
       errPanel.classList.remove('empty');
-      errCount.textContent = '· ' + res.errors.length;
+      errCount.textContent = '· ' + errs.length;
       errList.innerHTML = '';
-      res.errors.forEach(function (e) {
+      errs.forEach(function (e) {
         const row = el('div', 'pg-error-row',
           `<span class="pg-error-pos" title="line ${e.line}, column ${e.col}">`
           + `${e.line}:${e.col}</span>`
@@ -4110,13 +4121,13 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
       errList.innerHTML = '<div class="pg-error-none">no errors</div>';
     }
 
-    errorLines = new Set(res.errors.map((e) => e.line));
-    errorMarks = res.errors.map((e) => ({ line: e.line, col: e.col }));
+    errorLines = new Set(errs.map((e) => e.line));
+    errorMarks = errs.map((e) => ({ line: e.line, col: e.col }));
     renderGutter();
     renderErrorOverlay();
 
-    statusEl.textContent = res.errors.length ? 'errors' : 'ok';
-    statusEl.style.color = res.errors.length ? 'var(--red)' : 'var(--teal)';
+    statusEl.textContent = errs.length ? 'errors' : 'ok';
+    statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
     empty.style.display = 'none';
   }
 

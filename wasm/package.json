@@ -1,0 +1,40 @@
+{
+  "name": "bovnar-wasm",
+  "version": "1.1.0",
+  "description": "The Bovnar C reference parser, compiled to WebAssembly: validate, parse-to-JSON, and stream events for .bvnr documents in browsers, Node, Deno, and edge runtimes.",
+  "type": "module",
+  "main": "./index.mjs",
+  "module": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./single": "./index.single.mjs",
+    "./wasm": "./bovnar.wasm"
+  },
+  "files": [
+    "index.mjs",
+    "index.single.mjs",
+    "bovnar.mjs",
+    "bovnar.single.mjs",
+    "bovnar.wasm",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "bovnar",
+    "bvnr",
+    "wasm",
+    "webassembly",
+    "parser",
+    "units",
+    "serialization",
+    "validation"
+  ],
+  "license": "MIT",
+  "author": "Janos Sonntag",
+  "homepage": "https://github.com/sothis/bovnar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sothis/bovnar.git",
+    "directory": "wasm"
+  }
+}

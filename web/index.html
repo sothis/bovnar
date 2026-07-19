@@ -4827,12 +4827,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
 
   /* ════════════════════ 4. Canvas drawing ════════════════════ */
-  const cv = $('orbit'), ctx = cv.getContext('2d');
+  const cv = $('orbit');
+  let ctx = cv.getContext('2d');
   let stars = [];
   function sizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
     const w = cv.clientWidth, h = cv.clientHeight;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!stars.length) for (let k = 0; k < 160; k++) {
       const big = Math.random() < 0.12;
@@ -5782,8 +5784,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     $('fdrift').textContent = drift < 0.005 ? '$' + drift.toFixed(8) : money(drift, 4);
   }
 
-  const cv = $('fpx'), ctx = cv.getContext('2d');
-  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  const cv = $('fpx');
+  let ctx = cv.getContext('2d');
+  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
   function drawChart() {
     const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h);
     const P = VIZ.pal();
@@ -6074,8 +6077,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     else { v.textContent = '✓ scaling matches'; v.style.color = 'var(--up)'; }
   }
 
-  const cv = $('ipx'), ctx = cv.getContext('2d');
-  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  const cv = $('ipx');
+  let ctx = cv.getContext('2d');
+  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
   function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function line(a, b, c, d) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); }
   // Analog dial gauge with redline arc, needle and value readout. frac/redFrac

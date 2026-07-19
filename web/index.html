@@ -3833,6 +3833,13 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     if (editor && editor.value.trim()) schedParse();
   });
 
+  /* parseF resolves through BovnarParser, which bovnar_parser_wasm.js upgrades
+     to the real WASM parser once it loads; re-render when that happens so the
+     tree, event count, and errors all reflect the reference implementation. */
+  window.addEventListener('bovnar-wasm-ready', function () {
+    if (editor && editor.value.trim()) schedParse();
+  });
+
   const editor   = document.getElementById('pg-editor');
   const hlDiv    = document.getElementById('pg-highlight');
   const gutter   = document.getElementById('pg-gutter');
@@ -4102,9 +4109,16 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     const errs = res.errors;
 
     if (errs.length) {
+    /* errors come straight from parseF — which is the real WASM parser once
+       bovnar_parser_wasm.js has loaded (lenient JS approximation before that). */
+    const errs = res.errors;
+
+    if (errs.length) {
       errPanel.classList.remove('empty');
       errCount.textContent = '· ' + errs.length;
+      errCount.textContent = '· ' + errs.length;
       errList.innerHTML = '';
+      errs.forEach(function (e) {
       errs.forEach(function (e) {
         const row = el('div', 'pg-error-row',
           `<span class="pg-error-pos" title="line ${e.line}, column ${e.col}">`
@@ -4123,9 +4137,13 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
     errorLines = new Set(errs.map((e) => e.line));
     errorMarks = errs.map((e) => ({ line: e.line, col: e.col }));
+    errorLines = new Set(errs.map((e) => e.line));
+    errorMarks = errs.map((e) => ({ line: e.line, col: e.col }));
     renderGutter();
     renderErrorOverlay();
 
+    statusEl.textContent = errs.length ? 'errors' : 'ok';
+    statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
     statusEl.textContent = errs.length ? 'errors' : 'ok';
     statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
     empty.style.display = 'none';

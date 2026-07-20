@@ -204,6 +204,55 @@ jobs:
           ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
           printf '.x = "hi";\n' | ./build/bovnar events -
 
+  source:
+    name: Source tarball
+    runs-on: ubuntu-latest
+    # A complete snapshot of the repository as a single tarball: every tracked
+    # file — i.e. everything except what .gitignore excludes — with a clean
+    # top-level directory. Packed with `git archive` (not `tar` over the working
+    # tree) so the file set is exactly HEAD's tracked files, deterministic and
+    # free of build output or local cruft. Runs on every trigger like the C
+    # build jobs; the name mirrors the other release archives
+    # (bovnar-<version>-<count>-source.tar.xz).
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so `git rev-list --count HEAD` yields the true build
+          # count (a shallow clone would report 1) — matches pack_artifacts.cmake.
+          fetch-depth: 0
+
+      - name: Pack source tarball
+        run: |
+          set -euo pipefail
+          # Version from the single source of truth (project() in CMakeLists),
+          # count = total commits, exactly as pack_artifacts.cmake derives them.
+          version=$(grep -oP 'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          count=$(git rev-list --count HEAD)
+          name="bovnar-${version}-${count}-source"
+          git archive --format=tar --prefix="${name}/" HEAD | xz -9 > "${name}.tar.xz"
+          ls -l "${name}.tar.xz"
+          echo "SRC_TARBALL=${name}.tar.xz" >> "$GITHUB_ENV"
+
+      - name: Verify tarball is exactly the tracked file set
+        run: |
+          set -euo pipefail
+          prefix="${SRC_TARBALL%.tar.xz}/"
+          # Files in the archive (drop directory entries and the prefix), sorted.
+          tar -tJf "$SRC_TARBALL" | grep -v '/$' | sed "s#^${prefix}##" | LC_ALL=C sort > archived.txt
+          git ls-files | LC_ALL=C sort > tracked.txt
+          if ! diff -u tracked.txt archived.txt; then
+            echo "::error::source tarball contents differ from the tracked file set" >&2
+            exit 1
+          fi
+          echo "OK: $(wc -l < tracked.txt) tracked files archived, nothing ignored included"
+
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-source
+          path: ${{ env.SRC_TARBALL }}
+          if-no-files-found: error
+
   # ── Python distribution ──────────────────────────────────────────────────
   # The wheel/sdist jobs are heavy (cibuildwheel across Linux x86_64 + arm64 and
   # macOS), so — unlike the C build/package jobs above — they do NOT run on every

@@ -2929,10 +2929,10 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
     <em>inside the stream</em>; no schema required. Hover a gauge to jump to the line it decoded.
   </p>
   <p class="engine-note">
-    Nothing here is faked or re-implemented in JavaScript: every frame is parsed by the
-    <strong>C reference implementation itself</strong>, compiled to WebAssembly and running live in your
-    browser — the exact <code>bvnr_read()</code> that ships in the native library. The same engine drives
-    all three demos and the <a href="#playground">playground</a> below.
+    Every frame is parsed by the <strong>C reference implementation itself</strong>, compiled to WebAssembly
+    and running live in your browser — the exact <code>bvnr_read()</code> that ships in the native library,
+    not a JavaScript re-implementation. The same engine drives all three demos and the
+    <a href="#playground">playground</a> below.
   </p>
   <details class="how">
     <summary>How it works — the full round-trip</summary>

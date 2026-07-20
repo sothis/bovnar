@@ -286,7 +286,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: cibw-wheels-${{ matrix.os }}
+          name: pypi-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -312,7 +312,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: cibw-sdist
+          name: pypi-source
           path: ./dist/*.tar.gz
 
   publish:
@@ -329,7 +329,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          pattern: cibw-*
+          pattern: pypi-*
           path: dist
           merge-multiple: true
 

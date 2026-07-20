@@ -288,6 +288,9 @@ jobs:
         with:
           name: pypi-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
+          # Fail loudly rather than publish an incomplete (immutable) PyPI release
+          # if a matrix leg ever produces an empty wheelhouse.
+          if-no-files-found: error
 
   build_sdist:
     name: Source distribution
@@ -314,6 +317,7 @@ jobs:
         with:
           name: pypi-source
           path: ./dist/*.tar.gz
+          if-no-files-found: error
 
   publish:
     name: Publish to PyPI

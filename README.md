@@ -62,7 +62,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 |---|---|---|
 | Assignment | `.key = value ;` | `.x = 42;` |
 | Comment | `# … newline` | `# a remark` |
-| Type annotation | `<family:width,unit>` before value | `<uint:32,k~m> 1000` |
+| Type annotation | `<family:width,base,unit>` before value | `<uint:32,_10,k~m> 1000` |
 | Integer | `[-]digits` | `42`, `-7` |
 | Float | `[-]digits[.digits][e[±]digits]` | `3.14`, `1e-6` |
 | Special float | `nan` `inf` `ninf` | `.x = nan;` |

@@ -87,9 +87,9 @@
      match the dynamic import so the module is reused, not re-fetched. -->
 <link rel="modulepreload" href="bovnar_wasm_core.mjs?v=22b20e8087bf">
 <link rel="modulepreload" href="bovnar_wasm.mjs?v=22b20e8087bf">
-<!-- Globe textures are sampled offscreen by the Mission Control demo; preload at low
-     priority so the demo has them without a late request, without competing with
-     above-the-fold work. -->
+<!-- Globe textures are sampled offscreen by the Mission Control demo, which is the
+     default-visible demo below the fold — preload them at high priority so they're
+     decoded before the demo first samples them, avoiding a blank/late globe. -->
 <link rel="preload" href="earth.jpg" as="image" fetchpriority="high">
 <link rel="preload" href="earth_night.jpg" as="image" fetchpriority="high">
 <!-- Self-hosted (marked MIT, highlight.js BSD-3) — no third-party CDN dependency,
@@ -3901,8 +3901,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </div>
 </div>
 
-<script src="bovnar_units.js?v=20260603"></script>
-<script src="bovnar_parser_wasm.js?v=22b20e8087bf"></script>
+<script src="bovnar_parser_wasm.js?v=64b6337baa63"></script>
 <script src="bovnar_highlight.js?v=20260720"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
@@ -5946,7 +5945,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // clientWidth read. Reading here would force whatever layout is pending — and
     // the very first activation is gated on fonts loading, i.e. exactly when a big
     // font-swap layout is pending, which is the reflow we're avoiding.
-    activate() { frame(0, true); if (sim.playing) start(); },
+    // Fallback only: with no ResizeObserver there's nothing to re-measure the canvas
+    // on show, so size it here (matches Trading/Industrial) to recover if the window
+    // was resized while this pane was hidden.
+    activate() { if (!window.ResizeObserver) sizeCanvas(); frame(0, true); if (sim.playing) start(); },
     deactivate() { stop(); },
   };
 })();

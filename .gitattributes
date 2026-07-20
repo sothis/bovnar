@@ -6,9 +6,8 @@
 # linguist-language is a harmless no-op; see dist/linguist/ for the submission.
 *.bvnr linguist-language=Bovnar linguist-detectable=true
 
-# Keep the browser-side parser/highlighter copies under web/ (duplicates of the
-# canonical sources) out of the repo's language statistics.
-web/bovnar_parser.js   linguist-vendored=true
+# Keep the browser-side highlighter copy under web/ (a duplicate of the canonical
+# source) out of the repo's language statistics.
 web/bovnar_highlight.js linguist-vendored=true
 
 # Example documents are real Bovnar, not generated/vendored — leave detectable.

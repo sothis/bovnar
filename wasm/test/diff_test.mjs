@@ -13,7 +13,7 @@
 
 import { loadBovnar } from '../../dist/wasm/index.mjs';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // fall back to the conventional ./build/bovnar.
 const CLI = process.env.BOVNAR_CLI || join(ROOT, 'build', 'bovnar');
 const tmp = mkdtempSync(join(tmpdir(), 'bvnr-diff-'));
+// Remove the scratch dir on any exit path (success, failure, or throw) so runs
+// don't leak a bvnr-diff-* dir into $TMPDIR.
+process.on('exit', () => { try { rmSync(tmp, { recursive: true, force: true }); } catch {} });
 
 let pass = 0, fail = 0, soft = 0;
 const fails = [];

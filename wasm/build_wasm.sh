@@ -78,8 +78,16 @@ sed "s#'./bovnar.mjs'#'./bovnar.single.mjs'#" \
 # Web playground integration: the inlined single-file build + a wrapper that
 # imports it, dropped into web/ so the playground loads the real parser offline
 # (no separate .wasm fetch, works over file:// and the static site).
+#
+# NOTE: the web copies use a .js extension, not .mjs. They are still ES modules
+# (loaded via import()/modulepreload) — but the live site is served by nginx,
+# whose default mime.types has no .mjs mapping, so it serves .mjs as
+# application/octet-stream and the browser refuses to execute the module. .js is
+# mapped to application/javascript everywhere, so this works with no server-side
+# MIME config. (The npm package under dist/wasm keeps .mjs — that's for node /
+# bundlers, where the extension is correct and MIME is irrelevant.)
 echo ">> installing web/ playground module"
-cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.mjs"
+cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.js"
 
 # Cache-busting: stamp content hashes so a rebuilt/redeployed asset can never be
 # served from a stale browser/CDN cache (the ?v query is the only thing these
@@ -90,10 +98,10 @@ cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.mjs"
 # changes only when its file's bytes change, so unchanged rebuilds stay byte-stable
 # (no spurious diffs) and there's no version number to bump by hand. All seds are
 # idempotent (they rewrite any existing ?v=).
-CORE_HASH="$(sha256sum "$ROOT/web/bovnar_wasm_core.mjs" | cut -c1-12)"
-sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.mjs?v=${CORE_HASH}'#" \
-	"$ROOT/wasm/index.mjs" > "$ROOT/web/bovnar_wasm.mjs"
-sed -i -E "s#(import\('\./bovnar_wasm\.mjs)(\?v=[0-9a-f]+)?('\))#\1?v=${CORE_HASH}\3#" \
+CORE_HASH="$(sha256sum "$ROOT/web/bovnar_wasm_core.js" | cut -c1-12)"
+sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.js?v=${CORE_HASH}'#" \
+	"$ROOT/wasm/index.mjs" > "$ROOT/web/bovnar_wasm.js"
+sed -i -E "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${CORE_HASH}\3#" \
 	"$ROOT/web/bovnar_parser_wasm.js"
 # The shim is hand-maintained FFI logic, versioned independently of the compiled
 # core — so key ITS cache-bust on its own content hash (computed after the import
@@ -105,8 +113,8 @@ sed -i -E "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${SHIM_HASH}#" \
 	"$ROOT/web/index.html"
 # ...and the two <link rel="modulepreload"> hrefs, which must match the dynamic-import
 # URLs above or the browser would fetch the modules twice.
-sed -i -E "s#(bovnar_wasm\.mjs\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
-sed -i -E "s#(bovnar_wasm_core\.mjs\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
+sed -i -E "s#(bovnar_wasm\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
+sed -i -E "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
 echo ">> stamped web/ module chain: core v=${CORE_HASH}, shim v=${SHIM_HASH}"
 
 echo ">> done:"

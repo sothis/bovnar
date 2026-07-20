@@ -1,10 +1,9 @@
 // Bovnar WASM — ergonomic wrapper around the emscripten module.
 //
-// The C reference parser, compiled to WebAssembly. Unlike the lenient
-// JavaScript approximation that powers the web playground's highlighter, this
-// IS the reference implementation: it synthesises default type annotations and
-// performs full type/value/unit validation, so error_unit_mismatch and friends
-// are reported exactly as the native `bovnar` CLI reports them.
+// The C reference parser, compiled to WebAssembly. This IS the reference
+// implementation: it synthesises default type annotations and performs full
+// type/value/unit validation, so error_unit_mismatch and friends are reported
+// exactly as the native `bovnar` CLI reports them.
 //
 // Usage:
 //   import { loadBovnar } from 'bovnar-wasm';
@@ -71,7 +70,7 @@ export async function loadBovnar(opts) {
     /** Full document tree in document order, each value carrying its resolved
      *  type fields (familyName/width/base/unit/epoch). Returns
      *  { ok, tree: [{ key, value }] }. Used by the web playground's parser
-     *  shim to reconstruct the JS parser's tree + event-stream shapes. */
+     *  shim to reconstruct the tree + event-stream shapes. */
     doc: (input) => callJson('bvnr_wasm_doc', input),
 
     /** Library version string, e.g. "1.1.0". */

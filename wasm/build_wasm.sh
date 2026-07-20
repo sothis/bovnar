@@ -80,8 +80,26 @@ sed "s#'./bovnar.mjs'#'./bovnar.single.mjs'#" \
 # (no separate .wasm fetch, works over file:// and the static site).
 echo ">> installing web/ playground module"
 cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.mjs"
-sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.mjs'#" \
+
+# Cache-busting: stamp a content hash of the compiled core across every hop that
+# loads it — the <script> tag, the shim's dynamic import, the wrapper's core import
+# — so a rebuilt/redeployed core can never be served from a stale browser/CDN cache
+# (the query is the only thing those ES-module URLs are keyed on). The hash changes
+# only when the core changes, so unchanged rebuilds stay byte-stable (no spurious
+# diffs), and there is no version number to bump by hand. All three seds are
+# idempotent (they rewrite any existing ?v=).
+CORE_HASH="$(sha256sum "$ROOT/web/bovnar_wasm_core.mjs" | cut -c1-12)"
+sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.mjs?v=${CORE_HASH}'#" \
 	"$ROOT/wasm/index.mjs" > "$ROOT/web/bovnar_wasm.mjs"
+sed -i -E "s#(import\('\./bovnar_wasm\.mjs)(\?v=[0-9a-f]+)?('\))#\1?v=${CORE_HASH}\3#" \
+	"$ROOT/web/bovnar_parser_wasm.js"
+sed -i -E "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${CORE_HASH}#" \
+	"$ROOT/web/index.html"
+# ...and the two <link rel="modulepreload"> hrefs, which must match the dynamic-import
+# URLs above or the browser would fetch the modules twice.
+sed -i -E "s#(bovnar_wasm\.mjs\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
+sed -i -E "s#(bovnar_wasm_core\.mjs\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
+echo ">> stamped web/ module chain with core hash v=${CORE_HASH}"
 
 echo ">> done:"
 ls -la "$OUT"

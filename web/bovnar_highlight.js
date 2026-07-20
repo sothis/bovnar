@@ -16,7 +16,7 @@
 
   /* ── Palette (mirrors highlighter/vim/bovnar.vim guifg values) ─────────── */
   const CSS = `
-.bvh-comment{color:#6e7a86}
+.bvh-comment{color:#8b96a3}
 .bvh-sigil{color:#c084fc}
 .bvh-key{color:#67d1f4}
 .bvh-eq{color:#f47067}

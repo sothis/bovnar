@@ -6,9 +6,22 @@
   "start_url": "/",
   "scope": "/",
   "icons": [
-    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "/bovnar-mark.svg", "sizes": "any", "type": "image/svg+xml" },
-    { "src": "/bovnar-mark-tile.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiB2aWV3Qm94PSIwIDAgMjU2IDI1NiI+CjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iYmx1IiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CiAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNmNiMGVhIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGE4NWQ2Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxwYXRoIGQ9Ik0xMTggNjYgTDk2IDY2IEw2MCAxMjggTDk2IDE5MCBMMTE4IDE5MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iMTUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xMzggNjYgTDE2MCA2NiBMMTk2IDEyOCBMMTYwIDE5MCBMMTM4IDE5MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iMTUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xMjggOTQgTDE2MiAxMjggTDEyOCAxNjIgTDk0IDEyOCBaIiBmaWxsPSIjMzNhNzhmIi8+PHBhdGggZD0iTTEyOCA5NCBMOTQgMTI4IEwxMjggMTI4IFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMTI4IDk0IEwxNjIgMTI4IEwxMjggMTI4IFoiIGZpbGw9IiM0ZWM5YjAiLz48cGF0aCBkPSJNOTQgMTI4IEwxMjggMTYyIEwxMjggMTI4IFoiIGZpbGw9IiMzZmI4OWUiLz48cGF0aCBkPSJNMTYyIDEyOCBMMTI4IDE2MiBMMTI4IDEyOCBaIiBmaWxsPSIjMmM5MjgxIi8+Cjwvc3ZnPg==",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/bovnar-mark-tile.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
   ],
   "theme_color": "#007acc",
   "background_color": "#1e1e1e",

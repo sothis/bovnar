@@ -323,6 +323,44 @@ fi
 
 echo
 
+_bold "=== WASM differential test ==="
+
+# Compares the WebAssembly build (dist/wasm) against this build's native CLI over
+# the example corpus + malformed snippets. Guards the exact regression that once
+# shipped: a stale dist/wasm whose parser disagreed with the sources (e.g. rejected
+# the k~m unit). Needs node (sourcing emsdk_env.sh puts one on PATH) and a built
+# dist/wasm; skips cleanly otherwise. Set NODE=/path/to/node to override.
+NODE_BIN="${NODE:-node}"
+WASM_DIST="${SRC_DIR}/dist/wasm/index.mjs"
+WASM_DIFF="${SRC_DIR}/wasm/test/diff_test.mjs"
+
+if [[ $WIN_BUILD -eq 1 ]]; then
+    _yellow "  SKIP  wasm diff_test  (Windows build)"
+    (( SKIP++ )) || true
+elif [[ ! -e "${BOVNAR_BIN}" ]]; then
+    _yellow "  SKIP  wasm diff_test  (not built: ${BOVNAR_BIN})"
+    (( SKIP++ )) || true
+elif [[ ! -e "${WASM_DIST}" ]]; then
+    _yellow "  SKIP  wasm diff_test  (no dist/wasm; run wasm/build_wasm.sh)"
+    (( SKIP++ )) || true
+elif ! command -v "${NODE_BIN}" > /dev/null 2>&1; then
+    _yellow "  SKIP  wasm diff_test  (no ${NODE_BIN}; set NODE=/path/to/node)"
+    (( SKIP++ )) || true
+else
+    printf '  %-52s ' "node wasm/test/diff_test.mjs"
+    if ( cd "${SRC_DIR}" && BOVNAR_CLI="${BOVNAR_BIN}" \
+            "${NODE_BIN}" "${WASM_DIFF}" > /dev/null 2>&1 ); then
+        _green "PASS"
+        (( PASS++ )) || true
+    else
+        _red "FAIL"
+        (( FAIL++ )) || true
+        FAILED_TESTS+=("node wasm/test/diff_test.mjs")
+    fi
+fi
+
+echo
+
 _bold "=== Results ==="
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"

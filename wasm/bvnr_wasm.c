@@ -141,8 +141,9 @@ static char *sb_finish(sb_t *b)
 {
 	if (b->oom) {
 		free(b->p);
-		char *e = (char *)malloc(48);
-		if (e) memcpy(e, "{\"ok\":false,\"error\":\"out_of_memory\"}", 36);
+		static const char oom[] = "{\"ok\":false,\"error\":\"out_of_memory\"}";
+		char *e = (char *)malloc(sizeof oom);           /* sizeof includes the NUL */
+		if (e) memcpy(e, oom, sizeof oom);
 		return e;
 	}
 	if (!b->p) { /* empty -> "" */

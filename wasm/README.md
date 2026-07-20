@@ -2,10 +2,9 @@
 
 The **Bovnar C reference parser, compiled to WebAssembly.**
 
-Unlike the lenient JavaScript approximation that powers the web playground's
-syntax highlighter, this is the *actual* reference implementation: it
-synthesises default type annotations and performs full type, value, and
-**physical-unit** validation. A unit mismatch such as
+This is the *actual* reference implementation: it synthesises default type
+annotations and performs full type, value, and **physical-unit** validation. A
+unit mismatch such as
 
 ```bovnar
 .v = <float:64,m/s> 9.81 kg;

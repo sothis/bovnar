@@ -1,34 +1,33 @@
 /*
- * bovnar_parser_wasm.js — WebAssembly-backed drop-in for window.BovnarParser.
+ * bovnar_parser_wasm.js — the parser behind window.BovnarParser.
  *
- * Loads the real C reference parser (compiled to WASM) and, once ready, makes it
- * the authority behind BovnarParser.parseFaithful / parseBovnar — reproducing
- * the exact output shapes the playground and the live demos consume, but with
- * true type/unit/value validation instead of the lenient JS approximation.
+ * Loads the real C reference parser (compiled to WASM) and makes it the sole
+ * authority behind BovnarParser.parseFaithful / parseBovnar, producing the exact
+ * output shapes the playground and the live demos consume with true
+ * type/unit/value validation.
  *
  * Both surfaces are assembled from the reference *verified event stream*
  * (bvnr_wasm_events, run in resync mode) plus the resync error list
  * (bvnr_wasm_errors). Resync means a malformed assignment is skipped, not fatal,
  * so the tree and the demos recover and show every well-formed assignment past
- * an error — matching the old lenient behaviour, but validated for real.
+ * an error.
  *
- * Load order in the page:
- *     <script src="bovnar_parser.js"></script>        <!-- JS impl: bootstrap fallback -->
- *     <script src="bovnar_parser_wasm.js"></script>   <!-- this: WASM authority -->
+ * The WASM module loads asynchronously, so until it is ready parseFaithful/
+ * parseBovnar return empty results (an empty tree / no events); a
+ * 'bovnar-wasm-ready' event fires once the module is live so the playground and
+ * demos can re-render against the real parser. The dispatcher functions have
+ * stable identity, so consumers that captured `const { parseBovnar } =
+ * BovnarParser` at load time pick up the parser transparently once it arrives.
  *
  * The C event stream carries no per-token position, so line numbers (demo
  * gutters) and the synthesised-vs-explicit annotation flag (a cosmetic tree tag)
  * are recovered from the source text by a forward scan over assignments in
- * document order. The dispatcher functions have stable identity, so consumers
- * that captured `const { parseBovnar } = BovnarParser` at load time transparently
- * upgrade from the JS fallback to WASM, and a 'bovnar-wasm-ready' event lets the
- * playground re-render.
+ * document order.
  */
 (function () {
   'use strict';
 
-  var JS = window.BovnarParser;                 // bootstrap fallback (may be undefined)
-  var EV = (JS && JS.EV) || {
+  var EV = {
     STREAM_START: 'ev_stream_start', STREAM_END: 'ev_stream_end',
     ASSIGNMENT_START: 'ev_assignment_start', ASSIGNMENT_END: 'ev_assignment_end',
     TYPE_ANN_START: 'ev_type_annotation_start',
@@ -45,39 +44,64 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.mjs')
+  import('./bovnar_wasm.mjs?v=22b20e8087bf')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
       try { window.dispatchEvent(new Event('bovnar-wasm-ready')); } catch (_) {}
     })
     .catch(function (e) {
-      if (window.console) console.warn('bovnar: WASM parser unavailable, using JS fallback', e);
+      if (window.console) console.warn('bovnar: WASM parser failed to load', e);
     });
+
+  /* Blank out string literals ("…") and '#' comments — replacing their bytes with
+   * spaces while preserving offsets and newlines — so the key scanner below can
+   * never match a '.key =' that merely appears inside a string or a comment.
+   * (Octet-stream content is base64/hex, which can't contain '.', '#' or '"', so
+   * it needs no masking.) */
+  function maskStringsAndComments(text) {
+    var out = '', n = text.length, mode = 0;   // 0 = code, 1 = string, 2 = comment
+    for (var i = 0; i < n; i++) {
+      var c = text[i];
+      if (mode === 2) { if (c === '\n') { mode = 0; out += '\n'; } else out += ' '; continue; }
+      if (mode === 1) {
+        if (c === '\\') { out += ' '; if (i + 1 < n) { out += (text[i + 1] === '\n' ? '\n' : ' '); i++; } continue; }
+        if (c === '"') { mode = 0; out += ' '; continue; }
+        out += (c === '\n') ? '\n' : ' '; continue;
+      }
+      if (c === '#') { mode = 2; out += ' '; continue; }
+      if (c === '"') { mode = 1; out += ' '; continue; }
+      out += c;
+    }
+    return out;
+  }
 
   /* ── source line / explicit-annotation scanner ───────────────────────── */
   function makeScan(text) {
+    // Structural scanning runs on the masked copy (offsets map 1:1 to the source,
+    // so line numbers and the value slice below are still correct).
+    var masked = maskStringsAndComments(text);
     var pos = 0;
     function lineAt(idx) {
       var l = 1;
-      for (var i = 0; i < idx && i < text.length; i++) if (text.charCodeAt(i) === 10) l++;
+      for (var i = 0; i < idx && i < masked.length; i++) if (masked.charCodeAt(i) === 10) l++;
       return l;
     }
     return function next(key) {
       var needle = '.' + key;
-      var i = text.indexOf(needle, pos);
+      var i = masked.indexOf(needle, pos);
       while (i >= 0) {
-        var before = i === 0 ? '\n' : text[i - 1];
+        var before = i === 0 ? '\n' : masked[i - 1];
         var j = i + needle.length;
-        while (j < text.length && (text[j] === ' ' || text[j] === '\t')) j++;
-        var after = text[j];
+        while (j < masked.length && (masked[j] === ' ' || masked[j] === '\t')) j++;
+        var after = masked[j];
         if (/[\s{};]/.test(before) && (after === '=' || after === '{')) {
           pos = j;
-          var semi = text.indexOf(';', j); if (semi < 0) semi = text.length;
+          var semi = masked.indexOf(';', j); if (semi < 0) semi = masked.length;
           return { line: lineAt(i),
-                   synthesized: after === '=' ? !/^\s*=\s*</.test(text.slice(j, semi)) : false };
+                   synthesized: after === '=' ? !/^\s*=\s*</.test(masked.slice(j, semi)) : false };
         }
-        i = text.indexOf(needle, i + 1);
+        i = masked.indexOf(needle, i + 1);
       }
       return { line: lineAt(pos), synthesized: false };
     };
@@ -148,7 +172,11 @@
           stack.push(snode); key = null;
           break;
         }
-        case 'struct_close': stack.pop(); break;
+        // Commit a pending array BEFORE popping the struct: the C stream emits
+        // array_row_end → struct_close, so an array that is the struct's last field
+        // would otherwise be finished (on the next assign_start / stream_end) after
+        // its parent struct is already popped, mis-parenting it to the outer scope.
+        case 'struct_close': finishArray(); stack.pop(); break;
         case 'array_row_start': {
           if (!arr) {
             var anode = { type: 'array', dims: 0, rows: [] };
@@ -175,8 +203,13 @@
           if (arr) {
             arr.value.rows[arr.value.rows.length - 1].elements.push(node);
           } else {
+            // Only numeric families carry a meaningful (synthesised or explicit)
+            // type annotation; reference/symbol/null/string/bool values have no
+            // family, so emitting annFromValue for them would render a bogus
+            // "synthesised → family vt_undefined" node in the playground tree.
             top().children.push({ type: 'assignment', key: key, line: line, col: 1,
-                                  ann: annFromValue(node, synth), value: node });
+                                  ann: NUMERIC[node.familyName] ? annFromValue(node, synth) : null,
+                                  value: node });
             key = null;
           }
           break;
@@ -221,7 +254,8 @@
           var d;
           if (e.tok === 'type_width')      d = { kind: 'width', value: e.width, text: String(e.width) };
           else if (e.tok === 'type_base')  d = { kind: 'base',  value: e.base,  text: '_' + e.base };
-          else if (e.tok === 'unit')       d = { kind: 'unit',  text: e.text };
+          else if (e.tok === 'unit')     { if (e.text === 'no_unit') break;   // synthesized "no unit" sentinel — not a real unit
+                                           d = { kind: 'unit', text: e.text }; }
           else if (e.tok === 'type_q')     d = { kind: 'q',     text: e.text };
           else                             d = { kind: 'param', text: e.text };
           E(EV.TYPE_ANN_PARAM, d);
@@ -229,7 +263,11 @@
         }
         case 'type_end': E(EV.TYPE_ANN_END); break;
         case 'struct_open': E(EV.STRUCT_START); break;
-        case 'struct_close': E(EV.STRUCT_END); E(EV.ASSIGNMENT_END); break;
+        case 'struct_close':
+          // Flush a struct-trailing array (array_row_end → struct_close) before
+          // closing, so it stays parented to this struct rather than the outer scope.
+          if (arrayOpen) { E(EV.ASSIGNMENT_END); arrayOpen = false; }
+          E(EV.STRUCT_END); E(EV.ASSIGNMENT_END); break;
         case 'array_row_start': E(EV.ARRAY_ROW_START); arrayOpen = true; break;
         case 'array_row_end': E(EV.ARRAY_ROW_END); break;
         case 'array_dim_start': E(EV.ARRAY_DIM_START); break;
@@ -257,20 +295,18 @@
   }
 
   function peekVersion(text) {
-    if (JS && JS.peekVersion) return JS.peekVersion(text);
     var m = /^﻿?\s*#!bovnar[ \t]+(\d+)\.(\d+)[ \t]*$/m.exec(text || '');
     if (!m || /^0\d/.test(m[1]) || /^0\d/.test(m[2])) return null;
     return { major: parseInt(m[1], 10), minor: parseInt(m[2], 10) };
   }
 
-  /* ── dispatcher: WASM when ready, JS fallback until then ─────────────────── */
+  /* ── dispatcher: WASM once ready, empty results until then ───────────────── */
   function parseFaithful(text) {
     if (wasm) { try { return wasmFaithful(text); } catch (e) { if (window.console) console.warn('bovnar wasm parseFaithful failed', e); } }
-    return JS ? JS.parseFaithful(text) : { events: [], errors: [], tree: { type: 'stream', children: [] } };
+    return { events: [], errors: [], tree: { type: 'stream', children: [] } };
   }
   function parseBovnar(text, cb) {
     if (wasm) { try { return wasmBovnar(text, cb); } catch (e) { if (window.console) console.warn('bovnar wasm parseBovnar failed', e); } }
-    if (JS) return JS.parseBovnar(text, cb);
   }
 
   window.BovnarParser = { parseFaithful: parseFaithful, parseBovnar: parseBovnar,

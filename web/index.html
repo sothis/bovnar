@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -45,10 +44,59 @@
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar — unit-safe serialization for science and industry">
 <title>Bovnar — Unit-safe serialization for science and industry</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<!-- Self-hosted webfonts (IBM Plex Sans + JetBrains Mono, OFL 1.1) — no
+     fonts.googleapis.com / fonts.gstatic.com dependency; works offline / file://.
+     Preload EVERY weight/style/subset up front so no glyph ever triggers a late font
+     load or a swap-in reflow, on any page state. Latin subset first (above-the-fold),
+     then latin-ext, then greek. crossorigin is required even same-origin — fonts are
+     always fetched in CORS mode. (~900 KB total, cached after the first visit.) -->
+<link rel="preload" href="fonts/ibm-plex-sans-300-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-300-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-400-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-400-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-500-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-600-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-300-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-400-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-500-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-600-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-300-italic-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-300-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-400-italic-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-400-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-500-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-600-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-300-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-400-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-500-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-600-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-300-italic-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-300-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-400-italic-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-400-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-500-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/ibm-plex-sans-600-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-300-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-400-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-500-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="preload" href="fonts/jetbrains-mono-600-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
+<link rel="stylesheet" href="fonts/fonts.css?v=20260720">
+<!-- Fetch + compile the WASM parser's ES-module chain up front, in parallel with the
+     rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
+     runs its dynamic import(). The ?v is the build-stamped content hash — it must
+     match the dynamic import so the module is reused, not re-fetched. -->
+<link rel="modulepreload" href="bovnar_wasm_core.mjs?v=22b20e8087bf">
+<link rel="modulepreload" href="bovnar_wasm.mjs?v=22b20e8087bf">
+<!-- Globe textures are sampled offscreen by the Mission Control demo; preload at low
+     priority so the demo has them without a late request, without competing with
+     above-the-fold work. -->
+<link rel="preload" href="earth.jpg" as="image" fetchpriority="high">
+<link rel="preload" href="earth_night.jpg" as="image" fetchpriority="high">
+<!-- Self-hosted (marked MIT, highlight.js BSD-3) — no third-party CDN dependency,
+     so the docs viewer works offline / over file:// and can't be broken by a CDN
+     outage or MITM. Versioned filenames are their own cache-buster. -->
+<script src="marked-9.1.6.min.js"></script>
+<script src="highlight-11.9.0.min.js"></script>
 <style>
 /* ── Variables ── */
 :root {
@@ -64,7 +112,7 @@
 
   --text:   #ededed;
   --text2:  #c2c2c2;
-  --text3:  #a0a0a0;
+  --text3:  #a8a8a8;
 
   --blue:    #569cd6;
   --blue2:   #007acc;
@@ -79,7 +127,7 @@
   --pink:    #ff6a8c;
 
   /* Bovnar token colors — kept in lock-step with highlighter/vim/bovnar.vim */
-  --c-comment:  #6e7a86;
+  --c-comment:  #8b96a3;
   --c-sigil:    #c084fc;
   --c-key:      #67d1f4;
   --c-eq:       #f47067;
@@ -117,7 +165,7 @@ html[data-theme="light"] {
 
   --text:   #1f1f1f;
   --text2:  #444444;
-  --text3:  #6b6b6b;
+  --text3:  #656565;
 
   --blue:    #0451a5;
   --blue2:   #0066b8;
@@ -236,6 +284,17 @@ body {
   line-height: 1.65;
   overflow-x: hidden;
 }
+
+/* Keyboard skip link: off-screen until focused, then pinned top-left. */
+.skip-link {
+  position: fixed; top: 0; left: 0; z-index: 1000;
+  transform: translateY(-120%);
+  background: var(--statusbar); color: #fff;
+  padding: 0.55rem 1rem; border-radius: 0 0 4px 0;
+  font-family: var(--mono); font-size: 0.8rem; text-decoration: none;
+  transition: transform 0.15s ease;
+}
+.skip-link:focus { transform: translateY(0); outline: 2px solid #fff; outline-offset: -4px; }
 
 ::selection { background: var(--select-bg); color: var(--cyan); }
 
@@ -577,7 +636,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
   padding: 0 0.75rem;
   font-family: var(--mono);
   font-size: 0.65rem;
-  color: rgba(255,255,255,0.9);
+  color: #fff;
   flex-shrink: 0;
   letter-spacing: 0.04em;
   gap: 1rem;
@@ -1540,7 +1599,7 @@ footer { position: relative; z-index: 1; }
   padding: 0 1rem;
   font-family: var(--mono);
   font-size: 0.65rem;
-  color: rgba(255,255,255,0.9);
+  color: #fff;
   letter-spacing: 0.04em;
 }
 .vsb-left, .vsb-right { display: flex; align-items: center; gap: 0.5rem; }
@@ -1985,6 +2044,9 @@ a[data-doc] { cursor: pointer; }
   overflow: hidden;
   background: var(--editor-bg);
 }
+/* Visible focus indicator: #pg-editor renders its text transparently via the
+   overlay and clears its own outline, so signal keyboard focus on the wrapper. */
+.pg-editor-wrap:focus-within { box-shadow: inset 0 0 0 1px var(--border-hi); }
 
 #pg-error-overlay {
   position: absolute;
@@ -2275,6 +2337,21 @@ a[data-doc] { cursor: pointer; }
   #launch-demo header.intro p { font-size: 0.85rem; }
   #launch-demo .controls { gap: 0.35rem 0.5rem; }
 }
+
+/* Respect the OS "reduce motion" preference: neutralize the ambient animations
+   (scroll-hint float, spinner, hero unfold, scroll-reveal, smooth scrolling) that
+   have no pause control. The canvas demos additionally suppress autoplay in JS and
+   already expose a Pause button. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
 </style>
 <script type="application/ld+json">
 {
@@ -2317,6 +2394,7 @@ a[data-doc] { cursor: pointer; }
 </script>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false"><defs><linearGradient id="bvnrGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient><symbol id="bvnr-mk" viewBox="0 0 256 256"><path d="M118 66 L96 66 L60 128 L96 190 L118 190" fill="none" stroke="url(#bvnrGrad)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M138 66 L160 66 L196 128 L160 190 L138 190" fill="none" stroke="url(#bvnrGrad)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M128 94 L162 128 L128 162 L94 128 Z" fill="#33a78f"/><path d="M128 94 L94 128 L128 128 Z" fill="#9cdcfe"/><path d="M128 94 L162 128 L128 128 Z" fill="#4ec9b0"/><path d="M94 128 L128 162 L128 128 Z" fill="#3fb89e"/><path d="M162 128 L128 162 L128 128 Z" fill="#2c9281"/></symbol><symbol id="bvnr-fav" viewBox="0 0 64 64"><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#bvnrGrad)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#bvnrGrad)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></symbol></defs></svg>
 
 <!-- ══════════════════════════════════════════════
@@ -2339,6 +2417,8 @@ a[data-doc] { cursor: pointer; }
     <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
   </button>
 </nav>
+
+<main id="main">
 
 <!-- ══════════════════════════════════════════════
      HERO
@@ -2379,7 +2459,7 @@ a[data-doc] { cursor: pointer; }
           <div class="editor-tab active">
             <span class="tab-icon">◆</span>
             <span>telemetry.bvnr</span>
-            <button class="tab-x" aria-label="close">×</button>
+            <span class="tab-x" aria-hidden="true">×</span>
           </div>
         </div>
         <div class="editor-breadcrumb">
@@ -2444,7 +2524,7 @@ a[data-doc] { cursor: pointer; }
 
   --text:   #ededed;
   --text2:  #c2c2c2;
-  --text3:  #a0a0a0;
+  --text3:  #a8a8a8;
 
   --blue:    #569cd6;
   --blue2:   #007acc;
@@ -2456,7 +2536,7 @@ a[data-doc] { cursor: pointer; }
   --red:     #f44747;
 
   /* Bovnar token colors — kept in lock-step with highlighter/vim/bovnar.vim */
-  --c-comment:  #6e7a86;
+  --c-comment:  #8b96a3;
   --c-sigil:    #c084fc;
   --c-key:      #67d1f4;
   --c-eq:       #f47067;
@@ -2504,7 +2584,7 @@ html[data-theme="light"] #launch-demo {
 
   --text:   #1f1f1f;
   --text2:  #444444;
-  --text3:  #6b6b6b;
+  --text3:  #656565;
 
   --blue:    #0b5bd3;
   --blue2:   #0066b8;
@@ -2703,7 +2783,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 #launch-demo .status-bar .lock.ok b { color: var(--teal); }
 #launch-demo .status-bar .lock.no b { color: var(--red); }
 
-#launch-demo .ticker { display: flex; gap: 2px; margin-bottom: 0.5rem; height: 14px; align-items: stretch; }
+#launch-demo .ticker { display: flex; gap: 2px; margin-bottom: 0.5rem; height: 14px; align-items: stretch; contain: layout; }
 #launch-demo .ticker i { flex: 1; background: #2d4a2d; border-radius: 1px; }
 #launch-demo .ticker i.ok { background: #2e7d32; }
 #launch-demo .ticker i.bad { background: #b71c1c; }
@@ -2714,6 +2794,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
   background: var(--stream-bg); border: 1px solid var(--border); border-radius: 4px;
   font-family: var(--mono); font-size: 0.76rem; line-height: 1.55;
   padding: 0.5rem 0; overflow-x: auto; max-height: 340px; overflow-y: auto;
+  contain: layout;   /* the ~14×/s innerHTML rewrite re-lays-out only this subtree, not the page */
 }
 #launch-demo pre.frame .ln { display: flex; padding: 0 0.6rem; white-space: pre; }
 #launch-demo pre.frame .ln:hover, #launch-demo pre.frame .ln.hl { background: rgba(38,79,120,0.45); }
@@ -2748,7 +2829,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 #launch-demo .t-d7 { color: var(--c-d7); } #launch-demo .t-d8 { color: var(--c-d8); }
 
 /* gauges */
-#launch-demo .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0.6rem; }
+#launch-demo .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0.6rem; contain: layout; }
 #launch-demo .gauge {
   background: var(--editor-bg); border: 1px solid var(--border); border-radius: 4px;
   padding: 0.45rem 0.55rem; cursor: default;
@@ -2860,14 +2941,14 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
       </div>
     </div>
   </details>
-  <div class="demo-tabs" role="tablist">
-    <button class="demo-tab active" data-demo="mc" role="tab">◐ Mission Control</button>
-    <button class="demo-tab" data-demo="fin" role="tab">$ Trading Desk</button>
-    <button class="demo-tab" data-demo="ind" role="tab">⚙ Plant Control</button>
+  <div class="demo-tabs" role="tablist" aria-label="Live demo">
+    <button class="demo-tab active" data-demo="mc" role="tab" id="tab-mc" aria-controls="demo-mc" aria-selected="true" tabindex="0">◐ Mission Control</button>
+    <button class="demo-tab" data-demo="fin" role="tab" id="tab-fin" aria-controls="demo-fin" aria-selected="false" tabindex="-1">$ Trading Desk</button>
+    <button class="demo-tab" data-demo="ind" role="tab" id="tab-ind" aria-controls="demo-ind" aria-selected="false" tabindex="-1">⚙ Plant Control</button>
   </div>
 </header>
 
-<div id="demo-mc" class="demo-pane">
+<div id="demo-mc" class="demo-pane" role="tabpanel" aria-labelledby="tab-mc">
 <div class="grid">
 
   <!-- ───────────── CONFIG ───────────── -->
@@ -2876,7 +2957,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
     <div class="body">
       <div class="editor">
         <div id="cfg-hl" aria-hidden="true"></div>
-        <textarea id="cfg" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+        <textarea id="cfg" aria-label="Spacecraft config — editable Bovnar (.bvnr) source" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
       </div>
       <div class="cfg-actions">
         <button class="btn primary" id="apply">Apply &amp; re-orbit</button>
@@ -2890,7 +2971,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
   <!-- ───────────── VISUALIZER ───────────── -->
   <section class="panel viz">
     <div class="head"><span class="dot"></span>Orbit visualizer <span class="grow"></span><span class="hint">ECI · XY projection</span></div>
-    <div class="canvas-wrap"><canvas id="orbit"></canvas></div>
+    <div class="canvas-wrap"><canvas id="orbit" role="img" aria-label="Orbit visualizer — the spacecraft's position and trail over a rotating Earth, driven by the decoded .bvnr telemetry stream. The same values are shown as text in the telemetry panel."></canvas></div>
     <div class="viz-legend">
       <span><b>◐</b> Earth (day / night)</span>
       <span><b style="color:#4ec9b0">●</b> spacecraft (decoded pos)</span>
@@ -2904,7 +2985,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
       <div class="controls">
         <button class="btn primary" id="play">⏸ Pause</button>
         <button class="btn" id="step">⏭ Step</button>
-        <input type="range" id="speed" min="1" max="240" value="160">
+        <input type="range" id="speed" min="1" max="240" value="160" aria-label="Simulation speed (× real time)">
         <span class="speed-lbl" id="speedlbl">160×</span>
         <span class="grow"></span>
         <label class="tgl"><input type="checkbox" id="noisy"> noisy channel</label>
@@ -2935,12 +3016,12 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 </div>
 </div><!-- /#demo-mc -->
 
-<div id="demo-fin" class="demo-pane" hidden>
+<div id="demo-fin" class="demo-pane" role="tabpanel" aria-labelledby="tab-fin" hidden>
 <div class="fgrid">
   <section class="panel cfg">
     <div class="head"><span class="dot"></span>Instrument config <span class="grow"></span><span class="hint">editable · .bvnr</span></div>
     <div class="body">
-      <div class="editor"><div id="fcfg-hl" aria-hidden="true"></div><textarea id="fcfg" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
+      <div class="editor"><div id="fcfg-hl" aria-hidden="true"></div><textarea id="fcfg" aria-label="Instrument feed config — editable Bovnar (.bvnr) source" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
       <div class="cfg-actions">
         <button class="btn primary" id="fapply">Apply &amp; restart</button>
         <button class="btn" id="freset">Reset</button>
@@ -2954,13 +3035,13 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
     <div class="body">
       <div class="controls">
         <button class="btn primary" id="fplay">⏸ Pause</button>
-        <input type="range" id="fspeed" min="1" max="40" value="6">
+        <input type="range" id="fspeed" min="1" max="40" value="6" aria-label="Simulation speed (× real time)">
         <span class="speed-lbl" id="fspeedlbl">6×</span>
         <span class="grow"></span>
         <label class="tgl"><input type="checkbox" id="fnoisy"> noisy feed</label>
         <label class="tgl"><input type="checkbox" id="fresync" checked> resync</label>
       </div>
-      <div class="chart-wrap"><canvas id="fpx"></canvas></div>
+      <div class="chart-wrap"><canvas id="fpx" role="img" aria-label="Live price chart driven by the decoded .bvnr market-data stream. The same values are shown as text in the panel."></canvas></div>
       <div class="chart-legend">
         <span><b style="color:#7fd1ff">―</b> last</span>
         <span><b style="color:#6e7a86">┄</b> EMA</span>
@@ -3003,12 +3084,12 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
 </div>
 </div><!-- /#demo-fin -->
 
-<div id="demo-ind" class="demo-pane" hidden>
+<div id="demo-ind" class="demo-pane" role="tabpanel" aria-labelledby="tab-ind" hidden>
 <div class="fgrid">
   <section class="panel cfg">
     <div class="head"><span class="dot"></span>Reactor config <span class="grow"></span><span class="hint">editable · .bvnr</span></div>
     <div class="body">
-      <div class="editor"><div id="icfg-hl" aria-hidden="true"></div><textarea id="icfg" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
+      <div class="editor"><div id="icfg-hl" aria-hidden="true"></div><textarea id="icfg" aria-label="Reactor PLC config — editable Bovnar (.bvnr) source" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
       <div class="cfg-actions">
         <button class="btn primary" id="iapply">Apply &amp; restart</button>
         <button class="btn" id="ireset">Reset</button>
@@ -3022,14 +3103,14 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
     <div class="body">
       <div class="controls">
         <button class="btn primary" id="iplay">⏸ Pause</button>
-        <input type="range" id="ispeed" min="1" max="30" value="6">
+        <input type="range" id="ispeed" min="1" max="30" value="6" aria-label="Simulation speed (× real time)">
         <span class="speed-lbl" id="ispeedlbl">6×</span>
         <span class="grow"></span>
         <label class="tgl"><input type="checkbox" id="imismatch"> scaling mismatch</label>
         <label class="tgl"><input type="checkbox" id="inoisy"> noisy bus</label>
         <label class="tgl"><input type="checkbox" id="iresync" checked> resync</label>
       </div>
-      <div class="chart-wrap"><canvas id="ipx"></canvas></div>
+      <div class="chart-wrap"><canvas id="ipx" role="img" aria-label="Reactor control HMI — tank, gauges and trend driven by the decoded .bvnr telemetry stream. The same values are shown as text in the panel."></canvas></div>
       <div class="chart-legend">
         <span><b style="color:#e88a3a">▮</b> jacket heat</span>
         <span><b style="color:#7fd1ff">―</b> temp · <b style="color:#6e7a86">┄</b> setpoint</span>
@@ -3101,7 +3182,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
           <div id="pg-error-overlay" aria-hidden="true"></div>
           <div id="pg-gutter" aria-hidden="true"></div>
           <div id="pg-highlight" aria-hidden="true"></div>
-          <textarea id="pg-editor" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"
+          <textarea id="pg-editor" aria-label="Bovnar playground editor — type .bvnr source to parse" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"
             placeholder="# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;"
           ></textarea>
         </div>
@@ -3372,13 +3453,13 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
     <h2 class="section-h2 reveal reveal-delay-1">Up in <em>minutes.</em></h2>
 
     <div style="margin-top:1.5rem;" class="reveal reveal-delay-2">
-      <div class="quickstart-tabs">
-        <button class="qs-tab active" onclick="showTab('c')">C99 API</button>
-        <button class="qs-tab" onclick="showTab('python')">Python</button>
-        <button class="qs-tab" onclick="showTab('build')">Build</button>
+      <div class="quickstart-tabs" role="tablist" aria-label="Quick start language">
+        <button class="qs-tab active" role="tab" id="qstab-c" aria-controls="tab-c" aria-selected="true" onclick="showTab('c', this)">C99 API</button>
+        <button class="qs-tab" role="tab" id="qstab-python" aria-controls="tab-python" aria-selected="false" onclick="showTab('python', this)">Python</button>
+        <button class="qs-tab" role="tab" id="qstab-build" aria-controls="tab-build" aria-selected="false" onclick="showTab('build', this)">Build</button>
       </div>
 
-      <div class="qs-pane active" id="tab-c">
+      <div class="qs-pane active" id="tab-c" role="tabpanel" aria-labelledby="qstab-c">
         <div class="qs-pane-inner">
           <div class="qs-step">
             <div class="qs-step-num">01</div>
@@ -3444,7 +3525,7 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
         </div>
       </div>
 
-      <div class="qs-pane" id="tab-python">
+      <div class="qs-pane" id="tab-python" role="tabpanel" aria-labelledby="qstab-python">
         <div class="qs-pane-inner">
           <div class="qs-step">
             <div class="qs-step-num">01</div>
@@ -3521,7 +3602,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         </div>
       </div>
 
-      <div class="qs-pane" id="tab-build">
+      <div class="qs-pane" id="tab-build" role="tabpanel" aria-labelledby="qstab-build">
         <div class="qs-pane-inner">
           <div class="qs-step">
             <div class="qs-step-num">01</div>
@@ -3723,6 +3804,8 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 <!-- ══════════════════════════════════════════════
      FOOTER
 ══════════════════════════════════════════════ -->
+</main>
+
 <footer>
   <div class="footer-main">
     <div class="footer-inner">
@@ -3819,19 +3902,16 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </div>
 
 <script src="bovnar_units.js?v=20260603"></script>
-<script src="bovnar_parser_wasm.js?v=20260630"></script>
-<script src="bovnar_highlight.js?v=20260616"></script>
+<script src="bovnar_parser_wasm.js?v=22b20e8087bf"></script>
+<script src="bovnar_highlight.js?v=20260720"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
+  // Degrade gracefully (rather than throw a load-time TypeError) if the parser
+  // or highlighter script failed to load. window.BovnarParser is set synchronously
+  // by bovnar_parser_wasm.js; the real WASM parser then loads asynchronously behind it.
+  if (!window.BovnarParser || !window.BovnarHighlight) return;
   const parseF = BovnarParser.parseFaithful;
-
-  /* parseF resolves through BovnarParser, which bovnar_parser_wasm.js upgrades
-     to the real WASM parser once it loads; re-render when that happens so the
-     tree, event count, and errors all reflect the reference implementation. */
-  window.addEventListener('bovnar-wasm-ready', function () {
-    if (editor && editor.value.trim()) schedParse();
-  });
 
   /* parseF resolves through BovnarParser, which bovnar_parser_wasm.js upgrades
      to the real WASM parser once it loads; re-render when that happens so the
@@ -3845,6 +3925,11 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   const gutter   = document.getElementById('pg-gutter');
   const overlay  = document.getElementById('pg-error-overlay');
   const treeEl   = document.getElementById('pg-event-tree');
+  // Cache the editor's scroll offset (updated by its scroll handler, where reading is
+  // cheap). The render path uses these instead of reading editor.scrollTop directly —
+  // that read forces any pending layout synchronously (a "forced reflow", ~130ms on a
+  // cold load when the whole page's initial/font-swap layout is still pending).
+  let edScrollTop = 0, edScrollLeft = 0;
   const empty    = document.getElementById('pg-empty');
   const countEl  = document.getElementById('pg-ev-count');
   const statusEl = document.getElementById('pg-status');
@@ -3868,13 +3953,16 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     return ctx.measureText('0').width || (parseFloat(cs.fontSize) * 0.6);
   }
 
-  function renderGutter() {
+  function renderGutter(st) {
+    // Use the cached scroll offset (never read editor.scrollTop here — it forces
+    // any pending layout synchronously). syncHighlight passes the cached value.
+    const scrollTop = st != null ? st : edScrollTop;
     const n = editor.value.split('\n').length;
     let h = '';
     for (let i = 1; i <= n; i++)
       h += `<span class="pg-gutter-num${errorLines.has(i) ? ' err' : ''}">${i}</span>`;
     gutter.innerHTML = h;
-    gutter.scrollTop = editor.scrollTop;
+    if (scrollTop) gutter.scrollTop = scrollTop;   // skip when unscrolled — avoids forcing layout
   }
 
   /* red mark on the single character that produced each error */
@@ -3885,11 +3973,12 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     const lh = parseFloat(cs.lineHeight) || 18;
     const padTop = parseFloat(cs.paddingTop) || 0;
     const cw = charWidth();
+    const sTop = edScrollTop, sLeft = edScrollLeft;   // cached — no layout-forcing read
     errorMarks.forEach(function (m) {
       const bar = document.createElement('div');
       bar.className = 'pg-err-char';
-      bar.style.top = (padTop + (m.line - 1) * lh - editor.scrollTop) + 'px';
-      bar.style.left = ((m.col - 1) * cw - editor.scrollLeft) + 'px';
+      bar.style.top = (padTop + (m.line - 1) * lh - sTop) + 'px';
+      bar.style.left = ((m.col - 1) * cw - sLeft) + 'px';
       bar.style.width = cw + 'px';
       bar.style.height = lh + 'px';
       overlay.appendChild(bar);
@@ -3898,9 +3987,12 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
   function syncHighlight() {
     hlDiv.innerHTML = highlightBovnar(editor.value) + '\n';
-    hlDiv.scrollTop  = editor.scrollTop;
-    hlDiv.scrollLeft = editor.scrollLeft;
-    renderGutter();
+    // Setting scrollTop after an innerHTML write also forces the pending layout (the
+    // browser must resolve the scroll range). Skip it when the editor isn't scrolled
+    // (e.g. at boot) — the fresh overlay is already at 0 — so the cold-load render
+    // doesn't force the whole page's layout.
+    if (edScrollTop || edScrollLeft) { hlDiv.scrollTop = edScrollTop; hlDiv.scrollLeft = edScrollLeft; }
+    renderGutter(edScrollTop);
   }
 
   /* place the caret at line:col and scroll it into view (used by on_error rows) */
@@ -4104,21 +4196,14 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
     countEl.textContent = res.events.length + ' event' + (res.events.length !== 1 ? 's' : '');
 
-    /* errors come straight from parseF — which is the real WASM parser once
-       bovnar_parser_wasm.js has loaded (lenient JS approximation before that). */
-    const errs = res.errors;
-
-    if (errs.length) {
-    /* errors come straight from parseF — which is the real WASM parser once
-       bovnar_parser_wasm.js has loaded (lenient JS approximation before that). */
+    /* errors come straight from parseF — the real WASM parser, once
+       bovnar_parser_wasm.js has loaded it (empty until then). */
     const errs = res.errors;
 
     if (errs.length) {
       errPanel.classList.remove('empty');
       errCount.textContent = '· ' + errs.length;
-      errCount.textContent = '· ' + errs.length;
       errList.innerHTML = '';
-      errs.forEach(function (e) {
       errs.forEach(function (e) {
         const row = el('div', 'pg-error-row',
           `<span class="pg-error-pos" title="line ${e.line}, column ${e.col}">`
@@ -4137,13 +4222,9 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 
     errorLines = new Set(errs.map((e) => e.line));
     errorMarks = errs.map((e) => ({ line: e.line, col: e.col }));
-    errorLines = new Set(errs.map((e) => e.line));
-    errorMarks = errs.map((e) => ({ line: e.line, col: e.col }));
     renderGutter();
     renderErrorOverlay();
 
-    statusEl.textContent = errs.length ? 'errors' : 'ok';
-    statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
     statusEl.textContent = errs.length ? 'errors' : 'ok';
     statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
     empty.style.display = 'none';
@@ -4183,9 +4264,12 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     schedParse();
   });
   editor.addEventListener('scroll', function () {
-    hlDiv.scrollTop  = editor.scrollTop;
-    hlDiv.scrollLeft = editor.scrollLeft;   /* horizontal sync (wrap=off) */
-    gutter.scrollTop = editor.scrollTop;     /* gutter only scrolls vertically */
+    // Safe to read here: during a scroll event the layout is already up to date, so
+    // this doesn't force a reflow. Cache it for the render path (syncHighlight etc.).
+    edScrollTop = editor.scrollTop; edScrollLeft = editor.scrollLeft;
+    hlDiv.scrollTop  = edScrollTop;
+    hlDiv.scrollLeft = edScrollLeft;   /* horizontal sync (wrap=off) */
+    gutter.scrollTop = edScrollTop;     /* gutter only scrolls vertically */
     renderErrorOverlay();
   });
   editor.addEventListener('keydown', function (e) {
@@ -4225,11 +4309,12 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   schedParse();
 }());
 
-function showTab(id) {
-  document.querySelectorAll('.qs-tab').forEach(t => t.classList.remove('active'));
+function showTab(id, btn) {
+  document.querySelectorAll('.qs-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
   document.querySelectorAll('.qs-pane').forEach(p => p.classList.remove('active'));
-  document.querySelector('#tab-' + id).classList.add('active');
-  event.target.classList.add('active');
+  const pane = document.getElementById('tab-' + id);
+  if (pane) pane.classList.add('active');
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true'); }
 }
 
 const io = new IntersectionObserver(entries => {
@@ -4262,6 +4347,13 @@ const errMsg   = document.getElementById('doc-error-msg');
 const errLink  = document.getElementById('doc-error-link');
 const content  = document.getElementById('doc-content');
 const wrap     = document.getElementById('doc-content-wrap');
+
+// Defense-in-depth: the libraries are self-hosted (reliable same-origin load), but
+// if one ever fails to load, stub it so the doc viewer degrades to plain text
+// instead of throwing a ReferenceError that would abort the rest of this script
+// (which also wires the doc drawer). marked.parse falls back to escaped <pre>.
+if (typeof marked === 'undefined') { window.marked = { use: function () {}, parse: function (t) { const p = document.createElement('pre'); p.textContent = t; return p.outerHTML; } }; }
+if (typeof hljs === 'undefined') { window.hljs = { registerLanguage: function () {}, highlightElement: function () {} }; }
 
 marked.use({ gfm: true, breaks: false });
 
@@ -4401,7 +4493,7 @@ function showState(state) {
   content.style.display = state === 'done'    ? 'block': 'none';
 }
 
-function renderDoc(file, text) {
+function renderDoc(file, text, frag) {
   if (!file.endsWith('.md')) {
     const _pre = document.createElement('pre');
     const _code = document.createElement('code');
@@ -4412,12 +4504,18 @@ function renderDoc(file, text) {
   } else {
     content.innerHTML = marked.parse(text);
 
+    // Heading ids for in-doc anchors: keep Unicode letters/digits (not just ASCII
+    // \w), and dedupe repeated headings (foo, foo-2, foo-3) so getElementById
+    // resolves every one, not only the first.
+    const seen = Object.create(null);
     content.querySelectorAll('h1, h2, h3, h4').forEach((h, i) => {
       if (!h.id) {
-        const slug = h.textContent.toLowerCase()
-          .replace(/[^\w\s-]/g, '')
-          .replace(/\s+/g, '-') ||
+        let slug = h.textContent.toLowerCase()
+          .replace(/[^\p{L}\p{N}\s-]/gu, '')
+          .trim().replace(/\s+/g, '-') ||
           ('h-' + i);
+        if (slug in seen) { seen[slug]++; slug = slug + '-' + seen[slug]; }
+        else seen[slug] = 1;
         h.id = slug;
       }
     });
@@ -4458,25 +4556,58 @@ function renderDoc(file, text) {
     });
   }
   showState('done');
+  // Cross-doc deep link (other.md#section): scroll to the target heading, if found.
+  if (frag) {
+    const target = document.getElementById(frag);
+    if (target) {
+      const top = target.getBoundingClientRect().top - wrap.getBoundingClientRect().top + wrap.scrollTop - 16;
+      wrap.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+    }
+  }
 }
 
-function openDoc(file, title) {
-  if (currentFile === file && drawer.classList.contains('open')) return;
+let lastFocus = null;   // element to restore focus to when the dialog closes
+
+// Human title for a doc file, looked up from its card (fallback: the filename).
+function docTitleFor(file) {
+  const sel = window.CSS && CSS.escape ? CSS.escape(file) : file;
+  const card = document.querySelector('a[data-doc="' + sel + '"]');
+  return (card && (card.dataset.docTitle || card.textContent.trim())) || file;
+}
+
+// `fileRaw` may carry a "#fragment" (cross-doc anchor). opts.push === false when we
+// are reacting to popstate / an initial deep link (don't add another history entry).
+function openDoc(fileRaw, title, opts) {
+  opts = opts || {};
+  const hashIdx = fileRaw.indexOf('#');
+  const file = hashIdx >= 0 ? fileRaw.slice(0, hashIdx) : fileRaw;
+  const frag = hashIdx >= 0 ? fileRaw.slice(hashIdx + 1) : null;
+  const already = drawer.classList.contains('open');
+  if (currentFile === file && already && !frag) return;
+  if (!already) lastFocus = document.activeElement;   // the triggering doc card
   currentFile = file;
   titleEl.textContent = title;
   errLink.href = GH_BASE + file;
+
+  // One history entry means "drawer open", so the Back button closes it and the
+  // open doc is deep-linkable; switching docs replaces that single entry.
+  if (opts.push !== false) {
+    const url = '#doc/' + encodeURIComponent(fileRaw);
+    history[already ? 'replaceState' : 'pushState']({ bvnrDoc: fileRaw, bvnrTitle: title }, '', url);
+  }
 
   scrim.classList.add('open');
   drawer.classList.add('open');
   document.body.style.overflow = 'hidden';
   wrap.scrollTop = 0;
+  if (closeBtn && closeBtn.focus) closeBtn.focus();   // move focus into the dialog
   showState('loading');
 
   const xhr = new XMLHttpRequest();
   xhr.open('GET', LOCAL_BASE + file, true);
   xhr.onload = function () {
     if (xhr.status === 0 || xhr.status === 200) {
-      renderDoc(file, xhr.responseText);
+      renderDoc(file, xhr.responseText, frag);
     } else {
       errMsg.textContent = 'Could not load "' + file + '" — HTTP ' + xhr.status;
       showState('error');
@@ -4491,16 +4622,49 @@ function openDoc(file, title) {
   xhr.send();
 }
 
-function closeDoc() {
+// Pure DOM close (no history side effects) — shared by closeDoc and popstate.
+function closeDrawerDOM() {
+  if (!drawer.classList.contains('open')) return;
   scrim.classList.remove('open');
   drawer.classList.remove('open');
   document.body.style.overflow = '';
   currentFile = null;
+  if (lastFocus && lastFocus.focus) lastFocus.focus();   // restore focus to the trigger
+  lastFocus = null;
 }
+
+// User-initiated close (button / scrim / Escape): close, then strip the #doc/
+// deep link from the URL in place (no new entry, no navigation away).
+function closeDoc() {
+  if (!drawer.classList.contains('open')) return;
+  closeDrawerDOM();
+  if (history.state && history.state.bvnrDoc) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
+// Back/Forward: reopen the doc when navigating onto its entry, else close.
+window.addEventListener('popstate', e => {
+  const st = e.state;
+  if (st && st.bvnrDoc) openDoc(st.bvnrDoc, st.bvnrTitle || docTitleFor(st.bvnrDoc.split('#')[0]), { push: false });
+  else closeDrawerDOM();
+});
 
 closeBtn.addEventListener('click', closeDoc);
 scrim.addEventListener('click', closeDoc);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDoc(); });
+document.addEventListener('keydown', e => {
+  if (!drawer.classList.contains('open')) return;
+  if (e.key === 'Escape') { closeDoc(); return; }
+  // Trap Tab within the modal dialog so focus can't wander behind the scrim.
+  if (e.key === 'Tab') {
+    const nodes = drawer.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    const f = Array.prototype.filter.call(nodes, el => el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
 
 document.querySelectorAll('a[data-doc]').forEach(a => {
   a.addEventListener('click', e => {
@@ -4508,6 +4672,17 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     openDoc(a.dataset.doc, a.dataset.docTitle || a.textContent.trim());
   });
 });
+
+// Deep link on initial load: #doc/<url-encoded file[#fragment]> opens that doc.
+(function () {
+  const m = /^#doc\/(.+)$/.exec(location.hash || '');
+  if (!m) return;
+  let fileRaw;
+  try { fileRaw = decodeURIComponent(m[1]); } catch (_) { return; }
+  const title = docTitleFor(fileRaw.split('#')[0]);
+  history.replaceState({ bvnrDoc: fileRaw, bvnrTitle: title }, '', location.hash);
+  openDoc(fileRaw, title, { push: false });
+})();
 </script>
 
 <script id="bvnr-viz-theme">
@@ -4577,6 +4752,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
 (function () {
   'use strict';
+  // Degrade gracefully if the parser/highlighter script failed to load, matching
+  // the other demos (rather than throwing a load-time TypeError on the destructure).
+  if (!window.BovnarParser || !window.BovnarHighlight) return;
   const { parseBovnar, EV } = window.BovnarParser;
   const $ = (id) => document.getElementById(id);
 
@@ -4678,7 +4856,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   const SUN_A = 23.44 * D2R;
   const SUN = { x: Math.cos(SUN_A), y: Math.sin(SUN_A) };     // sun direction (ECI, z≈0)
 
-  let orbit = { name: 'NYX-1', a: 8171, e: 0, i: 75.0, raan: 194.0, argp: 20.0 };
+  // Defaults mirror DEFAULT_CFG (altitude 900 km ⇒ a = RE + 900) so the globe and
+  // satellite render the correct orbit on the first frame, before the async WASM
+  // parser has loaded and applyConfig can decode the config for real.
+  let orbit = { name: 'NYX-1', a: RE + 900, e: 0, i: 100.0, raan: 194.0, argp: 0.0 };
   let orbitPath = [];       // sampled ECI [x,y] for drawing
   let pathExtent = 1;
   let resyncDefault = true;
@@ -4848,9 +5029,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   const cv = $('orbit');
   let ctx = cv.getContext('2d');
   let stars = [];
-  function sizeCanvas() {
+  // Cache the CSS pixel box. Reading cv.clientWidth/Height in the per-frame draw
+  // path (after the telemetry innerHTML rewrites invalidate layout) forces a
+  // synchronous reflow every frame; sizeCanvas runs only on real resizes, so
+  // measuring here and reusing the values keeps drawOrbit read-free.
+  let cssW = 0, cssH = 0;
+  // Size the backing buffer from an already-known CSS box (no layout read).
+  function sizeCanvasTo(w, h) {
     const dpr = window.devicePixelRatio || 1;
-    const w = cv.clientWidth, h = cv.clientHeight;
+    cssW = w; cssH = h;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -4862,6 +5049,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
                    tw: Math.random()*Math.PI*2 });
     }
   }
+  // Reads layout (clientWidth/Height) — call only at boot / activate / window-resize,
+  // never per frame. The ResizeObserver path below uses the size it already computed.
+  function sizeCanvas() { sizeCanvasTo(cv.clientWidth, cv.clientHeight); }
 
   const D = Math.PI / 180;
 
@@ -5000,66 +5190,90 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // The globe is rendered by per-pixel inverse texture mapping into a small
   // offscreen, with the day/night Lambert term baked in. The spin is slow, so we
   // only re-render when the rotation changes appreciably, then scale onto the disk.
-  const GLOBE_N = 320;
+  const GLOBE_N = 256;   // offscreen globe resolution; scaled onto the ~280px disk
   const globeCv = document.createElement('canvas');
   globeCv.width = globeCv.height = GLOBE_N;
+  // willReadFrequently: this offscreen is read back (getImageData) and rewritten
+  // (putImageData) every render, so keep it CPU-side to avoid the readback stall
+  // Chrome warns about. Fetch the context once and reuse it.
+  const globeCtx = globeCv.getContext('2d', { willReadFrequently: true });
   let globeRot = null;
-  function renderGlobe(rot) {
-    const N = GLOBE_N, g = globeCv.getContext('2d'), img = g.getImageData(0, 0, N, N), d = img.data;
-    const tw = earthTex.w, th = earthTex.h, td = earthTex.data;
-    const ntd = nightTex && nightTex.data, ntw = nightTex ? nightTex.w : 0, nth = nightTex ? nightTex.h : 0;
-    const Sx = SUN.x, Sy = -SUN.y, TW = 0.34;            // sun dir (screen); terminator half-width — the twilight band is centred on the disc (lit=0.5 at the centre) and spans ±TW of the radius, so it stays soft without eating the dark night hemisphere
+  // Everything except the texture longitude is rotation-invariant (the tilt
+  // cE/sE/cB/sB and the Sun are fixed), so the geometry, latitude, base longitude,
+  // bilinear row indices and the day/night lighting are precomputed once into this
+  // LUT. renderGlobe then only does the longitude shift, the texture fetch and the
+  // city lights — numerically identical to the old per-pixel version (verified),
+  // but the expensive sqrt/asin/atan2/smoothstep run once, not every frame.
+  // Float64 (not Float32) is required so BASEU keeps enough precision that floor()
+  // picks the same texel at boundaries. Rebuilt if the base texture's size changes.
+  let globeLUT = null;
+  function buildGlobeLUT() {
+    const N = GLOBE_N, sz = N * N, tw = earthTex.w, th = earthTex.h;
+    const BASEU = new Float64Array(sz), V = new Float64Array(sz), WY = new Float64Array(sz);
+    const IY0 = new Int32Array(sz), IY1 = new Int32Array(sz);
+    const M = new Float64Array(sz), ES = new Float64Array(sz), CF = new Float64Array(sz);
+    const Sx = SUN.x, Sy = -SUN.y, TW = 0.34;   // terminator half-width (see below)
     const I2PI = 1 / (2 * Math.PI), IPI = 1 / Math.PI;
     for (let j = 0; j < N; j++) {
       const ny = ((j + 0.5) / N) * 2 - 1;
       for (let i = 0; i < N; i++) {
-        const nx = ((i + 0.5) / N) * 2 - 1, o = (j * N + i) * 4;
+        const nx = ((i + 0.5) / N) * 2 - 1, p = j * N + i;
         const r2 = nx*nx + ny*ny;
         // Past the limb (r²>1) clamp the normal onto the rim (nz=0) and keep
-        // sampling — the buffer stays continuous so the anti-aliased clip can
-        // define a clean edge (no dark step/ring at the border).
+        // sampling so the anti-aliased clip has a clean edge.
         let snx = nx, sny = ny, nz;
         if (r2 >= 1) { const inv = 1 / Math.sqrt(r2); snx = nx * inv; sny = ny * inv; nz = 0; }
         else nz = Math.sqrt(1 - r2);
-        // screen normal (snx,-sny,nz) → invert roll(Z) then lean(X) → geographic vector
         const v0x = snx*cE - sny*sE;
         const y1  = -snx*sE - sny*cE;
         const v0y = y1*cB + nz*sB;
         const v0z = -y1*sB + nz*cB;
         const lat = Math.asin(v0y < -1 ? -1 : v0y > 1 ? 1 : v0y);
-        let u = Math.atan2(v0x, v0z) * I2PI - rot * I2PI + 0.5; u -= Math.floor(u);
+        BASEU[p] = Math.atan2(v0x, v0z) * I2PI;          // longitude before the spin
         let v = 0.5 - lat * IPI; if (v < 0) v = 0; else if (v > 0.999) v = 0.999;
-        // bilinear texture fetch (wrap longitude, clamp latitude) so a slow spin
-        // shifts the surface smoothly instead of snapping one whole texel at a time
-        const fx = u * tw - 0.5, fy = v * th - 0.5;
-        const x0 = Math.floor(fx), y0 = Math.floor(fy);
-        const wx = fx - x0, wy = fy - y0;
-        const xa = ((x0 % tw) + tw) % tw, xb = (xa + 1) % tw;
+        V[p] = v;
+        const fy = v * th - 0.5, y0 = Math.floor(fy);
+        WY[p] = fy - y0;
         const ya = y0 < 0 ? 0 : y0 >= th ? th - 1 : y0;
         const yb = y0 + 1 < 0 ? 0 : y0 + 1 >= th ? th - 1 : y0 + 1;
-        const i00 = (ya * tw + xa) * 4, i10 = (ya * tw + xb) * 4;
-        const i01 = (yb * tw + xa) * 4, i11 = (yb * tw + xb) * 4;
-        const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy),
-              w01 = (1 - wx) * wy,       w11 = wx * wy;
+        IY0[p] = ya * tw; IY1[p] = yb * tw;
         let t = (snx*Sx + sny*Sy + TW) / (2 * TW); t = t < 0 ? 0 : t > 1 ? 1 : t;
-        const lit = t * t * (3 - 2 * t);                 // smoothstep day fraction across the terminator
-        const m = 0.08 + 0.92 * lit;                     // dark night floor → full daylight, so the twilight reads as a real fade on BOTH sides of the border, not a flat grey night that starts at the centre
-        d[o]   = (td[i00]   * w00 + td[i10]   * w10 + td[i01]   * w01 + td[i11]   * w11) * m;
-        d[o+1] = (td[i00+1] * w00 + td[i10+1] * w10 + td[i01+1] * w01 + td[i11+1] * w11) * m;
-        d[o+2] = (td[i00+2] * w00 + td[i10+2] * w10 + td[i01+2] * w01 + td[i11+2] * w11) * m + 9 * (1 - lit); // cool earthshine on the night side
-        if (ntd) {                                       // real city lights on the dark side
-          const nu = (u * ntw) | 0, nv = (v * nth) | 0;
-          const ni = ((nv < nth ? nv : nth - 1) * ntw + (nu < ntw ? nu : ntw - 1)) * 4;
-          const w = ntd[ni] - ntd[ni+2];                 // warm excess (R−B): >0 only at lit cities, ≤0 on the map's blue land/ocean base
-          if (w > 6) {                                   // add just the warm glow → the blue base is ignored
-            const g2 = (1 - lit) * 1.5;                  // fade out across the terminator
-            d[o]   += w * g2;
-            d[o+1] += w * g2 * 0.78;
-            d[o+2] += w * g2 * 0.34;
-          }
-        }
-        d[o+3] = 255;
+        const lit = t * t * (3 - 2 * t);                 // smoothstep day fraction
+        M[p]  = 0.08 + 0.92 * lit;                       // dark-night floor → full daylight
+        ES[p] = 9 * (1 - lit);                           // cool earthshine on the night side
+        CF[p] = (1 - lit) * 1.5;                         // city-light fade across the terminator
       }
+    }
+    globeLUT = { BASEU, V, WY, IY0, IY1, M, ES, CF, tw, th };
+  }
+  function renderGlobe(rot) {
+    const N = GLOBE_N, g = globeCtx, img = g.getImageData(0, 0, N, N), d = img.data;
+    const tw = earthTex.w, td = earthTex.data;
+    if (!globeLUT || globeLUT.tw !== tw || globeLUT.th !== earthTex.h) buildGlobeLUT();
+    const L = globeLUT, BASEU = L.BASEU, V = L.V, WY = L.WY, IY0 = L.IY0, IY1 = L.IY1, M = L.M, ES = L.ES, CF = L.CF;
+    const ntd = nightTex && nightTex.data, ntw = nightTex ? nightTex.w : 0, nth = nightTex ? nightTex.h : 0;
+    const rotU = rot * (1 / (2 * Math.PI)), sz = N * N;
+    for (let p = 0; p < sz; p++) {
+      const o = p * 4;
+      let u = BASEU[p] - rotU + 0.5; u -= Math.floor(u);
+      // bilinear texture fetch (wrap longitude; latitude row indices are precomputed)
+      const fx = u * tw - 0.5, x0 = Math.floor(fx), wx = fx - x0;
+      const xa = ((x0 % tw) + tw) % tw, xb = (xa + 1) % tw;
+      const iy0 = IY0[p], iy1 = IY1[p], wy = WY[p];
+      const i00 = (iy0 + xa) * 4, i10 = (iy0 + xb) * 4, i01 = (iy1 + xa) * 4, i11 = (iy1 + xb) * 4;
+      const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy),
+            w01 = (1 - wx) * wy,       w11 = wx * wy;
+      const m = M[p];
+      d[o]   = (td[i00]   * w00 + td[i10]   * w10 + td[i01]   * w01 + td[i11]   * w11) * m;
+      d[o+1] = (td[i00+1] * w00 + td[i10+1] * w10 + td[i01+1] * w01 + td[i11+1] * w11) * m;
+      d[o+2] = (td[i00+2] * w00 + td[i10+2] * w10 + td[i01+2] * w01 + td[i11+2] * w11) * m + ES[p];
+      if (ntd) {                                         // real city lights on the dark side
+        const nu = (u * ntw) | 0, nv = (V[p] * nth) | 0;
+        const ni = ((nv < nth ? nv : nth - 1) * ntw + (nu < ntw ? nu : ntw - 1)) * 4;
+        const w = ntd[ni] - ntd[ni+2];                   // warm excess (R−B): >0 only at lit cities
+        if (w > 6) { const g2 = CF[p]; d[o] += w * g2; d[o+1] += w * g2 * 0.78; d[o+2] += w * g2 * 0.34; }
+      }
+      d[o+3] = 255;
     }
     g.putImageData(img, 0, 0);
     globeRot = rot;
@@ -5087,8 +5301,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.clip();
 
     if (earthTex) {
-      // texture-mapped Blue Marble; cheap per-frame redraw whenever the spin moved
-      if (rot !== globeRot) renderGlobe(rot);
+      // texture-mapped Blue Marble. The per-pixel re-projection is the frame's
+      // heaviest step, so only rebuild the offscreen when the spin has moved a
+      // perceptible amount (≈0.23°, sub-pixel at the on-screen disk size) or a
+      // forced invalidation set globeRot=null; otherwise reuse the cached globe.
+      if (globeRot === null || Math.abs(rot - globeRot) > 0.004) renderGlobe(rot);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(globeCv, cx - R, cy - R, 2*R, 2*R);
     } else {
@@ -5207,7 +5424,12 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
 
   function drawOrbit(view) {
-    const w = cv.clientWidth, h = cv.clientHeight;
+    const w = cssW, h = cssH;   // cached in sizeCanvas — avoids a per-frame reflow
+    // The ResizeObserver / resize handler can fire mid-layout with the canvas
+    // collapsed. Below ~60px the scale term (and thus the Earth radius er = RE*scale)
+    // goes negative, and Canvas throws IndexSizeError on the arc; skip the frame —
+    // a real resize with proper dimensions redraws.
+    if (w < 64 || h < 64) return;
     const cx = w/2, cy = h/2;
     const scale = (Math.min(w, h)/2 - 30) / pathExtent * 0.84;   // zoomed out a touch
     const SX = (x) => cx + x*scale, SY = (y) => cy - y*scale;
@@ -5288,60 +5510,102 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     temp_pan:  { label: 'PANEL TEMP' },
   };
 
+  // ── Frame source: built once, updated in place ──
+  // The downlink frame's line structure is fixed, so the rows (gutter + content
+  // span) are created once and only the leaf content span whose highlighted text
+  // actually changed is rewritten — instead of replacing the whole <pre> innerHTML
+  // ~14×/s, which re-parsed, re-styled and re-laid-out the entire subtree every
+  // frame. Hover 'hl' now lives on the persistent rows, so it needn't be re-applied.
+  let frameEls = null;
+  function buildFrameLines(n) {
+    const frag = document.createDocumentFragment();
+    frameEls = [];
+    for (let i = 0; i < n; i++) {
+      const div = document.createElement('div');
+      div.className = 'ln';
+      div.setAttribute('data-line', String(i + 1));
+      const gut = document.createElement('span'); gut.className = 'gut'; gut.textContent = String(i + 1);
+      const content = document.createElement('span');
+      div.append(gut, content);
+      frag.appendChild(div);
+      frameEls.push({ div: div, content: content, last: null, err: false });
+    }
+    const box = $('framesrc'); box.textContent = ''; box.appendChild(frag);
+  }
   function renderFrame(text, errs, badKeys) {
-    // Flag a line as errored if the parser reported an error on it OR it carries a
-    // field we deliberately corrupted this frame — keyed marking is reliable even
-    // when a fault shifts the parser's reported line.
+    // A line is errored if the parser flagged it OR it carries a field we corrupted
+    // this frame (keyed marking survives a fault shifting the reported line).
     const errLines = new Set(errs.map((e) => e.line));
     badKeys = badKeys || new Set();
-    const hlLines = BovnarHighlight.highlightLines(text);   // cross-line state (open strings) preserved
-    $('framesrc').innerHTML = text.split('\n').map((l, i) => {
-      const ln = i + 1;
-      const km = l.match(/^\s+\.(\w+)\b/);
-      const isErr = errLines.has(ln) || (km && badKeys.has(km[1]));
-      return '<div class="ln' + (isErr ? ' err' : '') + '" data-line="' + ln + '">' +
-             '<span class="gut">' + ln + '</span><span>' + hlLines[i] + '</span></div>';
-    }).join('');
-    applyHover();
+    const hlLines = BovnarHighlight.highlightLines(text);   // cross-line state preserved
+    const lines = text.split('\n');
+    if (!frameEls || frameEls.length !== lines.length) buildFrameLines(lines.length);
+    for (let i = 0; i < lines.length; i++) {
+      const km = lines[i].match(/^\s+\.(\w+)\b/);
+      const isErr = errLines.has(i + 1) || (km && badKeys.has(km[1]));
+      const fe = frameEls[i];
+      if (fe.err !== isErr) { fe.div.classList.toggle('err', isErr); fe.err = isErr; }
+      if (fe.last !== hlLines[i]) { fe.content.innerHTML = hlLines[i]; fe.last = hlLines[i]; }
+    }
   }
 
+  // ── Gauges: built once, updated in place ──
+  // One tile per field in a FIXED order; a field that errored (badKeys) or failed to
+  // decode shows a blank, error-marked tile that holds its place. Only the value /
+  // type / state that changed is written to the (leaf) nodes.
+  let gaugeEls = null;
+  function buildGauges() {
+    const frag = document.createDocumentFragment();
+    gaugeEls = {};
+    Object.keys(GAUGE_META).forEach((key) => {
+      const meta = GAUGE_META[key];
+      const tile = document.createElement('div');
+      tile.className = 'gauge' + (meta.sym ? ' sym' : '') + (meta.span ? ' span2' : '');
+      const k = document.createElement('div'); k.className = 'k'; k.textContent = meta.label;
+      const v = document.createElement('div'); v.className = 'v';
+      // Value as a text node + a persistent unit span, so per-frame updates set
+      // nodeValue / textContent (no style recalc) rather than innerHTML (which does).
+      const vText = document.createTextNode('');
+      const vUnit = document.createElement('span'); vUnit.className = 'u';
+      v.append(vText, vUnit);
+      const t = document.createElement('div'); t.className = 't';
+      tile.append(k, v, t);
+      frag.appendChild(tile);
+      gaugeEls[key] = { tile: tile, vText: vText, vUnit: vUnit, t: t,
+                        valStr: null, unitStr: null, tStr: null, line: null, err: null, stale: null };
+    });
+    const box = $('gauges'); box.textContent = ''; box.appendChild(frag);
+  }
   function renderGauges(rows, stale, badKeys) {
     badKeys = badKeys || new Set();
-    // Index the decoded telemetry rows by key, then render one tile per known
-    // field in a FIXED order. A field that errored this frame (in badKeys) — or
-    // that simply failed to decode — gets a blank, error-marked tile that holds
-    // its place; the tile is cleared for as long as that field's error persists.
+    if (!gaugeEls) buildGauges();
     const byKey = {};
     rows.forEach((r) => { if (r.depth === 1 && r.kind !== 'struct') byKey[r.key] = r; });
-    $('gauges').innerHTML = Object.keys(GAUGE_META).map((key) => {
-      const meta = GAUGE_META[key], r = byKey[key];
+    Object.keys(GAUGE_META).forEach((key) => {
+      const r = byKey[key], g = gaugeEls[key];
       const errored = badKeys.has(key) || !r;
-      const cls = ['gauge'];
-      if (meta.sym) cls.push('sym');
-      if (meta.span) cls.push('span2');
-      if (errored) cls.push('err');
-      else if (stale) cls.push('stale');
+      let valStr, unitStr, tStr, line;
       if (errored) {
-        return '<div class="' + cls.join(' ') + '"' + (r ? ' data-line="' + r.line + '"' : '') + '>' +
-               '<div class="k">' + esc(meta.label) + '</div>' +
-               '<div class="v">—</div>' +
-               '<div class="t">no data</div>' +
-               '</div>';
+        valStr = '—'; unitStr = ''; tStr = 'no data'; line = r ? String(r.line) : null;
+      } else {
+        valStr = r.dataKind === 'string' ? '"' + r.valueText + '"' : r.valueText;
+        unitStr = r.unit || '';
+        const type = r.family ? (r.family + (r.width ? ':' + r.width : '') + (r.epoch ? ',' + r.epoch : '')) : (r.dataKind === 'symbol' ? 'symbol' : '');
+        tStr = type ? '<' + type + '>' : ' ';   // textContent auto-escapes the angle brackets
+        line = String(r.line);
       }
-      let val = r.valueText;
-      if (r.dataKind === 'string') val = '"' + val + '"';
-      const unit = r.unit ? '<span class="u">' + esc(r.unit) + '</span>' : '';
-      const type = r.family ? (r.family + (r.width ? ':' + r.width : '') + (r.epoch ? ',' + r.epoch : '')) : (r.dataKind === 'symbol' ? 'symbol' : '');
-      // Always emit the .t line (placeholder when a field has no type) so a tile
-      // keeps the same height whether it is showing data or the "no data" error
-      // state — otherwise the column jumps as fields flip on a noisy channel.
-      return '<div class="' + cls.join(' ') + '" data-line="' + r.line + '">' +
-             '<div class="k">' + esc(meta.label) + '</div>' +
-             '<div class="v">' + esc(val) + unit + '</div>' +
-             '<div class="t">' + (type ? '&lt;' + esc(type) + '&gt;' : '&nbsp;') + '</div>' +
-             '</div>';
-    }).join('');
-    applyHover();
+      const wStale = !errored && !!stale;
+      if (g.err !== errored) { g.tile.classList.toggle('err', errored); g.err = errored; }
+      if (g.stale !== wStale) { g.tile.classList.toggle('stale', wStale); g.stale = wStale; }
+      if (g.line !== line) {
+        if (line != null) g.tile.setAttribute('data-line', line); else g.tile.removeAttribute('data-line');
+        g.line = line;
+      }
+      // Text-node / textContent writes (no style recalc); skip when unchanged.
+      if (g.valStr !== valStr) { g.vText.nodeValue = valStr; g.valStr = valStr; }
+      if (g.unitStr !== unitStr) { g.vUnit.textContent = unitStr; g.vUnit.style.display = unitStr ? '' : 'none'; g.unitStr = unitStr; }
+      if (g.tStr !== tStr) { g.t.textContent = tStr; g.tStr = tStr; }   // type rarely changes
+    });
   }
 
   /* hover coupling between gauges and frame source. The hovered line is kept in
@@ -5351,9 +5615,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
      as the pointer crosses between child spans of the same row. */
   let hoverLine = null;
   function applyHover() {
-    document.querySelectorAll('[data-line]').forEach((n) => {
-      n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine);
-    });
+    // Only touch the (≤2) elements that change, not every [data-line] node twice a
+    // frame — toggling 'hl' across the whole telemetry tree was the bulk of the
+    // per-frame style-recalc cost.
+    document.querySelectorAll('.hl').forEach((n) => n.classList.remove('hl'));
+    if (hoverLine != null)
+      document.querySelectorAll('[data-line="' + (window.CSS && CSS.escape ? CSS.escape(hoverLine) : hoverLine) + '"]')
+        .forEach((n) => n.classList.add('hl'));
   }
   function wireHover(container) {
     container.addEventListener('mouseover', (e) => {
@@ -5368,11 +5636,16 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   wireHover($('gauges')); wireHover($('framesrc'));
 
   /* ════════════════════ 7. Main loop ════════════════════ */
+  const tickerBox = $('ticker');
+  let tickerCur = null;   // the bar currently marked 'cur'
   function pushTicker(ok) {
-    sim.history.push(ok);
-    if (sim.history.length > 60) sim.history.shift();
-    $('ticker').innerHTML = sim.history.map((o, i) =>
-      '<i class="' + (o ? 'ok' : 'bad') + (i === sim.history.length - 1 ? ' cur' : '') + '"></i>').join('');
+    // Ring buffer: recycle the oldest bar to the end (one DOM move) and shift the
+    // 'cur' marker, instead of rebuilding all 60 <i> every frame.
+    const el = tickerBox.childElementCount >= 60 ? tickerBox.firstElementChild : document.createElement('i');
+    tickerBox.appendChild(el);   // appendChild moves an existing child to the end
+    if (tickerCur && tickerCur !== el) tickerCur.className = tickerCur.classList.contains('bad') ? 'bad' : 'ok';
+    el.className = (ok ? 'ok' : 'bad') + ' cur';
+    tickerCur = el;
   }
 
   // Advance + render one frame. The canvas (orbit/globe/satellite) is redrawn
@@ -5615,25 +5888,65 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   window.addEventListener('resize', () => { sizeCanvas(); drawOrbit(sim.lastGood); });
   // The visualizer's height comes from the flex row, so it isn't final until the
   // sibling panels (telemetry markup, web fonts) settle after boot. Re-sync the
-  // backing buffer to the canvas's real box whenever it changes, or it stays
-  // pinned to the boot-time min-height and the globe renders stretched/clipped.
+  // backing buffer to the canvas's real box whenever it changes.
   if (window.ResizeObserver) {
-    new ResizeObserver(() => { sizeCanvas(); drawOrbit(sim.lastGood); }).observe(cv);
+    new ResizeObserver((entries) => {
+      const e = entries[entries.length - 1];
+      // Use the size the observer already computed. Reading cv.clientWidth here
+      // instead would force a synchronous layout — and because frame()'s telemetry
+      // innerHTML rewrites can nudge this flex child's box, the observer fires often,
+      // which showed up as the recurring "Forced reflow" during the RAF loop. This
+      // also does the INITIAL sizing (the observer fires once on observe), after the
+      // page's first layout has settled — so boot never has to read clientWidth (which
+      // would force that ~150ms initial layout synchronously).
+      let w, h;
+      if (e.contentBoxSize) { const b = e.contentBoxSize[0] || e.contentBoxSize; w = b.inlineSize; h = b.blockSize; }
+      else { w = e.contentRect.width; h = e.contentRect.height; }
+      w = Math.round(w); h = Math.round(h);
+      if (w === cssW && h === cssH) return;   // box didn't actually change → no reflow, no redraw
+      sizeCanvasTo(w, h);
+      drawOrbit(sim.lastGood);
+    }).observe(cv);
+  } else {
+    sizeCanvas();   // fallback for browsers without ResizeObserver
   }
 
   /* ════════════════════ 10. Boot ════════════════════ */
   $('cfg').value = DEFAULT_CFG;
   updateCfgHL();
-  sizeCanvas();
-  applyConfig();
+  // (no sizeCanvas() here — the ResizeObserver above does the initial sizing after the
+  // first layout settles, so boot never reads clientWidth and forces that layout.)
+  // Build the orbit geometry from the default parameters up front so the globe and
+  // satellite render correctly on the very first frame. The real parser is WASM and
+  // loads asynchronously, so parseBovnar (and thus applyConfig's decode of the
+  // config) is a no-op until 'bovnar-wasm-ready' fires — without this seed the orbit
+  // path is never built, pathExtent stays at its placeholder, and the viewport scale
+  // blows up so nothing lands on screen.
+  rebuildOrbit();
+  renderDerived();
+  // Decode the config through the real parser once it's ready (and immediately if a
+  // cached WASM module is already live), so user edits to the orbit take effect.
+  if (window.BovnarParser && window.BovnarParser.isWasmReady && window.BovnarParser.isWasmReady()) applyConfig();
+  window.addEventListener('bovnar-wasm-ready', applyConfig);
   const params = new URLSearchParams(location.search);
   if (params.has('met')) sim.met = +params.get('met') || 0;
   if (params.has('speed')) { sim.speed = +params.get('speed') || sim.speed; $('speed').value = sim.speed; $('speedlbl').textContent = sim.speed + '×'; }
+  // Respect reduced-motion: hold a static first frame rather than auto-animating.
+  // activate() only calls start() when sim.playing, so the live sim then begins
+  // only on an explicit Play click.
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    sim.playing = false; $('play').textContent = '▶ Play';
+  }
   frame(0, true);
   // Registered with the demo switcher — the controller starts exactly one sim.
   window.BvnrDemos = window.BvnrDemos || {};
   window.BvnrDemos.mc = {
-    activate() { sizeCanvas(); frame(0, true); if (sim.playing) start(); },
+    // No sizeCanvas() here: the ResizeObserver re-fires when this pane is shown
+    // again (its box goes 0 → real), so it re-sizes and redraws without a forced
+    // clientWidth read. Reading here would force whatever layout is pending — and
+    // the very first activation is gated on fonts loading, i.e. exactly when a big
+    // font-swap layout is pending, which is the reflow we're avoiding.
+    activate() { frame(0, true); if (sim.playing) start(); },
     deactivate() { stop(); },
   };
 })();
@@ -5763,14 +6076,40 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     $('fs-seq').textContent = sim.seq; $('fs-drop').textContent = sim.dropped;
     const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
   }
-  function pushTicker(ok) {
-    sim.history.push(ok); if (sim.history.length > 64) sim.history.shift();
-    $('fticker').innerHTML = sim.history.map((o, i) => '<i class="' + (o ? 'ok' : 'bad') + (i === sim.history.length - 1 ? ' cur' : '') + '"></i>').join('');
+  const tickerBox = $('fticker');
+  let tickerCur = null;
+  function pushTicker(ok) {   // ring buffer: recycle the oldest bar instead of rebuilding all 64
+    const el = tickerBox.childElementCount >= 64 ? tickerBox.firstElementChild : document.createElement('i');
+    tickerBox.appendChild(el);
+    if (tickerCur && tickerCur !== el) tickerCur.className = tickerCur.classList.contains('bad') ? 'bad' : 'ok';
+    el.className = (ok ? 'ok' : 'bad') + ' cur';
+    tickerCur = el;
+  }
+  // Frame source built once, only the changed content spans rewritten (see Mission Control).
+  let frameEls = null;
+  function buildFrameLines(n) {
+    const frag = document.createDocumentFragment();
+    frameEls = [];
+    for (let i = 0; i < n; i++) {
+      const div = document.createElement('div'); div.className = 'ln'; div.setAttribute('data-line', String(i + 1));
+      const gut = document.createElement('span'); gut.className = 'gut'; gut.textContent = String(i + 1);
+      const content = document.createElement('span');
+      div.append(gut, content);
+      frag.appendChild(div); frameEls.push({ div: div, content: content, last: null, err: false });
+    }
+    const box = $('fframesrc'); box.textContent = ''; box.appendChild(frag);
   }
   function renderFrame(text, errs) {
     const el = new Set(errs.map((e) => e.line));
-    $('fframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '" data-line="' + (i + 1) + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
-    applyHover();
+    const hl = Hl.highlightLines(text);
+    if (!frameEls || frameEls.length !== hl.length) buildFrameLines(hl.length);
+    for (let i = 0; i < hl.length; i++) {
+      const isErr = el.has(i + 1);
+      const fe = frameEls[i];
+      if (fe.err !== isErr) { fe.div.classList.toggle('err', isErr); fe.err = isErr; }
+      if (fe.last !== hl[i]) { fe.content.innerHTML = hl[i]; fe.last = hl[i]; }
+    }
+    applyHover();   // the blotter still rebuilds, so re-apply the hover coupling
   }
   function renderBlotter(lastS, bidS, askS, miss, lines) {
     miss = miss || {}; lines = lines || {};
@@ -5804,9 +6143,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
   const cv = $('fpx');
   let ctx = cv.getContext('2d');
-  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  let cssW = 0, cssH = 0;   // cached CSS box; drawChart uses these to avoid a per-frame reflow
+  function sizeCanvasTo(w, h) { const dpr = window.devicePixelRatio || 1; cssW = w; cssH = h; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function sizeCanvas() { sizeCanvasTo(cv.clientWidth, cv.clientHeight); }   // reads layout — not per frame
   function drawChart() {
-    const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h);
+    const w = cssW, h = cssH; ctx.clearRect(0, 0, w, h);
     const P = VIZ.pal();
     ctx.fillStyle = P.chartBg; ctx.fillRect(0, 0, w, h);
     const A = sim.hist; if (A.length < 2) return;
@@ -5900,8 +6241,24 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   $('fplay').addEventListener('click', () => { sim.playing = !sim.playing; $('fplay').textContent = sim.playing ? '⏸ Pause' : '▶ Play'; sim.playing ? start() : stop(); });
   $('fspeed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('fspeedlbl').textContent = sim.speed + '×'; });
   $('fnoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
-  $('fresync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
-  if (window.ResizeObserver) new ResizeObserver(() => { sizeCanvas(); drawChart(); }).observe(cv);
+  // Two-way bind the resync toggle to the config's .feed.resync flag — flipping the
+  // checkbox rewrites the value in the config text (applyConfig does the reverse),
+  // matching Mission Control.
+  function setCfgResync(on) {
+    const ta = $('fcfg');
+    const next = ta.value.replace(/(\.resync\s*=\s*)(?:true|false)(\s*;)/, '$1' + (on ? 'true' : 'false') + '$2');
+    if (next !== ta.value) { ta.value = next; updateCfgHL(); }
+  }
+  $('fresync').addEventListener('change', (e) => { sim.resync = e.target.checked; setCfgResync(sim.resync); });
+  if (window.ResizeObserver) new ResizeObserver((es) => {
+    const e = es[es.length - 1];   // use the observer's size — no clientWidth read → no forced reflow
+    let w, h;
+    if (e.contentBoxSize) { const b = e.contentBoxSize[0] || e.contentBoxSize; w = b.inlineSize; h = b.blockSize; }
+    else { w = e.contentRect.width; h = e.contentRect.height; }
+    w = Math.round(w); h = Math.round(h);
+    if (w === cssW && h === cssH) return;   // no real change → skip
+    sizeCanvasTo(w, h); drawChart();
+  }).observe(cv);
 
   /* Gauge ↔ frame-source hover coupling (mirrors Mission Control). hoverLine is
      held in state and re-applied after every redraw so the ~6×/s rebuild can't
@@ -5918,8 +6275,20 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   wireHover($('fgauges')); wireHover($('fframesrc'));
 
-  $('fcfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig();
-  for (let i = 0; i < 3; i++) step();   // seed a few ticks so the panel/chart aren't blank on first view
+  $('fcfg').value = DEFAULT_CFG; updateCfgHL();
+  // The parser is WASM and loads asynchronously; decode the config once it's ready
+  // (immediately if already live). Until then the sim's defaults — which mirror
+  // DEFAULT_CFG — drive the demo, so skipping applyConfig avoids flashing a spurious
+  // "parse error" over a valid config. Re-seed after each apply so the panel/chart
+  // aren't blank on first view.
+  const seed = () => { for (let i = 0; i < 3; i++) step(); };
+  if (window.BovnarParser.isWasmReady && window.BovnarParser.isWasmReady()) applyConfig();
+  seed();
+  window.addEventListener('bovnar-wasm-ready', () => { applyConfig(); seed(); });
+  // Respect reduced-motion: hold a static frame; Play still starts the live sim.
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    sim.playing = false; $('fplay').textContent = '▶ Play';
+  }
   window.BvnrDemos = window.BvnrDemos || {};
   window.BvnrDemos.fin = {
     activate() { sizeCanvas(); drawChart(); if (sim.playing) start(); },
@@ -6054,14 +6423,40 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
   }
 
-  function pushTicker(ok) {
-    sim.history.push(ok); if (sim.history.length > 64) sim.history.shift();
-    $('iticker').innerHTML = sim.history.map((o, i) => '<i class="' + (o ? 'ok' : 'bad') + (i === sim.history.length - 1 ? ' cur' : '') + '"></i>').join('');
+  const tickerBox = $('iticker');
+  let tickerCur = null;
+  function pushTicker(ok) {   // ring buffer: recycle the oldest bar instead of rebuilding all 64
+    const el = tickerBox.childElementCount >= 64 ? tickerBox.firstElementChild : document.createElement('i');
+    tickerBox.appendChild(el);
+    if (tickerCur && tickerCur !== el) tickerCur.className = tickerCur.classList.contains('bad') ? 'bad' : 'ok';
+    el.className = (ok ? 'ok' : 'bad') + ' cur';
+    tickerCur = el;
+  }
+  // Frame source built once, only the changed content spans rewritten (see Mission Control).
+  let frameEls = null;
+  function buildFrameLines(n) {
+    const frag = document.createDocumentFragment();
+    frameEls = [];
+    for (let i = 0; i < n; i++) {
+      const div = document.createElement('div'); div.className = 'ln'; div.setAttribute('data-line', String(i + 1));
+      const gut = document.createElement('span'); gut.className = 'gut'; gut.textContent = String(i + 1);
+      const content = document.createElement('span');
+      div.append(gut, content);
+      frag.appendChild(div); frameEls.push({ div: div, content: content, last: null, err: false });
+    }
+    const box = $('iframesrc'); box.textContent = ''; box.appendChild(frag);
   }
   function renderFrame(text, errs) {
     const el = new Set(errs.map((e) => e.line));
-    $('iframesrc').innerHTML = Hl.highlightLines(text).map((h, i) => '<div class="ln' + (el.has(i + 1) ? ' err' : '') + '" data-line="' + (i + 1) + '"><span class="gut">' + (i + 1) + '</span><span>' + h + '</span></div>').join('');
-    applyHover();
+    const hl = Hl.highlightLines(text);
+    if (!frameEls || frameEls.length !== hl.length) buildFrameLines(hl.length);
+    for (let i = 0; i < hl.length; i++) {
+      const isErr = el.has(i + 1);
+      const fe = frameEls[i];
+      if (fe.err !== isErr) { fe.div.classList.toggle('err', isErr); fe.err = isErr; }
+      if (fe.last !== hl[i]) { fe.content.innerHTML = hl[i]; fe.last = hl[i]; }
+    }
+    applyHover();   // the HMI still rebuilds, so re-apply the hover coupling
   }
   function renderHMI(D, miss, lines) {
     miss = miss || {}; lines = lines || {};
@@ -6097,7 +6492,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
   const cv = $('ipx');
   let ctx = cv.getContext('2d');
-  function sizeCanvas() { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  let cssW = 0, cssH = 0;   // cached CSS box; draw() uses these to avoid a per-frame reflow
+  function sizeCanvasTo(w, h) { const dpr = window.devicePixelRatio || 1; cssW = w; cssH = h; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function sizeCanvas() { sizeCanvasTo(cv.clientWidth, cv.clientHeight); }   // reads layout — not per frame
   function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function line(a, b, c, d) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); }
   // Analog dial gauge with redline arc, needle and value readout. frac/redFrac
@@ -6126,7 +6523,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
   let lastDraw = null;
   function draw() {
-    const w = cv.clientWidth, h = cv.clientHeight;
+    const w = cssW, h = cssH;   // cached in sizeCanvas — avoids a per-frame reflow
     const tnow = performance.now() * 0.001;
     const dt = lastDraw == null ? 0.016 : Math.min(0.05, tnow - lastDraw); lastDraw = tnow;
     ctx.clearRect(0, 0, w, h);
@@ -6324,8 +6721,24 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   $('ispeed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('ispeedlbl').textContent = sim.speed + '×'; });
   $('imismatch').addEventListener('change', (e) => { sim.mismatch = e.target.checked; });
   $('inoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
-  $('iresync').addEventListener('change', (e) => { sim.resync = e.target.checked; });
-  if (window.ResizeObserver) new ResizeObserver(() => { sizeCanvas(); draw(); }).observe(cv);
+  // Two-way bind the resync toggle to the config's .bus.resync flag — flipping the
+  // checkbox rewrites the value in the config text (applyConfig does the reverse),
+  // matching Mission Control.
+  function setCfgResync(on) {
+    const ta = $('icfg');
+    const next = ta.value.replace(/(\.resync\s*=\s*)(?:true|false)(\s*;)/, '$1' + (on ? 'true' : 'false') + '$2');
+    if (next !== ta.value) { ta.value = next; updateCfgHL(); }
+  }
+  $('iresync').addEventListener('change', (e) => { sim.resync = e.target.checked; setCfgResync(sim.resync); });
+  if (window.ResizeObserver) new ResizeObserver((es) => {
+    const e = es[es.length - 1];   // use the observer's size — no clientWidth read → no forced reflow
+    let w, h;
+    if (e.contentBoxSize) { const b = e.contentBoxSize[0] || e.contentBoxSize; w = b.inlineSize; h = b.blockSize; }
+    else { w = e.contentRect.width; h = e.contentRect.height; }
+    w = Math.round(w); h = Math.round(h);
+    if (w === cssW && h === cssH) return;   // no real change → skip
+    sizeCanvasTo(w, h); draw();
+  }).observe(cv);
 
   /* Gauge ↔ frame-source hover coupling (mirrors Mission Control). hoverLine is
      held in state and re-applied after every redraw so the ~6×/s rebuild can't
@@ -6342,8 +6755,20 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   wireHover($('igauges')); wireHover($('iframesrc'));
 
-  $('icfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig();
-  for (let i = 0; i < 3; i++) step();   // seed a few cycles so the HMI/trend aren't blank on first view
+  $('icfg').value = DEFAULT_CFG; updateCfgHL();
+  // The parser is WASM and loads asynchronously; decode the config once it's ready
+  // (immediately if already live). Until then the sim's defaults — which mirror
+  // DEFAULT_CFG — drive the demo, so skipping applyConfig avoids flashing a spurious
+  // "parse error" over a valid config. Re-seed after each apply so the HMI/trend
+  // aren't blank on first view.
+  const seed = () => { for (let i = 0; i < 3; i++) step(); };
+  if (window.BovnarParser.isWasmReady && window.BovnarParser.isWasmReady()) applyConfig();
+  seed();
+  window.addEventListener('bovnar-wasm-ready', () => { applyConfig(); seed(); });
+  // Respect reduced-motion: hold a static frame; Play still starts the live sim.
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    sim.playing = false; $('iplay').textContent = '▶ Play';
+  }
   window.BvnrDemos = window.BvnrDemos || {};
   window.BvnrDemos.ind = { activate() { sizeCanvas(); draw(); if (sim.playing) start(); }, deactivate() { stop(); } };
 })();
@@ -6371,10 +6796,28 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // resize since the blurbs wrap to different line counts at different widths.
   function reserveBlurb() {
     if (!blurb) return;
-    blurb.style.minHeight = '0';
+    // Measure every blurb on an out-of-flow clone (same class ⇒ same font/padding,
+    // fixed border-box width ⇒ same wrapping) instead of swapping innerHTML on the
+    // live in-flow element and reading offsetHeight each pass — that write→read→…
+    // loop forced a full-page reflow per blurb. Mutating the absolutely-positioned
+    // clone dirties only itself, so the height reads are cheap.
+    const box = blurb.getBoundingClientRect();            // one layout read
+    // Stack every blurb as a sibling row inside ONE out-of-flow container, appended
+    // in a single write, then read all their heights together — layout flushes once
+    // for the batch instead of once per blurb (no write→read→write thrash).
+    const meas = document.createElement('div');
+    meas.style.cssText = 'position:absolute;visibility:hidden;left:-9999px;top:0;width:' + box.width + 'px';
+    const rows = [];
+    for (const k in BLURBS) {
+      const row = blurb.cloneNode(false);
+      row.style.cssText = 'box-sizing:border-box;min-height:0;width:' + box.width + 'px';
+      row.innerHTML = BLURBS[k];
+      meas.appendChild(row); rows.push(row);
+    }
+    blurb.parentNode.appendChild(meas);   // single insertion → single layout
     let max = 0;
-    for (const k in BLURBS) { blurb.innerHTML = BLURBS[k]; if (blurb.offsetHeight > max) max = blurb.offsetHeight; }
-    blurb.innerHTML = BLURBS[current];
+    for (const row of rows) if (row.offsetHeight > max) max = row.offsetHeight;   // batched reads
+    blurb.parentNode.removeChild(meas);
     blurb.style.minHeight = max + 'px';
   }
   function switchTo(name) {
@@ -6383,12 +6826,53 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     for (const k in panes) panes[k].hidden = (k !== name);
     current = name;
     if (blurb && BLURBS[name]) blurb.innerHTML = BLURBS[name];
-    document.querySelectorAll('#launch-demo .demo-tab').forEach((t) => t.classList.toggle('active', t.dataset.demo === name));
-    if (D[name]) D[name].activate();                                // size + draw + start (pane now visible)
+    document.querySelectorAll('#launch-demo .demo-tab').forEach((t) => {
+      const on = t.dataset.demo === name;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;   // roving tabindex per the ARIA tabs pattern
+    });
+    // Defer the demo's activation (which starts its RAF loop) until the fonts are
+    // loaded (fontsReady, below), so NO demo — Mission Control, Trading or Industrial
+    // — ever animates its JetBrains-Mono telemetry while the font is still swapping
+    // in (the cold-load "forced reflow"). Resolves instantly once cached. The
+    // current===name guard drops a stale activation if the user switches again first.
+    if (D[name]) fontsReady.then(function () { if (current === name && D[name]) D[name].activate(); });
   }
-  document.querySelectorAll('#launch-demo .demo-tab').forEach((t) => t.addEventListener('click', () => switchTo(t.dataset.demo)));
-  switchTo('mc');
-  reserveBlurb();
+  const tabEls = Array.prototype.slice.call(document.querySelectorAll('#launch-demo .demo-tab'));
+  tabEls.forEach((t) => t.addEventListener('click', () => switchTo(t.dataset.demo)));
+  // Arrow / Home / End keyboard navigation across the tablist (ARIA tabs pattern).
+  const tablist = document.querySelector('#launch-demo .demo-tabs');
+  if (tablist) tablist.addEventListener('keydown', (e) => {
+    const i = tabEls.indexOf(document.activeElement);
+    if (i < 0) return;
+    let j = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % tabEls.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + tabEls.length) % tabEls.length;
+    else if (e.key === 'Home') j = 0;
+    else if (e.key === 'End') j = tabEls.length - 1;
+    if (j < 0) return;
+    e.preventDefault();
+    tabEls[j].focus();
+    switchTo(tabEls[j].dataset.demo);
+  });
+  // Cold-load reflow guard, used by switchTo() above. The auto-animating telemetry
+  // renders in JetBrains Mono; on an uncached load that font arrives mid-animation and
+  // the text reflows — the "forced reflow during the RAF" seen only without cache.
+  // Explicitly load the telemetry/label fonts up front so every demo's loop starts,
+  // and the blurb is measured, only with the final font (the one-time swap then lands
+  // before any loop runs). Resolves instantly once cached, and still resolves (never
+  // hangs) if a font fails. document.fonts.ready alone is insufficient — the mono font
+  // isn't requested until the telemetry first renders, so we request it explicitly.
+  const fontsReady = (document.fonts && document.fonts.load)
+    ? Promise.all([
+        document.fonts.load('1em "JetBrains Mono"'),
+        document.fonts.load('500 1em "JetBrains Mono"'),
+        document.fonts.load('1em "IBM Plex Sans"'),
+      ]).catch(function () {})
+    : Promise.resolve();
+  switchTo('mc');                    // visual switch now; activation gated internally
+  fontsReady.then(reserveBlurb);     // measure the blurb with the final font
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(reserveBlurb, 150); });
 })();
 </script>

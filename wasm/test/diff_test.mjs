@@ -19,7 +19,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CLI = join(ROOT, 'build', 'bovnar');
+// Honour BOVNAR_CLI so the test runner can point at a non-default --build-dir;
+// fall back to the conventional ./build/bovnar.
+const CLI = process.env.BOVNAR_CLI || join(ROOT, 'build', 'bovnar');
 const tmp = mkdtempSync(join(tmpdir(), 'bvnr-diff-'));
 
 let pass = 0, fail = 0, soft = 0;

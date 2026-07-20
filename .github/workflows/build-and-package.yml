@@ -39,7 +39,10 @@ jobs:
           fetch-depth: 0
 
       - name: Set up MSVC x64 environment
-        uses: ilammy/msvc-dev-cmd@v1
+        # Maintained node24 equivalent of ilammy/msvc-dev-cmd, which has no
+        # node24 release and so trips the Node-20 deprecation warning. Same job:
+        # runs vcvarsall and exports the MSVC env to the following steps.
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
 
@@ -226,8 +229,11 @@ jobs:
 
       - name: Build wheels
         # v3.x ships CPython 3.14 final support (cp314); needed for the
-        # cp314-* entry in [tool.cibuildwheel].build.
-        uses: pypa/cibuildwheel@v3.1
+        # cp314-* entry in [tool.cibuildwheel].build. Pinned to v3.4 (still the
+        # v3 line) because v3.2+ bundles actions/setup-python@v6, which runs on
+        # node24 — v3.1 pulled in setup-python@v5 and tripped the Node-20
+        # deprecation warning.
+        uses: pypa/cibuildwheel@v3.4
 
       - uses: actions/upload-artifact@v7
         with:

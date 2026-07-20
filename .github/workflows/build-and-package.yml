@@ -53,7 +53,7 @@ jobs:
         run: cmake --build build\msvc
 
       - name: Upload Windows artifact (MSVC)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bovnar-windows-msvc
           path: build/msvc/bovnar-windows-*.zip
@@ -125,7 +125,7 @@ jobs:
         run: cmake --build build/mingw
 
       - name: Upload Windows artifact (MinGW)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bovnar-windows-mingw
           path: build/mingw/bovnar-windows-*.zip
@@ -181,14 +181,14 @@ jobs:
         run: cmake --build build -j"$(nproc)"
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bovnar-linux
           path: build/bovnar-linux-*.tar.xz
           if-no-files-found: error
 
       - name: Upload amalgamation artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bovnar-amalgamate
           path: build/bovnar-*-amalgamate.tar.xz
@@ -229,7 +229,7 @@ jobs:
         # cp314-* entry in [tool.cibuildwheel].build.
         uses: pypa/cibuildwheel@v3.1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cibw-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
@@ -255,7 +255,7 @@ jobs:
         # those to twine and errors "Unknown distribution format: 'README.md'".
         run: pipx run twine check dist/*.tar.gz
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cibw-sdist
           path: ./dist/*.tar.gz
@@ -272,7 +272,7 @@ jobs:
     permissions:
       id-token: write   # OIDC token for PyPI Trusted Publishing
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: cibw-*
           path: dist

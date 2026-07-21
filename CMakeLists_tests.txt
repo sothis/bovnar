@@ -37,6 +37,20 @@ set_tests_properties(bvnr_concurrency PROPERTIES
     TIMEOUT 120)
 endif()
 
+# What the writer emits, the reader must read back unchanged -- swept over every
+# integer width at its boundary values, every numeric base for bignums, and the
+# exact set of control bytes a string may carry. That last one is a SYMMETRY
+# check: if the reader's and writer's sets ever diverge, the library can read a
+# document whose value it cannot write back.
+add_executable(bvnr_write_read_roundtrip_test tests/bovnar_write_read_roundtrip_test.c)
+target_compile_options(bvnr_write_read_roundtrip_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_write_read_roundtrip_test PRIVATE bvnr_static)
+add_test(NAME bvnr_write_read_roundtrip COMMAND bvnr_write_read_roundtrip_test)
+set_tests_properties(bvnr_write_read_roundtrip PROPERTIES
+    LABELS "unit;writer;reader;roundtrip"
+    FAIL_REGULAR_EXPRESSION "FAILED"
+    TIMEOUT 60)
+
 add_executable(bvnr_int_test          tests/bvn_int_test.c)
 add_executable(bvnr_float_test           tests/bvn_float_test.c)
 add_executable(bvnr_datetime_test        tests/bvn_datetime_test.c)
@@ -972,7 +986,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 114)
+set(BVNR_EXPECTED_TEST_COUNT 115)
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

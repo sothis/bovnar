@@ -249,7 +249,10 @@ a string (`bvnr_data_t.frac_data`, or `bvn_dom_get_datetime_fraction()`), and a
 value carrying a fraction is pretty-printed back as an ISO literal so it
 round-trips. For sub-second values you compute on, use a finer integer carrier
 (e.g. milliseconds). The UTC→epoch conversion is leap-second correct for the civil epochs
-and `tai` (the offset is folded before `tai`'s leap-second lookup); the atomic
+and `tai` (the offset is folded before `tai`'s leap-second lookup). A second of
+`60` is an inserted leap second: on the civil epochs it folds onto the following
+second (POSIX time has none to spend on it), but on `tai` it keeps its own value
+one below the boundary, which is what makes UTC⇄TAI injective there. The atomic
 GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
 (`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. A
 malformed or out-of-range literal is `error_invalid_datetime_literal`.

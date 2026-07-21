@@ -106,6 +106,24 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **A prefixed currency could not be converted to its unprefixed form.**
+  Currencies deliberately carry no SI dimension, so `bvn_unit_dimension_vector`
+  fails for them and `bvn_units_compatible` calls every currency incompatible
+  even with itself. The identity short-circuit rescued `$USD → $USD`, but
+  `k~$USD → $USD` is not an identity — the two differ by one prefix and nothing
+  else, with a factor of 1000 between them. Every entry point refused it, so a
+  prefixed currency could neither be read through `want_unit` nor written under
+  `BVN_UNIT_REDUCE`; `examples/financial.bvnr` and `crypto_portfolio.bvnr` were
+  unwritable with that flag for exactly this reason, and both now round-trip
+  idempotently.
+  The three conversion entry points now fall back — only where
+  `bvn_units_compatible` has already said no, so a unit that *does* have an SI row
+  keeps taking the ordinary path — to a match on the base units and exponents
+  with the prefixes ignored, scaling by the exact prefix ratio. SI and IEC
+  prefixes are kept apart as powers of ten and two, which is what lets the
+  rational path stay lossless without consulting the conversion table at all.
+  Two genuinely different currencies are still refused: only the prefix may
+  differ.
 - **`convert bvnr → json` now reports what it drops and exits 1.** JSON cannot
   carry a unit, a symbol, a reference, an octet stream or an integer wider than
   64 bits — and the converter dropped all of it silently with exit 0, while going

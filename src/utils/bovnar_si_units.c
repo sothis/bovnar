@@ -398,6 +398,63 @@ bool bvn_units_compatible(value_unit_t a, value_unit_t b)
 	}
 	return true;
 }
+/*
+ * Two units that are the same apart from their PREFIXES, and the exact scale
+ * between them.
+ *
+ * This exists for units with no SI conversion row — currencies. They carry no
+ * dimension by design, so bvn_unit_dimension_vector fails for them and
+ * bvn_units_compatible calls every currency incompatible even with itself. The
+ * identity short-circuit rescues "$USD -> $USD", but "k~$USD -> $USD" is not an
+ * identity: the two differ by exactly one prefix, and nothing between them but a
+ * factor of 1000. Every conversion entry point refused it, so a prefixed
+ * currency could neither be read through want_unit nor written under
+ * BVN_UNIT_REDUCE.
+ *
+ * The match is a multiset over (base, exponent) — unit multiplication commutes,
+ * so "$USD·oz_t⁻¹" and "oz_t⁻¹·$USD" are the same unit. The scale comes out as
+ * separate powers of ten and two, because SI prefixes are decimal and IEC ones
+ * binary; keeping them apart is what lets the rational path stay exact.
+ *
+ * Only ever consulted AFTER bvn_units_compatible has said no, so a unit that
+ * does have an SI row keeps taking the normal, fully general path.
+ */
+static bool bvn_unit_prefix_only_delta(value_unit_t a, value_unit_t b,
+				       int32_t *si_delta, int32_t *iec_delta)
+{
+	if (a.num_components != b.num_components) return false;
+	if (!bvn_unit_structurally_valid(a) || !bvn_unit_structurally_valid(b))
+		return false;
+	uint32_t n = a.num_components < BVNR_MAX_UNIT_COMPONENTS
+		   ? a.num_components : BVNR_MAX_UNIT_COMPONENTS;
+	bool used[BVNR_MAX_UNIT_COMPONENTS] = { false };
+	for (uint32_t i = 0; i < n; i++) {
+		bool found = false;
+		for (uint32_t j = 0; j < n; j++) {
+			if (used[j]) continue;
+			if (a.components[i].base     != b.components[j].base)     continue;
+			if (a.components[i].exponent != b.components[j].exponent) continue;
+			used[j] = true;
+			found   = true;
+			break;
+		}
+		if (!found) return false;
+	}
+	int32_t si = 0, iec = 0;
+	for (uint32_t i = 0; i < n; i++) {
+		if (a.components[i].prefix.system == prefix_iec)
+			iec += bvni_prefix_exp_int(a.components[i]);
+		else
+			si  += bvni_prefix_exp_int(a.components[i]);
+		if (b.components[i].prefix.system == prefix_iec)
+			iec -= bvni_prefix_exp_int(b.components[i]);
+		else
+			si  -= bvni_prefix_exp_int(b.components[i]);
+	}
+	*si_delta  = si;
+	*iec_delta = iec;
+	return true;
+}
 double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 			       bool *ok, bool *requires_affine)
 {
@@ -411,8 +468,12 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 	 * bvn_unit_convert_rational short-circuit earlier because they must also
 	 * rescue an irrational factor, which has no bearing on an identity. */
 	if (!bvn_units_compatible(a, b)) {
-		if (bvn_unit_equal(a, b) && bvn_unit_structurally_valid(a))
-			return 1.0;
+		/* Same unit apart from prefixes — a currency, which has no SI row and so
+		 * cannot be judged by dimension. Identity is just the delta-zero case of
+		 * this. */
+		int32_t sid = 0, iecd = 0;
+		if (bvn_unit_prefix_only_delta(a, b, &sid, &iecd))
+			return bvni_pow10(sid) * bvni_ipow(2.0, iecd);
 		*ok = false;
 		return 0.0;
 	}
@@ -640,7 +701,22 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 		return bvn_int_copy(out_num, vnum) && bvn_int_copy(out_den, vden) &&
 		       rat_reduce(out_num, out_den);
 	}
-	if (!bvn_units_compatible(from, to)) return false;   /* dim mismatch */
+	if (!bvn_units_compatible(from, to)) {
+		/* Same unit apart from prefixes: the scale is a power of ten times a
+		 * power of two, both exact, so this stays lossless without ever touching
+		 * si_conv_table — which is the point, since a currency has no row there. */
+		int32_t sid = 0, iecd = 0;
+		if (!bvn_unit_prefix_only_delta(from, to, &sid, &iecd))
+			return false;                       /* genuine dim mismatch */
+		*exact = true;
+		if (!bvn_int_copy(out_num, vnum) || !bvn_int_copy(out_den, vden))
+			return false;
+		if (sid  > 0 && !bvn_int_mul_pow10(out_num,  sid))  return false;
+		if (sid  < 0 && !bvn_int_mul_pow10(out_den, -sid))  return false;
+		if (iecd > 0 && !bvn_int_shl(out_num,  iecd))       return false;
+		if (iecd < 0 && !bvn_int_shl(out_den, -iecd))       return false;
+		return rat_reduce(out_num, out_den);
+	}
 	bvn_int_t *ffn = bvn_int_alloc(), *ffd = bvn_int_alloc();
 	bvn_int_t *fon = bvn_int_alloc(), *fod = bvn_int_alloc();
 	bvn_int_t *tfn = bvn_int_alloc(), *tfd = bvn_int_alloc();

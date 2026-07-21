@@ -2276,6 +2276,63 @@ static void test_named_si_collapse_respects_kinds(void)
 	}
 }
 
+
+static void test_prefixed_currency_converts(void)
+{
+	printf("  a prefixed currency converts to its unprefixed form...\n");
+	/* Currencies carry no SI dimension by design, so bvn_unit_dimension_vector
+	 * fails for them and bvn_units_compatible calls every currency incompatible
+	 * even with itself. The identity short-circuit rescued "$USD -> $USD", but
+	 * "k~$USD -> $USD" is not an identity — it differs by one prefix, with
+	 * nothing between the two but a factor of 1000. Every entry point refused it,
+	 * so a prefixed currency could neither be read through want_unit nor written
+	 * under BVN_UNIT_REDUCE. */
+	bool ok1 = false, ok2 = false;
+	value_unit_t kusd = bvn_parse_unit((const uint8_t *)"k~$USD", &ok1);
+	value_unit_t usd  = bvn_parse_unit((const uint8_t *)"$USD",   &ok2);
+	if (!ok1 || !ok2) { ASSERT_TRUE(false, "currency units parse"); return; }
+
+	double out = -1.0;
+	ASSERT_TRUE(bvn_unit_convert_value(5.0, kusd, usd, &out) && out == 5000.0,
+		    "5 k$USD is 5000 $USD");
+	out = -1.0;
+	ASSERT_TRUE(bvn_unit_convert_value(5000.0, usd, kusd, &out) && out == 5.0,
+		    "...and back");
+	/* exact too: the scale is a power of ten, so the rational path stays lossless
+	 * without ever consulting si_conv_table, which has no row for a currency */
+	check_rat("5", 10, true, kusd, usd, 10, true, "5000", "5 k$USD -> 5000 $USD exactly");
+	check_rat("5000", 10, true, usd, kusd, 10, true, "5", "5000 $USD -> 5 k$USD exactly");
+
+	/* A compound carrying a currency works the same way. */
+	bool ok3 = false, ok4 = false;
+	value_unit_t a = bvn_parse_unit((const uint8_t *)"$USD/oz_t",   &ok3);
+	value_unit_t b = bvn_parse_unit((const uint8_t *)"k~$USD/oz_t", &ok4);
+	if (ok3 && ok4)
+		check_rat("2000", 10, true, a, b, 10, true, "2",
+			  "2000 $USD/oz_t -> 2 k$USD/oz_t");
+
+	/* Genuinely different currencies must STILL be refused — the match is on the
+	 * base units, so only the prefix may differ. */
+	bool oke = false;
+	value_unit_t eur = bvn_parse_unit((const uint8_t *)"$EUR", &oke);
+	if (oke) {
+		out = -1.0;
+		ASSERT_TRUE(!bvn_unit_convert_value(5.0, usd, eur, &out),
+			    "$USD does not convert to $EUR");
+		ASSERT_TRUE(!bvn_unit_convert_value(5.0, kusd, eur, &out),
+			    "...nor does a prefixed one");
+	}
+	/* And a physical unit still takes the ordinary path, unchanged. */
+	out = -1.0;
+	ASSERT_TRUE(bvn_unit_convert_value(5.0, BVN_UNIT_SI(bu_meter, si_kilo),
+					   BVN_UNIT_NO_PREFIX(bu_meter), &out) &&
+		    out == 5000.0, "physical units are unaffected");
+	out = -1.0;
+	ASSERT_TRUE(!bvn_unit_convert_value(5.0, BVN_UNIT_NO_PREFIX(bu_meter),
+					    BVN_UNIT_NO_PREFIX(bu_second), &out),
+		    "and a real dimension mismatch is still a mismatch");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -2312,6 +2369,7 @@ int main(void)
 	test_unwritable_units_are_refused();
 	test_reduce_keeps_a_prefixed_dimensionless_scale();
 	test_convert_factor_identity();
+	test_prefixed_currency_converts();
 	test_logarithmic_units_refuse();
 	test_angle_is_its_own_quantity_kind();
 	test_named_si_collapse_respects_kinds();

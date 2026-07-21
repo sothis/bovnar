@@ -123,3 +123,73 @@ def test_tz_offset_folds_to_utc():
                            f"{y:04d}-06-15T{H:02d}:{M:02d}:{S:02d}{zone};\n")
                     assert bovnar.loads(doc)["t"] == _oracle(y, 6, 15, H, M, S, ep, off_s)
     assert n > 200
+
+
+# Every table entry after the first is a positive leap second of exactly one
+# second, i.e. a real insertion UTC spells 23:59:60. Entry 0 establishes the
+# initial 1972 offset and inserts nothing.
+_INSERTIONS = [(thr, off) for i, (thr, off) in enumerate(_LEAP)
+               if i > 0 and off == _LEAP[i - 1][1] + 1]
+
+
+def _utc_civil_before(uniform_utc):
+    """Civil fields of the UTC second one below `uniform_utc` (TAI-epoch scale)."""
+    unix_s = uniform_utc - (40587 - 36204) * 86400 - 1
+    t = __import__("time").gmtime(unix_s)
+    return t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec
+
+
+@needs_lib
+def test_leap_second_has_its_own_tai_value():
+    # The inserted second is a real instant on the continuous atomic scale, so
+    # on tai it must NOT collapse onto the following second: it sits exactly one
+    # TAI second below the boundary. This is what makes UTC<->TAI injective.
+    assert len(_INSERTIONS) == 27, f"expected 27 insertions, got {len(_INSERTIONS)}"
+    for thr, off in _INSERTIONS:
+        y, mo, d, H, M, _ = _utc_civil_before(thr)
+        leap = f"{y:04d}-{mo:02d}-{d:02d}T{H:02d}:{M:02d}:60Z"
+        got = bovnar.loads(f"#!bovnar 1.1\n.t = <datetime:64,tai> {leap};\n")["t"]
+        assert got == thr + off - 1, f"{leap}: got {got}, want {thr + off - 1}"
+        # ... and the second after it is a distinct value, one higher.
+        nxt = bovnar.loads(
+            f"#!bovnar 1.1\n.t = <datetime:64,tai> {_oracle_iso(thr)};\n")["t"]
+        assert nxt == got + 1, f"{leap}: next second {nxt} not {got + 1}"
+
+
+def _oracle_iso(uniform_utc):
+    unix_s = uniform_utc - (40587 - 36204) * 86400
+    t = __import__("time").gmtime(unix_s)
+    return "%04d-%02d-%02dT%02d:%02d:%02dZ" % (
+        t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+
+
+@needs_lib
+def test_leap_second_collapses_on_civil_epochs():
+    # POSIX time runs a uniform 86400 s day and has no second to spend on the
+    # insertion, so there :60 must still fold onto the following second.
+    for thr, _ in _INSERTIONS:
+        y, mo, d, H, M, _ = _utc_civil_before(thr)
+        leap = f"{y:04d}-{mo:02d}-{d:02d}T{H:02d}:{M:02d}:60Z"
+        for ep in ("unix", "mjd", "ntp", "y2000"):
+            ann = "" if ep == "unix" else f"<datetime:64,{ep}> "
+            got = bovnar.loads(f"#!bovnar 1.1\n.t = {ann}{leap};\n")["t"]
+            assert got == _oracle(y, mo, d, H, M, 60, ep), f"{leap} on {ep}: {got}"
+
+
+@needs_lib
+def test_leap_second_survives_a_tz_offset():
+    # An ISO offset is whole minutes, so it moves the wall clock but not the
+    # second-of-minute: the :60 spelling must survive the fold to UTC.
+    doc_z = "#!bovnar 1.1\n.t = <datetime:64,tai> 2016-12-31T23:59:60Z;\n"
+    doc_tz = "#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T00:59:60+01:00;\n"
+    assert bovnar.loads(doc_z)["t"] == bovnar.loads(doc_tz)["t"] == 1861920036
+
+
+@needs_lib
+def test_unrecorded_leap_second_still_collapses():
+    # The table is a static snapshot. A build predating an IERS announcement
+    # must not reject a document spelling a genuine future leap second, so a
+    # :60 the table does not record keeps the historical collapse.
+    a = bovnar.loads("#!bovnar 1.1\n.t = <datetime:64,tai> 2020-06-30T23:59:60Z;\n")["t"]
+    b = bovnar.loads("#!bovnar 1.1\n.t = <datetime:64,tai> 2020-07-01T00:00:00Z;\n")["t"]
+    assert a == b

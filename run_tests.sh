@@ -294,7 +294,16 @@ _bold "=== Python binding tests ==="
 PY_BIN="${PYTHON:-python3}"
 PY_SRC="${SRC_DIR}/python"
 PY_TESTS="${PY_SRC}/tests"
+# ABSOLUTE, because LIBBOVNAR_PATH is consumed after a `cd "${PY_SRC}"` below. A
+# relative BUILD_DIR (the default is ./build) produced a path that does not exist
+# from python/, so _ffi.py skipped the override and silently fell back to the
+# in-tree build -- i.e. `--build-dir build-asan` reported PASS having tested the
+# ORDINARY library. Empty is a hard error for the same reason: an unset override
+# is indistinguishable from a working one in the output.
 SHARED_LIB="$(ls "${BUILD_DIR}"/libbvnr.so* "${BUILD_DIR}"/libbvnr.dylib 2>/dev/null | head -1 || true)"
+if [[ -n "${SHARED_LIB}" ]]; then
+    SHARED_LIB="$(cd "$(dirname "${SHARED_LIB}")" && pwd)/$(basename "${SHARED_LIB}")"
+fi
 
 if [[ $WIN_BUILD -eq 1 ]]; then
     # The bindings load libbvnr via ctypes from the host interpreter, which
@@ -308,6 +317,10 @@ elif ! "${PY_BIN}" -m pytest --version > /dev/null 2>&1; then
     _yellow "  SKIP  python suite  (pytest not installed)"
     (( SKIP++ )) || true
 else
+    if [[ -z "${SHARED_LIB}" || ! -e "${SHARED_LIB}" ]]; then
+        _red "  FAIL  python suite  (no shared library in ${BUILD_DIR})"
+        (( FAIL++ )) || true
+    fi
     printf '  %-52s ' "pytest python/tests"
     # The integration tests find the shared lib via LIBBOVNAR_PATH; pure tests
     # ignore it.  Tests needing the lib self-skip when it is absent.

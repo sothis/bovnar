@@ -112,6 +112,17 @@ if(BVNR_WERROR)
         list(APPEND BVNR_C_FLAGS /WX)
     else()
         list(APPEND BVNR_C_FLAGS -Werror)
+        # -fanalyzer is a heuristic whole-program checker, not a warning, and at
+        # low optimisation it loses the invariant that bigint_ensure_cap()
+        # guarantees a non-NULL limbs pointer when it returns true -- so
+        # BVNR_WERROR=ON, documented "for CI", failed to build in three of five
+        # configurations (no CMAKE_BUILD_TYPE, Debug, MinSizeRel) on exactly one
+        # false positive; Release and RelWithDebInfo are clean because the
+        # optimiser propagates the invariant. Keep the diagnostic visible, just
+        # do not let a heuristic decide whether the build succeeds.
+        if(BVNR_ANALYZER AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            list(APPEND BVNR_C_FLAGS -Wno-error=analyzer-null-dereference)
+        endif()
     endif()
 endif()
 

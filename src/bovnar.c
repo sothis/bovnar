@@ -723,10 +723,37 @@ static int cmd_events(int argc, char **argv)
 			cwputs("  ╚══════════════════════════════════════════════════════"
 				 "══════════════════════════╝");
 		}
-	} else if (ok) {
-		cwputs("\n  ✓ All tokens validated successfully.");
 	}
 	bvnr_reader_destroy(rd);
+
+	/* The streaming pass alone is not the whole of validity. Array homogeneity,
+	 * struct shape and duplicate keys are DOM-tier rules (spec 12.4/12.5), so
+	 * `events` printed "All tokens validated successfully" and exited 0 for a
+	 * document `validate` rejects -- and CMakeLists_tests.txt uses that very
+	 * string as the per-example validity gate, which made the gate blind to
+	 * every whole-array property. Run the same pass when the input is seekable;
+	 * say so plainly when it is not, rather than overclaiming. */
+	if (ok && !from_stdin) {
+		if (lseek(fd, 0, SEEK_SET) == 0) {
+			bvn_dom_doc_t *hdoc = bvn_dom_parse_fd(fd);
+			error_code_t herr = hdoc ? bvn_dom_doc_get_parse_error(hdoc)
+			                         : error_none;
+			if (hdoc) bvn_dom_doc_destroy(hdoc);
+			if (herr != error_none) {
+				cwe("\n  ✗ Document-tier validation failed: %s\n",
+				    bvn_error_to_string(herr));
+				ok = false;
+			} else {
+				cwputs("\n  ✓ All tokens validated successfully.");
+			}
+		} else {
+			cwputs("\n  ✓ All tokens validated successfully "
+			       "(streaming tier only; input is not seekable).");
+		}
+	} else if (ok) {
+		cwputs("\n  ✓ All tokens validated successfully "
+		       "(streaming tier only; stdin is not seekable).");
+	}
 	if (!from_stdin) close(fd);
 	free(ctx);
 	return ok ? 0 : 1;
@@ -2977,14 +3004,23 @@ int main(int argc, char **argv)
 	bvn_set_binary_stdio();
 	if (argc < 2) { usage(argv[0]); return 1; }
 	const char *cmd = argv[1];
+	/* Extra positional arguments were silently ignored, so a typo or a shell
+	 * glob that matched more than intended ("validate *.bvnr") checked only the
+	 * first file and still exited 0. Refuse instead of half-doing the job. */
 	if (strcmp(cmd, "validate") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s validate <file>\n", argv[0]); return 1; }
+		if (argc > 3) { fprintf(stderr, "validate: takes exactly one file, got %d\n",
+					argc - 2); return 2; }
 		return cmd_validate(argv[2]);
 	} else if (strcmp(cmd, "query") == 0) {
 		if (argc < 4) { fprintf(stderr, "Usage: %s query <path> <file>\n", argv[0]); return 1; }
+		if (argc > 4) { fprintf(stderr, "query: takes exactly a path and a file, "
+					"got %d arguments\n", argc - 2); return 2; }
 		return cmd_query(argv[2], argv[3]);
 	} else if (strcmp(cmd, "pretty-print") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s pretty-print <file>\n", argv[0]); return 1; }
+		if (argc > 3) { fprintf(stderr, "pretty-print: takes exactly one file, got %d\n",
+					argc - 2); return 2; }
 		return cmd_pretty(argv[2]);
 	} else if (strcmp(cmd, "convert") == 0) {
 		const char *from = NULL, *to = NULL, *file = NULL;

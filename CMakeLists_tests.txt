@@ -511,11 +511,29 @@ endif()
 # cannot load, and running CPython itself under Wine is out of scope — so the
 # whole Python suite is excluded on Windows. The C suite above is the Windows
 # coverage.
+set(_bvnr_have_pytest FALSE)
+
 if(NOT WIN32)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 
+# The interpreter alone is not enough: every test below is `python -m pytest`,
+# so without the module all 19 of them fail at once, each reporting nothing more
+# useful than "No module named pytest". That is exactly how this suite's first
+# CI run went. The header has always said "requires Python3 and pytest" -- only
+# the first half was ever checked. Probe for the second half too and skip the
+# registrations when it is missing, the same way a missing interpreter does.
 if(Python3_FOUND)
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} -c "import pytest"
+        RESULT_VARIABLE _bvnr_pytest_probe
+        OUTPUT_QUIET ERROR_QUIET)
+    if(_bvnr_pytest_probe EQUAL 0)
+        set(_bvnr_have_pytest TRUE)
+    endif()
+endif()
+
+if(_bvnr_have_pytest)
 
     set(_py_src   "${CMAKE_CURRENT_SOURCE_DIR}/python")
     set(_py_tests "${CMAKE_CURRENT_SOURCE_DIR}/python/tests")
@@ -742,10 +760,14 @@ if(Python3_FOUND)
         LABELS  "python;python_pure"
     )
 
-else()
+elseif(NOT Python3_FOUND)
     message(STATUS
         "Python3 interpreter not found -- skipping Python binding tests. "
         "Install Python 3.10+ and 'pip install pytest>=7' to enable them.")
+else()
+    message(STATUS
+        "pytest not importable by ${Python3_EXECUTABLE} -- skipping Python "
+        "binding tests. Run 'pip install pytest>=7' to enable them.")
 endif()
 
 endif() # NOT WIN32 (Python binding tests)
@@ -1047,11 +1069,14 @@ endif()
 # ── Registration self-check ─────────────────────────────────────────────────
 # Only meaningful for a default configure; any option that adds or removes tests
 # makes the count legitimately differ, so this compares only when the relevant
-# knobs are at their defaults.
+# knobs are at their defaults. _bvnr_have_pytest, not Python3_Interpreter_FOUND:
+# the Python gates now need the module too, so an interpreter without it is a
+# legitimate shortfall of 20 (the 19 bvnr_py_* gates plus the bvnr_abi_dump_build
+# fixture registered beside them) rather than something silently unregistering.
 get_property(_bvnr_all_tests DIRECTORY PROPERTY TESTS)
 list(LENGTH _bvnr_all_tests _bvnr_ntests)
 if(BVNR_PACKAGE AND BVNR_FUZZ_TEST AND NOT BVNR_SANITIZE AND NOT WIN32
-   AND NOT CMAKE_CROSSCOMPILING AND Python3_Interpreter_FOUND)
+   AND NOT CMAKE_CROSSCOMPILING AND _bvnr_have_pytest)
     if(NOT _bvnr_ntests EQUAL ${BVNR_EXPECTED_TEST_COUNT})
         message(FATAL_ERROR
             "registered ${_bvnr_ntests} tests, expected "

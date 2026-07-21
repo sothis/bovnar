@@ -542,9 +542,21 @@ if(NOT SKBUILD)
     # Relative hop from <libdir>/pkgconfig back to the prefix, so the .pc can
     # derive its own prefix from ${pcfiledir} instead of baking in the
     # configure-time CMAKE_INSTALL_PREFIX.
-    file(RELATIVE_PATH BVNR_PC_RELDIR
-         "/${CMAKE_INSTALL_LIBDIR}/pkgconfig" "/")
-    string(REGEX REPLACE "/$" "" BVNR_PC_RELDIR "${BVNR_PC_RELDIR}")
+    #
+    # Counted by string surgery -- one ".." per path component -- rather than
+    # file(RELATIVE_PATH <libdir>/pkgconfig "/") rooted at "/". That command
+    # demands a *full* path for both arguments, and on Windows a bare "/" is not
+    # one, so the rooted form aborted configure outright ("file RELATIVE_PATH
+    # must be passed a full path to the file: /") on MSVC and MinGW alike --
+    # before a single object was compiled. The .pc is a Unix artefact nothing on
+    # Windows consumes, but this block is not guarded and so has to at least
+    # *evaluate* there. Component counting gives the identical answer on every
+    # platform (lib -> ../.., lib/x86_64-linux-gnu -> ../../..) and reaches for
+    # no filesystem semantics to do it.
+    string(REGEX REPLACE "/+" "/"
+           _bvnr_pc_dir "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    string(REGEX REPLACE "^/|/$" "" _bvnr_pc_dir "${_bvnr_pc_dir}")
+    string(REGEX REPLACE "[^/]+" ".." BVNR_PC_RELDIR "${_bvnr_pc_dir}")
     if(BVNR_PC_RELDIR STREQUAL "")
         set(BVNR_PC_RELDIR ".")
     endif()

@@ -177,8 +177,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Ahead of Configure, not somewhere after CTest: CMakeLists_tests.txt
+      # probes for pytest at CONFIGURE time and skips the 19 bvnr_py_* gates
+      # without it. Installing later therefore bought nothing -- the first run of
+      # this job registered those gates against a runner whose interpreter had no
+      # pytest and every one of them failed. A setup-python toolchain rather than
+      # the runner's /usr/bin/python3, because the latter is an
+      # externally-managed distro interpreter that refuses `pip install`; this
+      # one lands first on PATH, which is what find_package(Python3) then picks.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Python test dependencies
+        run: python3 -m pip install --quiet pytest
+
+      # -DPython3_EXECUTABLE pins the resolution to the interpreter just
+      # provisioned instead of leaving FindPython3 to choose among the several on
+      # the runner -- only this one has pytest.
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DPython3_EXECUTABLE="$(command -v python3)" .
 
       - name: Build
         run: cmake --build build -j"$(nproc)"
@@ -192,20 +212,25 @@ jobs:
       # the cd -- and it is the name _ffi.py actually consults.
       - name: Python bindings
         run: |
-          python3 -m pip install --quiet pytest
           cd python && LIBBOVNAR_PATH="$GITHUB_WORKSPACE/build/libbvnr.so" \
             python3 -m pytest tests -q
 
       # A second pass under the sanitizers. The Python tests are excluded: they
       # load libbvnr.so through ctypes into an unsanitized interpreter, which
-      # ASan refuses outright.
+      # ASan refuses outright ("ASan runtime does not come first in initial
+      # library list").
       - name: Sanitizer build
         run: |
           cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
           cmake --build build-asan -j"$(nproc)"
 
+      # -LE python, not -E '^bvnr_py_': the thing that cannot run here is
+      # "drives the library from a Python interpreter", which is what the label
+      # records -- the name prefix only approximates it. bvnr_data_parity is
+      # exactly that kind of test under a name the prefix does not match, so it
+      # ran, hit the ctypes-into-unsanitized-interpreter wall and failed.
       - name: CTest (ASan + UBSan)
-        run: ctest --test-dir build-asan -j"$(nproc)" -E '^bvnr_py_' --output-on-failure
+        run: ctest --test-dir build-asan -j"$(nproc)" -LE python --output-on-failure
 
   linux:
     name: Linux (x64)

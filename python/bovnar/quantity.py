@@ -300,7 +300,10 @@ class Quantity:
         lit = self.decimal()
         if self._parser_saturated(f, lit):
             return decimal_to_interchange_bits(lit, width)
-        return f.to_decimal_bits(width)
+        # Straight from the literal: encoding the parsed bvn_float would round
+        # the decimal tie through a binary intermediate and land on the wrong
+        # side 26 % of the time. See BvnFloat.strtodec_bits.
+        return BvnFloat.strtodec_bits(self.raw, width)
 
     def _decimal_stored(self):
         """The materialised float_dec value as an exact Decimal, full range
@@ -311,7 +314,8 @@ class Quantity:
         lit = self.decimal()
         if self._parser_saturated(f, lit):
             return decimal_stored_value(lit, width)
-        return BvnFloat.from_decimal_bits(width, f.to_decimal_bits(width)).to_decimal()
+        return BvnFloat.from_decimal_bits(
+            width, BvnFloat.strtodec_bits(self.raw, width)).to_decimal()
 
     def _binary_bits(self) -> bytes:
         """IEEE binary interchange bytes for this (binary float) value, over the

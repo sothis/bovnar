@@ -569,6 +569,8 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_float_from_bin256.restype  = c_bool
     lib.bvn_float_from_bin256.argtypes = [c_void_p, c_u32_8]
     # IEEE decimal interchange dec16/32/64 (scalar) and dec128/256 (word arrays)
+    lib.bvn_float_strtodec.restype  = c_bool
+    lib.bvn_float_strtodec.argtypes = [c_char_p, c_uint32, P(c_uint32), c_int]
     lib.bvn_float_to_dec16.restype  = None
     lib.bvn_float_to_dec16.argtypes = [c_void_p, P(c_uint16)]
     lib.bvn_float_to_dec32.restype  = None

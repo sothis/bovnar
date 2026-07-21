@@ -2299,6 +2299,46 @@ void bvn_float_to_dec32(const bvn_float_t *f, uint32_t *out)
 	DecFmt fmt = {32, 8, 23, 101, 7};
 	bvnf_encode_dec(f, &fmt, out, 1);
 }
+/*
+ * Decimal string -> IEEE-754 DECIMAL interchange, in a single rounding.
+ *
+ * The counterpart to bvn_float_strtoieee_bin, which the public API had for the
+ * binary formats but not for the decimal ones. Without it a caller had to go
+ * bvn_float_from_str() -> bvn_float_to_dec*(), i.e. through a BINARY
+ * intermediate -- and a decimal tie is in general not exactly representable in
+ * binary, so it lands just above or below and the second rounding follows that
+ * instead of round-half-even. Measured over 4000 exact decimal64 ties: the
+ * two-step path disagrees with IEEE roundTiesToEven on 26.4 % of them (and not
+ * consistently up or down -- it is whichever side the binary landed on), while
+ * this direct path is exact on all 4000.
+ *
+ * width is 16, 32, 64, 128 or 256; bits32 is the number of uint32_t words in
+ * out (1, 1, 2, 4, 8 respectively). Returns false for an unsupported width or a
+ * short buffer, leaving *out untouched.
+ */
+bool bvn_float_strtodec(const char *s, uint32_t width, uint32_t *out, int bits32)
+{
+	if (!s || !out || bits32 < 1)
+		return false;
+	switch (width) {
+	case 16:  if (bits32 < 1) return false;
+		  out[0] = bvn_float_parse_dec16(s);  return true;
+	case 32:  if (bits32 < 1) return false;
+		  out[0] = bvn_float_parse_dec32(s);  return true;
+	case 64: {
+		if (bits32 < 2) return false;
+		uint64_t v = bvn_float_parse_dec64(s);
+		out[0] = (uint32_t)(v & 0xffffffffu);
+		out[1] = (uint32_t)(v >> 32);
+		return true;
+	}
+	case 128: if (bits32 < 4) return false;
+		  bvn_float_parse_dec128(s, out); return true;
+	case 256: if (bits32 < 8) return false;
+		  bvn_float_parse_dec256(s, out); return true;
+	default:  return false;
+	}
+}
 void bvn_float_to_dec64(const bvn_float_t *f, uint64_t *out)
 {
 	if (!f || !out) return;

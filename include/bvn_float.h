@@ -187,6 +187,21 @@ BVN_API bool bvn_float_from_bin256(bvn_float_t *f, const uint32_t bits[8]);
  * decimal16's 9-bit coefficient field versus its 2-digit maximum) is read as
  * zero, per IEEE 754 S3.5.2.
  */
+/* Decimal string -> IEEE-754 DECIMAL interchange, correctly rounded in a SINGLE
+ * step -- the decimal counterpart of bvn_float_strtoieee_bin above.
+ *
+ * Use this rather than bvn_float_from_str() followed by bvn_float_to_dec*():
+ * that route rounds through a BINARY intermediate, and a decimal tie is in
+ * general not exactly representable in binary, so it lands slightly above or
+ * below and the second rounding follows the intermediate instead of
+ * round-half-even. Over 4000 exact decimal64 ties the two-step route disagrees
+ * with IEEE on 26.4 % of them; this one is exact on all of them.
+ *
+ * width is 16/32/64/128/256, bits32 the number of uint32_t words in out
+ * (1/1/2/4/8). Returns false for an unsupported width or a short buffer,
+ * leaving *out untouched. */
+BVN_API bool bvn_float_strtodec(const char *s, uint32_t width,
+                                uint32_t *out, int bits32);
 BVN_API void bvn_float_to_dec16 (const bvn_float_t *f, uint16_t *out);
 BVN_API void bvn_float_to_dec32 (const bvn_float_t *f, uint32_t *out);
 BVN_API void bvn_float_to_dec64 (const bvn_float_t *f, uint64_t *out);

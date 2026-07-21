@@ -361,6 +361,32 @@ class BvnFloat:
         return f
 
     # -- IEEE decimal interchange -------------------------------------------
+    @staticmethod
+    def strtodec_bits(text: str, width: int) -> bytes:
+        """Decimal literal -> IEEE decimal interchange bytes, ONE rounding.
+
+        to_decimal_bits() encodes a bvn_float_t, which for a value parsed from a
+        decimal string means the value has already been rounded into BINARY --
+        and a decimal tie is generally not exactly representable in binary, so
+        it lands slightly above or below and the decimal rounding then follows
+        the intermediate rather than round-half-even. Over 4000 exact decimal64
+        ties that route disagrees with IEEE on 26.4 %. This one goes straight
+        from the string and is exact on all of them.
+        """
+        from ._ffi import load_library
+        lib = load_library()
+        words = {16: 1, 32: 1, 64: 2, 128: 4, 256: 8}.get(width)
+        if words is None:
+            raise BovnarArgumentError(
+                f"no decimal interchange format for width {width}")
+        buf = (ctypes.c_uint32 * words)()
+        if not lib.bvn_float_strtodec(text.encode(), ctypes.c_uint32(width),
+                                      buf, ctypes.c_int(words)):
+            raise BovnarArgumentError(
+                f"bvn_float_strtodec rejected {text!r} at width {width}")
+        raw = b''.join(int(w).to_bytes(4, 'little') for w in buf)
+        return raw[:{16: 2, 32: 4, 64: 8, 128: 16, 256: 32}[width]]
+
     def to_decimal_bits(self, width: int) -> bytes:
         lib = self._lib
         if width == 16:

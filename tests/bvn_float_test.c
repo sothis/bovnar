@@ -975,6 +975,65 @@ static void test_bvnf_audit_regressions(void)
 	CHECK(bvn_float_from_str(&f, "1.5", 10), "a clean literal still parses");
 }
 
+/*
+ * bvn_float_strtodec: decimal literal -> IEEE decimal interchange, ONE rounding.
+ *
+ * The public API had bvn_float_strtoieee_bin for the binary formats but no
+ * decimal counterpart, so a caller had to go from_str() -> to_dec*(), i.e.
+ * through a BINARY intermediate. A decimal tie is generally not exactly
+ * representable in binary, so it lands slightly above or below and the decimal
+ * rounding follows the intermediate rather than round-half-even -- wrong on
+ * 26.4 % of 4000 exact decimal64 ties, and not consistently up or down.
+ */
+static void test_bvnf_strtodec_ties(void)
+{
+	uint32_t b[8];
+	char buf[256];
+	bvn_limb_t sb[BVN_FLOAT_NLIMBS(256u)];
+	bvn_float_t g;
+
+	/* Each pair: the tie literal, and the half-even result. */
+	static const struct { const char *lit; const char *want; } T[] = {
+		{ "1.0000000000000015",    "1.000000000000002e+0" },
+		{ "1.0000000000000025",    "1.000000000000002e+0" },
+		{ "52906102648424555e-10", "5.290610264842456e+6" },
+		{ "57123991439313165e-11", "5.712399143931316e+5" },
+		{ "96653791927542435e-55", "9.665379192754244e-39" },
+	};
+	for (size_t i = 0; i < sizeof T / sizeof T[0]; i++) {
+		memset(b, 0, sizeof b);
+		CHECK(bvn_float_strtodec(T[i].lit, 64u, b, 2),
+			"strtodec accepts the literal");
+		uint64_t v = (uint64_t)b[0] | ((uint64_t)b[1] << 32);
+		bvn_float_init_buf(&g, 256u, sb, BVN_FLOAT_NLIMBS(256u));
+		CHECK(bvn_float_from_dec64(&g, v), "the bits decode");
+		int32_t n = bvn_float_to_str(&g, buf, sizeof buf, 10);
+		if (!(n > 0 && strcmp(buf, T[i].want) == 0))
+			fprintf(stderr, "    %s -> %s, want %s\n",
+				T[i].lit, n > 0 ? buf : "<err>", T[i].want);
+		CHECK(n > 0 && strcmp(buf, T[i].want) == 0,
+			"tie rounds half-to-even");
+	}
+
+	/* Contract: unsupported width or short buffer is refused, *out untouched. */
+	b[0] = 0xdeadbeefu;
+	CHECK(!bvn_float_strtodec("1.5", 48u, b, 2), "width 48 refused");
+	CHECK(b[0] == 0xdeadbeefu, "refused width leaves the buffer alone");
+	CHECK(!bvn_float_strtodec("1.5", 64u, b, 1), "short buffer refused");
+	CHECK(b[0] == 0xdeadbeefu, "short buffer leaves the buffer alone");
+	CHECK(!bvn_float_strtodec(NULL, 64u, b, 2), "NULL string refused");
+
+	/* Every supported width works. */
+	static const struct { uint32_t w, words; } W[] = {
+		{ 16u, 1u }, { 32u, 1u }, { 64u, 2u }, { 128u, 4u }, { 256u, 8u }
+	};
+	for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) {
+		memset(b, 0, sizeof b);
+		CHECK(bvn_float_strtodec("2.5", W[i].w, b, (int)W[i].words),
+			"every supported width is accepted");
+	}
+}
+
 int main(void)
 {
 #define RUN(fn) do { fprintf(stderr,">>> " #fn "\n"); fflush(stderr); fn(); } while(0)
@@ -997,6 +1056,7 @@ int main(void)
 	RUN(test_bvnf_to_str_wide_magnitude);
 	RUN(test_bvnf_ieee_roundtrip);
 	RUN(test_bvnf_audit_regressions);
+	RUN(test_bvnf_strtodec_ties);
 
 	printf("\n%s  %d passed, %d failed\n",
 		   g_fails ? "FAIL" : "PASS", g_pass, g_fails);

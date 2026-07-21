@@ -884,8 +884,119 @@ static void test_shape_count_and_datetime_unit_regression(void)
 	expect_parse("#!bovnar 1.1\n.t = <datetime:64> 100;\n", error_none,
 				 "datetime integer carrier without unit valid");
 }
+
+static void test_dom_accessors_fail_rather_than_lie(void)
+{
+	/* bovnar_dom.h promises these "return false (leaving *out UNCHANGED -- no
+	 * clamping or truncation)" when a value does not fit. They used to hand back
+	 * a reinterpreted bit pattern with a true return instead. */
+	const char *doc =
+		".u64max = <uint:64> 18446744073709551615;\n"
+		".u64mid = <uint:64> 9223372036854775808;\n"
+		".sneg   = <sint:64> -315619200;\n"
+		".wide   = <uint:128,k~m> 100000000000000000000;\n";
+	bvn_dom_doc_t *d = bvn_dom_parse(doc, (uint32_t)strlen(doc));
+	ASSERT_TRUE(d && bvn_dom_doc_get_parse_error(d) == error_none, "doc parses");
+	if (!d) return;
+
+	int64_t i64 = 7; int8_t i8 = 7; uint64_t u64 = 7; double f = 0;
+	const bvn_dom_node_t *n = bvn_dom_lookup(d, ".u64max");
+	ASSERT_TRUE(!bvn_dom_get_i64(n, &i64),
+		    "a uint64 above INT64_MAX does not fit an int64");
+	ASSERT_EQ_INT(i64, 7, "...and *out is left untouched");
+	ASSERT_TRUE(!bvn_dom_get_i8(n, &i8), "nor an int8");
+	ASSERT_TRUE(bvn_dom_get_u64(n, &u64) && u64 == UINT64_MAX,
+		    "but it reads correctly as unsigned");
+	ASSERT_TRUE(bvn_dom_get_float(n, &f) && f > 1.8e19,
+		    "and as a positive double, not a negative one");
+
+	n = bvn_dom_lookup(d, ".u64mid");
+	ASSERT_TRUE(!bvn_dom_get_i64(n, &i64), "INT64_MAX+1 does not fit an int64");
+
+	/* A negative signed carrier must not read as a huge unsigned one. */
+	n = bvn_dom_lookup(d, ".sneg");
+	ASSERT_TRUE(!bvn_dom_get_u64(n, &u64), "a negative value is not unsigned");
+	ASSERT_TRUE(bvn_dom_get_i64(n, &i64) && i64 == -315619200,
+		    "...but reads correctly as signed");
+
+	/* A bignum past int64 is still a fine double, and base units must not
+	 * collapse it to 0.0 -- the same value that means "no SI mapping". */
+	n = bvn_dom_lookup(d, ".wide");
+	ASSERT_TRUE(bvn_dom_get_float(n, &f) && f > 9.9e19 && f < 1.01e20,
+		    "a uint128 beyond int64 reads as a double");
+	double si = bvn_dom_get_value_in_base_units(n);
+	ASSERT_TRUE(si > 9.9e22 && si < 1.01e23,
+		    "1e20 km is 1e23 m, not 0");
+	bvn_dom_doc_destroy(d);
+}
+
+static void test_dom_string_carried_numbers_are_numbers(void)
+{
+	/* Spec 6.1: uint/sint/float accept "Number OR string". The quoted form is
+	 * the only way to write a non-decimal base whose digits are letters, and the
+	 * canonical way to write a wide integer -- examples/integers.bvnr ships
+	 * twelve. Dispatching on the token alone made them all BVN_DOM_STRING
+	 * carrying a numeric value_type, so the value was unreachable. */
+	const char *doc =
+		".hex  = <uint:32,_16> \"CAFEBABE\";\n"
+		".wide = <uint:256> \"115792089237316195423570985008687907853269984665640564039457584007913129639935\";\n"
+		".text = <utf8> \"CAFEBABE\";\n";
+	bvn_dom_doc_t *d = bvn_dom_parse(doc, (uint32_t)strlen(doc));
+	ASSERT_TRUE(d && bvn_dom_doc_get_parse_error(d) == error_none, "doc parses");
+	if (!d) return;
+
+	const bvn_dom_node_t *n = bvn_dom_lookup(d, ".hex");
+	uint64_t u = 0;
+	ASSERT_EQ_INT((int)bvn_dom_node_type(n), (int)BVN_DOM_INT,
+		      "a hex string carrier is an INT node");
+	ASSERT_TRUE(bvn_dom_get_u64(n, &u) && u == 3405691582ull,
+		    "...and its value is reachable");
+
+	n = bvn_dom_lookup(d, ".wide");
+	ASSERT_EQ_INT((int)bvn_dom_node_type(n), (int)BVN_DOM_INT,
+		      "a wide string carrier is an INT node");
+	ASSERT_TRUE(bvn_dom_get_bigint(n) != NULL, "...with a reachable bigint");
+	char *txt = bvn_dom_int_to_str(n, 10);
+	ASSERT_TRUE(txt && strcmp(txt,
+		"115792089237316195423570985008687907853269984665640564039457584007913129639935") == 0,
+		"...that round-trips to its digits");
+	if (txt) bvn_dom_free_string(txt);
+
+	/* A genuine string is still a string. */
+	n = bvn_dom_lookup(d, ".text");
+	ASSERT_EQ_INT((int)bvn_dom_node_type(n), (int)BVN_DOM_STRING,
+		      "a utf8 value is still a STRING node");
+	bvn_dom_doc_destroy(d);
+}
+
+static void test_dom_dimension_match_is_order_insensitive(void)
+{
+	/* Unit multiplication commutes, so "$USD*$EUR" and "$EUR*$USD" are the same
+	 * unit. The currency fallback compared components positionally and rejected
+	 * such an array as heterogeneous -- disagreeing with bvn_unit_equal, which
+	 * the rest of the library uses. */
+	static const struct { const char *doc; bool want_ok; } cases[] = {
+		{ "#!bovnar 1.1\n.p = [<float:64,$USD*$EUR> 1.0, <float:64,$EUR*$USD> 2.0];\n", true },
+		{ "#!bovnar 1.1\n.p = [<float:64,$USD/m/s> 1.0, <float:64,$USD/s/m> 2.0];\n", true },
+		{ "#!bovnar 1.1\n.p = [<float:64,m*s> 1.0, <float:64,s*m> 2.0];\n", true },
+		/* genuinely different currencies must still be rejected */
+		{ "#!bovnar 1.1\n.p = [<float:64,$USD> 1.0, <float:64,$EUR> 2.0];\n", false },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bvn_dom_doc_t *d = bvn_dom_parse(cases[i].doc,
+						 (uint32_t)strlen(cases[i].doc));
+		bool ok = d && bvn_dom_doc_get_parse_error(d) == error_none;
+		ASSERT_EQ_INT((int)ok, (int)cases[i].want_ok,
+			      "unit order does not decide array homogeneity");
+		if (d) bvn_dom_doc_destroy(d);
+	}
+}
+
 int main(void)
 {
+	test_dom_accessors_fail_rather_than_lie();
+	test_dom_string_carried_numbers_are_numbers();
+	test_dom_dimension_match_is_order_insensitive();
 	printf("Running bovnar_dom_test regression suite...\n");
 
 	test_parse_basic_dom();

@@ -629,7 +629,26 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			break;
 		case token_is_string:
 		case token_is_array_string:
-			nd = make_string(str, len, vt, vu);
+			/* A quoted literal is not necessarily a string. Spec 6.1 lets
+			 * uint/sint/float take "Number OR string", and the quoted form is
+			 * the ONLY way to write a non-decimal base whose digits are letters
+			 * and the canonical way to write a wide integer — examples/
+			 * integers.bvnr ships twelve of them, and pretty-print re-emits them
+			 * quoted. Dispatching on the token alone made every one of those a
+			 * BVN_DOM_STRING carrying a numeric value_type, so get_u64,
+			 * get_bigint and int_to_str all failed and the value was
+			 * unreachable. The declared family decides what the node is; the
+			 * token only says how it was spelled. */
+			if (bvn_type_is_numeric(vt)) {
+				if (number_is_float(str, len, vt))
+					nd = make_float(str, len, vt, vu);
+				else
+					nd = make_int(str, len, vt, vu);
+				if (!nd && b->last_error == error_none)
+					b->last_error = error_value_out_of_range;
+			} else {
+				nd = make_string(str, len, vt, vu);
+			}
 			break;
 		case token_is_bool:
 			nd = make_bool(str, len, vt, vu);
@@ -699,9 +718,25 @@ static bool bvn_dom_same_dimension(value_unit_t a, value_unit_t b)
 		return false;
 	uint32_t n = a.num_components < BVNR_MAX_UNIT_COMPONENTS
 	           ? a.num_components : BVNR_MAX_UNIT_COMPONENTS;
+	/* Order-insensitive, like bvn_unit_equal: unit multiplication commutes, so
+	 * "$USD·$EUR" and "$EUR·$USD" are the same unit. Comparing position by
+	 * position rejected an array whose elements spell the same unit in a
+	 * different order — a false rejection of a legitimate document, and a
+	 * disagreement with the comparator the rest of the library uses. Prefix
+	 * magnitude is still ignored here on purpose: k~$USD and $USD are the same
+	 * currency, which is what this fallback exists to say. */
+	bool used[BVNR_MAX_UNIT_COMPONENTS] = { false };
 	for (uint32_t i = 0; i < n; i++) {
-		if (a.components[i].base     != b.components[i].base)     return false;
-		if (a.components[i].exponent != b.components[i].exponent) return false;
+		bool found = false;
+		for (uint32_t j = 0; j < n; j++) {
+			if (used[j]) continue;
+			if (a.components[i].base     != b.components[j].base)     continue;
+			if (a.components[i].exponent != b.components[j].exponent) continue;
+			used[j] = true;
+			found   = true;
+			break;
+		}
+		if (!found) return false;
 	}
 	return true;
 }

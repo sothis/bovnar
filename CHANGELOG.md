@@ -119,6 +119,21 @@ reading the grown by-value structs at the wrong size.
   also fixes `bvn_dom_get_value_in_base_units` returning an exact `0.0` for a
   `uint:128` — the same value it uses to mean "no SI mapping", so a caller could
   not tell 1e23 metres from an unconvertible unit.
+- **A number written with a string carrier was not a number in the DOM.** The
+  builder dispatched on the token type alone, so `token_is_string` became a
+  `BVN_DOM_STRING` regardless of the declared family — but spec §6.1 lets
+  `uint`/`sint`/`float` take "Number **or string**", and the quoted form is the
+  *only* way to write a non-decimal base whose digits are letters and the
+  canonical way to write a wide integer. `examples/integers.bvnr` ships twelve of
+  them and `pretty-print` re-emits them quoted, yet `get_u64`, `get_bigint` and
+  `bvn_dom_int_to_str` all failed on every one. The declared family now decides
+  what the node is; the token only says how the value was spelled. `bovnar query
+  .uint256_max` prints the number instead of a quoted string.
+- **The DOM's currency dimension fallback compared unit components
+  positionally**, so an array whose elements spell the same unit in a different
+  order — `[$USD·$EUR, $EUR·$USD]` — was rejected as heterogeneous. Unit
+  multiplication commutes, and `bvn_unit_equal` has always known that; the
+  fallback now matches order-insensitively too. It only ever false-rejected.
 - **The writer could emit documents its own reader rejects**, against its stated
   contract that it "cannot be coaxed into emitting a stream the reader would
   reject":

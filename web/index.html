@@ -2379,7 +2379,7 @@ a[data-doc] { cursor: pointer; }
       "url": "https://www.bovnar.io/",
       "description": "A typed, unit-aware text serialization format. Every value carries its type family, bit-width, numeric base, and validated physical unit or currency inline, with no external schema. C99 reference implementation with Python bindings.",
       "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "Linux, macOS",
+      "operatingSystem": "Linux, macOS, Windows",
       "softwareVersion": "1.1.0",
       "programmingLanguage": ["C", "Python"],
       "codeRepository": "https://github.com/sothis/bovnar",
@@ -3410,7 +3410,7 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
         <div class="feature-desc">
           Parse from memory, file descriptor, or socket via a symmetric
           <code>on_unverified / on_verified</code> callback pair.
-          No heap required for the lexer itself.
+          No heap allocation during parsing itself.
         </div>
         <div class="feature-example"><span class="cl-fn">bvnr_open_read_source</span>(
   r, &amp;src, <span class="cl-kw">NULL</span>, &amp;opts);

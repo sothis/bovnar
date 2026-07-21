@@ -216,7 +216,16 @@ typedef enum error_code_e {
 	 * angle), or the exact result has no terminating expansion in the requested
 	 * output base. The reader refuses to silently round — request a representable
 	 * target unit/base, or read the value in its native form. */
-	error_unit_inexact                  = 47
+	error_unit_inexact                  = 47,
+	/* An octet stream ended while a multiplexed message was still being
+	 * reassembled: the declared length exceeded the bytes actually present.
+	 * Distinct from error_octet_stream_out_of_sync because the octet FRAMING is
+	 * well-formed -- the reader is right to succeed -- and only the message
+	 * layer is short. bvnr_demux_on_event() latches this and keeps going rather
+	 * than aborting the read, so the partial message is dropped (never
+	 * delivered, never pre-allocated) but the loss is reportable instead of
+	 * indistinguishable from an empty stream. */
+	error_octet_stream_truncated        = 48
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,

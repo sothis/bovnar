@@ -584,8 +584,20 @@ bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d)
 		 * rather than letting it bleed into the next stream on a reused demux,
 		 * where it would mis-frame the next message as a continuation. The
 		 * buffer itself is kept for reuse; only the progress (including a
-		 * partial length varint) is reset. */
+		 * partial length varint) is reset.
+		 *
+		 * Dropping it silently made truncation indistinguishable from an empty
+		 * stream: a message declaring 1000 bytes with 10 present simply vanished
+		 * and bvnr_demux_error() stayed error_none, so a caller could not tell
+		 * data loss from "nothing was sent". Latch it -- but keep returning true.
+		 * The octet framing is well-formed, so the READ is right to succeed; it
+		 * is the message layer that is short, which is why this is its own code
+		 * and not error_octet_stream_out_of_sync. The partial message is still
+		 * dropped and was never pre-allocated, so the amplification guard is
+		 * untouched; all that changes is that the loss is now reportable. */
 		for (uint32_t i = 0; i < dm->nchans; i++) {
+			if (dm->chans[i].active || dm->chans[i].lvhave)
+				dm->error = error_octet_stream_truncated;
 			dm->chans[i].active = false;
 			dm->chans[i].have   = 0;
 			dm->chans[i].need   = 0;

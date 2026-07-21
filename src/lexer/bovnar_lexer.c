@@ -1540,14 +1540,23 @@ typedef struct {
 	const uint8_t*  resid;
 	uint32_t        resid_left;
 } octet_source_t;
-static inline void bvn_capture_os_error(bvnr_reader_t* p, error_code_t err)
+/* processed_bytes counts bytes PULLED, and the text loop adds a whole buffer
+ * before lexing any of it, so the residual bytes handed to the octet reader are
+ * already counted but not yet consumed. Reporting processed_bytes alone made the
+ * error offset depend on the feed chunking -- the same desynced byte was blamed
+ * on offset 4022 when the document arrived in one buffer and on 32 when it
+ * trickled in 8 bytes at a time. Subtracting what is still unconsumed gives the
+ * position the octet reader has actually reached, which is the same number
+ * whatever the chunking. */
+static inline void bvn_capture_os_error(bvnr_reader_t* p, error_code_t err,
+					uint32_t resid_left)
 {
 	bvnr_lexer_t* l = &p->lex;
 	p->val.last_error   = err;
 	p->val.error_line   = l->line;
 	p->val.error_column = l->column;
 	p->val.error_byte   = 0;
-	p->val.error_offset = l->processed_bytes;
+	p->val.error_offset = l->processed_bytes - (uint64_t)resid_left;
 }
 /*
  * ---------------------------------------------------------------------------
@@ -1577,17 +1586,20 @@ static bool bvn_os_read_exact(
 	uint32_t from_resid = (src->resid_left < length)
 		? src->resid_left : length;
 	if (from_resid) {
+		const uint8_t* taken = src->resid;
 		memcpy(buf, src->resid, from_resid);
+		/* Account for the bytes before the sink push, so an error captured
+		 * inside it reports the position we have actually reached. */
+		src->resid      += from_resid;
+		src->resid_left -= from_resid;
 		if (p->lex.use_dbg) {
-			if (!bvn_sink_push(&p->lex.src_dbg, src->resid,
-							  from_resid)) {
-				bvn_capture_os_error(p, error_writing_to_sink);
+			if (!bvn_sink_push(&p->lex.src_dbg, taken, from_resid)) {
+				bvn_capture_os_error(p, error_writing_to_sink,
+						     src->resid_left);
 				bvn_notify_error(p);
 				return false;
 			}
 		}
-		src->resid      += from_resid;
-		src->resid_left -= from_resid;
 	}
 	uint32_t need = length - from_resid;
 	if (!need) return true;
@@ -1596,21 +1608,24 @@ static bool bvn_os_read_exact(
 		if (!bvn_source_pull(&p->lex.src, buf + from_resid + total,
 						  need - total, &got) || !got) {
 			bvn_capture_os_error(p,
-				error_read_complete_chunk_failed);
+				error_read_complete_chunk_failed,
+				src->resid_left);
 			bvn_notify_error(p);
 			return false;
 		}
 		p->lex.processed_bytes += (uint64_t)got;
 		if (p->lex.max_file_size &&
 			p->lex.processed_bytes > p->lex.max_file_size) {
-			bvn_capture_os_error(p, error_file_too_long);
+			bvn_capture_os_error(p, error_file_too_long,
+					     src->resid_left);
 			bvn_notify_error(p);
 			return false;
 		}
 		if (p->lex.use_dbg) {
 			if (!bvn_sink_push(&p->lex.src_dbg,
 							  buf + from_resid + total, got)) {
-				bvn_capture_os_error(p, error_writing_to_sink);
+				bvn_capture_os_error(p, error_writing_to_sink,
+						     src->resid_left);
 				bvn_notify_error(p);
 				return false;
 			}
@@ -1650,7 +1665,8 @@ static bool bvn_read_octet_stream(
 			return true;
 		}
 		if (tag != 0x01) {
-			bvn_capture_os_error(p, error_octet_stream_out_of_sync);
+			bvn_capture_os_error(p, error_octet_stream_out_of_sync,
+					     src.resid_left);
 			bvn_notify_error(p);
 			return false;
 		}

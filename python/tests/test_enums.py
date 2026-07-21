@@ -267,7 +267,7 @@ class TestErrorCode:
         assert len(values) == len(set(values))
 
     def test_count(self):
-        assert len(ErrorCode) == 48
+        assert len(ErrorCode) == 49
 
     def test_roundtrip(self):
         for code in ErrorCode:

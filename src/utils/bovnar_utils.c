@@ -549,6 +549,7 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_datetime_literal_unsupported_epoch:
 	                                      return "datetime_literal_unsupported_epoch";
 	case error_unit_inexact:              return "unit_inexact";
+	case error_octet_stream_truncated:    return "octet_stream_truncated";
 	default:                              return "unknown_error";
 	}
 }

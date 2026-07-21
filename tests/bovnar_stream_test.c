@@ -372,7 +372,11 @@ static void test_demux_truncated_stream_reset(void)
 		ASSERT_EQ_UINT(mc.lens[0], 3, "fresh message length (no bleed)");
 		ASSERT_TRUE(strcmp(mc.payloads[0], "XYZ") == 0, "fresh message payload");
 	}
-	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_none, "no desync after truncated stream");
+	/* The truncated stream is reported -- silently dropping it made data loss
+	 * indistinguishable from an empty stream -- but with its own code, and
+	 * without aborting: the fresh stream-2 message above still arrived. */
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_octet_stream_truncated,
+		       "truncated stream is reported, not silently dropped");
 	bvnr_demux_destroy(dm);
 }
 
@@ -771,8 +775,11 @@ static void test_octet_mux_amplification_guard(void)
 	bvnr_reader_t *r = bvnr_reader_create();
 	bool rok = bvnr_open_read_mem(r, doc, sizeof doc, NULL, 0, &fl) && bvnr_read(r);
 	ASSERT_TRUE(rok, "valid framing with oversized-declared message parses");
-	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_none,
-		       "incomplete (over-declared) message is not a desync");
+	/* Not a FRAMING desync -- the octet framing is valid and the read succeeds --
+	 * but the message layer is short, and that must be reportable rather than
+	 * silent. Hence its own code, latched without aborting the read. */
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_octet_stream_truncated,
+		       "over-declared message is reported as truncated, not as a desync");
 	ASSERT_EQ_UINT(n, 0, "incomplete message is not delivered");
 	bvnr_reader_destroy(r);
 	bvnr_demux_destroy(dm);

@@ -2641,6 +2641,10 @@ static int slurp(const char *path, uint8_t **out, uint64_t *outlen)
 	int fd = open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return -1; }
 	int rc = read_all_fd(fd, out, outlen);
+	/* open() succeeding does not mean read() will: a directory opens fine and
+	 * then fails with EISDIR. Without this the command exited 1 with nothing on
+	 * stderr at all. */
+	if (rc != 0) perror(path);
 	close(fd);
 	return rc;
 }
@@ -2749,6 +2753,16 @@ static int cmd_mux_pack(int argc, char **argv)
 		*colon = '\0';
 		char *endp = NULL;
 		errno = 0;
+		/* strtoull wraps a leading '-' into a huge positive value and skips
+		 * leading whitespace, neither of which endp or errno reports: "-1"
+		 * packed cleanly onto channel 18446744073709551615. Screen the sign
+		 * and space first so a typo is an error, not a surprise channel. */
+		if (argv[i][0] == '-' || argv[i][0] == '+' ||
+		    argv[i][0] == ' ' || argv[i][0] == '\t') {
+			fprintf(stderr, "mux pack: invalid channel '%s' (want a "
+					"plain non-negative number)\n", argv[i]);
+			goto done;
+		}
 		uint64_t channel = strtoull(argv[i], &endp, 10);
 		if (endp == argv[i] || *endp != '\0' || errno != 0) {
 			fprintf(stderr, "mux pack: invalid channel '%s' (want a number)\n",
@@ -2794,6 +2808,11 @@ static int cmd_mux_list(const char *path)
 	int fd = is_stdin ? STDIN_FILENO : open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return 1; }
 	bvnr_demux_t *dm = bvnr_demux_create(mux_print_msg, NULL, 0);
+	/* `mux pack` writes under the key "mux" and doc/9_bovnar_streaming.md tells
+	 * callers to set the same filter. Without it every octet stream in the
+	 * document is demuxed, so an ordinary binary payload is misread as framing
+	 * and printed as garbage channels. */
+	if (dm) bvnr_demux_set_key(dm, "mux");
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (!dm || !r) {
 		bvnr_demux_destroy(dm); bvnr_reader_destroy(r);
@@ -2810,10 +2829,13 @@ static int cmd_mux_list(const char *path)
 	fl.userdata           = dm;
 	bool ok = bvnr_open_read_source(r, &src, NULL, &fl) && bvnr_read(r);
 	error_code_t derr = bvnr_demux_error(dm);
+	/* Both, not one or the other: when the demux aborts the read, the reader
+	 * reports the generic scanner_callback_failed and the specific reason lives
+	 * only in derr -- an `else if` here hid exactly the case worth seeing. */
 	if (!ok)
 		fprintf(stderr, "mux list: parse error %s\n",
 				bvn_error_to_string(bvnr_reader_get_error(r)));
-	else if (derr != error_none)
+	if (derr != error_none)
 		fprintf(stderr, "mux list: demux error %s\n", bvn_error_to_string(derr));
 	bvnr_reader_destroy(r);
 	bvnr_demux_destroy(dm);

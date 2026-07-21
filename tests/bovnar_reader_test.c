@@ -238,6 +238,48 @@ static void test_bom_error_after_comment(void)
 	bvnr_reader_destroy(reader);
 }
 
+
+static void test_unterminated_array_is_rejected(void)
+{
+	/* A ';' or '}' ends the whole value, so every '[' opened for it must already
+	 * have been closed. Accepting an unterminated one emitted no array_row_end
+	 * and silently zeroed the nesting level, so the NEXT assignment's value was
+	 * absorbed into the array and its key vanished: ".a = [1;  .b = 2;" validated
+	 * as OK and converted to {"a":[1,2]} with no ".b" at all. Inside a struct the
+	 * level was not even reset, so a top-level key afterwards migrated into the
+	 * struct. */
+	static const struct { const char *doc; bool ok; const char *why; } cases[] = {
+		{ ".a = [1;\n.b = 2;\n", false,
+		  "an unterminated array is refused, not silently absorbed" },
+		{ ".s = { .a = [1; .b = 2; };\n.c = 3;\n", false,
+		  "...including inside a struct, where it used to escape the struct" },
+		{ ".a = [1,2;\n", false, "a partially filled row too" },
+		{ ".a = [[1,2];\n", false, "and a nested one" },
+		/* Everything legal must still parse — a ';' inside a struct that is
+		 * inside an array is at a deeper struct level and is not the array's. */
+		{ ".a = [1,2,3];\n", true, "a closed array still parses" },
+		{ ".m = [1,2]/[3,4];\n", true, "a multi-row array still parses" },
+		{ ".n = [[1,2],[3,4]];\n", true, "a nested array still parses" },
+		{ ".e = [];\n", true, "an empty array still parses" },
+		{ ".z = []/[];\n", true, "empty rows still parse" },
+		{ ".r = [{.a = 1;}, {.a = 2;}];\n", true,
+		  "a struct inside an array keeps its own semicolons" },
+		{ ".r = [{.a = [1,2];}];\n", true, "and its own arrays" },
+		{ ".s = { .x = [1]; };\n", true, "an array inside a struct still parses" },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		ASSERT_TRUE(bvnr_open_read_mem(r, cases[i].doc,
+					       (uint32_t)strlen(cases[i].doc),
+					       NULL, 0, &f), "open");
+		bool ok = bvnr_read(r);
+		ASSERT_EQ_INT((int)ok, (int)cases[i].ok, cases[i].why);
+		bvnr_reader_destroy(r);
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_reader_test regression suite...\n");
@@ -246,6 +288,7 @@ int main(void)
 	test_incomplete_stream();
 	test_comment_inside_array();
 	test_bom_error_after_comment();
+	test_unterminated_array_is_rejected();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

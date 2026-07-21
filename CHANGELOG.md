@@ -106,6 +106,24 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **An unterminated array was accepted, and swallowed the next key.** A `;` (or
+  `}`) ends the whole value, so every `[` opened for it must already have been
+  closed — but the lexer just zeroed the nesting level instead of checking it. No
+  `ev_array_row_end` was ever emitted, so the following assignment's value was
+  absorbed into the array and its key vanished entirely:
+
+  ```
+  .a = [1;        validate: OK
+  .b = 2;         convert:  { "a": [1, 2] }      <- ".b" is gone
+  ```
+
+  Inside a struct the level was not even reset, so a *top-level* key afterwards
+  migrated into the struct: `.s = { .a = [1; .b = 2; }; .c = 3;` produced
+  `{"s": {"a": [1,2], "c": 3}}`. Three tools gave three different answers for one
+  input — `validate` said OK, `convert` corrupted, `pretty-print` failed. The EBNF
+  makes `]` mandatory; it is now `error_got_incomplete_bvnr_stream`. A `;` inside
+  a struct nested in an array is still legal, so each array frame records the
+  struct level it was opened at.
 - **A prefixed currency could not be converted to its unprefixed form.**
   Currencies deliberately carry no SI dimension, so `bvn_unit_dimension_vector`
   fails for them and `bvn_units_compatible` calls every currency incompatible

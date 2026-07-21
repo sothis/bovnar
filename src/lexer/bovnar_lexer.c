@@ -659,6 +659,19 @@ bool bvn_action_value_intro(bvnr_reader_t* p)
 }
 bool bvn_action_value_outro(bvnr_reader_t* p)
 {
+	/* A ';' (or '}') here ends the whole value, so every '[' opened for it must
+	 * already have been closed by a ']'. Accepting an unterminated array meant no
+	 * ev_array_row_end was ever emitted and the level was silently zeroed, so the
+	 * NEXT assignment's value was absorbed into the array and its key vanished:
+	 * ".a = [1;  .b = 2;" validated as OK and converted to {"a":[1,2]} with no
+	 * ".b" at all. Inside a struct the level was not even reset, so a top-level
+	 * key afterwards migrated into the struct. The EBNF makes ']' mandatory. */
+	if (p->lex.array_nesting_level > 0 &&
+	    p->lex.arr_frames[p->lex.array_nesting_level].open_struct_level ==
+	    p->lex.struct_nesting_level) {
+		p->val.last_error = error_got_incomplete_bvnr_stream;
+		return false;
+	}
 	if (!bvn_lex_finalize(p, bvn_val_receive))
 		return false;
 	if (!bvn_val_on_value_outro(p))
@@ -790,6 +803,7 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	bvn_array_frame_t *child = &p->lex.arr_frames[level + 1u];
 	child->in_dim_seq   = false;
 	child->dim_row_size = 0;
+	child->open_struct_level = p->lex.struct_nesting_level;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = true;
 	bvn_acc_reset(&p->val);

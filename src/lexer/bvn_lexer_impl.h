@@ -262,6 +262,10 @@ typedef struct bvn_array_frame_s {
 	uint32_t		saved_unit_serial;
 	uint64_t		dim_row_size;
 	bool			in_dim_seq;
+	/* struct_nesting_level when this '[' was opened. A ';' ending a value only
+	 * belongs to THIS array if no struct has been opened inside it since —
+	 * "[{.a = 1;}]" has a perfectly legal ';' at a deeper struct level. */
+	uint8_t			open_struct_level;
 } bvn_array_frame_t;
 typedef struct bvnr_lexer_s {
 	bvnr_source_t		src;

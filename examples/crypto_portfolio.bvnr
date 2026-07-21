@@ -20,7 +20,7 @@
 # ── Human-readable decimal amounts ────────────────────────────────────────
 # float_dec provides exact decimal representation without binary rounding.
 
-.btc_decimal        = <float_dec:64,$BTC>     0.547820;
+.btc_decimal        = <float_dec:64,$BTC>     5.478200;
 .eth_decimal        = <float_dec:64,$ETH>     2.5;
 .sol_decimal        = <float_dec:64,$SOL>    18.5;
 .doge_decimal       = <float_dec:64,$DOGE> 42000.0;
@@ -92,7 +92,7 @@
         }
     ];
 
-    .total_value_usd = <float_dec:128,$USD> 27990.00;
+    .total_value_usd = <float_dec:128,$USD> 108426.25;
 };
 
 # ── DeFi liquidity pool entry ──────────────────────────────────────────────

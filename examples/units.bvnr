@@ -9,7 +9,7 @@
 # All three classes are identified by content, not position — they may appear
 # in any order and at most one of each class is allowed per annotation.
 #
-# The unit string is parsed by bvn_get_value_unit() after the lexer captures
+# The unit string is parsed by bvn_parse_unit() after the lexer captures
 # the full annotation body.  Validation errors are: error_unit_illegal (32),
 # error_unit_too_long (22), error_unit_mismatch (38).
 
@@ -50,6 +50,8 @@
 # 3.  Named SI-derived units (21 named SI-derived units)
 # ══════════════════════════════════════════════════════════════════════════════
 
+.u_radian     = <float:64,rad> 1.5708;     # radian    — plane angle (m/m)
+.u_steradian  = <float:64,sr>  3.1416;     # steradian — solid angle (m²/m²)
 .u_hertz      = <float:64,Hz>  440.0;      # hertz     — s⁻¹
 .u_newton     = <float:64,N>   9.81;       # newton    — kg·m·s⁻²
 .u_pascal     = <float:64,Pa>  101325.0;   # pascal    — kg·m⁻¹·s⁻²
@@ -581,7 +583,7 @@
 .baro_altimeter        = <float:32,inHg>    29.92;      # standard sea-level QNH
 .baro_low_pressure     = <float:32,inHg>    28.50;      # deep low-pressure system
 .baro_long_form        = <float:32,inch_hg> 30.15;      # long-form spelling
-# 29.92 inHg × 3386.389 = 101,325.2 Pa ≈ 1 atm — confirming round-trip
+# 29.92 inHg × 3386.389 = 101,320.8 Pa ≈ 1 atm — confirming round-trip
 
 
 # --- revolutions per minute ---

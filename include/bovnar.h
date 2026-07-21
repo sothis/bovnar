@@ -682,6 +682,20 @@ BVN_API void bvnr_canon_observer_destroy(bvnr_canon_observer_t* obs);
 BVN_API bool bvnr_canon_observer_on_event(
 	void* obs, bvnr_event_t ev, bvnr_data_t* data);
 BVN_API bool bvnr_canon_observer_finish(bvnr_canon_observer_t* obs);
+/* Where the error is. The three position counters measure DIFFERENT things, and
+ * a tool placing a caret needs the right one:
+ *
+ *   line   1-based line number.
+ *   column 1-based CHARACTER column, not a byte column -- a multi-byte UTF-8
+ *          sequence advances it by one. In `.x = "café"; .y = @;` the '@' is
+ *          byte 20 but column 19. A tab advances to the next multiple of 4.
+ *          This matters here more than in most formats: unit symbols are
+ *          routinely non-ASCII (µ~m, °C, Ω), so the two disagree often.
+ *   offset  0-based BYTE offset into the stream -- use this one to index the
+ *          input buffer.
+ *
+ * byte is the offending input byte itself, or 0 where the error is not
+ * attributable to a single byte. */
 BVN_API error_code_t bvnr_reader_get_error(const bvnr_reader_t* r);
 BVN_API uint64_t     bvnr_reader_get_error_line  (const bvnr_reader_t* r);
 BVN_API uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);

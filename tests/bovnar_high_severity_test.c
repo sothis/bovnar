@@ -2551,6 +2551,61 @@ static void test_rb6_read_without_open_does_not_fault(void)
 	bvnr_reader_destroy(r);
 }
 
+/*
+ * The error position counters measure different things, and nothing said which.
+ * column is a 1-based CHARACTER column (a multi-byte UTF-8 sequence advances it
+ * by one, a tab advances to the next multiple of 4) while offset is a 0-based
+ * BYTE offset. A tool highlighting the error needs to know: in
+ * `.x = "café"; .y = @;` the '@' is byte 20 but column 19, and unit symbols in
+ * this format are routinely non-ASCII (µ~m, °C, Ω), so the two disagree often.
+ * Now documented on the getters and in doc/3, so pinned here.
+ */
+static void test_rb7_error_position_counters(void)
+{
+	static const struct {
+		const char *doc;
+		uint64_t line, column, offset;
+		const char *why;
+	} T[] = {
+		{ ".x = @;\n",                    1,  6,  5, "plain ASCII" },
+		{ ".a = 1;\n.b = 2;\n.c = @;\n",  3,  6, 21, "third line" },
+		{ "# comment\n.x = @;\n",         2,  6, 15, "after a comment" },
+		/* café is 5 characters in 6 bytes, so column and offset diverge. */
+		{ ".x = \"caf\xc3\xa9\"; .y = @;\n", 1, 19, 19, "multi-byte UTF-8" },
+		/* ".x =" is 4 columns; the tab advances to 8, so '@' lands on 9. */
+		{ ".x =\t@;\n",                   1,  9,  5, "tab to the next multiple of 4" },
+		{ ".x =   \t@;\n",                1,  9,  8, "tab from column 8" },
+		{ ".x =    \t@;\n",               1, 13,  9, "tab from column 9" },
+	};
+	for (size_t i = 0; i < sizeof T / sizeof T[0]; i++) {
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t fl = { .max_file_size = BVNR_FILESIZE_UNLIMITED };
+		bool ok = bvnr_open_read_mem(r, (const uint8_t *)T[i].doc,
+					     (uint32_t)strlen(T[i].doc), NULL, 0, &fl)
+			  && bvnr_read(r);
+		ASSERT_FALSE(ok, "the probe document is meant to fail");
+		if (bvnr_reader_get_error_line(r) != T[i].line
+		    || bvnr_reader_get_error_column(r) != T[i].column
+		    || bvnr_reader_get_error_offset(r) != T[i].offset)
+			fprintf(stderr,
+				"    %s: line=%llu col=%llu off=%llu, want %llu/%llu/%llu\n",
+				T[i].why,
+				(unsigned long long)bvnr_reader_get_error_line(r),
+				(unsigned long long)bvnr_reader_get_error_column(r),
+				(unsigned long long)bvnr_reader_get_error_offset(r),
+				(unsigned long long)T[i].line,
+				(unsigned long long)T[i].column,
+				(unsigned long long)T[i].offset);
+		ASSERT_TRUE(bvnr_reader_get_error_line(r) == T[i].line,
+			"error line is the 1-based line number");
+		ASSERT_TRUE(bvnr_reader_get_error_column(r) == T[i].column,
+			"error column is the 1-based CHARACTER column");
+		ASSERT_TRUE(bvnr_reader_get_error_offset(r) == T[i].offset,
+			"error offset is the 0-based BYTE offset");
+		bvnr_reader_destroy(r);
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_high_severity_test suite...\n\n");
@@ -2644,6 +2699,7 @@ int main(void)
 	test_rb4_advance_line_once_per_byte();
 	test_rb5_resync_bracket_no_duplicate_row_end();
 	test_rb6_read_without_open_does_not_fault();
+	test_rb7_error_position_counters();
 
 	printf("\n");
 	if (g_failures == 0) {

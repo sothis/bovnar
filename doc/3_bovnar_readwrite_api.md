@@ -232,6 +232,19 @@ uint32_t     bvnr_reader_get_error_byte   (const bvnr_reader_t *r);
 uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t *r);
 ```
 
+The three position counters measure **different things**, and a tool placing a
+caret needs the right one:
+
+| Getter | Unit | Base | Note |
+|---|---|---|---|
+| `..._line` | lines | 1 | |
+| `..._column` | **characters** | 1 | a multi-byte UTF-8 sequence advances it by one; a tab advances to the next multiple of 4 |
+| `..._offset` | **bytes** | 0 | use this to index the input buffer |
+
+In `.x = "café"; .y = @;` the `@` is byte 20 but column 19. This matters here
+more than in most formats: unit symbols are routinely non-ASCII (`µ~m`, `°C`,
+`Ω`), so the two disagree often.
+
 All five error/location getters above (everything except `bvnr_reader_get_recovery_count`) are only meaningful when `bvnr_read` returned `false` (or after a recoverable error when `continue_on_error` is set). `bvnr_reader_get_error_byte` returns the raw byte value that triggered the error. `bvnr_reader_get_recovery_count` is the exception: it returns how many errors triggered entry into resync mode in `continue_on_error` mode (and so is meaningful even when `bvnr_read` ultimately returned `true`). This count is incremented at error entry, not when resync completes at `";".
 
 ```c

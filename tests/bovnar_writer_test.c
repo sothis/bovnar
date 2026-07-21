@@ -1347,14 +1347,20 @@ static void test_write_datetime(void)
  * epoch (which rejects literals), and a near-INT64_MIN tai carrier whose civil
  * conversion overflows (the converter leaves *dt untouched). All three must
  * fall back to the plain integer carrier — never a corrupt literal or a crash.
+ *
+ * The fourth case is the opposite ruling, and the only one a real document can
+ * reach: a tz offset can push the UTC year outside 0000-9999 while the literal
+ * itself parses. There the value is fine and only its ISO spelling is missing,
+ * so the integer fallback would silently drop digits the spec promises to keep
+ * — the writer must refuse instead. Returns the bvnr_write_finish() result.
  */
-static void emit_dt_value(uint8_t *out, uint32_t cap, uint32_t *outlen,
+static bool emit_dt_value(uint8_t *out, uint32_t cap, uint32_t *outlen,
 	uint32_t epoch_base, const char *carrier,
 	const char *frac, uint32_t frac_len)
 {
 	bvnr_sink_t sink;
 	bvnr_writer_t *w = make_writer(out, cap, &sink);
-	if (!w) { *outlen = 0; return; }
+	if (!w) { *outlen = 0; return false; }
 	const char *key = "t";
 	bvnr_data_t d = { .type = token_is_identifier,
 	                  .data = key, .length = 1 };
@@ -1365,10 +1371,11 @@ static void emit_dt_value(uint8_t *out, uint32_t cap, uint32_t *outlen,
 	                   .data = carrier, .length = (uint32_t)strlen(carrier),
 	                   .frac_data = frac, .frac_length = frac_len };
 	bvnr_write_event(w, ev_data, &d);
-	bvnr_write_finish(w);
+	bool ok = bvnr_write_finish(w);
 	*outlen = (uint32_t)bvnr_writer_bytes_written(w);
 	if (*outlen < cap) out[*outlen] = '\0';
 	bvnr_writer_destroy(w);
+	return ok;
 }
 static void test_write_datetime_fraction_guards(void)
 {
@@ -1400,6 +1407,17 @@ static void test_write_datetime_fraction_guards(void)
 	emit_dt_value(out, sizeof out, &n, 1, "-9223372036854775808", "5", 1);
 	ASSERT_TRUE(strstr((char *)out, "-9223372036854775808") != NULL,
 		"tai overflow falls back to the integer carrier (no UB)");
+
+	/* 5. the inverse: a UTC year outside 0000-9999 has no ISO spelling, but the
+	 *    integer carrier cannot hold the fraction either. Unlike 2-4 this IS
+	 *    reachable from a document — "0000-01-01T00:00:00.5+23:59" parses, and
+	 *    its UTC year is -1 — so the writer must refuse rather than drop the
+	 *    digits. Without a fraction the same carrier falls back normally. */
+	ASSERT_TRUE(!emit_dt_value(out, sizeof out, &n, 0, "-62167305540", "5", 1),
+		"out-of-range UTC year with a fraction is refused, not truncated");
+	ASSERT_TRUE(emit_dt_value(out, sizeof out, &n, 0, "-62167305540", NULL, 0) &&
+	            strstr((char *)out, "-62167305540") != NULL,
+		"the same carrier without a fraction still falls back");
 }
 /*
  * The canon-observer path drives the serializer with no validation (unlike the

@@ -1112,8 +1112,10 @@ done:
 	bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
 	return rc;
 }
-static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt)
+static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt,
+                                      bool* year_out_of_range)
 {
+	if (year_out_of_range) *year_out_of_range = false;
 	if (d->value_type.family != vt_datetime ||
 	    d->frac_data == NULL || d->frac_length == 0 || d->data == NULL)
 		return false;
@@ -1155,10 +1157,21 @@ static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt)
 			(bvn_epoch_t)bvnr_datetime_epoch_mjd(d->value_type), secs);
 	/* A well-formed civil time the reader can round-trip has month 1..12, a valid
 	 * day, and a 4-digit year; reject anything else (including the untouched-zero
-	 * case above) and emit the plain integer carrier instead. */
-	return dt->date.month >= 1 && dt->date.month <= 12 &&
-	       dt->date.day   >= 1 && dt->date.day   <= 31 &&
-	       dt->date.year  >= 0 && dt->date.year  <= 9999;
+	 * case above) and emit the plain integer carrier instead.
+	 *
+	 * The year check is singled out because it is the only rejection reason a
+	 * REAL document can reach: everything above (a non-digit fraction, a GNSS
+	 * epoch, an unparseable carrier) describes input the reader could never have
+	 * produced, so the caller supplied it and the integer fallback is the right
+	 * answer. A timezone offset pushing the UTC year past either end is not —
+	 * "0000-01-01T00:00:00.5+23:59" parses, and its fraction must not be dropped
+	 * by a fallback that has nowhere to put it. */
+	bool civil_ok = dt->date.month >= 1 && dt->date.month <= 12 &&
+			dt->date.day   >= 1 && dt->date.day   <= 31;
+	if (year_out_of_range)
+		*year_out_of_range = civil_ok &&
+				     (dt->date.year < 0 || dt->date.year > 9999);
+	return civil_ok && dt->date.year >= 0 && dt->date.year <= 9999;
 }
 bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 	bvnr_event_t ev, bvnr_data_t* d)
@@ -1395,7 +1408,16 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		} else if (d->type == token_is_number ||
 				   d->type == token_is_array_number) {
 			bvn_datetime_t dt;
-			if (bvn_ser_datetime_to_civil(d, &dt)) {
+			/* A datetime that carries sub-second digits but whose UTC civil
+			 * year falls outside 0000-9999 cannot be re-emitted as an ISO
+			 * literal — and the integer-carrier fallback below has nowhere to
+			 * put the fraction, so it used to vanish. The spec promises those
+			 * digits round-trip; dropping them silently is the one thing that
+			 * must not happen. Reachable when a tz offset pushes the UTC year
+			 * past either end: "0000-01-01T00:00:00.5+23:59" parses (its LOCAL
+			 * year is in range) but its UTC year is -1. */
+			bool dt_year_oor = false;
+			if (bvn_ser_datetime_to_civil(d, &dt, &dt_year_oor)) {
 				/* spec 1.1 — re-emit as an ISO literal so the captured
 				 * sub-second digits round-trip:
 				 * YYYY-MM-DDTHH:MM:SS.<frac>Z (always UTC). */
@@ -1412,6 +1434,13 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				if (!bvn_ser_push(s, d->frac_data, d->frac_length))
 					return false;
 				if (!bvn_ser_push_byte(s, 'Z')) return false;
+			} else if (dt_year_oor) {
+				/* The only rejection reason a real document can reach:
+				 * the value is fine, its UTC year simply has no ISO
+				 * spelling, and the integer carrier below cannot carry
+				 * the fraction. Refuse instead of losing it. */
+				s->ser_error = error_invalid_datetime_literal;
+				return false;
 			} else if (d->data && d->length) {
 				/* Special floats (nan/inf/ninf) are emitted as the
 				 * bare keyword, exactly like any other number token —

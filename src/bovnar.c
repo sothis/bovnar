@@ -181,10 +181,22 @@ static bool print_datetime_iso_literal(const bvn_dom_node_t *node)
 	else
 		bvn_dt_epoch_seconds_to_datetime(&dt,
 			(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt), secs);
+	/* Returning false here makes the caller print the bare integer carrier, which
+	 * has nowhere to put the fraction — so the digits the spec promises will
+	 * round-trip would silently disappear. The writer refuses this case outright;
+	 * `query` prints the carrier (its output is a value, not a document) but says
+	 * on stderr what was left out, so a caller piping stdout is never misled
+	 * into thinking it holds the whole instant. */
 	if (!(dt.date.month >= 1 && dt.date.month <= 12 &&
 	      dt.date.day   >= 1 && dt.date.day   <= 31 &&
-	      dt.date.year  >= 0 && dt.date.year  <= 9999))
+	      dt.date.year  >= 0 && dt.date.year  <= 9999)) {
+		if (dt.date.month >= 1 && dt.date.month <= 12 &&
+		    dt.date.day   >= 1 && dt.date.day   <= 31)
+			fprintf(stderr, "warning: sub-second digits '.%.*s' omitted: "
+				"UTC year %lld has no ISO literal\n",
+				(int)fraclen, frac, (long long)dt.date.year);
 		return false;
+	}
 	printf("%04lld-%02lld-%02lldT%02lld:%02lld:%02lld.%.*sZ",
 		(long long)dt.date.year, (long long)dt.date.month,
 		(long long)dt.date.day, (long long)dt.hour,

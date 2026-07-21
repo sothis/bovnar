@@ -209,7 +209,13 @@ int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
 /* TAI-UTC offset valid at the given TAI instant.  Picks the offset whose
  * validity interval (in TAI) contains the instant.  The inserted leap second
  * itself (23:59:60) is not representable and collapses onto 00:00:00 of the
- * following UTC day. */
+ * following UTC day.
+ *
+ * The collapse is deliberate, but note it makes this mapping non-injective for
+ * the 28 TAI seconds occupied by an insertion — the inserted second and the one
+ * after it share a UTC instant, so a TAI->UTC->TAI round trip returns the later
+ * of the two and the value grows by one second.  See the round-trip note on
+ * bvn_dt_utc_to_tai_seconds in bvn_datetime.h. */
 static int64_t bvn_dt_tai_minus_utc_for_tai(int64_t tai_seconds)
 {
 	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {

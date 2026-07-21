@@ -113,6 +113,21 @@ BVN_API int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int6
  * initial 10 s offset.  The inserted leap second itself (23:59:60) is not
  * representable: it collapses onto 00:00:00 of the following UTC day.
  *
+ * CONSEQUENCE FOR ROUND-TRIPPING.  That collapse makes TAI->UTC->TAI
+ * non-injective for exactly the 28 TAI seconds occupied by an insertion: the
+ * inserted second and the second after it both map to the same UTC instant, so
+ * converting back yields the LATER of the two.  A `datetime` value on the
+ * `tai` epoch whose carrier is one of those seconds therefore comes back one
+ * second larger after a write/read cycle that re-emits it as an ISO literal --
+ * e.g. carrier 1861920036 (the leap second inserted at the end of 2016) is
+ * re-emitted as 2017-01-01T00:00:00Z and reads back as 1861920037.
+ *
+ * The reader cannot produce such a carrier from an ISO literal (`:60`
+ * normalises up before the conversion), so this is only reachable by handing
+ * the carrier to the writer directly.  Callers that must preserve an exact TAI
+ * instant across a serialisation cycle should keep it as a plain integer rather
+ * than a `datetime` on the `tai` epoch.
+ *
  * bvn_dt_utc_to_tai_seconds() converts via bvn_dt_datetime_to_epoch_seconds()
  * and therefore normalizes dt->date in place and refreshes dt->mjd; it
  * returns BVN_GDATE_OVF on out-of-range input or overflow.

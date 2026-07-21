@@ -106,6 +106,27 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **A datetime's sub-second digits were dropped when a timezone offset pushed
+  its UTC year out of range.** The ISO literal can only carry a 4-digit year, so
+  the writer falls back to the bare integer carrier when the UTC civil year is
+  outside 0000–9999 — and that carrier has nowhere to put the fraction, which
+  simply vanished. Spec §"ISO-8601 literals" promises those digits round-trip.
+  Reachable when an offset crosses either end: `0000-01-01T00:00:00.5+23:59`
+  parses (its *local* year is in range) but its UTC year is −1, and the `.5` was
+  lost with no error. The writer now refuses with `error_invalid_datetime_literal`
+  rather than emitting a value it knows is incomplete. A datetime *without* a
+  fraction still falls back to the integer carrier, where nothing is lost.
+  `bovnar query` prints a value rather than a document, so it still emits the
+  carrier — but now warns on stderr which digits it left out, so a caller piping
+  stdout is not misled into thinking it holds the whole instant.
+- **Documented that a `tai` carrier on an inserted leap second does not
+  round-trip.** The collapse of 23:59:60 onto the next day's 00:00:00 was already
+  documented; its consequence was not. It makes TAI→UTC→TAI non-injective for the
+  28 seconds occupied by an insertion, so such a carrier comes back one second
+  larger after a write/read cycle. The reader cannot produce one from an ISO
+  literal, so it is only reachable by handing the carrier to the writer directly;
+  `bvn_datetime.h` now says so and points callers who need an exact TAI instant
+  at a plain integer instead.
 - **A consumer that aborted was called again.** The read/write API documents a
   callback returning `false` as "abort", but with `continue_on_error` set the
   reader treated it as a document error: it entered resync and kept calling the

@@ -203,7 +203,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
-    .aliases = ["ohms", "Ω", "ohm", "Ohm"];
+    .aliases = ["ohms", "Ω", "Ω", "ohm", "Ohm"];
   },
   {
     .id      = <uint:16>  17;
@@ -578,7 +578,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
-    .aliases = ["angstroms", "angstrom", "Å", "Å"];
+    .aliases = ["angstroms", "angstrom", "Å", "Å", "Å"];
   },
   {
     .id      = <uint:16>  51;

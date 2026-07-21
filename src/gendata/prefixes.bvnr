@@ -83,7 +83,7 @@
     .name    = "micro";
     .symbol  = "µ";
     .exp     = -6;
-    .aliases = ["µ", "u"];
+    .aliases = ["µ", "μ", "u"];
   },
   {
     .id      = <uint:16>  10;

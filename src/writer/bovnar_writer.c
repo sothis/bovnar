@@ -798,6 +798,21 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 	if (!bvn_type_is_numeric(d->value_type))                  return 0;
 	if (!d->data || !d->length)                               return 0;
 
+	/* Cheap way out first. bvn_unit_reduce reports the scalar every prefix folds
+	 * into; when that is 1 the value cannot move, whatever the formatter then
+	 * does with the unit — the named-SI collapse only fires when there is a scale
+	 * to absorb, and combining m·m into m² does not rescale anything. Most
+	 * documents use unprefixed units, so this skips the format-and-reparse below
+	 * for nearly every value. The overflow flag still has to fall through: an
+	 * exponent folded past the representable range leaves scale at 1 while the
+	 * unit has silently lost a dimension, and that must be refused. */
+	{
+		double scale = 1.0;
+		bool   ovf   = false;
+		(void)bvn_unit_reduce(d->value_unit, &scale, &ovf);
+		if (scale == 1.0 && !ovf) return 0;
+	}
+
 	/* Convert to the unit that will actually be EMITTED, not to what
 	 * bvn_unit_reduce returns. The formatter reduces and then re-attaches a
 	 * prefix when the result lands on a named SI unit, so kN stays kN with no

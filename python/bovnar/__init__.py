@@ -655,11 +655,20 @@ def _has_real_unit(vu: ValueUnit) -> bool:
     return any(vu.components[i].base != 0 for i in range(vu.num_components))
 
 
-def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit) -> bool:
-    """Return True only when the type annotation carries non-default information."""
+def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit, raw: str | None = None) -> bool:
+    """Return True only when the type annotation carries non-default information.
+
+    `raw` matters for exactly one case: default synthesis reads a bare
+    NON-NEGATIVE integer as uint, so a sint value that happens to be >= 0 loses
+    its family without an annotation -- "<sint:64> 127" came back as
+    "<uint:64> 127". A negative one re-reads as sint on its own and needs none.
+    """
     fam = int(vt.family)
     if fam == int(ValueTypeFamily.PLAIN):
         return False
+    if fam == int(ValueTypeFamily.SINT) and raw is not None \
+            and not raw.lstrip().startswith('-'):
+        return True
     # datetime is its own family — it must always be annotated (else the value
     # reloads as a plain integer, losing the timestamp semantics), even for the
     # default unix epoch / width 64.
@@ -681,7 +690,7 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     fam = int(q.vtype.family)
     w.emit(Event.ASSIGNMENT_START, key=key)
     fam_name = _FAM_NAMES.get(fam)
-    if fam_name is not None and _needs_annotation(q.vtype, q.unit):
+    if fam_name is not None and _needs_annotation(q.vtype, q.unit, q.raw):
         w._emit_annotation(fam_name, q.vtype, q.unit)
     raw_bytes = q.raw.encode('utf-8') if q.raw else b''
     d = BvnrData()
@@ -713,6 +722,7 @@ def _array_quantity_annotation(rows):
     load/dump cycle".
     """
     first = None
+    needed = False       # does ANY leaf need the annotation?
     stack = [rows]
     while stack:
         cur = stack.pop()
@@ -728,6 +738,12 @@ def _array_quantity_annotation(rows):
                 return None, None             # handled by the datetime path
             key = (int(e.vtype.family), int(e.vtype.width), int(e.vtype.base),
                    e.unit_str())
+            # Ask EVERY leaf, not just the first. A sint array of mixed sign
+            # needs the annotation because its non-negative elements would
+            # otherwise re-read as uint, but the first element it happened to see
+            # was negative and answered "no annotation needed" for the lot.
+            if _needs_annotation(e.vtype, e.unit, e.raw):
+                needed = True
             if first is None:
                 first = (key, e)
             elif key != first[0]:
@@ -745,7 +761,7 @@ def _array_quantity_annotation(rows):
     # Only annotate when the annotation says something the defaults do not --
     # otherwise a plain [1, 2, 3] would gain a redundant <uint:64> where it
     # previously had none.
-    if not _needs_annotation(vt, sample.unit):
+    if not needed:
         return None, None
     return vt, unit
 

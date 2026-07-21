@@ -1265,10 +1265,25 @@ static void test_frames_over_fd_short_reads(void)
 	ASSERT_TRUE(built, "four documents framed for the fd test");
 	uint64_t total = bvnr_sink_bytes_written(&sink);
 
+	/* ASSERT_TRUE records a failure and CONTINUES, so these two need an early
+	 * return of their own: after a failed pipe() the descriptors are
+	 * uninitialised and close(p[0]) would close whatever integer happened to be
+	 * on the stack -- possibly a live fd of this process -- and after a failed
+	 * fork() the parent would wait on a pipe nobody writes to and hang until the
+	 * CTest timeout. Both are only reachable under fd/process exhaustion, but a
+	 * test that hangs or closes a random fd there reports the wrong thing. */
 	int p[2];
-	ASSERT_TRUE(pipe(p) == 0, "pipe created");
+	if (pipe(p) != 0) {
+		ASSERT_TRUE(false, "pipe created");
+		return;
+	}
 	pid_t pid = fork();
-	ASSERT_TRUE(pid >= 0, "fork succeeds");
+	if (pid < 0) {
+		ASSERT_TRUE(false, "fork succeeds");
+		close(p[0]);
+		close(p[1]);
+		return;
+	}
 	if (pid == 0) {                       /* child: dribble 3 bytes at a time */
 		close(p[0]);
 		for (uint64_t off = 0; off < total; ) {

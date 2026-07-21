@@ -32,6 +32,10 @@ SEARCH_DIRS = [
     "src/stream", "src/utils", "src/validator", "src/writer",
 ]
 
+# The generated directory, resolved once, as the banner normalisation in
+# expand() identifies a build artifact by comparing against it.
+GEN_DIR = os.path.abspath(SEARCH_DIRS[0])
+
 # Public headers, in dependency order (recursion handles transitive includes).
 PUBLIC_HEADERS = [
     "bvn_int.h", "bvn_float.h", "bovnar.h",
@@ -100,13 +104,23 @@ def expand(path, inlined, sys_inc, out, in_platform_cond=False):
     # That also leaks absolute paths -- usernames, temp dirs -- into a shipped
     # release artifact. A fragment is identified by its own name and the
     # directory it sits in, both of which are stable.
-    rel = os.path.relpath(path, ROOT)
-    if os.path.isabs(rel) or rel.startswith(os.pardir + os.sep):
-        rel = os.path.join(os.path.basename(os.path.dirname(path)),
-                           os.path.basename(path))
-    elif rel.startswith("build" + os.sep):
-        rel = os.path.join(os.path.basename(os.path.dirname(path)),
-                           os.path.basename(path))
+    #
+    # Recognised by WHERE THE FILE LIVES, not by what the build directory is
+    # called. Matching the literal name "build" covered only two of the three
+    # cases -- a build tree outside the source tree, and one named exactly
+    # "build" -- and left an in-tree directory under any OTHER name falling
+    # through with its name intact. `cmake -B build-asan` is precisely that, so
+    # the sanitizer build produced a different amalgamation from the ordinary one
+    # over byte-identical sources, and bvnr_wasm_freshness (which hashes it)
+    # failed there while passing in build/. Comparing against the generated
+    # directory itself has no such blind spot: every build tree, wherever it is
+    # and whatever it is called, yields "generated/<fragment>".
+    apath = os.path.abspath(path)
+    rel = os.path.relpath(apath, ROOT)
+    if (os.path.dirname(apath) == GEN_DIR
+            or os.path.isabs(rel) or rel.startswith(os.pardir + os.sep)):
+        rel = os.path.join(os.path.basename(os.path.dirname(apath)),
+                           os.path.basename(apath))
     out.append(f"\n/* ==================== {rel} ==================== */\n")
     # Stack of bools: does this open #if level reference a platform macro?
     cond_platform = []

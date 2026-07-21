@@ -1020,7 +1020,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 115)
+set(BVNR_EXPECTED_TEST_COUNT 116)
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1070,6 +1070,26 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256 AND BVNR_PACKAGE)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_freshness.cmake)
     set_tests_properties(bvnr_wasm_freshness PROPERTIES
         LABELS "wasm;packaging" TIMEOUT 60)
+endif()
+
+# ── Amalgamation reproducibility ────────────────────────────────────────────
+# bvnr_wasm_freshness above hashes the amalgamated sources, so it is only a
+# freshness check if that hash depends on the SOURCES and nothing else. Twice now
+# it has also depended on the build directory's name, and the second time the
+# suite was green in build/ while failing in build-asan/ over identical inputs --
+# a gate accusing the tree of being stale when the tree was fine. Pin the
+# property the gate rests on rather than rediscovering it from the wreckage.
+if(Python3_Interpreter_FOUND AND NOT WIN32)
+    add_test(
+        NAME    bvnr_amalgam_reproducible
+        COMMAND "${CMAKE_COMMAND}"
+                -DPYTHON=${Python3_EXECUTABLE}
+                -DSCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/amalgamate.py
+                -DGENERATED=${CMAKE_CURRENT_BINARY_DIR}/generated
+                -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/amalgam_repro
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/amalgam_reproducible.cmake)
+    set_tests_properties(bvnr_amalgam_reproducible PROPERTIES
+        LABELS "wasm;packaging;codegen" TIMEOUT 120)
 endif()
 
 # ── Single-file amalgamation ────────────────────────────────────────────────

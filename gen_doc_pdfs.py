@@ -205,7 +205,34 @@ def build_html(title, subtitle, body_html, label):
             f"<body>{cover}{body_html}</body></html>")
 
 
+def check_docs_listed():
+    """Every NUMBERED doc must be in DOCS.
+
+    DOCS is hand-maintained, and a hand-maintained list of files drifts: the
+    examples list in CMakeLists_tests.txt had already lost two entries the same
+    way. The numbered 0_..9_ series is the published documentation set, so a new
+    one silently missing from the PDF bundle is a real omission. The unnumbered
+    files (design notes, the media-type registration) are deliberately not part
+    of that set -- nothing links to them from README or the site -- so they are
+    not required here.
+    """
+    listed = {src for src, _slug, _label in DOCS}
+    present = {f for f in os.listdir(DOC_DIR)
+               if f[:1].isdigit() and f.rsplit(".", 1)[-1] in ("md", "ebnf")}
+    missing = sorted(present - listed)
+    if missing:
+        raise SystemExit(
+            "gen_doc_pdfs: these numbered docs exist but are not in DOCS, so "
+            "they would be left out of the PDF bundle: %s" % ", ".join(missing))
+    gone = sorted(listed - present)
+    if gone:
+        raise SystemExit(
+            "gen_doc_pdfs: DOCS lists files that no longer exist: %s"
+            % ", ".join(gone))
+
+
 def main():
+    check_docs_listed()
     os.makedirs(OUT_DIR, exist_ok=True)
     today = datetime.date.today().isoformat()
     written = []

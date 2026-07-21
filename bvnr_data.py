@@ -17,7 +17,7 @@ drop-in replacement for the generators' purposes.
 """
 import re
 
-_NUMBER = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
+_NUMBER = re.compile(r"[-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_\-]*")
 # token terminators for a bare scalar (number / symbol)
 _SCALAR_END = set(" \t\r\n;,]}#")
@@ -98,6 +98,12 @@ class _Parser:
             return self._array()
         if c == "":
             self._err("unexpected end of input where a value was expected")
+        # An empty slot (".x = ;" or a gap between array commas) is the null
+        # value, not an empty symbol. _scalar() stops immediately on the
+        # terminator and returned "", which is falsy like None but is not None --
+        # so `value is None` checks in a generator would have missed it.
+        if c in ";,]}":
+            return None
         return self._scalar()
 
     def _string(self):
@@ -111,8 +117,38 @@ class _Parser:
             if c == "\\":
                 e = self.s[self.i] if self.i < self.n else ""
                 self.i += 1
-                out.append({'"': '"', "\\": "\\", "n": "\n",
-                            "t": "\t", "r": "\r"}.get(e, e))
+                # spec 1.1 codepoint and byte escapes. Unknown escapes used to
+                # fall through to the escaped character itself, so "caf\\u{e9}"
+                # silently became "cafu{e9}" -- a unit or currency NAME would
+                # have shipped corrupted into the generated tables.
+                if e == "u":
+                    if self.i < self.n and self.s[self.i] == "{":
+                        end = self.s.find("}", self.i)
+                        if end < 0:
+                            self._err("unterminated \\u{...} escape")
+                        cp = self.s[self.i + 1:end]
+                        self.i = end + 1
+                        try:
+                            out.append(chr(int(cp, 16)))
+                        except ValueError:
+                            self._err("bad codepoint in \\u{%s}" % cp)
+                        continue
+                    self._err("\\u must be followed by {")
+                if e == "x":
+                    hx = self.s[self.i:self.i + 2]
+                    if len(hx) != 2:
+                        self._err("truncated \\xHH escape")
+                    self.i += 2
+                    try:
+                        out.append(chr(int(hx, 16)))
+                    except ValueError:
+                        self._err("bad hex in \\x%s" % hx)
+                    continue
+                named = {'"': '"', "\\": "\\", "n": "\n", "t": "\t",
+                         "r": "\r", "v": "\v", "f": "\f", "0": "\0"}
+                if e not in named:
+                    self._err("unknown escape \\%s" % e)
+                out.append(named[e])
             else:
                 out.append(c)
         self._err("unterminated string")
@@ -149,10 +185,23 @@ class _Parser:
         while self.i < self.n and self.s[self.i] not in _SCALAR_END:
             self.i += 1
         tok = self.s[start:self.i]
-        if tok == "true":
+        # `on`/`off` are boolean synonyms in the format, and returning them as
+        # strings was actively dangerous: the string "off" is TRUTHY, so a field
+        # written `.exact = off;` -- perfectly legal bovnar -- would have been
+        # read as exact and shipped a wrong unit table. Same for the null and
+        # non-finite keywords, which became the strings "null", "nan", "inf".
+        if tok in ("true", "on"):
             return True
-        if tok == "false":
+        if tok in ("false", "off"):
             return False
+        if tok == "null":
+            return None
+        if tok in ("nan", "inf", "ninf"):
+            return float({"nan": "nan", "inf": "inf", "ninf": "-inf"}[tok])
+        if tok.startswith("+"):
+            # The format has no leading '+'; accepting one here would let a
+            # literal through that the reference reader rejects.
+            self._err("a leading '+' is not a valid bovnar number: %r" % tok)
         if _NUMBER.match(tok):
             if any(ch in tok for ch in ".eE"):
                 return float(tok)

@@ -919,9 +919,26 @@ set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
 # bvnr_wasm_freshness guarded on BVNR_PACKAGE, which at this point in the
 # configure had not been declared yet, so the condition was false and the test
 # vanished without a word. Assert the expected count instead of trusting it.
-set(BVNR_EXPECTED_TEST_COUNT 109 CACHE STRING
+set(BVNR_EXPECTED_TEST_COUNT 110 CACHE STRING
     "Number of CTest entries expected in a default configure; a mismatch means \
 a test was added, removed, or silently stopped registering")
+
+# ── bvnr_data.py vs the reference reader ────────────────────────────────────
+# bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
+# the code generators use so a clean checkout can rebuild the unit, prefix and
+# currency tables without a built libbvnr. Where it disagreed with the reference
+# reader it shipped wrong tables silently -- `off` came back as the truthy string
+# "off", so ".exact = off;" would have read as exact.
+if(Python3_Interpreter_FOUND AND NOT WIN32)
+    add_test(NAME bvnr_data_parity
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_bvnr_data_parity.py)
+    set_tests_properties(bvnr_data_parity PROPERTIES
+        LABELS "python;codegen"
+        ENVIRONMENT "LIBBOVNAR_PATH=$<TARGET_FILE:bvnr_shared>"
+        FAIL_REGULAR_EXPRESSION "FAILED"
+        TIMEOUT 60)
+endif()
 
 # ── Conformance counts vs the documentation ─────────────────────────────────
 # The documented total said 306 in six places while the suite ran 319, and one

@@ -1829,6 +1829,128 @@ static void test_exact_factor_table(void)
 	}
 }
 
+static void test_prefix_exponent_interaction(void)
+{
+	printf("  prefixed components with exponents...\n");
+	value_unit_t m = BVN_UNIT_NO_PREFIX(bu_meter);
+	value_unit_t m2 = m, m3 = m, km2 = BVN_UNIT_SI(bu_meter, si_kilo), km3 = km2;
+	m2.components[0].exponent  = exp_square;
+	m3.components[0].exponent  = exp_cubic;
+	km2.components[0].exponent = exp_square;
+	km3.components[0].exponent = exp_cubic;
+
+	/* A prefix on a squared component scales by 10^(3*2), not 10^(3*2*2): the
+	 * prefix exponent helper already folds in |exp|, and multiplying by it a
+	 * second time turned 1 km² into 10^12 m². */
+	check_rat("1", 10, true, km2, m2, 10, true, "1000000",  "1 km2 -> 1e6 m2");
+	check_rat("1", 10, true, km3, m3, 10, true, "1000000000", "1 km3 -> 1e9 m3");
+	check_rat("1", 10, true, m2, km2, 10, true, "0.000001", "1 m2 -> 1e-6 km2");
+
+	/* A prefix on a NEGATIVE exponent must scale down, not up. m/km is 1/1000;
+	 * applying the sign twice made it 1000 and the round trip 10^6 out. */
+	value_unit_t m_per_km = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+						   bu_meter, si_kilo, exp_neg_linear);
+	value_unit_t m_per_m  = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+						   bu_meter, si_none, exp_neg_linear);
+	check_rat("6", 10, true, m_per_km, m_per_m, 10, true, "0.006", "6 m/km -> 0.006");
+	check_rat("6", 10, true, m_per_m, m_per_km, 10, true, "6000",  "6 m/m -> 6000 m/km");
+
+	/* Same for a milli prefix, which scales the other way. */
+	value_unit_t m_per_mm = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+						   bu_meter, si_milli, exp_neg_linear);
+	check_rat("6", 10, true, m_per_mm, m_per_m, 10, true, "6000", "6 m/mm -> 6000");
+
+	/* IEC prefixes travel the base-2 path and must behave identically. */
+	value_unit_t GiB_s = { .num_components = 2, .components = {
+		{ .base = bu_byte, .exponent = exp_linear,
+		  .prefix = { .system = prefix_iec, .id.iec = iec_gibi } },
+		{ .base = bu_second, .exponent = exp_neg_linear,
+		  .prefix = { .system = prefix_si, .id.si = si_none } } } };
+	value_unit_t B_s = BVN_UNIT_COMPOUND2(bu_byte, si_none, exp_linear,
+					      bu_second, si_none, exp_neg_linear);
+	check_rat("2", 10, true, GiB_s, B_s, 10, true, "2147483648", "2 GiB/s -> bytes/s");
+
+	/* bu_none is a real table row that can carry a prefix — a dimensionless
+	 * kilo. Every other function in the library scales by 1000 for it; skipping
+	 * the component here made this the lone dissenter. */
+	value_unit_t kilo_none = BVN_UNIT_SI(bu_none, si_kilo);
+	value_unit_t plain     = BVN_UNIT_NO_PREFIX(bu_none);
+	check_rat("3000", 10, true, plain, kilo_none, 10, true, "3", "3000 -> 3 kilo");
+	check_rat("3", 10, true, kilo_none, plain, 10, true, "3000", "3 kilo -> 3000");
+}
+
+/*
+ * Structural guard: the exact-rational factor builder and the legacy double one
+ * model the same physics, so for any unit pair they must agree to within double
+ * rounding. Sweeping unit x prefix x exponent here is what catches a whole CLASS
+ * of factor-assembly bug — a prefix raised to the wrong power, a sign applied
+ * twice, a component silently skipped — rather than the one instance someone
+ * happened to write a case for.
+ */
+static double rat_to_double(const bvn_int_t *n, const bvn_int_t *d)
+{
+	char bn[4096], bd[4096];
+	if (bvn_int_to_str(n, bn, sizeof bn, 10) < 0) return NAN;
+	if (bvn_int_to_str(d, bd, sizeof bd, 10) < 0) return NAN;
+	return strtod(bn, NULL) / strtod(bd, NULL);
+}
+static void test_rational_matches_double_path(void)
+{
+	printf("  exact vs double factor agreement (sweep)...\n");
+	static const value_base_unit_t U[] = {
+		bu_meter, bu_second, bu_gram, bu_ampere, bu_kelvin, bu_newton,
+		bu_joule, bu_watt, bu_pascal, bu_hertz, bu_volt, bu_inch, bu_foot,
+		bu_mile, bu_pound, bu_liter, bu_byte, bu_bit, bu_hour, bu_none,
+	};
+	static const si_prefix_id_t P[] = { si_none, si_kilo, si_milli, si_mega, si_micro };
+	static const unit_exponent_t E[] = { exp_linear, exp_square, exp_cubic,
+					     exp_neg_linear, exp_neg_square };
+	const size_t NU = sizeof U / sizeof U[0], NP = sizeof P / sizeof P[0],
+		     NE = sizeof E / sizeof E[0];
+	int compared = 0, mismatches = 0;
+
+	for (size_t i = 0; i < NU; i++)
+	for (size_t p = 0; p < NP; p++)
+	for (size_t e = 0; e < NE; e++) {
+		/* prefixed+exponented unit vs. the same unit unprefixed */
+		value_unit_t f = BVN_UNIT_SI(U[i], P[p]);
+		value_unit_t t = BVN_UNIT_NO_PREFIX(U[i]);
+		f.components[0].exponent = E[e];
+		t.components[0].exponent = E[e];
+		/* and the same pair as the denominator of a compound */
+		value_unit_t cf = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+						     U[i], P[p], E[e]);
+		value_unit_t ct = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+						     U[i], si_none, E[e]);
+		value_unit_t pairs[][2] = { { f, t }, { t, f }, { cf, ct }, { ct, cf } };
+
+		for (size_t k = 0; k < sizeof pairs / sizeof pairs[0]; k++) {
+			value_unit_t a = pairs[k][0], b = pairs[k][1];
+			if (!bvn_units_compatible(a, b)) continue;
+			double dref;
+			bool dok = bvn_unit_convert_value(6.0, a, b, &dref);
+			bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+			bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+			bvn_int_from_uint64(vn, 6u); bvn_int_from_uint64(vd, 1u);
+			bool exact = false;
+			bool rok = bvn_unit_convert_rational(vn, vd, a, b, on, od, &exact);
+			if (dok != rok) {
+				mismatches++;
+			} else if (rok && exact) {
+				double r = rat_to_double(on, od);
+				double scale = fabs(dref) > 1e-300 ? fabs(dref) : 1.0;
+				compared++;
+				if (!(fabs(r - dref) / scale < 1e-9))
+					mismatches++;
+			}
+			bvn_int_free(vn); bvn_int_free(vd);
+			bvn_int_free(on); bvn_int_free(od);
+		}
+	}
+	ASSERT_TRUE(compared > 1000, "sweep actually compared a meaningful number of pairs");
+	ASSERT_EQ_INT(mismatches, 0, "exact and double factor paths agree everywhere");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -1858,6 +1980,8 @@ int main(void)
 	test_rational_to_str_bases();
 	test_rational_to_str_never_truncates();
 	test_exact_factor_table();
+	test_prefix_exponent_interaction();
+	test_rational_matches_double_path();
 	test_unit_reduce();
 	test_unit_reduce_full_cancel_si();
 	test_unit_reduce_iec();

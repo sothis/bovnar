@@ -66,6 +66,20 @@ reading the grown by-value structs at the wrong size.
 
 ### Fixed
 
+- **Prefixes on a component with an exponent were assembled wrongly** in the
+  exact-rational factor builder (never released; the `double` path was always
+  right). `bvni_prefix_exp_int` already folds in both `|exp|` and the sign of the
+  component's exponent, but `bvn_unit_to_si_rational` multiplied by `|exp|` a
+  second time and then inverted the result again for a negative exponent. So
+  `1 km²` converted to `10¹²` m² instead of `10⁶`, and `6 m/km` came out `6000`
+  instead of `0.006` — a factor of 10⁶. A prefixed `bu_none` (a dimensionless
+  kilo) was dropped entirely, making this the one function in the library that
+  disagreed with `bvn_prefix_unit_valid`, `bvn_unit_dimension_vector`,
+  `bvn_units_compatible` and `bvn_unit_to_si_factor`; it is reachable through the
+  `want_unit` hook, whose target unit comes from the caller rather than the
+  parser. Both are covered by a sweep test that cross-checks the exact and
+  `double` factor paths over unit × prefix × exponent, which catches the class
+  rather than the instance.
 - **Unit factors that were rounded doubles masquerading as exact rationals.**
   Sixteen units whose true SI factor is a non-terminating rational carried a
   17-significant-digit decimal, from which the table recovered a wrong "exact"

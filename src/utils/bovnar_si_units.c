@@ -450,7 +450,12 @@ static bool bvn_unit_to_si_rational(value_unit_t u,
 	for (uint32_t i = 0; ok && i < u.num_components &&
 	     i < BVNR_MAX_UNIT_COMPONENTS; i++) {
 		const value_unit_component_t *c = &u.components[i];
-		if (c->base == bu_none) continue;
+		/* No bu_none short-circuit here: bu_none is a real table row (factor
+		 * 1/1) and it can still carry a PREFIX — a dimensionless kilo, which
+		 * bvn_prefix_unit_valid, bvn_unit_dimension_vector, bvn_units_compatible
+		 * and bvn_unit_to_si_factor all accept as a scale of 1000. Skipping the
+		 * component here dropped that factor and made this the one function in
+		 * the library that disagreed, silently returning the value unscaled. */
 		if (c->exponent == exp_invalid) { ok = false; break; }
 		if (!bvn_prefix_unit_valid(c->prefix, c->base)) { ok = false; break; }
 		int32_t uexp = bvn_exponent_to_int(c->exponent);
@@ -467,8 +472,17 @@ static bool bvn_unit_to_si_rational(value_unit_t u,
 			if (!bvn_int_mul(cfn, cfn, bfn) || !bvn_int_mul(cfd, cfd, bfd)) {
 				ok = false; break; }
 		if (!ok) break;
-		/* prefix ^ (pexp * abs_exp): base 10 for SI, base 2 for IEC */
-		int32_t totpexp = bvni_prefix_exp_int(*c) * abs_exp;
+		if (uexp < 0) {                         /* invert this component */
+			bvn_int_t *sw = cfn; cfn = cfd; cfd = sw;
+		}
+		/* Prefix, base 10 for SI and base 2 for IEC. bvni_prefix_exp_int
+		 * already folds in |exp| AND the sign of the component's exponent, so it
+		 * is the FINAL signed power: it must not be multiplied by abs_exp again,
+		 * and it must be applied after the inversion above rather than through
+		 * it. Doing either turned k~m² into 10¹² instead of 10⁶ and inverted the
+		 * prefix outright on any negative exponent — 1 m/k~m came out 10⁶ times
+		 * too large. */
+		int32_t totpexp = bvni_prefix_exp_int(*c);
 		if (c->prefix.system == prefix_iec) {
 			if (totpexp > 0) ok = bvn_int_shl(cfn, totpexp);
 			else if (totpexp < 0) ok = bvn_int_shl(cfd, -totpexp);
@@ -477,9 +491,6 @@ static bool bvn_unit_to_si_rational(value_unit_t u,
 			else if (totpexp < 0) ok = bvn_int_mul_pow10(cfd, -totpexp);
 		}
 		if (!ok) break;
-		if (uexp < 0) {                         /* invert this component */
-			bvn_int_t *sw = cfn; cfn = cfd; cfd = sw;
-		}
 		/* accumulate into the running factor */
 		if (!rat_mul(tn, td, fnum, fden, cfn, cfd)) { ok = false; break; }
 		if (!bvn_int_copy(fnum, tn) || !bvn_int_copy(fden, td)) { ok = false; break; }

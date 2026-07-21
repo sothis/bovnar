@@ -106,6 +106,27 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **A consumer that aborted was called again.** The read/write API documents a
+  callback returning `false` as "abort", but with `continue_on_error` set the
+  reader treated it as a document error: it entered resync and kept calling the
+  consumer that had just said stop, counting each of those as a recovery. A
+  consumer whose buffer is full was re-entered for the rest of the file, and
+  `recovery_count` was inflated by aborts that were never parse failures.
+- **Resync inverted string-quote parity and swallowed the rest of the file.**
+  The string sub-machine was chosen only when the error happened *inside* a
+  string. If the offending byte was itself a `"` — illegal after a number, say —
+  that quote was consumed and plain resync began inside the string it opened, so
+  the string's *closing* quote read as an opening one. `.a = 1 "x"; .b = 2;`
+  recovered nothing after `.a` and failed with `incomplete_bvnr_stream`, while
+  the same shape with a non-quote offending byte recovered correctly.
+- **A UTF-8 BOM was accepted at a non-zero byte offset.** Spec §3.2 allows it
+  only at offset 0; the guard tested a lexer state that self-loops on
+  whitespace, so a BOM after a space or a newline slipped through.
+- **A version directive terminated by EOF was never parsed.** A document that is
+  nothing but the directive was accepted straight from the EOF handler, which
+  bypasses the only place the directive is checked — so `#!bovnar bogus` with no
+  trailing newline was accepted, and `#!bovnar 99.9` passed even under
+  `strict_version`. Both now behave identically with and without the newline.
 - **An unterminated array was accepted, and swallowed the next key.** A `;` (or
   `}`) ends the whole value, so every `[` opened for it must already have been
   closed — but the lexer just zeroed the nesting level instead of checking it. No

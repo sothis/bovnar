@@ -280,6 +280,141 @@ static void test_unterminated_array_is_rejected(void)
 	}
 }
 
+
+static bool abort_cb_count;
+static int  abort_cb_limit, abort_cb_seen;
+static bool abort_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
+{
+	(void)ud; (void)e; (void)d;
+	abort_cb_seen++;
+	return abort_cb_seen < abort_cb_limit;
+}
+
+static void test_consumer_abort_is_not_a_document_error(void)
+{
+	/* The API documents a callback returning false as "abort". With
+	 * continue_on_error set the reader treated it as a parse error instead: it
+	 * entered resync and kept calling the consumer that had just said stop, and
+	 * counted each of those as a recovery. */
+	const char *doc = ".a = 1;\n.b = 2;\n.c = 3;\n";
+	for (int co = 0; co < 2; co++) {
+		abort_cb_seen  = 0;
+		abort_cb_limit = 3;
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.continue_on_error = co != 0;
+		f.on_verified = abort_cb;
+		bvnr_open_read_mem(r, doc, (uint32_t)strlen(doc), NULL, 0, &f);
+		bool ok = bvnr_read(r);
+		ASSERT_TRUE(!ok, "an aborting consumer fails the read");
+		ASSERT_EQ_INT((int)bvnr_reader_get_error(r),
+			      (int)error_scanner_callback_failed,
+			      "...with scanner_callback_failed");
+		ASSERT_EQ_INT(abort_cb_seen, 3,
+			      "the consumer is not called again after it aborts");
+		ASSERT_EQ_INT((int64_t)bvnr_reader_get_recovery_count(r), 0,
+			      "a consumer abort is not counted as a recovery");
+		bvnr_reader_destroy(r);
+	}
+	(void)abort_cb_count;
+}
+
+static char resync_keys[256];
+static bool resync_key_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
+{
+	(void)ud;
+	if (e == ev_assignment_start && d && d->data && d->length) {
+		size_t used = strlen(resync_keys);
+		if (used + d->length + 2 < sizeof resync_keys) {
+			resync_keys[used] = '.';
+			memcpy(resync_keys + used + 1, d->data, d->length);
+			resync_keys[used + 1 + d->length] = ' ';
+			resync_keys[used + 2 + d->length] = '\0';
+		}
+	}
+	return true;
+}
+
+static void test_resync_handles_a_quote_as_the_offending_byte(void)
+{
+	/* Resync picked the string sub-machine only when the error happened INSIDE a
+	 * string. If the offending byte was itself a '"' — illegal after a number,
+	 * say — that quote was consumed and plain resync started inside the string it
+	 * opened, so the string's CLOSING quote read as an opening one and every
+	 * following assignment was swallowed to the next quote or EOF. */
+	static const struct { const char *doc; const char *keys; } cases[] = {
+		{ ".a = 1 \"x\";\n.b = 2;\n.c = 3;\n", ".a .b .c " },
+		{ ".a = 1 ?;\n.b = 2;\n.c = 3;\n",       ".a .b .c " },   /* control */
+		{ ".a = 1 \"x\" \"y\";\n.b = 2;\n",     ".a .b " },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		resync_keys[0] = '\0';
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.continue_on_error = true;
+		f.on_verified = resync_key_cb;
+		bvnr_open_read_mem(r, cases[i].doc, (uint32_t)strlen(cases[i].doc),
+				   NULL, 0, &f);
+		bvnr_read(r);
+		ASSERT_TRUE(strcmp(resync_keys, cases[i].keys) == 0,
+			    "resync resumes at the next assignment, quote or not");
+		bvnr_reader_destroy(r);
+	}
+}
+
+static void test_bom_only_at_offset_zero(void)
+{
+	/* Spec 3.2: the BOM is legal only at byte offset 0. The guard tested
+	 * last_state == undefined, but that state self-loops on whitespace, so a BOM
+	 * after a space or a newline slipped through. */
+	static const struct { const char *doc; bool ok; } cases[] = {
+		{ "\xef\xbb\xbf.a = 1;\n",     true  },
+		{ "  \xef\xbb\xbf.a = 1;\n",   false },
+		{ "\n\xef\xbb\xbf.a = 1;\n",   false },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		bvnr_open_read_mem(r, cases[i].doc, (uint32_t)strlen(cases[i].doc),
+				   NULL, 0, &f);
+		ASSERT_EQ_INT((int)bvnr_read(r), (int)cases[i].ok,
+			      "a BOM is accepted only at byte offset 0");
+		bvnr_reader_destroy(r);
+	}
+}
+
+static void test_version_directive_terminated_by_eof(void)
+{
+	/* A document that is nothing but the directive was accepted straight from
+	 * the EOF handler, which skipped the only place the directive is parsed — so
+	 * a malformed or unsupported version passed with no trailing newline. */
+	static const struct { const char *doc; bool strict; bool ok; int err; } cases[] = {
+		{ "#!bovnar bogus",   false, false, (int)error_invalid_spec_version },
+		{ "#!bovnar bogus\n", false, false, (int)error_invalid_spec_version },
+		{ "#!bovnar 99.9",    true,  false, (int)error_unsupported_spec_version },
+		{ "#!bovnar 99.9\n",  true,  false, (int)error_unsupported_spec_version },
+		{ "#!bovnar 99.9",    false, true,  (int)error_none },
+		{ "#!bovnar 1.1",     true,  true,  (int)error_none },
+		{ "# just a comment", false, true,  (int)error_none },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.strict_version = cases[i].strict;
+		bvnr_open_read_mem(r, cases[i].doc, (uint32_t)strlen(cases[i].doc),
+				   NULL, 0, &f);
+		ASSERT_EQ_INT((int)bvnr_read(r), (int)cases[i].ok,
+			      "the version directive is parsed with or without a newline");
+		ASSERT_EQ_INT((int)bvnr_reader_get_error(r), cases[i].err,
+			      "...and reports the same error either way");
+		bvnr_reader_destroy(r);
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_reader_test regression suite...\n");
@@ -289,6 +424,10 @@ int main(void)
 	test_comment_inside_array();
 	test_bom_error_after_comment();
 	test_unterminated_array_is_rejected();
+	test_consumer_abort_is_not_a_document_error();
+	test_resync_handles_a_quote_as_the_offending_byte();
+	test_bom_only_at_offset_zero();
+	test_version_directive_terminated_by_eof();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

@@ -265,7 +265,13 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 		l->next_state = resync_string;
 		break;
 	default:
-		l->next_state = resync;
+		/* The offending byte may itself be a '"' in a state where a quote is
+		 * illegal (after a number, inside an identifier, ...). That quote has
+		 * just been consumed and OPENS a string, so plain resync would read its
+		 * closing quote as another opening one — inverting the parity and
+		 * swallowing every following assignment to the next quote or EOF.
+		 * ".a = 1 \"x\"; .b = 2;" lost .b and everything after it. */
+		l->next_state = (l->byte == '"') ? resync_string : resync;
 		break;
 	}
 	++l->recovery_count;
@@ -622,8 +628,12 @@ bool bvn_action_copy_utf8bom_byte(bvnr_reader_t* p)
 		l->next_state = utf8bom_intro;
 		return true;
 	}
+	/* Spec 3.2: the BOM is legal only at byte offset 0. Testing last_state ==
+	 * undefined was not enough — the [undefined] row self-loops on whitespace, so
+	 * a BOM after a space or a newline slipped through. text_bytes counts what
+	 * has been consumed, and the BOM's own three bytes are already in it. */
 	if (l->bom[0] != 0xef || l->bom[1] != 0xbb || l->byte != 0xbf
-		|| l->last_state != undefined) {
+		|| l->last_state != undefined || l->text_bytes != 3u) {
 		bvn_lexer_set_error(p, error_invalid_byte_order_mark);
 		return false;
 	}
@@ -2121,6 +2131,13 @@ static bool bvn_interpret_input_buffer(
 			bvn_notify_error(p);
 			if (!line_advanced)
 				bvn_advance_line(l, prev);
+			/* A consumer returning false is not a document error: the API
+			 * documents it as "abort". Feeding it the rest of the file because
+			 * continue_on_error happens to be set re-enters a consumer that has
+			 * already said stop, and inflates recovery_count with aborts that
+			 * were never parse failures. */
+			if (p->val.last_error == error_scanner_callback_failed)
+				return false;
 			if (l->continue_on_error) {
 				if (!bvn_enter_resync(p))
 					return false;
@@ -2291,7 +2308,21 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				 * is a valid empty document — the EBNF comment production
 				 * ends on CR | LF | EOF. Without this a comment-only file
 				 * missing its final newline wrongly reported
-				 * error_got_incomplete_bvnr_stream. */
+				 * error_got_incomplete_bvnr_stream.
+				 *
+				 * That comment may be the VERSION DIRECTIVE, though, and
+				 * bvn_action_first_comment_outro is the only place it gets
+				 * parsed. Accepting straight from here skipped it, so
+				 * "#!bovnar 99.9" with no trailing newline passed even under
+				 * strict_version. Close the comment properly first. */
+				if (l->next_state == first_comment_intro &&
+				    !bvn_action_first_comment_outro(r)) {
+					bvn_set_eof_error(r, r->val.last_error != error_none
+						? r->val.last_error
+						: error_invalid_spec_version);
+					bvn_notify_error(r);
+					return false;
+				}
 				r->val.last_error = error_none;
 				break;
 			}

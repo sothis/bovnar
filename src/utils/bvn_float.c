@@ -396,27 +396,60 @@ static bool bvnf_bitdiv(const bvn_int_t *num, int shift,
 	int total = nb + (shift > 0 ? shift : 0);
 	if (total <= 0) { *sticky_out = false; return true; }
 	uint32_t r_cap = (uint32_t)(db / 32) + 4u;
-	bvn_int_t R;
+	bvn_int_t R, H;
 	if (!bvnf_scratch(&R, r_cap)) return false;
+	/* H = den >> 1 and dlow = den & 1. The obvious loop body -- shift R left,
+	 * pull in the next bit, then compare against den -- transiently needs
+	 * bitlen(den)+1 bits, which for a denominator of exactly BVN_INT_MAX_BITS
+	 * (10^9864 has bitlen 32768) the shift cannot produce: it failed and aborted
+	 * the whole division. Deciding against H instead never materialises that
+	 * extra bit:
+	 *
+	 *     2R + b >= den  <=>  R > H, or R == H and b >= dlow
+	 *
+	 * and the updated remainder is rewritten so the value being doubled always
+	 * stays below den:
+	 *
+	 *     2R + b - den  ==  2(R - H) + (b - dlow)
+	 *
+	 * which for b < dlow (only b=0, dlow=1) is taken as 2(R - H - 1) + 1 so the
+	 * intermediate never goes negative. Both branches therefore double a value
+	 * whose result is < den, i.e. at most bitlen(den) bits. */
+	if (!bvnf_scratch(&H, r_cap)) { bvnf_scratch_free(&R); return false; }
+	if (!bvn_int_copy(&H, den)) {
+		bvnf_scratch_free(&R); bvnf_scratch_free(&H); return false;
+	}
+	bvn_int_shr(&H, 1);
+	const int dlow = bvn_int_getbit(den, 0);
+	uint32_t one_limb[1] = { 1u };
+	bvn_int_t ONE = { one_limb, 1u, 1u, false, false, { 0, 0 } };
 	memset(Q, 0, (size_t)q_words * sizeof(uint32_t));
 	bool sticky = false;
+	bool fail = false;
 	for (int i = total - 1; i >= 0; i--) {
-		if (!bvn_int_shl(&R, 1)) { bvnf_scratch_free(&R); return false; }
 		int src = i - shift;
-		if (src >= 0 && bvn_int_getbit(num, src))
-			if (!bvn_int_add_u32(&R, 1u)) { bvnf_scratch_free(&R); return false; }
-		if (bvn_int_cmp(&R, den) >= 0) {
-			bvn_int_sub_inplace(&R, den);
+		int b = (src >= 0 && bvn_int_getbit(num, src)) ? 1 : 0;
+		int c = bvn_int_cmp(&R, &H);
+		if (c > 0 || (c == 0 && b >= dlow)) {
+			if (!bvn_int_sub_inplace(&R, &H)) { fail = true; break; }
+			if (b < dlow && !bvn_int_sub_inplace(&R, &ONE)) { fail = true; break; }
+			if (!bvn_int_shl(&R, 1)) { fail = true; break; }
+			if (b != dlow && !bvn_int_add_u32(&R, 1u)) { fail = true; break; }
 			if (i < want) {
 				uint32_t wi = (uint32_t)i / 32u;
 				if (wi < q_words) Q[wi] |= 1u << ((uint32_t)i % 32u);
 			} else {
 				sticky = true;
 			}
+		} else {
+			if (!bvn_int_shl(&R, 1)) { fail = true; break; }
+			if (b && !bvn_int_add_u32(&R, 1u)) { fail = true; break; }
 		}
 	}
+	if (fail) { bvnf_scratch_free(&R); bvnf_scratch_free(&H); return false; }
 	if (!bvn_int_is_zero(&R)) sticky = true;
 	bvnf_scratch_free(&R);
+	bvnf_scratch_free(&H);
 	*sticky_out = sticky;
 	return true;
 }
@@ -456,14 +489,26 @@ static bool bvnf_rational_to_float(bvn_float_t *f, bool neg,
 		}
 		bvnf_scratch_free(&tmp);
 	}
+	/* _sign/_exp are committed here, before the division that can still fail.
+	 * Every failure path below must therefore leave a VALID float behind: the
+	 * mantissa is untouched on failure, so returning early used to leave `f`
+	 * reporting is_regular() with an all-zero mantissa -- a state the rest of
+	 * the library treats as impossible, and which bvn_float_to_str() rendered
+	 * as the illegal "0e-9884" in base 10 and as "1p-32768" in base 16. Zero is
+	 * the honest fallback: the caller was told false, and reading `f` anyway now
+	 * yields a signed zero rather than nonsense. */
 	f->_sign = neg ? -1 : 1;
 	f->_exp  = (int64_t)E + 1;
 	int shift = prec + 1 - E;
 	int want  = prec + 2;
 	uint32_t q_words = (uint32_t)(want + 31) / 32u + 4u;
 	uint32_t *_Qb = calloc(q_words, sizeof(uint32_t));
-	if (!_Qb) return false;
-#define RTF_RET(v) do { free(_Qb); return (v); } while (0)
+	if (!_Qb) { bvn_float_set_zero(f, neg); return false; }
+#define RTF_RET(v) do { \
+		if (!(v)) bvn_float_set_zero(f, neg); \
+		free(_Qb); \
+		return (v); \
+	} while (0)
 	bool sticky = false, ok = true;
 	if (shift >= 0 && nb + shift > (int)BVN_INT_MAX_BITS - 32) {
 		ok = bvnf_bitdiv(num, shift, den, _Qb, q_words, want, &sticky);
@@ -757,9 +802,14 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 	{
 		const char *p = s;
 		uint8_t c0 = (uint8_t)(*p | 0x20);
-		if (c0 == 'n' && ((uint8_t)(p[1]|0x20)) == 'a' && ((uint8_t)(p[2]|0x20)) == 'n')
+		/* The NUL terminator check matters: without it "nanana" was a NaN and
+		 * "infinity" an infinity, and both p[1]/p[2] reads stay in bounds
+		 * because a mismatch short-circuits before the next index. */
+		if (c0 == 'n' && ((uint8_t)(p[1]|0x20)) == 'a' &&
+		    ((uint8_t)(p[2]|0x20)) == 'n' && p[3] == '\0')
 			return BVNF_RK_NAN;
-		if (c0 == 'i' && ((uint8_t)(p[1]|0x20)) == 'n' && ((uint8_t)(p[2]|0x20)) == 'f')
+		if (c0 == 'i' && ((uint8_t)(p[1]|0x20)) == 'n' &&
+		    ((uint8_t)(p[2]|0x20)) == 'f' && p[3] == '\0')
 			return BVNF_RK_INF;
 	}
 	bvn_int_zero(num);
@@ -837,6 +887,12 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		if (exp_overflow) return eneg ? BVNF_RK_UNDERFLOW : BVNF_RK_INF;
 		exp_val = eneg ? -eabs : eabs;
 	}
+	/* Everything above stops at the first byte it does not recognise, so without
+	 * this the parser happily returned a value for a prefix and ignored the rest:
+	 * "1.2.3" was 1.2, "12 34" was 12, "1e2e3" was 100, "0x1.8p1zzz" was 3. The
+	 * header promises false for a malformed literal, and bvn_int_from_str already
+	 * rejects the analogous "12 3", so the two string APIs disagreed. */
+	if (*s != '\0') return BVNF_RK_FAIL;
 	if (overflow) return (exp_val < 0) ? BVNF_RK_UNDERFLOW : BVNF_RK_INF;
 	uint32_t log2b = 0;
 	bool b_is_pow2 = bvnf_pow2_base(base, &log2b);
@@ -1007,6 +1063,10 @@ void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 size_t bvn_float_str_bufsize(uint32_t prec, uint32_t base)
 {
 	size_t digits;
+	/* Base 0 and 1 make the log2b_floor loop below yield 0 and the division
+	 * trap with SIGFPE. This is BVN_API with no documented precondition, and the
+	 * sibling bvn_int_str_bufsize() already screens base < 2 the same way. */
+	if (base < 2u) return 64u;
 	if (base == 10u) {
 		digits = (size_t)prec * 302u / 1000u + 24u;
 	} else {

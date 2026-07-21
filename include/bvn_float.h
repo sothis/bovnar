@@ -145,6 +145,17 @@ BVN_API void bvn_float_to_ieee_bin(const bvn_float_t *f,
  * value layer uses it for base-10 and base-16 float literals. NULL string or an
  * unsupported base leaves *bits all-zero (i.e. +0.0); a syntactically invalid
  * literal likewise yields +0.0 (there is no error channel in this signature).
+ *
+ * "Whole range" means the whole range OF THE TARGET FORMAT, and carries the same
+ * capacity caveat as bvn_float_from_str: the literal is held as an exact
+ * rational bounded by BVN_INT_MAX_BITS, so a decimal exponent beyond roughly
+ * +/-1e9865 saturates to inf / 0 no matter what the format could represent.
+ * Every standard format up to binary128 has a narrower range than that, so the
+ * limit is invisible there -- binary128's own overflow point is ~1e4932. It
+ * binds only for binary256 (max ~1e78913) and any wider caller-defined geometry,
+ * where "1e50000" yields +Infinity rather than the finite normal the format has
+ * room for. Lifting it needs a different algorithm -- 10^50000 alone is ~166000
+ * bits -- not a larger constant.
  */
 BVN_API void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 							uint32_t exp_bits, uint32_t man_bits, int32_t bias,

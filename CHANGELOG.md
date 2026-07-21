@@ -141,6 +141,43 @@ reading the grown by-value structs at the wrong size.
   `second`, which used to erase the `:60` spelling for every offset but `Z`; and
   the header records that `second == 60` is the one field value in a
   `bvn_datetime_t` that is not its own arithmetic value.
+- **The exact-rational division failed at one specific denominator size.**
+  `bvnf_bitdiv`, the bounded-memory fallback, shifted its running remainder left
+  *before* reducing it, which transiently needs `bitlen(den)+1` bits. For a
+  denominator of exactly `BVN_INT_MAX_BITS` — `10^9864` has bitlen 32768 — that
+  shift cannot succeed, so the whole division aborted: `bvn_float_from_str(f,
+  "1e-9864", 10)` returned false while both neighbours worked. Worse, the caller
+  commits `_sign`/`_exp` before that division, so the failure left a float
+  claiming `bvn_float_is_regular()` with an all-zero mantissa — a state the rest
+  of the library treats as impossible, which `bvn_float_to_str` rendered as the
+  illegal `"0e-9884"` in base 10 and as `"1p-32768"` in base 16. The loop now
+  decides against `den>>1` and rewrites the update as `2(R-H) + (b-dlow)`, so the
+  value being doubled always stays below `den`; every failure path also leaves a
+  valid signed zero. The rewritten step is verified exhaustively against the one
+  it replaces (all denominators 1…4000 × every remainder × both input bits, 16 M
+  evaluations, 0 disagreements) and the bignum implementation against an exact
+  `Fraction` oracle over 2008 parses straddling the boundary.
+- **`bvn_float_str_bufsize(prec, 0)` and `(prec, 1)` crashed with SIGFPE.** The
+  log2-of-base loop yields 0 for `base < 2` and the following division trapped.
+  Public API with no documented precondition; the sibling `bvn_int_str_bufsize`
+  already screened it.
+- **`bvn_float_from_str` accepted trailing garbage.** It stopped at the first
+  unrecognised byte and returned a value for the prefix: `"1.2.3"` was 1.2,
+  `"12 34"` was 12, `"1e2e3"` was 100, `"nanana"` a NaN and `"infinity"` an
+  infinity. The header promises false for a malformed literal, and
+  `bvn_int_from_str` already rejected the analogous `"12 3"`, so the two string
+  APIs disagreed.
+- **Documented two limits rather than pretending they are not there.**
+  `bvn_float_strtoieee_bin` promised correct rounding "across the whole range";
+  it inherits the exact-rational capacity cap, so a decimal exponent beyond
+  ~1e9865 saturates regardless of what the target format could hold. Invisible
+  for every standard format up to binary128, whose own range is narrower — it
+  binds only for binary256 and wider, where `"1e50000"` yields infinity instead
+  of a finite normal. Lifting it needs a different algorithm, not a bigger
+  constant. Separately, `bvn_int_shl` and `bvn_int_mul_u32` leave a *truncated*
+  value when they return false, which the header's "defined state" wording did
+  not convey; both now say so, and the general note warns that ignoring their
+  return means computing with wrong digits rather than merely missing an error.
 - **A consumer that aborted was called again.** The read/write API documents a
   callback returning `false` as "abort", but with `continue_on_error` set the
   reader treated it as a document error: it entered resync and kept calling the

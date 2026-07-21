@@ -56,7 +56,10 @@ typedef struct bvn_int_s {
  *    bvn_int_free() (NULL on allocation failure); bvn_int_free(NULL) is a no-op.
  *  - Functions returning bool return false on failure — chiefly a capacity
  *    overflow past BVN_INT_MAX_BITS — and otherwise leave their destination in
- *    a defined state (see each function). The constructor/parse/convert helpers
+ *    a defined state (see each function). "Defined" is not "unchanged": the
+ *    in-place helpers bvn_int_shl and bvn_int_mul_u32 leave a truncated value
+ *    behind, so a caller that ignores their return does not merely miss an
+ *    error, it goes on computing with wrong digits. The constructor/parse/convert helpers
  *    (bvn_int_from_*, bvn_int_to_*) tolerate a NULL argument and report failure;
  *    the in-place arithmetic helpers require non-NULL operands.
  */
@@ -99,9 +102,17 @@ BVN_API void     bvn_int_zero(bvn_int_t *n);
 BVN_API void     bvn_int_norm(bvn_int_t *n);
 BVN_API bool     bvn_int_copy(bvn_int_t *dst, const bvn_int_t *src);
 BVN_API bool     bvn_int_add_u32(bvn_int_t *n, uint32_t v);
+/* n *= v. Returns false if the product would exceed BVN_INT_MAX_BITS -- and in
+ * that case n holds the LOW BITS OF THE TRUNCATED PRODUCT, not its former value:
+ * the multiply runs in place and only the final carry limb is refused. Treat a
+ * false return as "n is now garbage" and reinitialise it. */
 BVN_API bool     bvn_int_mul_u32(bvn_int_t *n, uint32_t v);
 BVN_API bool     bvn_int_mul_pow10(bvn_int_t *n, int k);
 BVN_API uint32_t bvn_int_div_u32(bvn_int_t *n, uint32_t v);
+/* n <<= bits (a negative count is a no-op returning true). Returns false if the
+ * result would exceed BVN_INT_MAX_BITS, and like bvn_int_mul_u32 leaves n
+ * TRUNCATED rather than unchanged -- the shift is done in place and the limbs
+ * that no longer fit are dropped. Treat a false return as "n is now garbage". */
 BVN_API bool bvn_int_shl(bvn_int_t *n, int bits);
 BVN_API void bvn_int_shr(bvn_int_t *n, int bits);
 BVN_API int  bvn_int_bitlen(const bvn_int_t *n);

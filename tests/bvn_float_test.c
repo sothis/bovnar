@@ -910,6 +910,71 @@ static void test_bvnf_ieee_roundtrip(void)
 	}
 }
 
+/* Regressions from the numerics audit. Each of these was a live defect; the
+ * exact inputs are pinned because three of the four depend on landing on a
+ * specific boundary. */
+static void test_bvnf_audit_regressions(void)
+{
+	bvn_limb_t buf[BVN_FLOAT_NLIMBS(64u)];
+	bvn_float_t f;
+
+	/* 1. bvn_float_str_bufsize divided by zero for base 0 and 1 (SIGFPE): the
+	 *    log2-of-base loop yields 0 for base < 2. The sibling
+	 *    bvn_int_str_bufsize already screened it. */
+	CHECK(bvn_float_str_bufsize(53u, 0u) > 0, "bufsize base 0 does not trap");
+	CHECK(bvn_float_str_bufsize(53u, 1u) > 0, "bufsize base 1 does not trap");
+	CHECK(bvn_float_str_bufsize(53u, 2u) > 0, "bufsize base 2 still sane");
+
+	/* 2. A denominator of exactly BVN_INT_MAX_BITS broke the bounded-memory
+	 *    division: bvnf_bitdiv shifted its running remainder left BEFORE
+	 *    reducing, which needs bitlen(den)+1 bits, so 10^9864 (bitlen exactly
+	 *    32768) aborted the whole parse. Its neighbours worked, which is what
+	 *    made it easy to miss. */
+	bvn_float_init_buf(&f, 64u, buf, BVN_FLOAT_NLIMBS(64u));
+	CHECK(bvn_float_from_str(&f, "1e-9863", 10), "1e-9863 parses");
+	CHECK(bvn_float_from_str(&f, "1e-9864", 10),
+		"1e-9864 parses (denominator bitlen == BVN_INT_MAX_BITS)");
+	CHECK(bvn_float_is_regular(&f), "1e-9864 is a regular value");
+	{
+		char hex[256];
+		int32_t n = bvn_float_to_str(&f, hex, sizeof hex, 16);
+		/* Verified against an exact Fraction oracle: round-to-nearest-even
+		 * of 10^-9864 at 64 bits is mantissa 0xb52dd3ba8cdde3aa, exp -32768,
+		 * which normalised one bit left is 1.6a5ba77519bbc754. */
+		CHECK(n > 0 && strcmp(hex, "1.6a5ba77519bbc754p-32768") == 0,
+			"1e-9864 rounds to the exact expected value");
+	}
+
+	/* 3. bvnf_rational_to_float commits _sign/_exp before the division that can
+	 *    fail, so a failure used to leave a float claiming is_regular() with an
+	 *    all-zero mantissa -- rendered as the illegal "0e-9884" in base 10 and
+	 *    as "1p-32768" in base 16. Any failed parse must leave a valid value. */
+	CHECK(!bvn_float_from_str(&f, "1.2.3", 10), "malformed literal fails");
+	CHECK(!bvn_float_is_regular(&f) || !bvn_float_is_zero(&f),
+		"a failed parse never leaves regular-with-zero-mantissa");
+	{
+		char dec[256];
+		int32_t n = bvn_float_to_str(&f, dec, sizeof dec, 10);
+		CHECK(n > 0 && dec[0] != '0', "no illegal leading-zero rendering");
+		CHECK(n > 0 && strstr(dec, "e-9884") == NULL,
+			"no bogus 0e-9884 rendering after a failed parse");
+	}
+
+	/* 4. The parser stopped at the first unrecognised byte and ignored the rest,
+	 *    so a prefix parsed as a value. The header promises false for a
+	 *    malformed literal, and bvn_int_from_str already rejected "12 3". */
+	static const char *garbage[] = { "1.5xyz", "12 34", "1.2.3", "1e2e3",
+					 "nanana", "infinity", "1.5 ", NULL };
+	for (int i = 0; garbage[i]; i++)
+		CHECK(!bvn_float_from_str(&f, garbage[i], 10),
+			"trailing garbage is rejected");
+	CHECK(bvn_float_from_str(&f, "nan", 10) && bvn_float_is_nan(&f),
+		"exact 'nan' still accepted");
+	CHECK(bvn_float_from_str(&f, "inf", 10) && bvn_float_is_inf(&f),
+		"exact 'inf' still accepted");
+	CHECK(bvn_float_from_str(&f, "1.5", 10), "a clean literal still parses");
+}
+
 int main(void)
 {
 #define RUN(fn) do { fprintf(stderr,">>> " #fn "\n"); fflush(stderr); fn(); } while(0)
@@ -931,6 +996,7 @@ int main(void)
 	RUN(test_bvnf_to_str);
 	RUN(test_bvnf_to_str_wide_magnitude);
 	RUN(test_bvnf_ieee_roundtrip);
+	RUN(test_bvnf_audit_regressions);
 
 	printf("\n%s  %d passed, %d failed\n",
 		   g_fails ? "FAIL" : "PASS", g_pass, g_fails);

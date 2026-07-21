@@ -1339,3 +1339,128 @@ class TestReaderWantUnit:
         Reader().read_file(str(p), on_verified=on_event, want_unit=want,
                            strict_version=False)
         assert seen == ['5000']
+
+
+class TestWantUnitOverTheExampleCorpus:
+    """Property test: an IDENTITY conversion must never change a document.
+
+    Requesting each value's own unit is a no-op by construction, so running the
+    example corpus with the hook installed must produce exactly the event stream
+    it produces without one, and every converted value must equal the original.
+    That exercises the hook against real documents — floats, wide integers,
+    currencies, datetimes, arrays, references, octet streams — rather than the
+    handful of literals a unit test can name.
+    """
+
+    import pathlib as _pl
+    _EXAMPLES = sorted(
+        (_pl.Path(__file__).resolve().parents[2] / "examples").glob("*.bvnr"))
+
+    @staticmethod
+    def _read(doc: bytes, base=None, allow=False):
+        """Return (stream, converted_pairs). base None means no hook at all."""
+        stream, conv = [], []
+
+        def want(d):
+            return (d.value_unit, base)
+
+        def on_event(ev, d):
+            if d is None:
+                stream.append((ev, None, None))
+                return True
+            stream.append((ev, int(d.type), d.raw_bytes()))
+            if d.converted:
+                conv.append((d.raw_bytes(), _effective_base(d.value_type),
+                             d.converted_str(), int(d.conv.base),
+                             d.converted_rational()))
+            return True
+
+        kwargs = dict(on_verified=on_event)
+        if base is not None:
+            kwargs.update(want_unit=want, want_unit_allow_nonterminating=allow)
+        Reader().read_mem(doc, **kwargs)
+        return stream, conv
+
+    @needs_lib
+    @pytest.mark.parametrize("base", [0, 10, 16, 2, 36, 62])
+    def test_identity_hook_does_not_perturb_the_corpus(self, base):
+        from fractions import Fraction
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        checked = 0
+        for path in self._EXAMPLES:
+            doc = path.read_bytes()
+            plain, _ = self._read(doc)
+            try:
+                hooked, conv = self._read(doc, base=base)
+            except BovnarParseError as exc:
+                # A decimal fraction has no finite expansion in a base without a
+                # factor of 5 (3.14 in base 16), so a strict run legitimately
+                # stops. The opt-in must then carry the same stream through.
+                assert exc.code == ErrorCode.UNIT_INEXACT, (path.name, exc.code)
+                hooked, conv = self._read(doc, base=base, allow=True)
+
+            assert hooked == plain, f"{path.name}: identity hook changed the stream"
+
+            for raw, src_base, text, out_base, rational in conv:
+                assert rational is not None, f"{path.name}: no rational for {raw!r}"
+                # The exact rational must equal the literal it came from.
+                lit = raw.decode('ascii', 'replace')
+                if lit.lower() in ('nan', 'inf', 'ninf'):
+                    continue
+                assert Fraction(*rational) == _literal_fraction(lit, src_base), (
+                    f"{path.name}: identity changed {lit!r} -> {rational}")
+                checked += 1
+        assert checked > 0, "the corpus produced no conversions to check"
+
+
+def _effective_base(vt) -> int:
+    """Mirror of C bvn_effective_base: for float_fix the .base field holds Q and
+    for float_dec/datetime it is not a numeral base at all, so those are always
+    decimal. Reading .base blindly would decode the digits in a bogus base."""
+    from bovnar.enums import ValueTypeFamily as F
+    if int(vt.family) in (F.FLOAT_FIX, F.FLOAT_DEC, F.DATETIME):
+        return 10
+    return int(vt.base) or 10
+
+
+def _literal_fraction(lit: str, base: int):
+    """Exact value of a bovnar numeric literal, as a Fraction."""
+    from fractions import Fraction
+    t = lit.strip()
+    neg = t.startswith('-')
+    if t[:1] in '+-':
+        t = t[1:]
+    exp = 0
+    markers = ('p', 'P') if base == 16 else ('e', 'E') if base <= 14 else ()
+    for m in markers:
+        if m in t:
+            t, e = t.split(m, 1)
+            exp = int(e)
+            break
+    ip, _, fp = t.partition('.')
+    # Digit alphabets, mirroring bvn_char_to_digit / bigint_digit_to_char:
+    # up to base 36 it is 0-9 a-z and either case is accepted; 37..62 adds A-Z as
+    # 36..61 so case distinguishes digits; 64 is the Base64 alphabet and 85 is
+    # Ascii85 starting at '!'.
+    if base == 64:
+        digits = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                  "abcdefghijklmnopqrstuvwxyz0123456789+/")
+    elif base == 85:
+        digits = "".join(chr(33 + i) for i in range(85))
+    elif base <= 36:
+        digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    else:
+        digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    def val(s):
+        if base <= 36:
+            s = s.lower()
+        return sum(digits.index(c) * base ** i for i, c in enumerate(reversed(s)))
+
+    v = Fraction(val(ip or '0'))
+    if fp:
+        v += Fraction(val(fp), base ** len(fp))
+    v *= (Fraction(2) if base == 16 and exp else Fraction(base)) ** exp
+    return -v if neg else v

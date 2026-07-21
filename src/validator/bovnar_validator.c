@@ -102,6 +102,10 @@ void bvnr_reader_destroy(bvnr_reader_t* r)
 }
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 {
+	/* A reader is explicitly reusable across documents (bvnr_open_read_source),
+	 * and this memset is what re-arms it. Release the heap the previous document
+	 * left in the conversion scratch first, or every re-open orphans it. */
+	bvn_val_free(v);
 	memset(v, 0, sizeof(*v));
 	v->value_type             = BVN_TYPE_PLAIN;
 	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
@@ -111,6 +115,8 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 		v->on_unverified = opts->on_unverified;
 		v->on_verified   = opts->on_verified;
 		v->want_unit     = opts->want_unit;
+		v->want_unit_allow_nonterminating =
+			opts->want_unit_allow_nonterminating;
 		v->on_error      = opts->on_error;
 	}
 }
@@ -168,11 +174,18 @@ static inline bool bvn_emit_both(bvnr_reader_t* r,
  * `data`/`length`/`value_unit` are left untouched.
  *
  * Fires for every numeric family (never datetime), with or without a unit, so a
- * caller can also request a pure base conversion (same unit, new base). Three
- * outcomes abort the parse: a dimensionally incompatible target is
- * error_unit_mismatch; an irrational factor or a result that does not terminate
- * in the requested base is error_unit_inexact. A value whose text will not parse
- * to a finite rational (nan/inf) is left unconverted — no violation occurred.
+ * caller can also request a pure base conversion (same unit, new base).
+ *
+ * Nothing approximate is ever delivered, and nothing is ever silently skipped:
+ * once the hook has asked for a conversion, the value either arrives converted
+ * or the parse stops. An incompatible target is error_unit_mismatch; an
+ * irrational factor is error_unit_inexact; an unusable output base is
+ * error_invalid_argument; a finite literal too extreme to build a rational from
+ * is error_value_out_of_range. A result that is exact as a rational but has no
+ * terminating expansion in the output base is error_unit_inexact too, unless the
+ * caller set want_unit_allow_nonterminating — then it arrives with conv.text
+ * NULL and conv.num/den exact. Only nan/inf pass through unconverted: they hold
+ * no finite value, so no conversion was possible or promised.
  */
 static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* d)
 {
@@ -190,6 +203,18 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	if (!v->want_unit(v->userdata, d, &want, &want_base))
 		return true;                 /* caller declined this value */
 
+	/* Settle the output base before doing any work: 0 keeps the value's own, and
+	 * anything else must be a base bvnr can actually write (2..62, 64, 85).
+	 * Substituting a fallback here would hand back digits in a base the caller
+	 * never asked for, which is the same class of silent misread as a wrong
+	 * unit — so an unusable base is an error. */
+	uint32_t wire_base = bvn_effective_base(d->value_type);
+	uint32_t obase     = want_base ? want_base : wire_base;
+	if (!bvn_rational_base_valid(obase)) {
+		v->last_error = error_invalid_argument;
+		return false;
+	}
+
 	/* d->data is not NUL-terminated; copy the exact digits out. */
 	char  small[128];
 	char* nb  = small;
@@ -201,11 +226,19 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	if (len) memcpy(nb, d->data, len);
 	nb[len] = '\0';
 
+	/* nan/inf are floats wearing a numeric token: there is no finite value to
+	 * convert, so they are handed over untouched. This is the ONLY pass-through —
+	 * every other parse failure below is reported, never swallowed. */
+	if (bvn_is_special_number_string(nb)) {
+		if (nb != small) free(nb);
+		return true;
+	}
+
 	/* Parse the value into an exact rational vn/vd. */
 	bvn_int_t* vn = bvn_int_alloc();
 	bvn_int_t* vd = bvn_int_alloc();
-	uint32_t wire_base = bvn_effective_base(d->value_type);
-	bool parsed = vn && vd;
+	bool alloc_ok = vn && vd;
+	bool parsed   = alloc_ok;
 	if (parsed) {
 		if (d->value_type.family == vt_uint || d->value_type.family == vt_sint)
 			parsed = bvn_int_from_str(vn, nb, wire_base) &&
@@ -215,9 +248,15 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 				nb, wire_base == 16u ? 16u : 10u, vn, vd);
 	}
 	if (nb != small) free(nb);
-	if (!parsed) {                       /* nan/inf/undecodable: deliver native */
+	if (!parsed) {
+		/* A finite literal the rational builder could not represent — an
+		 * exponent so large the numerator would not fit in memory, say. The
+		 * caller asked for a conversion and must not be left holding the
+		 * original unit's digits while believing they were converted. */
 		bvn_int_free(vn); bvn_int_free(vd);
-		return true;
+		v->last_error = alloc_ok ? error_value_out_of_range
+					 : error_invalid_argument;
+		return false;
 	}
 
 	/* Convert exactly into the reader-owned scratch rational. */
@@ -235,30 +274,39 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	if (!conv_ok) { v->last_error = error_unit_mismatch; return false; }
 	if (!exact)   { v->last_error = error_unit_inexact;  return false; }
 
-	/* Render in the requested base (0 → the value's own; clamp to [2,36]). */
-	uint32_t obase = want_base ? want_base : wire_base;
-	if (obase < 2u || obase > 36u) obase = 10u;
-	/* Digit count in any base >= 2 is bounded by the bit length; size for the
-	 * integer part, the fractional part, and sign/dot/NUL. */
-	uint32_t need = (uint32_t)(bvn_int_bitlen(v->conv_num) +
-				   bvn_int_bitlen(v->conv_den)) + 16u;
-	if (v->conv_text_cap < need) {
+	/* Render in the output base. bvn_rational_to_str refuses a short buffer
+	 * rather than truncating, so the buffer is sized from its own bound. */
+	size_t need = bvn_rational_str_bufsize(v->conv_num, v->conv_den, obase);
+	if (need == 0u) { v->last_error = error_invalid_argument; return false; }
+	if ((size_t)v->conv_text_cap < need) {
 		char* nt = realloc(v->conv_text, need);
 		if (!nt) { v->last_error = error_invalid_argument; return false; }
 		v->conv_text = nt;
-		v->conv_text_cap = need;
+		v->conv_text_cap = (uint32_t)need;
 	}
 	bool rexact = false;
 	int32_t tlen = bvn_rational_to_str(v->conv_num, v->conv_den, obase,
 					   v->conv_text, v->conv_text_cap, &rexact);
-	if (tlen < 0 || !rexact) {           /* non-terminating in this base */
-		v->last_error = error_unit_inexact;
+	if (tlen == BVN_RATIONAL_NONTERMINATING) {
+		/* The rational is exact; only its digit string in this base is
+		 * infinite (5/18 m/s in base 10, 1/1000 km in base 2). Rounding it
+		 * would be the silent precision loss this hook exists to prevent, so
+		 * by default the parse stops. A caller that can consume a rational
+		 * opts in and gets num/den with no text. */
+		if (!v->want_unit_allow_nonterminating) {
+			v->last_error = error_unit_inexact;
+			return false;
+		}
+		tlen = 0;
+	} else if (tlen < 0 || !rexact) {
+		/* Out of memory, or a negative value in sign-less base 64/85. */
+		v->last_error = error_invalid_argument;
 		return false;
 	}
 	d->converted    = true;
 	d->conv.unit    = want;
-	d->conv.text    = v->conv_text;
-	d->conv.length  = (uint32_t)tlen;
+	d->conv.text    = rexact ? v->conv_text : NULL;
+	d->conv.length  = rexact ? (uint32_t)tlen : 0u;
 	d->conv.base    = obase;
 	d->conv.num     = (const struct bvn_int_s*)v->conv_num;
 	d->conv.den     = (const struct bvn_int_s*)v->conv_den;

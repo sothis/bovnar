@@ -1602,7 +1602,9 @@ static void check_rat(const char *vs, uint32_t vbase, bool isint,
 		char buf[4096]; bool rexact = false;
 		int32_t len = bvn_rational_to_str(on, od, obase, buf, sizeof buf, &rexact);
 		if (expect == NULL) {
-			ASSERT_TRUE(len < 0 && !rexact, msg);
+			/* Specifically the non-terminating signal, not a generic
+			 * failure — the rational itself is still exact. */
+			ASSERT_TRUE(len == BVN_RATIONAL_NONTERMINATING && !rexact, msg);
 		} else {
 			ASSERT_TRUE(len >= 0 && rexact && strcmp(buf, expect) == 0, msg);
 		}
@@ -1663,6 +1665,170 @@ static void test_convert_rational(void)
 	}
 }
 
+/* Build the rational num/den from two decimal strings, run it through
+ * bvn_rational_to_str in `base`, and compare. `expect` NULL means the expansion
+ * must be reported non-terminating. */
+static void check_str(const char *ns, const char *ds, uint32_t base,
+		      const char *expect, const char *msg)
+{
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+	ASSERT_TRUE(n && d && bvn_int_from_str(n, ns, 10) &&
+		    bvn_int_from_str(d, ds, 10), msg);
+	char buf[512]; bool exact = false;
+	int32_t len = bvn_rational_to_str(n, d, base, buf, sizeof buf, &exact);
+	if (expect == NULL) {
+		ASSERT_TRUE(len == BVN_RATIONAL_NONTERMINATING && !exact, msg);
+	} else {
+		ASSERT_TRUE(len >= 0 && exact && strcmp(buf, expect) == 0, msg);
+		ASSERT_TRUE(len == (int32_t)strlen(expect), msg);
+		/* The advertised bound must actually be enough. */
+		ASSERT_TRUE(bvn_rational_str_bufsize(n, d, base) >= strlen(expect) + 1u,
+			    msg);
+	}
+	bvn_int_free(n); bvn_int_free(d);
+}
+
+static void test_rational_to_str_bases(void)
+{
+	printf("  rational_to_str (full base range)...\n");
+	/* Every base bvnr can write, not just 2..36. 255 = 4·62+7, 3·64+63,
+	 * 3·85+0; base 64 spells its digits A-Za-z0-9+/ and base 85 from '!'. */
+	check_str("255", "1", 36, "73",  "255 in base 36");
+	check_str("255", "1", 37, "6x",  "255 in base 37");
+	check_str("255", "1", 62, "47",  "255 in base 62");
+	check_str("255", "1", 64, "D/",  "255 in base 64");
+	check_str("255", "1", 85, "$!",  "255 in base 85");
+	/* A high base's ZERO digit is not '0' — Base64 spells it 'A', Ascii85 '!' —
+	 * and it is what both the integer part and the fraction's leading padding
+	 * must use, exactly as bvn_int_to_str renders zero. 1/4096 is 1·64⁻², so
+	 * base 64 gives "A.AB"; 1/7225 is 1·85⁻², so base 85 gives "!.!\"". */
+	check_str("1", "4096", 64, "A.AB", "1/4096 in base 64 zero-pads with 'A'");
+	check_str("1", "7225", 85, "!.!\"", "1/7225 in base 85 zero-pads with '!'");
+	check_str("1", "8", 10, "0.125", "1/8 in base 10");
+	check_str("1", "8", 2, "0.001", "1/8 in base 2");
+	check_str("-3", "8", 10, "-0.375", "negative fraction keeps its sign");
+	check_str("0", "5", 10, "0", "zero renders as the bare zero digit");
+	/* Non-terminating is reported as such, distinctly from an error. */
+	check_str("1", "3", 10, NULL, "1/3 does not terminate in base 10");
+	check_str("1", "1000", 2, NULL, "1/1000 does not terminate in base 2");
+
+	/* Bases 64/85 have no sign character, so a negative value is unrepresentable
+	 * — a hard -1, never a '-' that would read back as a digit. */
+	{
+		bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+		bvn_int_from_str(n, "-255", 10); bvn_int_from_uint64(d, 1u);
+		char buf[64]; bool exact = true;
+		ASSERT_TRUE(bvn_rational_to_str(n, d, 85, buf, sizeof buf, &exact) == -1 &&
+			    !exact, "negative value refused in sign-less base 85");
+		ASSERT_TRUE(bvn_rational_to_str(n, d, 64, buf, sizeof buf, &exact) == -1,
+			    "negative value refused in sign-less base 64");
+		/* An unsupported base is refused too (63 is not a bvnr base). */
+		ASSERT_TRUE(bvn_rational_to_str(n, d, 63, buf, sizeof buf, &exact) == -1,
+			    "base 63 refused");
+		ASSERT_TRUE(!bvn_rational_base_valid(63u) && !bvn_rational_base_valid(1u) &&
+			    bvn_rational_base_valid(62u) && bvn_rational_base_valid(64u) &&
+			    bvn_rational_base_valid(85u), "base validity predicate");
+		bvn_int_free(n); bvn_int_free(d);
+	}
+}
+
+static void test_rational_to_str_never_truncates(void)
+{
+	printf("  rational_to_str (short buffer refused)...\n");
+	/* Truncating an exact expansion yields a DIFFERENT number, so a buffer that
+	 * cannot hold the result is refused outright rather than filled part-way. */
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+	ASSERT_TRUE(n && d && bvn_int_from_str(n, "123456789", 10) &&
+		    bvn_int_from_str(d, "1000", 10), "short-buffer setup");
+	const char *full = "123456.789";
+	size_t need = bvn_rational_str_bufsize(n, d, 10);
+	ASSERT_TRUE(need >= strlen(full) + 1u, "bufsize bound covers the result");
+
+	for (size_t cap = 2; cap <= strlen(full); cap++) {
+		char small[32];
+		memset(small, '#', sizeof small);
+		bool exact = true;
+		int32_t len = bvn_rational_to_str(n, d, 10, small, cap, &exact);
+		ASSERT_TRUE(len == -1, "short buffer returns -1, never a partial length");
+		ASSERT_TRUE(!exact, "short buffer never claims exactness");
+		ASSERT_TRUE(small[0] == '#', "short buffer left unwritten");
+	}
+	{
+		char ok[32]; bool exact = false;
+		int32_t len = bvn_rational_to_str(n, d, 10, ok, strlen(full) + 1u, &exact);
+		ASSERT_TRUE(len == (int32_t)strlen(full) && exact &&
+			    strcmp(ok, full) == 0, "exact-fit buffer succeeds");
+	}
+	bvn_int_free(n); bvn_int_free(d);
+}
+
+static void test_exact_factor_table(void)
+{
+	printf("  exact rational factor table...\n");
+	value_unit_t Pa   = BVN_UNIT_NO_PREFIX(bu_pascal);
+	value_unit_t torr = BVN_UNIT_NO_PREFIX(bu_torr);
+	value_unit_t m    = BVN_UNIT_NO_PREFIX(bu_meter);
+	value_unit_t ftUS = BVN_UNIT_NO_PREFIX(bu_survey_foot);
+	value_unit_t K    = BVN_UNIT_NO_PREFIX(bu_kelvin);
+	value_unit_t Ra   = BVN_UNIT_NO_PREFIX(bu_rankine);
+	value_unit_t Hz   = BVN_UNIT_NO_PREFIX(bu_hertz);
+	value_unit_t rpm  = BVN_UNIT_NO_PREFIX(bu_rpm);
+	value_unit_t ms   = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+					       bu_second, si_none, exp_neg_linear);
+	value_unit_t kn   = BVN_UNIT_NO_PREFIX(bu_knot);
+	value_unit_t rad  = BVN_UNIT_NO_PREFIX(bu_radian);
+	value_unit_t pc   = BVN_UNIT_NO_PREFIX(bu_parsec);
+	value_unit_t Oe   = BVN_UNIT_NO_PREFIX(bu_oersted);
+	value_unit_t Am   = BVN_UNIT_COMPOUND2(bu_ampere, si_none, exp_linear,
+					       bu_meter, si_none, exp_neg_linear);
+
+	/* These factors are exact rationals with a terminating decimal only at
+	 * particular multiples — the whole point being that the ANSWER is right.
+	 * 1 Torr = 101325/760 Pa, so 760 Torr is exactly 101325 Pa; the old table
+	 * held a rounded double and produced 101324.9999999999988. */
+	check_rat("760", 10, true, torr, Pa, 10, true, "101325",
+		  "760 Torr -> exactly 101325 Pa");
+	/* 1 ftUS = 1200/3937 m exactly, so 3937 of them are exactly 1200 m. */
+	check_rat("3937", 10, true, ftUS, m, 10, true, "1200",
+		  "3937 ftUS -> exactly 1200 m");
+	/* 9 °Ra = 5 K exactly (slope 5/9, the same as °F). */
+	check_rat("9", 10, true, Ra, K, 10, true, "5", "9 degRa -> exactly 5 K");
+	/* 60 rpm = 1 Hz exactly (slope 1/60). */
+	check_rat("60", 10, true, rpm, Hz, 10, true, "1", "60 rpm -> exactly 1 Hz");
+	/* 900 kn = 463 m/s exactly (slope 463/900). */
+	check_rat("900", 10, true, kn, ms, 10, true, "463", "900 kn -> exactly 463 m/s");
+
+	/* And at a value where the true rational does NOT terminate in base 10, the
+	 * conversion must REFUSE rather than hand back a rounded 17-digit decimal.
+	 * This is the half that used to be inconsistent: °F refused while °Ra, rpm
+	 * and kn silently returned wrong "exact" answers. */
+	check_rat("1", 10, true, Ra,  K,  10, true, NULL, "1 degRa -> K nonterminating");
+	check_rat("1", 10, true, rpm, Hz, 10, true, NULL, "1 rpm -> Hz nonterminating");
+	check_rat("1", 10, true, kn,  ms, 10, true, NULL, "1 kn -> m/s nonterminating");
+
+	/* π-based factors carry no exact rational at all and must be flagged
+	 * inexact — parsec (648000/π au) and oersted (1000/4π A/m) were missing
+	 * that flag while the angle units had it. */
+	{
+		value_unit_t froms[] = { pc, Oe, BVN_UNIT_NO_PREFIX(bu_degree) };
+		value_unit_t tos[]   = { m,  Am, rad };
+		const char *msgs[]   = { "parsec flagged irrational",
+					 "oersted flagged irrational",
+					 "degree flagged irrational" };
+		for (size_t i = 0; i < sizeof froms / sizeof froms[0]; i++) {
+			bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+			bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+			bvn_int_from_uint64(vn, 1u); bvn_int_from_uint64(vd, 1u);
+			bool exact = true;
+			ASSERT_TRUE(bvn_unit_convert_rational(vn, vd, froms[i], tos[i],
+							      on, od, &exact), msgs[i]);
+			ASSERT_TRUE(!exact, msgs[i]);
+			bvn_int_free(vn); bvn_int_free(vd);
+			bvn_int_free(on); bvn_int_free(od);
+		}
+	}
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -1689,6 +1855,9 @@ int main(void)
 	test_convert_factor_prefixed_affine_to_nonaffine();
 	test_convert_value();
 	test_convert_rational();
+	test_rational_to_str_bases();
+	test_rational_to_str_never_truncates();
+	test_exact_factor_table();
 	test_unit_reduce();
 	test_unit_reduce_full_cancel_si();
 	test_unit_reduce_iec();

@@ -365,12 +365,16 @@ bvnr_converted_t conv;        /* the exact converted value (see below) */
 
 typedef struct bvnr_converted_s {
     value_unit_t     unit;    /* the target unit */
-    const char*      text;    /* exact value in `base`, NUL-terminated */
-    uint32_t         length;  /* strlen(text) */
-    uint32_t         base;    /* base text is rendered in (2..36) */
+    const char*      text;    /* exact value in `base`, NUL-terminated;
+                               * NULL if it does not terminate in `base` */
+    uint32_t         length;  /* strlen(text), 0 when text is NULL */
+    uint32_t         base;    /* base text is rendered in (2..62, 64, 85) */
     const struct bvn_int_s* num;   /* exact numerator (signed) */
     const struct bvn_int_s* den;   /* exact denominator (> 0) */
 } bvnr_converted_t;
+
+/* bvnr_read_flags_t — opt in to rational-only results, see below */
+bool want_unit_allow_nonterminating;
 ```
 
 By default the reader hands you every numeric value exactly as written and you
@@ -382,9 +386,14 @@ When `want_unit` is non-NULL, the reader calls it for every numeric value (with
 or without a unit) just before `on_verified`. Inspect `data->value_unit` (native
 unit), `data->value_type`, or `data->data` and either:
 
-- fill `*want` with the target unit and `*want_base` with the output base
-  (`2..36`, or `0` to keep the value's own base) and **return `true`**, or
+- fill `*want` with the target unit and `*want_base` with the output base and
+  **return `true`**, or
 - **return `false`** (or leave `want_unit` NULL) to receive the value untouched.
+
+`*want_base` accepts any base bvnr can write — `2..62` plus `64` (Base64) and
+`85` (Ascii85) — or `0` to keep the value's own. Anything else is an error, never
+a quiet substitution. Note that `64` and `85` have no sign character, so a
+negative result in those is rejected too.
 
 Requesting `*want` equal to the native unit with a different `*want_base`
 performs a pure **base conversion** (e.g. a hex integer delivered in decimal).
@@ -405,16 +414,33 @@ eligible: `uint`/`sint` of any width and base (including a multiprecision intege
 or a non-decimal base written as a string literal like `<uint:32,_16> "FF"`),
 `float`, `float_dec`, `float_fix`. A datetime is never offered.
 
-Three outcomes **abort the parse**:
+Once the hook has asked for a conversion, the value either arrives converted or
+the parse **stops**. Nothing approximate is delivered, and nothing is silently
+skipped:
 
 | Condition | Error |
 |-----------|-------|
 | `*want` dimensionally incompatible with the value's unit (seconds for a length; one currency for another) | `error_unit_mismatch` |
 | the true factor is irrational (a π-based angle, e.g. degree → radian) | `error_unit_inexact` |
-| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10) | `error_unit_inexact` |
+| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
+| the literal is finite but too extreme to build an exact rational from (e.g. `1e1000000`) | `error_value_out_of_range` |
+| `*want_base` is not a base bvnr writes, or the result is negative in base 64/85, or out of memory | `error_invalid_argument` |
 
-The reader never silently rounds: if it cannot deliver the value exactly it
-stops. Request a representable unit/base (or read the value natively) instead.
+Only `nan`/`inf`/`ninf` are handed over untouched (`converted == false`, no
+error): they carry no finite value, so no conversion was possible or promised.
+
+#### Exact-but-not-writable results
+
+Plenty of everyday conversions are exact as a rational yet have no finite
+positional expansion in the output base — `km/h → m/s` is `5/18`, `°F → °C` and
+`m → km` in base 2 are the same story. By default those abort with
+`error_unit_inexact` rather than round.
+
+Set `want_unit_allow_nonterminating` when your consumer can take a rational. The
+value then arrives normally with `conv.num`/`conv.den` **exact** and
+`conv.text == NULL` (`conv.length == 0`) — always NULL-check `conv.text` before
+printing it. An irrational factor still aborts even with the flag set: there is
+no exact rational to hand over in the first place.
 
 ```c
 static bool want_unit(void *ud, const bvnr_data_t *d,
@@ -433,7 +459,7 @@ static bool want_unit(void *ud, const bvnr_data_t *d,
 
 static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 {
-    if (ev == ev_data && d->converted)
+    if (ev == ev_data && d->converted && d->conv.text)
         printf("= %s m\n", d->conv.text);   /* e.g. "5 k~m" -> "5000" */
     return true;
 }
@@ -1137,6 +1163,9 @@ bool    bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
                                   bool *exact);
 int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
                             uint32_t base, char *buf, size_t bufsize, bool *exact);
+size_t  bvn_rational_str_bufsize(const bvn_int_t *num, const bvn_int_t *den,
+                                 uint32_t base);
+bool    bvn_rational_base_valid(uint32_t base);   /* static inline */
 ```
 
 `bvn_unit_convert_rational` converts the exact rational `vnum/vden` (parse a wire
@@ -1145,10 +1174,25 @@ for integers) from `from` into `to`, writing the exact reduced result to
 `out_num`/`out_den`. It returns `false` for dimensionally incompatible units, and
 sets `*exact = false` when the true factor is irrational (π-based angles) — the
 result is then only an approximation and a lossless consumer must reject it.
-`bvn_rational_to_str` renders an exact rational in any `base` (2..36), setting
-`*exact = true` and writing the full expansion when it terminates, or returning
-`-1` when it does not. Both handle any value width — a 1056-bit float, a 512-bit
-integer — with no precision loss.
+`bvn_rational_to_str` renders an exact rational in any base bvnr can write —
+`2..62` plus `64` and `85` (`bvn_rational_base_valid`) — setting `*exact = true`
+and writing the full expansion when it terminates. It distinguishes two
+failures:
+
+| Return | Meaning |
+|--------|---------|
+| `BVN_RATIONAL_NONTERMINATING` (`-2`) | the expansion is infinite in this base. The rational itself is still exact, so use `num`/`den`. |
+| `-1` | bad arguments, an unsupported base, a negative value in the sign-less bases 64/85, out of memory, or a `bufsize` too small. |
+
+The buffer is **never truncated** — half an exact expansion is simply a different
+number — so size it with `bvn_rational_str_bufsize`, which upper-bounds the
+result from the operands' bit lengths.
+
+Both handle any value width — a 1056-bit float, a 512-bit integer — with no
+precision loss. The exactness they promise is bounded by the unit table's own
+declared factors: every non-irrational unit carries an exact rational `to_si`
+factor (see `src/gendata/units.bvnr`), and `gen_units.py` refuses to generate a
+table in which a rounded decimal is passed off as exact.
 
 ---
 
@@ -1171,7 +1215,8 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 |------|-------|--------|---------|
 | `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, >8 components) |
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
-| `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ |
+| `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§7c) |
+| `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§7c) |
 
 ---
 

@@ -173,6 +173,9 @@ class BvnrConverted(ctypes.Structure):
     # Mirrors C `bvnr_converted_t`: the exact result of a lossless read-time
     # unit/base conversion. `text` is the value's full positional expansion in
     # `base` (reader-owned, callback lifetime); num/den are opaque bvn_int_t*.
+    # `text` is NULL when the exact result has no terminating expansion in `base`
+    # and the reader was opened with want_unit_allow_nonterminating — num/den are
+    # still exact there. See BvnrData.converted_str().
     _fields_ = [
         ('unit',   ValueUnit),
         ('text',   ctypes.c_char_p),
@@ -209,7 +212,13 @@ class BvnrData(ctypes.Structure):
 
     def converted_str(self) -> "str | None":
         """The exact converted value in the requested base (lossless read-time
-        unit/base conversion), or None when no conversion was applied."""
+        unit/base conversion), or None when no conversion was applied.
+
+        Also None — with `converted` True — when the exact result has no
+        terminating expansion in the requested base and the reader was opened
+        with want_unit_allow_nonterminating: there is no finite digit string to
+        return, only the exact rational in conv.num/conv.den. Check `converted`
+        rather than this method to tell the two cases apart."""
         if not self.converted or not self.conv.text:
             return None
         return self.conv.text.decode('ascii')
@@ -288,6 +297,7 @@ class BvnrReadFlags(ctypes.Structure):
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
         ('strict_version',        ctypes.c_bool),
+        ('want_unit_allow_nonterminating', ctypes.c_bool),
         ('want_unit',             WANT_UNIT_FUNC),
         ('_reserved',             ctypes.c_uint64 * 3),
     ]

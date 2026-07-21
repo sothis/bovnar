@@ -129,6 +129,57 @@ def gen_enum(units):
     return "".join(out)
 
 
+# A decimal carrying this many significant digits is the repr of a double, not a
+# deliberately written exact value — i.e. it is a ROUNDED approximation of the
+# unit's true factor. Recovering a "exact" rational from it would bake that
+# rounding error into a conversion the library advertises as lossless, so such a
+# unit must state the truth explicitly (see check_exactness below).
+ROUNDED_DECIMAL_SIGDIGITS = 16
+
+
+def _sig_digits(lit):
+    from decimal import Decimal
+    return len(Decimal(lit).normalize().as_tuple().digits)
+
+
+def check_exactness(units):
+    """Refuse to generate a conversion table that silently claims a rounded
+    double is an exact rational.
+
+    The table's whole purpose is lossless conversion, so every factor/offset must
+    be one of three things, stated in the source rather than inferred:
+
+      * a short exact decimal        — `.factor = 0.0254;` (inch, exact by
+                                       definition), recovered exactly below;
+      * a non-terminating rational   — `.factor_num`/`.factor_den` (e.g. °F's
+                                       slope 5/9), which no decimal can express;
+      * genuinely irrational         — `.exact = false` (π-based units), rejected
+                                       at conversion time.
+
+    A 16+ digit decimal with none of those markers means somebody pasted a double
+    repr and the true value was lost. That is exactly how °R (5/9) once shipped a
+    wrong "exact" answer while °F, hand-overridden, correctly refused."""
+    bad = []
+    for u in units:
+        if not bool(u.get("exact", True)):
+            continue                      # irrational: never claimed exact
+        for key in ("factor", "offset"):
+            if u.get(key + "_num") is not None and u.get(key + "_den") is not None:
+                continue                  # truth stated explicitly
+            lit = c_double_literal(u[key])
+            if _sig_digits(lit) >= ROUNDED_DECIMAL_SIGDIGITS:
+                bad.append("  %-16s .%s = %s  (%d significant digits)"
+                           % (u["name"], key, lit, _sig_digits(lit)))
+    if bad:
+        raise SystemExit(
+            "gen_units: these units declare a %d+ digit decimal — the repr of a "
+            "double, i.e. a rounded value — but claim an exact rational:\n%s\n\n"
+            "Give each one either .%s_num/.%s_den with the true rational, or "
+            ".exact = false if the true value is irrational."
+            % (ROUNDED_DECIMAL_SIGDIGITS, "\n".join(bad), "<factor|offset>",
+               "<factor|offset>"))
+
+
 def exact_rational(u, key):
     """Return the exact (numerator, denominator) rational for a unit's `factor`
     or `offset`, reduced to lowest terms.
@@ -140,7 +191,11 @@ def exact_rational(u, key):
     (Decimal keeps every written digit, incl. exponent form), so a conversion
     introduces no error beyond the library's own declared factor. Units whose
     factor is genuinely irrational (π-based angles) carry .exact = false and are
-    reported inexact at conversion time regardless of what this returns."""
+    reported inexact at conversion time regardless of what this returns.
+
+    check_exactness has already rejected the dangerous middle case — a rounded
+    double repr presented as an exact decimal — so the fallback below is only
+    ever reached for a value the source really does state exactly."""
     from fractions import Fraction
     from decimal import Decimal
     n = u.get(key + "_num")
@@ -151,6 +206,7 @@ def exact_rational(u, key):
 
 
 def gen_conv_table(units):
+    check_exactness(units)
     out = [BANNER]
     for u in units:
         nm = "bu_" + u["name"]

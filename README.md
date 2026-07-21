@@ -231,7 +231,7 @@ cmake --build build
 cmake --install build --prefix /usr/local
 ```
 
-This installs the shared and static libraries (with the versioned `libbvnr.so.1`
+This installs the shared and static libraries (with the versioned `libbvnr.so.2`
 soname chain), the `bovnar` CLI, all public headers, a **pkg-config** file, and a
 **CMake package**. Downstream projects can then use either:
 

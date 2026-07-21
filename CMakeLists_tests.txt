@@ -8,6 +8,7 @@ add_executable(bvnr_dom_test             tests/bovnar_dom_test.c)
 add_executable(bvnr_si_test              tests/bovnar_si_units_test.c)
 add_executable(bvnr_unit_ext_test        tests/bovnar_unit_ext_test.c)
 add_executable(bvnr_reader_test          tests/bovnar_reader_test.c)
+add_executable(bvnr_want_unit_test       tests/bovnar_want_unit_test.c)
 add_executable(bvnr_writer_test          tests/bovnar_writer_test.c)
 add_executable(bvnr_extended_reader_test tests/bovnar_extended_reader_test.c)
 add_executable(bvnr_utils_test           tests/bovnar_utils_test.c)
@@ -44,6 +45,9 @@ target_link_libraries(bvnr_unit_ext_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_reader_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_reader_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_want_unit_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_want_unit_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_writer_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_writer_test PRIVATE bvnr_static)

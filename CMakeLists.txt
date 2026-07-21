@@ -219,12 +219,67 @@ target_include_directories(bvnr_objects
         ${BVNR_GENERATED_DIR}
 )
 
-# Generate the *.gen.inc snippets into BVNR_GENERATED_DIR. They are build
-# artifacts (not committed), so they must be produced before the library
-# compiles: regenerate when missing, or unconditionally when BVNR_REGEN_TABLES is
-# ON. The generators parse the src/gendata/*.bvnr documents with a small built-in
-# reader (bvnr_data.py) — only Python 3 is needed, no bovnar library.
-if(BVNR_REGEN_TABLES OR NOT EXISTS ${BVNR_GENERATED_DIR}/bovnar_si_conv_table.gen.inc)
+# Generate the unit/prefix/currency tables. The *.gen.inc snippets are build
+# artifacts under BVNR_GENERATED_DIR; the *.gen.h enum bodies are committed
+# public headers under include/. Either way they must exist and be current before
+# the library compiles. The generators parse the src/gendata/*.bvnr documents
+# with a small built-in reader (bvnr_data.py) — only Python 3 is needed, no
+# bovnar library.
+set(BVNR_GEN_INPUTS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/units.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/prefixes.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/currencies.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen_units.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen_prefixes.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen_currencies.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/bvnr_data.py)
+set(BVNR_GEN_OUTPUTS
+    ${BVNR_GENERATED_DIR}/bovnar_si_conv_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_base_unit_str.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_bu_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_bu_index.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_prefix_policy.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_si_pfx_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_iec_pfx_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_si_prefix_str.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_iec_prefix_str.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_si_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_iec_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_currency_table.gen.inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_units.gen.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_si_prefix.gen.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_iec_prefix.gen.h)
+
+# Editing a gendata document or a generator must re-run CMake, so the staleness
+# check below actually gets a chance to see the change. Without this an existing
+# build directory happily compiles yesterday's tables: an edit to units.bvnr —
+# correcting a conversion factor, say — would silently never reach the library.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${BVNR_GEN_INPUTS})
+
+# Regenerate when forced, when an output is missing, or when any input is at
+# least as new as any output. IS_NEWER_THAN is true for equal timestamps too, so
+# this errs toward regenerating — cheap (three short Python runs) and always
+# correct, where erring the other way ships a stale table.
+set(_bvnr_regen ${BVNR_REGEN_TABLES})
+if(NOT _bvnr_regen)
+    foreach(_out IN LISTS BVNR_GEN_OUTPUTS)
+        if(NOT EXISTS ${_out})
+            set(_bvnr_regen ON)
+            break()
+        endif()
+        foreach(_in IN LISTS BVNR_GEN_INPUTS)
+            if(${_in} IS_NEWER_THAN ${_out})
+                set(_bvnr_regen ON)
+                break()
+            endif()
+        endforeach()
+        if(_bvnr_regen)
+            break()
+        endif()
+    endforeach()
+endif()
+
+if(_bvnr_regen)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     foreach(_gen gen_units gen_prefixes gen_currencies)
         execute_process(
@@ -289,13 +344,21 @@ endif()
 # ABI mismatch — e.g. a consumer compiled against 1.0 headers (before a public
 # by-value struct such as bvnr_data_t grew) run against a newer shared library.
 # SOVERSION is the ABI-compatibility major; bump it on any incompatible ABI change.
+#
+# 2 — the read-time unit conversion work grew bvnr_data_t (`converted` + a
+#     bvnr_converted_t carrier) and reclaimed a bvnr_read_flags_t reserved slot.
+#     Both are passed by value across the ABI, so a consumer built against the
+#     1.x headers reads them at the wrong size. Leaving this at 1 would let the
+#     loader hand such a binary the new libbvnr.so.1 and corrupt memory instead
+#     of failing cleanly, which is precisely what the versioned soname is for.
+#
 # The wheel (SKBUILD) deliberately keeps the plain unversioned filename: _ffi.py
 # loads libbvnr.so by exact name via ctypes, and wheel archives do not preserve
 # the symlink chain a versioned soname creates.
 if(NOT SKBUILD)
     set_target_properties(bvnr_shared PROPERTIES
         VERSION   ${PROJECT_VERSION}
-        SOVERSION 1)
+        SOVERSION 2)
 endif()
 
 add_executable(bovnar src/bovnar.c)

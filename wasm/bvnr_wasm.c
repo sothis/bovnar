@@ -486,11 +486,19 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 		sb_json_str_body(b, (const char *)d->frac_data, d->frac_length);
 		sb_putc(b, '"');
 	}
-	/* lossless read-time unit/base conversion (bvnr_read_flags_t.want_unit). */
-	if (d->converted && d->conv.text) {
-		sb_puts(b, ",\"converted\":\"");
-		sb_json_str_body(b, d->conv.text, d->conv.length);
-		sb_printf(b, "\",\"converted_base\":%u", d->conv.base);
+	/* lossless read-time unit/base conversion (bvnr_read_flags_t.want_unit).
+	 * conv.text is NULL when the exact result has no terminating expansion in
+	 * the output base (want_unit_allow_nonterminating): report the conversion
+	 * with a null value rather than dropping the event's conversion fields. */
+	if (d->converted) {
+		if (d->conv.text) {
+			sb_puts(b, ",\"converted\":\"");
+			sb_json_str_body(b, d->conv.text, d->conv.length);
+			sb_putc(b, '"');
+		} else {
+			sb_puts(b, ",\"converted\":null");
+		}
+		sb_printf(b, ",\"converted_base\":%u", d->conv.base);
 		char ub[160];
 		if (bvn_unit_to_string(d->conv.unit, ub, sizeof ub) >= 0 && ub[0]) {
 			sb_puts(b, ",\"converted_unit\":");

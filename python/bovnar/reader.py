@@ -70,6 +70,9 @@ class EventPayload:
         # Lossless read-time unit/base conversion (see Reader want_unit). When
         # True, converted_text is the EXACT value in the requested unit and base
         # (converted_base); `raw` keeps the original text. See BvnrData.conv.
+        # converted_text is None even with converted True when the result has no
+        # terminating expansion in that base and the reader allowed it through
+        # (want_unit_allow_nonterminating).
         self.converted      = converted
         self.converted_text = converted_text
         self.converted_base = converted_base
@@ -120,7 +123,8 @@ class Reader:
                      max_file_size: int,
                      continue_on_error: bool,
                      strict_version: bool = False,
-                     want_unit=None) -> tuple:
+                     want_unit=None,
+                     want_unit_allow_nonterminating: bool = False) -> tuple:
 
         flags    = BvnrReadFlags()
         cb_refs  = []
@@ -151,6 +155,7 @@ class Reader:
 
         flags.continue_on_error = continue_on_error
         flags.strict_version    = strict_version
+        flags.want_unit_allow_nonterminating = want_unit_allow_nonterminating
         return flags, cb_refs
 
     @staticmethod
@@ -198,6 +203,10 @@ class Reader:
                                        unit_size)
                         # reading a c_char_p yields a fresh bytes copy; assigning
                         # it back lets ctypes keep it alive past the callback.
+                        # None when the result does not terminate in the output
+                        # base (want_unit_allow_nonterminating) — the exact value
+                        # then lives only in the C-side conv.num/conv.den, which
+                        # are opaque here and deliberately not snapshotted.
                         snap.conv.text = src.conv.text
                     data = snap
                 result = py_fn(ev, data)
@@ -219,9 +228,13 @@ class Reader:
         #   None                       -> decline (value delivered untouched)
         #   ValueUnit                  -> convert to that unit, keep native base
         #   (ValueUnit, base:int)      -> convert to that unit and output base
-        #                                 (base 0 keeps native; 2..36 otherwise)
-        # The conversion is lossless; an incompatible unit becomes
-        # error_unit_mismatch and an inexact one error_unit_inexact (parse abort).
+        #                                 (0 keeps native; otherwise any base bvnr
+        #                                  writes: 2..62, 64 or 85)
+        # The conversion is lossless. An incompatible unit becomes
+        # error_unit_mismatch, an irrational factor error_unit_inexact, an
+        # unusable base error_invalid_argument — each aborts the parse. So does a
+        # result that does not terminate in the output base, unless the reader was
+        # given want_unit_allow_nonterminating=True.
         state = {'exc': None}
         unit_size = ctypes.sizeof(ValueUnit)
 
@@ -272,7 +285,8 @@ class Reader:
                  max_file_size: int = 0,
                  continue_on_error: bool = False,
                  strict_version: bool = False,
-                 want_unit: Callable | None = None) -> None:
+                 want_unit: Callable | None = None,
+                 want_unit_allow_nonterminating: bool = False) -> None:
 
         self._check_open()
         if isinstance(data, memoryview):
@@ -282,7 +296,7 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, want_unit
+            strict_version, want_unit, want_unit_allow_nonterminating
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
@@ -318,7 +332,8 @@ class Reader:
                 max_file_size: int = 0,
                 continue_on_error: bool = False,
                 strict_version: bool = False,
-                want_unit: Callable | None = None) -> None:
+                want_unit: Callable | None = None,
+                want_unit_allow_nonterminating: bool = False) -> None:
 
         self._check_open()
         if not isinstance(fd, int) or fd < 0:
@@ -326,7 +341,7 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, want_unit
+            strict_version, want_unit, want_unit_allow_nonterminating
         )
 
         src = BvnrSource()

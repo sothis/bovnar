@@ -70,11 +70,39 @@ BVN_API bool bvn_unit_convert_value(double value, value_unit_t from,
 BVN_API bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
                                 value_unit_t from, value_unit_t to,
                                 bvn_int_t *out_num, bvn_int_t *out_den, bool *exact);
-/* Render an exact rational num/den as a positional string in `base` (2..36).
- * Writes the full exact expansion and sets *exact=true when the fraction
- * terminates in `base`; otherwise sets *exact=false and returns -1 (a
- * non-terminating expansion cannot be delivered losslessly). Returns the string
- * length (excluding NUL) on success. */
+/* Returned by bvn_rational_to_str when num/den has no terminating positional
+ * expansion in the requested base (1/3 in base 10, 1/1000 in base 2). The
+ * rational itself is still exact — only its digit string is infinite — so this
+ * is kept distinct from the -1 hard failures. */
+#define BVN_RATIONAL_NONTERMINATING (-2)
+/* True for a base bvnr can write and bvn_rational_to_str can render: 2..62 plus
+ * the two byte-encoding bases 64 (Base64) and 85 (Ascii85). Mirrors the range
+ * bvn_int_from_str/bvn_int_to_str accept. */
+static inline bool bvn_rational_base_valid(uint32_t base)
+{
+	return (base >= 2u && base <= 62u) || base == 64u || base == 85u;
+}
+/* Upper bound (including sign, radix point and NUL) on the buffer
+ * bvn_rational_to_str needs for num/den in `base`. The integer part takes at
+ * most bitlen(num) bits' worth of digits; the fraction terminates after at most
+ * bitlen(den) digits, since each digit strips a factor >= 2 from the
+ * denominator. */
+BVN_API size_t bvn_rational_str_bufsize(const bvn_int_t *num, const bvn_int_t *den,
+                                uint32_t base);
+/* Render an exact rational num/den as a positional string in `base` — 2..62,
+ * 64, or 85 (bvn_rational_base_valid). Writes the full exact expansion and sets
+ * *exact=true when the fraction terminates in `base`, returning the string
+ * length (excluding NUL).
+ *
+ * Two distinct failures, both leaving *exact=false and `buf` unwritten:
+ *   BVN_RATIONAL_NONTERMINATING (-2) — the expansion is infinite in this base.
+ *       Not a defect in the value: num/den remain exact and a caller that can
+ *       consume a rational should use them.
+ *   -1 — bad arguments, an unsupported base, a negative value in the sign-less
+ *       bases 64/85, allocation failure, or a `bufsize` too small to hold the
+ *       result. The buffer is NEVER truncated: a short buffer is refused, since
+ *       a truncated digit string is a WRONG number under an exact contract.
+ *       Size it with bvn_rational_str_bufsize. */
 BVN_API int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
                                 uint32_t base, char *buf, size_t bufsize, bool *exact);
 BVN_API bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);

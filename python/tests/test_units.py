@@ -1087,3 +1087,170 @@ class TestReaderWantUnit:
                           on_verified=on_event, want_unit=want)
         assert seen == ['1234.567890123456789012345678901234567890'
                         '123456789012345678901234567891']    # exact x1000
+
+    @needs_lib
+    def test_high_output_bases(self):
+        # Any base bvnr can write is a valid output base, not just 2..36:
+        # 255 = 4*62+7 = "47", = 3*64+63 = "D/", = 3*85+0 = "$!".
+        for base, expect in ((36, '73'), (62, '47'), (64, 'D/'), (85, '$!')):
+            seen = []
+
+            def want(d, _b=base):
+                return (make_unit_dimensionless(), _b)
+
+            def on_event(ev, d):
+                if ev == Event.DATA and d is not None and d.converted:
+                    seen.append((d.converted_str(), d.conv.base))
+                return True
+
+            Reader().read_mem(b'.n = 255;', on_verified=on_event, want_unit=want)
+            assert seen == [(expect, base)]
+
+    @needs_lib
+    def test_native_high_base_is_kept(self):
+        # base 0 means "keep the value's own" — including a base above 36, which
+        # used to be silently rewritten to 10.
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.METER), 0)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append((d.converted_str(), d.conv.base))
+            return True
+
+        Reader().read_mem(b'.x = <uint:64,_62> "zz" m;',
+                          on_verified=on_event, want_unit=want)
+        assert seen == [('zz', 62)]
+
+    @needs_lib
+    def test_unusable_output_base_is_error(self):
+        # 63 is not a base bvnr writes; substituting a default would hand back
+        # digits in a base the caller never asked for.
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return (make_unit_dimensionless(), 63)
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem(b'.n = 255;', on_verified=lambda e, d: True,
+                              want_unit=want)
+        assert ei.value.code == ErrorCode.INVALID_ARGUMENT
+
+    @needs_lib
+    def test_unrepresentable_value_is_error(self):
+        # A finite literal too extreme to build an exact rational from must not
+        # be silently passed through in its ORIGINAL unit.
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return make_unit_si(BaseUnit.METER)
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem(b'.d = <float:64> 1e1000000 k~m;',
+                              on_verified=lambda e, d: True, want_unit=want)
+        assert ei.value.code == ErrorCode.VALUE_OUT_OF_RANGE
+
+    @needs_lib
+    def test_special_floats_pass_through(self):
+        # nan/inf carry no finite value: nothing to convert, and no error.
+        for lit in (b'nan', b'inf', b'ninf'):
+            flags = []
+
+            def want(d):
+                return make_unit_si(BaseUnit.METER)
+
+            def on_event(ev, d):
+                if ev == Event.DATA and d is not None and d.type != 0:
+                    flags.append(bool(d.converted))
+                return True
+
+            Reader().read_mem(b'.d = <float:64,k~m> ' + lit + b';',
+                              on_verified=on_event, want_unit=want)
+            assert flags and not any(flags)
+
+    @needs_lib
+    def test_nonterminating_refused_by_default(self):
+        # 1 m -> mile is 125/201168: exact as a rational, no finite decimal.
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return (make_unit_si(BaseUnit.MILE), 10)
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem(b'.d = 1 m;', on_verified=lambda e, d: True,
+                              want_unit=want)
+        assert ei.value.code == ErrorCode.UNIT_INEXACT
+
+    @needs_lib
+    def test_nonterminating_opt_in_delivers_rational(self):
+        # With want_unit_allow_nonterminating the value arrives converted, with
+        # no text (the exact value lives in the C-side conv.num/conv.den).
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.MILE), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append((d.converted_str(), d.conv.base))
+            return True
+
+        Reader().read_mem(b'.d = 1 m;', on_verified=on_event, want_unit=want,
+                          want_unit_allow_nonterminating=True)
+        assert seen == [(None, 10)]
+
+    @needs_lib
+    def test_irrational_still_refused_with_opt_in(self):
+        # The opt-in relaxes only the RENDERING limit; a π-based factor has no
+        # exact rational to hand over at all.
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return make_unit_si(BaseUnit.RADIAN)
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem('.a = 90 °;'.encode('utf-8'),
+                              on_verified=lambda e, d: True, want_unit=want,
+                              want_unit_allow_nonterminating=True)
+        assert ei.value.code == ErrorCode.UNIT_INEXACT
+
+    @needs_lib
+    def test_corrected_exact_factors(self):
+        # Units whose true factor is a non-terminating rational used to ship a
+        # 17-digit double repr as their "exact" value and silently produced wrong
+        # answers flagged exact. 1 Torr = 101325/760 Pa, so 760 Torr is exactly
+        # 101325 Pa — it used to render 101324.9999999999988.
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.PASCAL), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append(d.converted_str())
+            return True
+
+        Reader().read_mem('.p = 760 Torr;'.encode('utf-8'),
+                          on_verified=on_event, want_unit=want)
+        assert seen == ['101325']
+
+    @needs_lib
+    def test_nonterminating_factor_now_refuses(self):
+        # 1 rpm = 1/60 Hz has no finite decimal, so it must refuse rather than
+        # return the old rounded 0.016666666666666666 flagged exact.
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return (make_unit_si(BaseUnit.HERTZ), 10)
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem(b'.f = 1 rpm;', on_verified=lambda e, d: True,
+                              want_unit=want)
+        assert ei.value.code == ErrorCode.UNIT_INEXACT

@@ -299,14 +299,22 @@ typedef struct value_unit_s {
  * reader-owned storage valid only for the duration of the callback — copy `text`
  * (or num/den, via bvn_int_copy) if you need to retain it. `text`/num/den never
  * lose precision, whatever the value's width or base; a conversion that could not
- * be exact (irrational factor, or non-terminating in `base`) never reaches you —
- * it aborts the parse with error_unit_inexact. */
+ * be exact (an irrational factor) never reaches you — it aborts the parse with
+ * error_unit_inexact.
+ *
+ * `text` is NULL (and `length` 0) in exactly one case: the exact result has no
+ * terminating expansion in `base` — 5/18 m/s in base 10, 1/1000 km in base 2 —
+ * AND the reader was told to deliver it anyway via
+ * bvnr_read_flags_t.want_unit_allow_nonterminating. num/den are still exact
+ * there; without that flag such a value aborts the parse instead. Always check
+ * `text` for NULL before printing it. */
 struct bvn_int_s;   /* bvn_int.h — arbitrary-precision integer */
 typedef struct bvnr_converted_s {
 	value_unit_t		unit;     /* the target unit */
-	const char*		text;     /* exact value in `base`, NUL-terminated */
-	uint32_t		length;   /* strlen(text) */
-	uint32_t		base;     /* base text is rendered in (2..36) */
+	const char*		text;     /* exact value in `base`, NUL-terminated;
+					   * NULL if it does not terminate in `base` */
+	uint32_t		length;   /* strlen(text), 0 when text is NULL */
+	uint32_t		base;     /* base text is rendered in (2..62, 64, 85) */
 	const struct bvn_int_s*	num;      /* exact numerator (signed) */
 	const struct bvn_int_s*	den;      /* exact denominator (> 0) */
 } bvnr_converted_t;
@@ -339,9 +347,11 @@ typedef struct bvnr_data_s {
 	 * The conversion is EXACT regardless of the value's width or base: a 1056-bit
 	 * float or a 512-bit integer converts with no loss beyond the library's own
 	 * declared factor. A conversion that cannot be represented exactly — an
-	 * irrational factor (π-based angle) or a result with no terminating expansion
-	 * in the requested base — is never delivered here; it aborts the parse with
-	 * error_unit_inexact. */
+	 * irrational factor (π-based angle) — is never delivered here; it aborts the
+	 * parse with error_unit_inexact. A result with no terminating expansion in the
+	 * requested base likewise aborts, unless
+	 * bvnr_read_flags_t.want_unit_allow_nonterminating is set, in which case it
+	 * arrives with conv.text == NULL and the exact conv.num/conv.den. */
 	bool			converted;
 	bvnr_converted_t	conv;
 } bvnr_data_t;
@@ -374,14 +384,28 @@ typedef struct bvnr_read_flags_s {
 	 * bvnr_reader_get_declared_version() — but not enforced. Production
 	 * consumers that must not silently misread a future document should set it. */
 	bool		strict_version;
+	/* Relaxes the want_unit hook's one unavoidably common refusal. Plenty of
+	 * everyday conversions are exact as a rational but have no finite positional
+	 * expansion in the output base — km/h to m/s is 5/18, m to km in base 2 is
+	 * 1/1000 — and by default those abort the parse with error_unit_inexact
+	 * rather than round. Set this when your consumer can take the rational: the
+	 * value is then delivered with data->conv.num/den exact and data->conv.text
+	 * NULL. A genuinely irrational factor (π-based angle) still aborts, because
+	 * there no exact rational exists to hand over. Leave false (the zero-init
+	 * default) to keep the strict all-or-nothing behaviour. */
+	bool		want_unit_allow_nonterminating;
 	/* Optional read-time LOSSLESS unit/base conversion hook. When non-NULL, the
 	 * reader calls it for every numeric value (with or without a unit), just
 	 * before the on_verified callback. To request a conversion, fill *want with
-	 * the target unit and *want_base with the output base (2..36, or 0 to keep
-	 * the value's own base) and return true; return false (or leave this NULL) to
-	 * receive the value untouched. Inspect data->value_unit (native unit),
-	 * data->value_type, and data->data to decide; track the current key via
-	 * userdata if the choice is key-specific.
+	 * the target unit and *want_base with the output base and return true; return
+	 * false (or leave this NULL) to receive the value untouched. Inspect
+	 * data->value_unit (native unit), data->value_type, and data->data to decide;
+	 * track the current key via userdata if the choice is key-specific.
+	 *
+	 * *want_base accepts any base bvnr can write — 2..62 plus 64 (Base64) and 85
+	 * (Ascii85) — or 0 to keep the value's own. Anything else is rejected with
+	 * error_invalid_argument rather than quietly substituted; note that 64 and 85
+	 * have no sign character, so a negative result in those is also rejected.
 	 *
 	 * The conversion is performed in exact arbitrary-precision arithmetic, so it
 	 * is lossless for any value width and base (a 1056-bit float, a 512-bit
@@ -390,10 +414,17 @@ typedef struct bvnr_read_flags_s {
 	 * data->data keeps the original text. Requesting `want` == the native unit
 	 * with a different base performs a pure base conversion.
 	 *
-	 * Two failures abort the parse: a `want` dimensionally incompatible with the
-	 * value's own unit is error_unit_mismatch; a conversion that cannot be exact
-	 * (irrational π-based factor, or a result that does not terminate in the
-	 * requested base) is error_unit_inexact. Never consulted for datetime. */
+	 * The parse aborts rather than deliver anything approximate:
+	 *   error_unit_mismatch     — `want` is dimensionally incompatible.
+	 *   error_unit_inexact      — the true factor is irrational (π-based angle),
+	 *                             or the result does not terminate in the output
+	 *                             base and want_unit_allow_nonterminating is off.
+	 *   error_value_out_of_range— the literal is finite but too extreme to build
+	 *                             an exact rational from (e.g. 1e1000000). The
+	 *                             value is NOT silently passed through unconverted.
+	 *   error_invalid_argument  — unusable *want_base, or out of memory.
+	 * Only nan/inf are delivered untouched (converted == false, no error): they
+	 * carry no finite value to convert. Never consulted for datetime. */
 	bool		(*want_unit)
 			(void* userdata, const bvnr_data_t* data,
 			 value_unit_t* want, uint32_t* want_base);

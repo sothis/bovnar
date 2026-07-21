@@ -536,20 +536,35 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 	return ok;
 }
 /*
- * Render an exact rational num/den as a positional string in `base` (2..36).
- * When the fraction terminates in that base the full exact expansion is written
- * and *exact is set true; when it does not (e.g. 1/3 in base 10) nothing usable
- * is produced, *exact is set false, and -1 is returned — the caller treats that
- * as error_unit_inexact. Returns the string length (excluding NUL) on success.
+ * Render an exact rational num/den as a positional string in `base` (2..62, 64,
+ * 85). When the fraction terminates in that base the full exact expansion is
+ * written and *exact is set true. When it does not (e.g. 1/3 in base 10) nothing
+ * is written, *exact is set false, and BVN_RATIONAL_NONTERMINATING is returned —
+ * the rational stays exact, so the reader can still hand num/den to a caller
+ * that asked for them. -1 is reserved for genuine failures, including a buffer
+ * too small: this function never truncates, because half of an exact expansion
+ * is simply a different (wrong) number.
  */
 static bool bvn_int_is_one(const bvn_int_t *n)
 {
 	return n && !n->negative && n->nused == 1u && n->limbs && n->limbs[0] == 1u;
 }
+size_t bvn_rational_str_bufsize(const bvn_int_t *num, const bvn_int_t *den,
+				uint32_t base)
+{
+	if (!num || !den || !bvn_rational_base_valid(base))
+		return 0u;
+	int nb = bvn_int_bitlen(num), db = bvn_int_bitlen(den);
+	/* Integer digits are bounded by the numerator's width; fraction digits by
+	 * the denominator's, since every emitted digit divides out a factor >= 2.
+	 * +3 covers the sign, the radix point and the NUL. */
+	return bvn_int_str_bufsize((uint32_t)(nb > 0 ? nb : 1), base) +
+	       (size_t)(db > 0 ? db : 1) + 3u;
+}
 int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 			    uint32_t base, char *buf, size_t bufsize, bool *exact)
 {
-	if (!num || !den || !buf || bufsize < 2 || base < 2u || base > 36u)
+	if (!num || !den || !buf || bufsize < 2 || !bvn_rational_base_valid(base))
 		return -1;
 	if (exact) *exact = false;
 	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
@@ -558,6 +573,7 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 	bvn_int_t *dd = bvn_int_alloc(), *qq = bvn_int_alloc(), *rr = bvn_int_alloc();
 	bvn_int_t *bk = bvn_int_alloc(), *m = bvn_int_alloc(), *fi = bvn_int_alloc();
 	char *ibuf = NULL, *fbuf = NULL;
+	char zdig[4];
 	int32_t ret = -1;
 	bool neg = false, terminates = true;
 	int32_t k = 0;
@@ -567,6 +583,15 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 		goto done;
 	neg = n->negative;
 	n->negative = false;
+	/* Bases 64 and 85 spend '+'/'-' on digits, so they have no sign character
+	 * and cannot represent a negative value at all (same rule bvn_int_to_str
+	 * enforces). Refuse rather than emit a '-' that would read back as a digit. */
+	if (neg && (base == 64u || base == 85u)) goto done;
+	/* The zero digit is not '0' outside the alphanumeric bases (Base64 spells it
+	 * 'A', Ascii85 '!'), and it is needed both to pad leading fraction zeros and
+	 * to trim trailing ones. Get it from the canonical renderer. */
+	bvn_int_zero(q);
+	if (bvn_int_to_str(q, zdig, sizeof zdig, base) != 1) goto done;
 	if (!bvn_int_from_uint64(bb, base)) goto done;
 	if (!bvn_int_divrem(q, r, n, d)) goto done;             /* integer part */
 	/* Strip primes shared with `base` from the (reduced) denominator; if what
@@ -578,7 +603,13 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 		if (!bvn_int_divrem(qq, rr, dd, g) || !bvn_int_copy(dd, qq)) goto done;
 		if (++k > 1000000) goto done;                       /* safety bound */
 	}
-	if (!terminates) goto done;                             /* -> error_unit_inexact */
+	if (!terminates) {
+		/* Not an error in itself: the rational IS exact, only its positional
+		 * expansion in this base is infinite. Distinguished from a hard failure
+		 * so a caller can still take num/den. */
+		ret = BVN_RATIONAL_NONTERMINATING;
+		goto done;
+	}
 	/* Size and render the integer part and (if any) the fractional integer. */
 	int qbits = bvn_int_bitlen(q);
 	size_t ibsz = bvn_int_str_bufsize((uint32_t)(qbits > 0 ? qbits : 1), base);
@@ -586,7 +617,7 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 	if (!ibuf) goto done;
 	int32_t ilen = bvn_int_to_str(q, ibuf, ibsz, base);
 	if (ilen < 0) goto done;
-	int32_t flen = 0;
+	int32_t flen = 0, fend = 0, pad = 0;
 	if (!bvn_int_is_zero(r)) {
 		/* fractional integer = r * (base^k / d), exactly k base-digits */
 		if (!bvn_int_from_uint64(bk, 1u)) goto done;
@@ -599,22 +630,26 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 		if (!fbuf) goto done;
 		flen = bvn_int_to_str(fi, fbuf, fbsz, base);
 		if (flen < 0) goto done;
+		fend = flen;
+		while (fend > 0 && fbuf[fend - 1] == zdig[0]) fend--;   /* trim */
+		pad  = k - flen;                                       /* leading zeros */
 	}
-	/* Assemble: [-]<int>[.<zero-pad><frac, trailing zeros trimmed>] */
+	/* Assemble: [-]<int>[.<zero-pad><frac, trailing zeros trimmed>]. The exact
+	 * length is known now, so a buffer that cannot hold it is refused outright —
+	 * truncating here would hand back a WRONG number under an exact-value
+	 * contract. Size with bvn_rational_str_bufsize. */
 	{
+		size_t need = (size_t)(neg ? 1 : 0) + (size_t)ilen +
+			      (bvn_int_is_zero(r) ? 0u : (size_t)(1 + pad + fend)) + 1u;
+		if (need > bufsize) goto done;
 		size_t pos = 0;
-		if (neg && pos < bufsize - 1) buf[pos++] = '-';
-		for (int32_t e = 0; e < ilen && pos < bufsize - 1; e++)
+		if (neg) buf[pos++] = '-';
+		for (int32_t e = 0; e < ilen; e++)
 			buf[pos++] = ibuf[e];
 		if (!bvn_int_is_zero(r)) {
-			int32_t fend = flen;
-			while (fend > 0 && fbuf[fend - 1] == '0') fend--;   /* trim */
-			int32_t pad = k - flen;                             /* leading zeros */
-			if (pos < bufsize - 1) buf[pos++] = '.';
-			for (int32_t e = 0; e < pad && pos < bufsize - 1; e++)
-				buf[pos++] = '0';
-			for (int32_t e = 0; e < fend && pos < bufsize - 1; e++)
-				buf[pos++] = fbuf[e];
+			buf[pos++] = '.';
+			for (int32_t e = 0; e < pad; e++)  buf[pos++] = zdig[0];
+			for (int32_t e = 0; e < fend; e++) buf[pos++] = fbuf[e];
 		}
 		buf[pos] = '\0';
 		if (exact) *exact = true;

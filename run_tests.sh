@@ -92,6 +92,7 @@ _bold "=== Unit tests ==="
 
 run_test "bvnr_dom_test"                  "$TESTS_DIR/bvnr_dom_test"
 run_test "bvnr_reader_test"               "$TESTS_DIR/bvnr_reader_test"
+run_test "bvnr_want_unit_test"            "$TESTS_DIR/bvnr_want_unit_test"
 run_test "bvnr_extended_reader_test"      "$TESTS_DIR/bvnr_extended_reader_test"
 run_test "bvnr_writer_test"               "$TESTS_DIR/bvnr_writer_test"
 run_test "bvnr_si_test"                   "$TESTS_DIR/bvnr_si_test"

@@ -599,6 +599,7 @@
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;
+    .exact   = false;       # π-based: 1 pc = 648000/π au is irrational
     .prefix  = default;
     .aliases = ["parsecs", "parsec", "pc"];
   },
@@ -759,6 +760,10 @@
     .dims    = { .length = -1; .mass = 1; .time = -2; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 Torr = 101325/760 Pa (non-terminating in base 10); the
+    # stored decimal is only the rounded double.
+    .factor_num = <sint:64> 101325;
+    .factor_den = <sint:64>    760;
     .prefix  = default;
     .aliases = ["Torr", "torr"];
   },
@@ -766,10 +771,14 @@
     .id      = <uint:16>  67;
     .name    = "psi";
     .symbol  = "psi";
-    .factor  = 6894.757293168361;
+    .factor  = 6894.757293168362;
     .dims    = { .length = -1; .mass = 1; .time = -2; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: lbf/in² = (0.45359237·9.80665)/0.0254² Pa. The denominator
+    # carries 127², so the decimal does not terminate — the stored one rounds.
+    .factor_num = <sint:64> 8896443230521;
+    .factor_den = <sint:64>    1290320000;
     .prefix  = default;
     .aliases = ["psi"];
   },
@@ -821,10 +830,14 @@
     .id      = <uint:16>  72;
     .name    = "horsepower";
     .symbol  = "hp";
-    .factor  = 745.69987158227;
+    .factor  = 745.6998715822702;
     .dims    = { .length = 2; .mass = 1; .time = -3; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 550 ft·lbf/s = 550·0.3048·0.45359237·9.80665 W, exactly
+    # 745.69987158227022 — the stored decimal was truncated two digits early.
+    .factor_num = <sint:64> 37284993579113511;
+    .factor_den = <sint:64>    50000000000000;
     .prefix  = default;
     .aliases = ["horsepower", "hp"];
   },
@@ -869,6 +882,9 @@
     .dims    = { .length = 1; .time = -1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 kn = 1852 m / 3600 s = 463/900 m/s (non-terminating).
+    .factor_num = <sint:64> 463;
+    .factor_den = <sint:64> 900;
     .prefix  = default;
     .aliases = ["knots", "knot", "kn"];
   },
@@ -1081,6 +1097,7 @@
     .dims    = { .length = -1; .current = 1; };
     .affine  = false;
     .offset  = 0.0;
+    .exact   = false;       # π-based: 1 Oe = 1000/(4π) A/m is irrational
     .prefix  = default;
     .aliases = ["oersteds", "oersted", "Oe"];
   },
@@ -1180,6 +1197,9 @@
     .dims    = { .temperature = 1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 °Ra = 5/9 K — the same non-terminating slope as °F.
+    .factor_num = <sint:64> 5;
+    .factor_den = <sint:64> 9;
     .prefix  = default;
     .aliases = ["degreesRa", "degreeRa", "rankine", "degrRa", "degRa", "°Ra", "Ra"];
   },
@@ -1290,6 +1310,9 @@
     .dims    = { .time = -1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 rpm = 1/60 Hz (non-terminating in base 10).
+    .factor_num = <sint:64>  1;
+    .factor_den = <sint:64> 60;
     .prefix  = default;
     .aliases = ["rpm"];
   },
@@ -1456,6 +1479,9 @@
     .dims    = { .length = -1; .mass = 1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 den = 1 g / 9000 m = 1/9000000 kg/m (non-terminating).
+    .factor_num = <sint:64>       1;
+    .factor_den = <sint:64> 9000000;
     .prefix  = default;
     .aliases = ["deniers", "denier", "den"];
   },
@@ -1555,6 +1581,9 @@
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 prln = 0.313853 m / 144 (non-terminating in base 10).
+    .factor_num = <sint:64>    313853;
+    .factor_den = <sint:64> 144000000;
     .prefix  = german;
     .aliases = ["prussian_line", "linie", "prln"];
   },
@@ -1566,6 +1595,9 @@
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 prz = 0.313853 m / 12 (non-terminating in base 10).
+    .factor_num = <sint:64>   313853;
+    .factor_den = <sint:64> 12000000;
     .prefix  = german;
     .aliases = ["prussian_zoll", "zoll", "prz"];
   },
@@ -1654,6 +1686,9 @@
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: 1 ftUS = 1200/3937 m by definition (non-terminating).
+    .factor_num = <sint:64> 1200;
+    .factor_den = <sint:64> 3937;
     .prefix  = default;
     .aliases = ["survey_foot", "ftUS"];
   },
@@ -1731,6 +1766,10 @@
     .dims    = { .temperature = 1; };
     .affine  = true;
     .offset  = 373.15;
+    # Exact rational: slope −2/3 K per °De (non-terminating). The 373.15 offset
+    # is already an exact decimal and needs no override.
+    .factor_num = <sint:64> -2;
+    .factor_den = <sint:64>  3;
     .prefix  = default;
     .aliases = ["degreesDe", "degreeDe", "delisle", "degrDe", "degDe", "°De"];
   },
@@ -1742,6 +1781,10 @@
     .dims    = { .temperature = 1; };
     .affine  = true;
     .offset  = 273.15;
+    # Exact rational: slope 100/33 K per °N (non-terminating). The 273.15 offset
+    # is already an exact decimal and needs no override.
+    .factor_num = <sint:64> 100;
+    .factor_den = <sint:64>  33;
     .prefix  = default;
     .aliases = ["newton_temperature", "degreesN", "degreeN", "degrN", "degN", "°N"];
   },
@@ -1764,6 +1807,12 @@
     .dims    = { .temperature = 1; };
     .affine  = true;
     .offset  = 258.8642857142857;
+    # Exact rationals: slope 40/21, offset 273.15 − 7.5·40/21 = 36241/140. Both
+    # are non-terminating; the stored decimals only approximate them.
+    .factor_num = <sint:64>    40;
+    .factor_den = <sint:64>    21;
+    .offset_num = <sint:64> 36241;
+    .offset_den = <sint:64>   140;
     .prefix  = default;
     .aliases = ["degreesRo", "degreeRo", "degrRo", "degRo", "romer", "°Ro"];
   },

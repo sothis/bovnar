@@ -387,7 +387,10 @@ bool bvn_int_copy(bvn_int_t *dst, const bvn_int_t *src)
 {
 	if (dst == src) return true;
 	if (!bigint_ensure_cap(dst, src->nused)) return false;
-	memcpy(dst->limbs, src->limbs, (size_t)src->nused * sizeof(uint32_t));
+	/* A zero bignum has nused == 0 and may still have limbs == NULL; memcpy is
+	 * undefined with a null pointer even for a zero length. */
+	if (src->nused)
+		memcpy(dst->limbs, src->limbs, (size_t)src->nused * sizeof(uint32_t));
 	dst->nused    = src->nused;
 	dst->negative = src->negative;
 	return true;

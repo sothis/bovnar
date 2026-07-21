@@ -11,7 +11,9 @@ it in lockstep. The highest spec a build understands is reported by
 
 Reference-implementation only; the on-the-wire format is unchanged. **The ABI
 breaks**: `bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see
-below) — rebuild consumers against the new headers.
+below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
+(`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
+reading the grown by-value structs at the wrong size.
 
 ### Added
 
@@ -24,28 +26,82 @@ below) — rebuild consumers against the new headers.
   (`bvnr_converted_t`: target unit, exact positional `text` in the requested
   base, and the reduced rational `num`/`den`); `data`/`value_unit` keep the
   original. Requesting the native unit with a different base is a pure base
-  conversion. A dimensionally incompatible target is `error_unit_mismatch`; an
-  irrational factor (π-based angle) or a result that does not terminate in the
-  requested base is the new `error_unit_inexact` — the reader never silently
-  rounds. See read/write API §7c. The Python `Reader` `want_unit=` callback
+  conversion. Once the hook asks for a conversion the value either arrives
+  converted or the parse stops — nothing approximate is delivered and nothing is
+  silently skipped. A dimensionally incompatible target is `error_unit_mismatch`;
+  an irrational factor (π-based angle) is the new `error_unit_inexact`; a finite
+  literal too extreme to build a rational from is `error_value_out_of_range`; an
+  unusable output base is `error_invalid_argument`. Only `nan`/`inf` pass through
+  unconverted. See read/write API §7c. The Python `Reader` `want_unit=` callback
   returns a unit or `(unit, base)`, and `BvnrData.converted_str()` /
   `EventPayload.converted_text` expose the exact string; the WASM event JSON
   gains `"converted"`, `"converted_base"`, `"converted_unit"`.
+- **`want_unit_allow_nonterminating`** (`bvnr_read_flags_t`, Python
+  `Reader.read_mem`/`read_fd`) — many everyday conversions are exact as a
+  rational but have no finite positional expansion in the output base (`km/h →
+  m/s` is 5/18, `°F → °C`, `m → km` in base 2). By default those abort with
+  `error_unit_inexact` rather than round; set this flag and they arrive with
+  `conv.num`/`conv.den` exact and `conv.text == NULL`. An irrational factor still
+  aborts — there is no exact rational to hand over.
 - **`bvn_unit_convert_rational` / `bvn_rational_to_str`** (`bovnar_si_units.h`) —
   exact unit conversion of an arbitrary-precision rational, and rendering of a
-  rational in any base (2..36) with terminating-expansion detection. The engine
-  behind `want_unit`. `bvn_float_parse_rational` (`bvn_float.h`) parses a wire
-  literal into an exact rational.
+  rational in any base bvnr can write — `2..62` plus `64` and `85`
+  (`bvn_rational_base_valid`) — with terminating-expansion detection. The engine
+  behind `want_unit`. `bvn_rational_to_str` never truncates: a buffer too small
+  is `-1`, a non-terminating expansion is the distinct
+  `BVN_RATIONAL_NONTERMINATING`, and `bvn_rational_str_bufsize` gives the bound.
+  `bvn_float_parse_rational` (`bvn_float.h`) parses a wire literal into an exact
+  rational.
 - **Exact rational factor table** — every non-irrational unit now carries an
-  exact rational `to_si` factor (recovered from its declared decimal, with
-  explicit overrides for non-terminating rationals like °F = 5/9). π-based angle
-  units (degree, arcminute, arcsecond, grad, revolution) are flagged inexact.
+  exact rational `to_si` factor, stated in `src/gendata/units.bvnr` rather than
+  recovered from a rounded decimal. `gen_units.py` now refuses to generate a
+  table in which a 16+ digit decimal (i.e. the repr of a double) is passed off as
+  exact: such a unit must supply `.factor_num`/`.factor_den` or `.exact = false`.
 - **`bvn_int_mul` / `bvn_int_add` / `bvn_int_gcd`** (`bvn_int.h`) —
   arbitrary-precision multiply, add, and gcd, underpinning exact-rational
   arithmetic.
 - **`bvn_unit_convert_value`** (`bovnar_si_units.h`) — the `double`, convenience
   counterpart (lossy for wide values): multiplicative + affine conversion in one
   call. The C equivalent of Python `convert_value` (which delegates to it).
+
+### Fixed
+
+- **Unit factors that were rounded doubles masquerading as exact rationals.**
+  Sixteen units whose true SI factor is a non-terminating rational carried a
+  17-significant-digit decimal, from which the table recovered a wrong "exact"
+  value: `760 Torr` converted to `101324.9999999999988 Pa` instead of exactly
+  `101325`, `1 rpm` to `0.016666666666666666 Hz` instead of `1/60`. They now
+  carry their true rationals (torr `101325/760`, rankine `5/9`, rpm `1/60`, knot
+  `463/900`, survey_foot `1200/3937`, delisle `−2/3`, newton_temp `100/33`, romer
+  `40/21` + offset `36241/140`, denier `1/9000000`, the Prussian units, psi,
+  horsepower), so an exact conversion is either right or refused — previously
+  `°F`, alone in having been hand-overridden, refused while `°R` with the same
+  5/9 slope returned a wrong answer flagged exact. `parsec` (648000/π au) and
+  `oersted` (1000/4π A/m) are now flagged irrational alongside the angle units.
+  The `double` factors for `psi` and `horsepower` were also truncated short of
+  their correctly-rounded values and are corrected, which slightly changes
+  `bvn_unit_to_si_factor` / `bvn_unit_convert_value` results for those two.
+- **Reader reuse leaked the conversion scratch.** `bvnr_open_read_source` — which
+  documents that one reader serves many documents — re-armed the validator with a
+  `memset` that orphaned the `want_unit` bignums and text buffer. It now releases
+  them first.
+- **`bvn_rational_to_str` truncated silently.** A buffer too small produced a
+  partial digit string reported as exact — a different number under an exact
+  contract. It now refuses with `-1`, matching `bvn_int_to_str`.
+- **Output bases above 36 were silently rewritten to 10.** `want_base` accepted
+  only `2..36` even though bvnr writes `2..62`, `64` and `85`; a base-62 value
+  asking to keep its own base got decimal instead. The full range now works, and
+  an unusable base is `error_invalid_argument` rather than a substitution.
+- **A value the rational builder could not represent was silently left
+  unconverted.** `1e1000000` came back with `converted == false` and no error, so
+  a consumer that trusted the hook read the original unit's digits — the exact
+  misread `want_unit` exists to prevent. It is now `error_value_out_of_range`.
+- **Editing a gendata document did not regenerate its table.** CMake only ran the
+  generators when an output was missing or `BVNR_REGEN_TABLES` was set, so in an
+  existing build directory a change to `src/gendata/*.bvnr` — correcting a
+  conversion factor, adding a unit — silently never reached the library. The
+  generator inputs are now `CMAKE_CONFIGURE_DEPENDS` and the tables are
+  regenerated whenever an input is newer than an output.
 
 ## [1.1.0] - 2026-06-21
 

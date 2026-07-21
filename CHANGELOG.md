@@ -123,6 +123,15 @@ reading the grown by-value structs at the wrong size.
   `error_value_out_of_range` instead of rounding, and a unit whose exponent
   overflowed the representable range is refused outright. `nan`/`inf` carry no
   finite value and pass through unscaled.
+  The reduction applies to the unit wherever it appears: on the reader-driven
+  path (pretty-print, canonicalise) the annotation's unit arrives as a token
+  carrying the text the reader saw, and that text goes through the same reducer,
+  so the annotation and the value never disagree and repeated canonicalisation is
+  idempotent. The rescaled value is re-validated against its declared type — the
+  writer's own validation runs before the rescale — so a count that stops being
+  an integer (20 ms is not a whole number of seconds) or that no longer fits its
+  width (20 ZiB in bytes, `uint:128` max scaled by 1000) is refused rather than
+  emitted as a document the library's own reader rejects.
 - **`BVN_UNIT_REDUCE` collapsed a data rate onto a frequency.** The named-SI
   collapse matched on the SI dimension vector alone, which is all-zero for every
   dimensionless kind, so `B/s` reduced to `Hz` — a unit the library itself calls

@@ -878,6 +878,22 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 		 * in base 16, say — cannot be expressed. Refuse; rounding here would be
 		 * the silent loss this whole path exists to prevent. */
 		if (l < 0 || !rexact) goto done;
+		/* The rescaled value has to satisfy the SAME type it was declared with.
+		 * bvn_writer_validate_event already approved the ORIGINAL text and runs
+		 * before this, so without re-checking here the writer happily emitted
+		 * "<uint:32,s> 0.02" (20 ms reduced to seconds is not an integer) and
+		 * values orders of magnitude past the declared width — reporting success
+		 * for a document its own reader rejects. Refusing is the only honest
+		 * answer: the caller asked for a unit the value cannot be expressed in. */
+		if (d->value_type.family == vt_uint || d->value_type.family == vt_sint) {
+			for (int32_t i = 0; i < l; i++)
+				if (out[i] == '.') goto done;      /* no longer an integer */
+			uint32_t width = bvn_effective_width(d->value_type);
+			bool fits = (d->value_type.family == vt_uint)
+				  ? bvn_validate_uint_range(out, width, base)
+				  : bvn_validate_sint_range(out, width, base);
+			if (!fits) goto done;
+		}
 		*text = out;
 		*len  = l;
 		out   = NULL;
@@ -1025,7 +1041,38 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			if (!bvn_ser_push_byte(s, use_colon ? ':' : ','))
 				return false;
 			if (d->data && d->length) {
-				if (!bvn_ser_push(s, d->data, d->length))
+				/* Apply unit_flags here too. On the reader-driven path
+				 * (pretty-print, canonicalise) this token carries the unit
+				 * TEXT the reader saw, and pushing it verbatim left the
+				 * annotation unreduced while bvn_ser_reduced_number scaled
+				 * the value against the reduced unit — writing "5 km" as
+				 * "5000 km", the very confusion the rescale exists to
+				 * prevent, and compounding on every further pass. The
+				 * annotation and the inline-unit path must agree, so both
+				 * go through bvn_unit_to_string_ex. Text that will not
+				 * parse back (a unit this build does not know) is passed
+				 * through unchanged rather than dropped. */
+				const uint8_t *ut = (const uint8_t *)d->data;
+				char           ubuf[512];
+				const char    *emit = (const char *)d->data;
+				uint32_t       elen = d->length;
+				if (s->unit_flags != BVN_UNIT_FLAGS_NONE &&
+				    d->length < sizeof ubuf) {
+					char tmp[512];
+					memcpy(tmp, ut, d->length);
+					tmp[d->length] = '\0';
+					bool pok = false;
+					value_unit_t pu =
+						bvn_parse_unit((const uint8_t *)tmp, &pok);
+					if (pok) {
+						int32_t un = bvn_unit_to_string_ex(
+							pu, ubuf, sizeof ubuf, s->unit_flags);
+						if (un < 0) return false;
+						emit = ubuf;
+						elen = (uint32_t)un;
+					}
+				}
+				if (!bvn_ser_push(s, emit, elen))
 					return false;
 			}
 			s->emitted_type_param = true;

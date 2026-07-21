@@ -1544,11 +1544,35 @@ static void test_unit_reduce_rescales_the_value(void)
 	 * not the double scale. */
 	value_type_spec_t u128 = { .family = vt_uint, .width = 128 };
 	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
-				  u128, "340282366920938463463374607431768211455"),
+				  u128, "340282366920938463463374607431768211"),
 		      0, "a 128-bit value writes");
 	ASSERT_TRUE(strcmp(out,
-		".d=340282366920938463463374607431768211455000 m") == 0,
+		".d=340282366920938463463374607431768211000 m") == 0,
 		    "the rescale is exact for a value far wider than a double");
+
+	/* ...but the rescaled value still has to fit the type it was declared with.
+	 * The rescale happens after the writer validated the ORIGINAL text, so
+	 * without re-checking it emitted values orders of magnitude past the declared
+	 * width and reported success for a document its own reader rejects. */
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
+				  u128, "340282366920938463463374607431768211455"),
+		      (int)error_value_out_of_range,
+		      "uint128 max scaled by 1000 no longer fits and is refused");
+	value_type_spec_t u32 = { .family = vt_uint, .width = 32 };
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_IEC(bu_byte, iec_zebi),
+				  u32, "20"),
+		      (int)error_value_out_of_range,
+		      "20 ZiB in bytes overflows uint32 and is refused");
+	/* An integer count that stops being an integer is refused too: 20 ms is not
+	 * a whole number of seconds. */
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_second, si_milli),
+				  u32, "20"),
+		      (int)error_value_out_of_range,
+		      "20 ms is not an integral number of seconds and is refused");
+	/* The same value under a float type is fine. */
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_second, si_milli),
+				  f64, "20"), 0, "20 ms as a float writes");
+	ASSERT_TRUE(strcmp(out, ".d=0.02 s") == 0, "...as 0.02 s");
 
 	/* nan/inf carry no finite value, so no scale applies. */
 	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
@@ -1594,9 +1618,71 @@ static void test_unit_reduce_rescales_the_value(void)
 	}
 }
 
+
+/*
+ * The annotation's unit must be reduced too. On the reader-driven path
+ * (pretty-print, canonicalise) the unit arrives as a TOKEN carrying the text the
+ * reader saw, and pushing it verbatim left the annotation unreduced while the
+ * value was scaled against the reduced unit — writing "5 km" as "5000 km", and
+ * multiplying again on every further pass.
+ */
+static bool reduce_canon_ev(void *u, bvnr_event_t e, bvnr_data_t *d)
+{
+	return bvnr_write_event((bvnr_writer_t *)u, e, d);
+}
+
+static int reduce_canon(const char *in, char *out, size_t cap)
+{
+	memset(out, 0, cap);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, cap);
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return -1;
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	wf.unit_flags = BVN_UNIT_REDUCE;
+	if (!bvnr_open_write_sink(w, &sink, false, &wf)) {
+		bvnr_writer_destroy(w); return -1;
+	}
+	bvnr_reader_t *r = bvnr_reader_create();
+	bvnr_read_flags_t rf;
+	memset(&rf, 0, sizeof rf);
+	rf.userdata = w;
+	rf.on_verified = reduce_canon_ev;
+	bvnr_open_read_mem(r, in, (uint32_t)strlen(in), NULL, 0, &rf);
+	bool ok = bvnr_read(r) && bvnr_write_finish(w);
+	bvnr_reader_destroy(r);
+	bvnr_writer_destroy(w);
+	return ok ? 0 : -1;
+}
+
+static void test_unit_reduce_annotation_matches_the_value(void)
+{
+	char p1[512], p2[512], p3[512];
+	/* annotation-carried unit */
+	ASSERT_EQ_INT(reduce_canon(".d = <float:64,k~m> 5;", p1, sizeof p1), 0,
+		      "canonicalising with REDUCE succeeds");
+	ASSERT_TRUE(strcmp(p1, ".d=<float:64,m>5000;") == 0,
+		    "the annotation is reduced along with the value");
+	/* and it must be stable: a second pass changed the value again before */
+	ASSERT_EQ_INT(reduce_canon(p1, p2, sizeof p2), 0, "second pass succeeds");
+	ASSERT_TRUE(strcmp(p1, p2) == 0, "REDUCE canonicalisation is idempotent");
+	ASSERT_EQ_INT(reduce_canon(p2, p3, sizeof p3), 0, "third pass succeeds");
+	ASSERT_TRUE(strcmp(p2, p3) == 0, "...and stays idempotent");
+
+	/* the inline-unit spelling must agree with the annotation one */
+	ASSERT_EQ_INT(reduce_canon(".d = <float:64> 5 k~m;", p1, sizeof p1), 0,
+		      "inline-unit canonicalisation succeeds");
+	ASSERT_TRUE(strcmp(p1, ".d=<float:64>5000 m;") == 0,
+		    "an inline unit reduces and scales the same way");
+	ASSERT_EQ_INT(reduce_canon(p1, p2, sizeof p2), 0, "second pass succeeds");
+	ASSERT_TRUE(strcmp(p1, p2) == 0, "...and is idempotent too");
+}
+
 int main(void)
 {
 	test_unit_reduce_rescales_the_value();
+	test_unit_reduce_annotation_matches_the_value();
 	printf("Running bovnar_writer_test regression suite...\n");
 
 	test_write_version_directive();

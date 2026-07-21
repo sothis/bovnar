@@ -304,39 +304,74 @@ if (BVNR_FUZZ_TEST)
                 -fsanitize=address,undefined>)
     endif()
 
-    set(_bvnr_writer_seed "${CMAKE_BINARY_DIR}/bvnr_fuzz_writer_seed_42.bin")
-    file(WRITE "${_bvnr_writer_seed}" "X")
+    # TWO seeds, deliberately. The original seed was the single byte "X", which
+    # sounds useless -- a mutator given one byte only reaches one-byte
+    # neighbourhoods, so the harness never saw an annotation, a unit, an array or
+    # a struct. But measuring beats assuming: an injected 8-byte overrun in
+    # push_mem is caught from the "X" seed at 1000 iterations and NOT caught from
+    # the rich document even at 20 000, because the two drive completely
+    # different output-length distributions and the bug needs a near-full sink
+    # buffer. Keep both rather than trading one blind spot for another.
+    set(_bvnr_writer_seed_min "${CMAKE_BINARY_DIR}/bvnr_fuzz_writer_seed_min.bin")
+    file(WRITE "${_bvnr_writer_seed_min}" "X")
 
-    # The standalone writer harness now mutates the seed across many
-    # iterations.  Iteration counts here are deliberately conservative:
-    # higher counts (eg. --iterations 1000) reliably trip the
-    # __builtin_trap() invariants inside harness_random_events /
-    # harness_structured — those traps mark known-suspect writer states
-    # that need investigation before deep fuzzing can run unattended.
-    # To reproduce locally:
-    #   ./tests/bvnr_fuzz_writer_test --iterations 1000 --seed 42 SEED
+    set(_bvnr_writer_seed "${CMAKE_BINARY_DIR}/bvnr_fuzz_writer_seed.bvnr")
+    file(WRITE "${_bvnr_writer_seed}"
+"#!bovnar 1.1\n"
+".name = \"seed\";\n"
+".port = <uint:16> 443;\n"
+".ratio = <sint:32> -7;\n"
+".speed = <float:64,k~m/h> 88.5;\n"
+".hex = <uint:32,_16> \"deadbeef\";\n"
+".price = <float_dec:64,$USD> 19.99;\n"
+".when = <datetime:64,tai> 2016-12-31T23:59:60.5Z;\n"
+".flag = on;\n"
+".sym = ok;\n"
+".ref = &.name;\n"
+".grid = [1, 2, 3]/[4, 5, 6];\n"
+".rec = {.a = 1; .b = \"two\";};\n"
+".hole = ;\n"
+".esc = \"tab\\there caf\\u{e9}\";\n")
+
+    # Iteration counts. These used to be 25/30/25 with timeouts of 60/600/300 s,
+    # i.e. 0.01 s of actual work each -- and the comment justifying the cap
+    # claimed --iterations 1000 "reliably trips the __builtin_trap() invariants".
+    # That is stale: 200 000 iterations pass cleanly on seeds 42, 7 and 999, and
+    # take 1.7 s. The cap bought nothing and cost the writer its only oracle --
+    # an injected heap overflow in push_mem survived all three tiers and was
+    # caught at 1000. Each tier also uses its own seed now; all three shared 42,
+    # so the deep and thorough runs were re-testing the smoke run's inputs.
     add_test(NAME bvnr_fuzz_writer
-        COMMAND bvnr_fuzz_writer_test --iterations 25 --seed 42
-                "${_bvnr_writer_seed}")
+        COMMAND bvnr_fuzz_writer_test --iterations 20000 --seed 42
+                "${_bvnr_writer_seed_min}")
     set_tests_properties(bvnr_fuzz_writer PROPERTIES
         TIMEOUT 60
         LABELS  "fuzz;fuzz_smoke"
         PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
 
     add_test(NAME bvnr_fuzz_writer_deep
-        COMMAND bvnr_fuzz_writer_test --iterations 30 --seed 42
-                "${_bvnr_writer_seed}")
+        COMMAND bvnr_fuzz_writer_test --iterations 200000 --seed 999
+                "${_bvnr_writer_seed_min}")
     set_tests_properties(bvnr_fuzz_writer_deep PROPERTIES
         TIMEOUT 600
         LABELS  "fuzz_deep"
         PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
 
     add_test(NAME bvnr_fuzz_writer_thorough
-        COMMAND bvnr_fuzz_writer_test --iterations 25 --seed 7
-                "${_bvnr_writer_seed}")
+        COMMAND bvnr_fuzz_writer_test --iterations 100000 --seed 7
+                "${_bvnr_writer_seed_min}")
     set_tests_properties(bvnr_fuzz_writer_thorough PROPERTIES
         TIMEOUT 300
         LABELS  "fuzz_thorough"
+        PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
+
+    # The document seed, over its own distribution.
+    add_test(NAME bvnr_fuzz_writer_doc
+        COMMAND bvnr_fuzz_writer_test --iterations 100000 --seed 4242
+                "${_bvnr_writer_seed}")
+    set_tests_properties(bvnr_fuzz_writer_doc PROPERTIES
+        TIMEOUT 300
+        LABELS  "fuzz;fuzz_thorough"
         PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
 
 endif()

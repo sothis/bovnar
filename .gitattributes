@@ -1,5 +1,15 @@
-# Bovnar documents — UTF-8 text, LF line endings.
-*.bvnr text eol=lf
+# Bovnar documents are BINARY-CAPABLE: an octet stream carries arbitrary bytes
+# inline, which is one of the format's headline features. Line-ending
+# normalisation is therefore unsound for them as a class -- and it had already
+# done damage: `*.bvnr text eol=lf` ate two 0x0D bytes out of
+# examples/octet_streams.bvnr (one of them inside the PNG magic 89 50 4E 47 0D 0A
+# 1A 0A), so the committed blob was 226483 bytes against 226485 in the worktree
+# and every clone, tarball and release archive shipped a file that fails
+# `bovnar validate` with octet_stream_out_of_sync.
+#
+# -text: never convert, in either direction. Documents are written LF by
+# convention; a tool that needs to enforce that should do it, not the filter.
+*.bvnr -text
 
 # GitHub Linguist: classify and (once the language is accepted upstream)
 # highlight .bvnr files as "Bovnar". Until github/linguist ships the language,

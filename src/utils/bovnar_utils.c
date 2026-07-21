@@ -1480,6 +1480,13 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 		}
 		if (!dim_match)
 			continue;
+		/* The SI dimension vector alone is not enough: it is [0,...,0] for every
+		 * dimensionless quantity kind, so "B/s" matched "Hz" on dimension and
+		 * collapsed onto it — turning a data rate into a frequency, a unit the
+		 * library itself would call incompatible with the one it replaced. Same
+		 * for rad/s against Hz. Require the kind vectors to agree too. */
+		if (!bvni_kinds_match(u, probe))
+			continue;
 		/*
 		 * Only an (almost-)exact power of ten maps onto a single SI
 		 * prefix. Find that integer power by matching net_si against the

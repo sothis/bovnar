@@ -85,15 +85,33 @@ reading the grown by-value structs at the wrong size.
   checked before the rational is built, and `bvn_rational_to_str` refuses on
   length before generating any digits (new `BVN_RATIONAL_TOO_LONG`, distinct from
   the -1 failures). Legitimate conversions are unaffected.
-- **Logarithmic units are their own quantity kind.** `dB` and `Np` both carried
-  factor 1.0 and no dimension, so they compared as compatible and `1 dB`
-  converted to `1 Np` — wrong by a factor of 8.7, silently. They are logarithms
-  of a ratio, not linear quantities (20 dB is a ratio of 100, not twice 10 dB),
-  and `dB` is ambiguous on its own: 1 Np is 8.686 dB for a power quantity and
-  4.343 dB for a field quantity, which a document does not record. They are now
-  tracked by net exponent alongside `bit`/`byte`, so a conversion between them,
-  or to a plain number, is `error_unit_mismatch`. Each still converts to itself
-  and across its own prefixes.
+- **Angles are their own quantity kind, and so are logarithmic units.** Units
+  that carry no SI dimension are now tracked by net exponent per *kind*, the way
+  `bit`/`byte` already were, and two units must agree on every kind to be
+  compatible.
+  - **Angle** is one *shared* kind — `degree → radian` is a conversion people
+    legitimately want, so giving each angle unit its own kind would have broken
+    it. What the kind stops is an angle drifting into a plain count: `rev/min` is
+    an angular rate and `rpm` a cycle rate, and with a revolution defined as 2π
+    radians the two used to "convert" into each other off by exactly 2π. Same for
+    `rad/s` against `Hz`, which are angular frequency and frequency. Steradian
+    carries weight 2, because a steradian *is* rad², so `sr ↔ rad²` keeps
+    working. `°→rad`, `rev→°` and `rpm→Hz` are unchanged.
+  - **`dB` and `Np`** are separate kinds. Both carried factor 1.0 and no
+    dimension, so they compared as compatible and `1 dB` converted to `1 Np` —
+    wrong by a factor of 8.7, silently. They are logarithms of a ratio, not
+    linear quantities (20 dB is a ratio of 100, not twice 10 dB), and `dB` is
+    ambiguous on its own: 1 Np is 8.686 dB for a power quantity and 4.343 dB for
+    a field quantity, which a document does not record. Each still converts to
+    itself and across its own prefixes.
+  - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
+    ratios, and converting 1 % to 0.01 is exactly right.
+- **`BVN_UNIT_REDUCE` collapsed a data rate onto a frequency.** The named-SI
+  collapse matched on the SI dimension vector alone, which is all-zero for every
+  dimensionless kind, so `B/s` reduced to `Hz` — a unit the library itself calls
+  incompatible with the one it replaced. It now requires the kind vectors to
+  agree too. (The other `BVN_UNIT_REDUCE` defect, dropping the prefix scale, is
+  still open: `5 km` is written as `5 m`.)
 - **A terminating expansion was refused in large bases.** The fractional digits
   were produced via `base^k`, an intermediate that overflows the big-int ceiling
   long before the answer does, so `1e-6000` rendered in base 40 and hard-failed in

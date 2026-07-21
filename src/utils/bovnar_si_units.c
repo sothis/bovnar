@@ -285,43 +285,98 @@ bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
 	}
 	return true;
 }
-static bool info_net_exponent(value_unit_t u, value_base_unit_t info_base,
-                              int32_t *out)
+/*
+ * Quantity kinds: units that carry NO SI dimension yet are not interchangeable
+ * with a pure number. The SI dimension vector cannot separate them — they are
+ * all [0,0,0,0,0,0,0] — so each kind is tracked by net exponent, exactly as a
+ * dimension would be, and two units are only compatible if their kind vectors
+ * agree as well.
+ *
+ *   information  — bit and byte are separate kinds: a data rate is not a
+ *                  frequency, and this format does not silently trade 8 bits
+ *                  for a byte either.
+ *   angle        — one SHARED kind, because degree -> radian is a conversion
+ *                  people legitimately want; only the factor is irrational.
+ *                  Giving each angle unit its own kind would break that. What
+ *                  the kind does stop is an angle drifting into a plain count:
+ *                  rev/min is an angular rate and rpm is a cycle rate, and with
+ *                  a revolution defined as 2*pi radians they differ by exactly
+ *                  that factor -- so the two used to "convert" into each other
+ *                  2*pi wrong. Same for rad/s against Hz, which are angular
+ *                  frequency and frequency.
+ *                  Steradian carries weight 2 because a steradian IS rad^2, so
+ *                  sr <-> rad^2 keeps working.
+ *   logarithmic  — Np and dB are separate kinds. They are logarithms of a
+ *                  ratio, not linear quantities (20 dB is a ratio of 100, not
+ *                  twice 10 dB), so no factor can relate them; dB is ambiguous
+ *                  on its own besides, being 8.686 or 4.343 per neper depending
+ *                  on whether the quantity is a power or a field.
+ *
+ * Percent, per-mille, ppm and friends are deliberately NOT here: those are pure
+ * ratios and converting 1 % to 0.01 is exactly right.
+ */
+typedef enum {
+	BVNI_KIND_INFO_BIT = 0,
+	BVNI_KIND_INFO_BYTE,
+	BVNI_KIND_ANGLE,
+	BVNI_KIND_LOG_NEPER,
+	BVNI_KIND_LOG_DECIBEL,
+	BVNI_KIND_COUNT
+} bvni_quantity_kind_t;
+typedef struct {
+	value_base_unit_t    base;
+	bvni_quantity_kind_t kind;
+	int32_t              weight;   /* how many of the kind one unit is worth */
+} bvni_kind_entry_t;
+static const bvni_kind_entry_t bvni_kind_table[] = {
+	{ bu_bit,        BVNI_KIND_INFO_BIT,    1 },
+	{ bu_byte,       BVNI_KIND_INFO_BYTE,   1 },
+	{ bu_radian,     BVNI_KIND_ANGLE,       1 },
+	{ bu_degree,     BVNI_KIND_ANGLE,       1 },
+	{ bu_arcminute,  BVNI_KIND_ANGLE,       1 },
+	{ bu_arcsecond,  BVNI_KIND_ANGLE,       1 },
+	{ bu_grad,       BVNI_KIND_ANGLE,       1 },
+	{ bu_revolution, BVNI_KIND_ANGLE,       1 },
+	{ bu_steradian,  BVNI_KIND_ANGLE,       2 },
+	{ bu_neper,      BVNI_KIND_LOG_NEPER,   1 },
+	{ bu_decibel,    BVNI_KIND_LOG_DECIBEL, 1 },
+};
+#define BVNI_KIND_TABLE_COUNT \
+	((uint32_t)(sizeof(bvni_kind_table) / sizeof(bvni_kind_table[0])))
+/* Net exponent of every quantity kind in `u`. False if a component's exponent
+ * is unusable, which makes the unit incomparable rather than equal-to-anything. */
+static bool bvni_kind_exponents(value_unit_t u, int32_t out[BVNI_KIND_COUNT])
 {
-	int32_t sum = 0;
+	for (uint32_t k = 0; k < BVNI_KIND_COUNT; k++)
+		out[k] = 0;
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
-		if (u.components[i].base == info_base) {
-			if (u.components[i].exponent == exp_invalid)
-				return false;
-			sum += bvn_exponent_to_int(u.components[i].exponent);
+		int32_t e = bvn_exponent_to_int(u.components[i].exponent);
+		if (e == 0)
+			return false;
+		for (uint32_t t = 0; t < BVNI_KIND_TABLE_COUNT; t++) {
+			if (bvni_kind_table[t].base == u.components[i].base) {
+				out[bvni_kind_table[t].kind] +=
+					bvni_kind_table[t].weight * e;
+				break;
+			}
 		}
 	}
-	*out = sum;
 	return true;
 }
-/*
- * Units that carry NO SI dimension yet are not interchangeable with a pure
- * number, nor with each other. The SI dimension vector cannot separate them —
- * they are all [0,0,0,0,0,0,0] — so each is tracked as its own quantity kind by
- * net exponent, exactly as a dimension would be.
- *
- *   bit, byte  — information. "B/s" is a data rate, not a frequency.
- *   Np, dB     — logarithmic ratios. These are not linear quantities at all:
- *                20 dB is a ratio of 100, not twice 10 dB, so the multiply-by-a-
- *                factor model the rest of this file is built on cannot express
- *                a conversion between them. Worse, dB is ambiguous by itself —
- *                1 Np is 8.686 dB for a power quantity but 4.343 dB for a field
- *                quantity, and nothing in a document says which is meant. With
- *                both carrying factor 1.0 and no dimension they used to compare
- *                as compatible, so "1 dB" converted to "1 Np": a number wrong by
- *                a factor of 8.7, delivered silently. Refusing is the honest
- *                answer, and it is the one this library gives everywhere else.
- */
-static const value_base_unit_t bvni_quantity_kinds[] = {
-	bu_bit, bu_byte, bu_neper, bu_decibel,
-};
-#define BVNI_QUANTITY_KIND_COUNT \
-	((uint32_t)(sizeof(bvni_quantity_kinds) / sizeof(bvni_quantity_kinds[0])))
+/* True when both units carry the same amount of every quantity kind. Exposed
+ * within the library so the formatter's named-SI collapse can apply the same
+ * test — collapsing "B/s" onto "Hz" passes the dimension check but produces a
+ * unit that is not compatible with what it replaced. */
+bool bvni_kinds_match(value_unit_t a, value_unit_t b)
+{
+	int32_t ka[BVNI_KIND_COUNT], kb[BVNI_KIND_COUNT];
+	if (!bvni_kind_exponents(a, ka) || !bvni_kind_exponents(b, kb))
+		return false;
+	for (uint32_t k = 0; k < BVNI_KIND_COUNT; k++)
+		if (ka[k] != kb[k])
+			return false;
+	return true;
+}
 /*
  * Two units are inter-convertible iff they have the same SI dimension vector AND
  * the same net exponent for every quantity kind above. bvn_unit_convert_factor
@@ -330,14 +385,8 @@ static const value_base_unit_t bvni_quantity_kinds[] = {
  */
 bool bvn_units_compatible(value_unit_t a, value_unit_t b)
 {
-	for (uint32_t k = 0; k < BVNI_QUANTITY_KIND_COUNT; k++) {
-		int32_t ea, eb;
-		if (!info_net_exponent(a, bvni_quantity_kinds[k], &ea) ||
-		    !info_net_exponent(b, bvni_quantity_kinds[k], &eb))
-			return false;
-		if (ea != eb)
-			return false;
-	}
+	if (!bvni_kinds_match(a, b))
+		return false;
 	int32_t da[bvn_si_dim_count], db[bvn_si_dim_count];
 	bool ok_a = bvn_unit_dimension_vector(a, da);
 	bool ok_b = bvn_unit_dimension_vector(b, db);

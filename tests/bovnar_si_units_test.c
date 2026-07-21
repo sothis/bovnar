@@ -2193,6 +2193,89 @@ static void test_wide_denominator_renders_in_every_base(void)
 	bvn_int_free(n); bvn_int_free(d); bvn_int_free(t);
 }
 
+
+static value_unit_t bvni_test_u2(value_base_unit_t a, unit_exponent_t ea,
+				 value_base_unit_t b, unit_exponent_t eb)
+{
+	value_unit_t u = { .num_components = 2, .components = {
+		{ .base = a, .exponent = ea, .prefix = {prefix_si, .id.si = si_none} },
+		{ .base = b, .exponent = eb, .prefix = {prefix_si, .id.si = si_none} } } };
+	return u;
+}
+
+static void test_angle_is_its_own_quantity_kind(void)
+{
+	printf("  angles are their own quantity kind...\n");
+	value_unit_t rad = BVN_UNIT_NO_PREFIX(bu_radian);
+	value_unit_t deg = BVN_UNIT_NO_PREFIX(bu_degree);
+	value_unit_t rev = BVN_UNIT_NO_PREFIX(bu_revolution);
+	value_unit_t sr  = BVN_UNIT_NO_PREFIX(bu_steradian);
+	value_unit_t rad2 = rad; rad2.components[0].exponent = exp_square;
+	value_unit_t rpm = BVN_UNIT_NO_PREFIX(bu_rpm);
+	value_unit_t Hz  = BVN_UNIT_NO_PREFIX(bu_hertz);
+	value_unit_t rev_min = bvni_test_u2(bu_revolution, exp_linear,
+					    bu_minute, exp_neg_linear);
+	value_unit_t rad_s   = bvni_test_u2(bu_radian, exp_linear,
+					    bu_second, exp_neg_linear);
+	double out = -1.0;
+
+	/* An angular rate is not a cycle rate. rpm counts cycles per minute while a
+	 * revolution is 2*pi radians, so these used to convert into each other 2*pi
+	 * wrong — silently, because SI calls both dimensionless. */
+	ASSERT_TRUE(!bvn_units_compatible(rev_min, rpm),
+		    "rev/min and rpm are not interconvertible");
+	ASSERT_TRUE(!bvn_unit_convert_value(1.0, rev_min, rpm, &out),
+		    "1 rev/min -> rpm is refused rather than answered with 1/(2pi)");
+	ASSERT_TRUE(!bvn_units_compatible(rad_s, Hz),
+		    "angular frequency is not frequency");
+	ASSERT_TRUE(!bvn_units_compatible(rad, BVN_UNIT_NO_PREFIX(bu_none)),
+		    "an angle is not a bare count");
+
+	/* The conversions people actually want must survive — this is why angle is
+	 * ONE shared kind rather than one kind per unit, as bit and byte are. */
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, rev, rad, &out) &&
+		    out > 6.283 && out < 6.284, "1 rev -> 2pi rad");
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, rev, deg, &out) &&
+		    out > 359.99 && out < 360.01, "1 rev -> 360 deg");
+	ASSERT_TRUE(bvn_unit_convert_value(180.0, deg, rad, &out) &&
+		    out > 3.1415 && out < 3.1416, "180 deg -> pi rad");
+	/* A steradian IS rad^2, hence weight 2 rather than a kind of its own. */
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, sr, rad2, &out) && out == 1.0,
+		    "sr -> rad^2 still converts");
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, rad2, sr, &out) && out == 1.0,
+		    "...and back");
+	/* And nothing outside the kinds moved. */
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, rpm, Hz, &out) &&
+		    out > 0.01666 && out < 0.01667, "rpm -> Hz is unaffected");
+}
+
+static void test_named_si_collapse_respects_kinds(void)
+{
+	printf("  the named-SI collapse does not cross a quantity kind...\n");
+	/* bvni_reduce_to_named_si matched on the SI dimension vector alone, which is
+	 * [0,...,0] for every dimensionless kind — so "B/s" collapsed onto "Hz",
+	 * turning a data rate into a frequency and producing a unit the library
+	 * itself calls incompatible with the one it replaced. */
+	static const struct { value_base_unit_t num; const char *keep; } cases[] = {
+		{ bu_byte,   "B/s"   },
+		{ bu_bit,    "b/s"   },
+		{ bu_radian, "rad/s" },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		value_unit_t u = bvni_test_u2(cases[i].num, exp_linear,
+					      bu_second, exp_neg_linear);
+		char buf[80];
+		int32_t n = bvn_unit_to_string_ex(u, buf, sizeof buf, BVN_UNIT_REDUCE);
+		ASSERT_TRUE(n > 0 && strcmp(buf, cases[i].keep) == 0,
+			    "a dimensionless kind is not collapsed onto a named SI unit");
+		/* whatever it reduces to must remain compatible with the original */
+		bool pok = false;
+		value_unit_t back = bvn_parse_unit((const uint8_t *)buf, &pok);
+		ASSERT_TRUE(pok && bvn_units_compatible(u, back),
+			    "the reduced form stays compatible with what it replaced");
+	}
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -2230,6 +2313,8 @@ int main(void)
 	test_reduce_keeps_a_prefixed_dimensionless_scale();
 	test_convert_factor_identity();
 	test_logarithmic_units_refuse();
+	test_angle_is_its_own_quantity_kind();
+	test_named_si_collapse_respects_kinds();
 	test_rational_to_str_reports_too_long();
 	test_wide_denominator_renders_in_every_base();
 	test_unit_reduce();

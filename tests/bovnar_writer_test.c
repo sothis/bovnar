@@ -1469,8 +1469,134 @@ static void test_canon_observer_emits_version(void)
 
 	bvnr_canon_observer_destroy(obs);
 }
+
+/*
+ * BVN_UNIT_REDUCE must move the VALUE with the unit. Reducing km to m and
+ * leaving the digits alone wrote "5 km" as "5 m" — the annotation saying one
+ * thing and the number another, in a format whose premise is that a unit
+ * confusion is the expensive failure.
+ */
+static int reduce_emit(char *out, size_t cap, value_unit_t u,
+		       value_type_spec_t vt, const char *lit)
+{
+	memset(out, 0, cap);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, cap);
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return -1;
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	wf.unit_flags = BVN_UNIT_REDUCE;
+	if (!bvnr_open_write_sink(w, &sink, false, &wf)) {
+		bvnr_writer_destroy(w); return -1;
+	}
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	bvnr_write_event(w, ev_stream_start, &d);
+	d.type = token_is_identifier; d.data = "d"; d.length = 1;
+	bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type       = token_is_number;
+	d.value_type = vt;
+	d.value_unit = u;
+	d.data       = lit;
+	d.length     = (uint32_t)strlen(lit);
+	bool ok = bvnr_write_event(w, ev_data, &d);
+	error_code_t err = bvnr_writer_get_error(w);
+	memset(&d, 0, sizeof d);
+	bvnr_write_event(w, ev_stream_end, &d);
+	bvnr_writer_destroy(w);
+	return ok ? 0 : (int)err;
+}
+
+static void test_unit_reduce_rescales_the_value(void)
+{
+	char out[512];
+	value_type_spec_t f64 = { .family = vt_float, .width = 64 };
+	static const struct { const char *lbl; const char *lit; const char *want; }
+	cases[] = {
+		{ "k~m",  "5",   ".d=5000 m"   },
+		{ "c~m",  "5",   ".d=0.05 m"   },
+		{ "k~g",  "2.5", ".d=2500 g"   },
+		{ "n~s",  "7",   ".d=0.000000007 s" },
+	};
+	value_unit_t units[] = {
+		BVN_UNIT_SI(bu_meter,  si_kilo),
+		BVN_UNIT_SI(bu_meter,  si_centi),
+		BVN_UNIT_SI(bu_gram,   si_kilo),
+		BVN_UNIT_SI(bu_second, si_nano),
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		ASSERT_EQ_INT(reduce_emit(out, sizeof out, units[i], f64, cases[i].lit),
+			      0, "REDUCE writes the value");
+		ASSERT_TRUE(strcmp(out, cases[i].want) == 0,
+			    "REDUCE scales the value along with the unit");
+	}
+
+	/* A named SI derived unit keeps its prefix, so the value must NOT move.
+	 * Rescaling by bvn_unit_reduce's raw scale here would multiply twice over. */
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_newton, si_kilo),
+				  f64, "1"), 0, "kN writes");
+	ASSERT_TRUE(strcmp(out, ".d=1 k~N") == 0,
+		    "a named SI unit keeps its prefix and its value");
+
+	/* Every digit survives: the rescale goes through exact rational arithmetic,
+	 * not the double scale. */
+	value_type_spec_t u128 = { .family = vt_uint, .width = 128 };
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
+				  u128, "340282366920938463463374607431768211455"),
+		      0, "a 128-bit value writes");
+	ASSERT_TRUE(strcmp(out,
+		".d=340282366920938463463374607431768211455000 m") == 0,
+		    "the rescale is exact for a value far wider than a double");
+
+	/* nan/inf carry no finite value, so no scale applies. */
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
+				  f64, "nan"), 0, "nan writes");
+	ASSERT_TRUE(strcmp(out, ".d=nan m") == 0, "nan is not scaled");
+
+	/* A scale that does not terminate in the value's OWN base cannot be written
+	 * exactly — 1/100 in base 16 needs a factor of 5. Refuse rather than round. */
+	value_type_spec_t f16 = { .family = vt_float, .width = 64, .base = 16 };
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_centi),
+				  f16, "5"),
+		      (int)error_value_out_of_range,
+		      "a non-terminating rescale is refused, not rounded");
+	/* ...while one that does terminate goes through: 5 km = 5000 = 0x1388. */
+	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
+				  f16, "5"), 0, "a terminating rescale writes in base 16");
+	ASSERT_TRUE(strcmp(out, ".d=1388 m") == 0, "and in the value's own base");
+
+	/* Without the flag nothing moves at all. */
+	memset(out, 0, sizeof out);
+	{
+		bvnr_sink_t sink;
+		bvnr_sink_to_mem(&sink, out, sizeof out);
+		bvnr_writer_t *w = bvnr_writer_create();
+		bvnr_write_flags_t wf;
+		memset(&wf, 0, sizeof wf);
+		ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, &wf), "plain writer opens");
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_start, &d);
+		d.type = token_is_identifier; d.data = "d"; d.length = 1;
+		bvnr_write_event(w, ev_assignment_start, &d);
+		memset(&d, 0, sizeof d);
+		d.type = token_is_number; d.value_type = f64;
+		d.value_unit = BVN_UNIT_SI(bu_meter, si_kilo);
+		d.data = "5"; d.length = 1;
+		bvnr_write_event(w, ev_data, &d);
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_end, &d);
+		bvnr_writer_destroy(w);
+		ASSERT_TRUE(strcmp(out, ".d=5 k~m") == 0,
+			    "without BVN_UNIT_REDUCE the value and unit are verbatim");
+	}
+}
+
 int main(void)
 {
+	test_unit_reduce_rescales_the_value();
 	printf("Running bovnar_writer_test regression suite...\n");
 
 	test_write_version_directive();

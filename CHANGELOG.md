@@ -106,6 +106,23 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **`BVN_UNIT_REDUCE` wrote values that did not match their unit.** The flag
+  folds every prefix out of the unit — `k~m` becomes `m` — and the formatter
+  discarded the scale `bvn_unit_reduce` hands back, while the writer emitted the
+  value unchanged beside it. `5 km` was written as `.d=5 m`, `2.5 kg` as
+  `.d=2.5 g`: the annotation saying one thing and the digits another, in a format
+  whose premise is that a unit confusion is the expensive failure. It only looked
+  right on the nineteen named SI derived units, where the collapse re-attaches the
+  prefix, so testing it on `kN` gave no hint.
+  The writer now scales the value with the unit — `.d=5000 m` — converting to the
+  unit that will actually be *emitted* rather than to `bvn_unit_reduce`'s raw
+  output, so `kN` correctly stays `1 k~N`. The rescale runs in exact rational
+  arithmetic, so a 128-bit value keeps every digit rather than going through a
+  `double`. Where the scaled value has no exact representation in the value's own
+  base — 1/100 in base 16 needs a factor of five — the write fails with
+  `error_value_out_of_range` instead of rounding, and a unit whose exponent
+  overflowed the representable range is refused outright. `nan`/`inf` carry no
+  finite value and pass through unscaled.
 - **`BVN_UNIT_REDUCE` collapsed a data rate onto a frequency.** The named-SI
   collapse matched on the SI dimension vector alone, which is all-zero for every
   dimensionless kind, so `B/s` reduced to `Hz` — a unit the library itself calls

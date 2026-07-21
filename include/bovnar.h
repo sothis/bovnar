@@ -453,6 +453,20 @@ typedef uint32_t bvn_unit_flags_t;
  * to the document. */
 #define BVNR_DEFAULT_MAX_CONVERSION_LENGTH 1024u
 #define BVN_UNIT_FLAGS_NONE ((bvn_unit_flags_t)0u)
+/* Reduce a compound unit to canonical form before writing it: repeated bases
+ * combine (m·m -> m²), and every prefix is folded out (km -> m).
+ *
+ * Folding a prefix out CHANGES THE UNIT, so the writer scales the value to
+ * match: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs
+ * in exact rational arithmetic, so a value far wider than a double keeps every
+ * digit. Where the scaled value cannot be written exactly in the value's own
+ * base — 1/100 in base 16 needs a factor of five — the write fails with
+ * error_value_out_of_range rather than rounding.
+ *
+ * Note for direct callers of bvn_unit_to_string_ex: that function returns only
+ * the reduced unit and discards bvn_unit_reduce's scale, so if you format a unit
+ * yourself you must apply that scale to your value. The writer does this for
+ * you; nothing else does. */
 #define BVN_UNIT_REDUCE     ((bvn_unit_flags_t)(1u << 0))
 #define BVN_UNIT_ASCII_EXP  ((bvn_unit_flags_t)(1u << 1))
 /*

@@ -63,6 +63,12 @@ typedef struct bvnr_serializer_s {
 	void*			event_userdata;
 	bool			(*on_event)(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bvn_unit_flags_t	unit_flags;
+	/* Set when serialisation fails for a reason of its own rather than because
+	 * the sink filled up — a BVN_UNIT_REDUCE rescale that cannot be written
+	 * exactly, say. bvnr_write_event prefers this over the generic sink error, so
+	 * the caller is told what actually went wrong. error_none means "no reason of
+	 * my own; assume the sink". */
+	error_code_t		ser_error;
 	uint8_t			wbuf[BVN_SER_WBUF_SIZE];
 	uint32_t		wbuf_pos;
 } bvnr_serializer_t;

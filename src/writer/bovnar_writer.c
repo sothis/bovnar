@@ -31,6 +31,8 @@
 #include "bovnar.h"
 #include "bvn_datetime.h"
 #include "bvn_float.h"
+#include "bvn_int.h"
+#include "bovnar_si_units.h"
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 /*
@@ -766,6 +768,113 @@ static void bvn_ser_mark_value_done(bvnr_serializer_t* s)
  * out-of-literal-range carrier. The atomic GNSS epochs never reach here: they
  * reject ISO literals at read time and so never carry a fraction.
  */
+/*
+ * BVN_UNIT_REDUCE rescales the VALUE, not just the unit.
+ *
+ * bvn_unit_reduce folds every prefix into a scalar — km becomes m with scale
+ * 1000 — and the formatter writes only the reduced unit. Emitting the value
+ * unchanged beside it therefore wrote "5 km" as "5 m": the annotation said one
+ * thing and the digits another, in a format whose whole premise is that a unit
+ * confusion is the expensive failure. The value has to move with the unit.
+ *
+ * The rescale goes through the exact-rational conversion rather than the double
+ * `scale`, so a wide value keeps every digit — the same guarantee the reader's
+ * want_unit hook gives. Returns:
+ *    1  text/len hold the rescaled value; write that instead of d->data
+ *    0  nothing to do; write d->data verbatim
+ *   -1  the reduced form cannot be written exactly; the caller must fail rather
+ *       than emit a rounded number under an exact annotation
+ *
+ * The scale is always a power of ten or two (prefixes are all this touches), so
+ * the digit growth is bounded by the prefix exponent and there is no unbounded
+ * work here.
+ */
+static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
+				  char **text, int32_t *len)
+{
+	if (!(s->unit_flags & BVN_UNIT_REDUCE))                   return 0;
+	if (d->value_unit.num_components == 0u)                   return 0;
+	if (BVN_UNIT_IS_NO_UNIT(d->value_unit))                   return 0;
+	if (!bvn_type_is_numeric(d->value_type))                  return 0;
+	if (!d->data || !d->length)                               return 0;
+
+	/* Convert to the unit that will actually be EMITTED, not to what
+	 * bvn_unit_reduce returns. The formatter reduces and then re-attaches a
+	 * prefix when the result lands on a named SI unit, so kN stays kN with no
+	 * rescale at all — using bvn_unit_reduce's raw scale there would multiply by
+	 * 1000 twice over. Round-tripping the emitted text is what keeps the digits
+	 * and the annotation in step whatever the formatter decides. */
+	char    ubuf[512];
+	int32_t ulen = bvn_unit_to_string_ex(d->value_unit, ubuf, sizeof ubuf,
+					     s->unit_flags);
+	if (ulen < 0) { s->ser_error = error_unit_illegal; return -1; }
+	bool         pok     = false;
+	value_unit_t emitted = bvn_parse_unit((const uint8_t *)ubuf, &pok);
+	if (!pok) { s->ser_error = error_unit_illegal; return -1; }
+	if (bvn_unit_equal(emitted, d->value_unit)) return 0;   /* nothing moved */
+
+
+	char  small[128];
+	char *nb  = small;
+	uint32_t n = d->length;
+	if ((size_t)n + 1u > sizeof small) {
+		nb = malloc((size_t)n + 1u);
+		if (!nb) return -1;
+	}
+	memcpy(nb, d->data, n);
+	nb[n] = '\0';
+	/* nan/inf carry no finite value; a scale does not apply to them. */
+	if (bvn_is_special_number_string(nb)) {
+		if (nb != small) free(nb);
+		return 0;
+	}
+
+	int rc = -1;
+	/* Everything from here that fails means the reduced form cannot be written
+	 * exactly. Say so specifically; the caller would otherwise report a sink
+	 * problem, which is not what happened. */
+	s->ser_error = error_value_out_of_range;
+	uint32_t base = bvn_effective_base(d->value_type);
+	bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+	bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+	char *out = NULL;
+	if (!vn || !vd || !on || !od) goto done;
+	if (d->value_type.family == vt_uint || d->value_type.family == vt_sint) {
+		if (!bvn_int_from_str(vn, nb, base) || !bvn_int_from_uint64(vd, 1u))
+			goto done;
+	} else if (!bvn_float_parse_rational(nb, base == 16u ? 16u : 10u, vn, vd)) {
+		goto done;
+	}
+	{
+		bool exact = false;
+		/* Incompatible here means the reduction lost something it should not
+		 * have — an exponent folded past the representable range, say. Refuse
+		 * rather than write digits under an annotation that no longer matches. */
+		if (!bvn_unit_convert_rational(vn, vd, d->value_unit, emitted,
+					       on, od, &exact) || !exact)
+			goto done;
+		size_t need = bvn_rational_str_bufsize(on, od, base);
+		if (!need || need > (1u << 20)) goto done;
+		out = malloc(need);
+		if (!out) goto done;
+		bool rexact = false;
+		int32_t l = bvn_rational_to_str(on, od, base, out, need, &rexact);
+		/* A scale that does not terminate in the value's own base — 1/100 written
+		 * in base 16, say — cannot be expressed. Refuse; rounding here would be
+		 * the silent loss this whole path exists to prevent. */
+		if (l < 0 || !rexact) goto done;
+		*text = out;
+		*len  = l;
+		out   = NULL;
+		rc    = 1;
+		s->ser_error = error_none;
+	}
+done:
+	free(out);
+	if (nb != small) free(nb);
+	bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+	return rc;
+}
 static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt)
 {
 	if (d->value_type.family != vt_datetime ||
@@ -1039,8 +1148,18 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				/* Special floats (nan/inf/ninf) are emitted as the
 				 * bare keyword, exactly like any other number token —
 				 * no sigil. */
-				if (!bvn_ser_push(s, d->data, d->length))
+				char   *rtext = NULL;
+				int32_t rlen  = 0;
+				int     rr    = bvn_ser_reduced_number(s, d, &rtext, &rlen);
+				if (rr < 0)
 					return false;
+				if (rr > 0) {
+					bool okp = bvn_ser_push(s, rtext, (uint32_t)rlen);
+					free(rtext);
+					if (!okp) return false;
+				} else if (!bvn_ser_push(s, d->data, d->length)) {
+					return false;
+				}
 			}
 			/* An inline unit ("<float:64> 9.81 m/s") lives on the value, not
 			 * the annotation, so it was NOT emitted as a type parameter above.
@@ -1193,10 +1312,14 @@ bool bvnr_write_event(
 		return bvn_writer_set_error(w, error_invalid_argument);
 	if (!bvn_writer_validate_event(w, ev, data))
 		return false;
-	if (!bvn_ser_serialize_event(&w->ser, ev, data))
+	w->ser.ser_error = error_none;
+	if (!bvn_ser_serialize_event(&w->ser, ev, data)) {
+		if (w->ser.ser_error != error_none)
+			return bvn_writer_set_error(w, w->ser.ser_error);
 		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
 			? error_sink_buffer_exhausted
 			: error_writing_to_sink);
+	}
 	if (w->ser.on_event) {
 		if (!w->ser.on_event(w->ser.event_userdata, ev, data))
 			return bvn_writer_set_error(w, error_scanner_callback_failed);

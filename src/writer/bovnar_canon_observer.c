@@ -102,7 +102,24 @@ bool bvnr_canon_observer_on_event(void *ud,
 			return false;
 		obs->emit_version = false;
 	}
-	return bvn_ser_serialize_event(&obs->ser, ev, data);
+	/* set_version guards on ser.stream_begun so a late call cannot inject the
+	 * directive mid-document — but only bvn_writer_validate_event sets that flag,
+	 * and the observer drives bvn_ser_serialize_event directly, so it stayed
+	 * false forever and the guard was dead code.
+	 *
+	 * Mark it on actual OUTPUT, not on the first event: a caller driving this
+	 * from a reader learns the declared version only after the directive line is
+	 * parsed, which is mid-stream but still ahead of the first value, and
+	 * ev_stream_start emits nothing. Comparing the byte count across the call is
+	 * what distinguishes "an event happened" from "bytes reached the document". */
+	uint64_t before = bvnr_sink_bytes_written(&obs->ser.sink) +
+			  (uint64_t)obs->ser.wbuf_pos;
+	bool ok = bvn_ser_serialize_event(&obs->ser, ev, data);
+	uint64_t after = bvnr_sink_bytes_written(&obs->ser.sink) +
+			 (uint64_t)obs->ser.wbuf_pos;
+	if (after != before)
+		obs->ser.stream_begun = true;
+	return ok;
 }
 bool bvnr_canon_observer_finish(bvnr_canon_observer_t *obs)
 {

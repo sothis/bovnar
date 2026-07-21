@@ -1309,14 +1309,32 @@ static void test_write_datetime(void)
 				bad[i].why);
 			bvnr_writer_destroy(w2);
 		}
-		/* in-range still accepted */
+		/* in-range still accepted — but datetime is a spec-1.1 construct, so the
+		 * document has to declare 1.1 or the reader will not accept it back.
+		 * This used to pass with default flags, silently producing exactly such
+		 * an unreadable document. */
+		bvnr_write_flags_t vf;
+		memset(&vf, 0, sizeof vf);
+		vf.emit_version = true;
 		bvnr_sink_to_mem(&s2, b2, sizeof(b2));
 		bvnr_writer_t *w3 = bvnr_writer_create();
 		if (w3) {
-			bvnr_open_write_sink(w3, &s2, false, NULL);
+			bvnr_open_write_sink(w3, &s2, false, &vf);
 			ASSERT_TRUE(bvnr_write_datetime(w3, "x", 8, NULL, 127),
 				"datetime:8 127 is in range");
 			bvnr_writer_destroy(w3);
+		}
+		/* ...and without the directive it is refused rather than written. */
+		bvnr_sink_to_mem(&s2, b2, sizeof(b2));
+		bvnr_writer_t *w4 = bvnr_writer_create();
+		if (w4) {
+			bvnr_open_write_sink(w4, &s2, false, NULL);
+			ASSERT_FALSE(bvnr_write_datetime(w4, "x", 8, NULL, 127),
+				"a datetime without a 1.1 directive is refused");
+			ASSERT_EQ_INT((int)bvnr_writer_get_error(w4),
+				(int)error_unsupported_spec_version,
+				"...naming the spec version as the reason");
+			bvnr_writer_destroy(w4);
 		}
 	}
 }

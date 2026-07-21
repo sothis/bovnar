@@ -467,6 +467,14 @@ static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 	value_type_spec_t vt)
 {
+	/* datetime is a spec-1.1 construct, and the reader gates the family on a
+	 * DECLARED version. Writing one into a document with no "#!bovnar 1.1"
+	 * directive produced something the library cannot read back, reported as
+	 * success. There is no way to add the directive retroactively — it has to
+	 * precede every value — so refuse instead, and point the caller at the flag
+	 * that fixes it. */
+	if (vt.family == vt_datetime && !w->ser.version_emitted)
+		return bvn_writer_set_error(w, error_unsupported_spec_version);
 	if (vt.family == vt_uint || vt.family == vt_sint) {
 		if (vt.width > BVN_MAX_INT_WIDTH)
 			return bvn_writer_set_error(w, error_illegal_value_type);

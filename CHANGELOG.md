@@ -133,6 +133,22 @@ reading the grown by-value structs at the wrong size.
     `error_base_requires_string_literal`, which until this release was an enum
     member nothing ever set. `5` and `1e3` still write bare in any base, because
     the lexer does read those.
+- **`bvnr_canon_observer_set_version`'s "ignored after output has begun" guard
+  was dead code.** It tests `ser.stream_begun`, which only
+  `bvn_writer_validate_event` sets — and the observer drives the serialiser
+  directly, so the flag stayed false forever and a late call injected the
+  `#!bovnar` directive between two already-written events, producing a document
+  that no longer parses. The observer now marks the flag when bytes actually
+  reach the sink, which is what "output has begun" means: `ev_stream_start` emits
+  nothing, so a caller driving this from a reader can still supply the version it
+  learns mid-stream.
+- **`bvnr_write_datetime()` produced a document the library cannot read back.**
+  `datetime` is a spec-1.1 construct and the reader gates the family on a
+  *declared* version, but the writer accepted it with the zero-init default,
+  which emits no directive. The directive has to precede every value so it cannot
+  be added retroactively; the writer now refuses with
+  `error_unsupported_spec_version` unless `bvnr_write_flags_t.emit_version` is
+  set.
 - **A writer whose `bvnr_open_write_*` failed crashed on the first flush.** The
   sink's `push` is NULL, and nothing checked it; events kept returning `true`
   because they only fill the internal buffer, so checking every return value did

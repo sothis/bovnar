@@ -690,6 +690,72 @@ static const struct { int64_t utc; int64_t off; } bvnt_leap[] = {
 };
 #define BVNT_NLEAP (sizeof bvnt_leap / sizeof bvnt_leap[0])
 
+/* TAI - UTC as the library actually implements it, derived rather than copied:
+ * render the instant, convert the civil fields back to the uniform UTC scale,
+ * and take the difference.  Well defined at an insertion too -- 23:59:60 folds
+ * to the boundary, giving the OLD offset, which is correct for that second. */
+static int64_t bvnt_offset_at(int64_t tai)
+{
+	bvn_datetime_t dt;
+	memset(&dt, 0, sizeof dt);
+	bvn_dt_tai_seconds_to_utc(&dt, tai);
+	return tai - bvn_dt_datetime_to_epoch_seconds(&dt, bvn_epoch_tai);
+}
+
+/* The offset is non-decreasing in TAI, so every step can be found by bisection
+ * without scanning 1.4e9 seconds.  Reports each boundary as the first TAI second
+ * at which the new offset holds. */
+static void bvnt_find_steps(int64_t lo, int64_t hi, int64_t* out, int* n, int cap)
+{
+	int64_t a = bvnt_offset_at(lo), b = bvnt_offset_at(hi);
+	if (a == b)
+		return;
+	if (hi - lo == 1) {
+		if (*n < cap) out[*n] = hi;
+		(*n)++;
+		return;
+	}
+	int64_t mid = lo + (hi - lo) / 2;
+	bvnt_find_steps(lo, mid, out, n, cap);
+	bvnt_find_steps(mid, hi, out, n, cap);
+}
+
+/* The table lives in bvn_datetime.c and the sweep above needs its own copy of
+ * the boundaries.  A copy can drift -- an appended entry would simply go
+ * unnoticed -- so verify it against what the library really does, by discovering
+ * every offset step from the outside.  This is the check the "append one entry
+ * here, nothing else needs to change" comment on the table depends on. */
+static void bvnt_check_table_matches_library(void)
+{
+	int64_t found[64];
+	int n = 0;
+	bvnt_find_steps(0, 4000000000LL, found, &n, 64);
+	CHECK(n == (int)BVNT_NLEAP - 1,
+		"library has %d offset steps, test table implies %d "
+		"(a leap-table entry was added or removed without updating the test)",
+		n, (int)BVNT_NLEAP - 1);
+	if (n != (int)BVNT_NLEAP - 1)
+		return;
+	int bad = 0;
+	for (int i = 0; i < n; i++) {
+		int64_t want = bvnt_leap[i + 1].utc + bvnt_leap[i + 1].off;
+		if (found[i] != want) {
+			CHECK(0, "step %d at tai %lld, test table says %lld",
+				i, (long long)found[i], (long long)want);
+			bad++;
+		}
+	}
+	CHECK(bad == 0, "all %d discovered boundaries match the test table", n);
+	/* Sorted ascending with strictly increasing offsets -- the invariant the
+	 * table's own comment states and both lookups rely on. */
+	int unsorted = 0;
+	for (size_t i = 1; i < BVNT_NLEAP; i++)
+		if (bvnt_leap[i].utc <= bvnt_leap[i-1].utc ||
+		    bvnt_leap[i].off <= bvnt_leap[i-1].off)
+			unsorted++;
+	CHECK(unsorted == 0, "leap table sorted, strictly increasing offsets");
+}
+
 static int bvnt_tai_roundtrips(int64_t tai)
 {
 	bvn_datetime_t dt;
@@ -701,6 +767,8 @@ static int bvnt_tai_roundtrips(int64_t tai)
 static void test_tai_injective(void)
 {
 	printf("\n-- tai/utc injectivity --\n");
+
+	bvnt_check_table_matches_library();
 
 	long bad = 0;
 	int64_t first_bad = 0;

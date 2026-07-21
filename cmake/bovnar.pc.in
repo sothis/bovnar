@@ -1,6 +1,14 @@
-prefix=@CMAKE_INSTALL_PREFIX@
-libdir=@CMAKE_INSTALL_FULL_LIBDIR@
-includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+# Relocatable. These used to be the ABSOLUTE paths substituted at CONFIGURE
+# time, so `cmake --install --prefix X` shipped a file pointing at whatever
+# CMAKE_INSTALL_PREFIX happened to be when the build tree was created -- normally
+# /usr/local. A consumer then either failed to find bovnar.h, or, on a machine
+# that does have an older /usr/local/lib/libbvnr.so, silently compiled and linked
+# against the WRONG library. pcfiledir is where this file actually is, so the
+# prefix is derived at use time; the relative hop back accounts for lib, lib64
+# and multiarch libdirs alike.
+prefix=${pcfiledir}/@BVNR_PC_RELDIR@
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 
 Name: bovnar
 Description: Unit-safe binary serialization format — reference C library (libbvnr)

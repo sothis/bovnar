@@ -408,10 +408,21 @@ endif()
 # The wheel (SKBUILD) deliberately keeps the plain unversioned filename: _ffi.py
 # loads libbvnr.so by exact name via ctypes, and wheel archives do not preserve
 # the symlink chain a versioned soname creates.
+#
+# VERSION tracks the ABI, NOT ${PROJECT_VERSION}. The project version is the
+# FORMAT version (see the CHANGELOG: "semantic versioning of the format"), which
+# is deliberately still 1.1.0 here -- the wire format did not change, only the
+# ABI did. Deriving the real filename from it produced libbvnr.so.1.1.0 for BOTH
+# SOVERSION 1 and SOVERSION 2, so the two mutually incompatible libraries had the
+# same on-disk name and would overwrite each other; a binary linked against
+# libbvnr.so.1 would then be handed a file that is actually ABI 2 -- exactly the
+# failure the versioned soname exists to prevent. Keying VERSION to the ABI major
+# gives libbvnr.so.2.0.0, so both can coexist and the loader resolves by SONAME.
+set(BVNR_ABI_MAJOR 2)
 if(NOT SKBUILD)
     set_target_properties(bvnr_shared PROPERTIES
-        VERSION   ${PROJECT_VERSION}
-        SOVERSION 2)
+        VERSION   ${BVNR_ABI_MAJOR}.0.0
+        SOVERSION ${BVNR_ABI_MAJOR})
 endif()
 
 add_executable(bovnar src/bovnar.c)
@@ -509,6 +520,16 @@ if(NOT SKBUILD)
         ${CMAKE_CURRENT_BINARY_DIR}/bovnarConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/bovnarConfigVersion.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bovnar)
+
+    # Relative hop from <libdir>/pkgconfig back to the prefix, so the .pc can
+    # derive its own prefix from ${pcfiledir} instead of baking in the
+    # configure-time CMAKE_INSTALL_PREFIX.
+    file(RELATIVE_PATH BVNR_PC_RELDIR
+         "/${CMAKE_INSTALL_LIBDIR}/pkgconfig" "/")
+    string(REGEX REPLACE "/$" "" BVNR_PC_RELDIR "${BVNR_PC_RELDIR}")
+    if(BVNR_PC_RELDIR STREQUAL "")
+        set(BVNR_PC_RELDIR ".")
+    endif()
 
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bovnar.pc.in

@@ -80,6 +80,8 @@ bvnr_writer_t* bvnr_writer_create(void)
 }
 void bvnr_writer_destroy(bvnr_writer_t* w)
 {
+	if (!w) return;
+	free(w->ser.ser_value_text);
 	free(w);
 }
 /*
@@ -578,9 +580,133 @@ static bool bvn_check_type_value_compat(bvnr_writer_t* w,
  * can be range-checked against it. Returning false here (via
  * bvn_writer_set_error) aborts the write before the stream is corrupted.
  */
+/*
+ * Is a value legal right here? Either an assignment is waiting for one, or we
+ * are inside an array row (whose elements are keyless), or an octet stream is
+ * open. Anywhere else — bare at the top level, or directly inside a struct —
+ * the bytes would be syntactically stranded.
+ */
+static inline bool bvn_ser_is_direct_array_element(
+	const bvnr_serializer_t* s, uint32_t idx)
+{
+	if (idx >= s->max_array_nesting)
+		return false;
+	return s->struct_depth ==
+		   s->struct_depth_at_array_start[idx];
+}
+static bool bvn_w_value_position(const bvnr_serializer_t* s)
+{
+	/* Inside an array, a value is only expected at a DIRECT element position;
+	 * once a struct has been opened within the array we are in that struct, and
+	 * a bare value there needs a key like anywhere else. */
+	if (s->array_depth > 0 &&
+	    bvn_ser_is_direct_array_element(s, s->array_depth - 1u))
+		return true;
+	return s->w_awaiting_value || s->in_octet_stream;
+}
+/* True where a key is legal: at the top level, or inside a struct — including a
+ * struct nested inside an array, which is why this is not simply
+ * "array_depth == 0". */
+static bool bvn_w_key_position(const bvnr_serializer_t* s)
+{
+	if (s->array_depth == 0)
+		return true;
+	return !bvn_ser_is_direct_array_element(s, s->array_depth - 1u);
+}
 static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	bvnr_event_t ev, bvnr_data_t* data)
 {
+	/*
+	 * Event-ordering gate. Everything below assumes the stream has been opened,
+	 * that annotation parameters arrive inside an annotation, and that a value
+	 * appears only where one belongs. Without it the writer emitted "/" for a
+	 * dimension outside an array, ".k=.k=1;" for two assignments in a row and
+	 * ".k={1;};" for a value bare inside a struct — reporting success each time
+	 * for output its own reader rejects.
+	 */
+	{
+		bvnr_serializer_t* s = &w->ser;
+		bool ok = true;
+		switch (ev) {
+		case ev_stream_start:
+			break;                            /* checked below: once only */
+		case ev_type_annotation_type_family:
+		case ev_type_annotation_type_family_parameter:
+		case ev_type_annotation_end:
+			ok = s->w_in_annotation;
+			break;
+		case ev_type_annotation_start:
+			ok = !s->w_in_annotation && bvn_w_value_position(s) &&
+			     !s->in_octet_stream;
+			break;
+		case ev_assignment_start:
+			/* A direct array element has no key, and an assignment cannot start
+			 * while one is already waiting for its value. */
+			ok = !s->w_in_annotation && !s->w_awaiting_value &&
+			     bvn_w_key_position(s) && !s->in_octet_stream;
+			break;
+		case ev_data:
+			ok = !s->w_in_annotation && bvn_w_value_position(s);
+			/* An octet chunk is only meaningful inside an open stream; on its
+			 * own the serializer still emitted a chunk header and the bytes,
+			 * which the reader cannot parse. Conversely a normal value cannot
+			 * appear in the middle of one. */
+			if (ok) {
+				bool is_oct = data && data->type == token_is_octet_stream;
+				ok = (is_oct == s->in_octet_stream);
+			}
+			break;
+		case ev_array_row_start:
+			/* A row may open where a value is expected, or straight after a "/"
+			 * that continues a multi-row array: [1,2]/[3,4]. */
+			ok = !s->w_in_annotation && !s->in_octet_stream &&
+			     (bvn_w_value_position(s) || s->w_after_dim);
+			break;
+		case ev_struct_start:
+		case ev_octet_stream_start:
+			ok = !s->w_in_annotation && bvn_w_value_position(s) &&
+			     !s->in_octet_stream;
+			break;
+		case ev_array_row_end:
+			ok = !s->w_in_annotation && s->array_depth > 0;
+			break;
+		case ev_array_dim_start:
+			/* The row separator sits BETWEEN two closed rows — [1,2]/[3,4] — so
+			 * what it needs is a row that just closed, at any depth. Keying off
+			 * array_depth instead let "[//]" through. */
+			ok = !s->w_in_annotation && s->w_after_row_end;
+			break;
+		case ev_octet_stream_end:
+			ok = s->in_octet_stream;
+			break;
+		case ev_struct_end:
+			/* A struct may legitimately close inside an array element. */
+			ok = !s->w_in_annotation && !s->w_awaiting_value &&
+			     s->struct_depth > 0 && !s->in_octet_stream;
+			break;
+		case ev_stream_end:
+			ok = !s->w_in_annotation && !s->w_awaiting_value &&
+			     s->array_depth == 0 && s->struct_depth == 0 &&
+			     !s->in_octet_stream;
+			break;
+		default:
+			ok = false;
+			break;
+		}
+		/* Once the stream has been closed nothing more may be written; the
+		 * serializer would happily append past the end. */
+		if (s->w_stream_ended)
+			ok = false;
+		/* A "/" promises another ROW, not a scalar: "[[]/null]" is not a thing. */
+		if (s->w_after_dim && ev != ev_array_row_start)
+			ok = false;
+		/* No blanket "stream must be open" rule: ev_stream_start is optional —
+		 * the bvnr_write_* helpers never send it, and an assignment opens the
+		 * stream by itself. The per-event conditions above already reject the
+		 * events that genuinely cannot come first. */
+		if (!ok)
+			return bvn_writer_set_error(w, error_unknown_token_type);
+	}
 	switch (ev) {
 	case ev_stream_start:
 		if (w->ser.stream_begun)
@@ -588,13 +714,17 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.stream_begun = true;
 		return true;
 	case ev_stream_end:
+		w->ser.w_stream_ended = true;
 		return true;
 	case ev_assignment_start:
 		w->ser.stream_begun = true;
-		return bvn_validate_id_for_writer(w,
-			data->data, data->length);
+		if (!bvn_validate_id_for_writer(w, data->data, data->length))
+			return false;
+		w->ser.w_awaiting_value = true;
+		return true;
 	case ev_type_annotation_start:
-		w->ser.stream_begun = true;
+		w->ser.stream_begun     = true;
+		w->ser.w_in_annotation  = true;
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
 		return bvn_validate_type_spec_for_writer(w,
@@ -605,9 +735,14 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->val.parsed_unit = data->value_unit;
 		break;
 	case ev_type_annotation_end:
+		w->ser.w_in_annotation = false;
 		break;
 	case ev_data: {
 		w->ser.stream_begun = true;
+		/* The value the assignment was waiting for has arrived. An octet stream
+		 * spans several data events, so it clears the flag at its end instead. */
+		if (!w->ser.in_octet_stream)
+			w->ser.w_awaiting_value = false;
 		token_type_t tt = data->type;
 		value_type_spec_t vt = data->value_type;
 		if (!bvn_check_type_value_compat(w, tt, vt))
@@ -698,15 +833,32 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (w->ser.struct_depth == 0)
 			return bvn_writer_set_error(w, error_illegal_struct_close);
 		break;
+	case ev_octet_stream_end:
+		w->ser.stream_begun     = true;
+		w->ser.w_awaiting_value = false;   /* the stream WAS the value */
+		break;
 	case ev_struct_start:
 		w->ser.stream_begun = true;
 		if (w->ser.struct_depth >= (uint32_t)w->ser.max_struct_nesting)
 			return bvn_writer_set_error(w, error_struct_nesting_too_high);
+		w->ser.w_awaiting_value = false;   /* the struct IS the value */
 		break;
 	case ev_array_row_start:
 		w->ser.stream_begun = true;
 		if (w->ser.array_depth >= w->ser.max_array_nesting)
 			return bvn_writer_set_error(w, error_array_nesting_too_high);
+		w->ser.w_awaiting_value = false;   /* the array IS the value */
+		w->ser.w_after_row_end  = false;
+		w->ser.w_after_dim      = false;
+		break;
+	case ev_array_row_end:
+		w->ser.stream_begun    = true;
+		w->ser.w_after_row_end = true;
+		break;
+	case ev_array_dim_start:
+		w->ser.stream_begun    = true;
+		w->ser.w_after_row_end = false;
+		w->ser.w_after_dim     = true;
 		break;
 	default:
 		w->ser.stream_begun = true;
@@ -765,14 +917,6 @@ static bool bvn_ser_serialize_string(bvnr_serializer_t* s,
  * bvn_ser_emit_pending_comma writes the comma due before the next element;
  * bvn_ser_mark_value_done arms the flag after a complete value is emitted.
  */
-static inline bool bvn_ser_is_direct_array_element(
-	const bvnr_serializer_t* s, uint32_t idx)
-{
-	if (idx >= s->max_array_nesting)
-		return false;
-	return s->struct_depth ==
-		   s->struct_depth_at_array_start[idx];
-}
 static bool bvn_ser_emit_pending_comma(bvnr_serializer_t* s)
 {
 	if (s->array_depth == 0)
@@ -888,6 +1032,7 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 	value_unit_t emitted = bvn_parse_unit((const uint8_t *)ubuf, &pok);
 	if (!pok) { s->ser_error = error_unit_illegal; return -1; }
 	if (bvn_unit_equal(emitted, d->value_unit)) return 0;   /* nothing moved */
+	s->ser_reduced_unit = emitted;
 
 
 	char  small[128];
@@ -1278,7 +1423,13 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					return false;
 				if (rr > 0) {
 					bool okp = bvn_ser_push(s, rtext, (uint32_t)rlen);
-					free(rtext);
+					/* Hand it to bvnr_write_event rather than dropping it:
+					 * an observer told the pre-rescale digits is out of
+					 * sync with the bytes it is meant to mirror. */
+					free(s->ser_value_text);
+					s->ser_value_text = rtext;
+					s->ser_value_len  = (uint32_t)rlen;
+					s->ser_value_unit = s->ser_reduced_unit;
 					if (!okp) return false;
 				} else if (!bvn_ser_push(s, d->data, d->length)) {
 					return false;
@@ -1436,6 +1587,9 @@ bool bvnr_write_event(
 	if (!bvn_writer_validate_event(w, ev, data))
 		return false;
 	w->ser.ser_error = error_none;
+	free(w->ser.ser_value_text);
+	w->ser.ser_value_text = NULL;
+	w->ser.ser_value_len  = 0;
 	if (!bvn_ser_serialize_event(&w->ser, ev, data)) {
 		if (w->ser.ser_error != error_none)
 			return bvn_writer_set_error(w, w->ser.ser_error);
@@ -1444,8 +1598,20 @@ bool bvnr_write_event(
 			: error_writing_to_sink);
 	}
 	if (w->ser.on_event) {
-		if (!w->ser.on_event(w->ser.event_userdata, ev, data))
+		/* Show the observer what reached the sink. A BVN_UNIT_REDUCE rescale
+		 * replaces the digits, and passing the caller's struct through unchanged
+		 * left anyone mirroring or checksumming the stream describing a value
+		 * that was never written. The caller's struct is not modified. */
+		if (w->ser.ser_value_text) {
+			bvnr_data_t shown = *data;
+			shown.data       = w->ser.ser_value_text;
+			shown.length     = w->ser.ser_value_len;
+			shown.value_unit = w->ser.ser_value_unit;
+			if (!w->ser.on_event(w->ser.event_userdata, ev, &shown))
+				return bvn_writer_set_error(w, error_scanner_callback_failed);
+		} else if (!w->ser.on_event(w->ser.event_userdata, ev, data)) {
 			return bvn_writer_set_error(w, error_scanner_callback_failed);
+		}
 	}
 	return true;
 }
@@ -1502,7 +1668,14 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	if (!w) return false;
 	if (w->val.last_error != error_none)
 		return false;
-	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0)
+	/* An assignment still waiting for its value, or an unclosed annotation, is
+	 * just as incomplete as an unclosed struct — it leaves ".k=" or ".k=<" in the
+	 * document with no terminating ';'. A caller who wants a null value sends
+	 * ev_data with token_is_null_value; leaving the assignment dangling is not
+	 * the same thing. */
+	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0 ||
+	    w->ser.w_awaiting_value || w->ser.w_in_annotation ||
+	    w->ser.in_octet_stream)
 		return bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
 	w->ser.ser_error = error_none;
 	if (!bvn_ser_finish_stream(&w->ser)) {

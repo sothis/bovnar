@@ -106,6 +106,31 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **The writer's event grammar is now enforced.** Its header claims it "cannot
+  be coaxed into emitting a stream the reader would reject", but validation
+  checked only struct balance and the two depth caps. A value bare at the top
+  level wrote `1;`; two assignments in a row wrote `.k=.k=1;`; a lone annotation
+  end wrote `>`; a dimension separator outside an array wrote `/`; a keyless
+  value inside a struct wrote `.k={1;};` — every one reported as success, none of
+  them readable. Fuzzing event sequences, **16 312 of 200 000** finished with no
+  error and produced unparseable bytes.
+  `bvn_writer_validate_event` now tracks whether an assignment is awaiting its
+  value, whether an annotation is open, whether a row just closed or a `/` was
+  just written, and whether the stream has ended — and rejects any event that
+  cannot occur there with `error_unknown_token_type`. `bvnr_write_finish`
+  additionally refuses a document with a dangling assignment, an unclosed
+  annotation or an open octet stream, alongside the unclosed structs and arrays
+  it already caught. A null value is still written by sending `ev_data` with
+  `token_is_null_value`; leaving the assignment open is not the same thing.
+  The test that matters is a property, not a list: everything the writer accepts
+  must re-parse. Over 600 000 fuzzed sequences across ten seeds, **zero**
+  violations remain, and a 40 000-sequence version of the same check now runs in
+  the suite.
+- **`on_event` was shown the value the caller passed, not the bytes that were
+  written.** A `BVN_UNIT_REDUCE` rescale replaces the digits and the unit, so an
+  observer used to mirror or checksum the stream described a value that never
+  reached the sink. It now receives the emitted text and unit; the caller's own
+  struct is left untouched.
 - **The DOM's integer accessors returned wrong values instead of failing.**
   `include/bovnar_dom.h` promises they "return false (leaving \*out UNCHANGED —
   no clamping or truncation)" when a value does not fit, but `dom_raw_i64` handed

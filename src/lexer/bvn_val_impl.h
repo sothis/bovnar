@@ -55,6 +55,15 @@ typedef struct bvnr_serializer_s {
 	bool			in_octet_stream;
 	uint32_t		struct_depth;
 	uint32_t		struct_depth_at_array_start[UINT8_MAX+1];
+	/* Event-grammar state for bvn_writer_validate_event. The serializer assumes a
+	 * well-ordered event stream — it happily writes ">" for a lone annotation_end
+	 * or ".k=.k=" for two assignments in a row — so the ordering has to be
+	 * enforced before any bytes are produced, not discovered by the reader later. */
+	bool			w_awaiting_value;  /* assignment_start, value not yet written */
+	bool			w_in_annotation;   /* between annotation_start and _end */
+	bool			w_after_row_end;   /* a row just closed; "/" may follow */
+	bool			w_after_dim;       /* a "/" was written; a row may follow */
+	bool			w_stream_ended;    /* ev_stream_end seen; nothing may follow */
 	bool			had_type_annotation;
 	bool			emitted_type_param;
 	bool			emitted_unit;	/* a unit was emitted in the annotation,
@@ -69,6 +78,14 @@ typedef struct bvnr_serializer_s {
 	 * the caller is told what actually went wrong. error_none means "no reason of
 	 * my own; assume the sink". */
 	error_code_t		ser_error;
+	/* When a BVN_UNIT_REDUCE rescale replaced the value's digits, the text that
+	 * actually reached the sink, so bvnr_write_event can show the observer what it
+	 * wrote rather than what the caller passed. Owned; freed and cleared per
+	 * event. */
+	char*			ser_value_text;
+	uint32_t		ser_value_len;
+	value_unit_t		ser_value_unit;   /* the unit that went with it */
+	value_unit_t		ser_reduced_unit; /* scratch: the unit being emitted */
 	uint8_t			wbuf[BVN_SER_WBUF_SIZE];
 	uint32_t		wbuf_pos;
 } bvnr_serializer_t;

@@ -1801,11 +1801,203 @@ static void test_writer_refuses_unreadable_output(void)
 	}
 }
 
+
+/*
+ * The writer's stated contract is that it "cannot be coaxed into emitting a
+ * stream the reader would reject". Before the event-ordering gate it enforced
+ * only struct balance and the depth caps, so a value bare at the top level, two
+ * assignments in a row, a lone annotation_end and a dimension separator outside
+ * an array all produced bytes and reported success.
+ *
+ * The property test below is the real check: fuzz event sequences and require
+ * that everything the writer ACCEPTS re-parses. The named cases here document
+ * the specific shapes and, unlike the fuzz, name what each one used to emit.
+ */
+static uint64_t gram_seq(const bvnr_event_t *evs, const token_type_t *toks,
+			 uint32_t n, char *out, size_t cap, bool *accepted)
+{
+	memset(out, 0, cap);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, cap);
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) { *accepted = false; return 0; }
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	bvnr_open_write_sink(w, &sink, false, &wf);
+	bool ok = true;
+	for (uint32_t i = 0; i < n && ok; i++) {
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		d.type = toks[i];
+		d.value_type.family = vt_uint;
+		d.value_type.width  = 64;
+		d.data = "1"; d.length = 1;
+		if (toks[i] == token_is_identifier) { d.data = "k"; d.length = 1; }
+		ok = bvnr_write_event(w, evs[i], &d);
+	}
+	if (ok) ok = bvnr_write_finish(w);
+	uint64_t nbytes = bvnr_writer_bytes_written(w);
+	bvnr_writer_destroy(w);
+	*accepted = ok;
+	return nbytes;
+}
+
+static void test_writer_event_grammar(void)
+{
+	char out[4096];
+	bool accepted;
+
+	/* Each of these produced output and reported success. */
+	{
+		bvnr_event_t e1[] = { ev_data };
+		token_type_t t1[] = { token_is_number };
+		gram_seq(e1, t1, 1, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "a value with no assignment is refused (was \"1;\")");
+	}
+	{
+		bvnr_event_t e[] = { ev_array_row_end };
+		token_type_t t[] = { token_is_number };
+		gram_seq(e, t, 1, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "closing a row that never opened is refused");
+	}
+	{
+		bvnr_event_t e[] = { ev_type_annotation_end };
+		token_type_t t[] = { token_is_type };
+		gram_seq(e, t, 1, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "a lone annotation end is refused (was \">\")");
+	}
+	{
+		bvnr_event_t e[] = { ev_assignment_start, ev_assignment_start };
+		token_type_t t[] = { token_is_identifier, token_is_identifier };
+		gram_seq(e, t, 2, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "two assignments in a row are refused (was \".k=.k=\")");
+	}
+	{
+		bvnr_event_t e[] = { ev_array_dim_start };
+		token_type_t t[] = { token_is_number };
+		gram_seq(e, t, 1, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "a dimension outside an array is refused (was \"/\")");
+	}
+	{
+		bvnr_event_t e[] = { ev_assignment_start, ev_struct_start, ev_data };
+		token_type_t t[] = { token_is_identifier, token_is_type, token_is_number };
+		gram_seq(e, t, 3, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "a keyless value inside a struct is refused");
+	}
+	{   /* an assignment left dangling is as incomplete as an unclosed struct */
+		bvnr_event_t e[] = { ev_assignment_start };
+		token_type_t t[] = { token_is_identifier };
+		gram_seq(e, t, 1, out, sizeof out, &accepted);
+		ASSERT_FALSE(accepted, "finishing with a dangling assignment is refused");
+	}
+
+	/* ...while every legal shape still writes. A null value is a value: the
+	 * caller sends it explicitly rather than leaving the assignment open. */
+	{
+		bvnr_event_t e[] = { ev_assignment_start, ev_data };
+		token_type_t t[] = { token_is_identifier, token_is_null_value };
+		gram_seq(e, t, 2, out, sizeof out, &accepted);
+		ASSERT_TRUE(accepted, "an explicit null value still writes");
+	}
+	{   /* .k = [1]/[1]; -- the row separator between two closed rows */
+		bvnr_event_t e[] = { ev_assignment_start, ev_array_row_start, ev_data,
+				     ev_array_row_end, ev_array_dim_start,
+				     ev_array_row_start, ev_data, ev_array_row_end };
+		token_type_t t[] = { token_is_identifier, token_is_number,
+				     token_is_array_number, token_is_number,
+				     token_is_number, token_is_number,
+				     token_is_array_number, token_is_number };
+		gram_seq(e, t, 8, out, sizeof out, &accepted);
+		ASSERT_TRUE(accepted, "a multi-row array still writes");
+	}
+	{   /* .k = {.k = 1;}; -- a key inside a struct inside nothing */
+		bvnr_event_t e[] = { ev_assignment_start, ev_struct_start,
+				     ev_assignment_start, ev_data, ev_struct_end };
+		token_type_t t[] = { token_is_identifier, token_is_type,
+				     token_is_identifier, token_is_number, token_is_type };
+		gram_seq(e, t, 5, out, sizeof out, &accepted);
+		ASSERT_TRUE(accepted, "a nested struct still writes");
+	}
+}
+
+/*
+ * The property the named cases above only sample: anything the writer accepts
+ * in full must re-parse. This is what makes the contract testable rather than
+ * aspirational -- it fails on any hole, not just the ones someone listed.
+ */
+static void test_writer_accepts_only_readable_streams(void)
+{
+	static const bvnr_event_t EVS[] = {
+		ev_stream_start, ev_assignment_start, ev_octet_stream_start,
+		ev_octet_stream_end, ev_struct_start, ev_struct_end,
+		ev_array_row_start, ev_array_row_end, ev_array_dim_start, ev_data,
+		ev_type_annotation_start, ev_type_annotation_end,
+		ev_type_annotation_type_family,
+		ev_type_annotation_type_family_parameter, ev_stream_end,
+	};
+	static const token_type_t TOKS[] = {
+		token_is_identifier, token_is_string, token_is_number, token_is_symbol,
+		token_is_reference, token_is_array_number, token_is_array_string,
+		token_is_type, token_is_octet_stream, token_is_null_value,
+		token_is_unit, token_is_type_width, token_is_type_base, token_is_bool,
+	};
+	static const char *LITS[] = { "1", "k", "42", "true", "abc", "1.5" };
+	uint64_t rs = 0x9E3779B97F4A7C15ull;
+	char out[8192];
+	uint32_t accepted = 0, unreadable = 0;
+
+	for (uint32_t it = 0; it < 40000u; it++) {
+#define GR_RND(n) (rs = rs * 6364136223846793005ull + 1442695040888963407ull, \
+		   (uint32_t)((rs >> 33) % (n)))
+		bvnr_sink_t sink;
+		memset(out, 0, sizeof out);
+		bvnr_sink_to_mem(&sink, out, sizeof out);
+		bvnr_writer_t *w = bvnr_writer_create();
+		if (!w) continue;
+		bvnr_write_flags_t wf;
+		memset(&wf, 0, sizeof wf);
+		if (!bvnr_open_write_sink(w, &sink, false, &wf)) {
+			bvnr_writer_destroy(w); continue;
+		}
+		uint32_t n = 1u + GR_RND(9u);
+		bool ok = true;
+		for (uint32_t i = 0; i < n && ok; i++) {
+			bvnr_data_t d;
+			memset(&d, 0, sizeof d);
+			d.type = TOKS[GR_RND(sizeof TOKS / sizeof TOKS[0])];
+			d.value_type.family = (value_type_family_t)GR_RND(9u);
+			d.value_type.width  = 64u;
+			const char *lit = LITS[GR_RND(6u)];
+			d.data = lit; d.length = (uint32_t)strlen(lit);
+			ok = bvnr_write_event(w, EVS[GR_RND(sizeof EVS / sizeof EVS[0])], &d);
+		}
+		if (ok) ok = bvnr_write_finish(w);
+		/* the real byte count: an octet stream embeds NULs, so strlen lies */
+		uint64_t nbytes = bvnr_writer_bytes_written(w);
+		bvnr_writer_destroy(w);
+		if (!ok) continue;
+		accepted++;
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t rf;
+		memset(&rf, 0, sizeof rf);
+		bvnr_open_read_mem(r, out, nbytes, NULL, 0, &rf);
+		if (!bvnr_read(r)) unreadable++;
+		bvnr_reader_destroy(r);
+#undef GR_RND
+	}
+	ASSERT_TRUE(accepted > 200,
+		    "the fuzz actually accepted a meaningful number of streams");
+	ASSERT_EQ_INT((int64_t)unreadable, 0,
+		      "every stream the writer accepts is one the reader can read");
+}
+
 int main(void)
 {
 	test_unit_reduce_rescales_the_value();
 	test_unit_reduce_annotation_matches_the_value();
 	test_writer_refuses_unreadable_output();
+	test_writer_event_grammar();
+	test_writer_accepts_only_readable_streams();
 	printf("Running bovnar_writer_test regression suite...\n");
 
 	test_write_version_directive();

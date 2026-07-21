@@ -612,7 +612,15 @@ class TestAnnotationRegressions:
         from bovnar.structs import make_type_spec, make_unit_none
         vt = make_type_spec(ValueTypeFamily.UTF8, 0, 0)
         with Writer.to_mem() as w:
+            # An annotation only belongs where a value is expected, so give it a
+            # key: the writer now rejects a bare one, which would produce
+            # "<utf8>" with nothing after it.
+            from bovnar.enums import Event
+            w.emit(Event.ASSIGNMENT_START, key='k')
             w._emit_annotation('utf8', vt, make_unit_none())
+            # ...and a value, so the assignment is complete: the writer now
+            # refuses to finish a document with a dangling ".k=".
+            w.emit(Event.DATA, value='x', vt=vt, vu=make_unit_none())
         out = w.get_output()
         assert b'utf8:0' not in out, \
             "UTF8 annotation with width=0 must not contain a width spec"
@@ -631,7 +639,10 @@ class TestAnnotationRegressions:
         from bovnar.structs import make_type_spec, make_unit_none
         vt = make_type_spec(ValueTypeFamily.UINT, 0, 16)
         with Writer.to_mem() as w:
+            from bovnar.enums import Event
+            w.emit(Event.ASSIGNMENT_START, key='k')
             w._emit_annotation('uint', vt, make_unit_none())
+            w.emit(Event.DATA, value='ff', vt=vt, vu=make_unit_none())
         out = w.get_output()
         assert b'_16' in out, \
             "base=16 must appear in annotation even when width=0"

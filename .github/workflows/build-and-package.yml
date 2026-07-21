@@ -21,7 +21,11 @@ concurrency:
 # highlighters (highlighter/) alongside the headers, libs and CLI.
 # Each job smoke-tests the CLI end to end (split one step per command so a
 # failure pinpoints the offending command from the step status alone). The full
-# C/Python test suite is not run here — it runs via run_tests.sh / CTest.
+# C/Python suite runs in the `tests` job below: it used to be left to whoever
+# remembered to run run_tests.sh locally, which meant nothing gated a push — the
+# shipped WebAssembly artifact drifted 35 commits behind the library, an eol
+# filter corrupted a tracked example so that a fresh clone failed to validate it,
+# and four CTest gates could not fail at all, none of which anything noticed.
 #
 # It also builds the Python wheels + sdist (cibuildwheel matrix) and publishes
 # them to PyPI on a v* tag. Those heavier jobs are gated (see their `if:`) to
@@ -162,6 +166,46 @@ jobs:
 
       - name: smoke - events (binary-mode stdin)
         run: printf '.x = "hi";\n' | ./build/mingw/bovnar.exe events -
+
+  tests:
+    name: Test suite (Linux)
+    runs-on: ubuntu-latest
+    # Everything that gates correctness: the C suite (CTest), the conformance
+    # suite, the fuzz tiers, the WebAssembly freshness check, and the Python
+    # bindings. Kept separate from the packaging jobs so a test failure is
+    # unambiguous and does not also block seeing whether the build itself works.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: CTest
+        run: ctest --test-dir build -j"$(nproc)" --output-on-failure
+
+      # From inside python/, as run_tests.sh does: the package is not installed,
+      # so `bovnar` is only importable with that directory on sys.path.
+      # LIBBOVNAR_PATH must be ABSOLUTE for the same reason -- it is read after
+      # the cd -- and it is the name _ffi.py actually consults.
+      - name: Python bindings
+        run: |
+          python3 -m pip install --quiet pytest
+          cd python && LIBBOVNAR_PATH="$GITHUB_WORKSPACE/build/libbvnr.so" \
+            python3 -m pytest tests -q
+
+      # A second pass under the sanitizers. The Python tests are excluded: they
+      # load libbvnr.so through ctypes into an unsanitized interpreter, which
+      # ASan refuses outright.
+      - name: Sanitizer build
+        run: |
+          cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
+          cmake --build build-asan -j"$(nproc)"
+
+      - name: CTest (ASan + UBSan)
+        run: ctest --test-dir build-asan -j"$(nproc)" -E '^bvnr_py_' --output-on-failure
 
   linux:
     name: Linux (x64)

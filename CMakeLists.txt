@@ -30,6 +30,13 @@ OFF for wheel builds; GCC 14's LTO ICEs on bvn_init_run_luts under manylinux)"
 option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
     ON)
+# Declared HERE, with the other options, not next to the packaging rules further
+# down: CMakeLists_tests.txt is included well before that point, and a test that
+# guards on BVNR_PACKAGE was silently never registered because the variable did
+# not exist yet. An undefined variable is simply false in an if().
+option(BVNR_PACKAGE
+    "On each build, regenerate the amalgamation and pack release archives into the build dir"
+    ON)
 option(BVNR_SANITIZE
     "Build with AddressSanitizer + UndefinedBehaviorSanitizer and pattern-fill \
 uninitialized stack variables (GCC/Clang only; dev/CI diagnostic, never a \
@@ -633,9 +640,6 @@ endif()
 # build (build/mingw) when present. Skipped for the Python wheel build (SKBUILD)
 # and disabled in the inner cross build (BVNR_PACKAGE=OFF above). See
 # cmake/pack_artifacts.cmake.
-option(BVNR_PACKAGE
-    "On each build, regenerate the amalgamation and pack release archives into the build dir"
-    ON)
 if(BVNR_PACKAGE AND NOT SKBUILD)
     find_package(Python3 COMPONENTS Interpreter QUIET)
     set(_bvnr_pkg_py "")

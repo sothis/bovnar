@@ -914,6 +914,15 @@ add_test(
 set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
     LABELS "cli;query" TIMEOUT 30)
 
+# A test that quietly stops registering is worse than one that fails: the suite
+# still reports 100% and the guard is simply gone. That happened once already --
+# bvnr_wasm_freshness guarded on BVNR_PACKAGE, which at this point in the
+# configure had not been declared yet, so the condition was false and the test
+# vanished without a word. Assert the expected count instead of trusting it.
+set(BVNR_EXPECTED_TEST_COUNT 109 CACHE STRING
+    "Number of CTest entries expected in a default configure; a mismatch means \
+a test was added, removed, or silently stopped registering")
+
 # ── Conformance counts vs the documentation ─────────────────────────────────
 # The documented total said 306 in six places while the suite ran 319, and one
 # whole group was missing from the table. Check the numbers instead of copying
@@ -952,3 +961,22 @@ endif()
 # git-ignored), so its regenerate-and-smoke-test (bvnr_amalgam) is disabled.
 # The tooling stays in the tree (amalgamate.py, cmake/amalgam_smoke.cmake) for
 # when it is reinstated.
+
+# ── Registration self-check ─────────────────────────────────────────────────
+# Only meaningful for a default configure; any option that adds or removes tests
+# makes the count legitimately differ, so this compares only when the relevant
+# knobs are at their defaults.
+get_property(_bvnr_all_tests DIRECTORY PROPERTY TESTS)
+list(LENGTH _bvnr_all_tests _bvnr_ntests)
+if(BVNR_PACKAGE AND BVNR_FUZZ_TEST AND NOT BVNR_SANITIZE AND NOT WIN32
+   AND NOT CMAKE_CROSSCOMPILING AND Python3_Interpreter_FOUND)
+    if(NOT _bvnr_ntests EQUAL ${BVNR_EXPECTED_TEST_COUNT})
+        message(FATAL_ERROR
+            "registered ${_bvnr_ntests} tests, expected "
+            "${BVNR_EXPECTED_TEST_COUNT}. If you added or removed one, update "
+            "BVNR_EXPECTED_TEST_COUNT in CMakeLists_tests.txt. If you did not, a "
+            "test has silently stopped registering -- check the conditions "
+            "guarding it.")
+    endif()
+endif()
+message(STATUS "registered ${_bvnr_ntests} tests")

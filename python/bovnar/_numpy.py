@@ -279,7 +279,14 @@ def _leaf(obj, acc):
                                obj.value_type.base)
         if dt:
             acc['dtypes'].add(dt)
+        # DomNode.unit_str is a PROPERTY returning the literal 'no_unit' for a
+        # dimensionless value, where Quantity.unit_str() returns ''. Used raw,
+        # every DOM-sourced array reported a truthy unit string -- contradicting
+        # the documented '' contract and disagreeing with the typed-list path for
+        # the same document.
         us = obj.unit_str
+        if us == 'no_unit':
+            us = ''
         if us:
             acc['units'][us] = obj.unit
         elif obj.dom_type in (DomType.INT, DomType.FLOAT):

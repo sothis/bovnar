@@ -400,9 +400,14 @@ class Quantity:
         return f'Quantity({self.raw!r}, {fam}{u_part})'
 
     def __eq__(self, other) -> bool:
+        # _frac is part of the value. Without it two datetimes 500 ms apart --
+        # same whole-second carrier, different sub-second digits -- compared
+        # equal and collapsed to one entry in a set or dict, silently
+        # deduplicating distinct instants.
         if not isinstance(other, Quantity):
             return NotImplemented
         return (self.raw        == other.raw
+                and self._frac        == other._frac
                 and self.vtype.family == other.vtype.family
                 and self.vtype.width  == other.vtype.width
                 and self.vtype.base   == other.vtype.base
@@ -410,6 +415,7 @@ class Quantity:
 
     def __hash__(self) -> int:
         return hash((self.raw,
+                     self._frac,
                      self.vtype.family,
                      self.vtype.width,
                      self.vtype.base,

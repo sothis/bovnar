@@ -70,3 +70,40 @@ def test_arrays_needing_no_annotation_get_none():
     for line in out.splitlines():
         if line.startswith(".plain") or line.startswith(".mixed"):
             assert "<" not in line, line
+
+
+@needs_lib
+@pytest.mark.parametrize("shape", [(1, 4), (4, 1), (1, 1), (2, 3),
+                                   (1, 2, 3), (2, 1, 3), (1, 5, 2), (4,)])
+def test_numpy_shape_survives_a_roundtrip(shape):
+    """A LEADING length-1 axis was dropped: (1,4) came back as (4,).
+
+    write_array maps the outer list to /-separated rows while the reader maps
+    NESTING to dimensions, and with exactly one row the two disagreed. The
+    format can express it -- ".x = [[0, 1, 2, 3]];" reads back as (1,4) -- so
+    this was a writer collapse, not a format limit.
+    """
+    np = pytest.importorskip("numpy")
+    from bovnar._numpy import to_numpy, array_to_bvnr
+
+    arr = np.arange(int(np.prod(shape)), dtype=np.int32).reshape(shape)
+    out = array_to_bvnr("x", arr)
+    src = out if isinstance(out, (bytes, bytearray)) else out.encode()
+    if not src.startswith(b"#!"):
+        src = b"#!bovnar 1.1\n" + src
+    back = to_numpy(bovnar.loads(src, typed=True)["x"])
+    assert back.shape == shape
+    assert (back == arr).all()
+
+
+@needs_lib
+def test_datetime_fraction_is_part_of_equality():
+    """Two instants 500 ms apart used to compare equal and collapse in a set."""
+    d = bovnar.loads(
+        "#!bovnar 1.1\n"
+        ".t1 = <datetime:64> 2024-01-01T00:00:00.250Z;\n"
+        ".t2 = <datetime:64> 2024-01-01T00:00:00.750Z;\n"
+        ".t3 = <datetime:64> 2024-01-01T00:00:00.250Z;\n", typed=True)
+    assert d["t1"] != d["t2"]
+    assert d["t1"] == d["t3"]
+    assert len({d["t1"], d["t2"], d["t3"]}) == 2

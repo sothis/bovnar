@@ -293,6 +293,19 @@ def write_array(w: Writer,
     else:
         row_list = [rows]
 
+    # A single explicit row is NESTED, not flattened. The outer list maps to
+    # /-separated rows here, but the reader maps NESTING to dimensions, and with
+    # exactly one row the two disagree: [[0,1,2,3]] was written as [0,1,2,3] and
+    # read back with shape (4,) instead of (1,4). The format can express it --
+    # ".x = [[0, 1, 2, 3]];" reads back as (1,4) -- so this is a writer collapse,
+    # not a format limit. Two or more rows are unaffected: [[1,2],[3,4]] stays
+    # [1,2]/[3,4], which already reads back as (2,2).
+    if len(row_list) == 1 and row_list is rows:
+        w.begin_array_row()
+        _emit_array_element(w, row_list[0])
+        w.end_array_row()
+        return
+
     first = True
     for row in row_list:
         if not first:

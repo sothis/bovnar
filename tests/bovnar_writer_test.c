@@ -1679,10 +1679,115 @@ static void test_unit_reduce_annotation_matches_the_value(void)
 	ASSERT_TRUE(strcmp(p1, p2) == 0, "...and is idempotent too");
 }
 
+
+static void test_writer_refuses_unreadable_output(void)
+{
+	/* The writer's contract is that it "cannot be coaxed into emitting a stream
+	 * the reader would reject". These three ways of doing exactly that reported
+	 * success instead. */
+	char out[200000];
+	static char big[70000];
+	memset(big, 'a', sizeof big);
+
+	/* Payloads past the reader's FIXED caps: max_identifier_length is a uint8_t
+	 * and max_string_length/max_symbol_length are uint16_t, so no reader
+	 * configuration can accept more. */
+	struct { const char *lbl; token_type_t tt; uint32_t len; int want; } lim[] = {
+		{ "identifier 255", token_is_identifier, 255,   0 },
+		{ "identifier 256", token_is_identifier, 256,   (int)error_identifier_too_long },
+		{ "string 65535",   token_is_string,     65535, 0 },
+		{ "string 65536",   token_is_string,     65536, (int)error_string_too_long },
+		{ "symbol 65536",   token_is_symbol,     65536, (int)error_symbol_too_long },
+	};
+	for (size_t i = 0; i < sizeof lim / sizeof lim[0]; i++) {
+		bvnr_sink_t sink;
+		bvnr_sink_to_mem(&sink, out, sizeof out);
+		bvnr_writer_t *w = bvnr_writer_create();
+		bvnr_open_write_sink(w, &sink, false, NULL);
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_start, &d);
+		if (lim[i].tt == token_is_identifier) {
+			d.type = lim[i].tt; d.data = big; d.length = lim[i].len;
+			bvnr_write_event(w, ev_assignment_start, &d);
+		} else {
+			d.type = token_is_identifier; d.data = "k"; d.length = 1;
+			bvnr_write_event(w, ev_assignment_start, &d);
+			memset(&d, 0, sizeof d);
+			d.type = lim[i].tt; d.data = big; d.length = lim[i].len;
+			if (lim[i].tt == token_is_string)
+				d.value_type.family = vt_utf8;
+			bvnr_write_event(w, ev_data, &d);
+		}
+		ASSERT_EQ_INT((int)bvnr_writer_get_error(w), lim[i].want,
+			      "a payload past the reader's fixed cap is refused");
+		bvnr_writer_destroy(w);
+	}
+
+	/* A bare number whose digits the lexer cannot read. "5" and "1e3" lex fine
+	 * in any base, so only genuinely unreadable literals are rejected. */
+	static const struct { const char *lit; uint32_t base; int want; } num[] = {
+		{ "18F",  16, (int)error_base_requires_string_literal },
+		{ "18F",  36, (int)error_base_requires_string_literal },
+		{ "1.8p+2", 16, (int)error_base_requires_string_literal },
+		{ "5",    16, 0 },
+		{ "1e3",  16, 0 },
+		{ "255",  10, 0 },
+		{ "inf",  16, 0 },
+	};
+	for (size_t i = 0; i < sizeof num / sizeof num[0]; i++) {
+		bvnr_sink_t sink;
+		bvnr_sink_to_mem(&sink, out, sizeof out);
+		bvnr_writer_t *w = bvnr_writer_create();
+		bvnr_open_write_sink(w, &sink, false, NULL);
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_start, &d);
+		d.type = token_is_identifier; d.data = "k"; d.length = 1;
+		bvnr_write_event(w, ev_assignment_start, &d);
+		memset(&d, 0, sizeof d);
+		d.type = token_is_number;
+		d.value_type = (value_type_spec_t){ .family = vt_float, .width = 64,
+						    .base = num[i].base };
+		if (num[i].base != 16 && num[i].base != 10)
+			d.value_type.family = vt_uint;
+		d.data = num[i].lit; d.length = (uint32_t)strlen(num[i].lit);
+		bvnr_write_event(w, ev_data, &d);
+		ASSERT_EQ_INT((int)bvnr_writer_get_error(w), num[i].want,
+			      "a bare literal is refused iff the lexer cannot read it");
+		bvnr_writer_destroy(w);
+	}
+
+	/* A writer whose open failed has no sink. Events still "succeed" because
+	 * they only fill the internal buffer, so checking their return value does
+	 * not save the caller — the first flush used to jump through a NULL
+	 * function pointer. */
+	{
+		bvnr_writer_t *w = bvnr_writer_create();
+		ASSERT_FALSE(bvnr_open_write_mem(w, NULL, 0, false, NULL),
+			     "opening with no buffer fails");
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_start, &d);
+		d.type = token_is_identifier; d.data = "key"; d.length = 3;
+		bvnr_write_event(w, ev_assignment_start, &d);
+		memset(&d, 0, sizeof d);
+		d.type = token_is_number;
+		d.value_type = (value_type_spec_t){ .family = vt_uint, .width = 64 };
+		d.data = "42"; d.length = 2;
+		bvnr_write_event(w, ev_data, &d);
+		ASSERT_FALSE(bvnr_write_finish(w), "finishing a sinkless writer fails");
+		ASSERT_EQ_INT((int)bvnr_writer_get_error(w), (int)error_writing_to_sink,
+			      "...and says why, rather than crashing");
+		bvnr_writer_destroy(w);
+	}
+}
+
 int main(void)
 {
 	test_unit_reduce_rescales_the_value();
 	test_unit_reduce_annotation_matches_the_value();
+	test_writer_refuses_unreadable_output();
 	printf("Running bovnar_writer_test regression suite...\n");
 
 	test_write_version_directive();

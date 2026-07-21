@@ -98,6 +98,15 @@ bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
 bool bvn_ser_flush_wbuf(bvnr_serializer_t* s)
 {
 	if (!s->wbuf_pos) return true;
+	/* A writer whose bvnr_open_write_* failed has no sink, so sink.push is NULL.
+	 * Events still "succeed" up to this point because they only fill wbuf, so a
+	 * caller checking every return value learns nothing — and the first flush,
+	 * usually from bvnr_write_finish, then jumped through the null pointer.
+	 * Fail cleanly instead. */
+	if (!bvn_sink_impl(&s->sink)->push) {
+		s->ser_error = error_writing_to_sink;
+		return false;
+	}
 	if (!bvn_sink_push(&s->sink, s->wbuf, s->wbuf_pos)) return false;
 	s->wbuf_pos = 0;
 	return true;
@@ -209,7 +218,12 @@ static bool bvn_validate_id_for_writer(bvnr_writer_t* w,
 	memcpy(buf, data, length);
 	buf[length] = '\0';
 	bool ok = true;
-	if (!bvn_validate_identifier(buf))
+	/* The reader's identifier limit is a uint8_t, so NO reader configuration can
+	 * accept more than 255 bytes. Emitting a longer one produced a document
+	 * nothing could read back, reported as success. */
+	if (length > UINT8_MAX)
+		ok = bvn_writer_set_error(w, error_identifier_too_long);
+	else if (!bvn_validate_identifier(buf))
 		ok = bvn_writer_set_error(w, error_invalid_argument);
 	if (need_free) free(buf);
 	return ok;
@@ -593,11 +607,48 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (tt == token_is_null_value) {
 		} else if (tt == token_is_number ||
 				   tt == token_is_array_number) {
+			/* A bare literal can only be read back in a base whose digits the
+			 * lexer accepts unquoted. Above base 10 the digits are letters, which
+			 * the grammar requires in a string literal — the reader even has
+			 * error_base_requires_string_literal for it, but never got the chance
+			 * because the writer emitted the bare token happily. */
+			if (bvn_type_is_numeric(vt) && bvn_effective_base(vt) > 10u &&
+			    data->data) {
+				/* The bare-number lexer only accepts [0-9.+-eE]; a letter used
+				 * as a digit in a base above ten has to arrive in a string
+				 * literal. The writer used to emit "<uint:64,_16> 18F" bare and
+				 * report success for a document the reader answers with
+				 * unexpected_input_byte. "5" and "1e3" stay bare — they lex
+				 * fine — so this rejects only what is genuinely unreadable.
+				 * nan/inf/ninf are keywords, not digits, and are exempt. */
+				char sb[8] = {0};
+				bool special = data->length < sizeof sb && data->data &&
+					(memcpy(sb, data->data, data->length),
+					 bvn_is_special_number_string(sb));
+				if (!special) {
+					const char *p = (const char *)data->data;
+					for (uint32_t i = 0; i < data->length; i++) {
+						char ch = p[i];
+						if ((ch >= '0' && ch <= '9') || ch == '.' ||
+						    ch == '+' || ch == '-' ||
+						    ch == 'e' || ch == 'E')
+							continue;
+						return bvn_writer_set_error(w,
+							error_base_requires_string_literal);
+					}
+				}
+			}
 			if (!bvn_validate_number_for_writer(w,
 					data->data, data->length, vt))
 				return false;
 		} else if (tt == token_is_string ||
 				   tt == token_is_array_string) {
+			/* The reader's max_string_length is a uint16_t, so no reader
+			 * configuration can accept more than 65535 bytes. Writing a longer
+			 * one produced a document nothing could read back, reported as
+			 * success. Same reasoning as the identifier cap. */
+			if (data->length > UINT16_MAX)
+				return bvn_writer_set_error(w, error_string_too_long);
 			if (!bvn_validate_string_content(w,
 					(const uint8_t*)data->data, data->length))
 				return false;
@@ -618,6 +669,8 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 				return bvn_writer_set_error(w,
 					error_type_value_mismatch);
 		} else if (tt == token_is_symbol) {
+			if (data->length > UINT16_MAX)
+				return bvn_writer_set_error(w, error_symbol_too_long);
 			if (!bvn_validate_symbol_for_writer(w,
 					data->data, data->length))
 				return false;
@@ -1443,10 +1496,14 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 		return false;
 	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0)
 		return bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
-	if (!bvn_ser_finish_stream(&w->ser))
+	w->ser.ser_error = error_none;
+	if (!bvn_ser_finish_stream(&w->ser)) {
+		if (w->ser.ser_error != error_none)
+			return bvn_writer_set_error(w, w->ser.ser_error);
 		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
 			? error_sink_buffer_exhausted
 			: error_writing_to_sink);
+	}
 	{
 		bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
 		if (si->flush) {

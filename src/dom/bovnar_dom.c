@@ -414,6 +414,14 @@ bool bvn_dom_get_bool(const bvn_dom_node_t *node, bool *out)
 	*out = node->val.int_val != 0;
 	return true;
 }
+/* True for a family whose narrow carrier is a SIGNED int64 (so a negative value
+ * is genuinely negative rather than a large unsigned one). datetime counts:
+ * epoch seconds run before 1970. */
+static bool dom_family_is_signed(const bvn_dom_node_t *node)
+{
+	return node->value_type.family == vt_sint ||
+	       node->value_type.family == vt_datetime;
+}
 bool bvn_dom_get_float(const bvn_dom_node_t *node, double *out)
 {
 	if (!node || !out) return false;
@@ -423,10 +431,38 @@ bool bvn_dom_get_float(const bvn_dom_node_t *node, double *out)
 	}
 	if (node->type == BVN_DOM_INT) {
 		if (node->value_type.width > 64u) {
+			/* A bignum beyond int64 is still a perfectly good double. Try the
+			 * cheap integer paths, then fall back to its decimal text: funnelling
+			 * everything through bvn_int_to_int64 made a uint:128 of 1e20 fail,
+			 * and bvn_dom_get_value_in_base_units turned that failure into an
+			 * exact 0.0 — indistinguishable from its "no SI mapping" signal. */
 			int64_t v;
-			if (!node->val.bigint || !bvn_int_to_int64(node->val.bigint, &v))
-				return false;
-			*out = (double)v;
+			if (node->val.bigint && bvn_int_to_int64(node->val.bigint, &v)) {
+				*out = (double)v;
+				return true;
+			}
+			uint64_t uv;
+			if (node->val.bigint && bvn_int_to_uint64(node->val.bigint, &uv)) {
+				*out = (double)uv;
+				return true;
+			}
+			if (!node->val.bigint) return false;
+			{
+				int bits = bvn_int_bitlen(node->val.bigint);
+				size_t sz = bvn_int_str_bufsize(
+					(uint32_t)(bits > 0 ? bits : 1), 10u);
+				char *txt = malloc(sz);
+				if (!txt) return false;
+				bool ok = bvn_int_to_str(node->val.bigint, txt, sz, 10u) >= 0;
+				if (ok) *out = bvn_float_strtod(txt);
+				free(txt);
+				return ok;
+			}
+		}
+		/* An unsigned width-64 value above INT64_MAX must not be read back as a
+		 * negative double. */
+		if (!dom_family_is_signed(node) && node->val.int_val < 0) {
+			*out = (double)(uint64_t)node->val.int_val;
 			return true;
 		}
 		*out = (double)node->val.int_val;
@@ -494,14 +530,12 @@ double bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node)
 	if (node->type == BVN_DOM_FLOAT) {
 		raw = node->val.float_val;
 	} else if (node->type == BVN_DOM_INT) {
-		if (node->value_type.width > 64u) {
-			int64_t v;
-			if (!node->val.bigint || !bvn_int_to_int64(node->val.bigint, &v))
-				return 0.0;
-			raw = (double)v;
-		} else {
-			raw = (double)node->val.int_val;
-		}
+		/* Reuse the accessor rather than repeating the carrier logic: this used
+		 * to funnel a bignum through bvn_int_to_int64 and return 0.0 when it did
+		 * not fit — the same value this function uses to signal "no SI mapping",
+		 * so a caller could not tell 1e23 metres from an unconvertible unit. */
+		if (!bvn_dom_get_float(node, &raw))
+			return 0.0;
 	} else {
 		return 0.0;
 	}
@@ -621,6 +655,14 @@ static bool dom_raw_i64(const bvn_dom_node_t *node, int64_t *out)
 	if (!node || node->type != BVN_DOM_INT || !out) return false;
 	if (node->value_type.width > 64u)
 		return node->val.bigint && bvn_int_to_int64(node->val.bigint, out);
+	/* A width-64 uint above INT64_MAX does not fit an int64. The narrow carrier
+	 * holds its bit pattern, and handing that back reinterpreted as signed
+	 * returned -1 for 18446744073709551615 — with a true return, against this
+	 * header's explicit promise of "no clamping or truncation". The fixed-width
+	 * wrappers then range-check the already-wrong number, so get_i8 "succeeded"
+	 * too. */
+	if (!dom_family_is_signed(node) && node->val.int_val < 0)
+		return false;
 	*out = node->val.int_val;
 	return true;
 }
@@ -629,7 +671,9 @@ static bool dom_raw_u64(const bvn_dom_node_t *node, uint64_t *out)
 	if (!node || node->type != BVN_DOM_INT || !out) return false;
 	if (node->value_type.width > 64u)
 		return node->val.bigint && bvn_int_to_uint64(node->val.bigint, out);
-	if (node->value_type.family == vt_sint && node->val.int_val < 0)
+	/* Guarding only vt_sint let a pre-epoch datetime through: its carrier is
+	 * signed too, so -315619200 came back as 18446744073393932416. */
+	if (dom_family_is_signed(node) && node->val.int_val < 0)
 		return false;
 	*out = (uint64_t)node->val.int_val;
 	return true;

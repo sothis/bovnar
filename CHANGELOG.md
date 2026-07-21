@@ -106,6 +106,37 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **The DOM's integer accessors returned wrong values instead of failing.**
+  `include/bovnar_dom.h` promises they "return false (leaving \*out UNCHANGED —
+  no clamping or truncation)" when a value does not fit, but `dom_raw_i64` handed
+  back a width-64 `uint`'s bit pattern reinterpreted as signed, so
+  `18446744073709551615` read as `-1` with a `true` return — and the fixed-width
+  wrappers then range-checked the already-wrong number, so `get_i8` "succeeded"
+  too. `dom_raw_u64` guarded only `vt_sint`, so a pre-epoch `datetime` (a signed
+  carrier) came back as `18446744073393932416`. Both now check the family's
+  signedness. `bvn_dom_get_float` shared the fault and additionally refused any
+  bignum beyond `int64`; it now renders those through their decimal text, which
+  also fixes `bvn_dom_get_value_in_base_units` returning an exact `0.0` for a
+  `uint:128` — the same value it uses to mean "no SI mapping", so a caller could
+  not tell 1e23 metres from an unconvertible unit.
+- **The writer could emit documents its own reader rejects**, against its stated
+  contract that it "cannot be coaxed into emitting a stream the reader would
+  reject":
+  - An identifier over 255 bytes, or a string/symbol over 65535, was written and
+    reported as success. Those are the reader's *fixed* caps (`uint8_t` and
+    `uint16_t`), so no reader configuration can accept more. Now
+    `error_identifier_too_long` / `error_string_too_long` /
+    `error_symbol_too_long`.
+  - A bare number token whose digits the lexer cannot read — `<uint:64,_16> 18F`,
+    where `F` is a digit in base 16 but not a bare-number character — was emitted
+    happily; the reader answers `unexpected_input_byte`. Now
+    `error_base_requires_string_literal`, which until this release was an enum
+    member nothing ever set. `5` and `1e3` still write bare in any base, because
+    the lexer does read those.
+- **A writer whose `bvnr_open_write_*` failed crashed on the first flush.** The
+  sink's `push` is NULL, and nothing checked it; events kept returning `true`
+  because they only fill the internal buffer, so checking every return value did
+  not help. It now fails cleanly with `error_writing_to_sink`.
 - **`BVN_UNIT_REDUCE` wrote values that did not match their unit.** The flag
   folds every prefix out of the unit — `k~m` becomes `m` — and the formatter
   discarded the scale `bvn_unit_reduce` hands back, while the writer emitted the

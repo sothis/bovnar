@@ -90,10 +90,18 @@ add_executable(bvnr_float_fix_dec_test tests/bvn_float_fix_dec_test.c)
 target_compile_options(bvnr_float_fix_dec_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_float_fix_dec_test PRIVATE bvnr_static)
 
+# NOTE on gating: these four binaries return non-zero when a case fails, so the
+# exit code is the reliable signal. They used to carry a PASS_REGULAR_EXPRESSION
+# instead -- which CTest treats as a REPLACEMENT for the exit code, not an
+# addition -- and the patterns were substrings of their own failure output:
+# "0 failed" matches "10 failed", and "Results:.*0 failures" matches
+# "Results: 641 tests, 10 failures". A run with 10, 20 or 100 failures was
+# reported green. The counters accumulate without aborting, so that is reachable.
+# Exit code now gates; FAIL_REGULAR_EXPRESSION is a second line of defence.
 add_test(NAME bvnr_float_fix_dec_test COMMAND bvnr_float_fix_dec_test)
 set_tests_properties(bvnr_float_fix_dec_test PROPERTIES
     LABELS "unit;float_fix;float_dec"
-    PASS_REGULAR_EXPRESSION "0 failed")
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed")
 
 add_test(NAME bvnr_dom_test COMMAND bvnr_dom_test)
 set_tests_properties(bvnr_dom_test PROPERTIES
@@ -103,12 +111,12 @@ set_tests_properties(bvnr_dom_test PROPERTIES
 add_test(NAME bvnr_si_test COMMAND bvnr_si_test)
 set_tests_properties(bvnr_si_test PROPERTIES
     LABELS "unit;si"
-    PASS_REGULAR_EXPRESSION "Results:.*0 failures")
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
 add_test(NAME bvnr_unit_ext_test COMMAND bvnr_unit_ext_test)
 set_tests_properties(bvnr_unit_ext_test PROPERTIES
     LABELS "unit;si;units_ext"
-    PASS_REGULAR_EXPRESSION "Results:.*0 failures")
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
 add_test(NAME bvnr_reader_test COMMAND bvnr_reader_test)
 set_tests_properties(bvnr_reader_test PROPERTIES
@@ -151,7 +159,7 @@ set_tests_properties(bvnr_high_severity_test PROPERTIES
 add_test(NAME bvnr_currency_test COMMAND bvnr_currency_test)
 set_tests_properties(bvnr_currency_test PROPERTIES
     LABELS "unit;currency"
-    PASS_REGULAR_EXPRESSION "Results:.*0 failures")
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
 add_test(NAME bvnr_int_test COMMAND bvnr_int_test)
 set_tests_properties(bvnr_int_test PROPERTIES
@@ -767,19 +775,22 @@ add_test(
 set_tests_properties(bvnr_cli_inline_currency_preserved PROPERTIES
     LABELS "cli;examples;currency" TIMEOUT 30)
 
-_bvnr_cli_example(arrays)
-_bvnr_cli_example(floats)
-_bvnr_cli_example(integers)
-_bvnr_cli_example(references)
-_bvnr_cli_example(strings)
-_bvnr_cli_example(structs)
-_bvnr_cli_example(symbols)
-_bvnr_cli_example(test)
-_bvnr_cli_example(units)
-_bvnr_cli_example(financial)
-_bvnr_cli_example(crypto_portfolio)
-_bvnr_cli_example(versioned)
-_bvnr_cli_example(datetime)
+# Glob rather than list. The hand-maintained list had drifted to 13 of the 15
+# files, and the two it omitted were numpy_roundtrip and octet_streams -- the
+# latter being exactly the file that a .gitattributes eol filter had silently
+# corrupted in git, so no test ever noticed that a fresh clone failed to
+# validate it. CONFIGURE_DEPENDS re-globs when a file is added or removed.
+file(GLOB _bvnr_examples CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/examples/*.bvnr")
+list(LENGTH _bvnr_examples _bvnr_nexamples)
+if(_bvnr_nexamples LESS 1)
+    message(FATAL_ERROR "no examples/*.bvnr found -- the glob is wrong")
+endif()
+foreach(_bvnr_ex ${_bvnr_examples})
+    get_filename_component(_bvnr_stem "${_bvnr_ex}" NAME_WE)
+    _bvnr_cli_example(${_bvnr_stem})
+endforeach()
+message(STATUS "registered ${_bvnr_nexamples} example documents")
 
 # Cross-tier regression: the canonical (pretty-printed) form of a datetime
 # document — whose arrays annotate only the first element and leave the rest

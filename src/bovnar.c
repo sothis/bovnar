@@ -2461,6 +2461,12 @@ static void bmark_print_result(const bmark_result_t *r, uint32_t iterations)
 		       mb_per_sec, assign_per_sec, events_per_sec);
 	}
 }
+static bool bmark_any_profile(void)
+{
+	for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
+		if (bmark_cfg.profiles[i]) return true;
+	return false;
+}
 static void bmark_parse_profile_list(const char *list)
 {
 	for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
@@ -2503,18 +2509,67 @@ static void bmark_parse_size_list(const char *list)
 	}
 	free(copy);
 }
+/* Parse a bounded count for a bench option. strtoul wraps a leading '-' into a
+ * huge positive value, and neither errno nor the end pointer reports it, so
+ * "--iterations -1" became 4294967295 rounds and the CLI hung for hours; the
+ * "< 1" clamp below it could never fire. "--iterations abc" silently became the
+ * default with no diagnostic. Same class as the guard on mux pack's channel id.
+ * Returns false and complains on anything that is not a plain decimal count. */
+static bool bench_parse_count(const char *opt, const char *arg,
+			      unsigned long max, uint32_t *out)
+{
+	if (!arg || !*arg || arg[0] == '-' || arg[0] == '+' ||
+	    arg[0] == ' ' || arg[0] == '\t') {
+		fprintf(stderr, "bench: %s wants a plain non-negative number, got '%s'\n",
+			opt, arg ? arg : "");
+		return false;
+	}
+	char *end = NULL;
+	errno = 0;
+	unsigned long v = strtoul(arg, &end, 10);
+	if (end == arg || *end != '\0' || errno != 0) {
+		fprintf(stderr, "bench: %s wants a plain non-negative number, got '%s'\n",
+			opt, arg);
+		return false;
+	}
+	if (v > max) {
+		fprintf(stderr, "bench: %s %lu exceeds the maximum of %lu\n",
+			opt, v, max);
+		return false;
+	}
+	*out = (uint32_t)v;
+	return true;
+}
 static int cmd_bench(int argc, char **argv)
 {
 	for (int i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "--profile") == 0 && i + 1 < argc) {
+			/* Both list parsers clear the defaults before parsing, so a
+			 * value that names nothing left an empty selection and the
+			 * benchmark printed an empty table and exited 0 -- "bench
+			 * --profile bogus" looked like a successful run of nothing. */
 			bmark_parse_profile_list(argv[++i]);
+			if (!bmark_any_profile()) {
+				fprintf(stderr, "bench: --profile '%s' selects no "
+					"known profile\n", argv[i]);
+				return 2;
+			}
 		} else if (strcmp(argv[i], "--size") == 0 && i + 1 < argc) {
 			bmark_parse_size_list(argv[++i]);
+			if (bmark_cfg.num_sizes == 0) {
+				fprintf(stderr, "bench: --size '%s' selects no "
+					"payload size\n", argv[i]);
+				return 2;
+			}
 		} else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
-			bmark_cfg.iterations = (uint32_t)strtoul(argv[++i], NULL, 10);
+			if (!bench_parse_count("--iterations", argv[++i],
+					       10000000ul, &bmark_cfg.iterations))
+				return 2;
 			if (bmark_cfg.iterations < 1) bmark_cfg.iterations = 1;
 		} else if (strcmp(argv[i], "--warmup") == 0 && i + 1 < argc) {
-			bmark_cfg.warmup = (uint32_t)strtoul(argv[++i], NULL, 10);
+			if (!bench_parse_count("--warmup", argv[++i],
+					       10000000ul, &bmark_cfg.warmup))
+				return 2;
 		} else if (strcmp(argv[i], "--verbose") == 0) {
 			bmark_cfg.verbose = true;
 		} else if (strcmp(argv[i], "--json") == 0) {

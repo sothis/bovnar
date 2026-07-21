@@ -1407,7 +1407,12 @@ bool bvn_unit_valid(value_unit_t u)
 		return false;
 	for (uint32_t i = 0; i < u.num_components; i++) {
 		const value_unit_component_t *c = &u.components[i];
-		if (c->exponent == exp_invalid)
+		/* bvn_exponent_to_int returns 0 both for exp_invalid and for a value
+		 * outside unit_exponent_t. Checking only for exp_invalid let an
+		 * exponent of, say, 10 through here and into arithmetic that cannot
+		 * represent it — the formatter dropped it silently and the factor
+		 * helpers had no defined answer. */
+		if (bvn_exponent_to_int(c->exponent) == 0)
 			return false;
 		if ((uint32_t)c->base >= BVN_VALUE_BASE_UNIT_COUNT)
 			return false;
@@ -1557,6 +1562,15 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 		buf[7] = '\0';
 		return 7;
 	}
+	/* Past the "no_unit" shapes above, a bu_none component has no spelling: the
+	 * base contributes no symbol, so a prefixed or exponentiated one formats as
+	 * a bare "k~" or "²" and a compound as "m·k~" — text this library's own
+	 * parser rejects, which the writer would then embed in a document. Refuse
+	 * instead of emitting something unreadable. */
+	for (uint32_t i = 0; i < nc; i++) {
+		if (u.components[i].base == bu_none)
+			return -1;
+	}
 	bool ascii = (flags & BVN_UNIT_ASCII_EXP) != 0;
 	if (nc == 1) {
 		return bvn_write_unit_component_ex(
@@ -1659,6 +1673,13 @@ int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize)
 		buf[7] = '\0';
 		return 7;
 	}
+	/* Same guard as bvn_unit_to_string_ex: a bu_none component past the
+	 * "no_unit" shapes above has no spelling, and emitting "m·k~" would put text
+	 * into a document that this library's own parser rejects. */
+	for (uint32_t i = 0; i < nc; i++) {
+		if (u.components[i].base == bu_none)
+			return -1;
+	}
 	if (nc == 1) {
 		return bvn_write_unit_component(
 			buf, bufsize, &u.components[0]);
@@ -1740,8 +1761,8 @@ double bvn_unit_prefix_factor(value_unit_t u)
 {
 	double f = 1.0;
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
-		if (u.components[i].exponent == exp_invalid)
-			continue;
+		if (bvn_exponent_to_int(u.components[i].exponent) == 0)
+			continue;                  /* exp_invalid, or outside the enum */
 		f *= bvn_single_component_factor(u.components[i]);
 	}
 	return f;
@@ -1750,8 +1771,8 @@ int32_t bvn_unit_prefix_exponent(value_unit_t u)
 {
 	int32_t total = 0;
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
-		if (u.components[i].exponent == exp_invalid)
-			continue;
+		if (bvn_exponent_to_int(u.components[i].exponent) == 0)
+			continue;                  /* exp_invalid, or outside the enum */
 		total += bvni_prefix_exp_int(u.components[i]);
 	}
 	return total;

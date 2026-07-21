@@ -142,6 +142,30 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))
+/*
+ * Structural validity of a unit, WITHOUT requiring an SI conversion row.
+ *
+ * This is the shared precondition of the identity short-circuits below. They
+ * must accept a unit that has no SI mapping — a currency — and one whose factor
+ * is irrational, because neither property means anything for the identity map.
+ * What they must NOT accept is a malformed unit: an exp_invalid component, a
+ * prefix the base does not allow, a base index off the end of the table. Every
+ * other entry point in this file rejects those, and skipping the check here
+ * would make the identity path the one place in the library that silently
+ * accepts a unit nothing else will.
+ */
+static bool bvn_unit_structurally_valid(value_unit_t u)
+{
+	if (u.num_components > BVNR_MAX_UNIT_COMPONENTS)
+		return false;
+	for (uint32_t i = 0; i < u.num_components; i++) {
+		const value_unit_component_t *c = &u.components[i];
+		if ((uint32_t)c->base >= SI_CONV_TABLE_SIZE)  return false;
+		if (c->exponent == exp_invalid)               return false;
+		if (!bvn_prefix_unit_valid(c->prefix, c->base)) return false;
+	}
+	return true;
+}
 static void bvn_verify_conv_table(void)
 {
 #ifndef NDEBUG
@@ -308,7 +332,16 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 {
 	*ok             = true;
 	*requires_affine = false;
+	/* An identity conversion has factor 1 whatever the unit is — no offset, no SI
+	 * mapping needed. But this is only a FALLBACK for the pairs the normal path
+	 * refuses (a currency, which deliberately has no SI row): every pair it
+	 * already handles keeps its previous result, including the requires_affine
+	 * signal callers read for °C -> °C. bvn_unit_convert_value and
+	 * bvn_unit_convert_rational short-circuit earlier because they must also
+	 * rescue an irrational factor, which has no bearing on an identity. */
 	if (!bvn_units_compatible(a, b)) {
+		if (bvn_unit_equal(a, b) && bvn_unit_structurally_valid(a))
+			return 1.0;
 		*ok = false;
 		return 0.0;
 	}
@@ -331,30 +364,6 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 		return 0.0;
 	}
 	return fa / fb;
-}
-/*
- * Structural validity of a unit, WITHOUT requiring an SI conversion row.
- *
- * This is the shared precondition of the identity short-circuits below. They
- * must accept a unit that has no SI mapping — a currency — and one whose factor
- * is irrational, because neither property means anything for the identity map.
- * What they must NOT accept is a malformed unit: an exp_invalid component, a
- * prefix the base does not allow, a base index off the end of the table. Every
- * other entry point in this file rejects those, and skipping the check here
- * would make the identity path the one place in the library that silently
- * accepts a unit nothing else will.
- */
-static bool bvn_unit_structurally_valid(value_unit_t u)
-{
-	if (u.num_components > BVNR_MAX_UNIT_COMPONENTS)
-		return false;
-	for (uint32_t i = 0; i < u.num_components; i++) {
-		const value_unit_component_t *c = &u.components[i];
-		if ((uint32_t)c->base >= SI_CONV_TABLE_SIZE)  return false;
-		if (c->exponent == exp_invalid)               return false;
-		if (!bvn_prefix_unit_valid(c->prefix, c->base)) return false;
-	}
-	return true;
 }
 /*
  * Convert one numeric quantity from `from` into `to`, handling both the simple
@@ -746,14 +755,26 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	memset(acc, 0, sizeof(acc));
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
 		const value_unit_component_t *c = &u.components[i];
-		if (c->base == bu_none)
-			continue;
-		if (c->exponent == exp_invalid)
+		int32_t uexp = bvn_exponent_to_int(c->exponent);
+		if (uexp == 0)                 /* exp_invalid, or outside the enum */
 			continue;
 		if (!bvn_prefix_unit_valid(c->prefix, c->base))
 			continue;
-		int32_t uexp = bvn_exponent_to_int(c->exponent);
 		int32_t pexp = bvni_prefix_exp_int(*c);
+		/* bu_none contributes no dimension, so it must not survive into the
+		 * reduced unit — but it CAN carry a prefix, and dropping the whole
+		 * component dropped that prefix's scale too. Fold the scale in, then
+		 * drop it. (bvn_unit_to_si_rational had the same defect; this was the
+		 * last function that still disagreed about a dimensionless kilo.) */
+		if (c->base == bu_none) {
+			if (pexp != 0) {
+				*scale *= (c->prefix.system == prefix_iec)
+					? bvni_ipow(2.0, pexp) : bvni_pow10(pexp);
+				if (isinf(*scale) && overflow)
+					*overflow = true;
+			}
+			continue;
+		}
 		accum_t *a = NULL;
 		for (uint32_t j = 0; j < acc_count; j++) {
 			if (acc[j].base == c->base) {

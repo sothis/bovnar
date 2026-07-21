@@ -2005,6 +2005,109 @@ static void test_identity_still_validates_structure(void)
 		    "irrational-factor identity converts");
 }
 
+
+static void test_malformed_exponent_never_aborts(void)
+{
+	printf("  out-of-enum exponent is rejected, not fatal...\n");
+	/* A caller can fill a value_unit_t by hand, and an exponent outside
+	 * unit_exponent_t used to pass bvn_unit_valid, get silently dropped by the
+	 * formatter, and then trip an assert() that the shipped Release build kept
+	 * live — a library taking down its host process over a bad argument. */
+	value_unit_t u = BVN_UNIT_NO_PREFIX(bu_meter);
+	u.components[0].exponent = (unit_exponent_t)10;
+	char buf[64];
+	ASSERT_TRUE(!bvn_unit_valid(u), "out-of-enum exponent fails bvn_unit_valid");
+	ASSERT_TRUE(bvn_unit_to_string(u, buf, sizeof buf) < 0,
+		    "out-of-enum exponent is refused, not silently dropped");
+	/* These must simply return; reaching them at all used to abort. */
+	(void)bvn_unit_prefix_factor(u);
+	(void)bvn_unit_prefix_exponent(u);
+	double scale = 1.0; bool ovf = false;
+	(void)bvn_unit_reduce(u, &scale, &ovf);
+	bool ok = true;
+	(void)bvn_unit_to_si_factor(u, &(bool){0}, &(double){0}, &ok);
+	ASSERT_TRUE(!ok, "out-of-enum exponent has no SI factor");
+}
+
+static void test_unwritable_units_are_refused(void)
+{
+	printf("  bu_none components do not format as unparseable text...\n");
+	/* bu_none contributes no symbol, so anything past the plain "no_unit" shape
+	 * formatted as "k~" or "m·k~" — which this library's own parser rejects, and
+	 * which the writer would have embedded in a document. */
+	char buf[64];
+	ASSERT_TRUE(bvn_unit_to_string(BVN_UNIT_NO_PREFIX(bu_none), buf, sizeof buf) == 7 &&
+		    strcmp(buf, "no_unit") == 0, "the plain dimensionless unit still formats");
+
+	value_unit_t bad[] = {
+		BVN_UNIT_SI(bu_none, si_kilo),
+		BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear, bu_none, si_none, exp_linear),
+		BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear, bu_none, si_kilo, exp_linear),
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+		ASSERT_TRUE(bvn_unit_to_string(bad[i], buf, sizeof buf) < 0,
+			    "an unwritable bu_none unit is refused by the formatter");
+		/* and whatever it does produce must never be text the parser rejects */
+		int32_t n = bvn_unit_to_string_ex(bad[i], buf, sizeof buf, BVN_UNIT_REDUCE);
+		if (n >= 0) {
+			bool pok = false;
+			(void)bvn_parse_unit((const uint8_t *)buf, &pok);
+			ASSERT_TRUE(pok, "REDUCE output round-trips through the parser");
+		}
+	}
+}
+
+static void test_reduce_keeps_a_prefixed_dimensionless_scale(void)
+{
+	printf("  reduce folds a prefixed bu_none into the scale...\n");
+	/* bu_none carries no dimension but it CAN carry a prefix. Dropping the whole
+	 * component dropped that 1000x with it — the same defect fixed earlier in
+	 * bvn_unit_to_si_rational, of which this was the last holdout. */
+	double scale = 1.0; bool ovf = false;
+	value_unit_t r = bvn_unit_reduce(BVN_UNIT_SI(bu_none, si_kilo), &scale, &ovf);
+	ASSERT_EQ_INT((int64_t)r.num_components, 0,
+		      "a dimensionless component does not survive reduction");
+	ASSERT_EQ_DBL(scale, 1000.0, 1e-9, "...but its prefix scale does");
+	ASSERT_TRUE(!ovf, "no overflow reported");
+
+	/* and it must not resurrect the component in a compound */
+	value_unit_t mixed = BVN_UNIT_COMPOUND2(bu_meter, si_none, exp_linear,
+						bu_none, si_kilo, exp_linear);
+	scale = 1.0; ovf = false;
+	r = bvn_unit_reduce(mixed, &scale, &ovf);
+	ASSERT_EQ_INT((int64_t)r.num_components, 1, "only the metre survives");
+	ASSERT_EQ_INT((int64_t)r.components[0].base, (int64_t)bu_meter, "and it is the metre");
+	ASSERT_EQ_DBL(scale, 1000.0, 1e-9, "with the dimensionless kilo folded in");
+}
+
+static void test_convert_factor_identity(void)
+{
+	printf("  convert_factor identity...\n");
+	/* bvn_unit_convert_value and _rational grew an identity short-circuit; the
+	 * public factor API did not, so it still refused $USD -> $USD — and Python's
+	 * convert_factor with it. */
+	bool ok = false, aff = false;
+	value_unit_t usd = bvn_parse_unit((const uint8_t *)"$USD", &ok);
+	if (ok) {
+		bool cok = false;
+		double f = bvn_unit_convert_factor(usd, usd, &cok, &aff);
+		ASSERT_TRUE(cok && f == 1.0, "a currency converts to itself with factor 1");
+	}
+	/* A pair the normal path already handled must keep its exact old answer,
+	 * including the requires_affine signal. */
+	bool cok = false; aff = false;
+	double f = bvn_unit_convert_factor(BVN_UNIT_NO_PREFIX(bu_celsius),
+					   BVN_UNIT_NO_PREFIX(bu_celsius), &cok, &aff);
+	ASSERT_TRUE(cok && f == 1.0 && aff,
+		    "degC -> degC keeps ok, factor 1 and requires_affine");
+	/* Malformed stays refused. */
+	value_unit_t bad = BVN_UNIT_NO_PREFIX(bu_meter);
+	bad.components[0].exponent = exp_invalid;
+	cok = false;
+	(void)bvn_unit_convert_factor(bad, bad, &cok, &aff);
+	ASSERT_TRUE(!cok, "a malformed unit is still refused by convert_factor");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -2037,6 +2140,10 @@ int main(void)
 	test_prefix_exponent_interaction();
 	test_rational_matches_double_path();
 	test_identity_still_validates_structure();
+	test_malformed_exponent_never_aborts();
+	test_unwritable_units_are_refused();
+	test_reduce_keeps_a_prefixed_dimensionless_scale();
+	test_convert_factor_identity();
 	test_unit_reduce();
 	test_unit_reduce_full_cancel_si();
 	test_unit_reduce_iec();

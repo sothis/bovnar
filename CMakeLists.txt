@@ -139,11 +139,17 @@ endif()
 
 # These are GCC/Clang flag spellings; on MSVC let CMake supply its own
 # per-config defaults (/Od /Zi, /O2, etc.).
+# These FORCE-overrides replace CMake's per-config defaults wholesale, so -DNDEBUG
+# has to be spelled out for the optimised configurations — CMake supplies it in
+# its own Release/MinSizeRel/RelWithDebInfo defaults, and dropping it silently
+# left assert() live in the shipped libbvnr. An assert in a library aborts the
+# HOST process, which is never an acceptable answer to a caller's bad argument;
+# the library returns errors for those instead. Debug keeps asserts on purpose.
 if(NOT MSVC)
     set(CMAKE_C_FLAGS_DEBUG          "-O0 -g3" CACHE STRING "C flags for Debug"           FORCE)
-    set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for Release"         FORCE)
-    set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0" CACHE STRING "C flags for MinSizeRel"      FORCE)
-    set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
+    set(CMAKE_C_FLAGS_RELEASE        "-O3 -g0 -DNDEBUG${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for Release"         FORCE)
+    set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -g0 -DNDEBUG" CACHE STRING "C flags for MinSizeRel"      FORCE)
+    set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g3 -DNDEBUG${BVNR_LTO_CFLAGS}" CACHE STRING "C flags for RelWithDebInfo"  FORCE)
 endif()
 
 if(BVNR_LTO

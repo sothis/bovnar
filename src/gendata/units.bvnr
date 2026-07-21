@@ -1311,6 +1311,16 @@
     .affine  = false;
     .offset  = 0.0;
     # Exact rational: 1 rpm = 1/60 Hz (non-terminating in base 10).
+    #
+    # rpm counts CYCLES per minute, so its SI target is s-1 and the factor is
+    # 1/60 exactly. Note this deliberately does NOT agree with the compound
+    # "rev/min": `revolution` below is an ANGLE of 2*pi radians, so rev/min is
+    # 2*pi/60 s-1. Both conventions are standard and both are wanted, but because
+    # SI treats the radian as dimensionless the two land in the same dimension
+    # and the library will happily "convert" between them, off by 2*pi. Do not
+    # reconcile them by changing either factor -- fixing this properly means
+    # tracking an angle exponent separately, the way bit/byte already are
+    # (see info_net_exponent in bovnar_si_units.c).
     .factor_num = <sint:64>  1;
     .factor_den = <sint:64> 60;
     .prefix  = default;

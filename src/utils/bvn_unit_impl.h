@@ -103,16 +103,24 @@ static inline bool bvni_is_neg_exp(unit_exponent_t e)
 	       e == exp_neg_septic  || e == exp_neg_octic   ||
 	       e == exp_neg_nonic;
 }
+/*
+ * |exponent|, or 0 for one that is not a member of unit_exponent_t.
+ *
+ * These used to assert. A library must not abort its host process over a struct
+ * a caller filled in wrongly, and the shipped Release build keeps asserts live,
+ * so `u.components[0].exponent = 10` reaching bvn_unit_prefix_factor took the
+ * whole program down. Returning 0 lets every caller use the check it already
+ * makes for exp_invalid — bvn_exponent_to_int returns 0 for that too.
+ */
 static inline int32_t bvni_exp_abs(unit_exponent_t e)
 {
-	assert(e != exp_invalid);
 	int32_t v = bvn_exponent_to_int(e);
-	assert(v != 0);
 	return v < 0 ? -v : v;
 }
 static inline int32_t bvni_prefix_exp_int(value_unit_component_t c)
 {
-	assert(c.exponent != exp_invalid);
+	if (bvn_exponent_to_int(c.exponent) == 0)
+		return 0;
 	int32_t base_exp;
 	if (c.prefix.system == prefix_iec) {
 		base_exp = (c.prefix.id.iec < BVN_IEC_PREFIX_COUNT)

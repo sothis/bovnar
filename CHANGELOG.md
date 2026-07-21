@@ -74,6 +74,29 @@ reading the grown by-value structs at the wrong size.
   `ev_data`. That is a deliberate property, not an accident of emission order,
   and is now stated in `bovnar.h`, in the API doc's callback section and §7c, and
   pinned by a test. Behaviour is unchanged.
+- **The shipped Release library could `abort()` the host process.** The
+  `CMAKE_C_FLAGS_*` FORCE-overrides replace CMake's per-config defaults
+  wholesale, and `-DNDEBUG` was not spelled back in, so `assert()` stayed live in
+  the released `libbvnr`. A hand-filled `value_unit_t` with an exponent outside
+  `unit_exponent_t` passed `bvn_unit_valid`, was silently dropped by the
+  formatter, and then aborted the whole program inside `bvn_unit_prefix_factor`.
+  Fixed on three levels: `bvn_unit_valid` now rejects any exponent
+  `bvn_exponent_to_int` does not recognise (not just `exp_invalid`), the two
+  `assert()`s in the unit helpers are replaced by the defensive return every
+  caller already checks for, and the optimised configurations define `NDEBUG`.
+- **`bvn_unit_to_string` produced text its own parser rejects.** A `bu_none`
+  component past the plain `no_unit` shape contributes no symbol, so a prefixed
+  or compound one formatted as `k~`, `²` or `m·k~` — which the writer would then
+  embed in a document that no longer parses. Both formatters now refuse.
+- **`bvn_unit_reduce` dropped a prefixed `bu_none`'s scale** — the same defect
+  fixed earlier in `bvn_unit_to_si_rational`, of which this was the last holdout.
+  The component still does not survive reduction (it carries no dimension), but
+  its prefix is folded into `*scale` instead of vanishing.
+- **`bvn_unit_convert_factor` still refused an identity conversion** for a unit
+  with no SI row, so `$USD → $USD` failed there — and Python's `convert_factor`
+  with it — after `bvn_unit_convert_value`/`_rational` had been fixed. Added as a
+  *fallback* rather than a short-circuit, so every pair the normal path already
+  handled keeps its exact previous result including the `requires_affine` signal.
 - **A nonzero literal could be delivered as exactly `"0"`.**
   `bvn_float_parse_rational` reported `BVNF_RK_ZERO` both for a literal that *is*
   zero and for one whose exact rational will not fit the big-int budget, and the

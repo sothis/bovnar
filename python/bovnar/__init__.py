@@ -687,6 +687,56 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     _write_event_data(w, d)
 
 
+def _array_quantity_annotation(rows):
+    """(ValueTypeSpec, ValueUnit) for an array whose leaves are all Quantities
+    that agree on type and unit, else (None, None).
+
+    An array carries ONE annotation for all its elements, and dumps() derived it
+    only for datetimes and wide integers. Everything else fell through to a bare
+    array, so a typed load/dump cycle silently dropped the unit and the width:
+    <float:64,k~m> [1.5, 2.5] came back as [1.5, 2.5], turning 1.5 km into a
+    dimensionless 1.5 -- while Quantity's own docstring promises that "numeric
+    precision, integer base, and physical units are all preserved across a
+    load/dump cycle".
+    """
+    first = None
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+                continue
+            if e is None:
+                continue                      # a null hole constrains nothing
+            if not isinstance(e, Quantity):
+                return None, None
+            if int(e.vtype.family) == int(ValueTypeFamily.DATETIME):
+                return None, None             # handled by the datetime path
+            key = (int(e.vtype.family), int(e.vtype.width), int(e.vtype.base),
+                   e.unit_str())
+            if first is None:
+                first = (key, e)
+            elif key != first[0]:
+                return None, None             # mixed: no single annotation fits
+    if first is None:
+        return None, None
+    (fam, width, base, _us), sample = first
+    if fam == int(ValueTypeFamily.PLAIN):
+        return None, None
+    vt = ValueTypeSpec()
+    vt.family = fam
+    vt.width  = width
+    vt.base   = base
+    unit = sample.unit if _has_real_unit(sample.unit) else None
+    # Only annotate when the annotation says something the defaults do not --
+    # otherwise a plain [1, 2, 3] would gain a redundant <uint:64> where it
+    # previously had none.
+    if not _needs_annotation(vt, sample.unit):
+        return None, None
+    return vt, unit
+
+
 def _array_int_annotation(rows):
     """
     For an array whose leaves are ALL plain ints, return a ValueTypeSpec giving a
@@ -804,9 +854,12 @@ def _emit_value(w: Writer, key: str, value) -> None:
         w.end_struct()
     elif isinstance(value, (list, tuple)):
         vt = _array_datetime_annotation(value)
+        vu = None
+        if vt is None:
+            vt, vu = _array_quantity_annotation(value)
         if vt is None:
             vt = _array_int_annotation(value)
-        write_array(w, key, value, vt=vt)
+        write_array(w, key, value, vt=vt, vu=vu)
     else:
         raise BovnarArgumentError(
             f"Cannot serialise value of type {type(value).__name__!r} "
@@ -842,6 +895,22 @@ def _emit_array_element(w: Writer, elem) -> None:
             d.length      = len(raw)
             d.frac_data   = _ct.cast(_ct.c_char_p(frac), _ct.c_void_p)
             d.frac_length = len(frac)
+            _write_event_data(w, d)
+            return
+        # Write the ORIGINAL literal, not the decoded scalar. Going through
+        # elem.value routes the number through a C double, so a float_dec:128
+        # element with 29 significant digits came back with 17.
+        if elem.raw and int(elem.vtype.family) in (
+                int(ValueTypeFamily.FLOAT), int(ValueTypeFamily.FLOAT_DEC),
+                int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.UINT),
+                int(ValueTypeFamily.SINT)):
+            raw = elem.raw.encode('utf-8')
+            d = BvnrData()
+            d.type       = _TOKEN_IS_ARRAY_NUMBER
+            d.value_type = elem.vtype
+            d.value_unit = make_unit_none()
+            d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.length     = len(raw)
             _write_event_data(w, d)
             return
         _emit_array_element(w, elem.value)

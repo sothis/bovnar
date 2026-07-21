@@ -736,3 +736,120 @@ bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 	free(v);
 	return true;
 }
+/* ── arbitrary-precision multiply / add / gcd ─────────────────────────────
+ *
+ * These three complete the arithmetic needed for exact-rational unit
+ * conversion: multiply and add operate on the signed value, gcd on the
+ * magnitude (for reducing a rational to lowest terms). Each writes into `dst`,
+ * which is allowed to alias the inputs — results are built in a private temp and
+ * copied out, so aliasing never corrupts an operand mid-computation.
+ */
+static int bigint_cmpmag(const bvn_int_t *a, const bvn_int_t *b)
+{
+	uint32_t na = a->nused, nb = b->nused;
+	while (na && a->limbs[na - 1u] == 0u) na--;
+	while (nb && b->limbs[nb - 1u] == 0u) nb--;
+	if (na != nb) return na > nb ? 1 : -1;
+	for (int32_t i = (int32_t)na - 1; i >= 0; i--)
+		if (a->limbs[(uint32_t)i] != b->limbs[(uint32_t)i])
+			return a->limbs[(uint32_t)i] > b->limbs[(uint32_t)i] ? 1 : -1;
+	return 0;
+}
+/* acc.magnitude += b.magnitude (signs ignored). */
+static bool bigint_addmag_into(bvn_int_t *acc, const bvn_int_t *b)
+{
+	uint32_t maxn = (acc->nused > b->nused) ? acc->nused : b->nused;
+	if (!bigint_ensure_cap(acc, maxn + 1u)) return false;
+	uint64_t carry = 0u;
+	for (uint32_t i = 0; i < maxn; i++) {
+		uint64_t s = (uint64_t)(i < acc->nused ? acc->limbs[i] : 0u)
+			   + (uint64_t)(i < b->nused   ? b->limbs[i]   : 0u) + carry;
+		acc->limbs[i] = (uint32_t)s;
+		carry = s >> 32;
+	}
+	acc->limbs[maxn] = (uint32_t)carry;
+	acc->nused = maxn + 1u;
+	bvn_int_norm(acc);
+	return true;
+}
+bool bvn_int_mul(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
+{
+	if (!dst || !a || !b) return false;
+	if (bvn_int_is_zero(a) || bvn_int_is_zero(b)) { bvn_int_zero(dst); return true; }
+	uint32_t na = a->nused, nb = b->nused;
+	bvn_int_t *tmp = bvn_int_alloc();
+	if (!tmp) return false;
+	if (!bigint_ensure_cap(tmp, na + nb)) { bvn_int_free(tmp); return false; }
+	memset(tmp->limbs, 0, (size_t)(na + nb) * sizeof(uint32_t));
+	for (uint32_t i = 0; i < na; i++) {
+		uint64_t ai = a->limbs[i], carry = 0u;
+		for (uint32_t j = 0; j < nb; j++) {
+			uint64_t cur = (uint64_t)tmp->limbs[i + j]
+				     + ai * (uint64_t)b->limbs[j] + carry;
+			tmp->limbs[i + j] = (uint32_t)cur;
+			carry = cur >> 32;
+		}
+		uint32_t k = i + nb;
+		while (carry) {
+			uint64_t cur = (uint64_t)tmp->limbs[k] + carry;
+			tmp->limbs[k] = (uint32_t)cur;
+			carry = cur >> 32;
+			k++;
+		}
+	}
+	tmp->nused    = na + nb;
+	tmp->negative = (a->negative != b->negative);
+	bvn_int_norm(tmp);
+	bool ok = bvn_int_copy(dst, tmp);
+	bvn_int_free(tmp);
+	return ok;
+}
+bool bvn_int_add(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
+{
+	if (!dst || !a || !b) return false;
+	bvn_int_t *tmp = bvn_int_alloc();
+	if (!tmp) return false;
+	bool ok = true;
+	if (a->negative == b->negative) {
+		/* same sign: magnitudes add, sign preserved */
+		ok = bvn_int_copy(tmp, a);
+		if (ok) { tmp->negative = false; ok = bigint_addmag_into(tmp, b); }
+		if (ok) tmp->negative = a->negative && (tmp->nused != 0u);
+	} else {
+		/* differing signs: larger magnitude minus smaller, sign of larger */
+		int c = bigint_cmpmag(a, b);
+		if (c == 0) {
+			bvn_int_zero(tmp);
+		} else if (c > 0) {
+			ok = bvn_int_copy(tmp, a);
+			if (ok) { tmp->negative = false; ok = bvn_int_sub_inplace(tmp, b); }
+			if (ok) tmp->negative = a->negative && (tmp->nused != 0u);
+		} else {
+			ok = bvn_int_copy(tmp, b);
+			if (ok) { tmp->negative = false; ok = bvn_int_sub_inplace(tmp, a); }
+			if (ok) tmp->negative = b->negative && (tmp->nused != 0u);
+		}
+	}
+	if (ok) ok = bvn_int_copy(dst, tmp);
+	bvn_int_free(tmp);
+	return ok;
+}
+bool bvn_int_gcd(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
+{
+	if (!dst || !a || !b) return false;
+	bvn_int_t *x = bvn_int_alloc(), *y = bvn_int_alloc();
+	bvn_int_t *q = bvn_int_alloc(), *r = bvn_int_alloc();
+	bool ok = x && y && q && r;
+	if (ok) ok = bvn_int_copy(x, a) && bvn_int_copy(y, b);
+	if (ok) { x->negative = false; y->negative = false; }
+	/* Euclid: gcd(x,y) = gcd(y, x mod y) until y == 0 */
+	while (ok && !bvn_int_is_zero(y)) {
+		if (!bvn_int_divrem(q, r, x, y)) { ok = false; break; }
+		r->negative = false;
+		if (!bvn_int_copy(x, y)) { ok = false; break; }
+		bvn_int_t *t = y; y = r; r = t;   /* y = r; reuse old y as scratch */
+	}
+	if (ok) { x->negative = false; ok = bvn_int_copy(dst, x); }
+	bvn_int_free(x); bvn_int_free(y); bvn_int_free(q); bvn_int_free(r);
+	return ok;
+}

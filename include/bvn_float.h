@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "bvn_int.h"
 #ifndef BVN_API
 #  if defined(_WIN32) || defined(__CYGWIN__)
 #    define BVN_API  /* DLL symbols exported via CMake WINDOWS_EXPORT_ALL_SYMBOLS */
@@ -89,6 +90,12 @@ BVN_API bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src);
  * bvn_float_is_inf / bvn_float_is_zero if that matters.
  */
 BVN_API bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base);
+/* Parse a base-10 or base-16 numeric literal into an EXACT rational value =
+ * num/den (sign carried in num; den > 0). Returns true only for a finite value;
+ * false for nan/inf, a malformed literal, or an unsupported base. num and den
+ * must be caller-allocated. Underpins lossless read-time unit conversion. */
+BVN_API bool bvn_float_parse_rational(const char *s, uint32_t base,
+                                      bvn_int_t *num, bvn_int_t *den);
 BVN_API int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 						  uint32_t base);
 BVN_API size_t bvn_float_str_bufsize(uint32_t prec, uint32_t base);

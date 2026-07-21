@@ -286,15 +286,17 @@ def convert_value(value: float,
 
     Handles both multiplicative and affine conversions correctly.
     Raises BovnarArgumentError for dimensionally incompatible units.
-    """
-    conv = unit_convert_factor(from_unit, to_unit)
-    if not conv.requires_affine:
-        return value * conv.factor
 
-    src = unit_to_si_factor(from_unit)
-    dst = unit_to_si_factor(to_unit)
-    si_value = value * src.factor + src.affine_offset
-    return (si_value - dst.affine_offset) / dst.factor
+    Delegates to the C reference implementation (bvn_unit_convert_value), the
+    same routine the reader's want_unit hook uses, so Python and C agree exactly.
+    """
+    out = ctypes.c_double(0.0)
+    ok  = get_library().bvn_unit_convert_value(
+        ctypes.c_double(value), from_unit, to_unit, ctypes.byref(out))
+    if not ok:
+        raise BovnarArgumentError(
+            "convert_value: incompatible or invalid units")
+    return out.value
 
 
 __all__ = [

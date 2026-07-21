@@ -22,6 +22,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
 7. [`bvnr_reader_get_error` and friends](#7-bvnr_reader_get_error-and-friends)
 7a. [Version directive (spec 1.1)](#7a-version-directive-spec-11)
 7b. [Datetime family (spec 1.1)](#7b-datetime-family-spec-11)
+7c. [Read-time unit conversion (`want_unit`)](#7c-read-time-unit-conversion-want_unit)
 8. [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#8-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
 
 **Writer**
@@ -347,6 +348,97 @@ NUL-terminated** — bound the read by `frac_length`.
 if (d->frac_data && d->frac_length) {
     /* d->frac_data[0 .. frac_length) are the sub-second digits, e.g. "5" */
 }
+```
+
+---
+
+### 7c. Read-time lossless unit / base conversion (`want_unit`)
+
+```c
+/* bvnr_read_flags_t */
+bool (*want_unit)(void *userdata, const bvnr_data_t *data,
+                  value_unit_t *want, uint32_t *want_base);
+
+/* bvnr_data_t */
+bool             converted;   /* true when this value was converted */
+bvnr_converted_t conv;        /* the exact converted value (see below) */
+
+typedef struct bvnr_converted_s {
+    value_unit_t     unit;    /* the target unit */
+    const char*      text;    /* exact value in `base`, NUL-terminated */
+    uint32_t         length;  /* strlen(text) */
+    uint32_t         base;    /* base text is rendered in (2..36) */
+    const struct bvn_int_s* num;   /* exact numerator (signed) */
+    const struct bvn_int_s* den;   /* exact denominator (> 0) */
+} bvnr_converted_t;
+```
+
+By default the reader hands you every numeric value exactly as written and you
+convert it yourself (§24a, `bvn_unit_convert_rational`). Set `want_unit` to have
+the reader do it for you — **losslessly**, in exact arbitrary-precision
+arithmetic, for a value of any width and any base.
+
+When `want_unit` is non-NULL, the reader calls it for every numeric value (with
+or without a unit) just before `on_verified`. Inspect `data->value_unit` (native
+unit), `data->value_type`, or `data->data` and either:
+
+- fill `*want` with the target unit and `*want_base` with the output base
+  (`2..36`, or `0` to keep the value's own base) and **return `true`**, or
+- **return `false`** (or leave `want_unit` NULL) to receive the value untouched.
+
+Requesting `*want` equal to the native unit with a different `*want_base`
+performs a pure **base conversion** (e.g. a hex integer delivered in decimal).
+The choice is usually key-specific; track "the current key" (from the earlier
+`ev_assignment_start` event) in your `userdata`.
+
+On a valid request the value arrives with `data->converted == true` and
+`data->conv` holding the **exact** result — the value in the requested unit and
+base as both a positional string (`conv.text`) and a reduced rational
+(`conv.num`/`conv.den`, `bvn_int.h`). Everything in `conv` is reader-owned and
+valid only for the callback — copy `text` (or the rational) to retain it.
+`data->data` / `data->value_unit` keep the original digits and unit.
+
+**The conversion is lossless.** A 1056-bit binary float or a 512-bit integer
+converts with no loss beyond the library's own declared factor — the result
+widens as needed rather than rounding into a `double`. Every numeric family is
+eligible: `uint`/`sint` of any width and base (including a multiprecision integer
+or a non-decimal base written as a string literal like `<uint:32,_16> "FF"`),
+`float`, `float_dec`, `float_fix`. A datetime is never offered.
+
+Three outcomes **abort the parse**:
+
+| Condition | Error |
+|-----------|-------|
+| `*want` dimensionally incompatible with the value's unit (seconds for a length; one currency for another) | `error_unit_mismatch` |
+| the true factor is irrational (a π-based angle, e.g. degree → radian) | `error_unit_inexact` |
+| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10) | `error_unit_inexact` |
+
+The reader never silently rounds: if it cannot deliver the value exactly it
+stops. Request a representable unit/base (or read the value natively) instead.
+
+```c
+static bool want_unit(void *ud, const bvnr_data_t *d,
+                      value_unit_t *want, uint32_t *want_base)
+{
+    /* deliver every length in metres, base 10; leave everything else */
+    bool ok;
+    value_unit_t metre = bvn_parse_unit((const uint8_t *)"m", &ok);
+    if (bvn_units_compatible(d->value_unit, metre)) {
+        *want = metre;
+        *want_base = 10;
+        return true;
+    }
+    return false;
+}
+
+static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+    if (ev == ev_data && d->converted)
+        printf("= %s m\n", d->conv.text);   /* e.g. "5 k~m" -> "5000" */
+    return true;
+}
+
+bvnr_read_flags_t opts = { .on_verified = on_event, .want_unit = want_unit };
 ```
 
 ---
@@ -1002,6 +1094,61 @@ int32_t n = bvn_unit_to_string(u, buf, sizeof(buf));
 n = bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
 /* buf = "k~g/s^2", n = 7 */
 ```
+
+---
+
+### 24a. `bvn_unit_convert_value` *(bovnar_si_units.h)*
+
+```c
+bool bvn_unit_convert_value(double value, value_unit_t from,
+                            value_unit_t to, double *out);
+```
+
+Convert one numeric quantity from unit `from` into unit `to`, writing the result
+to `*out`. Handles both the simple multiplicative case (`5 k~m → 5000 m`) and the
+affine case (`25 °C → 298.15 K`), routing the latter through SI base units. This
+is the same routine the reader's `want_unit` hook (§7c) uses, and the C
+equivalent of the Python `convert_value`.
+
+Returns `false` — leaving `*out` untouched — when the two units are
+dimensionally **incompatible** or have no SI mapping. That boolean is the
+"validly convert only" guard: the reader turns a `false` here into
+`error_unit_mismatch`.
+
+```c
+double m;
+if (bvn_unit_convert_value(5.0,
+        bvn_parse_unit((const uint8_t *)"k~m", &ok),
+        bvn_parse_unit((const uint8_t *)"m",   &ok), &m))
+    printf("%.0f m\n", m);          /* 5000 m */
+```
+
+For the standalone factor (without applying it) or to detect the affine case,
+see `bvn_unit_convert_factor` in `bovnar_si_units.h`.
+
+`bvn_unit_convert_value` works in `double`, so it is lossy for wide values. For a
+**lossless** conversion — the engine behind the reader's `want_unit` hook (§7c) —
+use the exact-rational pair, also in `bovnar_si_units.h`:
+
+```c
+bool    bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
+                                  value_unit_t from, value_unit_t to,
+                                  bvn_int_t *out_num, bvn_int_t *out_den,
+                                  bool *exact);
+int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
+                            uint32_t base, char *buf, size_t bufsize, bool *exact);
+```
+
+`bvn_unit_convert_rational` converts the exact rational `vnum/vden` (parse a wire
+value into one with `bvn_float_parse_rational` for floats, or `bvn_int_from_str`
+for integers) from `from` into `to`, writing the exact reduced result to
+`out_num`/`out_den`. It returns `false` for dimensionally incompatible units, and
+sets `*exact = false` when the true factor is irrational (π-based angles) — the
+result is then only an approximation and a lossless consumer must reject it.
+`bvn_rational_to_str` renders an exact rational in any `base` (2..36), setting
+`*exact = true` and writing the full expansion when it terminates, or returning
+`-1` when it does not. Both handle any value width — a 1056-bit float, a 512-bit
+integer — with no precision loss.
 
 ---
 

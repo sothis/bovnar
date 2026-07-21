@@ -34,6 +34,8 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
+#include "bvn_int.h"
+#include "bvn_float.h"
 /*
  * ===========================================================================
  * SI conversion and dimensional analysis
@@ -110,6 +112,16 @@ typedef struct {
 	int32_t           dims[bvn_si_dim_count];
 	bool              is_affine;
 	double            affine_offset;
+	/* Exact rational form of the factor and affine offset, as decimal strings
+	 * (parsed to bignums on demand). These drive lossless conversion; the double
+	 * fields above remain the fast path for approximate/legacy callers. `exact`
+	 * is false for a unit whose true factor is irrational (π-based angles) — such
+	 * a unit can never be converted losslessly and yields error_unit_inexact. */
+	const char       *factor_num;
+	const char       *factor_den;
+	const char       *offset_num;
+	const char       *offset_den;
+	bool              exact;
 } bvn_si_conv_entry_t;
 /*
  * The master conversion table, indexed directly by value_base_unit_t (the
@@ -120,7 +132,7 @@ typedef struct {
  * skipped here — they are handled by bovnar_currency.c, not by SI conversion.
  */
 static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
-	[bu_none]               = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0    },
+	[bu_none]               = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0,    "1", "1", "0", "1", true },
 	/*
 	 * Physical-unit conversion entries — generated from src/gendata/units.bvnr
 	 * by gen_units.py. Indexed by enum value; the [bu_none] row above
@@ -319,6 +331,301 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 		return 0.0;
 	}
 	return fa / fb;
+}
+/*
+ * Convert one numeric quantity from `from` into `to`, handling both the simple
+ * multiplicative case and the affine case (e.g. °C ↔ K ↔ °F, where a bare factor
+ * is not enough). Returns false — writing nothing to *out — when the two units
+ * are dimensionally incompatible or lack an SI mapping; this is the "validly"
+ * guard a reader turns into error_unit_mismatch. On success *out receives the
+ * value expressed in `to`.
+ *
+ * The multiplicative path is a single factor from bvn_unit_convert_factor. The
+ * affine path routes through SI base units in two steps — value·f_from +
+ * off_from lands in SI, then (si − off_to)/f_to lands in `to` — mirroring the
+ * Python convert_value() reference.
+ */
+bool bvn_unit_convert_value(double value, value_unit_t from, value_unit_t to,
+			    double *out)
+{
+	if (!out)
+		return false;
+	bool conv_ok = true, requires_affine = false;
+	double factor = bvn_unit_convert_factor(from, to, &conv_ok,
+						&requires_affine);
+	if (conv_ok) {
+		*out = value * factor;
+		return true;
+	}
+	if (!requires_affine)
+		return false;               /* dimensionally incompatible */
+	bool aff_f = false, aff_t = false;
+	double off_f = 0.0, off_t = 0.0;
+	bool ok_f = true, ok_t = true;
+	double f_from = bvn_unit_to_si_factor(from, &aff_f, &off_f, &ok_f);
+	double f_to   = bvn_unit_to_si_factor(to,   &aff_t, &off_t, &ok_t);
+	if (!ok_f || !ok_t || f_to == 0.0)
+		return false;
+	double si_value = value * f_from + off_f;
+	*out = (si_value - off_t) / f_to;
+	return true;
+}
+/* ── exact-rational unit conversion ───────────────────────────────────────
+ *
+ * Everything below performs unit conversion in EXACT arbitrary-precision
+ * rational arithmetic (num/den of bignums), so a value of any width and any
+ * base — a 1056-bit float, a 512-bit integer — converts with no loss beyond the
+ * library's own declared factor. A rational whose factor is genuinely irrational
+ * (π-based angles) is reported via *exact = false; the reader turns that into
+ * error_unit_inexact. These are the lossless counterparts to the double-based
+ * bvn_unit_to_si_factor / bvn_unit_convert_value above.
+ */
+static bool rat_reduce(bvn_int_t *n, bvn_int_t *d)
+{
+	if (bvn_int_is_zero(d)) return false;
+	if (d->negative) {                          /* keep denominator positive */
+		d->negative = false;
+		if (!bvn_int_is_zero(n)) n->negative = !n->negative;
+	}
+	if (bvn_int_is_zero(n)) return bvn_int_from_uint64(d, 1u);
+	bvn_int_t *g = bvn_int_alloc(), *q = bvn_int_alloc(), *r = bvn_int_alloc();
+	bool ok = g && q && r && bvn_int_gcd(g, n, d);
+	if (ok) ok = bvn_int_divrem(q, r, n, g) && bvn_int_copy(n, q);
+	if (ok) ok = bvn_int_divrem(q, r, d, g) && bvn_int_copy(d, q);
+	bvn_int_free(g); bvn_int_free(q); bvn_int_free(r);
+	return ok;
+}
+/* (no/do) = (an/ad) * (bn/bd), reduced. Outputs must differ from inputs. */
+static bool rat_mul(bvn_int_t *no, bvn_int_t *dou,
+		    const bvn_int_t *an, const bvn_int_t *ad,
+		    const bvn_int_t *bn, const bvn_int_t *bd)
+{
+	return bvn_int_mul(no, an, bn) && bvn_int_mul(dou, ad, bd) &&
+	       rat_reduce(no, dou);
+}
+/* (no/do) = (an/ad) + (bn/bd), reduced. Outputs must differ from inputs. */
+static bool rat_add(bvn_int_t *no, bvn_int_t *dou,
+		    const bvn_int_t *an, const bvn_int_t *ad,
+		    const bvn_int_t *bn, const bvn_int_t *bd)
+{
+	bvn_int_t *t1 = bvn_int_alloc(), *t2 = bvn_int_alloc();
+	bool ok = t1 && t2;
+	if (ok) ok = bvn_int_mul(t1, an, bd);     /* an*bd */
+	if (ok) ok = bvn_int_mul(t2, bn, ad);     /* bn*ad */
+	if (ok) ok = bvn_int_add(no, t1, t2);     /* numerator */
+	if (ok) ok = bvn_int_mul(dou, ad, bd);    /* denominator */
+	if (ok) ok = rat_reduce(no, dou);
+	bvn_int_free(t1); bvn_int_free(t2);
+	return ok;
+}
+static bool rat_set_decstr(bvn_int_t *n, bvn_int_t *d,
+			   const char *num_s, const char *den_s)
+{
+	return bvn_int_from_str(n, num_s ? num_s : "0", 10) &&
+	       bvn_int_from_str(d, den_s ? den_s : "1", 10);
+}
+/*
+ * Exact rational SI factor + affine offset for a unit: value_SI =
+ * value*(fnum/fden) + (onum/oden). Mirrors bvn_unit_to_si_factor's structure
+ * (per-component base-factor^exp × prefix^exp, a lone affine temperature adds an
+ * offset) but in exact rationals. Returns false on a structurally invalid unit
+ * (bad prefix/exponent, or an affine unit with exponent != 1 / two affine
+ * components); sets *exact = false when any component's factor is irrational.
+ */
+static bool bvn_unit_to_si_rational(value_unit_t u,
+				    bvn_int_t *fnum, bvn_int_t *fden,
+				    bvn_int_t *onum, bvn_int_t *oden,
+				    bool *exact)
+{
+	bvn_verify_conv_table();
+	*exact = true;
+	bool ok = bvn_int_from_uint64(fnum, 1u) && bvn_int_from_uint64(fden, 1u) &&
+		  bvn_int_from_uint64(oden, 1u);
+	bvn_int_zero(onum);
+	bool have_affine = false;
+	bvn_int_t *cfn = bvn_int_alloc(), *cfd = bvn_int_alloc();
+	bvn_int_t *tn  = bvn_int_alloc(), *td  = bvn_int_alloc();
+	bvn_int_t *bfn = bvn_int_alloc(), *bfd = bvn_int_alloc();
+	if (!cfn || !cfd || !tn || !td || !bfn || !bfd) { ok = false; goto done; }
+	for (uint32_t i = 0; ok && i < u.num_components &&
+	     i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+		const value_unit_component_t *c = &u.components[i];
+		if (c->base == bu_none) continue;
+		if (c->exponent == exp_invalid) { ok = false; break; }
+		if (!bvn_prefix_unit_valid(c->prefix, c->base)) { ok = false; break; }
+		int32_t uexp = bvn_exponent_to_int(c->exponent);
+		if (uexp == 0) { ok = false; break; }
+		int32_t abs_exp = bvni_exp_abs(c->exponent);
+		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
+		if (!conv) { ok = false; break; }
+		if (!conv->exact) *exact = false;
+		/* base factor ^ abs_exp */
+		if (!rat_set_decstr(bfn, bfd, conv->factor_num, conv->factor_den)) {
+			ok = false; break; }
+		if (!bvn_int_copy(cfn, bfn) || !bvn_int_copy(cfd, bfd)) { ok = false; break; }
+		for (int32_t e = 1; e < abs_exp; e++)
+			if (!bvn_int_mul(cfn, cfn, bfn) || !bvn_int_mul(cfd, cfd, bfd)) {
+				ok = false; break; }
+		if (!ok) break;
+		/* prefix ^ (pexp * abs_exp): base 10 for SI, base 2 for IEC */
+		int32_t totpexp = bvni_prefix_exp_int(*c) * abs_exp;
+		if (c->prefix.system == prefix_iec) {
+			if (totpexp > 0) ok = bvn_int_shl(cfn, totpexp);
+			else if (totpexp < 0) ok = bvn_int_shl(cfd, -totpexp);
+		} else {
+			if (totpexp > 0) ok = bvn_int_mul_pow10(cfn, totpexp);
+			else if (totpexp < 0) ok = bvn_int_mul_pow10(cfd, -totpexp);
+		}
+		if (!ok) break;
+		if (uexp < 0) {                         /* invert this component */
+			bvn_int_t *sw = cfn; cfn = cfd; cfd = sw;
+		}
+		/* accumulate into the running factor */
+		if (!rat_mul(tn, td, fnum, fden, cfn, cfd)) { ok = false; break; }
+		if (!bvn_int_copy(fnum, tn) || !bvn_int_copy(fden, td)) { ok = false; break; }
+		/* affine offset: only a lone linear temperature carries one */
+		if (conv->is_affine) {
+			if (uexp != 1 || have_affine) { ok = false; break; }
+			have_affine = true;
+			if (!rat_set_decstr(onum, oden, conv->offset_num, conv->offset_den)) {
+				ok = false; break; }
+			if (!conv->exact) *exact = false;
+		}
+	}
+	if (ok) ok = rat_reduce(fnum, fden) && rat_reduce(onum, oden);
+done:
+	bvn_int_free(cfn); bvn_int_free(cfd); bvn_int_free(tn); bvn_int_free(td);
+	bvn_int_free(bfn); bvn_int_free(bfd);
+	return ok;
+}
+bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
+			       value_unit_t from, value_unit_t to,
+			       bvn_int_t *out_num, bvn_int_t *out_den, bool *exact)
+{
+	if (!vnum || !vden || !out_num || !out_den || !exact) return false;
+	if (!bvn_units_compatible(from, to)) return false;   /* dim mismatch */
+	bvn_int_t *ffn = bvn_int_alloc(), *ffd = bvn_int_alloc();
+	bvn_int_t *fon = bvn_int_alloc(), *fod = bvn_int_alloc();
+	bvn_int_t *tfn = bvn_int_alloc(), *tfd = bvn_int_alloc();
+	bvn_int_t *ton = bvn_int_alloc(), *tod = bvn_int_alloc();
+	bvn_int_t *sn  = bvn_int_alloc(), *sd  = bvn_int_alloc();
+	bvn_int_t *un  = bvn_int_alloc(), *ud  = bvn_int_alloc();
+	bool exf = true, ext = true;
+	bool ok = ffn && ffd && fon && fod && tfn && tfd && ton && tod &&
+		  sn && sd && un && ud;
+	if (ok) ok = bvn_unit_to_si_rational(from, ffn, ffd, fon, fod, &exf);
+	if (ok) ok = bvn_unit_to_si_rational(to,   tfn, tfd, ton, tod, &ext);
+	if (ok) {
+		*exact = exf && ext;
+		/* si = value*(from factor) + (from offset) */
+		ok = rat_mul(sn, sd, vnum, vden, ffn, ffd) &&
+		     rat_add(sn, sd, sn, sd, fon, fod);
+		/* out = (si - to offset) / (to factor) = (si - off) * tfd/tfn */
+		if (ok) {
+			bvn_int_t *nton = bvn_int_alloc();
+			ok = nton && bvn_int_copy(nton, ton);
+			if (ok && !bvn_int_is_zero(nton)) nton->negative = !nton->negative;
+			if (ok) ok = rat_add(un, ud, sn, sd, nton, tod);   /* si - to off */
+			bvn_int_free(nton);
+		}
+		if (ok) ok = rat_mul(out_num, out_den, un, ud, tfd, tfn);
+	}
+	bvn_int_free(ffn); bvn_int_free(ffd); bvn_int_free(fon); bvn_int_free(fod);
+	bvn_int_free(tfn); bvn_int_free(tfd); bvn_int_free(ton); bvn_int_free(tod);
+	bvn_int_free(sn); bvn_int_free(sd); bvn_int_free(un); bvn_int_free(ud);
+	return ok;
+}
+/*
+ * Render an exact rational num/den as a positional string in `base` (2..36).
+ * When the fraction terminates in that base the full exact expansion is written
+ * and *exact is set true; when it does not (e.g. 1/3 in base 10) nothing usable
+ * is produced, *exact is set false, and -1 is returned — the caller treats that
+ * as error_unit_inexact. Returns the string length (excluding NUL) on success.
+ */
+static bool bvn_int_is_one(const bvn_int_t *n)
+{
+	return n && !n->negative && n->nused == 1u && n->limbs && n->limbs[0] == 1u;
+}
+int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
+			    uint32_t base, char *buf, size_t bufsize, bool *exact)
+{
+	if (!num || !den || !buf || bufsize < 2 || base < 2u || base > 36u)
+		return -1;
+	if (exact) *exact = false;
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+	bvn_int_t *q = bvn_int_alloc(), *r = bvn_int_alloc();
+	bvn_int_t *bb = bvn_int_alloc(), *g = bvn_int_alloc();
+	bvn_int_t *dd = bvn_int_alloc(), *qq = bvn_int_alloc(), *rr = bvn_int_alloc();
+	bvn_int_t *bk = bvn_int_alloc(), *m = bvn_int_alloc(), *fi = bvn_int_alloc();
+	char *ibuf = NULL, *fbuf = NULL;
+	int32_t ret = -1;
+	bool neg = false, terminates = true;
+	int32_t k = 0;
+	if (!n || !d || !q || !r || !bb || !g || !dd || !qq || !rr ||
+	    !bk || !m || !fi) goto done;
+	if (!bvn_int_copy(n, num) || !bvn_int_copy(d, den) || !rat_reduce(n, d))
+		goto done;
+	neg = n->negative;
+	n->negative = false;
+	if (!bvn_int_from_uint64(bb, base)) goto done;
+	if (!bvn_int_divrem(q, r, n, d)) goto done;             /* integer part */
+	/* Strip primes shared with `base` from the (reduced) denominator; if what
+	 * remains is 1 the fraction terminates in `base`, and k counts the digits. */
+	if (!bvn_int_copy(dd, d)) goto done;
+	while (!bvn_int_is_zero(r) && !bvn_int_is_one(dd)) {
+		if (!bvn_int_gcd(g, dd, bb)) goto done;
+		if (bvn_int_is_one(g)) { terminates = false; break; }
+		if (!bvn_int_divrem(qq, rr, dd, g) || !bvn_int_copy(dd, qq)) goto done;
+		if (++k > 1000000) goto done;                       /* safety bound */
+	}
+	if (!terminates) goto done;                             /* -> error_unit_inexact */
+	/* Size and render the integer part and (if any) the fractional integer. */
+	int qbits = bvn_int_bitlen(q);
+	size_t ibsz = bvn_int_str_bufsize((uint32_t)(qbits > 0 ? qbits : 1), base);
+	ibuf = malloc(ibsz);
+	if (!ibuf) goto done;
+	int32_t ilen = bvn_int_to_str(q, ibuf, ibsz, base);
+	if (ilen < 0) goto done;
+	int32_t flen = 0;
+	if (!bvn_int_is_zero(r)) {
+		/* fractional integer = r * (base^k / d), exactly k base-digits */
+		if (!bvn_int_from_uint64(bk, 1u)) goto done;
+		for (int32_t e = 0; e < k; e++)
+			if (!bvn_int_mul(bk, bk, bb)) goto done;
+		if (!bvn_int_divrem(m, rr, bk, d) || !bvn_int_mul(fi, r, m)) goto done;
+		int fbits = bvn_int_bitlen(fi);
+		size_t fbsz = bvn_int_str_bufsize((uint32_t)(fbits > 0 ? fbits : 1), base);
+		fbuf = malloc(fbsz);
+		if (!fbuf) goto done;
+		flen = bvn_int_to_str(fi, fbuf, fbsz, base);
+		if (flen < 0) goto done;
+	}
+	/* Assemble: [-]<int>[.<zero-pad><frac, trailing zeros trimmed>] */
+	{
+		size_t pos = 0;
+		if (neg && pos < bufsize - 1) buf[pos++] = '-';
+		for (int32_t e = 0; e < ilen && pos < bufsize - 1; e++)
+			buf[pos++] = ibuf[e];
+		if (!bvn_int_is_zero(r)) {
+			int32_t fend = flen;
+			while (fend > 0 && fbuf[fend - 1] == '0') fend--;   /* trim */
+			int32_t pad = k - flen;                             /* leading zeros */
+			if (pos < bufsize - 1) buf[pos++] = '.';
+			for (int32_t e = 0; e < pad && pos < bufsize - 1; e++)
+				buf[pos++] = '0';
+			for (int32_t e = 0; e < fend && pos < bufsize - 1; e++)
+				buf[pos++] = fbuf[e];
+		}
+		buf[pos] = '\0';
+		if (exact) *exact = true;
+		ret = (int32_t)pos;
+	}
+done:
+	free(ibuf); free(fbuf);
+	bvn_int_free(n); bvn_int_free(d); bvn_int_free(q); bvn_int_free(r);
+	bvn_int_free(bb); bvn_int_free(g); bvn_int_free(dd); bvn_int_free(qq);
+	bvn_int_free(rr); bvn_int_free(bk); bvn_int_free(m); bvn_int_free(fi);
+	return ret;
 }
 /*
  * Algebraically simplify a compound unit: combine repeated bases by summing

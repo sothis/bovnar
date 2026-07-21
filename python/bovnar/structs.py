@@ -169,12 +169,25 @@ class ValueTypeSpec(ctypes.Structure):
         f = self.type_family
         return f"ValueTypeSpec(family={f.name}, width={self.width}, base={self.base})"
 
+class BvnrConverted(ctypes.Structure):
+    # Mirrors C `bvnr_converted_t`: the exact result of a lossless read-time
+    # unit/base conversion. `text` is the value's full positional expansion in
+    # `base` (reader-owned, callback lifetime); num/den are opaque bvn_int_t*.
+    _fields_ = [
+        ('unit',   ValueUnit),
+        ('text',   ctypes.c_char_p),
+        ('length', ctypes.c_uint32),
+        ('base',   ctypes.c_uint32),
+        ('num',    ctypes.c_void_p),
+        ('den',    ctypes.c_void_p),
+    ]
+
 class BvnrData(ctypes.Structure):
     # Must mirror the C `bvnr_data_t` layout exactly: the writer path allocates
     # this and passes &d to bvnr_write_event(), and the reader path receives a
-    # C-allocated pointer. The spec-1.1 frac_* fields are appended last, matching
-    # the C struct — omitting them makes the struct 16 bytes short, so C would
-    # read frac_data/frac_length out of bounds when (de)serialising a datetime.
+    # C-allocated pointer. The spec-1.1 frac_* fields and the conversion carrier
+    # are appended last, matching the C struct — omitting them makes the struct
+    # short, so C would read out of bounds.
     _fields_ = [
         ('type',        ctypes.c_int),
         ('value_type',  ValueTypeSpec),
@@ -183,6 +196,8 @@ class BvnrData(ctypes.Structure):
         ('length',      ctypes.c_uint32),
         ('frac_data',   ctypes.c_void_p),    # spec 1.1 — ISO datetime sub-second digits, else NULL
         ('frac_length', ctypes.c_uint32),    # spec 1.1 — length of frac_data, else 0
+        ('converted',   ctypes.c_bool),      # lossless read-time conversion applied?
+        ('conv',        BvnrConverted),      # exact converted value when converted
     ]
 
     def frac_str(self) -> "str | None":
@@ -191,6 +206,13 @@ class BvnrData(ctypes.Structure):
             return None
         return (ctypes.c_char * self.frac_length).from_address(
             self.frac_data).raw.decode('ascii')
+
+    def converted_str(self) -> "str | None":
+        """The exact converted value in the requested base (lossless read-time
+        unit/base conversion), or None when no conversion was applied."""
+        if not self.converted or not self.conv.text:
+            return None
+        return self.conv.text.decode('ascii')
 
     def raw_bytes(self) -> bytes:
         if not self.data or self.length == 0:
@@ -211,6 +233,17 @@ EVENT_CALLBACK_FUNC = ctypes.CFUNCTYPE(
     ctypes.c_void_p,
     ctypes.c_int,
     ctypes.POINTER(BvnrData),
+)
+
+# bvnr_read_flags_t.want_unit:
+#   bool (*want_unit)(void* ud, const bvnr_data_t* data,
+#                     value_unit_t* want, uint32_t* want_base)
+WANT_UNIT_FUNC = ctypes.CFUNCTYPE(
+    ctypes.c_bool,
+    ctypes.c_void_p,
+    ctypes.POINTER(BvnrData),
+    ctypes.POINTER(ValueUnit),
+    ctypes.POINTER(ctypes.c_uint32),
 )
 
 # bvnr_stream.h callback signatures.
@@ -255,7 +288,8 @@ class BvnrReadFlags(ctypes.Structure):
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
         ('strict_version',        ctypes.c_bool),
-        ('_reserved',             ctypes.c_uint64 * 4),
+        ('want_unit',             WANT_UNIT_FUNC),
+        ('_reserved',             ctypes.c_uint64 * 3),
     ]
 
 class BvnrWriteFlags(ctypes.Structure):

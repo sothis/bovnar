@@ -210,7 +210,13 @@ typedef enum error_code_e {
 	 * round-trippable civil⇄seconds inverse in this build, so a literal there
 	 * is rejected; supply an integer epoch-seconds carrier instead. Civil
 	 * epochs (unix, mjd, ntp, y2000) and tai accept literals. */
-	error_datetime_literal_unsupported_epoch = 46
+	error_datetime_literal_unsupported_epoch = 46,
+	/* A read-time unit/base conversion (bvnr_read_flags_t.want_unit) could not be
+	 * performed losslessly: the true conversion factor is irrational (a π-based
+	 * angle), or the exact result has no terminating expansion in the requested
+	 * output base. The reader refuses to silently round — request a representable
+	 * target unit/base, or read the value in its native form. */
+	error_unit_inexact                  = 47
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,
@@ -286,6 +292,24 @@ typedef struct value_unit_s {
 	uint32_t			num_components;
 	value_unit_component_t		components[BVNR_MAX_UNIT_COMPONENTS];
 } value_unit_t;
+/* Result of a lossless read-time unit/base conversion (bvnr_read_flags_t.want_unit).
+ * The value is delivered EXACTLY: `text` is its full positional expansion in
+ * `base` (the requested output base, or the value's own if none was requested),
+ * and num/den are the exact reduced rational (den > 0). Every field references
+ * reader-owned storage valid only for the duration of the callback — copy `text`
+ * (or num/den, via bvn_int_copy) if you need to retain it. `text`/num/den never
+ * lose precision, whatever the value's width or base; a conversion that could not
+ * be exact (irrational factor, or non-terminating in `base`) never reaches you —
+ * it aborts the parse with error_unit_inexact. */
+struct bvn_int_s;   /* bvn_int.h — arbitrary-precision integer */
+typedef struct bvnr_converted_s {
+	value_unit_t		unit;     /* the target unit */
+	const char*		text;     /* exact value in `base`, NUL-terminated */
+	uint32_t		length;   /* strlen(text) */
+	uint32_t		base;     /* base text is rendered in (2..36) */
+	const struct bvn_int_s*	num;      /* exact numerator (signed) */
+	const struct bvn_int_s*	den;      /* exact denominator (> 0) */
+} bvnr_converted_t;
 typedef struct bvnr_data_s {
 	token_type_t		type;
 	value_type_spec_t	value_type;
@@ -301,6 +325,25 @@ typedef struct bvnr_data_s {
 	 * pretty-print round-trip via re-emission of the ISO literal. */
 	const void*		frac_data;
 	uint32_t		frac_length;
+	/* Read-time unit/base conversion (see bvnr_read_flags_t.want_unit). When the
+	 * reader was asked to convert this numeric value and could do so LOSSLESSLY,
+	 * `converted` is true and `conv` carries the exact result — the value in the
+	 * requested unit and base, as both a full positional string (conv.text) and
+	 * an exact rational (conv.num/conv.den). The `data`/`length` text above is
+	 * left untouched (the original digits in the original unit and base). When no
+	 * conversion was requested or applied, `converted` is false and `conv` is
+	 * zeroed. Every numeric family is eligible — uint/sint of any width and any
+	 * base (incl. a multiprecision integer or a non-decimal base written as a
+	 * string literal), float, float_dec, float_fix — but never a datetime.
+	 *
+	 * The conversion is EXACT regardless of the value's width or base: a 1056-bit
+	 * float or a 512-bit integer converts with no loss beyond the library's own
+	 * declared factor. A conversion that cannot be represented exactly — an
+	 * irrational factor (π-based angle) or a result with no terminating expansion
+	 * in the requested base — is never delivered here; it aborts the parse with
+	 * error_unit_inexact. */
+	bool			converted;
+	bvnr_converted_t	conv;
 } bvnr_data_t;
 typedef void (*bvnr_on_error_fn)(
 	void* userdata, error_code_t err,
@@ -331,7 +374,30 @@ typedef struct bvnr_read_flags_s {
 	 * bvnr_reader_get_declared_version() — but not enforced. Production
 	 * consumers that must not silently misread a future document should set it. */
 	bool		strict_version;
-	uint64_t	_reserved[4];
+	/* Optional read-time LOSSLESS unit/base conversion hook. When non-NULL, the
+	 * reader calls it for every numeric value (with or without a unit), just
+	 * before the on_verified callback. To request a conversion, fill *want with
+	 * the target unit and *want_base with the output base (2..36, or 0 to keep
+	 * the value's own base) and return true; return false (or leave this NULL) to
+	 * receive the value untouched. Inspect data->value_unit (native unit),
+	 * data->value_type, and data->data to decide; track the current key via
+	 * userdata if the choice is key-specific.
+	 *
+	 * The conversion is performed in exact arbitrary-precision arithmetic, so it
+	 * is lossless for any value width and base (a 1056-bit float, a 512-bit
+	 * integer). The result arrives with data->converted set and data->conv
+	 * carrying the exact value (text + rational) in the requested unit and base;
+	 * data->data keeps the original text. Requesting `want` == the native unit
+	 * with a different base performs a pure base conversion.
+	 *
+	 * Two failures abort the parse: a `want` dimensionally incompatible with the
+	 * value's own unit is error_unit_mismatch; a conversion that cannot be exact
+	 * (irrational π-based factor, or a result that does not terminate in the
+	 * requested base) is error_unit_inexact. Never consulted for datetime. */
+	bool		(*want_unit)
+			(void* userdata, const bvnr_data_t* data,
+			 value_unit_t* want, uint32_t* want_base);
+	uint64_t	_reserved[3];
 } bvnr_read_flags_t;
 typedef uint32_t bvn_unit_flags_t;
 #define BVN_UNIT_FLAGS_NONE ((bvn_unit_flags_t)0u)

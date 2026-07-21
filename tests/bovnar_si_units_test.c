@@ -28,6 +28,8 @@
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 #include "bovnar_si_units.h"
+#include "bvn_int.h"
+#include "bvn_float.h"
 
 static int failures = 0;
 static int tests    = 0;
@@ -1537,6 +1539,130 @@ static void test_dimension_vector_invalid_prefix(void)
 	            "exp_invalid: dim_vector returns false");
 }
 
+static void test_convert_value(void)
+{
+	printf("  convert_value...\n");
+	double out = 0.0;
+
+	/* multiplicative: 5 km → 5000 m */
+	ASSERT_TRUE(bvn_unit_convert_value(5.0,
+			BVN_UNIT_SI(bu_meter, si_kilo),
+			BVN_UNIT_NO_PREFIX(bu_meter), &out),
+		"5 km → m: ok");
+	ASSERT_EQ_DBL(out, 5000.0, 1e-9, "5 km → 5000 m");
+
+	/* affine: 25 °C → 298.15 K (two-step through SI) */
+	ASSERT_TRUE(bvn_unit_convert_value(25.0,
+			BVN_UNIT_NO_PREFIX(bu_celsius),
+			BVN_UNIT_NO_PREFIX(bu_kelvin), &out),
+		"25 °C → K: ok");
+	ASSERT_EQ_DBL(out, 298.15, 1e-9, "25 °C → 298.15 K");
+
+	/* affine reverse: 273.15 K → 0 °C */
+	ASSERT_TRUE(bvn_unit_convert_value(273.15,
+			BVN_UNIT_NO_PREFIX(bu_kelvin),
+			BVN_UNIT_NO_PREFIX(bu_celsius), &out),
+		"273.15 K → °C: ok");
+	ASSERT_EQ_DBL(out, 0.0, 1e-9, "273.15 K → 0 °C");
+
+	/* dimensionally incompatible: m → s must fail and not touch out */
+	out = -12345.0;
+	ASSERT_TRUE(!bvn_unit_convert_value(1.0,
+			BVN_UNIT_NO_PREFIX(bu_meter),
+			BVN_UNIT_NO_PREFIX(bu_second), &out),
+		"m → s: incompatible → false");
+	ASSERT_EQ_DBL(out, -12345.0, 1e-9, "m → s: out untouched on failure");
+
+	/* NULL out guarded */
+	ASSERT_TRUE(!bvn_unit_convert_value(1.0,
+			BVN_UNIT_NO_PREFIX(bu_meter),
+			BVN_UNIT_NO_PREFIX(bu_meter), NULL),
+		"NULL out → false");
+}
+
+/* Convert an exact-rational value (given as a decimal/int string in `vbase`)
+ * from unit `from` to `to`, render in `obase`, and compare against `expect`
+ * (NULL means the render is expected to be non-terminating → -1). */
+static void check_rat(const char *vs, uint32_t vbase, bool isint,
+		      value_unit_t from, value_unit_t to, uint32_t obase,
+		      bool expect_exact_factor, const char *expect,
+		      const char *msg)
+{
+	bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+	bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+	bool p = isint ? (bvn_int_from_str(vn, vs, vbase) &&
+			  bvn_int_from_uint64(vd, 1u))
+		       : bvn_float_parse_rational(vs, vbase, vn, vd);
+	ASSERT_TRUE(p, msg);
+	bool exact = false;
+	bool ok = bvn_unit_convert_rational(vn, vd, from, to, on, od, &exact);
+	if (p) {
+		ASSERT_TRUE(ok, msg);
+		ASSERT_TRUE(exact == expect_exact_factor, msg);
+		char buf[4096]; bool rexact = false;
+		int32_t len = bvn_rational_to_str(on, od, obase, buf, sizeof buf, &rexact);
+		if (expect == NULL) {
+			ASSERT_TRUE(len < 0 && !rexact, msg);
+		} else {
+			ASSERT_TRUE(len >= 0 && rexact && strcmp(buf, expect) == 0, msg);
+		}
+	}
+	bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+}
+
+static void test_convert_rational(void)
+{
+	printf("  convert_rational (lossless)...\n");
+	value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo), m = BVN_UNIT_NO_PREFIX(bu_meter);
+	value_unit_t mile = BVN_UNIT_NO_PREFIX(bu_mile), inch = BVN_UNIT_NO_PREFIX(bu_inch);
+	value_unit_t GiB = BVN_UNIT_IEC(bu_byte, iec_gibi), B = BVN_UNIT_NO_PREFIX(bu_byte);
+	value_unit_t degC = BVN_UNIT_NO_PREFIX(bu_celsius), K = BVN_UNIT_NO_PREFIX(bu_kelvin);
+	value_unit_t degF = BVN_UNIT_NO_PREFIX(bu_fahrenheit);
+	value_unit_t deg = BVN_UNIT_NO_PREFIX(bu_degree), rad = BVN_UNIT_NO_PREFIX(bu_radian);
+
+	check_rat("5", 10, true, km, m, 10, true, "5000", "5 km -> 5000 m");
+	check_rat("1", 10, true, mile, m, 10, true, "1609.344", "1 mile -> 1609.344 m");
+	check_rat("1", 10, true, mile, inch, 10, true, "63360", "1 mile -> 63360 in");
+	check_rat("3", 10, true, GiB, B, 10, true, "3221225472", "3 GiB -> bytes");
+	/* wide float, base-2 output (base conversion of a fraction) */
+	check_rat("1.0009765625", 10, false, km, m, 2, true,
+		  "1111101000.1111101", "1.0009765625 km -> m in base 2");
+	/* non-decimal-base carrier + base conversion */
+	check_rat("FF", 16, true, km, m, 10, true, "255000", "0xFF km -> 255000 m");
+	check_rat("255", 10, true, m, m, 16, true, "ff", "255 -> base16 ff (pure base)");
+	/* affine, exact via overrides */
+	check_rat("25", 10, true, degC, K, 10, true, "298.15", "25 C -> 298.15 K");
+	check_rat("98.6", 10, false, degF, degC, 10, true, "37", "98.6 F -> 37 C");
+	/* non-terminating in requested base -> render fails (inexact delivery) */
+	check_rat("1", 10, true, m, mile, 10, true, NULL, "1 m -> mile nonterminating b10");
+	/* irrational factor -> exact flag false (the decimal render may still
+	 * terminate; it is only an approximation, so the reader rejects it). */
+	{
+		bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+		bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+		bvn_int_from_uint64(vn, 90u); bvn_int_from_uint64(vd, 1u);
+		bool exact = true;
+		ASSERT_TRUE(bvn_unit_convert_rational(vn, vd, deg, rad, on, od, &exact),
+			    "90 deg -> rad converts");
+		ASSERT_TRUE(!exact, "90 deg -> rad flagged inexact (irrational)");
+		bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+	}
+	/* multiprecision integer: 2^128-1 km -> m (×1000), exact */
+	check_rat("340282366920938463463374607431768211455", 10, true, km, m, 10, true,
+		  "340282366920938463463374607431768211455000", "uint128 max km -> m");
+
+	/* incompatible dims -> convert returns false */
+	{
+		bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+		bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+		bvn_int_from_uint64(vn, 5u); bvn_int_from_uint64(vd, 1u);
+		bool exact = false;
+		ASSERT_TRUE(!bvn_unit_convert_rational(vn, vd, m, B, on, od, &exact),
+			    "m -> B incompatible returns false");
+		bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+	}
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -1561,6 +1687,8 @@ int main(void)
 	test_convert_factor_error_kinds();
 	test_convert_factor_prefixed_affine();
 	test_convert_factor_prefixed_affine_to_nonaffine();
+	test_convert_value();
+	test_convert_rational();
 	test_unit_reduce();
 	test_unit_reduce_full_cancel_si();
 	test_unit_reduce_iec();

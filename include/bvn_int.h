@@ -111,6 +111,13 @@ BVN_API int  bvn_int_cmp(const bvn_int_t *a, const bvn_int_t *b);
 BVN_API bool bvn_int_sub_inplace(bvn_int_t *a, const bvn_int_t *b);
 BVN_API bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 					const bvn_int_t *a, const bvn_int_t *b);
+/* dst = a * b, signed, arbitrary precision. dst may alias a and/or b. */
+BVN_API bool bvn_int_mul(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b);
+/* dst = a + b, signed. dst may alias a and/or b. */
+BVN_API bool bvn_int_add(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b);
+/* dst = gcd(|a|, |b|), always non-negative (gcd(0,0)=0, gcd(0,x)=|x|). dst may
+ * alias a and/or b. Underpins exact-rational reduction. */
+BVN_API bool bvn_int_gcd(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b);
 #ifdef __cplusplus
 }
 #endif

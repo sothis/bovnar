@@ -301,6 +301,11 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
         ValueUnit, ValueUnit, P(c_bool), P(c_bool),
     ]
 
+    lib.bvn_unit_convert_value.restype  = c_bool
+    lib.bvn_unit_convert_value.argtypes = [
+        c_double, ValueUnit, ValueUnit, P(c_double),
+    ]
+
     lib.bvn_unit_to_si_factor.restype  = c_double
     lib.bvn_unit_to_si_factor.argtypes = [
         ValueUnit, P(c_bool), P(c_double), P(c_bool),

@@ -25,6 +25,7 @@
 #ifndef BVN_VAL_IMPL_H_
 #define BVN_VAL_IMPL_H_
 #include "bvn_lexer_impl.h"
+#include "bvn_int.h"
 #define BVN_SER_WBUF_SIZE 65536u
 #define BOVN_READ_BUFFER_SIZE	65536u
 typedef enum bvn_limit_defaults_e {
@@ -111,6 +112,16 @@ typedef struct bvnr_validator_s {
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
 	bool			(*on_verified)
 			(void* userdata, bvnr_event_t e, bvnr_data_t* data);
+	bool			(*want_unit)
+			(void* userdata, const bvnr_data_t* data,
+			 value_unit_t* want, uint32_t* want_base);
+	/* Scratch for lossless want_unit conversion, allocated lazily and reused per
+	 * value; freed in bvn_val_free. num/den hold the exact converted rational,
+	 * conv_text the rendered string handed to the callback. */
+	bvn_int_t*		conv_num;
+	bvn_int_t*		conv_den;
+	char*			conv_text;
+	uint32_t		conv_text_cap;
 	bvnr_on_error_fn	on_error;
 	uint8_t			tcache_count;
 	uint8_t			tcache_next;
@@ -128,6 +139,7 @@ struct bvnr_writer_s {
 	bvnr_validator_t	val;
 };
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts);
+void bvn_val_free(bvnr_validator_t* v);
 bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw);
 bool bvn_val_receive_event(bvnr_reader_t* r, bvnr_event_t ev);
 bool bvn_val_receive_octet_chunk(

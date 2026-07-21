@@ -77,6 +77,16 @@ int main(void)
 	ABI_FIELD(bvnr_data_t, length);
 	ABI_FIELD(bvnr_data_t, frac_data);
 	ABI_FIELD(bvnr_data_t, frac_length);
+	ABI_FIELD(bvnr_data_t, converted);
+	ABI_FIELD(bvnr_data_t, conv);
+
+	ABI_STRUCT(bvnr_converted_t);
+	ABI_FIELD(bvnr_converted_t, unit);
+	ABI_FIELD(bvnr_converted_t, text);
+	ABI_FIELD(bvnr_converted_t, length);
+	ABI_FIELD(bvnr_converted_t, base);
+	ABI_FIELD(bvnr_converted_t, num);
+	ABI_FIELD(bvnr_converted_t, den);
 
 	/* The flags structs are field-mirrored in the bindings and carry the
 	 * callback function pointers a binding installs for C to invoke, so their
@@ -98,6 +108,7 @@ int main(void)
 	ABI_FIELD(bvnr_read_flags_t, continue_on_error);
 	ABI_FIELD(bvnr_read_flags_t, on_error);
 	ABI_FIELD(bvnr_read_flags_t, strict_version);
+	ABI_FIELD(bvnr_read_flags_t, want_unit);
 	ABI_FIELD(bvnr_read_flags_t, _reserved);
 
 	ABI_STRUCT(bvnr_write_flags_t);

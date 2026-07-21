@@ -7,6 +7,46 @@ versioning of the format (spec)**; the reference implementation
 it in lockstep. The highest spec a build understands is reported by
 `bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`.
 
+## [Unreleased]
+
+Reference-implementation only; the on-the-wire format is unchanged. **The ABI
+breaks**: `bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see
+below) — rebuild consumers against the new headers.
+
+### Added
+
+- **Lossless read-time unit / base conversion** — an optional `want_unit` hook on
+  `bvnr_read_flags_t`. When set, the reader calls it for every numeric value and,
+  if the caller names a target unit and output base, delivers the value converted
+  into it **exactly**, in arbitrary-precision rational arithmetic — a 1056-bit
+  float or a 512-bit integer converts with no loss beyond the library's declared
+  factor. `bvnr_data_t` gains `converted` (bool) and a `conv` carrier
+  (`bvnr_converted_t`: target unit, exact positional `text` in the requested
+  base, and the reduced rational `num`/`den`); `data`/`value_unit` keep the
+  original. Requesting the native unit with a different base is a pure base
+  conversion. A dimensionally incompatible target is `error_unit_mismatch`; an
+  irrational factor (π-based angle) or a result that does not terminate in the
+  requested base is the new `error_unit_inexact` — the reader never silently
+  rounds. See read/write API §7c. The Python `Reader` `want_unit=` callback
+  returns a unit or `(unit, base)`, and `BvnrData.converted_str()` /
+  `EventPayload.converted_text` expose the exact string; the WASM event JSON
+  gains `"converted"`, `"converted_base"`, `"converted_unit"`.
+- **`bvn_unit_convert_rational` / `bvn_rational_to_str`** (`bovnar_si_units.h`) —
+  exact unit conversion of an arbitrary-precision rational, and rendering of a
+  rational in any base (2..36) with terminating-expansion detection. The engine
+  behind `want_unit`. `bvn_float_parse_rational` (`bvn_float.h`) parses a wire
+  literal into an exact rational.
+- **Exact rational factor table** — every non-irrational unit now carries an
+  exact rational `to_si` factor (recovered from its declared decimal, with
+  explicit overrides for non-terminating rationals like °F = 5/9). π-based angle
+  units (degree, arcminute, arcsecond, grad, revolution) are flagged inexact.
+- **`bvn_int_mul` / `bvn_int_add` / `bvn_int_gcd`** (`bvn_int.h`) —
+  arbitrary-precision multiply, add, and gcd, underpinning exact-rational
+  arithmetic.
+- **`bvn_unit_convert_value`** (`bovnar_si_units.h`) — the `double`, convenience
+  counterpart (lossy for wide values): multiplicative + affine conversion in one
+  call. The C equivalent of Python `convert_value` (which delegates to it).
+
 ## [1.1.0] - 2026-06-21
 
 Spec 1.1 is **purely additive** over the frozen 1.0 baseline: every spec-1.0

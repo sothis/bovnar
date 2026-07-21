@@ -33,6 +33,7 @@ _MIRRORS = {
     S.ValueUnitPrefix:    ("value_unit_prefix_t", False),
     S.ValueUnitComponent: ("value_unit_component_t", False),
     S.ValueUnit:          ("value_unit_t", False),
+    S.BvnrConverted:      ("bvnr_converted_t", False),
     S.BvnrData:           ("bvnr_data_t", False),
     S.BvnrReadFlags:      ("bvnr_read_flags_t", False),
     S.BvnrWriteFlags:     ("bvnr_write_flags_t", False),

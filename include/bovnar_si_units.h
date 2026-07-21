@@ -25,6 +25,7 @@
 #ifndef BOVNAR_SI_UNITS_H_
 #define BOVNAR_SI_UNITS_H_
 #include "bovnar.h"
+#include "bvn_int.h"
 #include <stdbool.h>
 #include <stdint.h>
 #ifdef __cplusplus
@@ -52,6 +53,30 @@ BVN_API bool bvn_unit_dimension_vector(value_unit_t u,
 BVN_API bool bvn_units_compatible(value_unit_t a, value_unit_t b);
 BVN_API double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
                                 bool *ok, bool *requires_affine);
+/* Convert `value` from unit `from` into unit `to`, writing the result to *out.
+ * Handles multiplicative and affine (°C/°F/K) conversions. Returns false and
+ * leaves *out untouched when the units are dimensionally incompatible or have no
+ * SI mapping — the "validly convert only" guard used by the reader's want_unit. */
+BVN_API bool bvn_unit_convert_value(double value, value_unit_t from,
+                                value_unit_t to, double *out);
+/* Lossless (exact arbitrary-precision) unit conversion. Converts the exact
+ * rational value vnum/vden from unit `from` into unit `to`, writing the exact
+ * result to out_num/out_den (caller-allocated, reduced to lowest terms, den>0).
+ * Returns false when the units are dimensionally incompatible or the unit is
+ * structurally invalid. *exact is set false when the true conversion factor is
+ * irrational (π-based angles): the result is then only an approximation and a
+ * lossless consumer must reject it. This is the engine behind the reader's
+ * want_unit hook; it is exact for any value width and any base. */
+BVN_API bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
+                                value_unit_t from, value_unit_t to,
+                                bvn_int_t *out_num, bvn_int_t *out_den, bool *exact);
+/* Render an exact rational num/den as a positional string in `base` (2..36).
+ * Writes the full exact expansion and sets *exact=true when the fraction
+ * terminates in `base`; otherwise sets *exact=false and returns -1 (a
+ * non-terminating expansion cannot be delivered losslessly). Returns the string
+ * length (excluding NUL) on success. */
+BVN_API int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
+                                uint32_t base, char *buf, size_t bufsize, bool *exact);
 BVN_API bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
 #ifdef __cplusplus
 }

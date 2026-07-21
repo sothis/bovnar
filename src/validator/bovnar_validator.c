@@ -30,6 +30,8 @@
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
 #include "bovnar_currency.h"
+#include "bovnar_si_units.h"
+#include "bvn_float.h"
 #include "bvn_gregorian_date.h"
 #include "bvn_datetime.h"
 /*
@@ -83,9 +85,18 @@ bvnr_reader_t* bvnr_reader_create(void)
 	memset(r, 0, sizeof(*r));
 	return r;
 }
+void bvn_val_free(bvnr_validator_t* v)
+{
+	if (!v) return;
+	bvn_int_free(v->conv_num); v->conv_num = NULL;
+	bvn_int_free(v->conv_den); v->conv_den = NULL;
+	free(v->conv_text);        v->conv_text = NULL;
+	v->conv_text_cap = 0;
+}
 void bvnr_reader_destroy(bvnr_reader_t* r)
 {
 	if (!r) return;
+	bvn_val_free(&r->val);
 	bvn_lex_destroy(&r->lex);
 	free(r);
 }
@@ -99,6 +110,7 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 		v->userdata      = opts->userdata;
 		v->on_unverified = opts->on_unverified;
 		v->on_verified   = opts->on_verified;
+		v->want_unit     = opts->want_unit;
 		v->on_error      = opts->on_error;
 	}
 }
@@ -144,6 +156,112 @@ static inline bool bvn_emit_both(bvnr_reader_t* r,
 	if (!v->on_unverified && !v->on_verified) return true;
 	if (!bvn_emit_unverified(r, ev, d)) return false;
 	if (!bvn_emit_verified(r, ev, d))   return false;
+	return true;
+}
+/*
+ * Read-time LOSSLESS unit/base conversion. Just before a numeric value is
+ * delivered, ask the caller's want_unit hook (if any) which unit and output base
+ * it wants. When it names a target, the value's exact text is parsed into an
+ * arbitrary-precision rational, converted with bvn_unit_convert_rational (exact
+ * for any width/base, affine-aware), and rendered in the requested base. The
+ * exact result — string and rational — is attached to `d->conv`; the original
+ * `data`/`length`/`value_unit` are left untouched.
+ *
+ * Fires for every numeric family (never datetime), with or without a unit, so a
+ * caller can also request a pure base conversion (same unit, new base). Three
+ * outcomes abort the parse: a dimensionally incompatible target is
+ * error_unit_mismatch; an irrational factor or a result that does not terminate
+ * in the requested base is error_unit_inexact. A value whose text will not parse
+ * to a finite rational (nan/inf) is left unconverted — no violation occurred.
+ */
+static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* d)
+{
+	bvnr_validator_t* v = &r->val;
+	if (!v->want_unit)
+		return true;
+	if (tt != token_is_number && tt != token_is_array_number &&
+	    tt != token_is_string && tt != token_is_array_string)
+		return true;
+	if (!bvn_type_is_numeric(d->value_type))
+		return true;
+
+	value_unit_t want      = d->value_unit;
+	uint32_t     want_base = 0u;
+	if (!v->want_unit(v->userdata, d, &want, &want_base))
+		return true;                 /* caller declined this value */
+
+	/* d->data is not NUL-terminated; copy the exact digits out. */
+	char  small[128];
+	char* nb  = small;
+	uint32_t len = d->length;
+	if ((size_t)len + 1u > sizeof small) {
+		nb = malloc((size_t)len + 1u);
+		if (!nb) { v->last_error = error_invalid_argument; return false; }
+	}
+	if (len) memcpy(nb, d->data, len);
+	nb[len] = '\0';
+
+	/* Parse the value into an exact rational vn/vd. */
+	bvn_int_t* vn = bvn_int_alloc();
+	bvn_int_t* vd = bvn_int_alloc();
+	uint32_t wire_base = bvn_effective_base(d->value_type);
+	bool parsed = vn && vd;
+	if (parsed) {
+		if (d->value_type.family == vt_uint || d->value_type.family == vt_sint)
+			parsed = bvn_int_from_str(vn, nb, wire_base) &&
+				 bvn_int_from_uint64(vd, 1u);
+		else
+			parsed = bvn_float_parse_rational(
+				nb, wire_base == 16u ? 16u : 10u, vn, vd);
+	}
+	if (nb != small) free(nb);
+	if (!parsed) {                       /* nan/inf/undecodable: deliver native */
+		bvn_int_free(vn); bvn_int_free(vd);
+		return true;
+	}
+
+	/* Convert exactly into the reader-owned scratch rational. */
+	if (!v->conv_num) v->conv_num = bvn_int_alloc();
+	if (!v->conv_den) v->conv_den = bvn_int_alloc();
+	if (!v->conv_num || !v->conv_den) {
+		bvn_int_free(vn); bvn_int_free(vd);
+		v->last_error = error_invalid_argument;
+		return false;
+	}
+	bool exact = false;
+	bool conv_ok = bvn_unit_convert_rational(vn, vd, d->value_unit, want,
+						 v->conv_num, v->conv_den, &exact);
+	bvn_int_free(vn); bvn_int_free(vd);
+	if (!conv_ok) { v->last_error = error_unit_mismatch; return false; }
+	if (!exact)   { v->last_error = error_unit_inexact;  return false; }
+
+	/* Render in the requested base (0 → the value's own; clamp to [2,36]). */
+	uint32_t obase = want_base ? want_base : wire_base;
+	if (obase < 2u || obase > 36u) obase = 10u;
+	/* Digit count in any base >= 2 is bounded by the bit length; size for the
+	 * integer part, the fractional part, and sign/dot/NUL. */
+	uint32_t need = (uint32_t)(bvn_int_bitlen(v->conv_num) +
+				   bvn_int_bitlen(v->conv_den)) + 16u;
+	if (v->conv_text_cap < need) {
+		char* nt = realloc(v->conv_text, need);
+		if (!nt) { v->last_error = error_invalid_argument; return false; }
+		v->conv_text = nt;
+		v->conv_text_cap = need;
+	}
+	bool rexact = false;
+	int32_t tlen = bvn_rational_to_str(v->conv_num, v->conv_den, obase,
+					   v->conv_text, v->conv_text_cap, &rexact);
+	if (tlen < 0 || !rexact) {           /* non-terminating in this base */
+		v->last_error = error_unit_inexact;
+		return false;
+	}
+	d->converted    = true;
+	d->conv.unit    = want;
+	d->conv.text    = v->conv_text;
+	d->conv.length  = (uint32_t)tlen;
+	d->conv.base    = obase;
+	d->conv.num     = (const struct bvn_int_s*)v->conv_num;
+	d->conv.den     = (const struct bvn_int_s*)v->conv_den;
 	return true;
 }
 void bvn_acc_reset(bvnr_validator_t* v)
@@ -1249,6 +1367,11 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	 * is a datetime literal that had a `.frac` part). */
 	d.frac_data   = dt_frac;
 	d.frac_length = dt_frac_len;
+	/* Optional read-time unit conversion (bvnr_read_flags_t.want_unit). Runs
+	 * after all type/unit validation, so it sees the value in its native unit
+	 * and can rewrite it (or abort with error_unit_mismatch). */
+	if (!bvn_apply_want_unit(r, tt, &d))
+		return false;
 	return bvn_emit_both(r, raw->event, &d);
 }
 /*

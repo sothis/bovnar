@@ -544,6 +544,7 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_invalid_datetime_literal:  return "invalid_datetime_literal";
 	case error_datetime_literal_unsupported_epoch:
 	                                      return "datetime_literal_unsupported_epoch";
+	case error_unit_inexact:              return "unit_inexact";
 	default:                              return "unknown_error";
 	}
 }

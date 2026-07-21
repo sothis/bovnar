@@ -390,6 +390,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
+    .exact   = false;        # π-based: 1° = π/180 rad is irrational
     .aliases = ["degrees", "degree", "degr", "deg", "°"];
   },
   {
@@ -719,6 +720,12 @@
     .dims    = { .temperature = 1; };
     .affine  = true;
     .offset  = 255.37222222222223;
+    # Exact rationals: slope 5/9, offset 273.15 − 160/9 = 45967/180. The stored
+    # decimals only approximate these non-terminating rationals, so override.
+    .factor_num = <sint:64>     5;
+    .factor_den = <sint:64>     9;
+    .offset_num = <sint:64> 45967;
+    .offset_den = <sint:64>   180;
     .prefix  = default;
     .aliases = ["fahrenheit", "degreesF", "degreeF", "degrF", "degF", "°F"];
   },
@@ -995,6 +1002,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
+    .exact   = false;        # π-based (1/60 degree): irrational in SI radian
     .aliases = ["arcminutes", "arcminute", "arcmin"];
   },
   {
@@ -1006,6 +1014,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
+    .exact   = false;        # π-based (1/3600 degree): irrational in SI radian
     .aliases = ["arcseconds", "arcsecond", "arcsec"];
   },
   {
@@ -1017,6 +1026,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
+    .exact   = false;        # π-based: 1 grad = π/200 rad is irrational
     .aliases = ["gradians", "gradian", "grad", "gon"];
   },
   {
@@ -1391,6 +1401,7 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
+    .exact   = false;        # π-based: 1 rev = 2π rad is irrational
     .aliases = ["revolutions", "revolution", "turns", "turn", "rev"];
   },
   {

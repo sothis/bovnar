@@ -129,18 +129,46 @@ def gen_enum(units):
     return "".join(out)
 
 
+def exact_rational(u, key):
+    """Return the exact (numerator, denominator) rational for a unit's `factor`
+    or `offset`, reduced to lowest terms.
+
+    An explicit .<key>_num / .<key>_den override in the source wins — use it for
+    a factor whose true value is a NON-terminating rational (e.g. fahrenheit's
+    slope 5/9, offset 45967/180), which the stored decimal only approximates.
+    Otherwise the rational is recovered exactly from the declared decimal
+    (Decimal keeps every written digit, incl. exponent form), so a conversion
+    introduces no error beyond the library's own declared factor. Units whose
+    factor is genuinely irrational (π-based angles) carry .exact = false and are
+    reported inexact at conversion time regardless of what this returns."""
+    from fractions import Fraction
+    from decimal import Decimal
+    n = u.get(key + "_num")
+    d = u.get(key + "_den")
+    if n is not None and d is not None:
+        return Fraction(int(n), int(d))
+    return Fraction(Decimal(c_double_literal(u[key])))
+
+
 def gen_conv_table(units):
     out = [BANNER]
     for u in units:
         nm = "bu_" + u["name"]
         dims = ", ".join("%2d" % d for d in dims_to_vector(u["dims"], u["name"]))
-        out.append("\t[%-14s] = { %-14s %-22s {%s}, %-6s %s },\n" % (
-            nm, nm + ",",
-            c_double_literal(u["factor"]) + ",",
-            dims,
-            ("true," if u["affine"] else "false,"),
-            c_double_literal(u["offset"]),
-        ))
+        fr = exact_rational(u, "factor")
+        of = exact_rational(u, "offset")
+        exact = bool(u.get("exact", True))
+        out.append(
+            "\t[%-14s] = { %-14s %-22s {%s}, %-6s %-14s "
+            "\"%d\", \"%d\", \"%d\", \"%d\", %s },\n" % (
+                nm, nm + ",",
+                c_double_literal(u["factor"]) + ",",
+                dims,
+                ("true," if u["affine"] else "false,"),
+                c_double_literal(u["offset"]) + ",",
+                fr.numerator, fr.denominator, of.numerator, of.denominator,
+                ("true" if exact else "false"),
+            ))
     return "".join(out)
 
 

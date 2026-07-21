@@ -919,3 +919,171 @@ class TestNewUnitCompatibility:
     def test_gi_uk_compatible_with_pt_uk(self):   assert self._compat("gi_uk", "pt_uk")
     def test_gi_uk_compatible_with_gi(self):      assert self._compat("gi_uk", "gi")
     def test_gi_uk_compatible_with_gal_uk(self):  assert self._compat("gi_uk", "gal_uk")
+
+
+class TestReaderWantUnit:
+    """Lossless read-time unit/base conversion via the Reader want_unit hook."""
+
+    @needs_lib
+    def test_multiplicative_conversion(self):
+        seen = []
+
+        def want(d):
+            return make_unit_si(BaseUnit.METER)   # deliver lengths in metres
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append(d.converted_str())
+            return True
+
+        Reader().read_mem(b'.d = 5 k~m;', on_verified=on_event, want_unit=want)
+        assert seen == ['5000']                    # exact
+
+    @needs_lib
+    def test_affine_conversion(self):
+        seen = []
+
+        def want(d):
+            return make_unit_si(BaseUnit.KELVIN)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append(d.converted_str())
+            return True
+
+        Reader().read_mem('.t = 25 °C;'.encode('utf-8'),
+                          on_verified=on_event, want_unit=want)
+        assert seen == ['298.15']                  # exact
+
+    @needs_lib
+    def test_incompatible_is_unit_mismatch(self):
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return make_unit_si(BaseUnit.SECOND)   # seconds for a length
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem(b'.d = 5 k~m;', on_verified=lambda e, d: True,
+                              want_unit=want)
+        assert ei.value.code == ErrorCode.UNIT_MISMATCH
+
+    @needs_lib
+    def test_irrational_is_unit_inexact(self):
+        from bovnar.exceptions import BovnarParseError
+        from bovnar.enums import ErrorCode
+
+        def want(d):
+            return make_unit_si(BaseUnit.RADIAN)   # degree -> radian is π-based
+
+        with pytest.raises(BovnarParseError) as ei:
+            Reader().read_mem('.a = 90 °;'.encode('utf-8'),
+                              on_verified=lambda e, d: True, want_unit=want)
+        assert ei.value.code == ErrorCode.UNIT_INEXACT
+
+    @needs_lib
+    def test_decline_leaves_value_native(self):
+        flags = []
+
+        def want(d):
+            return None                            # decline every value
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.type != 0:
+                flags.append(bool(d.converted))
+            return True
+
+        Reader().read_mem(b'.d = 5 k~m;', on_verified=on_event, want_unit=want)
+        assert flags and not any(flags)
+
+    @needs_lib
+    def test_pure_base_conversion(self):
+        # same unit, different output base: return (unit, base)
+        seen = []
+
+        def want(d):
+            return (d.value_unit, 16)              # keep unit, render base 16
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append((d.converted_str(), d.conv.base))
+            return True
+
+        Reader().read_mem(b'.n = 255;', on_verified=on_event, want_unit=want)
+        assert seen == [('ff', 16)]
+
+    @needs_lib
+    def test_non_decimal_base_string_carrier_converts(self):
+        # A non-decimal base is written as a string literal but still has a
+        # numeric family — it must convert. Ask for base-10 output explicitly.
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.METER), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append(d.converted_str())
+            return True
+
+        Reader().read_mem(b'.x = <uint:32,_16> "FF" k~m;',
+                          on_verified=on_event, want_unit=want)
+        assert seen == ['255000']                  # 0xFF k~m -> 255000 m, exact
+
+    @needs_lib
+    def test_real_string_never_converted(self):
+        flags = []
+
+        def want(d):
+            return make_unit_si(BaseUnit.METER)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.type != 0:
+                flags.append(bool(d.converted))
+            return True
+
+        Reader().read_mem(b'.s = "hello";', on_verified=on_event, want_unit=want)
+        assert flags and not any(flags)
+
+    @needs_lib
+    def test_multiprecision_integer_converts_losslessly(self):
+        # A >64-bit integer converts EXACTLY (no double rounding): uint128 max
+        # times 1000, delivered as full decimal digits.
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.METER), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append((d.converted_str(), d.raw_bytes()))
+            return True
+
+        big = b'340282366920938463463374607431768211455'   # uint128 max
+        Reader().read_mem(b'.x = <uint:128> ' + big + b' k~m;',
+                          on_verified=on_event, want_unit=want)
+        assert len(seen) == 1
+        val, raw = seen[0]
+        assert val == '340282366920938463463374607431768211455000'  # exact ×1000
+        assert raw == big                              # exact source preserved
+
+    @needs_lib
+    def test_wide_float_converts_losslessly(self):
+        # A 1056-bit binary float converts EXACTLY: 70 significant digits
+        # survive k~m -> m, far beyond what a double could carry.
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.METER), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append(d.converted_str())
+            return True
+
+        digits = ('1.234567890123456789012345678901234567890'
+                  '123456789012345678901234567891')
+        Reader().read_mem(('.d = <float:1056> %s k~m;' % digits).encode(),
+                          on_verified=on_event, want_unit=want)
+        assert seen == ['1234.567890123456789012345678901234567890'
+                        '123456789012345678901234567891']    # exact x1000

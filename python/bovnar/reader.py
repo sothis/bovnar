@@ -30,7 +30,7 @@ from .enums import Event, ErrorCode
 from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
     BvnrSource, BvnrSink, BvnrReadFlags, BvnrData, ValueUnit,
-    EVENT_CALLBACK_FUNC,
+    EVENT_CALLBACK_FUNC, WANT_UNIT_FUNC,
     make_unit_dimensionless,
 )
 
@@ -52,17 +52,27 @@ class _CollectingHandler:
 class EventPayload:
 
 
-    __slots__ = ('event', 'raw', 'value_type', 'value_unit')
+    __slots__ = ('event', 'raw', 'value_type', 'value_unit',
+                 'converted', 'converted_text', 'converted_base')
 
     def __init__(self,
                  event: Event,
                  raw: bytes,
                  value_type,
-                 value_unit) -> None:
+                 value_unit,
+                 converted: bool = False,
+                 converted_text: "str | None" = None,
+                 converted_base: int = 0) -> None:
         self.event      = event
         self.raw        = raw
         self.value_type = value_type
         self.value_unit = value_unit
+        # Lossless read-time unit/base conversion (see Reader want_unit). When
+        # True, converted_text is the EXACT value in the requested unit and base
+        # (converted_base); `raw` keeps the original text. See BvnrData.conv.
+        self.converted      = converted
+        self.converted_text = converted_text
+        self.converted_base = converted_base
 
     @property
     def text(self) -> str:
@@ -109,7 +119,8 @@ class Reader:
                      on_unverified,
                      max_file_size: int,
                      continue_on_error: bool,
-                     strict_version: bool = False) -> tuple:
+                     strict_version: bool = False,
+                     want_unit=None) -> tuple:
 
         flags    = BvnrReadFlags()
         cb_refs  = []
@@ -132,6 +143,11 @@ class Reader:
             cb = self._wrap_callback(on_unverified)
             cb_refs.append(cb)
             flags.on_unverified = cb
+
+        if want_unit is not None:
+            cb = self._wrap_want_unit(want_unit)
+            cb_refs.append(cb)
+            flags.want_unit = cb
 
         flags.continue_on_error = continue_on_error
         flags.strict_version    = strict_version
@@ -170,6 +186,19 @@ class Reader:
                     # snap.frac_str() if you need to retain it.
                     snap.frac_data   = src.frac_data
                     snap.frac_length = src.frac_length
+                    # Lossless read-time conversion result (see want_unit). The
+                    # exact `text` lives in reader-owned memory valid only during
+                    # this call, so copy it into the snapshot's own carrier now.
+                    snap.converted = src.converted
+                    if src.converted:
+                        snap.conv.base   = src.conv.base
+                        snap.conv.length = src.conv.length
+                        ctypes.memmove(ctypes.addressof(snap.conv.unit),
+                                       ctypes.addressof(src.conv.unit),
+                                       unit_size)
+                        # reading a c_char_p yields a fresh bytes copy; assigning
+                        # it back lets ctypes keep it alive past the callback.
+                        snap.conv.text = src.conv.text
                     data = snap
                 result = py_fn(ev, data)
                 return bool(result) if result is not None else True
@@ -179,6 +208,48 @@ class Reader:
                 return False
 
         cb = EVENT_CALLBACK_FUNC(_c_cb)
+        cb._bvnr_state = state
+        return cb
+
+    @staticmethod
+    def _wrap_want_unit(py_fn: Callable):
+        # Wrap a Python want_unit(data) into the C want_unit contract
+        #   bool(*)(void*, const bvnr_data_t*, value_unit_t*, uint32_t*).
+        # The Python callback returns one of:
+        #   None                       -> decline (value delivered untouched)
+        #   ValueUnit                  -> convert to that unit, keep native base
+        #   (ValueUnit, base:int)      -> convert to that unit and output base
+        #                                 (base 0 keeps native; 2..36 otherwise)
+        # The conversion is lossless; an incompatible unit becomes
+        # error_unit_mismatch and an inexact one error_unit_inexact (parse abort).
+        state = {'exc': None}
+        unit_size = ctypes.sizeof(ValueUnit)
+
+        def _c_cb(userdata_void, data_ptr, want_ptr, want_base_ptr) -> bool:
+            try:
+                data = data_ptr.contents if data_ptr else None
+                res = py_fn(data)
+                if res is None:
+                    return False
+                if isinstance(res, tuple):
+                    want, base = res
+                else:
+                    want, base = res, 0
+                if not isinstance(want, ValueUnit):
+                    raise BovnarArgumentError(
+                        "want_unit callback must return a ValueUnit, "
+                        "(ValueUnit, base), or None")
+                ctypes.memmove(ctypes.addressof(want_ptr.contents),
+                               ctypes.addressof(want), unit_size)
+                if want_base_ptr:
+                    want_base_ptr.contents.value = int(base)
+                return True
+            except BaseException as exc:
+                if state['exc'] is None:
+                    state['exc'] = exc
+                return False
+
+        cb = WANT_UNIT_FUNC(_c_cb)
         cb._bvnr_state = state
         return cb
 
@@ -200,7 +271,8 @@ class Reader:
                  on_unverified: Callable | None = None,
                  max_file_size: int = 0,
                  continue_on_error: bool = False,
-                 strict_version: bool = False) -> None:
+                 strict_version: bool = False,
+                 want_unit: Callable | None = None) -> None:
 
         self._check_open()
         if isinstance(data, memoryview):
@@ -210,7 +282,7 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version
+            strict_version, want_unit
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
@@ -245,7 +317,8 @@ class Reader:
                 on_unverified: Callable | None = None,
                 max_file_size: int = 0,
                 continue_on_error: bool = False,
-                strict_version: bool = False) -> None:
+                strict_version: bool = False,
+                want_unit: Callable | None = None) -> None:
 
         self._check_open()
         if not isinstance(fd, int) or fd < 0:
@@ -253,7 +326,7 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version
+            strict_version, want_unit
         )
 
         src = BvnrSource()
@@ -316,7 +389,10 @@ class Reader:
             raw = d.raw_bytes() if d else b''
             vt  = d.value_type  if d else None
             vu  = d.value_unit  if d else None
-            events.append(EventPayload(ev, raw, vt, vu))
+            cvd = bool(d.converted) if d else False
+            ctxt = d.converted_str() if (d and cvd) else None
+            cbase = int(d.conv.base) if (d and cvd) else 0
+            events.append(EventPayload(ev, raw, vt, vu, cvd, ctxt, cbase))
             return True
 
         kwargs = dict(max_file_size=max_file_size)

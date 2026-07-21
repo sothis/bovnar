@@ -877,6 +877,25 @@ rational_path:;
 #undef FLUSH_CHUNK
 }
 /*
+ * Public exact-rational parse: expose the internal rational builder for lossless
+ * unit conversion. Yields value = num/den exactly, with the sign folded into
+ * num. Only finite values succeed; nan/inf and malformed input return false.
+ */
+bool bvn_float_parse_rational(const char *s, uint32_t base,
+                              bvn_int_t *num, bvn_int_t *den)
+{
+	if (!s || !num || !den || (base != 10u && base != 16u)) return false;
+	bool neg = false;
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, num, den);
+	if (k == BVNF_RK_ZERO) {
+		bvn_int_zero(num);
+		return bvn_int_from_uint64(den, 1u);
+	}
+	if (k != BVNF_RK_OK) return false;     /* nan / inf / malformed */
+	num->negative = neg && !bvn_int_is_zero(num);
+	return true;
+}
+/*
  * Parse a floating literal in base 10 or 16 into a correctly-rounded bvn_float
  * of precision f->_prec. The exact rational is built by bvnf_parse_rational and
  * rounded once by bvnf_rational_to_float. Routing all parsing through the exact

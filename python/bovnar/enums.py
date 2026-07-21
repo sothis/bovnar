@@ -604,3 +604,4 @@ class ErrorCode(IntEnum):
     INVALID_CODEPOINT           = 44
     INVALID_DATETIME_LITERAL    = 45
     DATETIME_LITERAL_UNSUPPORTED_EPOCH = 46
+    UNIT_INEXACT                = 47

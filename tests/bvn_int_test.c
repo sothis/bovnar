@@ -361,8 +361,62 @@ static void test_32768_bit(void)
 	free(input);
 }
 
+/* Compare a bignum against an expected base-10 string. */
+static bool eq_dec(const bvn_int_t *n, const char *expect)
+{
+	char buf[600];
+	if (bvn_int_to_str(n, buf, sizeof buf, 10) < 0) return false;
+	return strcmp(buf, expect) == 0;
+}
+
+static void test_arith(void)
+{
+	bvn_int_t *a = bvn_int_alloc(), *b = bvn_int_alloc(), *c = bvn_int_alloc();
+
+	/* multiply, big × small and wide × wide */
+	bvn_int_from_str(a, "340282366920938463463374607431768211455", 10); /* 2^128-1 */
+	bvn_int_from_str(b, "1000", 10);
+	CHECK(bvn_int_mul(c, a, b), "mul ok");
+	CHECK(eq_dec(c, "340282366920938463463374607431768211455000"), "mul (2^128-1)*1000");
+
+	bvn_int_from_str(a, "99999999999", 10);
+	CHECK(bvn_int_mul(a, a, a), "mul aliased ok");
+	CHECK(eq_dec(a, "9999999999800000000001"), "mul aliased square");
+
+	/* signed multiply */
+	bvn_int_from_str(a, "-7", 10); bvn_int_from_str(b, "6", 10);
+	bvn_int_mul(c, a, b); CHECK(eq_dec(c, "-42"), "mul -7*6");
+	bvn_int_from_str(a, "-7", 10); bvn_int_from_str(b, "-6", 10);
+	bvn_int_mul(c, a, b); CHECK(eq_dec(c, "42"), "mul -7*-6");
+	bvn_int_from_str(a, "12345", 10); bvn_int_from_str(b, "0", 10);
+	bvn_int_mul(c, a, b); CHECK(eq_dec(c, "0"), "mul x*0");
+
+	/* signed add (all sign combinations, incl. cancellation) */
+	bvn_int_from_str(a, "-500", 10); bvn_int_from_str(b, "1200", 10);
+	bvn_int_add(c, a, b); CHECK(eq_dec(c, "700"), "add -500+1200");
+	bvn_int_from_str(a, "-500", 10); bvn_int_from_str(b, "200", 10);
+	bvn_int_add(c, a, b); CHECK(eq_dec(c, "-300"), "add -500+200");
+	bvn_int_from_str(a, "500", 10); bvn_int_from_str(b, "-500", 10);
+	bvn_int_add(c, a, b); CHECK(eq_dec(c, "0"), "add 500+-500 cancels");
+	bvn_int_from_str(a, "18446744073709551615", 10); /* 2^64-1 */
+	bvn_int_from_str(b, "1", 10);
+	bvn_int_add(c, a, b); CHECK(eq_dec(c, "18446744073709551616"), "add carries across limb");
+	bvn_int_add(a, a, a); CHECK(eq_dec(a, "36893488147419103230"), "add aliased self");
+
+	/* gcd, incl. zero cases */
+	bvn_int_from_str(a, "1609344", 10); bvn_int_from_str(b, "1000", 10);
+	bvn_int_gcd(c, a, b); CHECK(eq_dec(c, "8"), "gcd(1609344,1000)=8");
+	bvn_int_from_str(a, "0", 10); bvn_int_from_str(b, "77", 10);
+	bvn_int_gcd(c, a, b); CHECK(eq_dec(c, "77"), "gcd(0,77)=77");
+	bvn_int_from_str(a, "-48", 10); bvn_int_from_str(b, "36", 10);
+	bvn_int_gcd(c, a, b); CHECK(eq_dec(c, "12"), "gcd(-48,36)=12");
+
+	bvn_int_free(a); bvn_int_free(b); bvn_int_free(c);
+}
+
 int main(void)
 {
+	test_arith();
 	test_zero();
 	test_small_values();
 	test_native_getters();

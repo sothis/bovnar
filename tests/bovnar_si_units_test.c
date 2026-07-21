@@ -1951,6 +1951,60 @@ static void test_rational_matches_double_path(void)
 	ASSERT_EQ_INT(mismatches, 0, "exact and double factor paths agree everywhere");
 }
 
+
+static void test_identity_still_validates_structure(void)
+{
+	printf("  identity conversion validates structure...\n");
+	/* The identity short-circuit exists so a unit with no SI row (a currency) or
+	 * an irrational factor can convert to itself. It must not become a hole that
+	 * waves through a MALFORMED unit, which every other entry point rejects. */
+	value_unit_t good = BVN_UNIT_NO_PREFIX(bu_meter);
+
+	value_unit_t bad_exp = good;
+	bad_exp.components[0].exponent = exp_invalid;
+
+	value_unit_t bad_pfx = good;                    /* IEC prefix on a metre */
+	bad_pfx.components[0].prefix.system = prefix_iec;
+	bad_pfx.components[0].prefix.id.iec = iec_gibi;
+
+	value_unit_t oob = good;                        /* base index off the table */
+	oob.components[0].base = (value_base_unit_t)9999;
+
+	value_unit_t toomany = good;                    /* count past the array */
+	toomany.num_components = BVNR_MAX_UNIT_COMPONENTS + 1u;
+
+	value_unit_t bad[] = { bad_exp, bad_pfx, oob, toomany };
+	for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+		double out = -1.0;
+		ASSERT_TRUE(!bvn_unit_convert_value(7.0, bad[i], bad[i], &out),
+			    "malformed unit refused by convert_value identity");
+		bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+		bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+		bvn_int_from_uint64(vn, 7u); bvn_int_from_uint64(vd, 1u);
+		bool exact = false;
+		ASSERT_TRUE(!bvn_unit_convert_rational(vn, vd, bad[i], bad[i],
+						       on, od, &exact),
+			    "malformed unit refused by convert_rational identity");
+		bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+	}
+
+	/* ...while the cases the short-circuit exists for still work. */
+	double out = 0.0;
+	ASSERT_TRUE(bvn_unit_convert_value(7.0, good, good, &out) && out == 7.0,
+		    "well-formed identity converts");
+	bool ok = false;
+	value_unit_t usd = bvn_parse_unit((const uint8_t *)"$USD", &ok);
+	if (ok) {
+		out = 0.0;
+		ASSERT_TRUE(bvn_unit_convert_value(7.0, usd, usd, &out) && out == 7.0,
+			    "currency identity converts despite having no SI row");
+	}
+	value_unit_t deg = BVN_UNIT_NO_PREFIX(bu_degree);
+	out = 0.0;
+	ASSERT_TRUE(bvn_unit_convert_value(7.0, deg, deg, &out) && out == 7.0,
+		    "irrational-factor identity converts");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -1982,6 +2036,7 @@ int main(void)
 	test_exact_factor_table();
 	test_prefix_exponent_interaction();
 	test_rational_matches_double_path();
+	test_identity_still_validates_structure();
 	test_unit_reduce();
 	test_unit_reduce_full_cancel_si();
 	test_unit_reduce_iec();

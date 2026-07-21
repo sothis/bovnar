@@ -94,7 +94,10 @@ reading the grown by-value structs at the wrong size.
   pure base conversion, where the caller names the value's own unit precisely
   because it wants no unit change — so the natural generic hook, "every number in
   base 16, keep its unit", could not read a document containing one angle or one
-  price. Identity now passes the value through exactly, for any unit.
+  price. Identity now passes the value through exactly, for any *well-formed*
+  unit: the short-circuit still rejects a malformed one (`exp_invalid`, a prefix
+  the base disallows, a base index off the table), so it does not become the one
+  place in the library that accepts a unit nothing else will.
 - **`want_unit` handed Python a live pointer into reader memory.** The Python
   binding's `want_unit` wrapper passed `data_ptr.contents` — a ctypes *view* over
   the reader's buffer — where the event-callback wrapper deliberately builds a

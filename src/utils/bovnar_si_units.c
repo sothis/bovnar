@@ -333,6 +333,30 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 	return fa / fb;
 }
 /*
+ * Structural validity of a unit, WITHOUT requiring an SI conversion row.
+ *
+ * This is the shared precondition of the identity short-circuits below. They
+ * must accept a unit that has no SI mapping — a currency — and one whose factor
+ * is irrational, because neither property means anything for the identity map.
+ * What they must NOT accept is a malformed unit: an exp_invalid component, a
+ * prefix the base does not allow, a base index off the end of the table. Every
+ * other entry point in this file rejects those, and skipping the check here
+ * would make the identity path the one place in the library that silently
+ * accepts a unit nothing else will.
+ */
+static bool bvn_unit_structurally_valid(value_unit_t u)
+{
+	if (u.num_components > BVNR_MAX_UNIT_COMPONENTS)
+		return false;
+	for (uint32_t i = 0; i < u.num_components; i++) {
+		const value_unit_component_t *c = &u.components[i];
+		if ((uint32_t)c->base >= SI_CONV_TABLE_SIZE)  return false;
+		if (c->exponent == exp_invalid)               return false;
+		if (!bvn_prefix_unit_valid(c->prefix, c->base)) return false;
+	}
+	return true;
+}
+/*
  * Convert one numeric quantity from `from` into `to`, handling both the simple
  * multiplicative case and the affine case (e.g. °C ↔ K ↔ °F, where a bare factor
  * is not enough). Returns false — writing nothing to *out — when the two units
@@ -355,11 +379,10 @@ bool bvn_unit_convert_value(double value, value_unit_t from, value_unit_t to,
 	 * unit with no SI row (a currency) or an irrational factor (a π-based angle)
 	 * be "converted" to itself, which is otherwise refused for reasons that do
 	 * not apply to the identity. Order-insensitive, so two spellings of the same
-	 * unit count as equal. */
-	if (bvn_unit_equal(from, to)) {
-		*out = value;
-		return true;
-	}
+	 * unit count as equal — but still structurally checked, so a malformed unit
+	 * is rejected here exactly as it is everywhere else. */
+	if (bvn_unit_equal(from, to))
+		return bvn_unit_structurally_valid(from) ? (*out = value, true) : false;
 	bool conv_ok = true, requires_affine = false;
 	double factor = bvn_unit_convert_factor(from, to, &conv_ok,
 						&requires_affine);
@@ -532,6 +555,7 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 	 * That broke the documented pure-base-conversion request, where the caller
 	 * names the value's own unit precisely because it wants no unit change. */
 	if (bvn_unit_equal(from, to)) {
+		if (!bvn_unit_structurally_valid(from)) return false;
 		*exact = true;
 		return bvn_int_copy(out_num, vnum) && bvn_int_copy(out_den, vden) &&
 		       rat_reduce(out_num, out_den);

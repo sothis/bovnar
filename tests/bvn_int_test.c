@@ -414,8 +414,45 @@ static void test_arith(void)
 	bvn_int_free(a); bvn_int_free(b); bvn_int_free(c);
 }
 
+
+static void test_str_bufsize_does_not_wrap(void)
+{
+	printf("  str_bufsize saturates instead of wrapping...\n");
+	/* The round-up used to be computed in uint32_t, so a bit length near
+	 * UINT32_MAX wrapped and the function returned 2 — a caller sizing a buffer
+	 * from it would allocate two bytes for a value needing hundreds of megabytes.
+	 * The answer must grow monotonically with the width, never collapse. */
+	static const uint32_t bases[] = { 2u, 4u, 10u, 16u, 36u, 64u, 85u };
+	for (size_t b = 0; b < sizeof bases / sizeof bases[0]; b++) {
+		size_t prev = 0;
+		static const uint32_t widths[] = {
+			1u, 1024u, 65535u, 1u << 20, 1u << 28,
+			4294967290u, 4294967291u, 4294967292u, 4294967294u, 4294967295u,
+		};
+		for (size_t i = 0; i < sizeof widths / sizeof widths[0]; i++) {
+			size_t got = bvn_int_str_bufsize(widths[i], bases[b]);
+			CHECK(got >= prev,
+				    "str_bufsize never shrinks as the bit width grows");
+			/* one digit + sign + NUL is the floor */
+			CHECK(got >= 3u, "str_bufsize always leaves room for a digit");
+			prev = got;
+		}
+	}
+	/* And a real value still gets a bound that actually holds. */
+	bvn_int_t *n = bvn_int_alloc();
+	CHECK(n && bvn_int_from_str(n, "123456789012345678901234567890", 10),
+		    "wide value parses");
+	size_t need = bvn_int_str_bufsize((uint32_t)bvn_int_bitlen(n), 10);
+	char *buf = malloc(need);
+	CHECK(buf && bvn_int_to_str(n, buf, need, 10) == 30,
+		    "the bound is sufficient for the real rendering");
+	free(buf);
+	bvn_int_free(n);
+}
+
 int main(void)
 {
+	test_str_bufsize_does_not_wrap();
 	test_arith();
 	test_zero();
 	test_small_values();

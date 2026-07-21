@@ -34,6 +34,7 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
+#include <limits.h>
 #include "bvn_int.h"
 #include "bvn_float.h"
 /*
@@ -644,9 +645,13 @@ size_t bvn_rational_str_bufsize(const bvn_int_t *num, const bvn_int_t *den,
 	int nb = bvn_int_bitlen(num), db = bvn_int_bitlen(den);
 	/* Integer digits are bounded by the numerator's width; fraction digits by
 	 * the denominator's, since every emitted digit divides out a factor >= 2.
-	 * +3 covers the sign, the radix point and the NUL. */
-	return bvn_int_str_bufsize((uint32_t)(nb > 0 ? nb : 1), base) +
-	       (size_t)(db > 0 ? db : 1) + 3u;
+	 * +3 covers the sign, the radix point and the NUL. Saturating rather than
+	 * wrapping: bvn_int_str_bufsize itself saturates at SIZE_MAX for a width no
+	 * buffer could hold, and adding to that must not turn a refusal into a tiny
+	 * allocation. */
+	size_t ipart = bvn_int_str_bufsize((uint32_t)(nb > 0 ? nb : 1), base);
+	size_t fpart = (size_t)(db > 0 ? db : 1) + 3u;
+	return (ipart > SIZE_MAX - fpart) ? SIZE_MAX : ipart + fpart;
 }
 int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 			    uint32_t base, char *buf, size_t bufsize, bool *exact)

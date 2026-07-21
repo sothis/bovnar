@@ -99,6 +99,14 @@ reading the grown by-value structs at the wrong size.
   long before the answer does, so `1e-6000` rendered in base 40 and hard-failed in
   base 50 — reported as "unusable output base". The digits now come from a long
   division whose intermediates stay the size of the denominator.
+- **`bvn_int_str_bufsize` wrapped for a bit width near `UINT32_MAX`** and
+  returned 2, so a caller sizing a buffer from it would allocate two bytes for a
+  value needing hundreds of megabytes. The round-up is now done in 64 bits and
+  saturates at `SIZE_MAX` where the true answer does not fit `size_t` at all, so
+  the caller's allocation fails honestly instead of succeeding at the wrong size;
+  `bvn_rational_str_bufsize`, which adds to it, saturates too. Not reachable
+  through the library — every internal call passes a `bvn_int_bitlen()` capped at
+  `BVN_INT_MAX_BITS` — but both are `BVN_API` and a caller may pass any width.
 - **`bvnr_open_read_mem(NULL, len > 0)` opened successfully and then crashed** in
   the lexer. `buf` and `len` arrive independently (the WASM entry points take them
   as separate arguments), so the pairing is now checked. A NULL buffer with length

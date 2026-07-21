@@ -186,7 +186,17 @@ size_t bvn_int_str_bufsize(uint32_t bits, uint32_t base)
 	else if (base >= 8u)  bpd = 3u;
 	else if (base >= 4u)  bpd = 2u;
 	else                  bpd = 1u;
-	return (size_t)((bits + bpd - 1u) / bpd) + 2u;
+	/* The round-up and the +2 are done in 64 bits, then saturated. Computed in
+	 * uint32_t, `bits + bpd - 1` wrapped for a bit length near UINT32_MAX and
+	 * returned 2 — a caller sizing a buffer from it would allocate two bytes for
+	 * a value needing hundreds of megabytes. Not reachable through this library
+	 * (every internal call passes a bvn_int_bitlen() capped at BVN_INT_MAX_BITS),
+	 * but this is BVN_API and a caller may pass any width. Where the true answer
+	 * does not fit size_t at all — a 32-bit host asking for base 2 — SIZE_MAX is
+	 * returned so the caller's allocation fails honestly instead of succeeding at
+	 * the wrong size. */
+	uint64_t need = ((uint64_t)bits + bpd - 1u) / bpd + 2u;
+	return (need > (uint64_t)SIZE_MAX) ? SIZE_MAX : (size_t)need;
 }
 /*
  * Convert a bignum to a string in `base` by repeated division: divide the whole

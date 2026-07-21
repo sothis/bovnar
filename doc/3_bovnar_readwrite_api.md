@@ -373,8 +373,9 @@ typedef struct bvnr_converted_s {
     const struct bvn_int_s* den;   /* exact denominator (> 0) */
 } bvnr_converted_t;
 
-/* bvnr_read_flags_t — opt in to rational-only results, see below */
-bool want_unit_allow_nonterminating;
+/* bvnr_read_flags_t */
+bool     want_unit_allow_nonterminating;  /* opt in to rational-only results */
+uint32_t max_conversion_length;           /* work limit; 0 = 1024 */
 ```
 
 By default the reader hands you every numeric value exactly as written and you
@@ -429,9 +430,24 @@ skipped:
 | the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
 | the literal is finite but too extreme to build an exact rational from (e.g. `1e1000000`) | `error_value_out_of_range` |
 | `*want_base` is not a base bvnr writes, or the result is negative in base 64/85, or out of memory | `error_invalid_argument` |
+| the exact result would be longer than `max_conversion_length` characters | `error_value_out_of_range` |
 
 Only `nan`/`inf`/`ninf` are handed over untouched (`converted == false`, no
 error): they carry no finite value, so no conversion was possible or promised.
+
+#### Bounding the work
+
+Rendering an exact expansion is **quadratic in its digit count**, and the count
+follows the *magnitude of the value's exponent*, not the literal's length:
+`1e-9800` is seven characters and expands to 9800 digits. Left unbounded, a
+one-kilobyte document of such values costs minutes of CPU while looking trivial.
+
+`max_conversion_length` caps the characters a conversion may produce; `0` selects
+`BVNR_DEFAULT_MAX_CONVERSION_LENGTH` (1024), generous next to any real
+measurement. Anything longer is `error_value_out_of_range`, rejected before the
+digits are generated. Raise it if you genuinely need thousands of exact digits.
+Like `max_number_length` and `max_array_items`, it is here so a consumer of
+untrusted input is not at the mercy of the input's shape.
 
 #### Exact-but-not-writable results
 

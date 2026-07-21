@@ -394,6 +394,19 @@ typedef struct bvnr_read_flags_s {
 	 * there no exact rational exists to hand over. Leave false (the zero-init
 	 * default) to keep the strict all-or-nothing behaviour. */
 	bool		want_unit_allow_nonterminating;
+	/* Longest conv.text a want_unit conversion may produce, in characters; 0
+	 * selects BVNR_DEFAULT_MAX_CONVERSION_LENGTH. A conversion whose exact result
+	 * would be longer aborts with error_value_out_of_range.
+	 *
+	 * This is a WORK limit, not a correctness one. Rendering an exact expansion is
+	 * quadratic in its digit count, and the count follows the magnitude of the
+	 * value's exponent rather than its length: `1e-9800` is seven characters and
+	 * expands to 9800 digits, so a kilobyte of such values costs minutes of CPU
+	 * while the document itself looks trivial. Like max_number_length and
+	 * max_array_items, this is here so a consumer of untrusted input is not at the
+	 * mercy of the input's shape. Raise it if you genuinely need thousands of
+	 * exact digits; no physical measurement does. */
+	uint32_t	max_conversion_length;
 	/* Optional read-time LOSSLESS unit/base conversion hook. When non-NULL, the
 	 * reader calls it for every numeric value (with or without a unit) after
 	 * validation and before EITHER value callback — it can abort the parse, and
@@ -432,9 +445,13 @@ typedef struct bvnr_read_flags_s {
 	bool		(*want_unit)
 			(void* userdata, const bvnr_data_t* data,
 			 value_unit_t* want, uint32_t* want_base);
-	uint64_t	_reserved[3];
+	uint64_t	_reserved[2];
 } bvnr_read_flags_t;
 typedef uint32_t bvn_unit_flags_t;
+/* Default for bvnr_read_flags_t.max_conversion_length: generous next to any real
+ * measurement, small enough that the quadratic render cost stays proportionate
+ * to the document. */
+#define BVNR_DEFAULT_MAX_CONVERSION_LENGTH 1024u
 #define BVN_UNIT_FLAGS_NONE ((bvn_unit_flags_t)0u)
 #define BVN_UNIT_REDUCE     ((bvn_unit_flags_t)(1u << 0))
 #define BVN_UNIT_ASCII_EXP  ((bvn_unit_flags_t)(1u << 1))

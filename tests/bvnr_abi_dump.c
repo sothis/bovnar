@@ -109,6 +109,7 @@ int main(void)
 	ABI_FIELD(bvnr_read_flags_t, on_error);
 	ABI_FIELD(bvnr_read_flags_t, strict_version);
 	ABI_FIELD(bvnr_read_flags_t, want_unit_allow_nonterminating);
+	ABI_FIELD(bvnr_read_flags_t, max_conversion_length);
 	ABI_FIELD(bvnr_read_flags_t, want_unit);
 	ABI_FIELD(bvnr_read_flags_t, _reserved);
 

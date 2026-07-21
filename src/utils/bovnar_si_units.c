@@ -299,23 +299,44 @@ static bool info_net_exponent(value_unit_t u, value_base_unit_t info_base,
 	return true;
 }
 /*
- * Two units are inter-convertible iff they have the same SI dimension vector
- * AND the same net information-unit exponents. Bits/bytes are dimensionless in
- * the SI sense but are not freely interchangeable with pure numbers, so they
- * are tracked separately (info_net_exponent) — e.g. "B/s" is not compatible
- * with "1/s". bvn_unit_convert_factor builds on this to return the actual
- * multiplier a->b, refusing affine conversions unless the offsets match.
+ * Units that carry NO SI dimension yet are not interchangeable with a pure
+ * number, nor with each other. The SI dimension vector cannot separate them —
+ * they are all [0,0,0,0,0,0,0] — so each is tracked as its own quantity kind by
+ * net exponent, exactly as a dimension would be.
+ *
+ *   bit, byte  — information. "B/s" is a data rate, not a frequency.
+ *   Np, dB     — logarithmic ratios. These are not linear quantities at all:
+ *                20 dB is a ratio of 100, not twice 10 dB, so the multiply-by-a-
+ *                factor model the rest of this file is built on cannot express
+ *                a conversion between them. Worse, dB is ambiguous by itself —
+ *                1 Np is 8.686 dB for a power quantity but 4.343 dB for a field
+ *                quantity, and nothing in a document says which is meant. With
+ *                both carrying factor 1.0 and no dimension they used to compare
+ *                as compatible, so "1 dB" converted to "1 Np": a number wrong by
+ *                a factor of 8.7, delivered silently. Refusing is the honest
+ *                answer, and it is the one this library gives everywhere else.
+ */
+static const value_base_unit_t bvni_quantity_kinds[] = {
+	bu_bit, bu_byte, bu_neper, bu_decibel,
+};
+#define BVNI_QUANTITY_KIND_COUNT \
+	((uint32_t)(sizeof(bvni_quantity_kinds) / sizeof(bvni_quantity_kinds[0])))
+/*
+ * Two units are inter-convertible iff they have the same SI dimension vector AND
+ * the same net exponent for every quantity kind above. bvn_unit_convert_factor
+ * builds on this to return the actual multiplier a->b, refusing affine
+ * conversions unless the offsets match.
  */
 bool bvn_units_compatible(value_unit_t a, value_unit_t b)
 {
-	int32_t a_bit, b_bit, a_byte, b_byte;
-	if (!info_net_exponent(a, bu_bit,  &a_bit)  ||
-	    !info_net_exponent(b, bu_bit,  &b_bit)  ||
-	    !info_net_exponent(a, bu_byte, &a_byte) ||
-	    !info_net_exponent(b, bu_byte, &b_byte))
-		return false;
-	if (a_bit != b_bit || a_byte != b_byte)
-		return false;
+	for (uint32_t k = 0; k < BVNI_QUANTITY_KIND_COUNT; k++) {
+		int32_t ea, eb;
+		if (!info_net_exponent(a, bvni_quantity_kinds[k], &ea) ||
+		    !info_net_exponent(b, bvni_quantity_kinds[k], &eb))
+			return false;
+		if (ea != eb)
+			return false;
+	}
 	int32_t da[bvn_si_dim_count], db[bvn_si_dim_count];
 	bool ok_a = bvn_unit_dimension_vector(a, da);
 	bool ok_b = bvn_unit_dimension_vector(b, db);
@@ -654,8 +675,8 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 	 * enforces). Refuse rather than emit a '-' that would read back as a digit. */
 	if (neg && (base == 64u || base == 85u)) goto done;
 	/* The zero digit is not '0' outside the alphanumeric bases (Base64 spells it
-	 * 'A', Ascii85 '!'), and it is needed both to pad leading fraction zeros and
-	 * to trim trailing ones. Get it from the canonical renderer. */
+	 * 'A', Ascii85 '!'), and it is what trailing fraction zeros are trimmed
+	 * against. Get it from the canonical renderer. */
 	bvn_int_zero(q);
 	if (bvn_int_to_str(q, zdig, sizeof zdig, base) != 1) goto done;
 	if (!bvn_int_from_uint64(bb, base)) goto done;
@@ -683,30 +704,56 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 	if (!ibuf) goto done;
 	int32_t ilen = bvn_int_to_str(q, ibuf, ibsz, base);
 	if (ilen < 0) goto done;
-	int32_t flen = 0, fend = 0, pad = 0;
-	if (!bvn_int_is_zero(r)) {
-		/* fractional integer = r * (base^k / d), exactly k base-digits */
-		if (!bvn_int_from_uint64(bk, 1u)) goto done;
-		for (int32_t e = 0; e < k; e++)
-			if (!bvn_int_mul(bk, bk, bb)) goto done;
-		if (!bvn_int_divrem(m, rr, bk, d) || !bvn_int_mul(fi, r, m)) goto done;
-		int fbits = bvn_int_bitlen(fi);
-		size_t fbsz = bvn_int_str_bufsize((uint32_t)(fbits > 0 ? fbits : 1), base);
-		fbuf = malloc(fbsz);
-		if (!fbuf) goto done;
-		flen = bvn_int_to_str(fi, fbuf, fbsz, base);
-		if (flen < 0) goto done;
-		fend = flen;
-		while (fend > 0 && fbuf[fend - 1] == zdig[0]) fend--;   /* trim */
-		pad  = k - flen;                                       /* leading zeros */
+	/*
+	 * Decide whether the result can fit BEFORE generating the digits. k is the
+	 * exact fractional digit count and trailing-zero trimming only shortens the
+	 * result, so this is a sound upper bound — and refusing here is what keeps
+	 * `bufsize` a usable work limit, since everything below is quadratic in k.
+	 */
+	{
+		size_t upper = (size_t)(neg ? 1 : 0) + (size_t)ilen +
+			       (bvn_int_is_zero(r) ? 0u : (size_t)(1 + k)) + 1u;
+		if (upper > bufsize) { ret = BVN_RATIONAL_TOO_LONG; goto done; }
 	}
-	/* Assemble: [-]<int>[.<zero-pad><frac, trailing zeros trimmed>]. The exact
+	int32_t fend = 0;
+	if (!bvn_int_is_zero(r)) {
+		/*
+		 * Emit the k fractional digits by long division: digit_i = (r*base)/d,
+		 * r = (r*base) mod d, k times.
+		 *
+		 * The obvious formulation -- build base^k, divide by d, multiply by r and
+		 * render the product -- materialises base^k, which overflows the big-int
+		 * ceiling long before the ANSWER does. That made a value whose expansion
+		 * terminates fail in a large base while succeeding in a small one (1e-6000
+		 * rendered in base 40 but not in base 50), reported as "unusable output
+		 * base". Dividing step by step keeps every intermediate the size of d, so
+		 * only the result's own length bounds what can be rendered -- and the
+		 * leading zeros fall out of the loop, so nothing has to count them.
+		 */
+		fbuf = malloc((size_t)k + 1u);
+		if (!fbuf) goto done;
+		if (!bvn_int_copy(m, r)) goto done;
+		for (int32_t e = 0; e < k; e++) {
+			uint64_t dig = 0;
+			char one[4];
+			if (!bvn_int_mul(m, m, bb)) goto done;
+			if (!bvn_int_divrem(fi, rr, m, d)) goto done;
+			if (!bvn_int_to_uint64(fi, &dig) || dig >= (uint64_t)base) goto done;
+			if (!bvn_int_from_uint64(bk, dig)) goto done;
+			if (bvn_int_to_str(bk, one, sizeof one, base) != 1) goto done;
+			fbuf[e] = one[0];
+			if (!bvn_int_copy(m, rr)) goto done;
+		}
+		fend = k;
+		while (fend > 0 && fbuf[fend - 1] == zdig[0]) fend--;   /* trim */
+	}
+	/* Assemble: [-]<int>[.<frac, trailing zeros trimmed>]. The exact
 	 * length is known now, so a buffer that cannot hold it is refused outright —
 	 * truncating here would hand back a WRONG number under an exact-value
 	 * contract. Size with bvn_rational_str_bufsize. */
 	{
 		size_t need = (size_t)(neg ? 1 : 0) + (size_t)ilen +
-			      (bvn_int_is_zero(r) ? 0u : (size_t)(1 + pad + fend)) + 1u;
+			      (bvn_int_is_zero(r) ? 0u : (size_t)(1 + fend)) + 1u;
 		if (need > bufsize) goto done;
 		size_t pos = 0;
 		if (neg) buf[pos++] = '-';
@@ -714,7 +761,6 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 			buf[pos++] = ibuf[e];
 		if (!bvn_int_is_zero(r)) {
 			buf[pos++] = '.';
-			for (int32_t e = 0; e < pad; e++)  buf[pos++] = zdig[0];
 			for (int32_t e = 0; e < fend; e++) buf[pos++] = fbuf[e];
 		}
 		buf[pos] = '\0';

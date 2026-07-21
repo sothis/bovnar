@@ -75,6 +75,14 @@ BVN_API bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *v
  * rational itself is still exact — only its digit string is infinite — so this
  * is kept distinct from the -1 hard failures. */
 #define BVN_RATIONAL_NONTERMINATING (-2)
+/* Returned when the exact expansion simply does not fit `bufsize`. Distinct from
+ * -1 so a caller can tell "your buffer is too small / this is more work than I
+ * allowed" from a genuine failure. Detected BEFORE the digits are generated, so
+ * `bufsize` doubles as a work limit: rendering is quadratic in the digit count,
+ * and the count is driven by the magnitude of the value's exponent rather than
+ * by its length, so a seven-character literal like 1e-9800 otherwise costs a
+ * tenth of a second. */
+#define BVN_RATIONAL_TOO_LONG (-3)
 /* True for a base bvnr can write and bvn_rational_to_str can render: 2..62 plus
  * the two byte-encoding bases 64 (Base64) and 85 (Ascii85). Mirrors the range
  * bvn_int_from_str/bvn_int_to_str accept. */
@@ -98,11 +106,12 @@ BVN_API size_t bvn_rational_str_bufsize(const bvn_int_t *num, const bvn_int_t *d
  *   BVN_RATIONAL_NONTERMINATING (-2) — the expansion is infinite in this base.
  *       Not a defect in the value: num/den remain exact and a caller that can
  *       consume a rational should use them.
+ *   BVN_RATIONAL_TOO_LONG (-3) — the exact expansion does not fit `bufsize`.
+ *       The buffer is NEVER truncated: a truncated digit string is a WRONG
+ *       number under an exact contract. Size it with bvn_rational_str_bufsize,
+ *       or pass a smaller buffer deliberately to bound the work.
  *   -1 — bad arguments, an unsupported base, a negative value in the sign-less
- *       bases 64/85, allocation failure, or a `bufsize` too small to hold the
- *       result. The buffer is NEVER truncated: a short buffer is refused, since
- *       a truncated digit string is a WRONG number under an exact contract.
- *       Size it with bvn_rational_str_bufsize. */
+ *       bases 64/85, or allocation failure. */
 BVN_API int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
                                 uint32_t base, char *buf, size_t bufsize, bool *exact);
 BVN_API bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);

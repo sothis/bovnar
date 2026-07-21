@@ -124,7 +124,8 @@ class Reader:
                      continue_on_error: bool,
                      strict_version: bool = False,
                      want_unit=None,
-                     want_unit_allow_nonterminating: bool = False) -> tuple:
+                     want_unit_allow_nonterminating: bool = False,
+                     max_conversion_length: int = 0) -> tuple:
 
         flags    = BvnrReadFlags()
         cb_refs  = []
@@ -156,6 +157,10 @@ class Reader:
         flags.continue_on_error = continue_on_error
         flags.strict_version    = strict_version
         flags.want_unit_allow_nonterminating = want_unit_allow_nonterminating
+        # 0 selects the C default (BVNR_DEFAULT_MAX_CONVERSION_LENGTH). This is a
+        # work limit: rendering an exact expansion is quadratic in its digit
+        # count, and the count follows the value's exponent, not its length.
+        flags.max_conversion_length = max_conversion_length
         return flags, cb_refs
 
     @staticmethod
@@ -300,7 +305,8 @@ class Reader:
                  continue_on_error: bool = False,
                  strict_version: bool = False,
                  want_unit: Callable | None = None,
-                 want_unit_allow_nonterminating: bool = False) -> None:
+                 want_unit_allow_nonterminating: bool = False,
+                 max_conversion_length: int = 0) -> None:
 
         self._check_open()
         if isinstance(data, memoryview):
@@ -310,7 +316,8 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, want_unit, want_unit_allow_nonterminating
+            strict_version, want_unit, want_unit_allow_nonterminating,
+            max_conversion_length
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
@@ -347,7 +354,8 @@ class Reader:
                 continue_on_error: bool = False,
                 strict_version: bool = False,
                 want_unit: Callable | None = None,
-                want_unit_allow_nonterminating: bool = False) -> None:
+                want_unit_allow_nonterminating: bool = False,
+                max_conversion_length: int = 0) -> None:
 
         self._check_open()
         if not isinstance(fd, int) or fd < 0:
@@ -355,7 +363,8 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, want_unit, want_unit_allow_nonterminating
+            strict_version, want_unit, want_unit_allow_nonterminating,
+            max_conversion_length
         )
 
         src = BvnrSource()
@@ -394,7 +403,8 @@ class Reader:
                   continue_on_error: bool = False,
                   strict_version: bool = False,
                   want_unit: Callable | None = None,
-                  want_unit_allow_nonterminating: bool = False) -> None:
+                  want_unit_allow_nonterminating: bool = False,
+                 max_conversion_length: int = 0) -> None:
         # Forwards every read_fd option; dropping any of them here would make a
         # conversion or strict-version read impossible from a path.
         import os
@@ -409,6 +419,7 @@ class Reader:
                 strict_version=strict_version,
                 want_unit=want_unit,
                 want_unit_allow_nonterminating=want_unit_allow_nonterminating,
+                max_conversion_length=max_conversion_length,
             )
         finally:
             os.close(fd)

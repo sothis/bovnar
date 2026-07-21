@@ -24,6 +24,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
@@ -1749,7 +1750,8 @@ static void test_rational_to_str_never_truncates(void)
 		memset(small, '#', sizeof small);
 		bool exact = true;
 		int32_t len = bvn_rational_to_str(n, d, 10, small, cap, &exact);
-		ASSERT_TRUE(len == -1, "short buffer returns -1, never a partial length");
+		ASSERT_TRUE(len == BVN_RATIONAL_TOO_LONG,
+			    "short buffer says TOO_LONG, never a partial length");
 		ASSERT_TRUE(!exact, "short buffer never claims exactness");
 		ASSERT_TRUE(small[0] == '#', "short buffer left unwritten");
 	}
@@ -2108,6 +2110,89 @@ static void test_convert_factor_identity(void)
 	ASSERT_TRUE(!cok, "a malformed unit is still refused by convert_factor");
 }
 
+
+static void test_logarithmic_units_refuse(void)
+{
+	printf("  logarithmic units are their own quantity kind...\n");
+	/* dB and Np are logarithms of a ratio, not linear quantities: 20 dB is a
+	 * ratio of 100, not twice 10 dB, so the multiply-by-a-factor model cannot
+	 * express a conversion between them. dB is ambiguous on its own too — 1 Np is
+	 * 8.686 dB for a power quantity and 4.343 dB for a field quantity, and a
+	 * document does not say which. Both carried factor 1.0 and no dimension, so
+	 * they compared as compatible and "1 dB" converted to "1 Np": wrong by a
+	 * factor of 8.7, silently. They are now tracked like bit/byte. */
+	value_unit_t dB = BVN_UNIT_NO_PREFIX(bu_decibel);
+	value_unit_t Np = BVN_UNIT_NO_PREFIX(bu_neper);
+	value_unit_t none = BVN_UNIT_NO_PREFIX(bu_none);
+	value_unit_t B  = BVN_UNIT_NO_PREFIX(bu_byte);
+	double out = -1.0;
+
+	ASSERT_TRUE(!bvn_units_compatible(dB, Np), "dB and Np are not interconvertible");
+	ASSERT_TRUE(!bvn_unit_convert_value(1.0, dB, Np, &out),
+		    "1 dB -> Np is refused rather than answered with 1");
+	ASSERT_TRUE(!bvn_units_compatible(Np, dB), "...symmetrically");
+	ASSERT_TRUE(!bvn_units_compatible(dB, none),
+		    "a logarithmic ratio is not a plain number");
+	ASSERT_TRUE(!bvn_units_compatible(dB, B),
+		    "nor interchangeable with another dimensionless kind");
+
+	/* Each still converts to itself and across its own prefixes. */
+	ASSERT_TRUE(bvn_units_compatible(dB, dB) &&
+		    bvn_unit_convert_value(3.0, dB, dB, &out) && out == 3.0,
+		    "dB -> dB is the identity");
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, BVN_UNIT_SI(bu_decibel, si_milli),
+					   dB, &out) && out == 0.001,
+		    "prefixed dB still scales within its own kind");
+	/* And the pre-existing kinds are untouched. */
+	ASSERT_TRUE(!bvn_units_compatible(B, BVN_UNIT_NO_PREFIX(bu_bit)),
+		    "byte and bit stay separate kinds");
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, BVN_UNIT_SI(bu_meter, si_kilo),
+					   BVN_UNIT_NO_PREFIX(bu_meter), &out) && out == 1000.0,
+		    "ordinary units are unaffected");
+}
+
+static void test_rational_to_str_reports_too_long(void)
+{
+	printf("  rational_to_str distinguishes too-long from failure...\n");
+	/* bufsize doubles as a work limit, so "does not fit" has to be tellable from
+	 * a genuine failure — the reader turns one into a limit error and the other
+	 * into invalid_argument. */
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+	bvn_int_from_str(n, "123456789", 10); bvn_int_from_str(d, "1000", 10);
+	char small[8]; bool exact = true;
+	ASSERT_TRUE(bvn_rational_to_str(n, d, 10, small, sizeof small, &exact)
+		    == BVN_RATIONAL_TOO_LONG, "a short buffer reports TOO_LONG");
+	ASSERT_TRUE(!exact, "and does not claim exactness");
+	/* A negative value in a sign-less base is a different, genuine failure. */
+	bvn_int_from_str(n, "-5", 10); bvn_int_from_uint64(d, 1u);
+	char big[64];
+	ASSERT_TRUE(bvn_rational_to_str(n, d, 85, big, sizeof big, &exact) == -1,
+		    "an unrepresentable sign is still a plain -1");
+	bvn_int_free(n); bvn_int_free(d);
+}
+
+static void test_wide_denominator_renders_in_every_base(void)
+{
+	printf("  wide denominators render in large bases too...\n");
+	/* The digits used to be produced via base^k, an intermediate that overflows
+	 * the big-int ceiling long before the answer does — so a value whose
+	 * expansion terminates rendered in base 40 and hard-failed in base 50. */
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc(), *t = bvn_int_alloc();
+	bvn_int_from_uint64(n, 1u); bvn_int_from_uint64(d, 1u);
+	bvn_int_from_uint64(t, 10u);
+	for (int i = 0; i < 3000; i++) bvn_int_mul(d, d, t);      /* d = 10^3000 */
+	for (uint32_t base = 10; base <= 60; base += 10) {
+		size_t need = bvn_rational_str_bufsize(n, d, base);
+		char *buf = malloc(need);
+		bool exact = false;
+		int32_t ret = buf ? bvn_rational_to_str(n, d, base, buf, need, &exact) : -1;
+		ASSERT_TRUE(ret > 0 && exact,
+			    "1/10^3000 renders exactly in every base, not just small ones");
+		free(buf);
+	}
+	bvn_int_free(n); bvn_int_free(d); bvn_int_free(t);
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -2144,6 +2229,9 @@ int main(void)
 	test_unwritable_units_are_refused();
 	test_reduce_keeps_a_prefixed_dimensionless_scale();
 	test_convert_factor_identity();
+	test_logarithmic_units_refuse();
+	test_rational_to_str_reports_too_long();
+	test_wide_denominator_renders_in_every_base();
 	test_unit_reduce();
 	test_unit_reduce_full_cancel_si();
 	test_unit_reduce_iec();

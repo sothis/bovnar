@@ -124,6 +124,7 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 		v->want_unit     = opts->want_unit;
 		v->want_unit_allow_nonterminating =
 			opts->want_unit_allow_nonterminating;
+		v->max_conversion_length = opts->max_conversion_length;
 		v->on_error      = opts->on_error;
 	}
 }
@@ -242,6 +243,39 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 		return true;
 	}
 
+	/* Refuse an out-of-reach exponent BEFORE building the rational. For a literal
+	 * M·base^E the exact value needs at least |E| digits either side of the point,
+	 * so |E| > the output cap means the result cannot be delivered whatever else
+	 * happens — and checking here is what stops the cost, because building the
+	 * 10^9800 denominator is itself a tenth of a second. Rejecting only at render
+	 * time left the whole attack intact under continue_on_error, where each value
+	 * paid the parse and then got skipped. The bound never rejects a value that
+	 * would have been accepted. */
+	{
+		uint32_t cap = v->max_conversion_length
+			     ? v->max_conversion_length
+			     : BVNR_DEFAULT_MAX_CONVERSION_LENGTH;
+		const char* e = NULL;
+		for (const char* p = nb; *p; p++) {
+			char c = *p;
+			if (wire_base == 16u ? (c == 'p' || c == 'P')
+					     : (c == 'e' || c == 'E')) { e = p + 1; break; }
+		}
+		if (e) {
+			if (*e == '+' || *e == '-') e++;
+			uint64_t mag = 0;
+			for (; *e >= '0' && *e <= '9'; e++) {
+				mag = mag * 10u + (uint64_t)(*e - '0');
+				if (mag > (uint64_t)cap) break;
+			}
+			if (mag > (uint64_t)cap) {
+				if (nb != small) free(nb);
+				v->last_error = error_value_out_of_range;
+				return false;
+			}
+		}
+	}
+
 	/* Parse the value into an exact rational vn/vd. */
 	bvn_int_t* vn = bvn_int_alloc();
 	bvn_int_t* vd = bvn_int_alloc();
@@ -286,6 +320,16 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	 * rather than truncating, so the buffer is sized from its own bound. */
 	size_t need = bvn_rational_str_bufsize(v->conv_num, v->conv_den, obase);
 	if (need == 0u) { v->last_error = error_invalid_argument; return false; }
+	/* Bound the work. Rendering is quadratic in the digit count, and the count
+	 * follows the magnitude of the value's exponent rather than its length, so a
+	 * seven-byte literal like 1e-9800 costs a tenth of a second and a kilobyte of
+	 * them costs minutes. Capping the buffer makes bvn_rational_to_str refuse
+	 * before it generates anything, which is the only place the cost can be
+	 * stopped without changing what an accepted conversion means. */
+	uint32_t cap = v->max_conversion_length ? v->max_conversion_length
+					        : BVNR_DEFAULT_MAX_CONVERSION_LENGTH;
+	if (need > (size_t)cap + 1u)
+		need = (size_t)cap + 1u;
 	if ((size_t)v->conv_text_cap < need) {
 		char* nt = realloc(v->conv_text, need);
 		if (!nt) { v->last_error = error_invalid_argument; return false; }
@@ -306,6 +350,11 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 			return false;
 		}
 		tlen = 0;
+	} else if (tlen == BVN_RATIONAL_TOO_LONG) {
+		/* Longer than max_conversion_length allows. The value is fine; it is
+		 * the cost of writing it out that the reader declines. */
+		v->last_error = error_value_out_of_range;
+		return false;
 	} else if (tlen < 0 || !rexact) {
 		/* Out of memory, or a negative value in sign-less base 64/85. */
 		v->last_error = error_invalid_argument;
@@ -1592,6 +1641,13 @@ bool bvnr_open_read_mem(
 {
 	bvnr_source_t src;
 	bvnr_sink_t   dbg;
+	/* A NULL pointer with a nonzero length used to open successfully and then
+	 * dereference the null in the lexer. buf and len arrive independently from
+	 * the caller (the WASM entry points take them as separate arguments), so the
+	 * pairing has to be checked here rather than assumed. A NULL buffer with
+	 * length 0 stays valid — that is an empty document. */
+	if (!buf && len > 0)
+		return false;
 	bvnr_source_from_mem(&src, buf, len);
 	if (dbg_buf && dbg_cap)
 		bvnr_sink_to_mem(&dbg, dbg_buf, dbg_cap);

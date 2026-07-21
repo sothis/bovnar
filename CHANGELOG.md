@@ -74,6 +74,35 @@ reading the grown by-value structs at the wrong size.
   `ev_data`. That is a deliberate property, not an accident of emission order,
   and is now stated in `bovnar.h`, in the API doc's callback section and §7c, and
   pinned by a test. Behaviour is unchanged.
+- **`max_conversion_length`** (`bvnr_read_flags_t`, Python
+  `Reader.read_mem`/`read_fd`/`read_file`) — bounds the characters a `want_unit`
+  conversion may produce; `0` selects `BVNR_DEFAULT_MAX_CONVERSION_LENGTH`
+  (1024). Rendering an exact expansion is quadratic in its digit count and the
+  count follows the value's *exponent* rather than its length, so `1e-9800` — seven
+  characters — expanded to 9800 digits and cost a tenth of a second. A 9.9 KB
+  document of them took **70 seconds**; through the WASM playground a 1.3 KB
+  paste froze the tab for 16 s. Now 0.000 s and 8 ms respectively: the exponent is
+  checked before the rational is built, and `bvn_rational_to_str` refuses on
+  length before generating any digits (new `BVN_RATIONAL_TOO_LONG`, distinct from
+  the -1 failures). Legitimate conversions are unaffected.
+- **Logarithmic units are their own quantity kind.** `dB` and `Np` both carried
+  factor 1.0 and no dimension, so they compared as compatible and `1 dB`
+  converted to `1 Np` — wrong by a factor of 8.7, silently. They are logarithms
+  of a ratio, not linear quantities (20 dB is a ratio of 100, not twice 10 dB),
+  and `dB` is ambiguous on its own: 1 Np is 8.686 dB for a power quantity and
+  4.343 dB for a field quantity, which a document does not record. They are now
+  tracked by net exponent alongside `bit`/`byte`, so a conversion between them,
+  or to a plain number, is `error_unit_mismatch`. Each still converts to itself
+  and across its own prefixes.
+- **A terminating expansion was refused in large bases.** The fractional digits
+  were produced via `base^k`, an intermediate that overflows the big-int ceiling
+  long before the answer does, so `1e-6000` rendered in base 40 and hard-failed in
+  base 50 — reported as "unusable output base". The digits now come from a long
+  division whose intermediates stay the size of the denominator.
+- **`bvnr_open_read_mem(NULL, len > 0)` opened successfully and then crashed** in
+  the lexer. `buf` and `len` arrive independently (the WASM entry points take them
+  as separate arguments), so the pairing is now checked. A NULL buffer with length
+  0 stays valid — that is an empty document.
 - **The shipped Release library could `abort()` the host process.** The
   `CMAKE_C_FLAGS_*` FORCE-overrides replace CMake's per-config defaults
   wholesale, and `-DNDEBUG` was not spelled back in, so `assert()` stayed live in

@@ -76,6 +76,7 @@ typedef struct {
 	uint32_t     want_base;  /* output base (0 = keep native) */
 	bool         request;    /* whether to request conversion at all */
 	bool         identity;   /* target the value's OWN unit (pure base conv) */
+	uint32_t     max_conv_len;   /* 0 = the library default */
 	bool         allow_nonterminating;   /* deliver rational-only results */
 	bool         saw_value;
 	bool         converted;
@@ -152,6 +153,7 @@ static void run_want(const char *payload, want_ctx_t *ctx,
 	flags.on_unverified = want_on_unverified;
 	flags.want_unit     = want_unit_cb;
 	flags.want_unit_allow_nonterminating = ctx->allow_nonterminating;
+	flags.max_conversion_length          = ctx->max_conv_len;
 
 	bvnr_reader_t *reader = bvnr_reader_create();
 	ASSERT_TRUE(reader != NULL, "want: reader_create");
@@ -523,15 +525,38 @@ static void test_want_unit_underflow_is_not_zero(void)
 		ctx.identity = true;
 		run_want(unrepresentable[i], &ctx, false, error_value_out_of_range);
 	}
-	/* Still small but representable: converts, and is emphatically not "0". */
+	/* Still small but representable, and within the work limit: converts, and is
+	 * emphatically not "0". */
 	{
 		want_ctx_t ctx = {0};
 		ctx.request  = true;
 		ctx.identity = true;
-		run_want(".d = <float:1056> 1.5e-9000 m;", &ctx, true, error_none);
+		run_want(".d = <float:1056> 1.5e-100 m;", &ctx, true, error_none);
 		ASSERT_TRUE(ctx.converted, "want: representable tiny value converts");
 		ASSERT_TRUE(strcmp(ctx.text, "0") != 0,
 					"want: representable tiny value is not rendered as 0");
+		ASSERT_TRUE(strlen(ctx.text) > 100,
+					"want: and it carries its full exact expansion");
+	}
+	/* Beyond the work limit is a DIFFERENT refusal from underflow: the value is
+	 * perfectly representable, it is the cost of writing out its thousands of
+	 * exact digits that the reader declines. Rendering is quadratic in the digit
+	 * count and the count follows the exponent rather than the literal's length,
+	 * so seven characters otherwise buy a tenth of a second of CPU. */
+	{
+		want_ctx_t ctx = {0};
+		ctx.request  = true;
+		ctx.identity = true;
+		run_want(".d = <float:64> 1e-9800 m;", &ctx, false, error_value_out_of_range);
+	}
+	/* ...and raising the limit lets it through again. */
+	{
+		want_ctx_t ctx = {0};
+		ctx.request    = true;
+		ctx.identity   = true;
+		ctx.max_conv_len = 20000;
+		run_want(".d = <float:64> 1e-2000 m;", &ctx, true, error_none);
+		ASSERT_TRUE(ctx.converted, "want: a raised limit admits a long expansion");
 	}
 	/* A literal that really is zero still converts to zero. */
 	{

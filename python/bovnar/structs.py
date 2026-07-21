@@ -348,8 +348,9 @@ class BvnrReadFlags(ctypes.Structure):
         ('on_error',              ON_ERROR_FUNC),
         ('strict_version',        ctypes.c_bool),
         ('want_unit_allow_nonterminating', ctypes.c_bool),
+        ('max_conversion_length', ctypes.c_uint32),
         ('want_unit',             WANT_UNIT_FUNC),
-        ('_reserved',             ctypes.c_uint64 * 3),
+        ('_reserved',             ctypes.c_uint64 * 2),
     ]
 
 class BvnrWriteFlags(ctypes.Structure):

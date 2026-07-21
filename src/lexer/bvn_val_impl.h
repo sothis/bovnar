@@ -116,6 +116,7 @@ typedef struct bvnr_validator_s {
 			(void* userdata, const bvnr_data_t* data,
 			 value_unit_t* want, uint32_t* want_base);
 	bool			want_unit_allow_nonterminating;
+	uint32_t		max_conversion_length;
 	/* Scratch for lossless want_unit conversion, allocated lazily and reused per
 	 * value; freed in bvn_val_free. num/den hold the exact converted rational,
 	 * conv_text the rendered string handed to the callback. */

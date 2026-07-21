@@ -719,12 +719,20 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
  * signed pattern; FAIL means the text is not a number. Both bvn_float_from_str
  * (which then rounds to a bvn_float) and bvn_float_strtoieee_bin (which rounds
  * straight to an IEEE binary format) build on this single parser.
+ *
+ * UNDERFLOW is ZERO's counterpart for a literal that is NOT zero but whose exact
+ * rational will not fit the big-int budget — 1.5e-20000, or a 2000-digit mantissa
+ * at e-9000. A rounding caller treats it exactly like ZERO (that is what it
+ * rounds to). A caller that wants the EXACT value must not: reporting such a
+ * literal as "exactly 0" is wrong by every digit, which is why it is a kind of
+ * its own rather than folded into ZERO. It mirrors INF on the overflow side.
  */
 typedef enum {
 	BVNF_RK_OK = 0,
 	BVNF_RK_NAN,
 	BVNF_RK_INF,
 	BVNF_RK_ZERO,
+	BVNF_RK_UNDERFLOW,
 	BVNF_RK_FAIL
 } bvnf_rkind;
 static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
@@ -826,10 +834,10 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 			has_e = true; s++;
 		}
 		if (!has_e) return BVNF_RK_FAIL;
-		if (exp_overflow) return eneg ? BVNF_RK_ZERO : BVNF_RK_INF;
+		if (exp_overflow) return eneg ? BVNF_RK_UNDERFLOW : BVNF_RK_INF;
 		exp_val = eneg ? -eabs : eabs;
 	}
-	if (overflow) return (exp_val < 0) ? BVNF_RK_ZERO : BVNF_RK_INF;
+	if (overflow) return (exp_val < 0) ? BVNF_RK_UNDERFLOW : BVNF_RK_INF;
 	uint32_t log2b = 0;
 	bool b_is_pow2 = bvnf_pow2_base(base, &log2b);
 	if (bvn_int_is_zero(num)) return BVNF_RK_ZERO;
@@ -847,7 +855,7 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		} else {
 			bvn_int_from_uint64(den, 1u);
 			if (-net_shift > (long)INT_MAX || !bvn_int_shl(den, (int)(-net_shift)))
-				return BVNF_RK_ZERO;
+				return BVNF_RK_UNDERFLOW;
 		}
 	} else {
 rational_path:;
@@ -858,17 +866,17 @@ rational_path:;
 					if (!bvn_int_mul_u32(num, base)) return BVNF_RK_INF;
 			} else {
 				for (long i = 0; i < -net_b_exp; i++)
-					if (!bvn_int_mul_u32(den, base)) return BVNF_RK_ZERO;
+					if (!bvn_int_mul_u32(den, base)) return BVNF_RK_UNDERFLOW;
 			}
 		} else {
 			for (int i = 0; i < frac_digits; i++)
-				if (!bvn_int_mul_u32(den, base)) return BVNF_RK_ZERO;
+				if (!bvn_int_mul_u32(den, base)) return BVNF_RK_UNDERFLOW;
 			if (exp_val >= 0) {
 				if (exp_val > (long)INT_MAX || !bvn_int_shl(num, (int)exp_val))
 					return BVNF_RK_INF;
 			} else {
 				if (-exp_val > (long)INT_MAX || !bvn_int_shl(den, (int)(-exp_val)))
-					return BVNF_RK_ZERO;
+					return BVNF_RK_UNDERFLOW;
 			}
 		}
 	}
@@ -887,11 +895,15 @@ bool bvn_float_parse_rational(const char *s, uint32_t base,
 	if (!s || !num || !den || (base != 10u && base != 16u)) return false;
 	bool neg = false;
 	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, num, den);
-	if (k == BVNF_RK_ZERO) {
+	if (k == BVNF_RK_ZERO) {               /* the literal really is zero */
 		bvn_int_zero(num);
 		return bvn_int_from_uint64(den, 1u);
 	}
-	if (k != BVNF_RK_OK) return false;     /* nan / inf / malformed */
+	/* nan / inf / malformed, and UNDERFLOW: a literal like 1.5e-20000 is not
+	 * zero, it is a value too small to build a rational for. Handing back an
+	 * exact zero here would be wrong by every digit, and silently so — the
+	 * symmetric case, INF, has always been refused. */
+	if (k != BVNF_RK_OK) return false;
 	num->negative = neg && !bvn_int_is_zero(num);
 	return true;
 }
@@ -918,6 +930,7 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 		case BVNF_RK_OK:   rc = bvnf_rational_to_float(f, neg, &num, &den); break;
 		case BVNF_RK_NAN:  bvn_float_set_nan(f);        rc = true;  break;
 		case BVNF_RK_INF:  bvn_float_set_inf(f, neg);   rc = true;  break;
+		case BVNF_RK_UNDERFLOW:   /* not representable exactly; rounds to +-0 */
 		case BVNF_RK_ZERO: bvn_float_set_zero(f, neg);  rc = true;  break;
 		case BVNF_RK_FAIL:
 		default:           rc = false; break;
@@ -980,6 +993,7 @@ void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 			bits[(man_bits + i) / 32] |= 1u << ((man_bits + i) % 32);
 		if (neg) bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
 		break;
+	case BVNF_RK_UNDERFLOW:       /* not representable exactly; rounds to +-0 */
 	case BVNF_RK_ZERO:
 		if (neg) bits[(total - 1) / 32] |= 1u << ((total - 1) % 32);
 		break;

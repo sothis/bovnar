@@ -350,6 +350,16 @@ bool bvn_unit_convert_value(double value, value_unit_t from, value_unit_t to,
 {
 	if (!out)
 		return false;
+	/* Converting a unit to itself is the identity map — no factor, no offset, and
+	 * nothing that needs an SI mapping. Short-circuiting it here is what lets a
+	 * unit with no SI row (a currency) or an irrational factor (a π-based angle)
+	 * be "converted" to itself, which is otherwise refused for reasons that do
+	 * not apply to the identity. Order-insensitive, so two spellings of the same
+	 * unit count as equal. */
+	if (bvn_unit_equal(from, to)) {
+		*out = value;
+		return true;
+	}
 	bool conv_ok = true, requires_affine = false;
 	double factor = bvn_unit_convert_factor(from, to, &conv_ok,
 						&requires_affine);
@@ -514,6 +524,18 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 			       bvn_int_t *out_num, bvn_int_t *out_den, bool *exact)
 {
 	if (!vnum || !vden || !out_num || !out_den || !exact) return false;
+	/* Identity conversion: the value passes through unchanged and EXACTLY,
+	 * whatever the unit is. Without this short-circuit the from- and to-unit's
+	 * own properties are consulted for what is arithmetically a no-op, so
+	 * `90° -> 90°` was rejected as inexact (the π factor never enters) and
+	 * `$USD -> $USD` as dimensionally incompatible (currencies have no SI row).
+	 * That broke the documented pure-base-conversion request, where the caller
+	 * names the value's own unit precisely because it wants no unit change. */
+	if (bvn_unit_equal(from, to)) {
+		*exact = true;
+		return bvn_int_copy(out_num, vnum) && bvn_int_copy(out_den, vden) &&
+		       rat_reduce(out_num, out_den);
+	}
 	if (!bvn_units_compatible(from, to)) return false;   /* dim mismatch */
 	bvn_int_t *ffn = bvn_int_alloc(), *ffd = bvn_int_alloc();
 	bvn_int_t *fon = bvn_int_alloc(), *fod = bvn_int_alloc();

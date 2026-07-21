@@ -75,6 +75,7 @@ typedef struct {
 	value_unit_t want;       /* unit to request */
 	uint32_t     want_base;  /* output base (0 = keep native) */
 	bool         request;    /* whether to request conversion at all */
+	bool         identity;   /* target the value's OWN unit (pure base conv) */
 	bool         allow_nonterminating;   /* deliver rational-only results */
 	bool         saw_value;
 	bool         converted;
@@ -87,10 +88,9 @@ static bool want_unit_cb(void *userdata, const bvnr_data_t *data,
 						 value_unit_t *want, uint32_t *want_base)
 {
 	want_ctx_t *c = userdata;
-	(void)data;
 	if (!c->request)
 		return false;        /* decline: deliver untouched */
-	*want      = c->want;
+	*want      = c->identity ? data->value_unit : c->want;
 	*want_base = c->want_base;
 	return true;
 }
@@ -446,6 +446,77 @@ static void test_want_unit_corrected_factors(void)
 	}
 }
 
+
+static void test_want_unit_identity_is_always_exact(void)
+{
+	/* The documented pure-base-conversion request names the value's OWN unit
+	 * precisely because it wants no unit change. That is the identity map, so it
+	 * must succeed whatever the unit is — including one with no SI row (a
+	 * currency) or an irrational factor (a π-based angle), which are refused for
+	 * reasons that simply do not apply when from == to. Without an identity
+	 * short-circuit the natural generic hook ("every number in base 16, keep its
+	 * unit") could not read a document containing one angle or one price. */
+	static const struct { const char *doc; uint32_t base; const char *text; } cases[] = {
+		{ ".a = 90 °;",                        16, "5a"     },  /* irrational factor */
+		{ ".a = 90 °;",                         0, "90"     },
+		{ ".x = 1 arcmin;",                    16, "1"      },
+		{ ".r = 2 rev;",                       16, "2"      },
+		{ ".d = 3 pc;",                        16, "3"      },
+		{ ".m = 5 Oe;",                        16, "5"      },
+		{ ".p = <uint:64,$BTC> 100;",          16, "64"     },  /* no SI row at all */
+		{ ".p = <float_dec:64,$USD> 100.25;",   0, "100.25" },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		want_ctx_t ctx = {0};
+		ctx.want      = BVN_UNIT_NONE;     /* replaced by the value's own below */
+		ctx.want_base = cases[i].base;
+		ctx.request   = true;
+		ctx.identity  = true;
+		run_want(cases[i].doc, &ctx, true, error_none);
+		ASSERT_TRUE(ctx.converted, "want: identity conversion applied");
+		ASSERT_TRUE(strcmp(ctx.text, cases[i].text) == 0,
+					"want: identity conversion is the value itself");
+	}
+}
+
+static void test_want_unit_underflow_is_not_zero(void)
+{
+	/* A literal whose exact rational will not fit the big-int budget is NOT
+	 * zero. It used to be delivered as exactly "0" with converted == true —
+	 * wrong by every digit, silently, from the path that advertises exactness.
+	 * The symmetric overflow side always refused; so must this one. */
+	static const char *unrepresentable[] = {
+		".d = <float:64> 1.5e-20000 m;",
+		".d = <float:64> -7e-30000 m;",
+		".d = <float:1056> 1.5e-9865 m;",
+	};
+	for (size_t i = 0; i < sizeof unrepresentable / sizeof unrepresentable[0]; i++) {
+		want_ctx_t ctx = {0};
+		ctx.request  = true;
+		ctx.identity = true;
+		run_want(unrepresentable[i], &ctx, false, error_value_out_of_range);
+	}
+	/* Still small but representable: converts, and is emphatically not "0". */
+	{
+		want_ctx_t ctx = {0};
+		ctx.request  = true;
+		ctx.identity = true;
+		run_want(".d = <float:1056> 1.5e-9000 m;", &ctx, true, error_none);
+		ASSERT_TRUE(ctx.converted, "want: representable tiny value converts");
+		ASSERT_TRUE(strcmp(ctx.text, "0") != 0,
+					"want: representable tiny value is not rendered as 0");
+	}
+	/* A literal that really is zero still converts to zero. */
+	{
+		want_ctx_t ctx = {0};
+		ctx.request  = true;
+		ctx.identity = true;
+		run_want(".d = <float:64> 0.0 m;", &ctx, true, error_none);
+		ASSERT_TRUE(ctx.converted && strcmp(ctx.text, "0") == 0,
+					"want: a genuine zero still converts to 0");
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_want_unit_test regression suite...\n");
@@ -470,6 +541,8 @@ int main(void)
 	test_want_unit_signless_base_rejects_negative();
 	test_want_unit_reader_reuse();
 	test_want_unit_corrected_factors();
+	test_want_unit_identity_is_always_exact();
+	test_want_unit_underflow_is_not_zero();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

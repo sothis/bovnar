@@ -66,6 +66,27 @@ reading the grown by-value structs at the wrong size.
 
 ### Fixed
 
+- **A nonzero literal could be delivered as exactly `"0"`.**
+  `bvn_float_parse_rational` reported `BVNF_RK_ZERO` both for a literal that *is*
+  zero and for one whose exact rational will not fit the big-int budget, and the
+  reader believed it: `.d = <float:64> 1.5e-20000 m;` arrived with
+  `converted == true` and `conv.text == "0"`, no error — wrong by every digit,
+  from the path that advertises exactness. Not an extreme-exponent corner either;
+  it is a total-precision limit, so a 2000-digit mantissa at `e-9000` tripped it
+  too. Underflow is now its own `BVNF_RK_UNDERFLOW`, refused by the exact parser
+  (`error_value_out_of_range`, matching what the symmetric overflow side has
+  always done) and still rounded to ±0 by the float parsers, whose behaviour is
+  unchanged.
+- **Converting a unit to itself was refused for angles and every currency.**
+  There was no identity short-circuit, so `bvn_unit_convert_rational` /
+  `bvn_unit_convert_value` consulted both units' exactness and SI-table presence
+  for what is arithmetically a no-op: `90° → 90°` came back `error_unit_inexact`
+  (the π factor never enters an identity) and `$USD → $USD`
+  `error_unit_mismatch` (currencies have no SI row). That broke the documented
+  pure base conversion, where the caller names the value's own unit precisely
+  because it wants no unit change — so the natural generic hook, "every number in
+  base 16, keep its unit", could not read a document containing one angle or one
+  price. Identity now passes the value through exactly, for any unit.
 - **`want_unit` handed Python a live pointer into reader memory.** The Python
   binding's `want_unit` wrapper passed `data_ptr.contents` — a ctypes *view* over
   the reader's buffer — where the event-callback wrapper deliberately builds a

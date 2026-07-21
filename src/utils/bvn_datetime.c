@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 /* TAI-UTC offset table.  utc_seconds is the UTC instant at which the offset
  * takes effect, expressed as uniform seconds (86400 s/day) since the TAI
@@ -71,6 +72,54 @@ static const bvn_dt_leap_entry_t bvn_dt_leap_table[] = {
 
 #define BVN_DT_LEAP_TABLE_LEN \
 	(sizeof(bvn_dt_leap_table) / sizeof(bvn_dt_leap_table[0]))
+
+/* True if table entry i is a POSITIVE leap second of exactly one second, i.e.
+ * a real insertion that UTC spells 23:59:60.  Entry 0 establishes the initial
+ * 1972 offset rather than inserting anything, and a step of any other size (a
+ * negative leap second has never been declared, but the table format permits
+ * one) has no single-second spelling — neither is an insertion.  Of the 28
+ * entries in the table, 27 satisfy this. */
+static bool bvn_dt_leap_is_insertion(size_t i)
+{
+	return i > 0 &&
+	       bvn_dt_leap_table[i].tai_minus_utc ==
+	       bvn_dt_leap_table[i - 1].tai_minus_utc + 1;
+}
+
+/* If tai_seconds IS an inserted leap second, return true and store the UTC
+ * instant it precedes (the boundary, i.e. 00:00:00 of the following day).  The
+ * inserted second sits one TAI second below the boundary's TAI instant, since
+ * the new (larger) offset only takes effect at the boundary itself. */
+static bool bvn_dt_tai_is_inserted_leap(int64_t tai_seconds, int64_t* boundary)
+{
+	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
+		const bvn_dt_leap_entry_t* e = &bvn_dt_leap_table[i];
+		if (!bvn_dt_leap_is_insertion(i))
+			continue;
+		if (tai_seconds == e->utc_seconds + e->tai_minus_utc - 1) {
+			if (boundary) *boundary = e->utc_seconds;
+			return true;
+		}
+	}
+	return false;
+}
+
+/* The inverse lookup: is utc_seconds a boundary this table knows an insertion
+ * precedes?  Used to give a written 23:59:60 its own TAI second.  A `:60` at
+ * any OTHER instant is not rejected -- the table is a static snapshot, and a
+ * build predating an announcement must not refuse a document that spells a
+ * genuine future leap second -- it keeps the historical collapse onto the
+ * following second instead. */
+static bool bvn_dt_utc_boundary_has_insertion(int64_t utc_seconds)
+{
+	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
+		if (bvn_dt_leap_table[i].utc_seconds == utc_seconds)
+			return bvn_dt_leap_is_insertion(i);
+		if (bvn_dt_leap_table[i].utc_seconds < utc_seconds)
+			return false;
+	}
+	return false;
+}
 
 /* TAI-UTC at the given UTC instant (uniform seconds since the TAI epoch).
  * Instants before 1972 predate UTC leap seconds (rubber-second era) and are
@@ -195,6 +244,13 @@ int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int64_t gali
 
 int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
 {
+	/* second == 60 has no room in a uniform 86400 s day, so the conversion
+	 * folds it onto 00:00:00 of the next day -- correct for the civil epochs,
+	 * where POSIX time genuinely has no leap second to spend.  On TAI it is
+	 * not: the inserted second is a real, distinct instant, and folding it
+	 * would make two different UTC spellings share one TAI value.  Remember
+	 * whether we were handed one before the fold erases the evidence. */
+	bool wrote_leap_second = (dt->second == 60);
 	int64_t utc_seconds = bvn_dt_datetime_to_epoch_seconds(dt, bvn_epoch_tai);
 	if (utc_seconds == BVN_GDATE_OVF)
 		return BVN_GDATE_OVF;
@@ -203,6 +259,13 @@ int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
 	if (bvn_ckd_add(&tai, utc_seconds, bvn_dt_tai_minus_utc_at(utc_seconds))
 			|| tai == BVN_GDATE_OVF)
 		return BVN_GDATE_OVF;
+	/* Give the insertion the TAI second directly below the boundary -- the one
+	 * bvn_dt_tai_seconds_to_utc() renders as 23:59:60.  Only where the table
+	 * actually records an insertion; elsewhere the historical fold stands. */
+	if (wrote_leap_second && bvn_dt_utc_boundary_has_insertion(utc_seconds)) {
+		if (bvn_ckd_sub(&tai, tai, (int64_t)1) || tai == BVN_GDATE_OVF)
+			return BVN_GDATE_OVF;
+	}
 	return tai;
 }
 
@@ -211,11 +274,12 @@ int64_t bvn_dt_utc_to_tai_seconds(bvn_datetime_t* dt)
  * itself (23:59:60) is not representable and collapses onto 00:00:00 of the
  * following UTC day.
  *
- * The collapse is deliberate, but note it makes this mapping non-injective for
- * the 28 TAI seconds occupied by an insertion — the inserted second and the one
- * after it share a UTC instant, so a TAI->UTC->TAI round trip returns the later
- * of the two and the value grows by one second.  See the round-trip note on
- * bvn_dt_utc_to_tai_seconds in bvn_datetime.h. */
+ * Used only to pick the offset; whether the instant IS the insertion is a
+ * separate question that bvn_dt_tai_is_inserted_leap() answers, and the two
+ * together are what make TAI->UTC->TAI injective.  Taken alone this function is
+ * not: the inserted second and the second after it are both below and at the
+ * boundary respectively and differ by exactly the offset step, so subtracting
+ * the offset maps them onto the same UTC instant. */
 static int64_t bvn_dt_tai_minus_utc_for_tai(int64_t tai_seconds)
 {
 	for (size_t i = BVN_DT_LEAP_TABLE_LEN; i-- > 0;) {
@@ -226,6 +290,23 @@ static int64_t bvn_dt_tai_minus_utc_for_tai(int64_t tai_seconds)
 	return bvn_dt_leap_table[0].tai_minus_utc;
 }
 
+/* Render utc_seconds, spelling an inserted leap second as 23:59:60 of the day
+ * that precedes it instead of collapsing it onto the next day's 00:00:00.  A
+ * uniform 86400 s day has no slot for the inserted second, so it is rendered as
+ * the second BEFORE the boundary and the field is then lifted 59 -> 60; that is
+ * the one place a bvn_datetime_t carries second == 60.
+ *
+ * dt->submjd stays at the value for 23:59:59.  It resolves 1e-5 of a day, i.e.
+ * 0.864 s, so it cannot separate the two in the first place; the exact instant
+ * lives in the second field. */
+static void bvn_dt_render_utc(bvn_datetime_t* dt, int64_t utc_seconds, bool leap)
+{
+	bvn_dt_epoch_seconds_to_datetime(dt, bvn_epoch_tai,
+					 leap ? utc_seconds - 1 : utc_seconds);
+	if (leap)
+		dt->second = 60;
+}
+
 void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
 {
 	int64_t off = bvn_dt_tai_minus_utc_for_tai(tai_seconds);
@@ -234,7 +315,8 @@ void bvn_dt_tai_seconds_to_utc(bvn_datetime_t* dt, int64_t tai_seconds)
 	int64_t utc_seconds;
 	if (bvn_ckd_sub(&utc_seconds, tai_seconds, off))
 		return;
-	bvn_dt_epoch_seconds_to_datetime(dt, bvn_epoch_tai, utc_seconds);
+	bvn_dt_render_utc(dt, utc_seconds,
+			  bvn_dt_tai_is_inserted_leap(tai_seconds, NULL));
 }
 
 void bvn_dt_tai_seconds_to_local_time(bvn_datetime_t* dt, int64_t tai_seconds, int64_t timezone_offset_seconds, int dls_active)
@@ -251,7 +333,11 @@ void bvn_dt_tai_seconds_to_local_time(bvn_datetime_t* dt, int64_t tai_seconds, i
 		return;
 	if (dls_active && bvn_ckd_add(&local, local, (int64_t)3600))
 		return;
-	bvn_dt_epoch_seconds_to_datetime(dt, bvn_epoch_tai, local);
+	/* Zone and DST shifts are whole minutes, so they move the wall clock but
+	 * not the second-of-minute: an inserted leap second is still spelled :60
+	 * locally (00:59:60 in +01:00, say).  Same rendering rule as UTC. */
+	bvn_dt_render_utc(dt, local,
+			  bvn_dt_tai_is_inserted_leap(tai_seconds, NULL));
 }
 
 int bvn_dt_is_date_equal(bvn_datetime_t* a, bvn_datetime_t* b)

@@ -595,8 +595,16 @@ static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
 	/* Fold a tz offset to true UTC: the written civil time is at UTC+offset, so
 	 * UTC = civil - offset. Done before the conversion so tai's leap-second
 	 * lookup is evaluated at the true UTC instant; the conversion formula
-	 * absorbs the now-out-of-range seconds (mktime-style). */
-	dt.second -= offset_seconds;
+	 * absorbs the now-out-of-range field (mktime-style).
+	 *
+	 * The shift goes into MINUTE, not second, even though the totals are equal:
+	 * an ISO offset is always a whole number of minutes, and bvn_dt has exactly
+	 * one value of `second` that means something other than its arithmetic
+	 * value -- 60, the inserted leap second. Subtracting the offset from
+	 * `second` would erase that spelling for every offset but Z, so
+	 * "2017-01-01T00:59:60+01:00" would silently become the following second
+	 * instead of the insertion it names. */
+	dt.minute -= offset_seconds / 60;
 	const char* ep = bvnr_datetime_epoch_name(vt);   /* vt.base = epoch index */
 	int64_t secs;
 	if (strcmp(ep, "tai") == 0) {

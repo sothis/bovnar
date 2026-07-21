@@ -593,9 +593,22 @@ timestamp without any annotation. Fields are strictly validated (month `01`–`1
 a valid day-of-month, hour `00`–`23`, minute `00`–`59`, second `00`–`60`, offset
 `±HH:MM` with two-digit components); a malformed or out-of-range literal is
 `error_invalid_datetime_literal`. A second of `60` is a **UTC leap second** and
-is accepted; because the carrier is whole epoch-seconds it normalises onto the
-following second (so `2016-12-31T23:59:60Z` and `2017-01-01T00:00:00Z` store the
-same `unix` value), which is the correct POSIX reading.
+is accepted. What it stores depends on the epoch:
+
+* On the **civil epochs** (`unix`, `mjd`, `ntp`, `y2000`) it normalises onto the
+  following second — `2016-12-31T23:59:60Z` and `2017-01-01T00:00:00Z` store the
+  same `unix` value. Those scales run a uniform 86 400 s day and have no second
+  to spend on the insertion; collapsing is the correct POSIX reading.
+* On **`tai`** it does not. TAI is a continuous atomic count, the inserted second
+  is a real instant on it, and the two literals above store `1861920036` and
+  `1861920037` respectively. This makes UTC⇄TAI **injective**: every TAI second
+  has exactly one civil spelling and every civil spelling one TAI second, so a
+  `tai` value survives any number of write/read cycles unchanged.
+
+A `:60` at an instant the implementation's leap-second table does not record as
+an insertion collapses on `tai` too. The table is a static snapshot, and a build
+that predates an IERS announcement must not reject a document spelling a genuine
+future leap second.
 
 A **`±HH:MM` offset** shifts the written civil time to true UTC before the
 conversion (`12:00:00+02:00` is `10:00:00Z`); for `tai` the offset is applied
@@ -631,6 +644,7 @@ literal under a non-`datetime` annotation is `error_type_value_mismatch`.
 .a = 2026-06-15;                                  # bare -> <datetime:64,unix>
 .b = 2026-06-15T12:00:00Z;                        # date-time, UTC
 .c = <datetime:64,tai> 2017-01-01T00:00:00Z;      # tai: leap-second correct
+.f = <datetime:64,tai> 2016-12-31T23:59:60Z;      # the insertion itself, one second earlier
 .d = 2026-06-15T12:00:00+02:00;                   # offset -> 10:00:00Z
 .e = 2026-06-15T12:00:00.5Z;                      # fraction preserved; round-trips as a literal
 ```

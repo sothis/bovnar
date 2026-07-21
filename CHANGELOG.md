@@ -119,14 +119,28 @@ reading the grown by-value structs at the wrong size.
   `bovnar query` prints a value rather than a document, so it still emits the
   carrier — but now warns on stderr which digits it left out, so a caller piping
   stdout is not misled into thinking it holds the whole instant.
-- **Documented that a `tai` carrier on an inserted leap second does not
-  round-trip.** The collapse of 23:59:60 onto the next day's 00:00:00 was already
-  documented; its consequence was not. It makes TAI→UTC→TAI non-injective for the
-  28 seconds occupied by an insertion, so such a carrier comes back one second
-  larger after a write/read cycle. The reader cannot produce one from an ISO
-  literal, so it is only reachable by handing the carrier to the writer directly;
-  `bvn_datetime.h` now says so and points callers who need an exact TAI instant
-  at a plain integer instead.
+- **UTC⇄TAI is now injective; an inserted leap second has its own value.**
+  `23:59:60` used to collapse onto the following day's `00:00:00` on *every*
+  epoch. On the civil epochs that is right — POSIX time runs a uniform 86 400 s
+  day and has no second to spend — but on `tai` it discarded a real instant: the
+  inserted second and the one after it shared a value, so `TAI→UTC→TAI` returned
+  the later of the two and grew by one second, and the two distinct literals
+  `2016-12-31T23:59:60Z` and `2017-01-01T00:00:00Z` were indistinguishable.
+  `bvn_dt_tai_seconds_to_utc()` now renders an insertion as `23:59:60` of the
+  preceding day and `bvn_dt_utc_to_tai_seconds()` maps that spelling back to the
+  TAI second below the boundary, making the two mutual inverses over the whole
+  int64 range. **This changes the value stored for a `tai` literal spelling a
+  known leap second** (`2016-12-31T23:59:60Z` is now `1861920036`, was
+  `1861920037`); conformance case DTLIT-127 is updated and DTLIT-129…132 pin the
+  neighbouring rulings. The civil epochs are unchanged. A `:60` at an instant the
+  leap table does not record as an insertion also still collapses, so a build
+  predating an IERS announcement does not reject a document spelling a genuine
+  future leap second. The property is now enforced by an exhaustive round-trip
+  sweep (±1 day around all 28 table boundaries, second by second) in the datetime
+  test. Two supporting fixes: the tz offset is folded into `minute` rather than
+  `second`, which used to erase the `:60` spelling for every offset but `Z`; and
+  the header records that `second == 60` is the one field value in a
+  `bvn_datetime_t` that is not its own arithmetic value.
 - **A consumer that aborted was called again.** The read/write API documents a
   callback returning `false` as "abort", but with `continue_on_error` set the
   reader treated it as a document error: it entered resync and kept calling the

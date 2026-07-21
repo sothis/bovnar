@@ -110,23 +110,29 @@ BVN_API int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int6
 
 /* UTC <-> TAI with the full IERS leap-second table (1972 .. 2017+).
  * Instants before 1972 predate leap seconds and are approximated with the
- * initial 10 s offset.  The inserted leap second itself (23:59:60) is not
- * representable: it collapses onto 00:00:00 of the following UTC day.
+ * initial 10 s offset.
  *
- * CONSEQUENCE FOR ROUND-TRIPPING.  That collapse makes TAI->UTC->TAI
- * non-injective for exactly the 28 TAI seconds occupied by an insertion: the
- * inserted second and the second after it both map to the same UTC instant, so
- * converting back yields the LATER of the two.  A `datetime` value on the
- * `tai` epoch whose carrier is one of those seconds therefore comes back one
- * second larger after a write/read cycle that re-emits it as an ISO literal --
- * e.g. carrier 1861920036 (the leap second inserted at the end of 2016) is
- * re-emitted as 2017-01-01T00:00:00Z and reads back as 1861920037.
+ * THE PAIR IS INJECTIVE, and the two functions are mutual inverses over the
+ * whole int64 range.  That takes one special case: an inserted leap second has
+ * no slot in a uniform 86400 s day, so bvn_dt_tai_seconds_to_utc() renders it as
+ * second == 60 of the PRECEDING day (2016-12-31T23:59:60, not 2017-01-01
+ * 00:00:00), and bvn_dt_utc_to_tai_seconds() maps that spelling back to the TAI
+ * second directly below the boundary.  second == 60 is the only field value in a
+ * bvn_datetime_t that is not its own arithmetic value; it is produced by these
+ * two functions alone -- bvn_dt_epoch_seconds_to_datetime() runs the uniform
+ * scale and never emits it.
  *
- * The reader cannot produce such a carrier from an ISO literal (`:60`
- * normalises up before the conversion), so this is only reachable by handing
- * the carrier to the writer directly.  Callers that must preserve an exact TAI
- * instant across a serialisation cycle should keep it as a plain integer rather
- * than a `datetime` on the `tai` epoch.
+ * Callers rendering a bvn_datetime_t must therefore allow second == 60, and
+ * callers folding a UTC offset into one must not fold it into `second` (an ISO
+ * offset is always whole minutes, so fold into `minute` and the spelling
+ * survives).  dt->submjd resolves 1e-5 of a day = 0.864 s and cannot separate
+ * :59 from :60; it stays at the :59 value.
+ *
+ * Of the 28 table entries 27 are insertions; the first establishes the initial
+ * 1972 offset and inserts nothing.  A `:60` at any instant the table does not
+ * record as an insertion still collapses onto the following second -- the table
+ * is a static snapshot, and a build predating an IERS announcement must not
+ * reject a document that spells a genuine future leap second.
  *
  * bvn_dt_utc_to_tai_seconds() converts via bvn_dt_datetime_to_epoch_seconds()
  * and therefore normalizes dt->date in place and refreshes dt->mjd; it

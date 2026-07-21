@@ -670,6 +670,97 @@ static void test_equality(void)
 	CHECK(!bvn_gregorian_date_is_equal(&g1, &g2), "gdate not equal");
 }
 
+/* The UTC<->TAI pair must be INJECTIVE and mutually inverse. Round-trip identity
+ * over a range is the proof: if two distinct TAI seconds rendered the same civil
+ * tuple, the single inverse could return at most one of them, so some probe in
+ * the range would have to fail.
+ *
+ * The map is a pure translation everywhere the offset is constant, hence trivially
+ * injective there; every interesting point is at an offset change. So sweep those
+ * exhaustively -- +-1 day around all 28 table boundaries, second by second -- and
+ * cover the flat stretches with strided sweeps that include the pre-1972 and
+ * post-2017 constant-offset eras. */
+static const struct { int64_t utc; int64_t off; } bvnt_leap[] = {
+	{441763200,10},{457488000,11},{473385600,12},{504921600,13},{536457600,14},
+	{567993600,15},{599616000,16},{631152000,17},{662688000,18},{694224000,19},
+	{741484800,20},{773020800,21},{804556800,22},{867715200,23},{946684800,24},
+	{1009843200,25},{1041379200,26},{1088640000,27},{1120176000,28},{1151712000,29},
+	{1199145600,30},{1246406400,31},{1293840000,32},{1514764800,33},{1609459200,34},
+	{1719792000,35},{1814400000,36},{1861920000,37},
+};
+#define BVNT_NLEAP (sizeof bvnt_leap / sizeof bvnt_leap[0])
+
+static int bvnt_tai_roundtrips(int64_t tai)
+{
+	bvn_datetime_t dt;
+	memset(&dt, 0, sizeof dt);
+	bvn_dt_tai_seconds_to_utc(&dt, tai);
+	return bvn_dt_utc_to_tai_seconds(&dt) == tai;   /* mutates dt; it is a copy */
+}
+
+static void test_tai_injective(void)
+{
+	printf("\n-- tai/utc injectivity --\n");
+
+	long bad = 0;
+	int64_t first_bad = 0;
+	for (size_t i = 0; i < BVNT_NLEAP; i++) {
+		int64_t t0 = bvnt_leap[i].utc + bvnt_leap[i].off;
+		for (int64_t t = t0 - 86400; t <= t0 + 86400; t++)
+			if (!bvnt_tai_roundtrips(t)) {
+				if (!bad++) first_bad = t;
+			}
+	}
+	CHECK(bad == 0, "exhaustive +-1d at 28 boundaries: %ld broken, first %lld",
+		bad, (long long)first_bad);
+
+	bad = 0;
+	for (int64_t t = -4000000000LL; t <= 6000000000LL; t += 100003)
+		if (!bvnt_tai_roundtrips(t)) { if (!bad++) first_bad = t; }
+	CHECK(bad == 0, "strided sweep -4e9..6e9: %ld broken, first %lld",
+		bad, (long long)first_bad);
+
+	/* Each of the 27 insertions (entry 0 sets the initial offset and inserts
+	 * nothing) is spelled :60 and is civilly distinct from the second after. */
+	int insertions = 0, collisions = 0;
+	for (size_t i = 1; i < BVNT_NLEAP; i++) {
+		if (bvnt_leap[i].off != bvnt_leap[i-1].off + 1)
+			continue;
+		bvn_datetime_t a, b;
+		memset(&a, 0, sizeof a); memset(&b, 0, sizeof b);
+		int64_t t = bvnt_leap[i].utc + bvnt_leap[i].off - 1;
+		bvn_dt_tai_seconds_to_utc(&a, t);
+		bvn_dt_tai_seconds_to_utc(&b, t + 1);
+		if (a.second == 60) insertions++;
+		if (bvn_dt_is_equal(&a, &b)) collisions++;
+	}
+	CHECK(insertions == 27, "27 insertions render as :60, got %d", insertions);
+	CHECK(collisions == 0, "insertion never collides with the next second, got %d",
+		collisions);
+
+	/* A concrete pair, spelled out so a regression names itself. */
+	{
+		bvn_datetime_t leap = { .date = { .year = 2016, .month = 12, .day = 31 },
+		                        .hour = 23, .minute = 59, .second = 60 };
+		bvn_datetime_t next = { .date = { .year = 2017, .month = 1, .day = 1 } };
+		CHECK(bvn_dt_utc_to_tai_seconds(&leap) == 1861920036,
+			"2016-12-31T23:59:60Z is tai 1861920036");
+		CHECK(bvn_dt_utc_to_tai_seconds(&next) == 1861920037,
+			"2017-01-01T00:00:00Z is tai 1861920037");
+	}
+
+	/* The table is a static snapshot: a :60 it does not record as an insertion
+	 * must still collapse, so a build predating an IERS announcement does not
+	 * reject a document spelling a genuine future leap second. */
+	{
+		bvn_datetime_t f = { .date = { .year = 2020, .month = 6, .day = 30 },
+		                     .hour = 23, .minute = 59, .second = 60 };
+		bvn_datetime_t g = { .date = { .year = 2020, .month = 7, .day = 1 } };
+		CHECK(bvn_dt_utc_to_tai_seconds(&f) == bvn_dt_utc_to_tai_seconds(&g),
+			"an unrecorded :60 still collapses onto the next second");
+	}
+}
+
 int main(void)
 {
 	test_walk();
@@ -685,6 +776,7 @@ int main(void)
 	test_dst_window();
 	test_gnss();
 	test_equality();
+	test_tai_injective();
 
 	printf("\n%s  %d passed, %d failed\n",
 	       g_fails ? "FAIL" : "PASS", g_pass, g_fails);

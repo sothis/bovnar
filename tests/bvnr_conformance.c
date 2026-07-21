@@ -704,6 +704,50 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("ENC-004", "encoding", "invalid UTF-8 byte 0xFF in text",
 	           ".x = \xFF;",
 	           error_invalid_utf8_byte),
+	/* The BOM rule (spec 3.2) has three branches and ENC-002/003 pinned two
+	 * of them. The middle one is the only path that produces its own error
+	 * code, and it was the untested one. */
+	ERROR_CASE("ENC-005", "encoding", "UTF-8 BOM inside the first comment line",
+	           "# comment \xEF\xBB\xBF text\n.x = 1;",
+	           error_invalid_byte_order_mark),
+	ERROR_CASE("ENC-006", "encoding", "a second BOM at byte 3 is not a BOM",
+	           "\xEF\xBB\xBF\xEF\xBB\xBF.x = 1;",
+	           error_unexpected_input_byte),
+	ERROR_CASE("ENC-007", "encoding", "BOM after a version directive",
+	           "#!bovnar 1.1\n\xEF\xBB\xBF.x = 1;",
+	           error_unexpected_input_byte),
+	/* Truncation. Spec 13.3 also makes this the second error reported when
+	 * EOF is reached while the parser is resyncing. */
+	ERROR_CASE("ENC-008", "encoding", "stream ends inside an open struct",
+	           "#!bovnar 1.1\n.x = {.a = 1;",
+	           error_got_incomplete_bvnr_stream),
+	ERROR_CASE("ENC-009", "encoding", "stream ends after '=' with no value",
+	           "#!bovnar 1.1\n.x =",
+	           error_got_incomplete_bvnr_stream),
+	/* Lexer token-length caps. Both buffers hold UINT8_MAX+1 bytes, so 255 is
+	 * the last accepted length and 256 the first rejected one. The 255-byte
+	 * cases fail on CONTENT (an unknown unit), not length, which is what
+	 * shows the boundary sits where it is claimed to. */
+	ERROR_CASE("LIM-201", "limits", "inline unit of 256 bytes is too long",
+	           ".x = 1.0 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmmmmm;",
+	           error_unit_too_long),
+	ERROR_CASE("LIM-202", "limits", "inline unit of 255 bytes fails on content, not length",
+	           ".x = 1.0 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmmmm;",
+	           error_unit_illegal),
+	ERROR_CASE("LIM-203", "limits", "type annotation body of 256 bytes is too long",
+	           ".x = <float:64,mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmm> 1.0;",
+	           error_type_too_long),
+	ERROR_CASE("LIM-204", "limits", "type annotation body of 255 bytes fails on content, not length",
+	           ".x = <float:64,mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	           "mmmmm> 1.0;",
+	           error_unit_illegal),
 	ERROR_CASE("ENC-005", "encoding", "overlong UTF-8 sequence",
 	           ".x = \xC0\x80;",
 	           error_invalid_utf8_byte),

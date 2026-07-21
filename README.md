@@ -208,10 +208,30 @@ Disable with `-DBVNR_PACKAGE=OFF`.
 | `BVNR_FUZZ_TEST` | `ON` | Build the self-contained fuzz harnesses and register them as CTest tests. |
 | `BVNR_FUZZ_EXTERNAL` | `OFF` | Build libFuzzer / AFL++ targets (requires clang or afl-clang-fast). |
 | `BVNR_PACKAGE` | `ON` | On each build, regenerate the amalgamation into `build/amalgamate/` and pack release archives into the build dir. |
+| `BVNR_SANITIZE` | `OFF` | ASan + UBSan (`-fno-sanitize-recover=all`) plus `-ftrivial-auto-var-init=pattern` where the compiler has it. GCC/Clang only; a diagnostic build, never a release one. |
 
 ```bash
 cmake -B build -DBVNR_WERROR=ON .
 ```
+
+**Running the sanitizer build.** The `bvnr_py_*` tests load `libbvnr.so` through
+ctypes into an unsanitized interpreter, which ASan refuses outright, so either
+skip them or preload the runtime:
+
+```bash
+cmake -S . -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+ctest --test-dir build-asan -E '^bvnr_py_'          # C suite
+
+LD_PRELOAD=$(gcc -print-file-name=libasan.so) ASAN_OPTIONS=detect_leaks=0 \
+    BVNR_LIB=$PWD/build-asan/libbvnr.so python3 -m pytest python
+```
+
+`-ftrivial-auto-var-init=pattern` is not a sanitizer and does not report
+anything: it fills uninitialized automatic variables with a conspicuous pattern
+so a read of one yields a distinctive value instead of whatever the stack held,
+which makes a test that depends on such a read change its answer. GCC has no
+MemorySanitizer; uninitialized *heap* reads are not covered by any of the above
+and need a clang/MSan run.
 
 ### Link against the library
 

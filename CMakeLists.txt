@@ -30,6 +30,12 @@ OFF for wheel builds; GCC 14's LTO ICEs on bvn_init_run_luts under manylinux)"
 option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
     ON)
+option(BVNR_SANITIZE
+    "Build with AddressSanitizer + UndefinedBehaviorSanitizer and pattern-fill \
+uninitialized stack variables (GCC/Clang only; dev/CI diagnostic, never a \
+release build). Note the Python ctypes tests need the sanitizer runtime \
+preloaded -- see the note at the option's definition"
+    OFF)
 option(BVNR_REGEN_TABLES
     "Force-regenerate the unit + prefix + currency tables from src/gendata/*.bvnr. \
 The *.gen.inc snippets are build artifacts in <build>/generated (not committed): \
@@ -106,6 +112,47 @@ if(BVNR_WERROR)
         list(APPEND BVNR_C_FLAGS /WX)
     else()
         list(APPEND BVNR_C_FLAGS -Werror)
+    endif()
+endif()
+
+# Sanitizer build. Kept as a first-class option rather than a remembered shell
+# incantation, because these runs are only useful if they are repeatable.
+#
+#   cmake -S . -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+#   ctest --test-dir build-asan -E '^bvnr_py_'
+#
+# -fno-sanitize-recover=all makes a diagnostic a failure instead of a log line.
+# -ftrivial-auto-var-init=pattern is not a sanitizer: it fills uninitialized
+# automatic variables with a conspicuous pattern instead of reporting them. GCC
+# has no MemorySanitizer, and this is the closest available substitute -- it
+# cannot flag such a read, but it does make one produce a distinctive value
+# rather than whatever the stack happened to hold, so a test whose result
+# depended on one will change its answer. It says nothing about uninitialized
+# HEAP memory; closing that class properly needs clang's MSan.
+#
+# The bvnr_py_* tests load libbvnr.so through ctypes into an unsanitized
+# interpreter, which ASan refuses ("runtime does not come first"). Exclude them,
+# or preload the runtime:
+#   LD_PRELOAD=$(gcc -print-file-name=libasan.so) ASAN_OPTIONS=detect_leaks=0 \
+#       BVNR_LIB=<build>/libbvnr.so python3 -m pytest python
+if(BVNR_SANITIZE)
+    if(MSVC)
+        message(FATAL_ERROR "BVNR_SANITIZE is GCC/Clang only")
+    endif()
+    set(BVNR_SAN_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=all
+                       -fno-omit-frame-pointer -g)
+    include(CheckCCompilerFlag)
+    check_c_compiler_flag(-ftrivial-auto-var-init=pattern BVNR_HAVE_AUTO_VAR_INIT)
+    if(BVNR_HAVE_AUTO_VAR_INIT)
+        list(APPEND BVNR_SAN_FLAGS -ftrivial-auto-var-init=pattern)
+    endif()
+    list(APPEND BVNR_C_FLAGS ${BVNR_SAN_FLAGS})
+    add_link_options(-fsanitize=address,undefined)
+    if(BVNR_HAVE_AUTO_VAR_INIT)
+        message(STATUS "BVNR_SANITIZE: ASan+UBSan + pattern auto-var-init")
+    else()
+        message(STATUS "BVNR_SANITIZE: ASan+UBSan "
+                       "(compiler has no -ftrivial-auto-var-init)")
     endif()
 endif()
 

@@ -502,7 +502,16 @@ Convert the raw token string received in `ev_data` into a C numeric type. The `v
 The `data` pointer inside `bvnr_data_t` is **not NUL-terminated**, and for null/empty values `d->length` may be `0`. Always guard the copy by `d->length` and NUL-terminate manually.
 
 - Returns `true` and writes `*out` on success.
-- Returns `false` if the string is not representable in the declared type.
+- Returns `false` if the string is not representable in the declared type — this
+  includes exceeding `vt.width`, so `<uint:8>` rejects `"256"`. A width above 64
+  is not checked: the 64-bit out parameter is the binding limit there.
+- Returns `false` for anything a value token cannot look like: an empty string,
+  leading whitespace, a leading `+`, or a sign on an unsigned carrier. (The C
+  standard library's `strtoull` accepts all four — the last by wrapping `-1` into
+  `18446744073709551615` — which is why these helpers do not simply forward to
+  it.)
+- Acceptance matches the reader exactly: anything these accept, a document can
+  carry, and vice versa.
 
 ```c
 static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
@@ -929,7 +938,8 @@ int32_t n = bvn_format_uint64(buf, sizeof(buf), 255, 16, 2);
 /* Format 9.81 as a 64-bit float */
 value_type_spec_t vt = BVN_TYPE_FLOAT(64);
 n = bvn_format_double(buf, sizeof(buf), 9.81, vt);
-/* buf = "9.81", n = 4 */
+/* buf = "9.81e+0", n = 7 — the writer always emits an exponent, so the
+   value re-reads as a float and never as an integer carrier */
 ```
 
 These strings are then placed into `bvnr_data_t.data` / `.length` before calling `bvnr_write_event(w, ev_data, &d)`.

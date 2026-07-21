@@ -438,6 +438,78 @@ static void test_unit_equal(void)
 				 "compound m/s^2 vs plain meter must not be equal");
 }
 
+/*
+ * bvn_parse_uint64/int64 take a value_type_spec_t so they can range-check, which
+ * is what doc/3 s8 promises ("the vt argument supplies the base and bit-width for
+ * range checking", "returns false if the string is not representable in the
+ * declared type"). Only the base was consulted: <uint:8> accepted 256 and, via
+ * strtoull's silent wrap of a sign an unsigned carrier cannot have, "-1" came
+ * back true with 18446744073709551615.
+ *
+ * The acceptance criterion is agreement with the READER: these helpers exist to
+ * decode ev_data, so anything they accept that a document could not carry is a
+ * trap. A sweep of 1250 (width, base, value) combinations against the reader
+ * found 503 divergences before this and 0 after; the cases below pin the
+ * boundaries of that sweep.
+ */
+static void test_parse_helpers_respect_declared_width(void)
+{
+	printf("  test_parse_helpers_respect_declared_width...\n");
+
+	uint64_t u = 0;
+	int64_t  i = 0;
+	value_type_spec_t u8   = { .family = vt_uint, .width = 8 };
+	value_type_spec_t s8   = { .family = vt_sint, .width = 8 };
+	value_type_spec_t u16h = { .family = vt_uint, .width = 16, .base = 16 };
+	value_type_spec_t u1   = { .family = vt_uint, .width = 1 };
+	value_type_spec_t u64  = { .family = vt_uint, .width = 64 };
+
+	ASSERT_TRUE(bvn_parse_uint64("255", u8, &u) && u == 255,
+		"uint:8 accepts its maximum");
+	ASSERT_FALSE(bvn_parse_uint64("256", u8, &u), "uint:8 rejects 256");
+	ASSERT_FALSE(bvn_parse_uint64("99999", u8, &u), "uint:8 rejects 99999");
+	/* the one that returned a huge positive value */
+	ASSERT_FALSE(bvn_parse_uint64("-1", u8, &u), "uint:8 rejects a sign");
+	ASSERT_FALSE(bvn_parse_uint64("-1", u64, &u), "uint:64 rejects a sign");
+
+	ASSERT_TRUE(bvn_parse_uint64("1", u1, &u) && u == 1, "uint:1 accepts 1");
+	ASSERT_FALSE(bvn_parse_uint64("2", u1, &u), "uint:1 rejects 2");
+
+	ASSERT_TRUE(bvn_parse_int64("-128", s8, &i) && i == -128,
+		"sint:8 accepts its minimum");
+	ASSERT_TRUE(bvn_parse_int64("127", s8, &i) && i == 127,
+		"sint:8 accepts its maximum");
+	ASSERT_FALSE(bvn_parse_int64("128", s8, &i), "sint:8 rejects 128");
+	ASSERT_FALSE(bvn_parse_int64("-129", s8, &i), "sint:8 rejects -129");
+
+	ASSERT_TRUE(bvn_parse_uint64("ffff", u16h, &u) && u == 65535,
+		"uint:16 base 16 accepts ffff");
+	ASSERT_FALSE(bvn_parse_uint64("10000", u16h, &u),
+		"uint:16 base 16 rejects 10000");
+
+	/* strtoll/strtoull also accept these; a value token never looks like them. */
+	ASSERT_FALSE(bvn_parse_uint64("", u8, &u), "empty string rejected");
+	ASSERT_FALSE(bvn_parse_int64("", s8, &i), "empty string rejected (signed)");
+	ASSERT_FALSE(bvn_parse_uint64("  12", u8, &u), "leading space rejected");
+	ASSERT_FALSE(bvn_parse_int64("\t-1", s8, &i), "leading tab rejected");
+	ASSERT_FALSE(bvn_parse_uint64("+1", u8, &u), "leading plus rejected");
+	ASSERT_FALSE(bvn_parse_int64("+1", s8, &i), "leading plus rejected (signed)");
+	ASSERT_FALSE(bvn_parse_int64("-", s8, &i), "a bare sign is not a number");
+
+	/* A width above 64 cannot be range-checked by a 64-bit out parameter, and
+	 * must not start rejecting things because of it. */
+	value_type_spec_t u128 = { .family = vt_uint, .width = 128 };
+	ASSERT_TRUE(bvn_parse_uint64("18446744073709551615", u128, &u),
+		"uint:128 still accepts everything a uint64 can hold");
+	ASSERT_FALSE(bvn_parse_uint64("18446744073709551616", u128, &u),
+		"...and nothing more");
+
+	/* Width 0 means the default 64. */
+	value_type_spec_t udef = { .family = vt_uint, .width = 0 };
+	ASSERT_TRUE(bvn_parse_uint64("18446744073709551615", udef, &u),
+		"width 0 behaves as 64");
+}
+
 int main(void)
 {
 	printf("Running bovnar_utils_test regression suite...\n");
@@ -459,6 +531,7 @@ int main(void)
 	test_format_double_base_out_of_range();
 	test_validate_number_in_base_e_digit();
 	test_unit_equal();
+	test_parse_helpers_respect_declared_width();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

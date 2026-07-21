@@ -2274,15 +2274,53 @@ uint32_t bvn_min_digits_for_type(value_type_spec_t vt)
  * handled specially since its magnitude is one past INT64_MAX. The uint64 and
  * double parsers follow the same base-split structure.
  */
+/* The declared width bounds the value, which is the whole reason these helpers
+ * take a value_type_spec_t: doc/3 states "the vt argument supplies the base and
+ * bit-width for range checking" and "returns false if the string is not
+ * representable in the declared type". Only the base was ever consulted, so
+ * bvn_parse_uint64("256", <uint:8>, &u) returned true with 256 and, worse,
+ * "-1" returned true with 18446744073709551615 -- strtoull wraps a sign the
+ * format does not allow on an unsigned carrier. A width above 64 needs no check:
+ * the out parameter is the binding limit there. */
+static bool bvn_fits_uint_width(uint64_t v, uint32_t width)
+{
+	if (width == 0u || width >= 64u) return true;
+	return v <= (~(uint64_t)0 >> (64u - width));
+}
+
+static bool bvn_fits_sint_width(int64_t v, uint32_t width)
+{
+	if (width == 0u || width >= 64u) return true;
+	int64_t lim = (int64_t)1 << (width - 1u);
+	return v >= -lim && v <= lim - 1;
+}
+
+/* strtoll/strtoull accept leading whitespace and an empty string (yielding 0),
+ * neither of which is a value token this format can produce. Screen them so the
+ * helpers reject what the reader would. */
+static bool bvn_parse_prefix_ok(const char* s, bool allow_sign)
+{
+	if (!s || !*s) return false;
+	if (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r' ||
+	    *s == '\f' || *s == '\v')
+		return false;
+	if (*s == '+') return false;              /* the format never writes one */
+	if (*s == '-') return allow_sign && s[1] != '\0';
+	return true;
+}
+
 bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 {
 	if (!s || !out) return false;
+	if (!bvn_parse_prefix_ok(s, true)) return false;
 	uint32_t base = bvn_effective_base(vt);
 	if (base >= 2u && base <= 36u) {
 		char* end;
 		errno = 0;
 		long long v = strtoll(s, &end, (int)base);
 		if (*end || errno == ERANGE) return false;
+		if (!bvn_fits_sint_width((int64_t)v, bvn_effective_width(vt)))
+			return false;
 		*out = (int64_t)v;
 		return true;
 	}
@@ -2299,11 +2337,17 @@ bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 	}
 	if (neg) {
 		if (acc > (uint64_t)INT64_MAX + 1u) return false;
+		if (!bvn_fits_sint_width(
+			(acc == (uint64_t)INT64_MAX + 1u) ? INT64_MIN : -(int64_t)acc,
+			bvn_effective_width(vt)))
+			return false;
 		*out = (acc == (uint64_t)INT64_MAX + 1u)
 		       ? INT64_MIN
 		       : -(int64_t)acc;
 	} else {
 		if (acc > (uint64_t)INT64_MAX) return false;
+		if (!bvn_fits_sint_width((int64_t)acc, bvn_effective_width(vt)))
+			return false;
 		*out = (int64_t)acc;
 	}
 	return true;
@@ -2311,17 +2355,21 @@ bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 {
 	if (!s || !out) return false;
+	/* No sign at all: an unsigned carrier has none, and strtoull silently wraps
+	 * a leading '-' into a huge positive value rather than failing. */
+	if (!bvn_parse_prefix_ok(s, false)) return false;
 	uint32_t base = bvn_effective_base(vt);
 	if (base >= 2u && base <= 36u) {
 		char* end;
 		errno = 0;
 		unsigned long long v = strtoull(s, &end, (int)base);
 		if (*end || errno == ERANGE) return false;
+		if (!bvn_fits_uint_width((uint64_t)v, bvn_effective_width(vt)))
+			return false;
 		*out = (uint64_t)v;
 		return true;
 	}
 	const char* p = s;
-	if (*p == '+') p++;
 	if (!*p) return false;
 	uint64_t acc = 0;
 	while (*p) {
@@ -2331,6 +2379,8 @@ bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 		acc = acc * base + d;
 		p++;
 	}
+	if (!bvn_fits_uint_width(acc, bvn_effective_width(vt)))
+		return false;
 	*out = acc;
 	return true;
 }

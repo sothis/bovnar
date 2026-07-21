@@ -75,11 +75,59 @@ def validate(curr):
         if c["is_crypto"] != (CRYPTO_FIRST <= c["id"] <= CRYPTO_LAST):
             raise SystemExit("%s: is_crypto disagrees with its id range"
                              % code)
+        # The numeric fields were unchecked, so a typo in the .bvnr shipped
+        # silently as wrong money data: .numeric_code = 8000 for UGX generated a
+        # table with 8000 in it and the whole build stayed green, and a value
+        # above 65535 truncates into the uint16_t field with nothing but a
+        # -Woverflow (off unless BVNR_WERROR). Bound them here, where the input
+        # is still readable, rather than hoping a warning is noticed.
+        num = c["numeric_code"]
+        if not (0 <= num <= 65535):
+            raise SystemExit("%s: numeric_code %d does not fit uint16_t"
+                             % (code, num))
+        if not c["is_crypto"] and num == 0:
+            raise SystemExit("%s: fiat currencies need an ISO 4217 numeric code"
+                             % code)
+        if c["is_crypto"] and num != 0:
+            raise SystemExit("%s: crypto assets carry no ISO numeric code, got %d"
+                             % (code, num))
+        minor = c["minor_unit"]
+        # The field is a uint8_t. ISO 4217 tops out at 4 (CLF); crypto goes much
+        # further -- 18 for ether-style tokens and 24 for NEAR, whose smallest
+        # unit is the yoctoNEAR. 38 leaves room for a wider token without
+        # admitting a digit-slip like 250.
+        if not (0 <= minor <= 38):
+            raise SystemExit("%s: minor_unit %d out of range 0..38"
+                             % (code, minor))
+        if not c["is_crypto"] and minor > 4:
+            raise SystemExit("%s: ISO 4217 minor units go up to 4, got %d"
+                             % (code, minor))
+    # A numeric code identifies a currency, so a repeat is either a typo or a
+    # deliberate succession (XCG inherits ANG's 532). Allow at most one pair.
+    numbers = {}
+    for c in curr:
+        if c["numeric_code"] == 0:
+            continue
+        numbers.setdefault(c["numeric_code"], []).append(c["code"])
+    shared = {n: v for n, v in numbers.items() if len(v) > 1}
+    if len(shared) > 1 or any(len(v) > 2 for v in shared.values()):
+        raise SystemExit("unexpected duplicate ISO numeric codes: %r" % shared)
     return fiat, crypto, ext
 
 
 def gen_table(curr):
+    # Emit the row counts the table actually has, so bovnar_currency.c can
+    # _Static_assert them against the BVN_CURRENCY_* range constants. Without
+    # that cross-check, widening a range in the header without adding a row here
+    # builds with no warning and exposes the extra slot as a valid currency with
+    # an empty code and name.
     out = [BANNER]
+    out.append("#define BVNR_CURRENCY_ROWS_FIAT   %d\n"
+               % len([c for c in curr if FIAT_FIRST <= c["id"] <= FIAT_LAST]))
+    out.append("#define BVNR_CURRENCY_ROWS_CRYPTO %d\n"
+               % len([c for c in curr if CRYPTO_FIRST <= c["id"] <= CRYPTO_LAST]))
+    out.append("#define BVNR_CURRENCY_ROWS_EXT    %d\n\n"
+               % len([c for c in curr if EXT_FIRST <= c["id"] <= EXT_LAST]))
     for c in curr:
         out.append("  { %-7s %4d, %2d, %-7s %s },\n" % (
             bvnr_c_string(c["code"]) + ",",

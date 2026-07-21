@@ -48,8 +48,13 @@
  * bvn_currency_index() below. The ordering of this array must stay in lockstep
  * with the enum within each segment. Each entry records the ISO numeric code (0
  * for crypto), the minor-unit digit count (e.g. 2 for cents, 0 for yen, 18 for
- * ether — used by float_dec/currency formatting), whether it is crypto, and a
- * human name.
+ * ether), whether it is crypto, and a human name.
+ *
+ * minor_unit is carried for APPLICATIONS to read via bvn_currency_minor_unit();
+ * nothing inside the library consumes it. In particular the validator does not
+ * check a value's decimal scale against it -- <float_dec:64,$JPY> 1.5555 is
+ * accepted even though JPY has no minor units -- because the format stores what
+ * the writer wrote and money precision is the application's policy.
  */
 static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
   /*
@@ -60,6 +65,18 @@ static const bvn_currency_info_t g_currency_table[N_TOTAL] = {
    */
 #include "bovnar_currency_table.gen.inc"
 };
+/* The table is generated; the ranges are hand-written in the header. Nothing
+ * connected the two, so widening a range without adding a row compiled cleanly
+ * and exposed the extra slot as a currency with an empty code and name (caught
+ * only at test time). The generator now emits its actual row counts. */
+/* Negative array length = hard error, the same C99-clean idiom the io impl uses
+ * for its size guards (_Static_assert is C11 and this builds as -std=c99). */
+typedef char bvn_currency_rows_fiat_check_[
+	BVNR_CURRENCY_ROWS_FIAT   == N_FIAT   ? 1 : -1];
+typedef char bvn_currency_rows_crypto_check_[
+	BVNR_CURRENCY_ROWS_CRYPTO == N_CRYPTO ? 1 : -1];
+typedef char bvn_currency_rows_ext_check_[
+	BVNR_CURRENCY_ROWS_EXT    == N_EXT    ? 1 : -1];
 /*
  * Range predicates over the currency enum block. Fiat and crypto occupy
  * contiguous enum ranges, and the extension segment (EXT_FIRST..EXT_LAST, all
@@ -146,5 +163,12 @@ bool bvn_currency_prefix_valid(int base, int prefix_system)
 {
     if (!bvn_unit_is_currency(base))
         return true;
-    return (prefix_system != prefix_iec);
+    /* Test for the one system that IS allowed rather than against the one that
+     * is not: `!= prefix_iec` waved through every out-of-range value, so
+     * bvn_currency_prefix_valid(bu_usd, 2) said yes. Not reachable through the
+     * parser (bvn_prefix_unit_valid range-checks first) but this is BVN_API and
+     * a caller may pass anything. The enum has exactly two members, and an
+     * unprefixed unit is carried as prefix_si with si_none, so prefix_si is the
+     * whole of the accepted set. */
+    return (prefix_system == prefix_si);
 }

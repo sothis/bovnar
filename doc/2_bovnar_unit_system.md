@@ -101,7 +101,7 @@ Annotations are **descriptive**, not prescriptive. Bovnar validates form and typ
 ### Design Principles
 
 - **SI-first.** All SI base units, all 22 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.
-- **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … quebi) are supported for digital storage quantities.
+- **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … yobi) are supported for digital storage quantities, plus `Ri`/`Qi` (robi, quebi) as a forward-looking extension — those two are a proposal, not part of IEC 80000-13, which stops at yobi.
 - **Compound units.** Derived quantities (m/s, kg·m/s², USD/oz_t) are expressed inline without separate schema definitions.
 - **Two exponent notations.** Unicode superscript (`m²`, `s⁻²`) and ASCII caret (`m^2`, `s^-2`) are accepted equivalently.
 - **Currency as a first-class unit.** ISO 4217 and cryptocurrency codes participate in all unit composition rules — prefixes, compound expressions, and the `value_unit_t` representation — with no special-case parsing.
@@ -596,7 +596,7 @@ Several prefix symbols overlap with base unit symbols. The `~` separator is the 
 
 ### 4.2 IEC Binary Prefixes
 
-IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
+IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only). The table below also lists `Ri` and `Qi`; the standard stops at `Yi` (2⁸⁰) and those two are an unratified extension.
 
 | Prefix | Symbol | Factor | Enum value |
 |--------|--------|--------|------------|
@@ -802,7 +802,7 @@ Because the sigil is mandatory, a bare uppercase code can never collide with a p
 
 ### 9.2 ISO 4217 Fiat Currencies and Precious Metals
 
-166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. The original 164 occupy the `value_base_unit_t` slot range **134 … 297** alphabetically (AED first, ZWL last), and — unlike physical units — have **no named `bu_*` enumerators**: such a currency is resolved from its `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value (the currency catalogue in `bovnar_currency.c` is index-aligned to these slots). Currencies added after that range was frozen are **appended past the unit block** at slots **378 … 379** — an *extension segment* (`bu_zwg`, `bu_xcg`) reached via `bvn_currency_index` rather than the direct 134-based indexing — so that adding a currency never shifts an existing enum value (ABI stability). Four codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022), `ZWL` (Zimbabwean Dollar, superseded by `ZWG` Zimbabwe Gold in 2024), and `BGN` (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); `ANG` (Netherlands Antillean Guilder) likewise coexists with its successor `XCG` (Caribbean Guilder, which inherits ANG's numeric code 532).
+166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. The original 164 occupy the `value_base_unit_t` slot range **134 … 297** in alphabetical order (AED first, ZWL last) with one exception — `SSP` precedes `SRD` at slots 260/261. Nothing depends on the ordering (`bvn_parse_currency_str` scans linearly) and the slots are ABI-frozen, so the pair stays as it is, and — unlike physical units — have **no named `bu_*` enumerators**: such a currency is resolved from its `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value (the currency catalogue in `bovnar_currency.c` is index-aligned to these slots). Currencies added after that range was frozen are **appended past the unit block** at slots **378 … 379** — an *extension segment* (`bu_zwg`, `bu_xcg`) reached via `bvn_currency_index` rather than the direct 134-based indexing — so that adding a currency never shifts an existing enum value (ABI stability). Four codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022), `ZWL` (Zimbabwean Dollar, superseded by `ZWG` Zimbabwe Gold in 2024), and `BGN` (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); `ANG` (Netherlands Antillean Guilder) likewise coexists with its successor `XCG` (Caribbean Guilder, which inherits ANG's numeric code 532).
 
 The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. `<uint:64,$KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift. Minor units are **bold** below when they differ from 2. `Num` is the ISO 4217 numeric identifier.
 
@@ -975,7 +975,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 | `ZWG` |  924 |   2 | Zimbabwe Gold |
 | `ZWL` |  932 |   2 | Zimbabwean Dollar *(historical; superseded by ZWG 2024)* |
 
-> `CLF` (Unidad de Fomento) is the only currency with 4 minor units. The four historical codes `HRK`, `SLL`, `ZWL`, and `BGN` are retained for compatibility but should not be used for new data.
+> `CLF` (Unidad de Fomento) is the only currency with 4 minor units **in this catalogue**. ISO 4217 also defines `UYW` with 4, but the catalogue omits the fund and bond codes (`BOV CHE CHW COU MXV USN UYI UYW`, `XBA`–`XBD`, `XSU`, `XUA`) and the no-currency code `XXX`: they denote accounting units and placeholders rather than money a value can be denominated in. The four historical codes `HRK`, `SLL`, `ZWL`, and `BGN` are retained for compatibility but should not be used for new data.
 
 ### 9.3 Cryptocurrencies
 

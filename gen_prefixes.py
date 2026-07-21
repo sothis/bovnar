@@ -41,9 +41,32 @@ def check(prefixes, sysname):
     ids = [p["id"] for p in prefixes]
     if ids != list(range(1, len(prefixes) + 1)):
         raise SystemExit("%s prefix ids must be contiguous from 1" % sysname)
+    # Everything below was unchecked, and each omission has a silent failure
+    # mode. A duplicate alias makes the linear parse scan pick whichever row
+    # comes first while the OTHER prefix still formats to that spelling -- give
+    # mega the symbol "m" and a value round-trips off by 10^9 with no diagnostic.
+    # A symbol missing from its own alias list emits output the parser cannot
+    # read back. A duplicated or mis-typed exponent silently rescales.
+    seen_alias = {}
+    seen_exp = {}
     for p in prefixes:
         if not p["aliases"]:
             raise SystemExit("%s_%s has no parse spelling" % (sysname, p["name"]))
+        if p["symbol"] not in p["aliases"]:
+            raise SystemExit(
+                "%s_%s formats as %r, which is not one of its own parse "
+                "spellings %r -- it would not read back"
+                % (sysname, p["name"], p["symbol"], p["aliases"]))
+        for a in p["aliases"]:
+            if a in seen_alias:
+                raise SystemExit("%s: alias %r claimed by both %s and %s"
+                                 % (sysname, a, seen_alias[a], p["name"]))
+            seen_alias[a] = p["name"]
+        e = p["exp"]
+        if e in seen_exp:
+            raise SystemExit("%s: exponent %d used by both %s and %s"
+                             % (sysname, e, seen_exp[e], p["name"]))
+        seen_exp[e] = p["name"]
 
 
 def enumerator(sysname, p):

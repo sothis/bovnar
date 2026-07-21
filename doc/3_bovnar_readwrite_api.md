@@ -148,7 +148,7 @@ typedef struct bvnr_read_flags_s {
 } bvnr_read_flags_t;
 ```
 
-`on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
+`on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: `want_unit` (§7c) runs ahead of **both** callbacks, so with it installed an `on_unverified` consumer also sees a populated `converted`/`conv` on `ev_data`. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
@@ -383,8 +383,12 @@ the reader do it for you — **losslessly**, in exact arbitrary-precision
 arithmetic, for a value of any width and any base.
 
 When `want_unit` is non-NULL, the reader calls it for every numeric value (with
-or without a unit) just before `on_verified`. Inspect `data->value_unit` (native
-unit), `data->value_type`, or `data->data` and either:
+or without a unit) after validation and before **either** value callback — it can
+abort the parse, and the two views of one value must not disagree. An
+`on_unverified` consumer therefore also sees a populated `converted`/`conv` on
+`ev_data`, even though everything else about that event is still the
+pre-validation view. Inspect `data->value_unit` (native unit),
+`data->value_type`, or `data->data` and either:
 
 - fill `*want` with the target unit and `*want_base` with the output base and
   **return `true`**, or

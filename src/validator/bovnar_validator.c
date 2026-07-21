@@ -51,6 +51,13 @@
  *   on_verified   : fired only after type/range/unit checks pass, carrying the
  *                   resolved value_type and unit.
  *
+ * One exception to "before any semantic check": read-time unit conversion. The
+ * want_unit hook has to run before either callback — it may abort the parse, and
+ * a value both callbacks then observe must not differ between them — so when it
+ * is installed, the ev_data an on_unverified consumer sees already carries a
+ * populated `converted`/`conv`. Everything else about that event is still the
+ * pre-validation view.
+ *
  * Tooling (the canonicaliser, the events demo) uses both to show the lexer and
  * validator views side by side; ordinary consumers usually set only
  * on_verified. The bvn_emit_unverified/_verified/_both helpers centralise the
@@ -166,8 +173,9 @@ static inline bool bvn_emit_both(bvnr_reader_t* r,
 }
 /*
  * Read-time LOSSLESS unit/base conversion. Just before a numeric value is
- * delivered, ask the caller's want_unit hook (if any) which unit and output base
- * it wants. When it names a target, the value's exact text is parsed into an
+ * delivered — ahead of BOTH callbacks, since this can abort the parse and the
+ * two views of one value must agree — ask the caller's want_unit hook (if any)
+ * which unit and output base it wants. When it names a target, the value's exact text is parsed into an
  * arbitrary-precision rational, converted with bvn_unit_convert_rational (exact
  * for any width/base, affine-aware), and rendered in the requested base. The
  * exact result — string and rational — is attached to `d->conv`; the original

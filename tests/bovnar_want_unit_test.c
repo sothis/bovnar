@@ -80,6 +80,9 @@ typedef struct {
 	bool         saw_value;
 	bool         converted;
 	bool         had_text;   /* conv.text non-NULL (false = rational only) */
+	bool         unv_seen;       /* on_unverified observed an ev_data value */
+	bool         unv_converted;  /* ...and what it saw in data->converted */
+	char         unv_text[512];  /* ...and the conversion text it could read */
 	char         text[512];  /* copy of the exact converted string */
 	uint32_t     base;
 } want_ctx_t;
@@ -92,6 +95,29 @@ static bool want_unit_cb(void *userdata, const bvnr_data_t *data,
 		return false;        /* decline: deliver untouched */
 	*want      = c->identity ? data->value_unit : c->want;
 	*want_base = c->want_base;
+	return true;
+}
+
+/*
+ * want_unit runs ahead of BOTH value callbacks, so an on_unverified consumer
+ * sees the same populated conv as on_verified does. That is a documented
+ * property (include/bovnar.h, read/write API §7c and §5) rather than an
+ * accident of emission order, so it is pinned here.
+ */
+static bool want_on_unverified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
+{
+	want_ctx_t *c = userdata;
+	if (ev == ev_data && data &&
+	    (data->type == token_is_number || data->type == token_is_string)) {
+		c->unv_seen      = true;
+		c->unv_converted = data->converted;
+		if (data->converted && data->conv.text) {
+			size_t n = data->conv.length < sizeof c->unv_text - 1
+				 ? data->conv.length : sizeof c->unv_text - 1;
+			memcpy(c->unv_text, data->conv.text, n);
+			c->unv_text[n] = '\0';
+		}
+	}
 	return true;
 }
 
@@ -122,8 +148,9 @@ static void run_want(const char *payload, want_ctx_t *ctx,
 	bvnr_read_flags_t flags;
 	memset(&flags, 0, sizeof(flags));
 	flags.userdata    = ctx;
-	flags.on_verified = want_on_verified;
-	flags.want_unit   = want_unit_cb;
+	flags.on_verified   = want_on_verified;
+	flags.on_unverified = want_on_unverified;
+	flags.want_unit     = want_unit_cb;
 	flags.want_unit_allow_nonterminating = ctx->allow_nonterminating;
 
 	bvnr_reader_t *reader = bvnr_reader_create();
@@ -517,6 +544,34 @@ static void test_want_unit_underflow_is_not_zero(void)
 	}
 }
 
+
+static void test_want_unit_unverified_sees_the_conversion(void)
+{
+	/* Documented: the hook runs after validation but before EITHER callback, so
+	 * the two views of one value cannot disagree. An on_unverified consumer
+	 * therefore observes the conversion too — everything else about that event
+	 * is still the pre-validation view. */
+	want_ctx_t ctx = {0};
+	ctx.want    = BVN_UNIT_NO_PREFIX(bu_meter);
+	ctx.request = true;
+	run_want(".d = 5 k~m;", &ctx, true, error_none);
+	ASSERT_TRUE(ctx.unv_seen, "want: on_unverified saw the value");
+	ASSERT_TRUE(ctx.unv_converted,
+				"want: on_unverified sees converted set, like on_verified");
+	ASSERT_TRUE(strcmp(ctx.unv_text, "5000") == 0,
+				"want: on_unverified reads the same exact text");
+	ASSERT_TRUE(strcmp(ctx.unv_text, ctx.text) == 0,
+				"want: both callbacks agree on the converted value");
+
+	/* And with no hook installed, neither callback sees a conversion. */
+	want_ctx_t plain = {0};
+	plain.request = false;
+	run_want(".d = 5 k~m;", &plain, true, error_none);
+	ASSERT_TRUE(plain.unv_seen, "want: on_unverified saw the declined value");
+	ASSERT_TRUE(!plain.unv_converted && !plain.converted,
+				"want: no conversion means converted clear in both callbacks");
+}
+
 int main(void)
 {
 	printf("Running bovnar_want_unit_test regression suite...\n");
@@ -543,6 +598,7 @@ int main(void)
 	test_want_unit_corrected_factors();
 	test_want_unit_identity_is_always_exact();
 	test_want_unit_underflow_is_not_zero();
+	test_want_unit_unverified_sees_the_conversion();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

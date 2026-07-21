@@ -395,8 +395,12 @@ typedef struct bvnr_read_flags_s {
 	 * default) to keep the strict all-or-nothing behaviour. */
 	bool		want_unit_allow_nonterminating;
 	/* Optional read-time LOSSLESS unit/base conversion hook. When non-NULL, the
-	 * reader calls it for every numeric value (with or without a unit), just
-	 * before the on_verified callback. To request a conversion, fill *want with
+	 * reader calls it for every numeric value (with or without a unit) after
+	 * validation and before EITHER value callback — it can abort the parse, and
+	 * the two views of one value must not disagree. An on_unverified consumer
+	 * therefore also sees a populated `converted`/`conv` on ev_data, even though
+	 * everything else about that event is the pre-validation view. To request a
+	 * conversion, fill *want with
 	 * the target unit and *want_base with the output base and return true; return
 	 * false (or leave this NULL) to receive the value untouched. Inspect
 	 * data->value_unit (native unit), data->value_type, and data->data to decide;

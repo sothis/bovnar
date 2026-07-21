@@ -66,6 +66,14 @@ reading the grown by-value structs at the wrong size.
 
 ### Fixed
 
+- **Clarified when `want_unit` runs relative to the two value callbacks.** The
+  header and read/write API said "just before `on_verified`", which is
+  imprecise: the hook runs after validation but ahead of **both** callbacks —
+  it can abort the parse, and the two views of one value must not disagree — so
+  an `on_unverified` consumer also sees a populated `converted`/`conv` on
+  `ev_data`. That is a deliberate property, not an accident of emission order,
+  and is now stated in `bovnar.h`, in the API doc's callback section and §7c, and
+  pinned by a test. Behaviour is unchanged.
 - **A nonzero literal could be delivered as exactly `"0"`.**
   `bvn_float_parse_rational` reported `BVNF_RK_ZERO` both for a literal that *is*
   zero and for one whose exact rational will not fit the big-int budget, and the

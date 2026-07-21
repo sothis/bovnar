@@ -30,6 +30,17 @@ from __future__ import annotations
 # reproduces bovnar's magnitude exactly (and sidesteps pint's CGS-Gaussian
 # fractional dimensions for gauss/maxwell/oersted).
 BOVNAR_PINT_DEFINITIONS: list[str] = [
+    # pint defines fathom/rod/chain/furlong/league/acre from its SURVEY foot
+    # (1200/3937 m), while bovnar uses the international foot -- a silent 2 ppm
+    # magnitude error (4 ppm for acre, being an area). pint's foot, mile, yard
+    # and inch are already international and agree exactly, so only these six
+    # need their own definition.
+    'bvnr_fathom = 1.8288 * meter',
+    'bvnr_rod = 5.0292 * meter',
+    'bvnr_chain = 20.1168 * meter',
+    'bvnr_furlong = 201.168 * meter',
+    'bvnr_league = 4828.032 * meter',
+    'bvnr_acre = 4046.8564224 * meter**2',
     'bvnr_therm = 105480400.0 * meter**2 * kilogram * second**-2',
     'bvnr_rpm = 0.016666666666666666 * second**-1',
     'bvnr_cable = 185.2 * meter',
@@ -121,8 +132,8 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
      50: 'angstrom',                     # ANGSTROM
      51: 'light_year',                   # LIGHT_YEAR
      52: 'parsec',                       # PARSEC
-     53: 'furlong',                      # FURLONG
-     54: 'fathom',                       # FATHOM
+     53: 'bvnr_furlong',                      # FURLONG
+     54: 'bvnr_fathom',                       # FATHOM
      55: 'pound',                        # POUND
      56: 'ounce',                        # OUNCE
      57: 'grain',                        # GRAIN
@@ -152,7 +163,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
      83: 'tablespoon',                   # TABLESPOON
      84: 'teaspoon',                     # TEASPOON
      85: 'oil_barrel',                   # BARREL
-     86: 'acre',                         # ACRE
+     86: 'bvnr_acre',                         # ACRE
      87: 'barn',                         # BARN
      88: 'arcminute',                    # ARCMINUTE
      89: 'arcsecond',                    # ARCSECOND
@@ -176,8 +187,8 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     115: 'foot_pound',                   # FOOT_POUND
     116: 'dram',                         # DRAM
     117: 'pennyweight',                  # PENNYWEIGHT
-    118: 'chain',                        # CHAIN
-    119: 'rod',                          # ROD
+    118: 'bvnr_chain',                        # CHAIN
+    119: 'bvnr_rod',                          # ROD
     120: 'gill',                         # GILL
     121: 'imperial_gill',                # GILL_UK
     122: 'standard_gravity',             # STANDARD_GRAVITY
@@ -193,7 +204,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     132: 'peck',                         # PECK
     133: 'bushel',                       # BUSHEL
     361: 'survey_foot',                  # SURVEY_FOOT
-    362: 'league',                       # LEAGUE
+    362: 'bvnr_league',                       # LEAGUE
     364: 'hand',                         # HAND
     366: 'scruple',                      # SCRUPLE
     367: 'baud',                         # BAUD

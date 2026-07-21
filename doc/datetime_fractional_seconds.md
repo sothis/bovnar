@@ -64,8 +64,16 @@ fraction for programmatic access); it has no re-serialiser of its own.
 3. **The fraction never crosses a second boundary.** Tz-offset folding and the
    leap-second lookup operate on whole seconds *before* the fraction is
    attached, so they are unaffected by it. The writer always emits `Z` (the
-   offset has already been folded to UTC at read time).
-4. **Lifetime:** streaming `frac_data` points into the lexer's scratch buffer —
+   offset has already been folded to UTC at read time). The offset is folded
+   into the *minute* field rather than the second, because `second == 60` is a
+   spelling (the inserted leap second) and not merely a count — folding into the
+   second would erase it for every offset but `Z`.
+4. **A `tai` leap second keeps its `:60` spelling on output.** So a fractional
+   one round-trips as `2016-12-31T23:59:60.5Z`, not as the following second. On
+   the civil epochs the carrier is the folded value and the literal comes back
+   as `2017-01-01T00:00:00.5Z` — the fraction survives either way, but only
+   `tai` preserves which of the two instants was meant.
+5. **Lifetime:** streaming `frac_data` points into the lexer's scratch buffer —
    valid only for the duration of the callback, exactly like `data`. The DOM's
    `dt_frac` is node-owned and NUL-terminated.
 

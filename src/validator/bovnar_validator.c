@@ -1584,6 +1584,17 @@ bool bvn_val_on_new_array_value(bvnr_reader_t* r,
 }
 bool bvnr_read(bvnr_reader_t* r)
 {
+	/* Every other entry point tolerates a NULL handle, and an unopened reader is
+	 * the same class of caller mistake -- but this one dereferenced straight
+	 * through to a NULL pull function pointer and segfaulted. Both open paths
+	 * (bvnr_open_read_source and bvnr_open_read_mem) install a pull, so a NULL
+	 * one means no source was ever attached. */
+	if (!r)
+		return false;
+	if (bvn_source_impl(&r->lex.src)->pull == NULL) {
+		r->val.last_error = error_invalid_argument;
+		return false;
+	}
 	return bvn_lex_run(r);
 }
 error_code_t bvnr_reader_get_error(const bvnr_reader_t* r)

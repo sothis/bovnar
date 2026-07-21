@@ -653,6 +653,10 @@ BVN_API bool bvnr_open_read_mem(
 	bvnr_reader_t* r, const void* buf, uint64_t len,
 	void* mirror_buf, uint64_t mirror_cap,
 	bvnr_read_flags_t* options);
+/* Run the parse. Requires a reader that one of the bvnr_open_read_* calls above
+ * has attached a source to; a NULL handle, or one that was created but never
+ * opened, returns false (the latter setting error_invalid_argument) rather than
+ * faulting. Returns false on the first error unless continue_on_error is set. */
 BVN_API bool bvnr_read(bvnr_reader_t* r);
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
 BVN_API bvnr_canon_observer_t* bvnr_canon_observer_create(

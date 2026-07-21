@@ -2520,6 +2520,37 @@ static void test_rb5_resync_bracket_no_duplicate_row_end(void)
 	bvnr_reader_destroy(r);
 }
 
+/*
+ * bvnr_read() on a reader that was created but never opened dereferenced a NULL
+ * pull function pointer and segfaulted. Every other entry point in the API
+ * tolerates a NULL handle -- bvnr_reader_get_error, bvnr_reader_destroy,
+ * bvn_dom_lookup, bvnr_demux_error all return quietly -- so this one was the odd
+ * one out, and an unopened reader is the same class of caller mistake as a NULL
+ * one. Found by driving every public entry point with NULL handles and
+ * out-of-order calls under ASan/UBSan.
+ */
+static void test_rb6_read_without_open_does_not_fault(void)
+{
+	ASSERT_FALSE(bvnr_read(NULL), "bvnr_read(NULL) returns false");
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "reader created");
+	if (!r) return;
+	ASSERT_FALSE(bvnr_read(r), "bvnr_read() on an unopened reader returns false");
+	ASSERT_TRUE(bvnr_reader_get_error(r) == error_invalid_argument,
+		"an unopened reader reports error_invalid_argument");
+
+	/* ... and the same reader still works once a source is attached, i.e. the
+	 * guard rejects the call without poisoning the handle. */
+	const char *doc = "#!bovnar 1.1\n.x = <float:64,m> 1.5;\n";
+	bvnr_read_flags_t fl = { .max_file_size = BVNR_FILESIZE_UNLIMITED };
+	ASSERT_TRUE(bvnr_open_read_mem(r, (const uint8_t *)doc,
+				       (uint32_t)strlen(doc), NULL, 0, &fl),
+		"open after the refused read succeeds");
+	ASSERT_TRUE(bvnr_read(r), "the reader parses normally afterwards");
+	bvnr_reader_destroy(r);
+}
+
 int main(void)
 {
 	printf("Running bovnar_high_severity_test suite...\n\n");
@@ -2612,6 +2643,7 @@ int main(void)
 	test_rb3_special_number_respects_max_symbol_length();
 	test_rb4_advance_line_once_per_byte();
 	test_rb5_resync_bracket_no_duplicate_row_end();
+	test_rb6_read_without_open_does_not_fault();
 
 	printf("\n");
 	if (g_failures == 0) {

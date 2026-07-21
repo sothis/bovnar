@@ -147,8 +147,7 @@ def main():
                             os.path.join(REPO, "build", "generated"))
     os.makedirs(gendir, exist_ok=True)
     dest = os.path.join(gendir, "bovnar_currency_table.gen.inc")
-    with open(dest, "w", encoding="utf-8") as f:
-        f.write(gen_table(curr))
+    bvnr_data.write_if_changed(dest, gen_table(curr))
     print("generated %d currencies (%d fiat, %d crypto, %d ext) -> %s"
           % (len(curr), len(fiat), len(crypto), len(ext), dest))
 

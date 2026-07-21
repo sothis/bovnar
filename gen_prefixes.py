@@ -131,8 +131,7 @@ def main():
     }
     os.makedirs(UTL, exist_ok=True)
     for dest, text in artifacts.items():
-        with open(dest, "w", encoding="utf-8") as f:
-            f.write(text)
+        bvnr_data.write_if_changed(dest, text)
     print("generated %d SI + %d IEC prefixes -> 8 fragments" % (len(si), len(iec)))
 
 

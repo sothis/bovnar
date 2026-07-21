@@ -165,3 +165,26 @@ def load(text):
     if isinstance(text, bytes):
         text = text.decode("utf-8")
     return _Parser(text).document()
+
+
+def write_if_changed(dest, text):
+    """Write `text` to `dest` only when the content differs.
+
+    The generators are re-run whenever a build directory lacks the .gen.inc
+    fragments -- which a FRESH build directory always does -- and three of their
+    outputs are committed headers under include/. Rewriting those unconditionally
+    meant configuring any new build tree modified the SOURCE tree: a read-only
+    checkout could not be configured at all (PermissionError on
+    include/bovnar_units.gen.h), and two build directories from one checkout
+    raced on the same files. Content-comparing first makes the normal case a
+    no-op, so an up-to-date checkout is never written to.
+    """
+    try:
+        with open(dest, "r", encoding="utf-8") as f:
+            if f.read() == text:
+                return False
+    except (OSError, UnicodeDecodeError):
+        pass
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write(text)
+    return True

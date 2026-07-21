@@ -314,8 +314,7 @@ def main():
         os.path.join(utl, "bovnar_prefix_policy.gen.inc"): gen_prefix_policy(units),
     }
     for dest, text in artifacts.items():
-        with open(dest, "w", encoding="utf-8") as f:
-            f.write(text)
+        bvnr_data.write_if_changed(dest, text)
 
     print("generated %d units (%d parse rows)" % (len(units), len(rows)))
     print("  wired: bovnar_units.gen.h, bovnar_si_conv_table.gen.inc,")

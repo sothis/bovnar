@@ -106,6 +106,33 @@ reading the grown by-value structs at the wrong size.
     itself and across its own prefixes.
   - Percent, per-mille and ppm are deliberately *not* kinds: those are pure
     ratios, and converting 1 % to 0.01 is exactly right.
+- **`convert bvnr → json` now reports what it drops and exits 1.** JSON cannot
+  carry a unit, a symbol, a reference, an octet stream or an integer wider than
+  64 bits — and the converter dropped all of it silently with exit 0, while going
+  out of its way to hard-error on a sub-second datetime, which is the same class
+  of loss. Refusing outright would make the command useless for any document with
+  a unit, so the JSON is still written; the exit status and a stderr summary say
+  it is not a faithful copy:
+
+  ```
+  convert: doc.bvnr: JSON cannot carry everything in this document; the output above is LOSSY:
+    3 value(s) lose their unit entirely, e.g. .dist_km (k~m)
+    1 symbol(s) become plain strings, e.g. .state
+  convert: exiting 1: this JSON does not convert back to the document it came from.
+  ```
+
+  A document JSON *can* represent still exits 0.
+- **`convert json → bvnr` turned a float inside an array into an integer.** The
+  scalar path uses `bvnr_write_float` and keeps the family, but an array element
+  was rendered with `%.17g` and emitted bare — so `2.0` came back as a `uint`
+  inside an array and a `float` outside it, in the same document. Array elements
+  now carry an explicit `<float>` annotation when the rendered text has no `.` or
+  exponent to mark it.
+- **The pretty-print idempotence test could not handle octet streams.** The CTest
+  helper routed each pass's output through a CMake variable, which cannot hold
+  the NUL bytes an octet stream is made of, so a document containing one was
+  reported as non-idempotent when it was not. Both passes now go straight to
+  files and are compared with `cmake -E compare_files`.
 - **The writer's event grammar is now enforced.** Its header claims it "cannot
   be coaxed into emitting a stream the reader would reject", but validation
   checked only struct balance and the two depth caps. A value bare at the top

@@ -1303,6 +1303,14 @@ static bool write_bvn_element(bvnr_writer_t *w, const JsonNode *e);
 static bool write_bvn_array_body(bvnr_writer_t *w, const JsonNode *node);
 static bool write_bvn_struct_body(bvnr_writer_t *w, const JsonNode *node);
 /* Emit one scalar array element as an ev_data event. */
+/* Does this rendered number text already look like a float to bovnar's default
+ * type synthesis? Only a '.' or an exponent marker makes it one. */
+static bool json_number_text_is_float(const char *t, uint32_t n)
+{
+	for (uint32_t i = 0; i < n; i++)
+		if (t[i] == '.' || t[i] == 'e' || t[i] == 'E') return true;
+	return false;
+}
 static bool write_bvn_array_elem(bvnr_writer_t *w, const JsonNode *e)
 {
 	bvnr_data_t d = {0};
@@ -1330,6 +1338,22 @@ static bool write_bvn_array_elem(bvnr_writer_t *w, const JsonNode *e)
 		d.type   = token_is_array_number;
 		d.data   = nbuf;
 		d.length = (n > 0) ? (uint32_t)n : 1u;
+		/* "%.17g" renders 2.0 as "2", which bovnar's default type synthesis then
+		 * reads back as a uint -- so the same JSON value came out float at the
+		 * top level (bvnr_write_float keeps the family) and uint inside an
+		 * array, in one document. An explicit float annotation on the element
+		 * keeps the two paths agreeing. */
+		d.value_type.family = vt_float;
+		if (!json_number_text_is_float(nbuf, (uint32_t)((n > 0) ? n : 1))) {
+			bvnr_data_t ann = {0};
+			ann.value_type.family = vt_float;
+			if (!bvnr_write_event(w, ev_type_annotation_start, &ann))
+				return false;
+			if (!bvnr_write_event(w, ev_type_annotation_type_family, &ann))
+				return false;
+			if (!bvnr_write_event(w, ev_type_annotation_end, &ann))
+				return false;
+		}
 	} else if (e->type == BVN_JSON_STRING) {
 		d.type   = token_is_array_string;
 		d.data   = e->u.s;
@@ -1754,6 +1778,125 @@ static const bvn_dom_node_t *find_fractional_datetime(const bvn_dom_node_t *node
 		return NULL;
 	}
 }
+
+/*
+ * JSON cannot carry most of what makes a bovnar document what it is. The
+ * converter used to drop all of it silently and exit 0 — while going out of its
+ * way to hard-error on a sub-second datetime, which is the same class of loss.
+ * Rather than refuse (that would make `convert` useless for any document with a
+ * unit, the format's whole point) it now reports precisely what it dropped and
+ * exits non-zero, so a script cannot mistake the output for a round-trip.
+ */
+typedef struct {
+	uint32_t n_unit, n_symbol, n_reference, n_octet, n_wide, n_typed;
+	char     ex_unit[160], ex_symbol[128], ex_reference[128];
+	char     ex_octet[128], ex_wide[128], ex_typed[160];
+} json_loss_t;
+
+static void json_loss_note(char *dst, size_t cap, const char *path,
+			   const char *detail)
+{
+	if (dst[0]) return;                     /* keep the first example only */
+	if (detail) snprintf(dst, cap, "%s (%s)", path, detail);
+	else        snprintf(dst, cap, "%s", path);
+}
+
+static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
+			   json_loss_t *L)
+{
+	if (!node) return;
+	value_unit_t vu = bvn_dom_get_unit(node);
+	/* BVN_UNIT_IS_NO_UNIT lives in an internal header; spell the same test out.
+	 * A single bu_none component is the dimensionless unit, not a real one. */
+	bool has_unit = vu.num_components > 0 &&
+			!(vu.num_components == 1u &&
+			  vu.components[0].base == bu_none);
+	if (has_unit) {
+		char ub[80];
+		if (bvn_unit_to_string(vu, ub, sizeof ub) < 0) ub[0] = '\0';
+		L->n_unit++;
+		json_loss_note(L->ex_unit, sizeof L->ex_unit, path, ub[0] ? ub : "a unit");
+	}
+	switch (bvn_dom_node_type(node)) {
+	case BVN_DOM_SYMBOL:
+		L->n_symbol++;
+		json_loss_note(L->ex_symbol, sizeof L->ex_symbol, path, NULL);
+		break;
+	case BVN_DOM_REFERENCE:
+		L->n_reference++;
+		json_loss_note(L->ex_reference, sizeof L->ex_reference, path, NULL);
+		break;
+	case BVN_DOM_OCTET_STREAM:
+		L->n_octet++;
+		json_loss_note(L->ex_octet, sizeof L->ex_octet, path, NULL);
+		break;
+	case BVN_DOM_INT: {
+		value_type_spec_t vt = bvn_dom_get_value_type(node);
+		if (vt.width > 64u) {
+			L->n_wide++;
+			json_loss_note(L->ex_wide, sizeof L->ex_wide, path,
+				       "emitted as a JSON string");
+		} else if (bvn_effective_base(vt) != 10u) {
+			L->n_typed++;
+			json_loss_note(L->ex_typed, sizeof L->ex_typed, path,
+				       "written in a non-decimal base");
+		}
+		break;
+	}
+	case BVN_DOM_STRUCT: {
+		uint32_t cnt = bvn_dom_struct_count(node);
+		const bvn_dom_entry_t *e = bvn_dom_struct_entries(node);
+		for (uint32_t i = 0; e && i < cnt; i++) {
+			char sub[256];
+			snprintf(sub, sizeof sub, "%s.%s", path, e[i].key);
+			json_loss_scan(e[i].value, sub, L);
+		}
+		break;
+	}
+	case BVN_DOM_ARRAY: {
+		uint32_t cnt = bvn_dom_array_count(node);
+		for (uint32_t i = 0; i < cnt; i++) {
+			char sub[256];
+			snprintf(sub, sizeof sub, "%s[%u]", path, i);
+			json_loss_scan(bvn_dom_array_at(node, i), sub, L);
+		}
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+/* Returns true if anything was lost (and reported). */
+static bool json_loss_report(const json_loss_t *L, const char *file)
+{
+	uint32_t total = L->n_unit + L->n_symbol + L->n_reference +
+			 L->n_octet + L->n_wide + L->n_typed;
+	if (!total) return false;
+	fprintf(stderr, "convert: %s: JSON cannot carry everything in this "
+			"document; the output above is LOSSY:\n", file);
+	if (L->n_unit)
+		fprintf(stderr, "  %u value(s) lose their unit entirely, e.g. %s\n",
+			L->n_unit, L->ex_unit);
+	if (L->n_wide)
+		fprintf(stderr, "  %u integer(s) wider than 64 bits become JSON "
+				"strings, e.g. %s\n", L->n_wide, L->ex_wide);
+	if (L->n_typed)
+		fprintf(stderr, "  %u integer(s) lose their numeric base, e.g. %s\n",
+			L->n_typed, L->ex_typed);
+	if (L->n_symbol)
+		fprintf(stderr, "  %u symbol(s) become plain strings, e.g. %s\n",
+			L->n_symbol, L->ex_symbol);
+	if (L->n_reference)
+		fprintf(stderr, "  %u reference(s) become plain strings and stop "
+				"resolving, e.g. %s\n", L->n_reference, L->ex_reference);
+	if (L->n_octet)
+		fprintf(stderr, "  %u octet stream(s) become hex strings, e.g. %s\n",
+			L->n_octet, L->ex_octet);
+	fprintf(stderr, "convert: exiting 1: this JSON does not convert back to "
+			"the document it came from.\n");
+	return true;
+}
 static int cmd_convert_bvnr_to_json(const char *file)
 {
 	int fd = open(file, BVN_O_RDONLY);
@@ -1788,6 +1931,15 @@ static int cmd_convert_bvnr_to_json(const char *file)
 			return 1;
 		}
 	}
+	/* Survey the loss before emitting, so the report is complete even if stdout
+	 * is a pipe the reader closes early. */
+	json_loss_t loss;
+	memset(&loss, 0, sizeof loss);
+	for (uint32_t i = 0; i < cnt; i++) {
+		char path[256];
+		snprintf(path, sizeof path, ".%s", entries[i].key);
+		json_loss_scan(entries[i].value, path, &loss);
+	}
 	putchar('{');
 	if (cnt) putchar('\n');
 	for (uint32_t i = 0; i < cnt; i++) {
@@ -1800,7 +1952,10 @@ static int cmd_convert_bvnr_to_json(const char *file)
 	}
 	puts("}");
 	bvn_dom_doc_destroy(doc);
-	return 0;
+	fflush(stdout);
+	/* The JSON is still written — it is usually what the caller wanted — but the
+	 * exit status says it is not a faithful copy. */
+	return json_loss_report(&loss, file) ? 1 : 0;
 }
 /* Map a file name to its format ("json" or "bvnr") by extension, or NULL if
  * the extension is unknown. Used to auto-detect the conversion direction so

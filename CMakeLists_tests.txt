@@ -21,6 +21,20 @@ add_executable(bvnr_currency_test        tests/bovnar_currency_test.c)
 # its link line, and the CTest registration.
 if(NOT WIN32)
 add_executable(bvnr_socketpair_roundtrip_test tests/bovnar_socketpair_roundtrip_test.c)
+# Distinct objects on distinct threads must not interfere. The library keeps no
+# mutable shared state -- bovnar_lexer.c builds its run LUTs from a pre-main
+# constructor precisely so the lazy-init flag cannot be raced on -- and that is a
+# deliberate guarantee, so it gets a test. A later lazily-initialised cache would
+# otherwise break it silently: the failure mode is a rare wrong parse, not a
+# crash. POSIX-only, like the socketpair test above.
+add_executable(bvnr_concurrency_test tests/bovnar_concurrency_test.c)
+target_compile_options(bvnr_concurrency_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_concurrency_test PRIVATE bvnr_static pthread)
+add_test(NAME bvnr_concurrency COMMAND bvnr_concurrency_test)
+set_tests_properties(bvnr_concurrency PROPERTIES
+    LABELS "unit;threads"
+    FAIL_REGULAR_EXPRESSION "FAILED"
+    TIMEOUT 120)
 endif()
 
 add_executable(bvnr_int_test          tests/bvn_int_test.c)
@@ -919,9 +933,10 @@ set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
 # bvnr_wasm_freshness guarded on BVNR_PACKAGE, which at this point in the
 # configure had not been declared yet, so the condition was false and the test
 # vanished without a word. Assert the expected count instead of trusting it.
-set(BVNR_EXPECTED_TEST_COUNT 110 CACHE STRING
-    "Number of CTest entries expected in a default configure; a mismatch means \
-a test was added, removed, or silently stopped registering")
+# Deliberately NOT a cache variable: a cached value survives an edit to the
+# default here, so bumping the count after adding a test would have no effect in
+# an existing build directory -- the check would keep reporting the old number.
+set(BVNR_EXPECTED_TEST_COUNT 111)
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

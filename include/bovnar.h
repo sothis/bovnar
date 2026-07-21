@@ -648,6 +648,11 @@ BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
  * copy and this stays 0 for the writer's whole lifetime. For writer output use
  * bvnr_writer_bytes_written(), and read it before bvnr_writer_destroy(). */
 BVN_API uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
+/* THREADING. A single reader or writer object holds the whole parse/serialise
+ * state and must not be used from two threads at once. DISTINCT objects on
+ * distinct threads need no synchronisation: the library writes no shared state
+ * after startup (the lexer's run tables are built from a pre-main constructor
+ * for exactly this reason). See tests/bovnar_concurrency_test.c. */
 BVN_API bvnr_reader_t* bvnr_reader_create(void);
 BVN_API void           bvnr_reader_destroy(bvnr_reader_t* r);
 BVN_API bool bvnr_open_read_source(

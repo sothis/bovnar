@@ -1302,10 +1302,21 @@ correct, readable C99 equivalent.
 
 C11 adds atomics, `_Generic`, `_Static_assert`, and `<threads.h>`. `_Static_assert`
 is useful and is approximated in the codebase with a macro. The atomics and
-threading additions are irrelevant: the reader and writer objects are not
-thread-safe by design — the caller is expected to guard them with their own
-synchronisation primitive. Pulling in C11 just for `_Static_assert` is not
-worth fragmenting compiler compatibility.
+threading additions are irrelevant, but for a more specific reason than "not
+thread-safe":
+
+* A **single** reader or writer object must not be used from two threads at once
+  — it carries the whole parse state. Guard it with your own primitive.
+* **Distinct** objects on distinct threads need no synchronisation at all. The
+  library keeps no mutable shared state: the lexer's run lookup tables are built
+  from a pre-main constructor precisely so their init flag can never be raced on,
+  and nothing else is written after startup. `tests/bovnar_concurrency_test.c`
+  pins this (12 000 concurrent reader / DOM / writer operations across 8
+  threads, clean under ThreadSanitizer).
+
+So no atomics are needed — not because concurrency is unsupported, but because
+the only shared state is immutable by the time any thread exists. Pulling in C11
+just for `_Static_assert` is not worth fragmenting compiler compatibility.
 
 ---
 

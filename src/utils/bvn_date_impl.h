@@ -99,19 +99,24 @@ static inline int64_t floor_mod(int64_t a, int64_t b)
 	return r + (b & needs_adj);
 }
 
-/* n / d rounded to the nearest integer, halves away from zero.  Requires
- * d > 0.  Free of intermediate overflow for every n including INT64_MIN:
- * |r| < d, so 2*r fits, and the +/-1 adjustment only fires when |n| >= d/2,
- * keeping q strictly inside the int64_t range. */
+/* n / d rounded to the nearest integer, halves away from zero.  Requires d > 0.
+ * Free of intermediate overflow for every n including INT64_MIN, and now for
+ * every d as well: the old form doubled the remainder, and |r| < d only bounds
+ * 2*r when d <= 2^62 -- for a larger divisor 2*r overflowed, which is UB and,
+ * compiled -fwrapv, returned the wrong quotient. Comparing r against d - r
+ * instead never leaves the representable range, because both sides are already
+ * bounded by d. No in-tree caller passes a divisor anywhere near that (86400 and
+ * 1000), so this was latent; it is a static inline in a shared header, which is
+ * exactly the kind of helper that acquires a new caller later. */
 static inline int64_t div_round_closest(int64_t n, int64_t d)
 {
 	int64_t q = n / d;
 	int64_t r = n % d;
 	if (r >= 0) {
-		if (2*r >= d)
+		if (r >= d - r)
 			q++;
 	} else {
-		if (-2*r >= d)
+		if (-r >= d + r)
 			q--;
 	}
 	return q;

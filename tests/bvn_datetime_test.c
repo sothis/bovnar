@@ -829,6 +829,95 @@ static void test_tai_injective(void)
 	}
 }
 
+/* German summer time and the fixed-date federal holidays are not the same rule
+ * in every year, and the module used to apply today's set throughout: it
+ * reported switches in 1970 (Germany had no summer time), missed the September
+ * ends that ran until 1995, called 1985-10-03 a holiday six years before the day
+ * existed, and did not know 17 June, the national holiday then in force. */
+static void test_german_calendar_history(void)
+{
+	printf("\n-- german DST / holiday history --\n");
+
+	static const struct { int64_t y, m, d; int want; const char *why; } SW[] = {
+		{ 1970,  3, 29, 0, "no summer time before 1980" },
+		{ 1970, 10, 25, 0, "no summer time before 1980" },
+		{ 1979,  3, 25, 0, "still none in 1979" },
+		{ 1980,  4,  6, 1, "1980 started on a fixed 6 April" },
+		{ 1980,  3, 30, 0, "...not the last Sunday in March" },
+		{ 1980,  9, 28, 1, "1980 ended in September" },
+		{ 1990,  9, 30, 1, "September end still in force" },
+		{ 1990, 10, 28, 0, "October is not a switch yet" },
+		/* September has 30 days, so its last Sunday can fall on the 24th --
+		 * which a `day > 24` test (right for 31-day months) would miss. */
+		{ 1995,  9, 24, 1, "last September year, last Sunday on the 24th" },
+		{ 1996,  9, 29, 0, "September end is over" },
+		{ 1996, 10, 27, 1, "October end from 1996 (EU directive)" },
+		{ 2024,  3, 31, 1, "current rule" },
+		{ 2024, 10, 27, 1, "current rule" },
+	};
+	for (size_t i = 0; i < sizeof SW / sizeof SW[0]; i++) {
+		bvn_gregorian_date_t g = { .year = SW[i].y, .month = SW[i].m,
+					   .day = SW[i].d };
+		CHECK(bvn_gregorian_date_is_daylight_saving_switch_in_germany(&g)
+			== SW[i].want,
+			"DST switch %04lld-%02lld-%02lld: %s",
+			(long long)SW[i].y, (long long)SW[i].m, (long long)SW[i].d,
+			SW[i].why);
+	}
+
+	/* bvn_dt_tai_second_is_dls_in_europe carries the same table; the two must
+	 * not drift apart. */
+	static const struct { int64_t y, m, d; int want; } WIN[] = {
+		{ 1970, 7,  1, 0 }, { 1979, 7,  1, 0 },
+		{ 1980, 4,  1, 0 }, { 1980, 7,  1, 1 },
+		{ 1990, 10, 10, 0 }, { 1996, 10, 10, 1 },
+		{ 2024, 7,  1, 1 }, { 2024, 1,  1, 0 },
+	};
+	for (size_t i = 0; i < sizeof WIN / sizeof WIN[0]; i++) {
+		bvn_datetime_t t = { .date = { .year = WIN[i].y, .month = WIN[i].m,
+					       .day = WIN[i].d }, .hour = 12 };
+		CHECK(bvn_dt_tai_second_is_dls_in_europe(
+			bvn_dt_utc_to_tai_seconds(&t)) == WIN[i].want,
+			"summer-time window %04lld-%02lld-%02lld",
+			(long long)WIN[i].y, (long long)WIN[i].m, (long long)WIN[i].d);
+	}
+
+	static const struct { int64_t y, m, d; int want; const char *why; } HD[] = {
+		{ 1985, 10,  3, 0, "Einheit did not exist yet" },
+		{ 1985,  6, 17, 1, "17 June was the national holiday then" },
+		{ 1991, 10,  3, 1, "Einheit from 1990" },
+		{ 1991,  6, 17, 0, "17 June no longer" },
+		{ 1900,  5,  1, 0, "1 May became a holiday in 1933" },
+		{ 1950,  5,  1, 1, "1 May afterwards" },
+		{ 2024, 10,  3, 1, "current" },
+		{ 2024,  1,  1, 1, "Neujahr, ungated" },
+		{ 2024, 12, 25, 1, "Weihnachten, ungated" },
+	};
+	for (size_t i = 0; i < sizeof HD / sizeof HD[0]; i++) {
+		bvn_gregorian_date_t g = { .year = HD[i].y, .month = HD[i].m,
+					   .day = HD[i].d };
+		CHECK(bvn_gregorian_date_is_federal_holiday_in_germany(&g)
+			== HD[i].want,
+			"holiday %04lld-%02lld-%02lld: %s",
+			(long long)HD[i].y, (long long)HD[i].m, (long long)HD[i].d,
+			HD[i].why);
+	}
+
+	/* The get_* family canonicalises its input like the is_* predicates do; the
+	 * two used to contradict each other on the same denormalised record. */
+	{
+		bvn_gregorian_date_t denorm = { .year = 2024, .month = 3, .day = 61 };
+		bvn_gregorian_date_t got;
+		memset(&got, 0, sizeof got);
+		bvn_gregorian_date_get_last_banking_day_in_month(&got, &denorm);
+		CHECK(bvn_gregorian_date_is_last_banking_day_in_month(&denorm)
+			&& got.year == 2024 && got.month == 4 && got.day == 30,
+			"{2024,3,61} normalises to 2024-04-30 and both agree "
+			"(got %04lld-%02lld-%02lld)",
+			(long long)got.year, (long long)got.month, (long long)got.day);
+	}
+}
+
 int main(void)
 {
 	test_walk();
@@ -845,6 +934,7 @@ int main(void)
 	test_gnss();
 	test_equality();
 	test_tai_injective();
+	test_german_calendar_history();
 
 	printf("\n%s  %d passed, %d failed\n",
 	       g_fails ? "FAIL" : "PASS", g_pass, g_fails);

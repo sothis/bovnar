@@ -305,7 +305,12 @@ BVN_API bool bvn_gregorian_date_calc_easter_monday(bvn_gregorian_date_t *gdate, 
 BVN_API bool bvn_gregorian_date_calc_ascension_day(bvn_gregorian_date_t *gdate, int64_t year);
 BVN_API bool bvn_gregorian_date_calc_whit_monday(bvn_gregorian_date_t *gdate, int64_t year);
 
-/* Returns true if given date is a federal holiday in Germany, false otherwise. */
+/* Returns true if given date is a federal holiday in Germany, false otherwise.
+ * The dated rules are applied per year, not timelessly: Tag der Deutschen
+ * Einheit (3 Oct) from 1990 and 17 June, the national holiday it replaced, for
+ * 1954..1989; 1 May from 1933. Neujahr, Weihnachten and the Easter-derived days
+ * are not gated. Regional holidays (Fronleichnam, Reformationstag, ...) are out
+ * of scope -- only the nine that are federal. */
 BVN_API bool bvn_gregorian_date_is_federal_holiday_in_germany(bvn_gregorian_date_t* date);
 
 /* Returns true if given date is a banking day in Germany, false otherwise (banking
@@ -343,6 +348,12 @@ BVN_API bool bvn_gregorian_date_is_first_banking_day_in_month(bvn_gregorian_date
 BVN_API bool bvn_gregorian_date_is_last_banking_day_in_quarter(int quarter, bvn_gregorian_date_t* date);
 BVN_API bool bvn_gregorian_date_is_first_banking_day_in_quarter(int quarter, bvn_gregorian_date_t* date);
 
+/* Summer-time switch days, per the rule actually in force in that year:
+ * none before 1980; 1980 started on a fixed 6 April and ended on the last
+ * Sunday in September; 1981..1995 ran last-Sunday-March .. last-Sunday-
+ * September; from 1996 last-Sunday-March .. last-Sunday-October. The 1916-18
+ * and 1940-49 wartime spells are irregular and deliberately not modelled.
+ * bvn_dt_tai_second_is_dls_in_europe() follows the same table. */
 BVN_API bool bvn_gregorian_date_is_daylight_saving_switch_in_germany(bvn_gregorian_date_t* date);
 BVN_API bool bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany(bvn_gregorian_date_t* date);
 

@@ -366,19 +366,37 @@ int bvn_dt_tai_second_is_dls_in_europe(int64_t tai_second)
 	 * of March .. last Sunday of October) lies entirely within that year. */
 	bvn_dt_tai_seconds_to_utc(&dt, tai_second);
 
+	/* Germany has no summer time before 1980, ended it in SEPTEMBER until 1995,
+	 * and began 1980 on a fixed 6 April rather than the last Sunday in March.
+	 * The same table lives in bvn_gregorian_date.c's DST predicates; keep them
+	 * in step. */
+	if (dt.date.year < 1980)
+		return 0;
+
+	/* .day must be a real day: the get_* helpers canonicalize their input, and
+	 * a zero day normalizes into the PREVIOUS month -- {Y, 3, 0} is the last of
+	 * February, so the "last Sunday in March" would come back as February's.
+	 * Any day in the month picks out the right month; 1 is the obvious one. */
 	bvn_datetime_t dls_on = {
 		.date.year = dt.date.year,
 		.date.month = 3,
+		.date.day = 1,
 		.hour = 1,
 	};
 
 	bvn_datetime_t dls_off = {
 		.date.year = dt.date.year,
-		.date.month = 10,
+		.date.month = (dt.date.year >= 1996) ? 10 : 9,
+		.date.day = 1,
 		.hour = 1,
 	};
 
-	bvn_gregorian_date_get_last_sunday_in_month(&dls_on.date, &dls_on.date);
+	if (dt.date.year == 1980) {
+		dls_on.date.month = 4;
+		dls_on.date.day   = 6;
+	} else {
+		bvn_gregorian_date_get_last_sunday_in_month(&dls_on.date, &dls_on.date);
+	}
 	bvn_gregorian_date_get_last_sunday_in_month(&dls_off.date, &dls_off.date);
 
 	tai_dls_on = bvn_dt_utc_to_tai_seconds(&dls_on);

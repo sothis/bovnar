@@ -285,12 +285,33 @@ static bool gdate_canonicalize(bvn_gregorian_date_t* c, const bvn_gregorian_date
 /* The *_canon helpers require a canonical record (as produced by
  * bvn_gregorian_date_from_mjd()/_normalize()); the public wrappers
  * canonicalize first, the walk predicates call them directly. */
+/* The fixed-date holidays are not timeless, and applying today's set to every
+ * year gave plainly wrong answers: 1985-10-03 was reported as a holiday six
+ * years before the day existed, while 1985-06-17 -- the national holiday then in
+ * force -- was not. The three datable rules are gated; Neujahr, Weihnachten and
+ * the Easter-derived days predate any year this module is useful for. */
+#define BVN_DE_UNITY_DAY_FROM     1990   /* 3 Oct, Tag der Deutschen Einheit  */
+#define BVN_DE_JUNE17_FROM        1954   /* 17 Jun, its predecessor ...        */
+#define BVN_DE_JUNE17_UNTIL       1989   /* ... last observed 1989             */
+#define BVN_DE_LABOUR_DAY_FROM    1933   /* 1 May became a legal holiday       */
+
 static bool federal_holiday_canon(bvn_gregorian_date_t* c)
 {
     switch (c->month) {
     case  1: if (c->day ==  1)                 return true; break; /* Neujahr */
-    case  5: if (c->day ==  1)                 return true; break; /* 1. Mai  */
-    case 10: if (c->day ==  3)                 return true; break; /* Einheit */
+    case  5: /* 1. Mai */
+        if (c->day == 1 && c->year >= BVN_DE_LABOUR_DAY_FROM)
+            return true;
+        break;
+    case  6: /* 17. Juni -- the national holiday before 1990 */
+        if (c->day == 17 && c->year >= BVN_DE_JUNE17_FROM
+                         && c->year <= BVN_DE_JUNE17_UNTIL)
+            return true;
+        break;
+    case 10: /* Tag der Deutschen Einheit */
+        if (c->day == 3 && c->year >= BVN_DE_UNITY_DAY_FROM)
+            return true;
+        break;
     case 12: if (c->day == 25 || c->day == 26) return true; break; /* Weihn.  */
     }
 
@@ -361,18 +382,41 @@ static void get_walk_day(bvn_gregorian_date_t* res, int64_t seed,
     *res = tmp;
 }
 
+/* The get_* functions below read year/month off the input record. The header
+ * promises the whole higher-level family judges "the civil day the input
+ * normalizes to", and the is_* predicates already canonicalize -- these did not,
+ * so the two contradicted each other on the same record: for {2024, 3, 61},
+ * which normalizes to 2024-04-30, is_last_banking_day_in_month() answered true
+ * while get_last_banking_day_in_month() returned 2024-03-28. The month alone was
+ * safe (eom_mjd/ymd_to_mjd floor-reduce it); an out-of-range DAY was silently
+ * dropped. Canonicalize first, and on failure leave *res untouched, which is
+ * what the header already specifies for an out-of-range quarter. */
+static bool gdate_canon_ym(const bvn_gregorian_date_t* d, int64_t* y, int64_t* m)
+{
+    bvn_gregorian_date_t c;
+    if (!d || !gdate_canonicalize(&c, d))
+        return false;
+    *y = c.year;
+    *m = c.month;
+    return true;
+}
+
 void bvn_gregorian_date_get_last_banking_day_in_month(bvn_gregorian_date_t* res,
                                                   bvn_gregorian_date_t* date)
 {
-    get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_banking);
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    get_walk_day(res, eom_mjd(y, m), -1, pred_banking);
 }
 
 void bvn_gregorian_date_get_penultimate_banking_day_in_month(bvn_gregorian_date_t* res,
                                                          bvn_gregorian_date_t* date)
 {
     bvn_gregorian_date_t tmp;
-    int64_t mjd;
-    if (!seed_walk(&tmp, &mjd, eom_mjd(date->year, date->month)))
+    int64_t mjd, y, m;
+    if (!gdate_canon_ym(date, &y, &m))
+        return;
+    if (!seed_walk(&tmp, &mjd, eom_mjd(y, m)))
         return;
     if (!walk_until(&tmp, &mjd, -1, pred_banking)) /* last banking day */
         return;
@@ -386,25 +430,33 @@ void bvn_gregorian_date_get_penultimate_banking_day_in_month(bvn_gregorian_date_
 void bvn_gregorian_date_get_first_banking_day_in_month(bvn_gregorian_date_t* res,
                                                    bvn_gregorian_date_t* date)
 {
-    get_walk_day(res, ymd_to_mjd(date->year, date->month, 1), +1, pred_banking);
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    get_walk_day(res, ymd_to_mjd(y, m, 1), +1, pred_banking);
 }
 
 void bvn_gregorian_date_get_mid_banking_day_in_month(bvn_gregorian_date_t* res,
                                                  bvn_gregorian_date_t* date)
 {
-    get_walk_day(res, ymd_to_mjd(date->year, date->month, 15), +1, pred_banking);
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    get_walk_day(res, ymd_to_mjd(y, m, 15), +1, pred_banking);
 }
 
 void bvn_gregorian_date_get_last_sunday_in_month(bvn_gregorian_date_t* res,
                                              bvn_gregorian_date_t* date)
 {
-    get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_sunday);
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    get_walk_day(res, eom_mjd(y, m), -1, pred_sunday);
 }
 
 void bvn_gregorian_date_get_last_saturday_in_month(bvn_gregorian_date_t* res,
                                                bvn_gregorian_date_t* date)
 {
-    get_walk_day(res, eom_mjd(date->year, date->month), -1, pred_saturday);
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    get_walk_day(res, eom_mjd(y, m), -1, pred_saturday);
 }
 
 /* The is_*_banking_day predicates judge the civil day the input normalizes to
@@ -479,7 +531,10 @@ void bvn_gregorian_date_get_last_banking_day_in_quarter(int quarter,
 {
     if (quarter < 1 || quarter > 4)
         return;
-    get_walk_day(res, eom_mjd(date->year, q_last_month(quarter)),
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    (void)m;
+    get_walk_day(res, eom_mjd(y, q_last_month(quarter)),
                  -1, pred_banking);
 }
 
@@ -489,21 +544,80 @@ void bvn_gregorian_date_get_first_banking_day_in_quarter(int quarter,
 {
     if (quarter < 1 || quarter > 4)
         return;
-    get_walk_day(res, ymd_to_mjd(date->year, q_first_month(quarter), 1),
+    int64_t y, m;
+    if (!gdate_canon_ym(date, &y, &m)) return;
+    (void)m;
+    get_walk_day(res, ymd_to_mjd(y, q_first_month(quarter), 1),
                  +1, pred_banking);
+}
+
+/* Germany's summer time is not the same rule in every year, and applying the
+ * current one throughout reported 1970 and 1990 switches that never happened
+ * while missing the ones that did:
+ *
+ *   before 1980  no summer time at all (reintroduced 1980; the 1916-18 and
+ *                1940-49 wartime spells are irregular and out of scope)
+ *   1980         started 6 April -- NOT the last Sunday in March -- ended on
+ *                the last Sunday in September
+ *   1981-1995    last Sunday in March .. last Sunday in September
+ *   from 1996    last Sunday in March .. last Sunday in October (EU directive)
+ *
+ * bvn_dt_tai_second_is_dls_in_europe() in bvn_datetime.c follows the same
+ * table; the two must not drift apart. */
+#define BVN_DE_DST_FROM           1980
+#define BVN_DE_DST_OCT_END_FROM   1996
+
+/* Which month ends summer time in `year`, or 0 if the year has none. */
+static int bvn_de_dst_end_month(int64_t year)
+{
+    if (year < BVN_DE_DST_FROM)         return 0;
+    return (year >= BVN_DE_DST_OCT_END_FROM) ? 10 : 9;
+}
+
+/* Last Sunday of `month`. Testing `day > 24` would be wrong here: that holds for
+ * a 31-day month, but September has 30 days and its last Sunday can fall on the
+ * 24th -- as it did in 1995. Ask whether another week still fits instead. */
+static bool bvn_de_is_last_sunday(const bvn_gregorian_date_t* c, int month)
+{
+    if (c->month != month || c->wday != 0) return false;
+    int64_t mjd = bvn_gregorian_date_to_mjd_fast(c);
+    int64_t eom = eom_mjd(c->year, month);
+    if (mjd == BVN_GDATE_OVF || eom == BVN_GDATE_OVF) return false;
+    return mjd + 7 > eom;
+}
+
+/* Is `c` the day summer time starts? 1980 began on a fixed date rather than the
+ * last Sunday of March. */
+static bool bvn_de_dst_start_day(const bvn_gregorian_date_t* c)
+{
+    if (c->year < BVN_DE_DST_FROM)      return false;
+    if (c->year == BVN_DE_DST_FROM)     return c->month == 4 && c->day == 6;
+    return bvn_de_is_last_sunday(c, 3);
+}
+
+static bool bvn_de_dst_end_day(const bvn_gregorian_date_t* c)
+{
+    int em = bvn_de_dst_end_month(c->year);
+    return em && bvn_de_is_last_sunday(c, em);
 }
 
 bool bvn_gregorian_date_is_daylight_saving_switch_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
     if (!gdate_canonicalize(&c, d)) return false;
-    return (c.month == 3 || c.month == 10) && c.day > 24 && c.wday == 0;
+    return bvn_de_dst_start_day(&c) || bvn_de_dst_end_day(&c);
 }
 
 bool bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany(bvn_gregorian_date_t* d)
 {
     bvn_gregorian_date_t c;
+    int64_t mjd;
     if (!gdate_canonicalize(&c, d)) return false;
-    return (c.month == 3 || c.month == 10)
-        && c.day >= 24 && c.day <= 30 && c.wday == 6;
+    /* "the day before a switch" is exactly that: step forward one day and ask.
+     * The old form open-coded a Saturday-in-a-window test, which cannot express
+     * 1980's Sunday-6-April start. */
+    mjd = bvn_gregorian_date_to_mjd_fast(&c);
+    if (mjd == BVN_GDATE_OVF || mjd == BVN_GDATE_MJD_MAX) return false;
+    bvn_gregorian_date_from_mjd(&c, mjd + 1);
+    return bvn_de_dst_start_day(&c) || bvn_de_dst_end_day(&c);
 }

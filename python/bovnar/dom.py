@@ -327,7 +327,19 @@ class DomNode:
         if dt == DomType.STRUCT:
             return {k: v.to_python() for k, v in self.entries()}
         if dt == DomType.ARRAY:
-            return [self[i].to_python() for i in range(len(self))]
+            flat = [self[i].to_python() for i in range(len(self))]
+            # The C DOM stores /-separated dimension rows FLAT and records the
+            # row count separately, so ignoring array_dims() mapped two different
+            # documents onto the same Python value: "[1,2,3]/[4,5,6]" and
+            # "[1,2,3,4,5,6]" both came back as [1, 2, 3, 4, 5, 6], while the
+            # streaming path (bovnar.loads) correctly gives [[1,2,3],[4,5,6]].
+            # Row sizes are equal by construction -- an uneven one is
+            # error_array_row_size_mismatch -- so the split is exact.
+            rows = self.array_dims()
+            if rows > 1 and flat and len(flat) % rows == 0:
+                width = len(flat) // rows
+                return [flat[i * width:(i + 1) * width] for i in range(rows)]
+            return flat
         return None
 
     def __repr__(self) -> str:

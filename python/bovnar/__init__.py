@@ -24,7 +24,7 @@ from decimal import Decimal
 from fractions import Fraction
 
 from .enums import (
-    Event, ValueTypeFamily, PrefixSystem,
+    Event, TokenType, ValueTypeFamily, PrefixSystem,
     SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
 )
 from .structs import (
@@ -507,9 +507,11 @@ def _seal_array(arr: _ArrScope):
     return arr.rows
 
 
-_TOKEN_IS_SYMBOL    = 3
-_TOKEN_IS_REFERENCE = 4
-_TOKEN_IS_BOOL      = 15
+# Mirror of C token_type_t; see enums.TokenType (checked against the header
+# by test_enums.py) rather than re-declaring the numbers here.
+_TOKEN_IS_SYMBOL    = TokenType.SYMBOL
+_TOKEN_IS_REFERENCE = TokenType.REFERENCE
+_TOKEN_IS_BOOL      = TokenType.BOOL
 
 
 def _char_to_digit(c: int, base: int) -> int:
@@ -796,10 +798,10 @@ def _emit_value(w: Writer, key: str, value) -> None:
 def _emit_array_element(w: Writer, elem) -> None:
     import ctypes as _ct
 
-    _TOKEN_IS_ARRAY_NUMBER = 5
-    _TOKEN_IS_ARRAY_STRING = 6
-    _TOKEN_IS_BOOL         = 15
-    _TOKEN_IS_NULL_VALUE   = 9
+    _TOKEN_IS_ARRAY_NUMBER = TokenType.ARRAY_NUMBER
+    _TOKEN_IS_ARRAY_STRING = TokenType.ARRAY_STRING
+    _TOKEN_IS_BOOL         = TokenType.BOOL
+    _TOKEN_IS_NULL_VALUE   = TokenType.NULL_VALUE
 
     # A typed load (loads(typed=True)) yields Quantity elements. Array elements
     # are written bare (bovnar arrays carry no per-element type annotation), so

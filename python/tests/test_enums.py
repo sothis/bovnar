@@ -22,10 +22,66 @@
 
 
 import pytest
+import pathlib
+import re
+
 from bovnar.enums import (
-    Event, ValueTypeFamily, PrefixSystem,
+    Event, TokenType, ValueTypeFamily, PrefixSystem,
     SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
 )
+
+_HEADER = pathlib.Path(__file__).resolve().parents[2] / "include" / "bovnar.h"
+
+
+def _c_enum(name: str) -> dict:
+    """Parse `typedef enum <name>_e { ... }` out of the C header.
+
+    Reading the header directly is the point: a hand-kept Python copy of a C
+    enum only stays correct if something compares the two.
+    """
+    text = _HEADER.read_text(encoding="utf-8")
+    m = re.search(r"typedef enum " + name + r"_e \{(.*?)\}", text, re.S)
+    assert m, f"{name}_e not found in {_HEADER}"
+    out, nxt = {}, 0
+    for line in m.group(1).splitlines():
+        line = re.sub(r"/\*.*?\*/", "", line).split("//")[0].strip().rstrip(",")
+        if not line:
+            continue
+        em = re.match(r"^(\w+)\s*(?:=\s*(-?\d+))?$", line)
+        if not em:
+            continue
+        nxt = int(em.group(2)) if em.group(2) is not None else nxt
+        out[em.group(1)] = nxt
+        nxt += 1
+    return out
+
+
+class TestTokenTypeMirrorsC:
+    # BvnrData.type reaches users as this raw int, and the writer selects
+    # behaviour on it, so a drift here is silent and consequential.
+    def test_every_c_token_type_is_mirrored(self):
+        c = _c_enum("token_type")
+        assert c, "parsed no token_type_e members"
+        for cname, cval in c.items():
+            pyname = cname[len("token_is_"):].upper()
+            assert hasattr(TokenType, pyname), f"TokenType is missing {pyname}"
+            assert int(getattr(TokenType, pyname)) == cval, (
+                f"TokenType.{pyname} is {int(getattr(TokenType, pyname))}, "
+                f"C {cname} is {cval}")
+
+    def test_no_extra_python_members(self):
+        c = {n[len("token_is_"):].upper() for n in _c_enum("token_type")}
+        assert {m.name for m in TokenType} == c
+
+
+class TestErrorCodeMirrorsC:
+    def test_every_c_error_code_is_mirrored(self):
+        c = _c_enum("error_code")
+        assert c, "parsed no error_code_e members"
+        by_value = {int(e): e.name for e in ErrorCode}
+        for cname, cval in c.items():
+            assert cval in by_value, f"ErrorCode is missing {cname} = {cval}"
+
 
 class TestEvent:
     def test_stream_begin_is_zero(self):

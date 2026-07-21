@@ -26,7 +26,7 @@ import ctypes
 
 from ._ffi import get_library
 from .enums import (
-    Event, ValueTypeFamily,
+    Event, TokenType, ValueTypeFamily,
     BaseUnit, SIPrefix, IECPrefix, Exponent, ErrorCode,
 )
 from .exceptions import BovnarWriteError, BovnarArgumentError
@@ -248,23 +248,25 @@ class Writer:
         if not ok:
             self._raise_error()
 
-    _TOKEN_IS_IDENTIFIER  = 0
-    _TOKEN_IS_STRING      = 1
-    _TOKEN_IS_NUMBER      = 2
-    _TOKEN_IS_SYMBOL      = 3
-    _TOKEN_IS_REFERENCE   = 4
-    _TOKEN_IS_ARRAY_NUMBER = 5
-    _TOKEN_IS_ARRAY_STRING = 6
-    _TOKEN_IS_TYPE        = 7
-    _TOKEN_IS_OCTET_STREAM = 8
-    _TOKEN_IS_NULL_VALUE  = 9
-    _TOKEN_IS_STRUCTURE   = 10
-    _TOKEN_IS_UNIT        = 11
-    _TOKEN_IS_TYPE_WIDTH  = 12
-    _TOKEN_IS_TYPE_BASE   = 13
-    _TOKEN_IS_TYPE_Q      = 14
-    _TOKEN_IS_BOOL        = 15
-    _TOKEN_IS_UNKNOWN     = 16
+    # Mirror of C token_type_t; see enums.TokenType, which test_enums.py
+    # checks against the header so these cannot drift.
+    _TOKEN_IS_IDENTIFIER   = TokenType.IDENTIFIER
+    _TOKEN_IS_STRING       = TokenType.STRING
+    _TOKEN_IS_NUMBER       = TokenType.NUMBER
+    _TOKEN_IS_SYMBOL       = TokenType.SYMBOL
+    _TOKEN_IS_REFERENCE    = TokenType.REFERENCE
+    _TOKEN_IS_ARRAY_NUMBER = TokenType.ARRAY_NUMBER
+    _TOKEN_IS_ARRAY_STRING = TokenType.ARRAY_STRING
+    _TOKEN_IS_TYPE         = TokenType.TYPE
+    _TOKEN_IS_OCTET_STREAM = TokenType.OCTET_STREAM
+    _TOKEN_IS_NULL_VALUE   = TokenType.NULL_VALUE
+    _TOKEN_IS_STRUCTURE    = TokenType.STRUCTURE
+    _TOKEN_IS_UNIT         = TokenType.UNIT
+    _TOKEN_IS_TYPE_WIDTH   = TokenType.TYPE_WIDTH
+    _TOKEN_IS_TYPE_BASE    = TokenType.TYPE_BASE
+    _TOKEN_IS_TYPE_Q       = TokenType.TYPE_Q
+    _TOKEN_IS_BOOL         = TokenType.BOOL
+    _TOKEN_IS_UNKNOWN      = TokenType.UNKNOWN
 
     def _emit_annotation(self,
                           family_name: str,

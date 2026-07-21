@@ -311,6 +311,29 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
         ValueUnit, P(c_bool), P(c_double), P(c_bool),
     ]
 
+    # Exact-rational conversion (bovnar_si_units.h). bvn_int_t is opaque here —
+    # it is only ever a pointer we received from C (BvnrData.conv.num/den) and
+    # hand straight back, so c_void_p is the whole binding it needs. Without
+    # these the exact rational a want_unit conversion produces is unreachable
+    # from Python, which is the only thing carrying the value when the result
+    # has no terminating expansion in the output base.
+    lib.bvn_rational_str_bufsize.restype  = c_size_t
+    lib.bvn_rational_str_bufsize.argtypes = [c_void_p, c_void_p, c_uint32]
+
+    lib.bvn_rational_to_str.restype  = c_int32
+    lib.bvn_rational_to_str.argtypes = [
+        c_void_p, c_void_p, c_uint32, c_char_p, c_size_t, P(c_bool),
+    ]
+
+    lib.bvn_int_bitlen.restype  = c_int
+    lib.bvn_int_bitlen.argtypes = [c_void_p]
+
+    lib.bvn_int_str_bufsize.restype  = c_size_t
+    lib.bvn_int_str_bufsize.argtypes = [c_uint32, c_uint32]
+
+    lib.bvn_int_to_str.restype  = c_int32
+    lib.bvn_int_to_str.argtypes = [c_void_p, c_char_p, c_size_t, c_uint32]
+
     lib.bvn_unit_dimension_vector.restype  = c_bool
     lib.bvn_unit_dimension_vector.argtypes = [ValueUnit, P(c_int32)]
 

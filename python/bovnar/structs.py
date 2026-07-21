@@ -223,6 +223,56 @@ class BvnrData(ctypes.Structure):
             return None
         return self.conv.text.decode('ascii')
 
+    def converted_rational(self) -> "tuple[int, int] | None":
+        """The exact converted value as a reduced ``(numerator, denominator)``
+        pair, or None when no conversion was applied.
+
+        This is the only carrier of the value when ``converted_str()`` returns
+        None — the result was exact but had no terminating expansion in the
+        requested base (``want_unit_allow_nonterminating``). ``Fraction(*pair)``
+        gives you the exact number.
+
+        Valid only while the callback is running: num/den point at reader-owned
+        bignums.
+        """
+        if not self.converted or not self.conv.num or not self.conv.den:
+            return None
+        from ._ffi import get_library
+        lib = get_library()
+
+        def _to_int(handle: int) -> int:
+            bits = lib.bvn_int_bitlen(handle) or 1
+            size = lib.bvn_int_str_bufsize(bits, 10)
+            buf  = ctypes.create_string_buffer(size)
+            if lib.bvn_int_to_str(handle, buf, size, 10) < 0:
+                raise ValueError("bvn_int_to_str failed on a conversion result")
+            return int(buf.value.decode('ascii'))
+
+        return (_to_int(self.conv.num), _to_int(self.conv.den))
+
+    def converted_in_base(self, base: int) -> "str | None":
+        """Render the exact converted value in ``base`` (2..62, 64 or 85).
+
+        Returns None when no conversion was applied, or when the exact value has
+        no terminating expansion in that base — use converted_rational() there.
+        Lets a caller re-render in a base other than the one requested at read
+        time. Valid only while the callback is running.
+        """
+        if not self.converted or not self.conv.num or not self.conv.den:
+            return None
+        from ._ffi import get_library
+        lib   = get_library()
+        size  = lib.bvn_rational_str_bufsize(self.conv.num, self.conv.den, base)
+        if not size:
+            raise ValueError(f"base {base} is not one bovnar can write")
+        buf   = ctypes.create_string_buffer(size)
+        exact = ctypes.c_bool(False)
+        n = lib.bvn_rational_to_str(self.conv.num, self.conv.den, base,
+                                    buf, size, ctypes.byref(exact))
+        if n < 0 or not exact.value:
+            return None                    # non-terminating, or unrepresentable
+        return buf.value.decode('ascii')
+
     def raw_bytes(self) -> bytes:
         if not self.data or self.length == 0:
             return b''

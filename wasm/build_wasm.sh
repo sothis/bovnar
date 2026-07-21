@@ -30,7 +30,7 @@ python3 "$ROOT/amalgamate.py" "$AMALG"
 
 # Symbols the JS glue calls. The leading underscore is the C name mangling
 # emscripten applies; _malloc/_free let the JS side pass byte buffers in.
-EXPORTS='_bvnr_wasm_validate,_bvnr_wasm_errors,_bvnr_wasm_to_json,_bvnr_wasm_events,_bvnr_wasm_doc,_bvnr_wasm_version,_bvnr_wasm_free,_malloc,_free'
+EXPORTS='_bvnr_wasm_validate,_bvnr_wasm_errors,_bvnr_wasm_to_json,_bvnr_wasm_events,_bvnr_wasm_events_convert,_bvnr_wasm_doc,_bvnr_wasm_version,_bvnr_wasm_free,_malloc,_free'
 RUNTIME='ccall,cwrap,UTF8ToString,lengthBytesUTF8,stringToUTF8,HEAPU8'
 
 COMMON=(

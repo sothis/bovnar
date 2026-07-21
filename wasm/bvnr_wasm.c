@@ -17,6 +17,10 @@
  *                                          plain JSON (units dropped — see notes)
  *   bvnr_wasm_events  (ptr,len) -> JSON  { ok, error, error_name, events:[...] }
  *                                          the reference event stream (verified)
+ *   bvnr_wasm_events_convert(ptr,len,unit,base,allow_nonterminating)
+ *                               -> the same stream with the reader's lossless
+ *                                  unit/base conversion armed, so events carry
+ *                                  converted / converted_base / converted_unit
  *
  * The caller passes a pointer+length (NOT a NUL-terminated string), because a
  * .bvnr document may carry octet streams with embedded NULs. Every returning
@@ -434,9 +438,22 @@ typedef struct {
 	int      count;
 } evt_ctx_t;
 
+/*
+ * on_verified and want_unit share the single `userdata` slot, so they share one
+ * context: `ev` for the event serialiser, `req` for the conversion target. A
+ * NULL `req.unit` means "keep each value's own unit", which together with a base
+ * makes the request a pure base conversion.
+ */
+typedef struct {
+	evt_ctx_t           ev;
+	const value_unit_t *unit;
+	uint32_t            base;
+} events_ud_t;
+
+
 static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 {
-	evt_ctx_t *ctx = (evt_ctx_t *)ud;
+	evt_ctx_t *ctx = &((events_ud_t *)ud)->ev;
 	sb_t *b = ctx->b;
 	if (ctx->count++) sb_putc(b, ',');
 	sb_putc(b, '{');
@@ -509,24 +526,38 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 	return true;
 }
 
-WASM_EXPORT
-char *bvnr_wasm_events(const char *buf, int len)
+static bool conv_want_unit(void *ud, const bvnr_data_t *d,
+			   value_unit_t *want, uint32_t *want_base)
+{
+	const events_ud_t *u = (const events_ud_t *)ud;
+	*want      = u->unit ? *u->unit : d->value_unit;
+	*want_base = u->base;
+	return true;
+}
+
+static char *events_impl(const char *buf, int len,
+			 const value_unit_t *target, uint32_t base,
+			 bool convert, bool allow_nonterminating)
 {
 	sb_t b; sb_init(&b);
 	if (len < 0) len = 0;
 
 	sb_t evbuf; sb_init(&evbuf);
-	evt_ctx_t ctx = { &evbuf, 0, 0 };
+	events_ud_t ud = { { &evbuf, 0, 0 }, target, base };
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	bvnr_read_flags_t flags;
 	memset(&flags, 0, sizeof(flags));
-	flags.userdata = &ctx;
+	flags.userdata = &ud;
 	flags.on_verified = evt_cb;
 	/* resync: emit verified events for every well-formed assignment, skipping
 	 * (not aborting at) a broken one — so the playground tree and the demos'
 	 * resync mode show all recoverable structure past an error. */
 	flags.continue_on_error = true;
+	if (convert) {
+		flags.want_unit = conv_want_unit;
+		flags.want_unit_allow_nonterminating = allow_nonterminating;
+	}
 
 	bool opened = r && bvnr_open_read_mem(r, buf, (uint64_t)len, NULL, 0, &flags);
 	if (opened) bvnr_read(r);
@@ -543,6 +574,57 @@ char *bvnr_wasm_events(const char *buf, int len)
 
 	if (r) bvnr_reader_destroy(r);
 	return sb_finish(&b);
+}
+
+WASM_EXPORT
+char *bvnr_wasm_events(const char *buf, int len)
+{
+	return events_impl(buf, len, NULL, 0u, false, false);
+}
+
+/*
+ * Same event stream, but with the reader's lossless read-time unit/base
+ * conversion armed — the only way to reach the `converted` / `converted_base` /
+ * `converted_unit` fields evt_cb emits.
+ *
+ * `unit` is a NUL-terminated unit string ("m", "k~m/s", ""/NULL to keep each
+ * value's own unit — which with a `base` is a pure base conversion). `base` is
+ * the output base (0 keeps the value's own; otherwise 2..62, 64 or 85).
+ * `allow_nonterminating` non-zero delivers a result that is exact as a rational
+ * but has no finite expansion in `base` with `"converted":null` instead of
+ * failing the parse.
+ *
+ * An unparseable `unit` is reported as error_unit_illegal rather than silently
+ * falling back to no conversion.
+ *
+ * Note the interaction with this surface's resync policy: because
+ * continue_on_error is on, a value the conversion rejects — dimensionally
+ * incompatible with `unit`, or inexact — is skipped along with its assignment
+ * rather than aborting, so it simply does not appear in `events` and the
+ * top-level status stays ok. Ask for a unit compatible with what you expect, or
+ * compare the event count against an unconverted run.
+ */
+WASM_EXPORT
+char *bvnr_wasm_events_convert(const char *buf, int len, const char *unit,
+			       int base, int allow_nonterminating)
+{
+	value_unit_t        target;
+	const value_unit_t *tp = NULL;
+
+	if (unit && unit[0]) {
+		bool ok = false;
+		target = bvn_parse_unit((const uint8_t *)unit, &ok);
+		if (!ok) {
+			sb_t b; sb_init(&b);
+			sb_putc(&b, '{');
+			emit_status(&b, error_unit_illegal);
+			sb_puts(&b, ",\"events\":[]}");
+			return sb_finish(&b);
+		}
+		tp = &target;
+	}
+	return events_impl(buf, len, tp, (uint32_t)(base > 0 ? base : 0),
+			   true, allow_nonterminating != 0);
 }
 
 /* ------- all errors (resync mode) ------- */

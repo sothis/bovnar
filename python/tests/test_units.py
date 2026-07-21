@@ -1254,3 +1254,88 @@ class TestReaderWantUnit:
             Reader().read_mem(b'.f = 1 rpm;', on_verified=lambda e, d: True,
                               want_unit=want)
         assert ei.value.code == ErrorCode.UNIT_INEXACT
+
+    @needs_lib
+    def test_callback_data_survives_the_reader(self):
+        # want_unit used to hand over `data_ptr.contents` — a view on reader
+        # memory — so an object a callback kept crashed the interpreter once the
+        # reader was gone. Both callbacks must snapshot.
+        kept = []
+
+        def want(d):
+            kept.append(d)
+            return make_unit_si(BaseUnit.METER)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None:
+                kept.append(d)
+            return True
+
+        Reader().read_mem(b'.d = 5 k~m;', on_verified=on_event, want_unit=want)
+        import gc
+        gc.collect()
+        # Touching the by-value fields after the reader is gone must not crash.
+        for d in kept:
+            assert isinstance(int(d.type), int)
+            assert isinstance(int(d.value_type.width), int)
+
+    @needs_lib
+    def test_converted_rational_exposes_the_exact_value(self):
+        # The non-terminating path carries the value ONLY as a rational, so it
+        # has to be reachable from Python or the flag is a dead end.
+        from fractions import Fraction
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.MILE), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append((d.converted_str(), d.converted_rational()))
+            return True
+
+        Reader().read_mem(b'.d = 1 m;', on_verified=on_event, want_unit=want,
+                          want_unit_allow_nonterminating=True)
+        text, rat = seen[0]
+        assert text is None                       # no finite decimal expansion
+        assert Fraction(*rat) == Fraction(1000, 1609344)   # 1 m in miles, exact
+
+    @needs_lib
+    def test_converted_in_base_rerenders(self):
+        seen = []
+
+        def want(d):
+            return (make_unit_si(BaseUnit.METER), 10)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append((d.converted_str(), d.converted_in_base(2),
+                             d.converted_in_base(16), d.converted_rational()))
+            return True
+
+        Reader().read_mem(b'.d = 5 k~m;', on_verified=on_event, want_unit=want)
+        dec, b2, b16, rat = seen[0]
+        assert dec == '5000'
+        assert b2  == bin(5000)[2:]
+        assert b16 == format(5000, 'x')
+        assert rat == (5000, 1)
+
+    @needs_lib
+    def test_read_file_forwards_every_option(self, tmp_path):
+        # read_file used to drop want_unit/strict_version, so a conversion read
+        # from a path was impossible.
+        p = tmp_path / "doc.bvnr"
+        p.write_bytes(b'.d = 5 k~m;')
+        seen = []
+
+        def want(d):
+            return make_unit_si(BaseUnit.METER)
+
+        def on_event(ev, d):
+            if ev == Event.DATA and d is not None and d.converted:
+                seen.append(d.converted_str())
+            return True
+
+        Reader().read_file(str(p), on_verified=on_event, want_unit=want,
+                           strict_version=False)
+        assert seen == ['5000']

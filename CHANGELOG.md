@@ -66,6 +66,37 @@ reading the grown by-value structs at the wrong size.
 
 ### Fixed
 
+- **`want_unit` handed Python a live pointer into reader memory.** The Python
+  binding's `want_unit` wrapper passed `data_ptr.contents` — a ctypes *view* over
+  the reader's buffer — where the event-callback wrapper deliberately builds a
+  snapshot. A callback that kept the object segfaulted the interpreter once the
+  reader was destroyed. Both wrappers now share one `Reader._snapshot`.
+- **The ABI test did not field-check `bvnr_converted_t`.** `bvnr_abi_dump` emits
+  all six of its field offsets, but `test_abi.py` compared only the total size,
+  so a same-size field reorder in the ctypes mirror passed silently — for the one
+  struct this release added.
+- **`Reader.read_file()` dropped `want_unit`, `want_unit_allow_nonterminating`
+  and `strict_version`**, making a conversion or strict-version read from a path
+  impossible. It now forwards every `read_fd` option.
+- **The WASM `converted` JSON fields were unreachable.** `evt_cb` emitted
+  `converted`/`converted_base`/`converted_unit`, but no entry point ever set
+  `flags.want_unit`, so the branch was dead code and the claim that the event
+  JSON gained those fields did not hold. A new `bvnr_wasm_events_convert(ptr,
+  len, unit, base, allow_nonterminating)` export arms the conversion, wrapped as
+  `eventsConvert()` in the JS module. The checked-in `web/` and `dist/wasm/`
+  artifacts, stale since before this release's ABI changes, are rebuilt.
+- **The exact rational was unreachable from Python.** `conv.num`/`conv.den` were
+  exposed as opaque pointers with nothing bound to read them, so the
+  `want_unit_allow_nonterminating` fallback — where the rational is the *only*
+  carrier of the value — was a dead end. `bvn_rational_to_str`,
+  `bvn_rational_str_bufsize`, `bvn_int_to_str`, `bvn_int_bitlen` and
+  `bvn_int_str_bufsize` are now bound, behind `BvnrData.converted_rational()`
+  (an exact `(num, den)` pair) and `BvnrData.converted_in_base(base)`.
+- **`token_type_t` was hand-copied as bare integers** in `writer.py` and
+  `__init__.py` with no mirror in `enums.py` and no test, while every other
+  public enum had both. It is now `enums.TokenType`, used at all sites, and
+  `test_enums.py` parses `token_type_e` and `error_code_e` out of the header and
+  compares them.
 - **Prefixes on a component with an exponent were assembled wrongly** in the
   exact-rational factor builder (never released; the `double` path was always
   right). `bvni_prefix_exp_int` already folds in both `|exp|` and the sign of the

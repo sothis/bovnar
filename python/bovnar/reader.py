@@ -159,10 +159,58 @@ class Reader:
         return flags, cb_refs
 
     @staticmethod
+    def _snapshot(src: BvnrData) -> BvnrData:
+        # Copy a C-owned BvnrData into a Python-owned one.
+        #
+        # `data_ptr.contents` is a VIEW over the reader's memory, not a copy:
+        # every field read through it dereferences C storage that dies with the
+        # reader, so an object a callback stashes away segfaults later. Every
+        # callback must therefore hand Python a snapshot, never the view.
+        #
+        # The by-value fields below become genuinely Python-owned. The pointer
+        # fields (`data`, `frac_data`) are deliberately carried over as raw
+        # addresses and stay valid only for the duration of the callback — read
+        # them with raw_bytes()/frac_str() before returning.
+        unit_size = ctypes.sizeof(ValueUnit)
+        snap = BvnrData()
+        snap.type              = src.type
+        snap.value_type.family = src.value_type.family
+        snap.value_type.width  = src.value_type.width
+        snap.value_type.base   = src.value_type.base
+        ctypes.memmove(ctypes.addressof(snap.value_unit),
+                       ctypes.addressof(src.value_unit),
+                       unit_size)
+        snap.length = src.length
+        snap.data   = src.data
+        # spec 1.1 — an ISO datetime literal's sub-second digits.
+        snap.frac_data   = src.frac_data
+        snap.frac_length = src.frac_length
+        # Lossless read-time conversion result (see want_unit). The exact `text`
+        # lives in reader-owned memory valid only during this call, so copy it
+        # into the snapshot's own carrier now.
+        snap.converted = src.converted
+        if src.converted:
+            snap.conv.base   = src.conv.base
+            snap.conv.length = src.conv.length
+            ctypes.memmove(ctypes.addressof(snap.conv.unit),
+                           ctypes.addressof(src.conv.unit),
+                           unit_size)
+            # reading a c_char_p yields a fresh bytes copy; assigning it back
+            # lets ctypes keep it alive past the callback. None when the result
+            # does not terminate in the output base
+            # (want_unit_allow_nonterminating) — the exact value then lives in
+            # conv.num/conv.den, which point at reader-owned bignums. Those are
+            # carried over as raw addresses, so converted_rational() is only
+            # valid during the callback.
+            snap.conv.text = src.conv.text
+            snap.conv.num  = src.conv.num
+            snap.conv.den  = src.conv.den
+        return snap
+
+    @staticmethod
     def _wrap_callback(py_fn: Callable):
 
         state = {'exc': None}
-        unit_size = ctypes.sizeof(ValueUnit)
         # Each event gets a fresh BvnrData (callers may retain sub-struct
         # references like d.value_type), but we skip the eager bytes copy
         # for d.data — d.data references the lexer's internal buffer and
@@ -172,43 +220,7 @@ class Reader:
         def _c_cb(userdata_void, event_int: int, data_ptr) -> bool:
             try:
                 ev = Event(event_int)
-                data = None
-                if data_ptr:
-                    src = data_ptr.contents
-                    snap = BvnrData()
-                    snap.type              = src.type
-                    snap.value_type.family = src.value_type.family
-                    snap.value_type.width  = src.value_type.width
-                    snap.value_type.base   = src.value_type.base
-                    ctypes.memmove(ctypes.addressof(snap.value_unit),
-                                   ctypes.addressof(src.value_unit),
-                                   unit_size)
-                    snap.length = src.length
-                    snap.data   = src.data
-                    # spec 1.1 — an ISO datetime literal's sub-second digits.
-                    # Like d.data, frac_data references the lexer's internal
-                    # buffer (valid only during the callback); read it now via
-                    # snap.frac_str() if you need to retain it.
-                    snap.frac_data   = src.frac_data
-                    snap.frac_length = src.frac_length
-                    # Lossless read-time conversion result (see want_unit). The
-                    # exact `text` lives in reader-owned memory valid only during
-                    # this call, so copy it into the snapshot's own carrier now.
-                    snap.converted = src.converted
-                    if src.converted:
-                        snap.conv.base   = src.conv.base
-                        snap.conv.length = src.conv.length
-                        ctypes.memmove(ctypes.addressof(snap.conv.unit),
-                                       ctypes.addressof(src.conv.unit),
-                                       unit_size)
-                        # reading a c_char_p yields a fresh bytes copy; assigning
-                        # it back lets ctypes keep it alive past the callback.
-                        # None when the result does not terminate in the output
-                        # base (want_unit_allow_nonterminating) — the exact value
-                        # then lives only in the C-side conv.num/conv.den, which
-                        # are opaque here and deliberately not snapshotted.
-                        snap.conv.text = src.conv.text
-                    data = snap
+                data = Reader._snapshot(data_ptr.contents) if data_ptr else None
                 result = py_fn(ev, data)
                 return bool(result) if result is not None else True
             except BaseException as exc:
@@ -240,7 +252,9 @@ class Reader:
 
         def _c_cb(userdata_void, data_ptr, want_ptr, want_base_ptr) -> bool:
             try:
-                data = data_ptr.contents if data_ptr else None
+                # Snapshot, never the raw view: a callback that stashes the
+                # object away would otherwise be holding freed reader memory.
+                data = Reader._snapshot(data_ptr.contents) if data_ptr else None
                 res = py_fn(data)
                 if res is None:
                     return False
@@ -377,8 +391,12 @@ class Reader:
                   on_verified: Callable | None = None,
                   on_unverified: Callable | None = None,
                   max_file_size: int = MAX_FILESIZE_BYTES,
-                  continue_on_error: bool = False) -> None:
-
+                  continue_on_error: bool = False,
+                  strict_version: bool = False,
+                  want_unit: Callable | None = None,
+                  want_unit_allow_nonterminating: bool = False) -> None:
+        # Forwards every read_fd option; dropping any of them here would make a
+        # conversion or strict-version read impossible from a path.
         import os
         fd = os.open(path, os.O_RDONLY)
         try:
@@ -388,6 +406,9 @@ class Reader:
                 on_unverified=on_unverified,
                 max_file_size=max_file_size,
                 continue_on_error=continue_on_error,
+                strict_version=strict_version,
+                want_unit=want_unit,
+                want_unit_allow_nonterminating=want_unit_allow_nonterminating,
             )
         finally:
             os.close(fd)

@@ -42,6 +42,31 @@ class Event(IntEnum):
     STREAM_END                          = 14
 
 
+class TokenType(IntEnum):
+    # Mirrors C `token_type_t` (include/bovnar.h). This reaches users as the raw
+    # int in BvnrData.type, and the writer path selects behaviour on it, so it
+    # belongs here beside the other public enums rather than being re-declared as
+    # bare integers at each use site. test_enums.py checks it against C.
+
+    IDENTIFIER    = 0
+    STRING        = 1
+    NUMBER        = 2
+    SYMBOL        = 3
+    REFERENCE     = 4
+    ARRAY_NUMBER  = 5
+    ARRAY_STRING  = 6
+    TYPE          = 7
+    OCTET_STREAM  = 8
+    NULL_VALUE    = 9
+    STRUCTURE     = 10
+    UNIT          = 11
+    TYPE_WIDTH    = 12
+    TYPE_BASE     = 13
+    TYPE_Q        = 14
+    BOOL          = 15
+    UNKNOWN       = 16
+
+
 class ValueTypeFamily(IntEnum):
 
     PLAIN       = 0

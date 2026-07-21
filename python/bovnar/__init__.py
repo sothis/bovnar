@@ -596,6 +596,24 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
             return {'nan': float('nan'),
                     'inf': float('inf'),
                     'ninf': float('-inf')}[text]
+        # A <float:W,_16> carrier is a hex-float literal, not a decimal one.
+        # float(text) read "1.8" as decimal 1.8 where the value is 1.5, and
+        # returned the STRING "1.0p+0" for the binary-exponent form because it
+        # could not parse it at all. Quantity.decimal() already honours the base
+        # via _numeric_base(), so the two Python paths disagreed with each other
+        # as well as with the C reader.
+        # FLOAT only: for float_fix the base field carries the Q parameter (the
+        # fractional-bit count) and for float_dec it is unused -- both are always
+        # decimal, exactly as bvn_effective_base() decides in C. Reading Q=16 as
+        # "base 16" turned 1.5 into 1.3125.
+        base = (vt.base if vt and vt.base > 1 else 10) \
+               if fam == ValueTypeFamily.FLOAT else 10
+        if base == 16:
+            try:
+                from ._bvnfloat import BvnFloat
+                return float(BvnFloat.from_str(text, 16).to_decimal())
+            except Exception:
+                return text
         try:
             return float(text)
         except ValueError:

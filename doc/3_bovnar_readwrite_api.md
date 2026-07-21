@@ -152,6 +152,13 @@ typedef struct bvnr_read_flags_s {
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
+**`max_text_bytes` is not a total-size cap.** It counts the bytes the *text*
+scanner consumes; an octet stream's binary payload does not count towards it. A
+212-byte document whose body is a 200-byte octet stream is accepted at
+`max_text_bytes = 8`. If you are bounding memory or guarding against a hostile
+input, `max_file_size` is the one that counts every byte. Both are exact at their
+boundary: a document needing N is accepted at N and refused at N-1.
+
 **Reader default limits.** When a `bvnr_read_flags_t` field is set to `0`, the reader substitutes an internal default. For the nesting fields, the default is **64** (not 255); the hard maximum is 255. For `max_array_items` and `max_text_bytes`, the default is **2 147 483 647** — permissive but finite. **`max_file_size` differs: `0` means unlimited / endless** (no byte-count cap accumulated), which is the default so endless streaming works out of the box. Setting `max_file_size` explicitly to `16777216` (16 MiB) is recommended for production.
 
 ```c

@@ -375,7 +375,17 @@ typedef struct bvnr_read_flags_s {
 	uint16_t	max_symbol_length;
 	uint16_t	max_reference_length;
 	uint64_t	max_array_items;
+	/* Bytes consumed by the TEXT scanner. An octet stream's binary payload does
+	 * NOT count towards it -- a 212-byte document whose body is a 200-byte octet
+	 * stream is accepted at max_text_bytes = 8. So this does not bound total
+	 * input, and using it as a memory cap leaves a large binary payload
+	 * unbounded; max_file_size is the one that counts every byte. Both are exact
+	 * at their boundary (a document needing N is accepted at N, refused at N-1).
+	 * 0 selects the internal default of 2147483647. */
 	uint64_t	max_text_bytes;
+	/* Bytes of INPUT, octet-stream payloads included -- the total-size cap.
+	 * 0 means unlimited (BVNR_FILESIZE_UNLIMITED), which is the default so
+	 * endless streaming works out of the box; set it explicitly in production. */
 	uint64_t	max_file_size;
 	uint8_t		max_struct_nesting;
 	uint8_t		max_array_nesting;

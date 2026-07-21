@@ -2606,6 +2606,93 @@ static void test_rb7_error_position_counters(void)
 	}
 }
 
+/*
+ * Every reader limit must be exact at its boundary -- a document needing N is
+ * accepted at N and refused at N-1 -- and the two BYTE caps must keep counting
+ * different things.
+ *
+ * max_text_bytes counts what the TEXT scanner consumes; an octet stream's binary
+ * payload does not count towards it. A 212-byte document whose body is a
+ * 200-byte octet stream is accepted at max_text_bytes = 8. Nothing said so, and
+ * the distinction has teeth: using it as a memory cap leaves a large binary
+ * payload unbounded. Only max_file_size counts every byte.
+ */
+static bool hs_parses(const unsigned char *doc, uint32_t len,
+                      const bvnr_read_flags_t *base)
+{
+	bvnr_reader_t *r = bvnr_reader_create();
+	if (!r) return false;
+	bvnr_read_flags_t fl = *base;
+	bool ok = bvnr_open_read_mem(r, doc, len, NULL, 0, &fl) && bvnr_read(r);
+	bvnr_reader_destroy(r);
+	return ok;
+}
+
+static void test_rb8_reader_limits_are_exact(void)
+{
+	bvnr_read_flags_t base;
+
+#define HS_BOUNDARY(field, cast, doc, n, why)                                 \
+	do {                                                                      \
+		const char *_d = (doc);                                               \
+		uint32_t _l = (uint32_t)strlen(_d);                                   \
+		memset(&base, 0, sizeof base);                                        \
+		base.max_file_size = BVNR_FILESIZE_UNLIMITED;                         \
+		base.field = (cast)(n);                                               \
+		ASSERT_TRUE(hs_parses((const unsigned char *)_d, _l, &base),          \
+			"accepted at its own size: " why);                                \
+		memset(&base, 0, sizeof base);                                        \
+		base.max_file_size = BVNR_FILESIZE_UNLIMITED;                         \
+		base.field = (cast)((n) - 1);                                         \
+		ASSERT_FALSE(hs_parses((const unsigned char *)_d, _l, &base),         \
+			"refused one below: " why);                                       \
+	} while (0)
+
+	HS_BOUNDARY(max_identifier_length, uint16_t,
+		".aaaaaaaaaaaaaaaaaaaa = 1;\n", 20, "identifier of 20");
+	HS_BOUNDARY(max_string_length, uint16_t,
+		".x = \"aaaaaaaaaa\";\n", 10, "string of 10");
+	HS_BOUNDARY(max_number_length, uint16_t,
+		".x = 777777777777;\n", 12, "number of 12 digits");
+	HS_BOUNDARY(max_symbol_length, uint16_t,
+		".x = sssssssssssssss;\n", 15, "symbol of 15");
+	HS_BOUNDARY(max_reference_length, uint16_t,
+		".abcdefghij = 1;\n.y = &.abcdefghij;\n", 11, "reference path of 11");
+	HS_BOUNDARY(max_array_items, uint64_t,
+		".x = [1, 2, 3, 4, 5];\n", 5, "array of 5 items");
+	HS_BOUNDARY(max_struct_nesting, uint8_t,
+		".x = {.a = {.b = {.c = 1;};};};\n", 3, "struct nesting of 3");
+	HS_BOUNDARY(max_array_nesting, uint8_t,
+		".x = [[[1]]];\n", 3, "array nesting of 3");
+#undef HS_BOUNDARY
+
+	/* The two byte caps, on one document: 212 bytes of which 200 are an octet
+	 * stream payload. */
+	unsigned char doc[512];
+	uint32_t n = 0;
+	memcpy(doc, ".b = ", 5); n = 5;
+	doc[n++] = 0x00; doc[n++] = 0x01; doc[n++] = 200; doc[n++] = 0x00;
+	for (int i = 0; i < 200; i++) doc[n++] = (unsigned char)(i & 0xff);
+	doc[n++] = 0x00; doc[n++] = ';'; doc[n++] = '\n';
+
+	memset(&base, 0, sizeof base);
+	base.max_file_size = BVNR_FILESIZE_UNLIMITED;
+	base.max_text_bytes = 8;
+	ASSERT_TRUE(hs_parses(doc, n, &base),
+		"max_text_bytes ignores the octet-stream payload");
+	base.max_text_bytes = 7;
+	ASSERT_FALSE(hs_parses(doc, n, &base),
+		"...and is still exact at its own boundary");
+
+	memset(&base, 0, sizeof base);
+	base.max_file_size = n;
+	ASSERT_TRUE(hs_parses(doc, n, &base),
+		"max_file_size counts every byte, payload included");
+	base.max_file_size = n - 1;
+	ASSERT_FALSE(hs_parses(doc, n, &base),
+		"...and is exact at its boundary");
+}
+
 int main(void)
 {
 	printf("Running bovnar_high_severity_test suite...\n\n");
@@ -2700,6 +2787,7 @@ int main(void)
 	test_rb5_resync_bracket_no_duplicate_row_end();
 	test_rb6_read_without_open_does_not_fault();
 	test_rb7_error_position_counters();
+	test_rb8_reader_limits_are_exact();
 
 	printf("\n");
 	if (g_failures == 0) {

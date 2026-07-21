@@ -588,7 +588,7 @@ bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 void bvnr_sink_to_mem(bvnr_sink_t *s, void *buf, uint64_t cap);
 ```
 
-Initialise sink `s` to write into a caller-provided memory buffer of `cap` bytes. Writing beyond `cap` produces `error_sink_buffer_exhausted`. Use `bvnr_sink_bytes_written` to query how many bytes were actually written.
+Initialise sink `s` to write into a caller-provided memory buffer of `cap` bytes. Writing beyond `cap` produces `error_sink_buffer_exhausted`. Use `bvnr_sink_bytes_written` to query how many bytes were actually written — but see the note there: for output produced by a *writer*, `bvnr_writer_bytes_written` is the one that works.
 
 ```c
 char out[4096];
@@ -604,12 +604,18 @@ bvnr_sink_to_mem(&sink, out, sizeof(out));
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t *s);
 ```
 
-Return the number of bytes pushed into a memory sink so far. Only meaningful for sinks created with `bvnr_sink_to_mem`. Useful after `bvnr_write_finish` to know the exact output length.
+Return the number of bytes pushed into a memory sink so far. Only meaningful for sinks created with `bvnr_sink_to_mem`.
+
+**Not for writer output.** `bvnr_open_write_sink` takes a *copy* of the sink, so
+everything a writer emits advances the copy and never the caller's struct — this
+counter stays 0 for the whole lifetime of the writer. Use it only when you push
+into the sink yourself. To size writer output, ask the writer:
 
 ```c
 bvnr_write_finish(w);
-uint64_t n = bvnr_sink_bytes_written(&sink);
+uint64_t n = bvnr_writer_bytes_written(w);   /* NOT bvnr_sink_bytes_written(&sink) */
 fwrite(out, 1, n, stdout);
+bvnr_writer_destroy(w);                       /* read the count before destroying */
 ```
 
 ---

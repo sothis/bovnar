@@ -86,6 +86,17 @@ sed "s#'./bovnar.mjs'#'./bovnar.single.mjs'#" \
 # mapped to application/javascript everywhere, so this works with no server-side
 # MIME config. (The npm package under dist/wasm keeps .mjs — that's for node /
 # bundlers, where the extension is correct and MIME is irrelevant.)
+# Record what this artifact was built FROM, so a later build can tell whether the
+# committed module still matches the sources. The ?v= hashes below are
+# cache-busting -- they key on the artifact's own bytes and cannot detect that it
+# ought to be rebuilt. cmake/wasm_freshness.cmake recomputes this and fails the
+# test suite when they diverge.
+{
+	sha256sum "$AMALG/bovnar.c" "$AMALG/bovnar.h" "$ROOT/wasm/bvnr_wasm.c" \
+		| cut -d' ' -f1 | tr -d '\n'
+} | sha256sum | cut -d' ' -f1 > "$ROOT/wasm/built_from.sha256"
+echo ">> recorded source stamp $(cat "$ROOT/wasm/built_from.sha256" | cut -c1-12)"
+
 echo ">> installing web/ playground module"
 cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.js"
 

@@ -643,6 +643,10 @@ BVN_API void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 BVN_API void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 BVN_API void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
+/* Bytes pushed into a bvnr_sink_to_mem sink. Counts only what the CALLER pushed:
+ * bvnr_open_write_sink() takes a copy of the sink, so writer output advances the
+ * copy and this stays 0 for the writer's whole lifetime. For writer output use
+ * bvnr_writer_bytes_written(), and read it before bvnr_writer_destroy(). */
 BVN_API uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
 BVN_API bvnr_reader_t* bvnr_reader_create(void);
 BVN_API void           bvnr_reader_destroy(bvnr_reader_t* r);

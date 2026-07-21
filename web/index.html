@@ -85,8 +85,8 @@
      rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
      runs its dynamic import(). The ?v is the build-stamped content hash — it must
      match the dynamic import so the module is reused, not re-fetched. -->
-<link rel="modulepreload" href="bovnar_wasm_core.js?v=a6f3bb112c67">
-<link rel="modulepreload" href="bovnar_wasm.js?v=a6f3bb112c67">
+<link rel="modulepreload" href="bovnar_wasm_core.js?v=0da54e70edd1">
+<link rel="modulepreload" href="bovnar_wasm.js?v=0da54e70edd1">
 <!-- Globe textures are sampled offscreen by the Mission Control demo, which is the
      default-visible demo below the fold — preload them at high priority so they're
      decoded before the demo first samples them, avoiding a blank/late globe. -->
@@ -3526,11 +3526,10 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
         w, <span class="cl-str">"velocity"</span>, <span class="cl-num">64</span>, <span class="cl-num">9.81</span>, u);
 
     <span class="cl-fn">bvnr_write_finish</span>(w);
+    <span class="cl-type">uint64_t</span> n = <span class="cl-fn">bvnr_writer_bytes_written</span>(w);
     <span class="cl-fn">bvnr_writer_destroy</span>(w);
-    <span class="cl-fn">fwrite</span>(buf, <span class="cl-num">1</span>,
-        (<span class="cl-type">size_t</span>)<span class="cl-fn">bvnr_sink_bytes_written</span>(&amp;sink),
-        stdout);
-    <span class="c-comment">// → .velocity = &lt;float:64,m/s&gt; 9.81;</span>
+    <span class="cl-fn">fwrite</span>(buf, <span class="cl-num">1</span>, (<span class="cl-type">size_t</span>)n, stdout);
+    <span class="c-comment">// → .velocity = &lt;float:64,m/s&gt; 9.81e+0;</span>
 }</div>
           </div>
         </div>
@@ -3772,7 +3771,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">08</div>
         <div>
           <div class="doc-card-title">Units &amp; Currencies Reference</div>
-          <div class="doc-card-desc">All 163 physical units, 164 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
+          <div class="doc-card-desc">All 163 physical units, 166 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
           <div class="doc-card-tag">Quick reference</div>
         </div>
       </a>
@@ -3912,7 +3911,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </div>
 </div>
 
-<script src="bovnar_parser_wasm.js?v=47a6d4df1510"></script>
+<script src="bovnar_parser_wasm.js?v=fd3a4281dc06"></script>
 <script src="bovnar_highlight.js?v=20260720"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
@@ -4235,8 +4234,20 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     renderGutter();
     renderErrorOverlay();
 
-    statusEl.textContent = errs.length ? 'errors' : 'ok';
-    statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
+    /* Never claim "ok" for a document the parser did not actually see.
+       parseFaithful returns an empty result for three distinct failures — WASM
+       not loaded yet (there is a real boot race), WASM failed to load, or a
+       throw inside the shim — and all three used to render as a green "ok · no
+       errors · 0 events". Gate on the module actually being live. */
+    const parserLive = !!(window.BovnarParser && window.BovnarParser.isWasmReady
+                          && window.BovnarParser.isWasmReady());
+    if (!parserLive) {
+      statusEl.textContent = 'parser unavailable';
+      statusEl.style.color = 'var(--amber, #d08a20)';
+    } else {
+      statusEl.textContent = errs.length ? 'errors' : 'ok';
+      statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
+    }
     empty.style.display = 'none';
   }
 

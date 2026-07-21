@@ -868,6 +868,23 @@ add_test(
 set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
     LABELS "cli;query" TIMEOUT 30)
 
+# ── WebAssembly artifact freshness ──────────────────────────────────────────
+# The committed web/ module is presented as the reference implementation. It
+# silently drifted 35 commits behind the library once; nothing detected it,
+# because the ?v= cache-busting hashes key on the artifact's own bytes. This
+# compares the sources it was built from against the sources as they are now, and
+# needs neither emscripten nor node.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256)
+    add_test(
+        NAME    bvnr_wasm_freshness
+        COMMAND "${CMAKE_COMMAND}"
+                -DSTAMP=${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256
+                "-DSOURCES=${CMAKE_CURRENT_BINARY_DIR}/amalgamate/bovnar.c;${CMAKE_CURRENT_BINARY_DIR}/amalgamate/bovnar.h;${CMAKE_CURRENT_SOURCE_DIR}/wasm/bvnr_wasm.c"
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_freshness.cmake)
+    set_tests_properties(bvnr_wasm_freshness PROPERTIES
+        LABELS "wasm;packaging" TIMEOUT 60)
+endif()
+
 # ── Single-file amalgamation ────────────────────────────────────────────────
 # The amalgamation is currently not shipped in dist/ (dist/bovnar.{c,h} are
 # git-ignored), so its regenerate-and-smoke-test (bvnr_amalgam) is disabled.

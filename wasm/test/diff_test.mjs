@@ -78,6 +78,31 @@ const badCases = [
   ['1.1 construct in 1.0 doc', '.t = <datetime:64,unix> 1750000000;\n'],
 ];
 
+// Values whose correctness the CLI and the module must agree on -- chosen so a
+// stale module shows up. The tai leap second is the one that caught the drift.
+const valueCases = [
+  { name: 'tai inserted leap second',
+    text: '#!bovnar 1.1\n.t = <datetime:64,tai> 2016-12-31T23:59:60Z;\n' },
+  { name: 'the second after it',
+    text: '#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T00:00:00Z;\n' },
+  { name: 'leap second with a tz offset',
+    text: '#!bovnar 1.1\n.t = <datetime:64,tai> 2017-01-01T00:59:60+01:00;\n' },
+  { name: 'civil epoch still collapses :60',
+    text: '#!bovnar 1.1\n.t = <datetime:64,unix> 2016-12-31T23:59:60Z;\n' },
+  /* Units, currencies and >64-bit integers are deliberately NOT here: the CLI
+     refuses to convert those to JSON rather than silently dropping the unit or
+     the precision, so there is no CLI value to compare against. They are covered
+     by the validate cases above. */
+  { name: 'negative and fractional',
+    text: '#!bovnar 1.1\n.a = -273.15;\n.b = <sint:64> -9007199254740993;\n' },
+  { name: 'special floats',
+    text: '#!bovnar 1.1\n.a = nan;\n.b = inf;\n.c = ninf;\n' },
+  { name: 'string escapes',
+    text: '#!bovnar 1.1\n.s = "tab\\there \\u{1F600} quote\\"end";\n' },
+  { name: 'nested array and struct',
+    text: '#!bovnar 1.1\n.a = [[1, 2], [3, 4]];\n.s = {.x = 1; .y = 2;};\n' },
+];
+
 // --- run -------------------------------------------------------------------
 const b = await loadBovnar();
 console.log(`bovnar-wasm ${b.version()}  vs  CLI @ ${CLI}\n`);
@@ -89,14 +114,25 @@ for (const { name, text } of examples) {
   ok(w.ok === c.ok && w.error_name === c.error_name,
      `validate ${name}: wasm=${w.ok}/${w.error_name} cli=${c.ok}/${c.error_name}`);
 
-  // soft: JSON value agreement (only meaningful when both validate clean)
+  // HARD: the values must agree too. This was a soft warning, which is why the
+  // shipped module could drift 35 commits behind the library -- answering the
+  // pre-fix value for a tai leap second -- without anything failing.
   if (w.ok && c.ok) {
     const wj = b.toJSON(text);
     const cj = cliJson(text);
     if (cj !== undefined && wj.ok) {
-      if (!deepEq(wj.value, cj)) { soft++; console.log(`  ~ toJSON differs: ${name}`); }
+      ok(deepEq(wj.value, cj),
+         `toJSON ${name}: wasm=${JSON.stringify(wj.value)} cli=${JSON.stringify(cj)}`);
     }
   }
+}
+
+console.log('# values (must match the CLI exactly)');
+for (const { name, text } of valueCases) {
+  const w = b.toJSON(text);
+  const c = cliJson(text);
+  ok(w.ok && c !== undefined && deepEq(w.value, c),
+     `value ${name}: wasm=${JSON.stringify(w.ok ? w.value : w.error)} cli=${JSON.stringify(c)}`);
 }
 
 console.log('# malformed snippets (must error, same code as CLI)');

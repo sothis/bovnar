@@ -2153,7 +2153,7 @@ void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
 ```
 
-`bvnr_sink_bytes_written` queries the total bytes written to a memory sink created with `bvnr_sink_to_mem`. For the writer-encapsulated variant, see `bvnr_writer_bytes_written` in §16.7.
+`bvnr_sink_bytes_written` queries the total bytes written to a memory sink created with `bvnr_sink_to_mem` **by the caller**; `bvnr_open_write_sink` copies the sink, so writer output never advances the caller's struct and this stays 0. For writer output use `bvnr_writer_bytes_written` (§16.7).
 
 ### 16.6 Reading
 

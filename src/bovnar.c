@@ -288,8 +288,33 @@ static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 		break;
 	}
 	case BVN_DOM_ARRAY: {
+		uint32_t cnt  = bvn_dom_array_count(node);
+		uint32_t dims = bvn_dom_array_dims(node);
+		/* The DOM stores /-separated dimension rows FLAT with the row count
+		 * beside them, so printing the elements in order made two DIFFERENT
+		 * documents identical: "[1,2,3]/[4,5,6]" and "[1,2,3,4,5,6]" both came
+		 * out as [1, 2, 3, 4, 5, 6]. `query` prints a value someone reads or
+		 * pipes onward, so the shape has to survive. print_json_node below
+		 * already does this; this path did not. Row sizes are equal by
+		 * construction (an uneven one is error_array_row_size_mismatch). */
+		if (dims > 1 && cnt % dims == 0) {
+			uint32_t row_len = cnt / dims;
+			putchar('[');
+			for (uint32_t r = 0; r < dims; r++) {
+				if (r) fputs(", ", stdout);
+				putchar('[');
+				for (uint32_t c = 0; c < row_len; c++) {
+					if (c) fputs(", ", stdout);
+					print_dom_node(
+						bvn_dom_array_at(node, r * row_len + c),
+						indent);
+				}
+				putchar(']');
+			}
+			putchar(']');
+			break;
+		}
 		putchar('[');
-		uint32_t cnt = bvn_dom_array_count(node);
 		for (uint32_t i = 0; i < cnt; i++) {
 			if (i) fputs(", ", stdout);
 			bvn_dom_node_t *elem = bvn_dom_array_at(node, i);

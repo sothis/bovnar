@@ -928,6 +928,42 @@ add_test(
 set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
     LABELS "cli;query" TIMEOUT 30)
 
+# /-separated dimension rows must survive `query`, which prints a value someone
+# reads or pipes onward. They used to be flattened, so ".rows" and ".flat" below
+# printed identically.
+add_test(
+    NAME    bvnr_cli_query_array_dims
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DFILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/array_dims.bvnr
+            -DQPATH=.rows
+            "-DNEEDLE=[[1, 2, 3], [4, 5, 6]]"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/query_expect.cmake)
+set_tests_properties(bvnr_cli_query_array_dims PROPERTIES
+    LABELS "cli;query;arrays" TIMEOUT 30)
+
+add_test(
+    NAME    bvnr_cli_query_array_flat
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DFILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/array_dims.bvnr
+            -DQPATH=.flat
+            "-DNEEDLE=[1, 2, 3, 4, 5, 6]"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/query_expect.cmake)
+set_tests_properties(bvnr_cli_query_array_flat PROPERTIES
+    LABELS "cli;query;arrays" TIMEOUT 30)
+
+add_test(
+    NAME    bvnr_cli_query_array_dims3
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DFILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/array_dims.bvnr
+            -DQPATH=.deep
+            "-DNEEDLE=[[1, 2], [3, 4], [5, 6]]"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/query_expect.cmake)
+set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
+    LABELS "cli;query;arrays" TIMEOUT 30)
+
 # A test that quietly stops registering is worse than one that fails: the suite
 # still reports 100% and the guard is simply gone. That happened once already --
 # bvnr_wasm_freshness guarded on BVNR_PACKAGE, which at this point in the
@@ -936,7 +972,7 @@ set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 111)
+set(BVNR_EXPECTED_TEST_COUNT 114)
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

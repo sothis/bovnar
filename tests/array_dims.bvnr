@@ -1,0 +1,8 @@
+#!bovnar 1.1
+# The DOM stores /-separated dimension rows FLAT with the row count beside them.
+# Printing the elements in order made these two indistinguishable -- both came
+# out as [1, 2, 3, 4, 5, 6] -- although README calls "[1,2,3]/[4,5,6] is a
+# native 2D structure" a headline feature.
+.rows = [1, 2, 3]/[4, 5, 6];
+.flat = [1, 2, 3, 4, 5, 6];
+.deep = [1, 2]/[3, 4]/[5, 6];

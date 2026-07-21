@@ -189,8 +189,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      # numpy is not optional here even though test_numpy_bridge.py
+      # importorskip()s it: skipping is how bvnr_py_numpy silently tested nothing
+      # (and, worse, failed -- a collection-time skip exits 5). The runner has no
+      # numpy, so without this the bridge ships unexercised by CI.
       - name: Install Python test dependencies
-        run: python3 -m pip install --quiet pytest
+        run: python3 -m pip install --quiet pytest numpy
 
       # -DPython3_EXECUTABLE pins the resolution to the interpreter just
       # provisioned instead of leaving FindPython3 to choose among the several on

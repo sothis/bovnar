@@ -74,7 +74,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (306 cases) ──→ for each test case:                │
+│  Test corpus (319 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -172,7 +172,8 @@ Options:
 
 | Group | Description |
 |-------|-------------|
-| `encoding` | UTF-8, BOM handling, byte class enforcement |
+| `encoding` | UTF-8, BOM handling, byte class enforcement, truncated streams |
+| `limits` | Lexer token-length caps |
 | `version` | `#!bovnar M.N` directive parsing and strictness |
 | `identifiers` | Key syntax, length limits |
 | `strings` | Escape sequences, concatenation, length limits |
@@ -438,11 +439,12 @@ specifies:
 
 | Group | Cases | What is tested |
 |-------|-------|---------------|
-| `encoding` | 9 | UTF-8 validity, BOM placement, byte classes |
+| `encoding` | 14 | UTF-8 validity, BOM placement, byte classes, truncated streams |
+| `limits` | 4 | Lexer token-length caps at both sides of the boundary |
 | `version` | 13 | `#!bovnar M.N` directive: valid, malformed, strictness (spec 1.1) |
 | `identifiers` | 11 | Syntax, body characters, length limits |
 | `strings` | 33 | Escapes, concatenation, UTF-8, limits |
-| `datetime` | 50 | Timestamp family: epochs, signed range, gating, ISO-8601 literals (spec 1.1) |
+| `datetime` | 54 | Timestamp family: epochs, signed range, gating, ISO-8601 literals (spec 1.1) |
 | `numbers` | 16 | Integer, float, scientific, special numbers |
 | `types` | 52 | All seven type families, widths, bases, errors |
 | `default_synthesis` | 8 | Auto-type inference rules |
@@ -459,7 +461,7 @@ specifies:
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 16 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **306** | |
+| **Total** | **319** | |
 
 ---
 
@@ -469,7 +471,7 @@ The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
 natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading `# Subtest:` comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 21), not the 306 cases.
+parent plan therefore counts the groups (currently 22), not the 319 cases.
 
 ```
 TAP version 14

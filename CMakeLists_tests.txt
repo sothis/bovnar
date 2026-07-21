@@ -868,6 +868,19 @@ add_test(
 set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
     LABELS "cli;query" TIMEOUT 30)
 
+# ── Conformance counts vs the documentation ─────────────────────────────────
+# The documented total said 306 in six places while the suite ran 319, and one
+# whole group was missing from the table. Check the numbers instead of copying
+# them again.
+add_test(
+    NAME    bvnr_conformance_doc_counts
+    COMMAND "${CMAKE_COMMAND}"
+            -DCONFORMANCE=$<TARGET_FILE:bvnr_conformance>
+            -DDOCFILE=${CMAKE_CURRENT_SOURCE_DIR}/doc/7_bovnar_conformance.md
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conformance_counts.cmake)
+set_tests_properties(bvnr_conformance_doc_counts PROPERTIES
+    LABELS "conformance;docs" TIMEOUT 60)
+
 # ── WebAssembly artifact freshness ──────────────────────────────────────────
 # The committed web/ module is presented as the reference implementation. It
 # silently drifted 35 commits behind the library once; nothing detected it,

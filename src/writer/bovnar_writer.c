@@ -454,6 +454,14 @@ static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 	bool ok = true;
 	if (!bvn_validate_reference(buf))
 		ok = bvn_writer_set_error(w, error_type_value_mismatch);
+	/* The "[N]" index suffix is a spec-1.1 construct and the lexer gates it on a
+	 * DECLARED version, exactly as it gates the datetime family. Without the
+	 * directive the reference reads back as error_unexpected_input_byte, so
+	 * refuse here for the same reason and with the same error the datetime gate
+	 * in bvn_validate_type_spec_for_writer uses -- the directive cannot be added
+	 * retroactively, it has to precede every value. */
+	if (ok && !w->ser.version_emitted && memchr(buf, '[', length) != NULL)
+		ok = bvn_writer_set_error(w, error_unsupported_spec_version);
 	if (need_free) free(buf);
 	return ok;
 }

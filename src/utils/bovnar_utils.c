@@ -127,9 +127,13 @@ bool bvn_validate_digits_for_base(const char* s, uint32_t base)
 	if (!s || !*s) return false;
 	uint32_t i = 0;
 	/* In bases 64 and 85 '+'/'-' are digit characters, not signs, so the bases
-	 * are unsigned-only and no leading sign is consumed. Other bases accept one
-	 * optional leading sign. */
-	if (base != 64u && base != 85u && (s[0] == '-' || s[0] == '+')) i = 1;
+	 * are unsigned-only and no leading sign is consumed. Other bases accept a
+	 * leading '-' and only '-': the reader's string-carrier digit loop derives
+	 * its sign from '-' alone and rejects every other non-digit byte, so
+	 * accepting '+' here let the writer emit an integer literal that came back
+	 * as error_digit_not_in_base. (Float carriers DO take a leading '+' -- that
+	 * is bvn_validate_number_in_base, which is right to keep it.) */
+	if (base != 64u && base != 85u && s[0] == '-') i = 1;
 	if (!s[i]) return false;
 	for (; s[i]; i++) {
 		if (bvn_char_to_digit((uint8_t)s[i], base) >= base)
@@ -2157,7 +2161,15 @@ bool bvn_validate_reference(const char* link)
 			p++;
 		}
 	} while (*p == '.');
-	return true;
+	/* The per-byte reject set above screens punctuation, not encoding: every
+	 * byte >= 0x80 other than 0xc2 walks straight through it. Without this the
+	 * writer accepted a lone continuation byte, a UTF-16 surrogate, or an
+	 * overlong sequence in a path and emitted a document its own reader then
+	 * refused with error_invalid_utf8_byte. The overlong form is the worse one
+	 * in principle: "\xc0\xae" is an overlong '.', so a lenient third-party
+	 * decoder would read it as the path separator the reject set is there to
+	 * forbid. bvn_validate_identifier ends with the same call. */
+	return bvn_validate_string((const uint8_t*)link, strlen(link));
 }
 bool bvn_validate_number(const char* s)
 {

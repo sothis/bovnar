@@ -93,7 +93,20 @@ def expand(path, inlined, sys_inc, out, in_platform_cond=False):
     System includes guarded by a platform conditional are kept inline so their
     guard survives. `in_platform_cond` carries that context across inlining when
     a header is itself included from inside a platform conditional."""
+    # Path RELATIVE TO THE ROOT leaks the build directory for generated
+    # fragments (they live under <build>/generated), which made the amalgamation
+    # non-reproducible: two runs over identical sources differed in exactly these
+    # banner comments, so any hash of bovnar.c depended on where it was built.
+    # That also leaks absolute paths -- usernames, temp dirs -- into a shipped
+    # release artifact. A fragment is identified by its own name and the
+    # directory it sits in, both of which are stable.
     rel = os.path.relpath(path, ROOT)
+    if os.path.isabs(rel) or rel.startswith(os.pardir + os.sep):
+        rel = os.path.join(os.path.basename(os.path.dirname(path)),
+                           os.path.basename(path))
+    elif rel.startswith("build" + os.sep):
+        rel = os.path.join(os.path.basename(os.path.dirname(path)),
+                           os.path.basename(path))
     out.append(f"\n/* ==================== {rel} ==================== */\n")
     # Stack of bools: does this open #if level reference a platform macro?
     cond_platform = []

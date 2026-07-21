@@ -223,7 +223,7 @@ cmake -S . -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
 ctest --test-dir build-asan -E '^bvnr_py_'          # C suite
 
 LD_PRELOAD=$(gcc -print-file-name=libasan.so) ASAN_OPTIONS=detect_leaks=0 \
-    BVNR_LIB=$PWD/build-asan/libbvnr.so python3 -m pytest python
+    LIBBOVNAR_PATH=$PWD/build-asan/libbvnr.so python3 -m pytest python
 ```
 
 `-ftrivial-auto-var-init=pattern` is not a sanitizer and does not report

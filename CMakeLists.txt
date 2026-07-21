@@ -134,7 +134,7 @@ endif()
 # interpreter, which ASan refuses ("runtime does not come first"). Exclude them,
 # or preload the runtime:
 #   LD_PRELOAD=$(gcc -print-file-name=libasan.so) ASAN_OPTIONS=detect_leaks=0 \
-#       BVNR_LIB=<build>/libbvnr.so python3 -m pytest python
+#       LIBBOVNAR_PATH=<build>/libbvnr.so python3 -m pytest python
 if(BVNR_SANITIZE)
     if(MSVC)
         message(FATAL_ERROR "BVNR_SANITIZE is GCC/Clang only")

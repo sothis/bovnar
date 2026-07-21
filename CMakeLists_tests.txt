@@ -887,7 +887,10 @@ set_tests_properties(bvnr_conformance_doc_counts PROPERTIES
 # because the ?v= cache-busting hashes key on the artifact's own bytes. This
 # compares the sources it was built from against the sources as they are now, and
 # needs neither emscripten nor node.
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256)
+# The stamp covers the amalgamated sources, which only the bvnr_package target
+# produces -- so with BVNR_PACKAGE=OFF there is nothing to hash and the test
+# would hard-fail on a missing input rather than say nothing useful.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256 AND BVNR_PACKAGE)
     add_test(
         NAME    bvnr_wasm_freshness
         COMMAND "${CMAKE_COMMAND}"

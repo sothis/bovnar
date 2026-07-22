@@ -36,8 +36,9 @@ window.bvnrT = function (key, english) {
      bouncing that visitor away because their browser prefers another language
      would make those links unshareable. */
   if (here !== DEFAULT) return;
+  var hasEdition = function (l) { return Object.prototype.hasOwnProperty.call(EDITIONS, l); };
   function go(lang) {
-    if (lang !== here && EDITIONS[lang]) {
+    if (lang !== here && hasEdition(lang)) {
       location.replace(EDITIONS[lang] + location.search + location.hash);
     }
   }
@@ -50,7 +51,7 @@ window.bvnrT = function (key, english) {
       /* First recognised preference wins; an unavailable language is skipped
          rather than treated as a match, so a de-before-en visitor still gets
          German and an fr-only visitor simply stays where they landed. */
-      if (EDITIONS[tag]) { go(tag); return; }
+      if (hasEdition(tag)) { go(tag); return; }
     }
   } catch (e) { /* private mode: fall through to the edition as served */ }
 })();
@@ -3882,6 +3883,10 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     return cwCache;
   }
   window.addEventListener('resize', function () { cwCache = null; });
+  // The webfont swaps in AFTER first paint (font-display: swap), so a first
+  // measurement during the swap window freezes fallback-monospace metrics and
+  // every error box would sit at the wrong offset until a resize.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { cwCache = null; });
 
   let gutterSig = null;
   function renderGutter(st) {
@@ -4497,6 +4502,7 @@ hljs.registerLanguage('bovnar', function() {
 let docLibsPromise = null;
 function loadDocLibs() {
   if (docLibsPromise) return docLibsPromise;
+  let anyFailed = false;
   docLibsPromise = Promise.all([BASE + 'marked-9.1.6.min.js',
                                 BASE + 'highlight-11.9.0.min.js'].map(function (src) {
     return new Promise(function (resolve) {
@@ -4506,18 +4512,38 @@ function loadDocLibs() {
       // (plain <pre> instead of rendered Markdown) rather than hanging on
       // "Fetching document…" forever.
       el.onload = resolve;
-      el.onerror = function () { console.warn('bovnar: failed to load ' + src); resolve(); };
+      el.onerror = function () { anyFailed = true; console.warn('bovnar: failed to load ' + src); resolve(); };
       document.head.appendChild(el);
     });
   })).then(function () {
     if (typeof marked !== 'undefined' && typeof hljs !== 'undefined'
         && typeof hljs.registerLanguage === 'function') initDocLibs();
+    // Do NOT memoise a failure: a flaky load would otherwise pin the drawer to
+    // the plain-text stubs for the rest of the session, and renderCache would
+    // then store that degraded output per document with no way back.
+    if (anyFailed) docLibsPromise = null;
+    return !anyFailed;
   });
   return docLibsPromise;
 }
 
 let currentFile = null;
 let docSeq = 0, pendingXhr = null;
+
+// The documents this page offers, taken from the cards themselves so the two can
+// never disagree. Built lazily: the cards exist at parse time, but this file is
+// also the source for the generated translated editions.
+let docAllowList = null;
+function docAllowed(file) {
+  if (!docAllowList) {
+    docAllowList = new Set();
+    document.querySelectorAll('a[data-doc]').forEach(function (a) {
+      const d = a.getAttribute('data-doc');
+      if (d) docAllowList.add(d.split('#')[0]);
+    });
+  }
+  return docAllowList.has(file);
+}
 
 function showState(state) {
   loading.style.display = state === 'loading' ? 'flex' : 'none';
@@ -4529,7 +4555,7 @@ function showState(state) {
 // inherently bounded and needs no eviction. Re-opening a large spec used to
 // re-run marked, the slug pass and every code block's highlighter.
 const renderCache = new Map();
-function renderDoc(file, text, frag) {
+function renderDoc(file, text, frag, degraded) {
   if (!file.endsWith('.md')) {
     const _pre = document.createElement('pre');
     const _code = document.createElement('code');
@@ -4546,7 +4572,9 @@ function renderDoc(file, text, frag) {
       const box = document.createElement('div');
       buildDocHTML(box, text);
       html = box.innerHTML;
-      renderCache.set(file, html);
+      // Only cache output produced by the real libraries — never the degraded
+      // stub rendering from a failed load.
+      if (!degraded) renderCache.set(file, html);
     }
     content.innerHTML = html;
     wireDocLinks();
@@ -4672,9 +4700,15 @@ function openDoc(fileRaw, title, opts) {
   const seq = ++docSeq;
   if (pendingXhr) { pendingXhr.abort(); pendingXhr = null; }
 
-  // Only ever fetch a plain document name out of doc/. A deep link is
+  // Only ever fetch a document this page actually offers. A deep link is
   // user-controlled input and its result is rendered as trusted Markdown.
-  if (!/^[\w.-]+\.(md|txt)$/.test(file) || file.indexOf('..') >= 0) {
+  //
+  // This used to be an extension allow-list, (md|txt), which quietly excluded
+  // 5_bovnar.ebnf -- the single non-Markdown document -- and broke its card.
+  // Validating against the real card set cannot drift from what the page serves,
+  // and is strictly narrower than any extension pattern. The shape test stays as
+  // defence in depth for the deep-link path.
+  if (!/^[\w.-]+\.[\w]+$/.test(file) || file.indexOf('..') >= 0 || !docAllowed(file)) {
     errMsg.textContent = bvnrT('doc.httpError', 'Could not load "$F" — HTTP $S')
       .replace('$F', file).replace('$S', '400');
     showState('error');
@@ -4689,9 +4723,9 @@ function openDoc(fileRaw, title, opts) {
     if (seq !== docSeq) return;
     pendingXhr = null;
     if (xhr.status === 0 || xhr.status === 200) {
-      loadDocLibs().then(function () {
+      loadDocLibs().then(function (libsOk) {
         if (seq !== docSeq) return;
-        renderDoc(file, xhr.responseText, frag);
+        renderDoc(file, xhr.responseText, frag, libsOk === false);
       });
     } else {
       errMsg.textContent = bvnrT('doc.httpError', 'Could not load "$F" — HTTP $S')
@@ -6493,6 +6527,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.hist = []; sim.trades = []; sim.history = []; sim.lastGood = null;
     $('fsymhint').textContent = sim.symbol + ' · ' + sim.currency;
     msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + bvnrT('cfg.restarted', '$S restarted').replace('$S', sim.symbol);
+    // The series was emptied outside step(), which the draw gate keys on, so
+    // without this the chart shows the previous instrument until the next step.
+    drawChart();
   }
   function updateCfgHL() { $('fcfg-hl').innerHTML = Hl.highlightLines($('fcfg').value).join('\n') + '\n'; }
   $('fcfg').addEventListener('input', updateCfgHL);
@@ -6526,16 +6563,19 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
      drop the highlight. Scoped to this demo's two containers. Declared before the
      seed step() loop below so applyHover() isn't called in the let's TDZ. */
   let hoverLine = null;
-  let hoverApplied = false, lockState = null;   // false = "never applied"; null is a real hover state
+  let lockState = null;
   function applyHover() {
-    // Called twice per step (from renderFrame and from the panel renderer) and
-    // once per hover event. The tiles are persistent now, so the 'hl' class is
-    // not wiped by a re-render and this only has to do work when the hovered
-    // line actually changed.
-    if (hoverApplied === hoverLine) return;
-    hoverApplied = hoverLine;
-    [$('fgauges'), $('fframesrc')].forEach((c) => c && c.querySelectorAll('[data-line]').forEach((n) =>
-      n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine)));
+    // Clear by CLASS, then add by selector -- the way Mission Control does it.
+    // Toggling over [data-line] instead cannot reach a tile that has just LOST
+    // its data-line: gaugeGrid removes the attribute when a register fails to
+    // decode (flip "noisy" on), so a highlighted tile could keep 'hl' forever
+    // while a second tile also lit up. An early-out on hoverLine made it
+    // unrepairable, since the later clean frame changed no hover state.
+    const scope = [$('fgauges'), $('fframesrc')].filter(Boolean);
+    scope.forEach((c) => c.querySelectorAll('.hl').forEach((n) => n.classList.remove('hl')));
+    if (hoverLine != null)
+      scope.forEach((c) => c.querySelectorAll('[data-line="' + (window.CSS && CSS.escape ? CSS.escape(hoverLine) : hoverLine) + '"]')
+        .forEach((n) => n.classList.add('hl')));
   }
   function wireHover(c) {
     c.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-line]'); if (!el) return; const ln = el.getAttribute('data-line'); if (ln !== hoverLine) { hoverLine = ln; applyHover(); } });
@@ -7048,17 +7088,20 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
      drop the highlight. Scoped to this demo's two containers. Declared before the
      seed step() loop below so applyHover() isn't called in the let's TDZ. */
   let hoverLine = null;
-  let hoverApplied = false, lockState = null;   // false = "never applied"; null is a real hover state
+  let lockState = null;
   let indBgGrad = null, indBgKey = '';
   function applyHover() {
-    // Called twice per step (from renderFrame and from the panel renderer) and
-    // once per hover event. The tiles are persistent now, so the 'hl' class is
-    // not wiped by a re-render and this only has to do work when the hovered
-    // line actually changed.
-    if (hoverApplied === hoverLine) return;
-    hoverApplied = hoverLine;
-    [$('igauges'), $('iframesrc')].forEach((c) => c && c.querySelectorAll('[data-line]').forEach((n) =>
-      n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine)));
+    // Clear by CLASS, then add by selector -- the way Mission Control does it.
+    // Toggling over [data-line] instead cannot reach a tile that has just LOST
+    // its data-line: gaugeGrid removes the attribute when a register fails to
+    // decode (flip "noisy" on), so a highlighted tile could keep 'hl' forever
+    // while a second tile also lit up. An early-out on hoverLine made it
+    // unrepairable, since the later clean frame changed no hover state.
+    const scope = [$('igauges'), $('iframesrc')].filter(Boolean);
+    scope.forEach((c) => c.querySelectorAll('.hl').forEach((n) => n.classList.remove('hl')));
+    if (hoverLine != null)
+      scope.forEach((c) => c.querySelectorAll('[data-line="' + (window.CSS && CSS.escape ? CSS.escape(hoverLine) : hoverLine) + '"]')
+        .forEach((n) => n.classList.add('hl')));
   }
   function wireHover(c) {
     c.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-line]'); if (!el) return; const ln = el.getAttribute('data-line'); if (ln !== hoverLine) { hoverLine = ln; applyHover(); } });

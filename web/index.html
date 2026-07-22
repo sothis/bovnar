@@ -2895,8 +2895,8 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
     You saw the syntax — here's a spacecraft running on it. One format, the whole loop:
     <strong>config in, telemetry out</strong>. Edit the orbit; the craft encodes each measurement into a
     <code>.bvnr</code> frame and the ground station decodes it — the orbit you see is drawn only from those
-    <em>decoded</em> values, a full round-trip through the format. Units, bit-widths and types ride
-    <em>inside the stream</em>; no schema required. Hover a gauge to jump to the line it decoded.
+    <em>decoded</em> values, a full round-trip through the format. Units, bit-widths, and types ride
+    <em>inside the stream</em>; no schema required. Hover any gauge to light up the line it was decoded from.
   </p>
   <p class="engine-note">
     Every frame is parsed by the <strong>C reference implementation itself</strong>, compiled to WebAssembly
@@ -3146,7 +3146,7 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
       This is the reference C reader's <code>on_verified</code> callback stream, running live in your browser —
       the unmodified C core compiled to WebAssembly, not a JavaScript re-implementation. The same events, in the
       same order, that <code>bvnr_read()</code> delivers. Bare values get the
-      validator's <em>synthesised</em> default annotation; type, range, base and unit violations surface on the
+      validator's <em>synthesised</em> default annotation; type, range, base, and unit violations surface on the
       separate <code>on_error</code> channel, exactly as the C core reports them.
     </p>
 
@@ -3235,25 +3235,25 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">01</span> Bit-width</div>
         <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span></div>
-        <div class="anat-pillar-d">Exact storage width, declared inline and never inferred &mdash; from a single bit to thousands. A <code>uint:16</code> stays exactly 16 bits: it can&rsquo;t silently widen to 64, nor be reinterpreted as a float.</div>
+        <div class="anat-pillar-d">Exact storage width, declared inline and never inferred &mdash; from a single bit to thousands. A <code>uint:16</code> stays exactly 16 bits: it can't silently widen to 64, or be reinterpreted as a float.</div>
       </div>
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">02</span> Numeric base</div>
         <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_2</span><span class="c-ann">&gt;</span> <span class="c-val">11001010</span></div>
-        <div class="anat-pillar-d">Binary, hex, or decimal &mdash; the radix is declared, so <code>11001010</code> is never mistaken for a decimal. Values whose digits include letters (e.g. hex <code>ff</code>) are written as a quoted string: <code>&lt;uint:_16&gt; "ff"</code>.</div>
+        <div class="anat-pillar-d">Binary, hex, or decimal &mdash; the radix is declared, so <code>11001010</code> is never mistaken for a decimal value. Values whose digits include letters (e.g. hex <code>ff</code>) are written as quoted strings: <code>&lt;uint:_16&gt; "ff"</code>.</div>
       </div>
       <div class="anat-pillar">
         <div class="anat-pillar-h"><span class="n">03</span> Physical unit</div>
         <div class="anat-chip"><span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">64</span><span class="c-semi">,</span><span class="c-unit">k~g*m*s^-2</span><span class="c-ann">&gt;</span> <span class="c-val">1.0</span></div>
-        <div class="anat-pillar-d">SI base &amp; derived units, IEC prefixes, and compound expressions &mdash; validated by the parser, not the reader. Exponents accept a Unicode superscript (<code>s⁻²</code>) <em>or</em> a plain-ASCII caret (<code>s^-2</code>) interchangeably.</div>
+        <div class="anat-pillar-d">SI base &amp; derived units, IEC binary prefixes, and compound expressions &mdash; validated by the parser, not by your application. Exponents accept a Unicode superscript (<code>s⁻²</code>) <em>or</em> a plain-ASCII caret (<code>s^-2</code>) interchangeably.</div>
       </div>
     </div>
 
     <div class="anat-tip reveal reveal-delay-3">
-      <span class="tip-lead">Typing it by hand?</span> <b>Both notations are first-class to the parser</b> &mdash; the
-      Unicode superscripts (<code>s⁻²</code>, <code>m²</code>) and an all-ASCII form that uses a caret for the
+      <span class="tip-lead">Typing it by hand?</span> <b>Both notations are first-class to the parser</b> &mdash; a
+      Unicode-superscript form (<code>s⁻²</code>, <code>m²</code>) and an all-ASCII form that uses a caret for the
       exponent and <code>*</code> in place of the <code>·</code> separator. <code>k~g*m*s^-2</code> and
-      <code>k~g·m·s⁻²</code> parse to exactly the same unit. The ASCII form needs no obscure glyphs, so it&rsquo;s the
+      <code>k~g·m·s⁻²</code> parse to exactly the same unit. The ASCII form needs no obscure glyphs, so it's the
       <b>natural choice for hand-authoring <code>.bvnr</code></b>. The writer emits Unicode superscripts by default, or
       the caret form when you set <code>BVN_UNIT_ASCII_EXP</code>.
     </div>
@@ -3261,7 +3261,7 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
     <p class="section-p reveal reveal-delay-3" style="margin-top:1.6rem;max-width:760px;">
       All of it is optional: omit annotations for well-defined defaults (<code>uint:64</code>,
       <code>float:64</code>), or add them for full parser validation. Both modes are unambiguous —
-      and a <code>.bvnr</code> file stays UTF-8 prose you can read in any editor, no toolchain required.
+      and a <code>.bvnr</code> file stays plain UTF-8 text you can read in any editor, no toolchain required.
     </p>
   </div>
 </section>
@@ -3354,7 +3354,7 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
         <div class="feature-tag">Type System</div>
         <div class="feature-title">Strong, optional typing</div>
         <div class="feature-desc">
-          Eight type families. The numeric ones take an explicit bit-width, and <code>uint</code>, <code>sint</code>
+          Eight type families. The numeric ones take an explicit bit-width, and <code>uint</code>, <code>sint</code>,
           and <code>float</code> a numeric base. Defaults are defined, not guessed. Annotate when precision
           matters; omit when it doesn't.
         </div>
@@ -3393,7 +3393,7 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
         <div class="feature-title">Error recovery &amp; resync</div>
         <div class="feature-desc">
           Optional resync mode skips broken assignments and continues parsing.
-          Suitable for log streams, unreliable transports, and long-running telemetry.
+          It suits log streams, unreliable transports, and long-running telemetry.
         </div>
         <div class="feature-example">opts.<span class="cl-var">continue_on_error</span> = <span class="cl-kw">true</span>;
 <span class="c-comment">/* parser skips broken record,
@@ -3476,7 +3476,7 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
           <div class="qs-step">
             <div class="qs-step-num">02</div>
             <div class="qs-step-title">Write typed values</div>
-            <div class="qs-step-desc">High-level write helpers accept a key string and a typed value directly. The format is emitted with correct annotations.</div>
+            <div class="qs-step-desc">High-level write helpers accept a key string and a typed value directly. The output is emitted with the correct annotations.</div>
             <div class="code-block"><span class="cl-inc">#include "bovnar.h"</span>
 
 <span class="cl-type">int</span> <span class="cl-fn">main</span>(<span class="cl-type">void</span>)
@@ -3547,7 +3547,7 @@ Reader().<span class="py-fn">read_mem</span>(
           <div class="qs-step">
             <div class="qs-step-num">03</div>
             <div class="qs-step-title">Typed round-trips with Quantity</div>
-            <div class="qs-step-desc"><code>loads(typed=True)</code> wraps each typed value in a <code>Quantity</code> that preserves its exact text, bit width, and unit. Pass the dict directly back to <code>dumps()</code> for a lossless round-trip.</div>
+            <div class="qs-step-desc"><code>loads(typed=True)</code> wraps each typed value in a <code>Quantity</code> that preserves its exact text, bit-width, and unit. Pass the dict directly back to <code>dumps()</code> for a lossless round-trip.</div>
             <div class="code-block"><span class="py-kw">import</span> bovnar
 
 src = <span class="py-str">b".pressure = &lt;float:32,Pa&gt; 101325.0;"</span>
@@ -3565,7 +3565,7 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
           <div class="qs-step">
             <div class="qs-step-num">04</div>
             <div class="qs-step-title">NumPy bridge</div>
-            <div class="qs-step-desc">Typed arrays load straight into a <code>numpy.ndarray</code> &mdash; bovnar widths map to native dtypes (<code>float:32&nbsp;→&nbsp;float32</code>) and the whole-array unit rides alongside. NumPy is an optional, lazily-imported extra (<code>pip install "bovnar[numpy]"</code>).</div>
+            <div class="qs-step-desc">Typed arrays load straight into a <code>numpy.ndarray</code> &mdash; Bovnar widths map to native dtypes (<code>float:32&nbsp;→&nbsp;float32</code>) and the whole-array unit rides alongside. NumPy is an optional, lazily imported extra (<code>pip install "bovnar[numpy]"</code>).</div>
             <div class="code-block"><span class="py-kw">import</span> bovnar, numpy <span class="py-kw">as</span> np
 
 src = <span class="py-str">b".accel = &lt;float:64,m/s^2&gt; "</span> \
@@ -3606,7 +3606,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <div class="qs-step">
             <div class="qs-step-num">02</div>
             <div class="qs-step-title">Link &amp; test</div>
-            <div class="qs-step-desc">The test suite includes unit tests, socket-pair round-trip tests and fuzz harnesses. Benchmarks run from the CLI, with <code>bovnar bench</code>.</div>
+            <div class="qs-step-desc">The test suite includes unit tests, socket-pair round-trip tests, and fuzz harnesses. Benchmarks run from the CLI with <code>bovnar bench</code>.</div>
             <div class="code-block"><span class="c-comment"># Link your app</span>
 <span class="sh-cmd">gcc</span> my_app.c \
   <span class="sh-flag">-I</span> include \

@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=297516e3a2b8')
+  import('./bovnar_wasm.js?v=d28b63b0fdf9')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
@@ -246,9 +246,21 @@
   var lastText = null, lastResult = null;
   function wasmFaithful(text) {
     if (text === lastText && lastResult) return lastResult;
-    var events = wasm.events(text).events || [];
+    // One reader pass for both streams (bvnr_wasm_parse). This used to call
+    // wasm.events() and wasm.errors() separately, walking the document twice and
+    // paying two JSON round-trips. Falls back to the two older exports if the
+    // module predates the combined one.
+    var events, errObj;
+    if (typeof wasm.parse === 'function') {
+      var both = wasm.parse(text);
+      events = both.events || [];
+      errObj = both;
+    } else {
+      events = wasm.events(text).events || [];
+      errObj = wasm.errors(text);
+    }
     var tree = buildTree(events, makeScan(text));
-    lastResult = { events: events, errors: mapErrors(wasm.errors(text)), tree: tree };
+    lastResult = { events: events, errors: mapErrors(errObj), tree: tree };
     lastText = text;
     return lastResult;
   }

@@ -21,6 +21,10 @@
  *                               -> the same stream with the reader's lossless
  *                                  unit/base conversion armed, so events carry
  *                                  converted / converted_base / converted_unit
+ *   bvnr_wasm_parse   (ptr,len) -> JSON  { ok, error, error_name, events:[...],
+ *                                          errors:[...], declared_version }
+ *                                          events + errors from ONE reader pass;
+ *                                          what a caller wanting both should use
  *
  * The caller passes a pointer+length (NOT a NUL-terminated string), because a
  * .bvnr document may carry octet streams with embedded NULs. Every returning
@@ -679,6 +683,93 @@ char *bvnr_wasm_errors(const char *buf, int len)
 	char *es = sb_finish(&ebuf);
 	if (es) { sb_puts(&b, es); free(es); }
 	sb_puts(&b, "]");
+	if (r) {
+		uint16_t maj = 0, min = 0;
+		if (bvnr_reader_get_declared_version(r, &maj, &min))
+			sb_printf(&b, ",\"declared_version\":\"%u.%u\"", maj, min);
+		else
+			sb_puts(&b, ",\"declared_version\":null");
+	}
+	sb_putc(&b, '}');
+
+	if (r) bvnr_reader_destroy(r);
+	return sb_finish(&b);
+}
+
+/* ------- combined single-pass parse (events + errors) ------- */
+/*
+ * The playground needs BOTH the verified event stream and the full error list
+ * for the same document. Doing that with bvnr_wasm_events + bvnr_wasm_errors
+ * meant constructing two readers, walking the document twice, and serialising
+ * then re-parsing two JSON payloads in JS -- for a 1000-assignment document the
+ * event payload alone is hundreds of KB, on every debounce tick.
+ *
+ * Both of those surfaces already run with continue_on_error = true, so a single
+ * reader carrying both callbacks produces exactly the same two streams in one
+ * pass. The only thing in the way was bvnr_read_flags_t::userdata being a single
+ * pointer; the shim struct below lets both callbacks keep their own context.
+ *
+ * Returns { ok, error, error_name, events:[...], errors:[...], declared_version }
+ * -- the union of what the two separate exports return. They are kept for
+ * compatibility (and because errors alone is genuinely cheaper when the caller
+ * only validates).
+ */
+typedef struct {
+	events_ud_t ev;
+	err_ctx_t   er;
+} both_ud_t;
+
+static bool both_evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
+{
+	return evt_cb(&((both_ud_t *)ud)->ev, e, d);
+}
+
+static void both_err_cb(void *ud, error_code_t err,
+                        uint64_t line, uint64_t column,
+                        uint32_t byte, uint64_t offset)
+{
+	err_collect(&((both_ud_t *)ud)->er, err, line, column, byte, offset);
+}
+
+WASM_EXPORT
+char *bvnr_wasm_parse(const char *buf, int len)
+{
+	sb_t b; sb_init(&b);
+	if (len < 0) len = 0;
+
+	sb_t evbuf; sb_init(&evbuf);
+	sb_t ebuf;  sb_init(&ebuf);
+	both_ud_t ud;
+	memset(&ud, 0, sizeof(ud));
+	ud.ev.ev.b = &evbuf;
+	ud.ev.unit = NULL;
+	ud.ev.base = 0u;
+	ud.er.b     = &ebuf;
+	ud.er.count = 0;
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata          = &ud;
+	flags.on_verified       = both_evt_cb;
+	flags.on_error          = both_err_cb;
+	flags.continue_on_error = true;   /* resync: all events AND all errors */
+
+	bool opened = r && bvnr_open_read_mem(r, buf, (uint64_t)len, NULL, 0, &flags);
+	if (opened) bvnr_read(r);
+
+	error_code_t err = r ? bvnr_reader_get_error(r) : error_invalid_argument;
+	if (!opened && err == error_none) err = error_invalid_argument;
+
+	sb_putc(&b, '{');
+	emit_status(&b, err);
+	sb_puts(&b, ",\"events\":[");
+	char *evs = sb_finish(&evbuf);
+	if (evs) { sb_puts(&b, evs); free(evs); }
+	sb_puts(&b, "],\"errors\":[");
+	char *es = sb_finish(&ebuf);
+	if (es) { sb_puts(&b, es); free(es); }
+	sb_putc(&b, ']');
 	if (r) {
 		uint16_t maj = 0, min = 0;
 		if (bvnr_reader_get_declared_version(r, &maj, &min))

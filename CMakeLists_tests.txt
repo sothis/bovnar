@@ -1020,7 +1020,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 117)   # +1: bvnr_i18n_de
+set(BVNR_EXPECTED_TEST_COUNT 118)   # +2: bvnr_i18n_de, bvnr_wasm_wrapper_sync
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1070,6 +1070,22 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256 AND BVNR_PACKAGE)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_freshness.cmake)
     set_tests_properties(bvnr_wasm_freshness PROPERTIES
         LABELS "wasm;packaging" TIMEOUT 60)
+endif()
+
+# ── The generated WASM wrapper still matches its source ─────────────────────
+# web/bovnar_wasm.js is generated from wasm/index.mjs by build_wasm.sh. Editing
+# the generated copy works until the next build silently reverts it, and nothing
+# else in the tree notices -- the artifact stamp covers the compiled core, not
+# this hand-written wrapper.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/index.mjs)
+    add_test(
+        NAME    bvnr_wasm_wrapper_sync
+        COMMAND "${CMAKE_COMMAND}"
+                -DSRC=${CMAKE_CURRENT_SOURCE_DIR}/wasm/index.mjs
+                -DCOPY=${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm.js
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_wrapper_sync.cmake)
+    set_tests_properties(bvnr_wasm_wrapper_sync PROPERTIES
+        LABELS "wasm;web" TIMEOUT 60)
 endif()
 
 # ── Website translations still match the English source ─────────────────────

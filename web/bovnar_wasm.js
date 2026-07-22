@@ -1,5 +1,11 @@
 // Bovnar WASM — ergonomic wrapper around the emscripten module.
 //
+// SOURCE OF TRUTH: wasm/index.mjs. build_wasm.sh copies this file to
+// web/bovnar_wasm.js (rewriting the core import to a cache-busted URL) and to
+// dist/wasm/. Editing a copy appears to work and is silently reverted by the
+// next build — that has already happened once, which is why
+// bvnr_wasm_wrapper_sync now fails the suite when the two diverge.
+//
 // The C reference parser, compiled to WebAssembly. This IS the reference
 // implementation: it synthesises default type annotations and performs full
 // type/value/unit validation, so error_unit_mismatch and friends are reported
@@ -17,7 +23,7 @@
 // `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
 // through verbatim — required if the document embeds octet streams with NULs).
 
-import createBovnar from './bovnar_wasm_core.js?v=297516e3a2b8';
+import createBovnar from './bovnar_wasm_core.js?v=d28b63b0fdf9';
 
 const enc = new TextEncoder();
 
@@ -105,6 +111,12 @@ export async function loadBovnar(opts) {
     /** The reference (verified) event stream. Returns { ok, error, error_name,
      *  events: [{ seq, ev, tok, text?, family?, width?, base?, unit?, ... }] }. */
     events: (input) => callJson('bvnr_wasm_events', input),
+
+    /** Events AND errors from a SINGLE reader pass:
+     *  { ok, error, error_name, events:[...], errors:[...], declared_version }.
+     *  Prefer this over calling events() and errors() for the same document —
+     *  that walks it twice and pays two JSON round-trips. */
+    parse: (input) => callJson('bvnr_wasm_parse', input),
 
     /** The event stream with the reader's LOSSLESS unit/base conversion armed,
      *  so numeric events also carry `converted` (the exact value, or null when

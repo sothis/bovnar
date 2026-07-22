@@ -2232,6 +2232,42 @@ a[data-doc] { cursor: pointer; }
 }
 .pg-example-btn:hover { border-color: var(--blue2); color: var(--blue); }
 
+/* ── PRINT ──
+   There was no print stylesheet. A reader in dark mode printed #ededed text onto
+   white paper (browsers drop backgrounds but keep colours) -- an effectively
+   blank page. Everything below is about paper legibility, so colour is dropped
+   rather than re-themed: that cannot fail whatever the active theme is. */
+@media print {
+  html, body { background: #fff !important; color: #111 !important; }
+  /* Kill every inherited colour and backdrop; keep the text. */
+  #main *, footer * { color: #111 !important; background: transparent !important;
+                      box-shadow: none !important; text-shadow: none !important; }
+  .code-block, pre, .syntax-card-body, .feature-example, #pg-editor, #pg-highlight {
+    background: #f5f5f5 !important; border: 1px solid #ccc !important;
+    white-space: pre-wrap !important; word-break: break-word !important;
+  }
+  /* Fixed layers overlap the first page (and repeat per page in some engines). */
+  nav, #doc-scrim, .scroll-hint, .theme-toggle, .skip-link { display: none !important; }
+  /* An open drawer is position:fixed with its own scroller and body overflow
+     hidden, so printing a document yielded exactly one viewport of it. */
+  #doc-drawer { position: static !important; transform: none !important;
+                width: 100% !important; max-width: none !important;
+                height: auto !important; box-shadow: none !important; }
+  #doc-content-wrap { overflow: visible !important; height: auto !important; }
+  body { overflow: visible !important; }
+  /* Only the active language pane is displayed, so a printed quickstart carried
+     one of its three languages. Print all of them. */
+  .qs-pane { display: block !important; }
+  .qs-tab { display: none !important; }
+  /* Live canvases print as a mid-animation bitmap on a suppressed backdrop. */
+  canvas { display: none !important; }
+  /* Link targets are lost on paper. */
+  #main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.8em; word-break: break-all; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+  section { break-inside: auto; }
+  h2, h3 { break-after: avoid; }
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
   nav { padding: 0 1rem; }
@@ -2310,6 +2346,26 @@ a[data-doc] { cursor: pointer; }
   .reveal { opacity: 1 !important; transform: none !important; }
 }
 </style>
+<noscript><style>
+/* The reveal-on-scroll animation adds .visible from an IntersectionObserver, so
+   without JavaScript all 48 .reveal elements stayed at opacity:0 -- the entire
+   quickstart, syntax, capabilities, comparison and documentation index, about
+   two thirds of the page, present in the markup but invisible. Show them. */
+.reveal { opacity: 1 !important; transform: none !important; }
+
+/* The live demos and the playground are JS-driven. Without it they rendered as
+   three empty <textarea>s under headings saying "editable", blank 360px canvases,
+   gauges reading "frame 0 / lock ACQ", and a playground status badge hard-coded
+   to "ready" -- a demo that looks like it is running and has decoded nothing.
+   Hide the shells and let the <noscript> notes below explain instead. */
+#launch-demo .demo-tabs, #launch-demo .pane, #playground .playground-layout,
+#launch-demo .engine-note, #launch-demo details.how { display: none !important; }
+.ns-note {
+  margin: 1.5rem 0; padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--blue2); background: var(--panel-bg);
+  color: var(--text2); font-size: 0.92rem; line-height: 1.6;
+}
+</style></noscript>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -3826,7 +3882,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </div>
 </div>
 
-<script src="bovnar_parser_wasm.js?v=9cc92028cfc2"></script>
+<script src="bovnar_parser_wasm.js?v=d4170e91fb32"></script>
 <script src="bovnar_highlight.js?v=20260720"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
@@ -3886,7 +3942,13 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   // The webfont swaps in AFTER first paint (font-display: swap), so a first
   // measurement during the swap window freezes fallback-monospace metrics and
   // every error box would sit at the wrong offset until a resize.
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { cwCache = null; });
+  // Invalidate AND repaint: dropping the cache only fixes the next measurement,
+  // so any error boxes already positioned with fallback-monospace metrics stayed
+  // misaligned until the user happened to scroll or type.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () {
+    cwCache = null;
+    renderErrorOverlay();
+  });
 
   let gutterSig = null;
   function renderGutter(st) {
@@ -4771,15 +4833,44 @@ function closeDrawerDOM() {
   drawer.classList.remove('open');
   document.body.style.overflow = '';
   currentFile = null;
+  // A request still in flight would otherwise land on the closed drawer:
+  // xhr.onload would see its own generation, render into it, and leave the full
+  // document attached for good (the next close early-returns on !open). Retire
+  // the generation and drop the request.
+  docSeq++;
+  if (pendingXhr) { pendingXhr.abort(); pendingXhr = null; }
   // Drop the rendered document. A closed drawer was holding its entire DOM --
-  // measured at 7,262 nodes for the specification, 75% of the whole page's node
-  // count -- for a panel the reader had shut, and since renderCache now keeps the
-  // HTML string too it was retained twice over. Re-opening rebuilds from that
-  // cache in ~14 ms, so there is nothing to gain by keeping the nodes alive.
-  content.textContent = '';
-  showState('loading');
+  // measured at 8,124 nodes for the specification against a 2,330 baseline --
+  // and since renderCache also keeps the HTML string it was retained twice over.
+  // Re-opening rebuilds from that cache in ~14 ms.
+  //
+  // Deferred until the slide-out finishes: the drawer is not display:none, it is
+  // translateX(100%) with a 0.35s transition, so clearing synchronously made the
+  // reader watch the text vanish and a "Fetching document…" spinner appear in a
+  // panel that was still on screen -- and left that spinner animating for the
+  // rest of the session.
+  releaseDrawerContent();
   if (lastFocus && lastFocus.focus) lastFocus.focus();   // restore focus to the trigger
   lastFocus = null;
+}
+
+let releaseTimer = 0;
+function releaseDrawerContent() {
+  clearTimeout(releaseTimer);
+  const done = () => {
+    if (drawer.classList.contains('open')) return;   // reopened meanwhile
+    content.textContent = '';
+    showState('loading');
+  };
+  // transitionend is the accurate signal; the timer is the fallback for a
+  // browser that skips the transition (prefers-reduced-motion) and so never
+  // fires it.
+  drawer.addEventListener('transitionend', function once(e) {
+    if (e.propertyName !== 'transform') return;
+    drawer.removeEventListener('transitionend', once);
+    done();
+  });
+  releaseTimer = setTimeout(done, 500);
 }
 
 // User-initiated close (button / scrim / Escape): close, then strip the #doc/

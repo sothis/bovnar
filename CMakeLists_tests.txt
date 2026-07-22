@@ -1020,7 +1020,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 118)   # 116 base + bvnr_i18n_de + bvnr_wasm_wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 119)   # 116 base + i18n_de + wasm_wrapper_sync + cache_stamps
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1086,6 +1086,17 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/index.mjs)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_wrapper_sync.cmake)
     set_tests_properties(bvnr_wasm_wrapper_sync PROPERTIES
         LABELS "wasm;web" TIMEOUT 60)
+endif()
+
+# ── ?v= cache-bust stamps still match the files they label ──────────────────
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/web/index.html)
+    add_test(
+        NAME    bvnr_cache_stamps
+        COMMAND "${CMAKE_COMMAND}"
+                -DPAGE=${CMAKE_CURRENT_SOURCE_DIR}/web/index.html
+                "-DPAIRS=${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_parser_wasm.js:bovnar_parser_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm_core.js:bovnar_wasm_core\\.js"
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cache_stamps.cmake)
+    set_tests_properties(bvnr_cache_stamps PROPERTIES LABELS "wasm;web" TIMEOUT 60)
 endif()
 
 # ── Website translations still match the English source ─────────────────────

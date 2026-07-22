@@ -400,7 +400,9 @@ def cmd_extract(lang: str) -> int:
     if dropped:
         print(f"{len(dropped)} translation(s) no longer match the English "
               f"source; moved to _orphaned in {lang}.json")
-    return report_code_classes(unknown_code) or report_uncovered(uncovered)
+    rc_classes = report_code_classes(unknown_code)
+    rc_uncovered = report_uncovered(uncovered)
+    return rc_classes or rc_uncovered
 
 
 def report_code_classes(unknown) -> int:
@@ -470,7 +472,7 @@ def generate(lang: str, check_only: bool) -> int:
     # English on every translated page with the gate still green -- exactly the
     # failure this tool exists to prevent, just on the other half of the strings.
     used = js_keys(src)
-    have = set(table.get("js", {}))
+    have = {k for k, v in table.get("js", {}).items() if v}
     missing_js = sorted(k for k in used - have)
     dead_js = sorted(k for k in have - used)
     if missing_js:
@@ -485,6 +487,10 @@ def generate(lang: str, check_only: bool) -> int:
 
     if unknown_code:
         return report_code_classes(unknown_code)
+    # This was computed and dropped, so the detector only ever ran under
+    # --extract -- the gate it exists for never consulted it.
+    if uncovered:
+        return report_uncovered(uncovered)
 
     bad = check_js_paths(src)
     if bad:
@@ -501,10 +507,12 @@ def generate(lang: str, check_only: bool) -> int:
         # being older than the sources it was spliced from. publish_web.sh always
         # regenerates, but web/httpd.sh serves the tree directly and a manual
         # rsync would ship whatever is on disk.
+        # Always run the rewrites, even when there is nothing to compare
+        # against: that is what exercises the once() guards, and web/<lang>/ is
+        # git-ignored so a fresh clone would otherwise never reach them.
+        fresh = localize_document(splice(src, edits), lang, table)
         dest = WEB / lang / "index.html"
         if dest.exists():
-            fresh = splice(src, edits)
-            fresh = localize_document(fresh, lang, table)
             if dest.read_text(encoding="utf-8") != fresh:
                 print(f"error: web/{lang}/index.html is STALE -- it differs from "
                       f"what index.html + i18n/{lang}.json produce now. "
@@ -512,7 +520,8 @@ def generate(lang: str, check_only: bool) -> int:
                 return 1
         print(f"{lang}: all {len(units)} units, {len(attrs)} attributes and "
               f"{len(used)} runtime strings are translated; script paths use "
-              f"BASE; web/{lang}/index.html is current")
+              f"BASE" + (f"; web/{lang}/index.html is current" if dest.exists()
+                         else f"; web/{lang}/index.html not built yet"))
         return 0
 
     doc = localize_document(splice(src, edits), lang, table)
@@ -593,9 +602,15 @@ def localize_document(doc: str, lang: str, table: dict) -> str:
     # Escape "</" so a translation containing </script> cannot terminate the
     # element and destroy the page from that point on. JSON.parse is unaffected:
     # "<\/script>" is the same string.
-    decls = "".join(
-        f"window.{k}={json.dumps(v, ensure_ascii=False).replace('</', '<\\/')};"
-        for k, v in boot.items())
+    def _decl(key, value):
+        # Escape "</" so a translation containing </script> cannot terminate the
+        # element. Built outside the f-string: a backslash inside an f-string
+        # expression is a SyntaxError before Python 3.12, and this file must
+        # import on the >=3.10 that pyproject.toml promises.
+        blob = json.dumps(value, ensure_ascii=False).replace("</", "<\\/")
+        return f"window.{key}={blob};"
+
+    decls = "".join(_decl(k, v) for k, v in boot.items())
     doc = doc.replace("</head>", f"<script>{decls}</script>\n</head>", 1)
     return doc
 

@@ -4368,6 +4368,25 @@ if (typeof BovnarHighlight === 'undefined') { window.BovnarHighlight = { highlig
 function initDocLibs() {
 marked.use({ gfm: true, breaks: false });
 
+// highlight.js ships 36 languages in this build and EBNF is not among them, so
+// the grammar block in the Unit System document rendered unhighlighted and logged
+// two warnings on every open. EBNF is small enough to define outright: comments
+// are (* … *), terminals are quoted, and the rest is operators and rule names.
+hljs.registerLanguage('ebnf', function () {
+  return {
+    name: 'EBNF',
+    contains: [
+      { scope: 'comment', begin: /\(\*/, end: /\*\)/ },
+      { scope: 'string', begin: /"/, end: /"/ },
+      { scope: 'string', begin: /'/, end: /'/ },
+      // a rule name at the start of a line, up to its '='
+      { scope: 'attribute', begin: /^[A-Za-z][\w-]*(?=\s*=)/ },
+      { scope: 'operator', match: /[=|;,]|\.\.\./ },
+      { scope: 'punctuation', match: /[\[\]{}()]/ },
+    ],
+  };
+});
+
 hljs.registerLanguage('bovnar', function() {
 
   const COMMENT = {

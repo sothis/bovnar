@@ -237,10 +237,20 @@
                line: e.line, col: e.column, offset: e.offset };
     });
   }
+  /* One-entry memo on the raw text. The playground renders the same document
+     more than once -- the bovnar-wasm-ready re-render, a scroll-triggered
+     refresh, an example button re-clicked -- and each render costs TWO full
+     WASM passes over the document plus two JSON round-trips (events and errors
+     are separate exports). Keyed on identity of the input string, so any real
+     edit misses immediately. Holds one document, so it cannot grow. */
+  var lastText = null, lastResult = null;
   function wasmFaithful(text) {
+    if (text === lastText && lastResult) return lastResult;
     var events = wasm.events(text).events || [];
     var tree = buildTree(events, makeScan(text));
-    return { events: events, errors: mapErrors(wasm.errors(text)), tree: tree };
+    lastResult = { events: events, errors: mapErrors(wasm.errors(text)), tree: tree };
+    lastText = text;
+    return lastResult;
   }
 
   /* ── parseBovnar: translate the verified event stream to the live cb ───── */
@@ -312,8 +322,15 @@
 
   /* ── dispatcher: WASM once ready, empty results until then ───────────────── */
   function parseFaithful(text) {
-    if (wasm) { try { return wasmFaithful(text); } catch (e) { if (window.console) console.warn('bovnar wasm parseFaithful failed', e); } }
-    return { events: [], errors: [], tree: { type: 'stream', children: [] } };
+    // A throw inside the shim used to return the same empty result as "WASM not
+    // loaded yet", so the playground reported a green "ok - 0 events - no errors"
+    // for a document it had actually failed on. Flag it so the caller can tell.
+    var failed = false;
+    if (wasm) {
+      try { return wasmFaithful(text); }
+      catch (e) { failed = true; if (window.console) console.warn('bovnar wasm parseFaithful failed', e); }
+    }
+    return { events: [], errors: [], tree: { type: 'stream', children: [] }, failed: failed };
   }
   function parseBovnar(text, cb) {
     if (wasm) { try { return wasmBovnar(text, cb); } catch (e) { if (window.console) console.warn('bovnar wasm parseBovnar failed', e); } }

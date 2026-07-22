@@ -915,6 +915,7 @@ section { position: relative; z-index: 1; }
 /* the label text — all at one depth, sitting clearly *below* the end of the
    dash (not overlapping it) */
 .tok-label::after {
+  /* var(--blue2) was 3.40:1 dark / 4.06:1 light at this size; both fail 4.5:1. */
   content: attr(data-label);
   position: absolute;
   left: 50%;
@@ -924,10 +925,11 @@ section { position: relative; z-index: 1; }
   font-size: 0.56rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--blue2);
+  color: var(--blue);
   white-space: nowrap;
 }
 
+html[data-theme="light"] .tok-label::after { color: #005a99; }   /* 5.9:1 on --sidebar-bg */
 /* the three kinds of context that characterise a number */
 .anat-pillars {
   margin-top: 1.6rem;
@@ -2082,22 +2084,7 @@ a[data-doc] { cursor: pointer; }
 #pg-editor::placeholder { color: var(--text3); }
 
 /* Bovnar syntax highlight token colors */
-.hl-comment      { color: var(--c-comment); font-style: italic; }
-.hl-str          { color: var(--c-str); }
-.hl-special      { color: var(--c-val); }
-.hl-ann          { color: var(--c-ann); }
-.hl-type         { color: var(--c-type); font-weight: 600; }
-.hl-param        { color: var(--c-param); }
-.hl-ref          { color: var(--c-param); }
-.hl-sigil        { color: var(--c-sigil); }
-.hl-key          { color: var(--c-key); }
-.hl-num          { color: var(--c-val); }
-.hl-sym          { color: var(--c-unit); }
-.hl-eq           { color: var(--c-eq); }
-.hl-semi         { color: var(--c-semi); }
-.hl-bracket      { color: var(--yellow); }
 .hl-struct-brace { color: var(--c-struct); }
-.hl-dim          { color: var(--text2); }
 
 /* ── on_verified event tree ── */
 #pg-event-tree {
@@ -2738,34 +2725,7 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
 #launch-demo pre.frame .ln { display: flex; padding: 0 0.6rem; white-space: pre; }
 #launch-demo pre.frame .ln:hover, #launch-demo pre.frame .ln.hl { background: rgba(38,79,120,0.45); }
 #launch-demo pre.frame .ln.err { background: rgba(244,71,71,0.13); }
-#launch-demo pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-right: 0.9em; flex-shrink: 0; user-select: none; }
-#launch-demo .t-comment { color: var(--c-comment); }
-#launch-demo .t-sigil { color: var(--c-sigil); }
-#launch-demo .t-key { color: var(--c-key); }
-#launch-demo .t-eq { color: var(--c-eq); }
-#launch-demo .t-semi { color: var(--c-semi); }
-#launch-demo .t-str { color: var(--c-str); }
-#launch-demo .t-num { color: var(--c-val); }
-#launch-demo .t-neg { color: var(--c-neg); }
-#launch-demo .t-unit { color: var(--c-unit); }
-#launch-demo .t-unitsep { color: var(--c-unitsep); }
-#launch-demo .t-sym { color: var(--c-sym); }
-#launch-demo .t-bool { color: var(--c-bool); font-weight: 600; }
-#launch-demo .t-null { color: var(--c-null); font-weight: 600; }
-#launch-demo .t-special { color: var(--c-special); }
-#launch-demo .t-sep { color: var(--c-sep); }
-#launch-demo .t-adelim { color: var(--c-ann); }
-#launch-demo .t-type { color: var(--c-type); font-weight: 600; }
-#launch-demo .t-tsep { color: var(--c-sep); }
-#launch-demo .t-width { color: var(--c-width); }
-#launch-demo .t-base { color: var(--c-base); }
-#launch-demo .t-param { color: var(--c-param); }
-#launch-demo .t-refop { color: var(--c-refop); font-weight: 600; }
-#launch-demo .t-refpath { color: var(--c-refpath); }
-#launch-demo .t-d1 { color: var(--c-d1); } #launch-demo .t-d2 { color: var(--c-d2); }
-#launch-demo .t-d3 { color: var(--c-d3); } #launch-demo .t-d4 { color: var(--c-d4); }
-#launch-demo .t-d5 { color: var(--c-d5); } #launch-demo .t-d6 { color: var(--c-d6); }
-#launch-demo .t-d7 { color: var(--c-d7); } #launch-demo .t-d8 { color: var(--c-d8); }
+#launch-demo pre.frame .gut { color: var(--text3); width: 2.2em; text-align: right; margin-right: 0.9em; flex-shrink: 0; user-select: none; } #launch-demo .t-d2 { color: var(--c-d2); } #launch-demo .t-d4 { color: var(--c-d4); } #launch-demo .t-d6 { color: var(--c-d6); } #launch-demo .t-d8 { color: var(--c-d8); }
 
 /* gauges */
 #launch-demo .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0.6rem; contain: layout; }
@@ -2852,8 +2812,26 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
 #launch-demo .how-flow { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); font-family: var(--mono); font-size: 0.72rem; color: var(--text3); line-height: 1.8; }
 #launch-demo .how-flow b { color: var(--teal); font-weight: 600; }
 #launch-demo .how-flow .arr { color: var(--text3); margin: 0 0.35rem; }
+
+/* Legend swatches. These were inline styles, so the themed rule below could
+   never reach them: on the light demo panel (#f3f3f3) the chart colours sit at
+   1.5-2.3:1, and they are the key to reading the charts (WCAG SC 1.4.11, 3:1). */
+#launch-demo .sw-a { color: #7fd1ff; }
+#launch-demo .sw-b { color: #6e7a86; }
+#launch-demo .sw-c { color: #3fb87f; }
+#launch-demo .sw-d { color: #e0533d; }
+#launch-demo .sw-e { color: #3a4a5a; }
+#launch-demo .sw-f { color: #4ec9b0; }
+#launch-demo .sw-g { color: #e88a3a; }
+html[data-theme="light"] #launch-demo .sw-a { color: #1268a8; }
+html[data-theme="light"] #launch-demo .sw-b { color: #5a6672; }
+html[data-theme="light"] #launch-demo .sw-c { color: #1c7a4d; }
+html[data-theme="light"] #launch-demo .sw-d { color: #b32d18; }
+html[data-theme="light"] #launch-demo .sw-e { color: #8894a2; }
+html[data-theme="light"] #launch-demo .sw-f { color: #0f7a67; }
+html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
 </style>
-<section id="launch-demo" aria-label="Live Mission Control demo">
+<section id="launch-demo" aria-label="Live demos">
 <header class="intro">
   <h2>One format, <span class="accent">end to end</span> — <span class="accent">config in, decoded values out</span>.</h2>
   <p id="demo-blurb">
@@ -2919,7 +2897,7 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
     <div class="canvas-wrap"><canvas id="orbit" role="img" aria-label="Orbit visualizer — the spacecraft's position and trail over a rotating Earth, driven by the decoded .bvnr telemetry stream. The same values are shown as text in the telemetry panel."></canvas></div>
     <div class="viz-legend">
       <span><b>◐</b> Earth (day / night)</span>
-      <span><b style="color:#4ec9b0">●</b> spacecraft (decoded pos)</span>
+      <span><b class="sw-f">●</b> spacecraft (decoded pos)</span>
     </div>
   </section>
 
@@ -2988,10 +2966,10 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
       </div>
       <div class="chart-wrap"><canvas id="fpx" role="img" aria-label="Live price chart driven by the decoded .bvnr market-data stream. The same values are shown as text in the panel."></canvas></div>
       <div class="chart-legend">
-        <span><b style="color:#7fd1ff">―</b> last</span>
-        <span><b style="color:#6e7a86">┄</b> EMA</span>
-        <span><b style="color:#3fb87f">▲</b> buy · <b style="color:#e0533d">▼</b> sell</span>
-        <span><b style="color:#3a4a5a">▒</b> bid/ask</span>
+        <span><b class="sw-a">―</b> last</span>
+        <span><b class="sw-b">┄</b> EMA</span>
+        <span><b class="sw-c">▲</b> buy · <b class="sw-d">▼</b> sell</span>
+        <span><b class="sw-e">▒</b> bid/ask</span>
       </div>
     </div>
   </section>
@@ -3057,10 +3035,10 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
       </div>
       <div class="chart-wrap"><canvas id="ipx" role="img" aria-label="Reactor control HMI — tank, gauges and trend driven by the decoded .bvnr telemetry stream. The same values are shown as text in the panel."></canvas></div>
       <div class="chart-legend">
-        <span><b style="color:#e88a3a">▮</b> jacket heat</span>
-        <span><b style="color:#7fd1ff">―</b> temp · <b style="color:#6e7a86">┄</b> setpoint</span>
-        <span><b style="color:#4ec9b0">✚</b> impeller</span>
-        <span><b style="color:#e0533d">◔</b> pressure</span>
+        <span><b class="sw-g">▮</b> jacket heat</span>
+        <span><b class="sw-a">―</b> temp · <b class="sw-b">┄</b> setpoint</span>
+        <span><b class="sw-f">✚</b> impeller</span>
+        <span><b class="sw-d">◔</b> pressure</span>
       </div>
     </div>
   </section>
@@ -3891,22 +3869,37 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   let errorMarks = [];   /* [{ line, col }] — the character that produced the error */
 
   /* width of one (monospace) character in the editor font */
+  // Memoised: this is called from the scroll path, and getComputedStyle there
+  // flushes style right after the overlay was mutated. The editor's font cannot
+  // change without a resize or a theme toggle, both of which clear the cache.
+  let cwCache = null;
   function charWidth() {
+    if (cwCache != null) return cwCache;
     const cs = getComputedStyle(editor);
     const ctx = (charWidth._c || (charWidth._c = document.createElement('canvas').getContext('2d')));
     ctx.font = cs.fontSize + ' ' + cs.fontFamily;
-    return ctx.measureText('0').width || (parseFloat(cs.fontSize) * 0.6);
+    cwCache = ctx.measureText('0').width || (parseFloat(cs.fontSize) * 0.6);
+    return cwCache;
   }
+  window.addEventListener('resize', function () { cwCache = null; });
 
+  let gutterSig = null;
   function renderGutter(st) {
     // Use the cached scroll offset (never read editor.scrollTop here — it forces
     // any pending layout synchronously). syncHighlight passes the cached value.
     const scrollTop = st != null ? st : edScrollTop;
     const n = editor.value.split('\n').length;
-    let h = '';
-    for (let i = 1; i <= n; i++)
-      h += `<span class="pg-gutter-num${errorLines.has(i) ? ' err' : ''}">${i}</span>`;
-    gutter.innerHTML = h;
+    // The gutter is a pure function of (line count, error lines). Typing inside a
+    // line changes neither, so this used to rebuild N spans per keystroke for an
+    // identical result.
+    const sig = n + ':' + Array.from(errorLines).sort((a, b) => a - b).join(',');
+    if (sig !== gutterSig) {
+      gutterSig = sig;
+      let h = '';
+      for (let i = 1; i <= n; i++)
+        h += `<span class="pg-gutter-num${errorLines.has(i) ? ' err' : ''}">${i}</span>`;
+      gutter.innerHTML = h;
+    }
     if (scrollTop) gutter.scrollTop = scrollTop;   // skip when unscrolled — avoids forcing layout
   }
 
@@ -3930,7 +3923,13 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     });
   }
 
+  let hlPending = 0;
+  function syncHighlightSoon() {
+    if (hlPending) return;
+    hlPending = requestAnimationFrame(function () { hlPending = 0; syncHighlight(); });
+  }
   function syncHighlight() {
+    if (hlPending) { cancelAnimationFrame(hlPending); hlPending = 0; }
     hlDiv.innerHTML = highlightBovnar(editor.value) + '\n';
     // Setting scrollTop after an innerHTML write also forces the pending layout (the
     // browser must resolve the scroll range). Skip it when the editor isn't scrolled
@@ -3941,11 +3940,25 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   }
 
   /* place the caret at line:col and scroll it into view (used by on_error rows) */
+  // The C lexer reports a DISPLAY column: a tab snaps it to the next multiple of
+  // 4 and it advances once per CODE POINT. Treating that as a UTF-16 offset put
+  // the caret 3 characters past the target on a tab-indented line, and short by
+  // one per astral character. Convert properly.
+  function displayColToIndex(lineText, col) {
+    let disp = 1, idx = 0;
+    for (const ch of lineText) {          // iterates code points, not UTF-16 units
+      if (disp >= col) break;
+      disp = ch === '\t' ? (((disp - 1) >> 2) + 1) * 4 + 1 : disp + 1;
+      idx += ch.length;                   // 2 for astral, 1 otherwise
+    }
+    return idx;
+  }
   function jumpTo(line, col) {
     const lines = editor.value.split('\n');
     let idx = 0;
     for (let i = 0; i < line - 1 && i < lines.length; i++) idx += lines[i].length + 1;
-    idx = Math.min(idx + Math.max(0, col - 1), editor.value.length);
+    const target = lines[Math.max(0, Math.min(line - 1, lines.length - 1))] || '';
+    idx = Math.min(idx + displayColToIndex(target, Math.max(1, col)), editor.value.length);
     editor.focus();
     editor.setSelectionRange(idx, idx);
     const lh = parseFloat(getComputedStyle(editor).lineHeight) || 16;
@@ -4176,8 +4189,10 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
        not loaded yet (there is a real boot race), WASM failed to load, or a
        throw inside the shim — and all three used to render as a green "ok · no
        errors · 0 events". Gate on the module actually being live. */
+    // isWasmReady() is TRUE in the third case (module loaded, shim threw), so it
+    // alone still reported success for a failed parse. res.failed covers that.
     const parserLive = !!(window.BovnarParser && window.BovnarParser.isWasmReady
-                          && window.BovnarParser.isWasmReady());
+                          && window.BovnarParser.isWasmReady()) && !res.failed;
     if (!parserLive) {
       statusEl.textContent = bvnrT('pg.parserUnavailable', 'parser unavailable');
       statusEl.style.color = 'var(--amber, #d08a20)';
@@ -4219,7 +4234,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     /* the marks belong to the previous text — drop them so a stale red box
        can't sit at the wrong place during the debounce window */
     overlay.innerHTML = '';
-    syncHighlight();
+    syncHighlightSoon();   // at most one re-tokenise per painted frame
     schedParse();
   });
   editor.addEventListener('scroll', function () {
@@ -4510,6 +4525,10 @@ function showState(state) {
   content.style.display = state === 'done'    ? 'block': 'none';
 }
 
+// Rendered-output cache. The doc set is fixed (the cards in #docs), so this is
+// inherently bounded and needs no eviction. Re-opening a large spec used to
+// re-run marked, the slug pass and every code block's highlighter.
+const renderCache = new Map();
 function renderDoc(file, text, frag) {
   if (!file.endsWith('.md')) {
     const _pre = document.createElement('pre');
@@ -4519,6 +4538,34 @@ function renderDoc(file, text, frag) {
     content.innerHTML = '';
     content.appendChild(_pre);
   } else {
+    // Build in a DETACHED node so the result can be cached as a string. Doing
+    // marked + the slug pass + every code block's highlighter directly on the
+    // live #doc-content meant re-opening a document repeated all of it.
+    let html = renderCache.get(file);
+    if (html == null) {
+      const box = document.createElement('div');
+      buildDocHTML(box, text);
+      html = box.innerHTML;
+      renderCache.set(file, html);
+    }
+    content.innerHTML = html;
+    wireDocLinks();
+  }
+  showState('done');
+  // Cross-doc deep link (other.md#section): scroll to the target heading, if found.
+  if (frag) {
+    const target = document.getElementById(frag);
+    if (target) {
+      const top = target.getBoundingClientRect().top - wrap.getBoundingClientRect().top + wrap.scrollTop - 16;
+      wrap.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+    }
+  }
+}
+
+// Markdown -> annotated HTML, on a detached container. Pure: no listeners here,
+// because innerHTML round-tripping would drop them anyway (see wireDocLinks).
+function buildDocHTML(content, text) {
+  {
     content.innerHTML = marked.parse(text);
 
     // Heading ids for in-doc anchors: keep Unicode letters/digits (not just ASCII
@@ -4550,37 +4597,35 @@ function renderDoc(file, text, frag) {
 
     content.querySelectorAll('a[href]').forEach(a => {
       const href = a.getAttribute('href');
-      if (/^https?:\/\//.test(href)) {
-        a.target = '_blank';
-        a.rel = 'noopener';
-      } else if (href.startsWith('#')) {
-        a.addEventListener('click', e => {
-          e.preventDefault();
-          const target = document.getElementById(href.slice(1));
-          if (target) {
-            const top = target.getBoundingClientRect().top
-                      - wrap.getBoundingClientRect().top
-                      + wrap.scrollTop - 16;
-            wrap.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-          }
-        });
-      } else {
-        a.addEventListener('click', e => {
-          e.preventDefault();
-          openDoc(href, a.textContent.trim() || href);
-        });
-      }
+      if (/^https?:\/\//.test(href)) { a.target = '_blank'; a.rel = 'noopener'; }
     });
   }
-  showState('done');
-  // Cross-doc deep link (other.md#section): scroll to the target heading, if found.
-  if (frag) {
-    const target = document.getElementById(frag);
-    if (target) {
-      const top = target.getBoundingClientRect().top - wrap.getBoundingClientRect().top + wrap.scrollTop - 16;
-      wrap.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+}
+
+// Listeners must be (re)attached after every innerHTML write, including a cache
+// hit -- innerHTML does not carry them across.
+function wireDocLinks() {
+  content.querySelectorAll('a[href]').forEach(a => {
+    const href = a.getAttribute('href');
+    if (/^https?:\/\//.test(href)) return;      // already marked in buildDocHTML
+    if (href.startsWith('#')) {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.getElementById(href.slice(1));
+        if (target) {
+          const top = target.getBoundingClientRect().top
+                    - wrap.getBoundingClientRect().top
+                    + wrap.scrollTop - 16;
+          wrap.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        }
+      });
+    } else {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        openDoc(href, a.textContent.trim() || href);
+      });
     }
-  }
+  });
 }
 
 let lastFocus = null;   // element to restore focus to when the dialog closes
@@ -4795,6 +4840,69 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   window.VIZ = { pal: function () {
     return document.documentElement.getAttribute('data-theme') === 'light' ? LIGHT : DARK;
   } };
+
+  /* Incremental gauge grid, shared by the trading and industrial panels.
+     Both used to rebuild their whole tile grid with innerHTML on every step
+     (6/s by default, up to 40/s): ~8 template strings, an HTML parse, ~21
+     elements destroyed and recreated, then a style recalc + layout of the grid
+     -- and it wiped the .hl hover class, which is why both had to re-apply
+     hover immediately afterwards. Mission Control already solved this with
+     persistent tiles (buildGauges/renderGauges); this is the same idea, factored
+     so both other sims can use it.
+
+     Tiles are created once and keyed; each update writes only what changed, via
+     a text node and classList toggles. classList (not .className) so the hover
+     class set by applyHover survives an update. */
+  window.VIZ.gaugeGrid = function (box) {
+    var els = null, sig = null;
+    function build(items) {
+      var frag = document.createDocumentFragment();
+      els = {};
+      items.forEach(function (it) {
+        var tile = document.createElement('div');
+        tile.className = 'gauge';
+        var k = document.createElement('div'); k.className = 'k'; k.textContent = it.label;
+        var v = document.createElement('div'); v.className = 'v';
+        var vText = document.createTextNode('');
+        var vUnit = document.createElement('span'); vUnit.className = 'u';
+        v.appendChild(vText); v.appendChild(vUnit);
+        tile.appendChild(k); tile.appendChild(v);
+        frag.appendChild(tile);
+        els[it.key] = { tile: tile, vText: vText, vUnit: vUnit,
+                        applied: [], val: null, unit: null, line: null };
+      });
+      box.textContent = '';
+      box.appendChild(frag);
+    }
+    return function render(items) {
+      var s = items.map(function (i) { return i.key; }).join('|');
+      if (!els || s !== sig) { build(items); sig = s; }
+      items.forEach(function (it) {
+        var g = els[it.key];
+        var want = ((it.cls || '') + (it.err ? ' err' : '')).trim();
+        var wantList = want ? want.split(/\s+/) : [];
+        if (wantList.join(' ') !== g.applied.join(' ')) {
+          g.applied.forEach(function (c) { if (wantList.indexOf(c) < 0) g.tile.classList.remove(c); });
+          wantList.forEach(function (c) { if (g.applied.indexOf(c) < 0) g.tile.classList.add(c); });
+          g.applied = wantList;
+        }
+        var val = it.err ? (window.bvnrT ? window.bvnrT('mc.noData', 'no data') : 'no data') : it.value;
+        if (g.val !== val) { g.vText.nodeValue = val; g.val = val; }
+        var unit = it.err ? '' : (it.unit || '');
+        if (g.unit !== unit) {
+          g.vUnit.textContent = unit;
+          g.vUnit.style.display = unit ? '' : 'none';
+          g.unit = unit;
+        }
+        var line = (it.line != null) ? String(it.line) : null;
+        if (g.line !== line) {
+          if (line != null) g.tile.setAttribute('data-line', line);
+          else g.tile.removeAttribute('data-line');
+          g.line = line;
+        }
+      });
+    };
+  };
 })();
 </script>
 
@@ -5716,14 +5824,18 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
      the highlight and make it flicker. mouseleave (not mouseout) avoids clearing
      as the pointer crosses between child spans of the same row. */
   let hoverLine = null;
+  let lockState = null;
   function applyHover() {
     // Only touch the (≤2) elements that change, not every [data-line] node twice a
     // frame — toggling 'hl' across the whole telemetry tree was the bulk of the
     // per-frame style-recalc cost.
-    document.querySelectorAll('.hl').forEach((n) => n.classList.remove('hl'));
+    // Scoped to this demo's two containers: an unscoped document query also
+    // walked the hidden trading/industrial panes for identically numbered lines.
+    const scope = [$('gauges'), $('framesrc')].filter(Boolean);
+    scope.forEach((c) => c.querySelectorAll('.hl').forEach((n) => n.classList.remove('hl')));
     if (hoverLine != null)
-      document.querySelectorAll('[data-line="' + (window.CSS && CSS.escape ? CSS.escape(hoverLine) : hoverLine) + '"]')
-        .forEach((n) => n.classList.add('hl'));
+      scope.forEach((c) => c.querySelectorAll('[data-line="' + (window.CSS && CSS.escape ? CSS.escape(hoverLine) : hoverLine) + '"]')
+        .forEach((n) => n.classList.add('hl')));
   }
   function wireHover(container) {
     container.addEventListener('mouseover', (e) => {
@@ -5834,9 +5946,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       $('s-orb').textContent = (sim.met / sim.period).toFixed(2);
       $('s-drop').textContent = sim.dropped;
       const lock = $('s-lock');
-      const lockTxt = (st) => bvnrT('sim.lock', 'lock') + ' <b>' + bvnrT(st, st === 'sim.lockLost' ? 'LOST' : 'LOCKED') + '</b>';
-      if (drop) { lock.className = 'lock no'; lock.innerHTML = lockTxt('sim.lockLost'); }
-      else { lock.className = 'lock ok'; lock.innerHTML = lockTxt('sim.lockOk'); }
+      // Only rewrite on an actual state flip: this ran the HTML parser on every
+      // DOM update for a string that changes a handful of times a minute.
+      if (lockState !== drop) {
+        lockState = drop;
+        lock.className = drop ? 'lock no' : 'lock ok';
+        lock.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>'
+          + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
+      }
     }
   }
 
@@ -6196,7 +6313,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const lines = m ? { last: m.last && m.last.line, bid: m.bid && m.bid.line, ask: m.ask && m.ask.line } : {};
     pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS, miss, lines);
     $('fs-seq').textContent = sim.seq; $('fs-drop').textContent = sim.dropped;
-    const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>' + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
+    // Only rewrite on an actual state flip -- this ran the HTML parser on every
+    // step for a string that changes a handful of times a minute.
+    if (lockState !== drop) {
+      lockState = drop;
+      const lock = $('fs-lock');
+      lock.className = drop ? 'lock no' : 'lock ok';
+      lock.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>'
+        + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
+    }
   }
   const tickerBox = $('fticker');
   let tickerCur = null;
@@ -6233,26 +6358,25 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     }
     applyHover();   // the blotter still rebuilds, so re-apply the hover coupling
   }
+  const renderFGauges = VIZ.gaugeGrid($('fgauges'));
   function renderBlotter(lastS, bidS, askS, miss, lines) {
     miss = miss || {}; lines = lines || {};
     const dp = sim.decimals, cur = sim.currency, last = parseFloat(lastS);
     const prev = sim.hist.length > 1 ? sim.hist[sim.hist.length - 2].last : last;
     const dir = last > prev ? 'up' : last < prev ? 'down' : '';
     const spread = parseFloat(askS) - parseFloat(bidS);
-    // `ln` (optional) links a tile to the frame line it decoded, so hovering the
-    // gauge highlights that source line and vice-versa (see wireHover below).
-    const dl = (ln) => (ln != null ? ' data-line="' + ln + '"' : '');
-    const g = (cls, k, v, u, ln) => '<div class="gauge ' + cls + '"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
-    // a feed field that failed to decode shows a blank, red "no data" tile that
-    // holds the same height as its value tile (matches the Mission Control gauges)
-    const ge = (cls, k, ln) => '<div class="gauge ' + cls + ' err"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">no data</div></div>';
+    // `line` links a tile to the frame line it decoded, so hovering the gauge
+    // highlights that source line and vice-versa (see wireHover below). A field
+    // that failed to decode shows a blank, red "no data" tile of the same height.
     const spreadMiss = miss.bid || miss.ask;
-    $('fgauges').innerHTML =
-      (miss.last ? ge('span2 big', 'Last', lines.last) : g('span2 big ' + dir, 'Last', last.toFixed(dp), cur, lines.last)) +
-      (miss.bid ? ge('', 'Bid', lines.bid) : g('', 'Bid', parseFloat(bidS).toFixed(dp), cur, lines.bid)) +
-      (miss.ask ? ge('', 'Ask', lines.ask) : g('', 'Ask', parseFloat(askS).toFixed(dp), cur, lines.ask)) +
-      (spreadMiss ? ge('', 'Spread', lines.bid) : g('', 'Spread', spread.toFixed(dp), cur, lines.bid)) +
-      g('', 'Position', sim.pos, 'sh') + g('', 'Fills', sim.fills, '');
+    renderFGauges([
+      { key: 'last',   label: 'Last',     cls: 'span2 big ' + dir, err: miss.last, line: lines.last, value: last.toFixed(dp), unit: cur },
+      { key: 'bid',    label: 'Bid',      err: miss.bid,  line: lines.bid, value: parseFloat(bidS).toFixed(dp), unit: cur },
+      { key: 'ask',    label: 'Ask',      err: miss.ask,  line: lines.ask, value: parseFloat(askS).toFixed(dp), unit: cur },
+      { key: 'spread', label: 'Spread',   err: spreadMiss, line: lines.bid, value: spread.toFixed(dp), unit: cur },
+      { key: 'pos',    label: 'Position', value: String(sim.pos), unit: 'sh' },
+      { key: 'fills',  label: 'Fills',    value: String(sim.fills), unit: '' },
+    ]);
     applyHover();
     const feeB = microsToNum(sim.feeMicros), feeF = sim.feeF;
     const pnlB = microsToNum(sim.cashMicros + BigInt(sim.pos) * toMicros(lastS));
@@ -6395,7 +6519,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
      drop the highlight. Scoped to this demo's two containers. Declared before the
      seed step() loop below so applyHover() isn't called in the let's TDZ. */
   let hoverLine = null;
+  let hoverApplied = false, lockState = null;   // false = "never applied"; null is a real hover state
   function applyHover() {
+    // Called twice per step (from renderFrame and from the panel renderer) and
+    // once per hover event. The tiles are persistent now, so the 'hl' class is
+    // not wiped by a re-render and this only has to do work when the hovered
+    // line actually changed.
+    if (hoverApplied === hoverLine) return;
+    hoverApplied = hoverLine;
     [$('fgauges'), $('fframesrc')].forEach((c) => c && c.querySelectorAll('[data-line]').forEach((n) =>
       n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine)));
   }
@@ -6421,7 +6552,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   }
   window.BvnrDemos = window.BvnrDemos || {};
   window.BvnrDemos.fin = {
-    activate() { sizeCanvas(); drawChart(); if (sim.playing) start(); },
+    // No sizeCanvas() here when a ResizeObserver is available: it reads
+    // clientWidth and forces a full-page layout on every tab click, and the
+    // observer below already fires when the pane's box goes 0 -> real.
+    activate() { if (!window.ResizeObserver) sizeCanvas(); drawChart(); if (sim.playing) start(); },
     deactivate() { stop(); },
   };
 })();
@@ -6554,7 +6688,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       level: m.level && m.level.line, flow: m.flow_in && m.flow_in.line, heat: m.heater && m.heater.line, agit: m.agitator && m.agitator.line } : {};
     pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D, miss, lines);
     $('is-cyc').textContent = sim.cyc; $('is-drop').textContent = sim.dropped;
-    const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>' + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
+    // Only rewrite on an actual state flip -- this ran the HTML parser on every
+    // step for a string that changes a handful of times a minute.
+    if (lockState !== drop) {
+      lockState = drop;
+      const lk = $('is-lock');
+      lk.className = drop ? 'lock no' : 'lock ok';
+      lk.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>'
+        + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
+    }
   }
 
   const tickerBox = $('iticker');
@@ -6592,26 +6734,30 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     }
     applyHover();   // the HMI still rebuilds, so re-apply the hover coupling
   }
+  const renderIGauges = VIZ.gaugeGrid($('igauges'));
+  let lastAlarmHTML = null;
   function renderHMI(D, miss, lines) {
     miss = miss || {}; lines = lines || {};
     const hiT = (D.status & 8), hiP = (D.status & 16), loL = (D.status & 32);
-    $('ialarms').innerHTML = BITS.filter((b) => D.status & b.m).map((b) => '<span class="alarm-chip ' + b.cls + '">' + b.name + '</span>').join('') ||
+    // Alarm chips vary in number, so they stay an innerHTML write -- but only
+    // when the markup actually changes, which is rare (it used to be rebuilt on
+    // every step regardless).
+    const alarmHTML = BITS.filter((b) => D.status & b.m).map((b) => '<span class="alarm-chip ' + b.cls + '">' + b.name + '</span>').join('') ||
       '<span class="alarm-chip ok">● ' + bvnrT('plc.nominal', 'NOMINAL') + '</span>';
-    // `ln` (optional) links a tile to the frame line it decoded, so hovering the
-    // gauge highlights that source line and vice-versa (see wireHover below).
-    const dl = (ln) => (ln != null ? ' data-line="' + ln + '"' : '');
-    const g = (cls, k, v, u, ln) => '<div class="gauge ' + cls + '"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div></div>';
-    // a register that failed to decode shows a blank, red "no data" tile that
-    // holds the same height as its value tile (matches the Mission Control gauges)
-    const ge = (cls, k, ln) => '<div class="gauge ' + cls + ' err"' + dl(ln) + '><div class="k">' + k + '</div><div class="v">no data</div></div>';
-    $('igauges').innerHTML =
-      (miss.temp ? ge('span2 big', 'Temperature', lines.temp) : g('span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''), 'Temperature', D.temp.toFixed(2), '°C', lines.temp)) +
-      (miss.set ? ge('', 'Setpoint', lines.set) : g('', 'Setpoint', D.set.toFixed(2), '°C', lines.set)) +
-      (miss.press ? ge('', 'Pressure', lines.press) : g(hiP ? 'down' : '', 'Pressure', D.press.toFixed(2), 'bar', lines.press)) +
-      (miss.level ? ge('', 'Level', lines.level) : g(loL ? 'down' : '', 'Level', D.level.toFixed(1), '%', lines.level)) +
-      (miss.flow ? ge('', 'Flow in', lines.flow) : g('', 'Flow in', D.flow.toFixed(1), 'L/min', lines.flow)) +
-      (miss.heat ? ge('', 'Heater', lines.heat) : g('', 'Heater', D.heat.toFixed(0), '%', lines.heat)) +
-      (miss.agit ? ge('', 'Agitator', lines.agit) : g('', 'Agitator', D.agit, 'rpm', lines.agit));
+    if (alarmHTML !== lastAlarmHTML) { $('ialarms').innerHTML = alarmHTML; lastAlarmHTML = alarmHTML; }
+    // `line` links a tile to the frame line it decoded, so hovering the gauge
+    // highlights that source line and vice-versa (see wireHover below). A
+    // register that failed to decode shows a blank, red "no data" tile.
+    renderIGauges([
+      { key: 'temp',  label: 'Temperature', cls: 'span2 big ' + (hiT ? 'down' : Math.abs(sim.setpoint - D.temp) < 0.8 ? 'up' : ''),
+        err: miss.temp,  line: lines.temp,  value: D.temp.toFixed(2),  unit: '°C' },
+      { key: 'set',   label: 'Setpoint',  err: miss.set,   line: lines.set,   value: D.set.toFixed(2),   unit: '°C' },
+      { key: 'press', label: 'Pressure',  cls: hiP ? 'down' : '', err: miss.press, line: lines.press, value: D.press.toFixed(2), unit: 'bar' },
+      { key: 'level', label: 'Level',     cls: loL ? 'down' : '', err: miss.level, line: lines.level, value: D.level.toFixed(1), unit: '%' },
+      { key: 'flow',  label: 'Flow in',   err: miss.flow,  line: lines.flow,  value: D.flow.toFixed(1),  unit: 'L/min' },
+      { key: 'heat',  label: 'Heater',    err: miss.heat,  line: lines.heat,  value: D.heat.toFixed(0),  unit: '%' },
+      { key: 'agit',  label: 'Agitator',  err: miss.agit,  line: lines.agit,  value: String(D.agit),     unit: 'rpm' },
+    ]);
     applyHover();
     // raw register vs self-describing Bovnar
     const reg = Math.max(0, Math.min(65535, Math.round(D.temp * 256)));
@@ -6668,7 +6814,16 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const dt = lastDraw == null ? 0.016 : Math.min(0.05, tnow - lastDraw); lastDraw = tnow;
     ctx.clearRect(0, 0, w, h);
     const P = VIZ.pal();
-    const bgg = ctx.createLinearGradient(0, 0, 0, h); bgg.addColorStop(0, P.indBg0); bgg.addColorStop(1, P.indBg1);
+    // Cached: depends only on (h, palette), both constant between resizes.
+    const bggKey = h + '|' + P.indBg0;
+    if (bggKey !== indBgKey) {
+      indBgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      // addColorStop is NOT idempotent -- it appends. It must only run on rebuild.
+      indBgGrad.addColorStop(0, P.indBg0);
+      indBgGrad.addColorStop(1, P.indBg1);
+      indBgKey = bggKey;
+    }
+    const bgg = indBgGrad;
     ctx.fillStyle = bgg; ctx.fillRect(0, 0, w, h);
 
     const D = sim.lastGood || { temp: sim.temp, set: sim.setpoint, press: sim.pressure, level: sim.level, heat: sim.heater, flow: sim.flow, agit: sim.agitator };
@@ -6886,7 +7041,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
      drop the highlight. Scoped to this demo's two containers. Declared before the
      seed step() loop below so applyHover() isn't called in the let's TDZ. */
   let hoverLine = null;
+  let hoverApplied = false, lockState = null;   // false = "never applied"; null is a real hover state
+  let indBgGrad = null, indBgKey = '';
   function applyHover() {
+    // Called twice per step (from renderFrame and from the panel renderer) and
+    // once per hover event. The tiles are persistent now, so the 'hl' class is
+    // not wiped by a re-render and this only has to do work when the hovered
+    // line actually changed.
+    if (hoverApplied === hoverLine) return;
+    hoverApplied = hoverLine;
     [$('igauges'), $('iframesrc')].forEach((c) => c && c.querySelectorAll('[data-line]').forEach((n) =>
       n.classList.toggle('hl', hoverLine != null && n.getAttribute('data-line') === hoverLine)));
   }
@@ -6911,7 +7074,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.playing = false; $('iplay').textContent = bvnrT('sim.play', '▶ Play');
   }
   window.BvnrDemos = window.BvnrDemos || {};
-  window.BvnrDemos.ind = { activate() { sizeCanvas(); draw(); if (sim.playing) start(); }, deactivate() { stop(); } };
+  window.BvnrDemos.ind = {
+    // As above: the ResizeObserver covers sizing without the layout flush.
+    activate() { if (!window.ResizeObserver) sizeCanvas(); draw(); if (sim.playing) start(); },
+    deactivate() { stop(); } };
 })();
 </script>
 

@@ -1094,7 +1094,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/web/index.html)
         NAME    bvnr_cache_stamps
         COMMAND "${CMAKE_COMMAND}"
                 -DPAGE=${CMAKE_CURRENT_SOURCE_DIR}/web/index.html
-                "-DPAIRS=${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_parser_wasm.js:bovnar_parser_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm_core.js:bovnar_wasm_core\\.js"
+                "-DPAIRS=${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_parser_wasm.js:bovnar_parser_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm_core.js:bovnar_wasm_core\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_highlight.js:bovnar_highlight\\.js"
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cache_stamps.cmake)
     set_tests_properties(bvnr_cache_stamps PROPERTIES LABELS "wasm;web" TIMEOUT 60)
 endif()

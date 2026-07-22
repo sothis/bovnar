@@ -3883,7 +3883,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </div>
 
 <script src="bovnar_parser_wasm.js?v=d4170e91fb32"></script>
-<script src="bovnar_highlight.js?v=20260720"></script>
+<script src="bovnar_highlight.js?v=594ce7c394a8"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {
@@ -6241,7 +6241,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       Math.ceil(lines * cfgMetrics.lh + cfgMetrics.pad + 2) + 'px';   // +2 = editor borders
   }
   function updateCfgHL() {
-    $('cfg-hl').innerHTML = BovnarHighlight.highlightLines($('cfg').value).join('\n') + '\n';
+    $('cfg-hl').innerHTML = BovnarHighlight.highlight($('cfg').value) + '\n';
     fitCfgEditor();
   }
   $('cfg').addEventListener('input', updateCfgHL);
@@ -6641,7 +6641,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // without this the chart shows the previous instrument until the next step.
     drawChart();
   }
-  function updateCfgHL() { $('fcfg-hl').innerHTML = Hl.highlightLines($('fcfg').value).join('\n') + '\n'; }
+  function updateCfgHL() { $('fcfg-hl').innerHTML = Hl.highlight($('fcfg').value) + '\n'; }
   $('fcfg').addEventListener('input', updateCfgHL);
   $('fcfg').addEventListener('scroll', () => { $('fcfg-hl').scrollTop = $('fcfg').scrollTop; $('fcfg-hl').scrollLeft = $('fcfg').scrollLeft; });
   $('fapply').addEventListener('click', applyConfig);
@@ -7165,7 +7165,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.bubbles = []; sim.steam = []; sim.impAng = 0; sim.bubAcc = 0; sim.steamAcc = 0;
     msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + bvnrT('cfg.reactorRestarted', 'reactor restarted');
   }
-  function updateCfgHL() { $('icfg-hl').innerHTML = Hl.highlightLines($('icfg').value).join('\n') + '\n'; }
+  function updateCfgHL() { $('icfg-hl').innerHTML = Hl.highlight($('icfg').value) + '\n'; }
   $('icfg').addEventListener('input', updateCfgHL);
   $('icfg').addEventListener('scroll', () => { $('icfg-hl').scrollTop = $('icfg').scrollTop; $('icfg-hl').scrollLeft = $('icfg').scrollLeft; });
   $('iapply').addEventListener('click', applyConfig);

@@ -86,7 +86,10 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
   // Token char classes shared by the body scanner and the annotation scanner.
   // Non-ASCII letters are valid identifier chars (parser: id-start ≥ U+00C0,
   // id-body > U+007F), so the ranges keep symbols like 'schön' coloured.
-  const ID  = /^[A-Za-z_$µμΩΩÅ°%‰‱\u00C0-\uFFFF][\w·~µμΩΩÅ°⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-*\/^$()\u0080-\uFFFF]*/;
+  // '(' is a valid START char, not only a body char: the grammar lets an inline
+  // unit open with a parenthesised group, e.g. "(m/s)/s". Without it such a unit
+  // fell through to the raw path and rendered as value symbols.
+  const ID  = /^[A-Za-z_$µμΩΩÅ°%‰‱\u00C0-\uFFFF(][\w·~µμΩΩÅ°⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻+\-*\/^$()\u0080-\uFFFF]*/;
   // A bare *symbol* (value-position word / keyword) is stricter than a unit:
   // the C core allows only A-Za-z0-9_+- plus non-ASCII, rejecting unit-only
   // chars (* / ^ ( ) $ : ? ...). ID stays the broad *unit* charset (used after
@@ -106,7 +109,10 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
   // Split a unit so '~', '*' and '/' read as separators (vim BovnarUnitTilde /
   // UnitSep) and the rest as the unit body (BovnarTypeUnit / UnitExp).
   function unit(u) {
-    return u.replace(/[~*\/]+|[^~*\/]+/g, (s) => span(/[~*\/]/.test(s[0]) ? 'unitsep' : 'unit', s));
+    // '·' is a unit separator too -- the grammar calls it semantically
+    // equivalent to '*', and it is the spelling the hero uses (k~g·m·s⁻²).
+    // Omitting it meant the canonical form got the LESS informative colouring.
+    return u.replace(/[~*\/·]+|[^~*\/·]+/g, (s) => span(/[~*\/·]/.test(s[0]) ? 'unitsep' : 'unit', s));
   }
 
   // Tokenise the interior of a <…> type annotation as vim does: olive delimiters,
@@ -138,13 +144,23 @@ html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{
     let out = '', i = 0, sd = 0, ad = 0, afterNum = false, m;
     while (i < src.length) {
       const c = src[i], r = src.slice(i);
-      if (c === '\n' || c === '\r') { out += c; i++; afterNum = false; continue; }
+      // Do NOT clear afterNum here: a newline between a value and its inline unit
+      // is legal whitespace, and clearing it made the unit render as bare value
+      // symbols. Only a real terminator clears it.
+      if (c === '\n' || c === '\r') { out += c; i++; continue; }
       if (c === ' ' || c === '\t') { m = /^[ \t]+/.exec(r); out += esc(m[0]); i += m[0].length; continue; } // keep afterNum across spaces
-      if (c === '#') { let j = i; while (j < src.length && src[j] !== '\n' && src[j] !== '\r') j++; out += span('comment', src.slice(i, j)); i = j; afterNum = false; continue; }
+      // A comment is whitespace between a value and its unit too, so afterNum survives it.
+      if (c === '#') { let j = i; while (j < src.length && src[j] !== '\n' && src[j] !== '\r') j++; out += span('comment', src.slice(i, j)); i = j; continue; }
       if (c === '<') {                                  // type annotation (single line)
-        const nl = src.indexOf('\n', i); const lim = nl < 0 ? src.length : nl;
-        let j = src.indexOf('>', i);
-        if (j < 0 || j > lim) { out += esc('<'); i++; afterNum = false; continue; }
+        // Bounded scan. Both lookups used to run to end-of-string on a miss, for
+        // EVERY '<' in the document -- quadratic on input that is mostly '<'
+        // (paste HTML or C++ templates into the playground), with no size cap
+        // above this. An annotation is single-line, so stop at the line end.
+        let lim = i + 1;
+        while (lim < src.length && src[lim] !== '\n' && src[lim] !== '\r') lim++;
+        let j = -1;
+        for (let k = i + 1; k < lim; k++) if (src[k] === '>') { j = k; break; }
+        if (j < 0) { out += esc('<'); i++; afterNum = false; continue; }
         out += ann(src.slice(i, j + 1)); i = j + 1; afterNum = false; continue;
       }
       if (c === '"') {                                  // string literal (unescaped newlines are legal, so it may span lines)

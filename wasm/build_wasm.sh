@@ -126,7 +126,12 @@ sed -i -E "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${SHIM_HASH}#" \
 # URLs above or the browser would fetch the modules twice.
 sed -i -E "s#(bovnar_wasm\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
 sed -i -E "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
-echo ">> stamped web/ module chain: core v=${CORE_HASH}, shim v=${SHIM_HASH}"
+# bovnar_highlight.js carried a HAND-WRITTEN date stamp (?v=20260720) that nobody
+# remembered to bump, so every edit to the highlighter shipped stale to returning
+# visitors from cache. Key it on its own content, like the other two.
+HL_HASH="$(sha256sum "$ROOT/web/bovnar_highlight.js" | cut -c1-12)"
+sed -i -E "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/index.html"
+echo ">> stamped web/ module chain: core v=${CORE_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}"
 
 echo ">> done:"
 ls -la "$OUT"

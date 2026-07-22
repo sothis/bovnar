@@ -45,6 +45,11 @@ EXCLUDES=(
     "doc/datetime_fractional_seconds.md"
     "doc/bovnar_pipeline.svg"
     "httpd.sh"
+    # Translation SOURCE tables. They are a build input -- gen_i18n.py has
+    # already baked them into web/<lang>/index.html by the time we stage -- and
+    # they carry the _orphaned graveyard of superseded strings. There is no
+    # reason to serve them from the live root.
+    "i18n"
 )
 
 BUILD_PDF=0
@@ -52,7 +57,8 @@ DRY_RUN=0
 RSYNC_DELETE=0
 DEST="${BOVNAR_PUBLISH_DEST:-}"
 
-usage() { sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+# 2..(last comment line) — printing past the header dumped shell source.
+usage() { sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -131,7 +137,13 @@ done
 # un-traversable by the web server (403). Forcing world-readable/-traversable
 # perms here is both the fix and idempotent on every subsequent publish.
 RSYNC_OPTS=(-az --human-readable --chmod=D755,F644)
-[ "$RSYNC_DELETE" -eq 1 ] && RSYNC_OPTS+=(--delete)
+# --delete prunes everything at the destination that is not in the staging tree,
+# and the staging tree is only what lives under web/. Anything the SERVER owns
+# must be protected explicitly -- above all .well-known/acme-challenge, which is
+# where certbot writes ACME challenges: deleting it breaks TLS renewal. Use
+# --delete-after so a transfer that fails partway does not leave the live site
+# with files already removed.
+[ "$RSYNC_DELETE" -eq 1 ] && RSYNC_OPTS+=(--delete-after --exclude='/.well-known/')
 [ "$DRY_RUN" -eq 1 ] && RSYNC_OPTS+=(--dry-run --itemize-changes)
 
 echo "==> Publishing to: $DEST"

@@ -75,6 +75,15 @@ VOID = {
 }
 # Attributes whose values reach a user or a screen reader.
 TRANS_ATTRS = {"alt", "title", "placeholder", "aria-label"}
+# Attributes that are prose EVEN ON A CODE ELEMENT, so they must be collected
+# without consulting in_code. Both are rendered as visible text:
+#   data-label     -> .tok-label::after { content: attr(data-label) }, the
+#                     TYPE / BIT-WIDTH / UNIT callouts under the anatomy figure,
+#                     which sit on spans whose own text is a code token.
+#   data-doc-title -> becomes the documentation drawer's heading, so a reader
+#                     clicking "Spezifikation (v1.1)" was getting a panel titled
+#                     "Specification (v1.1)".
+PROSE_DATA_ATTRS = {"data-label", "data-doc-title"}
 # <meta> whose content is prose, matched on name= or property=.
 META_PROSE = re.compile(r"^(description|og:(title|description|image:alt)|twitter:(title|description|image:alt))$")
 
@@ -90,7 +99,11 @@ META_PROSE = re.compile(r"^(description|og:(title|description|image:alt)|twitter
 # would silently rot as new ones appear -- a missed token makes its whole code
 # block look like prose and get "translated". Every class in index.html carrying
 # one of these prefixes is a token; no prose class does.
-CODE_CLASS = re.compile(r"\b(?:(?:c|py|sh|cl)-[a-z]+|code-block|tok)\b")
+# ("tok" is deliberately absent: the only class it ever matched was tok-label,
+#  an annotation callout rather than a token. Those spans are in_code anyway via
+#  their c-type/c-param/c-unit class, so nothing changes -- but the name was
+#  claiming something false.)
+CODE_CLASS = re.compile(r"\b(?:(?:c|py|sh|cl)-[a-z]+|code-block)\b")
 COMMENT_CLASS = re.compile(r"\b(c-comment|py-comment|sh-comment|comment)\b")
 
 
@@ -150,8 +163,7 @@ class UnitFinder(html.parser.HTMLParser):
         in_comment = parent_comment or bool(COMMENT_CLASS.search(cls))
 
         # Translatable attributes are independent of the unit structure.
-        if not in_code or in_comment:
-            self._collect_attrs(tag, attrs, raw)
+        self._collect_attrs(tag, attrs, raw, prose_ok=(not in_code or in_comment))
 
         if tag in BLOCK or (in_code and not in_comment):
             # Mark every ancestor, not just the parent: a wrapper whose only
@@ -172,24 +184,34 @@ class UnitFinder(html.parser.HTMLParser):
         self.stack.append([tag, dict(attrs), self._end_of_tag(), False, False,
                            in_code, in_comment, False])
 
-    def _collect_attrs(self, tag, attrs, raw):
-        """Record offsets of translatable attribute values inside a start tag."""
+    def _collect_attrs(self, tag, attrs, raw, prose_ok=True):
+        """Record offsets of translatable attribute values inside a start tag.
+
+        prose_ok is False inside a code span: the element's TEXT is code, so its
+        alt/title/aria-label would be too. PROSE_DATA_ATTRS ignore that, because
+        they are prose regardless of what the element itself contains.
+        """
         wanted = []
-        if tag == "meta":
+        if prose_ok and tag == "meta":
             d = dict(attrs)
             name = d.get("name") or d.get("property") or ""
             if META_PROSE.match(name) and d.get("content"):
                 wanted.append(("content", d["content"]))
         for a, v in attrs:
-            if a in TRANS_ATTRS and v and has_letters(v):
+            if not v or not has_letters(v):
+                continue
+            if a in PROSE_DATA_ATTRS or (prose_ok and a in TRANS_ATTRS):
                 wanted.append((a, v))
         base = self._off()
         for name, value in wanted:
-            # Find this attribute's value span within the raw start tag. Match
-            # the attribute by name so repeated values can't be confused.
+            # Anchor the name: \b matches between '-' and 't', so searching for
+            # "title" would hit data-doc-title= first and splice the WRONG span.
             m = re.search(
-                rf"""\b{re.escape(name)}\s*=\s*(?:"([^"]*)"|'([^']*)')""", raw)
+                rf"""(?<![\w-]){re.escape(name)}\s*=\s*(?:"([^"]*)"|'([^']*)')""", raw)
             if not m:
+                if re.search(rf"""(?<![\w-]){re.escape(name)}\s*=\s*[^\s"'>]""", raw):
+                    print(f"warning: unquoted {name}= not translatable: "
+                          f"{raw[:70]}", file=sys.stderr)
                 continue
             g = 1 if m.group(1) is not None else 2
             self.attrs.append((base + m.start(g), base + m.end(g), m.group(g)))
@@ -199,8 +221,8 @@ class UnitFinder(html.parser.HTMLParser):
             return
         raw = self.get_starttag_text() or ""
         cls = dict(attrs).get("class", "") or ""
-        if not (self.stack and self.stack[-1][5]) or COMMENT_CLASS.search(cls):
-            self._collect_attrs(tag, attrs, raw)
+        self._collect_attrs(tag, attrs, raw, prose_ok=(
+            not (self.stack and self.stack[-1][5]) or bool(COMMENT_CLASS.search(cls))))
         if tag in BLOCK:
             for frame in self.stack:
                 frame[3] = True
@@ -279,10 +301,27 @@ def find_units(src: str):
     attrs = [a for a in p.attrs
              if not any(s <= a[0] and a[1] <= e for s, e, _ in units)]
 
-    uncovered = [(line, t) for off, line, t, frame in p.text_nodes
-                 if not frame[7]                       # loose text inside code
-                 and not any(s <= off < e for s, e, _ in units)]
-    return units, attrs, uncovered
+    # A text node inside a container that also holds token spans is normally a
+    # loose code fragment ("src,", "opts);") between them, so frame[7] suppresses
+    # it. But that also silently swallowed genuine PROSE placed beside a token
+    # span: neither a unit nor an uncovered string, so it would ship English with
+    # the gate green. Suppression is kept -- removing it floods the check with
+    # code fragments -- but anything reading like a sentence is surfaced.
+    def prose_like(t: str) -> bool:
+        if any(c in t for c in "(){};=<>"):
+            return False
+        return len(re.findall(r"[A-Za-zAOUaou\u00c4\u00d6\u00dc\u00e4\u00f6\u00fc\u00df]{3,}", t)) >= 2
+
+    uncovered, suspicious = [], []
+    for off, line, t, frame in p.text_nodes:
+        if any(s <= off < e for s, e, _ in units):
+            continue
+        if frame[7]:
+            if prose_like(t):
+                suspicious.append((line, t))
+            continue
+        uncovered.append((line, t))
+    return units, attrs, uncovered + suspicious
 
 
 def load_table(lang: str) -> dict:
@@ -305,17 +344,29 @@ def cmd_extract(lang: str) -> int:
     for _s, _e, value in attrs:
         new_a[value] = old_a.get(value, "")
 
-    dropped = [k for k in old_u if k not in new_u and old_u[k]]
-    dropped += [k for k in old_a if k not in new_a and old_a[k]]
+    dropped_u = [k for k in old_u if k not in new_u and old_u[k]]
+    dropped_a = [k for k in old_a if k not in new_a and old_a[k]]
+    dropped = dropped_u + dropped_a
     table["units"], table["attrs"] = new_u, new_a
     table.setdefault("js", {})
     table.setdefault("_meta", {})["lang"] = lang
     # Keep translations that no longer match, under a separate key, so hand
     # work is never destroyed by an extract after an English edit.
     if dropped:
+        # Namespaced: a string can be BOTH a unit and an attribute (the page
+        # title is also og:title), and a flat dict keyed on the text alone would
+        # store the unit's German under a dropped attribute's key and lose the
+        # attribute translation.
         stale = table.setdefault("_orphaned", {})
-        for k in dropped:
-            stale[k] = old_u.get(k) or old_a.get(k)
+        if not isinstance(stale.get("units"), dict):
+            stale = table["_orphaned"] = {"units": {}, "attrs": {},
+                                          **{k: v for k, v in stale.items()
+                                             if k not in ("units", "attrs")}}
+        stale.setdefault("units", {}); stale.setdefault("attrs", {})
+        for k in dropped_u:
+            stale["units"][k] = old_u[k]
+        for k in dropped_a:
+            stale["attrs"][k] = old_a[k]
 
     I18N_DIR.mkdir(parents=True, exist_ok=True)
     (I18N_DIR / f"{lang}.json").write_text(
@@ -379,6 +430,23 @@ def generate(lang: str, check_only: bool) -> int:
               f"web/i18n/{lang}.json", file=sys.stderr)
         return 1
 
+    # The js table was never validated: a new bvnrT('x', 'English') shipped
+    # English on every translated page with the gate still green -- exactly the
+    # failure this tool exists to prevent, just on the other half of the strings.
+    used = js_keys(src)
+    have = set(table.get("js", {}))
+    missing_js = sorted(k for k in used - have)
+    dead_js = sorted(k for k in have - used)
+    if missing_js:
+        print(f"error: {len(missing_js)} bvnrT() key(s) have no '{lang}' "
+              f"translation:", file=sys.stderr)
+        for k in missing_js:
+            print(f"  - {k}", file=sys.stderr)
+        return 1
+    if dead_js:
+        print(f"note: {len(dead_js)} unused key(s) in web/i18n/{lang}.json['js']: "
+              f"{', '.join(dead_js)}", file=sys.stderr)
+
     bad = check_js_paths(src)
     if bad:
         print(f"error: {len(bad)} document-relative path(s) in <script> do not "
@@ -388,10 +456,38 @@ def generate(lang: str, check_only: bool) -> int:
         return 1
 
     if check_only:
-        print(f"{lang}: all {len(units)} units and {len(attrs)} attributes "
-              f"are translated; script paths use BASE")
+        # Also verify the OUTPUT is current, not just the translations. The
+        # docstring's anti-drift promise covered a changed English string
+        # orphaning its key -- it said nothing about web/<lang>/index.html itself
+        # being older than the sources it was spliced from. publish_web.sh always
+        # regenerates, but web/httpd.sh serves the tree directly and a manual
+        # rsync would ship whatever is on disk.
+        dest = WEB / lang / "index.html"
+        if dest.exists():
+            fresh = splice(src, edits)
+            fresh = localize_document(fresh, lang, table)
+            if dest.read_text(encoding="utf-8") != fresh:
+                print(f"error: web/{lang}/index.html is STALE -- it differs from "
+                      f"what index.html + i18n/{lang}.json produce now. "
+                      f"Regenerate: ./gen_i18n.py {lang}", file=sys.stderr)
+                return 1
+        print(f"{lang}: all {len(units)} units, {len(attrs)} attributes and "
+              f"{len(used)} runtime strings are translated; script paths use "
+              f"BASE; web/{lang}/index.html is current")
         return 0
 
+    doc = localize_document(splice(src, edits), lang, table)
+
+    dest_dir = WEB / lang
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    (dest_dir / "index.html").write_text(doc, encoding="utf-8")
+    print(f"wrote web/{lang}/index.html "
+          f"({len(units)} units, {len(attrs)} attributes)")
+    return 0
+
+
+def splice(src: str, edits) -> str:
+    """Apply (start, end, replacement) edits to src, left to right."""
     out = []
     pos = 0
     for s, e, rep in sorted(edits):
@@ -406,33 +502,48 @@ def generate(lang: str, check_only: bool) -> int:
         out.append(rep)
         pos = e
     out.append(src[pos:])
-    doc = "".join(out)
-    doc = localize_document(doc, lang, table)
-
-    dest_dir = WEB / lang
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    (dest_dir / "index.html").write_text(doc, encoding="utf-8")
-    print(f"wrote web/{lang}/index.html "
-          f"({len(units)} units, {len(attrs)} attributes)")
-    return 0
+    return "".join(out)
 
 
 def localize_document(doc: str, lang: str, table: dict) -> str:
     """Fix up document-level metadata that is not a translation unit."""
     locale = {"de": "de_DE"}.get(lang, lang)
-    doc = doc.replace('<html lang="en">', f'<html lang="{lang}">', 1)
-    doc = re.sub(r'(<meta property="og:locale" content=")[^"]*(")',
-                 rf"\g<1>{locale}\g<2>", doc, count=1)
-    # Assets and links are one directory deeper under web/<lang>/.
-    doc = re.sub(r'((?:href|src)=")(?!https?:|//|#|/|data:)', r"\1../", doc)
+
+    def once(pattern, repl, text, what):
+        """Substitute exactly once, or fail loudly.
+
+        These were plain replaces that silently did nothing if the markup shifted
+        -- a different attribute order or quote style and the edition would ship
+        unchanged. The <html lang> one is the dangerous case: the pre-paint
+        redirect reads document.documentElement.lang to decide whether it is
+        already on the translated edition, so a missed rewrite leaves /de/
+        claiming lang="en" and a visitor with a stored preference is redirected
+        from /de/ to /de/ forever.
+        """
+        out, n = re.subn(pattern, repl, text, count=1)
+        if n != 1:
+            raise SystemExit(f"error: could not rewrite {what} for '{lang}' -- "
+                             f"the markup in web/index.html changed shape. "
+                             f"gen_i18n.py must be updated before publishing.")
+        return out
+
+    doc = once(r'(<html\b[^>]*\blang=")en(")', rf"\g<1>{lang}\g<2>", doc, "<html lang>")
+    doc = once(r'(<meta property="og:locale" content=")[^"]*(")',
+               rf"\g<1>{locale}\g<2>", doc, "og:locale")
+    # Assets and links are one directory deeper under web/<lang>/. Allow-list the
+    # forms that are genuinely document-relative: anything with a scheme
+    # (mailto:, tel:, https:), a root/protocol-relative path, a fragment, a bare
+    # query, or an empty value must be left alone.
+    doc = re.sub(r'((?:href|src)=")(?![a-zA-Z][a-zA-Z0-9+.\-]*:|//|#|/|\?|")',
+                 r"\1../", doc)
     # This edition is its own canonical URL. Left pointing at the English page,
     # it would tell search engines the translation is a duplicate and should not
-    # be indexed at all -- exactly the opposite of why it exists. The hreflang
-    # alternates are absolute and deliberately copied unchanged.
-    doc = re.sub(r'(<link rel="canonical" href="https://[^"]*?)/?"',
-                 rf'\g<1>/{lang}/"', doc, count=1)
-    doc = re.sub(r'(<meta property="og:url" content="https://[^"]*?)/?"',
-                 rf'\g<1>/{lang}/"', doc, count=1)
+    # be indexed at all -- exactly the opposite of why it exists. Capture the
+    # ORIGIN only, so a canonical that already carries a path is not corrupted.
+    doc = once(r'(<link rel="canonical" href="https://[^"/]*)(?:/[^"]*)?"',
+               rf'\g<1>/{lang}/"', doc, "canonical")
+    doc = once(r'(<meta property="og:url" content="https://[^"/]*)(?:/[^"]*)?"',
+               rf'\g<1>/{lang}/"', doc, "og:url")
     # The translated page lives one directory down, so paths that JavaScript
     # resolves against the document need a prefix. index.html reads this as
     # BASE; check_js_paths() guarantees nothing bypasses it.
@@ -440,17 +551,38 @@ def localize_document(doc: str, lang: str, table: dict) -> str:
     js = table.get("js", {})
     if js:
         boot["__BVNR_I18N__"] = js
-    decls = "".join(f"window.{k}={json.dumps(v, ensure_ascii=False)};"
-                    for k, v in boot.items())
+    # Escape "</" so a translation containing </script> cannot terminate the
+    # element and destroy the page from that point on. JSON.parse is unaffected:
+    # "<\/script>" is the same string.
+    decls = "".join(
+        f"window.{k}={json.dumps(v, ensure_ascii=False).replace('</', '<\\/')};"
+        for k, v in boot.items())
     doc = doc.replace("</head>", f"<script>{decls}</script>\n</head>", 1)
     return doc
 
 
 # Quoted paths in <script> that resolve against the document, not the script.
 JS_PATH = re.compile(
-    r"""(?P<pre>.{0,12})(?P<q>['"])(?P<path>(?!https?:|//|/|\#|data:|\.\./)"""
-    r"""[\w][\w./-]*(?:\.(?:png|jpe?g|svg|gif|webp|ico|css|js|mjs|json|md|pdf|zip)|/))"""
+    r"""(?P<pre>.{0,16})(?P<q>['"`])(?P<path>(?!https?:|//|/|\#|data:|\.\./)"""
+    r"""[\w][\w./-]*(?:\.(?:png|jpe?g|svg|gif|webp|ico|css|js|mjs|json|md|pdf|zip)"""
+    r"""(?:\?[^'"`]*)?|/))"""
     r"""(?P=q)""")
+# Backticks are included: a template literal is the natural way to write a path
+# in this codebase, and one there used to slip past the gate entirely. A query
+# string after the extension is allowed too (bovnar_parser_wasm.js?v=...).
+BASE_PREFIXED = re.compile(r"(?:BASE|__BVNR\w*)\s*\+\s*$")
+
+
+# Runtime strings the sims/playground/doc drawer read through bvnrT(key, english).
+BVNRT_CALL = re.compile(r'''\bbvnrT\(\s*['"]([^'"]+)['"]''')
+
+
+def js_keys(src: str) -> set[str]:
+    """Every bvnrT() key used in <script> blocks."""
+    keys = set()
+    for m in re.finditer(r"<script\b[^>]*>(.*?)</script>", src, re.S | re.I):
+        keys.update(BVNRT_CALL.findall(m.group(1)))
+    return keys
 
 
 def check_js_paths(src: str) -> list[str]:
@@ -465,7 +597,8 @@ def check_js_paths(src: str) -> list[str]:
                          re.S | re.I):
         block, base = m.group(1), m.start(1)
         for p in JS_PATH.finditer(block):
-            if "BASE +" in p.group("pre") or "__BVNR" in p.group("pre"):
+            # Accept any spacing around the concatenation, not just "BASE +".
+            if BASE_PREFIXED.search(p.group("pre")):
                 continue
             line = src.count("\n", 0, base + p.start("path")) + 1
             bad.append(f"index.html:{line}: {p.group('path')}")

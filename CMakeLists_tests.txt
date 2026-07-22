@@ -1097,7 +1097,11 @@ endif()
 # rejects a document-relative asset path added to a <script>, which would 404
 # only on the translated pages.
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/web/i18n)
-    file(GLOB _i18n_tables ${CMAKE_CURRENT_SOURCE_DIR}/web/i18n/*.json)
+    # CONFIGURE_DEPENDS so dropping in web/i18n/fr.json re-runs CMake and
+    # actually registers its gate, instead of waiting for an unrelated
+    # reconfigure. Note a new language file also moves the registered test
+    # count, so BVNR_EXPECTED_TEST_COUNT must be bumped with it.
+    file(GLOB _i18n_tables CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/web/i18n/*.json)
     foreach(_tbl ${_i18n_tables})
         get_filename_component(_lang "${_tbl}" NAME_WE)
         add_test(

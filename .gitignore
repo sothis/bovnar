@@ -17,4 +17,5 @@ bovnar.zip
 # web/i18n/<lang>.json by gen_i18n.py, which publish_web.sh runs before every
 # upload. Committing them would just create a second thing to keep in sync --
 # unlike the WASM artifact, they need no toolchain to rebuild.
-web/??/index.html
+web/[a-z][a-z]/
+web/[a-z][a-z]-[A-Za-z]*/

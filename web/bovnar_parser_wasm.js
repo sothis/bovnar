@@ -237,19 +237,22 @@
                line: e.line, col: e.column, offset: e.offset };
     });
   }
-  /* One-entry memo on the raw text. The playground renders the same document
-     more than once -- the bovnar-wasm-ready re-render, a scroll-triggered
-     refresh, an example button re-clicked -- and each render costs TWO full
-     WASM passes over the document plus two JSON round-trips (events and errors
-     are separate exports). Keyed on identity of the input string, so any real
-     edit misses immediately. Holds one document, so it cannot grow. */
-  var lastText = null, lastResult = null;
-  function wasmFaithful(text) {
-    if (text === lastText && lastResult) return lastResult;
-    // One reader pass for both streams (bvnr_wasm_parse). This used to call
-    // wasm.events() and wasm.errors() separately, walking the document twice and
-    // paying two JSON round-trips. Falls back to the two older exports if the
-    // module predates the combined one.
+  /* Single source of both streams, shared by parseFaithful and parseBovnar.
+     bvnr_wasm_parse runs ONE reader carrying both callbacks; the two older
+     exports each construct their own reader and walk the whole document, so
+     using them together cost two passes and two JSON round-trips. The fallback
+     is kept for a module that predates the combined export -- note the probe is
+     on wasm.parse, which index.mjs defines only when the compiled core actually
+     exports it, so a current wrapper paired with a stale core still falls back
+     rather than throwing.
+
+     One-entry memo on the input string: the same document is parsed more than
+     once (the bovnar-wasm-ready re-render, an example button re-clicked, and
+     every demo step re-parses its just-encoded frame). Keyed on string identity,
+     so any real edit misses immediately; one entry, so it cannot grow. */
+  var lastText = null, lastRaw = null;
+  function rawParse(text) {
+    if (text === lastText && lastRaw) return lastRaw;
     var events, errObj;
     if (typeof wasm.parse === 'function') {
       var both = wasm.parse(text);
@@ -259,15 +262,21 @@
       events = wasm.events(text).events || [];
       errObj = wasm.errors(text);
     }
-    var tree = buildTree(events, makeScan(text));
-    lastResult = { events: events, errors: mapErrors(errObj), tree: tree };
+    lastRaw = { events: events, errors: mapErrors(errObj) };
     lastText = text;
-    return lastResult;
+    return lastRaw;
+  }
+
+  function wasmFaithful(text) {
+    var raw = rawParse(text);
+    if (!raw.tree) raw.tree = buildTree(raw.events, makeScan(text));
+    return raw;
   }
 
   /* ── parseBovnar: translate the verified event stream to the live cb ───── */
   function wasmBovnar(text, cb) {
-    var events = wasm.events(text).events || [];
+    var raw = rawParse(text);
+    var events = raw.events;
     var scan = makeScan(text);
     var line = 0, arrayOpen = false;
     function E(type, data) { cb({ type: type, data: data || {}, line: line }); }
@@ -321,9 +330,11 @@
         default: break;
       }
     }
-    var errs = wasm.errors(text).errors || [];
+    // Same pass as the events above -- this was a second full walk of the
+    // document. mapErrors already normalised error_name onto .code/.message.
+    var errs = raw.errors;
     for (var k = 0; k < errs.length; k++)
-      cb({ type: EV.ERROR, data: { msg: errs[k].error_name, code: errs[k].error_name }, line: errs[k].line });
+      cb({ type: EV.ERROR, data: { msg: errs[k].message, code: errs[k].code }, line: errs[k].line });
   }
 
   function peekVersion(text) {

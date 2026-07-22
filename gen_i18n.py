@@ -106,6 +106,22 @@ META_PROSE = re.compile(r"^(description|og:(title|description|image:alt)|twitter
 CODE_CLASS = re.compile(r"\b(?:(?:c|py|sh|cl)-[a-z]+|code-block)\b")
 COMMENT_CLASS = re.compile(r"\b(c-comment|py-comment|sh-comment|comment)\b")
 
+# Every class CODE_CLASS is expected to match. The prefix rule above is what
+# makes the BEHAVIOUR right -- a new highlighter token is treated as code
+# automatically instead of being mistaken for prose and "translated". But the
+# same breadth means a PROSE class that happens to match (cl-eanup, sh-adow)
+# would be swallowed with no diagnostic: its text would simply vanish from the
+# translation set. This list is not used for matching. It exists so --check can
+# report that the matched set CHANGED, and either reading of that is worth
+# seeing:
+#   a new token class -> behaviour was already correct, add it here
+#   a new prose class -> its text is being silently dropped, rename the class
+KNOWN_CODE_CLASSES = frozenset(
+    "c-a c-ann c-comment c-eq c-key c-num c-param c-semi c-sigil c-str "
+    "c-struct c-type c-unit c-val cl-fn cl-inc cl-kw cl-num cl-str cl-type "
+    "cl-var code-block py-bi py-fn py-kw py-num py-str sh-cmd sh-flag sh-var"
+    .split())
+
 
 def has_letters(s: str) -> bool:
     """Prose has at least one two-letter word; '42' and '×' do not."""
@@ -136,6 +152,7 @@ class UnitFinder(html.parser.HTMLParser):
         self.cand: list[tuple[int, int, str]] = []    # (start, end, innerHTML)
         self.attrs: list[tuple[int, int, str]] = []   # (start, end, value)
         self.text_nodes: list[tuple[int, int, str]] = []  # (offset, line, text)
+        self.code_classes: set[str] = set()   # every class CODE_CLASS matched
 
     def _off(self) -> int:
         line, col = self.getpos()
@@ -159,7 +176,9 @@ class UnitFinder(html.parser.HTMLParser):
         cls = dict(attrs).get("class", "") or ""
         parent_code = self.stack[-1][5] if self.stack else False
         parent_comment = self.stack[-1][6] if self.stack else False
-        in_code = parent_code or bool(CODE_CLASS.search(cls))
+        own_code = [c for c in cls.split() if CODE_CLASS.fullmatch(c)]
+        self.code_classes.update(own_code)
+        in_code = parent_code or bool(own_code)
         in_comment = parent_comment or bool(COMMENT_CLASS.search(cls))
 
         # Translatable attributes are independent of the unit structure.
@@ -312,6 +331,8 @@ def find_units(src: str):
             return False
         return len(re.findall(r"[A-Za-zAOUaou\u00c4\u00d6\u00dc\u00e4\u00f6\u00fc\u00df]{3,}", t)) >= 2
 
+    unknown_code = sorted(p.code_classes - KNOWN_CODE_CLASSES)
+
     uncovered, suspicious = [], []
     for off, line, t, frame in p.text_nodes:
         if any(s <= off < e for s, e, _ in units):
@@ -321,7 +342,7 @@ def find_units(src: str):
                 suspicious.append((line, t))
             continue
         uncovered.append((line, t))
-    return units, attrs, uncovered + suspicious
+    return units, attrs, uncovered + suspicious, unknown_code
 
 
 def load_table(lang: str) -> dict:
@@ -333,7 +354,7 @@ def load_table(lang: str) -> dict:
 
 def cmd_extract(lang: str) -> int:
     src = SRC.read_text(encoding="utf-8")
-    units, attrs, uncovered = find_units(src)
+    units, attrs, uncovered, unknown_code = find_units(src)
     table = load_table(lang)
     old_u, old_a = table.get("units", {}), table.get("attrs", {})
 
@@ -379,7 +400,22 @@ def cmd_extract(lang: str) -> int:
     if dropped:
         print(f"{len(dropped)} translation(s) no longer match the English "
               f"source; moved to _orphaned in {lang}.json")
-    return report_uncovered(uncovered)
+    return report_code_classes(unknown_code) or report_uncovered(uncovered)
+
+
+def report_code_classes(unknown) -> int:
+    """A class newly treated as code is either a new token or swallowed prose."""
+    if not unknown:
+        return 0
+    print(f"\nerror: {len(unknown)} class(es) are being treated as CODE but are "
+          f"not in KNOWN_CODE_CLASSES:", file=sys.stderr)
+    for c in unknown:
+        print(f"  - {c}", file=sys.stderr)
+    print("If these are highlighter tokens, add them to KNOWN_CODE_CLASSES in "
+          "gen_i18n.py.\nIf any is a PROSE class, its text is being dropped from "
+          "the translation set\nwithout a trace -- rename the class so it does "
+          "not match CODE_CLASS.", file=sys.stderr)
+    return 1
 
 
 def report_uncovered(uncovered) -> int:
@@ -397,7 +433,7 @@ def report_uncovered(uncovered) -> int:
 
 def generate(lang: str, check_only: bool) -> int:
     src = SRC.read_text(encoding="utf-8")
-    units, attrs, uncovered = find_units(src)
+    units, attrs, uncovered, unknown_code = find_units(src)
     table = load_table(lang)
     tu, ta = table.get("units", {}), table.get("attrs", {})
 
@@ -446,6 +482,9 @@ def generate(lang: str, check_only: bool) -> int:
     if dead_js:
         print(f"note: {len(dead_js)} unused key(s) in web/i18n/{lang}.json['js']: "
               f"{', '.join(dead_js)}", file=sys.stderr)
+
+    if unknown_code:
+        return report_code_classes(unknown_code)
 
     bad = check_js_paths(src)
     if bad:

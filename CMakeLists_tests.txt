@@ -1020,7 +1020,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 118)   # +2: bvnr_i18n_de, bvnr_wasm_wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 118)   # 116 base + bvnr_i18n_de + bvnr_wasm_wrapper_sync
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

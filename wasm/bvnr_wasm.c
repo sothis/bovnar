@@ -761,8 +761,22 @@ char *bvnr_wasm_parse(const char *buf, int len)
 	error_code_t err = r ? bvnr_reader_get_error(r) : error_invalid_argument;
 	if (!opened && err == error_none) err = error_invalid_argument;
 
+	/* `ok` here means "nothing went wrong", which for a payload that also
+	 * carries an errors array must account for RECOVERED errors. emit_status
+	 * derives ok from the reader's final error code, and under
+	 * continue_on_error a document that resyncs and then reaches EOF cleanly
+	 * has that code cleared (bovnar_lexer.c clears last_error on the clean-EOF
+	 * break; tests/bovnar_reader_test.c asserts it). Using emit_status verbatim
+	 * therefore produced {"ok":true, ..., "errors":[...3 entries...]} -- self-
+	 * contradictory, and disagreeing with bvnr_wasm_errors, which computes ok
+	 * from its error COUNT. Match that instead. The exact reader code is still
+	 * reported separately in "error"/"error_name", so nothing is lost. */
 	sb_putc(&b, '{');
-	emit_status(&b, err);
+	sb_printf(&b, "\"ok\":%s,",
+	          (err == error_none && ud.er.count == 0) ? "true" : "false");
+	sb_printf(&b, "\"error\":%d,", (int)err);
+	sb_puts(&b, "\"error_name\":");
+	sb_json_cstr(&b, bvn_error_to_string(err));
 	sb_puts(&b, ",\"events\":[");
 	char *evs = sb_finish(&evbuf);
 	if (evs) { sb_puts(&b, evs); free(evs); }

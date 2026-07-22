@@ -120,8 +120,8 @@ window.bvnrT = function (key, english) {
      rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
      runs its dynamic import(). The ?v is the build-stamped content hash — it must
      match the dynamic import so the module is reused, not re-fetched. -->
-<link rel="modulepreload" href="bovnar_wasm_core.js?v=d28b63b0fdf9">
-<link rel="modulepreload" href="bovnar_wasm.js?v=d28b63b0fdf9">
+<link rel="modulepreload" href="bovnar_wasm_core.js?v=2580aa622694">
+<link rel="modulepreload" href="bovnar_wasm.js?v=2580aa622694">
 <!-- Globe textures are sampled offscreen by the Mission Control demo, which is the
      default-visible demo below the fold — preload them at high priority so they're
      decoded before the demo first samples them, avoiding a blank/late globe. -->
@@ -3825,7 +3825,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </div>
 </div>
 
-<script src="bovnar_parser_wasm.js?v=6954a5d9b201"></script>
+<script src="bovnar_parser_wasm.js?v=9cc92028cfc2"></script>
 <script src="bovnar_highlight.js?v=20260720"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
@@ -4718,6 +4718,13 @@ function closeDrawerDOM() {
   drawer.classList.remove('open');
   document.body.style.overflow = '';
   currentFile = null;
+  // Drop the rendered document. A closed drawer was holding its entire DOM --
+  // measured at 7,262 nodes for the specification, 75% of the whole page's node
+  // count -- for a panel the reader had shut, and since renderCache now keeps the
+  // HTML string too it was retained twice over. Re-opening rebuilds from that
+  // cache in ~14 ms, so there is nothing to gain by keeping the nodes alive.
+  content.textContent = '';
+  showState('loading');
   if (lastFocus && lastFocus.focus) lastFocus.focus();   // restore focus to the trigger
   lastFocus = null;
 }

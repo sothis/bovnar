@@ -23,7 +23,7 @@
 // `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
 // through verbatim — required if the document embeds octet streams with NULs).
 
-import createBovnar from './bovnar_wasm_core.js?v=d28b63b0fdf9';
+import createBovnar from './bovnar_wasm_core.js?v=2580aa622694';
 
 const enc = new TextEncoder();
 
@@ -115,8 +115,20 @@ export async function loadBovnar(opts) {
     /** Events AND errors from a SINGLE reader pass:
      *  { ok, error, error_name, events:[...], errors:[...], declared_version }.
      *  Prefer this over calling events() and errors() for the same document —
-     *  that walks it twice and pays two JSON round-trips. */
-    parse: (input) => callJson('bvnr_wasm_parse', input),
+     *  that walks it twice and pays two JSON round-trips.
+     *
+     *  `ok` is false if ANY error was reported, including ones the reader
+     *  recovered from — matching errors(), not events(). events() reports the
+     *  reader's final code, which continue_on_error clears on a clean EOF.
+     *
+     *  Defined only when the compiled module actually exports it: this wrapper
+     *  and the core are separate URLs with separate cache entries, so a current
+     *  wrapper can be paired with a stale core. Callers feature-test `parse`,
+     *  and an unconditional definition would make that test lie and turn a
+     *  recoverable fallback into a throw. */
+    ...(typeof Module._bvnr_wasm_parse === 'function'
+        ? { parse: (input) => callJson('bvnr_wasm_parse', input) }
+        : {}),
 
     /** The event stream with the reader's LOSSLESS unit/base conversion armed,
      *  so numeric events also carry `converted` (the exact value, or null when

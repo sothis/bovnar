@@ -10,6 +10,52 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#e8e8e8">
 <script>
+/* Send a visitor to their language before anything renders, so they never see
+   the wrong edition flash past. Runs on EVERY edition (gen_i18n.py copies this
+   file verbatim), so it reads the edition it is currently on from <html lang>
+   and only navigates when the target differs — otherwise a stored choice would
+   make the page replace() itself forever.
+
+   An explicit click on the switch is recorded and always wins over the browser's
+   Accept-Language order. Deep links survive: the fragment is carried across. */
+/* Strings that only exist at runtime (built by the simulations, the playground
+   and the doc drawer) cannot be reached by gen_i18n.py, which only rewrites
+   markup. They go through bvnrT() instead: the English text stays right here as
+   the fallback, and a translated edition ships a table that overrides it. */
+window.bvnrT = function (key, english) {
+  var d = window.__BVNR_I18N__;
+  return (d && Object.prototype.hasOwnProperty.call(d, key)) ? d[key] : english;
+};
+
+(function () {
+  var EDITIONS = { en: '/', de: '/de/' };
+  var DEFAULT = 'en';               // the edition served at / and x-default
+  var here = (document.documentElement.lang || DEFAULT).toLowerCase();
+  /* Only the default edition negotiates. A translated URL was asked for
+     explicitly -- by a shared link, a search result, or the switch -- and
+     bouncing that visitor away because their browser prefers another language
+     would make those links unshareable. */
+  if (here !== DEFAULT) return;
+  function go(lang) {
+    if (lang !== here && EDITIONS[lang]) {
+      location.replace(EDITIONS[lang] + location.search + location.hash);
+    }
+  }
+  try {
+    var chosen = localStorage.getItem('bovnar-lang');
+    if (chosen) { go(chosen); return; }
+    var prefs = navigator.languages || [navigator.language || ''];
+    for (var i = 0; i < prefs.length; i++) {
+      var tag = (prefs[i] || '').toLowerCase().split('-')[0];
+      /* First recognised preference wins; an unavailable language is skipped
+         rather than treated as a match, so a de-before-en visitor still gets
+         German and an fr-only visitor simply stays where they landed. */
+      if (EDITIONS[tag]) { go(tag); return; }
+    }
+  } catch (e) { /* private mode: fall through to the edition as served */ }
+})();
+</script>
+<script>
 /* Apply the theme before first paint to avoid a flash. An explicit toggle wins;
    otherwise we follow the visitor's desktop theme. Light stays the default —
    it is what we fall back to when no dark preference can be detected. */
@@ -28,6 +74,11 @@
 <meta name="description" content="Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/">
+<!-- Translated editions. Absolute URLs, so gen_i18n.py copies them unchanged
+     and every edition advertises the same complete set, as hreflang requires. -->
+<link rel="alternate" hreflang="en" href="https://www.bovnar.io/">
+<link rel="alternate" hreflang="de" href="https://www.bovnar.io/de/">
+<link rel="alternate" hreflang="x-default" href="https://www.bovnar.io/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:url" content="https://www.bovnar.io/">
@@ -392,6 +443,21 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
   transition: background 0.15s !important;
 }
 .nav-cta:hover { background: #0086d8 !important; }
+
+/* Language switch — deliberately quieter than the GitHub CTA: it matters to the
+   fraction of visitors who need it and should not compete with the nav. */
+.nav-lang {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text3) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 3px;
+  padding: 0.28rem 0.6rem !important;
+  height: auto !important;
+  transition: color 0.15s, border-color 0.15s !important;
+}
+.nav-lang:hover { color: var(--text) !important; border-color: var(--text3) !important; }
 
 /* ── LAUNCH DEMO (auto-running Mission Control, shown under the hero) ── */
 #launch-demo {
@@ -2238,7 +2304,12 @@ a[data-doc] { cursor: pointer; }
 
 .pg-examples-bar {
   display: flex;
-  flex-wrap: nowrap;
+  /* Wrap, not nowrap. With nowrap every button was forced to an equal 1/n
+     share, and a label wider than that share overflowed on top of its
+     neighbour instead of making room -- German "Standardwerte" printed across
+     "Datetime". The English labels all happened to fit, so the layout only
+     broke once a translation existed. */
+  flex-wrap: wrap;
   gap: 0.3rem;
   padding: 0.55rem 0.85rem;
   background: var(--panel-bg);
@@ -2268,8 +2339,10 @@ a[data-doc] { cursor: pointer; }
 }
 
 .pg-example-btn {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  /* Never shrink below the label itself; a button that cannot fit its own text
+     wraps to the next row rather than overlapping the one beside it. */
+  min-width: max-content;
   text-align: center;
   font-family: var(--mono);
   font-size: 0.65rem;
@@ -2411,6 +2484,10 @@ a[data-doc] { cursor: pointer; }
     <li><a href="#quickstart">Quick Start</a></li>
     <li><a href="#docs">Docs</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
+    <!-- Language switch. The whole <li> is one translation unit, so the German
+         edition swaps target, hreflang and label together and can never point
+         at itself. -->
+    <li><a href="/de/" class="nav-lang" hreflang="de" data-lang-switch lang="de">Deutsch</a></li>
   </ul>
   <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme">
     <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -3384,8 +3461,9 @@ html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
         <div class="feature-tag">Type System</div>
         <div class="feature-title">Strong, optional typing</div>
         <div class="feature-desc">
-          Eight type families with explicit bit-width and (for numbers) a numeric base. Defaults are defined,
-          not guessed. Annotate when precision matters; omit when it doesn't.
+          Eight type families. The numeric ones take an explicit bit-width, and <code>uint</code>, <code>sint</code>
+          and <code>float</code> a numeric base. Defaults are defined, not guessed. Annotate when precision
+          matters; omit when it doesn't.
         </div>
         <div class="feature-example"><span class="c-ann">&lt;</span><span class="c-type">uint</span><span class="c-semi">:</span><span class="c-param">16</span><span class="c-ann">&gt;</span> <span class="c-val">443</span>
 <span class="c-ann">&lt;</span><span class="c-type">float</span><span class="c-semi">:</span><span class="c-param">32</span><span class="c-semi">,</span><span class="c-param">_16</span><span class="c-ann">&gt;</span> <span class="c-str">"1.0p+0"</span>
@@ -3617,7 +3695,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <div class="qs-step">
             <div class="qs-step-num">01</div>
             <div class="qs-step-title">Build the library</div>
-            <div class="qs-step-desc">Requires CMake ≥ 3.21 and a C99-conforming compiler. <code>libm</code> is the only mandatory dependency.</div>
+            <div class="qs-step-desc">Requires CMake ≥ 3.21 and a C99-conforming compiler. There are no external dependencies, at build time or runtime — not even <code>libm</code>.</div>
             <div class="code-block"><span class="c-comment"># Clone and build</span>
 <span class="sh-cmd">cmake</span> <span class="sh-flag">-B</span> build .
 <span class="sh-cmd">cmake</span> <span class="sh-flag">--build</span> build
@@ -3635,7 +3713,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <div class="qs-step">
             <div class="qs-step-num">02</div>
             <div class="qs-step-title">Link &amp; test</div>
-            <div class="qs-step-desc">The test suite includes unit tests, socket-pair round-trip tests, fuzz harnesses, and a benchmark binary.</div>
+            <div class="qs-step-desc">The test suite includes unit tests, socket-pair round-trip tests and fuzz harnesses. Benchmarks run from the CLI, with <code>bovnar bench</code>.</div>
             <div class="code-block"><span class="c-comment"># Link your app</span>
 <span class="sh-cmd">gcc</span> my_app.c \
   <span class="sh-flag">-I</span> include \
@@ -4130,8 +4208,8 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   }
   function renderAnn(ann) {
     const tag = ann.synthesized
-      ? `<span class="pg-ann-tag synth">✦ synthesised</span>`
-      : `<span class="pg-ann-tag">explicit</span>`;
+      ? `<span class="pg-ann-tag synth">✦ ${bvnrT('pg.synthesised', 'synthesised')}</span>`
+      : `<span class="pg-ann-tag">${bvnrT('pg.explicit', 'explicit')}</span>`;
     const kids = [];
     kids.push(leaf(`<span class="pg-lk">family</span><span class="pg-lv">${esc(ann.family)}</span>`));
     for (const p of ann.params) {
@@ -4219,14 +4297,15 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           + `${e.line}:${e.col}</span>`
           + `<span class="pg-error-code">${esc(e.code)}</span>`
           + `<span class="pg-error-num">#${e.codeNum}</span>`);
-        row.title = 'jump to line ' + e.line + ', column ' + e.col;
+        row.title = bvnrT('pg.jumpTo', 'jump to line $L, column $C')
+          .replace('$L', e.line).replace('$C', e.col);
         row.addEventListener('click', function () { jumpTo(e.line, e.col); });
         errList.appendChild(row);
       });
     } else {
       errPanel.classList.add('empty');
       errCount.textContent = '';
-      errList.innerHTML = '<div class="pg-error-none">no errors</div>';
+      errList.innerHTML = '<div class="pg-error-none">' + bvnrT('pg.noErrors', 'no errors') + '</div>';
     }
 
     errorLines = new Set(errs.map((e) => e.line));
@@ -4242,10 +4321,11 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     const parserLive = !!(window.BovnarParser && window.BovnarParser.isWasmReady
                           && window.BovnarParser.isWasmReady());
     if (!parserLive) {
-      statusEl.textContent = 'parser unavailable';
+      statusEl.textContent = bvnrT('pg.parserUnavailable', 'parser unavailable');
       statusEl.style.color = 'var(--amber, #d08a20)';
     } else {
-      statusEl.textContent = errs.length ? 'errors' : 'ok';
+      statusEl.textContent = errs.length ? bvnrT('pg.errors', 'errors')
+                                         : bvnrT('pg.ok', 'ok');
       statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
     }
     empty.style.display = 'none';
@@ -4262,11 +4342,11 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         treeEl.appendChild(empty);
         empty.style.display = 'flex';
         countEl.textContent = '0 events';
-        statusEl.textContent = 'ready';
+        statusEl.textContent = bvnrT('pg.ready', 'ready');
         statusEl.style.color = '';
         errPanel.classList.add('empty');
         errCount.textContent = '';
-        errList.innerHTML = '<div class="pg-error-none">no errors</div>';
+        errList.innerHTML = '<div class="pg-error-none">' + bvnrT('pg.noErrors', 'no errors') + '</div>';
         errorLines = new Set();
         errorMarks = [];
         renderGutter();
@@ -4355,7 +4435,13 @@ document.querySelectorAll('a[href^="#"]:not([data-doc])').forEach(a => {
 });
 
 /* ══ DOC OVERLAY ══ */
-const LOCAL_BASE = 'doc/';
+/* Asset paths reached from JavaScript resolve against the *document*, not this
+   script, so a translated copy one directory down (/de/) would look for
+   /de/doc/. gen_i18n.py sets __BVNR_BASE__ to '../' on those pages; it is empty
+   here. Keep every document-relative path in this file prefixed with BASE —
+   gen_i18n.py --check fails the build if a bare one appears. */
+const BASE = (typeof window !== 'undefined' && window.__BVNR_BASE__) || '';
+const LOCAL_BASE = BASE + 'doc/';
 const GH_BASE    = 'https://github.com/sothis/bovnar/blob/main/doc/';
 
 const scrim    = document.getElementById('doc-scrim');
@@ -4630,14 +4716,16 @@ function openDoc(fileRaw, title, opts) {
     if (xhr.status === 0 || xhr.status === 200) {
       renderDoc(file, xhr.responseText, frag);
     } else {
-      errMsg.textContent = 'Could not load "' + file + '" — HTTP ' + xhr.status;
+      errMsg.textContent = bvnrT('doc.httpError', 'Could not load "$F" — HTTP $S')
+        .replace('$F', file).replace('$S', xhr.status);
       showState('error');
     }
   };
   xhr.onerror = function () {
-    errMsg.textContent = 'Could not load "' + file + '". ' +
-      'If using Chrome, start it with --allow-file-access-from-files, ' +
-      'or open the page through a local server (e.g. python3 -m http.server).';
+    errMsg.textContent = bvnrT('doc.fileError',
+      'Could not load "$F". If using Chrome, start it with ' +
+      '--allow-file-access-from-files, or open the page through a local ' +
+      'server (e.g. python3 -m http.server).').replace('$F', file);
     showState('error');
   };
   xhr.send();
@@ -5187,7 +5275,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
         return td[i + 2] <= Math.max(td[i], td[i + 1]) + 6;   // not blue-dominant ⇒ land
       });
     };
-    img.src = 'earth.jpg';
+    img.src = BASE + 'earth.jpg';
   })();
 
   // ── Optional night-lights texture (NASA Black Marble, equirectangular 2:1).
@@ -5205,7 +5293,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       nightTex = { data: c.getContext('2d').getImageData(0, 0, img.width, img.height).data, w: img.width, h: img.height };
       globeRot = null;            // force a re-render so the baked lights appear
     };
-    img.src = 'earth_night.jpg';  // optional; img.onerror left default → silent fallback
+    img.src = BASE + 'earth_night.jpg';  // optional; img.onerror left default → silent fallback
   })();
 
   // The globe is rendered by per-pixel inverse texture mapping into a small
@@ -5504,9 +5592,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       ctx.fillText('ALT  ' + view.alt.toFixed(1) + ' km', 12, 20);
       ctx.fillText('VEL  ' + (view.speed/1000).toFixed(3) + ' km/s', 12, 34);
       let hudY = 48;
-      if (view.eclipse) { ctx.fillStyle = P.hudDim2; ctx.fillText('☾ ECLIPSE', 12, hudY); hudY += 14; }
-      if (occluded) { ctx.fillStyle = P.hudDim; ctx.fillText('⊘ BEHIND EARTH', 12, hudY); }
-      if (view.stale) { ctx.fillStyle = '#f44747'; ctx.fillText('▲ HOLDING — frame dropped', 12, h - 12); }
+      if (view.eclipse) { ctx.fillStyle = P.hudDim2; ctx.fillText('☾ ' + bvnrT('mc.eclipse', 'ECLIPSE'), 12, hudY); hudY += 14; }
+      if (occluded) { ctx.fillStyle = P.hudDim; ctx.fillText('⊘ ' + bvnrT('mc.behindEarth', 'BEHIND EARTH'), 12, hudY); }
+      if (view.stale) { ctx.fillStyle = '#f44747'; ctx.fillText('▲ ' + bvnrT('mc.holding', 'HOLDING — frame dropped'), 12, h - 12); }
     }
   }
 
@@ -5607,7 +5695,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       const errored = badKeys.has(key) || !r;
       let valStr, unitStr, tStr, line;
       if (errored) {
-        valStr = '—'; unitStr = ''; tStr = 'no data'; line = r ? String(r.line) : null;
+        valStr = '—'; unitStr = ''; tStr = bvnrT('mc.noData', 'no data'); line = r ? String(r.line) : null;
       } else {
         valStr = r.dataKind === 'string' ? '"' + r.valueText + '"' : r.valueText;
         unitStr = r.unit || '';
@@ -5753,8 +5841,9 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       $('s-orb').textContent = (sim.met / sim.period).toFixed(2);
       $('s-drop').textContent = sim.dropped;
       const lock = $('s-lock');
-      if (drop) { lock.className = 'lock no'; lock.innerHTML = 'lock <b>LOST</b>'; }
-      else { lock.className = 'lock ok'; lock.innerHTML = 'lock <b>LOCKED</b>'; }
+      const lockTxt = (st) => bvnrT('sim.lock', 'lock') + ' <b>' + bvnrT(st, st === 'sim.lockLost' ? 'LOST' : 'LOCKED') + '</b>';
+      if (drop) { lock.className = 'lock no'; lock.innerHTML = lockTxt('sim.lockLost'); }
+      else { lock.className = 'lock ok'; lock.innerHTML = lockTxt('sim.lockOk'); }
     }
   }
 
@@ -5793,7 +5882,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // Only the fields the visualizer actually reads — edit any of them to reshape
   // the orbit live. Self-describing: each value carries its own type + unit
   // inline (ASCII notation; SI prefixes take a '~', e.g. k~m).
-  const DEFAULT_CFG =
+  const DEFAULT_CFG = bvnrT('cfg.mc',
 `#!bovnar 1.1
 .spacecraft = {
     # orbit-updated badge
@@ -5816,7 +5905,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 .telemetry = {
     # enable error recovery
     .resync = true;
-};`;
+};`);
 
   function applyConfig() {
     const txt = $('cfg').value;
@@ -5824,12 +5913,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const msg = $('cfgmsg');
     if (dec.errs.length) {
       msg.className = 'cfg-msg err';
-      msg.textContent = '✗ ' + dec.errs.length + ' parse error(s), line ' + dec.errs[0].line;
+      msg.textContent = '✗ ' + bvnrT('cfg.parseErrors', '$N parse error(s), line $L')
+        .replace('$N', dec.errs.length).replace('$L', dec.errs[0].line);
       return;
     }
     const o = dec.map.orbit && dec.map.orbit.struct;
     if (!o || !o.altitude) {
-      msg.className = 'cfg-msg err'; msg.textContent = '✗ no .orbit.altitude found';
+      msg.className = 'cfg-msg err'; msg.textContent = '✗ ' + bvnrT('cfg.noAltitude', 'no .orbit.altitude found');
       return;
     }
     orbit = {
@@ -5851,7 +5941,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     rebuildOrbit();
     renderDerived();
     msg.className = 'cfg-msg ok';
-    msg.textContent = '✓ orbit updated — ' + orbit.name;
+    msg.textContent = '✓ ' + bvnrT('cfg.orbitUpdated', 'orbit updated — ') + orbit.name;
   }
 
   function renderDerived() {
@@ -5892,10 +5982,10 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   $('reset-cfg').addEventListener('click', () => { $('cfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig(); });
   $('play').addEventListener('click', () => {
     sim.playing = !sim.playing;
-    $('play').textContent = sim.playing ? '⏸ Pause' : '▶ Play';
+    $('play').textContent = sim.playing ? bvnrT('sim.pause', '⏸ Pause') : bvnrT('sim.play', '▶ Play');
     sim.playing ? start() : stop();
   });
-  $('step').addEventListener('click', () => { if (sim.playing) { sim.playing = false; $('play').textContent = '▶ Play'; stop(); } frame(STEP_DT, true); });
+  $('step').addEventListener('click', () => { if (sim.playing) { sim.playing = false; $('play').textContent = bvnrT('sim.play', '▶ Play'); stop(); } frame(STEP_DT, true); });
   $('speed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('speedlbl').textContent = sim.speed + '×'; });
   $('noisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
   // Two-way bind the resync toggle to the config's .resync flag: flipping the
@@ -5956,7 +6046,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // activate() only calls start() when sim.playing, so the live sim then begins
   // only on an explicit Play click.
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    sim.playing = false; $('play').textContent = '▶ Play';
+    sim.playing = false; $('play').textContent = bvnrT('sim.play', '▶ Play');
   }
   frame(0, true);
   // Registered with the demo switcher — the controller starts exactly one sim.
@@ -6098,7 +6188,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const lines = m ? { last: m.last && m.last.line, bid: m.bid && m.bid.line, ask: m.ask && m.ask.line } : {};
     pushTicker(!bad); renderFrame(text, dec.errs); renderBlotter(lastS, bidS, askS, miss, lines);
     $('fs-seq').textContent = sim.seq; $('fs-drop').textContent = sim.dropped;
-    const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
+    const lock = $('fs-lock'); lock.className = drop ? 'lock no' : 'lock ok'; lock.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>' + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
   }
   const tickerBox = $('fticker');
   let tickerCur = null;
@@ -6213,7 +6303,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   function start() { if (rafId == null) { lastWall = null; acc = 0; rafId = requestAnimationFrame(loop); } }
   function stop() { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
 
-  const DEFAULT_CFG =
+  const DEFAULT_CFG = bvnrT('cfg.fin',
 `# ── ACME equity — market-data feed config ──────────────
 # Prices ride as float_dec: exact decimal money, currency inline.
 .instrument = {
@@ -6233,13 +6323,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
 .feed = {
     .resync = true;
-};`;
+};`);
 
   function applyConfig() {
     const dec = decode($('fcfg').value), msg = $('fcfgmsg');
-    if (dec.errs.length) { msg.className = 'cfg-msg err'; msg.textContent = '✗ parse error, line ' + dec.errs[0].line; return; }
+    if (dec.errs.length) { msg.className = 'cfg-msg err'; msg.textContent = '✗ ' + bvnrT('cfg.parseError', 'parse error, line $L')
+      .replace('$L', dec.errs[0].line); return; }
     const inst = dec.map.instrument && dec.map.instrument.struct, strat = dec.map.strategy && dec.map.strategy.struct, feed = dec.map.feed && dec.map.feed.struct;
-    if (!inst || !inst.start_price) { msg.className = 'cfg-msg err'; msg.textContent = '✗ no .instrument.start_price'; return; }
+    if (!inst || !inst.start_price) { msg.className = 'cfg-msg err'; msg.textContent = '✗ ' + bvnrT('cfg.noStartPrice', 'no .instrument.start_price'); return; }
     sim.symbol = (inst.symbol && String(inst.symbol.value)) || 'SYM';
     sim.currency = (inst.currency && String(inst.currency.value)) || 'USD';
     sim.decimals = inst.decimals ? Math.max(0, Math.min(6, gnum(inst.decimals) | 0)) : 2;
@@ -6255,14 +6346,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.cashMicros = 0n; sim.feeMicros = 0n; sim.cashF = 0; sim.feeF = 0;
     sim.hist = []; sim.trades = []; sim.history = []; sim.lastGood = null;
     $('fsymhint').textContent = sim.symbol + ' · ' + sim.currency;
-    msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + sim.symbol + ' restarted';
+    msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + bvnrT('cfg.restarted', '$S restarted').replace('$S', sim.symbol);
   }
   function updateCfgHL() { $('fcfg-hl').innerHTML = Hl.highlightLines($('fcfg').value).join('\n') + '\n'; }
   $('fcfg').addEventListener('input', updateCfgHL);
   $('fcfg').addEventListener('scroll', () => { $('fcfg-hl').scrollTop = $('fcfg').scrollTop; $('fcfg-hl').scrollLeft = $('fcfg').scrollLeft; });
   $('fapply').addEventListener('click', applyConfig);
   $('freset').addEventListener('click', () => { $('fcfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig(); });
-  $('fplay').addEventListener('click', () => { sim.playing = !sim.playing; $('fplay').textContent = sim.playing ? '⏸ Pause' : '▶ Play'; sim.playing ? start() : stop(); });
+  $('fplay').addEventListener('click', () => { sim.playing = !sim.playing; $('fplay').textContent = sim.playing ? bvnrT('sim.pause', '⏸ Pause') : bvnrT('sim.play', '▶ Play'); sim.playing ? start() : stop(); });
   $('fspeed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('fspeedlbl').textContent = sim.speed + '×'; });
   $('fnoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
   // Two-way bind the resync toggle to the config's .feed.resync flag — flipping the
@@ -6311,7 +6402,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   window.addEventListener('bovnar-wasm-ready', () => { applyConfig(); seed(); });
   // Respect reduced-motion: hold a static frame; Play still starts the live sim.
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    sim.playing = false; $('fplay').textContent = '▶ Play';
+    sim.playing = false; $('fplay').textContent = bvnrT('sim.play', '▶ Play');
   }
   window.BvnrDemos = window.BvnrDemos || {};
   window.BvnrDemos.fin = {
@@ -6353,8 +6444,12 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   function gauss() { return Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd()); }
 
   const BITS = [
-    { m: 1, name: 'RUN', cls: 'ok' }, { m: 2, name: 'HEATING', cls: 'warn' }, { m: 4, name: 'AT SETPOINT', cls: 'ok' },
-    { m: 8, name: 'HIGH TEMP', cls: 'alarm' }, { m: 16, name: 'HIGH PRESS', cls: 'alarm' }, { m: 32, name: 'LOW LEVEL', cls: 'warn' },
+    { m: 1, name: bvnrT('plc.run', 'RUN'), cls: 'ok' },
+    { m: 2, name: bvnrT('plc.heating', 'HEATING'), cls: 'warn' },
+    { m: 4, name: bvnrT('plc.atSetpoint', 'AT SETPOINT'), cls: 'ok' },
+    { m: 8, name: bvnrT('plc.highTemp', 'HIGH TEMP'), cls: 'alarm' },
+    { m: 16, name: bvnrT('plc.highPress', 'HIGH PRESS'), cls: 'alarm' },
+    { m: 32, name: bvnrT('plc.lowLevel', 'LOW LEVEL'), cls: 'warn' },
   ];
 
   const sim = {
@@ -6444,7 +6539,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       level: m.level && m.level.line, flow: m.flow_in && m.flow_in.line, heat: m.heater && m.heater.line, agit: m.agitator && m.agitator.line } : {};
     pushTicker(!bad); renderFrame(text, dec.errs); renderHMI(D, miss, lines);
     $('is-cyc').textContent = sim.cyc; $('is-drop').textContent = sim.dropped;
-    const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = drop ? 'lock <b>LOST</b>' : 'lock <b>LOCKED</b>';
+    const lk = $('is-lock'); lk.className = drop ? 'lock no' : 'lock ok'; lk.innerHTML = bvnrT('sim.lock', 'lock') + ' <b>' + (drop ? bvnrT('sim.lockLost', 'LOST') : bvnrT('sim.lockOk', 'LOCKED')) + '</b>';
   }
 
   const tickerBox = $('iticker');
@@ -6486,7 +6581,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     miss = miss || {}; lines = lines || {};
     const hiT = (D.status & 8), hiP = (D.status & 16), loL = (D.status & 32);
     $('ialarms').innerHTML = BITS.filter((b) => D.status & b.m).map((b) => '<span class="alarm-chip ' + b.cls + '">' + b.name + '</span>').join('') ||
-      '<span class="alarm-chip ok">● NOMINAL</span>';
+      '<span class="alarm-chip ok">● ' + bvnrT('plc.nominal', 'NOMINAL') + '</span>';
     // `ln` (optional) links a tile to the frame line it decoded, so hovering the
     // gauge highlights that source line and vice-versa (see wireHover below).
     const dl = (ln) => (ln != null ? ' data-line="' + ln + '"' : '');
@@ -6510,8 +6605,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     $('inaive').textContent = naive.toFixed(2) + ' °C';
     $('ibvnr').textContent = D.temp.toFixed(2) + ' °C';
     const v = $('iverdict');
-    if (sim.mismatch) { v.textContent = '✗ false over-temp: reads ' + naive.toFixed(0) + ' °C'; v.style.color = 'var(--down)'; }
-    else { v.textContent = '✓ scaling matches'; v.style.color = 'var(--up)'; }
+    if (sim.mismatch) {
+      v.textContent = '✗ ' + bvnrT('plc.falseOverTemp', 'false over-temp: reads $T °C')
+        .replace('$T', naive.toFixed(0));
+      v.style.color = 'var(--down)';
+    } else {
+      v.textContent = '✓ ' + bvnrT('plc.scalingOk', 'scaling matches');
+      v.style.color = 'var(--up)';
+    }
   }
 
   const cv = $('ipx');
@@ -6700,7 +6801,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   function start() { if (rafId == null) { lastWall = null; acc = 0; rafId = requestAnimationFrame(loop); } }
   function stop() { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
 
-  const DEFAULT_CFG =
+  const DEFAULT_CFG = bvnrT('cfg.ind',
 `# ── Reactor R-204 — PLC telemetry config ───────────────
 # Fixed-point registers carry their scaling (q) and unit inline.
 .control = {
@@ -6718,13 +6819,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
 .bus = {
     .resync = true;
-};`;
+};`);
 
   function applyConfig() {
     const dec = decode($('icfg').value), msg = $('icfgmsg');
-    if (dec.errs.length) { msg.className = 'cfg-msg err'; msg.textContent = '✗ parse error, line ' + dec.errs[0].line; return; }
+    if (dec.errs.length) { msg.className = 'cfg-msg err'; msg.textContent = '✗ ' + bvnrT('cfg.parseError', 'parse error, line $L')
+      .replace('$L', dec.errs[0].line); return; }
     const c = dec.map.control && dec.map.control.struct, lim = dec.map.limits && dec.map.limits.struct, bus = dec.map.bus && dec.map.bus.struct;
-    if (!c || !c.setpoint) { msg.className = 'cfg-msg err'; msg.textContent = '✗ no .control.setpoint'; return; }
+    if (!c || !c.setpoint) { msg.className = 'cfg-msg err'; msg.textContent = '✗ ' + bvnrT('cfg.noSetpoint', 'no .control.setpoint'); return; }
     sim.setpoint = parseFloat(c.setpoint.value);
     sim.Kp = c.kp ? parseFloat(c.kp.value) : 3; sim.Ki = c.ki ? parseFloat(c.ki.value) : 0.04; sim.Kd = c.kd ? parseFloat(c.kd.value) : 6;
     sim.tempMax = lim && lim.temp_max ? parseFloat(lim.temp_max.value) : 86;
@@ -6734,14 +6836,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     sim.temp = sim.ambient + 2; sim.pressure = 1.0; sim.heater = 0; sim.integ = 0; sim.prevErr = 0; sim.cyc = 0; sim.dropped = 0; sim.tframe = 0;
     sim.hist = []; sim.history = []; sim.lastGood = null;
     sim.bubbles = []; sim.steam = []; sim.impAng = 0; sim.bubAcc = 0; sim.steamAcc = 0;
-    msg.className = 'cfg-msg ok'; msg.textContent = '✓ reactor restarted';
+    msg.className = 'cfg-msg ok'; msg.textContent = '✓ ' + bvnrT('cfg.reactorRestarted', 'reactor restarted');
   }
   function updateCfgHL() { $('icfg-hl').innerHTML = Hl.highlightLines($('icfg').value).join('\n') + '\n'; }
   $('icfg').addEventListener('input', updateCfgHL);
   $('icfg').addEventListener('scroll', () => { $('icfg-hl').scrollTop = $('icfg').scrollTop; $('icfg-hl').scrollLeft = $('icfg').scrollLeft; });
   $('iapply').addEventListener('click', applyConfig);
   $('ireset').addEventListener('click', () => { $('icfg').value = DEFAULT_CFG; updateCfgHL(); applyConfig(); });
-  $('iplay').addEventListener('click', () => { sim.playing = !sim.playing; $('iplay').textContent = sim.playing ? '⏸ Pause' : '▶ Play'; sim.playing ? start() : stop(); });
+  $('iplay').addEventListener('click', () => { sim.playing = !sim.playing; $('iplay').textContent = sim.playing ? bvnrT('sim.pause', '⏸ Pause') : bvnrT('sim.play', '▶ Play'); sim.playing ? start() : stop(); });
   $('ispeed').addEventListener('input', (e) => { sim.speed = +e.target.value; $('ispeedlbl').textContent = sim.speed + '×'; });
   $('imismatch').addEventListener('change', (e) => { sim.mismatch = e.target.checked; });
   $('inoisy').addEventListener('change', (e) => { sim.noisy = e.target.checked; });
@@ -6791,7 +6893,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   window.addEventListener('bovnar-wasm-ready', () => { applyConfig(); seed(); });
   // Respect reduced-motion: hold a static frame; Play still starts the live sim.
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    sim.playing = false; $('iplay').textContent = '▶ Play';
+    sim.playing = false; $('iplay').textContent = bvnrT('sim.play', '▶ Play');
   }
   window.BvnrDemos = window.BvnrDemos || {};
   window.BvnrDemos.ind = { activate() { sizeCanvas(); draw(); if (sim.playing) start(); }, deactivate() { stop(); } };
@@ -6805,14 +6907,16 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   const blurb = document.getElementById('demo-blurb');
   const BLURBS = {
     mc: blurb ? blurb.innerHTML : '',
-    fin: '<strong>Same format, a trading desk.</strong> The exchange serializes every tick as ' +
+    fin: bvnrT('demo.blurb.fin',
+         '<strong>Same format, a trading desk.</strong> The exchange serializes every tick as ' +
          '<code>&lt;float_dec:64,$USD&gt;</code> — exact decimal money, currency <em>inline</em> — and the chart and ' +
          'ledger run only on <em>decoded</em> values. Because prices ride as decimal (not binary float), the book stays ' +
-         'penny-perfect; watch the naïve-float ledger drift against it.',
-    ind: '<strong>Same format, a plant floor.</strong> A PLC streams reactor registers as ' +
+         'penny-perfect; watch the naïve-float ledger drift against it.'),
+    ind: bvnrT('demo.blurb.ind',
+         '<strong>Same format, a plant floor.</strong> A PLC streams reactor registers as ' +
          '<code>&lt;float_fix:16,q8,°C&gt;</code> — fixed-point scaling and unit <em>inline</em>, just like the device — ' +
          'and the HMI and PID loop run only on <em>decoded</em> values. Toggle <em>scaling mismatch</em> to see the ' +
-         'classic Modbus disaster a self-describing register can\'t cause.',
+         'classic Modbus disaster a self-describing register can\'t cause.'),
   };
   let current = 'mc';
   // Reserve the height of the TALLEST blurb so the shorter ones don't shrink the
@@ -6901,6 +7005,20 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 })();
 </script>
 
+<script id="bvnr-lang-switch">
+/* Record an explicit language choice so the pre-paint redirect in <head> stops
+   consulting Accept-Language on later visits, and carry the current fragment
+   across so switching language keeps the reader where they were. */
+(function () {
+  var a = document.querySelector('[data-lang-switch]');
+  if (!a) return;
+  a.addEventListener('click', function () {
+    try { localStorage.setItem('bovnar-lang', a.getAttribute('hreflang')); }
+    catch (e) { /* private mode: the switch still navigates, just doesn't stick */ }
+    a.href = a.getAttribute('href').split('#')[0] + location.hash;
+  });
+})();
+</script>
 <script id="bvnr-theme-toggle">
 /* Theme toggle — persists the choice and keeps <meta theme-color> in sync.
    The pre-paint script in <head> already applied the initial theme. */
@@ -6910,7 +7028,8 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   var meta = document.querySelector('meta[name="theme-color"]');
   function isLight() { return root.getAttribute('data-theme') === 'light'; }
   function sync() {
-    if (btn) btn.setAttribute('aria-label', isLight() ? 'Switch to dark theme' : 'Switch to light theme');
+    if (btn) btn.setAttribute('aria-label', isLight() ? bvnrT('theme.toDark', 'Switch to dark theme')
+                             : bvnrT('theme.toLight', 'Switch to light theme'));
     if (meta) meta.setAttribute('content', isLight() ? '#e8e8e8' : '#1e1e1e');
   }
   function apply(light) {

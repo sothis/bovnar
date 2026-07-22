@@ -89,6 +89,23 @@ if ! ls "$PDF_BUILD_DIR"/*.pdf >/dev/null 2>&1; then
     echo "         Re-run with --pdf to generate them." >&2
 fi
 
+# ── 1b. Regenerate the translated editions ──────────────────────────────────
+# web/<lang>/index.html is generated, git-ignored, and rebuilt on every publish,
+# so a translated page can never lag behind the English source it is spliced
+# from. gen_i18n.py exits non-zero if any string is untranslated or if a script
+# path would break one directory down, which fails the publish before upload.
+for _lang_table in "$WEB_DIR"/i18n/*.json; do
+    [ -e "$_lang_table" ] || continue
+    _lang="$(basename "$_lang_table" .json)"
+    echo "==> Generating web/$_lang/ from index.html + i18n/$_lang.json"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "    [dry-run] would run: python3 $ROOT/gen_i18n.py $_lang"
+        python3 "$ROOT/gen_i18n.py" --check "$_lang"
+    else
+        python3 "$ROOT/gen_i18n.py" "$_lang"
+    fi
+done
+
 # ── 2. Stage the site, resolving the web/doc symlink to real files ──────────
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/bovnar-publish.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT

@@ -1020,7 +1020,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 116)
+set(BVNR_EXPECTED_TEST_COUNT 117)   # +1: bvnr_i18n_de
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1070,6 +1070,27 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/built_from.sha256 AND BVNR_PACKAGE)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_freshness.cmake)
     set_tests_properties(bvnr_wasm_freshness PROPERTIES
         LABELS "wasm;packaging" TIMEOUT 60)
+endif()
+
+# ── Website translations still match the English source ─────────────────────
+# gen_i18n.py keys each translation on the English text it was made from, so
+# editing web/index.html orphans the German for that string. Nothing about the
+# English page changes when that happens -- it keeps working perfectly -- which
+# is exactly why this needs a test: the failure is invisible until a German
+# visitor reads a paragraph that silently reverted to English. --check also
+# rejects a document-relative asset path added to a <script>, which would 404
+# only on the translated pages.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/web/i18n)
+    file(GLOB _i18n_tables ${CMAKE_CURRENT_SOURCE_DIR}/web/i18n/*.json)
+    foreach(_tbl ${_i18n_tables})
+        get_filename_component(_lang "${_tbl}" NAME_WE)
+        add_test(
+            NAME    bvnr_i18n_${_lang}
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/gen_i18n.py --check ${_lang})
+        set_tests_properties(bvnr_i18n_${_lang} PROPERTIES
+            LABELS "web;i18n" TIMEOUT 60)
+    endforeach()
 endif()
 
 # ── Amalgamation reproducibility ────────────────────────────────────────────

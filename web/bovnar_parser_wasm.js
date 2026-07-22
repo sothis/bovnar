@@ -82,10 +82,20 @@
     // so line numbers and the value slice below are still correct).
     var masked = maskStringsAndComments(text);
     var pos = 0;
+    // Incremental line counter. This used to rescan from offset 0 on every call,
+    // and next() calls it once per assignment -- O(assignments x document), i.e.
+    // quadratic: ~46M charCodeAt calls for a 1000-assignment, 46 KB document, on
+    // the main thread, every debounce tick. The scan is strictly monotonic (pos
+    // only advances and each match index is >= the previous pos), so count
+    // newlines only over the span since the last query. lastIdx is reset if a
+    // caller ever asks for an earlier offset, so a non-monotonic use stays correct.
+    var lastIdx = 0, lastLine = 1;
     function lineAt(idx) {
-      var l = 1;
-      for (var i = 0; i < idx && i < masked.length; i++) if (masked.charCodeAt(i) === 10) l++;
-      return l;
+      if (idx > masked.length) idx = masked.length;
+      if (idx < lastIdx) { lastIdx = 0; lastLine = 1; }
+      for (var i = lastIdx; i < idx; i++) if (masked.charCodeAt(i) === 10) lastLine++;
+      lastIdx = idx;
+      return lastLine;
     }
     return function next(key) {
       var needle = '.' + key;

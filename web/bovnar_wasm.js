@@ -36,6 +36,11 @@ export async function loadBovnar(opts) {
     const bytes = toBytes(input);
     const len = bytes.length;
     const inPtr = Module._malloc(len || 1);
+    // emscripten's malloc RETURNS 0 on failure, it does not throw. Without this
+    // check a large paste that exhausts the heap would memcpy the input over
+    // address 0 -- the null page and the module's static data -- silently
+    // corrupting the parser for the rest of the session instead of failing.
+    if (!inPtr) throw new Error('bovnar: out of memory');
     if (len) Module.HEAPU8.set(bytes, inPtr);
     let outPtr = 0;
     try {
@@ -54,13 +59,20 @@ export async function loadBovnar(opts) {
     const bytes = toBytes(input);
     const len = bytes.length;
     const unitBytes = enc.encode(unit || '');
-    const inPtr = Module._malloc(len || 1);
-    const uPtr = Module._malloc(unitBytes.length + 1);
-    if (len) Module.HEAPU8.set(bytes, inPtr);
-    Module.HEAPU8.set(unitBytes, uPtr);
-    Module.HEAPU8[uPtr + unitBytes.length] = 0;
-    let outPtr = 0;
+    // Both allocations happen before the try, so a failure in the second used to
+    // leak the first. Allocate, check for the null emscripten returns on OOM,
+    // and let the finally below release whichever succeeded.
+    let inPtr = 0, uPtr = 0, outPtr = 0;
     try {
+      inPtr = Module._malloc(len || 1);
+      if (!inPtr) throw new Error('bovnar: out of memory');
+      uPtr = Module._malloc(unitBytes.length + 1);
+      if (!uPtr) throw new Error('bovnar: out of memory');
+      // Re-read HEAPU8 after every _malloc: growth swaps the ArrayBuffer and
+      // detaches any view captured earlier.
+      if (len) Module.HEAPU8.set(bytes, inPtr);
+      Module.HEAPU8.set(unitBytes, uPtr);
+      Module.HEAPU8[uPtr + unitBytes.length] = 0;
       outPtr = Module.ccall(
         'bvnr_wasm_events_convert', 'number',
         ['number', 'number', 'number', 'number', 'number'],
@@ -68,8 +80,8 @@ export async function loadBovnar(opts) {
       const json = outPtr ? Module.UTF8ToString(outPtr) : '';
       return JSON.parse(json);
     } finally {
-      Module._free(inPtr);
-      Module._free(uPtr);
+      if (inPtr) Module._free(inPtr);
+      if (uPtr) Module._free(uPtr);
       if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
     }
   }

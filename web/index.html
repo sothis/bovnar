@@ -101,36 +101,20 @@ window.bvnrT = function (key, english) {
      load or a swap-in reflow, on any page state. Latin subset first (above-the-fold),
      then latin-ext, then greek. crossorigin is required even same-origin — fonts are
      always fetched in CORS mode. (~900 KB total, cached after the first visit.) -->
-<link rel="preload" href="fonts/ibm-plex-sans-300-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/ibm-plex-sans-300-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/ibm-plex-sans-400-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- Preload ONLY the faces the page actually renders with. All 30 @font-face
+     files used to be preloaded, which defeated their own unicode-range subsetting:
+     preload fetches unconditionally, so every latin-ext and greek subset was
+     downloaded on every visit and never used (834 KB of fonts, 30 requests). The
+     rest still load on demand via unicode-range, with font-display: swap, so a
+     stray Greek glyph would still resolve -- it just no longer costs every
+     visitor who has none. -->
 <link rel="preload" href="fonts/ibm-plex-sans-400-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-400-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/ibm-plex-sans-500-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/ibm-plex-sans-600-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/jetbrains-mono-300-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/jetbrains-mono-400-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/jetbrains-mono-500-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/jetbrains-mono-600-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/ibm-plex-sans-300-italic-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-300-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-400-italic-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-400-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-500-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-600-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-300-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-400-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-500-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-600-normal-latin-ext.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-300-italic-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-300-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-400-italic-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-400-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-500-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/ibm-plex-sans-600-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-300-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-400-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-500-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
-<link rel="preload" href="fonts/jetbrains-mono-600-normal-greek.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
 <link rel="stylesheet" href="fonts/fonts.css?v=20260720">
 <!-- Fetch + compile the WASM parser's ES-module chain up front, in parallel with the
      rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
@@ -141,13 +125,23 @@ window.bvnrT = function (key, english) {
 <!-- Globe textures are sampled offscreen by the Mission Control demo, which is the
      default-visible demo below the fold — preload them at high priority so they're
      decoded before the demo first samples them, avoiding a blank/late globe. -->
-<link rel="preload" href="earth.jpg" as="image" fetchpriority="high">
-<link rel="preload" href="earth_night.jpg" as="image" fetchpriority="high">
+<!-- Canvas textures for the orbit demo, which sits below a full-height hero.
+     They are never <img> elements (the globe samples them offscreen), so they
+     cannot affect first paint -- at fetchpriority="high" their 122 KB competed
+     with the webfonts and the stylesheet for it anyway. -->
+<link rel="preload" href="earth.jpg" as="image" fetchpriority="low">
+<link rel="prefetch" href="earth_night.jpg" as="image">
 <!-- Self-hosted (marked MIT, highlight.js BSD-3) — no third-party CDN dependency,
      so the docs viewer works offline / over file:// and can't be broken by a CDN
      outage or MITM. Versioned filenames are their own cache-buster. -->
-<script src="marked-9.1.6.min.js"></script>
-<script src="highlight-11.9.0.min.js"></script>
+<!-- marked (36 KB) and highlight.js (122 KB) are used ONLY by the documentation
+     drawer, which opens on a click most visitors never make. Loaded here as plain
+     <script> they blocked the parser before the stylesheet, costing 154 KB of
+     download+compile on the critical path of every visit. They are now injected
+     on the first openDoc() call instead (see loadDocLibs). Note `defer` would NOT
+     have worked: the init calls below run in an inline end-of-body script, which
+     executes BEFORE deferred scripts, so the stubs would have won and the real
+     libraries would then have clobbered the registered bovnar grammar. -->
 <style>
 /* ── Variables ── */
 :root {
@@ -318,6 +312,9 @@ html[data-theme="light"] .hljs-invalid      { color: #d11b2b; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html {
   scroll-behavior: smooth;
+  /* Clear the 48px fixed nav, which otherwise covers the top of every anchor
+     target -- including #main from the skip link (WCAG 2.2 SC 2.4.11). */
+  scroll-padding-top: 56px;
   /* Stop mobile browsers (iOS Safari / Android Chrome) from auto-inflating the
      font of some text blocks but not others — this is what made the demo/code
      fonts look oversized next to an adjacent line in landscape. */
@@ -982,96 +979,6 @@ section { position: relative; z-index: 1; }
 }
 
 /* ── MISSION CONTROL LIVE DEMO ── */
-#demo .section-inner { padding-bottom: 3rem; }
-#demo .section-p code {
-  font-family: var(--mono);
-  font-size: 0.85em;
-  color: var(--cyan);
-}
-
-.demo-window {
-  margin-top: 1.5rem;
-  border: 1px solid var(--border);
-  background: var(--editor-bg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 10px 44px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03);
-}
-.demo-titlebar {
-  height: 38px;
-  background: var(--titlebar-bg);
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0 0.9rem;
-  flex-shrink: 0;
-  border-bottom: 1px solid #252525;
-}
-.demo-titlename {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--text3);
-  letter-spacing: 0.04em;
-}
-.demo-open {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--text2);
-  text-decoration: none;
-  border: 1px solid var(--border);
-  padding: 0.28rem 0.7rem;
-  transition: border-color 0.15s, color 0.15s;
-}
-.demo-open:hover { border-color: var(--blue2); color: var(--blue); }
-
-.demo-stage {
-  position: relative;
-  width: 100%;
-  height: clamp(540px, 80vh, 860px);
-  background: radial-gradient(circle at 50% 32%, #12131f 0%, #0a0a12 58%, #060608 100%);
-}
-/* Once the live app is mounted, the stage grows to the iframe's measured
-   content height (set in JS) so the embed never needs an inner scrollbar. */
-.demo-stage.is-live { height: auto; }
-.demo-stage iframe {
-  width: 100%;
-  height: clamp(540px, 80vh, 860px);
-  border: 0;
-  display: block;
-}
-
-.demo-poster {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1.15rem;
-  text-align: center;
-  cursor: pointer;
-  overflow: hidden;
-}
-.demo-poster::before {
-  content: '';
-  position: absolute;
-  width: min(460px, 70vw); height: min(460px, 70vw);
-  border: 1px solid rgba(86,156,214,0.16);
-  border-radius: 50%;
-  box-shadow: inset 0 0 90px rgba(0,122,204,0.10);
-}
-.demo-poster::after {
-  content: '';
-  position: absolute;
-  width: min(300px, 48vw); height: min(300px, 48vw);
-  border: 1px dashed rgba(78,201,176,0.22);
-  border-radius: 50%;
-  animation: demo-spin 32s linear infinite;
-}
-@keyframes demo-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .demo-poster::after { animation: none; } }
 
 .demo-planet {
   position: relative;
@@ -1388,7 +1295,7 @@ section { position: relative; z-index: 1; }
   font-family: var(--mono);
   font-size: 2rem;
   font-weight: 400;
-  color: var(--border);
+  color: var(--text3);            /* --border rendered at 1.34:1 */
   line-height: 1;
   margin-bottom: 0.65rem;
 }
@@ -1684,26 +1591,6 @@ footer { position: relative; z-index: 1; }
 .reveal-delay-1 { transition-delay: 0.08s; }
 .reveal-delay-2 { transition-delay: 0.16s; }
 .reveal-delay-3 { transition-delay: 0.24s; }
-.reveal-delay-4 { transition-delay: 0.32s; }
-.reveal-delay-5 { transition-delay: 0.40s; }
-
-/* ── SECTION DIVIDER ── */
-.section-divider {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 2rem 0;
-  color: var(--text3);
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-}
-.section-divider::before, .section-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
 
 /* ══════════════════════════════════════════════
    DOC OVERLAY
@@ -2361,7 +2248,10 @@ a[data-doc] { cursor: pointer; }
 @media (max-width: 900px) {
   nav { padding: 0 1rem; }
   .nav-links { gap: 0; }
-  .nav-links li:nth-child(n+4):not(:last-child) { display: none; }
+  /* Hide the later section links, never the CTA or the language switch. This
+     used to read li:nth-child(n+4):not(:last-child), which silently began
+     hiding the GitHub button the moment another <li> was appended after it. */
+  .nav-links li.nav-section:nth-of-type(n+4) { display: none; }
 
   .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; }
   .hero-right { display: none; }
@@ -2387,8 +2277,14 @@ a[data-doc] { cursor: pointer; }
 @media (max-width: 600px) {
   /* nav: drop the section links and keep only the GitHub button, pushed right */
   nav { padding: 0 0.85rem; }
-  .nav-links li:not(:last-child) { display: none; }
-  .nav-links li:last-child { margin-left: auto; }
+  .nav-links li.nav-section { display: none; }
+  .nav-links li:first-child { margin-left: auto; }
+
+  /* The annotated .thrust line is ~397px of monospace; below this width it
+     wrapped and the absolutely-positioned TYPE/BIT-WIDTH/UNIT callouts landed
+     on top of the following line. Scroll it instead of wrapping it. */
+  .anat-code { overflow-x: auto; }
+  .anat-line { font-size: 0.8rem; }
 
   #hero { padding: 6rem 1.2rem 3rem; }
   .section-inner { padding: 3rem 1.1rem; }
@@ -2476,13 +2372,13 @@ a[data-doc] { cursor: pointer; }
 <nav>
   <a class="nav-brand" href="#"><svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true" style="flex:none;vertical-align:-4px;margin-right:.55rem"><use href="#bvnr-fav"/></svg>BOVNAR<span class="ext">.bvnr</span></a>
   <ul class="nav-links">
-    <li><a href="#launch-demo">Live Demo</a></li>
-    <li><a href="#playground">Playground</a></li>
-    <li><a href="#anatomy">The Idea</a></li>
-    <li><a href="#syntax">Syntax</a></li>
-    <li><a href="#features">Features</a></li>
-    <li><a href="#quickstart">Quick Start</a></li>
-    <li><a href="#docs">Docs</a></li>
+    <li class="nav-section"><a href="#launch-demo">Live Demo</a></li>
+    <li class="nav-section"><a href="#playground">Playground</a></li>
+    <li class="nav-section"><a href="#anatomy">The Idea</a></li>
+    <li class="nav-section"><a href="#syntax">Syntax</a></li>
+    <li class="nav-section"><a href="#features">Features</a></li>
+    <li class="nav-section"><a href="#quickstart">Quick Start</a></li>
+    <li class="nav-section"><a href="#docs">Docs</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
     <!-- Language switch. The whole <li> is one translation unit, so the German
          edition swaps target, hreflang and label together and can never point
@@ -2699,44 +2595,6 @@ html[data-theme="light"] #launch-demo {
 }
 html[data-theme="light"] #launch-demo ::-webkit-scrollbar-thumb { background: #c1c1c1; }
 html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; }
-html[data-theme="light"] #launch-demo nav { border-bottom-color: var(--border); }
-html[data-theme="light"] #launch-demo .ticker i { background: #c7e6c7; }
-html[data-theme="light"] #launch-demo .ticker i.ok { background: #2e9e3a; }
-html[data-theme="light"] #launch-demo .ticker i.bad { background: #d11b2b; }
-/* canvas wrappers — shown briefly during load/resize; match the light viz fill */
-html[data-theme="light"] #launch-demo .canvas-wrap { background: #141d31; }
-html[data-theme="light"] #launch-demo .chart-wrap { background: #f5f8fc; }
-
-#launch-demo *, #launch-demo *::before, #launch-demo *::after { box-sizing: border-box; margin: 0; padding: 0; }
-#launch-demo {
-  background: var(--editor-bg);
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.5;
-}
-#launch-demo ::-webkit-scrollbar { width: 8px; height: 8px; }
-#launch-demo ::-webkit-scrollbar-track { background: var(--editor-bg); }
-#launch-demo ::-webkit-scrollbar-thumb { background: #4e4e4e; border-radius: 4px; }
-#launch-demo * { scrollbar-width: thin; scrollbar-color: #4e4e4e var(--editor-bg); }
-
-#launch-demo nav {
-  height: 46px;
-  background: var(--titlebar-bg);
-  border-bottom: 1px solid #252525;
-  display: flex; align-items: center;
-  padding: 0 1.2rem; gap: 1rem;
-}
-#launch-demo .brand {
-  font-family: var(--mono); font-size: 0.82rem; font-weight: 500;
-  letter-spacing: 0.12em; color: var(--blue2); text-decoration: none;
-}
-#launch-demo .brand .ext { color: var(--text3); font-weight: 400; }
-#launch-demo nav .sep { color: var(--text3); font-family: var(--mono); font-size: 0.75rem; }
-#launch-demo nav .tag { color: var(--text2); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; }
-#launch-demo nav .spacer { flex: 1; }
-#launch-demo nav a.link { color: var(--text2); text-decoration: none; font-size: 0.78rem; font-family: var(--mono); }
-#launch-demo nav a.link:hover { color: var(--cyan); }
 
 #launch-demo header.intro { padding: 1.1rem 1.4rem 0.4rem; max-width: 1700px; margin: 0 auto; }
 #launch-demo header.intro h2 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }
@@ -3543,9 +3401,9 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
 
     <div style="margin-top:1.5rem;" class="reveal reveal-delay-2">
       <div class="quickstart-tabs" role="tablist" aria-label="Quick start language">
-        <button class="qs-tab active" role="tab" id="qstab-c" aria-controls="tab-c" aria-selected="true" onclick="showTab('c', this)">C99 API</button>
-        <button class="qs-tab" role="tab" id="qstab-python" aria-controls="tab-python" aria-selected="false" onclick="showTab('python', this)">Python</button>
-        <button class="qs-tab" role="tab" id="qstab-build" aria-controls="tab-build" aria-selected="false" onclick="showTab('build', this)">Build</button>
+        <button class="qs-tab active" role="tab" tabindex="0" id="qstab-c" aria-controls="tab-c" aria-selected="true" onclick="showTab('c', this)">C99 API</button>
+        <button class="qs-tab" role="tab" tabindex="-1" id="qstab-python" aria-controls="tab-python" aria-selected="false" onclick="showTab('python', this)">Python</button>
+        <button class="qs-tab" role="tab" tabindex="-1" id="qstab-build" aria-controls="tab-build" aria-selected="false" onclick="showTab('build', this)">Build</button>
       </div>
 
       <div class="qs-pane active" id="tab-c" role="tabpanel" aria-labelledby="qstab-c">
@@ -4377,7 +4235,13 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     if (e.key === 'Tab') {
       e.preventDefault();
       const s = editor.selectionStart, en = editor.selectionEnd;
-      editor.value = editor.value.slice(0, s) + '    ' + editor.value.slice(en);
+      // insertText keeps the textarea's native undo stack; assigning .value wipes
+    // it, so a single Tab used to make Ctrl+Z unable to recover anything typed
+    // before it. Fall back to the assignment only where execCommand is gone.
+    let inserted = false;
+    try { inserted = document.execCommand('insertText', false, '    '); } catch (e) { inserted = false; }
+    if (inserted) { schedParse(); syncHighlight(); return; }
+    editor.value = editor.value.slice(0, s) + '    ' + editor.value.slice(en);
       editor.selectionStart = editor.selectionEnd = s + 4;
       syncHighlight();
       schedParse();
@@ -4410,12 +4274,30 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   schedParse();
 }());
 
+function qsTabKeys(e) {
+  const tabs = Array.prototype.slice.call(document.querySelectorAll('.quickstart-tabs .qs-tab'));
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  let j = -1;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % tabs.length;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + tabs.length) % tabs.length;
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = tabs.length - 1;
+  if (j < 0) return;
+  e.preventDefault();
+  tabs[j].focus();
+  tabs[j].click();
+}
+document.querySelectorAll('.quickstart-tabs').forEach(function (tl) {
+  tl.addEventListener('keydown', qsTabKeys);
+});
+
 function showTab(id, btn) {
-  document.querySelectorAll('.qs-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+  document.querySelectorAll('.qs-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); t.tabIndex = -1; });
   document.querySelectorAll('.qs-pane').forEach(p => p.classList.remove('active'));
   const pane = document.getElementById('tab-' + id);
   if (pane) pane.classList.add('active');
-  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true'); }
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true'); btn.tabIndex = 0; }
 }
 
 const io = new IntersectionObserver(entries => {
@@ -4461,7 +4343,9 @@ const wrap     = document.getElementById('doc-content-wrap');
 // (which also wires the doc drawer). marked.parse falls back to escaped <pre>.
 if (typeof marked === 'undefined') { window.marked = { use: function () {}, parse: function (t) { const p = document.createElement('pre'); p.textContent = t; return p.outerHTML; } }; }
 if (typeof hljs === 'undefined') { window.hljs = { registerLanguage: function () {}, highlightElement: function () {} }; }
+if (typeof BovnarHighlight === 'undefined') { window.BovnarHighlight = { highlight: function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }, highlightLines: function (t) { return String(t).split('\n').map(function (l) { return l.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }); } }; }
 
+function initDocLibs() {
 marked.use({ gfm: true, breaks: false });
 
 hljs.registerLanguage('bovnar', function() {
@@ -4591,8 +4475,34 @@ hljs.registerLanguage('bovnar', function() {
     ]
   };
 });
+}
+
+// Fetch marked + highlight.js on demand, once, and resolve when both are usable.
+// Repeat calls share the same promise, so opening a second doc costs nothing.
+let docLibsPromise = null;
+function loadDocLibs() {
+  if (docLibsPromise) return docLibsPromise;
+  docLibsPromise = Promise.all([BASE + 'marked-9.1.6.min.js',
+                                BASE + 'highlight-11.9.0.min.js'].map(function (src) {
+    return new Promise(function (resolve) {
+      const el = document.createElement('script');
+      el.src = src;
+      // Resolve on error too: the stubs installed above keep the drawer usable
+      // (plain <pre> instead of rendered Markdown) rather than hanging on
+      // "Fetching document…" forever.
+      el.onload = resolve;
+      el.onerror = function () { console.warn('bovnar: failed to load ' + src); resolve(); };
+      document.head.appendChild(el);
+    });
+  })).then(function () {
+    if (typeof marked !== 'undefined' && typeof hljs !== 'undefined'
+        && typeof hljs.registerLanguage === 'function') initDocLibs();
+  });
+  return docLibsPromise;
+}
 
 let currentFile = null;
+let docSeq = 0, pendingXhr = null;
 
 function showState(state) {
   loading.style.display = state === 'loading' ? 'flex' : 'none';
@@ -4710,11 +4620,34 @@ function openDoc(fileRaw, title, opts) {
   if (closeBtn && closeBtn.focus) closeBtn.focus();   // move focus into the dialog
   showState('loading');
 
+  // Switching docs before the previous response lands used to leave the drawer
+  // showing document A's body under document B's title -- permanently, because
+  // currentFile already said B, so clicking B again hit the early return above.
+  // Abort the old request and stamp each one, ignoring any straggler.
+  const seq = ++docSeq;
+  if (pendingXhr) { pendingXhr.abort(); pendingXhr = null; }
+
+  // Only ever fetch a plain document name out of doc/. A deep link is
+  // user-controlled input and its result is rendered as trusted Markdown.
+  if (!/^[\w.-]+\.(md|txt)$/.test(file) || file.indexOf('..') >= 0) {
+    errMsg.textContent = bvnrT('doc.httpError', 'Could not load "$F" — HTTP $S')
+      .replace('$F', file).replace('$S', '400');
+    showState('error');
+    return;
+  }
+
   const xhr = new XMLHttpRequest();
+  pendingXhr = xhr;
   xhr.open('GET', LOCAL_BASE + file, true);
   xhr.onload = function () {
+    // Check the stamp BEFORE the status: an aborted request also reports 0.
+    if (seq !== docSeq) return;
+    pendingXhr = null;
     if (xhr.status === 0 || xhr.status === 200) {
-      renderDoc(file, xhr.responseText, frag);
+      loadDocLibs().then(function () {
+        if (seq !== docSeq) return;
+        renderDoc(file, xhr.responseText, frag);
+      });
     } else {
       errMsg.textContent = bvnrT('doc.httpError', 'Could not load "$F" — HTTP $S')
         .replace('$F', file).replace('$S', xhr.status);
@@ -4722,6 +4655,8 @@ function openDoc(fileRaw, title, opts) {
     }
   };
   xhr.onerror = function () {
+    if (seq !== docSeq) return;
+    pendingXhr = null;
     errMsg.textContent = bvnrT('doc.fileError',
       'Could not load "$F". If using Chrome, start it with ' +
       '--allow-file-access-from-files, or open the page through a local ' +
@@ -4770,6 +4705,12 @@ document.addEventListener('keydown', e => {
     const f = Array.prototype.filter.call(nodes, el => el.offsetParent !== null);
     if (!f.length) return;
     const first = f[0], last = f[f.length - 1];
+  // Clicking non-focusable text inside the dialog moves activeElement to <body>,
+  // which matched neither branch below, so Tab walked out to the page behind the
+  // scrim. Pull focus back whenever it is outside the drawer entirely.
+  if (!drawer.contains(document.activeElement)) {
+    e.preventDefault(); (e.shiftKey ? last : first).focus(); return;
+  }
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
@@ -5237,6 +5178,27 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     return out;
   })();
 
+  // Flattened, trig-free view of LIGHTS for the draw loop. Projecting a light
+  // used to call projGlobe() per point per frame -- two sin + two cos and a fresh
+  // {x,y,z} object each, for ~2,900 points at 60 fps (~690k trig calls and ~170k
+  // allocations per second). Longitude enters the projection only as
+  // lam = lon + rot, so sin/cos of the FIXED longitude and latitude are baked in
+  // here and combined with the frame's single sin(rot)/cos(rot) by the angle-sum
+  // identities. The colour depends only on inten, so it is precomputed too.
+  let LP = null, LP_n = 0, LCOL = null;
+  function prepLights() {
+    LP_n = LIGHTS.length;
+    LP = new Float64Array(LP_n * 8);
+    LCOL = new Array(LP_n);
+    for (let i = 0, k = 0; i < LP_n; i++, k += 8) {
+      const L = LIGHTS[i], lon = L[0] * D, lat = L[1] * D, inten = L[2];
+      LP[k]   = Math.sin(lon); LP[k+1] = Math.cos(lon);
+      LP[k+2] = Math.sin(lat); LP[k+3] = Math.cos(lat);
+      LP[k+4] = inten; LP[k+5] = L[3]; LP[k+6] = L[4]; LP[k+7] = L[5];
+      LCOL[i] = 'rgb(255,' + ((170 + inten * 48) | 0) + ',' + ((98 + inten * 54) | 0) + ')';
+    }
+  }
+
   const OBLIQ = 23.44 * D;                  // axial tilt (obliquity) — slants the spin axis in-plane
   const LEAN  = 28 * D;                      // view lean — how far above the equator we look
   const cE = Math.cos(OBLIQ), sE = Math.sin(OBLIQ);
@@ -5274,6 +5236,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
         const i = (((v * th) | 0) * tw + ((u * tw) | 0)) * 4;
         return td[i + 2] <= Math.max(td[i], td[i + 1]) + 6;   // not blue-dominant ⇒ land
       });
+      prepLights();                    // the set shrank; rebuild the flat table
     };
     img.src = BASE + 'earth.jpg';
   })();
@@ -5306,7 +5269,14 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // (putImageData) every render, so keep it CPU-side to avoid the readback stall
   // Chrome warns about. Fetch the context once and reuse it.
   const globeCtx = globeCv.getContext('2d', { willReadFrequently: true });
+  // One reusable pixel buffer. renderGlobe writes all four channels of every
+  // pixel unconditionally, so reading the previous frame back was pure waste --
+  // and getImageData allocated a fresh 256x256x4 = 256 KB array each time, at
+  // roughly 15-22 renders/s (~4-6 MB/s of garbage). createImageData once and
+  // overwrite it in place instead.
+  const globeImg = globeCtx.createImageData(GLOBE_N, GLOBE_N);
   let globeRot = null;
+  let bgGrad = null, bgGradKey = '';   // deep-space gradient, rebuilt only on resize/theme
   // Everything except the texture longitude is rotation-invariant (the tilt
   // cE/sE/cB/sB and the Sun are fixed), so the geometry, latitude, base longitude,
   // bilinear row indices and the day/night lighting are precomputed once into this
@@ -5356,7 +5326,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     globeLUT = { BASEU, V, WY, IY0, IY1, M, ES, CF, tw, th };
   }
   function renderGlobe(rot) {
-    const N = GLOBE_N, g = globeCtx, img = g.getImageData(0, 0, N, N), d = img.data;
+    const N = GLOBE_N, g = globeCtx, img = globeImg, d = img.data;
     const tw = earthTex.w, td = earthTex.data;
     if (!globeLUT || globeLUT.tw !== tw || globeLUT.th !== earthTex.h) buildGlobeLUT();
     const L = globeLUT, BASEU = L.BASEU, V = L.V, WY = L.WY, IY0 = L.IY0, IY1 = L.IY1, M = L.M, ES = L.ES, CF = L.CF;
@@ -5436,12 +5406,21 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // faint flicker accent over it (kept low so the twinkle never dominates the
     // steady baked lights); without it they ARE the city lights (full).
     const synthGain = nightTex ? 0.12 : 1;
-    for (const [lo, la, inten, tw, sp, am] of LIGHTS) {
-      const p = projGlobe(lo, la, rot);
-      if (p.z <= 0.04) continue;                          // far hemisphere
-      const px = cx + p.x * R, py = cy - p.y * R;
+    if (!LP) prepLights();
+    const sr = Math.sin(rot), cr = Math.cos(rot);
+    for (let i = 0, k = 0; i < LP_n; i++, k += 8) {
+      // projGlobe(), inlined and with the fixed-longitude trig hoisted out:
+      //   sin(lon+rot) = sin lon·cos rot + cos lon·sin rot
+      //   cos(lon+rot) = cos lon·cos rot − sin lon·sin rot
+      const sinLon = LP[k], cosLon = LP[k+1], sinLat = LP[k+2], cosLat = LP[k+3];
+      const sl = sinLon * cr + cosLon * sr, cl = cosLon * cr - sinLon * sr;
+      const x = cosLat * sl, z = cosLat * cl;
+      const y1 = sinLat * cB - z * sB, pz = sinLat * sB + z * cB;
+      if (pz <= 0.04) continue;                           // far hemisphere
+      const px = cx + (x * cE - y1 * sE) * R, py = cy - (x * sE + y1 * cE) * R;
       const nt = nightAt(px, py);
       if (nt <= 0.02) continue;
+      const inten = LP[k+4], tw = LP[k+5], sp = LP[k+6], am = LP[k+7];
       // Gentle atmospheric breathing: two slow, incommensurate waves per light
       // so the brightness drifts softly and never repeats. No fast component —
       // the eye latches onto quick changes, so quick = "flicker"; slow = the calm
@@ -5449,12 +5428,13 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       // keeps its own phase/rate, so the field glows incoherently, not in sync.
       const fl = 1 + am * (Math.sin(tnow * sp + tw)
                         + 0.45 * Math.sin(tnow * sp * 1.8 + tw * 2.3)) * 0.7;
-      const a = Math.min(1, nt * 2.6) * Math.min(1, p.z * 2.8) * inten * fl * synthGain;
+      const a = Math.min(1, nt * 2.6) * Math.min(1, pz * 2.8) * inten * fl * synthGain;
       if (a < 0.03) continue;
-      const g0 = (170 + inten * 48) | 0, b0 = (98 + inten * 54) | 0;   // sodium→whiter
-      ctx.fillStyle = 'rgba(255,' + g0 + ',' + b0 + ',' + (0.5 * a) + ')';
+      ctx.fillStyle = LCOL[i];        // sodium→whiter, precomputed per light
+      ctx.globalAlpha = 0.5 * a;
       ctx.fillRect(px, py, 1, 1);     // fractional coords → sub-pixel smooth drift, no jump
     }
+    ctx.globalAlpha = 1;
     ctx.restore();
     ctx.restore();
   }
@@ -5545,14 +5525,27 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
 
     // deep-space background (daylight sky in light theme)
     const P = VIZ.pal();
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h)*0.7);
-    bg.addColorStop(0, P.bg0); bg.addColorStop(1, P.bg1);
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    // The background gradient depends only on (cx, cy, w, h, palette), none of
+    // which change between resizes and theme toggles -- rebuilding it every frame
+    // made the 2D backend regenerate the colour ramp 60x/s for an identical result.
+    const bgKey = w + 'x' + h + P.bg0;
+    if (bgKey !== bgGradKey) {
+      bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h)*0.7);
+      bgGrad.addColorStop(0, P.bg0); bgGrad.addColorStop(1, P.bg1);
+      bgGradKey = bgKey;
+    }
+    ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, w, h);
+    // One clock read and one fillStyle for the whole field: this used to call
+    // performance.now() and build an rgba() string per star (160 each, 60x/s).
+    // Opacity rides on globalAlpha so the colour string stays constant.
+    const starT = performance.now() * 0.0016;
+    ctx.fillStyle = 'rgb(' + P.starRGB + ')';
     for (const s of stars) {
-      const tw = 0.6 + 0.4*Math.sin(s.tw + performance.now()*0.0016);
-      ctx.fillStyle = 'rgba(' + P.starRGB + ',' + (s.b*tw*P.starA) + ')';
+      const tw = 0.6 + 0.4*Math.sin(s.tw + starT);
+      ctx.globalAlpha = s.b*tw*P.starA;
       ctx.beginPath(); ctx.arc(s.x*w, s.y*h, s.r, 0, 2*Math.PI); ctx.fill();
     }
+    ctx.globalAlpha = 1;
 
     const er = RE*scale;
 
@@ -5961,12 +5954,23 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // internal scrollbar. Derived from the real computed line metrics (line-height
   // is unitless, so this is independent of the web font and any page zoom).
   const cfgEditor = document.querySelector('.editor');
+  // Line height and padding never change, but reading them back after writing
+  // the highlight layer forced a style recalc + layout on every keystroke.
+  let cfgMetrics = null;
   function fitCfgEditor() {
-    const ta = $('cfg'), cs = getComputedStyle(ta);
-    const lh = parseFloat(cs.lineHeight) || 19;
+    const ta = $('cfg');
+    if (!cfgMetrics) {
+      // Resolve to NUMBERS once. Holding the CSSStyleDeclaration would not help:
+      // it is live, so every property read off it flushes style again.
+      const cs = getComputedStyle(ta);
+      cfgMetrics = {
+        lh: parseFloat(cs.lineHeight) || 19,
+        pad: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom),
+      };
+    }
     const lines = ta.value.split('\n').length;
-    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    cfgEditor.style.minHeight = Math.ceil(lines * lh + pad + 2) + 'px';   // +2 = editor borders
+    cfgEditor.style.minHeight =
+      Math.ceil(lines * cfgMetrics.lh + cfgMetrics.pad + 2) + 'px';   // +2 = editor borders
   }
   function updateCfgHL() {
     $('cfg-hl').innerHTML = BovnarHighlight.highlightLines($('cfg').value).join('\n') + '\n';
@@ -5996,7 +6000,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     if (next !== ta.value) { ta.value = next; updateCfgHL(); }
   }
   $('resync').addEventListener('change', (e) => { sim.resync = e.target.checked; setCfgResync(sim.resync); });
-  window.addEventListener('resize', () => { sizeCanvas(); drawOrbit(sim.lastGood); });
+  // (No window.resize listener here: it called sizeCanvas(), which reads
+  //  clientWidth/clientHeight and forces a layout flush on every resize event
+  //  during a drag -- exactly the read the ResizeObserver below was written to
+  //  avoid. The observer covers this, with a sizeCanvas() fallback where it is
+  //  unavailable.)
   // The visualizer's height comes from the flex row, so it isn't final until the
   // sibling panels (telemetry markup, web fonts) settle after boot. Re-sync the
   // backing buffer to the canvas's real box whenever it changes.
@@ -6292,13 +6300,20 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     ctx.fillStyle = P.tagBg; ctx.fillRect(w - padR + 1, ly - 8, padR - 2, 16); ctx.fillStyle = P.accent; ctx.fillText(lastP.toFixed(sim.decimals), w - padR + 5, ly + 3);
   }
 
-  let rafId = null, lastWall = null, acc = 0;
+  let rafId = null, lastWall = null, acc = 0, lastPal = null;
   function loop(now) {
     if (lastWall == null) lastWall = now; let el = now - lastWall; lastWall = now; if (el > 250) el = 250;
     acc += el; const interval = 1000 / sim.speed; let did = false;
     while (acc >= interval) { acc -= interval; step(); did = true; }
     if (did) $('fs-rate').textContent = sim.speed + '/s';
-    drawChart(); rafId = requestAnimationFrame(loop);
+    // drawChart() has no time term -- its output is a pure function of the
+    // series and the palette. Repainting it every frame produced a pixel-
+    // identical image ~90% of the time at the default 6 steps/s. The palette
+    // object is one of two singletons, so identity is enough to catch a theme
+    // toggle; the ResizeObserver already redraws on resize.
+    const pal = VIZ.pal();
+    if (did || pal !== lastPal) { lastPal = pal; drawChart(); }
+    rafId = requestAnimationFrame(loop);
   }
   function start() { if (rafId == null) { lastWall = null; acc = 0; rafId = requestAnimationFrame(loop); } }
   function stop() { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
@@ -6938,6 +6953,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     const rows = [];
     for (const k in BLURBS) {
       const row = blurb.cloneNode(false);
+      row.removeAttribute('id');    // cloning copied id="demo-blurb" onto 3 nodes
       row.style.cssText = 'box-sizing:border-box;min-height:0;width:' + box.width + 'px';
       row.innerHTML = BLURBS[k];
       meas.appendChild(row); rows.push(row);

@@ -200,8 +200,17 @@ def build_html(title, subtitle, body_html, label):
     cover = (f'<div class="cover"><p class="mark">BOVNAR · v{VERSION}</p>'
              f'<h1>{title}</h1>'
              f'<p class="subtitle">{subtitle}</p></div>')
-    return (f"<!DOCTYPE html><html><head><meta charset='utf-8'>"
-            f"<title>{title}</title><style>{css}</style></head>"
+    # weasyprint maps these to the PDF's document-information dictionary:
+    # <title> -> Title, author -> Author, description -> Subject, keywords ->
+    # Keywords. Set them so the PDFs carry proper metadata (indexed by search
+    # engines and shown in PDF viewers) rather than an empty info dict.
+    meta = (f"<meta name='author' content='Janos Sonntag'>"
+            f"<meta name='description' content='{subtitle}'>"
+            f"<meta name='keywords' content='Bovnar, BVNR, serialization, "
+            f"data format, physical units, units of measure, SI units, "
+            f"dimensional analysis, telemetry, C library, Python'>")
+    return (f"<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
+            f"<title>{title}</title>{meta}<style>{css}</style></head>"
             f"<body>{cover}{body_html}</body></html>")
 
 

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bovnar Streaming, Framing &amp; Multiplexing · Bovnar</title>
+<meta name="description" content="Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded documents for transport over sockets and files.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/docs/streaming/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:title" content="Bovnar Streaming, Framing &amp; Multiplexing · Bovnar">
+<meta property="og:description" content="Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded documents for transport over sockets and files.">
+<meta property="og:url" content="https://www.bovnar.io/docs/streaming/">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bovnar Streaming, Framing &amp; Multiplexing · Bovnar">
+<meta name="twitter:description" content="Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded documents for transport over sockets and files.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<style>
+:root{--bg:#fff;--fg:#1c2530;--muted:#5a6675;--border:#e2e6ea;--accent:#0a6cb0;
+--code-bg:#f6f8fa;--nav-bg:#fbfcfd;}
+@media (prefers-color-scheme:dark){:root{--bg:#14181d;--fg:#e6ebf0;--muted:#9aa6b2;
+--border:#2a323b;--accent:#6cb0ea;--code-bg:#1c2229;--nav-bg:#1a1f25;}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+header.site{position:sticky;top:0;background:var(--nav-bg);border-bottom:1px solid var(--border);
+padding:.7rem 1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10;}
+header.site a{color:var(--fg);text-decoration:none}
+header.site .brand{font-weight:600;display:flex;align-items:center;gap:.5rem}
+header.site svg{width:26px;height:26px}
+header.site nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap;font-size:.95rem}
+header.site nav a:hover{color:var(--accent)}
+main{max-width:52rem;margin:0 auto;padding:2rem 1.2rem 4rem}
+main h1{font-size:2.1rem;letter-spacing:-.02em;margin:.2em 0 .1em}
+.doc-meta{color:var(--muted);font-size:.92rem;margin-bottom:1.5rem;
+border-bottom:1px solid var(--border);padding-bottom:1rem}
+.doc-meta a{color:var(--accent)}
+h2{margin-top:2.2em;border-bottom:1px solid var(--border);padding-bottom:.2em}
+h3{margin-top:1.8em}
+a{color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.9em}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+padding:1rem;overflow-x:auto}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%}
+th,td{border:1px solid var(--border);padding:.4em .7em;text-align:left}
+th{background:var(--nav-bg)}
+blockquote{margin:1em 0;padding:.4em 1em;border-left:3px solid var(--accent);
+color:var(--muted);background:var(--code-bg);border-radius:0 6px 6px 0}
+img{max-width:100%}
+footer{max-width:52rem;margin:0 auto;padding:2rem 1.2rem;border-top:1px solid var(--border);
+color:var(--muted);font-size:.9rem}
+footer a{color:var(--accent)}
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+.codehilite { background: #f8f8f8; }
+.codehilite .c { color: #3D7B7B; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #008000; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #9C6500 } /* Comment.Preproc */
+.codehilite .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #E40000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #008400 } /* Generic.Inserted */
+.codehilite .go { color: #717171 } /* Generic.Output */
+.codehilite .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #008000 } /* Keyword.Pseudo */
+.codehilite .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #B00040 } /* Keyword.Type */
+.codehilite .m { color: #666 } /* Literal.Number */
+.codehilite .s { color: #BA2121 } /* Literal.String */
+.codehilite .na { color: #687822 } /* Name.Attribute */
+.codehilite .nb { color: #008000 } /* Name.Builtin */
+.codehilite .nc { color: #00F; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #800 } /* Name.Constant */
+.codehilite .nd { color: #A2F } /* Name.Decorator */
+.codehilite .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #00F } /* Name.Function */
+.codehilite .nl { color: #767600 } /* Name.Label */
+.codehilite .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #19177C } /* Name.Variable */
+.codehilite .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #666 } /* Literal.Number.Bin */
+.codehilite .mf { color: #666 } /* Literal.Number.Float */
+.codehilite .mh { color: #666 } /* Literal.Number.Hex */
+.codehilite .mi { color: #666 } /* Literal.Number.Integer */
+.codehilite .mo { color: #666 } /* Literal.Number.Oct */
+.codehilite .sa { color: #BA2121 } /* Literal.String.Affix */
+.codehilite .sb { color: #BA2121 } /* Literal.String.Backtick */
+.codehilite .sc { color: #BA2121 } /* Literal.String.Char */
+.codehilite .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #BA2121 } /* Literal.String.Double */
+.codehilite .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.codehilite .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.codehilite .sx { color: #008000 } /* Literal.String.Other */
+.codehilite .sr { color: #A45A77 } /* Literal.String.Regex */
+.codehilite .s1 { color: #BA2121 } /* Literal.String.Single */
+.codehilite .ss { color: #19177C } /* Literal.String.Symbol */
+.codehilite .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #00F } /* Name.Function.Magic */
+.codehilite .vc { color: #19177C } /* Name.Variable.Class */
+.codehilite .vg { color: #19177C } /* Name.Variable.Global */
+.codehilite .vi { color: #19177C } /* Name.Variable.Instance */
+.codehilite .vm { color: #19177C } /* Name.Variable.Magic */
+.codehilite .il { color: #666 } /* Literal.Number.Integer.Long */</style>
+</head>
+<body>
+<header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg><span>Bovnar</span></a><nav><a href="/docs/">Docs</a><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;start</a><a href="https://github.com/sothis/bovnar">GitHub</a></nav></header>
+<main>
+<h1>Bovnar Streaming, Framing &amp; Multiplexing</h1>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/9_bovnar_streaming.md">Markdown</a> and <a href="/doc/pdf/bovnar-streaming.pdf">PDF</a>.</p>
+<p>This document describes four capabilities layered <strong>on top of</strong> the Bovnar
+lexer/validator event API, <em>beside</em> the DOM. None of them change the frozen 1.0
+grammar or wire format (see <a href="https://www.bovnar.io/docs/spec/">doc/1_bovnar_spec.md</a>); they are
+applications built on the SAX-style event pipe and the octet-stream value form.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Capability</th>
+<th>Where it lives</th>
+<th>Header</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Endless streaming</td>
+<td>core policy knob</td>
+<td><code>bovnar.h</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Multi-document framing</td>
+<td>transport beside the lexer</td>
+<td><code>bovnar_stream.h</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Octet multiplexing</td>
+<td>convention inside one octet stream</td>
+<td><code>bovnar_stream.h</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Document-in-document</td>
+<td>a document embedded as octet payload</td>
+<td><code>bovnar_stream.h</code></td>
+</tr>
+</tbody>
+</table>
+<p>The mental model: the <strong>reader</strong> turns bytes into a <code>bvnr_event_t</code> stream and the
+<strong>writer</strong> turns events back into bytes. The DOM is one consumer of that pipe;
+everything here is another. Octet streams (spec §9) are the binary substrate —
+opaque, chunked, UTF-8-validation-suspended byte regions — and three of the four
+capabilities are sub-protocols carried in or around them.</p>
+<hr />
+<h2 id="1-endless-streaming-2⁶⁴1">1. Endless streaming (2⁶⁴−1)</h2>
+<p>Every byte/offset/line/column counter in the core is 64-bit, so a single
+never-ending document — or a single octet stream of unbounded length — is
+limited only by one policy knob: <code>max_file_size</code> on <code>bvnr_read_flags_t</code> /
+<code>bvnr_write_flags_t</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#define BVNR_FILESIZE_UNLIMITED  0   </span><span class="cm">/* in bovnar.h */</span>
+</code></pre></div>
+
+<p>Semantics — <strong><code>0</code> is unlimited and the default</strong>:</p>
+<table>
+<thead>
+<tr>
+<th><code>max_file_size</code> value</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code> (= <code>BVNR_FILESIZE_UNLIMITED</code>, the default)</td>
+<td><strong>No cap</strong> — endless, no accumulated size limit</td>
+</tr>
+<tr>
+<td>any positive N</td>
+<td>Cap at N bytes (<code>error_file_too_long</code> beyond)</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">.</span><span class="n">on_verified</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">my_cb</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">max_file_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVNR_FILESIZE_UNLIMITED</span><span class="p">,</span><span class="w">   </span><span class="cm">/* endless */</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>A long-lived document is processed incrementally: process each value in the
+<code>on_verified</code>/<code>on_unverified</code> callback and retain nothing, and memory stays flat
+regardless of stream length. (The DOM builder, by contrast, retains a tree and
+is therefore not the tool for an endless stream.)</p>
+<hr />
+<h2 id="2-multi-document-record-framing">2. Multi-document record framing</h2>
+<p>The grammar has no in-band document separator: a reader ends one document at EOF.
+To carry a <strong>sequence of independent documents</strong> over one byte stream (file,
+socket, pipe) without closing it, wrap each in a length-prefixed frame. The
+framing lives beside the lexer; each payload is a complete, standalone document
+parsed by an ordinary reader.</p>
+<h3 id="wire-format">Wire format</h3>
+<div class="codehilite"><pre><span></span><code>frame   = &quot;BVF1&quot;            ; 4-byte magic
+          payload_len       ; uint64, little-endian
+          payload[payload_len]
+stream  = { frame }         ; terminated by EOF on a frame boundary
+</code></pre></div>
+
+<p>A clean EOF <em>before any header byte</em> ends the sequence successfully; an EOF
+part-way through a header or payload is a truncation error.</p>
+<h3 id="api">API</h3>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Producer */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_frame_write</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="o">*</span><span class="w"> </span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">doc_len</span><span class="p">);</span>
+
+<span class="cm">/* Consumer */</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">bvnr_read_flags_t</span><span class="o">*</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span><span class="w">            </span><span class="cm">/* per-document reader callbacks/limits */</span>
+<span class="w">    </span><span class="kt">void</span><span class="o">*</span><span class="w">              </span><span class="n">userdata</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">on_document</span><span class="p">)(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">ud</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">index</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="p">,</span><span class="w"> </span><span class="n">error_code_t</span><span class="w"> </span><span class="n">err</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w">               </span><span class="n">continue_past_failed</span><span class="p">;</span><span class="w"> </span><span class="cm">/* keep going after a failed document */</span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w">           </span><span class="n">max_document_size</span><span class="p">;</span><span class="w">    </span><span class="cm">/* 0 =&gt; BVNR_DOC_DEFAULT_MAX (256 MiB) */</span>
+<span class="p">}</span><span class="w"> </span><span class="n">bvnr_doc_stream_opts_t</span><span class="p">;</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_doc_stream_read</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span>
+<span class="w">                          </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_doc_stream_opts_t</span><span class="o">*</span><span class="w"> </span><span class="n">opts</span><span class="p">,</span>
+<span class="w">                          </span><span class="kt">uint64_t</span><span class="o">*</span><span class="w"> </span><span class="n">out_count</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>bvnr_doc_stream_read</code> reads frames until EOF, parsing each payload with a fresh
+reader (reusing one handle internally) and invoking <code>on_document</code> after each. It
+returns false on a framing/IO error, or on the first per-document parse failure
+unless <code>continue_past_failed</code> is set. Each frame payload is buffered in RAM
+before parsing (the buffer grows with the bytes that actually arrive, so a
+crafted oversized length cannot force a large up-front allocation), bounded by
+<code>max_document_size</code>. Unlike <code>max_file_size</code>, this framing guard stays finite when
+<code>0</code> (it then selects <code>BVNR_DOC_DEFAULT_MAX</code>, 256 MiB); set an explicit huge cap
+(e.g. <code>UINT64_MAX</code>) to lift it.</p>
+<p>Two <strong>orthogonal</strong> error controls — because each document occupies its own
+length-delimited frame, the two are independent:</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Scope</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>flags-&gt;continue_on_error</code></td>
+<td><em>within</em> a document</td>
+<td>resync/recover from errors inside one document</td>
+</tr>
+<tr>
+<td><code>continue_past_failed</code></td>
+<td><em>across</em> documents</td>
+<td>report a failed document and advance to the next frame instead of aborting</td>
+</tr>
+</tbody>
+</table>
+<p>So you can parse each document <strong>strictly</strong> (<code>continue_on_error = false</code>) yet
+<strong>resiliently</strong> process every frame (<code>continue_past_failed = true</code>), reporting the
+bad ones via <code>on_document</code> — the natural mode for a log of independent records.</p>
+<h3 id="cli">CLI</h3>
+<div class="codehilite"><pre><span></span><code>bovnar<span class="w"> </span>frames<span class="w"> </span>pack<span class="w"> </span>a.bvnr<span class="w"> </span>b.bvnr<span class="w"> </span>c.bvnr<span class="w"> </span>&gt;<span class="w"> </span>docs.bvf<span class="w">   </span><span class="c1"># wrap each file in a frame</span>
+bovnar<span class="w"> </span>frames<span class="w"> </span>list<span class="w"> </span>docs.bvf<span class="w">                          </span><span class="c1"># list documents + status</span>
+bovnar<span class="w"> </span>frames<span class="w"> </span>list<span class="w"> </span>-<span class="w">                                 </span><span class="c1"># read the frame stream from stdin</span>
+</code></pre></div>
+
+<hr />
+<h2 id="3-octet-multiplexing-out-of-band-channels-cross-chunk">3. Octet multiplexing (out-of-band channels, cross-chunk)</h2>
+<p>Many logical channels interleaved inside a <strong>single octet-stream value</strong>. The
+channel id and message framing are a convention interpreted <em>above</em> <code>ev_data</code>,
+so to the lexer these are ordinary <code>0x01</code> data chunks and <code>bvnr_data_t</code> needs no
+channel field. The 1.0 wire format is untouched.</p>
+<h3 id="wire-convention-two-layers">Wire convention (two layers)</h3>
+<div class="codehilite"><pre><span></span><code>per octet chunk:    varint(channel)  fragment_bytes
+per channel:        concat(fragments in order) = the channel&#39;s logical stream,
+                    a sequence of length-prefixed messages:
+                        varint(msg_len)  msg_bytes
+</code></pre></div>
+
+<ul>
+<li><code>varint</code> is unsigned LEB128 (1 byte for channels/lengths &lt; 128; up to 10 bytes).</li>
+<li>A message is <strong>length-prefixed</strong>, so it may span any number of chunks, and
+  channels may interleave freely at chunk granularity — the demultiplexer
+  reassembles each channel independently. Both the message data <strong>and</strong> its
+  length varint may straddle chunk boundaries (the demux accumulates a partial
+  length varint per channel).</li>
+<li><code>BVNR_MUX_MAX_MESSAGE</code> is a conservative <strong>single-chunk guarantee</strong>, not an
+  enforced cap: any message of at most that many bytes is emitted by
+  <code>bvnr_mux_send</code> in one chunk regardless of channel id or length magnitude
+  (it subtracts the maximum 10+10 varint bytes from the 64 KiB chunk). Larger
+  messages are simply split; nothing rejects them.</li>
+<li><strong>The one wire requirement:</strong> the per-chunk <strong>channel</strong> varint — the routing
+  prefix the demux needs to attribute a chunk — is whole within its chunk.
+  <code>bvnr_mux_send</code> always satisfies this (the channel id is ≤ 10 bytes and leads
+  every chunk).</li>
+</ul>
+<h3 id="api-1">API</h3>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Producer */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_begin</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_send</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span>
+<span class="w">                    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w">   </span><span class="cm">/* split as needed */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_end</span><span class="w">  </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">);</span>
+
+<span class="cm">/* Consumer */</span>
+<span class="k">typedef</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bvnr_mux_on_msg_fn</span><span class="p">)(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">ud</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span>
+<span class="w">                                   </span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+
+<span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="nf">bvnr_demux_create</span><span class="p">(</span><span class="n">bvnr_mux_on_msg_fn</span><span class="w"> </span><span class="n">on_message</span><span class="p">,</span>
+<span class="w">                                </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">userdata</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">max_message</span><span class="p">);</span>
+<span class="kt">void</span><span class="w">          </span><span class="nf">bvnr_demux_destroy</span><span class="p">(</span><span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="n">dm</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w">          </span><span class="nf">bvnr_demux_set_key</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="n">dm</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w">          </span><span class="nf">bvnr_demux_on_event</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">demux</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_event_t</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="o">*</span><span class="w"> </span><span class="n">d</span><span class="p">);</span>
+<span class="n">error_code_t</span><span class="w">  </span><span class="nf">bvnr_demux_error</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="n">dm</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Install <code>bvnr_demux_on_event</code> as <code>bvnr_read_flags_t.on_verified</code> with <code>userdata</code>
+set to the <code>bvnr_demux_t*</code>. It peels the channel varint off each chunk,
+reassembles per-channel messages (owning a buffer per active channel), and
+invokes <code>on_message</code> for each complete message. A malformed varint, an oversized
+declared length (&gt; <code>max_message</code>, default 64 MiB), or an allocation failure
+latches <code>bvnr_demux_error</code> and aborts the read. If <code>on_message</code> returns false the
+read is aborted and <code>bvnr_demux_error</code> reports <code>error_scanner_callback_failed</code>
+(distinct from the desync code, so a deliberate stop is distinguishable from a
+framing error).</p>
+<p>A separate, non-fatal case: if the octet stream <em>ends</em> while a channel is still
+mid-message (or mid-length-varint), the octet framing itself was well-formed, so
+the read still <strong>succeeds</strong> — but the partial message is dropped and
+<code>bvnr_demux_error</code> latches <code>error_octet_stream_truncated</code>. This is deliberately a
+different code from the desync <code>error_octet_stream_out_of_sync</code>: a truncated
+message is a message-layer loss, not a framing error. Always check
+<code>bvnr_demux_error</code> after the read even when it returned true.</p>
+<p><strong>Key scoping.</strong> By default the demux treats <em>every</em> octet stream in the document
+as multiplexed. Call <code>bvnr_demux_set_key(dm, "mux")</code> so it only demuxes streams
+opened under that key — a document can then mix one mux stream with ordinary
+binary octet payloads (those under other keys are ignored, not misread as
+framing). Pass <code>NULL</code> to clear the filter.</p>
+<p><strong>Memory.</strong> The demux keeps one reassembly buffer per channel it has seen; each
+grows to that channel's largest message and is retained for reuse until
+<code>bvnr_demux_destroy</code>, so steady-state memory is the sum of per-channel high-water
+marks (bounded by 4096 channels). Channels are not reclaimed individually.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="n">dm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_demux_create</span><span class="p">(</span><span class="n">on_message</span><span class="p">,</span><span class="w"> </span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="cm">/* default cap */</span><span class="p">);</span>
+<span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">.</span><span class="n">on_verified</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_demux_on_event</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">userdata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dm</span><span class="w"> </span><span class="p">};</span>
+<span class="cm">/* ... open_read_* + bvnr_read ... */</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_demux_error</span><span class="p">(</span><span class="n">dm</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">error_none</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* desync, oversize, alloc, or a truncated message */</span><span class="w"> </span><span class="p">}</span>
+<span class="n">bvnr_demux_destroy</span><span class="p">(</span><span class="n">dm</span><span class="p">);</span>
+</code></pre></div>
+
+<h3 id="cli-1">CLI</h3>
+<div class="codehilite"><pre><span></span><code>bovnar<span class="w"> </span>mux<span class="w"> </span>pack<span class="w"> </span><span class="m">1</span>:req.bvnr<span class="w"> </span><span class="m">42</span>:log.bvnr<span class="w"> </span>&gt;<span class="w"> </span>mux.bvnr<span class="w">   </span><span class="c1"># files onto channels 1 and 42</span>
+bovnar<span class="w"> </span>mux<span class="w"> </span>list<span class="w"> </span>mux.bvnr<span class="w">                            </span><span class="c1"># channel &lt;n&gt;: &lt;len&gt; bytes</span>
+bovnar<span class="w"> </span>mux<span class="w"> </span>pack<span class="w"> </span><span class="m">7</span>:a.bvnr<span class="w"> </span><span class="p">|</span><span class="w"> </span>bovnar<span class="w"> </span>mux<span class="w"> </span>list<span class="w"> </span>-<span class="w">        </span><span class="c1"># pipe producer to consumer</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4-document-in-document">4. Document-in-document</h2>
+<p>Embed a complete Bovnar document as the octet-stream payload of a key. The outer
+parser treats the inner document as opaque octets; only an application that knows
+the key holds a nested document re-feeds those bytes to a sub-reader. This is the
+natural recursion primitive — no envelope type, just the octet-stream value form.</p>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Producer: emits  .&lt;key&gt; = &lt;octets of doc&gt;;  (64 KiB chunks) */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_embed_document</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">,</span>
+<span class="w">                         </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">doc_len</span><span class="p">);</span>
+
+<span class="cm">/* Consumer: parse the embedded bytes with an ordinary reader (recursion). */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_parse_embedded</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">doc_len</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">bvnr_read_flags_t</span><span class="o">*</span><span class="w"> </span><span class="n">flags</span><span class="p">);</span>
+</code></pre></div>
+
+<p>To recurse while reading the outer document, accumulate the octet chunks for the
+known key between <code>ev_octet_stream_start</code> and <code>ev_octet_stream_end</code>, then call
+<code>bvnr_parse_embedded</code> on the accumulated bytes with the nested callbacks:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">case</span><span class="w"> </span><span class="no">ev_octet_stream_end</span><span class="p">:</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">in_payload</span><span class="p">)</span>
+<span class="w">        </span><span class="n">bvnr_parse_embedded</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">inner_flags</span><span class="p">);</span><span class="w">   </span><span class="cm">/* parses the nested doc */</span>
+<span class="w">    </span><span class="k">break</span><span class="p">;</span>
+</code></pre></div>
+
+<p>The inner callbacks may themselves embed/extract further documents, so nesting
+is arbitrarily deep (bounded by your own recursion budget).</p>
+<hr />
+<h2 id="python-bindings">Python bindings</h2>
+<p>All four capabilities are exposed through the <code>bovnar.stream</code> module (a thin
+ctypes layer over the C functions, so framing, varint reassembly and the
+strict-vs-resilient document policy behave identically):</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">stream</span>
+
+<span class="c1"># Multi-document framing</span>
+<span class="n">blob</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">dump_documents</span><span class="p">([{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}])</span>     <span class="c1"># list[dict] -&gt; bytes</span>
+<span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">)</span>                        <span class="c1"># bytes -&gt; list[dict]</span>
+<span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="n">continue_past_failed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># bad docs -&gt; None</span>
+
+<span class="c1"># Octet multiplexing (channel, payload) — any size, interleaved</span>
+<span class="n">m</span>   <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">mux_dump</span><span class="p">([(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;world&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;x&quot;</span> <span class="o">*</span> <span class="mi">200000</span><span class="p">)])</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">mux_load</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>                                  <span class="c1"># [(1, b&quot;hello&quot;), ...]</span>
+
+<span class="c1"># Document-in-document</span>
+<span class="n">outer</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">embed_document</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;v&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;payload&quot;</span><span class="p">)</span>
+<span class="n">inner</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">parse_embedded</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">outer</span><span class="p">)[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span>   <span class="c1"># {&quot;v&quot;: 1}</span>
+</code></pre></div>
+
+<p><code>stream.BVNR_FILESIZE_UNLIMITED</code> (<code>== 0</code>) selects endless mode for
+<strong><code>max_file_size</code></strong> only. Note it does <strong>not</strong> lift the framing/mux guards:
+for <code>max_document_size</code> and <code>max_message</code>, <code>0</code> selects their finite defaults
+(<code>BVNR_DOC_DEFAULT_MAX</code> / <code>BVNR_MUX_DEFAULT_MAX</code>), so pass an explicit large
+value there to raise them. See <a href="https://www.bovnar.io/docs/python/">Python Bindings</a>
+and <code>python/tests/test_stream.py</code>.</p>
+<h2 id="composition">Composition</h2>
+<p>The four compose cleanly because they live at different layers:</p>
+<ul>
+<li>A <strong>frame stream</strong> (2) can carry documents that each <strong>embed</strong> sub-documents (4).</li>
+<li>A <strong>multiplexed</strong> octet stream (3) is itself just one value in a document, which
+  can be one frame in a frame stream (2).</li>
+<li>Any of the above is <strong>endless</strong> (1) by default (<code>max_file_size</code> 0 ==
+  <code>BVNR_FILESIZE_UNLIMITED</code>); set a positive <code>max_file_size</code> to impose a cap.</li>
+</ul>
+<p>Because each is a thin application over the public event API, you can also write
+your own consumer/producer at the same seam without touching the core.</p>
+<hr />
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/spec/#9-octet-streams-binary-mode">Specification §9 — Octet Streams</a></li>
+<li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — the underlying event interface</li>
+<li><code>include/bovnar_stream.h</code> — full declarations and per-function contracts</li>
+<li><code>tests/bovnar_stream_test.c</code> — round-trip tests for all four capabilities</li>
+<li><code>python/bovnar/stream.py</code> — Python bindings; <code>python/tests/test_stream.py</code></li>
+</ul>
+</main>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
+</body>
+</html>

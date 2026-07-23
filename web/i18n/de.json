@@ -279,7 +279,7 @@
     "BOVNAR DOCS": "BOVNAR DOKU",
     "Fetching document…": "Dokument wird geladen…",
     "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>",
-    "A Markdown version of this page, optimized for AI and LLM tools, is available at https://www.bovnar.io/index.md": "Eine für KI- und LLM-Tools optimierte Markdown-Version dieser Seite ist unter https://www.bovnar.io/index.md verfügbar."
+    "A Markdown version of this page, optimized for AI and LLM tools, is available at https://www.bovnar.io/index.md": "Eine für KI- und LLM-Tools optimierte Markdown-Version dieser Seite ist unter https://www.bovnar.io/de/index.md verfügbar."
   },
   "attrs": {
     "Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.": "Bovnar (BVNR) — einheitensichere Serialisierung für Wissenschaft und Industrie. Jede Messung trägt validierte physikalische Einheit, Bitbreite und Zahlenbasis direkt in sich, ganz ohne externes Schema. C99-Referenzimplementierung, MIT-lizenziert.",

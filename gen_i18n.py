@@ -586,6 +586,11 @@ def localize_document(doc: str, lang: str, table: dict) -> str:
     doc = once(r'(<html\b[^>]*\blang=")en(")', rf"\g<1>{lang}\g<2>", doc, "<html lang>")
     doc = once(r'(<meta property="og:locale" content=")[^"]*(")',
                rf"\g<1>{locale}\g<2>", doc, "og:locale")
+    # The OG "alternate" locale on a translated edition is the default (English)
+    # edition -- the mirror of the English page pointing here. Two-locale setup;
+    # with a third language this would need to list every OTHER locale.
+    doc = once(r'(<meta property="og:locale:alternate" content=")[^"]*(")',
+               r"\g<1>en_US\g<2>", doc, "og:locale:alternate")
     # Assets and links are one directory deeper under web/<lang>/. Allow-list the
     # forms that are genuinely document-relative: anything with a scheme
     # (mailto:, tel:, https:), a root/protocol-relative path, a fragment, a bare
@@ -600,6 +605,9 @@ def localize_document(doc: str, lang: str, table: dict) -> str:
                rf'\g<1>/{lang}/"', doc, "canonical")
     doc = once(r'(<meta property="og:url" content="https://[^"/]*)(?:/[^"]*)?"',
                rf'\g<1>/{lang}/"', doc, "og:url")
+    # The Markdown alternate points at this edition's own Markdown page.
+    doc = once(r'(<link rel="alternate" type="text/markdown" href=")/index\.md(")',
+               rf'\g<1>/{lang}/index.md\g<2>', doc, "markdown alternate")
     # The translated page lives one directory down, so paths that JavaScript
     # resolves against the document need a prefix. index.html reads this as
     # BASE; check_js_paths() guarantees nothing bypasses it.

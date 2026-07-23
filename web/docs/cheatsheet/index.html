@@ -1,0 +1,3555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bovnar Unit &amp; Currency Cheat Sheet · Bovnar</title>
+<meta name="description" content="A one-page reference of every Bovnar unit symbol, SI/IEC prefix, and ISO 4217 and cryptocurrency code.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/docs/cheatsheet/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:title" content="Bovnar Unit &amp; Currency Cheat Sheet · Bovnar">
+<meta property="og:description" content="A one-page reference of every Bovnar unit symbol, SI/IEC prefix, and ISO 4217 and cryptocurrency code.">
+<meta property="og:url" content="https://www.bovnar.io/docs/cheatsheet/">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bovnar Unit &amp; Currency Cheat Sheet · Bovnar">
+<meta name="twitter:description" content="A one-page reference of every Bovnar unit symbol, SI/IEC prefix, and ISO 4217 and cryptocurrency code.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<style>
+:root{--bg:#fff;--fg:#1c2530;--muted:#5a6675;--border:#e2e6ea;--accent:#0a6cb0;
+--code-bg:#f6f8fa;--nav-bg:#fbfcfd;}
+@media (prefers-color-scheme:dark){:root{--bg:#14181d;--fg:#e6ebf0;--muted:#9aa6b2;
+--border:#2a323b;--accent:#6cb0ea;--code-bg:#1c2229;--nav-bg:#1a1f25;}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+header.site{position:sticky;top:0;background:var(--nav-bg);border-bottom:1px solid var(--border);
+padding:.7rem 1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10;}
+header.site a{color:var(--fg);text-decoration:none}
+header.site .brand{font-weight:600;display:flex;align-items:center;gap:.5rem}
+header.site svg{width:26px;height:26px}
+header.site nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap;font-size:.95rem}
+header.site nav a:hover{color:var(--accent)}
+main{max-width:52rem;margin:0 auto;padding:2rem 1.2rem 4rem}
+main h1{font-size:2.1rem;letter-spacing:-.02em;margin:.2em 0 .1em}
+.doc-meta{color:var(--muted);font-size:.92rem;margin-bottom:1.5rem;
+border-bottom:1px solid var(--border);padding-bottom:1rem}
+.doc-meta a{color:var(--accent)}
+h2{margin-top:2.2em;border-bottom:1px solid var(--border);padding-bottom:.2em}
+h3{margin-top:1.8em}
+a{color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.9em}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+padding:1rem;overflow-x:auto}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%}
+th,td{border:1px solid var(--border);padding:.4em .7em;text-align:left}
+th{background:var(--nav-bg)}
+blockquote{margin:1em 0;padding:.4em 1em;border-left:3px solid var(--accent);
+color:var(--muted);background:var(--code-bg);border-radius:0 6px 6px 0}
+img{max-width:100%}
+footer{max-width:52rem;margin:0 auto;padding:2rem 1.2rem;border-top:1px solid var(--border);
+color:var(--muted);font-size:.9rem}
+footer a{color:var(--accent)}
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+.codehilite { background: #f8f8f8; }
+.codehilite .c { color: #3D7B7B; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #008000; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #9C6500 } /* Comment.Preproc */
+.codehilite .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #E40000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #008400 } /* Generic.Inserted */
+.codehilite .go { color: #717171 } /* Generic.Output */
+.codehilite .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #008000 } /* Keyword.Pseudo */
+.codehilite .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #B00040 } /* Keyword.Type */
+.codehilite .m { color: #666 } /* Literal.Number */
+.codehilite .s { color: #BA2121 } /* Literal.String */
+.codehilite .na { color: #687822 } /* Name.Attribute */
+.codehilite .nb { color: #008000 } /* Name.Builtin */
+.codehilite .nc { color: #00F; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #800 } /* Name.Constant */
+.codehilite .nd { color: #A2F } /* Name.Decorator */
+.codehilite .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #00F } /* Name.Function */
+.codehilite .nl { color: #767600 } /* Name.Label */
+.codehilite .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #19177C } /* Name.Variable */
+.codehilite .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #666 } /* Literal.Number.Bin */
+.codehilite .mf { color: #666 } /* Literal.Number.Float */
+.codehilite .mh { color: #666 } /* Literal.Number.Hex */
+.codehilite .mi { color: #666 } /* Literal.Number.Integer */
+.codehilite .mo { color: #666 } /* Literal.Number.Oct */
+.codehilite .sa { color: #BA2121 } /* Literal.String.Affix */
+.codehilite .sb { color: #BA2121 } /* Literal.String.Backtick */
+.codehilite .sc { color: #BA2121 } /* Literal.String.Char */
+.codehilite .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #BA2121 } /* Literal.String.Double */
+.codehilite .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.codehilite .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.codehilite .sx { color: #008000 } /* Literal.String.Other */
+.codehilite .sr { color: #A45A77 } /* Literal.String.Regex */
+.codehilite .s1 { color: #BA2121 } /* Literal.String.Single */
+.codehilite .ss { color: #19177C } /* Literal.String.Symbol */
+.codehilite .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #00F } /* Name.Function.Magic */
+.codehilite .vc { color: #19177C } /* Name.Variable.Class */
+.codehilite .vg { color: #19177C } /* Name.Variable.Global */
+.codehilite .vi { color: #19177C } /* Name.Variable.Instance */
+.codehilite .vm { color: #19177C } /* Name.Variable.Magic */
+.codehilite .il { color: #666 } /* Literal.Number.Integer.Long */</style>
+</head>
+<body>
+<header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg><span>Bovnar</span></a><nav><a href="/docs/">Docs</a><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;start</a><a href="https://github.com/sothis/bovnar">GitHub</a></nav></header>
+<main>
+<h1>Bovnar (BVNR) — Units &amp; Currencies Reference</h1>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/8_unit_cheatsheet.md">Markdown</a> and <a href="/doc/pdf/bovnar-cheatsheet.pdf">PDF</a>.</p>
+<blockquote>
+<p>Spec version 1.1 · 163 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
+</blockquote>
+<hr />
+<h2 id="contents">Contents</h2>
+<ol>
+<li><a href="#1-si-prefixes">SI Prefixes</a></li>
+<li><a href="#2-iec-binary-prefixes">IEC Binary Prefixes</a></li>
+<li><a href="#3-prefix-validity-rules">Prefix Validity Rules</a></li>
+<li><a href="#4-physical-units">Physical Units</a>
+   - 4.1 <a href="#41-si-base-units">SI Base Units</a>
+   - 4.2 <a href="#42-named-si-derived-units">Named SI-Derived Units</a>
+   - 4.3 <a href="#43-non-si-units-accepted-with-si">Non-SI Units Accepted with SI</a>
+   - 4.4 <a href="#44-imperial--us-customary--length">Imperial &amp; US Customary — Length</a>
+   - 4.5 <a href="#45-imperial--us-customary--mass">Imperial &amp; US Customary — Mass</a>
+   - 4.6 <a href="#46-temperature">Temperature</a>
+   - 4.7 <a href="#47-pressure">Pressure</a>
+   - 4.8 <a href="#48-energy">Energy</a>
+   - 4.9 <a href="#49-power">Power</a>
+   - 4.10 <a href="#410-force">Force</a>
+   - 4.11 <a href="#411-speed--rotation">Speed &amp; Rotation</a>
+   - 4.12 <a href="#412-acceleration">Acceleration</a>
+   - 4.13 <a href="#413-volume--us-liquid">Volume — US Liquid</a>
+   - 4.14 <a href="#414-volume--uk-imperial">Volume — UK Imperial</a>
+   - 4.15 <a href="#415-volume--us-apothecary--dry">Volume — US Apothecary &amp; Dry</a>
+   - 4.16 <a href="#416-area">Area</a>
+   - 4.17 <a href="#417-angle">Angle</a>
+   - 4.18 <a href="#418-digital">Digital</a>
+   - 4.19 <a href="#419-cgs-units">CGS Units</a>
+   - 4.20 <a href="#420-radiation">Radiation</a>
+   - 4.21 <a href="#421-logarithmic">Logarithmic</a>
+   - 4.22 <a href="#422-electrical-power">Electrical Power</a>
+   - 4.23 <a href="#423-textile-linear-density">Textile Linear Density</a>
+   - 4.24 <a href="#424-old-german-units">Old German Units</a>
+   - 4.25 <a href="#425-additional-physical-units-361367">Additional Physical Units</a>
+   - 4.26 <a href="#426-ratio-and-proportion-372377">Ratio and Proportion</a></li>
+<li><a href="#5-currencies">Currencies</a>
+   - 5.1 <a href="#51-the-mandatory-currency-sigil">The Mandatory Currency Sigil</a>
+   - 5.2 <a href="#52-iso-4217-fiat-currencies">ISO 4217 Fiat Currencies</a>
+   - 5.3 <a href="#53-cryptocurrencies">Cryptocurrencies</a>
+   - 5.4 <a href="#54-currency-prefix-rules">Currency Prefix Rules</a></li>
+<li><a href="#6-symbol-disambiguation">Symbol Disambiguation</a></li>
+</ol>
+<hr />
+<h2 id="1-si-prefixes">1. SI Prefixes</h2>
+<p>Written as <code>prefix~base</code> (mandatory <code>~</code> separator). Example: <code>k~m</code> = kilometre.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Symbol</th>
+<th>Factor</th>
+<th>Enum (<code>si_prefix_id_t</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>quetta</td>
+<td><code>Q</code></td>
+<td>10³⁰</td>
+<td><code>si_quetta</code></td>
+</tr>
+<tr>
+<td>ronna</td>
+<td><code>R</code></td>
+<td>10²⁷</td>
+<td><code>si_ronna</code></td>
+</tr>
+<tr>
+<td>yotta</td>
+<td><code>Y</code></td>
+<td>10²⁴</td>
+<td><code>si_yotta</code></td>
+</tr>
+<tr>
+<td>zetta</td>
+<td><code>Z</code></td>
+<td>10²¹</td>
+<td><code>si_zetta</code></td>
+</tr>
+<tr>
+<td>exa</td>
+<td><code>E</code></td>
+<td>10¹⁸</td>
+<td><code>si_exa</code></td>
+</tr>
+<tr>
+<td>peta</td>
+<td><code>P</code></td>
+<td>10¹⁵</td>
+<td><code>si_peta</code></td>
+</tr>
+<tr>
+<td>tera</td>
+<td><code>T</code></td>
+<td>10¹²</td>
+<td><code>si_tera</code></td>
+</tr>
+<tr>
+<td>giga</td>
+<td><code>G</code></td>
+<td>10⁹</td>
+<td><code>si_giga</code></td>
+</tr>
+<tr>
+<td>mega</td>
+<td><code>M</code></td>
+<td>10⁶</td>
+<td><code>si_mega</code></td>
+</tr>
+<tr>
+<td>kilo</td>
+<td><code>k</code></td>
+<td>10³</td>
+<td><code>si_kilo</code></td>
+</tr>
+<tr>
+<td>hecto</td>
+<td><code>h</code></td>
+<td>10²</td>
+<td><code>si_hecto</code></td>
+</tr>
+<tr>
+<td>deca</td>
+<td><code>da</code></td>
+<td>10¹</td>
+<td><code>si_deca</code></td>
+</tr>
+<tr>
+<td><em>(none)</em></td>
+<td>—</td>
+<td>10⁰</td>
+<td><code>si_none</code></td>
+</tr>
+<tr>
+<td>deci</td>
+<td><code>d</code></td>
+<td>10⁻¹</td>
+<td><code>si_deci</code></td>
+</tr>
+<tr>
+<td>centi</td>
+<td><code>c</code></td>
+<td>10⁻²</td>
+<td><code>si_centi</code></td>
+</tr>
+<tr>
+<td>milli</td>
+<td><code>m</code></td>
+<td>10⁻³</td>
+<td><code>si_milli</code></td>
+</tr>
+<tr>
+<td>micro</td>
+<td><code>µ</code> <em>(or <code>u</code>)</em></td>
+<td>10⁻⁶</td>
+<td><code>si_micro</code></td>
+</tr>
+<tr>
+<td>nano</td>
+<td><code>n</code></td>
+<td>10⁻⁹</td>
+<td><code>si_nano</code></td>
+</tr>
+<tr>
+<td>pico</td>
+<td><code>p</code></td>
+<td>10⁻¹²</td>
+<td><code>si_pico</code></td>
+</tr>
+<tr>
+<td>femto</td>
+<td><code>f</code></td>
+<td>10⁻¹⁵</td>
+<td><code>si_femto</code></td>
+</tr>
+<tr>
+<td>atto</td>
+<td><code>a</code></td>
+<td>10⁻¹⁸</td>
+<td><code>si_atto</code></td>
+</tr>
+<tr>
+<td>zepto</td>
+<td><code>z</code></td>
+<td>10⁻²¹</td>
+<td><code>si_zepto</code></td>
+</tr>
+<tr>
+<td>yocto</td>
+<td><code>y</code></td>
+<td>10⁻²⁴</td>
+<td><code>si_yocto</code></td>
+</tr>
+<tr>
+<td>ronto</td>
+<td><code>r</code></td>
+<td>10⁻²⁷</td>
+<td><code>si_ronto</code></td>
+</tr>
+<tr>
+<td>quecto</td>
+<td><code>q</code></td>
+<td>10⁻³⁰</td>
+<td><code>si_quecto</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>µ</code> is U+00B5 MICRO SIGN (UTF-8 <code>0xC2 0xB5</code>). U+03BC (Greek small letter mu) is also accepted on input; the canonical output is always U+00B5. ASCII <code>u</code> is accepted as an input-only alias for <code>µ</code> (e.g. <code>u~m</code> = <code>µ~m</code>); the canonical output is always <code>µ</code>.
+<code>da</code> is a two-character prefix: <code>da~m</code> = decametre.</p>
+</blockquote>
+<p><strong>Prefix–base ambiguities</strong> — resolved by the mandatory <code>~</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Bare token</th>
+<th>Is a base unit</th>
+<th>With <code>~</code> becomes prefix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>m</code></td>
+<td>meter (<code>bu_meter</code>)</td>
+<td>milli</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>day (<code>bu_day</code>)</td>
+<td>deci</td>
+</tr>
+<tr>
+<td><code>h</code></td>
+<td>hour (<code>bu_hour</code>)</td>
+<td>hecto</td>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td>tesla (<code>bu_tesla</code>)</td>
+<td>tera</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td>gauss (<code>bu_gauss</code>)</td>
+<td>giga</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>poise (<code>bu_poise</code>)</td>
+<td>peta</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>röntgen (<code>bu_roentgen</code>)</td>
+<td>ronna</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>farad (<code>bu_farad</code>)</td>
+<td>femto</td>
+</tr>
+<tr>
+<td><code>u</code></td>
+<td>dalton (<code>bu_dalton</code>)</td>
+<td>micro (ASCII alias for <code>µ</code>)</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>siemens (<code>bu_siemens</code>)</td>
+<td><em>(not a prefix — <code>S</code> has no prefix role)</em></td>
+</tr>
+</tbody>
+</table>
+<p>Examples: bare <code>m</code> = metre; <code>m~s</code> = millisecond. Bare <code>d</code> = day; <code>d~s</code> = decisecond.</p>
+<hr />
+<h2 id="2-iec-binary-prefixes">2. IEC Binary Prefixes</h2>
+<p>Used <strong>only</strong> on <code>b</code> (bit) and <code>B</code> (byte). Written as <code>prefix~base</code>: <code>Ki~B</code> = kibibyte.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Symbol</th>
+<th>Factor</th>
+<th>Enum (<code>iec_prefix_id_t</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kibi</td>
+<td><code>Ki</code></td>
+<td>2¹⁰</td>
+<td><code>iec_kibi</code></td>
+</tr>
+<tr>
+<td>mebi</td>
+<td><code>Mi</code></td>
+<td>2²⁰</td>
+<td><code>iec_mebi</code></td>
+</tr>
+<tr>
+<td>gibi</td>
+<td><code>Gi</code></td>
+<td>2³⁰</td>
+<td><code>iec_gibi</code></td>
+</tr>
+<tr>
+<td>tebi</td>
+<td><code>Ti</code></td>
+<td>2⁴⁰</td>
+<td><code>iec_tebi</code></td>
+</tr>
+<tr>
+<td>pebi</td>
+<td><code>Pi</code></td>
+<td>2⁵⁰</td>
+<td><code>iec_pebi</code></td>
+</tr>
+<tr>
+<td>exbi</td>
+<td><code>Ei</code></td>
+<td>2⁶⁰</td>
+<td><code>iec_exbi</code></td>
+</tr>
+<tr>
+<td>zebi</td>
+<td><code>Zi</code></td>
+<td>2⁷⁰</td>
+<td><code>iec_zebi</code></td>
+</tr>
+<tr>
+<td>yobi</td>
+<td><code>Yi</code></td>
+<td>2⁸⁰</td>
+<td><code>iec_yobi</code></td>
+</tr>
+<tr>
+<td>robi</td>
+<td><code>Ri</code></td>
+<td>2⁹⁰</td>
+<td><code>iec_robi</code></td>
+</tr>
+<tr>
+<td>quebi</td>
+<td><code>Qi</code></td>
+<td>2¹⁰⁰</td>
+<td><code>iec_quebi</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-prefix-validity-rules">3. Prefix Validity Rules</h2>
+<table>
+<thead>
+<tr>
+<th>Unit category</th>
+<th>SI prefixes</th>
+<th>IEC prefixes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>All physical units (default)</td>
+<td>All 24 allowed</td>
+<td>Forbidden</td>
+</tr>
+<tr>
+<td><code>b</code> (bit) and <code>B</code> (byte)</td>
+<td>Only ≥ kilo (<code>k</code>, <code>M</code>, <code>G</code>, …, <code>Q</code>)</td>
+<td>All 10 allowed</td>
+</tr>
+<tr>
+<td><code>b</code> and <code>B</code> with sub-kilo SI (<code>d</code>, <code>c</code>, <code>m</code>, <code>µ</code>, <code>n</code>, <code>p</code>, <code>f</code>, <code>a</code>, <code>z</code>, <code>y</code>, <code>r</code>, <code>q</code>, <code>da</code>, <code>h</code>)</td>
+<td><strong>Forbidden</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Currency codes</td>
+<td>All 24 allowed</td>
+<td><strong>Forbidden</strong></td>
+</tr>
+<tr>
+<td>Old German units (<code>bu_pfund</code> … <code>bu_scheffel</code>)</td>
+<td><strong>None</strong> (<code>si_none</code> only)</td>
+<td><strong>Forbidden</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-physical-units">4. Physical Units</h2>
+<blockquote>
+<p><strong>Symbol</strong> = canonical serialized form (produced on output; accepted on input).
+<strong>Long forms</strong> = accepted on input only; never produced on output.
+<strong>Factor</strong> = conversion factor to SI base units unless noted.</p>
+</blockquote>
+<h3 id="41-si-base-units">4.1 SI Base Units</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s</code></td>
+<td><code>sec</code>, <code>second</code>, <code>seconds</code></td>
+<td>second</td>
+<td><code>bu_second</code></td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td><code>meter</code>, <code>metre</code>, <code>meters</code>, <code>metres</code></td>
+<td>metre</td>
+<td><code>bu_meter</code></td>
+</tr>
+<tr>
+<td><code>g</code></td>
+<td><code>gram</code>, <code>grams</code></td>
+<td>gram</td>
+<td><code>bu_gram</code></td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td><code>amp</code>, <code>amps</code>, <code>ampere</code>, <code>amperes</code></td>
+<td>ampere</td>
+<td><code>bu_ampere</code></td>
+</tr>
+<tr>
+<td><code>K</code></td>
+<td><code>kelvin</code>, <code>kelvins</code></td>
+<td>kelvin</td>
+<td><code>bu_kelvin</code></td>
+</tr>
+<tr>
+<td><code>mol</code></td>
+<td><code>mole</code>, <code>moles</code></td>
+<td>mole</td>
+<td><code>bu_mol</code></td>
+</tr>
+<tr>
+<td><code>cd</code></td>
+<td><code>candela</code>, <code>candelas</code></td>
+<td>candela</td>
+<td><code>bu_candela</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>g</code> (gram) is the base symbol; <code>k~g</code> = kilogram.</p>
+</blockquote>
+<h3 id="42-named-si-derived-units">4.2 Named SI-Derived Units</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>SI definition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Hz</code></td>
+<td><code>hertz</code></td>
+<td>hertz</td>
+<td><code>bu_hertz</code></td>
+<td>s⁻¹</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td><code>newton</code>, <code>newtons</code></td>
+<td>newton</td>
+<td><code>bu_newton</code></td>
+<td>kg·m·s⁻²</td>
+</tr>
+<tr>
+<td><code>Pa</code></td>
+<td><code>pascal</code>, <code>pascals</code></td>
+<td>pascal</td>
+<td><code>bu_pascal</code></td>
+<td>kg·m⁻¹·s⁻²</td>
+</tr>
+<tr>
+<td><code>J</code></td>
+<td><code>joule</code>, <code>joules</code></td>
+<td>joule</td>
+<td><code>bu_joule</code></td>
+<td>kg·m²·s⁻²</td>
+</tr>
+<tr>
+<td><code>W</code></td>
+<td><code>watt</code>, <code>watts</code></td>
+<td>watt</td>
+<td><code>bu_watt</code></td>
+<td>kg·m²·s⁻³</td>
+</tr>
+<tr>
+<td><code>V</code></td>
+<td><code>volt</code>, <code>volts</code></td>
+<td>volt</td>
+<td><code>bu_volt</code></td>
+<td>kg·m²·A⁻¹·s⁻³</td>
+</tr>
+<tr>
+<td><code>Ω</code></td>
+<td><code>ohm</code>, <code>ohms</code>, <code>Ohm</code></td>
+<td>ohm</td>
+<td><code>bu_ohm</code></td>
+<td>kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) also accepted on input, canonical output is always U+2126</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td><code>farad</code>, <code>farads</code></td>
+<td>farad</td>
+<td><code>bu_farad</code></td>
+<td>kg⁻¹·m⁻²·A²·s⁴</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td><code>coulomb</code>, <code>coulombs</code></td>
+<td>coulomb</td>
+<td><code>bu_coulomb</code></td>
+<td>A·s</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td><code>siemens</code></td>
+<td>siemens</td>
+<td><code>bu_siemens</code></td>
+<td>kg⁻¹·m⁻²·A²·s³</td>
+</tr>
+<tr>
+<td><code>Wb</code></td>
+<td><code>weber</code>, <code>webers</code></td>
+<td>weber</td>
+<td><code>bu_weber</code></td>
+<td>kg·m²·A⁻¹·s⁻²</td>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td><code>tesla</code>, <code>teslas</code></td>
+<td>tesla</td>
+<td><code>bu_tesla</code></td>
+<td>kg·A⁻¹·s⁻²</td>
+</tr>
+<tr>
+<td><code>H</code></td>
+<td><code>henry</code>, <code>henrys</code>, <code>henries</code></td>
+<td>henry</td>
+<td><code>bu_henry</code></td>
+<td>kg·m²·A⁻²·s⁻²</td>
+</tr>
+<tr>
+<td><code>lm</code></td>
+<td><code>lumen</code>, <code>lumens</code></td>
+<td>lumen</td>
+<td><code>bu_lumen</code></td>
+<td>cd·sr</td>
+</tr>
+<tr>
+<td><code>lx</code></td>
+<td><code>lux</code></td>
+<td>lux</td>
+<td><code>bu_lux</code></td>
+<td>cd·sr·m⁻²</td>
+</tr>
+<tr>
+<td><code>Bq</code></td>
+<td><code>becquerel</code>, <code>becquerels</code></td>
+<td>becquerel</td>
+<td><code>bu_becquerel</code></td>
+<td>s⁻¹</td>
+</tr>
+<tr>
+<td><code>Gy</code></td>
+<td><code>gray</code>, <code>grays</code></td>
+<td>gray</td>
+<td><code>bu_gray</code></td>
+<td>m²·s⁻²</td>
+</tr>
+<tr>
+<td><code>Sv</code></td>
+<td><code>sievert</code>, <code>sieverts</code></td>
+<td>sievert</td>
+<td><code>bu_sievert</code></td>
+<td>m²·s⁻²</td>
+</tr>
+<tr>
+<td><code>kat</code></td>
+<td><code>katal</code>, <code>katals</code></td>
+<td>katal</td>
+<td><code>bu_katal</code></td>
+<td>mol·s⁻¹</td>
+</tr>
+<tr>
+<td><code>rad</code></td>
+<td><code>radian</code>, <code>radians</code></td>
+<td>radian</td>
+<td><code>bu_radian</code></td>
+<td>dimensionless (m/m)</td>
+</tr>
+<tr>
+<td><code>sr</code></td>
+<td><code>steradian</code>, <code>steradians</code></td>
+<td>steradian</td>
+<td><code>bu_steradian</code></td>
+<td>dimensionless (m²/m²)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-non-si-units-accepted-with-si">4.3 Non-SI Units Accepted with SI</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor / notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>L</code>, <code>l</code></td>
+<td><code>liter</code>, <code>litre</code>, <code>liters</code>, <code>litres</code></td>
+<td>litre</td>
+<td><code>bu_liter</code></td>
+<td>10⁻³ m³</td>
+</tr>
+<tr>
+<td><code>min</code></td>
+<td><code>minute</code>, <code>minutes</code></td>
+<td>minute</td>
+<td><code>bu_minute</code></td>
+<td>60 s</td>
+</tr>
+<tr>
+<td><code>h</code></td>
+<td><code>hour</code>, <code>hours</code></td>
+<td>hour</td>
+<td><code>bu_hour</code></td>
+<td>3600 s</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td><code>day</code>, <code>days</code></td>
+<td>day</td>
+<td><code>bu_day</code></td>
+<td>86400 s</td>
+</tr>
+<tr>
+<td><code>wk</code></td>
+<td><code>week</code>, <code>weeks</code></td>
+<td>week</td>
+<td><code>bu_week</code></td>
+<td>604 800 s</td>
+</tr>
+<tr>
+<td><code>mo</code></td>
+<td><code>month</code>, <code>months</code></td>
+<td>month (Julian)</td>
+<td><code>bu_month</code></td>
+<td>2 629 800 s (= 365.25 d / 12)</td>
+</tr>
+<tr>
+<td><code>fn</code></td>
+<td><code>fortnight</code>, <code>fortnights</code></td>
+<td>fortnight</td>
+<td><code>bu_fortnight</code></td>
+<td>1 209 600 s (= 14 d)</td>
+</tr>
+<tr>
+<td><code>yr</code></td>
+<td><code>year</code>, <code>years</code></td>
+<td>year (Julian)</td>
+<td><code>bu_year</code></td>
+<td>31 557 600 s</td>
+</tr>
+<tr>
+<td><code>°</code>, <code>deg</code></td>
+<td><code>degr</code>, <code>degree</code>, <code>degrees</code></td>
+<td>degree (angle)</td>
+<td><code>bu_degree</code></td>
+<td>π/180 rad — U+00B0</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td><code>tonne</code></td>
+<td>tonne</td>
+<td><code>bu_tonne</code></td>
+<td>10³ kg</td>
+</tr>
+<tr>
+<td><code>bar</code></td>
+<td>—</td>
+<td>bar</td>
+<td><code>bu_bar</code></td>
+<td>10⁵ Pa</td>
+</tr>
+<tr>
+<td><code>eV</code></td>
+<td><code>electronvolt</code></td>
+<td>electronvolt</td>
+<td><code>bu_electronvolt</code></td>
+<td>1.602176634×10⁻¹⁹ J</td>
+</tr>
+<tr>
+<td><code>Da</code></td>
+<td><code>dalton</code>, <code>amu</code>, <code>u</code></td>
+<td>dalton</td>
+<td><code>bu_dalton</code></td>
+<td>1.66053906660×10⁻²⁷ kg</td>
+</tr>
+<tr>
+<td><code>au</code></td>
+<td>—</td>
+<td>astronomical unit</td>
+<td><code>bu_astronomical_unit</code></td>
+<td>1.495978707×10¹¹ m</td>
+</tr>
+<tr>
+<td><code>ha</code></td>
+<td><code>hectare</code></td>
+<td>hectare</td>
+<td><code>bu_hectare</code></td>
+<td>10⁴ m²</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-imperial--us-customary--length">4.4 Imperial &amp; US Customary — Length</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>in</code></td>
+<td><code>inch</code>, <code>inches</code></td>
+<td>inch</td>
+<td><code>bu_inch</code></td>
+<td>0.0254 m (exact)</td>
+</tr>
+<tr>
+<td><code>ft</code></td>
+<td><code>foot</code>, <code>feet</code></td>
+<td>foot</td>
+<td><code>bu_foot</code></td>
+<td>0.3048 m (exact)</td>
+</tr>
+<tr>
+<td><code>yd</code></td>
+<td><code>yard</code>, <code>yards</code></td>
+<td>yard</td>
+<td><code>bu_yard</code></td>
+<td>0.9144 m (exact)</td>
+</tr>
+<tr>
+<td><code>mi</code></td>
+<td><code>mile</code>, <code>miles</code></td>
+<td>statute mile</td>
+<td><code>bu_mile</code></td>
+<td>1609.344 m (exact)</td>
+</tr>
+<tr>
+<td><code>nmi</code></td>
+<td><code>nautical_mile</code>, <code>nautical_miles</code></td>
+<td>nautical mile</td>
+<td><code>bu_nautical_mile</code></td>
+<td>1852 m (exact)</td>
+</tr>
+<tr>
+<td><code>Å</code> (U+212B)</td>
+<td><code>angstrom</code>, <code>angstroms</code>, Å (U+00C5)</td>
+<td>ångström</td>
+<td><code>bu_angstrom</code></td>
+<td>10⁻¹⁰ m</td>
+</tr>
+<tr>
+<td><code>ly</code></td>
+<td><code>light_year</code>, <code>light_years</code></td>
+<td>light-year</td>
+<td><code>bu_light_year</code></td>
+<td>9.4607304725808×10¹⁵ m</td>
+</tr>
+<tr>
+<td><code>pc</code></td>
+<td><code>parsec</code>, <code>parsecs</code></td>
+<td>parsec</td>
+<td><code>bu_parsec</code></td>
+<td>3.085677581491367×10¹⁶ m</td>
+</tr>
+<tr>
+<td><code>fur</code></td>
+<td><code>furlong</code>, <code>furlongs</code></td>
+<td>furlong</td>
+<td><code>bu_furlong</code></td>
+<td>201.168 m (exact)</td>
+</tr>
+<tr>
+<td><code>fath</code></td>
+<td><code>fathom</code>, <code>fathoms</code></td>
+<td>fathom</td>
+<td><code>bu_fathom</code></td>
+<td>1.8288 m (exact)</td>
+</tr>
+<tr>
+<td><code>thou</code></td>
+<td><code>thou</code>, <code>mil</code>, <code>mils</code></td>
+<td>thou</td>
+<td><code>bu_thou</code></td>
+<td>25.4×10⁻⁶ m (exact)</td>
+</tr>
+<tr>
+<td><code>ch</code></td>
+<td><code>chain</code>, <code>chains</code></td>
+<td>chain (Gunter's)</td>
+<td><code>bu_chain</code></td>
+<td>20.1168 m (exact)</td>
+</tr>
+<tr>
+<td><code>rd</code></td>
+<td><code>rod</code>, <code>rods</code></td>
+<td>rod (pole, perch)</td>
+<td><code>bu_rod</code></td>
+<td>5.0292 m (exact)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>thou</code> and <code>mil</code> are synonyms. Canonical output is <code>thou</code>. <code>mil</code> does <strong>not</strong> mean milliradian; milliradians are written <code>m~rad</code>.</p>
+</blockquote>
+<h3 id="45-imperial--us-customary--mass">4.5 Imperial &amp; US Customary — Mass</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lb</code></td>
+<td><code>lbs</code>, <code>pound</code>, <code>pounds</code></td>
+<td>pound (avoirdupois)</td>
+<td><code>bu_pound</code></td>
+<td>0.45359237 kg (exact)</td>
+</tr>
+<tr>
+<td><code>oz</code></td>
+<td><code>ounce</code>, <code>ounces</code></td>
+<td>ounce (avoirdupois)</td>
+<td><code>bu_ounce</code></td>
+<td>0.028349523125 kg (exact)</td>
+</tr>
+<tr>
+<td><code>gr</code></td>
+<td><code>grain</code>, <code>grains</code></td>
+<td>grain</td>
+<td><code>bu_grain</code></td>
+<td>6.479891×10⁻⁵ kg (exact)</td>
+</tr>
+<tr>
+<td><code>st</code></td>
+<td><code>stone</code>, <code>stones</code></td>
+<td>stone</td>
+<td><code>bu_stone</code></td>
+<td>6.35029318 kg (exact)</td>
+</tr>
+<tr>
+<td><code>tn_sh</code></td>
+<td><code>short_ton</code>, <code>short_tons</code></td>
+<td>short ton (US)</td>
+<td><code>bu_short_ton</code></td>
+<td>907.18474 kg (exact)</td>
+</tr>
+<tr>
+<td><code>tn_l</code></td>
+<td><code>long_ton</code>, <code>long_tons</code></td>
+<td>long ton (UK)</td>
+<td><code>bu_long_ton</code></td>
+<td>1016.0469088 kg (exact)</td>
+</tr>
+<tr>
+<td><code>oz_t</code></td>
+<td><code>troy_ounce</code>, <code>troy_ounces</code></td>
+<td>troy ounce</td>
+<td><code>bu_troy_ounce</code></td>
+<td>0.0311034768 kg (exact)</td>
+</tr>
+<tr>
+<td><code>ct</code></td>
+<td><code>carat</code>, <code>carats</code></td>
+<td>metric carat</td>
+<td><code>bu_carat</code></td>
+<td>2×10⁻⁴ kg (exact)</td>
+</tr>
+<tr>
+<td><code>slug</code></td>
+<td><code>slugs</code></td>
+<td>slug</td>
+<td><code>bu_slug</code></td>
+<td>14.593902937 kg</td>
+</tr>
+<tr>
+<td><code>dr</code></td>
+<td><code>dram</code>, <code>drams</code></td>
+<td>dram (avoirdupois)</td>
+<td><code>bu_dram</code></td>
+<td>1.7718451953125×10⁻³ kg (exact)</td>
+</tr>
+<tr>
+<td><code>dwt</code></td>
+<td><code>pennyweight</code>, <code>pennyweights</code></td>
+<td>pennyweight (troy)</td>
+<td><code>bu_pennyweight</code></td>
+<td>1.55517384×10⁻³ kg (exact)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="46-temperature">4.6 Temperature</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Conversion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>°C</code>, <code>degC</code></td>
+<td><code>degrC</code>, <code>degreeC</code>, <code>degreesC</code>, <code>celsius</code></td>
+<td>degree Celsius</td>
+<td><code>bu_celsius</code></td>
+<td>K = °C + 273.15 <strong>(affine)</strong></td>
+</tr>
+<tr>
+<td><code>°F</code>, <code>degF</code></td>
+<td><code>degrF</code>, <code>degreeF</code>, <code>degreesF</code>, <code>fahrenheit</code></td>
+<td>degree Fahrenheit</td>
+<td><code>bu_fahrenheit</code></td>
+<td>K = (°F + 459.67) × 5/9 <strong>(affine)</strong></td>
+</tr>
+<tr>
+<td><code>°Ra</code>, <code>degRa</code></td>
+<td><code>degrRa</code>, <code>degreeRa</code>, <code>degreesRa</code>, <code>rankine</code></td>
+<td>degree Rankine</td>
+<td><code>bu_rankine</code></td>
+<td>K = °Ra × 5/9 (linear)</td>
+</tr>
+<tr>
+<td><code>°De</code>, <code>degDe</code></td>
+<td><code>degrDe</code>, <code>degreeDe</code>, <code>degreesDe</code>, <code>delisle</code></td>
+<td>degree Delisle</td>
+<td><code>bu_delisle</code></td>
+<td>K = 373.15 − °De × 2/3 <strong>(affine)</strong></td>
+</tr>
+<tr>
+<td><code>°N</code>, <code>degN</code></td>
+<td><code>degrN</code>, <code>degreeN</code>, <code>degreesN</code>, <code>newton_temperature</code></td>
+<td>degree Newton</td>
+<td><code>bu_newton_temp</code></td>
+<td>K = °N × 100/33 + 273.15 <strong>(affine)</strong></td>
+</tr>
+<tr>
+<td><code>°Re</code>, <code>degRe</code></td>
+<td><code>degrRe</code>, <code>degreeRe</code>, <code>degreesRe</code>, <code>reaumur</code></td>
+<td>degree Réaumur</td>
+<td><code>bu_reaumur</code></td>
+<td>K = °Re × 5/4 + 273.15 <strong>(affine)</strong></td>
+</tr>
+<tr>
+<td><code>°Ro</code>, <code>degRo</code></td>
+<td><code>degrRo</code>, <code>degreeRo</code>, <code>degreesRo</code>, <code>romer</code></td>
+<td>degree Rømer</td>
+<td><code>bu_romer</code></td>
+<td>K = (°Ro − 7.5) × 40/21 + 273.15 <strong>(affine)</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Kelvin (<code>K</code>) is in §4.1. <code>R</code> is reserved for röntgen (§4.20). <code>N</code> alone is newton (§4.2); use <code>°N</code> or <code>degN</code> for Newton temperature.</p>
+</blockquote>
+<h3 id="47-pressure">4.7 Pressure</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>atm</code></td>
+<td><code>atmosphere</code>, <code>atmospheres</code></td>
+<td>standard atmosphere</td>
+<td><code>bu_atmosphere</code></td>
+<td>101 325 Pa (exact)</td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>atmosphere_technical</code></td>
+<td>atmosphere technical</td>
+<td><code>bu_atmosphere_technical</code></td>
+<td>98 066.5 Pa (= 1 kgf/cm²)</td>
+</tr>
+<tr>
+<td><code>mmHg</code></td>
+<td>—</td>
+<td>millimetre of mercury</td>
+<td><code>bu_mmhg</code></td>
+<td>133.322387415 Pa</td>
+</tr>
+<tr>
+<td><code>Torr</code></td>
+<td><code>torr</code></td>
+<td>torr</td>
+<td><code>bu_torr</code></td>
+<td>101 325/760 Pa</td>
+</tr>
+<tr>
+<td><code>psi</code></td>
+<td>—</td>
+<td>pound-force per square inch</td>
+<td><code>bu_psi</code></td>
+<td>6894.757293168362 Pa</td>
+</tr>
+<tr>
+<td><code>inHg</code></td>
+<td><code>inch_hg</code>, <code>inch_mercury</code></td>
+<td>inch of mercury</td>
+<td><code>bu_inch_hg</code></td>
+<td>3386.388645 Pa</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>at ≠ atm</code>: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.</p>
+</blockquote>
+<h3 id="48-energy">4.8 Energy</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cal</code></td>
+<td><code>calorie</code>, <code>calories</code></td>
+<td>thermochemical calorie</td>
+<td><code>bu_calorie</code></td>
+<td>4.184 J (exact)</td>
+</tr>
+<tr>
+<td><code>Btu</code></td>
+<td><code>btu</code>, <code>BTU</code></td>
+<td>International Table BTU</td>
+<td><code>bu_btu</code></td>
+<td>1055.05585262 J</td>
+</tr>
+<tr>
+<td><code>erg</code></td>
+<td><code>ergs</code></td>
+<td>erg</td>
+<td><code>bu_erg</code></td>
+<td>10⁻⁷ J (exact)</td>
+</tr>
+<tr>
+<td><code>thm</code></td>
+<td><code>therm</code>, <code>therms</code></td>
+<td>US therm</td>
+<td><code>bu_therm</code></td>
+<td>1.05480400×10⁸ J (exact)</td>
+</tr>
+<tr>
+<td><code>ft_lb</code></td>
+<td><code>foot_pound</code>, <code>foot_pounds</code></td>
+<td>foot-pound</td>
+<td><code>bu_foot_pound</code></td>
+<td>1.3558179483 J</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>BTU</code> (all-caps) is a valid alias: with no <code>$</code> sigil the token is a physical-unit lookup (the currency table is only consulted for <code>$</code>-prefixed tokens), and it matches <code>bu_btu</code>. <code>Btu</code> and <code>btu</code> are also accepted.</p>
+</blockquote>
+<h3 id="49-power">4.9 Power</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hp</code></td>
+<td><code>horsepower</code></td>
+<td>mechanical horsepower</td>
+<td><code>bu_horsepower</code></td>
+<td>745.69987158227 W</td>
+</tr>
+<tr>
+<td><code>PS</code></td>
+<td><code>CV</code>, <code>metric_horsepower</code></td>
+<td>metric horsepower</td>
+<td><code>bu_metric_horsepower</code></td>
+<td>735.49875 W (exact)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="410-force">4.10 Force</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lbf</code></td>
+<td><code>pound_force</code></td>
+<td>pound-force</td>
+<td><code>bu_pound_force</code></td>
+<td>4.4482216152605 N</td>
+</tr>
+<tr>
+<td><code>dyn</code></td>
+<td><code>dyne</code>, <code>dynes</code></td>
+<td>dyne</td>
+<td><code>bu_dyne</code></td>
+<td>10⁻⁵ N (exact)</td>
+</tr>
+<tr>
+<td><code>kip</code></td>
+<td><code>kips</code></td>
+<td>kip (kilopound-force)</td>
+<td><code>bu_kip</code></td>
+<td>4448.2216152605 N</td>
+</tr>
+<tr>
+<td><code>kgf</code></td>
+<td><code>kilogram_force</code></td>
+<td>kilogram-force</td>
+<td><code>bu_kilogram_force</code></td>
+<td>9.80665 N (exact)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="411-speed--rotation">4.11 Speed &amp; Rotation</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kn</code></td>
+<td><code>knot</code>, <code>knots</code></td>
+<td>knot</td>
+<td><code>bu_knot</code></td>
+<td>1852/3600 m/s</td>
+</tr>
+<tr>
+<td><code>rpm</code></td>
+<td>—</td>
+<td>revolutions per minute</td>
+<td><code>bu_rpm</code></td>
+<td>1/60 s⁻¹</td>
+</tr>
+</tbody>
+</table>
+<h3 id="412-acceleration">4.12 Acceleration</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gn</code></td>
+<td><code>standard_gravity</code></td>
+<td>standard gravity</td>
+<td><code>bu_standard_gravity</code></td>
+<td>9.80665 m·s⁻² (exact)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="413-volume--us-liquid">4.13 Volume — US Liquid</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gal</code></td>
+<td><code>gallon</code>, <code>gallons</code></td>
+<td>US liquid gallon</td>
+<td><code>bu_gallon</code></td>
+<td>3.785411784×10⁻³ m³ (exact)</td>
+</tr>
+<tr>
+<td><code>qt</code></td>
+<td><code>quart</code>, <code>quarts</code></td>
+<td>US liquid quart</td>
+<td><code>bu_quart</code></td>
+<td>9.46352946×10⁻⁴ m³</td>
+</tr>
+<tr>
+<td><code>pt</code></td>
+<td><code>pint</code>, <code>pints</code></td>
+<td>US liquid pint</td>
+<td><code>bu_pint</code></td>
+<td>4.73176473×10⁻⁴ m³</td>
+</tr>
+<tr>
+<td><code>cup</code></td>
+<td><code>cups</code></td>
+<td>US cup</td>
+<td><code>bu_cup</code></td>
+<td>2.365882365×10⁻⁴ m³</td>
+</tr>
+<tr>
+<td><code>gi</code></td>
+<td><code>gill</code>, <code>gills</code></td>
+<td>US gill</td>
+<td><code>bu_gill</code></td>
+<td>1.18294118250×10⁻⁴ m³</td>
+</tr>
+<tr>
+<td><code>fl_oz</code></td>
+<td><code>fluid_ounce</code>, <code>fluid_ounces</code></td>
+<td>US fluid ounce</td>
+<td><code>bu_fluid_ounce</code></td>
+<td>2.95735295625×10⁻⁵ m³</td>
+</tr>
+<tr>
+<td><code>tbsp</code></td>
+<td><code>tablespoon</code>, <code>tablespoons</code></td>
+<td>US tablespoon</td>
+<td><code>bu_tablespoon</code></td>
+<td>1.47867648×10⁻⁵ m³</td>
+</tr>
+<tr>
+<td><code>tsp</code></td>
+<td><code>teaspoon</code>, <code>teaspoons</code></td>
+<td>US teaspoon</td>
+<td><code>bu_teaspoon</code></td>
+<td>4.92892159375×10⁻⁶ m³</td>
+</tr>
+<tr>
+<td><code>bbl</code></td>
+<td><code>barrel</code>, <code>barrels</code></td>
+<td>petroleum barrel</td>
+<td><code>bu_barrel</code></td>
+<td>0.158987294928 m³</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>cup</code> (lowercase) = US cup; <code>CUP</code> (uppercase) = Cuban Peso. See §6.</p>
+</blockquote>
+<h3 id="414-volume--uk-imperial">4.14 Volume — UK Imperial</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gal_uk</code></td>
+<td><code>gallon_uk</code>, <code>gallons_uk</code></td>
+<td>imperial gallon</td>
+<td><code>bu_gallon_uk</code></td>
+<td>4.54609×10⁻³ m³ (exact)</td>
+</tr>
+<tr>
+<td><code>qt_uk</code></td>
+<td><code>quart_uk</code>, <code>quarts_uk</code></td>
+<td>imperial quart</td>
+<td><code>bu_quart_uk</code></td>
+<td>1136.5225×10⁻⁶ m³</td>
+</tr>
+<tr>
+<td><code>pt_uk</code></td>
+<td><code>pint_uk</code>, <code>pints_uk</code></td>
+<td>imperial pint</td>
+<td><code>bu_pint_uk</code></td>
+<td>568.26125×10⁻⁶ m³</td>
+</tr>
+<tr>
+<td><code>gi_uk</code></td>
+<td><code>gill_uk</code>, <code>gills_uk</code></td>
+<td>imperial gill</td>
+<td><code>bu_gill_uk</code></td>
+<td>1.420653125×10⁻⁴ m³ (exact)</td>
+</tr>
+<tr>
+<td><code>fl_oz_uk</code></td>
+<td><code>fluid_ounce_uk</code>, <code>fluid_ounces_uk</code></td>
+<td>imperial fluid ounce</td>
+<td><code>bu_fluid_ounce_uk</code></td>
+<td>28.4130625×10⁻⁶ m³</td>
+</tr>
+</tbody>
+</table>
+<h3 id="415-volume--us-apothecary--dry">4.15 Volume — US Apothecary &amp; Dry</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fl_dr</code></td>
+<td><code>fluid_dram</code>, <code>fluid_drams</code></td>
+<td>US fluid dram</td>
+<td><code>bu_fluid_dram</code></td>
+<td>3.6966911953125×10⁻⁶ m³</td>
+</tr>
+<tr>
+<td><code>minim</code></td>
+<td><code>minims</code></td>
+<td>US minim</td>
+<td><code>bu_minim</code></td>
+<td>6.16115199218750×10⁻⁸ m³</td>
+</tr>
+<tr>
+<td><code>pk</code></td>
+<td><code>peck</code>, <code>pecks</code></td>
+<td>US dry peck</td>
+<td><code>bu_peck</code></td>
+<td>8.80976754172×10⁻³ m³</td>
+</tr>
+<tr>
+<td><code>bsh</code></td>
+<td><code>bushel</code>, <code>bushels</code></td>
+<td>US bushel</td>
+<td><code>bu_bushel</code></td>
+<td>3.523907016688×10⁻² m³</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>minim</code> not <code>min</code> (which is the minute).</p>
+</blockquote>
+<h3 id="416-area">4.16 Area</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ac</code></td>
+<td><code>acre</code>, <code>acres</code></td>
+<td>acre</td>
+<td><code>bu_acre</code></td>
+<td>4046.8564224 m² (exact)</td>
+</tr>
+<tr>
+<td><code>barn</code></td>
+<td><code>barns</code></td>
+<td>barn</td>
+<td><code>bu_barn</code></td>
+<td>10⁻²⁸ m² (exact)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="417-angle">4.17 Angle</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>arcmin</code></td>
+<td><code>arcminute</code>, <code>arcminutes</code></td>
+<td>arcminute</td>
+<td><code>bu_arcminute</code></td>
+<td>π/10800 rad</td>
+</tr>
+<tr>
+<td><code>arcsec</code></td>
+<td><code>arcsecond</code>, <code>arcseconds</code></td>
+<td>arcsecond</td>
+<td><code>bu_arcsecond</code></td>
+<td>π/648000 rad</td>
+</tr>
+<tr>
+<td><code>grad</code></td>
+<td><code>gradian</code>, <code>gradians</code>, <code>gon</code></td>
+<td>gradian</td>
+<td><code>bu_grad</code></td>
+<td>π/200 rad</td>
+</tr>
+<tr>
+<td><code>rev</code></td>
+<td><code>turn</code>, <code>revolution</code>, <code>revolutions</code>, <code>turns</code></td>
+<td>revolution</td>
+<td><code>bu_revolution</code></td>
+<td>2π rad</td>
+</tr>
+</tbody>
+</table>
+<h3 id="418-digital">4.18 Digital</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>b</code></td>
+<td><code>bit</code>, <code>bits</code></td>
+<td>bit</td>
+<td><code>bu_bit</code></td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td><code>byte</code>, <code>bytes</code>, <code>Byte</code>, <code>Bytes</code></td>
+<td>byte</td>
+<td><code>bu_byte</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="419-cgs-units">4.19 CGS Units</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>SI equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>P</code></td>
+<td><code>poise</code>, <code>poises</code></td>
+<td>poise (dynamic viscosity)</td>
+<td><code>bu_poise</code></td>
+<td>0.1 Pa·s</td>
+</tr>
+<tr>
+<td><code>St</code></td>
+<td><code>stokes</code>, <code>stoke</code></td>
+<td>stokes (kinematic viscosity)</td>
+<td><code>bu_stokes</code></td>
+<td>10⁻⁴ m²·s⁻¹</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td><code>gauss</code></td>
+<td>gauss (magnetic flux density)</td>
+<td><code>bu_gauss</code></td>
+<td>10⁻⁴ T</td>
+</tr>
+<tr>
+<td><code>Mx</code></td>
+<td><code>maxwell</code>, <code>maxwells</code></td>
+<td>maxwell (magnetic flux)</td>
+<td><code>bu_maxwell</code></td>
+<td>10⁻⁸ Wb</td>
+</tr>
+<tr>
+<td><code>Oe</code></td>
+<td><code>oersted</code>, <code>oersteds</code></td>
+<td>oersted (magnetic field strength)</td>
+<td><code>bu_oersted</code></td>
+<td>1000/(4π) A/m</td>
+</tr>
+<tr>
+<td><code>sb</code></td>
+<td><code>stilb</code>, <code>stilbs</code></td>
+<td>stilb (luminance)</td>
+<td><code>bu_stilb</code></td>
+<td>10⁴ cd/m²</td>
+</tr>
+<tr>
+<td><code>ph</code></td>
+<td><code>phot</code>, <code>phots</code></td>
+<td>phot (illuminance)</td>
+<td><code>bu_phot</code></td>
+<td>10⁴ lx</td>
+</tr>
+<tr>
+<td><code>Gal</code></td>
+<td><code>galileo</code>, <code>galileos</code></td>
+<td>galileo (acceleration)</td>
+<td><code>bu_galileo</code></td>
+<td>10⁻² m/s²</td>
+</tr>
+</tbody>
+</table>
+<h3 id="420-radiation">4.20 Radiation</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>SI equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ci</code></td>
+<td><code>curie</code>, <code>curies</code></td>
+<td>curie (radioactivity)</td>
+<td><code>bu_curie</code></td>
+<td>3.7×10¹⁰ Bq</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td><code>roentgen</code>, <code>roentgens</code></td>
+<td>röntgen (radiation exposure)</td>
+<td><code>bu_roentgen</code></td>
+<td>2.58×10⁻⁴ C/kg</td>
+</tr>
+<tr>
+<td><code>rem</code></td>
+<td><code>rems</code></td>
+<td>rem (dose equivalent)</td>
+<td><code>bu_rem</code></td>
+<td>10⁻² Sv</td>
+</tr>
+</tbody>
+</table>
+<h3 id="421-logarithmic">4.21 Logarithmic</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Np</code></td>
+<td><code>neper</code>, <code>nepers</code></td>
+<td>neper</td>
+<td><code>bu_neper</code></td>
+<td>dimensionless; 1 Np = 20/ln(10) dB ≈ 8.686 dB</td>
+</tr>
+<tr>
+<td><code>dB</code></td>
+<td><code>decibel</code>, <code>decibels</code></td>
+<td>decibel</td>
+<td><code>bu_decibel</code></td>
+<td>dimensionless</td>
+</tr>
+</tbody>
+</table>
+<h3 id="422-electrical-power">4.22 Electrical Power</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>var</code></td>
+<td><code>vars</code></td>
+<td>var (volt-ampere reactive)</td>
+<td><code>bu_var</code></td>
+<td>reactive power; same SI dim as W</td>
+</tr>
+<tr>
+<td><code>VA</code></td>
+<td><code>volt_ampere</code>, <code>volt_amperes</code></td>
+<td>volt-ampere</td>
+<td><code>bu_volt_ampere</code></td>
+<td>apparent power; same SI dim as W</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>W</code>, <code>var</code>, and <code>VA</code> all have SI dimension kg·m²·s⁻³. <code>bvn_units_compatible</code> returns <code>true</code> across them; use <code>.components[0].base</code> to distinguish.</p>
+</blockquote>
+<h3 id="423-textile-linear-density">4.23 Textile Linear Density</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tex</code></td>
+<td>—</td>
+<td>tex</td>
+<td><code>bu_tex</code></td>
+<td>1×10⁻⁶ kg/m (ISO 1144)</td>
+</tr>
+<tr>
+<td><code>den</code></td>
+<td><code>denier</code>, <code>deniers</code></td>
+<td>denier</td>
+<td><code>bu_denier</code></td>
+<td>1/9 000 000 kg/m</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>9 den = 1 tex.</p>
+</blockquote>
+<h3 id="424-old-german-units">4.24 Old German Units</h3>
+<p>No Old German unit accepts any SI or IEC prefix (<code>bvn_prefix_unit_valid</code> rejects all non-<code>si_none</code> prefixes for <code>bu_pfund</code> … <code>bu_scheffel</code>). Enum values 348–360.</p>
+<h4 id="mass-metric-compatible">Mass (metric-compatible)</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Pfd</code></td>
+<td><code>pfund</code>, <code>pfunds</code></td>
+<td>Pfund</td>
+<td><code>bu_pfund</code></td>
+<td>0.5 kg (exact)</td>
+</tr>
+<tr>
+<td><code>Ztr</code></td>
+<td><code>zentner</code></td>
+<td>Zentner</td>
+<td><code>bu_zentner</code></td>
+<td>50 kg (exact)</td>
+</tr>
+<tr>
+<td><code>dz</code></td>
+<td><code>doppelzentner</code></td>
+<td>Doppelzentner</td>
+<td><code>bu_doppelzentner</code></td>
+<td>100 kg (exact)</td>
+</tr>
+<tr>
+<td><code>lot</code></td>
+<td><code>lots</code></td>
+<td>Lot</td>
+<td><code>bu_lot</code></td>
+<td>15.625×10⁻³ kg (exact)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="length-historical-prussian">Length (historical Prussian)</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prln</code></td>
+<td><code>prussian_line</code>, <code>linie</code></td>
+<td>Prussian line</td>
+<td><code>bu_prussian_line</code></td>
+<td>2.17953×10⁻³ m</td>
+</tr>
+<tr>
+<td><code>prz</code></td>
+<td><code>prussian_zoll</code>, <code>zoll</code></td>
+<td>Prussian Zoll</td>
+<td><code>bu_prussian_zoll</code></td>
+<td>2.61544×10⁻² m</td>
+</tr>
+<tr>
+<td><code>prf</code></td>
+<td><code>prussian_fuss</code>, <code>preussischer_fuss</code></td>
+<td>Prussian Fuß</td>
+<td><code>bu_prussian_fuss</code></td>
+<td>3.13853×10⁻¹ m</td>
+</tr>
+<tr>
+<td><code>elle</code></td>
+<td><code>prussian_elle</code>, <code>preussische_elle</code></td>
+<td>Prussian Elle</td>
+<td><code>bu_prussian_elle</code></td>
+<td>6.67160×10⁻¹ m</td>
+</tr>
+<tr>
+<td><code>rute</code></td>
+<td><code>prussian_rute</code>, <code>preussische_rute</code></td>
+<td>Prussian Rute</td>
+<td><code>bu_prussian_rute</code></td>
+<td>3.76624 m</td>
+</tr>
+<tr>
+<td><code>klafter</code></td>
+<td><code>prussian_klafter</code></td>
+<td>Klafter</td>
+<td><code>bu_klafter</code></td>
+<td>1.88312 m</td>
+</tr>
+<tr>
+<td><code>dt_mi</code></td>
+<td><code>deutsche_meile</code>, <code>german_mile</code></td>
+<td>Geographische Meile</td>
+<td><code>bu_german_mile</code></td>
+<td>7420.44 m</td>
+</tr>
+</tbody>
+</table>
+<h4 id="area-historical-prussian">Area (historical Prussian)</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>morgen</code></td>
+<td><code>prussian_morgen</code></td>
+<td>Morgen (Prussian)</td>
+<td><code>bu_morgen</code></td>
+<td>2553.22 m²</td>
+</tr>
+</tbody>
+</table>
+<h4 id="volume-historical-prussian">Volume (historical Prussian)</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schffl</code></td>
+<td><code>scheffel</code>, <code>prussian_scheffel</code></td>
+<td>Scheffel (Prussian)</td>
+<td><code>bu_scheffel</code></td>
+<td>54.961×10⁻³ m³</td>
+</tr>
+</tbody>
+</table>
+<h3 id="425-additional-physical-units-361367">4.25 Additional Physical Units (361–367)</h3>
+<h4 id="length">Length</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ftUS</code></td>
+<td><code>survey_foot</code></td>
+<td>US survey foot</td>
+<td><code>bu_survey_foot</code></td>
+<td>1200/3937 m ≈ 0.30480061 m</td>
+</tr>
+<tr>
+<td><code>lea</code></td>
+<td><code>league</code>, <code>leagues</code></td>
+<td>League (US statute, 3 mi)</td>
+<td><code>bu_league</code></td>
+<td>4828.032 m</td>
+</tr>
+<tr>
+<td><code>cbl</code></td>
+<td><code>cable</code>, <code>cables</code></td>
+<td>Cable (international, ¹⁄₁₀ nmi)</td>
+<td><code>bu_cable</code></td>
+<td>185.2 m</td>
+</tr>
+<tr>
+<td><code>hand</code></td>
+<td><code>hands</code></td>
+<td>Hand (4 in)</td>
+<td><code>bu_hand</code></td>
+<td>0.1016 m</td>
+</tr>
+</tbody>
+</table>
+<h4 id="mass">Mass</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>qntl</code></td>
+<td><code>quintal</code>, <code>quintals</code></td>
+<td>Metric quintal</td>
+<td><code>bu_quintal</code></td>
+<td>100 kg</td>
+</tr>
+<tr>
+<td><code>sc</code></td>
+<td><code>scruple</code>, <code>scruples</code></td>
+<td>Apothecary scruple (20 gr)</td>
+<td><code>bu_scruple</code></td>
+<td>1.2959782×10⁻³ kg</td>
+</tr>
+</tbody>
+</table>
+<h4 id="signal-rate">Signal Rate</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>SI dimension</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Bd</code></td>
+<td><code>baud</code>, <code>bauds</code></td>
+<td>Baud (symbol/s)</td>
+<td><code>bu_baud</code></td>
+<td>s⁻¹</td>
+</tr>
+</tbody>
+</table>
+<p>SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.</p>
+<h3 id="426-ratio-and-proportion-372377">4.26 Ratio and Proportion (372–377)</h3>
+<p>Dimensionless scaling factors: <code>5 %</code> ≡ <code>0.05</code>, <code>250 ppm</code> ≡ <code>0.00025</code>. These do <strong>not</strong> accept SI or IEC prefixes.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>%</code></td>
+<td><code>percent</code></td>
+<td>per cent</td>
+<td><code>bu_percent</code></td>
+<td>10⁻²</td>
+</tr>
+<tr>
+<td><code>‰</code></td>
+<td><code>per_mille</code></td>
+<td>per mille</td>
+<td><code>bu_per_mille</code></td>
+<td>10⁻³</td>
+</tr>
+<tr>
+<td><code>‱</code></td>
+<td><code>per_myriad</code></td>
+<td>per myriad</td>
+<td><code>bu_per_myriad</code></td>
+<td>10⁻⁴</td>
+</tr>
+<tr>
+<td><code>pcm</code></td>
+<td><code>per_cent_mille</code></td>
+<td>per cent mille</td>
+<td><code>bu_per_cent_mille</code></td>
+<td>10⁻⁵</td>
+</tr>
+<tr>
+<td><code>ppm</code></td>
+<td>—</td>
+<td>parts per million</td>
+<td><code>bu_ppm</code></td>
+<td>10⁻⁶</td>
+</tr>
+<tr>
+<td><code>ppb</code></td>
+<td>—</td>
+<td>parts per billion</td>
+<td><code>bu_ppb</code></td>
+<td>10⁻⁹</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-currencies">5. Currencies</h2>
+<h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
+<p>As of spec 1.0 a currency code carries a <strong>mandatory <code>$</code> sigil</strong>: write <code>$USD</code>,
+<code>$BTC</code>, <code>k~$EUR</code>, <code>$USD/oz_t</code>. The codes listed in the tables below are the bare
+ISO 4217 / crypto identifiers — prefix each with <code>$</code> when you use it in a document.
+A bare code (no <code>$</code>) is <strong>not</strong> a currency; it is matched against the physical-unit
+table and raises <code>error_unit_illegal</code> if it is not a unit. This removes every
+currency/unit namespace collision (e.g. <code>$CUP</code> the Cuban Peso vs <code>cup</code> the unit).</p>
+<h3 id="52-iso-4217-fiat-currencies">5.2 ISO 4217 Fiat Currencies</h3>
+<p>166 codes: 164 occupying <code>value_base_unit_t</code> slots <strong>134 … 297</strong> (<code>BVN_CURRENCY_FIAT_FIRST … BVN_CURRENCY_FIAT_LAST</code>), plus <code>ZWG</code> and <code>XCG</code> appended past the unit block at slots <strong>378 … 379</strong> (<code>BVN_CURRENCY_EXT_FIRST … BVN_CURRENCY_EXT_LAST</code>) so that adding them shifted no existing enum value. The 134–297 codes have no named <code>bu_*</code> enumerators — they are resolved from the <code>$</code>-sigil code by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value; query them with <code>bvn_unit_is_fiat</code> / <code>bvn_currency_info</code>.</p>
+<blockquote>
+<p><strong>Min</strong> = minor unit exponent N: 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2).
+Minor units are <strong>bold</strong> when they differ from 2. <code>numeric_code</code> is the ISO 4217 numeric identifier.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th style="text-align: right;">Num</th>
+<th style="text-align: right;">Min</th>
+<th>Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AED</code></td>
+<td style="text-align: right;">784</td>
+<td style="text-align: right;">2</td>
+<td>UAE Dirham</td>
+</tr>
+<tr>
+<td><code>AFN</code></td>
+<td style="text-align: right;">971</td>
+<td style="text-align: right;">2</td>
+<td>Afghan Afghani</td>
+</tr>
+<tr>
+<td><code>ALL</code></td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">2</td>
+<td>Albanian Lek</td>
+</tr>
+<tr>
+<td><code>AMD</code></td>
+<td style="text-align: right;">51</td>
+<td style="text-align: right;">2</td>
+<td>Armenian Dram</td>
+</tr>
+<tr>
+<td><code>ANG</code></td>
+<td style="text-align: right;">532</td>
+<td style="text-align: right;">2</td>
+<td>Netherlands Antillean Guilder</td>
+</tr>
+<tr>
+<td><code>AOA</code></td>
+<td style="text-align: right;">973</td>
+<td style="text-align: right;">2</td>
+<td>Angolan Kwanza</td>
+</tr>
+<tr>
+<td><code>ARS</code></td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">2</td>
+<td>Argentine Peso</td>
+</tr>
+<tr>
+<td><code>AUD</code></td>
+<td style="text-align: right;">36</td>
+<td style="text-align: right;">2</td>
+<td>Australian Dollar</td>
+</tr>
+<tr>
+<td><code>AWG</code></td>
+<td style="text-align: right;">533</td>
+<td style="text-align: right;">2</td>
+<td>Aruban Florin</td>
+</tr>
+<tr>
+<td><code>AZN</code></td>
+<td style="text-align: right;">944</td>
+<td style="text-align: right;">2</td>
+<td>Azerbaijani Manat</td>
+</tr>
+<tr>
+<td><code>BAM</code></td>
+<td style="text-align: right;">977</td>
+<td style="text-align: right;">2</td>
+<td>Bosnia-Herzegovina Convertible Mark</td>
+</tr>
+<tr>
+<td><code>BBD</code></td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">2</td>
+<td>Barbados Dollar</td>
+</tr>
+<tr>
+<td><code>BDT</code></td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">2</td>
+<td>Bangladeshi Taka</td>
+</tr>
+<tr>
+<td><code>BGN</code></td>
+<td style="text-align: right;">975</td>
+<td style="text-align: right;">2</td>
+<td>Bulgarian Lev <em>(historical; retired 2026-01-01)</em></td>
+</tr>
+<tr>
+<td><code>BHD</code></td>
+<td style="text-align: right;">48</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Bahraini Dinar</td>
+</tr>
+<tr>
+<td><code>BIF</code></td>
+<td style="text-align: right;">108</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Burundian Franc</td>
+</tr>
+<tr>
+<td><code>BMD</code></td>
+<td style="text-align: right;">60</td>
+<td style="text-align: right;">2</td>
+<td>Bermudian Dollar</td>
+</tr>
+<tr>
+<td><code>BND</code></td>
+<td style="text-align: right;">96</td>
+<td style="text-align: right;">2</td>
+<td>Brunei Dollar</td>
+</tr>
+<tr>
+<td><code>BOB</code></td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">2</td>
+<td>Boliviano</td>
+</tr>
+<tr>
+<td><code>BRL</code></td>
+<td style="text-align: right;">986</td>
+<td style="text-align: right;">2</td>
+<td>Brazilian Real</td>
+</tr>
+<tr>
+<td><code>BSD</code></td>
+<td style="text-align: right;">44</td>
+<td style="text-align: right;">2</td>
+<td>Bahamian Dollar</td>
+</tr>
+<tr>
+<td><code>BTN</code></td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">2</td>
+<td>Bhutanese Ngultrum</td>
+</tr>
+<tr>
+<td><code>BWP</code></td>
+<td style="text-align: right;">72</td>
+<td style="text-align: right;">2</td>
+<td>Botswana Pula</td>
+</tr>
+<tr>
+<td><code>BYN</code></td>
+<td style="text-align: right;">933</td>
+<td style="text-align: right;">2</td>
+<td>Belarusian Ruble</td>
+</tr>
+<tr>
+<td><code>BZD</code></td>
+<td style="text-align: right;">84</td>
+<td style="text-align: right;">2</td>
+<td>Belize Dollar</td>
+</tr>
+<tr>
+<td><code>CAD</code></td>
+<td style="text-align: right;">124</td>
+<td style="text-align: right;">2</td>
+<td>Canadian Dollar</td>
+</tr>
+<tr>
+<td><code>CDF</code></td>
+<td style="text-align: right;">976</td>
+<td style="text-align: right;">2</td>
+<td>Congolese Franc</td>
+</tr>
+<tr>
+<td><code>CHF</code></td>
+<td style="text-align: right;">756</td>
+<td style="text-align: right;">2</td>
+<td>Swiss Franc</td>
+</tr>
+<tr>
+<td><code>CLF</code></td>
+<td style="text-align: right;">990</td>
+<td style="text-align: right;"><strong>4</strong></td>
+<td>Unidad de Fomento</td>
+</tr>
+<tr>
+<td><code>CLP</code></td>
+<td style="text-align: right;">152</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Chilean Peso</td>
+</tr>
+<tr>
+<td><code>CNY</code></td>
+<td style="text-align: right;">156</td>
+<td style="text-align: right;">2</td>
+<td>Chinese Yuan</td>
+</tr>
+<tr>
+<td><code>COP</code></td>
+<td style="text-align: right;">170</td>
+<td style="text-align: right;">2</td>
+<td>Colombian Peso</td>
+</tr>
+<tr>
+<td><code>CRC</code></td>
+<td style="text-align: right;">188</td>
+<td style="text-align: right;">2</td>
+<td>Costa Rican Colon</td>
+</tr>
+<tr>
+<td><code>CUP</code></td>
+<td style="text-align: right;">192</td>
+<td style="text-align: right;">2</td>
+<td>Cuban Peso</td>
+</tr>
+<tr>
+<td><code>CVE</code></td>
+<td style="text-align: right;">132</td>
+<td style="text-align: right;">2</td>
+<td>Cape Verdean Escudo</td>
+</tr>
+<tr>
+<td><code>CZK</code></td>
+<td style="text-align: right;">203</td>
+<td style="text-align: right;">2</td>
+<td>Czech Koruna</td>
+</tr>
+<tr>
+<td><code>DJF</code></td>
+<td style="text-align: right;">262</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Djiboutian Franc</td>
+</tr>
+<tr>
+<td><code>DKK</code></td>
+<td style="text-align: right;">208</td>
+<td style="text-align: right;">2</td>
+<td>Danish Krone</td>
+</tr>
+<tr>
+<td><code>DOP</code></td>
+<td style="text-align: right;">214</td>
+<td style="text-align: right;">2</td>
+<td>Dominican Peso</td>
+</tr>
+<tr>
+<td><code>DZD</code></td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">2</td>
+<td>Algerian Dinar</td>
+</tr>
+<tr>
+<td><code>EGP</code></td>
+<td style="text-align: right;">818</td>
+<td style="text-align: right;">2</td>
+<td>Egyptian Pound</td>
+</tr>
+<tr>
+<td><code>ERN</code></td>
+<td style="text-align: right;">232</td>
+<td style="text-align: right;">2</td>
+<td>Eritrean Nakfa</td>
+</tr>
+<tr>
+<td><code>ETB</code></td>
+<td style="text-align: right;">230</td>
+<td style="text-align: right;">2</td>
+<td>Ethiopian Birr</td>
+</tr>
+<tr>
+<td><code>EUR</code></td>
+<td style="text-align: right;">978</td>
+<td style="text-align: right;">2</td>
+<td>Euro</td>
+</tr>
+<tr>
+<td><code>FJD</code></td>
+<td style="text-align: right;">242</td>
+<td style="text-align: right;">2</td>
+<td>Fijian Dollar</td>
+</tr>
+<tr>
+<td><code>FKP</code></td>
+<td style="text-align: right;">238</td>
+<td style="text-align: right;">2</td>
+<td>Falkland Islands Pound</td>
+</tr>
+<tr>
+<td><code>GBP</code></td>
+<td style="text-align: right;">826</td>
+<td style="text-align: right;">2</td>
+<td>Pound Sterling</td>
+</tr>
+<tr>
+<td><code>GEL</code></td>
+<td style="text-align: right;">981</td>
+<td style="text-align: right;">2</td>
+<td>Georgian Lari</td>
+</tr>
+<tr>
+<td><code>GHS</code></td>
+<td style="text-align: right;">936</td>
+<td style="text-align: right;">2</td>
+<td>Ghanaian Cedi</td>
+</tr>
+<tr>
+<td><code>GIP</code></td>
+<td style="text-align: right;">292</td>
+<td style="text-align: right;">2</td>
+<td>Gibraltar Pound</td>
+</tr>
+<tr>
+<td><code>GMD</code></td>
+<td style="text-align: right;">270</td>
+<td style="text-align: right;">2</td>
+<td>Gambian Dalasi</td>
+</tr>
+<tr>
+<td><code>GNF</code></td>
+<td style="text-align: right;">324</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Guinean Franc</td>
+</tr>
+<tr>
+<td><code>GTQ</code></td>
+<td style="text-align: right;">320</td>
+<td style="text-align: right;">2</td>
+<td>Guatemalan Quetzal</td>
+</tr>
+<tr>
+<td><code>GYD</code></td>
+<td style="text-align: right;">328</td>
+<td style="text-align: right;">2</td>
+<td>Guyanese Dollar</td>
+</tr>
+<tr>
+<td><code>HKD</code></td>
+<td style="text-align: right;">344</td>
+<td style="text-align: right;">2</td>
+<td>Hong Kong Dollar</td>
+</tr>
+<tr>
+<td><code>HNL</code></td>
+<td style="text-align: right;">340</td>
+<td style="text-align: right;">2</td>
+<td>Honduran Lempira</td>
+</tr>
+<tr>
+<td><code>HRK</code></td>
+<td style="text-align: right;">191</td>
+<td style="text-align: right;">2</td>
+<td>Croatian Kuna <em>(historical; retired 2023-01-01)</em></td>
+</tr>
+<tr>
+<td><code>HTG</code></td>
+<td style="text-align: right;">332</td>
+<td style="text-align: right;">2</td>
+<td>Haitian Gourde</td>
+</tr>
+<tr>
+<td><code>HUF</code></td>
+<td style="text-align: right;">348</td>
+<td style="text-align: right;">2</td>
+<td>Hungarian Forint</td>
+</tr>
+<tr>
+<td><code>IDR</code></td>
+<td style="text-align: right;">360</td>
+<td style="text-align: right;">2</td>
+<td>Indonesian Rupiah</td>
+</tr>
+<tr>
+<td><code>ILS</code></td>
+<td style="text-align: right;">376</td>
+<td style="text-align: right;">2</td>
+<td>Israeli New Shekel</td>
+</tr>
+<tr>
+<td><code>INR</code></td>
+<td style="text-align: right;">356</td>
+<td style="text-align: right;">2</td>
+<td>Indian Rupee</td>
+</tr>
+<tr>
+<td><code>IQD</code></td>
+<td style="text-align: right;">368</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Iraqi Dinar</td>
+</tr>
+<tr>
+<td><code>IRR</code></td>
+<td style="text-align: right;">364</td>
+<td style="text-align: right;">2</td>
+<td>Iranian Rial</td>
+</tr>
+<tr>
+<td><code>ISK</code></td>
+<td style="text-align: right;">352</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Icelandic Krona</td>
+</tr>
+<tr>
+<td><code>JMD</code></td>
+<td style="text-align: right;">388</td>
+<td style="text-align: right;">2</td>
+<td>Jamaican Dollar</td>
+</tr>
+<tr>
+<td><code>JOD</code></td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Jordanian Dinar</td>
+</tr>
+<tr>
+<td><code>JPY</code></td>
+<td style="text-align: right;">392</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Japanese Yen</td>
+</tr>
+<tr>
+<td><code>KES</code></td>
+<td style="text-align: right;">404</td>
+<td style="text-align: right;">2</td>
+<td>Kenyan Shilling</td>
+</tr>
+<tr>
+<td><code>KGS</code></td>
+<td style="text-align: right;">417</td>
+<td style="text-align: right;">2</td>
+<td>Kyrgyzstani Som</td>
+</tr>
+<tr>
+<td><code>KHR</code></td>
+<td style="text-align: right;">116</td>
+<td style="text-align: right;">2</td>
+<td>Cambodian Riel</td>
+</tr>
+<tr>
+<td><code>KMF</code></td>
+<td style="text-align: right;">174</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Comorian Franc</td>
+</tr>
+<tr>
+<td><code>KPW</code></td>
+<td style="text-align: right;">408</td>
+<td style="text-align: right;">2</td>
+<td>North Korean Won</td>
+</tr>
+<tr>
+<td><code>KRW</code></td>
+<td style="text-align: right;">410</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>South Korean Won</td>
+</tr>
+<tr>
+<td><code>KWD</code></td>
+<td style="text-align: right;">414</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Kuwaiti Dinar</td>
+</tr>
+<tr>
+<td><code>KYD</code></td>
+<td style="text-align: right;">136</td>
+<td style="text-align: right;">2</td>
+<td>Cayman Islands Dollar</td>
+</tr>
+<tr>
+<td><code>KZT</code></td>
+<td style="text-align: right;">398</td>
+<td style="text-align: right;">2</td>
+<td>Kazakhstani Tenge</td>
+</tr>
+<tr>
+<td><code>LAK</code></td>
+<td style="text-align: right;">418</td>
+<td style="text-align: right;">2</td>
+<td>Laotian Kip</td>
+</tr>
+<tr>
+<td><code>LBP</code></td>
+<td style="text-align: right;">422</td>
+<td style="text-align: right;">2</td>
+<td>Lebanese Pound</td>
+</tr>
+<tr>
+<td><code>LKR</code></td>
+<td style="text-align: right;">144</td>
+<td style="text-align: right;">2</td>
+<td>Sri Lankan Rupee</td>
+</tr>
+<tr>
+<td><code>LRD</code></td>
+<td style="text-align: right;">430</td>
+<td style="text-align: right;">2</td>
+<td>Liberian Dollar</td>
+</tr>
+<tr>
+<td><code>LSL</code></td>
+<td style="text-align: right;">426</td>
+<td style="text-align: right;">2</td>
+<td>Lesotho Loti</td>
+</tr>
+<tr>
+<td><code>LYD</code></td>
+<td style="text-align: right;">434</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Libyan Dinar</td>
+</tr>
+<tr>
+<td><code>MAD</code></td>
+<td style="text-align: right;">504</td>
+<td style="text-align: right;">2</td>
+<td>Moroccan Dirham</td>
+</tr>
+<tr>
+<td><code>MDL</code></td>
+<td style="text-align: right;">498</td>
+<td style="text-align: right;">2</td>
+<td>Moldovan Leu</td>
+</tr>
+<tr>
+<td><code>MGA</code></td>
+<td style="text-align: right;">969</td>
+<td style="text-align: right;">2</td>
+<td>Malagasy Ariary</td>
+</tr>
+<tr>
+<td><code>MKD</code></td>
+<td style="text-align: right;">807</td>
+<td style="text-align: right;">2</td>
+<td>Macedonian Denar</td>
+</tr>
+<tr>
+<td><code>MMK</code></td>
+<td style="text-align: right;">104</td>
+<td style="text-align: right;">2</td>
+<td>Myanmar Kyat</td>
+</tr>
+<tr>
+<td><code>MNT</code></td>
+<td style="text-align: right;">496</td>
+<td style="text-align: right;">2</td>
+<td>Mongolian Togrog</td>
+</tr>
+<tr>
+<td><code>MOP</code></td>
+<td style="text-align: right;">446</td>
+<td style="text-align: right;">2</td>
+<td>Macanese Pataca</td>
+</tr>
+<tr>
+<td><code>MRU</code></td>
+<td style="text-align: right;">929</td>
+<td style="text-align: right;">2</td>
+<td>Mauritanian Ouguiya</td>
+</tr>
+<tr>
+<td><code>MUR</code></td>
+<td style="text-align: right;">480</td>
+<td style="text-align: right;">2</td>
+<td>Mauritian Rupee</td>
+</tr>
+<tr>
+<td><code>MVR</code></td>
+<td style="text-align: right;">462</td>
+<td style="text-align: right;">2</td>
+<td>Maldivian Rufiyaa</td>
+</tr>
+<tr>
+<td><code>MWK</code></td>
+<td style="text-align: right;">454</td>
+<td style="text-align: right;">2</td>
+<td>Malawian Kwacha</td>
+</tr>
+<tr>
+<td><code>MXN</code></td>
+<td style="text-align: right;">484</td>
+<td style="text-align: right;">2</td>
+<td>Mexican Peso</td>
+</tr>
+<tr>
+<td><code>MYR</code></td>
+<td style="text-align: right;">458</td>
+<td style="text-align: right;">2</td>
+<td>Malaysian Ringgit</td>
+</tr>
+<tr>
+<td><code>MZN</code></td>
+<td style="text-align: right;">943</td>
+<td style="text-align: right;">2</td>
+<td>Mozambican Metical</td>
+</tr>
+<tr>
+<td><code>NAD</code></td>
+<td style="text-align: right;">516</td>
+<td style="text-align: right;">2</td>
+<td>Namibian Dollar</td>
+</tr>
+<tr>
+<td><code>NGN</code></td>
+<td style="text-align: right;">566</td>
+<td style="text-align: right;">2</td>
+<td>Nigerian Naira</td>
+</tr>
+<tr>
+<td><code>NIO</code></td>
+<td style="text-align: right;">558</td>
+<td style="text-align: right;">2</td>
+<td>Nicaraguan Cordoba</td>
+</tr>
+<tr>
+<td><code>NOK</code></td>
+<td style="text-align: right;">578</td>
+<td style="text-align: right;">2</td>
+<td>Norwegian Krone</td>
+</tr>
+<tr>
+<td><code>NPR</code></td>
+<td style="text-align: right;">524</td>
+<td style="text-align: right;">2</td>
+<td>Nepalese Rupee</td>
+</tr>
+<tr>
+<td><code>NZD</code></td>
+<td style="text-align: right;">554</td>
+<td style="text-align: right;">2</td>
+<td>New Zealand Dollar</td>
+</tr>
+<tr>
+<td><code>OMR</code></td>
+<td style="text-align: right;">512</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Omani Rial</td>
+</tr>
+<tr>
+<td><code>PAB</code></td>
+<td style="text-align: right;">590</td>
+<td style="text-align: right;">2</td>
+<td>Panamanian Balboa</td>
+</tr>
+<tr>
+<td><code>PEN</code></td>
+<td style="text-align: right;">604</td>
+<td style="text-align: right;">2</td>
+<td>Peruvian Sol</td>
+</tr>
+<tr>
+<td><code>PGK</code></td>
+<td style="text-align: right;">598</td>
+<td style="text-align: right;">2</td>
+<td>Papua New Guinean Kina</td>
+</tr>
+<tr>
+<td><code>PHP</code></td>
+<td style="text-align: right;">608</td>
+<td style="text-align: right;">2</td>
+<td>Philippine Peso</td>
+</tr>
+<tr>
+<td><code>PKR</code></td>
+<td style="text-align: right;">586</td>
+<td style="text-align: right;">2</td>
+<td>Pakistani Rupee</td>
+</tr>
+<tr>
+<td><code>PLN</code></td>
+<td style="text-align: right;">985</td>
+<td style="text-align: right;">2</td>
+<td>Polish Zloty</td>
+</tr>
+<tr>
+<td><code>PYG</code></td>
+<td style="text-align: right;">600</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Paraguayan Guarani</td>
+</tr>
+<tr>
+<td><code>QAR</code></td>
+<td style="text-align: right;">634</td>
+<td style="text-align: right;">2</td>
+<td>Qatari Riyal</td>
+</tr>
+<tr>
+<td><code>RON</code></td>
+<td style="text-align: right;">946</td>
+<td style="text-align: right;">2</td>
+<td>Romanian Leu</td>
+</tr>
+<tr>
+<td><code>RSD</code></td>
+<td style="text-align: right;">941</td>
+<td style="text-align: right;">2</td>
+<td>Serbian Dinar</td>
+</tr>
+<tr>
+<td><code>RUB</code></td>
+<td style="text-align: right;">643</td>
+<td style="text-align: right;">2</td>
+<td>Russian Ruble</td>
+</tr>
+<tr>
+<td><code>RWF</code></td>
+<td style="text-align: right;">646</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Rwandan Franc</td>
+</tr>
+<tr>
+<td><code>SAR</code></td>
+<td style="text-align: right;">682</td>
+<td style="text-align: right;">2</td>
+<td>Saudi Riyal</td>
+</tr>
+<tr>
+<td><code>SBD</code></td>
+<td style="text-align: right;">90</td>
+<td style="text-align: right;">2</td>
+<td>Solomon Islands Dollar</td>
+</tr>
+<tr>
+<td><code>SCR</code></td>
+<td style="text-align: right;">690</td>
+<td style="text-align: right;">2</td>
+<td>Seychellois Rupee</td>
+</tr>
+<tr>
+<td><code>SDG</code></td>
+<td style="text-align: right;">938</td>
+<td style="text-align: right;">2</td>
+<td>Sudanese Pound</td>
+</tr>
+<tr>
+<td><code>SEK</code></td>
+<td style="text-align: right;">752</td>
+<td style="text-align: right;">2</td>
+<td>Swedish Krona</td>
+</tr>
+<tr>
+<td><code>SGD</code></td>
+<td style="text-align: right;">702</td>
+<td style="text-align: right;">2</td>
+<td>Singapore Dollar</td>
+</tr>
+<tr>
+<td><code>SHP</code></td>
+<td style="text-align: right;">654</td>
+<td style="text-align: right;">2</td>
+<td>Saint Helena Pound</td>
+</tr>
+<tr>
+<td><code>SLE</code></td>
+<td style="text-align: right;">925</td>
+<td style="text-align: right;">2</td>
+<td>Sierra Leonean Leone</td>
+</tr>
+<tr>
+<td><code>SLL</code></td>
+<td style="text-align: right;">694</td>
+<td style="text-align: right;">2</td>
+<td>Sierra Leonean Leone (old) <em>(historical; replaced by SLE 2022)</em></td>
+</tr>
+<tr>
+<td><code>SOS</code></td>
+<td style="text-align: right;">706</td>
+<td style="text-align: right;">2</td>
+<td>Somali Shilling</td>
+</tr>
+<tr>
+<td><code>SSP</code></td>
+<td style="text-align: right;">728</td>
+<td style="text-align: right;">2</td>
+<td>South Sudanese Pound</td>
+</tr>
+<tr>
+<td><code>SRD</code></td>
+<td style="text-align: right;">968</td>
+<td style="text-align: right;">2</td>
+<td>Surinamese Dollar</td>
+</tr>
+<tr>
+<td><code>STN</code></td>
+<td style="text-align: right;">930</td>
+<td style="text-align: right;">2</td>
+<td>Sao Tome and Principe Dobra</td>
+</tr>
+<tr>
+<td><code>SVC</code></td>
+<td style="text-align: right;">222</td>
+<td style="text-align: right;">2</td>
+<td>Salvadoran Colon</td>
+</tr>
+<tr>
+<td><code>SYP</code></td>
+<td style="text-align: right;">760</td>
+<td style="text-align: right;">2</td>
+<td>Syrian Pound</td>
+</tr>
+<tr>
+<td><code>SZL</code></td>
+<td style="text-align: right;">748</td>
+<td style="text-align: right;">2</td>
+<td>Swazi Lilangeni</td>
+</tr>
+<tr>
+<td><code>THB</code></td>
+<td style="text-align: right;">764</td>
+<td style="text-align: right;">2</td>
+<td>Thai Baht</td>
+</tr>
+<tr>
+<td><code>TJS</code></td>
+<td style="text-align: right;">972</td>
+<td style="text-align: right;">2</td>
+<td>Tajikistani Somoni</td>
+</tr>
+<tr>
+<td><code>TMT</code></td>
+<td style="text-align: right;">934</td>
+<td style="text-align: right;">2</td>
+<td>Turkmenistan Manat</td>
+</tr>
+<tr>
+<td><code>TND</code></td>
+<td style="text-align: right;">788</td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td>Tunisian Dinar</td>
+</tr>
+<tr>
+<td><code>TOP</code></td>
+<td style="text-align: right;">776</td>
+<td style="text-align: right;">2</td>
+<td>Tongan Pa'anga</td>
+</tr>
+<tr>
+<td><code>TRY</code></td>
+<td style="text-align: right;">949</td>
+<td style="text-align: right;">2</td>
+<td>Turkish Lira</td>
+</tr>
+<tr>
+<td><code>TTD</code></td>
+<td style="text-align: right;">780</td>
+<td style="text-align: right;">2</td>
+<td>Trinidad and Tobago Dollar</td>
+</tr>
+<tr>
+<td><code>TWD</code></td>
+<td style="text-align: right;">901</td>
+<td style="text-align: right;">2</td>
+<td>New Taiwan Dollar</td>
+</tr>
+<tr>
+<td><code>TZS</code></td>
+<td style="text-align: right;">834</td>
+<td style="text-align: right;">2</td>
+<td>Tanzanian Shilling</td>
+</tr>
+<tr>
+<td><code>UAH</code></td>
+<td style="text-align: right;">980</td>
+<td style="text-align: right;">2</td>
+<td>Ukrainian Hryvnia</td>
+</tr>
+<tr>
+<td><code>UGX</code></td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Ugandan Shilling</td>
+</tr>
+<tr>
+<td><code>USD</code></td>
+<td style="text-align: right;">840</td>
+<td style="text-align: right;">2</td>
+<td>US Dollar</td>
+</tr>
+<tr>
+<td><code>UYU</code></td>
+<td style="text-align: right;">858</td>
+<td style="text-align: right;">2</td>
+<td>Uruguayan Peso</td>
+</tr>
+<tr>
+<td><code>UZS</code></td>
+<td style="text-align: right;">860</td>
+<td style="text-align: right;">2</td>
+<td>Uzbekistani Som</td>
+</tr>
+<tr>
+<td><code>VES</code></td>
+<td style="text-align: right;">928</td>
+<td style="text-align: right;">2</td>
+<td>Venezuelan Bolivar Soberano</td>
+</tr>
+<tr>
+<td><code>VND</code></td>
+<td style="text-align: right;">704</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Vietnamese Dong</td>
+</tr>
+<tr>
+<td><code>VUV</code></td>
+<td style="text-align: right;">548</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Vanuatu Vatu</td>
+</tr>
+<tr>
+<td><code>WST</code></td>
+<td style="text-align: right;">882</td>
+<td style="text-align: right;">2</td>
+<td>Samoan Tala</td>
+</tr>
+<tr>
+<td><code>XAF</code></td>
+<td style="text-align: right;">950</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>CFA Franc BEAC</td>
+</tr>
+<tr>
+<td><code>XAG</code></td>
+<td style="text-align: right;">961</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Silver</td>
+</tr>
+<tr>
+<td><code>XAU</code></td>
+<td style="text-align: right;">959</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Gold</td>
+</tr>
+<tr>
+<td><code>XCD</code></td>
+<td style="text-align: right;">951</td>
+<td style="text-align: right;">2</td>
+<td>East Caribbean Dollar</td>
+</tr>
+<tr>
+<td><code>XCG</code></td>
+<td style="text-align: right;">532</td>
+<td style="text-align: right;">2</td>
+<td>Caribbean Guilder</td>
+</tr>
+<tr>
+<td><code>XDR</code></td>
+<td style="text-align: right;">960</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Special Drawing Rights</td>
+</tr>
+<tr>
+<td><code>XOF</code></td>
+<td style="text-align: right;">952</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>CFA Franc BCEAO</td>
+</tr>
+<tr>
+<td><code>XPD</code></td>
+<td style="text-align: right;">964</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Palladium</td>
+</tr>
+<tr>
+<td><code>XPF</code></td>
+<td style="text-align: right;">953</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>CFP Franc</td>
+</tr>
+<tr>
+<td><code>XPT</code></td>
+<td style="text-align: right;">962</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Platinum</td>
+</tr>
+<tr>
+<td><code>XTS</code></td>
+<td style="text-align: right;">963</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td>Test (ISO 4217 reserved)</td>
+</tr>
+<tr>
+<td><code>YER</code></td>
+<td style="text-align: right;">886</td>
+<td style="text-align: right;">2</td>
+<td>Yemeni Rial</td>
+</tr>
+<tr>
+<td><code>ZAR</code></td>
+<td style="text-align: right;">710</td>
+<td style="text-align: right;">2</td>
+<td>South African Rand</td>
+</tr>
+<tr>
+<td><code>ZMW</code></td>
+<td style="text-align: right;">967</td>
+<td style="text-align: right;">2</td>
+<td>Zambian Kwacha</td>
+</tr>
+<tr>
+<td><code>ZWG</code></td>
+<td style="text-align: right;">924</td>
+<td style="text-align: right;">2</td>
+<td>Zimbabwe Gold</td>
+</tr>
+<tr>
+<td><code>ZWL</code></td>
+<td style="text-align: right;">932</td>
+<td style="text-align: right;">2</td>
+<td>Zimbabwean Dollar <em>(historical; superseded by ZWG 2024)</em></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>CLF</code> is the only currency with 4 minor units.
+<code>XTS</code> is the ISO 4217 testing code; present in the table but should not appear in production data.</p>
+</blockquote>
+<h3 id="53-cryptocurrencies">5.3 Cryptocurrencies</h3>
+<p>50 codes occupying <code>value_base_unit_t</code> slots <strong>298 … 347</strong> (<code>BVN_CURRENCY_CRYPTO_FIRST … BVN_CURRENCY_CRYPTO_LAST</code>). Like the fiat codes they have no named <code>bu_*</code> enumerators — resolved by <code>bvn_parse_currency_str</code>, queried with <code>bvn_unit_is_crypto</code> / <code>bvn_currency_info</code>. <code>numeric_code = 0</code> for all.</p>
+<blockquote>
+<p><strong>Min</strong> = <code>minor_unit</code> = on-chain decimal places. E.g. <code>&lt;uint:64,$BTC&gt;</code> stores satoshis; divide by 10⁸ to obtain BTC.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th style="text-align: right;">Min</th>
+<th>Subunit</th>
+<th>Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BTC</code></td>
+<td style="text-align: right;">8</td>
+<td>satoshi</td>
+<td>Bitcoin</td>
+</tr>
+<tr>
+<td><code>ETH</code></td>
+<td style="text-align: right;">18</td>
+<td>wei</td>
+<td>Ethereum</td>
+</tr>
+<tr>
+<td><code>SOL</code></td>
+<td style="text-align: right;">9</td>
+<td>lamport</td>
+<td>Solana</td>
+</tr>
+<tr>
+<td><code>XRP</code></td>
+<td style="text-align: right;">6</td>
+<td>drop</td>
+<td>XRP</td>
+</tr>
+<tr>
+<td><code>BNB</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>BNB</td>
+</tr>
+<tr>
+<td><code>ADA</code></td>
+<td style="text-align: right;">6</td>
+<td>lovelace</td>
+<td>Cardano</td>
+</tr>
+<tr>
+<td><code>LTC</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>Litecoin</td>
+</tr>
+<tr>
+<td><code>DOT</code></td>
+<td style="text-align: right;">10</td>
+<td>planck</td>
+<td>Polkadot</td>
+</tr>
+<tr>
+<td><code>XMR</code></td>
+<td style="text-align: right;">12</td>
+<td>piconero</td>
+<td>Monero</td>
+</tr>
+<tr>
+<td><code>ETC</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Ethereum Classic</td>
+</tr>
+<tr>
+<td><code>BCH</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>Bitcoin Cash</td>
+</tr>
+<tr>
+<td><code>XLM</code></td>
+<td style="text-align: right;">7</td>
+<td>stroop</td>
+<td>Stellar</td>
+</tr>
+<tr>
+<td><code>FIL</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Filecoin</td>
+</tr>
+<tr>
+<td><code>ICP</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>Internet Computer</td>
+</tr>
+<tr>
+<td><code>TRX</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>TRON</td>
+</tr>
+<tr>
+<td><code>EOS</code></td>
+<td style="text-align: right;">4</td>
+<td>—</td>
+<td>EOS</td>
+</tr>
+<tr>
+<td><code>VET</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>VeChain</td>
+</tr>
+<tr>
+<td><code>NEO</code></td>
+<td style="text-align: right;">0</td>
+<td>—</td>
+<td>Neo</td>
+</tr>
+<tr>
+<td><code>ZEC</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>Zcash</td>
+</tr>
+<tr>
+<td><code>UNI</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Uniswap</td>
+</tr>
+<tr>
+<td><code>ARB</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Arbitrum</td>
+</tr>
+<tr>
+<td><code>SUI</code></td>
+<td style="text-align: right;">9</td>
+<td>—</td>
+<td>Sui</td>
+</tr>
+<tr>
+<td><code>TON</code></td>
+<td style="text-align: right;">9</td>
+<td>—</td>
+<td>Toncoin</td>
+</tr>
+<tr>
+<td><code>INJ</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Injective</td>
+</tr>
+<tr>
+<td><code>SEI</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Sei</td>
+</tr>
+<tr>
+<td><code>APT</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>Aptos</td>
+</tr>
+<tr>
+<td><code>TAO</code></td>
+<td style="text-align: right;">9</td>
+<td>—</td>
+<td>Bittensor</td>
+</tr>
+<tr>
+<td><code>WIF</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>dogwifhat</td>
+</tr>
+<tr>
+<td><code>DOGE</code></td>
+<td style="text-align: right;">8</td>
+<td>koinu</td>
+<td>Dogecoin</td>
+</tr>
+<tr>
+<td><code>LINK</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Chainlink</td>
+</tr>
+<tr>
+<td><code>USDT</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Tether</td>
+</tr>
+<tr>
+<td><code>USDC</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>USD Coin</td>
+</tr>
+<tr>
+<td><code>AVAX</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Avalanche</td>
+</tr>
+<tr>
+<td><code>ATOM</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Cosmos</td>
+</tr>
+<tr>
+<td><code>POL</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Polygon</td>
+</tr>
+<tr>
+<td><code>NEAR</code></td>
+<td style="text-align: right;">24</td>
+<td>—</td>
+<td>NEAR Protocol</td>
+</tr>
+<tr>
+<td><code>ALGO</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Algorand</td>
+</tr>
+<tr>
+<td><code>HBAR</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>Hedera</td>
+</tr>
+<tr>
+<td><code>AAVE</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Aave</td>
+</tr>
+<tr>
+<td><code>MKR</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Maker</td>
+</tr>
+<tr>
+<td><code>DAI</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Dai</td>
+</tr>
+<tr>
+<td><code>STX</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Stacks</td>
+</tr>
+<tr>
+<td><code>GRT</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>The Graph</td>
+</tr>
+<tr>
+<td><code>LDO</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Lido DAO</td>
+</tr>
+<tr>
+<td><code>BONK</code></td>
+<td style="text-align: right;">5</td>
+<td>—</td>
+<td>Bonk</td>
+</tr>
+<tr>
+<td><code>PEPE</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Pepe</td>
+</tr>
+<tr>
+<td><code>SHIB</code></td>
+<td style="text-align: right;">18</td>
+<td>—</td>
+<td>Shiba Inu</td>
+</tr>
+<tr>
+<td><code>JUP</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Jupiter</td>
+</tr>
+<tr>
+<td><code>PYTH</code></td>
+<td style="text-align: right;">6</td>
+<td>—</td>
+<td>Pyth Network</td>
+</tr>
+<tr>
+<td><code>RUNE</code></td>
+<td style="text-align: right;">8</td>
+<td>—</td>
+<td>THORChain</td>
+</tr>
+</tbody>
+</table>
+<h3 id="54-currency-prefix-rules">5.4 Currency Prefix Rules</h3>
+<p>All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are forbidden on all currencies (<code>error_unit_illegal</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Example</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>k~USD</code></td>
+<td>thousands of USD (×10³)</td>
+</tr>
+<tr>
+<td><code>M~EUR</code></td>
+<td>millions of EUR (×10⁶)</td>
+</tr>
+<tr>
+<td><code>G~ETH</code></td>
+<td>giga-ETH = Gwei scale (×10⁹)</td>
+</tr>
+<tr>
+<td><code>m~USD</code></td>
+<td>milli-USD = one tenth of a cent (×10⁻³)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-symbol-disambiguation">6. Symbol Disambiguation</h2>
+<p>As of spec 1.0 a currency is written <strong>only</strong> with the <code>$</code> sigil (§5.1), so the bare form is always a physical-unit lookup and the namespaces never collide:</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Bare form (no <code>$</code>)</th>
+<th><code>$</code>-sigil form</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cup</code> / <code>CUP</code></td>
+<td><code>cup</code> → US cup (<code>bu_cup</code>); <code>CUP</code> → <code>error_unit_illegal</code></td>
+<td><code>$CUP</code> → Cuban Peso (ISO 4217:192)</td>
+</tr>
+<tr>
+<td><code>BTU</code></td>
+<td><code>BTU</code> → BTU (<code>bu_btu</code>); <code>Btu</code>, <code>btu</code> also accepted</td>
+<td><em>(not ISO 4217)</em></td>
+</tr>
+<tr>
+<td><code>SOL</code></td>
+<td><code>SOL</code> → <code>error_unit_illegal</code></td>
+<td><code>$SOL</code> → Solana (crypto)</td>
+</tr>
+<tr>
+<td><code>BAR</code></td>
+<td><code>BAR</code> → <code>error_unit_illegal</code>; use lowercase <code>bar</code></td>
+<td><em>(not ISO 4217)</em></td>
+</tr>
+<tr>
+<td><code>ERG</code></td>
+<td><code>ERG</code> → <code>error_unit_illegal</code>; use lowercase <code>erg</code></td>
+<td><em>(not ISO 4217)</em></td>
+</tr>
+<tr>
+<td><code>CAD</code>, <code>XAU</code></td>
+<td><code>error_unit_illegal</code> (no physical unit)</td>
+<td><code>$CAD</code> → Canadian Dollar; <code>$XAU</code> → Gold (X-code)</td>
+</tr>
+</tbody>
+</table>
+<p>No bare token is simultaneously a valid physical unit and a currency: currencies live entirely under <code>$</code>, physical units entirely without it.</p>
+<hr />
+<p><em>Physical unit enum range: 1–133, 348–367, 368–371, and 372–377 (163 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
+<em><code>BVN_VALUE_BASE_UNIT_COUNT</code> = 380 (<code>bu_xcg + 1</code>)</em></p>
+</main>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
+</body>
+</html>

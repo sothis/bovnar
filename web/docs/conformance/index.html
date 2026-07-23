@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bovnar Conformance Testing · Bovnar</title>
+<meta name="description" content="The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/docs/conformance/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:title" content="Bovnar Conformance Testing · Bovnar">
+<meta property="og:description" content="The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta property="og:url" content="https://www.bovnar.io/docs/conformance/">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bovnar Conformance Testing · Bovnar">
+<meta name="twitter:description" content="The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<style>
+:root{--bg:#fff;--fg:#1c2530;--muted:#5a6675;--border:#e2e6ea;--accent:#0a6cb0;
+--code-bg:#f6f8fa;--nav-bg:#fbfcfd;}
+@media (prefers-color-scheme:dark){:root{--bg:#14181d;--fg:#e6ebf0;--muted:#9aa6b2;
+--border:#2a323b;--accent:#6cb0ea;--code-bg:#1c2229;--nav-bg:#1a1f25;}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+header.site{position:sticky;top:0;background:var(--nav-bg);border-bottom:1px solid var(--border);
+padding:.7rem 1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10;}
+header.site a{color:var(--fg);text-decoration:none}
+header.site .brand{font-weight:600;display:flex;align-items:center;gap:.5rem}
+header.site svg{width:26px;height:26px}
+header.site nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap;font-size:.95rem}
+header.site nav a:hover{color:var(--accent)}
+main{max-width:52rem;margin:0 auto;padding:2rem 1.2rem 4rem}
+main h1{font-size:2.1rem;letter-spacing:-.02em;margin:.2em 0 .1em}
+.doc-meta{color:var(--muted);font-size:.92rem;margin-bottom:1.5rem;
+border-bottom:1px solid var(--border);padding-bottom:1rem}
+.doc-meta a{color:var(--accent)}
+h2{margin-top:2.2em;border-bottom:1px solid var(--border);padding-bottom:.2em}
+h3{margin-top:1.8em}
+a{color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.9em}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+padding:1rem;overflow-x:auto}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%}
+th,td{border:1px solid var(--border);padding:.4em .7em;text-align:left}
+th{background:var(--nav-bg)}
+blockquote{margin:1em 0;padding:.4em 1em;border-left:3px solid var(--accent);
+color:var(--muted);background:var(--code-bg);border-radius:0 6px 6px 0}
+img{max-width:100%}
+footer{max-width:52rem;margin:0 auto;padding:2rem 1.2rem;border-top:1px solid var(--border);
+color:var(--muted);font-size:.9rem}
+footer a{color:var(--accent)}
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+.codehilite { background: #f8f8f8; }
+.codehilite .c { color: #3D7B7B; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #008000; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #9C6500 } /* Comment.Preproc */
+.codehilite .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #E40000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #008400 } /* Generic.Inserted */
+.codehilite .go { color: #717171 } /* Generic.Output */
+.codehilite .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #008000 } /* Keyword.Pseudo */
+.codehilite .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #B00040 } /* Keyword.Type */
+.codehilite .m { color: #666 } /* Literal.Number */
+.codehilite .s { color: #BA2121 } /* Literal.String */
+.codehilite .na { color: #687822 } /* Name.Attribute */
+.codehilite .nb { color: #008000 } /* Name.Builtin */
+.codehilite .nc { color: #00F; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #800 } /* Name.Constant */
+.codehilite .nd { color: #A2F } /* Name.Decorator */
+.codehilite .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #00F } /* Name.Function */
+.codehilite .nl { color: #767600 } /* Name.Label */
+.codehilite .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #19177C } /* Name.Variable */
+.codehilite .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #666 } /* Literal.Number.Bin */
+.codehilite .mf { color: #666 } /* Literal.Number.Float */
+.codehilite .mh { color: #666 } /* Literal.Number.Hex */
+.codehilite .mi { color: #666 } /* Literal.Number.Integer */
+.codehilite .mo { color: #666 } /* Literal.Number.Oct */
+.codehilite .sa { color: #BA2121 } /* Literal.String.Affix */
+.codehilite .sb { color: #BA2121 } /* Literal.String.Backtick */
+.codehilite .sc { color: #BA2121 } /* Literal.String.Char */
+.codehilite .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #BA2121 } /* Literal.String.Double */
+.codehilite .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.codehilite .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.codehilite .sx { color: #008000 } /* Literal.String.Other */
+.codehilite .sr { color: #A45A77 } /* Literal.String.Regex */
+.codehilite .s1 { color: #BA2121 } /* Literal.String.Single */
+.codehilite .ss { color: #19177C } /* Literal.String.Symbol */
+.codehilite .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #00F } /* Name.Function.Magic */
+.codehilite .vc { color: #19177C } /* Name.Variable.Class */
+.codehilite .vg { color: #19177C } /* Name.Variable.Global */
+.codehilite .vi { color: #19177C } /* Name.Variable.Instance */
+.codehilite .vm { color: #19177C } /* Name.Variable.Magic */
+.codehilite .il { color: #666 } /* Literal.Number.Integer.Long */</style>
+</head>
+<body>
+<header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg><span>Bovnar</span></a><nav><a href="/docs/">Docs</a><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;start</a><a href="https://github.com/sothis/bovnar">GitHub</a></nav></header>
+<main>
+<h1>Bovnar Conformance Test Tool</h1>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/7_bovnar_conformance.md">Markdown</a> and <a href="/doc/pdf/bovnar-conformance.pdf">PDF</a>.</p>
+<blockquote>
+<p><strong>Version:</strong> 1.1
+<strong>Protocol:</strong> bvnr-conformance-v1
+<strong>Last updated:</strong> 2026-06-01</p>
+</blockquote>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-purpose">Purpose</a></li>
+<li><a href="#2-quick-start">Quick Start</a></li>
+<li><a href="#3-architecture">Architecture</a></li>
+<li><a href="#4-building">Building</a></li>
+<li><a href="#5-running">Running</a></li>
+<li><a href="#6-iut-protocol">IUT Protocol</a></li>
+<li><a href="#7-writing-a-compliant-iut-adapter">Writing a Compliant IUT Adapter</a></li>
+<li><a href="#8-test-case-corpus">Test Case Corpus</a></li>
+<li><a href="#9-output-format-tap">Output Format (TAP)</a></li>
+<li><a href="#10-extending-the-corpus">Extending the Corpus</a></li>
+<li><a href="#11-cmake-integration">CMake Integration</a></li>
+</ol>
+<hr />
+<h2 id="1-purpose">1. Purpose</h2>
+<p>The Bovnar Conformance Test Tool (<code>bvnr_conformance</code>) verifies that any
+implementation of the Bovnar serialization format produces correct, spec-
+compliant behaviour.  The reference implementation (this repository) is
+used both as the test driver and as the oracle against which candidate
+implementations are judged.</p>
+<p>Two use modes are supported:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Self-test</strong> (default)</td>
+<td>Runs the corpus against the reference libbvnr directly</td>
+</tr>
+<tr>
+<td><strong>IUT test</strong> (<code>--iut</code>)</td>
+<td>Invokes an external binary and compares its output to the reference</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-quick-start">2. Quick Start</h2>
+<h3 id="self-test-verify-the-reference-implementation">Self-test (verify the reference implementation)</h3>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span>bvnr_conformance
+ctest<span class="w"> </span>-R<span class="w"> </span>bvnr_conformance_self<span class="w"> </span>--output-on-failure
+</code></pre></div>
+
+<h3 id="testing-an-external-implementation">Testing an external implementation</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Build your adapter (see Section 7)</span>
+cc<span class="w"> </span>-o<span class="w"> </span>my_impl_adapter<span class="w"> </span>my_adapter.c<span class="w"> </span>-lmy_bovnar
+
+<span class="c1"># Run the conformance suite against it</span>
+./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_impl_adapter
+</code></pre></div>
+
+<h3 id="filtering-by-group">Filtering by group</h3>
+<div class="codehilite"><pre><span></span><code>./tests/bvnr_conformance<span class="w"> </span>--filter<span class="w"> </span>units
+./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_impl_adapter<span class="w"> </span>--filter<span class="w"> </span>arrays
+</code></pre></div>
+
+<hr />
+<h2 id="3-architecture">3. Architecture</h2>
+<div class="codehilite"><pre><span></span><code>┌───────────────────────────────────────────────────────────────────┐
+│                       bvnr_conformance                            │
+│                                                                   │
+│  Test corpus (319 cases) ──→ for each test case:                │
+│                                                                   │
+│  Self-test mode:                    IUT mode:                     │
+│  ┌─────────────────────┐            ┌──────────────────────────┐  │
+│  │ ref_parse()         │            │ ref_parse() → event log  │  │
+│  │  (uses libbvnr)     │            │ fork/exec IUT binary     │  │
+│  │ verify error codes  │            │ compare IUT stdout to    │  │
+│  │ verify key presence │            │ reference event log      │  │
+│  └─────────────────────┘            └──────────────────────────┘  │
+│                                                                   │
+│  Output: TAP v14 stream                                           │
+└───────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+
+<p>The reference implementation is the single authoritative oracle.  An
+implementation is conformant when its IUT adapter produces output
+byte-for-byte identical to the reference for every test case.</p>
+<h3 id="validation-tiers">Validation tiers</h3>
+<p>Most cases exercise the <strong>streaming reader</strong> (<code>bvnr_read</code>): the lexer,
+validator, and the <code>on_verified</code> event stream the IUT protocol mirrors. A
+smaller set — the <code>homogeneity</code> group — exercises the <strong>materialised-document
+(DOM) tier</strong> (<code>bvn_dom_parse</code>), because the spec-1.0 array-homogeneity (§7.4),
+struct-shape, and duplicate-key (§8.1) rules are enforced <em>above</em> the lexer and
+are therefore unreachable through the streaming <code>on_verified</code> callback. These
+DOM-tier cases run in <strong>self-test mode only</strong>; under <code>--iut</code> they are reported
+as <code># SKIP</code>, since IUT protocol v1 is streaming-only and cannot express a
+DOM-tier check. An implementation that targets full spec-1.0 conformance must
+still enforce these rules in its document/tree API; the self-test cases pin the
+reference behaviour and its frozen error codes (39, 40, 41).</p>
+<hr />
+<h2 id="4-building">4. Building</h2>
+<p>The conformance tool is built automatically as part of the standard CMake
+build.  Both the main driver and the reference IUT adapter are compiled:</p>
+<div class="codehilite"><pre><span></span><code>mkdir<span class="w"> </span>build<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>..
+cmake<span class="w"> </span>--build<span class="w"> </span>.
+</code></pre></div>
+
+<p>Targets produced:</p>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Binary</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bvnr_conformance</code></td>
+<td><code>tests/bvnr_conformance</code></td>
+<td>Main conformance driver</td>
+</tr>
+<tr>
+<td><code>bvnr_conformance_iut</code></td>
+<td><code>tests/bvnr_conformance_iut</code></td>
+<td>Reference IUT adapter</td>
+</tr>
+</tbody>
+</table>
+<p>The conformance tool links against <code>bvnr_static</code>.  No external
+dependencies beyond libc and POSIX are required.</p>
+<hr />
+<h2 id="5-running">5. Running</h2>
+<h3 id="command-line-options">Command-line options</h3>
+<div class="codehilite"><pre><span></span><code>bvnr_conformance [OPTIONS]
+
+Options:
+  --iut &lt;binary&gt;   Path to the IUT binary to test
+  --filter &lt;group&gt; Run only cases in the specified group
+  --list           List all test case IDs and descriptions
+  --verbose        Print additional diagnostic information
+  --help           Show this help and exit
+</code></pre></div>
+
+<h3 id="examples">Examples</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Run self-test (reference vs. reference)</span>
+./tests/bvnr_conformance
+
+<span class="c1"># Run with verbose output</span>
+./tests/bvnr_conformance<span class="w"> </span>--verbose
+
+<span class="c1"># List all test cases</span>
+./tests/bvnr_conformance<span class="w"> </span>--list
+
+<span class="c1"># Run only unit-related tests</span>
+./tests/bvnr_conformance<span class="w"> </span>--filter<span class="w"> </span>units
+
+<span class="c1"># Test an external IUT adapter</span>
+./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_adapter
+
+<span class="c1"># Test external adapter, units group only</span>
+./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_adapter<span class="w"> </span>--filter<span class="w"> </span>units
+</code></pre></div>
+
+<h3 id="test-groups">Test groups</h3>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>encoding</code></td>
+<td>UTF-8, BOM handling, byte class enforcement, truncated streams</td>
+</tr>
+<tr>
+<td><code>limits</code></td>
+<td>Lexer token-length caps</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td><code>#!bovnar M.N</code> directive parsing and strictness</td>
+</tr>
+<tr>
+<td><code>identifiers</code></td>
+<td>Key syntax, length limits</td>
+</tr>
+<tr>
+<td><code>strings</code></td>
+<td>Escape sequences, concatenation, length limits</td>
+</tr>
+<tr>
+<td><code>datetime</code></td>
+<td>Timestamp family: epochs, range, version gating, ISO-8601 literals (spec 1.1)</td>
+</tr>
+<tr>
+<td><code>numbers</code></td>
+<td>Integer and float literals, scientific notation</td>
+</tr>
+<tr>
+<td><code>types</code></td>
+<td>All type families, widths, bases</td>
+</tr>
+<tr>
+<td><code>default_synthesis</code></td>
+<td>Automatic type annotation inference</td>
+</tr>
+<tr>
+<td><code>symbols</code></td>
+<td>Bare-word values</td>
+</tr>
+<tr>
+<td><code>references</code></td>
+<td><code>&amp;.path</code> syntax</td>
+</tr>
+<tr>
+<td><code>null_values</code></td>
+<td>Null scalars and null array elements</td>
+</tr>
+<tr>
+<td><code>structs</code></td>
+<td>Nesting, empty structs, struct arrays</td>
+</tr>
+<tr>
+<td><code>arrays</code></td>
+<td>1D, 2D, nested, typed, null elements</td>
+</tr>
+<tr>
+<td><code>octet_streams</code></td>
+<td>Binary chunk protocol</td>
+</tr>
+<tr>
+<td><code>units</code></td>
+<td>SI, IEC, compound, inline suffix, mismatch errors</td>
+</tr>
+<tr>
+<td><code>special_numbers</code></td>
+<td><code>nan</code>, <code>inf</code>, <code>ninf</code></td>
+</tr>
+<tr>
+<td><code>roundtrip</code></td>
+<td>Multi-assignment sequences</td>
+</tr>
+<tr>
+<td><code>recovery</code></td>
+<td>Error-resync behaviour</td>
+</tr>
+<tr>
+<td><code>comments</code></td>
+<td>Comment parsing</td>
+</tr>
+<tr>
+<td><code>whitespace</code></td>
+<td>Whitespace tolerance</td>
+</tr>
+<tr>
+<td><code>homogeneity</code></td>
+<td>DOM-tier: array homogeneity, struct shape, key uniqueness (self-test only)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-iut-protocol">6. IUT Protocol</h2>
+<p>The <strong>IUT (Implementation Under Test) Protocol</strong> version 1
+(<code>bvnr-conformance-v1</code>) defines the interface between the conformance
+driver and a candidate implementation's adapter binary.</p>
+<h3 id="communication-model">Communication model</h3>
+<div class="codehilite"><pre><span></span><code>conformance driver                    IUT adapter
+       │                                   │
+       │  fork, exec IUT binary            │
+       │ ─────────────────────────────────→│
+       │                                   │
+       │  Bovnar text (stdin)              │
+       │ ─────────────────────────────────→│
+       │                                   │
+       │       closes stdin (EOF)          │
+       │ ─────────────────────────────────→│
+       │                                   │
+       │  event log or error (stdout)     │
+       │ ←─────────────────────────────── │
+       │                                   │
+       │  exit(0) or exit(1)              │
+       │ ←─────────────────────────────── │
+</code></pre></div>
+
+<h3 id="success-response">Success response</h3>
+<p>The IUT must:</p>
+<ol>
+<li>Exit with code <strong>0</strong>.</li>
+<li>Write the conformance event log to stdout with <strong>no trailing garbage</strong>.</li>
+</ol>
+<p>The event log is a sequence of lines, one event per line, in the order
+the events were received from the <code>on_verified</code> callback.</p>
+<h3 id="error-response">Error response</h3>
+<p>The IUT must:</p>
+<ol>
+<li>Exit with code <strong>non-zero</strong> (typically 1).</li>
+<li>Write exactly one line to stdout: <code>ERROR &lt;code_name&gt;</code> followed by <code>\n</code>.</li>
+</ol>
+<p>Where <code>&lt;code_name&gt;</code> is the value returned by <code>bvn_error_to_string()</code> for
+the first error encountered, e.g. <code>value_out_of_range</code>.</p>
+<hr />
+<h2 id="7-writing-a-compliant-iut-adapter">7. Writing a Compliant IUT Adapter</h2>
+<p>The file <code>tests/bvnr_conformance_iut.c</code> is the reference IUT adapter.
+It uses the reference libbvnr and is intended both for self-testing and
+as a template for third-party implementors.</p>
+<p>A minimal conforming adapter must:</p>
+<ol>
+<li><strong>Read all of stdin</strong> into a buffer.</li>
+<li><strong>Parse the buffer</strong> using the implementation under test.</li>
+<li><strong>Collect events</strong> from the <code>on_verified</code> callback.</li>
+<li><strong>Emit the event log</strong> to stdout on success.</li>
+<li><strong>Emit</strong> <code>ERROR &lt;code_name&gt;\n</code> to stdout and exit non-zero on failure.</li>
+</ol>
+<h3 id="event-log-format-reference">Event log format reference</h3>
+<p>Each event maps to one line.  Text fields use <code>\xNN</code> escaping for any
+byte outside the printable ASCII range <code>0x20–0x7E</code> or for the backslash
+character <code>0x5C</code>.</p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START &lt;key&gt;
+TYPE_ANN_START &lt;family&gt;
+TYPE_FAMILY &lt;family&gt;
+TYPE_PARAM_WIDTH &lt;N&gt;
+TYPE_PARAM_BASE &lt;N&gt;
+TYPE_PARAM_Q &lt;N&gt;
+TYPE_PARAM_UNIT &lt;unit&gt;
+TYPE_ANN_END &lt;family&gt;
+DATA &lt;token_type&gt; &lt;value&gt;
+STRUCT_START
+STRUCT_END
+ARRAY_ROW_START
+ARRAY_ROW_END
+ARRAY_DIM_START
+OCTET_STREAM_START
+OCTET_STREAM_END
+</code></pre></div>
+
+<h3 id="field-details">Field details</h3>
+<table>
+<thead>
+<tr>
+<th>Line</th>
+<th>Fields</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STREAM_START</code></td>
+<td>—</td>
+<td>Always first</td>
+</tr>
+<tr>
+<td><code>ASSIGNMENT_START &lt;key&gt;</code></td>
+<td>key: raw key bytes, safe-escaped</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TYPE_ANN_START &lt;family&gt;</code></td>
+<td>family: <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>, <code>utf8</code>, <code>bool</code>, <code>datetime</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>TYPE_FAMILY &lt;family&gt;</code></td>
+<td>Same as TYPE_ANN_START</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TYPE_PARAM_WIDTH &lt;N&gt;</code></td>
+<td>N: effective width (0 → 64)</td>
+<td>Only for numeric types</td>
+</tr>
+<tr>
+<td><code>TYPE_PARAM_BASE &lt;N&gt;</code></td>
+<td>N: effective base (0 → 10)</td>
+<td>Only for numeric types</td>
+</tr>
+<tr>
+<td><code>TYPE_PARAM_Q &lt;N&gt;</code></td>
+<td>N: Q parameter</td>
+<td>Only for <code>float_fix</code></td>
+</tr>
+<tr>
+<td><code>TYPE_PARAM_UNIT &lt;unit&gt;</code></td>
+<td>unit: unit string, safe-escaped</td>
+<td>Only for numeric types</td>
+</tr>
+<tr>
+<td><code>TYPE_ANN_END &lt;family&gt;</code></td>
+<td>Same as TYPE_ANN_START</td>
+<td></td>
+</tr>
+<tr>
+<td><code>DATA &lt;token_type&gt; &lt;value&gt;</code></td>
+<td>token_type: see below; value: safe-escaped</td>
+<td></td>
+</tr>
+<tr>
+<td><code>STRUCT_START</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>STRUCT_END</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ARRAY_ROW_START</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ARRAY_ROW_END</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ARRAY_DIM_START</code></td>
+<td>—</td>
+<td>Emitted between <code>/</code>-separated rows</td>
+</tr>
+<tr>
+<td><code>OCTET_STREAM_START</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>OCTET_STREAM_END</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="token_type-values-for-data-lines">TOKEN_TYPE values for DATA lines</h3>
+<table>
+<thead>
+<tr>
+<th>Token type</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>token_is_number</code></td>
+<td><code>number</code></td>
+</tr>
+<tr>
+<td><code>token_is_string</code></td>
+<td><code>string</code></td>
+</tr>
+<tr>
+<td><code>token_is_symbol</code></td>
+<td><code>symbol</code></td>
+</tr>
+<tr>
+<td><code>token_is_reference</code></td>
+<td><code>reference</code></td>
+</tr>
+<tr>
+<td><code>token_is_array_number</code></td>
+<td><code>array_number</code></td>
+</tr>
+<tr>
+<td><code>token_is_array_string</code></td>
+<td><code>array_string</code></td>
+</tr>
+<tr>
+<td><code>token_is_null_value</code></td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td><code>token_is_octet_stream</code></td>
+<td><code>octets</code></td>
+</tr>
+<tr>
+<td><code>token_is_bool</code></td>
+<td><code>bool</code></td>
+</tr>
+</tbody>
+</table>
+<p>For <code>octets</code> token type, the value field is <code>&lt;N&gt; bytes</code> (decimal byte
+count, then a space, then the literal string <code>bytes</code>), not the raw
+binary data.</p>
+<h3 id="effective-width-and-base">Effective width and base</h3>
+<ul>
+<li><strong>Effective width</strong>: if the stored width is 0, emit <code>64</code>.
+  Use <code>bvn_effective_width(value_type)</code>.</li>
+<li><strong>Effective base</strong>: if the stored base is 0, emit <code>10</code>.
+  Use <code>bvn_effective_base(value_type)</code>.</li>
+</ul>
+<p>These rules ensure that untyped values synthesised to <code>uint:64,_10</code>
+produce <code>TYPE_PARAM_WIDTH 64</code> and <code>TYPE_PARAM_BASE 10</code>, matching the
+reference output exactly.</p>
+<h3 id="example-traces">Example traces</h3>
+<p><strong>Input:</strong> <code>.x = 42;</code></p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START x
+TYPE_ANN_START uint
+TYPE_FAMILY uint
+TYPE_PARAM_WIDTH 64
+TYPE_PARAM_BASE 10
+TYPE_PARAM_UNIT no_unit
+TYPE_ANN_END uint
+DATA number 42
+</code></pre></div>
+
+<p><strong>Input:</strong> <code>.s = "hello";</code></p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START s
+TYPE_ANN_START utf8
+TYPE_FAMILY utf8
+TYPE_ANN_END utf8
+DATA string hello
+</code></pre></div>
+
+<p><strong>Input:</strong> <code>.v = &lt;float:64,m/s&gt; 9.81;</code></p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START v
+TYPE_ANN_START float
+TYPE_FAMILY float
+TYPE_PARAM_WIDTH 64
+TYPE_PARAM_BASE 10
+TYPE_PARAM_UNIT m/s
+TYPE_ANN_END float
+DATA number 9.81
+</code></pre></div>
+
+<p><strong>Input:</strong> <code>.x = ok;</code> (symbol)</p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START x
+DATA symbol ok
+</code></pre></div>
+
+<p><strong>Input:</strong> <code>.a = [1, 2];</code></p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START a
+ARRAY_ROW_START
+TYPE_ANN_START uint
+TYPE_FAMILY uint
+TYPE_PARAM_WIDTH 64
+TYPE_PARAM_BASE 10
+TYPE_PARAM_UNIT no_unit
+TYPE_ANN_END uint
+DATA array_number 1
+TYPE_ANN_START uint
+TYPE_FAMILY uint
+TYPE_PARAM_WIDTH 64
+TYPE_PARAM_BASE 10
+TYPE_PARAM_UNIT no_unit
+TYPE_ANN_END uint
+DATA array_number 2
+ARRAY_ROW_END
+</code></pre></div>
+
+<p><strong>Input:</strong> <code>.x = &lt;uint:8&gt; 999;</code> (error — value out of range)</p>
+<div class="codehilite"><pre><span></span><code>ERROR value_out_of_range
+</code></pre></div>
+
+<p>(exit code 1)</p>
+<hr />
+<h2 id="8-test-case-corpus">8. Test Case Corpus</h2>
+<p>The corpus is embedded in <code>tests/bvnr_conformance.c</code>.  Each case
+specifies:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>Unique identifier, e.g. <code>TYP-019</code></td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td>Group name for <code>--filter</code></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Human-readable description</td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td>Bovnar text (or binary) to parse</td>
+</tr>
+<tr>
+<td><code>expect</code></td>
+<td><code>CF_VALID</code> or <code>CF_ERROR</code></td>
+</tr>
+<tr>
+<td><code>expected_error</code></td>
+<td>Error code for <code>CF_ERROR</code> cases</td>
+</tr>
+<tr>
+<td><code>continue_on_error</code></td>
+<td>Whether the reader should resync</td>
+</tr>
+<tr>
+<td><code>max_*</code></td>
+<td>Limit overrides (0 = use defaults)</td>
+</tr>
+<tr>
+<td><code>expect_key</code></td>
+<td>Optional: key name expected in event log</td>
+</tr>
+</tbody>
+</table>
+<h3 id="coverage-summary">Coverage summary</h3>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Cases</th>
+<th>What is tested</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>encoding</code></td>
+<td>14</td>
+<td>UTF-8 validity, BOM placement, byte classes, truncated streams</td>
+</tr>
+<tr>
+<td><code>limits</code></td>
+<td>4</td>
+<td>Lexer token-length caps at both sides of the boundary</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>13</td>
+<td><code>#!bovnar M.N</code> directive: valid, malformed, strictness (spec 1.1)</td>
+</tr>
+<tr>
+<td><code>identifiers</code></td>
+<td>11</td>
+<td>Syntax, body characters, length limits</td>
+</tr>
+<tr>
+<td><code>strings</code></td>
+<td>33</td>
+<td>Escapes, concatenation, UTF-8, limits</td>
+</tr>
+<tr>
+<td><code>datetime</code></td>
+<td>54</td>
+<td>Timestamp family: epochs, signed range, gating, ISO-8601 literals (spec 1.1)</td>
+</tr>
+<tr>
+<td><code>numbers</code></td>
+<td>16</td>
+<td>Integer, float, scientific, special numbers</td>
+</tr>
+<tr>
+<td><code>types</code></td>
+<td>52</td>
+<td>All seven type families, widths, bases, errors</td>
+</tr>
+<tr>
+<td><code>default_synthesis</code></td>
+<td>8</td>
+<td>Auto-type inference rules</td>
+</tr>
+<tr>
+<td><code>symbols</code></td>
+<td>6</td>
+<td>Bare-word values and limits</td>
+</tr>
+<tr>
+<td><code>references</code></td>
+<td>10</td>
+<td>Dotted paths, array indexing (spec 1.1), limits</td>
+</tr>
+<tr>
+<td><code>null_values</code></td>
+<td>5</td>
+<td>Null in all positions</td>
+</tr>
+<tr>
+<td><code>structs</code></td>
+<td>7</td>
+<td>Nesting, empty, unmatched braces</td>
+</tr>
+<tr>
+<td><code>arrays</code></td>
+<td>19</td>
+<td>1D, 2D, nested, typed, null, limits, /-row size consistency</td>
+</tr>
+<tr>
+<td><code>octet_streams</code></td>
+<td>4</td>
+<td>Single/multi-chunk, sync errors</td>
+</tr>
+<tr>
+<td><code>units</code></td>
+<td>25</td>
+<td>SI/IEC prefixes, compound, inline, errors</td>
+</tr>
+<tr>
+<td><code>special_numbers</code></td>
+<td>5</td>
+<td><code>nan</code>, <code>inf</code>, <code>ninf</code></td>
+</tr>
+<tr>
+<td><code>roundtrip</code></td>
+<td>5</td>
+<td>Multi-assignment correctness</td>
+</tr>
+<tr>
+<td><code>recovery</code></td>
+<td>2</td>
+<td>Error-resync: valid data after error</td>
+</tr>
+<tr>
+<td><code>comments</code></td>
+<td>6</td>
+<td>Comment styles</td>
+</tr>
+<tr>
+<td><code>whitespace</code></td>
+<td>4</td>
+<td>Whitespace tolerance</td>
+</tr>
+<tr>
+<td><code>homogeneity</code></td>
+<td>16</td>
+<td>DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>319</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-output-format-tap">9. Output Format (TAP)</h2>
+<p>The tool emits <strong>TAP version 14</strong> (Test Anything Protocol), which is consumed
+natively by CTest and many CI systems. Each case <strong>group</strong> is a TAP 14 <em>subtest</em>:
+a 4-space-indented child stream of the individual cases, a trailing child plan,
+and a leading <code># Subtest:</code> comment, rolled up into one parent test point. The
+parent plan therefore counts the groups (currently 22), not the 319 cases.</p>
+<div class="codehilite"><pre><span></span><code>TAP version 14
+1..21
+# Subtest: encoding
+    ok 1 - [ENC-001] empty stream
+    ok 2 - [ENC-002] UTF-8 BOM at byte 0
+    not ok 3 - [ENC-003] UTF-8 BOM after first comment
+      ---
+      message: expected error invalid_byte_order_mark but got none
+      ...
+    1..9
+not ok 1 - encoding
+# Subtest: version
+    ok 1 - [VER-001] directive declaring the current spec version
+    ...
+    1..13
+ok 2 - version
+</code></pre></div>
+
+<p>A group's parent point is <code>not ok</code> if any of its cases failed. Exit code is <strong>0</strong>
+when all tests pass, <strong>1</strong> when any test fails. (<code>--filter &lt;group&gt;</code> restricts the
+run to a single group; the parent plan is then <code>1..1</code>.)</p>
+<hr />
+<h2 id="10-extending-the-corpus">10. Extending the Corpus</h2>
+<p>To add a new conformance test, add an entry to the <code>g_cases[]</code> array in
+<code>tests/bvnr_conformance.c</code> using one of the provided macros:</p>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Valid input — no expected error */</span>
+<span class="n">VALID</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description of the test&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s">&quot;.input = value;&quot;</span><span class="p">),</span>
+
+<span class="cm">/* Valid input — verify a specific key and value appear */</span>
+<span class="n">VALID_KEY</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="s">&quot;.key = value;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;key&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;value&quot;</span><span class="p">),</span>
+
+<span class="cm">/* Error — no special limits */</span>
+<span class="n">ERROR_CASE</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="s">&quot;.bad = &lt;uint:8&gt; 999;&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">error_value_out_of_range</span><span class="p">),</span>
+
+<span class="cm">/* Error — with continue_on_error (resync mode) */</span>
+<span class="n">ERROR_CONT</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="s">&quot;.a = 1; .bad = &lt;uint:8&gt; 999; .b = 2;&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">error_value_out_of_range</span><span class="p">),</span>
+
+<span class="cm">/* Error — with custom limits (max_id, max_str, max_num,</span>
+<span class="cm">                               max_struct_nesting, max_array_nesting,</span>
+<span class="cm">                               max_array_items) */</span>
+<span class="n">ERROR_LIM</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="s">&quot;.long_name = 1;&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="n">error_identifier_too_long</span><span class="p">,</span>
+<span class="w">          </span><span class="mi">4</span><span class="w"> </span><span class="cm">/*max_id*/</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span>
+
+<span class="cm">/* Materialised-document (DOM) tier — validated via bvn_dom_parse instead of</span>
+<span class="cm">   the streaming reader; runs in self-test mode only (skipped under --iut).</span>
+<span class="cm">   Use for the spec-1.0 homogeneity / struct-shape / duplicate-key rules. */</span>
+<span class="n">DOM_VALID</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="s">&quot;.a = [1, 2.5, 3];&quot;</span><span class="p">),</span>
+<span class="n">DOM_ERROR</span><span class="p">(</span><span class="s">&quot;GRP-NNN&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;group_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;description&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="s">&quot;.a = [1, </span><span class="se">\&quot;</span><span class="s">two</span><span class="se">\&quot;</span><span class="s">];&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="n">error_array_element_type_mismatch</span><span class="p">),</span>
+</code></pre></div>
+
+<p>After editing, rebuild:</p>
+<div class="codehilite"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>bvnr_conformance
+</code></pre></div>
+
+<hr />
+<h2 id="11-cmake-integration">11. CMake Integration</h2>
+<p>Two CTest tests are registered:</p>
+<table>
+<thead>
+<tr>
+<th>CTest name</th>
+<th>What it runs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bvnr_conformance_self</code></td>
+<td>Conformance suite against the reference implementation</td>
+</tr>
+<tr>
+<td><code>bvnr_conformance_iut_self</code></td>
+<td>Conformance suite using the IUT adapter as the external binary</td>
+</tr>
+</tbody>
+</table>
+<p>Both are in the <code>conformance</code> label group and can be run with:</p>
+<div class="codehilite"><pre><span></span><code>ctest<span class="w"> </span>-L<span class="w"> </span>conformance<span class="w"> </span>--output-on-failure
+</code></pre></div>
+
+<p>The <code>bvnr_conformance_iut_self</code> test validates the IUT adapter itself:
+it must produce bit-for-bit identical output to the internal reference
+path for every valid test case.</p>
+<p>To run all tests including conformance:</p>
+<div class="codehilite"><pre><span></span><code>ctest<span class="w"> </span>--output-on-failure
+</code></pre></div>
+</main>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
+</body>
+</html>

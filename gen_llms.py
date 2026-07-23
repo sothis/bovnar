@@ -177,6 +177,73 @@ def build_llms_txt(tag):
     return "\n".join(out).rstrip("\n") + "\n"
 
 
+def build_index_md_de(sections):
+    """German counterpart of index.md — the Markdown edition of /de/. The
+    documentation it links to is English (there is no German doc set yet)."""
+    example = ""
+    ov = sections.get("Overview", "")
+    m = re.search(r"```bovnar\n.*?```", ov, re.S)
+    if m:
+        example = m.group(0)
+    docs = "\n".join(
+        f"- [{title}]({SITE}/docs/{slug}/) — {desc}"
+        for slug, title, desc in [
+            ("tutorial", "Tutorial", "Einführung in das Lesen und Schreiben von Bovnar-Dokumenten."),
+            ("spec", "Spezifikation", "Die vollständige Formatspezifikation (Spec 1.1)."),
+            ("units", "Einheitensystem", "163 physikalische Einheiten, SI/IEC-Präfixe und 216 Währungen."),
+            ("api", "C-Lese-/Schreib-API", "Die C-Reader-/Writer-/DOM-API-Referenz."),
+            ("python", "Python-Bindings", "Das reine ctypes-Python-Paket."),
+            ("grammar", "EBNF-Grammatik", "Die formale Grammatik, kommentiert gegen die Referenzimplementierung."),
+            ("faq", "FAQ", "Häufige Fragen zu Typen, Einheiten, Limits und der API."),
+            ("conformance", "Konformität", "Die 319-Fall-Konformitätssuite und das IUT-Protokoll."),
+            ("cheatsheet", "Einheiten- & Währungs-Spickzettel", "Alle Einheitensymbole, Präfixe und Währungscodes."),
+            ("streaming", "Streaming & Framing", "Oktett-Streams, Frames, Multiplexing und eingebettete Dokumente."),
+        ])
+    parts = [
+        "# Bovnar (BVNR)",
+        "",
+        "**Einheitensichere Serialisierung für Wissenschaft und Industrie — mit "
+        "einer C99-Referenzimplementierung.**",
+        "",
+        "## Links",
+        "",
+        f"- **Website:** {SITE}",
+        "- **IANA-Medientyp (`text/vnd.bovnar`):** "
+        "https://www.iana.org/assignments/media-types/text/vnd.bovnar",
+        "- **DOI — Dokumentation & Spezifikation 1.1.0:** https://zenodo.org/records/21443296",
+        "- **DOI — Quellcode 1.1.0:** https://zenodo.org/records/21443009",
+        "",
+        "## Überblick",
+        "",
+        "In wissenschaftlichen und industriellen Systemen entstehen die teuren "
+        "Fehler selten durch falsche Syntax — sondern durch Einheitenverwechslung: "
+        "ein Wert wird in Pfund-Kraft gesendet und als Newton gelesen, Fuß als "
+        "Meter. Die Zahl parst fehlerfrei; die Dimension ist falsch.",
+        "",
+        "Bovnar schließt diese Lücke. Jeder Wert in einem `.bvnr`-Dokument trägt "
+        "seine eigene Typfamilie, Bitbreite, Zahlenbasis und **physikalische "
+        "Einheit** — direkt im Byte-Strom, ohne externes Schema. Die Einheit ist "
+        "kein Kommentar und keine Namenskonvention; sie ist Teil des Wertes und "
+        "wird vom Parser validiert. Wird eine Messung als `m/s` annotiert und eine "
+        "unpassende Inline-Einheit geschrieben, schlägt das Parsen mit "
+        "`error_unit_mismatch` fehl.",
+        "",
+    ]
+    if example:
+        parts += [example, ""]
+    parts += [
+        "## Dokumentation",
+        "",
+        docs,
+        "",
+        f"Eine einzelne Datei mit der gesamten Dokumentation liegt unter "
+        f"[{SITE}/llms-full.txt]({SITE}/llms-full.txt); die englische "
+        f"Markdown-Startseite unter [{SITE}/index.md]({SITE}/index.md).",
+        "",
+    ]
+    return "\n".join(parts).rstrip("\n") + "\n"
+
+
 def build_llms_full(index_md):
     parts = []
     parts.append("# Bovnar (BVNR) — Full documentation")
@@ -209,12 +276,17 @@ def main():
     index_md = build_index_md(preamble, sections)
     llms_txt = build_llms_txt(tag)
     llms_full = build_llms_full(index_md)
+    index_md_de = build_index_md_de(sections)
 
     targets = {
         os.path.join(WEB, "index.md"): index_md,
         os.path.join(WEB, "llms.txt"): llms_txt,
         os.path.join(WEB, "llms-full.txt"): llms_full,
     }
+    # The German Markdown edition lives under the gitignored web/de/ (like
+    # web/de/index.html) — a build output, regenerated on every publish, so it is
+    # written on a real run but not part of --check.
+    de_target = os.path.join(WEB, "de", "index.md")
 
     if check:
         stale = []
@@ -232,6 +304,8 @@ def main():
     print("==> Generating LLM views (gen_llms.py)")
     for path, text in targets.items():
         write(path, text)
+    os.makedirs(os.path.dirname(de_target), exist_ok=True)
+    write(de_target, index_md_de)
     return 0
 
 

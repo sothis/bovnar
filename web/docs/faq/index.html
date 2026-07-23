@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bovnar FAQ · Bovnar</title>
+<meta name="description" content="Frequently asked questions about Bovnar types, units, limits, encoding, and the C and Python APIs.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/docs/faq/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:title" content="Bovnar FAQ · Bovnar">
+<meta property="og:description" content="Frequently asked questions about Bovnar types, units, limits, encoding, and the C and Python APIs.">
+<meta property="og:url" content="https://www.bovnar.io/docs/faq/">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bovnar FAQ · Bovnar">
+<meta name="twitter:description" content="Frequently asked questions about Bovnar types, units, limits, encoding, and the C and Python APIs.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What problem does Bovnar solve?", "acceptedAnswer": {"@type": "Answer", "text": "A bare 9.81 tells you nothing about whether the value is a float or an integer, 32-bit or 64-bit, and it carries no physical meaning. The type and the unit live outside the data — in an external schema, a naming convention, or documentation — and that gap is where unit-confusion failures hide. Bovnar is self-describing at the per-value level: every value in a .bvnr stream carries its type family, bit-width, numeric base, and physical unit inside the same byte stream. No external schema is required. You can hand a .bvnr file to anyone and they have everything they need to interpret it exactly a"}}, {"@type": "Question", "name": "Is Bovnar a binary or a text format?", "acceptedAnswer": {"@type": "Answer", "text": "It is primarily a text format. The syntax is UTF-8 prose that is readable and writable by hand. The one binary escape mechanism — the octet stream (0x00 framing) — lets you embed opaque binary payloads without Base64 overhead. Outside of octet-stream regions the parser enforces strict UTF-8 validity. ---"}}, {"@type": "Question", "name": "Does Bovnar perform unit conversion or dimensional analysis?", "acceptedAnswer": {"@type": "Answer", "text": "No. The unit annotation is parsed, validated, and delivered to the application through the event API, but Bovnar itself never converts between compatible units. That is deliberately left to the application. The Python bindings expose helper functions (unit_convert_factor, convert_value, units_compatible) that applications can use to implement dimensional checking and conversion on top of the parsed unit data. ---"}}, {"@type": "Question", "name": "Is there an official file extension?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The canonical extension is .bvnr. ---"}}, {"@type": "Question", "name": "Which version of the specification does the reference implementation target?", "acceptedAnswer": {"@type": "Answer", "text": "Spec 1.1 — the additive features documented here (the !bovnar version directive, \\u/\\x escapes, the datetime family, and reference array indexing). Spec 1.0 remains the frozen, stable baseline: a document that declares no !bovnar directive is treated as 1.0, and every 1.0 document parses unchanged. bvnr_version_string() reports the library version (1.1.0) and bvnr_spec_version() the highest spec it understands. ---"}}, {"@type": "Question", "name": "What is the minimum valid Bovnar file?", "acceptedAnswer": {"@type": "Answer", "text": "An empty file (zero bytes) is valid. A file with a single assignment is the practical minimum: bovnar .key = value; ---"}}, {"@type": "Question", "name": "Why do keys start with a dot?", "acceptedAnswer": {"@type": "Answer", "text": "The leading dot is a hard syntactic marker. It unambiguously separates key tokens from value tokens anywhere in the stream, including inside structs and arrays-of-structs. The parser uses it as the entry point for the identifier state machine. ---"}}, {"@type": "Question", "name": "Can I use Unicode characters in key names?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, with restrictions. UTF-8 leader bytes in the range 0xC3–0xF4 are valid at both the start and body of an identifier, covering most non-ASCII letters. The one excluded range is 0xC2 (U+0080–U+00BF), which is explicitly rejected everywhere in identifiers. The following ASCII punctuation characters are also hard errors inside identifier bodies: ! \" $ % & ' ( ) , . / : ; < = ? @ [ \\ ] ^ { } ~ The characters +, -, and _ are allowed in identifier bodies (but not as the first character, except for _). ---"}}, {"@type": "Question", "name": "Can a key start with a digit?", "acceptedAnswer": {"@type": "Answer", "text": "No. Identifiers must begin with a letter (A–Z, a–z), an underscore, or a valid UTF-8 leader byte. A leading digit is a hard parse error. ---"}}, {"@type": "Question", "name": "Are comments supported?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. A character starts a comment that runs to the end of the line. Comments are legal anywhere whitespace is legal — before the first assignment, between tokens, and at the end of a value line: bovnar"}}, {"@type": "Question", "name": "Is whitespace significant?", "acceptedAnswer": {"@type": "Answer", "text": "No, except as a token separator and (required) separator between a scalar value and an inline unit suffix. Indentation and blank lines are purely cosmetic and are freely interleaved between all tokens. ---"}}, {"@type": "Question", "name": "Is a UTF-8 BOM accepted?", "acceptedAnswer": {"@type": "Answer", "text": "A UTF-8 BOM (EF BB BF) is accepted only at byte offset 0 of the stream. A BOM appearing later in a string is valid UTF-8 and passes through without error. For BOMs in other positions the error code depends on where the BOM appears: - A BOM found inside the first comment line (the dedicated first_comment_ states) produces error_invalid_byte_order_mark. - A BOM byte (0xEF) found after the first comment line but before the first . identifier (the first_bom state) is not handled in the state table and produces error_unexpected_input_byte. A BOM appearing inside any subsequent comment is valid UTF-"}}, {"@type": "Question", "name": "Can a document declare which bovnar version it uses?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, since spec 1.1. Put a directive on the first line: bovnar !bovnar 1.1 .x = 42; A document with no directive is treated as spec 1.0 — the frozen baseline grammar — so existing files need no change. The directive only opts in to a newer version. It is recognised only as the very first comment (after an optional BOM and whitespace). A reader records the declared version (bvnr_reader_get_declared_version, bovnar validate reports it, and the Python Reader.declared_version / bovnar.peek_version() expose it), and a reader opened with strict_version rejects a version it does not support with erro"}}, {"@type": "Question", "name": "Wait — isn't a comment supposed to be meaningless? How can `#!bovnar …` matter?", "acceptedAnswer": {"@type": "Answer", "text": "The version directive is the single, deliberate exception. Everywhere else a comment is semantically inert. The directive is shaped like a comment on purpose: that is exactly what makes it backward compatible — a spec-1.0 reader (which knows nothing about versions) skips it as a plain comment and parses the rest of the document normally, while a 1.1+ reader additionally recognises the !bovnar prefix on the first line and acts on it. Nothing else about comment semantics changes, and a !bovnar … on any line other than the first is still just a comment. ---"}}, {"@type": "Question", "name": "What are the seven type families?", "acceptedAnswer": {"@type": "Answer", "text": "Keyword Description ------ uint Unsigned integer sint Signed integer float IEEE 754 binary floating-point float_fix Q-format signed fixed-point float_dec IEEE 754-2008 decimal floating-point utf8 UTF-8 string bool Boolean (true/false); takes no parameters Spec 1.1 adds an eighth, datetime (see below). ---"}}, {"@type": "Question", "name": "Is there a date/time type?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, since spec 1.1: the datetime family. A datetime value is a signed integer count of seconds since a named epoch — a timestamp: bovnar !bovnar 1.1 .created = <datetime:64,unix 1750000000; The epoch parameter is one of unix (default), tai, gps, mjd, ntp, galileo, glonass, y2000, beidou. The value validates like sint (negative = before the epoch); a numeric base/unit/q is error_illegal_value_type and a fractional value is error_type_value_mismatch. Being a 1.1 feature it requires a !bovnar 1.1 declaration. Convert to civil time with the bvn_datetime.h helpers. You can also write the value as "}}, {"@type": "Question", "name": "What is default type synthesis?", "acceptedAnswer": {"@type": "Answer", "text": "When no explicit type annotation is present, the parser synthesises one based on the literal: - Positive integer literal → uint:64 - Negative integer literal → sint:64 - Literal containing . or e → float:64 - Quoted string → utf8 - Boolean keyword (true/false/on/off) → bool - ISO-8601 datetime literal (spec 1.1) → datetime:64,unix This is called default type synthesis and is convenient for configuration files and quick hand-authored data. For precision-sensitive use cases, always write an explicit annotation. ---"}}, {"@type": "Question", "name": "Where exactly does the type annotation go?", "acceptedAnswer": {"@type": "Answer", "text": "Between = and the value — never on the key, and never after the value: bovnar .port = <uint:16 443; correct .port<uint:16 = 443; WRONG — hard error .port = 443 <uint:16; WRONG — hard error ---"}}, {"@type": "Question", "name": "Can annotation parameters appear in any order?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Width, base, and unit are distinguished by their syntactic form, not by position. The following three are equivalent: bovnar .x = <uint:32,_16,m \"1F4\";"}}, {"@type": "Question", "name": "What widths are valid for each type family?", "acceptedAnswer": {"@type": "Answer", "text": "Family Valid widths ------ uint, sint Any positive integer up to BVN_MAX_INT_WIDTH (32768), e.g. <uint:12 is legal for a 12-bit ADC float 0 (→64), 16, and any multiple of 32 up to 32768 float_fix 0 (→64), 16, 32, 64, 128, 256 float_dec 0 (→64), 16, 32, 64, 128, 256 datetime Same as sint — any positive integer up to BVN_MAX_INT_WIDTH (the carrier is a signed epoch-seconds integer); 0 →64 Width 0 always means \"use the default,\" which is 64 bits for all families. Width 8 is legal for uint/sint/datetime but is a hard error for all float families. A non-multiple-of-32 (other than 16) width for floa"}}, {"@type": "Question", "name": "What is the `float_fix` (Q-format) type and how is it annotated?", "acceptedAnswer": {"@type": "Answer", "text": "float_fix encodes a value as a signed integer with a declared number of fractional bits. The mathematical value is raw_integer × 2⁻Q. The annotation requires a qN parameter specifying fractional bits: bovnar .pid = <float_fix:32,q16 -1.5; 32-bit, 16 fractional bits .adc = <float_fix:16,q8,°C 25.0; 16-bit Q8 with a unit Q must satisfy 0 ≤ Q < effective_width. <float_fix:16,q16 is illegal. The base parameter (_N) is forbidden for float_fix. ---"}}, {"@type": "Question", "name": "What is `float_dec` and when should I use it?", "acceptedAnswer": {"@type": "Answer", "text": "float_dec is IEEE 754-2008 decimal floating-point. Binary floats cannot represent 0.1 exactly; decimal floats can. Use float_dec in financial, metrological, or billing contexts where exact decimal representation matters. The base parameter is forbidden for float_dec as well. ---"}}, {"@type": "Question", "name": "Can I annotate a string value with a type?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, with <utf8: bovnar .label = <utf8 \"hello\"; This is redundant — a bare quoted literal is already synthesised as utf8 — but it makes the type explicit, which is useful for documentation and tooling. utf8 is a parameterless family: a width, base, q, or unit parameter inside a <utf8 annotation is error_illegal_value_type. ---"}}, {"@type": "Question", "name": "What is the purpose of the unit annotation?", "acceptedAnswer": {"@type": "Answer", "text": "Physical units are a first-class part of the type system, not a comment field. Attaching a unit to a value makes the data self-documenting and enables the consuming application to perform dimensional verification and conversion. The parser fully validates every unit expression and exposes the structured result through the value_unit_t field of the ev_data event. ---"}}, {"@type": "Question", "name": "How do I write a simple unit?", "acceptedAnswer": {"@type": "Answer", "text": "Place the unit symbol inside the angle brackets after the other type parameters: bovnar .distance = <uint:64,m 384400000; .voltage = <float:32,V 3.3; .frequency = <float:64,Hz 2400000000; ---"}}, {"@type": "Question", "name": "How do SI prefixes work, and why is the `~` separator mandatory?", "acceptedAnswer": {"@type": "Answer", "text": "An SI prefix is written before the unit symbol with a mandatory ~ separator: k~m (kilometer), m~V (millivolt), G~Hz (gigahertz). The ~ is required because without it there is no general way to distinguish a two-character unit symbol from a one-character prefix followed by a one-character unit — mV would be ambiguous. The ~ resolves all such cases unambiguously: bovnar .k_ohm = <float:32,k~Ω 4.7; .micro = <float:32,µ~s 50.0; .giga = <float:64,G~Hz 2.4; IEC binary prefixes (Ki, Mi, Gi, Ti, …) follow the same rule: bovnar .ram = <uint:64,Gi~B 8; .disk = <uint:64,Ti~B 2; ---"}}, {"@type": "Question", "name": "What is the difference between `M~B` (megabytes) and `Mi~B` (mebibytes)?", "acceptedAnswer": {"@type": "Answer", "text": "M~ is the SI decimal prefix (mega = 10⁶). Mi~ is the IEC binary prefix (mebi = 2²⁰ = 1,048,576). The difference matters for storage: bovnar .link_rate = <uint:32,M~b 1000; 1 000 × 10⁶ bits .cache = <uint:64,Mi~B 512; 512 × 2²⁰ bytes ---"}}, {"@type": "Question", "name": "How do I write compound units like m/s² or kg·m/s²?", "acceptedAnswer": {"@type": "Answer", "text": "Use or the middle-dot · (U+00B7) for multiplication and / for division: bovnar .velocity = <float:64,m/s 9.81; .acceleration = <float:64,m/s² 9.81; .force = <float:64,k~g·m/s² 9.81; .energy = <float:64,k~g·m²/s² 1000.0; The / separator is a one-way switch: once written, every subsequent component is in the denominator. To place a component back in the numerator after a divisor, use a negative exponent instead: bovnar .force_alt = <float:64,k~g·m·s⁻² 9.81; identical to k~g·m/s² The maximum number of unit components in a compound unit is 8; exceeding that is error_unit_illegal. ---"}}, {"@type": "Question", "name": "Can exponents be written in ASCII instead of Unicode superscripts?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Both forms are accepted and produce identical internal representations: bovnar .area1 = <float:64,m² 100.0; Unicode superscript .area2 = <float:64,m^2 100.0; ASCII caret form — same result .inv1 = <float:64,s⁻¹ 50.0; .inv2 = <float:64,s^-1 50.0; Only a single ASCII digit is supported after ^; multi-digit exponents are a parse error. ---"}}, {"@type": "Question", "name": "What does `no_unit` mean, and how does it differ from omitting the unit?", "acceptedAnswer": {"@type": "Answer", "text": "Both mean \"dimensionless,\" but they produce distinct internal states: - Omitting the unit parameter → BVN_UNIT_NO_PREFIX(bu_none): num_components == 1, base == bu_none. - Writing no_unit explicitly → BVN_UNIT_NONE: num_components == 0. Both compare as compatible via bvn_units_compatible and both serialise to \"no_unit\" via bvn_unit_to_string. The distinction is expressive: explicit no_unit signals that the author actively chose dimensionless, whereas an omitted unit might mean the author simply did not think about units. For documentation-grade data, prefer the explicit form. ---"}}, {"@type": "Question", "name": "Can I write a unit as an inline suffix instead of inside the annotation?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, for scalar values in non-array context. Write the unit directly after the value literal, separated by at least one whitespace character: bovnar .speed = 9.81 m/s; no annotation; inline unit adopted .mass = 70.0 k~g; .storage = 65536 B; The inline unit is forbidden inside array elements — any letter or underscore following an array-element value is error_unexpected_input_byte. If both an annotation unit and an inline unit are present, they must be identical; a mismatch is error_unit_mismatch. ---"}}, {"@type": "Question", "name": "How many base units does Bovnar support?", "acceptedAnswer": {"@type": "Answer", "text": "163 named base units across the following categories: - 7 SI base units — second, meter, gram, ampere, kelvin, mole, candela. - 21 named SI-derived units — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr). - 14 non-SI units accepted for use with SI — liter, minute, hour, day, week, year, degree (angle), degree Celsius, tonne, bar, electronvolt, dalton, astronomical unit, hectare. - 2 digital units — bit (b), byte (B), with IEC binary prefixes (kibi through quebi). - 13 Imperial/US customary length units — inch, foot, yard, mile, nautical mile, ån"}}, {"@type": "Question", "name": "Do I need to quote non-decimal numbers?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Bovnar's lexer distinguishes bare words (symbols) from numbers by context. A bare FF in value position is a symbol, not a hex number, and will produce error_type_value_mismatch. Any non-decimal value must be a quoted string: bovnar .hex = <uint:8,_16 \"FF\"; correct — 255 .hex = <uint:8,_16 FF; WRONG — FF is a symbol .bin = <uint:8,_2 \"11010110\"; correct For signed non-decimal values, the minus sign goes inside the string: bovnar .neg = <sint:32,_16 \"-7FFFFFFF\"; ---"}}, {"@type": "Question", "name": "What base systems are supported?", "acceptedAnswer": {"@type": "Answer", "text": "For uint and sint: every base from _2 through _62 (consecutive). Bases _64 (standard Base64) and _85 (Ascii85) are also supported, but for uint only — their alphabets claim the sign glyphs as digits (Base64 uses + and /; Ascii85 uses both + and -), leaving no unambiguous sign character, so a signed value in these bases is a hard error (error_illegal_value_type). For float: _10 (decimal, the default) and _16 (hexadecimal) only. float_fix and float_dec do not accept a base parameter at all — specifying one is a hard error. ---"}}, {"@type": "Question", "name": "What are the special number literals?", "acceptedAnswer": {"@type": "Answer", "text": "Three special values bypass normal numeric parsing. They are bare reserved keywords — no sigil — and, like null/true/false, are reclassified out of the symbol space by the validator. Only these exact spellings are reserved; any other bare word (e.g. infinity, nans) is an ordinary symbol: bovnar .nan = nan; .inf = inf; .neg = ninf; negative infinity They are valid in both typed and untyped context and may be combined with any float type annotation. A special-number keyword takes no inline unit suffix — give its unit via the annotation (<float:64,m/s inf). ---"}}, {"@type": "Question", "name": "Are leading zeros legal in decimal integers?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. 007 parses as the integer 7. There is no octal interpretation — the leading zeros are ignored. ---"}}, {"@type": "Question", "name": "Are there shorthand float forms like `-.5` or `123.`?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Both leading-dot (.5 or -.5) and trailing-dot (123.) forms are valid for float:64: bovnar .a = -.5; -0.5 as float:64 .b = 123.; 123.0 as float:64 ---"}}, {"@type": "Question", "name": "What escape sequences are defined?", "acceptedAnswer": {"@type": "Answer", "text": "Exactly seven: Escape Meaning ------ \\t Horizontal tab \\n Line feed \\v Vertical tab \\f Form feed \\r Carriage return \\\" Double quote \\\\ Backslash In spec 1.0 that is all — any other character after a backslash is error_illegal_escape_sequence. A spec 1.1 document (declaring !bovnar 1.1, see §3.4) adds two more: Escape Meaning ------ \\xHH the single byte HH (two hex digits) \\u{H…} Unicode scalar U+H… (1–6 hex digits), UTF-8 encoded \\u{…} rejects surrogates and values above U+10FFFF (error_invalid_codepoint). \\x writes a raw byte but the string must stay valid UTF-8, so \"\\xC3\\xA9\" is \"é\" while a "}}, {"@type": "Question", "name": "Can strings span multiple lines?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Raw whitespace bytes (HT, LF, VT, FF, CR) are accepted unescaped inside string literals: bovnar .poem = \"roses are red violets are blue\"; ---"}}, {"@type": "Question", "name": "How does string concatenation work?", "acceptedAnswer": {"@type": "Answer", "text": "Adjacent string literals separated only by whitespace or comments are concatenated at lex time. This is the idiomatic way to split a long string across lines: bovnar .url = \"https://\" \"api.example.com\" \"/v1\"; .guid = <uint:128,_16 \"deadbeef\" \"cafebabe\" \"01234567\" \"89abcdef\"; The combined byte length must not exceed max_string_length (default 65535). ---"}}, {"@type": "Question", "name": "Is the `<utf8>` annotation ever required?", "acceptedAnswer": {"@type": "Answer", "text": "No. A bare quoted literal is always synthesised as utf8. The annotation is purely optional and expressive. ---"}}, {"@type": "Question", "name": "What is the basic array syntax?", "acceptedAnswer": {"@type": "Answer", "text": "Comma-separated values inside square brackets: bovnar .primes = [2, 3, 5, 7, 11]; ---"}}, {"@type": "Question", "name": "How are multi-dimensional arrays written?", "acceptedAnswer": {"@type": "Answer", "text": "Rows are separated by /: bovnar .matrix = [1, 2, 3]/[4, 5, 6]/[7, 8, 9]; Each /[…] is a new row dimension. The parser emits ev_array_row_start and ev_array_row_end events for each row and ev_array_dim_start for each / separator. ---"}}, {"@type": "Question", "name": "Can array elements have different types?", "acceptedAnswer": {"@type": "Answer", "text": "Array elements must be homogeneous (spec 1.0): every non-null element shares the same kind, and a bare array of numbers shares the same physical dimension. The numeric encodings may still mix, since they all denote the same dimension: bovnar .mixed = [<uint:8 1, <sint:8 -1, <float:32 3.14]; valid: all dimensionless But genuinely different kinds ([1, \"two\"]) or dimensions ([<float:64,m 1.0, <float:64,k~g 2.0]) are rejected with error_array_element_type_mismatch. Heterogeneous data goes in a struct, not an array. Homogeneity is a materialised-document rule: it is checked over the whole value onc"}}, {"@type": "Question", "name": "How do null elements work inside arrays?", "acceptedAnswer": {"@type": "Answer", "text": "Leading, trailing, or consecutive commas produce null elements: bovnar .sparse = [, 1, , 2, ]; null, 1, null, 2, null — five elements ---"}}, {"@type": "Question", "name": "Can I nest arrays?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, inner arrays are just element values: bovnar .nested = [[1, 2], [3, 4]]; valid; rectangular sub-arrays .ragged = [[1, 2], [3, 4, 5]]; error_array_row_size_mismatch — sibling sub-arrays differ in length Note: since spec 1.0 sibling sub-arrays must match in length (and element shape), so bare arrays and matrices are rectangular — [[1, 2], [3, 4, 5]] is rejected. error_array_row_size_mismatch fires both when the /-rows of one array disagree ([1,2,3]/[4,5]) and when ragged sibling sub-arrays disagree ([[1,2],[3,4,5]]). ---"}}, {"@type": "Question", "name": "Are inline unit suffixes allowed inside arrays?", "acceptedAnswer": {"@type": "Answer", "text": "No. The inline unit suffix is forbidden at the lexer level for all array elements. Any letter or underscore following an array-element value token is error_unexpected_input_byte. ---"}}, {"@type": "Question", "name": "What is the struct syntax?", "acceptedAnswer": {"@type": "Answer", "text": "A struct groups zero or more assignments inside {…}. Every field inside is a complete .key = value; assignment. The struct value at the parent level ends with };: bovnar .server = { .host = \"db.internal\"; .port = <uint:16 5432; }; ---"}}, {"@type": "Question", "name": "How deeply can structs nest?", "acceptedAnswer": {"@type": "Answer", "text": "Up to max_struct_nesting levels — the reference reader defaults to 64 and the field (a uint8_t) has a hard cap of 255. An empty struct ({}) is valid. An unmatched closing brace is error_illegal_struct_close. ---"}}, {"@type": "Question", "name": "Are structs valid as array elements?", "acceptedAnswer": {"@type": "Answer", "text": "Yes: bovnar .sensors = [ {.id = <uint:8 0; .value = <float:32,°C 27.3;}, {.id = <uint:8 1; .value = <float:32,°C 31.7;} ]; ---"}}, {"@type": "Question", "name": "What is a null value?", "acceptedAnswer": {"@type": "Answer", "text": "An explicit absence of value — nothing between = and ;, or the reserved keyword null: bovnar .nothing = ; null, no type annotation .also_null = null; the null keyword — identical to the empty slot .typed_null = <uint:32 ; null with an explicit type ---"}}, {"@type": "Question", "name": "Does Bovnar have booleans?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. true, false, on, and off are reserved keywords carrying the bool type family (on ≡ true, off ≡ false). A bare boolean synthesises a <bool annotation; <bool takes no parameters and accepts only those four keywords. They serialize canonically as true / false: bovnar .enabled = true; .debug = off; == false .typed = <bool on; explicit; on == true ---"}}, {"@type": "Question", "name": "What is a symbol?", "acceptedAnswer": {"@type": "Answer", "text": "A bare, unquoted word in value position — for application-defined enums and the like. The reserved keywords null, true, false, on, off and the special floats nan, inf, ninf are not symbols (a word that merely starts with one, like Monday, ontology, or infinity, is): bovnar .status = ok; .mode = read_only; .day = Monday; Symbol bodies follow the same character rules as identifier bodies. The key distinction from an identifier is context: identifiers appear after the leading dot, symbols appear as values. ---"}}, {"@type": "Question", "name": "What is a reference?", "acceptedAnswer": {"@type": "Answer", "text": "A dotted path to another key in the document, introduced by &. The parser stores the path as a string token; it does not resolve it — resolution is left entirely to the application: bovnar .host = \"db.internal\"; .conn_host = &.host; stored as \".host\" .deep = &.config.db.host; multi-segment path ---"}}, {"@type": "Question", "name": "Can a reference index into an array?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, since spec 1.1: a reference path may carry [N] index suffixes. bovnar !bovnar 1.1 .matrix = [10, 20, 30]/[40, 50, 60]; .row0c1 = &.matrix[0][1]; stored as \".matrix[0][1]\" As with the rest of a reference, the index is stored verbatim and unresolved; it is interpreted only when the application resolves the path against the materialised tree (bvn_dom_lookup, also used by the CLI query command), where &.matrix[0][1] resolves to 20. A flat /-row matrix is addressed [row][col], a 1-D array [i], and nested arrays descend one index per level; a partial/out-of-range index simply doesn't resolve. B"}}, {"@type": "Question", "name": "When should I use an octet stream?", "acceptedAnswer": {"@type": "Answer", "text": "When you need to embed raw binary data without Base64 overhead. A NUL byte (0x00) in value position switches the parser into binary chunk mode. The UTF-8 validator is suspended for the duration of the binary region. In practice you will not hand-author octet streams. Use the writer API, which generates the correct framing automatically: 0x00 ← stream open 0x01 <LL <LL <data ← chunk: tag 0x01, length as little-endian uint16, data 0x00 ← stream close A length value of 0x0000 means exactly 65536 bytes. Any tag byte other than 0x01 (chunk) or 0x00 (close) inside a stream is error_octet_stream_out_"}}, {"@type": "Question", "name": "What information does a parse error carry?", "acceptedAnswer": {"@type": "Answer", "text": "Every error includes: - error_code_t — a named code (e.g. error_value_out_of_range) - Line number and column number in the input stream - Byte offset from stream start - The raw byte value that triggered the error Retrieve these after a failed bvnr_read: c fprintf(stderr, \"%s at line %\" PRIu64 \" col %\" PRIu64 \" offset %\" PRIu64 \" byte 0x%02X\\n\", bvn_error_to_string(bvnr_reader_get_error(r)), bvnr_reader_get_error_line(r), bvnr_reader_get_error_column(r), bvnr_reader_get_error_offset(r), bvnr_reader_get_error_byte(r)); ---"}}, {"@type": "Question", "name": "What is `continue_on_error` mode and when should I use it?", "acceptedAnswer": {"@type": "Answer", "text": "When continue_on_error is set in bvnr_read_flags_t, a parse error invokes the on_error callback and enters a resync state machine that skips bytes while tracking bracket and brace nesting. Once the resync state machine finds a ; at the original nesting depth, normal parsing resumes. The recovery count (accessible via bvnr_reader_get_recovery_count) is incremented at error entry, not on resync completion. Use this mode for log streams and unreliable transports where a single malformed assignment should not discard the rest of the file. For configuration and data serialization, disable it and fa"}}, {"@type": "Question", "name": "What does `error_type_value_mismatch` mean?", "acceptedAnswer": {"@type": "Answer", "text": "The value token is incompatible with the declared type annotation. The most common cause is a non-decimal number written as a bare word (symbol) instead of a quoted string: bovnar .x = <uint:8,_16 FF; FF is a symbol → error_type_value_mismatch .x = <uint:8,_16 \"FF\"; correct ---"}}, {"@type": "Question", "name": "What causes `error_unit_mismatch`?", "acceptedAnswer": {"@type": "Answer", "text": "An inline unit suffix and a type-annotation unit are both present but resolve to different value_unit_t values: bovnar .bad = <float:64,m 1.0 s; annotation says m, inline says s → error Semantically equivalent notations that parse to the same internal representation (e.g. m/s and m·s⁻¹) compare as equal and do not trigger this error. ---"}}, {"@type": "Question", "name": "What are the most common mistakes?", "acceptedAnswer": {"@type": "Answer", "text": "Mistake Error produced ------ Annotation on the key side of = error_unexpected_input_byte Non-decimal value not quoted error_type_value_mismatch Signed value in an unsigned type error_value_out_of_range Integer overflow (e.g. <uint:8 256) error_value_out_of_range <float:8 or a non-16, non-multiple-of-32 width for float error_illegal_value_type Base parameter on float_fix or float_dec error_illegal_value_type q ≥ width in float_fix error_illegal_value_type Empty unit component (m//s) error_unit_illegal More than 8 unit components error_unit_illegal Inline unit suffix inside an array error_unexp"}}, {"@type": "Question", "name": "What is the overall reader lifecycle?", "acceptedAnswer": {"@type": "Answer", "text": "bvnr_reader_create() → bvnr_source_from_fd() or bvnr_source_from_mem() → bvnr_open_read_source() or bvnr_open_read_mem() → bvnr_read() → bvnr_reader_destroy() The reader does not allocate during bvnr_read; all buffering is internal to the reader struct. The bvnr_read_flags_t struct is read only during bvnr_open_read_source and may live on the stack. ---"}}, {"@type": "Question", "name": "Which callback should I implement — `on_verified` or `on_unverified`?", "acceptedAnswer": {"@type": "Answer", "text": "Almost always on_verified. This callback receives fully validated events after semantic checking. on_unverified fires before validation and receives raw token events; use it only for diagnostics or partial pre-inspection. There is an important asymmetry for ev_type_annotation_start: - on_unverified receives it with raw annotation bytes but no value_type or value_unit populated. - on_verified receives it with value_type and value_unit filled in. All other type-annotation events and ev_data are emitted to both callbacks simultaneously. ---"}}, {"@type": "Question", "name": "Do callbacks need to return anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Both on_verified and on_unverified must return bool. Return true to continue parsing; return false to abort — the parser stops and bvnr_read returns false with error_scanner_callback_failed. ---"}}, {"@type": "Question", "name": "How do I read a value from the `ev_data` event?", "acceptedAnswer": {"@type": "Answer", "text": "The bvnr_data_t struct provides the raw bytes in data/length. Use the bvn_parse_ helpers to convert them to native C types: c uint64_t v; bvn_parse_uint64(vbuf, d-value_type, &v); double f; bvn_parse_double(vbuf, d-value_type, &f); The d-value_type contains family, width, and base (which holds the numeric base, or the Q for float_fix, or the epoch index for datetime). Use bvn_effective_width(d-value_type) to get the resolved width (handles the width == 0 → 64 default). ---"}}, {"@type": "Question", "name": "How is the writer API structured?", "acceptedAnswer": {"@type": "Answer", "text": "It is symmetric with the reader. You construct events and push them through bvnr_write_event, then call bvnr_write_finish: bvnr_writer_create() → bvnr_sink_to_fd() or bvnr_sink_to_mem() → bvnr_open_write_sink() or bvnr_open_write_mem() → bvnr_write_event() × N → bvnr_write_finish() → bvnr_writer_destroy() Use bvnr_write_type_annotation(w, vt, vu) as a convenience to emit the full annotation event sequence in one call. Use bvnr_write_bvnf_base and bvnr_write_bvni for the convenience integer/float helpers that generate the scalar key+value pair in a single call. ---"}}, {"@type": "Question", "name": "Does the library close file descriptors for me?", "acceptedAnswer": {"@type": "Answer", "text": "No. Both bvnr_source_from_fd and bvnr_sink_to_fd leave ownership of the file descriptor with the caller. Close it yourself after the reader or writer is destroyed. ---"}}, {"@type": "Question", "name": "What is the `max_array_nesting` limit and why is it capped at 255?", "acceptedAnswer": {"@type": "Answer", "text": "The lexer stores per-nesting-level state in a heap array sized to max_array_nesting + 1 entries (so at most 256 at the 255 hard cap). max_array_nesting is a uint8_t field, so values above 255 cannot be represented; no runtime rejection is performed. Zero-initialising bvnr_read_flags_t is safe: a zero value causes the reader to substitute the internal default of 64. The hard maximum is 255. The same default and cap apply to max_struct_nesting. ---"}}, {"@type": "Question", "name": "Do the Python bindings require a compiled extension module?", "acceptedAnswer": {"@type": "Answer", "text": "No. The bindings are pure ctypes and load libbvnr.so at import time via ctypes.CDLL. No compilation step beyond building the C library is needed. ---"}}, {"@type": "Question", "name": "How does the library discovery order work?", "acceptedAnswer": {"@type": "Answer", "text": "1. LIBBOVNAR_PATH environment variable — absolute path to the .so. 2. LIBBOVNAR_DIR environment variable — directory containing the .so. 3. ctypes.util.find_library('bvnr') — standard ldconfig/LD_LIBRARY_PATH search. 4. In-tree build paths relative to _ffi.py (../../build/, etc.). If none of these resolves the library, BovnarLibraryNotFound is raised with the list of searched paths. ---"}}, {"@type": "Question", "name": "What is the difference between `loads`/`dumps`, the SAX reader, and the DOM?", "acceptedAnswer": {"@type": "Answer", "text": "Interface When to use ------ bovnar.loads / bovnar.dumps Simple dict serialization — loses type and unit metadata Reader (SAX) Streaming; low memory; full access to type and unit data via callbacks bovnar.dom_parse / DomDoc Random-access queries on a fully parsed in-memory tree ---"}}, {"@type": "Question", "name": "How do I capture state in a SAX callback?", "acceptedAnswer": {"@type": "Answer", "text": "The Python on_verified callback receives exactly two positional arguments — the event code and the data payload — with no userdata parameter. Use a closure to capture external state: python state = {\"current_key\": \"\"} def on_event(ev, data): if ev == Event.ASSIGNMENT_START: state[\"current_key\"] = data.raw_str() elif ev == Event.DATA: print(state[\"current_key\"], \"→\", data.raw_bytes()) return True ---"}}, {"@type": "Question", "name": "What happens when a callback raises a Python exception?", "acceptedAnswer": {"@type": "Answer", "text": "The exception is captured, the C callback returns False to stop parsing, the C call returns, and then the original Python exception is re-raised from read_mem / read_fd. The exception is not wrapped; it propagates as-is. ---"}}, {"@type": "Question", "name": "How do I access unit information in Python?", "acceptedAnswer": {"@type": "Answer", "text": "The data.value_unit field of an Event.DATA payload is a ValueUnit ctypes struct. Use the helper functions to work with it: python import bovnar vu = bovnar.parse_unit(\"k~g·m/s²\") parse string → ValueUnit s = bovnar.unit_to_str(vu) → \"k~g·m/s²\" ok = bovnar.units_compatible(vu_a, vu_b) dimensional compatibility c = bovnar.unit_convert_factor(vu_from, vu_to) kelvin = bovnar.convert_value(25.0, vu_celsius, vu_kelvin) unit_dimension_vector returns a 7-element list of SI dimension exponents in the order [m, kg, s, A, K, mol, cd]. ---"}}, {"@type": "Question", "name": "What exception classes exist?", "acceptedAnswer": {"@type": "Answer", "text": "Exception Trigger ------ BovnarLibraryNotFound libbvnr.so not found at import BovnarParseError Parse error (carries code, line, column, offset, byte) BovnarWriteError Write error (carries code, offset) BovnarArgumentError Invalid argument to a helper function All are subclasses of BovnarError. ---"}}, {"@type": "Question", "name": "What Python version is required?", "acceptedAnswer": {"@type": "Answer", "text": "Python ≥ 3.10. The bindings use dataclasses, enum.IntEnum, and union-type annotations (X Y). ---"}}, {"@type": "Question", "name": "What are the default size limits and what should I set in production?", "acceptedAnswer": {"@type": "Answer", "text": "All limits are configurable via bvnr_read_flags_t. Defaults are permissive. Field Default Suggested production cap --------- max_identifier_length 255 255 max_string_length 65535 application-defined max_number_length 65535 65535 max_symbol_length 255 255 max_reference_length 65535 65535 max_array_items 0 (→ 2 147 483 647 internal default) application-defined max_text_bytes 0 (→ 2 147 483 647 internal default) application-defined max_file_size 0 (→ unlimited / endless) 16777216 (16 MiB) max_array_nesting 0 (→ 64 internal default; hard cap 255) 32 or less max_struct_nesting 0 (→ 64 internal defa"}}, {"@type": "Question", "name": "Does `bvnr_read` allocate heap memory?", "acceptedAnswer": {"@type": "Answer", "text": "No. The reader does not allocate during bvnr_read. All buffering is internal to the bvnr_reader_t struct, which is allocated once by bvnr_reader_create. Event data pointers (d-data) point into the reader's internal buffer and are valid only for the duration of the callback invocation. ---"}}, {"@type": "Question", "name": "What throughput can I expect from the parser?", "acceptedAnswer": {"@type": "Answer", "text": "Performance depends heavily on the input profile (scalars, typed values, structs, arrays, units) and hardware. The CLI's benchmark subcommand (bovnar bench) can measure MB/s, assignments/s, and events/s across configurable profiles and payload sizes. Run bovnar bench --profile all --size 1024,65536 --iterations 200 for a representative baseline. Use --min-overhead to isolate raw lexer throughput by skipping the on_verified callback. ---"}}, {"@type": "Question", "name": "How many unit components can a compound unit have?", "acceptedAnswer": {"@type": "Answer", "text": "A maximum of 8 (BVNR_MAX_UNIT_COMPONENTS). Exceeding this limit during parsing is error_unit_illegal. ---"}}, {"@type": "Question", "name": "What is the stated language standard for the reference implementation?", "acceptedAnswer": {"@type": "Answer", "text": "Strict C99 (-std=c99 -pedantic). No C11, C17, or C23 extensions are used intentionally. ---"}}, {"@type": "Question", "name": "Why not C23, given that it was finalised in 2024?", "acceptedAnswer": {"@type": "Answer", "text": "Several compilers that are still in active use on embedded and cross-compilation targets do not yet ship a complete C23 implementation, and some may never receive one for cost or lifecycle reasons: Toolchain / target C23 status (as of 2026) ------ GCC < 14 Partial; _BitInt, typeof, nullptr missing or gated behind -std=c2x Clang < 17 Partial; several C23 headers and attributes absent IAR Embedded Workbench Trails the standard by several years; C11 support only on recent versions Arm Compiler 5 (armcc) Frozen at C99/C11 subset; no C23 roadmap Green Hills MULTI Embedded-safety toolchain; C23 not "}}, {"@type": "Question", "name": "Which specific C23 features would have been attractive but were ruled out?", "acceptedAnswer": {"@type": "Answer", "text": "Feature C23 addition Why skipped --------- bool, true, false keywords (no <stdbool.h) C23 Requires C23-capable front-end; <stdbool.h works everywhere nullptr C23 Cosmetic; NULL or (void)0 is unambiguous typeof / typeof_unqual C23 Useful for generic macros; GCC/Clang extensions exist but are non-standard pre-C23 embed C23 Attractive for embedding binary tables at compile time; workaround via xxd -i is portable [[attributes]] C23 __attribute__((…)) is already used where needed via compiler-specific guards _BitInt(N) C23 Would help for arbitrary-width integer types; current code uses uint64_t + m"}}, {"@type": "Question", "name": "Does C99 impose any meaningful limitations on the implementation?", "acceptedAnswer": {"@type": "Answer", "text": "In practice, no. The limitations that do exist are handled cleanly: - Variable-length arrays (VLAs): Not used. All fixed-size buffers are declared with compile-time constants. VLAs are optional in C11 and later and are dangerous on stack-limited embedded targets regardless of standard version. - <stdint.h and <stdbool.h: Both are C99 additions and are available everywhere the library targets. - // comments: C99. No issue. - Designated initialisers: C99. Used extensively for bvnr_data_t and flag struct setup. - Flexible array members: C99. Not currently used. - restrict: C99. Used on internal b"}}, {"@type": "Question", "name": "Is this likely to change in the future?", "acceptedAnswer": {"@type": "Answer", "text": "The minimum standard may be raised to C11 if a compelling use of _Generic or _Static_assert arises and the embedded toolchain matrix shifts accordingly. C23 as a baseline is not on the roadmap until the IAR, Keil, and Green Hills ecosystems ship production-qualified C23 front-ends, which historically lags the standard publication by three to five years. --- End of Bovnar FAQ — Specification (v1.1)"}}]}</script>
+<style>
+:root{--bg:#fff;--fg:#1c2530;--muted:#5a6675;--border:#e2e6ea;--accent:#0a6cb0;
+--code-bg:#f6f8fa;--nav-bg:#fbfcfd;}
+@media (prefers-color-scheme:dark){:root{--bg:#14181d;--fg:#e6ebf0;--muted:#9aa6b2;
+--border:#2a323b;--accent:#6cb0ea;--code-bg:#1c2229;--nav-bg:#1a1f25;}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+header.site{position:sticky;top:0;background:var(--nav-bg);border-bottom:1px solid var(--border);
+padding:.7rem 1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10;}
+header.site a{color:var(--fg);text-decoration:none}
+header.site .brand{font-weight:600;display:flex;align-items:center;gap:.5rem}
+header.site svg{width:26px;height:26px}
+header.site nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap;font-size:.95rem}
+header.site nav a:hover{color:var(--accent)}
+main{max-width:52rem;margin:0 auto;padding:2rem 1.2rem 4rem}
+main h1{font-size:2.1rem;letter-spacing:-.02em;margin:.2em 0 .1em}
+.doc-meta{color:var(--muted);font-size:.92rem;margin-bottom:1.5rem;
+border-bottom:1px solid var(--border);padding-bottom:1rem}
+.doc-meta a{color:var(--accent)}
+h2{margin-top:2.2em;border-bottom:1px solid var(--border);padding-bottom:.2em}
+h3{margin-top:1.8em}
+a{color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.9em}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+padding:1rem;overflow-x:auto}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%}
+th,td{border:1px solid var(--border);padding:.4em .7em;text-align:left}
+th{background:var(--nav-bg)}
+blockquote{margin:1em 0;padding:.4em 1em;border-left:3px solid var(--accent);
+color:var(--muted);background:var(--code-bg);border-radius:0 6px 6px 0}
+img{max-width:100%}
+footer{max-width:52rem;margin:0 auto;padding:2rem 1.2rem;border-top:1px solid var(--border);
+color:var(--muted);font-size:.9rem}
+footer a{color:var(--accent)}
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+.codehilite { background: #f8f8f8; }
+.codehilite .c { color: #3D7B7B; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #008000; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #9C6500 } /* Comment.Preproc */
+.codehilite .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #E40000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #008400 } /* Generic.Inserted */
+.codehilite .go { color: #717171 } /* Generic.Output */
+.codehilite .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #008000 } /* Keyword.Pseudo */
+.codehilite .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #B00040 } /* Keyword.Type */
+.codehilite .m { color: #666 } /* Literal.Number */
+.codehilite .s { color: #BA2121 } /* Literal.String */
+.codehilite .na { color: #687822 } /* Name.Attribute */
+.codehilite .nb { color: #008000 } /* Name.Builtin */
+.codehilite .nc { color: #00F; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #800 } /* Name.Constant */
+.codehilite .nd { color: #A2F } /* Name.Decorator */
+.codehilite .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #00F } /* Name.Function */
+.codehilite .nl { color: #767600 } /* Name.Label */
+.codehilite .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #19177C } /* Name.Variable */
+.codehilite .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #666 } /* Literal.Number.Bin */
+.codehilite .mf { color: #666 } /* Literal.Number.Float */
+.codehilite .mh { color: #666 } /* Literal.Number.Hex */
+.codehilite .mi { color: #666 } /* Literal.Number.Integer */
+.codehilite .mo { color: #666 } /* Literal.Number.Oct */
+.codehilite .sa { color: #BA2121 } /* Literal.String.Affix */
+.codehilite .sb { color: #BA2121 } /* Literal.String.Backtick */
+.codehilite .sc { color: #BA2121 } /* Literal.String.Char */
+.codehilite .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #BA2121 } /* Literal.String.Double */
+.codehilite .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.codehilite .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.codehilite .sx { color: #008000 } /* Literal.String.Other */
+.codehilite .sr { color: #A45A77 } /* Literal.String.Regex */
+.codehilite .s1 { color: #BA2121 } /* Literal.String.Single */
+.codehilite .ss { color: #19177C } /* Literal.String.Symbol */
+.codehilite .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #00F } /* Name.Function.Magic */
+.codehilite .vc { color: #19177C } /* Name.Variable.Class */
+.codehilite .vg { color: #19177C } /* Name.Variable.Global */
+.codehilite .vi { color: #19177C } /* Name.Variable.Instance */
+.codehilite .vm { color: #19177C } /* Name.Variable.Magic */
+.codehilite .il { color: #666 } /* Literal.Number.Integer.Long */</style>
+</head>
+<body>
+<header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg><span>Bovnar</span></a><nav><a href="/docs/">Docs</a><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;start</a><a href="https://github.com/sothis/bovnar">GitHub</a></nav></header>
+<main>
+<h1>Bovnar (BVNR) — Frequently Asked Questions</h1>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/6_bovnar_faq.md">Markdown</a> and <a href="/doc/pdf/bovnar-faq.pdf">PDF</a>.</p>
+<blockquote>
+<p><strong>Applies to:</strong> Bovnar specification v1.1</p>
+</blockquote>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-general">General</a></li>
+<li><a href="#2-file-format-and-syntax">File Format and Syntax</a></li>
+<li><a href="#3-type-system-and-annotations">Type System and Annotations</a></li>
+<li><a href="#4-units">Units</a></li>
+<li><a href="#5-numbers-and-special-values">Numbers and Special Values</a></li>
+<li><a href="#6-strings">Strings</a></li>
+<li><a href="#7-arrays">Arrays</a></li>
+<li><a href="#8-structs">Structs</a></li>
+<li><a href="#9-null-symbols-and-references">Null, Symbols, and References</a></li>
+<li><a href="#10-octet-streams">Octet Streams</a></li>
+<li><a href="#11-error-handling-and-debugging">Error Handling and Debugging</a></li>
+<li><a href="#12-c-api">C API</a></li>
+<li><a href="#13-python-bindings">Python Bindings</a></li>
+<li><a href="#14-limits-and-performance">Limits and Performance</a></li>
+<li><a href="#15-why-c99-and-not-c23">Why C99 and Not C23?</a></li>
+</ol>
+<hr />
+<h2 id="1-general">1. General</h2>
+<p><strong>What problem does Bovnar solve?</strong></p>
+<p>A bare <code>9.81</code> tells you nothing about whether the value is a float or an
+integer, 32-bit or 64-bit, and it carries no physical meaning. The type and the
+unit live outside the data — in an external schema, a naming convention, or
+documentation — and that gap is where unit-confusion failures hide.</p>
+<p>Bovnar is self-describing at the per-value level: every value in a <code>.bvnr</code>
+stream carries its type family, bit-width, numeric base, and physical unit
+inside the same byte stream. No external schema is required. You can hand a
+<code>.bvnr</code> file to anyone and they have everything they need to interpret it
+exactly as the author intended.</p>
+<hr />
+<p><strong>Is Bovnar a binary or a text format?</strong></p>
+<p>It is primarily a text format. The syntax is UTF-8 prose that is readable and
+writable by hand. The one binary escape mechanism — the octet stream (<code>0x00</code>
+framing) — lets you embed opaque binary payloads without Base64 overhead.
+Outside of octet-stream regions the parser enforces strict UTF-8 validity.</p>
+<hr />
+<p><strong>Does Bovnar perform unit conversion or dimensional analysis?</strong></p>
+<p>No. The unit annotation is parsed, validated, and delivered to the application
+through the event API, but Bovnar itself never converts between compatible
+units. That is deliberately left to the application. The Python bindings expose
+helper functions (<code>unit_convert_factor</code>, <code>convert_value</code>, <code>units_compatible</code>)
+that applications can use to implement dimensional checking and conversion on
+top of the parsed unit data.</p>
+<hr />
+<p><strong>Is there an official file extension?</strong></p>
+<p>Yes. The canonical extension is <code>.bvnr</code>.</p>
+<hr />
+<p><strong>Which version of the specification does the reference implementation target?</strong></p>
+<p>Spec 1.1 — the additive features documented here (the <code>#!bovnar</code>
+version directive, <code>\u</code>/<code>\x</code> escapes, the <code>datetime</code> family, and reference array
+indexing). Spec 1.0 remains the frozen, stable baseline: a document that declares
+no <code>#!bovnar</code> directive is treated as 1.0, and every 1.0 document parses
+unchanged. <code>bvnr_version_string()</code> reports the library version (<code>1.1.0</code>) and
+<code>bvnr_spec_version()</code> the highest spec it understands.</p>
+<hr />
+<h2 id="2-file-format-and-syntax">2. File Format and Syntax</h2>
+<p><strong>What is the minimum valid Bovnar file?</strong></p>
+<p>An empty file (zero bytes) is valid. A file with a single assignment is the
+practical minimum:</p>
+<div class="codehilite"><pre><span></span><code>.key = value;
+</code></pre></div>
+
+<hr />
+<p><strong>Why do keys start with a dot?</strong></p>
+<p>The leading dot is a hard syntactic marker. It unambiguously separates key
+tokens from value tokens anywhere in the stream, including inside structs and
+arrays-of-structs. The parser uses it as the entry point for the identifier
+state machine.</p>
+<hr />
+<p><strong>Can I use Unicode characters in key names?</strong></p>
+<p>Yes, with restrictions. UTF-8 leader bytes in the range <code>0xC3–0xF4</code> are valid
+at both the start and body of an identifier, covering most non-ASCII letters.
+The one excluded range is <code>0xC2</code> (U+0080–U+00BF), which is explicitly rejected
+everywhere in identifiers. The following ASCII punctuation characters are also
+hard errors inside identifier bodies:</p>
+<div class="codehilite"><pre><span></span><code>! &quot; # $ % &amp; &#39; ( ) * , . / : ; &lt; = &gt; ? @ [ \ ] ^ ` { | } ~
+</code></pre></div>
+
+<p>The characters <code>+</code>, <code>-</code>, and <code>_</code> are allowed in identifier bodies (but not as
+the first character, except for <code>_</code>).</p>
+<hr />
+<p><strong>Can a key start with a digit?</strong></p>
+<p>No. Identifiers must begin with a letter (<code>A–Z</code>, <code>a–z</code>), an underscore, or a
+valid UTF-8 leader byte. A leading digit is a hard parse error.</p>
+<hr />
+<p><strong>Are comments supported?</strong></p>
+<p>Yes. A <code>#</code> character starts a comment that runs to the end of the line. Comments
+are legal anywhere whitespace is legal — before the first assignment, between
+tokens, and at the end of a value line:</p>
+<div class="codehilite"><pre><span></span><code># full-line comment
+.port = 5432;   # inline comment
+</code></pre></div>
+
+<hr />
+<p><strong>Is whitespace significant?</strong></p>
+<p>No, except as a token separator and (required) separator between a scalar value
+and an inline unit suffix. Indentation and blank lines are purely cosmetic and
+are freely interleaved between all tokens.</p>
+<hr />
+<p><strong>Is a UTF-8 BOM accepted?</strong></p>
+<p>A UTF-8 BOM (<code>EF BB BF</code>) is accepted only at byte offset 0 of the stream.
+A BOM appearing later in a string is valid UTF-8 and passes through without error.
+For BOMs in other positions the error code depends on where the BOM appears:</p>
+<ul>
+<li>A BOM found <strong>inside the first comment line</strong> (the dedicated <code>first_comment_*</code> states) produces <code>error_invalid_byte_order_mark</code>.</li>
+<li>A BOM byte (<code>0xEF</code>) found <strong>after the first comment line</strong> but before the first <code>.</code> identifier (the <code>first_bom</code> state) is not handled in the state table and produces <code>error_unexpected_input_byte</code>.</li>
+</ul>
+<p>A BOM appearing inside any <em>subsequent</em> comment is valid UTF-8 and accepted without error.</p>
+<hr />
+<p><strong>Can a document declare which bovnar version it uses?</strong></p>
+<p>Yes, since spec 1.1. Put a directive on the first line:</p>
+<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+.x = 42;
+</code></pre></div>
+
+<p>A document with <strong>no</strong> directive is treated as spec <strong>1.0</strong> — the frozen
+baseline grammar — so existing files need no change. The directive only opts in
+to a newer version.</p>
+<p>It is recognised only as the very first comment (after an optional BOM and
+whitespace). A reader records the declared version
+(<code>bvnr_reader_get_declared_version</code>, <code>bovnar validate</code> reports it, and
+the Python <code>Reader.declared_version</code> / <code>bovnar.peek_version()</code> expose it), and a
+reader opened with <code>strict_version</code> rejects a version it does not support with
+<code>error_unsupported_spec_version</code>. A malformed directive is
+<code>error_invalid_spec_version</code>.</p>
+<hr />
+<p><strong>Wait — isn't a comment supposed to be meaningless? How can <code>#!bovnar …</code> matter?</strong></p>
+<p>The version directive is the single, deliberate exception. Everywhere else a
+comment is semantically inert. The directive is <em>shaped</em> like a comment on
+purpose: that is exactly what makes it backward compatible — a spec-1.0 reader
+(which knows nothing about versions) skips it as a plain comment and parses the
+rest of the document normally, while a 1.1+ reader additionally recognises the
+<code>#!bovnar</code> prefix on the first line and acts on it. Nothing else about comment
+semantics changes, and a <code>#!bovnar …</code> on any line other than the first is still
+just a comment.</p>
+<hr />
+<h2 id="3-type-system-and-annotations">3. Type System and Annotations</h2>
+<p><strong>What are the seven type families?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>uint</code></td>
+<td>Unsigned integer</td>
+</tr>
+<tr>
+<td><code>sint</code></td>
+<td>Signed integer</td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td>IEEE 754 binary floating-point</td>
+</tr>
+<tr>
+<td><code>float_fix</code></td>
+<td>Q-format signed fixed-point</td>
+</tr>
+<tr>
+<td><code>float_dec</code></td>
+<td>IEEE 754-2008 decimal floating-point</td>
+</tr>
+<tr>
+<td><code>utf8</code></td>
+<td>UTF-8 string</td>
+</tr>
+<tr>
+<td><code>bool</code></td>
+<td>Boolean (<code>true</code>/<code>false</code>); takes no parameters</td>
+</tr>
+</tbody>
+</table>
+<p>Spec 1.1 adds an eighth, <code>datetime</code> (see below).</p>
+<hr />
+<p><strong>Is there a date/time type?</strong></p>
+<p>Yes, since spec 1.1: the <code>datetime</code> family. A <code>datetime</code> value is a <strong>signed
+integer count of seconds since a named epoch</strong> — a timestamp:</p>
+<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+.created = &lt;datetime:64,unix&gt; 1750000000;
+</code></pre></div>
+
+<p>The epoch parameter is one of <code>unix</code> (default), <code>tai</code>, <code>gps</code>, <code>mjd</code>, <code>ntp</code>,
+<code>galileo</code>, <code>glonass</code>, <code>y2000</code>, <code>beidou</code>. The value validates like <code>sint</code>
+(negative = before the epoch); a numeric base/unit/<code>q</code> is <code>error_illegal_value_type</code>
+and a fractional value is <code>error_type_value_mismatch</code>. Being a 1.1 feature it
+requires a <code>#!bovnar 1.1</code> declaration. Convert to civil time with the
+<code>bvn_datetime.h</code> helpers.</p>
+<p>You can also write the value as an <strong>ISO-8601 literal</strong> instead of a raw
+integer — <code>2026-06-15</code>, <code>2026-06-15T12:00:00</code>, a trailing <code>Z</code>, or a numeric
+<code>±HH:MM</code> offset, with an optional fractional second:</p>
+<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+.created = 2026-06-15T12:00:00Z;        # bare literal infers &lt;datetime:64,unix&gt;
+.local   = 2026-06-15T12:00:00+02:00;   # offset folds to 10:00:00Z
+.logline = 2026-06-15T12:00:00.123Z;    # fraction preserved as a string; round-trips
+</code></pre></div>
+
+<p>It is converted to the epoch-seconds carrier at parse time (the integer is what
+is stored, so round-trips are idempotent). A bare literal with no annotation
+infers <code>&lt;datetime:64,unix&gt;</code>. A <code>±HH:MM</code> offset shifts the time to true UTC before
+the conversion. A fractional part (any number of digits) does not change the
+whole-second carrier, but the digits are kept verbatim — consumers read them as
+a string (<code>bvnr_data_t.frac_data</code>, or <code>bvn_dom_get_datetime_fraction()</code>), and a
+value carrying a fraction is pretty-printed back as an ISO literal so it
+round-trips. For sub-second values you compute on, use a finer integer carrier
+(e.g. milliseconds). The UTC→epoch conversion is leap-second correct for the civil epochs
+and <code>tai</code> (the offset is folded before <code>tai</code>'s leap-second lookup). A second of
+<code>60</code> is an inserted leap second: on the civil epochs it folds onto the following
+second (POSIX time has none to spend on it), but on <code>tai</code> it keeps its own value
+one below the boundary, which is what makes UTC⇄TAI injective there. The atomic
+GNSS epochs (<code>gps</code>/<code>galileo</code>/<code>glonass</code>/<code>beidou</code>) reject a literal
+(<code>error_datetime_literal_unsupported_epoch</code>) — give those an integer carrier. A
+malformed or out-of-range literal is <code>error_invalid_datetime_literal</code>.</p>
+<p><strong>Timestamp vs. duration — don't confuse them.</strong> A <em>timestamp</em> (an instant) is a
+<code>datetime</code>; a <em>duration</em> (an elapsed amount) is a plain number with a time unit,
+e.g. <code>&lt;float:64,s&gt; 2.5</code> (2.5 seconds) or <code>&lt;uint:32,h&gt; 8</code> (8 hours). The time
+<em>units</em> (<code>s</code>, <code>min</code>, <code>h</code>, <code>d</code>, …) measure spans; the <code>datetime</code> <em>family</em> names a
+point on a timeline.</p>
+<hr />
+<p><strong>What is default type synthesis?</strong></p>
+<p>When no explicit type annotation is present, the parser synthesises one based
+on the literal:</p>
+<ul>
+<li>Positive integer literal → <code>uint:64</code></li>
+<li>Negative integer literal → <code>sint:64</code></li>
+<li>Literal containing <code>.</code> or <code>e</code> → <code>float:64</code></li>
+<li>Quoted string → <code>utf8</code></li>
+<li>Boolean keyword (<code>true</code>/<code>false</code>/<code>on</code>/<code>off</code>) → <code>bool</code></li>
+<li>ISO-8601 datetime literal (spec 1.1) → <code>datetime:64,unix</code></li>
+</ul>
+<p>This is called default type synthesis and is convenient for configuration files
+and quick hand-authored data. For precision-sensitive use cases, always write an
+explicit annotation.</p>
+<hr />
+<p><strong>Where exactly does the type annotation go?</strong></p>
+<p>Between <code>=</code> and the value — never on the key, and never after the value:</p>
+<div class="codehilite"><pre><span></span><code>.port = &lt;uint:16&gt; 443;       # correct
+.port&lt;uint:16&gt; = 443;        # WRONG — hard error
+.port = 443 &lt;uint:16&gt;;       # WRONG — hard error
+</code></pre></div>
+
+<hr />
+<p><strong>Can annotation parameters appear in any order?</strong></p>
+<p>Yes. Width, base, and unit are distinguished by their syntactic form, not by
+position. The following three are equivalent:</p>
+<div class="codehilite"><pre><span></span><code>.x = &lt;uint:32,_16,m&gt; &quot;1F4&quot;;
+#    &lt;uint:_16,m,32&gt;     — identical (parameter order is free)
+#    &lt;uint:m,32,_16&gt;     — identical
+</code></pre></div>
+
+<hr />
+<p><strong>What widths are valid for each type family?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Valid widths</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>uint</code>, <code>sint</code></td>
+<td>Any positive integer up to <code>BVN_MAX_INT_WIDTH</code> (32768), e.g. <code>&lt;uint:12&gt;</code> is legal for a 12-bit ADC</td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td><code>0</code> (→64), <code>16</code>, and any multiple of <code>32</code> up to <code>32768</code></td>
+</tr>
+<tr>
+<td><code>float_fix</code></td>
+<td><code>0</code> (→64), <code>16</code>, <code>32</code>, <code>64</code>, <code>128</code>, <code>256</code></td>
+</tr>
+<tr>
+<td><code>float_dec</code></td>
+<td><code>0</code> (→64), <code>16</code>, <code>32</code>, <code>64</code>, <code>128</code>, <code>256</code></td>
+</tr>
+<tr>
+<td><code>datetime</code></td>
+<td>Same as <code>sint</code> — any positive integer up to <code>BVN_MAX_INT_WIDTH</code> (the carrier is a signed epoch-seconds integer); <code>0</code> →64</td>
+</tr>
+</tbody>
+</table>
+<p>Width <code>0</code> always means "use the default," which is 64 bits for all families.
+Width <code>8</code> is legal for <code>uint</code>/<code>sint</code>/<code>datetime</code> but is a hard error for all float families.
+A non-multiple-of-32 (other than 16) width for <code>float</code> is <code>error_illegal_value_type</code>.</p>
+<hr />
+<p><strong>What is the <code>float_fix</code> (Q-format) type and how is it annotated?</strong></p>
+<p><code>float_fix</code> encodes a value as a signed integer with a declared number of
+fractional bits. The mathematical value is <code>raw_integer × 2⁻Q</code>. The annotation
+requires a <code>qN</code> parameter specifying fractional bits:</p>
+<div class="codehilite"><pre><span></span><code>.pid = &lt;float_fix:32,q16&gt; -1.5;    # 32-bit, 16 fractional bits
+.adc = &lt;float_fix:16,q8,°C&gt; 25.0;  # 16-bit Q8 with a unit
+</code></pre></div>
+
+<p>Q must satisfy <code>0 ≤ Q &lt; effective_width</code>. <code>&lt;float_fix:16,q16&gt;</code> is illegal.
+The base parameter (<code>_N</code>) is forbidden for <code>float_fix</code>.</p>
+<hr />
+<p><strong>What is <code>float_dec</code> and when should I use it?</strong></p>
+<p><code>float_dec</code> is IEEE 754-2008 decimal floating-point. Binary floats cannot
+represent <code>0.1</code> exactly; decimal floats can. Use <code>float_dec</code> in financial,
+metrological, or billing contexts where exact decimal representation matters.
+The base parameter is forbidden for <code>float_dec</code> as well.</p>
+<hr />
+<p><strong>Can I annotate a string value with a type?</strong></p>
+<p>Yes, with <code>&lt;utf8&gt;</code>:</p>
+<div class="codehilite"><pre><span></span><code>.label = &lt;utf8&gt; &quot;hello&quot;;
+</code></pre></div>
+
+<p>This is redundant — a bare quoted literal is already synthesised as <code>utf8</code> — but
+it makes the type explicit, which is useful for documentation and tooling. <code>utf8</code>
+is a parameterless family: a width, base, q, or unit parameter inside a <code>&lt;utf8&gt;</code>
+annotation is <code>error_illegal_value_type</code>.</p>
+<hr />
+<h2 id="4-units">4. Units</h2>
+<p><strong>What is the purpose of the unit annotation?</strong></p>
+<p>Physical units are a first-class part of the type system, not a comment field.
+Attaching a unit to a value makes the data self-documenting and enables the
+consuming application to perform dimensional verification and conversion. The
+parser fully validates every unit expression and exposes the structured result
+through the <code>value_unit_t</code> field of the <code>ev_data</code> event.</p>
+<hr />
+<p><strong>How do I write a simple unit?</strong></p>
+<p>Place the unit symbol inside the angle brackets after the other type parameters:</p>
+<div class="codehilite"><pre><span></span><code>.distance  = &lt;uint:64,m&gt;      384400000;
+.voltage   = &lt;float:32,V&gt;     3.3;
+.frequency = &lt;float:64,Hz&gt;    2400000000;
+</code></pre></div>
+
+<hr />
+<p><strong>How do SI prefixes work, and why is the <code>~</code> separator mandatory?</strong></p>
+<p>An SI prefix is written before the unit symbol with a mandatory <code>~</code> separator:
+<code>k~m</code> (kilometer), <code>m~V</code> (millivolt), <code>G~Hz</code> (gigahertz). The
+<code>~</code> is required because without it there is no general way to distinguish
+a two-character unit symbol from a one-character prefix followed by a
+one-character unit — <code>mV</code> would be ambiguous. The <code>~</code> resolves all such
+cases unambiguously:</p>
+<div class="codehilite"><pre><span></span><code>.k_ohm = &lt;float:32,k~Ω&gt; 4.7;
+.micro = &lt;float:32,µ~s&gt; 50.0;
+.giga  = &lt;float:64,G~Hz&gt; 2.4;
+</code></pre></div>
+
+<p>IEC binary prefixes (<code>Ki</code>, <code>Mi</code>, <code>Gi</code>, <code>Ti</code>, …) follow the same rule:</p>
+<div class="codehilite"><pre><span></span><code>.ram  = &lt;uint:64,Gi~B&gt; 8;
+.disk = &lt;uint:64,Ti~B&gt; 2;
+</code></pre></div>
+
+<hr />
+<p><strong>What is the difference between <code>M~B</code> (megabytes) and <code>Mi~B</code> (mebibytes)?</strong></p>
+<p><code>M~</code> is the SI decimal prefix (mega = 10⁶). <code>Mi~</code> is the IEC binary prefix
+(mebi = 2²⁰ = 1,048,576). The difference matters for storage:</p>
+<div class="codehilite"><pre><span></span><code>.link_rate = &lt;uint:32,M~b&gt;  1000;   # 1 000 × 10⁶ bits
+.cache     = &lt;uint:64,Mi~B&gt; 512;    # 512 × 2²⁰ bytes
+</code></pre></div>
+
+<hr />
+<p><strong>How do I write compound units like m/s² or kg·m/s²?</strong></p>
+<p>Use <code>*</code> or the middle-dot <code>·</code> (U+00B7) for multiplication and <code>/</code> for division:</p>
+<div class="codehilite"><pre><span></span><code>.velocity     = &lt;float:64,m/s&gt;          9.81;
+.acceleration = &lt;float:64,m/s²&gt;         9.81;
+.force        = &lt;float:64,k~g·m/s²&gt;     9.81;
+.energy       = &lt;float:64,k~g·m²/s²&gt;    1000.0;
+</code></pre></div>
+
+<p>The <code>/</code> separator is a one-way switch: once written, every subsequent component
+is in the denominator. To place a component back in the numerator after a
+divisor, use a negative exponent instead:</p>
+<div class="codehilite"><pre><span></span><code>.force_alt = &lt;float:64,k~g·m·s⁻²&gt; 9.81;   # identical to k~g·m/s²
+</code></pre></div>
+
+<p>The maximum number of unit components in a compound unit is 8; exceeding that
+is <code>error_unit_illegal</code>.</p>
+<hr />
+<p><strong>Can exponents be written in ASCII instead of Unicode superscripts?</strong></p>
+<p>Yes. Both forms are accepted and produce identical internal representations:</p>
+<div class="codehilite"><pre><span></span><code>.area1 = &lt;float:64,m²&gt;   100.0;   # Unicode superscript
+.area2 = &lt;float:64,m^2&gt;  100.0;   # ASCII caret form — same result
+.inv1  = &lt;float:64,s⁻¹&gt;  50.0;
+.inv2  = &lt;float:64,s^-1&gt; 50.0;
+</code></pre></div>
+
+<p>Only a single ASCII digit is supported after <code>^</code>; multi-digit exponents are
+a parse error.</p>
+<hr />
+<p><strong>What does <code>no_unit</code> mean, and how does it differ from omitting the unit?</strong></p>
+<p>Both mean "dimensionless," but they produce distinct internal states:</p>
+<ul>
+<li>Omitting the unit parameter → <code>BVN_UNIT_NO_PREFIX(bu_none)</code>:
+  <code>num_components == 1</code>, <code>base == bu_none</code>.</li>
+<li>Writing <code>no_unit</code> explicitly → <code>BVN_UNIT_NONE</code>:
+  <code>num_components == 0</code>.</li>
+</ul>
+<p>Both compare as compatible via <code>bvn_units_compatible</code> and both serialise to
+<code>"no_unit"</code> via <code>bvn_unit_to_string</code>. The distinction is expressive: explicit
+<code>no_unit</code> signals that the author actively chose dimensionless, whereas an
+omitted unit might mean the author simply did not think about units. For
+documentation-grade data, prefer the explicit form.</p>
+<hr />
+<p><strong>Can I write a unit as an inline suffix instead of inside the annotation?</strong></p>
+<p>Yes, for scalar values in non-array context. Write the unit directly after the
+value literal, separated by at least one whitespace character:</p>
+<div class="codehilite"><pre><span></span><code>.speed   = 9.81 m/s;       # no annotation; inline unit adopted
+.mass    = 70.0 k~g;
+.storage = 65536 B;
+</code></pre></div>
+
+<p>The inline unit is forbidden inside array elements — any letter or underscore
+following an array-element value is <code>error_unexpected_input_byte</code>. If both
+an annotation unit and an inline unit are present, they must be identical;
+a mismatch is <code>error_unit_mismatch</code>.</p>
+<hr />
+<p><strong>How many base units does Bovnar support?</strong></p>
+<p>163 named base units across the following categories:</p>
+<ul>
+<li><strong>7 SI base units</strong> — second, meter, gram, ampere, kelvin, mole, candela.</li>
+<li><strong>21 named SI-derived units</strong> — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).</li>
+<li><strong>14 non-SI units accepted for use with SI</strong> — liter, minute, hour, day, week, year, degree (angle), degree Celsius, tonne, bar, electronvolt, dalton, astronomical unit, hectare.</li>
+<li><strong>2 digital units</strong> — bit (<code>b</code>), byte (<code>B</code>), with IEC binary prefixes (kibi through quebi).</li>
+<li><strong>13 Imperial/US customary length units</strong> — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom, <strong>chain</strong> (<code>ch</code>), <strong>rod</strong> (<code>rd</code>), and <strong>thou</strong> (thousandth of an inch, alias <code>mil</code>).</li>
+<li><strong>11 Imperial/US customary mass units</strong> — pound, ounce, grain, stone, short ton, long ton, troy ounce, carat, <strong>slug</strong>, <strong>dram</strong> (<code>dr</code>), <strong>pennyweight</strong> (<code>dwt</code>).</li>
+<li><strong>6 temperature scales</strong> — degree Fahrenheit (affine), <strong>degree Rankine</strong> (linear, absolute), and the historical <strong>Delisle</strong> (<code>°De</code>), <strong>Newton</strong> (<code>°N</code>), <strong>Réaumur</strong> (<code>°Re</code>), and <strong>Rømer</strong> (<code>°Ro</code>) scales (all affine). Degree Celsius is counted among the non-SI accepted units above.</li>
+<li><strong>6 pressure units</strong> — atmosphere, mmHg, Torr, psi, <strong>inch of mercury</strong> (<code>inHg</code>), and <strong>atmosphere technical</strong> (<code>at</code>, = 1 kgf/cm² = 98 066.5 Pa).</li>
+<li><strong>5 energy units</strong> — calorie, BTU, erg, therm, <strong>foot-pound</strong> (<code>ft_lb</code>).</li>
+<li><strong>2 power units</strong> — horsepower (<code>hp</code>), <strong>metric horsepower</strong> (<code>PS</code>, also <code>CV</code>; = 735.49875 W).</li>
+<li><strong>4 force units</strong> — pound-force, dyne, kip, <strong>kilogram-force</strong> (<code>kgf</code>).</li>
+<li><strong>1 acceleration unit</strong> — <strong>standard gravity</strong> (<code>gn</code>, = 9.80665 m/s², exact).</li>
+<li><strong>3 speed/frequency/rotation units</strong> — knot, <strong>revolutions per minute</strong> (<code>rpm</code>), <strong>revolution</strong> (<code>rev</code>, full angular turn = 2π rad).</li>
+<li><strong>15 US and UK volume units</strong> — gallon, gallon (UK), quart, pint, cup, fluid ounce, tablespoon, teaspoon, barrel, <strong>US gill</strong> (<code>gi</code>), <strong>imperial gill</strong> (<code>gi_uk</code>), <strong>fluid dram</strong> (<code>fl_dr</code>), <strong>minim</strong>, <strong>peck</strong> (<code>pk</code>), <strong>bushel</strong> (<code>bsh</code>).</li>
+<li><strong>3 UK imperial volume units</strong> — <strong>pint_uk</strong>, <strong>fluid_ounce_uk</strong>, <strong>quart_uk</strong>.</li>
+<li><strong>2 area units</strong> — acre, barn.</li>
+<li><strong>3 angle units</strong> — arcminute, arcsecond, gradian; plus <strong>revolution</strong> (see rotation above).</li>
+<li><strong>8 CGS units</strong> — poise, stokes, gauss, maxwell, oersted, stilb, phot, galileo.</li>
+<li><strong>3 radiation units</strong> — curie, röntgen, rem.</li>
+<li><strong>2 logarithmic units</strong> — neper, <strong>decibel</strong> (<code>dB</code>).</li>
+<li><strong>2 electrical power units</strong> — <strong>var</strong> (reactive power), <strong>volt-ampere</strong> (<code>VA</code>, apparent power).</li>
+<li><strong>2 time extensions</strong> — <strong>month</strong> (<code>mo</code>, Julian month = 2 629 800 s), <strong>fortnight</strong> (<code>fn</code> = 14 d = 1 209 600 s).</li>
+<li><strong>2 textile linear density units</strong> — <strong>tex</strong> (1 g/km = 10⁻⁶ kg/m, ISO 1144), <strong>denier</strong> (<code>den</code>, 1 g/9 000 m; 9 den = 1 tex).</li>
+<li><strong>13 Old German units</strong> — <strong>Pfund</strong> (<code>Pfd</code>), <strong>Zentner</strong> (<code>Ztr</code>), <strong>Doppelzentner</strong>, <strong>Lot</strong> (mass); <strong>Prussian line, Zoll, Fuß, Elle, Rute</strong>, <strong>Klafter</strong>, and <strong>German (geographical) mile</strong> (length); <strong>Morgen</strong> (area); <strong>Scheffel</strong> (volume). None accept an SI or IEC prefix.</li>
+<li><strong>7 surveying &amp; signalling units</strong> — <strong>US survey foot</strong>, <strong>league</strong>, <strong>cable length</strong>, <strong>hand</strong> (length); <strong>quintal</strong>, <strong>scruple</strong> (mass); <strong>baud</strong> (<code>Bd</code>, signalling rate).</li>
+<li><strong>6 ratio / proportion units</strong> — <strong>percent</strong> (<code>%</code>), <strong>per mille</strong> (<code>‰</code>), <strong>per myriad</strong> (<code>‱</code>), <strong>per cent mille</strong> (<code>pcm</code>), <strong>ppm</strong>, <strong>ppb</strong> — dimensionless scaling factors that take no prefix.</li>
+</ul>
+<p>The <code>bu_gram</code> base unit is used for mass so that the <code>k~</code> prefix can carry the kilo: <code>k~g</code> = kilogram. The Rankine symbol is <code>°Ra</code> (also accepted as <code>Ra</code>); note <code>R</code> alone is reserved for röntgen. Thou accepts <code>mil</code> as an alternative spelling. <code>var</code> and <code>VA</code> share the same SI dimensional signature as watt but are kept distinct for physical clarity. <code>rpm</code> has the same SI dimension as <code>Hz</code> (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. <code>at</code> (atmosphere technical) must not be confused with <code>atm</code> (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.</p>
+<hr />
+<h2 id="5-numbers-and-special-values">5. Numbers and Special Values</h2>
+<p><strong>Do I need to quote non-decimal numbers?</strong></p>
+<p>Yes. Bovnar's lexer distinguishes bare words (symbols) from numbers by context.
+A bare <code>FF</code> in value position is a symbol, not a hex number, and will produce
+<code>error_type_value_mismatch</code>. Any non-decimal value must be a quoted string:</p>
+<div class="codehilite"><pre><span></span><code>.hex = &lt;uint:8,_16&gt;  &quot;FF&quot;;       # correct — 255
+.hex = &lt;uint:8,_16&gt;  FF;         # WRONG — FF is a symbol
+.bin = &lt;uint:8,_2&gt;   &quot;11010110&quot;; # correct
+</code></pre></div>
+
+<p>For signed non-decimal values, the minus sign goes inside the string:</p>
+<div class="codehilite"><pre><span></span><code>.neg = &lt;sint:32,_16&gt; &quot;-7FFFFFFF&quot;;
+</code></pre></div>
+
+<hr />
+<p><strong>What base systems are supported?</strong></p>
+<p>For <code>uint</code> and <code>sint</code>: every base from <code>_2</code> through <code>_62</code> (consecutive). Bases
+<code>_64</code> (standard Base64) and <code>_85</code> (Ascii85) are also supported, but <strong>for <code>uint</code>
+only</strong> — their alphabets claim the sign glyphs as digits (Base64 uses <code>+</code> and
+<code>/</code>; Ascii85 uses both <code>+</code> and <code>-</code>), leaving no unambiguous sign character, so a
+signed value in these bases is a hard error (<code>error_illegal_value_type</code>). For
+<code>float</code>: <code>_10</code> (decimal, the default) and <code>_16</code> (hexadecimal) only. <code>float_fix</code>
+and <code>float_dec</code> do not accept a base parameter at all — specifying one is a hard
+error.</p>
+<hr />
+<p><strong>What are the special number literals?</strong></p>
+<p>Three special values bypass normal numeric parsing. They are bare reserved
+keywords — no sigil — and, like <code>null</code>/<code>true</code>/<code>false</code>, are reclassified out of
+the symbol space by the validator. Only these exact spellings are reserved;
+any other bare word (e.g. <code>infinity</code>, <code>nans</code>) is an ordinary symbol:</p>
+<div class="codehilite"><pre><span></span><code>.nan = nan;
+.inf = inf;
+.neg = ninf;     # negative infinity
+</code></pre></div>
+
+<p>They are valid in both typed and untyped context and may be combined with any
+float type annotation. A special-number keyword takes no inline unit suffix —
+give its unit via the annotation (<code>&lt;float:64,m/s&gt; inf</code>).</p>
+<hr />
+<p><strong>Are leading zeros legal in decimal integers?</strong></p>
+<p>Yes. <code>007</code> parses as the integer <code>7</code>. There is no octal interpretation — the
+leading zeros are ignored.</p>
+<hr />
+<p><strong>Are there shorthand float forms like <code>-.5</code> or <code>123.</code>?</strong></p>
+<p>Yes. Both leading-dot (<code>.5</code> or <code>-.5</code>) and trailing-dot (<code>123.</code>) forms are valid
+for <code>float:64</code>:</p>
+<div class="codehilite"><pre><span></span><code>.a = -.5;     # -0.5 as float:64
+.b = 123.;    # 123.0 as float:64
+</code></pre></div>
+
+<hr />
+<h2 id="6-strings">6. Strings</h2>
+<p><strong>What escape sequences are defined?</strong></p>
+<p>Exactly seven:</p>
+<table>
+<thead>
+<tr>
+<th>Escape</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>\t</code></td>
+<td>Horizontal tab</td>
+</tr>
+<tr>
+<td><code>\n</code></td>
+<td>Line feed</td>
+</tr>
+<tr>
+<td><code>\v</code></td>
+<td>Vertical tab</td>
+</tr>
+<tr>
+<td><code>\f</code></td>
+<td>Form feed</td>
+</tr>
+<tr>
+<td><code>\r</code></td>
+<td>Carriage return</td>
+</tr>
+<tr>
+<td><code>\"</code></td>
+<td>Double quote</td>
+</tr>
+<tr>
+<td><code>\\</code></td>
+<td>Backslash</td>
+</tr>
+</tbody>
+</table>
+<p>In <strong>spec 1.0</strong> that is all — any other character after a backslash is
+<code>error_illegal_escape_sequence</code>.</p>
+<p>A <strong>spec 1.1</strong> document (declaring <code>#!bovnar 1.1</code>, see §3.4) adds two more:</p>
+<table>
+<thead>
+<tr>
+<th>Escape</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>\xHH</code></td>
+<td>the single byte <code>HH</code> (two hex digits)</td>
+</tr>
+<tr>
+<td><code>\u{H…}</code></td>
+<td>Unicode scalar <code>U+H…</code> (1–6 hex digits), UTF-8 encoded</td>
+</tr>
+</tbody>
+</table>
+<p><code>\u{…}</code> rejects surrogates and values above <code>U+10FFFF</code> (<code>error_invalid_codepoint</code>).
+<code>\x</code> writes a raw byte but the string must stay valid UTF-8, so <code>"\xC3\xA9"</code> is
+<code>"é"</code> while a lone <code>"\xFF"</code> is <code>error_invalid_utf8_byte</code> — for arbitrary binary
+data, still use an octet stream. Both <code>\x</code> and <code>\u</code> are <strong>1.1-only</strong>: in a
+1.0/unversioned document they remain <code>error_illegal_escape_sequence</code>, so existing
+documents are unaffected.</p>
+<hr />
+<p><strong>Can strings span multiple lines?</strong></p>
+<p>Yes. Raw whitespace bytes (HT, LF, VT, FF, CR) are accepted unescaped inside
+string literals:</p>
+<div class="codehilite"><pre><span></span><code>.poem = &quot;roses are red
+violets are blue&quot;;
+</code></pre></div>
+
+<hr />
+<p><strong>How does string concatenation work?</strong></p>
+<p>Adjacent string literals separated only by whitespace or comments are
+concatenated at lex time. This is the idiomatic way to split a long string
+across lines:</p>
+<div class="codehilite"><pre><span></span><code>.url  = &quot;https://&quot; &quot;api.example.com&quot; &quot;/v1&quot;;
+.guid = &lt;uint:128,_16&gt; &quot;deadbeef&quot;
+                       &quot;cafebabe&quot;
+                       &quot;01234567&quot;
+                       &quot;89abcdef&quot;;
+</code></pre></div>
+
+<p>The combined byte length must not exceed <code>max_string_length</code> (default 65535).</p>
+<hr />
+<p><strong>Is the <code>&lt;utf8&gt;</code> annotation ever required?</strong></p>
+<p>No. A bare quoted literal is always synthesised as <code>utf8</code>. The annotation is
+purely optional and expressive.</p>
+<hr />
+<h2 id="7-arrays">7. Arrays</h2>
+<p><strong>What is the basic array syntax?</strong></p>
+<p>Comma-separated values inside square brackets:</p>
+<div class="codehilite"><pre><span></span><code>.primes = [2, 3, 5, 7, 11];
+</code></pre></div>
+
+<hr />
+<p><strong>How are multi-dimensional arrays written?</strong></p>
+<p>Rows are separated by <code>/</code>:</p>
+<div class="codehilite"><pre><span></span><code>.matrix = [1, 2, 3]/[4, 5, 6]/[7, 8, 9];
+</code></pre></div>
+
+<p>Each <code>/[…]</code> is a new row dimension. The parser emits <code>ev_array_row_start</code> and
+<code>ev_array_row_end</code> events for each row and <code>ev_array_dim_start</code> for each <code>/</code>
+separator.</p>
+<hr />
+<p><strong>Can array elements have different types?</strong></p>
+<p>Array elements must be <strong>homogeneous</strong> (spec 1.0): every non-null element shares
+the same kind, and a bare array of numbers shares the same physical dimension.
+The numeric <em>encodings</em> may still mix, since they all denote the same dimension:</p>
+<div class="codehilite"><pre><span></span><code>.mixed = [&lt;uint:8&gt; 1, &lt;sint:8&gt; -1, &lt;float:32&gt; 3.14];   # valid: all dimensionless
+</code></pre></div>
+
+<p>But genuinely different kinds (<code>[1, "two"]</code>) or dimensions (<code>[&lt;float:64,m&gt; 1.0,
+&lt;float:64,k~g&gt; 2.0]</code>) are rejected with <code>error_array_element_type_mismatch</code>.
+Heterogeneous data goes in a <strong>struct</strong>, not an array.</p>
+<p>Homogeneity is a <strong>materialised-document</strong> rule: it is checked over the whole
+value once it is assembled, so it is enforced by the DOM parser
+(<code>bvn_dom_parse</code> / <code>bovnar.dom_parse</code>), not by the streaming SAX <code>Reader</code> (nor
+by <code>loads</code>, which is built on it) — the streaming layer surfaces per-value
+type/unit errors as the bytes arrive but cannot see sibling elements. Parse
+through the DOM tier (or the <code>bovnar</code> CLI's <code>convert</code>) if you need these rules
+enforced. A whole-array annotation (placed before <code>[</code>) is the default type for
+elements that do not carry their own annotation:</p>
+<div class="codehilite"><pre><span></span><code>.ports = &lt;uint:16&gt; [80, 443, 8080];
+</code></pre></div>
+
+<hr />
+<p><strong>How do null elements work inside arrays?</strong></p>
+<p>Leading, trailing, or consecutive commas produce null elements:</p>
+<div class="codehilite"><pre><span></span><code>.sparse = [, 1, , 2, ];   # null, 1, null, 2, null — five elements
+</code></pre></div>
+
+<hr />
+<p><strong>Can I nest arrays?</strong></p>
+<p>Yes, inner arrays are just element values:</p>
+<div class="codehilite"><pre><span></span><code>.nested = [[1, 2], [3, 4]];    # valid; rectangular sub-arrays
+.ragged = [[1, 2], [3, 4, 5]];  # error_array_row_size_mismatch — sibling sub-arrays differ in length
+</code></pre></div>
+
+<p>Note: since spec 1.0 sibling sub-arrays must match in length (and element shape), so bare arrays and matrices are rectangular — <code>[[1, 2], [3, 4, 5]]</code> is rejected. <code>error_array_row_size_mismatch</code> fires both when the <code>/</code>-rows of one array disagree (<code>[1,2,3]/[4,5]</code>) and when ragged sibling sub-arrays disagree (<code>[[1,2],[3,4,5]]</code>).</p>
+<hr />
+<p><strong>Are inline unit suffixes allowed inside arrays?</strong></p>
+<p>No. The inline unit suffix is forbidden at the lexer level for all array
+elements. Any letter or underscore following an array-element value token is
+<code>error_unexpected_input_byte</code>.</p>
+<hr />
+<h2 id="8-structs">8. Structs</h2>
+<p><strong>What is the struct syntax?</strong></p>
+<p>A struct groups zero or more assignments inside <code>{…}</code>. Every field inside is a
+complete <code>.key = value;</code> assignment. The struct value at the parent level ends
+with <code>};</code>:</p>
+<div class="codehilite"><pre><span></span><code>.server = {
+    .host = &quot;db.internal&quot;;
+    .port = &lt;uint:16&gt; 5432;
+};
+</code></pre></div>
+
+<hr />
+<p><strong>How deeply can structs nest?</strong></p>
+<p>Up to <code>max_struct_nesting</code> levels — the reference reader defaults to 64 and the field (a <code>uint8_t</code>) has a hard cap of 255. An empty struct (<code>{}</code>) is valid. An
+unmatched closing brace is <code>error_illegal_struct_close</code>.</p>
+<hr />
+<p><strong>Are structs valid as array elements?</strong></p>
+<p>Yes:</p>
+<div class="codehilite"><pre><span></span><code>.sensors = [
+    {.id = &lt;uint:8&gt; 0; .value = &lt;float:32,°C&gt; 27.3;},
+    {.id = &lt;uint:8&gt; 1; .value = &lt;float:32,°C&gt; 31.7;}
+];
+</code></pre></div>
+
+<hr />
+<h2 id="9-null-symbols-and-references">9. Null, Symbols, and References</h2>
+<p><strong>What is a null value?</strong></p>
+<p>An explicit absence of value — nothing between <code>=</code> and <code>;</code>, or the reserved
+keyword <code>null</code>:</p>
+<div class="codehilite"><pre><span></span><code>.nothing    = ;              # null, no type annotation
+.also_null  = null;          # the null keyword — identical to the empty slot
+.typed_null = &lt;uint:32&gt; ;    # null with an explicit type
+</code></pre></div>
+
+<hr />
+<p><strong>Does Bovnar have booleans?</strong></p>
+<p>Yes. <code>true</code>, <code>false</code>, <code>on</code>, and <code>off</code> are reserved keywords carrying the
+<code>bool</code> type family (<code>on</code> ≡ <code>true</code>, <code>off</code> ≡ <code>false</code>). A bare boolean
+synthesises a <code>&lt;bool&gt;</code> annotation; <code>&lt;bool&gt;</code> takes no parameters and accepts
+only those four keywords. They serialize canonically as <code>true</code> / <code>false</code>:</p>
+<div class="codehilite"><pre><span></span><code>.enabled = true;
+.debug   = off;          # == false
+.typed   = &lt;bool&gt; on;    # explicit; on == true
+</code></pre></div>
+
+<hr />
+<p><strong>What is a symbol?</strong></p>
+<p>A bare, unquoted word in value position — for application-defined enums and
+the like. The reserved keywords <code>null</code>, <code>true</code>, <code>false</code>, <code>on</code>, <code>off</code> and the
+special floats <code>nan</code>, <code>inf</code>, <code>ninf</code> are <em>not</em> symbols (a word that merely
+starts with one, like <code>Monday</code>, <code>ontology</code>, or <code>infinity</code>, is):</p>
+<div class="codehilite"><pre><span></span><code>.status  = ok;
+.mode    = read_only;
+.day     = Monday;
+</code></pre></div>
+
+<p>Symbol bodies follow the same character rules as identifier bodies. The key
+distinction from an identifier is context: identifiers appear after the leading
+dot, symbols appear as values.</p>
+<hr />
+<p><strong>What is a reference?</strong></p>
+<p>A dotted path to another key in the document, introduced by <code>&amp;</code>. The parser
+stores the path as a string token; it does not resolve it — resolution is left
+entirely to the application:</p>
+<div class="codehilite"><pre><span></span><code>.host       = &quot;db.internal&quot;;
+.conn_host  = &amp;.host;             # stored as &quot;.host&quot;
+.deep       = &amp;.config.db.host;   # multi-segment path
+</code></pre></div>
+
+<hr />
+<p><strong>Can a reference index into an array?</strong></p>
+<p>Yes, since spec 1.1: a reference path may carry <code>[N]</code> index suffixes.</p>
+<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+.matrix  = [10, 20, 30]/[40, 50, 60];
+.row0c1  = &amp;.matrix[0][1];        # stored as &quot;.matrix[0][1]&quot;
+</code></pre></div>
+
+<p>As with the rest of a reference, the index is stored <strong>verbatim and unresolved</strong>;
+it is interpreted only when the application resolves the path against the
+materialised tree (<code>bvn_dom_lookup</code>, also used by the CLI <code>query</code> command), where
+<code>&amp;.matrix[0][1]</code> resolves to <code>20</code>. A flat <code>/</code>-row matrix is addressed
+<code>[row][col]</code>, a 1-D array <code>[i]</code>, and nested arrays descend one index per level; a
+partial/out-of-range index simply doesn't resolve. Being a 1.1 feature, a <code>[</code> in
+a reference is <code>error_unexpected_input_byte</code> in a 1.0/unversioned document.</p>
+<hr />
+<h2 id="10-octet-streams">10. Octet Streams</h2>
+<p><strong>When should I use an octet stream?</strong></p>
+<p>When you need to embed raw binary data without Base64 overhead. A NUL byte
+(<code>0x00</code>) in value position switches the parser into binary chunk mode. The
+UTF-8 validator is suspended for the duration of the binary region.</p>
+<p>In practice you will not hand-author octet streams. Use the writer API, which
+generates the correct framing automatically:</p>
+<div class="codehilite"><pre><span></span><code>0x00                     ← stream open
+  0x01 &lt;LL&gt; &lt;LL&gt; &lt;data&gt;  ← chunk: tag 0x01, length as little-endian uint16, data
+0x00                     ← stream close
+</code></pre></div>
+
+<p>A length value of <code>0x0000</code> means exactly 65536 bytes. Any tag byte other than
+<code>0x01</code> (chunk) or <code>0x00</code> (close) inside a stream is
+<code>error_octet_stream_out_of_sync</code>.</p>
+<hr />
+<h2 id="11-error-handling-and-debugging">11. Error Handling and Debugging</h2>
+<p><strong>What information does a parse error carry?</strong></p>
+<p>Every error includes:</p>
+<ul>
+<li><code>error_code_t</code> — a named code (e.g. <code>error_value_out_of_range</code>)</li>
+<li>Line number and column number in the input stream</li>
+<li>Byte offset from stream start</li>
+<li>The raw byte value that triggered the error</li>
+</ul>
+<p>Retrieve these after a failed <code>bvnr_read</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;%s at line %&quot;</span><span class="w"> </span><span class="n">PRIu64</span><span class="w"> </span><span class="s">&quot; col %&quot;</span><span class="w"> </span><span class="n">PRIu64</span>
+<span class="w">        </span><span class="s">&quot; offset %&quot;</span><span class="w"> </span><span class="n">PRIu64</span><span class="w"> </span><span class="s">&quot; byte 0x%02X</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">bvn_error_to_string</span><span class="p">(</span><span class="n">bvnr_reader_get_error</span><span class="p">(</span><span class="n">r</span><span class="p">)),</span>
+<span class="w">        </span><span class="n">bvnr_reader_get_error_line</span><span class="p">(</span><span class="n">r</span><span class="p">),</span>
+<span class="w">        </span><span class="n">bvnr_reader_get_error_column</span><span class="p">(</span><span class="n">r</span><span class="p">),</span>
+<span class="w">        </span><span class="n">bvnr_reader_get_error_offset</span><span class="p">(</span><span class="n">r</span><span class="p">),</span>
+<span class="w">        </span><span class="n">bvnr_reader_get_error_byte</span><span class="p">(</span><span class="n">r</span><span class="p">));</span>
+</code></pre></div>
+
+<hr />
+<p><strong>What is <code>continue_on_error</code> mode and when should I use it?</strong></p>
+<p>When <code>continue_on_error</code> is set in <code>bvnr_read_flags_t</code>, a parse error invokes
+the <code>on_error</code> callback and enters a resync state machine that skips bytes while
+tracking bracket and brace nesting. Once the resync state machine finds a <code>;</code>
+at the original nesting depth, normal parsing resumes. The recovery count
+(accessible via <code>bvnr_reader_get_recovery_count</code>) is incremented at error entry,
+not on resync completion.</p>
+<p>Use this mode for log streams and unreliable transports where a single malformed
+assignment should not discard the rest of the file. For configuration and data
+serialization, disable it and fail fast.</p>
+<hr />
+<p><strong>What does <code>error_type_value_mismatch</code> mean?</strong></p>
+<p>The value token is incompatible with the declared type annotation. The most
+common cause is a non-decimal number written as a bare word (symbol) instead of
+a quoted string:</p>
+<div class="codehilite"><pre><span></span><code>.x = &lt;uint:8,_16&gt; FF;   # FF is a symbol → error_type_value_mismatch
+.x = &lt;uint:8,_16&gt; &quot;FF&quot;; # correct
+</code></pre></div>
+
+<hr />
+<p><strong>What causes <code>error_unit_mismatch</code>?</strong></p>
+<p>An inline unit suffix and a type-annotation unit are both present but resolve
+to different <code>value_unit_t</code> values:</p>
+<div class="codehilite"><pre><span></span><code>.bad = &lt;float:64,m&gt; 1.0 s;   # annotation says m, inline says s → error
+</code></pre></div>
+
+<p>Semantically equivalent notations that parse to the same internal representation
+(e.g. <code>m/s</code> and <code>m·s⁻¹</code>) compare as equal and do not trigger this error.</p>
+<hr />
+<p><strong>What are the most common mistakes?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mistake</th>
+<th>Error produced</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Annotation on the key side of <code>=</code></td>
+<td><code>error_unexpected_input_byte</code></td>
+</tr>
+<tr>
+<td>Non-decimal value not quoted</td>
+<td><code>error_type_value_mismatch</code></td>
+</tr>
+<tr>
+<td>Signed value in an unsigned type</td>
+<td><code>error_value_out_of_range</code></td>
+</tr>
+<tr>
+<td>Integer overflow (e.g. <code>&lt;uint:8&gt; 256</code>)</td>
+<td><code>error_value_out_of_range</code></td>
+</tr>
+<tr>
+<td><code>&lt;float:8&gt;</code> or a non-16, non-multiple-of-32 width for <code>float</code></td>
+<td><code>error_illegal_value_type</code></td>
+</tr>
+<tr>
+<td>Base parameter on <code>float_fix</code> or <code>float_dec</code></td>
+<td><code>error_illegal_value_type</code></td>
+</tr>
+<tr>
+<td><code>q ≥ width</code> in <code>float_fix</code></td>
+<td><code>error_illegal_value_type</code></td>
+</tr>
+<tr>
+<td>Empty unit component (<code>m//s</code>)</td>
+<td><code>error_unit_illegal</code></td>
+</tr>
+<tr>
+<td>More than 8 unit components</td>
+<td><code>error_unit_illegal</code></td>
+</tr>
+<tr>
+<td>Inline unit suffix inside an array</td>
+<td><code>error_unexpected_input_byte</code></td>
+</tr>
+<tr>
+<td>Unknown escape sequence (<code>\0</code>, <code>\uXXXX</code>; <code>\x</code>/<code>\u{}</code> outside spec 1.1)</td>
+<td><code>error_illegal_escape_sequence</code></td>
+</tr>
+<tr>
+<td><code>\u{…}</code> surrogate or <code>&gt; U+10FFFF</code> (spec 1.1)</td>
+<td><code>error_invalid_codepoint</code></td>
+</tr>
+<tr>
+<td>Unmatched <code>}</code></td>
+<td><code>error_illegal_struct_close</code></td>
+</tr>
+<tr>
+<td>Empty key (<code>.= value;</code>)</td>
+<td><code>error_empty_identifier</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-c-api">12. C API</h2>
+<p><strong>What is the overall reader lifecycle?</strong></p>
+<div class="codehilite"><pre><span></span><code>bvnr_reader_create()
+  → bvnr_source_from_fd() or bvnr_source_from_mem()
+  → bvnr_open_read_source() or bvnr_open_read_mem()
+  → bvnr_read()
+  → bvnr_reader_destroy()
+</code></pre></div>
+
+<p>The reader does not allocate during <code>bvnr_read</code>; all buffering is internal to
+the reader struct. The <code>bvnr_read_flags_t</code> struct is read only during
+<code>bvnr_open_read_source</code> and may live on the stack.</p>
+<hr />
+<p><strong>Which callback should I implement — <code>on_verified</code> or <code>on_unverified</code>?</strong></p>
+<p>Almost always <code>on_verified</code>. This callback receives fully validated events after
+semantic checking. <code>on_unverified</code> fires before validation and receives raw token
+events; use it only for diagnostics or partial pre-inspection.</p>
+<p>There is an important asymmetry for <code>ev_type_annotation_start</code>:
+- <code>on_unverified</code> receives it with raw annotation bytes but no <code>value_type</code> or
+  <code>value_unit</code> populated.
+- <code>on_verified</code> receives it with <code>value_type</code> and <code>value_unit</code> filled in.</p>
+<p>All other type-annotation events and <code>ev_data</code> are emitted to both callbacks
+simultaneously.</p>
+<hr />
+<p><strong>Do callbacks need to return anything?</strong></p>
+<p>Yes. Both <code>on_verified</code> and <code>on_unverified</code> must return <code>bool</code>. Return <code>true</code>
+to continue parsing; return <code>false</code> to abort — the parser stops and
+<code>bvnr_read</code> returns <code>false</code> with <code>error_scanner_callback_failed</code>.</p>
+<hr />
+<p><strong>How do I read a value from the <code>ev_data</code> event?</strong></p>
+<p>The <code>bvnr_data_t</code> struct provides the raw bytes in <code>data</code>/<code>length</code>. Use the
+<code>bvn_parse_*</code> helpers to convert them to native C types:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">uint64_t</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="n">bvn_parse_uint64</span><span class="p">(</span><span class="n">vbuf</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="o">-&gt;</span><span class="n">value_type</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">v</span><span class="p">);</span>
+
+<span class="kt">double</span><span class="w"> </span><span class="n">f</span><span class="p">;</span>
+<span class="n">bvn_parse_double</span><span class="p">(</span><span class="n">vbuf</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="o">-&gt;</span><span class="n">value_type</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">f</span><span class="p">);</span>
+</code></pre></div>
+
+<p>The <code>d-&gt;value_type</code> contains <code>family</code>, <code>width</code>, and <code>base</code> (which holds the numeric base, or the Q for <code>float_fix</code>, or the epoch index for <code>datetime</code>). Use
+<code>bvn_effective_width(d-&gt;value_type)</code> to get the resolved width (handles the
+<code>width == 0</code> → 64 default).</p>
+<hr />
+<p><strong>How is the writer API structured?</strong></p>
+<p>It is symmetric with the reader. You construct events and push them through
+<code>bvnr_write_event</code>, then call <code>bvnr_write_finish</code>:</p>
+<div class="codehilite"><pre><span></span><code>bvnr_writer_create()
+  → bvnr_sink_to_fd() or bvnr_sink_to_mem()
+  → bvnr_open_write_sink() or bvnr_open_write_mem()
+  → bvnr_write_event() × N
+  → bvnr_write_finish()
+  → bvnr_writer_destroy()
+</code></pre></div>
+
+<p>Use <code>bvnr_write_type_annotation(w, vt, vu)</code> as a convenience to emit the full
+annotation event sequence in one call. Use <code>bvnr_write_bvnf_base</code> and
+<code>bvnr_write_bvni</code> for the convenience integer/float helpers that generate the
+scalar key+value pair in a single call.</p>
+<hr />
+<p><strong>Does the library close file descriptors for me?</strong></p>
+<p>No. Both <code>bvnr_source_from_fd</code> and <code>bvnr_sink_to_fd</code> leave ownership of the
+file descriptor with the caller. Close it yourself after the reader or writer
+is destroyed.</p>
+<hr />
+<p><strong>What is the <code>max_array_nesting</code> limit and why is it capped at 255?</strong></p>
+<p>The lexer stores per-nesting-level state in a heap array sized to <code>max_array_nesting + 1</code> entries (so at most 256 at the 255 hard cap).
+<code>max_array_nesting</code> is a <code>uint8_t</code> field, so values above 255 cannot be
+represented; no runtime rejection is performed. Zero-initialising
+<code>bvnr_read_flags_t</code> is safe: a zero value causes the reader to substitute the
+internal default of <strong>64</strong>. The hard maximum is 255. The same default and cap
+apply to <code>max_struct_nesting</code>.</p>
+<hr />
+<h2 id="13-python-bindings">13. Python Bindings</h2>
+<p><strong>Do the Python bindings require a compiled extension module?</strong></p>
+<p>No. The bindings are pure <code>ctypes</code> and load <code>libbvnr.so</code> at import time
+via <code>ctypes.CDLL</code>. No compilation step beyond building the C library is needed.</p>
+<hr />
+<p><strong>How does the library discovery order work?</strong></p>
+<ol>
+<li><code>LIBBOVNAR_PATH</code> environment variable — absolute path to the <code>.so</code>.</li>
+<li><code>LIBBOVNAR_DIR</code> environment variable — directory containing the <code>.so</code>.</li>
+<li><code>ctypes.util.find_library('bvnr')</code> — standard <code>ldconfig</code>/<code>LD_LIBRARY_PATH</code> search.</li>
+<li>In-tree build paths relative to <code>_ffi.py</code> (<code>../../build/</code>, etc.).</li>
+</ol>
+<p>If none of these resolves the library, <code>BovnarLibraryNotFound</code> is raised with
+the list of searched paths.</p>
+<hr />
+<p><strong>What is the difference between <code>loads</code>/<code>dumps</code>, the SAX reader, and the DOM?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bovnar.loads</code> / <code>bovnar.dumps</code></td>
+<td>Simple dict serialization — loses type and unit metadata</td>
+</tr>
+<tr>
+<td><code>Reader</code> (SAX)</td>
+<td>Streaming; low memory; full access to type and unit data via callbacks</td>
+</tr>
+<tr>
+<td><code>bovnar.dom_parse</code> / <code>DomDoc</code></td>
+<td>Random-access queries on a fully parsed in-memory tree</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><strong>How do I capture state in a SAX callback?</strong></p>
+<p>The Python <code>on_verified</code> callback receives exactly two positional arguments —
+the event code and the data payload — with no userdata parameter. Use a closure
+to capture external state:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">state</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;current_key&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">}</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">on_event</span><span class="p">(</span><span class="n">ev</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">ev</span> <span class="o">==</span> <span class="n">Event</span><span class="o">.</span><span class="n">ASSIGNMENT_START</span><span class="p">:</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">&quot;current_key&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">raw_str</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">ev</span> <span class="o">==</span> <span class="n">Event</span><span class="o">.</span><span class="n">DATA</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">&quot;current_key&quot;</span><span class="p">],</span> <span class="s2">&quot;→&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">raw_bytes</span><span class="p">())</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</code></pre></div>
+
+<hr />
+<p><strong>What happens when a callback raises a Python exception?</strong></p>
+<p>The exception is captured, the C callback returns <code>False</code> to stop parsing, the C
+call returns, and then the original Python exception is re-raised from
+<code>read_mem</code> / <code>read_fd</code>. The exception is not wrapped; it propagates as-is.</p>
+<hr />
+<p><strong>How do I access unit information in Python?</strong></p>
+<p>The <code>data.value_unit</code> field of an <code>Event.DATA</code> payload is a <code>ValueUnit</code> ctypes
+struct. Use the helper functions to work with it:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="n">vu</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~g·m/s²&quot;</span><span class="p">)</span>          <span class="c1"># parse string → ValueUnit</span>
+<span class="n">s</span>  <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># → &quot;k~g·m/s²&quot;</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">units_compatible</span><span class="p">(</span><span class="n">vu_a</span><span class="p">,</span> <span class="n">vu_b</span><span class="p">)</span>      <span class="c1"># dimensional compatibility</span>
+<span class="n">c</span>  <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_convert_factor</span><span class="p">(</span><span class="n">vu_from</span><span class="p">,</span> <span class="n">vu_to</span><span class="p">)</span>
+<span class="n">kelvin</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">convert_value</span><span class="p">(</span><span class="mf">25.0</span><span class="p">,</span> <span class="n">vu_celsius</span><span class="p">,</span> <span class="n">vu_kelvin</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>unit_dimension_vector</code> returns a 7-element list of SI dimension exponents in
+the order <code>[m, kg, s, A, K, mol, cd]</code>.</p>
+<hr />
+<p><strong>What exception classes exist?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Exception</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BovnarLibraryNotFound</code></td>
+<td><code>libbvnr.so</code> not found at import</td>
+</tr>
+<tr>
+<td><code>BovnarParseError</code></td>
+<td>Parse error (carries <code>code</code>, <code>line</code>, <code>column</code>, <code>offset</code>, <code>byte</code>)</td>
+</tr>
+<tr>
+<td><code>BovnarWriteError</code></td>
+<td>Write error (carries <code>code</code>, <code>offset</code>)</td>
+</tr>
+<tr>
+<td><code>BovnarArgumentError</code></td>
+<td>Invalid argument to a helper function</td>
+</tr>
+</tbody>
+</table>
+<p>All are subclasses of <code>BovnarError</code>.</p>
+<hr />
+<p><strong>What Python version is required?</strong></p>
+<p>Python ≥ 3.10. The bindings use <code>dataclasses</code>, <code>enum.IntEnum</code>, and union-type
+annotations (<code>X | Y</code>).</p>
+<hr />
+<h2 id="14-limits-and-performance">14. Limits and Performance</h2>
+<p><strong>What are the default size limits and what should I set in production?</strong></p>
+<p>All limits are configurable via <code>bvnr_read_flags_t</code>. Defaults are permissive.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Suggested production cap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_identifier_length</code></td>
+<td>255</td>
+<td>255</td>
+</tr>
+<tr>
+<td><code>max_string_length</code></td>
+<td>65535</td>
+<td>application-defined</td>
+</tr>
+<tr>
+<td><code>max_number_length</code></td>
+<td>65535</td>
+<td>65535</td>
+</tr>
+<tr>
+<td><code>max_symbol_length</code></td>
+<td>255</td>
+<td>255</td>
+</tr>
+<tr>
+<td><code>max_reference_length</code></td>
+<td>65535</td>
+<td>65535</td>
+</tr>
+<tr>
+<td><code>max_array_items</code></td>
+<td>0 (→ 2 147 483 647 internal default)</td>
+<td>application-defined</td>
+</tr>
+<tr>
+<td><code>max_text_bytes</code></td>
+<td>0 (→ 2 147 483 647 internal default)</td>
+<td>application-defined</td>
+</tr>
+<tr>
+<td><code>max_file_size</code></td>
+<td>0 (→ unlimited / endless)</td>
+<td><code>16777216</code> (16 MiB)</td>
+</tr>
+<tr>
+<td><code>max_array_nesting</code></td>
+<td>0 (→ 64 internal default; hard cap 255)</td>
+<td>32 or less</td>
+</tr>
+<tr>
+<td><code>max_struct_nesting</code></td>
+<td>0 (→ 64 internal default; hard cap 255)</td>
+<td>32 or less</td>
+</tr>
+</tbody>
+</table>
+<p>Setting a field to <code>0</code> causes the reader to substitute a finite internal
+default — <strong>2 147 483 647</strong> for <code>max_array_items</code>/<code>max_text_bytes</code> and <strong>64</strong>
+for both nesting depths. <strong><code>max_file_size</code> is the exception: <code>0</code> means
+unlimited / endless</strong> (no byte-count cap), which is the default so endless
+streams work out of the box. Production deployments should set <code>max_file_size</code>
+explicitly at minimum. For untrusted input, set <code>max_array_items</code>,
+<code>max_text_bytes</code>, and the nesting limits as well.</p>
+<hr />
+<p><strong>Does <code>bvnr_read</code> allocate heap memory?</strong></p>
+<p>No. The reader does not allocate during <code>bvnr_read</code>. All buffering is internal
+to the <code>bvnr_reader_t</code> struct, which is allocated once by <code>bvnr_reader_create</code>.
+Event data pointers (<code>d-&gt;data</code>) point into the reader's internal buffer and are
+valid only for the duration of the callback invocation.</p>
+<hr />
+<p><strong>What throughput can I expect from the parser?</strong></p>
+<p>Performance depends heavily on the input profile (scalars, typed values, structs,
+arrays, units) and hardware. The CLI's benchmark subcommand (<code>bovnar bench</code>) can
+measure MB/s, assignments/s, and events/s across configurable profiles and
+payload sizes. Run <code>bovnar bench --profile all --size 1024,65536 --iterations 200</code>
+for a representative baseline. Use <code>--min-overhead</code> to isolate raw lexer
+throughput by skipping the <code>on_verified</code> callback.</p>
+<hr />
+<p><strong>How many unit components can a compound unit have?</strong></p>
+<p>A maximum of 8 (<code>BVNR_MAX_UNIT_COMPONENTS</code>). Exceeding this limit during
+parsing is <code>error_unit_illegal</code>.</p>
+<hr />
+<h2 id="15-why-c99-and-not-c23">15. Why C99 and Not C23?</h2>
+<p><strong>What is the stated language standard for the reference implementation?</strong></p>
+<p>Strict C99 (<code>-std=c99 -pedantic</code>). No C11, C17, or C23 extensions are used
+intentionally.</p>
+<hr />
+<p><strong>Why not C23, given that it was finalised in 2024?</strong></p>
+<p>Several compilers that are still in active use on embedded and cross-compilation
+targets do not yet ship a complete C23 implementation, and some may never
+receive one for cost or lifecycle reasons:</p>
+<table>
+<thead>
+<tr>
+<th>Toolchain / target</th>
+<th>C23 status (as of 2026)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GCC &lt; 14</td>
+<td>Partial; <code>_BitInt</code>, <code>typeof</code>, <code>nullptr</code> missing or gated behind <code>-std=c2x</code></td>
+</tr>
+<tr>
+<td>Clang &lt; 17</td>
+<td>Partial; several C23 headers and attributes absent</td>
+</tr>
+<tr>
+<td>IAR Embedded Workbench</td>
+<td>Trails the standard by several years; C11 support only on recent versions</td>
+</tr>
+<tr>
+<td>Arm Compiler 5 (armcc)</td>
+<td>Frozen at C99/C11 subset; no C23 roadmap</td>
+</tr>
+<tr>
+<td>Green Hills MULTI</td>
+<td>Embedded-safety toolchain; C23 not yet qualified</td>
+</tr>
+<tr>
+<td>SDCC (small-device C compiler)</td>
+<td>C11 subset; no C23</td>
+</tr>
+<tr>
+<td>Keil MDK (ARMCC legacy)</td>
+<td>C99 only</td>
+</tr>
+</tbody>
+</table>
+<p>C99 has essentially universal compiler support across every architecture Bovnar
+is expected to run on — x86-64, Arm Cortex-M/R/A, RISC-V, MIPS, PowerPC, and
+various DSP families. C23 does not.</p>
+<hr />
+<p><strong>Which specific C23 features would have been attractive but were ruled out?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>C23 addition</th>
+<th>Why skipped</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bool</code>, <code>true</code>, <code>false</code> keywords (no <code>&lt;stdbool.h&gt;</code>)</td>
+<td>C23</td>
+<td>Requires C23-capable front-end; <code>&lt;stdbool.h&gt;</code> works everywhere</td>
+</tr>
+<tr>
+<td><code>nullptr</code></td>
+<td>C23</td>
+<td>Cosmetic; <code>NULL</code> or <code>(void*)0</code> is unambiguous</td>
+</tr>
+<tr>
+<td><code>typeof</code> / <code>typeof_unqual</code></td>
+<td>C23</td>
+<td>Useful for generic macros; GCC/Clang extensions exist but are non-standard pre-C23</td>
+</tr>
+<tr>
+<td><code>#embed</code></td>
+<td>C23</td>
+<td>Attractive for embedding binary tables at compile time; workaround via <code>xxd -i</code> is portable</td>
+</tr>
+<tr>
+<td><code>[[attributes]]</code></td>
+<td>C23</td>
+<td><code>__attribute__((…))</code> is already used where needed via compiler-specific guards</td>
+</tr>
+<tr>
+<td><code>_BitInt(N)</code></td>
+<td>C23</td>
+<td>Would help for arbitrary-width integer types; current code uses <code>uint64_t</code> + masking</td>
+</tr>
+<tr>
+<td>Improved <code>constexpr</code></td>
+<td>C23</td>
+<td>Not applicable to a runtime library</td>
+</tr>
+</tbody>
+</table>
+<p>None of these are blockers. Every C23 feature Bovnar would have used has a
+correct, readable C99 equivalent.</p>
+<hr />
+<p><strong>What about C11? It has <code>_Atomic</code> and <code>_Static_assert</code>.</strong></p>
+<p>C11 adds atomics, <code>_Generic</code>, <code>_Static_assert</code>, and <code>&lt;threads.h&gt;</code>. <code>_Static_assert</code>
+is useful and is approximated in the codebase with a macro. The atomics and
+threading additions are irrelevant, but for a more specific reason than "not
+thread-safe":</p>
+<ul>
+<li>A <strong>single</strong> reader or writer object must not be used from two threads at once
+  — it carries the whole parse state. Guard it with your own primitive.</li>
+<li><strong>Distinct</strong> objects on distinct threads need no synchronisation at all. The
+  library keeps no mutable shared state: the lexer's run lookup tables are built
+  from a pre-main constructor precisely so their init flag can never be raced on,
+  and nothing else is written after startup. <code>tests/bovnar_concurrency_test.c</code>
+  pins this (12 000 concurrent reader / DOM / writer operations across 8
+  threads, clean under ThreadSanitizer).</li>
+</ul>
+<p>So no atomics are needed — not because concurrency is unsupported, but because
+the only shared state is immutable by the time any thread exists. Pulling in C11
+just for <code>_Static_assert</code> is not worth fragmenting compiler compatibility.</p>
+<hr />
+<p><strong>Does C99 impose any meaningful limitations on the implementation?</strong></p>
+<p>In practice, no. The limitations that do exist are handled cleanly:</p>
+<ul>
+<li><strong>Variable-length arrays (VLAs):</strong> Not used. All fixed-size buffers are
+  declared with compile-time constants. VLAs are optional in C11 and later and
+  are dangerous on stack-limited embedded targets regardless of standard version.</li>
+<li><strong><code>&lt;stdint.h&gt;</code> and <code>&lt;stdbool.h&gt;</code>:</strong> Both are C99 additions and are available
+  everywhere the library targets.</li>
+<li><strong><code>//</code> comments:</strong> C99. No issue.</li>
+<li><strong>Designated initialisers:</strong> C99. Used extensively for <code>bvnr_data_t</code> and flag
+  struct setup.</li>
+<li><strong>Flexible array members:</strong> C99. Not currently used.</li>
+<li><strong><code>restrict</code>:</strong> C99. Used on internal buffer pointers where beneficial.</li>
+</ul>
+<p>The one area where C99 imposes a real discipline is the absence of <code>_Static_assert</code>
+— the implementation works around this with the classic <code>typedef char
+static_assert_failed[condition ? 1 : -1]</code> pattern.</p>
+<hr />
+<p><strong>Is this likely to change in the future?</strong></p>
+<p>The minimum standard may be raised to C11 if a compelling use of <code>_Generic</code> or
+<code>_Static_assert</code> arises and the embedded toolchain matrix shifts accordingly.
+C23 as a baseline is not on the roadmap until the IAR, Keil, and Green Hills
+ecosystems ship production-qualified C23 front-ends, which historically lags the
+standard publication by three to five years.</p>
+<hr />
+<p><em>End of Bovnar FAQ — Specification (v1.1)</em></p>
+</main>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
+</body>
+</html>

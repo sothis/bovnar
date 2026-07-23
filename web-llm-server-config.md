@@ -61,6 +61,10 @@ server {
     root /var/www/html;
     index index.html index.htm index.nginx-debian.html;
 
+    # Branded 404 page (web/404.html). The =404 in try_files below triggers it.
+    error_page 404 /404.html;
+    location = /404.html { internal; }
+
     # Home page: advertise + serve the Markdown edition to AI tools.
     # Declares add_header, so it must repeat the server-level HSTS (see above).
     location = / {
@@ -76,6 +80,15 @@ server {
         add_header Strict-Transport-Security "max-age=31536000" always;
 
         try_files /index.html =404;
+    }
+
+    # German home page: the same, pointing at /de/index.md.
+    location = /de/ {
+        if ($bvnr_wants_md) { return 302 /de/index.md; }
+        add_header Link '</de/index.md>; rel="alternate"; type="text/markdown"' always;
+        add_header Vary 'Accept' always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files /de/index.html =404;
     }
 
     # 1. Serve .md as Markdown (RFC 7763) with a UTF-8 charset. Empty types{}

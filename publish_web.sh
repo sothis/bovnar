@@ -120,6 +120,23 @@ else
     python3 "$ROOT/gen_llms.py"
 fi
 
+# ── 1a3. Render the docs as indexable HTML pages (web/docs/) ─────────────────
+echo "==> Generating HTML doc pages (gen_html_docs.py)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    python3 "$ROOT/gen_html_docs.py" --check
+else
+    python3 "$ROOT/gen_html_docs.py"
+fi
+
+# ── 1a4. Regenerate sitemap.xml with git-derived lastmod dates ───────────────
+# Runs after the doc/LLM generators so every referenced file exists.
+echo "==> Generating sitemap (gen_sitemap.py)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    python3 "$ROOT/gen_sitemap.py" --check
+else
+    python3 "$ROOT/gen_sitemap.py"
+fi
+
 # ── 1b. Regenerate the translated editions ──────────────────────────────────
 # web/<lang>/index.html is generated, git-ignored, and rebuilt on every publish,
 # so a translated page can never lag behind the English source it is spliced

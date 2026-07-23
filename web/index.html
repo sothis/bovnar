@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-/IFkvbthaOPPftB7vpxyR2Rfq+DmM6bV/vWRJyV2jQ8=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-pZHA+CnuEdmkyrRIiC6ktKD9Y2296/ON3ocARrq19Zk=' 'sha256-nwMdJzAVc31ivEW6N5SP/myddbpu378yr7zoAXrjEFs=' 'sha256-OROyOyUFwMfOMFdB+tT8NFgWtVZHZ/ihILuucsj9Fuw=' 'sha256-7kLUF7g9kLKd5u+BuEVLt8Sws2vhEshnWuuGiQdy7oU=' 'sha256-I8hxlDIX54LqLqFYKAeNPLj6KZARlcf8w0MpIZdaBME=' 'sha256-omyHv1QEefxMokHD+P8854xovVlLQ/yB5QeU+o10Y0w=' 'sha256-hBz0uQqQnreVR0lQcO5b6av6YW1+5BTitcAeui4XpzU=' 'sha256-8MuR68vg5uGLI5Rol45sSslY96kC/KVpkoSCfAJnsaQ=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-/IFkvbthaOPPftB7vpxyR2Rfq+DmM6bV/vWRJyV2jQ8=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-YqUFhqMM11vGvCBewwrejRZ6pFs/5IFHKDxiFfC9DI0=' 'sha256-nwMdJzAVc31ivEW6N5SP/myddbpu378yr7zoAXrjEFs=' 'sha256-OROyOyUFwMfOMFdB+tT8NFgWtVZHZ/ihILuucsj9Fuw=' 'sha256-7kLUF7g9kLKd5u+BuEVLt8Sws2vhEshnWuuGiQdy7oU=' 'sha256-I8hxlDIX54LqLqFYKAeNPLj6KZARlcf8w0MpIZdaBME=' 'sha256-omyHv1QEefxMokHD+P8854xovVlLQ/yB5QeU+o10Y0w=' 'sha256-WURd5QCm9ryKasG0LWLjBGRTlzzzZh3la93YpyDEUi4=' 'sha256-8MuR68vg5uGLI5Rol45sSslY96kC/KVpkoSCfAJnsaQ=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -1667,10 +1667,16 @@ footer { position: relative; z-index: 1; }
   background: var(--editor-bg);
   border-left: 1px solid var(--border);
   transform: translateX(100%);
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  /* visibility:hidden while closed keeps the off-screen close button (and any
+     rendered links) out of the tab order and the accessibility tree — otherwise
+     a keyboard user tabs to an invisible "Close documentation" control on every
+     page. The 0.35s delay holds visibility until the slide-out finishes, so the
+     panel doesn't blink away before it has animated out. */
+  visibility: hidden;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.35s;
   will-change: transform;
 }
-#doc-drawer.open { transform: translateX(0); }
+#doc-drawer.open { transform: translateX(0); visibility: visible; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
 
 #doc-topbar {
   display: flex;
@@ -2485,7 +2491,7 @@ a[data-doc] { cursor: pointer; }
   <!-- Language switch (country flag), beside the theme toggle. The whole <a> is
        one translation unit, so the German edition swaps target, hreflang, flag
        and label together and can never point at itself. -->
-  <span class="nav-lang-wrap"><a href="/de/" class="nav-lang" hreflang="de" data-lang-switch lang="de">Switch to German</a></span>
+  <span class="nav-lang-wrap"><a href="/de/" class="nav-lang" hreflang="de" data-lang-switch>Switch to German</a></span>
   <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme">
     <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -7334,6 +7340,11 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
          'classic Modbus disaster a self-describing register can\'t cause.'),
   };
   let current = 'mc';
+  // Whether the demo section is within (or near) the viewport. The active sim is
+  // only allowed to animate while this is true — see the IntersectionObserver
+  // below. Defaults to true so that a browser without IntersectionObserver keeps
+  // the original always-on behaviour.
+  let onScreen = true;
   // Reserve the height of the TALLEST blurb so the shorter ones don't shrink the
   // header on switch (which would shift everything below up). Re-measured on
   // resize since the blurbs wrap to different line counts at different widths.
@@ -7381,7 +7392,7 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     // — ever animates its JetBrains-Mono telemetry while the font is still swapping
     // in (the cold-load "forced reflow"). Resolves instantly once cached. The
     // current===name guard drops a stale activation if the user switches again first.
-    if (D[name]) fontsReady.then(function () { if (current === name && D[name]) D[name].activate(); });
+    if (D[name]) fontsReady.then(function () { if (current === name && onScreen && D[name]) D[name].activate(); });
   }
   const tabEls = Array.prototype.slice.call(document.querySelectorAll('#launch-demo .demo-tab'));
   tabEls.forEach((t) => t.addEventListener('click', () => switchTo(t.dataset.demo)));
@@ -7415,6 +7426,26 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
         document.fonts.load('1em "IBM Plex Sans"'),
       ]).catch(function () {})
     : Promise.resolve();
+  // Pause the live demo whenever its section is scrolled out of the viewport.
+  // rAF is only throttled by the browser when the whole TAB is hidden; a sim left
+  // running far below the fold otherwise keeps burning CPU/GPU (and battery) on
+  // frames nobody can see. The sim keeps its state across a deactivate()/activate()
+  // pair, so it simply resumes where it paused — and only if the user hadn't paused
+  // it. rootMargin starts it a little before it scrolls fully into view so the
+  // first visible frame is already live. (This also parks the below-the-fold demo
+  // on first load until the visitor actually scrolls down to it.)
+  const section = document.getElementById('launch-demo');
+  if (window.IntersectionObserver && section) {
+    new IntersectionObserver(function (entries) {
+      const vis = entries[entries.length - 1].isIntersecting;
+      if (vis === onScreen) return;
+      onScreen = vis;
+      const D = window.BvnrDemos || {};
+      if (!D[current]) return;
+      if (onScreen) fontsReady.then(function () { if (onScreen && D[current]) D[current].activate(); });
+      else D[current].deactivate();
+    }, { rootMargin: '200px' }).observe(section);
+  }
   switchTo('mc');                    // visual switch now; activation gated internally
   fontsReady.then(reserveBlurb);     // measure the blurb with the final font
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(reserveBlurb, 150); });

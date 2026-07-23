@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-Jn5n4Ny+R4IisAgAMvvXuo17oFsm/VvI0rP8olaDShs='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-psu6F0sUvBTJ0T5aWzkvE8W0Fgkew8AQHGGE7GjIcNI='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -202,7 +202,11 @@ footer a { color: var(--text2); }
   var meta = document.querySelector('meta[name="theme-color"]');
   function isLight() { return root.getAttribute('data-theme') === 'light'; }
   function sync() {
-    if (btn) btn.setAttribute('aria-label', isLight() ? 'Switch to dark theme' : 'Switch to light theme');
+    if (btn) {
+      var lbl = isLight() ? 'Zum dunklen Design wechseln' : 'Zum hellen Design wechseln';
+      btn.setAttribute('aria-label', lbl);
+      btn.setAttribute('title', lbl);
+    }
     if (meta) meta.setAttribute('content', isLight() ? '#e8e8e8' : '#1e1e1e');
   }
   function apply(light) {

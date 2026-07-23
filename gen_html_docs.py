@@ -268,6 +268,8 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <meta property="og:description" content="{esc(description)}">
 <meta property="og:url" content="{canonical}">
 <meta property="og:image" content="{SITE}/bovnar-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 {date_meta}
 <meta name="twitter:card" content="summary_large_image">
@@ -380,10 +382,13 @@ def doc_schema(title, desc, canonical, published, modified, faqs=None):
 def build_index_page():
     rows = []
     for src, slug, pdf, title, desc in DOCS:
+        # The grammar is shipped as EBNF/plain text, not Markdown — label its
+        # raw-source link accordingly so the format link doesn't lie.
+        raw_label = "EBNF" if src.endswith(".ebnf") else "Markdown"
         rows.append(
             f'<li><a href="/docs/{slug}/"><strong>{html.escape(title)}</strong></a>'
             f'<div class="d">{html.escape(desc)}</div>'
-            f'<div class="fmt"><a href="/doc/{src}">Markdown</a> · '
+            f'<div class="fmt"><a href="/doc/{src}">{raw_label}</a> · '
             f'<a href="/doc/pdf/{pdf}.pdf">PDF</a></div></li>')
     body = (
         '<h1>Bovnar documentation</h1>'
@@ -425,11 +430,16 @@ def build_doc_page(src, slug, pdf, title, desc):
     faqs = faq_items(text) if slug == "faq" else None
     published = git_date(f"doc/{src}", first=True)
     modified = git_date(f"doc/{src}")
-    # Advertise this doc's Markdown counterpart for LLM/agent tools (RFC 7763).
-    extra_head = (f'<link rel="alternate" type="text/markdown" href="/doc/{src}">\n'
+    # Advertise this doc's raw-source counterpart for LLM/agent tools (RFC 7763
+    # for Markdown; the grammar ships as EBNF/plain text, so label + media type
+    # follow the actual format rather than claiming Markdown).
+    is_ebnf = src.endswith(".ebnf")
+    raw_label = "EBNF" if is_ebnf else "Markdown"
+    raw_type = "text/plain" if is_ebnf else "text/markdown"
+    extra_head = (f'<link rel="alternate" type="{raw_type}" href="/doc/{src}">\n'
                   + doc_schema(title, desc, canonical, published, modified, faqs))
     meta = (f'<p class="doc-meta">Bovnar (BVNR) v{VERSION} documentation · '
-            f'Also available as <a href="/doc/{src}">Markdown</a> and '
+            f'Also available as <a href="/doc/{src}">{raw_label}</a> and '
             f'<a href="/doc/pdf/{pdf}.pdf">PDF</a>.</p>')
     body = f"<h1>{html.escape(h1)}</h1>\n{meta}\n{rendered}"
     # `title` already leads with "Bovnar", so no redundant "· Bovnar" suffix.

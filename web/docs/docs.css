@@ -1,0 +1,217 @@
+/* Bovnar documentation pages — shares the landing page's design tokens
+   (VS Code-inspired dark theme, IBM Plex Sans / JetBrains Mono, blue accent).
+   Fonts come from /fonts/fonts.css. Generated pages: gen_html_docs.py. */
+
+:root {
+  --editor-bg:  #1e1e1e;
+  --panel-bg:   #252526;
+  --bar-bg:     #333333;
+  --border:     #3e3e42;
+  --text:       #ededed;
+  --text2:      #c2c2c2;
+  --text3:      #a8a8a8;
+  --blue:       #569cd6;
+  --blue2:      #007acc;
+  --teal:       #4ec9b0;
+  --code-bg:    #252526;
+  --sel:        #264f78;
+  --mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+html[data-theme="light"] {
+  --editor-bg:  #ffffff;
+  --panel-bg:   #f3f3f3;
+  --bar-bg:     #e8e8e8;
+  --border:     #d4d4d4;
+  --text:       #1f1f1f;
+  --text2:      #444444;
+  --text3:      #656565;
+  --blue:       #0451a5;
+  --blue2:      #0066b8;
+  --teal:       #267f99;
+  --code-bg:    #f5f5f5;
+  --sel:        #add6ff;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--editor-bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--sel); }
+
+/* ── Sticky top bar, mirroring the landing nav ── */
+header.site {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 1.2rem;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+header.site .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  text-decoration: none;
+}
+header.site .brand svg { width: 22px; height: 22px; flex: none; }
+header.site .brand .ext { color: var(--text3); font-weight: 400; }
+header.site nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+header.site nav a {
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+header.site nav a:hover { color: var(--text); background: rgba(127,127,127,0.14); }
+header.site nav a.cta {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--blue2);
+  padding: 0.35rem 0.8rem;
+}
+header.site nav a.cta:hover { background: var(--blue); color: #fff; }
+
+/* Theme toggle — identical behaviour/appearance to the landing */
+.theme-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 0.35rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--blue2); }
+.theme-toggle svg { width: 16px; height: 16px; display: block; }
+.theme-toggle .icon-sun  { display: none; }
+.theme-toggle .icon-moon { display: block; }
+html[data-theme="light"] .theme-toggle .icon-sun  { display: block; }
+html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+/* ── Article body ── */
+main { max-width: 54rem; margin: 0 auto; padding: 2.4rem 1.3rem 4rem; }
+main h1 {
+  font-size: 2.15rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0.1em 0 0.15em;
+}
+.doc-meta {
+  color: var(--text3);
+  font-size: 0.9rem;
+  margin: 0 0 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.doc-meta a { color: var(--blue); }
+h2 {
+  font-size: 1.5rem;
+  margin-top: 2.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.2rem; margin-top: 1.9em; }
+h4, h5, h6 { margin-top: 1.6em; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+p, li { color: var(--text); }
+strong { color: var(--text); }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 0.1em 0.38em;
+  border-radius: 4px;
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  line-height: 1.55;
+}
+pre code { background: none; border: 0; padding: 0; font-size: 0.85rem; color: var(--text2); }
+
+table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 1.2em 0;
+  font-size: 0.92rem;
+}
+th, td { border: 1px solid var(--border); padding: 0.45em 0.75em; text-align: left; }
+th { background: var(--panel-bg); font-weight: 600; }
+
+blockquote {
+  margin: 1.2em 0;
+  padding: 0.5em 1em;
+  border-left: 3px solid var(--blue2);
+  background: var(--code-bg);
+  border-radius: 0 6px 6px 0;
+  color: var(--text2);
+}
+blockquote p { margin: 0.3em 0; }
+hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+img { max-width: 100%; }
+
+/* Docs index list */
+.doclist { list-style: none; padding: 0; }
+.doclist li { padding: 1.1rem 0; border-bottom: 1px solid var(--border); }
+.doclist li a { font-size: 1.05rem; }
+.doclist .d { color: var(--text3); margin: 0.25rem 0; }
+.doclist .fmt { font-size: 0.82rem; color: var(--text3); }
+.doclist .fmt a { color: var(--blue); }
+
+footer {
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: 2rem 1.3rem 3rem;
+  border-top: 1px solid var(--border);
+  color: var(--text3);
+  font-size: 0.88rem;
+}
+footer a { color: var(--blue); }
+
+@media (max-width: 600px) {
+  header.site nav a:not(.cta) { display: none; }
+  main { padding-top: 1.6rem; }
+}

@@ -18,7 +18,9 @@ Design notes:
 
 publish_web.sh runs this before staging. Run by hand: python3 gen_html_docs.py
 """
+import base64
 import datetime
+import hashlib
 import html
 import os
 import re
@@ -26,7 +28,6 @@ import subprocess
 import sys
 
 import markdown
-from pygments.formatters import HtmlFormatter
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -154,47 +155,58 @@ def rewrite_links(body):
     return re.sub(r'href="([^"]+)"', repl, body)
 
 
-PYGMENTS_CSS = HtmlFormatter(style="default").get_style_defs(".codehilite")
+# Styling lives in the external /docs/docs.css (shares the landing's design
+# tokens and /fonts/fonts.css). The two inline theme scripts below are
+# byte-identical on every page, so their CSP hashes are computed once.
+THEME_INIT_JS = (
+    "(function(){try{var s=localStorage.getItem('bovnar-theme');"
+    "var d=s==='dark'||(s!=='light'&&window.matchMedia&&"
+    "window.matchMedia('(prefers-color-scheme: dark)').matches);"
+    "if(!d)document.documentElement.setAttribute('data-theme','light');}"
+    "catch(e){document.documentElement.setAttribute('data-theme','light');}})();")
+
+THEME_TOGGLE_JS = (
+    "(function(){var root=document.documentElement,"
+    "btn=document.getElementById('theme-toggle'),"
+    "meta=document.querySelector('meta[name=\"theme-color\"]');"
+    "function light(){return root.getAttribute('data-theme')==='light';}"
+    "function sync(){if(btn)btn.setAttribute('aria-label',"
+    "light()?'Switch to dark theme':'Switch to light theme');"
+    "if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}"
+    "sync();if(btn)btn.addEventListener('click',function(){"
+    "var n=light()?'dark':'light';"
+    "if(n==='light')root.setAttribute('data-theme','light');"
+    "else root.removeAttribute('data-theme');sync();"
+    "try{localStorage.setItem('bovnar-theme',n);}catch(e){}});"
+    "try{var mq=window.matchMedia('(prefers-color-scheme: dark)');"
+    "mq.addEventListener('change',function(e){"
+    "var s=localStorage.getItem('bovnar-theme');"
+    "if(s==='dark'||s==='light')return;"
+    "if(e.matches)root.removeAttribute('data-theme');"
+    "else root.setAttribute('data-theme','light');sync();});}catch(e){}})();")
 
 
-CSS = """
-:root{--bg:#fff;--fg:#1c2530;--muted:#5a6675;--border:#e2e6ea;--accent:#0a6cb0;
---code-bg:#f6f8fa;--nav-bg:#fbfcfd;}
-@media (prefers-color-scheme:dark){:root{--bg:#14181d;--fg:#e6ebf0;--muted:#9aa6b2;
---border:#2a323b;--accent:#6cb0ea;--code-bg:#1c2229;--nav-bg:#1a1f25;}}
-*{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--fg);
-font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-header.site{position:sticky;top:0;background:var(--nav-bg);border-bottom:1px solid var(--border);
-padding:.7rem 1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10;}
-header.site a{color:var(--fg);text-decoration:none}
-header.site .brand{font-weight:600;display:flex;align-items:center;gap:.5rem}
-header.site svg{width:26px;height:26px}
-header.site nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap;font-size:.95rem}
-header.site nav a:hover{color:var(--accent)}
-main{max-width:52rem;margin:0 auto;padding:2rem 1.2rem 4rem}
-main h1{font-size:2.1rem;letter-spacing:-.02em;margin:.2em 0 .1em}
-.doc-meta{color:var(--muted);font-size:.92rem;margin-bottom:1.5rem;
-border-bottom:1px solid var(--border);padding-bottom:1rem}
-.doc-meta a{color:var(--accent)}
-h2{margin-top:2.2em;border-bottom:1px solid var(--border);padding-bottom:.2em}
-h3{margin-top:1.8em}
-a{color:var(--accent)}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-background:var(--code-bg);padding:.12em .4em;border-radius:4px;font-size:.9em}
-pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
-padding:1rem;overflow-x:auto}
-pre code{background:none;padding:0}
-table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%}
-th,td{border:1px solid var(--border);padding:.4em .7em;text-align:left}
-th{background:var(--nav-bg)}
-blockquote{margin:1em 0;padding:.4em 1em;border-left:3px solid var(--accent);
-color:var(--muted);background:var(--code-bg);border-radius:0 6px 6px 0}
-img{max-width:100%}
-footer{max-width:52rem;margin:0 auto;padding:2rem 1.2rem;border-top:1px solid var(--border);
-color:var(--muted);font-size:.9rem}
-footer a{color:var(--accent)}
-""" + PYGMENTS_CSS
+def _sha(js):
+    return "sha256-" + base64.b64encode(
+        hashlib.sha256(js.encode()).digest()).decode()
+
+
+CSP = ("default-src 'none'; "
+       f"script-src 'self' '{_sha(THEME_INIT_JS)}' '{_sha(THEME_TOGGLE_JS)}'; "
+       "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+       "base-uri 'none'; form-action 'none'")
+
+THEME_TOGGLE_BTN = (
+    '<button type="button" class="theme-toggle" id="theme-toggle" '
+    'aria-label="Switch to light theme" title="Toggle light / dark theme">'
+    '<svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+    '<svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41'
+    'M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'
+    '</svg></button>')
 
 MARK_SVG = (
     '<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" '
@@ -211,11 +223,16 @@ MARK_SVG = (
     '<path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>')
 
 HEADER = (
-    '<header class="site"><a class="brand" href="/">' + MARK_SVG +
-    '<span>Bovnar</span></a><nav>'
-    '<a href="/docs/">Docs</a><a href="/#playground">Playground</a>'
+    '<header class="site">'
+    '<a class="brand" href="/">' + MARK_SVG +
+    'BOVNAR<span class="ext">.bvnr</span></a>'
+    '<nav>'
+    '<a href="/docs/">Docs</a>'
+    '<a href="/#playground">Playground</a>'
     '<a href="/#quickstart">Quick&nbsp;start</a>'
-    '<a href="https://github.com/sothis/bovnar">GitHub</a></nav></header>')
+    '<a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a>'
+    + THEME_TOGGLE_BTN +
+    '</nav></header>')
 
 FOOTER = (
     '<footer>Bovnar (BVNR) v' + VERSION +
@@ -235,10 +252,12 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="{CSP}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>{THEME_INIT_JS}</script>
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(description)}">
+<meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="{canonical}">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -256,14 +275,16 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <meta name="twitter:description" content="{esc(description)}">
 <meta name="twitter:image" content="{SITE}/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
-{extra_head}<style>{CSS}</style>
-</head>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/docs/docs.css">
+{extra_head}</head>
 <body>
 {HEADER}
 <main>
 {body}
 </main>
 {FOOTER}
+<script>{THEME_TOGGLE_JS}</script>
 </body>
 </html>
 """
@@ -368,10 +389,7 @@ def build_index_page():
         '<h1>Bovnar documentation</h1>'
         '<p class="doc-meta">Tutorial, specification, unit system, C and Python '
         'APIs, grammar, FAQ, and more — as HTML, Markdown, and PDF.</p>'
-        '<ul class="doclist">' + "".join(rows) + '</ul>'
-        '<style>.doclist{list-style:none;padding:0}.doclist li{padding:1rem 0;'
-        'border-bottom:1px solid var(--border)}.doclist .d{color:var(--muted);'
-        'margin:.2rem 0}.doclist .fmt{font-size:.85rem}</style>')
+        '<ul class="doclist">' + "".join(rows) + '</ul>')
     schema = json_ld({
         "@context": "https://schema.org",
         "@graph": [

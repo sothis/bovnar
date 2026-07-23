@@ -14,7 +14,7 @@
     "<a href=\"#quickstart\">Quick Start</a>": "<a href=\"#quickstart\">Schnellstart</a>",
     "<a href=\"#docs\">Docs</a>": "<a href=\"#docs\">Doku</a>",
     "<a href=\"https://github.com/sothis/bovnar\" class=\"nav-cta\">GitHub ↗</a>": "<a href=\"https://github.com/sothis/bovnar\" class=\"nav-cta\">GitHub ↗</a>",
-    "<a href=\"/de/\" class=\"nav-lang\" hreflang=\"de\" data-lang-switch lang=\"de\">Deutsch</a>": "<a href=\"/\" class=\"nav-lang\" hreflang=\"en\" data-lang-switch lang=\"en\">English</a>",
+    "<a href=\"/de/\" class=\"nav-lang\" hreflang=\"de\" data-lang-switch lang=\"de\">Switch to German</a>": "<a href=\"/\" class=\"nav-lang\" hreflang=\"en\" data-lang-switch lang=\"en\">Auf Englisch wechseln</a>",
     "<span>unit-safe</span>\n        <span class=\"hl-sep\">/</span>\n        <span>spec v1.1</span>\n        <span class=\"hl-sep\">/</span>\n        <span>c99</span>": "<span>einheitensicher</span>\n        <span class=\"hl-sep\">/</span>\n        <span>spec v1.1</span>\n        <span class=\"hl-sep\">/</span>\n        <span>c99</span>",
     "Unit-safe serialization<br>for <em>science and industry.</em>": "Einheitensichere Serialisierung<br>für <em>Wissenschaft und Industrie.</em>",
     "Every value carries its width, base, and physical unit inline — no schema, just\n        human-readable text. A bare <code>9.81</code> is never ambiguous, and a mismatched\n        unit is a parse error.": "Jeder Wert trägt Breite, Basis und physikalische Einheit direkt in sich — kein Schema,\n        nur menschenlesbarer Text. Ein bloßes <code>9.81</code> ist nie mehrdeutig, und eine\n        unpassende Einheit ist ein Parse-Fehler.",

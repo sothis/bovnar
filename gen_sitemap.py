@@ -72,6 +72,7 @@ def build():
         entries.append(url(f"{SITE}/doc/pdf/{pdf}.pdf", lastmod(f"doc/{src}"), "0.6"))
     # LLM-facing entry points.
     entries.append(url(f"{SITE}/index.md", lastmod("README.md"), "0.7"))
+    entries.append(url(f"{SITE}/de/index.md", lastmod("README.md"), "0.6"))
     entries.append(url(f"{SITE}/llms.txt", lastmod("README.md"), "0.5"))
     entries.append(url(f"{SITE}/llms-full.txt", newest_doc, "0.5"))
 

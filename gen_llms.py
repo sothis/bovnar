@@ -126,9 +126,9 @@ def docs_index_md():
     for slug, title, desc in DOCS:
         out.append(f"- [{title}]({SITE}/doc/{slug}) — {desc}")
     out.append("")
-    out.append(f"A single-file copy of the full documentation is at "
-               f"[{SITE}/llms-full.txt]({SITE}/llms-full.txt). "
-               f"PDF editions live under [{SITE}/doc/pdf/]({SITE}/doc/pdf/).")
+    out.append(f"Browse the documentation as HTML at [{SITE}/docs/]({SITE}/docs/). "
+               f"A single-file copy of the whole set is at "
+               f"[{SITE}/llms-full.txt]({SITE}/llms-full.txt).")
     return "\n".join(out)
 
 
@@ -233,6 +233,8 @@ def build_index_md_de(sections):
         parts += [example, ""]
     parts += [
         "## Dokumentation",
+        "",
+        "*(Die Dokumentation ist derzeit auf Englisch verfügbar.)*",
         "",
         docs,
         "",

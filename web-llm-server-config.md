@@ -157,6 +157,177 @@ RewriteRule ^$ /index.md [R=302,L]
 - Nothing here changes the human-facing site: browsers send
   `Accept: text/html,…` and continue to receive `index.html`.
 
+## Optional: consolidate the raw `.md` to the HTML docs for search
+
+The same documentation is served three ways — the HTML pages `/docs/<slug>/` (the
+canonical, indexable form), the raw Markdown `/doc/*.md` (for LLM tools), and the
+PDFs. To keep search engines from treating the raw `.md` as competing pages while
+LLM tools keep fetching it, advertise the HTML page as canonical via a response
+header on the `.md`. This is a search-only signal; it does not affect what LLM
+crawlers receive.
+
+The map holds the **complete** `Link` header value (RFC 8288: the URI in angle
+brackets) for each doc `.md`, and an empty string for everything else. Add it to
+the `http{}` context beside the other `map`:
+
+```nginx
+map $uri $bvnr_canon_hdr {
+    default                            "";
+    "/doc/0_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/1_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/2_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/3_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/4_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/6_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/7_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
+    "/doc/8_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/9_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+}
+```
+
+Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
+`add_header` whose value evaluates to the empty string, so `/index.md` and
+`/de/index.md` get no canonical header, while the doc `.md` do:
+
+```nginx
+    # (add to the existing .md location; also repeat HSTS there, since declaring
+    #  add_header stops the location inheriting the server-level HSTS)
+    add_header Link "$bvnr_canon_hdr" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+```
+
+`/doc/5_bovnar.ebnf` isn't matched by the `.md` location; it is niche and can be
+left as-is. The complete assembled config is in the next section.
+
+## Complete assembled nginx config
+
+The live `www.bovnar.io` config, with every AI/SEO addition folded in (the two
+apex/`.com`/`.net`/`.org` redirect blocks are unchanged from the original):
+
+```nginx
+##
+# bovnar — canonical host: www.bovnar.io
+# Every other name (apex bovnar.io + all .com/.net/.org) redirects here.
+##
+
+# AI/LLM content negotiation: does the client prefer Markdown? (http{} context)
+map $http_accept $bvnr_wants_md {
+    default            0;
+    "~*text/markdown"  1;
+}
+
+# Search consolidation: the full Link: rel=canonical header value for each raw
+# doc .md (empty for /index.md, /de/index.md — nginx then adds no such header).
+map $uri $bvnr_canon_hdr {
+    default                            "";
+    "/doc/0_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/1_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/2_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/3_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/4_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/6_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/7_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
+    "/doc/8_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/9_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+}
+
+# 1) Serve the site over HTTPS on the canonical host only
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name www.bovnar.io;
+
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
+
+    # Branded 404 page (web/404.html).
+    error_page 404 /404.html;
+    location = /404.html { internal; }
+
+    # Home page: advertise + serve the Markdown edition to AI tools. Declaring
+    # add_header here drops inherited HSTS, so it is repeated.
+    location = / {
+        if ($bvnr_wants_md) { return 302 /index.md; }
+        add_header Link '</index.md>; rel="alternate"; type="text/markdown"' always;
+        add_header Vary 'Accept' always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files /index.html =404;
+    }
+
+    # German home page, pointing at /de/index.md.
+    location = /de/ {
+        if ($bvnr_wants_md) { return 302 /de/index.md; }
+        add_header Link '</de/index.md>; rel="alternate"; type="text/markdown"' always;
+        add_header Vary 'Accept' always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files /de/index.html =404;
+    }
+
+    # .md as Markdown (RFC 7763) + UTF-8; plus the canonical→HTML header for the
+    # doc .md (empty, hence omitted, for /index.md and /de/index.md).
+    location ~ \.md$ {
+        types         { }
+        default_type  text/markdown;
+        charset       utf-8;
+        charset_types text/markdown;
+        add_header Link "$bvnr_canon_hdr" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # TLS — the multi-SAN cert lineage is named "bovnar.com"; do NOT repoint at
+    # /etc/letsencrypt/live/bovnar.io/ (no such path).
+    ssl_certificate         /etc/letsencrypt/live/bovnar.com/fullchain.pem;
+    ssl_certificate_key     /etc/letsencrypt/live/bovnar.com/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/bovnar.com/chain.pem;
+    include                 /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam             /etc/letsencrypt/ssl-dhparams.pem;
+
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+}
+
+# 2) HTTPS redirect for every non-canonical name -> https://www.bovnar.io
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name bovnar.io
+                bovnar.com www.bovnar.com
+                bovnar.net www.bovnar.net
+                bovnar.org www.bovnar.org;
+
+    ssl_certificate     /etc/letsencrypt/live/bovnar.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bovnar.com/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    return 301 https://www.bovnar.io$request_uri;
+}
+
+# 3) HTTP redirect for every name (incl. www.bovnar.io) -> https://www.bovnar.io
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name bovnar.io www.bovnar.io
+                bovnar.com www.bovnar.com
+                bovnar.net www.bovnar.net
+                bovnar.org www.bovnar.org;
+
+    return 301 https://www.bovnar.io$request_uri;
+}
+```
+
+Apply with `nginx -t && systemctl reload nginx`, then validate with
+acceptmarkdown.com / isitagentready.com.
+
 ## Analytics (optional, operational)
 
 To see whether any of this pays off, log requests to the AI endpoints and

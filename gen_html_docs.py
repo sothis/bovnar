@@ -18,15 +18,38 @@ Design notes:
 
 publish_web.sh runs this before staging. Run by hand: python3 gen_html_docs.py
 """
+import datetime
 import html
 import os
 import re
+import subprocess
 import sys
 
 import markdown
 from pygments.formatters import HtmlFormatter
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def git_date(relpath, first=False):
+    """Last- (or, first=True, first-) commit date YYYY-MM-DD of a repo file;
+    falls back to the file mtime, then today."""
+    args = ["git", "-C", ROOT, "log", "--format=%cs", "--", relpath]
+    if first:
+        args = ["git", "-C", ROOT, "log", "--diff-filter=A", "--follow",
+                "--format=%cs", "--", relpath]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True,
+                             check=True).stdout.strip().splitlines()
+        if out:
+            return out[-1] if first else out[0]
+    except Exception:
+        pass
+    try:
+        return datetime.date.fromtimestamp(
+            os.path.getmtime(os.path.join(ROOT, relpath))).isoformat()
+    except OSError:
+        return datetime.date.today().isoformat()
 DOC_DIR = os.path.join(ROOT, "doc")
 OUT_DIR = os.path.join(ROOT, "web", "docs")
 SITE = "https://www.bovnar.io"
@@ -201,8 +224,13 @@ FOOTER = (
     '</footer>')
 
 
-def page(title, description, canonical, body, extra_head=""):
+def page(title, description, canonical, body, extra_head="", og_dates=None):
     esc = html.escape
+    date_meta = ""
+    if og_dates:
+        pub, mod = og_dates
+        date_meta = (f'<meta property="article:published_time" content="{pub}">\n'
+                     f'<meta property="article:modified_time" content="{mod}">\n')
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -221,10 +249,13 @@ def page(title, description, canonical, body, extra_head=""):
 <meta property="og:description" content="{esc(description)}">
 <meta property="og:url" content="{canonical}">
 <meta property="og:image" content="{SITE}/bovnar-og.png">
+<meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
+{date_meta}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{esc(title)}">
 <meta name="twitter:description" content="{esc(description)}">
 <meta name="twitter:image" content="{SITE}/bovnar-og.png">
+<meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 {extra_head}<style>{CSS}</style>
 </head>
 <body>
@@ -238,14 +269,10 @@ def page(title, description, canonical, body, extra_head=""):
 """
 
 
-def faq_jsonld(md_text):
-    """Build FAQPage structured data from the FAQ Markdown.
-
-    The FAQ uses bold questions like **How do I …?** followed by the answer up
-    to the next question or heading. Returns "" if fewer than 3 pairs are found
-    (Google wants a real Q&A set)."""
+def faq_items(md_text):
+    """(question, answer) pairs from the FAQ Markdown — bold questions ending in
+    '?' followed by their answer, up to the next question or heading."""
     items = []
-    # bold-line questions ending in '?'
     pattern = re.compile(r"^\*\*(.+?\?)\*\*\s*$", re.M)
     matches = list(pattern.finditer(md_text))
     for i, m in enumerate(matches):
@@ -253,29 +280,80 @@ def faq_jsonld(md_text):
         start = m.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(md_text)
         ans = md_text[start:end]
-        # stop the answer at the next section heading if one comes first
         h = re.search(r"^#{1,6}\s", ans, re.M)
         if h:
             ans = ans[:h.start()]
         ans = re.sub(r"\s+", " ", re.sub(r"[`*#>|]", "", ans)).strip()
         if len(ans) < 20:
             continue
-        ans = ans[:600]
-        items.append((q, ans))
-    if len(items) < 3:
-        return ""
+        items.append((q, ans[:600]))
+    return items
+
+
+def json_ld(obj):
     import json
-    data = {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        "mainEntity": [
-            {"@type": "Question", "name": q,
-             "acceptedAnswer": {"@type": "Answer", "text": a}}
-            for q, a in items
+    blob = json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
+    return f'<script type="application/ld+json">{blob}</script>\n'
+
+
+def breadcrumb(name, url):
+    return {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{SITE}/"},
+            {"@type": "ListItem", "position": 2, "name": "Documentation",
+             "item": f"{SITE}/docs/"},
+            {"@type": "ListItem", "position": 3, "name": name, "item": url},
         ],
     }
-    blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    return f'<script type="application/ld+json">{blob}</script>\n'
+
+
+# @id values mirror the entities defined in the landing page's JSON-LD graph, so
+# search engines merge them into one site-wide entity graph across all pages.
+AUTHOR = {"@type": "Person", "@id": f"{SITE}/#author", "name": "Janos Sonntag"}
+PUBLISHER = {
+    "@type": "Organization",
+    "@id": f"{SITE}/#organization",
+    "name": "Bovnar",
+    "url": f"{SITE}/",
+    "logo": {"@type": "ImageObject", "url": f"{SITE}/apple-touch-icon.png",
+             "width": 180, "height": 180},
+}
+WEBSITE_REF = {"@type": "WebSite", "@id": f"{SITE}/#website",
+               "name": "Bovnar", "url": f"{SITE}/"}
+
+
+def doc_schema(title, desc, canonical, published, modified, faqs=None):
+    """TechArticle + BreadcrumbList (+ FAQPage) structured data for a doc page.
+    `title` is the clean doc title (no site suffix); published/modified are the
+    git-derived ISO dates."""
+    graph = [
+        {
+            "@type": "TechArticle",
+            "headline": title,
+            "description": desc,
+            "url": canonical,
+            "mainEntityOfPage": canonical,
+            "inLanguage": "en",
+            "image": [f"{SITE}/bovnar-og.png"],
+            "datePublished": published,
+            "dateModified": modified,
+            "author": AUTHOR,
+            "publisher": PUBLISHER,
+            "isPartOf": WEBSITE_REF,
+        },
+        breadcrumb(title, canonical),
+    ]
+    if faqs:
+        graph.append({
+            "@type": "FAQPage",
+            "mainEntity": [
+                {"@type": "Question", "name": q,
+                 "acceptedAnswer": {"@type": "Answer", "text": a}}
+                for q, a in faqs
+            ],
+        })
+    return json_ld({"@context": "https://schema.org", "@graph": graph})
 
 
 def build_index_page():
@@ -294,11 +372,23 @@ def build_index_page():
         '<style>.doclist{list-style:none;padding:0}.doclist li{padding:1rem 0;'
         'border-bottom:1px solid var(--border)}.doclist .d{color:var(--muted);'
         'margin:.2rem 0}.doclist .fmt{font-size:.85rem}</style>')
+    schema = json_ld({
+        "@context": "https://schema.org",
+        "@graph": [
+            {"@type": "CollectionPage", "url": f"{SITE}/docs/",
+             "name": "Bovnar documentation", "inLanguage": "en",
+             "isPartOf": WEBSITE_REF, "publisher": PUBLISHER},
+            {"@type": "BreadcrumbList", "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{SITE}/"},
+                {"@type": "ListItem", "position": 2, "name": "Documentation",
+                 "item": f"{SITE}/docs/"}]},
+        ],
+    })
     return page(
         "Documentation · Bovnar",
         "Bovnar (BVNR) documentation: tutorial, specification, unit system, C and "
         "Python APIs, grammar, FAQ, conformance, and streaming.",
-        f"{SITE}/docs/", body)
+        f"{SITE}/docs/", body, schema)
 
 
 def build_doc_page(src, slug, pdf, title, desc):
@@ -313,14 +403,19 @@ def build_doc_page(src, slug, pdf, title, desc):
         h1 = m.group(1).strip() if m else title
         text_wo_h1 = re.sub(r"^#\s+.*$", "", text, count=1, flags=re.M)
         rendered = rewrite_links(render_markdown(text_wo_h1))
-        if slug == "faq":
-            extra_head = faq_jsonld(text)
     canonical = f"{SITE}/docs/{slug}/"
+    faqs = faq_items(text) if slug == "faq" else None
+    published = git_date(f"doc/{src}", first=True)
+    modified = git_date(f"doc/{src}")
+    # Advertise this doc's Markdown counterpart for LLM/agent tools (RFC 7763).
+    extra_head = (f'<link rel="alternate" type="text/markdown" href="/doc/{src}">\n'
+                  + doc_schema(title, desc, canonical, published, modified, faqs))
     meta = (f'<p class="doc-meta">Bovnar (BVNR) v{VERSION} documentation · '
             f'Also available as <a href="/doc/{src}">Markdown</a> and '
             f'<a href="/doc/pdf/{pdf}.pdf">PDF</a>.</p>')
     body = f"<h1>{html.escape(h1)}</h1>\n{meta}\n{rendered}"
-    return page(f"{title} · Bovnar", desc, canonical, body, extra_head)
+    # `title` already leads with "Bovnar", so no redundant "· Bovnar" suffix.
+    return page(title, desc, canonical, body, extra_head, og_dates=(published, modified))
 
 
 def main():

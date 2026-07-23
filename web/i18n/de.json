@@ -208,7 +208,7 @@
     "Data written today still means exactly the same thing decades from now — the meaning lives in the file, not in lost tooling.": "Was heute geschrieben wird, bedeutet auch in Jahrzehnten noch exakt dasselbe — die Bedeutung steckt in der Datei, nicht in verlorengegangenen Werkzeugen.",
     "documentation": "Dokumentation",
     "Everything you need to <em>ship.</em>": "Alles, was Sie zum <em>Ausliefern</em> brauchen.",
-    "Ten documents — from a five-minute tutorial to the formal EBNF grammar and conformance\n      protocol. Read inline below, or <a href=\"#doc-downloads\" class=\"inline-link\">download the full set as PDF</a>.": "Zehn Dokumente — vom fünfminütigen Tutorial bis zur formalen EBNF-Grammatik und zum Konformitäts­protokoll. Lesen Sie sie unten direkt auf der Seite, oder <a href=\"#doc-downloads\" class=\"inline-link\">laden Sie den vollständigen Satz als PDF herunter</a>.",
+    "Ten documents — from a five-minute tutorial to the formal EBNF grammar and conformance\n      protocol. Read inline below, browse them as <a href=\"/docs/\" class=\"inline-link\">standalone pages</a>, or <a href=\"#doc-downloads\" class=\"inline-link\">download the full set as PDF</a>.": "Zehn Dokumente — vom fünfminütigen Tutorial bis zur formalen EBNF-Grammatik und zum Konformitäts­protokoll. Lesen Sie sie unten direkt auf der Seite, rufen Sie sie als <a href=\"/docs/\" class=\"inline-link\">eigenständige Seiten</a> auf, oder <a href=\"#doc-downloads\" class=\"inline-link\">laden Sie den vollständigen Satz als PDF herunter</a>.",
     "Tutorial": "Tutorial",
     "Practical introduction for developers. Get productive with Bovnar in minutes.": "Praxisnahe Einführung für Entwickler. In Minuten produktiv mit Bovnar.",
     "Start here": "Hier anfangen",

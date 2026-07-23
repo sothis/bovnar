@@ -183,11 +183,11 @@ For `float`, valid widths are `0`, `16`, and any multiple of `32` up to `32768`.
 .quad   = <float:128> 3.14;    # quad-precision
 ```
 
-For `sint` and `uint`, any positive integer is accepted as a width — `<uint:12>` is perfectly valid for a 12-bit ADC sample.
+For `sint` and `uint`, any width from 1 up to 32768 bits (`BVN_MAX_INT_WIDTH`) is accepted — `<uint:12>` is perfectly valid for a 12-bit ADC sample.
 
 #### Base
 
-The base parameter starts with `_` followed by a decimal number. For `uint` and `sint`, every base from `_2` through `_62` (consecutive) is allowed. Bases `_64` (standard Base64) and `_85` (Ascii85) are also available, but **only for `uint`**: their alphabets use `+` and `-` as digit characters, so no sign character remains and signed values are illegal (`error_illegal_value_type`). The base selects the numeral system used to interpret the value.
+The base parameter starts with `_` followed by a decimal number. For `uint` and `sint`, every base from `_2` through `_62` (consecutive) is allowed. Bases `_64` (standard Base64) and `_85` (Ascii85) are also available, but **only for `uint`**: their alphabets claim the sign glyphs as digits — Base64 uses `+` (digit 62) and `/`, Ascii85 uses both `+` and `-` — so no unambiguous sign character remains and signed values are illegal (`error_illegal_value_type`). The base selects the numeral system used to interpret the value.
 
 This is the biggest surprise for newcomers: **non-decimal values must be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. Always quote non-decimal digits:
 
@@ -251,7 +251,7 @@ SI prefixes are written before the base unit symbol with a **mandatory `~`** sep
 
 The `~` between prefix and unit is non-optional. `<float:32,kΩ>` (no `~`) would either fail to parse or be interpreted differently. Every prefix listed in the SI table uses the same pattern: `prefix~unit`.
 
-IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`) follow the same rule:
+IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, `Ri`, `Qi`) follow the same rule:
 
 ```bovnar
 .ram  = <uint:64,Gi~B>  8;     # 8 gibibytes
@@ -873,7 +873,7 @@ The synthesised annotation always produces all three parameter events; explicit 
 
 The `bvnr_data_t` structure passed with `ev_data` carries:
 
-- `type` — the token type (`token_is_number`, `token_is_string`, `token_is_symbol`, `token_is_reference`, `token_is_array_number`, `token_is_array_string`, `token_is_null_value`, `token_is_octet_stream`)
+- `type` — the token type (`token_is_number`, `token_is_string`, `token_is_symbol`, `token_is_reference`, `token_is_array_number`, `token_is_array_string`, `token_is_bool`, `token_is_null_value`, `token_is_octet_stream`)
 - `value_type` — the `value_type_spec_t` (family, width, base/Q)
 - `value_unit` — the `value_unit_t` (up to 8 components)
 - `data` — pointer to the raw value bytes

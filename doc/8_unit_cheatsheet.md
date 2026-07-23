@@ -77,7 +77,7 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 | ronto  | `r`    | 10⁻²⁷  | `si_ronto`  |
 | quecto | `q`    | 10⁻³⁰  | `si_quecto` |
 
-> `µ` is U+00B5 MICRO SIGN (UTF-8 `0xC2 0xB5`). U+03BC (Greek small letter mu) is **not** accepted. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` = `µ~m`); the canonical output is always `µ`.
+> `µ` is U+00B5 MICRO SIGN (UTF-8 `0xC2 0xB5`). U+03BC (Greek small letter mu) is also accepted on input; the canonical output is always U+00B5. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` = `µ~m`); the canonical output is always `µ`.
 > `da` is a two-character prefix: `da~m` = decametre.
 
 **Prefix–base ambiguities** — resolved by the mandatory `~`:
@@ -160,7 +160,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `J`   | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
 | `W`   | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
 | `V`   | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
-| `Ω`   | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) **not** accepted |
+| `Ω`   | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) also accepted on input, canonical output is always U+2126 |
 | `F`   | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`   | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
 | `S`   | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
@@ -205,7 +205,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `yd`   | `yard`, `yards` | yard | `bu_yard` | 0.9144 m (exact) |
 | `mi`   | `mile`, `miles` | statute mile | `bu_mile` | 1609.344 m (exact) |
 | `nmi`  | `nautical_mile`, `nautical_miles` | nautical mile | `bu_nautical_mile` | 1852 m (exact) |
-| `Å` (U+212B) | `angstrom`, `angstroms`, Å (U+00C5) | ångström | `bu_angstrom` | 10⁻¹⁰ m |
+| `Å` (U+212B) | `angstrom`, `angstroms`, Å (U+00C5) | ångström | `bu_angstrom` | 10⁻¹⁰ m |
 | `ly`   | `light_year`, `light_years` | light-year | `bu_light_year` | 9.4607304725808×10¹⁵ m |
 | `pc`   | `parsec`, `parsecs` | parsec | `bu_parsec` | 3.085677581491367×10¹⁶ m |
 | `fur`  | `furlong`, `furlongs` | furlong | `bu_furlong` | 201.168 m (exact) |
@@ -254,7 +254,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = ki
 | `at`   | `atmosphere_technical` | atmosphere technical | `bu_atmosphere_technical` | 98 066.5 Pa (= 1 kgf/cm²) |
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
 | `Torr` | `torr` | torr | `bu_torr` | 101 325/760 Pa |
-| `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168361 Pa |
+| `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
 | `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
 
 > `at ≠ atm`: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.

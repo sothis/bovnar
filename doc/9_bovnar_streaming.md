@@ -187,6 +187,14 @@ read is aborted and `bvnr_demux_error` reports `error_scanner_callback_failed`
 (distinct from the desync code, so a deliberate stop is distinguishable from a
 framing error).
 
+A separate, non-fatal case: if the octet stream *ends* while a channel is still
+mid-message (or mid-length-varint), the octet framing itself was well-formed, so
+the read still **succeeds** — but the partial message is dropped and
+`bvnr_demux_error` latches `error_octet_stream_truncated`. This is deliberately a
+different code from the desync `error_octet_stream_out_of_sync`: a truncated
+message is a message-layer loss, not a framing error. Always check
+`bvnr_demux_error` after the read even when it returned true.
+
 **Key scoping.** By default the demux treats *every* octet stream in the document
 as multiplexed. Call `bvnr_demux_set_key(dm, "mux")` so it only demuxes streams
 opened under that key — a document can then mix one mux stream with ordinary
@@ -202,7 +210,7 @@ marks (bounded by 4096 channels). Channels are not reclaimed individually.
 bvnr_demux_t* dm = bvnr_demux_create(on_message, ctx, 0 /* default cap */);
 bvnr_read_flags_t fl = { .on_verified = bvnr_demux_on_event, .userdata = dm };
 /* ... open_read_* + bvnr_read ... */
-if (bvnr_demux_error(dm) != error_none) { /* desync */ }
+if (bvnr_demux_error(dm) != error_none) { /* desync, oversize, alloc, or a truncated message */ }
 bvnr_demux_destroy(dm);
 ```
 

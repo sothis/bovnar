@@ -7,7 +7,7 @@
 (*    "…"  = literal terminal   (*…*) = comment                       *)
 (*  Updated: 2026-06-17 — drop the residual "1.1 (draft)" label (spec   *)
 (*    1.1 is released); note datetime also accepts a width parameter;    *)
-(*    reframe base-unit as a lookup into the full 163-unit / 487-spelling *)
+(*    reframe base-unit as a lookup into the full 163-unit / 491-spelling *)
 (*    table (NOT the closed SI subset it previously claimed).             *)
 (*  2026-06-16 — consistency pass vs the implementation:               *)
 (*    allow ws/comments before the assignment ";" and the "/" array    *)
@@ -37,7 +37,9 @@
 (*   first_bom       – BOM or first-line comment (its newline seen),  *)
 (*                     no assignment yet                              *)
 (*   value_outro     – the semicolon of the last assignment consumed  *)
-(* In all four cases struct_nesting_level must be zero.               *)
+(*   comment_intro / ignore_comment_byte – a trailing comment         *)
+(*                   opened after the last ";", ended by EOF          *)
+(* In all these cases struct_nesting_level must be zero.              *)
 
 (* Events emitted to the validator callbacks (bvnr_event_t):         *)
 (*                                                                    *)
@@ -63,7 +65,7 @@
 (*     ev_type_annotation_type_family        – the family name        *)
 (*     ev_type_annotation_type_family_parameter  – zero to three      *)
 (*                      times, once per present parameter (width,     *)
-(*                      base, unit), in that order                    *)
+(*                      base or q, unit), in that order               *)
 (*     ev_type_annotation_end                – once, after params     *)
 (*     ev_data                               – the value token        *)
 (*                                                                    *)
@@ -157,7 +159,7 @@ id-start     = ALPHA | "_" | utf8-leader ;
 (* Body characters of an identifier:                                  *)
 (* Accepted: "+", "-", digits, alpha, "_",                            *)
 (*   UTF-8 leader bytes 0xC3–0xF4, UTF-8 continuation bytes 0x80–0xBF.*)
-(* Hard-error bytes: 0x00–0x1F, 0x7F, 0xC2, and ASCII punctuation:  *)
+(* Hard-error bytes: 0x00–0x08, 0x0E–0x1F, 0x7F, 0xC2, punct:       *)
 (*   " # , . / ; < > [ ] { } = ! $ % & ' ( ) * : ? @ \ ^ ` | ~    *)
 (* "=" terminates the body (ACT_value_intro).                         *)
 (* Whitespace terminates the body (ACT_to_identifier_outro), after    *)
@@ -370,9 +372,9 @@ q-param      = "q" , DIGIT , {DIGIT} ;
 unit-param   = unit-char , {unit-char} ;
 unit-char    = (* any byte accepted by copy_type_byte that is not     *)
                (* "," (0x2C) or ">" (0x3E):                          *)
-               (* A–Z, a–z, 0–9, "*", ".", "/", "-", ":", "^", "_",  *)
-               (* "~", "$", "(", ")", or a UTF-8 multi-byte byte     *)
-               (* (0x80–0xF4)                                         *) ;
+               (* A–Z, a–z, 0–9, "*", "+", ".", "/", "-", ":", "^",  *)
+               (* "_", "~", "$", "%", "(", ")", or a UTF-8 multi-     *)
+               (* byte byte (0x80–0xBF or 0xC2–0xF4)                  *) ;
 
 (* ── Unit sub-grammar (semantic, enforced by bvn_parse_unit) ─── *)
 (*                                                                     *)
@@ -407,14 +409,14 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*                                                                     *)
 (* si-prefix  = "Q"|"R"|"Y"|"Z"|"E"|"P"|"T"|"G"|"M"|"k"|"h"|"da"   *)
 (*            | "d"|"c"|"m"|"µ"|"n"|"p"|"f"|"a"|"z"|"y"|"r"|"q" ;  *)
-(*   (µ = U+00B5: 0xC2 0xB5; ASCII "u" is an accepted alias)         *)
+(*   (µ = U+00B5 0xC2 0xB5; Greek μ = U+03BC; ASCII "u" alias)       *)
 (*                                                                     *)
 (* iec-prefix = "Ki"|"Mi"|"Gi"|"Ti"|"Pi"|"Ei"|"Zi"|"Yi"|"Ri"|"Qi" ; *)
 (*   Ri (2^90) and Qi (2^100) were added in IEC 80000-13:2022 ed. 2. *)
 (*                                                                     *)
 (* base-unit  = a symbol looked up in the fixed unit table by              *)
-(*   bvn_parse_unit (src/utils/bovnar_si_units.c): 163 named units with     *)
-(*   487 accepted spellings (canonical symbols plus long-form and plural    *)
+(*   bvn_parse_unit (src/utils/bovnar_utils.c): 163 named units with        *)
+(*   491 accepted spellings (canonical symbols plus long-form and plural    *)
 (*   aliases), spanning SI, imperial / US customary, CGS, radiation,        *)
 (*   surveying, culinary, Old German and digital-storage quantities.        *)
 (*   Doc 2 (the unit-system spec) is the authoritative registry; the SI     *)
@@ -648,11 +650,13 @@ ref-segment  = "." , id-start , {ref-body-char} ;
 (* enclosing array (which ends the reference).                         *)
 ref-index    = "[" , DIGIT , {DIGIT} , "]" ;
 
-(* ref-body-char: same byte set as sym-body-char, except that         *)
-(* "." (0x2E) is ACT_copy_reference_dot, which pushes the dot into   *)
-(* the token buffer and advances to reference_segment_intro for the   *)
-(* next segment's id-start character.                                 *)
-ref-body-char = sym-body-char | "." ;
+(* ref-body-char: same byte set as sym-body-char. A "." (0x2E)        *)
+(* does NOT extend the body: it is ACT_copy_reference_dot, which      *)
+(* starts a NEW ref-segment (advancing to reference_segment_intro,    *)
+(* which REQUIRES an id-start next). A "." with no following          *)
+(* id-start — a trailing or doubled dot — is                          *)
+(* error_unexpected_input_byte.                                       *)
+ref-body-char = sym-body-char ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -941,9 +945,11 @@ byte         = (* any single byte 0x00–0xFF *) ;
      at the next ";" at the current nesting depth.  recovery_count
      (bvnr_reader_get_recovery_count) is incremented immediately when
      an error triggers entry into resync mode, not when resync
-     completes at ";".  EOF inside any resync state propagates
-     the original error code rather than overwriting it with
-     error_got_incomplete_bvnr_stream.
+     completes at ";".  EOF inside any resync state raises a final
+     error_got_incomplete_bvnr_stream (delivered to on_error and
+     returned by bvnr_reader_get_error); the original error that
+     triggered resync was already delivered to on_error earlier, at
+     the point of fault.
 
   o) Inline unit suffix
      An inline-unit follows a scalar number or string in non-array

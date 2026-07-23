@@ -530,7 +530,7 @@ a mismatch is `error_unit_mismatch`.
 - **7 surveying & signalling units** — **US survey foot**, **league**, **cable length**, **hand** (length); **quintal**, **scruple** (mass); **baud** (`Bd`, signalling rate).
 - **6 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb** — dimensionless scaling factors that take no prefix.
 
-The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `Ra` (not `R`, which is reserved for röntgen). Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
+The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `°Ra` (also accepted as `Ra`); note `R` alone is reserved for röntgen. Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
 ---
 
@@ -560,7 +560,8 @@ For signed non-decimal values, the minus sign goes inside the string:
 
 For `uint` and `sint`: every base from `_2` through `_62` (consecutive). Bases
 `_64` (standard Base64) and `_85` (Ascii85) are also supported, but **for `uint`
-only** — their alphabets use `+`/`-` as digits, leaving no sign character, so a
+only** — their alphabets claim the sign glyphs as digits (Base64 uses `+` and
+`/`; Ascii85 uses both `+` and `-`), leaving no unambiguous sign character, so a
 signed value in these bases is a hard error (`error_illegal_value_type`). For
 `float`: `_10` (decimal, the default) and `_16` (hexadecimal) only. `float_fix`
 and `float_dec` do not accept a base parameter at all — specifying one is a hard
@@ -1050,7 +1051,7 @@ double f;
 bvn_parse_double(vbuf, d->value_type, &f);
 ```
 
-The `d->value_type` contains `family`, `width`, and `base_or_q`. Use
+The `d->value_type` contains `family`, `width`, and `base` (which holds the numeric base, or the Q for `float_fix`, or the epoch index for `datetime`). Use
 `bvn_effective_width(d->value_type)` to get the resolved width (handles the
 `width == 0` → 64 default).
 
@@ -1087,7 +1088,7 @@ is destroyed.
 
 **What is the `max_array_nesting` limit and why is it capped at 255?**
 
-The lexer stores per-nesting-level state in a fixed array of 256 entries.
+The lexer stores per-nesting-level state in a heap array sized to `max_array_nesting + 1` entries (so at most 256 at the 255 hard cap).
 `max_array_nesting` is a `uint8_t` field, so values above 255 cannot be
 represented; no runtime rejection is performed. Zero-initialising
 `bvnr_read_flags_t` is safe: a zero value causes the reader to substitute the
@@ -1109,7 +1110,7 @@ via `ctypes.CDLL`. No compilation step beyond building the C library is needed.
 
 1. `LIBBOVNAR_PATH` environment variable — absolute path to the `.so`.
 2. `LIBBOVNAR_DIR` environment variable — directory containing the `.so`.
-3. `ctypes.util.find_library('bovnar')` — standard `ldconfig`/`LD_LIBRARY_PATH` search.
+3. `ctypes.util.find_library('bvnr')` — standard `ldconfig`/`LD_LIBRARY_PATH` search.
 4. In-tree build paths relative to `_ffi.py` (`../../build/`, etc.).
 
 If none of these resolves the library, `BovnarLibraryNotFound` is raised with
@@ -1156,7 +1157,7 @@ call returns, and then the original Python exception is re-raised from
 
 **How do I access unit information in Python?**
 
-The `data.value_unit` field of an `EVENT.DATA` payload is a `ValueUnit` ctypes
+The `data.value_unit` field of an `Event.DATA` payload is a `ValueUnit` ctypes
 struct. Use the helper functions to work with it:
 
 ```python

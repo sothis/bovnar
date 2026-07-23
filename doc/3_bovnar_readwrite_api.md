@@ -48,6 +48,10 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
 24. [`bvn_unit_to_string`](#24-bvn_unit_to_string--bvn_unit_to_string_ex)
 25. [`bvn_error_to_string`](#25-bvn_error_to_string)
 
+**DOM**
+
+26. [DOM API (`bovnar_dom.h`)](#dom-api-bovnar_domh)
+
 ---
 
 ## Reader
@@ -1089,10 +1093,10 @@ This is the **preferred** way to write type annotations. Using `bvnr_write_event
 
 The function emits parameters as follows:
 
-- **Width** — emitted for numeric families when `vt.width != 0`. A width of `0` is **not** written to the stream (the absence implies the default width of 64 on the reader side via `bvn_effective_width`). Also emitted for `utf8` when `vt.width != 0`, though width on `utf8` has no defined semantics.
+- **Width** — emitted for numeric families when `vt.width != 0`. A width of `0` is **not** written to the stream (the absence implies the default width of 64 on the reader side via `bvn_effective_width`). Also emitted for `datetime` when `vt.width != 0`. It is **not** emitted for `utf8` or `bool`, which are parameterless — a width on them is rejected by the type-spec validator (`error_illegal_value_type`).
 - **Base** — emitted for `float` when `vt.base` is non-zero and not `10`; emitted for `uint`/`sint` when `vt.base` is non-zero and not `10`.
 - **Q** — emitted for `float_fix` when `vt.base` (which stores Q) is non-zero. A Q value of `0` is therefore not written explicitly.
-- **Unit** — emitted when `vu.num_components > 0`. `BVN_UNIT_NONE` (num_components == 0) produces no unit parameter; `BVN_UNIT_NO_PREFIX(bu_none)` (num_components == 1) produces `no_unit` in the annotation.
+- **Unit** — emitted when `vu.num_components > 0`. `BVN_UNIT_NONE` (num_components == 0) produces no unit parameter; a lone `bu_none` component — `BVN_UNIT_NO_PREFIX(bu_none)`, num_components == 1 — is normalised to `BVN_UNIT_NONE` on entry and likewise produces **no** unit parameter.
 
 ```c
 value_type_spec_t vt = BVN_TYPE_FLOAT(64);
@@ -1273,6 +1277,141 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§7c) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§7c) |
+
+---
+
+## DOM API (`bovnar_dom.h`)
+
+The SAX reader above streams events. When you instead want the whole document in
+memory for random-access queries — without writing a callback — use the DOM API
+in `include/bovnar_dom.h`. It parses a document into a tree of `bvn_dom_node_t`
+owned by a `bvn_dom_doc_t`, which you navigate and read with typed accessors.
+
+### Parsing and lifetime
+
+```c
+bvn_dom_doc_t *bvn_dom_doc_create(void);
+void           bvn_dom_doc_destroy(bvn_dom_doc_t *doc);   /* frees the whole tree; NULL-safe */
+bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len);
+bvn_dom_doc_t *bvn_dom_parse_fd(int fd);
+bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes);
+error_code_t   bvn_dom_doc_get_parse_error(const bvn_dom_doc_t *doc);
+```
+
+`bvn_dom_parse` returns NULL **only** on allocation failure — a *malformed*
+document still returns a non-NULL doc, so check `bvn_dom_doc_get_parse_error()`
+(`error_none` means it parsed cleanly), not the pointer, to detect a parse error.
+The `bvn_dom_parse_fd*` variants instead return NULL on **any** failure
+(allocation, I/O, or exceeding the size cap). `bvn_dom_parse_fd_ex` caps the
+accumulated input at `max_bytes`, but only *downward*: `0` or any value above the
+built-in hard cap `BVN_DOM_FD_MAX_BYTES` (256 MiB) is clamped to that cap — there
+is no unlimited mode. Free every returned doc with `bvn_dom_doc_destroy`.
+
+### Navigation
+
+```c
+bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc, const char *path); /* dot path, e.g. "server.tls.cert" */
+bvn_dom_node_t *bvn_dom_struct_get(const bvn_dom_node_t *node, const char *key);
+bvn_dom_node_t *bvn_dom_array_at(const bvn_dom_node_t *node, uint32_t index);
+uint32_t        bvn_dom_struct_count(const bvn_dom_node_t *node);
+uint32_t        bvn_dom_array_count(const bvn_dom_node_t *node);
+uint32_t        bvn_dom_array_dims(const bvn_dom_node_t *node);   /* number of `/`-separated dimensions */
+const bvn_dom_entry_t *bvn_dom_struct_entries(const bvn_dom_node_t *node);
+const bvn_dom_entry_t *bvn_dom_doc_entries(const bvn_dom_doc_t *doc);
+uint32_t               bvn_dom_doc_count(const bvn_dom_doc_t *doc);
+```
+
+Each `bvn_dom_entry_t` is `{ char *key; bvn_dom_node_t *value; }`. A missing key
+or out-of-range index returns NULL.
+
+### Type inspection
+
+```c
+typedef enum bvn_dom_type_e {
+    BVN_DOM_NULL, BVN_DOM_INT, BVN_DOM_FLOAT, BVN_DOM_STRING, BVN_DOM_SYMBOL,
+    BVN_DOM_REFERENCE, BVN_DOM_STRUCT, BVN_DOM_ARRAY, BVN_DOM_OCTET_STREAM, BVN_DOM_BOOL
+} bvn_dom_type_t;
+
+bvn_dom_type_t    bvn_dom_node_type(const bvn_dom_node_t *node);
+bool              bvn_dom_is_null(const bvn_dom_node_t *node);
+value_type_spec_t bvn_dom_get_value_type(const bvn_dom_node_t *node);
+value_unit_t      bvn_dom_get_unit(const bvn_dom_node_t *node);
+int32_t           bvn_dom_get_unit_string(const bvn_dom_node_t *node, char *buf, size_t bufsize);
+double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
+```
+
+### Typed value accessors
+
+Each accessor returns `false` (leaving the out-param **unchanged** — no clamping
+or truncation) when the node is NULL, not of the requested kind, or does not fit
+the target type. Pointer results are **borrowed** — valid only until the owning
+document is destroyed; do not free them.
+
+```c
+bool bvn_dom_get_bool  (const bvn_dom_node_t *node, bool   *out);
+bool bvn_dom_get_float (const bvn_dom_node_t *node, double *out);
+bool bvn_dom_get_i64/u64/i32/u32/i16/u16/i8/u8(const bvn_dom_node_t *node, /* int type */ *out);
+bool bvn_dom_get_string   (const bvn_dom_node_t *node, const char    **out, uint32_t *len); /* NUL-terminated; *len excludes NUL */
+bool bvn_dom_get_symbol   (const bvn_dom_node_t *node, const char    **out, uint32_t *len);
+bool bvn_dom_get_reference(const bvn_dom_node_t *node, const char    **out, uint32_t *len);
+bool bvn_dom_get_octets   (const bvn_dom_node_t *node, const uint8_t **out, uint32_t *len); /* raw bytes, NOT NUL-terminated */
+```
+
+Wide integers (> 64 bits) are not stored inline; read them as a borrowed bigint
+or render them to a string:
+
+```c
+const bvn_int_t *bvn_dom_get_bigint(const bvn_dom_node_t *node); /* NULL unless the int is wider than 64 bits */
+char            *bvn_dom_int_to_str(const bvn_dom_node_t *node, uint32_t base); /* caller owns; free with bvn_dom_free_string */
+void             bvn_dom_free_string(char *s);
+```
+
+For a `datetime` node written as a literal with a fractional second (spec 1.1),
+the verbatim sub-second digits are available separately; the node's integer value
+is still the whole-second epoch count read via `bvn_dom_get_i64`:
+
+```c
+const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node, uint32_t *len_out);
+```
+
+### Building a tree
+
+The DOM is also writable, e.g. to construct a document programmatically and hand
+it to a serialiser. `bvn_dom_node_alloc` / the `bvn_dom_node_from_*` constructors
+make nodes; the `*_add`/`*_append` functions attach them.
+
+```c
+bvn_dom_node_t *bvn_dom_node_alloc(bvn_dom_type_t t);
+void            bvn_dom_node_destroy(bvn_dom_node_t *n);
+bvn_dom_node_t *bvn_dom_node_from_i64/u64/i32/u32/i16/u16/i8/u8(/* value */);
+bvn_dom_node_t *bvn_dom_node_from_bigint(bvn_int_t *bigint, value_type_spec_t vt, value_unit_t vu);
+bool bvn_dom_struct_add   (bvn_dom_node_t *s, const char *key, uint32_t klen, bvn_dom_node_t *val);
+bool bvn_dom_doc_add      (bvn_dom_doc_t  *d, const char *key, uint32_t klen, bvn_dom_node_t *val);
+bool bvn_dom_array_append (bvn_dom_node_t *a, bvn_dom_node_t *elem);
+char *bvn_dom_strdup(const char *s, uint32_t len);
+```
+
+**Ownership.** `bvn_dom_struct_add` / `bvn_dom_doc_add` / `bvn_dom_array_append`
+**always** take ownership of the value node: on success the container owns it, and
+on **every** failure path the node is destroyed internally — so never destroy it
+yourself after the call (doing so double-frees). `bvn_dom_node_from_bigint` is the
+one exception with *asymmetric* ownership: on success it takes ownership of the
+`bvn_int_t`; on failure (NULL return) it does not, and you still own it.
+
+### Minimal example
+
+```c
+bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
+if (!doc) { /* out of memory */ }
+if (bvn_dom_doc_get_parse_error(doc) != error_none) {
+    /* malformed input — inspect the code */
+} else {
+    bvn_dom_node_t *port = bvn_dom_lookup(doc, "server.port");
+    uint16_t p;
+    if (port && bvn_dom_get_u16(port, &p)) { /* use p */ }
+}
+bvn_dom_doc_destroy(doc);
+```
 
 ---
 

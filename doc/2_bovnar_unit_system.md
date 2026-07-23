@@ -204,7 +204,7 @@ Bovnar supports 163 named physical base units. Currency codes are a separate nam
 | `J`    | `joule`, `joules` | joule | `bu_joule` | kg·m²·s⁻² |
 | `W`    | `watt`, `watts` | watt | `bu_watt` | kg·m²·s⁻³ |
 | `V`    | `volt`, `volts` | volt | `bu_volt` | kg·m²·A⁻¹·s⁻³ |
-| `Ω`    | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN, UTF-8: `0xE2 0x84 0xA6`; U+03A9 (Greek capital omega) **not** accepted |
+| `Ω`    | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN, UTF-8: `0xE2 0x84 0xA6`; U+03A9 (Greek capital omega) also accepted on input, canonical output is always U+2126 |
 | `F`    | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`    | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
 | `S`    | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
@@ -301,7 +301,7 @@ Bovnar supports 163 named physical base units. Currency codes are a separate nam
 | `at`   | `atmosphere_technical` | atmosphere technical | `bu_atmosphere_technical` | 98066.5 Pa (= 1 kgf/cm²) |
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
 | `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa |
-| `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168361 Pa |
+| `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
 | `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
 
 ### 3.6 Energy Units
@@ -575,7 +575,7 @@ All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10
 | ronto  | `r`    | 10⁻²⁷  | `si_ronto`  |
 | quecto | `q`    | 10⁻³⁰  | `si_quecto` |
 
-> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point and is **not** accepted. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` parses as `µ~m`); the canonical output form is always `µ`. Note `u` is also the bare symbol for the dalton, but the two never collide — a prefix only appears before `~`, a base only bare or after `~`.
+> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point but is also accepted on input; the canonical output form is always U+00B5. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` parses as `µ~m`); the canonical output form is always `µ`. Note `u` is also the bare symbol for the dalton, but the two never collide — a prefix only appears before `~`, a base only bare or after `~`.
 
 #### Prefix–Symbol Ambiguities
 
@@ -1208,7 +1208,7 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347.
+Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
 
 ```c
 typedef enum value_base_unit_e {
@@ -1649,8 +1649,8 @@ const bvn_currency_info_t *ci = bvn_currency_info(bu_usd);
 /* ci->code="USD", ci->numeric_code=840, ci->minor_unit=2,
    ci->is_crypto=false, ci->name="US Dollar" */
 
-int cv = bvn_parse_currency_str((const uint8_t *)"EUR", 3);  /* cv=176 */
-int cc = bvn_parse_currency_str((const uint8_t *)"DOGE", 4); /* cc=323 */
+int cv = bvn_parse_currency_str((const uint8_t *)"EUR", 3);  /* cv=177 */
+int cc = bvn_parse_currency_str((const uint8_t *)"DOGE", 4); /* cc=326 */
 int cx = bvn_parse_currency_str((const uint8_t *)"xyz", 3);  /* cx=0   */
 
 /* Distinguishing cup (volume) from CUP (currency) in code: */

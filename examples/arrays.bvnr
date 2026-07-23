@@ -29,8 +29,8 @@
 
 
 # ── 3. Multi-row arrays (dimensions separated by /) ───────────────────────────
-# Rows within the same / group are independent; different rows can have
-# different element counts. Sub-arrays within one bracket group must be uniform.
+# All rows in the same / group must have the same element count; a mismatch is
+# error_array_row_size_mismatch. Sub-arrays within one bracket group must be uniform.
 
 .matrix_2x3 = [1, 2, 3]/[4, 5, 6];   # 2 rows × 3 columns
 .matrix_3x2 = [1, 2]/[3, 4]/[5, 6];  # 3 rows × 2 columns

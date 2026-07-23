@@ -5,6 +5,16 @@
 [![Spec version](https://img.shields.io/badge/spec-1.1-blue)](doc/1_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
+[![Website](https://img.shields.io/badge/web-bovnar.io-blue)](https://www.bovnar.io)
+
+---
+
+## Links
+
+- **Website:** https://www.bovnar.io
+- **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
+- **DOI — Bovnar 1.1.0 Documentation and Specification:** https://zenodo.org/records/21443296
+- **DOI — Bovnar 1.1.0 Source:** https://zenodo.org/records/21443009
 
 ---
 
@@ -50,7 +60,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
-- **Browser playground** — a dependency-free JavaScript parser (`bovnar_parser.js`) approximates the C reference event stream (lenient: it does not synthesise default type annotations or perform type/value validation) and powers an interactive single-file web playground.
+- **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
 - **Extensively tested** — Unit tests, socket-pair round-trip tests, a 319-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
@@ -137,9 +147,10 @@ bovnar/
 │   ├── geany/               # Geany filetype definition
 │   ├── vim/                 # Vim syntax + filetype plugin
 │   └── clion/               # CLion / JetBrains TextMate-bundle installer (reuses the VS Code grammar)
-├── web/                     # Single-file browser playground
+├── web/                     # Browser playground + landing page
 │   ├── index.html           # Playground + landing page
-│   └── bovnar_parser.js     # Dependency-free JavaScript parser
+│   ├── bovnar_parser_wasm.js # JS wrapper exposing the WASM parser
+│   └── bovnar_wasm_core.js   # C reference parser compiled to WASM
 ├── doc/
 │   ├── 0_bovnar_tutorial.md
 │   ├── 1_bovnar_spec.md            # Format specification (v1.1)
@@ -548,7 +559,7 @@ PyCharm, GoLand, …) too.
 
 ## Web Playground
 
-A dependency-free JavaScript parser (`web/bovnar_parser.js`) approximates the reference event stream in the browser and drives an interactive single-file playground (`web/index.html`). It is deliberately lenient — it adds an `ev_assignment_end` delimiter the C core does not emit, does not synthesise the default type-annotation events, and performs no type/value validation — so it is a visualisation aid, not a conformant second implementation. Serve the `web/` directory and open it — no build step required:
+The real C reference parser, compiled to WebAssembly (`web/bovnar_wasm_core.js`, wrapped by `web/bovnar_parser_wasm.js`), runs the reference verified event stream in the browser (in resync mode, so a malformed assignment is skipped rather than fatal) with full type/unit/value validation, and drives the interactive playground (`web/index.html`). It is the reference implementation itself, not a separate approximation. Serve the `web/` directory and open it — no build step required:
 
 ```bash
 cd web && ./httpd.sh          # python3 -m http.server

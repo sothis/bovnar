@@ -313,6 +313,11 @@ further escapes are available:
 - `\x` writes a raw byte, but a string's contents must still be valid UTF-8 (the
   `utf8` family guarantee). So `"\xC3\xA9"` is `"é"`, whereas a lone `"\xFF"` is
   `error_invalid_utf8_byte`. Use an octet stream for arbitrary, non-textual bytes.
+- A `\xHH` or `\u{…}` escape that *resolves to* an ASCII control byte
+  (`0x00`–`0x08`, `0x0E`–`0x1F`, `0x7F` — every control except the whitespace
+  controls `0x09`–`0x0D`) is rejected with `error_unexpected_input_byte`, exactly
+  as a raw control byte in a string is: the escape is no way around the
+  control-byte rule.
 - **Gating.** `\x` and `\u` are 1.1-only. In a 1.0 or unversioned document
   (§3.4) the `x`/`u` after a backslash is not a recognised escape and yields
   `error_illegal_escape_sequence`, exactly as a 1.0 reader reports.
@@ -910,7 +915,7 @@ The `p`/`P` exponent value is always interpreted as a decimal integer (the binar
 
 ### 6.4 Special Number Semantics
 
-`nan`, `inf`, `ninf` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected only when the declared type is `utf8`, because the token type (`token_is_number`) is incompatible with a string-only family.
+`nan`, `inf`, `ninf` are accepted by any numeric type family (`uint`, `sint`, `float`, `float_fix`, `float_dec`) and in untyped context. `bvn_check_acc_range` explicitly returns `true` when `bvn_is_special_number_string` matches, bypassing all range validation regardless of the declared family. They are rejected under the non-numeric families whose token kind is incompatible with `token_is_number` — `utf8` (string-only) and `bool` (boolean-keyword-only) — both producing `error_type_value_mismatch`. (A `datetime` annotation, by contrast, accepts them: the special-string check short-circuits before the datetime carrier is parsed.)
 
 ```bovnar
 .okay_f64  = <float:64>  inf;
@@ -1187,17 +1192,25 @@ When a number or string value carries **no explicit** type annotation (i.e. the 
 | Number with `.` or `e`/`E` (float literal) | `<float:64,_10,no_unit>` |
 | Negative integer | `<sint:64,_10,no_unit>` |
 | Plain integer | `<uint:64,_10,no_unit>` |
+| Number with an inline currency unit (`$XXX`) | `<float_dec:64,$XXX>` |
 | ISO-8601 datetime literal, no annotation (spec 1.1) | `<datetime:64,unix>` |
+
+The currency row takes **precedence** over the float/integer rows: any number
+(integer or decimal) that carries an inline currency unit synthesises
+`float_dec`, so money is never stored as a binary float — `.price = 5 $USD;`
+becomes `<float_dec:64,$USD>`, not `<uint:64>`.
 
 > **A bare integer inside a `datetime` array** inherits the array's `datetime`
 > type (width and epoch) rather than synthesising `uint`/`sint`, so a datetime
 > array's canonical form — annotation on the first element, bare integers after
 > — stays homogeneous.
 
-> **`float_fix` and `float_dec` are never auto-synthesised.** `float_fix`
-> requires a Q parameter that cannot be inferred from the value literal;
-> `float_dec` requires an explicit choice of decimal encoding.  Both families
-> must be introduced by an explicit type annotation.
+> **`float_fix` is never auto-synthesised**, because it requires a Q parameter
+> that cannot be inferred from the value literal; it must be introduced by an
+> explicit type annotation. **`float_dec` is auto-synthesised in exactly one
+> case** — a number carrying an inline currency unit (the row above) — so that
+> monetary values are never held as a binary float; in every other context it
+> too requires an explicit annotation.
 
 ### 10.2 Event Sequence
 
@@ -1465,9 +1478,9 @@ The literal string `no_unit` in the unit parameter position means "explicitly di
 .dimensionless = <uint:32,no_unit> 42;
 ```
 
-Omitting the unit parameter also defaults to dimensionless and produces a **different** internal representation: `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`.
+Within an explicit annotation, **omitting** the unit parameter yields the same internal representation as an explicit `no_unit`: `BVN_UNIT_NONE` with `num_components == 0`. (`bvn_parse_type_annotation` initialises the unit to `BVN_UNIT_NONE` and only overwrites it when a dimensioned unit parameter is actually present.)
 
-An explicit `no_unit` parameter yields `BVN_UNIT_NONE` with `num_components == 0`. Both forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` via `bvn_unit_to_string` — but they are structurally distinct internal states.
+A **fully untyped** value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`. All three forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both encodings serialize to `"no_unit"` via `bvn_unit_to_string` — but the untyped-default form (`num_components == 1`) is a structurally distinct internal state from the annotated forms (`num_components == 0`).
 
 ---
 
@@ -2044,6 +2057,8 @@ typedef struct bvnr_data_s {
     uint32_t          length;
     const void*       frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t          frac_length;  /* spec 1.1 — length of frac_data, else 0 */
+    bool              converted;    /* a want_unit read-time conversion was applied (§ read-time conversion) */
+    bvnr_converted_t  conv;         /* the exact converted value (unit + text + rational); zeroed when converted is false */
 } bvnr_data_t;
 ```
 
@@ -2140,6 +2155,11 @@ typedef struct bvnr_read_flags_s {
     bool    (*on_verified)(void*, bvnr_event_t, bvnr_data_t*);
     bool      continue_on_error;
     bvnr_on_error_fn on_error;
+    bool      strict_version;                 // reject a declared spec version newer than this build
+    bool      want_unit_allow_nonterminating; // deliver a non-terminating exact conversion as a rational
+    uint32_t  max_conversion_length;          // 0 → 1024; longest want_unit conversion text, in chars
+    bool    (*want_unit)(void*, const bvnr_data_t*, value_unit_t*, uint32_t*);  // read-time lossless unit/base conversion hook
+    uint64_t  _reserved[2];
 } bvnr_read_flags_t;
 ```
 
@@ -2388,6 +2408,11 @@ typedef enum error_code_e {
     /* spec 1.1 — an ISO-8601 literal was given for an atomic GNSS epoch
      * (gps/galileo/glonass/beidou), which has no round-trippable inverse. */
     error_datetime_literal_unsupported_epoch = 46,
+    /* a lossless read-time unit/base conversion (want_unit) could not be
+     * performed: an irrational factor, or a non-terminating expansion. */
+    error_unit_inexact                       = 47,
+    /* a multiplexed message was still short when its octet stream ended. */
+    error_octet_stream_truncated             = 48,
 } error_code_t;
 ```
 
@@ -2616,11 +2641,14 @@ static inline uint32_t bvn_effective_width(value_type_spec_t s) {
 }
 
 /*
- * For float_fix and float_dec the .base field has a different meaning
- * (Q for float_fix, unused for float_dec); always report base 10 for those.
+ * For float_fix, float_dec and datetime the .base field has a different meaning
+ * (Q for float_fix, unused for float_dec, epoch index for datetime); always
+ * report base 10 for those — the datetime carrier is decimal epoch-seconds, so
+ * decoding it in the epoch index stored in .base would corrupt the value.
  */
 static inline uint32_t bvn_effective_base(value_type_spec_t s) {
-    if (s.family == vt_float_fix || s.family == vt_float_dec)
+    if (s.family == vt_float_fix || s.family == vt_float_dec ||
+        s.family == vt_datetime)
         return 10u;
     return s.base ? s.base : 10u;
 }

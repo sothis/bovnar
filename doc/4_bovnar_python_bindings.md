@@ -54,7 +54,7 @@ The bindings search for `libbvnr.so` in this order:
    ```bash
    export LIBBOVNAR_DIR=/opt/bovnar/lib
    ```
-3. **`ctypes.util.find_library('bovnar')`** — standard `ldconfig` / `LD_LIBRARY_PATH` search.
+3. **`ctypes.util.find_library('bvnr')`** — standard `ldconfig` / `LD_LIBRARY_PATH` search.
 4. **In-tree build paths** — `../../build/`, `../../build/release/`, `../../`,
    `.` (resolved relative to the `_ffi.py` file; useful when building Bovnar
    alongside the bindings from a mono-repo).
@@ -127,6 +127,19 @@ def on_event(ev, data):
 with Reader() as r:
     r.read_mem(bvnr_bytes, on_verified=on_event)
 ```
+
+The `BvnrData` payload passed to a callback exposes:
+
+| Method | Returns | Description |
+|---|---|---|
+| `data.raw_str(encoding='utf-8')` | `str` | The token bytes decoded as text |
+| `data.raw_bytes()` | `bytes` | The raw token bytes |
+| `data.converted_str()` | `str \| None` | Exact `want_unit` conversion result as a positional string, or `None` if no conversion / it does not terminate in its base |
+| `data.converted_in_base(base)` | `str \| None` | The exact conversion re-rendered in `base` |
+| `data.converted_rational()` | `tuple[int, int] \| None` | The exact conversion as `(numerator, denominator)` |
+| `data.frac_str()` | `str \| None` | Verbatim ISO sub-second digits of a `datetime` literal (spec 1.1), or `None` |
+
+It also carries the `converted` (bool) and `value_type` / `value_unit` fields directly.
 
 ### Generator / iterator interface
 
@@ -397,6 +410,7 @@ validates the width for the chosen family.
 | `q.ieee_bits()` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+| `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
 
 ### Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
 
@@ -737,7 +751,7 @@ with Reader() as r:
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
 
-### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version)`
+### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -749,13 +763,16 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
 | `strict_version` | `bool` | `False` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
+| `want_unit` | `Callable[[BvnrData], tuple \| None] \| None` | `None` | Optional read-time lossless unit/base conversion hook. Called per numeric value; return `(unit, base)` to request a conversion (the exact result arrives on the payload as `converted`/`converted_text`), or `None` to leave the value untouched. An inexact conversion aborts the parse (`error_unit_inexact`). |
+| `want_unit_allow_nonterminating` | `bool` | `False` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational with `converted_text` `None` instead of aborting with `error_unit_inexact` |
+| `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
 
-### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version)`
+### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
 
 Parse BVNR from an open POSIX file descriptor. Parameters identical to
 `read_mem` except the first argument is a non-negative `int` fd.
 
-### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version)`
+### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
 
 Convenience wrapper: opens `path` with `os.O_RDONLY`, calls `read_fd`, closes
 the fd in a `finally` block. The `max_file_size` default is `MAX_FILESIZE_BYTES`
@@ -780,6 +797,9 @@ Generator that collects all events from `read_mem` and yields
 | `value_type` | `ValueTypeSpec \| None` | Type annotation if present |
 | `value_unit` | `ValueUnit \| None` | Unit if present |
 | `text` | `str` (property) | `raw` decoded as UTF-8 (with `errors='replace'`) |
+| `converted` | `bool` | `True` when a `want_unit` conversion was applied to this value |
+| `converted_text` | `str \| None` | Exact converted value as a positional string; `None` if the conversion does not terminate in `converted_base` |
+| `converted_base` | `int` | Base the converted text is rendered in |
 
 ### Error-state properties
 
@@ -894,6 +914,18 @@ w.end_struct()        # emit STRUCT_END, decrement depth
 `finish()` verifies that the struct depth is zero; an unclosed struct raises
 `BovnarWriteError(GOT_INCOMPLETE_BVNR_STREAM)`.
 
+### Version directive
+
+```python
+w.write_version(major=1, minor=1)   # emit a leading "#!bovnar 1.1" directive
+```
+
+Emits a leading `#!bovnar <major>.<minor>` directive. Must be called before any
+value is written; calling it after output has begun raises
+`BovnarWriteError(INVALID_ARGUMENT)`. Use it to self-declare the spec version a
+document targets (spec-1.1 constructs such as datetime literals need it to
+re-read).
+
 ### Array helpers
 
 ```python
@@ -970,6 +1002,7 @@ for as long as any derived `DomNode` is in use.
 | `node.as_i16()` / `as_u16()` | Signed / unsigned 16-bit integer |
 | `node.as_i8()` / `as_u8()` | Signed / unsigned 8-bit integer |
 | `node.as_float()` | `float` (64-bit) |
+| `node.as_bool()` | `bool` for `BOOL` nodes |
 | `node.as_str()` | Python `str` for `STRING`, `SYMBOL`, or `REFERENCE` nodes |
 | `node.as_bytes()` | `bytes` for `OCTET_STREAM` nodes |
 | `node.as_int_str(base=10)` | Integer value as a string in the given base; result C string is freed before return |
@@ -1207,7 +1240,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 130–133 | Apothecary/dry volume (`FLUID_DRAM`, `MINIM`, `PECK`, `BUSHEL`) |
 | 134–297 | ISO 4217 fiat currencies (`AED` … `ZWL`) — see `CURRENCY_FIAT_FIRST` / `CURRENCY_FIAT_LAST` |
 | 298–347 | Cryptocurrencies (`BTC` … `RUNE`) — see `CURRENCY_CRYPTO_FIRST` / `CURRENCY_CRYPTO_LAST` |
-| 348–360 | Historical German units (`PFUND`, `ZENTNER`, `LOT`, Prussian line/zoll/fuss/elle/rute, `KLAFTER`, `GERMAN_MILE`, `MORGEN`, `SCHEFFEL`) |
+| 348–360 | Historical German units (`PFUND`, `ZENTNER`, `DOPPELZENTNER`, `LOT`, Prussian line/zoll/fuss/elle/rute, `KLAFTER`, `GERMAN_MILE`, `MORGEN`, `SCHEFFEL`) |
 | 361–367 | Additional physical units (`SURVEY_FOOT`, `LEAGUE`, `CABLE`, `HAND`, `QUINTAL`, `SCRUPLE`, `BAUD`) |
 | 368–371 | Temperature scales (`DELISLE`, `NEWTON_TEMP`, `REAUMUR`, `ROMER`) |
 | 372–377 | Ratio/proportion units (`PERCENT`, `PER_MILLE`, `PER_MYRIAD`, `PER_CENT_MILLE`, `PPM`, `PPB`) |
@@ -1233,8 +1266,9 @@ unversioned document is treated as 1.0) are exposed as:
   → `(major, minor)` of the highest spec understood, and
   `bovnar.peek_version(data)` → the `(major, minor)` a document declares, or
   `None`. `Reader.declared_version` gives the same after a read; `read_mem`/
-  `read_fd`/`loads` accept `strict_version=True` to reject a too-new version
-  (`ErrorCode.UNSUPPORTED_SPEC_VERSION`).
+  `read_fd`/`read_file` accept `strict_version=True` to reject a too-new version
+  (`ErrorCode.UNSUPPORTED_SPEC_VERSION`). `loads` does not take `strict_version`;
+  use a `Reader` when you need it.
 - **Richer escapes:** `\u{…}` and `\xHH` in string literals are decoded by the C
   reader, so `loads` returns the resulting text transparently. A surrogate /
   out-of-range `\u` is `ErrorCode.INVALID_CODEPOINT`.

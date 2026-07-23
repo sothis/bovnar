@@ -12,7 +12,7 @@
     "<a href=\"#syntax\">Syntax</a>": "<a href=\"#syntax\">Syntax</a>",
     "<a href=\"#features\">Features</a>": "<a href=\"#features\">Funktionen</a>",
     "<a href=\"#quickstart\">Quick Start</a>": "<a href=\"#quickstart\">Schnellstart</a>",
-    "<a href=\"#docs\">Docs</a>": "<a href=\"#docs\">Doku</a>",
+    "<a href=\"/docs/\">Docs</a>": "<a href=\"/docs/\">Doku</a>",
     "<a href=\"https://github.com/sothis/bovnar\" class=\"nav-cta\">GitHub ↗</a>": "<a href=\"https://github.com/sothis/bovnar\" class=\"nav-cta\">GitHub ↗</a>",
     "<a href=\"/de/\" class=\"nav-lang\" hreflang=\"de\" data-lang-switch lang=\"de\">Switch to German</a>": "<a href=\"/\" class=\"nav-lang\" hreflang=\"en\" data-lang-switch lang=\"en\">Auf Englisch wechseln</a>",
     "<span>unit-safe</span>\n        <span class=\"hl-sep\">/</span>\n        <span>spec v1.1</span>\n        <span class=\"hl-sep\">/</span>\n        <span>c99</span>": "<span>einheitensicher</span>\n        <span class=\"hl-sep\">/</span>\n        <span>spec v1.1</span>\n        <span class=\"hl-sep\">/</span>\n        <span>c99</span>",

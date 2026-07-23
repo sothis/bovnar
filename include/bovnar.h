@@ -202,8 +202,9 @@ typedef enum error_code_e {
 	 * malformed: a field has the wrong width, a separator is misplaced, or a
 	 * component is out of range (month 1–12, a valid day-of-month, hour 0–23,
 	 * minute 0–59, second 0–60 — 60 is a UTC leap second). Accepted shapes are
-	 * YYYY-MM-DD and YYYY-MM-DDTHH:MM:SS, each with an optional fractional second
-	 * and an optional trailing `Z` (UTC) or numeric `±HH:MM` offset. */
+	 * YYYY-MM-DD, or YYYY-MM-DDTHH:MM:SS with an optional fractional second and an
+	 * optional trailing `Z` (UTC) or numeric `±HH:MM` offset; the fraction and
+	 * zone attach only to the time-bearing form (a bare date takes neither). */
 	error_invalid_datetime_literal      = 45,
 	/* spec 1.1 — an ISO-8601 datetime literal was given for an atomic GNSS
 	 * epoch (gps, galileo, glonass, beidou). Those scales have no
@@ -828,7 +829,11 @@ BVN_API bool bvnr_write_float(bvnr_writer_t* w, const char* key,
  * "mjd", "ntp", "galileo", "glonass", "y2000", "beidou") or NULL for unix; an
  * unknown name is error_invalid_argument. `value` is signed seconds since the
  * epoch. Emits a <datetime:width,epoch> annotation (the epoch is implicit when
- * it is the default unix). The document must declare #!bovnar 1.1 to be re-read. */
+ * it is the default unix). A #!bovnar 1.1 directive must ALREADY have been emitted
+ * (set bvnr_write_flags_t.emit_version, or call bvnr_write_version right after
+ * open); a datetime written without it FAILS with error_unsupported_spec_version
+ * and emits nothing, since the directive cannot be added retroactively. That
+ * directive is also what lets the document be re-read. */
 BVN_API bool bvnr_write_datetime(bvnr_writer_t* w, const char* key,
 			  uint32_t width, const char* epoch, int64_t value);
 BVN_API bool bvnr_write_float_fix(bvnr_writer_t* w, const char* key,

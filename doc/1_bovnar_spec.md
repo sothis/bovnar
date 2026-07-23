@@ -1348,7 +1348,7 @@ The unit system supports **163 named base units** across SI, IEC-binary, Imperia
 | ronto | `r` | 10⁻²⁷ | `si_ronto` |
 | quecto | `q` | 10⁻³⁰ | `si_quecto` |
 
-> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8. ASCII `u` is accepted as an input-only alias for the micro prefix (`u~m` = `µ~m`); the canonical output is always `µ`.
+> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8. ASCII `u` is accepted as an input-only alias for the micro prefix (`u~m` = `µ~m`); `bvn_unit_to_string` and the `bvnr_write_*` helpers always render it as `µ`, though the pretty-print / canonicalize path preserves the input `u` at default `unit_flags`.
 
 ### 11.3 IEC Binary Prefixes
 
@@ -1393,7 +1393,7 @@ The `·` (middle dot, U+00B7, encoded as `0xC2 0xB7`) and `*` (asterisk) are sem
 
 The `/` separator divides the preceding components by the following ones. The first `/` switches all subsequent components into the denominator; additional `/` separators do not toggle back to the numerator. Every component after the first `/` is always in the denominator.
 
-**Parenthesised grouping.** A `(…)` group is a sub-expression evaluated independently; like any factor it obeys the latching denominator, so a `/` before a group negates the group's net exponents as a whole. Thus `k~g/(m·s²)` parses to `kg·m⁻¹·s⁻²` (identical to `k~g/m·s²`), while `(k~g/m)·s²` is `kg·m⁻¹·s²`. An explicit separator is required before a group (`m·(s)`, not `m(s)`); a group is not followed by its own exponent (`(m·s)²` is rejected); parentheses must balance and nest no deeper than 16. The writer emits the canonical, parenless form.
+**Parenthesised grouping.** A `(…)` group is a sub-expression evaluated independently; like any factor it obeys the latching denominator, so a `/` before a group negates the group's net exponents as a whole. Thus `k~g/(m·s²)` parses to `kg·m⁻¹·s⁻²` (identical to `k~g/m·s²`), while `(k~g/m)·s²` is `kg·m⁻¹·s²`. An explicit separator is required before a group (`m·(s)`, not `m(s)`); a group is not followed by its own exponent (`(m·s)²` is rejected); parentheses must balance and nest no deeper than 16. The `bvnr_write_*` helpers and `bvn_unit_to_string`, which build the unit from a parsed `value_unit`, emit the canonical, parenless form (`k~g/(m·s²)` → `k~g/m·s²`); the reader-driven pretty-print / canonicalize path preserves the source spelling verbatim unless a unit flag such as `BVN_UNIT_REDUCE` is set.
 
 **Within each `unit-component`:**
 

@@ -118,9 +118,10 @@ BVN_API int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int6
  * second == 60 of the PRECEDING day (2016-12-31T23:59:60, not 2017-01-01
  * 00:00:00), and bvn_dt_utc_to_tai_seconds() maps that spelling back to the TAI
  * second directly below the boundary.  second == 60 is the only field value in a
- * bvn_datetime_t that is not its own arithmetic value; it is produced by these
- * two functions alone -- bvn_dt_epoch_seconds_to_datetime() runs the uniform
- * scale and never emits it.
+ * bvn_datetime_t that is not its own arithmetic value; it is produced only by the
+ * TAI->civil renderers (bvn_dt_tai_seconds_to_utc and
+ * bvn_dt_tai_seconds_to_local_time) and consumed by bvn_dt_utc_to_tai_seconds --
+ * bvn_dt_epoch_seconds_to_datetime() runs the uniform scale and never emits it.
  *
  * Callers rendering a bvn_datetime_t must therefore allow second == 60, and
  * callers folding a UTC offset into one must not fold it into `second` (an ISO
@@ -151,10 +152,13 @@ BVN_API int bvn_dt_is_date_equal(bvn_datetime_t* a, bvn_datetime_t* b);
 BVN_API int bvn_dt_is_time_equal(bvn_datetime_t* a, bvn_datetime_t* b);
 BVN_API int bvn_dt_is_equal(bvn_datetime_t* a, bvn_datetime_t* b);
 
-/* Returns 1 if the TAI instant falls inside European daylight saving time
- * (last Sunday of March 01:00 UTC .. last Sunday of October 01:00 UTC),
- * 0 otherwise — including when the instant cannot be resolved (int64
- * extremes). */
+/* Returns 1 if the TAI instant falls inside German/European daylight saving
+ * time, 0 otherwise — including when the instant cannot be resolved (int64
+ * extremes). The window follows the rule actually in force that year, not a
+ * fixed one: none before 1980; 1980 ran 6 April 01:00 UTC .. last Sunday of
+ * September; 1981–1995 last Sunday of March .. last Sunday of September; from
+ * 1996 last Sunday of March .. last Sunday of October. Kept in step with the
+ * DST predicates in bvn_gregorian_date.c. */
 BVN_API int bvn_dt_tai_second_is_dls_in_europe(int64_t tai_second);
 
 BVN_API void bvn_dt_dump(bvn_datetime_t* dt);

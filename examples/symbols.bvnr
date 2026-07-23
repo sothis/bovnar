@@ -100,7 +100,7 @@
 # A null is the absence of any value token. A symbol is a present, named value.
 
 .nothing  = ;               # null (no value)
-.null_sym = null;           # symbol "null" — NOT a language-level null
+.null_sym = null;           # reserved keyword → a language-level null (same as `;`), NOT a symbol
 .none_sym = none;           # symbol "none" — purely application-defined
 
 

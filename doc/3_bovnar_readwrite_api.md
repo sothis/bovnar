@@ -962,8 +962,9 @@ int32_t n = bvn_format_uint64(buf, sizeof(buf), 255, 16, 2);
 /* Format 9.81 as a 64-bit float */
 value_type_spec_t vt = BVN_TYPE_FLOAT(64);
 n = bvn_format_double(buf, sizeof(buf), 9.81, vt);
-/* buf = "9.81e+0", n = 7 — the writer always emits an exponent, so the
-   value re-reads as a float and never as an integer carrier */
+/* buf = "9.81e+0", n = 7 — the writer emits an exponent for every non-zero
+   value (zero is written as "0.0" / "-0.0"), so a float always re-reads as a
+   float and never as an integer carrier */
 ```
 
 These strings are then placed into `bvnr_data_t.data` / `.length` before calling `bvnr_write_event(w, ev_data, &d)`.

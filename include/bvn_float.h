@@ -78,8 +78,9 @@ BVN_API void bvn_float_set_inf (bvn_float_t *f, bool neg);
 BVN_API void bvn_float_set_zero(bvn_float_t *f, bool neg);
 BVN_API bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src);
 /*
- * Parse a number in the given base into f (rounded to f's precision). Returns
- * false on malformed input. Note a capacity limit: a finite decimal whose exact
+ * Parse a number in base 10 or base 16 (the only bases supported) into f
+ * (rounded to f's precision). Returns false on malformed input or an
+ * unsupported base. Note a capacity limit: a finite decimal whose exact
  * value would need more than BVN_INT_MAX_BITS of intermediate precision -- i.e.
  * an extreme decimal exponent (on this build, magnitude beyond ~1e9865 -- the
  * exact bound shifts slightly with the number of coefficient digits), such as

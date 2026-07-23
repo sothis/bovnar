@@ -44,6 +44,10 @@ EXCLUDES=(
     "doc/iana_media_type.md"
     "doc/datetime_fractional_seconds.md"
     "doc/bovnar_pipeline.svg"
+    # A draft German Wikipedia article about the format. Working document, not
+    # referenced anywhere on the site, and MediaWiki markup a browser would show
+    # as raw source -- no reason to serve it from the live root.
+    "doc/wiki"
     "httpd.sh"
     # Translation SOURCE tables. They are a build input -- gen_i18n.py has
     # already baked them into web/<lang>/index.html by the time we stage -- and

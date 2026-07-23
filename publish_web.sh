@@ -109,6 +109,17 @@ else
     python3 "$ROOT/gen_csp.py"
 fi
 
+# ── 1a2. Regenerate the LLM-facing views ────────────────────────────────────
+# llms.txt, index.md, and llms-full.txt are built from README.md + doc/*.md so
+# they can never drift from the real documentation. gen_llms.py --check fails the
+# dry run if the committed copies are stale.
+echo "==> Generating LLM views (gen_llms.py)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    python3 "$ROOT/gen_llms.py" --check
+else
+    python3 "$ROOT/gen_llms.py"
+fi
+
 # ── 1b. Regenerate the translated editions ──────────────────────────────────
 # web/<lang>/index.html is generated, git-ignored, and rebuilt on every publish,
 # so a translated page can never lag behind the English source it is spliced

@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+"""Generate the LLM-facing plain-text/Markdown views of the Bovnar website.
+
+Produces three files under web/ from the canonical Markdown sources (README.md
+and doc/*.md), so they can never drift from the real documentation:
+
+  web/llms.txt        curated content map per the llmstxt.org convention:
+                      an H1 name, a one-line summary, and H2 sections of
+                      annotated links to the Markdown docs and project resources.
+  web/index.md        a clean Markdown rendering of the landing page (the
+                      "/index.md" alternate advertised from index.html), sliced
+                      from README's overview/features sections plus a docs index.
+  web/llms-full.txt   the whole documentation set concatenated into one file,
+                      the single-fetch view (llms-full.txt convention).
+
+publish_web.sh runs this before staging, so the live site is always current.
+Run it by hand any time to refresh the committed copies:  python3 gen_llms.py
+"""
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+WEB = os.path.join(ROOT, "web")
+SITE = "https://www.bovnar.io"
+REPO = "https://github.com/sothis/bovnar"
+
+# Served Markdown docs (doc/ is symlinked to web/doc/), in reading order, with a
+# display title, the URL slug, and a one-line description for the link maps.
+DOCS = [
+    ("0_bovnar_tutorial.md",     "Tutorial",
+     "A guided introduction to writing and reading Bovnar documents."),
+    ("1_bovnar_spec.md",         "Specification",
+     "The complete format specification (spec 1.1): grammar, types, units, limits."),
+    ("2_bovnar_unit_system.md",  "Unit system",
+     "The 163 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors."),
+    ("3_bovnar_readwrite_api.md","Read & Write C API",
+     "The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h)."),
+    ("4_bovnar_python_bindings.md","Python bindings",
+     "The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges."),
+    ("5_bovnar.ebnf",            "EBNF grammar",
+     "The formal grammar, annotated against the reference lexer/validator."),
+    ("6_bovnar_faq.md",          "FAQ",
+     "Common questions on types, units, limits, encoding, and the API."),
+    ("7_bovnar_conformance.md",  "Conformance",
+     "The 319-case conformance suite and the IUT protocol for third-party implementations."),
+    ("8_unit_cheatsheet.md",     "Unit & currency cheatsheet",
+     "Every unit symbol, prefix, and currency code in one reference table."),
+    ("9_bovnar_streaming.md",    "Streaming & framing",
+     "Octet streams, frames, multiplexing/demultiplexing, and embedded documents."),
+]
+
+# External project resources for the llms.txt "Project" section.
+PROJECT_LINKS = [
+    (f"{SITE}/", "Website",
+     "The Bovnar homepage and interactive browser playground."),
+    (REPO, "Source (GitHub)",
+     "The C99 reference implementation, Python bindings, and tooling (MIT-licensed)."),
+    ("https://www.iana.org/assignments/media-types/text/vnd.bovnar",
+     "IANA media type (text/vnd.bovnar)",
+     "The registered media type for .bvnr documents."),
+    ("https://zenodo.org/records/21443296",
+     "DOI — Documentation & Specification (1.1.0)",
+     "Archived, citable release of the specification and documentation."),
+    ("https://zenodo.org/records/21443009",
+     "DOI — Source (1.1.0)",
+     "Archived, citable release of the source code."),
+]
+
+
+def read(path):
+    with open(path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def write(path, text):
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    print(f"  wrote {os.path.relpath(path, ROOT)} ({len(text.encode('utf-8'))} bytes)")
+
+
+def split_readme_sections(md):
+    """Return (preamble, {h2_title: body}) split on level-2 headings.
+
+    Badge lines ([![...]](...)) are stripped from the preamble. Body text keeps
+    its original Markdown verbatim.
+    """
+    lines = md.splitlines()
+    preamble = []
+    sections = {}
+    order = []
+    cur = None
+    buf = []
+    for line in lines:
+        m = re.match(r"^##\s+(.*\S)\s*$", line)
+        if m:
+            if cur is None:
+                preamble = buf
+            else:
+                sections[cur] = "\n".join(buf).strip("\n")
+            cur = m.group(1).strip()
+            order.append(cur)
+            buf = []
+        else:
+            buf.append(line)
+    if cur is None:
+        preamble = buf
+    else:
+        sections[cur] = "\n".join(buf).strip("\n")
+    # drop badge/image-only lines and the horizontal rules from the preamble
+    pre = [l for l in preamble
+           if not l.strip().startswith("[![") and l.strip() != "---"]
+    return "\n".join(pre).strip("\n"), sections, order
+
+
+def tagline(preamble):
+    for line in preamble.splitlines():
+        s = line.strip()
+        if s.startswith("**") and s.endswith("**") and len(s) > 4:
+            return s.strip("*").strip()
+    return "Unit-safe serialization for scientific and industrial systems."
+
+
+def docs_index_md():
+    out = ["## Documentation", ""]
+    for slug, title, desc in DOCS:
+        out.append(f"- [{title}]({SITE}/doc/{slug}) — {desc}")
+    out.append("")
+    out.append(f"A single-file copy of the full documentation is at "
+               f"[{SITE}/llms-full.txt]({SITE}/llms-full.txt). "
+               f"PDF editions live under [{SITE}/doc/pdf/]({SITE}/doc/pdf/).")
+    return "\n".join(out)
+
+
+def build_index_md(preamble, sections):
+    """The Markdown landing page: title + tagline + the load-bearing README
+    sections + a generated documentation index."""
+    parts = [preamble, ""]
+    for name in ("Links", "Overview", "Key Features", "Format at a Glance"):
+        if name in sections:
+            parts.append(f"## {name}")
+            parts.append("")
+            parts.append(sections[name])
+            parts.append("")
+    parts.append(docs_index_md())
+    parts.append("")
+    return "\n".join(parts).rstrip("\n") + "\n"
+
+
+def build_llms_txt(tag):
+    out = []
+    out.append("# Bovnar (BVNR)")
+    out.append("")
+    out.append(f"> {tag}")
+    out.append("")
+    out.append("Bovnar is a self-describing data serialization format: every value "
+               "carries its own type family, bit-width, numeric base, and physical "
+               "unit inline, validated by the parser, with no external schema. This "
+               "file maps the Markdown documentation and project resources.")
+    out.append("")
+    out.append("## Documentation")
+    out.append("")
+    for slug, title, desc in DOCS:
+        out.append(f"- [{title}]({SITE}/doc/{slug}): {desc}")
+    out.append("")
+    out.append("## Project")
+    out.append("")
+    for url, title, desc in PROJECT_LINKS:
+        out.append(f"- [{title}]({url}): {desc}")
+    out.append("")
+    out.append("## Optional")
+    out.append("")
+    out.append(f"- [Landing page (Markdown)]({SITE}/index.md): "
+               "A clean Markdown rendering of the homepage.")
+    out.append(f"- [Full documentation (single file)]({SITE}/llms-full.txt): "
+               "The entire documentation set concatenated for one-fetch ingestion.")
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+def build_llms_full(index_md):
+    parts = []
+    parts.append("# Bovnar (BVNR) — Full documentation")
+    parts.append("")
+    parts.append("This single file concatenates the Bovnar landing page and the "
+                 "complete documentation set, for one-fetch ingestion by LLM tools. "
+                 f"The canonical, individually-linkable Markdown sources live under "
+                 f"{SITE}/doc/.")
+    parts.append("")
+    parts.append("<!-- ==================== Landing page ==================== -->")
+    parts.append("")
+    parts.append(index_md.rstrip("\n"))
+    parts.append("")
+    for slug, title, _desc in DOCS:
+        body = read(os.path.join(ROOT, "doc", slug)).rstrip("\n")
+        parts.append(f"<!-- ==================== {title} "
+                     f"({SITE}/doc/{slug}) ==================== -->")
+        parts.append("")
+        parts.append(body)
+        parts.append("")
+    return "\n".join(parts).rstrip("\n") + "\n"
+
+
+def main():
+    check = "--check" in sys.argv[1:]
+    readme = read(os.path.join(ROOT, "README.md"))
+    preamble, sections, _order = split_readme_sections(readme)
+    tag = tagline(preamble)
+
+    index_md = build_index_md(preamble, sections)
+    llms_txt = build_llms_txt(tag)
+    llms_full = build_llms_full(index_md)
+
+    targets = {
+        os.path.join(WEB, "index.md"): index_md,
+        os.path.join(WEB, "llms.txt"): llms_txt,
+        os.path.join(WEB, "llms-full.txt"): llms_full,
+    }
+
+    if check:
+        stale = []
+        for path, text in targets.items():
+            cur = read(path) if os.path.exists(path) else None
+            if cur != text:
+                stale.append(os.path.relpath(path, ROOT))
+        if stale:
+            print("gen_llms.py --check: stale/missing: " + ", ".join(stale),
+                  file=sys.stderr)
+            return 1
+        print("gen_llms.py --check: llms.txt / index.md / llms-full.txt are current")
+        return 0
+
+    print("==> Generating LLM views (gen_llms.py)")
+    for path, text in targets.items():
+        write(path, text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

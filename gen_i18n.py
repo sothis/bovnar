@@ -38,6 +38,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import gen_csp
 import html.parser
 import json
 import re
@@ -510,7 +511,7 @@ def generate(lang: str, check_only: bool) -> int:
         # Always run the rewrites, even when there is nothing to compare
         # against: that is what exercises the once() guards, and web/<lang>/ is
         # git-ignored so a fresh clone would otherwise never reach them.
-        fresh = localize_document(splice(src, edits), lang, table)
+        fresh = build_page(src, edits, lang, table)
         dest = WEB / lang / "index.html"
         if dest.exists():
             if dest.read_text(encoding="utf-8") != fresh:
@@ -524,7 +525,7 @@ def generate(lang: str, check_only: bool) -> int:
                          else f"; web/{lang}/index.html not built yet"))
         return 0
 
-    doc = localize_document(splice(src, edits), lang, table)
+    doc = build_page(src, edits, lang, table)
 
     dest_dir = WEB / lang
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -551,6 +552,13 @@ def splice(src: str, edits) -> str:
         pos = e
     out.append(src[pos:])
     return "".join(out)
+
+
+def build_page(src, edits, lang, table):
+    """Splice translations, localise metadata, then stamp the CSP LAST -- after
+    the boot script is injected, so its hash is part of the recomputed policy."""
+    doc = localize_document(splice(src, edits), lang, table)
+    return gen_csp.stamp(doc)
 
 
 def localize_document(doc: str, lang: str, table: dict) -> str:

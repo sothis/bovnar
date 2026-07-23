@@ -95,6 +95,16 @@ if ! ls "$PDF_BUILD_DIR"/*.pdf >/dev/null 2>&1; then
     echo "         Re-run with --pdf to generate them." >&2
 fi
 
+# ── 1a. Stamp the Content-Security-Policy into the served-directly pages ─────
+# index.html and impressum.html carry a hash-based CSP that must match their
+# inline scripts. gen_i18n.py restamps the translated editions itself.
+echo "==> Stamping CSP (gen_csp.py)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    python3 "$ROOT/gen_csp.py" --check
+else
+    python3 "$ROOT/gen_csp.py"
+fi
+
 # ── 1b. Regenerate the translated editions ──────────────────────────────────
 # web/<lang>/index.html is generated, git-ignored, and rebuilt on every publish,
 # so a translated page can never lag behind the English source it is spliced

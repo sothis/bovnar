@@ -22,7 +22,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
 7. [`bvnr_reader_get_error` and friends](#7-bvnr_reader_get_error-and-friends)
 7a. [Version directive (spec 1.1)](#7a-version-directive-spec-11)
 7b. [Datetime family (spec 1.1)](#7b-datetime-family-spec-11)
-7c. [Read-time unit conversion (`want_unit`)](#7c-read-time-unit-conversion-want_unit)
+7c. [Read-time lossless unit / base conversion (`want_unit`)](#7c-read-time-lossless-unit--base-conversion-want_unit)
 8. [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#8-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
 
 **Writer**

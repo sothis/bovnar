@@ -54,6 +54,20 @@ def git_date(relpath, first=False):
 DOC_DIR = os.path.join(ROOT, "doc")
 OUT_DIR = os.path.join(ROOT, "web", "docs")
 SITE = "https://www.bovnar.io"
+
+
+def css_stamp(relpath):
+    """?v=<first 12 of sha256> for a stylesheet these pages link.
+
+    The landing page content-stamps every versioned asset (wasm/build_wasm.sh)
+    and the server now serves a 12-hex ?v= as immutable for a year. The doc
+    pages linked both stylesheets bare, so an edit to either reached a returning
+    visitor only after the short fallback TTL expired. Stamping here costs
+    nothing extra to police: --check regenerates these pages, so a changed
+    stylesheet that was not re-generated fails the suite like any other drift.
+    """
+    with open(os.path.join(ROOT, "web", relpath), "rb") as fh:
+        return "?v=" + hashlib.sha256(fh.read()).hexdigest()[:12]
 VERSION = "1.1"
 
 # source, clean URL slug, PDF slug, title, meta description.
@@ -277,8 +291,8 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <meta name="twitter:description" content="{esc(description)}">
 <meta name="twitter:image" content="{SITE}/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
-<link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/docs/docs.css">
+<link rel="stylesheet" href="/fonts/fonts.css{css_stamp("fonts/fonts.css")}">
+<link rel="stylesheet" href="/docs/docs.css{css_stamp("docs/docs.css")}">
 {extra_head}</head>
 <body>
 {HEADER}

@@ -60,9 +60,14 @@ map $http_accept $bvnr_wants_md {
 # request for the same path WITHOUT ?v= is not necessarily the same bytes
 # forever, so it gets a short TTL and revalidates instead. HTML is left alone:
 # it carries an ETag and must reflect a publish immediately.
+#
+# Only a 12-hex-char stamp qualifies, because that is the shape build_wasm.sh
+# emits and cmake/cache_stamps.cmake verifies. A hand-written stamp gets the
+# short TTL rather than a year: fonts/fonts.css shipped as ?v=20260724 for
+# months, correct only while someone remembered to bump it.
 map $arg_v $bvnr_cache_ctl {
-    default  "public, max-age=3600";
-    "~.+"    "public, max-age=31536000, immutable";
+    default            "public, max-age=3600";
+    "~^[0-9a-f]{12}$"  "public, max-age=31536000, immutable";
 }
 
 # Canonical host (only the additions inside are new; TLS/redirect blocks unchanged).
@@ -298,9 +303,16 @@ map $http_accept $bvnr_wants_md {
 # (wasm/build_wasm.sh stamps them from the file's own bytes), so a fingerprinted
 # URL is safe to cache forever -- that is the point of the fingerprint. A bare
 # path is not necessarily the same bytes forever, so it revalidates sooner.
+# Only a 12-hex-char stamp earns the immutable year, because that is what
+# build_wasm.sh emits (sha256 of the file, cut -c1-12) and it is verified by
+# cmake/cache_stamps.cmake. Anything else -- a hand-written date, a hand-edited
+# value -- falls to the short TTL instead of pinning a stale asset in caches for
+# a year. fonts/fonts.css was exactly that case: ?v=20260724, kept correct only
+# by whoever remembered to bump it. It is content-hashed now, and this pattern
+# means the next one to slip through is merely uncached, not wrong.
 map $arg_v $bvnr_cache_ctl {
-    default  "public, max-age=3600";
-    "~.+"    "public, max-age=31536000, immutable";
+    default            "public, max-age=3600";
+    "~^[0-9a-f]{12}$"  "public, max-age=31536000, immutable";
 }
 
 # Search consolidation: the full "Link: rel=canonical" value (RFC 8288 — URI in

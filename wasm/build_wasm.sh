@@ -142,7 +142,16 @@ sed -i -E "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/in
 # visitors from cache. Key it on its own content, like the other two.
 HL_HASH="$(sha256sum "$ROOT/web/bovnar_highlight.js" | cut -c1-12)"
 sed -i -E "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/index.html"
-echo ">> stamped web/ module chain: core v=${CORE_HASH}, wrapper v=${WRAP_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}"
+# fonts/fonts.css was the last hand-written stamp on the page -- a date, ?v=20260724,
+# carried over from the same batch as the highlighter's. It survived on luck: the
+# one commit that changed the file (pruning 30 webfont faces to 14) happened to
+# bump the date too. Nothing enforced that, and the site now serves a ?v= URL as
+# "max-age=31536000, immutable", so a single forgotten bump would pin the old
+# stylesheet in returning visitors' caches for a year instead of revalidating.
+# Key it on its own bytes like the other four; cache_stamps.cmake covers it now.
+FONTS_HASH="$(sha256sum "$ROOT/web/fonts/fonts.css" | cut -c1-12)"
+sed -i -E "s#(fonts/fonts\.css\?v=)[0-9a-zA-Z]+#\1${FONTS_HASH}#" "$ROOT/web/index.html"
+echo ">> stamped web/ module chain: core v=${CORE_HASH}, wrapper v=${WRAP_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}, fonts v=${FONTS_HASH}"
 
 echo ">> done:"
 ls -la "$OUT"

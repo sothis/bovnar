@@ -13,6 +13,9 @@ runs **nginx** — the tailored block for the live config is below; an Apache
 equivalent follows as a portable alternative. All three are additive and safe:
 they only add response headers and an `Accept`-based redirect for the home page.
 
+0. **HTTP/2** (`http2 on;`) — ALPN advertised only `http/1.1` before, so the page
+   and its subresources shared one connection pool with the usual six-connection
+   cap. Clients that do not speak h2 still negotiate 1.1.
 1. **`text/markdown` MIME type** for `.md` files (RFC 7763) — so `/index.md` and
    `/doc/*.md` are served as Markdown, not `text/plain` or a download. `.ebnf`
    (the single non-Markdown document) gets `text/plain` for the same reason.
@@ -335,6 +338,11 @@ map $uri $bvnr_canon_hdr {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    # ALPN offered only http/1.1 before this, so every visit fetched the page and
+    # its 15 subresources over HTTP/1.1 with the usual 6-connection cap and
+    # head-of-line blocking. Directive form, not "listen ... http2", which nginx
+    # deprecated in 1.25.1. Clients that do not speak h2 still negotiate 1.1.
+    http2 on;
     server_name www.bovnar.io;
 
     root /var/www/html;
@@ -437,8 +445,10 @@ server {
     include                 /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam             /etc/letsencrypt/ssl-dhparams.pem;
 
-    ssl_stapling on;
-    ssl_stapling_verify on;
+    # ssl_stapling removed: Let's Encrypt has retired OCSP and its certificates
+    # carry no responder URL, so nginx logged "ssl_stapling ignored" on every
+    # config test and reload while stapling nothing. A standing benign warning
+    # is how a real one gets missed.
 
     add_header Strict-Transport-Security "max-age=31536000" always;
 }
@@ -447,6 +457,7 @@ server {
 server {
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
+    http2 on;
     server_name bovnar.io
                 bovnar.com www.bovnar.com
                 bovnar.net www.bovnar.net

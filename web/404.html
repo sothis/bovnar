@@ -64,6 +64,9 @@ a.btn {
 }
 a.btn:hover { border-color: var(--accent); }
 a.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+p.legal { margin: 1.8rem 0 0; font-size: 0.85rem; }
+p.legal a { color: var(--muted); }
+p.legal a:hover { color: var(--accent); }
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   background: var(--bg); padding: 0.1em 0.4em; border-radius: 4px;
@@ -93,6 +96,10 @@ code {
     <a class="btn" href="/#playground">Playground</a>
     <a class="btn" href="https://github.com/sothis/bovnar">GitHub</a>
   </div>
+  <!-- Every page of the offering has to reach the provider identification
+       (§ 5 DDG), and a 404 is a page like any other -- often the first one a
+       visitor sees. Small and out of the way, but present. -->
+  <p class="legal"><a href="/impressum.html">Impressum</a></p>
 </main>
 </body>
 </html>

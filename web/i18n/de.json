@@ -395,7 +395,9 @@
     "ind.g.flow": "Zulauf",
     "ind.g.heat": "Heizung",
     "ind.g.agit": "Rührwerk",
-    "ind.dial.press": "DRUCK bar"
+    "ind.dial.press": "DRUCK bar",
+    "pg.eventCount.one": "$N Event",
+    "pg.eventCount.other": "$N Events"
   },
   "_orphaned": {
     "units": {

@@ -327,10 +327,15 @@ BACK_TOP_BTN = (
     'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     '<path d="M12 19V6M5 13l7-7 7 7"/></svg></button>')
 
+# The Impressum belongs in every footer, not just the landing page's. These pages
+# are indexable and rank on their own, so a reader arriving from a search engine
+# lands here with no route to the provider identification that § 5 DDG requires
+# to be reachable from any page of the offering.
 FOOTER = (
     '<footer>Bovnar (BVNR) v' + VERSION +
     ' · <a href="/">Home</a> · <a href="/docs/">All docs</a> · '
-    '<a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed'
+    '<a href="https://github.com/sothis/bovnar">Source</a> · '
+    '<a href="/impressum.html">Impressum</a> · MIT-licensed'
     '</footer>')
 
 

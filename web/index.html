@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-dS9RBYTyFcQ/GvwwRIEZ0GVzXeuGlnePH+grNJ2rl1Y=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-BUpm72Gwn6KNkSx8RzU/bR+5mmMAjYoSpP59hFgSITc=' 'sha256-s9+QAwRuDI9AwiPlQFQwUu6vx0vJ9Bo5ydCYZxqvr/4=' 'sha256-jlqXQkcRPQ9KY1+NEIjZ+OyQC61t9z6pvKJh3FNWBz0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-hC1+rjhPRb6hDDjo7/9MQEF0p3w+OB0cSfI1rLKWq7A=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-u+resVsSlbgDnBnE8zCTNkCkiQwKNYZvrnJpbEY/Ino=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-BUpm72Gwn6KNkSx8RzU/bR+5mmMAjYoSpP59hFgSITc=' 'sha256-s9+QAwRuDI9AwiPlQFQwUu6vx0vJ9Bo5ydCYZxqvr/4=' 'sha256-jlqXQkcRPQ9KY1+NEIjZ+OyQC61t9z6pvKJh3FNWBz0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-hC1+rjhPRb6hDDjo7/9MQEF0p3w+OB0cSfI1rLKWq7A=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -4116,6 +4116,16 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     if (statusEl.style.color !== color) statusEl.style.color = color;
   }
 
+  // The badge next to it starts as markup ("0 events"), which gen_i18n.py
+  // translates, and was then overwritten on every parse with a string built in
+  // English here -- so the German playground read "0 Events" until you typed,
+  // and "12 events" from then on. Runtime strings have to go through bvnrT();
+  // markup translation cannot reach them.
+  function eventCount(n) {
+    return (n === 1 ? bvnrT('pg.eventCount.one', '$N event')
+                    : bvnrT('pg.eventCount.other', '$N events')).replace('$N', n);
+  }
+
   /* ── Syntax highlighter — shared, vim-consistent (bovnar_highlight.js) ── */
   function highlightBovnar(src) { return BovnarHighlight.highlight(src); }
 
@@ -4417,7 +4427,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     frag.appendChild(leaf(evName('ev_stream_end')));
     treeEl.appendChild(frag);
 
-    countEl.textContent = res.events.length + ' event' + (res.events.length !== 1 ? 's' : '');
+    countEl.textContent = eventCount(res.events.length);
 
     /* errors come straight from parseF — the real WASM parser, once
        bovnar_parser_wasm.js has loaded it (empty until then). */
@@ -4478,7 +4488,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         treeEl.innerHTML = '';
         treeEl.appendChild(empty);
         empty.style.display = 'flex';
-        countEl.textContent = '0 events';
+        countEl.textContent = eventCount(0);
         setStatus(bvnrT('pg.ready', 'ready'), '');
         errPanel.classList.add('empty');
         errCount.textContent = '';

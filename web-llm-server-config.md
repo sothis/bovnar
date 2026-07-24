@@ -40,9 +40,10 @@ redirect blocks stay as they are. Two nginx specifics are handled below:
   site config file, *above* the `server` blocks (a site file under
   `sites-enabled/` is included inside `http{}`).
 - **`add_header` replaces inherited headers at a new level.** The moment
-  `location = /` declares its own `add_header`, the server-level
-  `Strict-Transport-Security` stops inheriting *there* — so HSTS is repeated
-  inside that location.
+  `location = /` declares its own `add_header`, the server-level headers stop
+  inheriting *there* — so every such location `include`s
+  `snippets/bovnar-headers.conf` (documented below) instead of restating them
+  one at a time and losing one of them the next time the set grows.
 
 ```nginx
 # AI/LLM content negotiation: does the client prefer Markdown? (technique 3)
@@ -122,7 +123,7 @@ server {
         add_header Link '</index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
 
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
 
         try_files /index.html =404;
     }
@@ -132,7 +133,7 @@ server {
         if ($bvnr_wants_md) { return 302 /de/index.md; }
         add_header Link '</de/index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
         try_files /de/index.html =404;
     }
 
@@ -172,11 +173,12 @@ server {
     }
 
     # Static assets only -- see the $bvnr_cache_ctl map. Declaring add_header
-    # here stops this location inheriting the server-level HSTS, so it repeats
-    # it (the same trap as the home-page locations above).
-    location ~* \.(js|css|woff2|jpe?g|png|svg|ico)$ {
+    # here stops this location inheriting the server-level headers, so it
+    # includes them (the same trap as the home-page locations above). pdf and zip
+    # are in the list because the documentation ships as both.
+    location ~* \.(js|css|woff2|jpe?g|png|svg|ico|pdf|zip)$ {
         add_header Cache-Control "$bvnr_cache_ctl" always;
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
@@ -278,10 +280,10 @@ Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
 `/de/index.md` get no canonical header, while the doc `.md` do:
 
 ```nginx
-    # (add to the existing .md location; also repeat HSTS there, since declaring
-    #  add_header stops the location inheriting the server-level HSTS)
+    # (add to the existing .md location; also include the shared header snippet
+    #  there, since declaring add_header stops the location inheriting it)
     add_header Link "$bvnr_canon_hdr" always;
-    add_header Strict-Transport-Security "max-age=31536000" always;
+    include snippets/bovnar-headers.conf;
 ```
 
 `/doc/5_bovnar.ebnf` isn't matched by the `.md` location, and is deliberately left
@@ -494,7 +496,13 @@ server {
     # all before this, so every asset revalidated on every visit. Declaring
     # add_header here stops this location inheriting the server-level headers, so
     # it includes them (same trap as the home-page locations above).
-    location ~* \.(js|css|woff2|jpe?g|png|svg|ico)$ {
+    #
+    # pdf and zip are here because the documentation ships as both: ten PDFs and
+    # a 2.5 MB bundle, none of which matched this list, so each download
+    # revalidated on every visit while every other asset on the site was told
+    # what to do. They are regenerated on publish, hence the map's short default
+    # rather than a year -- a stale PDF for an hour, not for a year.
+    location ~* \.(js|css|woff2|jpe?g|png|svg|ico|pdf|zip)$ {
         add_header Cache-Control "$bvnr_cache_ctl" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;

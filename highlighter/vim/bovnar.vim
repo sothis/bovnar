@@ -3,11 +3,11 @@ syn clear
 hi BovnarComment      ctermfg=240 guifg=#6e7a86 gui=none
 hi BovnarKeySigil     ctermfg=135 guifg=#c084fc
 hi BovnarKeyName      ctermfg=39  guifg=#67d1f4
-hi BovnarSemicolon    ctermfg=66  guifg=#5a6270 gui=none
+hi BovnarSemicolon    ctermfg=245 guifg=#828d9a gui=none
 hi BovnarAssign       ctermfg=203 guifg=#f47067
 hi BovnarType         ctermfg=255 guifg=#e8e8e8 gui=bold
 hi BovnarTypeDelim    ctermfg=186 guifg=#a09040 gui=none
-hi BovnarTypeSep      ctermfg=246 guifg=#6e7a86 gui=none
+hi BovnarTypeSep      ctermfg=246 guifg=#8a94a1 gui=none
 hi BovnarTypeParam    ctermfg=209 guifg=#da844c gui=none
 hi BovnarTypeBitWidth ctermfg=205 guifg=#ff5faf gui=none
 hi BovnarTypeBase     ctermfg=158 guifg=#afffd7 gui=none
@@ -21,22 +21,22 @@ hi BovnarEscape       ctermfg=72  guifg=#5ab06e gui=bold
 hi BovnarInvalidEsc   ctermfg=203 guifg=#f47067 gui=undercurl
 hi BovnarSymbol       ctermfg=39  guifg=#67d1f4 gui=none
 hi BovnarRefOp        ctermfg=203 guifg=#f47067 gui=bold
-hi BovnarRefPath      ctermfg=214 guifg=#d06070 gui=none
+hi BovnarRefPath      ctermfg=168 guifg=#d4737f gui=none
 hi BovnarDirective    ctermfg=170 guifg=#c084fc gui=bold
 hi BovnarDateTime     ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarArrayDelim1  ctermfg=209 guifg=#da844c gui=none
 hi BovnarArrayDelim2  ctermfg=135 guifg=#c084fc gui=none
-hi BovnarArrayDelim3  ctermfg=200 guifg=#ff2a7d gui=none
+hi BovnarArrayDelim3  ctermfg=204 guifg=#ff5f96 gui=none
 hi BovnarArrayDelim4  ctermfg=214 guifg=#ffa500 gui=none
 hi BovnarArrayDelim5  ctermfg=46  guifg=#87d88c gui=none
-hi BovnarArraySep     ctermfg=66  guifg=#6e7a86 gui=none
-hi BovnarRowSep       ctermfg=66  guifg=#6e7a86 gui=none
-hi BovnarUnitSep      ctermfg=66  guifg=#6e7a86 gui=none
+hi BovnarArraySep     ctermfg=246 guifg=#8a94a1 gui=none
+hi BovnarRowSep       ctermfg=246 guifg=#8a94a1 gui=none
+hi BovnarUnitSep      ctermfg=246 guifg=#8a94a1 gui=none
 hi BovnarUnitPrefix   ctermfg=80  guifg=#5eead4 gui=none
-hi BovnarUnitTilde    ctermfg=66  guifg=#6e7a86 gui=none
+hi BovnarUnitTilde    ctermfg=246 guifg=#8a94a1 gui=none
 hi BovnarUnitExp      ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarTypeUnit     ctermfg=80  guifg=#5eead4 gui=none
-hi BovnarTypeUnitSep  ctermfg=66  guifg=#6e7a86 gui=none
+hi BovnarTypeUnitSep  ctermfg=246 guifg=#8a94a1 gui=none
 hi BovnarTypeUnitExp  ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarTypePrefix   ctermfg=80  guifg=#5eead4 gui=none
 hi BovnarOctetData    ctermfg=102 guifg=#6272a4 gui=italic
@@ -46,7 +46,7 @@ hi BovnarBoolean      ctermfg=170 guifg=#c084fc gui=bold
 " 8 cycling colors for { } depth — levels 1,9,17,… share color 1; 2,10,18,… color 2; etc.
 hi BovnarStructDelim1 ctermfg=209 guifg=#da844c gui=none
 hi BovnarStructDelim2 ctermfg=135 guifg=#c084fc gui=none
-hi BovnarStructDelim3 ctermfg=200 guifg=#ff2a7d gui=none
+hi BovnarStructDelim3 ctermfg=204 guifg=#ff5f96 gui=none
 hi BovnarStructDelim4 ctermfg=214 guifg=#ffa500 gui=none
 hi BovnarStructDelim5 ctermfg=46  guifg=#87d88c gui=none
 hi BovnarStructDelim6 ctermfg=80  guifg=#5eead4 gui=none

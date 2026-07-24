@@ -187,7 +187,7 @@
     {
       "name": "Bovnar Semicolon",
       "scope": "punctuation.terminator.semicolon.bovnar",
-      "settings": { "foreground": "#5a6270" }
+      "settings": { "foreground": "#828d9a" }
     },
     {
       "name": "Bovnar Assignment Operator",
@@ -225,7 +225,7 @@
         "punctuation.separator.colon.bovnar",
         "punctuation.separator.comma.bovnar"
       ],
-      "settings": { "foreground": "#6e7a86" }
+      "settings": { "foreground": "#8a94a1" }
     },
     {
       "name": "Bovnar Unit Expression (type annotation)",
@@ -243,13 +243,13 @@
 
     { "name": "Bovnar Array Depth 1",  "scope": "punctuation.section.array.depth1.bovnar", "settings": { "foreground": "#da844c" } },
     { "name": "Bovnar Array Depth 2",  "scope": "punctuation.section.array.depth2.bovnar", "settings": { "foreground": "#c084fc" } },
-    { "name": "Bovnar Array Depth 3",  "scope": "punctuation.section.array.depth3.bovnar", "settings": { "foreground": "#ff2a7d" } },
+    { "name": "Bovnar Array Depth 3",  "scope": "punctuation.section.array.depth3.bovnar", "settings": { "foreground": "#ff5f96" } },
     { "name": "Bovnar Array Depth 4",  "scope": "punctuation.section.array.depth4.bovnar", "settings": { "foreground": "#ffa500" } },
     { "name": "Bovnar Array Depth 5",  "scope": "punctuation.section.array.depth5.bovnar", "settings": { "foreground": "#87d88c" } },
 
     { "name": "Bovnar Struct Depth 1", "scope": "punctuation.section.struct.depth1.bovnar", "settings": { "foreground": "#da844c" } },
     { "name": "Bovnar Struct Depth 2", "scope": "punctuation.section.struct.depth2.bovnar", "settings": { "foreground": "#c084fc" } },
-    { "name": "Bovnar Struct Depth 3", "scope": "punctuation.section.struct.depth3.bovnar", "settings": { "foreground": "#ff2a7d" } },
+    { "name": "Bovnar Struct Depth 3", "scope": "punctuation.section.struct.depth3.bovnar", "settings": { "foreground": "#ff5f96" } },
     { "name": "Bovnar Struct Depth 4", "scope": "punctuation.section.struct.depth4.bovnar", "settings": { "foreground": "#ffa500" } },
     { "name": "Bovnar Struct Depth 5", "scope": "punctuation.section.struct.depth5.bovnar", "settings": { "foreground": "#87d88c" } },
     { "name": "Bovnar Struct Depth 6", "scope": "punctuation.section.struct.depth6.bovnar", "settings": { "foreground": "#5eead4" } },
@@ -298,7 +298,7 @@
     {
       "name": "Bovnar Inline Unit Separator Whitespace",
       "scope": "punctuation.separator.inline-unit.bovnar",
-      "settings": { "foreground": "#6e7a86" }
+      "settings": { "foreground": "#8a94a1" }
     },
     {
       "name": "Bovnar Inline Unit",
@@ -318,12 +318,12 @@
     {
       "name": "Bovnar Reference Path",
       "scope": "variable.other.reference-path.bovnar",
-      "settings": { "foreground": "#d06070" }
+      "settings": { "foreground": "#d4737f" }
     },
     {
       "name": "Bovnar Array/Row Separators",
       "scope": "punctuation.separator.array-row.bovnar",
-      "settings": { "foreground": "#6e7a86" }
+      "settings": { "foreground": "#8a94a1" }
     },
     {
       "name": "Bovnar Version Directive (spec 1.1)",

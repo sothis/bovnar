@@ -277,8 +277,10 @@ in the next section.
 
 ## Complete assembled nginx config
 
-The live `www.bovnar.io` config, with every AI/SEO addition folded in (the two
-apex/`.com`/`.net`/`.org` redirect blocks are unchanged from the original):
+The live `www.bovnar.io` config — this block is a verbatim copy of
+`/etc/nginx/sites-available/bovnar` as applied, with every AI/SEO, MIME,
+compression and caching addition folded in (the two apex/`.com`/`.net`/`.org`
+redirect blocks are unchanged from the original):
 
 ```nginx
 ##
@@ -292,20 +294,18 @@ map $http_accept $bvnr_wants_md {
     "~*text/markdown"  1;
 }
 
-# Cache policy. Every versioned asset on the page is requested as
-# <path>?v=<content-hash> (wasm/build_wasm.sh stamps them from the file's own
-# bytes), so a fingerprinted URL can safely be cached forever -- that is the
-# entire point of the fingerprint, and the server was not telling anyone. A
-# request for the same path WITHOUT ?v= is not necessarily the same bytes
-# forever, so it gets a short TTL and revalidates instead. HTML is left alone:
-# it carries an ETag and must reflect a publish immediately.
+# Cache lifetimes. Every versioned asset is requested as <path>?v=<content-hash>
+# (wasm/build_wasm.sh stamps them from the file's own bytes), so a fingerprinted
+# URL is safe to cache forever -- that is the point of the fingerprint. A bare
+# path is not necessarily the same bytes forever, so it revalidates sooner.
 map $arg_v $bvnr_cache_ctl {
     default  "public, max-age=3600";
     "~.+"    "public, max-age=31536000, immutable";
 }
 
-# Search consolidation: the full Link: rel=canonical header value for each raw
-# doc .md (empty for /index.md, /de/index.md — nginx then adds no such header).
+# Search consolidation: the full "Link: rel=canonical" value (RFC 8288 — URI in
+# angle brackets) for each raw doc .md; empty for /index.md and /de/index.md, so
+# nginx adds no canonical header there (it omits an empty-valued add_header).
 map $uri $bvnr_canon_hdr {
     default                            "";
     "/doc/0_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
@@ -328,20 +328,14 @@ server {
     root /var/www/html;
     index index.html index.htm index.nginx-debian.html;
 
-    # ── Compression ──────────────────────────────────────────────────────────
-    # nginx compresses text/html and nothing else unless told otherwise, so the
-    # site shipped 791 KB per cold visit that did not need to move: llms-full.txt
-    # 560->185 KB, bovnar_wasm_core.js 252->92 KB, highlight.js 122->41 KB, the
-    # spec .md 115->38 KB. Measured against the live server; HTML was already
-    # gzipped (376->129 KB) because that one is nginx's built-in default.
-    # text/html is deliberately absent below: listing it is a duplicate and nginx
-    # warns.
-    #
-    # gzip_vary is not cosmetic. The live server already gzips HTML while sending
-    # only "Vary: Accept" (from the home page's add_header), never
-    # "Vary: Accept-Encoding" -- so a shared cache may hand the compressed body
-    # to a client that never asked for it. nginx appends Accept-Encoding to Vary
-    # itself once this is on.
+    # Compression. nginx compresses text/html and nothing else unless told, and
+    # the http{} block leaves gzip_types commented out -- so llms-full.txt (560
+    # KB), bovnar_wasm_core.js (252 KB), highlight.js (122 KB) and the doc .md
+    # all went out raw: 791 KB per cold visit, 58% of the text bytes on the wire.
+    # text/html is deliberately absent: listing it is a duplicate and nginx warns.
+    # gzip_vary is required for correctness, not tuning -- without it a gzipped
+    # response carries no "Vary: Accept-Encoding" and a shared cache may hand the
+    # compressed body to a client that never asked for it.
     gzip              on;
     gzip_vary         on;
     gzip_comp_level   6;
@@ -375,7 +369,7 @@ server {
         try_files /de/index.html =404;
     }
 
-    # .md as Markdown (RFC 7763) + UTF-8; plus the canonical→HTML header for the
+    # .md as Markdown (RFC 7763) + UTF-8; plus the canonical->HTML header for the
     # doc .md (empty, hence omitted, for /index.md and /de/index.md).
     location ~ \.md$ {
         types         { }
@@ -388,9 +382,9 @@ server {
     }
 
     # The one non-Markdown document. Nothing maps .ebnf, so it fell through to
-    # nginx's default_type (application/octet-stream) and the browser offered a
-    # download instead of showing the grammar -- while its nine Markdown siblings
-    # on /docs/ displayed inline, and /docs/grammar/ advertises it as
+    # default_type (application/octet-stream) and the browser offered a download
+    # instead of showing the grammar -- while its nine Markdown siblings on
+    # /docs/ display inline, and /docs/grammar/ advertises it as
     # <link rel="alternate" type="text/plain">, which the server contradicted.
     location ~ \.ebnf$ {
         types         { }
@@ -400,10 +394,8 @@ server {
         try_files $uri =404;
     }
 
-    # site.webmanifest: nginx's mime.types has no .webmanifest entry, so it went
-    # out as application/octet-stream. Browsers are lenient about it, but the
-    # spec type is application/manifest+json -- and naming it also brings the
-    # file under gzip_types above.
+    # mime.types has no .webmanifest entry, so the manifest went out as
+    # application/octet-stream. Naming it also brings it under gzip_types.
     location ~ \.webmanifest$ {
         types         { }
         default_type  application/manifest+json;
@@ -411,9 +403,10 @@ server {
         try_files $uri =404;
     }
 
-    # Static assets only -- see the $bvnr_cache_ctl map. Declaring add_header
-    # here stops this location inheriting the server-level HSTS, so it repeats
-    # it (the same trap as the home-page locations above).
+    # Static assets -- see the $bvnr_cache_ctl map. Nothing sent Cache-Control at
+    # all before this, so every asset revalidated on every visit. Declaring
+    # add_header here stops this location inheriting the server-level HSTS, so it
+    # repeats it (same trap as the home-page locations above).
     location ~* \.(js|css|woff2|jpe?g|png|svg|ico)$ {
         add_header Cache-Control "$bvnr_cache_ctl" always;
         add_header Strict-Transport-Security "max-age=31536000" always;

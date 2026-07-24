@@ -37,6 +37,17 @@ WEB = ROOT / "web"
 # content is captured verbatim (no entity decoding) because that is what the
 # browser hashes.
 SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.S)
+# The page documents its own markup inside HTML comments -- "the init calls below
+# run in an inline end-of-body <script>" is one of several. A bare scan opens a
+# phantom element at that mention and closes it at the next REAL </script>,
+# swallowing everything between (here: the whole <style> block and the JSON-LD)
+# into one hash that matches nothing the browser runs. That was harmless only by
+# luck: no executable script happened to sit inside the swallowed span. One added
+# there would have inherited the phantom's hash instead of getting its own, and
+# the browser would have refused to run it -- with --check still passing, because
+# the stamp and the scan agree on the same wrong answer. Mask comment bodies
+# before scanning, preserving length so the offsets still index the real bytes.
+COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 # type= values the browser does NOT execute, so CSP never checks them.
 DATA_TYPES = re.compile(r'type\s*=\s*["\']?(application/(ld\+)?json)', re.I)
 HAS_SRC = re.compile(r'\bsrc\s*=', re.I)
@@ -97,14 +108,22 @@ def sha256_b64(text: str) -> str:
     return base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode()
 
 
+def mask_comments(html: str) -> str:
+    """Same-length copy of html with HTML comment bodies blanked out."""
+    return COMMENT_RE.sub(lambda m: " " * (m.end() - m.start()), html)
+
+
 def script_hashes(html: str) -> list[str]:
     """'sha256-...' for every executable inline <script> in the page, in order."""
     out = []
-    for m in SCRIPT_RE.finditer(html):
-        attrs, body = m.group(1), m.group(2)
+    # Scan the masked copy so a <script> written inside a comment cannot open an
+    # element; hash the ORIGINAL bytes at those offsets, which is what the
+    # browser sees. Masking is length-preserving, so the offsets carry over.
+    for m in SCRIPT_RE.finditer(mask_comments(html)):
+        attrs = m.group(1)
         if HAS_SRC.search(attrs) or DATA_TYPES.search(attrs):
             continue
-        out.append("'sha256-" + sha256_b64(body) + "'")
+        out.append("'sha256-" + sha256_b64(html[m.start(2):m.end(2)]) + "'")
     return out
 
 

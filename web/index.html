@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-E1Wwa6RfXKhC/EFWfTkEdBg+PcPztsUhyaVQt5hBVgE=' 'sha256-nwMdJzAVc31ivEW6N5SP/myddbpu378yr7zoAXrjEFs=' 'sha256-OROyOyUFwMfOMFdB+tT8NFgWtVZHZ/ihILuucsj9Fuw=' 'sha256-7VSwJg4XFUtVkEZiDYls6E+0DR4ijbhAg/wnPq7RgLM=' 'sha256-K7ran4NhecUJRAb9dX5ZZK9hfH3zX2L7jK6w3KKd7V0=' 'sha256-bAIlU2qM+RXky2aO45DuBzGaGr/O2E8rclCha+Um9Vk=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-/W/soTuSUjKsKzfqbIuiuW4vlh9r5OfZqJ1dKb1vVjQ=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-nwMdJzAVc31ivEW6N5SP/myddbpu378yr7zoAXrjEFs=' 'sha256-OROyOyUFwMfOMFdB+tT8NFgWtVZHZ/ihILuucsj9Fuw=' 'sha256-7VSwJg4XFUtVkEZiDYls6E+0DR4ijbhAg/wnPq7RgLM=' 'sha256-K7ran4NhecUJRAb9dX5ZZK9hfH3zX2L7jK6w3KKd7V0=' 'sha256-bAIlU2qM+RXky2aO45DuBzGaGr/O2E8rclCha+Um9Vk=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-/W/soTuSUjKsKzfqbIuiuW4vlh9r5OfZqJ1dKb1vVjQ=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -139,7 +139,7 @@ window.bvnrTcfg = function (key, english) {
      runs its dynamic import(). The ?v is the build-stamped content hash — it must
      match the dynamic import so the module is reused, not re-fetched. -->
 <link rel="modulepreload" href="bovnar_wasm_core.js?v=2580aa622694">
-<link rel="modulepreload" href="bovnar_wasm.js?v=2580aa622694">
+<link rel="modulepreload" href="bovnar_wasm.js?v=6850820cec18">
 <!-- Globe textures are sampled offscreen by the Mission Control demo, which is the
      default-visible demo below the fold — preload them at high priority so they're
      decoded before the demo first samples them, avoiding a blank/late globe. -->
@@ -246,7 +246,7 @@ html[data-theme="light"] {
 
   --blue:    #0451a5;
   --blue2:   #0066b8;
-  --teal:    #267f99;
+  --teal:    #22738a;
   --green:   #098658;
   --green2:  #098658;
   --yellow:  #9a7d0a;
@@ -403,7 +403,12 @@ nav {
   font-size: 0.82rem;
   font-weight: 500;
   letter-spacing: 0.1em;
-  color: var(--blue2);
+  /* The wordmark sits on --titlebar-bg (#3c3c3c), the lightest dark surface,
+     where --blue2 renders at 2.4:1 and even --blue only reaches 3.7:1. This is
+     the logo gradient's light stop -- the same #6cb0ea the favicon and the 404
+     mark already use -- and it clears AA at 4.7:1 without a new hue. The light
+     theme keeps --blue, which is 6.3:1 on #e8e8e8. */
+  color: #6cb0ea;
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -411,6 +416,7 @@ nav {
   margin-right: 2.5rem;
   white-space: nowrap;
 }
+html[data-theme="light"] .nav-brand { color: var(--blue); }
 .nav-brand .ext { color: var(--text3); font-weight: 400; }
 
 .nav-links {
@@ -1016,7 +1022,7 @@ html[data-theme="light"] .tok-label::after { color: #005a99; }   /* 5.9:1 on --s
 .anat-pillar-h .n {
   font-family: var(--mono);
   font-size: 0.6rem;
-  color: var(--blue2);
+  color: var(--blue);
   border: 1px solid rgba(0,122,204,0.3);
   background: rgba(0,122,204,0.05);
   padding: 0.1rem 0.36rem;
@@ -2202,7 +2208,7 @@ a[data-doc] { cursor: pointer; }
 .pg-summary { display: none; color: var(--text3); }
 .pg-node.collapsed > .pg-row .pg-summary { display: inline; }
 
-.pg-ev-name  { color: var(--blue2); }                 /* the C event symbol */
+.pg-ev-name  { color: var(--blue); }                  /* the C event symbol */
 .pg-key2     { color: var(--c-key); }
 .pg-ann-tag  { color: var(--text3); font-size: 0.62rem; letter-spacing: 0.04em; }
 .pg-ann-tag.synth { color: var(--c-val); }
@@ -2801,7 +2807,12 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
   background: transparent; color: transparent; caret-color: var(--text);
   resize: none; z-index: 1; outline: none;
 }
-#launch-demo .cfg-actions { display: flex; gap: 0.5rem; margin-top: 0.55rem; align-items: center; }
+/* nowrap pushed the confirmation message ("✓ Orbit updated — NYX-1") past the
+   panel edge on a narrow phone -- 72px off-panel at 320px once the German
+   button labels are in ("Übernehmen & neu einschwenken"), with nothing to
+   scroll it back into view. Let the row wrap so the message drops to its own
+   line instead of off the side. */
+#launch-demo .cfg-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.55rem; align-items: center; }
 #launch-demo button.btn {
   background: var(--panel-bg2); color: var(--text);
   border: 1px solid var(--border); border-radius: 4px;
@@ -2896,6 +2907,10 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
 }
 #launch-demo .demo-tab:hover { color: var(--text); }
 #launch-demo .demo-tab.active { background: var(--panel-bg2); color: var(--cyan); box-shadow: inset 0 2px 0 var(--blue2); }
+/* --cyan is a syntax-token colour and stays as it is everywhere else; on the
+   active tab's light background it lands at 4.35:1, just under AA for 11.8px
+   text, so that one surface takes --blue (6.5:1) instead. */
+html[data-theme="light"] #launch-demo .demo-tab.active { color: var(--blue); }
 #launch-demo .demo-pane[hidden] { display: none; }
 
 /* trading-desk grid (reuses the shared .panel/.head/.body/.gauge/.editor styles) */
@@ -3658,7 +3673,7 @@ out = bovnar.<span class="py-fn">dumps</span>(doc)
             <div class="code-block"><span class="py-kw">import</span> bovnar, numpy <span class="py-kw">as</span> np
 
 src = <span class="py-str">b".accel = &lt;float:64,m/s^2&gt; "</span> \
-      <span class="py-str">b"[9.81,0.02,-9.79]/[0.05,9.80,0.01];"</span>
+      <span class="py-str">b"[9.81,0.02,-0.05]/[0.05,9.80,0.01];"</span>
 doc = bovnar.<span class="py-fn">loads</span>(src, typed=<span class="py-kw">True</span>)
 
 a, unit = bovnar.<span class="py-fn">to_numpy</span>(
@@ -3971,7 +3986,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </div>
 </div>
 
-<script src="bovnar_parser_wasm.js?v=d4170e91fb32"></script>
+<script src="bovnar_parser_wasm.js?v=041239c6b345"></script>
 <script src="bovnar_highlight.js?v=594ce7c394a8"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */

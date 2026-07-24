@@ -653,11 +653,24 @@ BASE_PREFIXED = re.compile(r"(?:BASE|__BVNR\w*)\s*\+\s*$")
 BVNRT_CALL = re.compile(r'''\bbvnrT(?:cfg)?\(\s*['"]([^'"]+)['"]''')
 
 
+# A <script> written inside an HTML comment (the page has several, describing its
+# own markup) would otherwise open a phantom element that runs to the next real
+# </script>, pulling the whole <style> block and the JSON-LD graph in with it --
+# 64 KB of CSS and metadata scanned as if it were JavaScript. gen_csp masks
+# comment bodies length-preservingly for exactly this reason; reuse it so both
+# scanners agree on where the scripts actually are.
+def _script_blocks(src: str):
+    """(body, offset-into-src) for every <script> element, comments excluded."""
+    for m in re.finditer(r"<script\b[^>]*>(.*?)</script>",
+                         gen_csp.mask_comments(src), re.S | re.I):
+        yield src[m.start(1):m.end(1)], m.start(1)
+
+
 def js_keys(src: str) -> set[str]:
     """Every bvnrT() key used in <script> blocks."""
     keys = set()
-    for m in re.finditer(r"<script\b[^>]*>(.*?)</script>", src, re.S | re.I):
-        keys.update(BVNRT_CALL.findall(m.group(1)))
+    for block, _ in _script_blocks(src):
+        keys.update(BVNRT_CALL.findall(block))
     return keys
 
 
@@ -669,9 +682,7 @@ def check_js_paths(src: str) -> list[str]:
     the English page it was written against works fine.
     """
     bad = []
-    for m in re.finditer(r"<script\b[^>]*>(.*?)</script>", src,
-                         re.S | re.I):
-        block, base = m.group(1), m.start(1)
+    for block, base in _script_blocks(src):
         for p in JS_PATH.finditer(block):
             # Accept any spacing around the concatenation, not just "BASE +".
             if BASE_PREFIXED.search(p.group("pre")):

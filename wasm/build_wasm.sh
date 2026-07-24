@@ -102,17 +102,26 @@ cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.js"
 
 # Cache-busting: stamp content hashes so a rebuilt/redeployed asset can never be
 # served from a stale browser/CDN cache (the ?v query is the only thing these
-# ES-module / script URLs are keyed on). Two independent hashes: CORE_HASH covers
-# the compiled core + the wrapper that imports it (the <script>/import hops that
-# change only when the wasm rebuilds), and SHIM_HASH (below) covers the
-# hand-maintained FFI shim, which is edited independently of the core. Each hash
+# ES-module / script URLs are keyed on). One hash per file in the chain, because
+# each link is edited independently of the others: CORE_HASH for the compiled
+# core, WRAP_HASH for the generated wrapper (whose source wasm/index.mjs is
+# hand-maintained), and SHIM_HASH for the hand-maintained FFI shim. Each hash
 # changes only when its file's bytes change, so unchanged rebuilds stay byte-stable
 # (no spurious diffs) and there's no version number to bump by hand. All seds are
 # idempotent (they rewrite any existing ?v=).
 CORE_HASH="$(sha256sum "$ROOT/web/bovnar_wasm_core.js" | cut -c1-12)"
 sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.js?v=${CORE_HASH}'#" \
 	"$ROOT/wasm/index.mjs" > "$ROOT/web/bovnar_wasm.js"
-sed -i -E "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${CORE_HASH}\3#" \
+# The wrapper is generated from wasm/index.mjs, which is hand-maintained and
+# edited independently of the compiled core (the OOM handling and the error
+# accounting both landed there with no core rebuild). Keying its ?v= on
+# CORE_HASH left the URL unchanged after such an edit, so a returning visitor
+# kept the old wrapper from cache against a correct core -- the same trap the
+# shim and the highlighter were already pulled out of below. Key it on its own
+# bytes, computed after the core import above is substituted in, so it also
+# rolls whenever the core it loads changes.
+WRAP_HASH="$(sha256sum "$ROOT/web/bovnar_wasm.js" | cut -c1-12)"
+sed -i -E "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${WRAP_HASH}\3#" \
 	"$ROOT/web/bovnar_parser_wasm.js"
 # The shim is hand-maintained FFI logic, versioned independently of the compiled
 # core — so key ITS cache-bust on its own content hash (computed after the import
@@ -123,15 +132,17 @@ SHIM_HASH="$(sha256sum "$ROOT/web/bovnar_parser_wasm.js" | cut -c1-12)"
 sed -i -E "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${SHIM_HASH}#" \
 	"$ROOT/web/index.html"
 # ...and the two <link rel="modulepreload"> hrefs, which must match the dynamic-import
-# URLs above or the browser would fetch the modules twice.
-sed -i -E "s#(bovnar_wasm\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
+# URLs above or the browser would fetch the modules twice. The wrapper preload
+# therefore carries WRAP_HASH (what bovnar_parser_wasm.js imports) and the core
+# preload CORE_HASH (what the wrapper itself imports).
+sed -i -E "s#(bovnar_wasm\.js\?v=)[0-9a-f]+#\1${WRAP_HASH}#g" "$ROOT/web/index.html"
 sed -i -E "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
 # bovnar_highlight.js carried a HAND-WRITTEN date stamp (?v=20260720) that nobody
 # remembered to bump, so every edit to the highlighter shipped stale to returning
 # visitors from cache. Key it on its own content, like the other two.
 HL_HASH="$(sha256sum "$ROOT/web/bovnar_highlight.js" | cut -c1-12)"
 sed -i -E "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/index.html"
-echo ">> stamped web/ module chain: core v=${CORE_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}"
+echo ">> stamped web/ module chain: core v=${CORE_HASH}, wrapper v=${WRAP_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}"
 
 echo ">> done:"
 ls -la "$OUT"

@@ -23,8 +23,6 @@
     <acronym>BVNR</acronym>
     <expanded-acronym>Bovnar typed, unit-aware serialisation</expanded-acronym>
     <sub-class-of type="text/plain"/>
-    <!-- Back-compat with the pre-registration unofficial name. -->
-    <alias type="text/x-bovnar"/>
     <glob pattern="*.bvnr"/>
     <!-- Strong heuristic: the spec-1.1 version directive on the first line. -->
     <magic priority="50">

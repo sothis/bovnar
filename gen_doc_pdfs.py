@@ -221,9 +221,8 @@ def check_docs_listed():
     examples list in CMakeLists_tests.txt had already lost two entries the same
     way. The numbered 0_..9_ series is the published documentation set, so a new
     one silently missing from the PDF bundle is a real omission. The unnumbered
-    files (design notes, the media-type registration) are deliberately not part
-    of that set -- nothing links to them from README or the site -- so they are
-    not required here.
+    files (design notes) are deliberately not part of that set -- nothing links
+    to them from README or the site -- so they are not required here.
     """
     listed = {src for src, _slug, _label in DOCS}
     present = {f for f in os.listdir(DOC_DIR)

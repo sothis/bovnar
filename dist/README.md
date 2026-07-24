@@ -1,12 +1,13 @@
-# Distribution & registration assets
+# Distribution & integration assets
 
-Everything needed to register the Bovnar media type and file extension with the
-relevant authorities and systems.
+Everything needed to integrate the Bovnar media type and file extension with
+desktop environments, OS tooling, and developer platforms. The media type
+`text/vnd.bovnar` is registered with IANA:
+<https://www.iana.org/assignments/media-types/text/vnd.bovnar>.
 
 | Identity       | Value                          |
 |----------------|--------------------------------|
 | Media type     | `text/vnd.bovnar`              |
-| Deprecated alias | `text/x-bovnar` (unofficial) |
 | File extension | `.bvnr`                        |
 | Encoding       | UTF-8 (8-bit text)             |
 | TextMate scope | `source.bovnar`                |
@@ -15,21 +16,15 @@ relevant authorities and systems.
 
 ### `mime/` — desktop / OS integration
 - **`text-vnd.bovnar.xml`** — freedesktop [shared-mime-info] database entry.
-  Detection is by the `*.bvnr` glob (the reliable mechanism for a text format),
-  with `text/x-bovnar` kept as an alias. Installed by `make install` into
-  `<datadir>/mime/packages/` (toggle with `-DBVNR_INSTALL_MIME=OFF`); then run
-  `update-mime-database <datadir>/mime`.
+  Detection is by the `*.bvnr` glob (the reliable mechanism for a text format).
+  Installed by `make install` into `<datadir>/mime/packages/` (toggle with
+  `-DBVNR_INSTALL_MIME=OFF`); then run `update-mime-database <datadir>/mime`.
 - **`bovnar.magic`** — `file(1)` content magic (best-effort fallback for
   extension-less files; the extension is authoritative). Compile/test with
   `file -C -m bovnar.magic`. Verified to content-match the `examples/*.bvnr`
   documents that lead with a comment or blank line, and to reject ordinary
   source code; a file that opens directly with an assignment is recognised by
   extension only (see the heuristic notes in the file).
-
-### `nginx/` — web server
-- **`bovnar-mime.conf`** — maps `.bvnr` → `text/vnd.bovnar; charset=utf-8` for
-  the nginx deploy. Include it from `http{}`, or use the per-location variant in
-  the file's comments.
 
 ### `linguist/` — GitHub syntax highlighting
 - **`languages.yml.fragment`** + **`README.md`** — the github/linguist
@@ -38,12 +33,6 @@ relevant authorities and systems.
   (`source.bovnar`). Note Linguist's real-world-usage acceptance bar. The
   repo-root `.gitattributes` already carries the `linguist-language=Bovnar`
   override, which activates once the language ships upstream.
-
-### IANA (formal media-type registration)
-- The application is **`doc/iana_media_type.md`** — a complete RFC 6838
-  vendor-tree template. Submit via <https://www.iana.org/form/media-types>.
-  Confirm the contact e-mail before submitting; approval is an external
-  ~2-week Expert Review.
 
 ## Quick verification
 

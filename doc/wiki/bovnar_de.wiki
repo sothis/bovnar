@@ -107,7 +107,7 @@ Bovnar steht in der Tradition menschenlesbarer Serialisierungsformate wie [[Java
 <ref name="tutorial">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-tutorial.pdf |titel=Bovnar (BVNR) — A Practical Tutorial |abruf=2026-07-21 |sprache=en |format=PDF}}</ref>
 <ref name="units">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-unit-system.pdf |titel=Bovnar Quantity Annotation System — Unit and Currency Reference |abruf=2026-07-21 |sprache=en |format=PDF}}</ref>
 <ref name="faq">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-faq.pdf |titel=Bovnar (BVNR) — Frequently Asked Questions |abruf=2026-07-21 |sprache=en |format=PDF}}</ref>
-<ref name="mime">{{Internetquelle |url=https://github.com/sothis/bovnar/blob/main/doc/iana_media_type.md |titel=IANA Media Type Registration — text/vnd.bovnar |werk=GitHub |abruf=2026-07-21 |sprache=en}}</ref>
+<ref name="mime">{{Internetquelle |url=https://www.iana.org/assignments/media-types/text/vnd.bovnar |titel=Media Type text/vnd.bovnar |werk=IANA Media Types |abruf=2026-07-24 |sprache=en}}</ref>
 <ref name="streaming">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-streaming.pdf |titel=Bovnar — Streaming, Framing & Multiplexing |abruf=2026-07-21 |sprache=en |format=PDF}}</ref>
 <ref name="python">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-python-bindings.pdf |titel=Bovnar — Python Bindings |abruf=2026-07-21 |sprache=en |format=PDF}}</ref>
 <ref name="conformance">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-conformance.pdf |titel=Bovnar — Conformance Test Tool |abruf=2026-07-21 |sprache=en |format=PDF}}</ref>

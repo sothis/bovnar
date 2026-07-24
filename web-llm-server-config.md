@@ -53,6 +53,18 @@ map $http_accept $bvnr_wants_md {
     "~*text/markdown"  1;
 }
 
+# Cache policy. Every versioned asset on the page is requested as
+# <path>?v=<content-hash> (wasm/build_wasm.sh stamps them from the file's own
+# bytes), so a fingerprinted URL can safely be cached forever -- that is the
+# entire point of the fingerprint, and the server was not telling anyone. A
+# request for the same path WITHOUT ?v= is not necessarily the same bytes
+# forever, so it gets a short TTL and revalidates instead. HTML is left alone:
+# it carries an ETag and must reflect a publish immediately.
+map $arg_v $bvnr_cache_ctl {
+    default  "public, max-age=3600";
+    "~.+"    "public, max-age=31536000, immutable";
+}
+
 # Canonical host (only the additions inside are new; TLS/redirect blocks unchanged).
 server {
     listen 443 ssl;
@@ -61,6 +73,24 @@ server {
 
     root /var/www/html;
     index index.html index.htm index.nginx-debian.html;
+
+    # ── Compression ──────────────────────────────────────────────────────────
+    # nginx compresses text/html and nothing else unless told otherwise, so the
+    # site shipped 791 KB per cold visit that did not need to move: llms-full.txt
+    # 560->185 KB, bovnar_wasm_core.js 252->92 KB, highlight.js 122->41 KB, the
+    # spec .md 115->38 KB. Measured against the live server; HTML was already
+    # gzipped (376->129 KB) because that one is nginx's built-in default.
+    # text/html is deliberately absent below: listing it is a duplicate and nginx
+    # warns. gzip_vary matters because the .md are also content-negotiated.
+    gzip              on;
+    gzip_vary         on;
+    gzip_comp_level   6;
+    gzip_min_length   256;
+    gzip_proxied      any;
+    gzip_types        text/plain text/css text/xml text/markdown
+                      application/javascript application/json
+                      application/manifest+json application/xml
+                      application/rss+xml image/svg+xml;
 
     # Branded 404 page (web/404.html). The =404 in try_files below triggers it.
     error_page 404 /404.html;
@@ -113,6 +143,26 @@ server {
         default_type  text/plain;
         charset       utf-8;
         charset_types text/plain;
+        try_files $uri =404;
+    }
+
+    # site.webmanifest: nginx's mime.types has no .webmanifest entry, so it went
+    # out as application/octet-stream. Browsers are lenient about it, but the
+    # spec type is application/manifest+json -- and naming it also brings the
+    # file under gzip_types above.
+    location ~ \.webmanifest$ {
+        types         { }
+        default_type  application/manifest+json;
+        charset       utf-8;
+        try_files $uri =404;
+    }
+
+    # Static assets only -- see the $bvnr_cache_ctl map. Declaring add_header
+    # here stops this location inheriting the server-level HSTS, so it repeats
+    # it (the same trap as the home-page locations above).
+    location ~* \.(js|css|woff2|jpe?g|png|svg|ico)$ {
+        add_header Cache-Control "$bvnr_cache_ctl" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
         try_files $uri =404;
     }
 
@@ -236,6 +286,18 @@ map $http_accept $bvnr_wants_md {
     "~*text/markdown"  1;
 }
 
+# Cache policy. Every versioned asset on the page is requested as
+# <path>?v=<content-hash> (wasm/build_wasm.sh stamps them from the file's own
+# bytes), so a fingerprinted URL can safely be cached forever -- that is the
+# entire point of the fingerprint, and the server was not telling anyone. A
+# request for the same path WITHOUT ?v= is not necessarily the same bytes
+# forever, so it gets a short TTL and revalidates instead. HTML is left alone:
+# it carries an ETag and must reflect a publish immediately.
+map $arg_v $bvnr_cache_ctl {
+    default  "public, max-age=3600";
+    "~.+"    "public, max-age=31536000, immutable";
+}
+
 # Search consolidation: the full Link: rel=canonical header value for each raw
 # doc .md (empty for /index.md, /de/index.md — nginx then adds no such header).
 map $uri $bvnr_canon_hdr {
@@ -259,6 +321,24 @@ server {
 
     root /var/www/html;
     index index.html index.htm index.nginx-debian.html;
+
+    # ── Compression ──────────────────────────────────────────────────────────
+    # nginx compresses text/html and nothing else unless told otherwise, so the
+    # site shipped 791 KB per cold visit that did not need to move: llms-full.txt
+    # 560->185 KB, bovnar_wasm_core.js 252->92 KB, highlight.js 122->41 KB, the
+    # spec .md 115->38 KB. Measured against the live server; HTML was already
+    # gzipped (376->129 KB) because that one is nginx's built-in default.
+    # text/html is deliberately absent below: listing it is a duplicate and nginx
+    # warns. gzip_vary matters because the .md are also content-negotiated.
+    gzip              on;
+    gzip_vary         on;
+    gzip_comp_level   6;
+    gzip_min_length   256;
+    gzip_proxied      any;
+    gzip_types        text/plain text/css text/xml text/markdown
+                      application/javascript application/json
+                      application/manifest+json application/xml
+                      application/rss+xml image/svg+xml;
 
     # Branded 404 page (web/404.html).
     error_page 404 /404.html;
@@ -305,6 +385,26 @@ server {
         default_type  text/plain;
         charset       utf-8;
         charset_types text/plain;
+        try_files $uri =404;
+    }
+
+    # site.webmanifest: nginx's mime.types has no .webmanifest entry, so it went
+    # out as application/octet-stream. Browsers are lenient about it, but the
+    # spec type is application/manifest+json -- and naming it also brings the
+    # file under gzip_types above.
+    location ~ \.webmanifest$ {
+        types         { }
+        default_type  application/manifest+json;
+        charset       utf-8;
+        try_files $uri =404;
+    }
+
+    # Static assets only -- see the $bvnr_cache_ctl map. Declaring add_header
+    # here stops this location inheriting the server-level HSTS, so it repeats
+    # it (the same trap as the home-page locations above).
+    location ~* \.(js|css|woff2|jpe?g|png|svg|ico)$ {
+        add_header Cache-Control "$bvnr_cache_ctl" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
         try_files $uri =404;
     }
 

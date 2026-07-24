@@ -14,7 +14,8 @@ equivalent follows as a portable alternative. All three are additive and safe:
 they only add response headers and an `Accept`-based redirect for the home page.
 
 1. **`text/markdown` MIME type** for `.md` files (RFC 7763) — so `/index.md` and
-   `/doc/*.md` are served as Markdown, not `text/plain` or a download.
+   `/doc/*.md` are served as Markdown, not `text/plain` or a download. `.ebnf`
+   (the single non-Markdown document) gets `text/plain` for the same reason.
 2. **`Link: …; rel="alternate"; type="text/markdown"`** response header on the
    home page, plus **`Vary: Accept`** — protocol-level discovery of the Markdown
    edition before the HTML body is read.
@@ -102,6 +103,19 @@ server {
         try_files $uri =404;
     }
 
+    # The one non-Markdown document. Nothing maps .ebnf, so it fell through to
+    # nginx's default_type (application/octet-stream) and the browser offered a
+    # download instead of showing the grammar -- while its nine Markdown siblings
+    # on /docs/ displayed inline, and /docs/grammar/ advertises it as
+    # <link rel="alternate" type="text/plain">, which the server contradicted.
+    location ~ \.ebnf$ {
+        types         { }
+        default_type  text/plain;
+        charset       utf-8;
+        charset_types text/plain;
+        try_files $uri =404;
+    }
+
     location / {
         try_files $uri $uri/ =404;
     }
@@ -128,8 +142,11 @@ root **only if `AllowOverride` already permits `FileInfo Indexes`** — otherwis
 Apache returns 500. Prefer the vhost.
 
 ```apache
-# 1. Serve .md as Markdown (RFC 7763).
+# 1. Serve .md as Markdown (RFC 7763), and the one non-Markdown document as
+#    plain text -- unmapped, .ebnf is offered as a download rather than shown.
 AddType text/markdown .md
+AddType text/plain .ebnf
+AddCharset UTF-8 .md .ebnf
 
 # 2. Advertise the Markdown alternate + vary on the home page.
 <If "%{REQUEST_URI} == '/'">
@@ -196,8 +213,11 @@ Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
     add_header Strict-Transport-Security "max-age=31536000" always;
 ```
 
-`/doc/5_bovnar.ebnf` isn't matched by the `.md` location; it is niche and can be
-left as-is. The complete assembled config is in the next section.
+`/doc/5_bovnar.ebnf` isn't matched by the `.md` location, and is deliberately left
+out of the canonical map above — it is niche enough not to compete for the
+`/docs/grammar/` ranking. It does still need its own `location` for the MIME type
+(above), or it downloads instead of displaying. The complete assembled config is
+in the next section.
 
 ## Complete assembled nginx config
 
@@ -272,6 +292,19 @@ server {
         charset_types text/markdown;
         add_header Link "$bvnr_canon_hdr" always;
         add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files $uri =404;
+    }
+
+    # The one non-Markdown document. Nothing maps .ebnf, so it fell through to
+    # nginx's default_type (application/octet-stream) and the browser offered a
+    # download instead of showing the grammar -- while its nine Markdown siblings
+    # on /docs/ displayed inline, and /docs/grammar/ advertises it as
+    # <link rel="alternate" type="text/plain">, which the server contradicted.
+    location ~ \.ebnf$ {
+        types         { }
+        default_type  text/plain;
+        charset       utf-8;
+        charset_types text/plain;
         try_files $uri =404;
     }
 

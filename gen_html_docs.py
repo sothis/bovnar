@@ -308,14 +308,21 @@ MARK_SVG = (
     '<path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/>'
     '<path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>')
 
+# Same wording and same order as the landing page's nav for the same
+# destinations: it called /docs/ "Docs" here and "Documentation" there, and
+# lower-cased the "Start" the landing capitalises -- so the two bars named the
+# same places differently, one click apart. The set is a subset (a doc page has
+# no reason to link the landing's individual sections); the labels are not.
+# The nbsp keeps each label on one line, which the landing gets from having
+# every narrow-viewport case hidden by a media query instead.
 HEADER = (
     '<header class="site">'
     '<a class="brand" href="/">' + MARK_SVG +
     'BOVNAR<span class="ext">.bvnr</span></a>'
     '<nav>'
-    '<a href="/docs/">Docs</a>'
     '<a href="/#playground">Playground</a>'
-    '<a href="/#quickstart">Quick&nbsp;start</a>'
+    '<a href="/#quickstart">Quick&nbsp;Start</a>'
+    '<a href="/docs/">Documentation</a>'
     '<a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a>'
     + THEME_TOGGLE_BTN +
     '</nav></header>')

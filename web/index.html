@@ -140,15 +140,19 @@ window.bvnrTcfg = function (key, english) {
      match the dynamic import so the module is reused, not re-fetched. -->
 <link rel="modulepreload" href="bovnar_wasm_core.js?v=2580aa622694">
 <link rel="modulepreload" href="bovnar_wasm.js?v=6850820cec18">
-<!-- Globe textures are sampled offscreen by the Mission Control demo, which is the
-     default-visible demo below the fold — preload them at high priority so they're
-     decoded before the demo first samples them, avoiding a blank/late globe. -->
 <!-- Canvas textures for the orbit demo, which sits below a full-height hero.
      They are never <img> elements (the globe samples them offscreen), so they
      cannot affect first paint -- at fetchpriority="high" their 122 KB competed
-     with the webfonts and the stylesheet for it anyway. -->
+     with the webfonts and the stylesheet for it anyway, hence "low".
+
+     Both are rel=preload, and earth_night.jpg in particular must be: it used to
+     be rel=prefetch, which populates the *prefetch* cache for a future
+     navigation. The demo's own new Image() on this page does not draw from that
+     cache, so the file was fetched twice and 45 KB of every first visit went on
+     downloading it a second time. Neither texture is conditional -- the Mission
+     Control sim loads both on every visit -- so preload is the honest hint. -->
 <link rel="preload" href="earth.jpg" as="image" fetchpriority="low">
-<link rel="prefetch" href="earth_night.jpg" as="image">
+<link rel="preload" href="earth_night.jpg" as="image" fetchpriority="low">
 <!-- Self-hosted (marked MIT, highlight.js BSD-3) — no third-party CDN dependency,
      so the docs viewer works offline / over file:// and can't be broken by a CDN
      outage or MITM. Versioned filenames are their own cache-buster. -->
@@ -2436,7 +2440,10 @@ a[data-doc] { cursor: pointer; }
    gauges reading "frame 0 / lock ACQ", and a playground status badge hard-coded
    to "ready" -- a demo that looks like it is running and has decoded nothing.
    Hide the shells and let the <noscript> notes below explain instead. */
-#launch-demo .demo-tabs, #launch-demo .pane, #playground .playground-layout,
+/* The shells are .demo-pane; ".pane" matched no element on the page, so none of
+   this actually applied and a no-JS visitor got exactly the demo-that-decoded-
+   nothing described above. */
+#launch-demo .demo-tabs, #launch-demo .demo-pane, #playground .playground-layout,
 #launch-demo .engine-note, #launch-demo details.how { display: none !important; }
 .ns-note {
   margin: 1.5rem 0; padding: 0.9rem 1.1rem;
@@ -3030,6 +3037,12 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
     <button class="demo-tab" data-demo="fin" role="tab" id="tab-fin" aria-controls="demo-fin" aria-selected="false" tabindex="-1">$ Trading Desk</button>
     <button class="demo-tab" data-demo="ind" role="tab" id="tab-ind" aria-controls="demo-ind" aria-selected="false" tabindex="-1">⚙ Plant Control</button>
   </div>
+  <noscript>
+    <p class="ns-note">The three demos drive the C reference parser compiled to WebAssembly, so they need
+    JavaScript and are hidden here. Nothing else on this page does: the syntax, the annotated examples and the
+    full documentation below are plain markup. The same parser ships as a C library, a Python package and the
+    <code>bovnar</code> command-line tool.</p>
+  </noscript>
 </header>
 
 <div id="demo-mc" class="demo-pane" role="tabpanel" aria-labelledby="tab-mc">
@@ -3253,6 +3266,12 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
       validator's <em>synthesised</em> default annotation; type, range, base, and unit violations surface on the
       separate <code>on_error</code> channel, exactly as the C core reports them.
     </p>
+
+    <noscript>
+      <p class="ns-note">The playground parses what you type with that same WebAssembly build, so it needs
+      JavaScript and is hidden here. To get the identical event stream offline, run
+      <code>bovnar events yourfile.bvnr</code> from the command-line tool.</p>
+    </noscript>
 
     <div class="playground-layout reveal reveal-delay-3">
       <!-- ── editor ── -->

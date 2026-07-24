@@ -5,6 +5,7 @@
   "units": {
     "Bovnar — Unit-safe serialization for science and industry": "Bovnar — Einheitensichere Serialisierung für Wissenschaft und Industrie",
     "Skip to content": "Zum Inhalt springen",
+    "A Markdown version of this page, optimized for AI and LLM tools, is available at https://www.bovnar.io/index.md": "Eine für KI- und LLM-Tools optimierte Markdown-Version dieser Seite ist unter https://www.bovnar.io/de/index.md verfügbar.",
     "<svg width=\"20\" height=\"20\" viewBox=\"0 0 64 64\" aria-hidden=\"true\" style=\"flex:none;vertical-align:-4px;margin-right:.55rem\"><use href=\"#bvnr-fav\"/></svg>BOVNAR<span class=\"ext\">.bvnr</span>": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 64 64\" aria-hidden=\"true\" style=\"flex:none;vertical-align:-4px;margin-right:.55rem\"><use href=\"#bvnr-fav\"/></svg>BOVNAR<span class=\"ext\">.bvnr</span>",
     "<a href=\"#launch-demo\">Live Demo</a>": "<a href=\"#launch-demo\">Live-Demo</a>",
     "<a href=\"#playground\">Playground</a>": "<a href=\"#playground\">Playground</a>",
@@ -13,6 +14,7 @@
     "<a href=\"#features\">Features</a>": "<a href=\"#features\">Funktionen</a>",
     "<a href=\"#quickstart\">Quick Start</a>": "<a href=\"#quickstart\">Schnellstart</a>",
     "<a href=\"#docs\">Docs</a>": "<a href=\"#docs\">Doku</a>",
+    "<a href=\"/docs/\">Documentation</a>": "<a href=\"/docs/\">Dokumentation</a>",
     "<a href=\"https://github.com/sothis/bovnar\" class=\"nav-cta\">GitHub ↗</a>": "<a href=\"https://github.com/sothis/bovnar\" class=\"nav-cta\">GitHub ↗</a>",
     "<a href=\"/de/\" class=\"nav-lang\" hreflang=\"de\" data-lang-switch>Switch to German</a>": "<a href=\"/\" class=\"nav-lang\" hreflang=\"en\" data-lang-switch>Auf Englisch wechseln</a>",
     "<span>unit-safe</span>\n        <span class=\"hl-sep\">/</span>\n        <span>spec v1.1</span>\n        <span class=\"hl-sep\">/</span>\n        <span>c99</span>": "<span>einheitensicher</span>\n        <span class=\"hl-sep\">/</span>\n        <span>spec v1.1</span>\n        <span class=\"hl-sep\">/</span>\n        <span>c99</span>",
@@ -40,6 +42,7 @@
     "◐ Mission Control": "◐ Mission Control",
     "$ Trading Desk": "$ Trading-Desk",
     "⚙ Plant Control": "⚙ Anlagensteuerung",
+    "The three demos drive the C reference parser compiled to WebAssembly, so they need\n    JavaScript and are hidden here. Nothing else on this page does: the syntax, the annotated examples and the\n    full documentation below are plain markup. The same parser ships as a C library, a Python package and the\n    <code>bovnar</code> command-line tool.": "Die drei Demos betreiben den C-Referenzparser, übersetzt nach WebAssembly — sie benötigen daher JavaScript und sind hier ausgeblendet. Sonst nichts auf dieser Seite: die Syntax, die kommentierten Beispiele und die vollständige Dokumentation weiter unten sind reines Markup. Derselbe Parser ist auch als C-Bibliothek, als Python-Paket und als Kommandozeilenwerkzeug <code>bovnar</code> verfügbar.",
     "<span class=\"dot\"></span>Spacecraft config <span class=\"grow\"></span><span class=\"hint\">editable · .bvnr</span>": "<span class=\"dot\"></span>Raumfahrzeug-Konfiguration <span class=\"grow\"></span><span class=\"hint\">bearbeitbar · .bvnr</span>",
     "Apply &amp; re-orbit": "Übernehmen &amp; neu einschwenken",
     "Reset": "Zurücksetzen",
@@ -88,6 +91,7 @@
     "live parser": "Live-Parser",
     "The real <em>event stream.</em>": "Der echte <em>Event-Stream.</em>",
     "This is the reference C reader's <code>on_verified</code> callback stream, running live in your browser —\n      the unmodified C core compiled to WebAssembly, not a JavaScript re-implementation. The same events, in the\n      same order, that <code>bvnr_read()</code> delivers. Bare values get the\n      validator's <em>synthesised</em> default annotation; type, range, base, and unit violations surface on the\n      separate <code>on_error</code> channel, exactly as the C core reports them.": "Dies ist der <code>on_verified</code>-Callback-Stream des C-Referenzreaders, live in Ihrem Browser —\n      der unveränderte C-Kern, übersetzt nach WebAssembly, keine JavaScript-Nachbildung. Dieselben Events, in\n      derselben Reihenfolge, die auch <code>bvnr_read()</code> liefert. Nicht annotierte Werte erhalten die\n      vom Validator <em>synthetisierte</em> Standardannotation; Verletzungen von Typ, Wertebereich, Basis und Einheit erscheinen auf dem\n      separaten <code>on_error</code>-Kanal, genau so, wie der C-Kern sie meldet.",
+    "The playground parses what you type with that same WebAssembly build, so it needs\n      JavaScript and is hidden here. To get the identical event stream offline, run\n      <code>bovnar events yourfile.bvnr</code> from the command-line tool.": "Der Playground parst Ihre Eingabe mit demselben WebAssembly-Build — er benötigt daher JavaScript und ist hier ausgeblendet. Denselben Ereignisstrom erhalten Sie offline mit <code>bovnar events ihredatei.bvnr</code> aus dem Kommandozeilenwerkzeug.",
     "Editor": "Editor",
     "<span class=\"pg-col-badge\" id=\"pg-status\">ready</span>": "<span class=\"pg-col-badge\" id=\"pg-status\">bereit</span>",
     "Typed": "Typisiert",
@@ -278,9 +282,7 @@
     "<span class=\"vsb-item\">© 2026 Janos Sonntag</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">MIT</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">C99</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">UTF-8</span>": "<span class=\"vsb-item\">© 2026 Janos Sonntag</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">MIT</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">C99</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">UTF-8</span>",
     "BOVNAR DOCS": "BOVNAR DOKU",
     "Fetching document…": "Dokument wird geladen…",
-    "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>",
-    "A Markdown version of this page, optimized for AI and LLM tools, is available at https://www.bovnar.io/index.md": "Eine für KI- und LLM-Tools optimierte Markdown-Version dieser Seite ist unter https://www.bovnar.io/de/index.md verfügbar.",
-    "<a href=\"/docs/\">Documentation</a>": "<a href=\"/docs/\">Dokumentation</a>"
+    "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>"
   },
   "attrs": {
     "Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.": "Bovnar (BVNR) — einheitensichere Serialisierung für Wissenschaft und Industrie. Jede Messung trägt validierte physikalische Einheit, Bitbreite und Zahlenbasis direkt in sich, ganz ohne externes Schema. C99-Referenzimplementierung, MIT-lizenziert.",

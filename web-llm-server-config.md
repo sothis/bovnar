@@ -81,7 +81,13 @@ server {
     # spec .md 115->38 KB. Measured against the live server; HTML was already
     # gzipped (376->129 KB) because that one is nginx's built-in default.
     # text/html is deliberately absent below: listing it is a duplicate and nginx
-    # warns. gzip_vary matters because the .md are also content-negotiated.
+    # warns.
+    #
+    # gzip_vary is not cosmetic. The live server already gzips HTML while sending
+    # only "Vary: Accept" (from the home page's add_header), never
+    # "Vary: Accept-Encoding" -- so a shared cache may hand the compressed body
+    # to a client that never asked for it. nginx appends Accept-Encoding to Vary
+    # itself once this is on.
     gzip              on;
     gzip_vary         on;
     gzip_comp_level   6;
@@ -329,7 +335,13 @@ server {
     # spec .md 115->38 KB. Measured against the live server; HTML was already
     # gzipped (376->129 KB) because that one is nginx's built-in default.
     # text/html is deliberately absent below: listing it is a duplicate and nginx
-    # warns. gzip_vary matters because the .md are also content-negotiated.
+    # warns.
+    #
+    # gzip_vary is not cosmetic. The live server already gzips HTML while sending
+    # only "Vary: Accept" (from the home page's add_header), never
+    # "Vary: Accept-Encoding" -- so a shared cache may hand the compressed body
+    # to a client that never asked for it. nginx appends Accept-Encoding to Vary
+    # itself once this is on.
     gzip              on;
     gzip_vary         on;
     gzip_comp_level   6;

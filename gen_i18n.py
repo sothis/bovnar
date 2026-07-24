@@ -608,6 +608,10 @@ def localize_document(doc: str, lang: str, table: dict) -> str:
     # The Markdown alternate points at this edition's own Markdown page.
     doc = once(r'(<link rel="alternate" type="text/markdown" href=")/index\.md(")',
                rf'\g<1>/{lang}/index.md\g<2>', doc, "markdown alternate")
+    # The structured-data graph is inside a <script>, so it is not a translation
+    # unit and rode across verbatim -- leaving the German edition telling every
+    # crawler "inLanguage": "en" about the page it had just been served.
+    doc = once(r'("inLanguage":\s*)"en"', rf'\g<1>"{lang}"', doc, "JSON-LD inLanguage")
     # The translated page lives one directory down, so paths that JavaScript
     # resolves against the document need a prefix. index.html reads this as
     # BASE; check_js_paths() guarantees nothing bypasses it.

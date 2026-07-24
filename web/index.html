@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-YqUFhqMM11vGvCBewwrejRZ6pFs/5IFHKDxiFfC9DI0=' 'sha256-nwMdJzAVc31ivEW6N5SP/myddbpu378yr7zoAXrjEFs=' 'sha256-OROyOyUFwMfOMFdB+tT8NFgWtVZHZ/ihILuucsj9Fuw=' 'sha256-7VSwJg4XFUtVkEZiDYls6E+0DR4ijbhAg/wnPq7RgLM=' 'sha256-K7ran4NhecUJRAb9dX5ZZK9hfH3zX2L7jK6w3KKd7V0=' 'sha256-bAIlU2qM+RXky2aO45DuBzGaGr/O2E8rclCha+Um9Vk=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-sIiknB9uWsd6cStdTx36g0kbDNydSPQPpCRBJ+4viZ0=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-E1Wwa6RfXKhC/EFWfTkEdBg+PcPztsUhyaVQt5hBVgE=' 'sha256-nwMdJzAVc31ivEW6N5SP/myddbpu378yr7zoAXrjEFs=' 'sha256-OROyOyUFwMfOMFdB+tT8NFgWtVZHZ/ihILuucsj9Fuw=' 'sha256-7VSwJg4XFUtVkEZiDYls6E+0DR4ijbhAg/wnPq7RgLM=' 'sha256-K7ran4NhecUJRAb9dX5ZZK9hfH3zX2L7jK6w3KKd7V0=' 'sha256-bAIlU2qM+RXky2aO45DuBzGaGr/O2E8rclCha+Um9Vk=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-/W/soTuSUjKsKzfqbIuiuW4vlh9r5OfZqJ1dKb1vVjQ=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -1351,6 +1351,12 @@ html[data-theme="light"] .tok-label::after { color: #005a99; }   /* 5.9:1 on --s
   flex-direction: column;
   padding: 2rem;
   border-right: 1px solid var(--border);
+  /* A grid item's automatic minimum size is its min-content width, and the
+     .code-block inside is white-space:pre -- so the track refused to shrink
+     below the longest source line (~482px) and pushed the whole document to
+     501px on a 390px phone, making every section scroll sideways. The code
+     block has overflow-x:auto and scrolls on its own; let the track shrink. */
+  min-width: 0;
 }
 .qs-step:last-child { border-right: none; }
 
@@ -2944,6 +2950,14 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
 #launch-demo .how-flow { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); font-family: var(--mono); font-size: 0.72rem; color: var(--text3); line-height: 1.8; }
 #launch-demo .how-flow b { color: var(--teal); font-weight: 600; }
 #launch-demo .how-flow .arr { color: var(--text3); margin: 0 0.35rem; }
+/* The stage chain is written without spaces (<b>edit</b><span class="arr">→</span>…)
+   so it is one unbreakable "word" ~420px wide -- 537px once translated. Its
+   <details> clips with overflow:hidden, so on a phone the tail was cut off and
+   unreachable. A zero-width space after each arrow puts the break opportunity
+   exactly where the chain should wrap; overflow-wrap is the backstop for a
+   single stage name too long to fit on its own line. */
+#launch-demo .how-flow .arr::after { content: "\200B"; }
+#launch-demo .how-flow { overflow-wrap: anywhere; }
 
 /* Legend swatches. These were inline styles, so the themed rule below could
    never reach them: on the light demo panel (#f3f3f3) the chart colours sit at
@@ -7526,6 +7540,22 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     + 'pre,h1,h2,h3,h4,h5,h6,p,li,dt,dd,td,th,figcaption,summary,label,button,canvas,'
     + 'textarea,select,option,picture,video,audio,template,title';
   var TRANS_ATTRS = ['title', 'alt', 'placeholder', 'aria-label', 'data-label', 'data-doc-title'];
+  // [selector, attribute] pairs in <head> that describe *this edition* and must
+  // follow the swap. The hreflang alternates are deliberately absent: both
+  // editions ship the same set, pointing at each other either way.
+  var HEAD_SYNC = [
+    ['meta[name="description"]', 'content'],
+    ['link[rel="canonical"]', 'href'],
+    ['link[rel="alternate"][type="text/markdown"]', 'href'],
+    ['meta[property="og:url"]', 'content'],
+    ['meta[property="og:title"]', 'content'],
+    ['meta[property="og:description"]', 'content'],
+    ['meta[property="og:image:alt"]', 'content'],
+    ['meta[property="og:locale"]', 'content'],
+    ['meta[property="og:locale:alternate"]', 'content'],
+    ['meta[name="twitter:title"]', 'content'],
+    ['meta[name="twitter:description"]', 'content']
+  ];
   var HASLET = /[A-Za-zÀ-ɏ]{2}/;
   // Runtime-populated sinks whose live child structure diverges from the static
   // page. Skipping them keeps the two walks in lockstep; their dynamic strings
@@ -7645,9 +7675,15 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
       }
       document.documentElement.lang = targetLang;
       if (other.title) document.title = other.title;
-      var md = document.querySelector('meta[name="description"]'),
-          omd = other.querySelector('meta[name="description"]');
-      if (md && omd && omd.getAttribute('content')) md.setAttribute('content', omd.getAttribute('content'));
+      // The swap moves the document to the other edition's URL, so the head has
+      // to move with it. Syncing only <title> and the description left the page
+      // claiming lang="de" under an English canonical, og:url and og:locale --
+      // a share sheet or a reader-mode extension reads these from the live DOM.
+      for (i = 0; i < HEAD_SYNC.length; i++) {
+        var sel = HEAD_SYNC[i][0], at = HEAD_SYNC[i][1];
+        var live = document.head.querySelector(sel), oth = other.head.querySelector(sel);
+        if (live && oth && oth.getAttribute(at) != null) live.setAttribute(at, oth.getAttribute(at));
+      }
       window.__BVNR_I18N__ = info.i18n || undefined;
       (window.__BVNR_RETRANSLATE__ || []).forEach(function (f) { try { f(targetLang); } catch (e) {} });
       persist(targetLang);

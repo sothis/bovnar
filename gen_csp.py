@@ -13,7 +13,7 @@ that recomputes them and cmake/csp.cmake (via --check) fails the suite when the
 stamped policy no longer matches the scripts it is meant to authorise — the same
 anti-drift discipline the ?v= cache stamps and the WASM artifact already have.
 
-  ./gen_csp.py           rewrite the CSP <meta> in index.html + impressum.html
+  ./gen_csp.py           rewrite the CSP <meta> in index.html, impressum.html, 404.html
   ./gen_csp.py --check   verify only; exit non-zero on drift
 
 The translated editions carry ONE extra inline script (the __BVNR_I18N__ boot
@@ -31,7 +31,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
-PAGES = [WEB / "index.html", WEB / "impressum.html"]
 
 # A <script> element, capturing its attributes and its exact byte content.
 # An attribute value never contains '>' on these pages, so [^>]* is safe; the
@@ -71,6 +70,28 @@ STATIC_DIRECTIVES = [
     "form-action 'none'",
 ]
 
+# 404.html is a standalone card: one inline theme-boot script, no WASM, no fetch,
+# no manifest, no webfont. It gets its own reduced policy rather than the app one
+# -- the page has no use for 'wasm-unsafe-eval' or connect-src, and a policy is
+# only worth having if it stays as narrow as the page it guards.
+STANDALONE_DIRECTIVES = [
+    "default-src 'none'",
+    "script-src {script_hashes}",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+]
+
+# The pages served directly, each with the directive set it is stamped from. The
+# translated editions are not here: gen_i18n.py stamps those through stamp().
+PAGES = [
+    (WEB / "index.html", STATIC_DIRECTIVES),
+    (WEB / "impressum.html", STATIC_DIRECTIVES),
+    (WEB / "404.html", STANDALONE_DIRECTIVES),
+]
+
 
 def sha256_b64(text: str) -> str:
     return base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode()
@@ -87,20 +108,21 @@ def script_hashes(html: str) -> list[str]:
     return out
 
 
-def build_meta(hashes: list[str]) -> str:
+def build_meta(hashes: list[str], directives: list[str] | None = None) -> str:
     directives = [
         d.format(script_hashes=" ".join(hashes)) if "{script_hashes}" in d else d
-        for d in STATIC_DIRECTIVES
+        for d in (directives or STATIC_DIRECTIVES)
     ]
     return ('<meta http-equiv="Content-Security-Policy" content="'
             + "; ".join(directives) + '">')
 
 
-def policy_for(html: str, extra_hashes: list[str] | None = None) -> str:
+def policy_for(html: str, extra_hashes: list[str] | None = None,
+               directives: list[str] | None = None) -> str:
     hashes = script_hashes(html)
     if extra_hashes:
         hashes += extra_hashes
-    return build_meta(hashes)
+    return build_meta(hashes, directives)
 
 
 def _stamp(html: str, meta: str) -> str:
@@ -124,9 +146,10 @@ def stamp(html: str, extra_hashes: list[str] | None = None) -> str:
     return _stamp(html, policy_for(html, extra_hashes))
 
 
-def process(path: Path, check: bool) -> int:
+def process(path: Path, check: bool, directives: list[str] | None = None) -> int:
     html = path.read_text(encoding="utf-8")
-    meta = policy_for(html)          # hashes are of the scripts as they are now
+    # hashes are of the scripts as they are now
+    meta = policy_for(html, directives=directives)
     want = _stamp(html, meta)
     if check:
         if html != want:
@@ -152,9 +175,9 @@ def process(path: Path, check: bool) -> int:
 def main() -> int:
     check = "--check" in sys.argv[1:]
     rc = 0
-    for page in PAGES:
+    for page, directives in PAGES:
         if page.exists():
-            rc |= process(page, check)
+            rc |= process(page, check, directives)
     return rc
 
 

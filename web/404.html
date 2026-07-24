@@ -2,22 +2,43 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-XOcoioxV4CFktrq7QfqsgVSHc+5YmPc/viXMF1/OV28='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, follow">
 <title>404 — Page not found · Bovnar</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<script>
+/* Apply the theme before first paint to avoid a flash — the same pre-paint boot
+   the landing, the doc pages and the Impressum run. This page used to key off
+   prefers-color-scheme alone, so a visitor who had explicitly chosen dark on the
+   site was thrown a white page the moment they hit a bad URL. An explicit toggle
+   wins; otherwise we follow the visitor's desktop theme. */
+(function () {
+  try {
+    var stored = localStorage.getItem('bovnar-theme');
+    var dark = stored === 'dark' ||
+      (stored !== 'light' && window.matchMedia &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (!dark) document.documentElement.setAttribute('data-theme', 'light');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
 <style>
+/* Dark is the :root default and light is the html[data-theme="light"] override,
+   matching docs.css and the landing page — the boot script above sets the
+   attribute, so the stored choice wins over the desktop preference. */
 :root {
+  --bg: #14181d; --fg: #e6ebf0; --muted: #9aa6b2; --card: #1c2229;
+  --border: #2a323b; --accent: #6cb0ea; --accent-2: #4ec9b0;
+  color-scheme: dark;
+}
+html[data-theme="light"] {
   --bg: #f4f6f8; --fg: #1c2530; --muted: #5a6675; --card: #ffffff;
   --border: #dfe3e8; --accent: #0a85d6; --accent-2: #33a78f;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14181d; --fg: #e6ebf0; --muted: #9aa6b2; --card: #1c2229;
-    --border: #2a323b; --accent: #6cb0ea; --accent-2: #4ec9b0;
-  }
+  color-scheme: light;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }

@@ -152,6 +152,14 @@ a:hover { text-decoration: underline; }
 p, li { color: var(--text); }
 strong { color: var(--text); }
 
+/* Running prose carries long unbreakable identifiers -- error_invalid_datetime_epoch,
+   <family:…,unit-param>, LIBBOVNAR_PATH=/opt/bovnar/lib/libbvnr.so -- with no break
+   opportunity in them. They pushed /docs/spec/, /docs/units/ and /docs/python/ past a
+   390px viewport and made the whole page scroll sideways. <pre> and <table> have
+   their own scrollers and are deliberately left alone; text must wrap instead. */
+p, li, dd, dt, blockquote, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; }
+:not(pre) > code { overflow-wrap: anywhere; }
+
 code {
   font-family: var(--mono);
   font-size: 0.88em;

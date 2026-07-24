@@ -1420,6 +1420,36 @@ html[data-theme="light"] .tok-label::after { color: #005a99; }   /* 5.9:1 on --s
   flex: 1 1 auto;          /* fill the (grid-equalized) step so both columns match height */
 }
 
+/* ── Rows that line up in every language ──
+   A feature card and a quick-start step are each four stacked parts: a label, a
+   title, a description and a code frame. Laid out as independent flex columns,
+   the frames line up only while the text above them happens to wrap to the same
+   number of lines -- true in English, not in German, where one card's
+   description takes an extra line and drags its frame 18 px off its neighbours'
+   (22 px in the quick start).
+
+   Subgrid puts all four parts on the row's shared tracks, so the frames start
+   and end on the same line whatever the prose above them does. row-gap: 0 is
+   the important detail: the features grid draws its 1 px separators AS gaps
+   over a border-coloured background, and a subgrid inherits its parent's
+   gutters -- without this, those separators would be drawn through the middle
+   of every card as well as between them.
+
+   Behind @supports because the fallback is exactly today's layout: a browser
+   without subgrid keeps the flex columns and the frame pinned to the bottom. */
+@supports (grid-template-rows: subgrid) {
+  .feature-card, .qs-step {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 4;
+    row-gap: 0;
+  }
+  /* The frame now fills its shared row, so the boxes are identical rectangles
+     rather than merely bottom-aligned; the gap above it was the flex
+     margin-top:auto, which has nothing left to push against. */
+  .feature-card .feature-example { margin-top: 1.25rem; }
+}
+
 /* ── DOCS ── */
 #docs {
   border-top: 1px solid var(--border);

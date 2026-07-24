@@ -5,7 +5,7 @@
 :root {
   --editor-bg:  #1e1e1e;
   --panel-bg:   #252526;
-  --bar-bg:     #333333;
+  --bar-bg:     #3c3c3c;   /* the landing's --titlebar-bg, to the byte */
   --border:     #3e3e42;
   --text:       #ededed;
   --text2:      #c2c2c2;
@@ -48,56 +48,90 @@ body {
 }
 ::selection { background: var(--sel); }
 
-/* ── Sticky top bar, mirroring the landing nav ── */
+/* ── Sticky top bar ──
+   Said "mirroring the landing nav" and mirrored almost none of it. It sat on
+   --panel-bg where the landing's bar is the lighter title-bar surface; its
+   wordmark was 0.95rem/600 in --text against a 0.82rem/500 wordmark in the logo
+   blue; its links were 0.82rem pills with a grey hover against 0.8rem links
+   whose hover fills the full height of the bar; and its call to action hovered
+   to a different blue. Two designs for the same piece of furniture, one click
+   apart. Every value below is the landing page's, so the bar does not change
+   under the reader when they follow a doc card out of the drawer. */
 header.site {
   position: sticky;
   top: 0;
   z-index: 20;
+  height: 48px;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.55rem 1.2rem;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(6px);
+  gap: 0;
+  padding: 0 1.5rem;
+  background: var(--bar-bg);
+  /* Hard-coded on the landing too: on #3c3c3c a --border edge disappears. */
+  border-bottom: 1px solid #252525;
 }
+html[data-theme="light"] header.site { border-bottom-color: var(--border); }
 header.site .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  /* Not gap: a bare text node is its own flex item, so a gap would also open
+     between BOVNAR and .bvnr. The landing spaces the mark with a margin. */
+  gap: 0;
   font-family: var(--mono);
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: 0.06em;
-  color: var(--text);
+  font-weight: 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  /* The wordmark sits on the lightest dark surface, where --blue2 manages only
+     2.4:1. This is the logo gradient's light stop, 4.7:1 -- the landing page
+     carries the same exception, and for the same reason. */
+  color: #6cb0ea;
   text-decoration: none;
+  white-space: nowrap;
+  margin-right: 2.5rem;
 }
-header.site .brand svg { width: 22px; height: 22px; flex: none; }
+html[data-theme="light"] header.site .brand { color: var(--blue); }
+header.site .brand svg { width: 20px; height: 20px; flex: none; margin-right: 0.55rem; }
 header.site .brand .ext { color: var(--text3); font-weight: 400; }
 header.site nav {
-  margin-left: auto;
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0;
 }
+/* Last item in the bar, hard right -- the landing's arrangement: wordmark,
+   links, then the toggle alone at the far end. */
+header.site .theme-toggle { margin-left: auto; margin-right: 0.75rem; }
 header.site nav a {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   color: var(--text2);
   text-decoration: none;
-  font-size: 0.82rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 4px;
+  padding: 0 0.85rem;
+  height: 48px;
+  display: flex;
+  align-items: center;
   transition: color 0.15s, background 0.15s;
 }
-header.site nav a:hover { color: var(--text); background: rgba(127,127,127,0.14); }
+header.site nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+html[data-theme="light"] header.site nav a:hover { background: rgba(0, 0, 0, 0.05); }
+/* Sans, not mono, and 0.8rem, not 0.75. The landing's .nav-cta asks for mono
+   0.75rem too -- and never gets it: .nav-links li a is the more specific
+   selector, so the button there renders in the same face and size as the links
+   beside it, with only the fill and the white text setting it apart. This bar
+   copies what the landing RENDERS, which is the whole point of the exercise; the
+   pair that read differently at a glance were this button and its neighbour. */
 header.site nav a.cta {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-size: 0.8rem;
   color: #fff;
   background: var(--blue2);
-  padding: 0.35rem 0.8rem;
+  padding: 0.35rem 0.9rem;
+  height: auto;
+  margin-left: 0.5rem;
+  transition: background 0.15s;
 }
-header.site nav a.cta:hover { background: var(--blue); color: #fff; }
+header.site nav a.cta:hover { background: #0086d8; color: #fff; }
 
 /* Theme toggle — identical behaviour/appearance to the landing */
 .theme-toggle {
@@ -335,6 +369,12 @@ footer a { color: var(--blue); }
 
 @media (max-width: 600px) {
   header.site nav a:not(.cta) { display: none; }
+  /* With the links gone, a flex:1 nav would strand the call to action against
+     the wordmark. Collapse the nav to its content and let it hug the right,
+     which is where the phone layout put it before the bar was aligned with the
+     landing page's. */
+  header.site nav { flex: none; margin-left: auto; }
+  header.site .brand { margin-right: 0; }
   main { padding-top: 1.6rem; }
   .to-top { right: 0.8rem; bottom: 0.8rem; }
 }

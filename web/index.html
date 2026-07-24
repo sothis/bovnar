@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-u+resVsSlbgDnBnE8zCTNkCkiQwKNYZvrnJpbEY/Ino=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-BUpm72Gwn6KNkSx8RzU/bR+5mmMAjYoSpP59hFgSITc=' 'sha256-s9+QAwRuDI9AwiPlQFQwUu6vx0vJ9Bo5ydCYZxqvr/4=' 'sha256-jlqXQkcRPQ9KY1+NEIjZ+OyQC61t9z6pvKJh3FNWBz0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-hC1+rjhPRb6hDDjo7/9MQEF0p3w+OB0cSfI1rLKWq7A=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-AtKGVI48tVvJNqtepmbobaEN4tJXgBmjbCv8Ahu5gvM=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-BUpm72Gwn6KNkSx8RzU/bR+5mmMAjYoSpP59hFgSITc=' 'sha256-s9+QAwRuDI9AwiPlQFQwUu6vx0vJ9Bo5ydCYZxqvr/4=' 'sha256-jlqXQkcRPQ9KY1+NEIjZ+OyQC61t9z6pvKJh3FNWBz0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-/1w5cQO+9Fh2i3oAY8J83dRlJJh6sfbT+z8XRphDFT4=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -5006,7 +5006,13 @@ function wireDocLinks() {
       a.addEventListener('click', e => {
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        openDoc(href, a.textContent.trim() || href);
+        // Title from the card, not from the link's own text. A Markdown
+        // cross-reference is often written as a bare filename, and that landed
+        // verbatim in the title bar -- where every other route into the same
+        // document (card, deep link, Back button) shows "Specification (v1.1)".
+        // docTitleFor falls back to the filename, so a document with no card
+        // behaves exactly as before.
+        openDoc(href, docTitleFor(href.split('#')[0]));
       });
     }
   });
@@ -7800,7 +7806,18 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
   // are retranslated separately via window.__BVNR_I18N__ + __BVNR_RETRANSLATE__.
   var PROTECT = '#pg-highlight,#pg-gutter,#pg-error-overlay,#pg-event-tree,#pg-error-list,'
     + '[id$="cfg-hl"],[id$="ticker"],[id$="framesrc"],[id$="gauges"],[id$="cfgmsg"],'
-    + '#derived,#ialarms,#iraw,#inaive,#ibvnr,#fsymhint,#ihint';
+    + '#derived,#ialarms,#iraw,#inaive,#ibvnr,#fsymhint,#ihint,'
+    // The doc drawer. #doc-title ships as an em dash -- no letters, so not a
+    // unit -- and holds a document title the moment one is opened, which IS a
+    // unit: one extra on the live side, and the walks no longer line up. Opening
+    // a document and closing it again was therefore enough to make every later
+    // language switch fall back to a full navigation, silently, for the rest of
+    // the session -- losing the scroll position, the playground's contents and
+    // the running demo, which is the entire point of switching in place.
+    // #doc-content is the same story several hundred units over, while open.
+    // Neither needs translating: the drawer renders the English Markdown in both
+    // editions, and its title comes back from the card on the next open.
+    + '#doc-title,#doc-content';
 
   function isUnit(el) { return HASLET.test(el.textContent || '') && !el.querySelector(BLOCK); }
   function skip(el) {

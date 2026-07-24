@@ -55,7 +55,10 @@ html[data-theme="light"] {
   --border:      #d4d4d4;
   --text:   #1f1f1f;
   --text2:  #444444;
-  --text3:  #6b6b6b;
+  /* #6b6b6b managed only 4.35:1 against the title bar this page puts the
+     wordmark on. The landing page's light --text3 is #656565 and clears it
+     at 4.76:1 -- same role, same value now. */
+  --text3:  #656565;
   --blue2:  #0066b8;
   --teal:   #267f99;
   --cyan:   #0070c1;

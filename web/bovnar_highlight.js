@@ -28,10 +28,18 @@
      separators #6e7a86 -> #8a94a1, refpath #d06070 -> #d4737f, depth-3
      #ff2a7d -> #ff5f96, the light greys #7a7a7a -> #6f6f6f, light depth-4
      #bf6a02 -> #9c5a00 -- so punctuation still recedes behind keys and values,
-     it is merely legible now. Every token clears 4.5:1 on both code
-     backgrounds, in both themes. The same four token classes moved in
+     it is merely legible now. The same four token classes moved in
      highlighter/{vim,vscode,sublime}, which is what the lock-step above means;
-     their comment colour is a different value from the web's and stays put. */
+     their comment colour is a different value from the web's and stays put.
+
+     A later audit of every rendered text node found a background nobody had
+     checked the palette against: --stream-bg (#e4ecf7), the blue-tinted panel
+     the demos decode into, which is lighter than both code surfaces. Four light
+     tokens missed AA on it -- the greys at 4.22, strings at 4.25, units and
+     bases at 4.42 -- so those went a step darker again (#6f6f6f -> #666666,
+     #178021 -> #12731c, #0a7a66 -> #0a7060). Every token now clears 4.5:1 on
+     every surface it is actually rendered on: page, code block and stream
+     panel, in both themes. */
   const CSS = `
 .bvh-comment{color:#8b96a3}
 .bvh-sigil{color:#c084fc}
@@ -66,27 +74,27 @@ html[data-theme="light"] .bvh-comment{color:#5b6b7a}
 html[data-theme="light"] .bvh-sigil{color:#8200d6}
 html[data-theme="light"] .bvh-key{color:#0b5bd3}
 html[data-theme="light"] .bvh-eq{color:#d11b2b}
-html[data-theme="light"] .bvh-semi{color:#6f6f6f}
-html[data-theme="light"] .bvh-str{color:#178021}
+html[data-theme="light"] .bvh-semi{color:#666666}
+html[data-theme="light"] .bvh-str{color:#12731c}
 html[data-theme="light"] .bvh-num{color:#a35200}
 html[data-theme="light"] .bvh-neg{color:#d11b2b}
-html[data-theme="light"] .bvh-unit{color:#0a7a66}
-html[data-theme="light"] .bvh-unitsep{color:#6f6f6f}
+html[data-theme="light"] .bvh-unit{color:#0a7060}
+html[data-theme="light"] .bvh-unitsep{color:#666666}
 html[data-theme="light"] .bvh-sym{color:#0b5bd3}
 html[data-theme="light"] .bvh-bool{color:#8200d6}
 html[data-theme="light"] .bvh-null{color:#8200d6}
 html[data-theme="light"] .bvh-special{color:#8200d6}
-html[data-theme="light"] .bvh-sep{color:#6f6f6f}
+html[data-theme="light"] .bvh-sep{color:#666666}
 html[data-theme="light"] .bvh-adelim{color:#7a5c00}
 html[data-theme="light"] .bvh-type{color:#16191d}
-html[data-theme="light"] .bvh-tsep{color:#6f6f6f}
+html[data-theme="light"] .bvh-tsep{color:#666666}
 html[data-theme="light"] .bvh-width{color:#c01a6b}
-html[data-theme="light"] .bvh-base{color:#0a7a66}
+html[data-theme="light"] .bvh-base{color:#0a7060}
 html[data-theme="light"] .bvh-param{color:#b1430a}
 html[data-theme="light"] .bvh-refop{color:#d11b2b}
 html[data-theme="light"] .bvh-refpath{color:#b31226}
 html[data-theme="light"] .bvh-d1{color:#b1430a}html[data-theme="light"] .bvh-d2{color:#8200d6}html[data-theme="light"] .bvh-d3{color:#c01a6b}html[data-theme="light"] .bvh-d4{color:#9c5a00}
-html[data-theme="light"] .bvh-d5{color:#178021}html[data-theme="light"] .bvh-d6{color:#0a7a66}html[data-theme="light"] .bvh-d7{color:#a35200}html[data-theme="light"] .bvh-d8{color:#0b5bd3}
+html[data-theme="light"] .bvh-d5{color:#12731c}html[data-theme="light"] .bvh-d6{color:#0a7060}html[data-theme="light"] .bvh-d7{color:#a35200}html[data-theme="light"] .bvh-d8{color:#0b5bd3}
 `;
   if (typeof document !== 'undefined' && !document.getElementById('bvh-style')) {
     const s = document.createElement('style');

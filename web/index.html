@@ -186,6 +186,11 @@ window.bvnrTcfg = function (key, english) {
   --sidebar-bg:  #252526;
   --panel-bg:    #2d2d2d;
   --titlebar-bg: #3c3c3c;
+  /* Hover fill for anything filled with --blue2 and lettered in white. Hovering
+     used to LIGHTEN those buttons (#0086d8, and --blue on the back-to-top
+     controls), which drops white text to 3.89:1 and 2.95:1 -- legible at rest,
+     not while you are pointing at it. Hover darkens instead. */
+  --cta-hover: #0069ae;
   --tabbar-bg:   #2d2d2d;
   --statusbar:   #007acc;
   --border:      #3e3e42;
@@ -239,6 +244,7 @@ html[data-theme="light"] {
   --sidebar-bg:  #f3f3f3;
   --panel-bg:    #f3f3f3;
   --titlebar-bg: #e8e8e8;
+  --cta-hover: #005596;
   --tabbar-bg:   #ececec;
   --statusbar:   #007acc;
   --border:      #d4d4d4;
@@ -270,9 +276,9 @@ html[data-theme="light"] {
   --c-type:     #16191d;
   --c-param:    #b1430a;
   --c-val:      #a35200;
-  --c-unit:     #0a7a66;
-  --c-str:      #178021;
-  --c-semi:     #6f6f6f;
+  --c-unit:     #0a7060;
+  --c-str:      #12731c;
+  --c-semi:     #666666;
   --c-struct:   #b1430a;
 
   color-scheme: light;
@@ -341,7 +347,7 @@ html[data-theme="light"] .hljs-punctuation  { color: #555555; }
 /* Bovnar tokens with hard-coded (non-var) colours */
 html[data-theme="light"] .hljs-bvn-special,
 html[data-theme="light"] .hljs-bvn-keyword  { color: #8200d6; }
-html[data-theme="light"] .hljs-bvn-esc      { color: #178021; }
+html[data-theme="light"] .hljs-bvn-esc      { color: #12731c; }
 html[data-theme="light"] .hljs-bvn-refop    { color: #d11b2b; }
 html[data-theme="light"] .hljs-invalid      { color: #d11b2b; }
 
@@ -511,7 +517,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
   height: auto !important;
   transition: background 0.15s !important;
 }
-.nav-cta:hover { background: #0086d8 !important; }
+.nav-cta:hover { background: var(--cta-hover) !important; }
 
 /* Language switch — deliberately quieter than the GitHub CTA: it matters to the
    fraction of visitors who need it and should not compete with the nav. */
@@ -620,7 +626,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
   display: inline-block;
   transition: background 0.15s, transform 0.1s;
 }
-.btn-primary:hover { background: #0086d8; transform: translateY(-1px); }
+.btn-primary:hover { background: var(--cta-hover); transform: translateY(-1px); }
 
 .btn-ghost {
   font-family: var(--mono);
@@ -1085,7 +1091,7 @@ html[data-theme="light"] .tok-label::after { color: #005a99; }   /* 5.9:1 on --s
   transition: background 0.15s, transform 0.1s, box-shadow 0.2s;
 }
 .demo-launch-btn:hover {
-  background: #0086d8;
+  background: var(--cta-hover);
   transform: translateY(-1px);
   box-shadow: 0 6px 26px rgba(0,122,204,0.42);
 }
@@ -1830,7 +1836,7 @@ footer { position: relative; z-index: 1; }
   transition: border-color 0.15s, background 0.15s;
 }
 #doc-drawer.scrolled #doc-to-top { display: flex; animation: doc-top-in 0.18s ease-out; }
-#doc-to-top:hover { border-color: var(--blue); background: var(--blue); }
+#doc-to-top:hover { border-color: var(--cta-hover); background: var(--cta-hover); }
 #doc-to-top:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 #doc-to-top svg { width: 20px; height: 20px; display: block; }
 @keyframes doc-top-in { from { opacity: 0; transform: translateY(6px); } }
@@ -2729,8 +2735,8 @@ html[data-theme="light"] #launch-demo {
   --border:      #d4d4d4;
   --border-hi:   #007acc;
   --select-bg:   #add6ff;
-  --up:          #0a7d2c;
-  --down:        #d11b2b;
+  --up:          #0a7026;
+  --down:        #b81326;
 
   --text:   #1f1f1f;
   --text2:  #444444;
@@ -2752,23 +2758,23 @@ html[data-theme="light"] #launch-demo {
   --c-ann:      #7a5c00;
   --c-type:     #16191d;
   --c-width:    #c01a6b;
-  --c-base:     #0a7a66;
+  --c-base:     #0a7060;
   --c-param:    #b1430a;
   --c-val:      #a35200;
   --c-neg:      #d11b2b;
-  --c-unit:     #0a7a66;
-  --c-unitsep:  #6f6f6f;
-  --c-str:      #178021;
-  --c-semi:     #6f6f6f;
+  --c-unit:     #0a7060;
+  --c-unitsep:  #666666;
+  --c-str:      #12731c;
+  --c-semi:     #666666;
   --c-sym:      #0b5bd3;
   --c-bool:     #8200d6;
   --c-null:     #8200d6;
   --c-special:  #8200d6;
   --c-refop:    #d11b2b;
   --c-refpath:  #b31226;
-  --c-sep:      #6f6f6f;
+  --c-sep:      #666666;
   --c-d1: #b1430a; --c-d2: #8200d6; --c-d3: #c01a6b; --c-d4: #9c5a00;
-  --c-d5: #178021; --c-d6: #0a7a66; --c-d7: #a35200; --c-d8: #0b5bd3;
+  --c-d5: #12731c; --c-d6: #0a7060; --c-d7: #a35200; --c-d8: #0b5bd3;
 }
 html[data-theme="light"] #launch-demo ::-webkit-scrollbar-thumb { background: #c1c1c1; }
 html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; }
@@ -4074,7 +4080,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 </div>
 
 <script src="bovnar_parser_wasm.js?v=adc3bc618f03"></script>
-<script src="bovnar_highlight.js?v=3d957a4945d3"></script>
+<script src="bovnar_highlight.js?v=667c4a367efc"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
 (function () {

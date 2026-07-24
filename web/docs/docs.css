@@ -223,3 +223,52 @@ footer a { color: var(--blue); }
   header.site nav a:not(.cta) { display: none; }
   main { padding-top: 1.6rem; }
 }
+
+/* ── Print ──
+   These are the pages people actually print, and they carried no print rules at
+   all. Because :root is the DARK theme here, a reader who had chosen dark got
+   #ededed text over a #1e1e1e background that browsers do not print by default
+   -- a sheet of white paper with near-invisible ink on it. Force the light ink
+   regardless of the stored theme (the landing page's print block does the same),
+   drop the on-screen chrome, and stop the two sideways scrollers from silently
+   truncating at the page edge: on screen an overflowing <pre> or <table> can be
+   scrolled, on paper it is simply cut off. */
+@media print {
+  html, body { background: #fff !important; color: #111 !important; }
+  main, main *, footer, footer * {
+    color: #111 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  /* Sticky site header, its nav and the theme toggle are screen controls; the
+     header is position:sticky, which some engines repeat on every page. */
+  header.site, .theme-toggle { display: none !important; }
+  main { max-width: none; padding: 0 0 1rem; }
+
+  pre, code {
+    background: #f5f5f5 !important;
+    border: 1px solid #ccc !important;
+    /* Long source lines scroll on screen and would be guillotined on paper. */
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+  }
+  pre code { background: none !important; border: 0 !important; }
+
+  /* display:block + overflow-x:auto makes a wide table scrollable on screen and
+     invisible past the margin on paper. Let it lay out as a table and wrap. */
+  table { display: table !important; width: 100% !important; overflow: visible !important; }
+  th, td { border: 1px solid #999 !important; }
+  th { background: #eee !important; }
+  blockquote { border-left: 3px solid #999 !important; }
+
+  a { color: #111 !important; text-decoration: underline; }
+  /* A link target is lost on paper unless it is written out. */
+  main a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    word-break: break-all;
+  }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  blockquote { break-inside: avoid; }
+}

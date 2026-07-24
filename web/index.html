@@ -1809,24 +1809,30 @@ footer { position: relative; z-index: 1; }
    40 000 words into the specification had to drag the scrollbar. Hidden with
    display:none rather than opacity so it stays out of the tab order (and out of
    the dialog's focus trap, which filters on offsetParent) until it is offered. */
+/* Filled with the accent rather than the sidebar colour it started with: that
+   surface differs from the drawer's own background by 1.06:1 and its border by
+   1.4:1, under the 3:1 WCAG 1.4.11 asks of a control's boundary -- a dark square
+   on a dark panel, which readers reported simply not seeing. 44px is the pointer
+   target size WCAG 2.5.5 asks for. */
 #doc-to-top {
   display: none;
   position: absolute;
   right: 1.75rem;
   bottom: 1.75rem;
-  width: 38px; height: 38px;
+  width: 44px; height: 44px;
   align-items: center;
   justify-content: center;
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border);
-  color: var(--text3);
+  background: var(--blue2);
+  border: 1px solid var(--blue2);
+  color: #fff;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+  transition: border-color 0.15s, background 0.15s;
 }
 #doc-drawer.scrolled #doc-to-top { display: flex; animation: doc-top-in 0.18s ease-out; }
-#doc-to-top:hover { border-color: var(--blue2); color: var(--blue); background: var(--editor-bg); }
-#doc-to-top svg { width: 16px; height: 16px; display: block; }
+#doc-to-top:hover { border-color: var(--blue); background: var(--blue); }
+#doc-to-top:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+#doc-to-top svg { width: 20px; height: 20px; display: block; }
 @keyframes doc-top-in { from { opacity: 0; transform: translateY(6px); } }
 
 #doc-content {
@@ -2548,7 +2554,7 @@ a[data-doc] { cursor: pointer; }
     <li class="nav-section"><a href="#syntax">Syntax</a></li>
     <li class="nav-section"><a href="#features">Features</a></li>
     <li class="nav-section"><a href="#quickstart">Quick Start</a></li>
-    <li class="nav-section"><a href="#docs">Docs</a></li>
+    <li class="nav-section"><a href="#docs">Inline Documentation</a></li>
     <li class="nav-section"><a href="/docs/">Documentation</a></li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>

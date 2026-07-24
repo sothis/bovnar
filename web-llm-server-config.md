@@ -237,6 +237,13 @@ RewriteRule ^$ /index.md [R=302,L]
   context enabled.
 - Nothing here changes the human-facing site: browsers send
   `Accept: text/html,…` and continue to receive `index.html`.
+- The `$bvnr_cache_ctl` map only ever sees a stamp the *page* asked for, so an
+  asset reached from somewhere else never earned the immutable year: the woff2
+  files are named only inside `fonts/fonts.css`, which stamped none of them, and
+  ~440 kB of fonts that never change revalidated hourly on the critical path.
+  `./gen_font_stamps.py` now derives those stamps (and the pages' stamp for
+  `fonts.css` itself) from the bytes, gated by the `bvnr_font_stamps` test — the
+  same contract `cmake/cache_stamps.cmake` gives the WASM artifacts.
 
 ## Optional: consolidate the raw `.md` to the HTML docs for search
 
@@ -282,6 +289,47 @@ out of the canonical map above — it is niche enough not to compete for the
 `/docs/grammar/` ranking. It does still need its own `location` for the MIME type
 (above), or it downloads instead of displaying. The complete assembled config is
 in the next section.
+
+## Response headers (`/etc/nginx/snippets/bovnar-headers.conf`)
+
+The pages carry their own hash-based CSP in a `<meta>`, which covers scripts,
+styles and everything else that loads — but `frame-ancestors` is ignored in a
+`<meta>` by specification, so until this snippet existed the site could be framed
+by anyone. That directive only works as a header, so it is one here, alongside
+the two headers no static site should be without.
+
+Kept in one file because `add_header` is not additive: a location that declares
+any header of its own stops inheriting the entire server-level set. Every
+location in the config below that adds a header therefore `include`s this file,
+which is what stops the set from quietly thinning out one location at a time.
+
+```nginx
+##
+# bovnar — the header set every response from the canonical host carries.
+#
+# add_header is NOT additive across configuration levels: the moment a location
+# declares one header of its own, it stops inheriting the entire set from the
+# server block. That trap already cost this config its HSTS in four locations
+# once. Keeping the set in one file and including it wherever headers are
+# declared means the next location cannot silently ship a thinner set.
+#
+#   Strict-Transport-Security  — HTTPS-only for a year.
+#   X-Content-Type-Options     — no MIME sniffing; every type here is declared.
+#   Referrer-Policy            — send the full URL same-origin, the bare origin
+#                                cross-origin, nothing when downgrading.
+#   Content-Security-Policy    — framing only. The pages carry their own full
+#                                policy in a <meta>, where frame-ancestors is
+#                                ignored by definition, so the site was
+#                                embeddable in anyone's iframe. A header is the
+#                                only place that directive works; the two
+#                                policies are enforced together, and this one
+#                                restricts nothing else.
+##
+add_header Strict-Transport-Security "max-age=31536000" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Content-Security-Policy "frame-ancestors 'none'" always;
+```
 
 ## Complete assembled nginx config
 
@@ -366,17 +414,36 @@ server {
                       application/manifest+json application/xml
                       application/rss+xml image/svg+xml;
 
+    # Label the charset instead of leaving it to the client's locale. llms.txt
+    # and llms-full.txt are text/plain and carry 19 kB of non-ASCII (µ, Ω, ×, —)
+    # with no in-band declaration to fall back on, so a browser guessing
+    # windows-1252 rendered them as mojibake. The .md and .ebnf locations each
+    # said utf-8 already; saying it once at the top covers text/html, text/plain
+    # and text/xml (nginx's default charset_types) and cannot drift per location.
+    # No source_charset is set, so nginx labels the bytes, it does not re-code
+    # them.
+    charset utf-8;
+    # nginx's default charset_types leaves out text/css and the manifest type,
+    # and both files here contain non-ASCII. A stylesheet with no charset falls
+    # back to the encoding of the document that linked it, which is UTF-8 today
+    # but is not something a stylesheet should have to depend on.
+    # text/html is deliberately absent: charset_types always includes it and
+    # naming it again makes nginx warn on every config test and reload (the same
+    # reason gzip_types above leaves it out).
+    charset_types text/xml text/plain text/css
+                  application/javascript application/manifest+json;
+
     # Branded 404 page (web/404.html).
     error_page 404 /404.html;
     location = /404.html { internal; }
 
     # Home page: advertise + serve the Markdown edition to AI tools. Declaring
-    # add_header here drops inherited HSTS, so it is repeated.
+    # add_header here drops the whole inherited set, so the snippet is included.
     location = / {
         if ($bvnr_wants_md) { return 302 /index.md; }
         add_header Link '</index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
         try_files /index.html =404;
     }
 
@@ -385,7 +452,7 @@ server {
         if ($bvnr_wants_md) { return 302 /de/index.md; }
         add_header Link '</de/index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
         try_files /de/index.html =404;
     }
 
@@ -397,7 +464,7 @@ server {
         charset       utf-8;
         charset_types text/markdown;
         add_header Link "$bvnr_canon_hdr" always;
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
@@ -425,11 +492,11 @@ server {
 
     # Static assets -- see the $bvnr_cache_ctl map. Nothing sent Cache-Control at
     # all before this, so every asset revalidated on every visit. Declaring
-    # add_header here stops this location inheriting the server-level HSTS, so it
-    # repeats it (same trap as the home-page locations above).
+    # add_header here stops this location inheriting the server-level headers, so
+    # it includes them (same trap as the home-page locations above).
     location ~* \.(js|css|woff2|jpe?g|png|svg|ico)$ {
         add_header Cache-Control "$bvnr_cache_ctl" always;
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
@@ -450,7 +517,7 @@ server {
     # config test and reload while stapling nothing. A standing benign warning
     # is how a real one gets missed.
 
-    add_header Strict-Transport-Security "max-age=31536000" always;
+    include snippets/bovnar-headers.conf;
 }
 
 # 2) HTTPS redirect for every non-canonical name -> https://www.bovnar.io
@@ -468,7 +535,7 @@ server {
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    add_header Strict-Transport-Security "max-age=31536000" always;
+    include snippets/bovnar-headers.conf;
 
     return 301 https://www.bovnar.io$request_uri;
 }

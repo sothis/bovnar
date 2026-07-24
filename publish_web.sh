@@ -98,6 +98,17 @@ if ! ls "$PDF_BUILD_DIR"/*.pdf >/dev/null 2>&1; then
     echo "         Re-run with --pdf to generate them." >&2
 fi
 
+# ── 1a0. Content-stamp the fonts and the stylesheet that reaches them ───────
+# Runs before everything else that hashes a stamped file: this step rewrites
+# web/fonts/fonts.css, and gen_html_docs.py stamps its own link to that file
+# from those very bytes.
+echo "==> Stamping fonts (gen_font_stamps.py)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    python3 "$ROOT/gen_font_stamps.py" --check
+else
+    python3 "$ROOT/gen_font_stamps.py"
+fi
+
 # ── 1a. Stamp the Content-Security-Policy into the served-directly pages ─────
 # index.html and impressum.html carry a hash-based CSP that must match their
 # inline scripts. gen_i18n.py restamps the translated editions itself.

@@ -10,7 +10,7 @@
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url('ibm-plex-sans-400-italic-greek.woff2') format('woff2');
+  src: url('ibm-plex-sans-400-italic-greek.woff2?v=f1fae68d3ec6') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -19,7 +19,7 @@
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url('ibm-plex-sans-400-italic-latin.woff2') format('woff2');
+  src: url('ibm-plex-sans-400-italic-latin.woff2?v=4363757d2695') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -28,7 +28,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('ibm-plex-sans-400-normal-greek.woff2') format('woff2');
+  src: url('ibm-plex-sans-400-normal-greek.woff2?v=f598dd0700f1') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -37,7 +37,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('ibm-plex-sans-400-normal-latin.woff2') format('woff2');
+  src: url('ibm-plex-sans-400-normal-latin.woff2?v=e2291e842cf5') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -46,7 +46,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('ibm-plex-sans-500-normal-greek.woff2') format('woff2');
+  src: url('ibm-plex-sans-500-normal-greek.woff2?v=f598dd0700f1') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -55,7 +55,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('ibm-plex-sans-500-normal-latin.woff2') format('woff2');
+  src: url('ibm-plex-sans-500-normal-latin.woff2?v=e2291e842cf5') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -64,7 +64,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('ibm-plex-sans-600-normal-greek.woff2') format('woff2');
+  src: url('ibm-plex-sans-600-normal-greek.woff2?v=f598dd0700f1') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -73,7 +73,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('ibm-plex-sans-600-normal-latin.woff2') format('woff2');
+  src: url('ibm-plex-sans-600-normal-latin.woff2?v=e2291e842cf5') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -82,7 +82,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('jetbrains-mono-400-normal-greek.woff2') format('woff2');
+  src: url('jetbrains-mono-400-normal-greek.woff2?v=ee863198077f') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -91,7 +91,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('jetbrains-mono-400-normal-latin.woff2') format('woff2');
+  src: url('jetbrains-mono-400-normal-latin.woff2?v=18be452724bf') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -100,7 +100,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('jetbrains-mono-500-normal-greek.woff2') format('woff2');
+  src: url('jetbrains-mono-500-normal-greek.woff2?v=ee863198077f') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -109,7 +109,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('jetbrains-mono-500-normal-latin.woff2') format('woff2');
+  src: url('jetbrains-mono-500-normal-latin.woff2?v=18be452724bf') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -118,7 +118,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('jetbrains-mono-600-normal-greek.woff2') format('woff2');
+  src: url('jetbrains-mono-600-normal-greek.woff2?v=ee863198077f') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
@@ -127,6 +127,6 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('jetbrains-mono-600-normal-latin.woff2') format('woff2');
+  src: url('jetbrains-mono-600-normal-latin.woff2?v=18be452724bf') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }

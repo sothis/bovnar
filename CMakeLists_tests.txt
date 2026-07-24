@@ -1020,7 +1020,8 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 120)   # 116 base + i18n_de + wrapper_sync + cache_stamps + csp
+set(BVNR_EXPECTED_TEST_COUNT 122)   # 116 base + i18n_de + wrapper_sync + cache_stamps
+                                    #           + csp + font_stamps + html_docs
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1098,6 +1099,30 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_csp.py)
                 -DWORKDIR=${CMAKE_CURRENT_SOURCE_DIR}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/csp.cmake)
     set_tests_properties(bvnr_csp PROPERTIES LABELS "web;security" TIMEOUT 60)
+endif()
+
+# ── Font/stylesheet cache stamps still match their bytes ────────────────────
+# Same contract as bvnr_cache_stamps, one level down: the woff2 URLs live inside
+# fonts.css and the pages' link to fonts.css is stamped from that file, so an
+# edited font that skipped the generator would be requested under the old
+# immutable URL and served from cache for a year. The script prints its own
+# remedy, so no wrapper is needed to explain the failure.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_font_stamps.py)
+    add_test(NAME bvnr_font_stamps
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/gen_font_stamps.py --check)
+    set_tests_properties(bvnr_font_stamps PROPERTIES LABELS "web" TIMEOUT 60)
+endif()
+
+# ── The generated HTML doc pages match their Markdown sources ───────────────
+# web/docs/**/index.html is committed, so an edited doc/*.md that never went
+# through the generator ships a page contradicting the Markdown beside it -- the
+# drift every other generator here is already gated on.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py)
+    add_test(NAME bvnr_html_docs
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py --check)
+    set_tests_properties(bvnr_html_docs PROPERTIES LABELS "web;docs" TIMEOUT 120)
 endif()
 
 # ── ?v= cache-bust stamps still match the files they label ──────────────────

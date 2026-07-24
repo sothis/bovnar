@@ -1,0 +1,122 @@
+{{Infobox file format
+| name                   = Bovnar
+| screenshot             =
+| extension              = <code>.bvnr</code>
+| mime                   = <code>text/vnd.bovnar</code>
+| developer              = Janos Sonntag
+| released               = {{Start date and age|2026|06|15|df=yes}}
+| latest_release_version = 1.1.0
+| latest_release_date    = {{Start date and age|2026|06|21|df=yes}}
+| type                   = [[Serialization]] format
+| standard               = Bovnar Specification 1.1
+| open                   = Yes
+| url                    = {{URL|https://www.bovnar.io/}}
+}}
+
+'''Bovnar''' (short form '''BVNR''') is a typed, self-describing [[serialization]] format for scientific and industrial applications. Its central feature is ''unit-safe serialization'': every value in a Bovnar document can carry its type family, its bit width, its number base and a [[Units of measurement|physical unit]] directly in the data stream, without requiring an external [[Database schema|schema]]. The unit is neither a comment nor a naming convention but part of the value, and it is validated by the parser against a built-in unit table; a contradictory unit annotation results in a parse error.<ref name="web" /><ref name="spec" />
+
+The format combines a human-readable, [[UTF-8]]-encoded text layer with a binary escape mechanism (octet streams), so that text and binary data can coexist in the same document. The reference implementation is written in [[C99]], has no external library dependencies and is released under the [[MIT License]].<ref name="repo" /> Bovnar was developed by Janos Sonntag; the first stable version appeared in 2026. The canonical file extension is <code>.bvnr</code>, and the media type <code>text/vnd.bovnar</code> (vendor tree per RFC 6838) is registered with the [[Internet Assigned Numbers Authority]].<ref name="mime" />
+
+== Concept ==
+The format starts from the observation that costly failures in measurement, telemetry and control systems are rarely syntax errors but rather unit confusions: a value is sent in pounds-force and read as [[Newton (unit)|newtons]], or [[Foot (unit)|feet]] are interpreted as [[Metre|metres]]. The number itself is parsed correctly – only the dimension is wrong, and nothing in the data points to it. A well-known example of the consequences of such a mix-up is the loss of the [[Mars Climate Orbiter]].
+
+Bovnar moves the meaning of a value into the data stream itself: an annotation such as <code>&lt;float:64,m/s&gt; 9.81</code> carries the type, the width and the unit alongside the numeric value. A document therefore remains self-describing at the level of individual values and can be interpreted correctly without an accompanying schema, code generation or documentation – even decades after it was created, which positions the format for the long-term archival of measurement data.<ref name="tutorial" /> All annotations are optional; in their absence defined default types apply (for example <code>uint:64</code> for integers and <code>float:64</code> for floating-point numbers), which the validator synthesises explicitly.
+
+The documentation names as fields of application scientific instrumentation and [[metrology]], industrial telemetry and process control, [[Internet of things|IoT]] sensor networks, financial and cryptocurrency data as well as mixed text–binary protocols and log streams.<ref name="web" /> The format does not itself convert between compatible units; conversion is deliberately left to the application, for which the reference implementation provides helper functions (dimension comparison, conversion factors).<ref name="faq" />
+
+== Structure of the format ==
+=== Basic syntax ===
+A Bovnar document is a sequence of assignments of the form <code>.key = value;</code>. Keys always begin with a dot, comments begin with <code>#</code> and run to the end of the line. The document is UTF-8-encoded throughout; outside of octet streams the parser enforces strict UTF-8 validity. An empty file is also valid. An example:
+
+<pre>
+#!bovnar 1.1                                # optional version directive
+.config = {
+    .host   = "api.example.com";
+    .port   = <uint:16> 443;
+    .timeout = <float:64,s> 2.5;
+};
+.acceleration = 70.5 k~m·s⁻²;               # inline unit suffix
+.price        = <float_dec:64,$USD> 19.99;  # currency with mandatory $ sigil
+.created      = 2026-06-15T12:00:00Z;       # ISO 8601 literal (spec 1.1)
+.matrix       = [1, 2, 3]/[4, 5, 6];        # two-dimensional array
+.cell         = &.matrix[0][1];             # reference with index → 2
+</pre>
+
+=== Type system ===
+Bovnar defines eight type families: <code>uint</code> and <code>sint</code> (unsigned and signed integers), <code>float</code> (binary [[IEEE 754]] floating-point numbers), <code>float_fix</code> ([[Fixed-point arithmetic|fixed-point numbers]] in Q format), <code>float_dec</code> (decimal floating-point numbers per IEEE 754-2008), <code>utf8</code> (character strings), <code>bool</code> and – since specification 1.1 – <code>datetime</code> (timestamps).<ref name="spec" /> Type annotations are placed in angle brackets before the value and name the family, bit width, number base and unit, e.g. <code>&lt;uint:32,_2,k~m&gt;</code>.
+
+The bit width is declared explicitly and not inferred: integers can be declared from 1 to 32,768 bits wide, binary floating-point numbers with 16 bits or multiples of 32 bits up to 32,768 bits, fixed- and decimal-point numbers with 16, 32, 64, 128 or 256 bits; the default width is 64 bits everywhere. Values are range-checked against the declared width, and an overflow is a parse error. The number bases 2 to 62 as well as 64 and 85 are provided; non-decimal values with letter digits (for example hexadecimal <code>ff</code>) are written as a string. Boolean values accept <code>true</code>/<code>false</code> as well as <code>on</code>/<code>off</code>; the special values <code>nan</code>, <code>inf</code> and <code>ninf</code> exist as well as a null value (<code>null</code> or an empty value).
+
+=== Unit system ===
+The built-in unit system comprises 163 named physical units, including all seven [[SI base unit]]s, 22 derived SI units with their own name, non-SI units accepted for use with the SI, as well as Anglo-American, [[Centimetre–gram–second system of units|CGS]], radiometric, angular, logarithmic and historical units.<ref name="units" /> [[Metric prefix|SI prefixes]] and [[Binary prefix|IEC binary prefixes]] are bound to the unit with a tilde (<code>k~m</code> for kilometre, <code>Mi~B</code> for mebibyte); the grammar enforces which prefixes are permissible for which unit.
+
+Compound units such as <code>m/s²</code> or <code>k~g·m·s⁻²</code> are part of the grammar. Exponents can be written either as Unicode superscripts (<code>s⁻²</code>) or in a pure [[ASCII]] form with a circumflex (<code>s^-2</code>, separator <code>*</code> instead of <code>·</code>); both notations are equivalent to the parser. A unit can appear as part of the type annotation or as an inline suffix after the value (<code>.speed = 9.81 m/s;</code>). If an inline suffix contradicts the annotated unit, the parser reports <code>error_unit_mismatch</code>.
+
+=== Currencies ===
+Currencies are independent units with a mandatory <code>$</code> sigil, which rules out collisions between currency codes and physical unit symbols. As of specification 1.1 the catalogue comprises a total of 166 fiat currencies per [[ISO 4217]] (including precious-metal codes) as well as 50 [[cryptocurrency|cryptocurrencies]]; each currency carries metadata about its smallest units (minor units) and its own prefix rules.<ref name="units" /> For monetary amounts the documentation recommends decimal floating-point types (<code>&lt;float_dec:64,$USD&gt; 19.99</code>) or integers in the smallest units (for example satoshi for <code>$BTC</code>) in order to avoid binary rounding errors.
+
+=== Date and time values ===
+Specification 1.1 added the <code>datetime</code> type family, which carries a timestamp as a signed number of seconds since a named [[Epoch (computing)|epoch]] and thereby distinguishes it from a duration (a number with a time unit). Nine epochs are supported: <code>unix</code> (default), <code>tai</code>, <code>gps</code>, <code>galileo</code>, <code>glonass</code>, <code>beidou</code>, <code>mjd</code>, <code>ntp</code> and <code>y2000</code>.<ref name="notes11" /> As an alternative to the raw integer value, [[ISO 8601]] literals are permitted (with <code>Z</code> or a numeric time-zone offset and optional fractional seconds), which are converted to the epoch-seconds carrier during parsing. The conversion is leap-second-correct – for the <code>tai</code> epoch the [[leap second]] table of the [[International Earth Rotation and Reference Systems Service|IERS]] is applied – while the atomic GNSS epochs accept no literals, since for them no losslessly reversible mapping to civil time exists. Fractional seconds are preserved digit-for-digit and emitted again as an ISO literal, so that documents can be written back idempotently.
+
+=== Arrays, structures, references and binary data ===
+Multi-dimensional arrays have their own row syntax: <code>[1,2,3]/[4,5,6]</code> is a native 2×3 structure and not a nested list. Array elements must be homogeneous (same kind and dimension) and sub-arrays rectangular; heterogeneous data are represented via structures. Structures (<code>{ … }</code>) can be nested arbitrarily, whereby keys must be unique within a scope. References (<code>&amp;.path.to.value</code>) point to other values of the same document and, since specification 1.1, can index arrays (<code>&amp;.matrix[0][1]</code>); cyclic or dangling references are validation errors. By design, references do not address external resources (network, file system).<ref name="mime" />
+
+Octet streams embed raw binary data without [[Base64]] overhead: a region framed by <code>0x00</code> bytes carries length-prefixed data chunks with arbitrary byte values, while UTF-8 validation is suspended for its duration. This allows, for example, firmware images, memory dumps or sensor frames to be stored together with readable text in a single document.
+
+=== Versioning and stability ===
+A document can declare, on its first line, the specification version it relies on with the directive <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code>; documents without the directive are treated as specification 1.0. The specification defines a stability contract: with version 1.0 the grammar, type families, array/structure/reference rules and the error-code values were frozen; 1.x versions may only extend additively (new units, appended error codes, optional flags), while incompatible changes are reserved for a version 2.0. A document valid under specification 1.0 remains valid under any 1.x version and decodes to the same values.<ref name="notes10" />
+
+== Reference implementation ==
+=== Architecture ===
+The reference implementation is a library (<code>libbvnr</code>) written in C99 with no external dependencies – since version 1.1 the math library <code>libm</code> is also no longer required.<ref name="changelog" /> The parser works in two phases: a lexer produces a raw token event stream (<code>on_unverified</code>), and a downstream validator checks types, value ranges, bases and units and delivers the verified stream (<code>on_verified</code>). Both phases are delivered as callback events following the [[Simple API for XML|SAX]] principle, so that documents can be read incrementally from memory, file descriptors or [[Network socket|sockets]]; the lexer itself requires no [[C dynamic memory allocation|heap]] allocation. An optional resynchronisation mode (''resync'') skips corrupted assignments and continues parsing, which makes the format usable for log streams and unreliable transmission paths.
+
+In addition there exist a [[Document Object Model|DOM]]-like tree API for random access, a writer with typed writing helpers and canonicalising output, as well as a streaming layer which – without changing the wire format – builds framing (length-prefixed multi-document streams), channel [[multiplexing]] over octet streams and document-in-document embedding on top of the event API.<ref name="streaming" />
+
+The library runs on [[Linux]] and [[macOS]] as well as, since version 1.1, natively on 64-bit [[Microsoft Windows|Windows]] (MSVC and MinGW-w64). For embedding purposes a single-file amalgamation (<code>bovnar.h</code>/<code>bovnar.c</code>) is produced on every build. The C core can moreover be compiled to [[WebAssembly]]; the live demos and the playground of the official website are driven by exactly this compiled reference reader in the browser.<ref name="web" />
+
+=== Command-line tool ===
+The bundled tool <code>bovnar</code> validates documents, queries individual values via path expressions, formats documents canonically, converts between [[JSON]] and Bovnar, prints the lexer and validator event stream, packs and lists framing and multiplex streams, and includes a benchmark mode for parsing throughput.<ref name="repo" />
+
+=== Language bindings ===
+The official [[Python (programming language)|Python]] bindings (package <code>bovnar</code>, Python ≥ 3.10) are based entirely on <code>ctypes</code> and require no compiled extension. They offer a dictionary-like high-level API (<code>loads</code>/<code>dumps</code>), an event-driven streaming API, as well as type-faithful round-trips via <code>Quantity</code> objects, which preserve the exact literal text, the bit width and the unit of a value. Optional bridges bind [[NumPy]] (typed arrays are loaded into <code>ndarray</code> objects together with their unit; decimal and wide floating-point formats losslessly as <code>Decimal</code>) and the unit library Pint.<ref name="python" /> Binary wheels are published for CPython 3.10 to 3.14 on Linux (x86-64, AArch64) and macOS (ARM64, x86-64).
+
+== Conformance testing and tests ==
+The specification includes a conformance test suite with 319 test cases in 22 groups, which in addition to a self-test mode defines an IUT protocol ("implementation under test") with which third-party implementations can be checked against the suite through a simple adapter process; output is in the [[Test Anything Protocol]] (TAP, version 14).<ref name="conformance" /> The reference implementation is further tested with unit tests, socketpair round-trip tests, robustness tests against malformed input, and [[fuzzing]] harnesses for the reader, writer, DOM and helper functions (optionally with libFuzzer/AFL++).
+
+== Tool support ==
+For the editors [[Visual Studio Code]], [[Sublime Text]], [[Vim (text editor)|Vim]], [[Geany]] and the [[JetBrains]] IDEs (among others CLion), syntax-highlighting grammars with a shared colour scheme are provided. The project also ships a freedesktop MIME definition and a <code>file</code> magic file for file-type detection as well as a language-definition fragment for GitHub Linguist.<ref name="repo" />
+
+== Licence ==
+The source code (C, Python, build system) is released under the [[MIT License]], the documentation under [[Creative Commons license|CC BY 4.0]] and the example files under [[Creative Commons license|CC0 1.0]].<ref name="repo" />
+
+== History ==
+Bovnar was developed by Janos Sonntag. The first stable version 1.0.0 appeared in 2026 and at the same time marked the format freeze of specification 1.0; among other things, the mandatory currency sigil, the keyword spelling of the floating-point special values and the homogeneity rules for arrays were finalised.<ref name="notes10" /> Following the maintenance release 1.0.1, version 1.1.0 followed on 21 June 2026, introducing the additive specification 1.1: the version directive <code>#!bovnar</code>, the <code>datetime</code> type family with ISO 8601 literals, extended string escapes (<code>\u{…}</code>, <code>\xHH</code>), array indexing in references, native Windows support, as well as the expansion of the conformance suite from 207 to 306 cases.<ref name="notes11" /> All documents valid under specification 1.0 remained valid unchanged; the new constructs can be enabled per document via the directive.
+
+== Classification ==
+Bovnar stands in the tradition of human-readable serialization formats such as [[JSON]], [[YAML]] or [[TOML]], but differs from them through the parser-validated carrying of physical units, currencies, bit widths and number bases at the value level, through native multi-dimensional arrays, as well as through the ability to embed raw binary data without transport encoding. Compared with schema-based binary formats such as [[Protocol Buffers]], Bovnar dispenses with an external schema and code generation: the type information travels entirely within the document itself. In return the format design accepts a higher space requirement per value and is aimed at use cases in which dimensional correctness, self-description and long-term readability take precedence over minimal size.<ref name="faq" />
+
+== External links ==
+* [https://www.bovnar.io/ Official website] (with interactive playground and live demos)
+* [https://github.com/sothis/bovnar Source code repository on GitHub]
+* [https://www.bovnar.io/doc/pdf/bovnar-specification.pdf Bovnar Specification v1.1] (PDF)
+
+== References ==
+{{reflist|refs=
+<ref name="web">{{cite web |url=https://www.bovnar.io/ |title=Bovnar — Unit-safe serialization for science and industry |access-date=2026-07-24}}</ref>
+<ref name="spec">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-specification.pdf |title=Bovnar Specification, Version 1.1 |date=2026-06-21 |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="repo">{{cite web |url=https://github.com/sothis/bovnar |title=sothis/bovnar – Unit-safe serialization for scientific and industrial systems |website=GitHub |access-date=2026-07-24}}</ref>
+<ref name="tutorial">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-tutorial.pdf |title=Bovnar (BVNR) — A Practical Tutorial |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="units">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-unit-system.pdf |title=Bovnar Quantity Annotation System — Unit and Currency Reference |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="faq">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-faq.pdf |title=Bovnar (BVNR) — Frequently Asked Questions |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="mime">{{cite web |url=https://www.iana.org/assignments/media-types/text/vnd.bovnar |title=Media Type text/vnd.bovnar |website=IANA Media Types |access-date=2026-07-24}}</ref>
+<ref name="streaming">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-streaming.pdf |title=Bovnar — Streaming, Framing & Multiplexing |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="python">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-python-bindings.pdf |title=Bovnar — Python Bindings |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="conformance">{{cite web |url=https://www.bovnar.io/doc/pdf/bovnar-conformance.pdf |title=Bovnar — Conformance Test Tool |access-date=2026-07-24 |format=PDF}}</ref>
+<ref name="notes10">{{cite web |url=https://github.com/sothis/bovnar/releases/tag/v1.0.0 |title=Bovnar 1.0.0 — first stable release |website=GitHub |date=2026 |access-date=2026-07-24}}</ref>
+<ref name="notes11">{{cite web |url=https://github.com/sothis/bovnar/releases/tag/v1.1.0 |title=Bovnar 1.1.0 — native time, opt-in and fully compatible |website=GitHub |date=2026-06-21 |access-date=2026-07-24}}</ref>
+<ref name="changelog">{{cite web |url=https://github.com/sothis/bovnar/blob/main/CHANGELOG.md |title=Bovnar Changelog |website=GitHub |access-date=2026-07-24}}</ref>
+}}
+
+[[:Category:Data serialization formats]]
+[[:Category:Open formats]]
+[[:Category:Free software]]

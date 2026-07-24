@@ -94,7 +94,7 @@
     "The playground parses what you type with that same WebAssembly build, so it needs\n      JavaScript and is hidden here. To get the identical event stream offline, run\n      <code>bovnar events yourfile.bvnr</code> from the command-line tool.": "Der Playground parst Ihre Eingabe mit demselben WebAssembly-Build — er benötigt daher JavaScript und ist hier ausgeblendet. Denselben Ereignisstrom erhalten Sie offline mit <code>bovnar events ihredatei.bvnr</code> aus dem Kommandozeilenwerkzeug.",
     "Editor": "Editor",
     "Tab indents · Shift+Tab or Esc leaves": "Tab rückt ein · Umschalt+Tab oder Esc verlässt",
-    "<span class=\"pg-col-badge\" id=\"pg-status\">ready</span>": "<span class=\"pg-col-badge\" id=\"pg-status\">bereit</span>",
+    "<span class=\"pg-col-badge\" id=\"pg-status\" role=\"status\">ready</span>": "<span class=\"pg-col-badge\" id=\"pg-status\" role=\"status\">bereit</span>",
     "Typed": "Typisiert",
     "Units": "Einheiten",
     "Struct": "Struct",

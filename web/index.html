@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-pbpYpiKGqfhMdv4WJwM6z9OxVPs0LpC4YqlefXHSSj8=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-BUpm72Gwn6KNkSx8RzU/bR+5mmMAjYoSpP59hFgSITc=' 'sha256-s9+QAwRuDI9AwiPlQFQwUu6vx0vJ9Bo5ydCYZxqvr/4=' 'sha256-jlqXQkcRPQ9KY1+NEIjZ+OyQC61t9z6pvKJh3FNWBz0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-hC1+rjhPRb6hDDjo7/9MQEF0p3w+OB0cSfI1rLKWq7A=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-dS9RBYTyFcQ/GvwwRIEZ0GVzXeuGlnePH+grNJ2rl1Y=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-BUpm72Gwn6KNkSx8RzU/bR+5mmMAjYoSpP59hFgSITc=' 'sha256-s9+QAwRuDI9AwiPlQFQwUu6vx0vJ9Bo5ydCYZxqvr/4=' 'sha256-jlqXQkcRPQ9KY1+NEIjZ+OyQC61t9z6pvKJh3FNWBz0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-hC1+rjhPRb6hDDjo7/9MQEF0p3w+OB0cSfI1rLKWq7A=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -3336,7 +3336,7 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
           <span class="pg-col-title">Editor</span>
           <span class="pg-col-hint">Tab indents · Shift+Tab or Esc leaves</span>
           <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
-            <span class="pg-col-badge" id="pg-status">ready</span>
+            <span class="pg-col-badge" id="pg-status" role="status">ready</span>
           </div>
         </div>
         <div class="pg-editor-wrap">
@@ -4103,6 +4103,19 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   const errList  = document.getElementById('pg-error-list');
   const errCount = document.getElementById('pg-error-count');
 
+  // The badge is the only thing that tells a reader whether their document
+  // parsed, and it is now a live region (role="status" on the element), so a
+  // screen-reader user hears the verdict instead of watching for a colour they
+  // cannot see. Writes go through here for two reasons: the parse is debounced
+  // at 80 ms, so most re-renders land on the SAME verdict, and assigning
+  // textContent replaces the text node whether or not the string changed --
+  // which is enough for assistive technology to announce it again. Only a real
+  // change is written.
+  function setStatus(text, color) {
+    if (statusEl.textContent !== text) statusEl.textContent = text;
+    if (statusEl.style.color !== color) statusEl.style.color = color;
+  }
+
   /* ── Syntax highlighter — shared, vim-consistent (bovnar_highlight.js) ── */
   function highlightBovnar(src) { return BovnarHighlight.highlight(src); }
 
@@ -4446,12 +4459,11 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     const parserLive = !!(window.BovnarParser && window.BovnarParser.isWasmReady
                           && window.BovnarParser.isWasmReady()) && !res.failed;
     if (!parserLive) {
-      statusEl.textContent = bvnrT('pg.parserUnavailable', 'parser unavailable');
-      statusEl.style.color = 'var(--amber, #d08a20)';
+      setStatus(bvnrT('pg.parserUnavailable', 'parser unavailable'),
+                'var(--amber, #d08a20)');
     } else {
-      statusEl.textContent = errs.length ? bvnrT('pg.errors', 'errors')
-                                         : bvnrT('pg.ok', 'ok');
-      statusEl.style.color = errs.length ? 'var(--red)' : 'var(--teal)';
+      setStatus(errs.length ? bvnrT('pg.errors', 'errors') : bvnrT('pg.ok', 'ok'),
+                errs.length ? 'var(--red)' : 'var(--teal)');
     }
     empty.style.display = 'none';
   }
@@ -4467,8 +4479,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         treeEl.appendChild(empty);
         empty.style.display = 'flex';
         countEl.textContent = '0 events';
-        statusEl.textContent = bvnrT('pg.ready', 'ready');
-        statusEl.style.color = '';
+        setStatus(bvnrT('pg.ready', 'ready'), '');
         errPanel.classList.add('empty');
         errCount.textContent = '';
         errList.innerHTML = '<div class="pg-error-none">' + bvnrT('pg.noErrors', 'no errors') + '</div>';

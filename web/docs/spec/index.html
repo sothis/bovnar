@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Specification (v1.1)</title>
@@ -30,7 +30,7 @@
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=dd713e0da055">
-<link rel="stylesheet" href="/docs/docs.css?v=534bb2781d06">
+<link rel="stylesheet" href="/docs/docs.css?v=ccff0fd09606">
 <link rel="alternate" type="text/markdown" href="/doc/1_bovnar_spec.md">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.1)", "description": "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-23", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.1)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
 </head>
@@ -117,7 +117,7 @@
 
 <hr />
 <h2 id="2-file-format-at-a-glance">2. File Format at a Glance</h2>
-<div class="codehilite"><pre><span></span><code># This is a comment
+<div class="codehilite"><pre><code class="language-bovnar"># This is a comment
 
 .my_first_value = 42;
 .my_next_value = 3.14159;
@@ -127,9 +127,7 @@
 .an_array = [1, 2, 3]/[4, 5, 6];
 .a_struct = {
     .nested = true;
-};
-</code></pre></div>
-
+};</code></pre></div>
 <h3 id="key-syntax-rules">Key Syntax Rules</h3>
 <table>
 <thead>
@@ -254,7 +252,7 @@
 <li>A BOM (<code>EF BB BF</code>) detected <strong>inside the first-line comment</strong> produces <code>error_invalid_byte_order_mark</code>.</li>
 <li>A BOM byte (<code>EF</code>) seen <strong>after</strong> the first comment line (in the <code>first_bom</code> state, before the first <code>.</code> identifier) is unhandled and produces <code>error_unexpected_input_byte</code>.</li>
 </ul>
-<div class="codehilite"><pre><span></span><code># BOM at byte offset 0: valid
+<div class="codehilite"><pre><code class="language-bovnar"># BOM at byte offset 0: valid
 EF BB BF.foo = 1;
 
 # BOM bytes inside the first comment → error_invalid_byte_order_mark
@@ -262,9 +260,7 @@ EF BB BF.foo = 1;
 
 # BOM bytes after the first comment line → error_unexpected_input_byte
 # comment line
-EF BB BF.foo = 1;
-</code></pre></div>
-
+EF BB BF.foo = 1;</code></pre></div>
 <p>A BOM appearing <strong>inside</strong> any later comment or string is <strong>valid UTF-8</strong> and accepted (only the <code>first_comment_*</code> states guard against BOM).</p>
 <h3 id="33-byte-classes">3.3 Byte Classes</h3>
 <table>
@@ -301,10 +297,8 @@ EF BB BF.foo = 1;
 <h3 id="34-version-directive-spec-11">3.4 Version Directive (spec 1.1)</h3>
 <p>A document <strong>may</strong> declare the spec version it targets with a directive on its
 very first line:</p>
-<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
-.x = 42;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1
+.x = 42;</code></pre></div>
 <p><strong>An unversioned document is spec 1.0.</strong> A document with no directive is treated
 as targeting spec <strong>1.0</strong> — the frozen baseline grammar. The directive only ever
 <em>opts in</em> to a newer version; its absence is never ambiguous. Consequently, any
@@ -340,13 +334,11 @@ opened with <code>strict_version</code> instead rejects any unsupported version
 (<code>error_unsupported_spec_version</code>) at the directive. A reader supports spec
 <code>&lt;major&gt;.&lt;minor&gt;</code> when <code>major</code> equals its own and <code>minor</code> is ≤ its own
 (<code>BVNR_SPEC_VERSION_*</code>).</p>
-<div class="codehilite"><pre><span></span><code>#!bovnar 1.1        # current — accepted
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1        # current — accepted
 #!bovnar 1.0        # older minor — accepted
 #!bovnar 1.9        # newer minor — lenient: accepted; strict: error
 #!bovnar 2.0        # newer major — lenient: accepted; strict: error
-#!bovnar 1          # malformed (no minor) — error_invalid_spec_version
-</code></pre></div>
-
+#!bovnar 1          # malformed (no minor) — error_invalid_spec_version</code></pre></div>
 <hr />
 <h2 id="4-lexical-structure">4. Lexical Structure</h2>
 <h3 id="41-whitespace--comments">4.1 Whitespace &amp; Comments</h3>
@@ -360,10 +352,8 @@ opened with <code>strict_version</code> instead rejects any unsupported version
 # terminated by LF or CR (or EOF)
 </code></pre></div>
 
-<div class="codehilite"><pre><span></span><code># A full-line comment
-.foo = 42;  # an inline comment
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar"># A full-line comment
+.foo = 42;  # an inline comment</code></pre></div>
 <h3 id="42-identifiers-keys">4.2 Identifiers (Keys)</h3>
 <p>Every assignment begins with <code>.</code> followed by an identifier (the key).</p>
 <p><strong>Syntax:</strong></p>
@@ -378,20 +368,16 @@ id-body   = id-start | &quot;+&quot; | &quot;-&quot; | DIGIT | UTF-8 continuatio
 <li>The following ASCII punctuation characters are <strong>hard errors</strong> inside identifier bodies: <code>! " # $ % &amp; ' ( ) * , . / : ; &lt; = &gt; ? @ [ \ ] ^</code> { | } ~`</li>
 </ul>
 <p><strong>Valid identifiers:</strong></p>
-<div class="codehilite"><pre><span></span><code>.foo = 1;
+<div class="codehilite"><pre><code class="language-bovnar">.foo = 1;
 .FooBar = 2;
 ._private = 3;
 .my-key = 4;           # hyphen allowed
 .my+key = 5;           # plus allowed
-.user_defined = 6;
-</code></pre></div>
-
+.user_defined = 6;</code></pre></div>
 <p><strong>Invalid identifiers:</strong></p>
-<div class="codehilite"><pre><span></span><code>. = 1;                 # error_empty_identifier
+<div class="codehilite"><pre><code class="language-bovnar">. = 1;                 # error_empty_identifier
 .123 = 2;              # starts with digit
-.foo,bar = 3;          # comma inside identifier – error
-</code></pre></div>
-
+.foo,bar = 3;          # comma inside identifier – error</code></pre></div>
 <h3 id="43-string-literals">4.3 String Literals</h3>
 <p><strong>Syntax:</strong></p>
 <div class="codehilite"><pre><span></span><code>string-literal = &#39;&quot;&#39; { safe-byte | escape-seq } &#39;&quot;&#39;
@@ -486,17 +472,13 @@ further escapes are available:</p>
 <p>Any byte other than <code>t</code>, <code>n</code>, <code>v</code>, <code>f</code>, <code>r</code>, <code>"</code>, <code>\</code> (plus <code>x</code>, <code>u</code> in 1.1)
 after <code>\</code> causes <code>error_illegal_escape_sequence</code>.</p>
 <p><strong>String concatenation:</strong> Two or more adjacent string literals (separated only by whitespace/comments) are concatenated into a single token:</p>
-<div class="codehilite"><pre><span></span><code>.long = &quot;hello &quot; &quot;world&quot;;     # → &quot;hello world&quot;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.long = &quot;hello &quot; &quot;world&quot;;     # → &quot;hello world&quot;</code></pre></div>
 <p>The combined byte length must not exceed <code>max_string_length</code> (default 65535).</p>
 <h4 id="examples">Examples</h4>
-<div class="codehilite"><pre><span></span><code>.simple = &quot;hello&quot;;
+<div class="codehilite"><pre><code class="language-bovnar">.simple = &quot;hello&quot;;
 .with_escapes = &quot;tab:\there\nnewline&quot;;
 .unicode = &quot;café&quot;;            # UTF-8 bytes for é = 0xC3 0xA9
-.empty = &quot;&quot;;
-</code></pre></div>
-
+.empty = &quot;&quot;;</code></pre></div>
 <h3 id="44-symbols">4.4 Symbols</h3>
 <p>A <strong>symbol</strong> is an unquoted bare-word token that appears in value position. It starts with an <code>id-start</code> character and continues with <code>id-body</code> characters.</p>
 <p><strong>Differences from identifier keys:</strong></p>
@@ -527,18 +509,14 @@ after <code>\</code> causes <code>error_illegal_escape_sequence</code>.</p>
 </tr>
 </tbody>
 </table>
-<div class="codehilite"><pre><span></span><code>.status = ok;              # symbol &quot;ok&quot;
+<div class="codehilite"><pre><code class="language-bovnar">.status = ok;              # symbol &quot;ok&quot;
 .day = Monday;             # symbol &quot;Monday&quot;
-.flags = [red, green, blue];  # symbols as array elements
-</code></pre></div>
-
+.flags = [red, green, blue];  # symbols as array elements</code></pre></div>
 <p><strong>Reserved keywords.</strong> Eight exact bare words are <em>not</em> symbols: <code>null</code>, <code>true</code>, <code>false</code>, <code>on</code>, <code>off</code>, <code>nan</code>, <code>inf</code>, and <code>ninf</code>. Lexically they are still symbol tokens, but the validator reserves the exact spellings and reclassifies them — <code>null</code> to a null value, <code>true</code>/<code>false</code>/<code>on</code>/<code>off</code> to a <code>bool</code> value (<code>on</code> ≡ <code>true</code>, <code>off</code> ≡ <code>false</code>), and the special floats <code>nan</code>/<code>inf</code>/<code>ninf</code> to numeric special values (§6.4). A bare boolean with no annotation synthesises a <code>&lt;bool&gt;</code> type (§10); an explicit <code>&lt;bool&gt;</code> annotation accepts only the four bool keywords. A longer word that merely begins with a keyword (<code>ontology</code>, <code>nullable</code>, <code>truthy</code>, <code>infinity</code>) remains an ordinary symbol.</p>
-<div class="codehilite"><pre><span></span><code>.enabled = true;           # bool value (vt_bool), not a symbol
+<div class="codehilite"><pre><code class="language-bovnar">.enabled = true;           # bool value (vt_bool), not a symbol
 .debug   = off;            # bool false
 .choice  = &lt;bool&gt; on;      # explicit; on == true
-.label   = truthy;         # symbol &quot;truthy&quot; — not a keyword
-</code></pre></div>
-
+.label   = truthy;         # symbol &quot;truthy&quot; — not a keyword</code></pre></div>
 <h3 id="45-references">4.5 References</h3>
 <p>A <strong>reference</strong> is a dotted path to another key, introduced by <code>&amp;</code>.</p>
 <p><strong>Syntax:</strong></p>
@@ -549,18 +527,14 @@ index         = &quot;[&quot; digit { digit } &quot;]&quot;        (* spec 1.1 *
 </code></pre></div>
 
 <p>The stored text includes the leading dot and all intermediate dots:</p>
-<div class="codehilite"><pre><span></span><code>.host = &quot;localhost&quot;;
+<div class="codehilite"><pre><code class="language-bovnar">.host = &quot;localhost&quot;;
 .port = 8080;
 
 .connection = &amp;.host;             # stored as &quot;.host&quot;
-.full = &amp;.config.host;            # stored as &quot;.config.host&quot;
-</code></pre></div>
-
+.full = &amp;.config.host;            # stored as &quot;.config.host&quot;</code></pre></div>
 <p><strong>Examples:</strong></p>
-<div class="codehilite"><pre><span></span><code>.config = { .host = &quot;example.com&quot;; };  # nested struct
-.ref = &amp;.config.host;                  # reference → &quot;.config.host&quot;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.config = { .host = &quot;example.com&quot;; };  # nested struct
+.ref = &amp;.config.host;                  # reference → &quot;.config.host&quot;</code></pre></div>
 <p><strong>Resolution.</strong> A reference is stored <strong>unresolved</strong> — as the path string only.
 The parser and library never dereference it, so:</p>
 <ul>
@@ -593,11 +567,9 @@ reference is <code>error_unexpected_input_byte</code>, exactly as a 1.0 reader r
 index per level. A partial index of a flat matrix (<code>&amp;.matrix[0]</code>), an
 out-of-range index, or indexing a non-array does not resolve (the application
 sees no node).</p>
-<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1
 .matrix  = [10, 20, 30]/[40, 50, 60];
-.row0c1  = &amp;.matrix[0][1];   # resolves to 20
-</code></pre></div>
-
+.row0c1  = &amp;.matrix[0][1];   # resolves to 20</code></pre></div>
 <h3 id="46-numbers">4.6 Numbers</h3>
 <h4 id="bare-number-literals">Bare Number Literals</h4>
 <div class="codehilite"><pre><span></span><code>number = [&quot;-&quot;] ( int-led | dot-led ) [ dec-exponent ]
@@ -613,41 +585,33 @@ dec-exponent  = (&quot;e&quot; | &quot;E&quot;) [ &quot;+&quot; | &quot;-&quot; 
 <li>A trailing dot without fractional digits is valid (<code>123.</code>)</li>
 <li><code>.</code> alone is a hard error</li>
 </ul>
-<div class="codehilite"><pre><span></span><code>.i = 42;
+<div class="codehilite"><pre><code class="language-bovnar">.i = 42;
 .neg = -17;
 .float = 3.14;
 .trailing = 123.;
 .dot_led = .5;
 .sci = 1e6;
-.neg_sci = -2.5e-3;
-</code></pre></div>
-
+.neg_sci = -2.5e-3;</code></pre></div>
 <h4 id="special-number-literals">Special Number Literals</h4>
 <div class="codehilite"><pre><span></span><code>special-number = &quot;nan&quot; | &quot;inf&quot; | &quot;ninf&quot;
 </code></pre></div>
 
 <p>The special IEEE-754 values are <strong>bare reserved keywords</strong> — <code>nan</code>, <code>inf</code>, and <code>ninf</code> (negative infinity) — with no sigil. Like <code>null</code>/<code>true</code>/<code>false</code>/<code>on</code>/<code>off</code>, they are lexed as symbols and reclassified to numeric special values by the validator; a bare word that is not one of these exact spellings (e.g. <code>infinity</code>, <code>nans</code>) stays an ordinary symbol. The stored token text is the keyword itself: <code>nan</code>, <code>inf</code>, <code>ninf</code>. A special-number keyword takes <strong>no inline unit suffix</strong> — supply a unit through the type annotation instead (<code>&lt;float:64,m/s&gt; inf</code>).</p>
-<div class="codehilite"><pre><span></span><code>.not_a_number = nan;
+<div class="codehilite"><pre><code class="language-bovnar">.not_a_number = nan;
 .infinite = inf;
-.neg_infinite = ninf;
-</code></pre></div>
-
+.neg_infinite = ninf;</code></pre></div>
 <h3 id="47-null-values">4.7 Null Values</h3>
 <p>A null value is the <strong>absence</strong> of a raw-value token, or the reserved keyword <code>null</code>. It occurs when:</p>
 <ul>
 <li>At assignment level: <code>.key = ;</code> (nothing between <code>=</code> and <code>;</code>), or <code>.key = null;</code></li>
 <li>In array context: leading/trailing commas, or consecutive commas: <code>[,1,,2,]</code>; a bare <code>null</code> element is equivalent</li>
 </ul>
-<div class="codehilite"><pre><span></span><code>.null = ;                    # null value
+<div class="codehilite"><pre><code class="language-bovnar">.null = ;                    # null value
 .also = null;                # the null keyword — identical to the empty slot
-.items = [,1, ,2,];          # null, 1, null, 2, null
-</code></pre></div>
-
+.items = [,1, ,2,];          # null, 1, null, 2, null</code></pre></div>
 <p>When a type annotation precedes a null value, the null carries the annotated type:</p>
-<div class="codehilite"><pre><span></span><code>.null_typed = &lt;uint:32&gt; ;
-.nulls_in_array = [&lt;uint:32&gt;, &lt;sint:64&gt; , ];
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.null_typed = &lt;uint:32&gt; ;
+.nulls_in_array = [&lt;uint:32&gt;, &lt;sint:64&gt; , ];</code></pre></div>
 <hr />
 <h2 id="5-type-annotations">5. Type Annotations</h2>
 <h3 id="51-syntax">5.1 Syntax</h3>
@@ -663,7 +627,7 @@ dec-exponent  = (&quot;e&quot; | &quot;E&quot;) [ &quot;+&quot; | &quot;-&quot; 
 </ol>
 <p>In all cases the annotation comes <strong>before</strong> the value it describes.</p>
 <p><strong>Correct placement:</strong></p>
-<div class="codehilite"><pre><span></span><code>.an_int  = &lt;uint:32&gt; 42;
+<div class="codehilite"><pre><code class="language-bovnar">.an_int  = &lt;uint:32&gt; 42;
 .a_float = &lt;float:64&gt; 3.14;
 .arr = [&lt;uint:8&gt; 1, &lt;sint:16&gt; -2];
 
@@ -671,13 +635,9 @@ dec-exponent  = (&quot;e&quot; | &quot;E&quot;) [ &quot;+&quot; | &quot;-&quot; 
 .ports = &lt;uint:16&gt; [80, 443, 8080];
 
 # Per-element annotations override the whole-array annotation
-.mixed = &lt;uint:8&gt; [1, &lt;sint:8&gt; -1, 255];
-</code></pre></div>
-
+.mixed = &lt;uint:8&gt; [1, &lt;sint:8&gt; -1, 255];</code></pre></div>
 <p><strong>Incorrect placement (hard error):</strong></p>
-<div class="codehilite"><pre><span></span><code>.key&lt;uint:32&gt; = 42;    # ERROR: type annotation must follow &#39;=&#39;, not the key
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.key&lt;uint:32&gt; = 42;    # ERROR: type annotation must follow &#x27;=&#x27;, not the key</code></pre></div>
 <p>Seven type families are recognized in spec 1.0, plus <code>datetime</code> in spec 1.1:</p>
 <table>
 <thead>
@@ -754,12 +714,10 @@ requires a <code>#!bovnar 1.1</code> declaration (§3.4) — in a 1.0/unversione
 <code>datetime</code> is <code>error_illegal_value_type</code>. Recover the civil date/time with the
 <code>bvn_datetime.h</code> helpers (<code>bvnr_datetime_epoch_mjd()</code> → the epoch, then
 <code>bvn_dt_epoch_seconds_to_datetime()</code>).</p>
-<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1
 .created = &lt;datetime:64,unix&gt; 1750000000;   # 2025-06-15T...Z
 .tai_t   = &lt;datetime:tai&gt;     1400000000;
-.before  = &lt;datetime&gt;         -100;          # 100 s before 1970-01-01Z
-</code></pre></div>
-
+.before  = &lt;datetime&gt;         -100;          # 100 s before 1970-01-01Z</code></pre></div>
 <p><strong>ISO-8601 literals (spec 1.1).</strong> Instead of a raw integer, a <code>datetime</code> value
 may be written as an ISO-8601 literal:</p>
 <div class="codehilite"><pre><span></span><code>datetime-literal = YYYY-MM-DD [ &quot;T&quot; HH:MM:SS [ &quot;.&quot; fraction ] [ zone ] ]
@@ -822,15 +780,13 @@ POSIX time) and <code>tai</code> applies the IERS leap-second table. The atomic 
 round-trippable civil⇄seconds inverse in this implementation, so supply an
 integer epoch-seconds carrier for them. A literal carries no unit, and an ISO
 literal under a non-<code>datetime</code> annotation is <code>error_type_value_mismatch</code>.</p>
-<div class="codehilite"><pre><span></span><code>#!bovnar 1.1
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1
 .a = 2026-06-15;                                  # bare -&gt; &lt;datetime:64,unix&gt;
 .b = 2026-06-15T12:00:00Z;                        # date-time, UTC
 .c = &lt;datetime:64,tai&gt; 2017-01-01T00:00:00Z;      # tai: leap-second correct
 .f = &lt;datetime:64,tai&gt; 2016-12-31T23:59:60Z;      # the insertion itself, one second earlier
 .d = 2026-06-15T12:00:00+02:00;                   # offset -&gt; 10:00:00Z
-.e = 2026-06-15T12:00:00.5Z;                      # fraction preserved; round-trips as a literal
-</code></pre></div>
-
+.e = 2026-06-15T12:00:00.5Z;                      # fraction preserved; round-trips as a literal</code></pre></div>
 <p><strong>Parameter syntax:</strong></p>
 <div class="codehilite"><pre><span></span><code>type-spec = param-type [ &quot;:&quot; type-param-list ]
 
@@ -951,19 +907,17 @@ format) parameterised by width:</p>
 <code>width</code> bits; the mathematical value is <code>raw_integer × 2^(-Q)</code>.</p>
 <h3 id="53-parameter-order">5.3 Parameter Order</h3>
 <p>Parameters are <strong>identified by class</strong> — each class is recognised by its syntactic form — and at most one of each class may appear. They can appear in any order:</p>
-<div class="codehilite"><pre><span></span><code># All of these annotations are equivalent (parameter order is free):
+<div class="codehilite"><pre><code class="language-bovnar"># All of these annotations are equivalent (parameter order is free):
 .val = &lt;uint:32,_10,no_unit&gt; 42;
 #      &lt;uint:_10,no_unit,32&gt;      — identical
-#      &lt;uint:no_unit,_10,32&gt;      — identical
-</code></pre></div>
-
+#      &lt;uint:no_unit,_10,32&gt;      — identical</code></pre></div>
 <p>Because parameters are class-identified rather than positional, an empty
 positional slot is never needed, so the parameter list is parsed strictly: a
 comma must introduce a real parameter, and a <code>:</code> must be followed by at least
 one parameter. Empty, trailing, or doubled components — <code>&lt;uint:8,&gt;</code>,
 <code>&lt;uint:8,,&gt;</code>, <code>&lt;uint:,_16&gt;</code>, and the bare <code>&lt;uint:&gt;</code> — are <code>error_illegal_value_type</code>.</p>
 <h3 id="54-examples">5.4 Examples</h3>
-<div class="codehilite"><pre><span></span><code># Simple types
+<div class="codehilite"><pre><code class="language-bovnar"># Simple types
 .a = &lt;uint:32&gt; 1000;
 .b = &lt;sint:16&gt; -32768;
 .c = &lt;float:64&gt; 3.14159;
@@ -1009,15 +963,11 @@ one parameter. Empty, trailing, or doubled components — <code>&lt;uint:8,&gt;<
 
 # float_fix and float_dec do NOT accept a base parameter:
 # .bad = &lt;float_fix:32,q8,_10&gt; 1.0;   # ERROR: base forbidden for float_fix
-# .bad = &lt;float_dec:64,_10&gt; 1.0;      # ERROR: base forbidden for float_dec
-</code></pre></div>
-
+# .bad = &lt;float_dec:64,_10&gt; 1.0;      # ERROR: base forbidden for float_dec</code></pre></div>
 <h3 id="55-non-decimal-base-with-bare-numbers">5.5 Non-decimal Base with Bare Numbers</h3>
 <p>A non-decimal base with a bare number literal is not caught by the validator (no error is raised). In practice, a bare non-decimal value such as <code>ff</code> is parsed as a symbol token, not a number, so type/value compatibility validation will flag the mismatch instead. Use a quoted string for non-decimal values:</p>
-<div class="codehilite"><pre><span></span><code># CORRECT: quoted string
-.n = &lt;uint:_16&gt; &quot;ff&quot;;     # hex value 255
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar"># CORRECT: quoted string
+.n = &lt;uint:_16&gt; &quot;ff&quot;;     # hex value 255</code></pre></div>
 <hr />
 <h2 id="6-value-tokens">6. Value Tokens</h2>
 <h3 id="61-typevalue-compatibility">6.1 Type/Value Compatibility</h3>
@@ -1069,25 +1019,21 @@ one parameter. Empty, trailing, or doubled components — <code>&lt;uint:8,&gt;<
 </table>
 <h3 id="62-validation-rules-per-numeric-type">6.2 Validation Rules per Numeric Type</h3>
 <p><strong>uint (unsigned integer):</strong></p>
-<div class="codehilite"><pre><span></span><code>.valid = &lt;uint:8&gt; 255;
+<div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;uint:8&gt; 255;
 .valid = &lt;uint:8&gt; 0;
 
 .invalid = &lt;uint:8&gt; -1;       # error_value_out_of_range (negative)
-.invalid = &lt;uint:8&gt; 256;      # error_value_out_of_range (overflow)
-</code></pre></div>
-
+.invalid = &lt;uint:8&gt; 256;      # error_value_out_of_range (overflow)</code></pre></div>
 <p><strong>sint (signed integer):</strong></p>
-<div class="codehilite"><pre><span></span><code>.valid = &lt;sint:8&gt; 127;
+<div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;sint:8&gt; 127;
 .valid = &lt;sint:8&gt; -128;
 
 .invalid = &lt;sint:8&gt; 128;      # error_value_out_of_range
-.invalid = &lt;sint:8&gt; -129;     # error_value_out_of_range
-</code></pre></div>
-
+.invalid = &lt;sint:8&gt; -129;     # error_value_out_of_range</code></pre></div>
 <p><strong>float (binary floating-point):</strong></p>
 <p>Valid widths: <code>0</code> (default 64), <code>16</code>, or any multiple of <code>32</code> up to <code>32768</code>.
 Base <code>10</code> (default) or <code>16</code> are accepted; all other bases are rejected.</p>
-<div class="codehilite"><pre><span></span><code>.valid = &lt;float:64&gt; 3.14;
+<div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;float:64&gt; 3.14;
 .valid = &lt;float:64&gt; 1e100;
 .valid = &lt;float:64&gt; nan;
 .valid = &lt;float:16&gt; 3.14;      # half-precision
@@ -1095,9 +1041,7 @@ Base <code>10</code> (default) or <code>16</code> are accepted; all other bases 
 
 .invalid = &lt;float:8&gt; 3.14;     # width 8 → error_illegal_value_type
 .invalid = &lt;float:12&gt; 3.14;    # not 16 or a multiple of 32 → error_illegal_value_type
-.invalid = &lt;float:64,_2&gt; 3.14; # base 2 → error_illegal_value_type
-</code></pre></div>
-
+.invalid = &lt;float:64,_2&gt; 3.14; # base 2 → error_illegal_value_type</code></pre></div>
 <p><strong>float_fix (fixed-point Q-format):</strong></p>
 <p>Valid widths: <code>0</code> (default 64), <code>16</code>, <code>32</code>, <code>64</code>, <code>128</code>, <code>256</code>.
 The Q parameter (<code>qN</code>) specifies fractional bits; <code>0 ≤ N &lt; effective_width</code>.
@@ -1111,7 +1055,7 @@ range is <code>error_value_out_of_range</code>, exactly as for <code>uint</code>
 <code>bvn_float_to_fixNN</code> additionally <strong>saturate</strong> to the representable extreme on
 overflow rather than wrapping, so a fixed-point datum can never silently decode
 to an unrelated value.</p>
-<div class="codehilite"><pre><span></span><code>.valid   = &lt;float_fix:16,q8&gt; 3.14;    # Q8 in 16-bit: range [-128, 127.99609375]
+<div class="codehilite"><pre><code class="language-bovnar">.valid   = &lt;float_fix:16,q8&gt; 3.14;    # Q8 in 16-bit: range [-128, 127.99609375]
 .valid   = &lt;float_fix:16,q8&gt; 127.99609375;  # max in range
 .valid   = &lt;float_fix:16,q8&gt; -128;    # min in range
 .valid   = &lt;float_fix:32,q16&gt; -1.5;   # Q16 in 32-bit
@@ -1122,48 +1066,38 @@ to an unrelated value.</p>
 .invalid = &lt;float_fix:16,q0&gt; 70000;   # exceeds signed-16-bit range → error_value_out_of_range
 .invalid = &lt;float_fix:16,q16&gt; 1.0;    # Q &gt;= width → error_illegal_value_type
 .invalid = &lt;float_fix:8&gt; 1.0;         # width 8 not in {0,16,32,64,128,256}
-.invalid = &lt;float_fix:32,q8,_10&gt; 1.0; # base param forbidden → error_illegal_value_type
-</code></pre></div>
-
+.invalid = &lt;float_fix:32,q8,_10&gt; 1.0; # base param forbidden → error_illegal_value_type</code></pre></div>
 <p><strong>float_dec (IEEE 754-2008 decimal floating-point):</strong></p>
 <p>Valid widths: <code>0</code> (default 64), <code>16</code>, <code>32</code>, <code>64</code>, <code>128</code>, <code>256</code>.
 Base parameter (<code>_N</code>) is forbidden (decimal base is implicit).
 Values are written as ordinary decimal literals or special numbers.</p>
-<div class="codehilite"><pre><span></span><code>.valid   = &lt;float_dec:32&gt; 3.14;
+<div class="codehilite"><pre><code class="language-bovnar">.valid   = &lt;float_dec:32&gt; 3.14;
 .valid   = &lt;float_dec:64,Pa&gt; 101325;
 .valid   = &lt;float_dec:128&gt; nan;
 
 .invalid = &lt;float_dec:8&gt; 1.0;         # width 8 not valid → error_illegal_value_type
-.invalid = &lt;float_dec:64,_10&gt; 1.0;    # base param forbidden → error_illegal_value_type
-</code></pre></div>
-
+.invalid = &lt;float_dec:64,_10&gt; 1.0;    # base param forbidden → error_illegal_value_type</code></pre></div>
 <h3 id="63-digit-validation">6.3 Digit Validation</h3>
 <p>Digits in values are checked against the declared base:</p>
-<div class="codehilite"><pre><span></span><code>.value = &lt;uint:_16&gt; &quot;ff&quot;;      # OK: f and f are valid in base 16
-.value = &lt;uint:_16&gt; &quot;fg&quot;;      # error_digit_not_in_base: &#39;g&#39; &gt; base 16
+<div class="codehilite"><pre><code class="language-bovnar">.value = &lt;uint:_16&gt; &quot;ff&quot;;      # OK: f and f are valid in base 16
+.value = &lt;uint:_16&gt; &quot;fg&quot;;      # error_digit_not_in_base: &#x27;g&#x27; &gt; base 16
 .value = &lt;uint:_2&gt; &quot;1010&quot;;     # OK: valid binary
-.value = &lt;uint:_2&gt; &quot;210&quot;;      # error_digit_not_in_base
-</code></pre></div>
-
+.value = &lt;uint:_2&gt; &quot;210&quot;;      # error_digit_not_in_base</code></pre></div>
 <h4 id="exponent-markers-in-quoted-string-literals">Exponent Markers in Quoted String Literals</h4>
 <p>Bare number literals always use <code>e</code>/<code>E</code> as the exponent separator (§4.6). Quoted string number literals follow the same rule <strong>except</strong> for base-16 (<code>_16</code>) float values, where <code>p</code>/<code>P</code> must be used instead of <code>e</code>/<code>E</code>. This is required because <code>e</code> and <code>E</code> are valid hexadecimal digits: with base 16 you must write <code>"1.8p+2"</code>, not <code>"1.8e+2"</code> — the <code>e</code> would be read as a mantissa digit rather than an exponent marker, leaving the trailing <code>+2</code> invalid. Float values support a decimal base (the default) and base-16 (<code>_16</code>); the <code>p</code>/<code>P</code> exponent separator applies to the base-16 form.</p>
-<div class="codehilite"><pre><span></span><code>.hex_float  = &lt;float:64,_16&gt; &quot;1.8p+2&quot;;   # OK: 1.8₁₆ × 2² = 6.0  (p = binary exponent)
-.hex_mant   = &lt;float:64,_16&gt; &quot;1.8e&quot;;     # OK: &#39;e&#39; is a hex digit → mantissa 1.8e₁₆
-.dec_float  = &lt;float:64&gt; 12.0;           # OK: default decimal base
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.hex_float  = &lt;float:64,_16&gt; &quot;1.8p+2&quot;;   # OK: 1.8₁₆ × 2² = 6.0  (p = binary exponent)
+.hex_mant   = &lt;float:64,_16&gt; &quot;1.8e&quot;;     # OK: &#x27;e&#x27; is a hex digit → mantissa 1.8e₁₆
+.dec_float  = &lt;float:64&gt; 12.0;           # OK: default decimal base</code></pre></div>
 <p>The <code>p</code>/<code>P</code> exponent value is always interpreted as a decimal integer (the binary exponent bias), matching the C99 hexadecimal floating-point literal convention.</p>
 <h3 id="64-special-number-semantics">6.4 Special Number Semantics</h3>
 <p><code>nan</code>, <code>inf</code>, <code>ninf</code> are accepted by any numeric type family (<code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>) and in untyped context. <code>bvn_check_acc_range</code> explicitly returns <code>true</code> when <code>bvn_is_special_number_string</code> matches, bypassing all range validation regardless of the declared family. They are rejected under the non-numeric families whose token kind is incompatible with <code>token_is_number</code> — <code>utf8</code> (string-only) and <code>bool</code> (boolean-keyword-only) — both producing <code>error_type_value_mismatch</code>. (A <code>datetime</code> annotation, by contrast, accepts them: the special-string check short-circuits before the datetime carrier is parsed.)</p>
-<div class="codehilite"><pre><span></span><code>.okay_f64  = &lt;float:64&gt;  inf;
+<div class="codehilite"><pre><code class="language-bovnar">.okay_f64  = &lt;float:64&gt;  inf;
 .okay_f32  = &lt;float:32&gt;  nan;
 .okay_u8   = &lt;uint:8&gt;    nan;         # accepted — range check bypassed
 .okay_s16  = &lt;sint:16&gt;   ninf;   # accepted — range check bypassed
 
 # Fine in plain/untyped context too
-.untyped = inf;       # defaults to float:64
-</code></pre></div>
-
+.untyped = inf;       # defaults to float:64</code></pre></div>
 <h3 id="65-inline-unit-suffix">6.5 Inline Unit Suffix</h3>
 <p>A <strong>scalar</strong> number or string value may carry an optional unit suffix separated from the literal by <strong>at least one whitespace character</strong>. The suffix uses the same character set as the unit parameter inside a type annotation (<code>unit-param</code>).</p>
 <table>
@@ -1187,13 +1121,11 @@ Values are written as ordinary decimal literals or special numbers.</p>
 </tr>
 </tbody>
 </table>
-<div class="codehilite"><pre><span></span><code>.distance = 100 m;            # plain integer with inline unit: meter
+<div class="codehilite"><pre><code class="language-bovnar">.distance = 100 m;            # plain integer with inline unit: meter
 .speed    = 9.81 m/s;         # plain float with inline compound unit
 .mass     = 70.0 k~g;         # with SI prefix
 .storage  = 4 Gi~B;           # with IEC prefix
-.ratio    = 3.14 no_unit;     # explicitly dimensionless via inline suffix
-</code></pre></div>
-
+.ratio    = 3.14 no_unit;     # explicitly dimensionless via inline suffix</code></pre></div>
 <p>The inline unit suffix is <strong>forbidden inside arrays</strong>; any character that would begin an inline unit — a letter, <code>_</code>, <code>$</code>, <code>%</code>, <code>(</code>, or a UTF-8 lead byte — following a value inside <code>[ … ]</code> is a lexical error (<code>error_unexpected_input_byte</code>).</p>
 <p><strong>Interaction with type annotations:</strong></p>
 <table>
@@ -1222,7 +1154,7 @@ Values are written as ordinary decimal literals or special numbers.</p>
 </tr>
 </tbody>
 </table>
-<div class="codehilite"><pre><span></span><code># Annotation unit with no inline unit — normal
+<div class="codehilite"><pre><code class="language-bovnar"># Annotation unit with no inline unit — normal
 .dist = &lt;float:64,m&gt; 1.5;
 
 # No annotation unit, inline unit — unit from suffix
@@ -1232,17 +1164,13 @@ Values are written as ordinary decimal literals or special numbers.</p>
 .dist = &lt;float:64,m&gt; 1.5 m;
 
 # Both present and different — error_unit_mismatch
-.dist = &lt;float:64,m&gt; 1.5 s;     # ERROR: annotation says m, inline says s
-</code></pre></div>
-
+.dist = &lt;float:64,m&gt; 1.5 s;     # ERROR: annotation says m, inline says s</code></pre></div>
 <p>An invalid inline unit string (unrecognised base unit, bad prefix, etc.) produces <code>error_unit_illegal</code>. The suffix may appear after <code>no_unit</code> checks as with any other unit string.</p>
 <hr />
 <h2 id="7-arrays">7. Arrays</h2>
 <h3 id="71-row-syntax">7.1 Row Syntax</h3>
 <p>An array consists of one or more bracket-enclosed <strong>rows</strong> separated by <code>/</code>:</p>
-<div class="codehilite"><pre><span></span><code>.array_2d = [1, 2, 3]/[4, 5, 6];
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.array_2d = [1, 2, 3]/[4, 5, 6];</code></pre></div>
 <p>This produces the event sequence:</p>
 <div class="codehilite"><pre><span></span><code>ev_array_row_start → 3× ev_data  → ev_array_row_end
 ev_array_dim_start → ev_array_row_start  → 3× ev_data  → ev_array_row_end
@@ -1251,16 +1179,12 @@ ev_array_dim_start → ev_array_row_start  → 3× ev_data  → ev_array_row_end
 <h3 id="72-null-elements">7.2 Null Elements</h3>
 <p>Leading/trailing commas, consecutive commas, and the bare keyword <code>null</code> all
 produce null elements:</p>
-<div class="codehilite"><pre><span></span><code>.items = [,1,,2,];   # 5 elements: null, 1, null, 2, null
-.one   = [null];     # 1 element: a single null
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.items = [,1,,2,];   # 5 elements: null, 1, null, 2, null
+.one   = [null];     # 1 element: a single null</code></pre></div>
 <p><strong>Empty arrays.</strong> A row with nothing between the brackets is <strong>empty</strong> — zero
 elements, no <code>ev_data</code> emitted. It is distinct from a one-null row:</p>
-<div class="codehilite"><pre><span></span><code>.empty = [];         # 0 elements
-.null1 = [null];     # 1 element (null)
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.empty = [];         # 0 elements
+.null1 = [null];     # 1 element (null)</code></pre></div>
 <p>So <code>bvn_dom_array_count([])</code> is <code>0</code> and <code>bvn_dom_array_count([null])</code> is <code>1</code>. The
 canonical serialiser writes a null array element as the explicit <code>null</code> keyword
 (e.g. <code>[, 1]</code> round-trips through <code>[null, 1]</code>), so an empty slot never collides
@@ -1280,7 +1204,7 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 <li><strong>Structs — same keys, fields free.</strong> Sibling structs must share the same keys, in order, with the same per-field <em>kinds</em> and nesting. Differing keys are <code>error_struct_shape_mismatch</code>; a field that is a number in one record and a string in another is <code>error_array_element_type_mismatch</code>. But a scalar field may carry a <strong>different unit</strong> in each record, and a list field a <strong>different length</strong> — so a multi-currency ledger and per-record argument lists are valid.</li>
 <li><strong>Null is a hole.</strong> <code>null</code> / empty array elements match any shape and never establish or break homogeneity, so sparse arrays like <code>[1, , 3]</code> remain valid.</li>
 </ul>
-<div class="codehilite"><pre><span></span><code>.ok_scalars = [1, 2.5, 3];                 # valid: same (no) dimension, encodings may mix
+<div class="codehilite"><pre><code class="language-bovnar">.ok_scalars = [1, 2.5, 3];                 # valid: same (no) dimension, encodings may mix
 .ok_matrix  = [[1, 2], [3, 4]];            # valid: rectangular
 .ok_records = [{.cur = USD; .bal = &lt;float_dec:64,$USD&gt; 1.0;},
                {.cur = EUR; .bal = &lt;float_dec:64,$EUR&gt; 2.0;}]; # valid: same keys, fields free
@@ -1289,16 +1213,12 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 .bad_kind   = [1, &quot;two&quot;];                  # error_array_element_type_mismatch
 .bad_dim    = [&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0];  # error_array_element_type_mismatch
 .bad_ragged = [[1, 2], [3, 4, 5]];         # error_array_row_size_mismatch
-.bad_keys   = [{.x = 1;}, {.y = 1;}];      # error_struct_shape_mismatch
-</code></pre></div>
-
+.bad_keys   = [{.x = 1;}, {.y = 1;}];      # error_struct_shape_mismatch</code></pre></div>
 <p>A bare array of measurements is therefore uniform — a consumer may treat its elements identically — while records (structs) describe genuinely different things. <strong>Heterogeneous data is modelled with a struct, not an array.</strong> (This is a deliberate tightening over pre-1.0 drafts, which allowed ragged and mixed-type arrays; it also means a ragged or mixed-type JSON array has no bovnar representation and the <code>json → bvnr</code> converter rejects it rather than losing structure.)</p>
 <h3 id="75-array-elements-with-type-annotations">7.5 Array Elements with Type Annotations</h3>
 <p>Individual elements may carry type annotations. The annotation appears <strong>before</strong> each element value, <strong>after</strong> the comma or opening bracket:</p>
-<div class="codehilite"><pre><span></span><code>.mixed = [&lt;uint:8&gt; 1, &lt;sint:8&gt; -1, &lt;float:64&gt; 3.14];
-.nulls = [&lt;uint:32&gt; , &lt;sint:64&gt; ];    # null, null with types
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.mixed = [&lt;uint:8&gt; 1, &lt;sint:8&gt; -1, &lt;float:64&gt; 3.14];
+.nulls = [&lt;uint:32&gt; , &lt;sint:64&gt; ];    # null, null with types</code></pre></div>
 <h3 id="76-constraints">7.6 Constraints</h3>
 <table>
 <thead>
@@ -1325,39 +1245,31 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 </code></pre></div>
 
 <p>Structs group related assignments into a nested scope:</p>
-<div class="codehilite"><pre><span></span><code>.person = {
+<div class="codehilite"><pre><code class="language-bovnar">.person = {
     .name = &quot;Alice&quot;;
     .age = 30;
     .address = {
         .street = &quot;123 Main St&quot;;
         .city = &quot;Springfield&quot;;
     };
-};
-</code></pre></div>
-
+};</code></pre></div>
 <p><strong>Key uniqueness.</strong> Keys must be unique within a single scope — a struct, and
 the top-level document. A repeated key is <code>error_duplicate_struct_key</code>, so
 lookup, references, and iteration always agree on the value of a key:</p>
-<div class="codehilite"><pre><span></span><code>.bad = {.x = 1; .x = 2;};   # error_duplicate_struct_key
-.ok  = {.x = 1; .y = 2;};   # fine
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.bad = {.x = 1; .x = 2;};   # error_duplicate_struct_key
+.ok  = {.x = 1; .y = 2;};   # fine</code></pre></div>
 <p>The same key in <em>different</em> scopes is unrelated and always allowed (e.g.
 <code>.a = {.x = 1;}; .b = {.x = 2;};</code>). The rule is enforced over the materialised
 document, alongside array homogeneity (§7.4).</p>
 <h3 id="82-nesting">8.2 Nesting</h3>
 <p>Structs can be nested up to <code>max_struct_nesting</code> levels — default 64, hard cap 255 (the limit field is a <code>uint8_t</code>; setting it to 0 selects the default of 64). Exceeding the configured limit produces <code>error_struct_nesting_too_high</code>.</p>
 <h3 id="83-empty-structs">8.3 Empty Structs</h3>
-<div class="codehilite"><pre><span></span><code>.empty = {};
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.empty = {};</code></pre></div>
 <h3 id="84-structs-as-array-elements">8.4 Structs as Array Elements</h3>
-<div class="codehilite"><pre><span></span><code>.people = [
+<div class="codehilite"><pre><code class="language-bovnar">.people = [
     {.name = &quot;Alice&quot;; .age = 30;},
     {.name = &quot;Bob&quot;; .age = 25;}
-];
-</code></pre></div>
-
+];</code></pre></div>
 <h3 id="85-unmatched-braces">8.5 Unmatched Braces</h3>
 <p>A <code>}</code> seen with <code>struct_nesting_level == 0</code> is <code>error_illegal_struct_close</code>.</p>
 <hr />
@@ -1404,10 +1316,8 @@ ev_octet_stream_end    →  (emitted on the trailing 0x00)
 </code></pre></div>
 
 <h3 id="94-example">9.4 Example</h3>
-<div class="codehilite"><pre><span></span><code>.data = ;
-.binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.data = ;
+.binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;</code></pre></div>
 <p>This binary region encodes two chunks: <code>"hello"</code> (5 bytes) and <code>"bye"</code> (3 bytes), producing:</p>
 <div class="codehilite"><pre><span></span><code>ev_octet_stream_start
 ev_data (type=octet_stream, data=&quot;hello&quot;,  length=5)
@@ -1502,7 +1412,7 @@ ev_data
 </code></pre></div>
 
 <h3 id="103-examples">10.3 Examples</h3>
-<div class="codehilite"><pre><span></span><code># No annotation → synthesised &lt;uint:64,_10,no_unit&gt;
+<div class="codehilite"><pre><code class="language-bovnar"># No annotation → synthesised &lt;uint:64,_10,no_unit&gt;
 .x = 42;
 
 # No annotation → synthesised &lt;float:64,_10,no_unit&gt;
@@ -1513,9 +1423,7 @@ ev_data
 .w = -7;
 
 # No annotation → synthesised &lt;utf8&gt;
-.s = &quot;hello&quot;;
-</code></pre></div>
-
+.s = &quot;hello&quot;;</code></pre></div>
 <hr />
 <h2 id="11-units-system">11. Units System</h2>
 <h3 id="111-base-units">11.1 Base Units</h3>
@@ -2059,7 +1967,7 @@ unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 <li>When a prefix is present, the separator <code>~</code> between the prefix and the base unit is <strong>mandatory</strong>.</li>
 <li>A bare base unit with no prefix requires no separator.</li>
 </ul>
-<div class="codehilite"><pre><span></span><code># Simple (single-component) units — same as before
+<div class="codehilite"><pre><code class="language-bovnar"># Simple (single-component) units — same as before
 .time = &lt;float:64,s&gt; 2.5;               # seconds
 .speed = &lt;float:64,k~m&gt; 1.5;            # kilometers (kilo-meter)
 
@@ -2074,9 +1982,7 @@ unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 .pressure = &lt;float:64,k~g/(m·s²)&gt; 101325; # grouped denominator (= k~g/m·s²)
 
 # Explicitly dimensionless
-.no_unit_float = &lt;float:64,no_unit&gt; 3.14;
-</code></pre></div>
-
+.no_unit_float = &lt;float:64,no_unit&gt; 3.14;</code></pre></div>
 <h3 id="115-unit-exponents">11.5 Unit Exponents</h3>
 <p>Exponents can be written in two forms:</p>
 <table>
@@ -2168,7 +2074,7 @@ unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 </tbody>
 </table>
 <h3 id="116-examples">11.6 Examples</h3>
-<div class="codehilite"><pre><span></span><code>.distance = &lt;float:64,k~m&gt; 1.5;             # kilometers
+<div class="codehilite"><pre><code class="language-bovnar">.distance = &lt;float:64,k~m&gt; 1.5;             # kilometers
 .mass = &lt;float:64,g&gt; 500;                   # grams
 .velocity = &lt;float:64,m/s&gt; 9.81;            # meters per second
 .acceleration = &lt;float:64,m/s²&gt; 9.81;       # meters per second squared
@@ -2178,9 +2084,7 @@ unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 .frequency = &lt;float:64,k~Hz&gt; 2.4;           # kilohertz
 .force = &lt;float:64,k~g·m/s²&gt; 9.81;         # kilogram-meters per second squared
 .momentum = &lt;float:64,k~g·m/s&gt; 0.5;        # kilogram-meters per second
-.density = &lt;float:64,k~g/m³&gt; 7800;          # kilograms per cubic meter
-</code></pre></div>
-
+.density = &lt;float:64,k~g/m³&gt; 7800;          # kilograms per cubic meter</code></pre></div>
 <h3 id="117-compound-unit-constraints">11.7 Compound Unit Constraints</h3>
 <table>
 <thead>
@@ -2200,9 +2104,7 @@ unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 <p>Empty components between separators (e.g., <code>m//s</code>, <code>m*·s</code>) produce <code>error_unit_illegal</code>.</p>
 <h3 id="118-the-no_unit-keyword">11.8 The <code>no_unit</code> Keyword</h3>
 <p>The literal string <code>no_unit</code> in the unit parameter position means "explicitly dimensionless":</p>
-<div class="codehilite"><pre><span></span><code>.dimensionless = &lt;uint:32,no_unit&gt; 42;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.dimensionless = &lt;uint:32,no_unit&gt; 42;</code></pre></div>
 <p>Within an explicit annotation, <strong>omitting</strong> the unit parameter yields the same internal representation as an explicit <code>no_unit</code>: <code>BVN_UNIT_NONE</code> with <code>num_components == 0</code>. (<code>bvn_parse_type_annotation</code> initialises the unit to <code>BVN_UNIT_NONE</code> and only overwrites it when a dimensioned unit parameter is actually present.)</p>
 <p>A <strong>fully untyped</strong> value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing <code>BVN_UNIT_NO_PREFIX(bu_none)</code> with <code>num_components == 1</code> and <code>base == bu_none</code>. All three forms are semantically equivalent — they compare as compatible via <code>bvn_units_compatible</code> and both encodings serialize to <code>"no_unit"</code> via <code>bvn_unit_to_string</code> — but the untyped-default form (<code>num_components == 1</code>) is a structurally distinct internal state from the annotated forms (<code>num_components == 0</code>).</p>
 <hr />
@@ -2654,16 +2556,14 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 <hr />
 <h2 id="15-complete-examples">15. Complete Examples</h2>
 <h3 id="151-simple-configuration">15.1 Simple Configuration</h3>
-<div class="codehilite"><pre><span></span><code># Application configuration
+<div class="codehilite"><pre><code class="language-bovnar"># Application configuration
 .app_name = &quot;Bovnar Demo&quot;;
 .version = 1;
 .debug = false;
 .max_connections = 100;
-.timeout_s = 30;
-</code></pre></div>
-
+.timeout_s = 30;</code></pre></div>
 <h3 id="152-typed-scientific-data">15.2 Typed Scientific Data</h3>
-<div class="codehilite"><pre><span></span><code># Physical measurements with units
+<div class="codehilite"><pre><code class="language-bovnar"># Physical measurements with units
 .measurements = [
     {.name = &quot;temperature&quot;;
      .value = &lt;float:32,°C&gt; 23.5;
@@ -2681,12 +2581,10 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 
 .calibration = &lt;float:64,no_unit&gt; 1.00042;
 .density = &lt;float:64,k~g/m³&gt; 7800;
-.accel = &lt;float:64,m/s²&gt; 9.81;
-</code></pre></div>
-
+.accel = &lt;float:64,m/s²&gt; 9.81;</code></pre></div>
 <h3 id="153-inline-unit-suffix">15.3 Inline Unit Suffix</h3>
 <p>The unit may be written directly after the value literal instead of — or redundantly alongside — the type annotation:</p>
-<div class="codehilite"><pre><span></span><code># No type annotation: inline unit supplies both type default and unit
+<div class="codehilite"><pre><code class="language-bovnar"># No type annotation: inline unit supplies both type default and unit
 .distance   = 1500 m;           # uint:64, no_unit → unit overridden to m
 .speed      = 9.81 m/s;         # float:64, unit = m/s
 .mass       = 70.5 k~g;         # float:64, unit = k~g
@@ -2698,22 +2596,18 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 .pressure   = &lt;float:64,Pa&gt; 101325 Pa;
 
 # Annotation and inline unit differ: error_unit_mismatch
-# .bad      = &lt;float:64,m&gt; 1.5 s;    # ERROR
-</code></pre></div>
-
+# .bad      = &lt;float:64,m&gt; 1.5 s;    # ERROR</code></pre></div>
 <h3 id="154-binary-data-with-octet-stream">15.4 Binary Data with Octet Stream</h3>
-<div class="codehilite"><pre><span></span><code># An image file embedded as binary
+<div class="codehilite"><pre><code class="language-bovnar"># An image file embedded as binary
 .image = \x00
     \x01\x10\x00\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00
     \x01\x00\x00\x00\xFF\xD9
     \x00;
 
 # A checksum alongside
-.checksum = &lt;uint:_16&gt; &quot;abcd&quot;;
-</code></pre></div>
-
+.checksum = &lt;uint:_16&gt; &quot;abcd&quot;;</code></pre></div>
 <h3 id="155-arrays-with-mixed-dimensions">15.5 Arrays with Mixed Dimensions</h3>
-<div class="codehilite"><pre><span></span><code># 2D matrix (uniform rows)
+<div class="codehilite"><pre><code class="language-bovnar"># 2D matrix (uniform rows)
 .matrix = [1, 2, 3]/[4, 5, 6];
 
 # Uniform nested arrays (all inner arrays same size)
@@ -2730,12 +2624,10 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 
 # These produce error_array_row_size_mismatch:
 # .bad1 = [1,2,3]/[4,5];           # /-row sizes differ: 3 vs 2
-# .bad2 = [[1,2]/[3,4,5]];         # inner /-array&#39;s own rows differ: 2 vs 3
-# .bad3 = [[1,2],[3,4,5]];         # ragged sibling sub-arrays differ: 2 vs 3
-</code></pre></div>
-
+# .bad2 = [[1,2]/[3,4,5]];         # inner /-array&#x27;s own rows differ: 2 vs 3
+# .bad3 = [[1,2],[3,4,5]];         # ragged sibling sub-arrays differ: 2 vs 3</code></pre></div>
 <h3 id="156-deeply-nested-struct">15.6 Deeply Nested Struct</h3>
-<div class="codehilite"><pre><span></span><code>.api_response = {
+<div class="codehilite"><pre><code class="language-bovnar">.api_response = {
     .status = ok;
     .code = 200;
     .data = {
@@ -2749,11 +2641,9 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
             .total = 2;
         };
     };
-};
-</code></pre></div>
-
+};</code></pre></div>
 <h3 id="157-references-and-symbols">15.7 References and Symbols</h3>
-<div class="codehilite"><pre><span></span><code># Configuration with references
+<div class="codehilite"><pre><code class="language-bovnar"># Configuration with references
 .config = {
     .host = &quot;api.example.com&quot;;
     .port = 443;
@@ -2769,11 +2659,9 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 # Using symbols as enum-like values
 .status = ok;
 .mode = readonly;
-.direction = north;
-</code></pre></div>
-
+.direction = north;</code></pre></div>
 <h3 id="158-compound-unit-examples">15.8 Compound Unit Examples</h3>
-<div class="codehilite"><pre><span></span><code># Velocity
+<div class="codehilite"><pre><code class="language-bovnar"># Velocity
 .velocity = &lt;float:64,m/s&gt; 9.81;
 
 # Acceleration
@@ -2804,11 +2692,9 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 .moment = &lt;float:64,m*s&gt; 1.0;
 
 # Alternative superscript notation for compound units
-.force_alt = &lt;float:64,k~g·m·s⁻²&gt; 9.81;
-</code></pre></div>
-
+.force_alt = &lt;float:64,k~g·m·s⁻²&gt; 9.81;</code></pre></div>
 <h3 id="159-fixed-point-and-decimal-float-examples">15.9 Fixed-Point and Decimal Float Examples</h3>
-<div class="codehilite"><pre><span></span><code># ── float_fix: fixed-point Q-format ────────────────────────────────
+<div class="codehilite"><pre><code class="language-bovnar"># ── float_fix: fixed-point Q-format ────────────────────────────────
 
 # 16-bit Q8: 8 fractional bits, resolution 2^-8 ≈ 0.00390625
 # range: [-128.0, +127.99609375]
@@ -2861,21 +2747,19 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 .val_dec       = &lt;float_dec:64&gt; 3.14;
 
 # Fixed-point — same text representation, Q-format wire encoding
-.val_fix       = &lt;float_fix:32,q16&gt; 3.14;
-</code></pre></div>
-
+.val_fix       = &lt;float_fix:32,q16&gt; 3.14;</code></pre></div>
 <h3 id="1510-error-examples">15.10 Error Examples</h3>
-<div class="codehilite"><pre><span></span><code># These will produce parse errors:
+<div class="codehilite"><pre><code class="language-bovnar"># These will produce parse errors:
 
 # Empty identifier
 . = 42;                          # error_empty_identifier
 
 # Type violation (type annotation on the identifier, not the value)
-.x&lt;utf8&gt; = 42;                   # error (annotation must be after &#39;=&#39;)
+.x&lt;utf8&gt; = 42;                   # error (annotation must be after &#x27;=&#x27;)
 
 # Correct: .x = &lt;utf8&gt; &quot;text&quot;;
 
-# Type violation – value doesn&#39;t match type
+# Type violation – value doesn&#x27;t match type
 .x = &lt;utf8&gt; 42;                   # error_type_value_mismatch
 
 # Value out of range
@@ -2884,7 +2768,7 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 # Negative unsigned
 .z = &lt;uint:8&gt; -1;                 # error_value_out_of_range
 
-# Unmatched struct close — a &#39;}&#39; at the top level (struct nesting 0)
+# Unmatched struct close — a &#x27;}&#x27; at the top level (struct nesting 0)
 .stray_close = 1;}               # error_illegal_struct_close
 
 # Unknown escape
@@ -2893,7 +2777,7 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 # error_array_row_size_mismatch — /-dimension rows of one array, and (since 1.0)
 # ragged sibling sub-arrays, must match in length:
 # .bad1 = [1,2,3]/[4,5];           # /-row sizes differ: 3 vs 2
-# .bad2 = [[1,2]/[3,4,5]];         # inner /-array&#39;s own rows differ: 2 vs 3
+# .bad2 = [[1,2]/[3,4,5]];         # inner /-array&#x27;s own rows differ: 2 vs 3
 # .bad3 = [[1,2],[3,4,5]];         # ragged sibling sub-arrays differ: 2 vs 3
 # Uniform /-rows and rectangular sibling sub-arrays are valid:
 .ok1 = [1,2,3]/[4,5,6];    # valid — both dimension rows have 3 elements
@@ -2927,9 +2811,7 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 .bad_db = &lt;float_dec:64,_10&gt; 1.0;           # error_illegal_value_type
 
 # q~param on non-float_fix type
-.bad_qu = &lt;float:64,q8&gt; 1.0;               # q~param only valid for float_fix
-</code></pre></div>
-
+.bad_qu = &lt;float:64,q8&gt; 1.0;               # q~param only valid for float_fix</code></pre></div>
 <hr />
 <h2 id="16-reference-api">16. Reference API</h2>
 <h3 id="161-core-types">16.1 Core Types</h3>
@@ -3676,6 +3558,8 @@ float_dec:
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
+<script src="/bovnar_highlight.js?v=594ce7c394a8"></script>
+<script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
 <script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
 </body>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Python Bindings</title>
@@ -30,7 +30,7 @@
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=dd713e0da055">
-<link rel="stylesheet" href="/docs/docs.css?v=534bb2781d06">
+<link rel="stylesheet" href="/docs/docs.css?v=ccff0fd09606">
 <link rel="alternate" type="text/markdown" href="/doc/4_bovnar_python_bindings.md">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Python Bindings", "description": "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the DOM, Quantity, and the NumPy and Pint bridges.", "url": "https://www.bovnar.io/docs/python/", "mainEntityOfPage": "https://www.bovnar.io/docs/python/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-23", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Python Bindings", "item": "https://www.bovnar.io/docs/python/"}]}]}</script>
 </head>
@@ -376,11 +376,9 @@ It can be constructed with class methods or extracted from a <code>ValueUnitComp
 <p>In addition to the unit embedded in a type annotation (<code>&lt;float:64,m/s&gt;</code>), the
 Bovnar format supports an <strong>inline unit suffix</strong> placed directly after a scalar
 value, before the terminating <code>;</code>:</p>
-<div class="codehilite"><pre><span></span><code>.speed = 9.81 m/s;           # inline suffix, no annotation
+<div class="codehilite"><pre><code class="language-bovnar">.speed = 9.81 m/s;           # inline suffix, no annotation
 .mass  = &lt;float:64&gt; 70.5 k~g;# annotation without unit, inline adopted
-.dist  = &lt;float:64,m&gt; 1.5 m; # annotation and inline both say &#39;m&#39; — valid
-</code></pre></div>
-
+.dist  = &lt;float:64,m&gt; 1.5 m; # annotation and inline both say &#x27;m&#x27; — valid</code></pre></div>
 <p>From the Python layer, inline and annotation units are <strong>identical</strong>: both
 reach the application as <code>data.value_unit</code> inside the <code>Event.DATA</code> payload.
 No extra code is required to consume inline units.</p>
@@ -1100,9 +1098,7 @@ inline values; any Bovnar-supported base for <code>write_bvni</code>).</p>
 <p>Write an IEEE 754-2008 decimal float.</p>
 <h4 id="write_stringkey-value"><code>write_string(key, value)</code></h4>
 <p>Write a bare quoted UTF-8 string with no type annotation:</p>
-<div class="codehilite"><pre><span></span><code>.host = &quot;localhost&quot;;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.host = &quot;localhost&quot;;</code></pre></div>
 <p>To emit an explicit <code>&lt;utf8&gt;</code> annotation, use the low-level <code>emit</code> API with
 <code>Event.TYPE_ANNOTATION_START</code> / <code>TYPE_ANNOTATION_END</code> before <code>Event.DATA</code>.</p>
 <h4 id="write_boolkey-value"><code>write_bool(key, value)</code></h4>
@@ -1489,9 +1485,7 @@ serialising unit annotations. <code>_emit_annotation</code> retrieves the live f
 <h3 id="write_string-behaviour"><code>write_string</code> behaviour</h3>
 <p><code>Writer.write_string</code> emits a bare quoted string with no type annotation,
 matching <code>bvnr_write_string</code> in the C library:</p>
-<div class="codehilite"><pre><span></span><code>.host = &quot;localhost&quot;;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.host = &quot;localhost&quot;;</code></pre></div>
 <p>To write a string with an explicit <code>&lt;utf8&gt;</code> annotation, use the low-level
 <code>emit</code> API with <code>Event.TYPE_ANNOTATION_START</code> / <code>TYPE_ANNOTATION_END</code> events
 before the <code>Event.DATA</code> event.</p>
@@ -1744,6 +1738,8 @@ unversioned document is treated as 1.0) are exposed as:</p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
+<script src="/bovnar_highlight.js?v=594ce7c394a8"></script>
+<script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
 <script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
 </body>

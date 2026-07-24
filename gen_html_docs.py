@@ -139,7 +139,31 @@ class GHSlugSeen(dict):
         return base if n == 0 else f"{base}-{n}"
 
 
+# ```bovnar fences -- 188 of them across the doc set, the single most common
+# tagged language and the one this site is about. Pygments has no Bovnar lexer,
+# so codehilite fell back to plain text and every .bvnr sample on /docs/ rendered
+# flat while the SAME block, read through the drawer on the landing page, came
+# out fully coloured. Rather than port the highlighter to Python (a second
+# implementation to keep in lock-step with the vim syntax file), these blocks are
+# lifted out before conversion, re-inserted tagged, and coloured in the browser
+# by the very same web/bovnar_highlight.js the drawer and the playground use.
+# Only column-0 fences are taken: an indented fence belongs to a list item, and
+# hoisting it out of that context would change the document structure. Every
+# indented fence in doc/ is ```bash, so nothing is missed.
+BVNR_FENCE = re.compile(r"^```(?:bovnar|bvnr)[ \t]*\n(.*?)^```[ \t]*$", re.S | re.M)
+# Alphanumeric so no Markdown construct can touch it, and unique enough that a
+# document could never contain it by accident.
+BVNR_MARK = "BVNRHLBLOCK{}ENDBVNRHLBLOCK"
+
+
 def render_markdown(text):
+    blocks = []
+
+    def stash(m):
+        blocks.append(m.group(1))
+        return "\n\n" + BVNR_MARK.format(len(blocks) - 1) + "\n\n"
+
+    text = BVNR_FENCE.sub(stash, text)
     md = markdown.Markdown(
         extensions=["extra", "sane_lists", "tables", "fenced_code",
                     "codehilite", "toc"],
@@ -148,7 +172,19 @@ def render_markdown(text):
             "toc": {"slugify": GHSlugSeen()},
         },
     )
-    return md.convert(text)
+    out = md.convert(text)
+    for i, code in enumerate(blocks):
+        # The placeholder stood alone in its own block, so Markdown wrapped it in
+        # a paragraph. Swap the paragraph, not just the text, or the code block
+        # would end up nested inside a <p>.
+        marker = f"<p>{BVNR_MARK.format(i)}</p>"
+        if marker not in out:                       # never silently drop a block
+            raise SystemExit(f"gen_html_docs.py: lost .bvnr code block {i}")
+        out = out.replace(
+            marker,
+            '<div class="codehilite"><pre><code class="language-bovnar">'
+            + html.escape(code.rstrip("\n")) + "</code></pre></div>")
+    return out
 
 
 def rewrite_links(body):
@@ -223,6 +259,18 @@ BACK_TOP_JS = (
     "if(h&&h.focus)h.focus({preventScroll:true});});sync();})();")
 
 
+# Colour the .bvnr blocks with the shared highlighter (loaded as a same-origin
+# <script>, so no CSP hash is needed for it -- only for this hook). The module
+# injects its own palette, dark and light, keyed on the same html[data-theme]
+# attribute these pages use, so there is nothing to style here. Without
+# JavaScript the blocks stay legible plain text, which is what they were before.
+BOVNAR_HL_JS = (
+    "(function(){if(!window.BovnarHighlight)return;"
+    "var b=document.querySelectorAll('pre code.language-bovnar');"
+    "for(var i=0;i<b.length;i++)"
+    "b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();")
+
+
 def _sha(js):
     return "sha256-" + base64.b64encode(
         hashlib.sha256(js.encode()).digest()).decode()
@@ -230,7 +278,7 @@ def _sha(js):
 
 CSP = ("default-src 'none'; "
        f"script-src 'self' '{_sha(THEME_INIT_JS)}' '{_sha(THEME_TOGGLE_JS)}' "
-       f"'{_sha(BACK_TOP_JS)}'; "
+       f"'{_sha(BACK_TOP_JS)}' '{_sha(BOVNAR_HL_JS)}'; "
        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
        "base-uri 'none'; form-action 'none'")
 
@@ -293,6 +341,13 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
         pub, mod = og_dates
         date_meta = (f'<meta property="article:published_time" content="{pub}">\n'
                      f'<meta property="article:modified_time" content="{mod}">\n')
+    # The highlighter is only worth 13 kB to a page that has .bvnr blocks to
+    # colour; the docs index and the cheatsheet have none.
+    bvnr_hl = ""
+    if 'class="language-bovnar"' in body:
+        bvnr_hl = (f'<script src="/bovnar_highlight.js'
+                   f'{css_stamp("bovnar_highlight.js")}"></script>\n'
+                   f'<script>{BOVNAR_HL_JS}</script>\n')
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -332,7 +387,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 </main>
 {FOOTER}
 {BACK_TOP_BTN}
-<script>{THEME_TOGGLE_JS}</script>
+{bvnr_hl}<script>{THEME_TOGGLE_JS}</script>
 <script>{BACK_TOP_JS}</script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Unit &amp; Currency System</title>
@@ -30,7 +30,7 @@
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=dd713e0da055">
-<link rel="stylesheet" href="/docs/docs.css?v=534bb2781d06">
+<link rel="stylesheet" href="/docs/docs.css?v=ccff0fd09606">
 <link rel="alternate" type="text/markdown" href="/doc/2_bovnar_unit_system.md">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 163 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-23", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
 </head>
@@ -160,20 +160,16 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </code></pre></div>
 
 <h3 id="21-parameter-ordering-flexibility">2.1 Parameter Ordering Flexibility</h3>
-<div class="codehilite"><pre><span></span><code>.val = &lt;uint:32,_10,no_unit&gt; 42;
+<div class="codehilite"><pre><code class="language-bovnar">.val = &lt;uint:32,_10,no_unit&gt; 42;
 #      &lt;uint:_10,no_unit,32&gt;        — identical (parameter order is free)
-#      &lt;uint:no_unit,_10,32&gt;        — identical
-</code></pre></div>
-
+#      &lt;uint:no_unit,_10,32&gt;        — identical</code></pre></div>
 <h3 id="22-inline-unit-suffix">2.2 Inline Unit Suffix</h3>
 <p>A unit may be written directly after a scalar value literal, between the value and the terminating <code>;</code>:</p>
-<div class="codehilite"><pre><span></span><code>.distance  = 1500 m;            # inline physical unit
+<div class="codehilite"><pre><code class="language-bovnar">.distance  = 1500 m;            # inline physical unit
 .speed     = 9.81 m/s;          # compound inline unit
 .price     = 19.99 $USD;        # inline currency (mandatory $ sigil)
 .gold_rate = 2351.40 $USD/oz_t; # inline compound currency/unit
-.ratio     = 3.14 no_unit;      # explicit dimensionless
-</code></pre></div>
-
+.ratio     = 3.14 no_unit;      # explicit dimensionless</code></pre></div>
 <p>The inline unit uses the <strong>same character set</strong> and <strong>same semantic parser</strong> (<code>bvn_parse_unit</code>) as the type-annotation unit parameter. It is terminated by ASCII whitespace, <code>#</code> (comment), or <code>;</code>.</p>
 <h4 id="constraints">Constraints</h4>
 <table>
@@ -211,10 +207,8 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tbody>
 </table>
 <p>When both are present, equality is checked after parsing via <code>bvn_unit_equal</code>, a structural comparison of the parsed <code>value_unit_t</code> values: the two units must have the same number of components and the same <em>set</em> of components (matching base, exponent, and prefix). The comparison is <strong>order-insensitive</strong> — unit multiplication is commutative, so components are matched as multisets and reordered spellings such as <code>N·m</code> and <code>m·N</code> (or <code>m·s⁻¹</code> and <code>m/s</code>) compare as equal. (It is <em>not</em> a raw <code>memcmp</code>, which would wrongly reject reordered components.)</p>
-<div class="codehilite"><pre><span></span><code>.v = &lt;float:64,m/s&gt; 9.81 m·s⁻¹;   # OK: both parse to m/s
-.v = &lt;float:64,m&gt; 1.0 s;           # ERROR: error_unit_mismatch
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.v = &lt;float:64,m/s&gt; 9.81 m·s⁻¹;   # OK: both parse to m/s
+.v = &lt;float:64,m&gt; 1.0 s;           # ERROR: error_unit_mismatch</code></pre></div>
 <h3 id="applicable-type-families">Applicable Type Families</h3>
 <table>
 <thead>
@@ -2181,27 +2175,23 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 <li><strong>German units</strong> (<code>bu_pfund</code> through <code>bu_scheffel</code>) accept only <code>si_none</code>/<code>iec_none</code>.</li>
 <li><strong>Currency units</strong> accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.</li>
 </ul>
-<div class="codehilite"><pre><span></span><code>.valid1   = &lt;uint:64,Ki~B&gt;  8;     # OK: IEC prefix on byte
+<div class="codehilite"><pre><code class="language-bovnar">.valid1   = &lt;uint:64,Ki~B&gt;  8;     # OK: IEC prefix on byte
 .valid2   = &lt;uint:32,M~b&gt;   100;   # OK: SI mega on bit
 .valid3   = &lt;float_dec:64,k~$USD&gt; 250.0;  # OK: kilo on currency
 .invalid1 = &lt;uint:64,Ki~m&gt;  1;     # ERROR: IEC prefix on meter
 .invalid2 = &lt;uint:32,m~B&gt;   512;   # ERROR: SI milli on byte
-.invalid3 = &lt;float_dec:64,Ki~$USD&gt; 1;     # ERROR: IEC prefix on currency
-</code></pre></div>
-
+.invalid3 = &lt;float_dec:64,Ki~$USD&gt; 1;     # ERROR: IEC prefix on currency</code></pre></div>
 <hr />
 <h2 id="5-unit-notation-grammar">5. Unit Notation Grammar</h2>
 <h3 id="51-simple-units">5.1 Simple Units</h3>
 <div class="codehilite"><pre><span></span><code>unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 </code></pre></div>
 
-<div class="codehilite"><pre><span></span><code>.temperature = &lt;float:64,K&gt;      300.0;   # kelvin
+<div class="codehilite"><pre><code class="language-bovnar">.temperature = &lt;float:64,K&gt;      300.0;   # kelvin
 .distance    = &lt;float:64,k~m&gt;    1.5;     # kilometer
 .frequency   = &lt;float:64,M~Hz&gt;   2400;    # megahertz
 .storage     = &lt;uint:64,Ki~B&gt;    1024;    # kibibytes
-.fund_nav    = &lt;float_dec:64,k~$USD&gt; 250.0; # $250,000
-</code></pre></div>
-
+.fund_nav    = &lt;float_dec:64,k~$USD&gt; 250.0; # $250,000</code></pre></div>
 <h3 id="52-compound-units">5.2 Compound Units</h3>
 <div class="codehilite"><pre><span></span><code><span class="k">compound-unit  </span><span class="o">=</span> <span class="s2">&quot;no_unit&quot;</span>
                <span class="p">|</span> <span class="k">unit-component </span><span class="p">{</span> <span class="k">unit-sep unit-component </span><span class="p">}</span>
@@ -2220,12 +2210,10 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 </code></pre></div>
 
 <p>Currency codes participate in compound expressions using the same separators:</p>
-<div class="codehilite"><pre><span></span><code>.gold_spot    = &lt;float_dec:64,$USD/oz_t&gt;   2351.40;  # $/troy oz
+<div class="codehilite"><pre><code class="language-bovnar">.gold_spot    = &lt;float_dec:64,$USD/oz_t&gt;   2351.40;  # $/troy oz
 .rent         = &lt;float_dec:64,$EUR/m²&gt;       12.50;  # €/m²
 .billing_rate = &lt;float_dec:64,$EUR/h&gt;       150.00;  # €/h
-.eur_usd      = &lt;float_dec:64,$USD/$EUR&gt;      1.0842; # exchange rate
-</code></pre></div>
-
+.eur_usd      = &lt;float_dec:64,$USD/$EUR&gt;      1.0842; # exchange rate</code></pre></div>
 <blockquote>
 <p>The sub-grammar is <strong>semantic</strong>, not lexical. The outer lexer captures the type-annotation body as a raw byte sequence; <code>bvn_parse_unit</code> parses the unit string portion after the lexer finishes.</p>
 </blockquote>
@@ -2274,11 +2262,9 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 obeys the latching denominator, so a <code>/</code> before a group negates the group's net
 component exponents as a whole. This makes the readable denominator form work and
 compose correctly:</p>
-<div class="codehilite"><pre><span></span><code>.pressure = &lt;float:64,k~g/(m·s²)&gt; 101325;  # kg·m⁻¹·s⁻² — same as k~g/m·s²
+<div class="codehilite"><pre><code class="language-bovnar">.pressure = &lt;float:64,k~g/(m·s²)&gt; 101325;  # kg·m⁻¹·s⁻² — same as k~g/m·s²
 .areal    = &lt;float:64,(k~g/m)·s²&gt; 1.0;     # kg·m⁻¹·s²  — grouping changes the s sign
-.rate     = &lt;float:64,m/(s·s)&gt; 1.0;        # m·s⁻²
-</code></pre></div>
-
+.rate     = &lt;float:64,m/(s·s)&gt; 1.0;        # m·s⁻²</code></pre></div>
 <p><code>k~g/(m·s²)</code> and <code>k~g/m·s²</code> therefore parse to the <strong>same</strong> <code>value_unit_t</code> (the
 canonical, parenless form is what the writer emits). Rules: an explicit separator
 is required before a group (<code>m·(s)</code>, not <code>m(s)</code>); a group is not followed by its
@@ -2408,10 +2394,8 @@ groups raise <code>error_unit_illegal</code>.</p>
 <hr />
 <h2 id="7-the-no_unit-keyword">7. The <code>no_unit</code> Keyword</h2>
 <p>The literal <code>no_unit</code> declares a value as <strong>explicitly dimensionless</strong>:</p>
-<div class="codehilite"><pre><span></span><code>.ratio       = &lt;float:64,no_unit&gt; 0.95;
-.count       = &lt;uint:32,no_unit&gt;  1000;
-</code></pre></div>
-
+<div class="codehilite"><pre><code class="language-bovnar">.ratio       = &lt;float:64,no_unit&gt; 0.95;
+.count       = &lt;uint:32,no_unit&gt;  1000;</code></pre></div>
 <p><code>bvn_parse_unit</code> detects <code>no_unit</code> via <code>memcmp</code> and returns <code>BVN_UNIT_NONE</code> (<code>num_components = 0</code>).</p>
 <p><strong>Omitting the unit parameter</strong> (e.g. <code>&lt;float:64&gt;</code>) yields <code>BVN_UNIT_NO_PREFIX(bu_none)</code> (<code>num_components = 1</code>, <code>base == bu_none</code>). Both forms are semantically equivalent — they compare as compatible via <code>bvn_units_compatible</code> and both serialize to <code>"no_unit"</code> — but they are structurally distinct internal states.</p>
 <hr />
@@ -3792,31 +3776,25 @@ groups raise <code>error_unit_illegal</code>.</p>
 </table>
 <h3 id="94-prefix-rules-for-currency-units">9.4 Prefix Rules for Currency Units</h3>
 <p><strong>All SI prefixes</strong> are permitted on all currency units. <code>k~USD</code> denotes "values in thousands of USD" — a common scale annotation in financial reporting.</p>
-<div class="codehilite"><pre><span></span><code>.fund_nav   = &lt;float_dec:64,k~$USD&gt;    250.0;   # $250,000
+<div class="codehilite"><pre><code class="language-bovnar">.fund_nav   = &lt;float_dec:64,k~$USD&gt;    250.0;   # $250,000
 .gdp        = &lt;float_dec:64,M~$EUR&gt; 42800.0;    # €42.8 billion
-.eth_gwei   = &lt;float_dec:64,G~$ETH&gt;    35.0;    # 35 Gwei gas price
-</code></pre></div>
-
+.eth_gwei   = &lt;float_dec:64,G~$ETH&gt;    35.0;    # 35 Gwei gas price</code></pre></div>
 <p><strong>IEC binary prefixes</strong> (<code>Ki~</code>, <code>Mi~</code>, …) are <strong>forbidden</strong> on all currency units. <code>bvn_currency_prefix_valid()</code> returns <code>false</code> for any IEC prefix; the parser raises <code>error_unit_illegal</code>.</p>
 <h3 id="95-compound-currency-expressions">9.5 Compound Currency Expressions</h3>
 <p>Currency codes participate in compound unit expressions using the existing separators:</p>
-<div class="codehilite"><pre><span></span><code>.gold_spot    = &lt;float_dec:64,$USD/oz_t&gt;    2351.40;  # $/troy oz
+<div class="codehilite"><pre><code class="language-bovnar">.gold_spot    = &lt;float_dec:64,$USD/oz_t&gt;    2351.40;  # $/troy oz
 .wheat        = &lt;float_dec:64,$USD/bsh&gt;        5.82;  # $/bushel
 .rent         = &lt;float_dec:64,$EUR/m²&gt;        12.50;  # €/m²
 .billing_rate = &lt;float_dec:64,$EUR/h&gt;         150.00; # €/h
 .eur_usd      = &lt;float_dec:64,$USD/$EUR&gt;        1.0842; # exchange rate
-.eth_btc      = &lt;float_dec:64,$BTC/$ETH&gt;       0.05610; # cross-crypto rate
-</code></pre></div>
-
+.eth_btc      = &lt;float_dec:64,$BTC/$ETH&gt;       0.05610; # cross-crypto rate</code></pre></div>
 <p>Currency × currency compounds (<code>USD·EUR</code>) are syntactically valid and produce no error. Their financial interpretation is the application's responsibility.</p>
 <h4 id="exchange-rate-timestamps">Exchange Rate Timestamps</h4>
 <p>Bovnar annotates denomination; it does not store exchange rates or timestamps. The timestamp belongs in a separate field:</p>
-<div class="codehilite"><pre><span></span><code>.snapshot = {
+<div class="codehilite"><pre><code class="language-bovnar">.snapshot = {
     .epoch    = &lt;uint:64,s&gt;              1716400000;
     .eur_usd  = &lt;float_dec:64,$USD/$EUR&gt;        1.0842;
-};
-</code></pre></div>
-
+};</code></pre></div>
 <h3 id="96-compatibility-rules">9.6 Compatibility Rules</h3>
 <p><code>bvn_units_compatible()</code> requires no modification for currencies. Two currency expressions are structurally compatible only if they have identical component sequences including base enum values. Since <code>bu_usd ≠ bu_eur</code>, <code>USD</code> and <code>EUR</code> are already structurally incompatible under the existing comparison logic.</p>
 <h3 id="97-type-pairing-recommendations">9.7 Type Pairing Recommendations</h3>
@@ -4006,25 +3984,21 @@ groups raise <code>error_unit_illegal</code>.</p>
 </tr>
 </tbody>
 </table>
-<div class="codehilite"><pre><span></span><code>.recipe_volume = &lt;float_dec:32,cup&gt;  2.0;    # 2 US cups (volume)
+<div class="codehilite"><pre><code class="language-bovnar">.recipe_volume = &lt;float_dec:32,cup&gt;  2.0;    # 2 US cups (volume)
 .balance       = &lt;float_dec:64,$CUP&gt; 15.00;  # 15 Cuban Pesos (currency)
-# .bad         = &lt;float_dec:64,CUP&gt;  15.00;  # error_unit_illegal: bare &#39;CUP&#39; is not a unit
-</code></pre></div>
-
+# .bad         = &lt;float_dec:64,CUP&gt;  15.00;  # error_unit_illegal: bare &#x27;CUP&#x27; is not a unit</code></pre></div>
 <p>Calling <code>bvn_unit_to_si_factor</code> on a <code>$CUP</code> unit returns <code>*ok = false</code> because <code>bvn_find_si_conv</code> skips currency enum values. Calling <code>bvn_unit_is_currency</code> on a <code>cup</code> unit returns <code>false</code>. The two are completely disjoint in both parsing and the conversion API — and, because the peso <em>must</em> be written <code>$CUP</code>, a user who writes the bare <code>CUP</code> intending the culinary cup gets an immediate <code>error_unit_illegal</code> (the correct spelling is lowercase <code>cup</code>) rather than a silently-accepted currency.</p>
 <h3 id="104-the-mandatory-currency-sigil">10.4 The Mandatory Currency Sigil</h3>
 <p>A currency code carries a <strong>mandatory <code>$</code> sigil</strong> as of spec 1.0. This is the resolution of the <code>CUP</code> (Cuban Peso) vs <code>cup</code> (the physical cup) namespace collision: a currency is <em>only</em> recognised in its sigil form, so a bare code can never collide with a physical-unit symbol — present or future.</p>
-<div class="codehilite"><pre><span></span><code># Currencies — the &#39;$&#39; sigil is required:
+<div class="codehilite"><pre><code class="language-bovnar"># Currencies — the &#x27;$&#x27; sigil is required:
 .price   = &lt;float_dec:64,$USD&gt;      19.99;   # US Dollar
 .btc     = &lt;uint:64,$BTC&gt;        54782000;   # Bitcoin (satoshis)
 .fund    = &lt;float_dec:64,k~$EUR&gt;   250.0;    # kilo-Euro (prefix before the sigil)
 .spot    = &lt;float_dec:64,$USD/oz_t&gt; 2351.40; # currency / physical-unit compound
 
 # A bare code is no longer a currency:
-.volume  = &lt;float_dec:32,cup&gt;        2.0;    # the physical &#39;cup&#39;, unambiguously
-# .bad   = &lt;float_dec:64,USD&gt; 1.0;            # error_unit_illegal: bare &#39;USD&#39; is not a unit (needs &#39;$&#39;)
-</code></pre></div>
-
+.volume  = &lt;float_dec:32,cup&gt;        2.0;    # the physical &#x27;cup&#x27;, unambiguously
+# .bad   = &lt;float_dec:64,USD&gt; 1.0;            # error_unit_illegal: bare &#x27;USD&#x27; is not a unit (needs &#x27;$&#x27;)</code></pre></div>
 <p>The sigil attaches directly before the currency code, after any SI/IEC prefix and its <code>~</code> (<code>k~$EUR</code>, <code>M~$USDT</code>). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this <strong>breaks</strong> any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning &amp; Stability section of the specification).</p>
 <hr />
 <h2 id="11-c-data-model">11. C Data Model</h2>
@@ -4517,7 +4491,7 @@ groups raise <code>error_unit_illegal</code>.</p>
 <li><strong>Inline unit suffix</strong> — parsed from the suffix following a scalar value literal before the terminating <code>;</code>.</li>
 </ol>
 <p>In both cases the effective unit is reported in the <code>bvnr_data_t.value_unit</code> field of the <code>ev_data</code> event.</p>
-<h4 id="full-event-sequence--physical-unit">Full event sequence — physical unit</h4>
+<h3 id="full-event-sequence--physical-unit">Full event sequence — physical unit</h3>
 <div class="codehilite"><pre><span></span><code>Input: .force = &lt;float:64,k~g·m/s²&gt; 9.81;
 
 ev_assignment_start          data = &quot;force&quot;
@@ -4533,7 +4507,7 @@ ev_type_annotation_end
 ev_data   data=&quot;9.81&quot;
 </code></pre></div>
 
-<h4 id="full-event-sequence--currency-unit">Full event sequence — currency unit</h4>
+<h3 id="full-event-sequence--currency-unit">Full event sequence — currency unit</h3>
 <div class="codehilite"><pre><span></span><code>Input: .price = &lt;float_dec:64,$USD&gt; 19.99;
 
 ev_assignment_start          data = &quot;price&quot;
@@ -4548,7 +4522,7 @@ ev_data   data=&quot;19.99&quot;
 </code></pre></div>
 
 <p>For events with an explicit type annotation but no unit parameter, the unit event is <strong>not emitted</strong>. For <code>no_unit</code>, the unit event IS emitted with <code>BVN_UNIT_NONE</code> (<code>num_components=0</code>). For synthesised (default) type annotations, the unit event IS emitted with <code>BVN_UNIT_NO_PREFIX(bu_none)</code>.</p>
-<h4 id="inline-unit-suffix--event-stream-view">Inline unit suffix — event stream view</h4>
+<h3 id="inline-unit-suffix--event-stream-view">Inline unit suffix — event stream view</h3>
 <div class="codehilite"><pre><span></span><code>Input: .distance = 1500 m;
 
 ev_assignment_start      data = &quot;distance&quot;
@@ -4564,7 +4538,7 @@ ev_data   data=&quot;1500&quot;
 </code></pre></div>
 
 <p>The <code>value_unit</code> field of <code>ev_data</code> always reflects the final, reconciled unit.</p>
-<h4 id="practical-callback">Practical callback</h4>
+<h3 id="practical-callback">Practical callback</h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">my_verified_handler</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">userdata</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_event_t</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="o">*</span><span class="w"> </span><span class="n">d</span><span class="p">)</span>
 <span class="p">{</span>
 <span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ev</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">ev_type_annotation_type_family_parameter</span><span class="p">)</span>
@@ -4629,7 +4603,7 @@ ev_data   data=&quot;1500&quot;
 <hr />
 <h2 id="15-annotated-examples">15. Annotated Examples</h2>
 <h3 id="151-physical-quantities">15.1 Physical Quantities</h3>
-<div class="codehilite"><pre><span></span><code># Thermodynamic temperature
+<div class="codehilite"><pre><code class="language-bovnar"># Thermodynamic temperature
 .ambient_temp  = &lt;float:64,K&gt;          293.15;
 
 # Temperature in Celsius (affine: K = °C + 273.15)
@@ -4657,20 +4631,16 @@ ev_data   data=&quot;1500&quot;
 
 # Duration
 .shelf_life    = &lt;uint:32,wk&gt;           52;
-.service_life  = &lt;float:64,yr&gt;          10.0;
-</code></pre></div>
-
+.service_life  = &lt;float:64,yr&gt;          10.0;</code></pre></div>
 <h3 id="152-digital-storage">15.2 Digital Storage</h3>
-<div class="codehilite"><pre><span></span><code>.packet_size = &lt;uint:32,B&gt;      1500;
+<div class="codehilite"><pre><code class="language-bovnar">.packet_size = &lt;uint:32,B&gt;      1500;
 .cache_size  = &lt;uint:64,Ki~B&gt;    512;
 .ram_size    = &lt;uint:64,Mi~B&gt;   4096;
 .disk_size   = &lt;uint:64,Gi~B&gt;    500;
 .link_rate   = &lt;uint:32,M~b&gt;    1000;
-.nic_speed   = &lt;float:64,G~b/s&gt;   10.0;
-</code></pre></div>
-
+.nic_speed   = &lt;float:64,G~b/s&gt;   10.0;</code></pre></div>
 <h3 id="153-compound-si-quantities">15.3 Compound SI Quantities</h3>
-<div class="codehilite"><pre><span></span><code># Force: Newton = k~g·m/s²
+<div class="codehilite"><pre><code class="language-bovnar"># Force: Newton = k~g·m/s²
 .force          = &lt;float:64,k~g·m/s²&gt;    9.81;
 .force_alt      = &lt;float:64,k~g·m·s⁻²&gt;  9.81;   # identical internal form
 
@@ -4681,11 +4651,9 @@ ev_data   data=&quot;1500&quot;
 .field_strength = &lt;float:64,V/m&gt;         150.0;
 
 # Torque
-.torque         = &lt;float:64,N·m&gt;          25.0;
-</code></pre></div>
-
+.torque         = &lt;float:64,N·m&gt;          25.0;</code></pre></div>
 <h3 id="154-currency-amounts-and-rates">15.4 Currency Amounts and Rates</h3>
-<div class="codehilite"><pre><span></span><code># ── Fiat scalar amounts ────────────────────────────────────────────────────
+<div class="codehilite"><pre><code class="language-bovnar"># ── Fiat scalar amounts ────────────────────────────────────────────────────
 .price_usd     = &lt;float_dec:64,$USD&gt;   19.99;
 .balance_eur   = &lt;float_dec:64,$EUR&gt;  342.00;
 .yen_fee       = &lt;uint:64,$JPY&gt;           500;    # zero minor unit — integer only
@@ -4718,11 +4686,9 @@ ev_data   data=&quot;1500&quot;
 };
 
 # ── Array of prices ────────────────────────────────────────────────────────
-.tier_prices   = &lt;float_dec:64,$USD&gt; [9.99, 19.99, 49.99, 99.99];
-</code></pre></div>
-
+.tier_prices   = &lt;float_dec:64,$USD&gt; [9.99, 19.99, 49.99, 99.99];</code></pre></div>
 <h3 id="155-error-cases">15.5 Error Cases</h3>
-<div class="codehilite"><pre><span></span><code># Empty component → error_unit_illegal
+<div class="codehilite"><pre><code class="language-bovnar"># Empty component → error_unit_illegal
 .bad1 = &lt;float:64,m//s&gt;      1.0;
 
 # Too many components (9 &gt; 8) → error_unit_illegal
@@ -4754,14 +4720,14 @@ ev_data   data=&quot;1500&quot;
 
 # Correct: cup (volume) vs CUP (currency) — both valid, different meaning
 .vol  = &lt;float_dec:32,cup&gt;  2.0;    # US cup (236.6 mL)
-.bal  = &lt;float_dec:64,$CUP&gt; 25.00;   # Cuban Peso
-</code></pre></div>
-
+.bal  = &lt;float_dec:64,$CUP&gt; 25.00;   # Cuban Peso</code></pre></div>
 <hr />
 <p><em>End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1.</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
+<script src="/bovnar_highlight.js?v=594ce7c394a8"></script>
+<script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
 <script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
 </body>

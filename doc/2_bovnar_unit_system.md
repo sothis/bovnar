@@ -1704,7 +1704,7 @@ Unit information flows into the application through two paths:
 
 In both cases the effective unit is reported in the `bvnr_data_t.value_unit` field of the `ev_data` event.
 
-#### Full event sequence — physical unit
+### Full event sequence — physical unit
 
 ```
 Input: .force = <float:64,k~g·m/s²> 9.81;
@@ -1722,7 +1722,7 @@ ev_type_annotation_end
 ev_data   data="9.81"
 ```
 
-#### Full event sequence — currency unit
+### Full event sequence — currency unit
 
 ```
 Input: .price = <float_dec:64,$USD> 19.99;
@@ -1740,7 +1740,7 @@ ev_data   data="19.99"
 
 For events with an explicit type annotation but no unit parameter, the unit event is **not emitted**. For `no_unit`, the unit event IS emitted with `BVN_UNIT_NONE` (`num_components=0`). For synthesised (default) type annotations, the unit event IS emitted with `BVN_UNIT_NO_PREFIX(bu_none)`.
 
-#### Inline unit suffix — event stream view
+### Inline unit suffix — event stream view
 
 ```
 Input: .distance = 1500 m;
@@ -1759,7 +1759,7 @@ ev_data   data="1500"
 
 The `value_unit` field of `ev_data` always reflects the final, reconciled unit.
 
-#### Practical callback
+### Practical callback
 
 ```c
 bool my_verified_handler(void* userdata, bvnr_event_t ev, bvnr_data_t* d)

@@ -178,6 +178,75 @@ pre {
 }
 pre code { background: none; border: 0; padding: 0; font-size: 0.85rem; color: var(--text2); }
 
+/* ── Code tokens ──
+   gen_html_docs.py renders through python-markdown's codehilite, so every code
+   block already ships Pygments token spans -- 3,700 of them on the unit-system
+   page alone. Nothing styled them: all that markup rendered as one flat grey,
+   while the SAME document read through the inline drawer on the landing page
+   came out fully highlighted. The colours below are the drawer's .hljs-* theme
+   (index.html), token for token, so a reader sees one document, not two.
+   Pygments' short class names: k=keyword kt=keyword.type n=name nf=function
+   nc=class nb=builtin s*=string m*=number c*=comment cp=preprocessor
+   o=operator p=punctuation w=whitespace. */
+.codehilite .k, .codehilite .kc, .codehilite .kd, .codehilite .kn,
+.codehilite .kp, .codehilite .kr, .codehilite .o, .codehilite .ow { color: #ffff60; }
+.codehilite .kt, .codehilite .nc, .codehilite .nn, .codehilite .nt { color: #60ff60; }
+.codehilite .nb, .codehilite .bp, .codehilite .nf, .codehilite .fm,
+.codehilite .na, .codehilite .nv, .codehilite .vc, .codehilite .vg,
+.codehilite .vi, .codehilite .vm { color: #40ffff; }
+.codehilite .s, .codehilite .s1, .codehilite .s2, .codehilite .sa,
+.codehilite .sb, .codehilite .sc, .codehilite .sd, .codehilite .sh,
+.codehilite .si, .codehilite .sr, .codehilite .ss, .codehilite .sx,
+.codehilite .m, .codehilite .mi, .codehilite .mf, .codehilite .mh,
+.codehilite .mo, .codehilite .no, .codehilite .sx { color: #ffa0a0; }
+.codehilite .se { color: #5ab06e; font-weight: 600; }
+.codehilite .c, .codehilite .c1, .codehilite .cm, .codehilite .ch,
+.codehilite .cs { color: #80a0ff; font-style: italic; }
+.codehilite .cp { color: #ff80ff; }
+.codehilite .cpf { color: #ffa0a0; }
+.codehilite .p, .codehilite .pi { color: #b6b6c2; }
+/* Pygments' EBNF lexer calls the grammar's own "=" an error token. The rule is
+   valid EBNF, so a red flag on it would be the stylesheet lying about the
+   document -- leave those runs in the body colour. */
+.codehilite .err { color: inherit; }
+/* Diff blocks. */
+.codehilite .gd { color: #f47067; }
+.codehilite .gi { color: #87d88c; }
+.codehilite .gh, .codehilite .gu, .codehilite .gs { font-weight: 600; }
+.codehilite .ge { font-style: italic; }
+
+html[data-theme="light"] .codehilite .k, html[data-theme="light"] .codehilite .kc,
+html[data-theme="light"] .codehilite .kd, html[data-theme="light"] .codehilite .kn,
+html[data-theme="light"] .codehilite .kp, html[data-theme="light"] .codehilite .kr,
+html[data-theme="light"] .codehilite .o, html[data-theme="light"] .codehilite .ow { color: #0b39c4; }
+/* The drawer's light theme collapses built_in onto the type colour (both
+   #0a7a8c) and keeps functions at #8a5a00; mirror that split, not the dark
+   one, or builtins would read as function names here and as types there. */
+html[data-theme="light"] .codehilite .kt, html[data-theme="light"] .codehilite .nc,
+html[data-theme="light"] .codehilite .nn, html[data-theme="light"] .codehilite .nt,
+html[data-theme="light"] .codehilite .nb, html[data-theme="light"] .codehilite .bp { color: #0a7a8c; }
+html[data-theme="light"] .codehilite .nf, html[data-theme="light"] .codehilite .fm { color: #8a5a00; }
+html[data-theme="light"] .codehilite .na, html[data-theme="light"] .codehilite .nv,
+html[data-theme="light"] .codehilite .vc, html[data-theme="light"] .codehilite .vg,
+html[data-theme="light"] .codehilite .vi, html[data-theme="light"] .codehilite .vm { color: #00228a; }
+html[data-theme="light"] .codehilite .s, html[data-theme="light"] .codehilite .s1,
+html[data-theme="light"] .codehilite .s2, html[data-theme="light"] .codehilite .sa,
+html[data-theme="light"] .codehilite .sb, html[data-theme="light"] .codehilite .sc,
+html[data-theme="light"] .codehilite .sd, html[data-theme="light"] .codehilite .sh,
+html[data-theme="light"] .codehilite .si, html[data-theme="light"] .codehilite .sr,
+html[data-theme="light"] .codehilite .ss, html[data-theme="light"] .codehilite .sx,
+html[data-theme="light"] .codehilite .no { color: #b1102b; }
+html[data-theme="light"] .codehilite .m, html[data-theme="light"] .codehilite .mi,
+html[data-theme="light"] .codehilite .mf, html[data-theme="light"] .codehilite .mh,
+html[data-theme="light"] .codehilite .mo { color: #0a7d2c; }
+html[data-theme="light"] .codehilite .se { color: #178021; }
+html[data-theme="light"] .codehilite .c, html[data-theme="light"] .codehilite .c1,
+html[data-theme="light"] .codehilite .cm, html[data-theme="light"] .codehilite .ch,
+html[data-theme="light"] .codehilite .cs { color: #1a7a31; }
+html[data-theme="light"] .codehilite .cp { color: #8200d6; }
+html[data-theme="light"] .codehilite .cpf { color: #b1102b; }
+html[data-theme="light"] .codehilite .p, html[data-theme="light"] .codehilite .pi { color: #555555; }
+
 table {
   border-collapse: collapse;
   display: block;

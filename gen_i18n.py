@@ -643,8 +643,10 @@ JS_PATH = re.compile(
 BASE_PREFIXED = re.compile(r"(?:BASE|__BVNR\w*)\s*\+\s*$")
 
 
-# Runtime strings the sims/playground/doc drawer read through bvnrT(key, english).
-BVNRT_CALL = re.compile(r'''\bbvnrT\(\s*['"]([^'"]+)['"]''')
+# Runtime strings the sims/playground/doc drawer read through bvnrT(key, english)
+# -- or bvnrTcfg(key, english), the variant that also remembers the English
+# default so a demo's editable config can be rebuilt in the other language.
+BVNRT_CALL = re.compile(r'''\bbvnrT(?:cfg)?\(\s*['"]([^'"]+)['"]''')
 
 
 def js_keys(src: str) -> set[str]:

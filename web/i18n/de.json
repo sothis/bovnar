@@ -320,7 +320,8 @@
     "Streaming, Framing &amp; Multiplexing": "Streaming, Framing &amp; Multiplexing",
     "Download all ten documentation PDFs as a ZIP archive": "Alle zehn Dokumentations-PDFs als ZIP-Archiv herunterladen",
     "Documentation": "Dokumentation",
-    "Close documentation": "Dokumentation schließen"
+    "Close documentation": "Dokumentation schließen",
+    "Back to top": "Zurück nach oben"
   },
   "js": {
     "demo.blurb.fin": "<strong>Dasselbe Format, ein Trading-Desk.</strong> Die Börse serialisiert jeden Tick als <code>&lt;float_dec:64,$USD&gt;</code> — exaktes Dezimalgeld, Währung <em>inline</em> — und Chart und Hauptbuch arbeiten ausschließlich mit <em>dekodierten</em> Werten. Weil Kurse als Dezimalzahl reisen (nicht als Binär-Float), bleibt das Buch auf den Cent genau; beobachten Sie, wie das naive Float-Hauptbuch dagegen driftet.",

@@ -219,9 +219,46 @@ footer {
 }
 footer a { color: var(--blue); }
 
+/* ── Back to top ──
+   These documents run tens of thousands of words, and the only way back to the
+   contents at the top was the scrollbar. display:none while idle (rather than
+   opacity:0) keeps the control out of the tab order until the reader has
+   actually scrolled; gen_html_docs.py's BACK_TOP_JS adds .show past 400 px. */
+.to-top {
+  display: none;
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 30;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text2);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  transition: color 0.15s, border-color 0.15s;
+}
+.to-top.show { display: inline-flex; animation: to-top-in 0.18s ease-out; }
+.to-top:hover { color: var(--text); border-color: var(--blue2); }
+.to-top svg { width: 17px; height: 17px; display: block; }
+@keyframes to-top-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* html{scroll-behavior:smooth} above animates every in-page jump, including the
+   one this button makes. Honour the reader who asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .to-top.show { animation: none; }
+}
+
 @media (max-width: 600px) {
   header.site nav a:not(.cta) { display: none; }
   main { padding-top: 1.6rem; }
+  .to-top { right: 0.8rem; bottom: 0.8rem; }
 }
 
 /* ── Print ──
@@ -243,7 +280,7 @@ footer a { color: var(--blue); }
   }
   /* Sticky site header, its nav and the theme toggle are screen controls; the
      header is position:sticky, which some engines repeat on every page. */
-  header.site, .theme-toggle { display: none !important; }
+  header.site, .theme-toggle, .to-top { display: none !important; }
   main { max-width: none; padding: 0 0 1rem; }
 
   pre, code {

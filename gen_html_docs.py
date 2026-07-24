@@ -200,13 +200,37 @@ THEME_TOGGLE_JS = (
     "else root.setAttribute('data-theme','light');sync();});}catch(e){}})();")
 
 
+# These are long documents -- the specification runs past 100 kB of Markdown --
+# and the only way back to the table of contents at the top was the scrollbar or
+# Ctrl+Home. Offer the button once the reader is a screenful down, and keep it
+# out of the tab order until then (display:none, see docs.css).
+BACK_TOP_JS = (
+    "(function(){var b=document.getElementById('to-top');if(!b)return;"
+    "var shown=false,tick=0;"
+    "function sync(){var y=window.pageYOffset||"
+    "document.documentElement.scrollTop||0;var want=y>400;"
+    "if(want===shown)return;shown=want;b.classList.toggle('show',want);}"
+    "window.addEventListener('scroll',function(){if(tick)return;"
+    "tick=requestAnimationFrame(function(){tick=0;sync();});},"
+    "{passive:true});"
+    "b.addEventListener('click',function(){"
+    "var r=window.matchMedia&&"
+    "window.matchMedia('(prefers-reduced-motion: reduce)').matches;"
+    "window.scrollTo({top:0,behavior:r?'auto':'smooth'});"
+    # The button hides itself on the way up; without this, focus would fall to
+    # <body> and a keyboard user would resume tabbing from nowhere.
+    "var h=document.querySelector('header.site .brand');"
+    "if(h&&h.focus)h.focus({preventScroll:true});});sync();})();")
+
+
 def _sha(js):
     return "sha256-" + base64.b64encode(
         hashlib.sha256(js.encode()).digest()).decode()
 
 
 CSP = ("default-src 'none'; "
-       f"script-src 'self' '{_sha(THEME_INIT_JS)}' '{_sha(THEME_TOGGLE_JS)}'; "
+       f"script-src 'self' '{_sha(THEME_INIT_JS)}' '{_sha(THEME_TOGGLE_JS)}' "
+       f"'{_sha(BACK_TOP_JS)}'; "
        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
        "base-uri 'none'; form-action 'none'")
 
@@ -247,6 +271,13 @@ HEADER = (
     '<a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a>'
     + THEME_TOGGLE_BTN +
     '</nav></header>')
+
+BACK_TOP_BTN = (
+    '<button type="button" class="to-top" id="to-top" '
+    'aria-label="Back to top" title="Back to top">'
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M12 19V6M5 13l7-7 7 7"/></svg></button>')
 
 FOOTER = (
     '<footer>Bovnar (BVNR) v' + VERSION +
@@ -300,7 +331,9 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 {body}
 </main>
 {FOOTER}
+{BACK_TOP_BTN}
 <script>{THEME_TOGGLE_JS}</script>
+<script>{BACK_TOP_JS}</script>
 </body>
 </html>
 """

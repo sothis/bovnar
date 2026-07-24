@@ -34,6 +34,13 @@ PAGES = [WEB / "index.html", WEB / "impressum.html"]
 
 FONT_URL = re.compile(r"""url\((['"]?)([\w.-]+\.woff2)(\?v=[0-9a-f]+)?\1\)""")
 CSS_LINK = re.compile(r"""(href="[^"]*fonts/fonts\.css)(\?v=[0-9a-f]+)?(")""")
+# <link rel="preload" as="font" href="fonts/<name>.woff2"> on the landing page.
+# A preload only satisfies a later request for the SAME URL, so the moment the
+# stylesheet started asking for a stamped one, an unstamped preload downloaded
+# every face a second time -- exactly what the modulepreload comment beside it
+# warns about for the WASM chain.
+FONT_PRELOAD = re.compile(
+    r"""(href="[^"]*fonts/)([\w.-]+\.woff2)(\?v=[0-9a-f]+)?(")""")
 
 
 def stamp(path: Path) -> str:
@@ -79,6 +86,7 @@ def main() -> int:
     if new_css != css:
         stale.append("web/fonts/fonts.css")
 
+    preloads = 0
     for page in PAGES:
         text = page.read_text(encoding="utf-8")
         if not CSS_LINK.search(text):
@@ -86,6 +94,31 @@ def main() -> int:
                   f"drop it from PAGES or restore the link", file=sys.stderr)
             return 1
         new = CSS_LINK.sub(lambda m: f"{m.group(1)}?v={digest}{m.group(3)}", text)
+
+        def preload(m):
+            nonlocal preloads
+            font = FONTS_CSS.parent / m.group(2)
+            if not font.exists():
+                missing.append(m.group(2))
+                return m.group(0)
+            preloads += 1
+            return f"{m.group(1)}{m.group(2)}?v={stamp(font)}{m.group(4)}"
+
+        new = FONT_PRELOAD.sub(preload, new)
+        # A preload only pays off if the stylesheet asks for that exact URL. The
+        # stamps match by construction (same bytes, same hash), but a face the
+        # CSS no longer references would still be fetched -- eagerly, on the
+        # critical path, and used by nothing.
+        wanted = {m.group(2) for m in FONT_URL.finditer(new_css)}
+        orphan = sorted({m.group(2) for m in FONT_PRELOAD.finditer(new)} - wanted)
+        if orphan:
+            print(f"gen_font_stamps.py: {page.name} preloads face(s) fonts.css "
+                  f"never requests: {', '.join(orphan)}", file=sys.stderr)
+            return 1
+        if missing:
+            print(f"gen_font_stamps.py: {page.name} preloads missing file(s): "
+                  + ", ".join(sorted(set(missing))), file=sys.stderr)
+            return 1
         if new != text:
             stale.append("web/" + page.name)
             if not check:
@@ -98,8 +131,8 @@ def main() -> int:
                   file=sys.stderr)
             return 1
         n = len(FONT_URL.findall(css))
-        print(f"gen_font_stamps.py --check: {n} font stamps and "
-              f"{len(PAGES)} stylesheet links are current")
+        print(f"gen_font_stamps.py --check: {n} font stamps, {preloads} preloads "
+              f"and {len(PAGES)} stylesheet links are current")
         return 0
 
     print(f"gen_font_stamps.py: fonts.css -> ?v={digest}"

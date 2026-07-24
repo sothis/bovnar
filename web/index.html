@@ -115,10 +115,8 @@ window.bvnrTcfg = function (key, english) {
 <title>Bovnar — Unit-safe serialization for science and industry</title>
 <!-- Self-hosted webfonts (IBM Plex Sans + JetBrains Mono, OFL 1.1) — no
      fonts.googleapis.com / fonts.gstatic.com dependency; works offline / file://.
-     Preload EVERY weight/style/subset up front so no glyph ever triggers a late font
-     load or a swap-in reflow, on any page state. Latin subset first (above-the-fold),
-     then latin-ext, then greek. crossorigin is required even same-origin — fonts are
-     always fetched in CORS mode. (~900 KB total, cached after the first visit.) -->
+     crossorigin is required even same-origin — fonts are always fetched in CORS
+     mode, and a preload without it is simply fetched a second time. -->
 <!-- Preload ONLY the faces the page actually renders with. All 30 @font-face
      files used to be preloaded, which defeated their own unicode-range subsetting:
      preload fetches unconditionally, so every latin-ext and greek subset was
@@ -126,14 +124,17 @@ window.bvnrTcfg = function (key, english) {
      rest still load on demand via unicode-range, with font-display: swap, so a
      stray Greek glyph would still resolve -- it just no longer costs every
      visitor who has none. -->
-<link rel="preload" href="fonts/ibm-plex-sans-400-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/ibm-plex-sans-400-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/ibm-plex-sans-500-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/ibm-plex-sans-600-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/jetbrains-mono-400-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/jetbrains-mono-500-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/jetbrains-mono-600-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="fonts/fonts.css?v=dae09cf0d55c">
+<!-- Three files, not seven: these are variable fonts, so one file per
+     family/style/subset covers 400, 500, 600 and bold alike. The four that used
+     to be listed here were byte-identical copies of these under weight-stamped
+     names, and a browser caches by URL -- so the same 45 KB came down three
+     times, 168 KB of the critical path spent on bytes it already had.
+     The ?v= stamps are content hashes and must match what fonts.css requests,
+     or the preload satisfies nothing (./gen_font_stamps.py keeps both in step). -->
+<link rel="preload" href="fonts/ibm-plex-sans-normal-latin.woff2?v=e2291e842cf5" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-sans-italic-latin.woff2?v=4363757d2695" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-normal-latin.woff2?v=18be452724bf" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts/fonts.css?v=47fe6a616ffc">
 <!-- Fetch + compile the WASM parser's ES-module chain up front, in parallel with the
      rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
      runs its dynamic import(). The ?v is the build-stamped content hash — it must

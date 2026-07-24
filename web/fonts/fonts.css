@@ -1,132 +1,73 @@
 /* Self-hosted webfonts (IBM Plex Sans — OFL 1.1; JetBrains Mono — OFL 1.1).
    Subsets: latin, greek. Generated from the Google Fonts css2 API, src rewritten
    to local files so there is no fonts.googleapis/gstatic dependency.
-   Only the weights/styles the site actually renders are kept: IBM Plex Sans
-   400 (+italic), 500, 600; JetBrains Mono 400, 500, 600. The latin-ext subset
-   and weight 300 were unused and have been pruned. */
+
+   These are VARIABLE fonts: one file per family/style/subset carries the whole
+   wght axis, and the descriptor below tells the browser which part of it this
+   face covers. The download that produced this directory did not know that, and
+   saved a copy of the same file per requested weight -- ibm-plex-sans-{400,500,
+   600}-normal-latin.woff2 were byte-identical, as were the mono and greek sets:
+   14 files, 6 distinct. Because a browser caches by URL, the page then preloaded
+   and downloaded the SAME 45 KB three times over: 301 KB of critical-path font
+   bytes to deliver 133 KB of fonts. The duplicates are gone and the survivors
+   are named for what they are, with no weight in the filename.
+
+   The declared ranges are the axes the files actually carry (fvar): 100-700 for
+   IBM Plex Sans, 100-800 for JetBrains Mono. The site renders 400, 500 and 600,
+   plus browser-default bold (700) on <strong>/<b> -- which used to clamp to the
+   heaviest declared face, 600, and now gets the real 700 the file has always
+   contained. The latin-ext subset was pruned earlier and stays pruned. */
 
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: italic;
-  font-weight: 400;
+  font-weight: 100 700;
   font-display: swap;
-  src: url('ibm-plex-sans-400-italic-greek.woff2?v=f1fae68d3ec6') format('woff2');
+  src: url('ibm-plex-sans-italic-greek.woff2?v=f1fae68d3ec6') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: italic;
-  font-weight: 400;
+  font-weight: 100 700;
   font-display: swap;
-  src: url('ibm-plex-sans-400-italic-latin.woff2?v=4363757d2695') format('woff2');
+  src: url('ibm-plex-sans-italic-latin.woff2?v=4363757d2695') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 700;
   font-display: swap;
-  src: url('ibm-plex-sans-400-normal-greek.woff2?v=f598dd0700f1') format('woff2');
+  src: url('ibm-plex-sans-normal-greek.woff2?v=f598dd0700f1') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 700;
   font-display: swap;
-  src: url('ibm-plex-sans-400-normal-latin.woff2?v=e2291e842cf5') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('ibm-plex-sans-500-normal-greek.woff2?v=f598dd0700f1') format('woff2');
-  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('ibm-plex-sans-500-normal-latin.woff2?v=e2291e842cf5') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('ibm-plex-sans-600-normal-greek.woff2?v=f598dd0700f1') format('woff2');
-  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('ibm-plex-sans-600-normal-latin.woff2?v=e2291e842cf5') format('woff2');
+  src: url('ibm-plex-sans-normal-latin.woff2?v=e2291e842cf5') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 800;
   font-display: swap;
-  src: url('jetbrains-mono-400-normal-greek.woff2?v=ee863198077f') format('woff2');
+  src: url('jetbrains-mono-normal-greek.woff2?v=ee863198077f') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
 
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 800;
   font-display: swap;
-  src: url('jetbrains-mono-400-normal-latin.woff2?v=18be452724bf') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('jetbrains-mono-500-normal-greek.woff2?v=ee863198077f') format('woff2');
-  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('jetbrains-mono-500-normal-latin.woff2?v=18be452724bf') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('jetbrains-mono-600-normal-greek.woff2?v=ee863198077f') format('woff2');
-  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('jetbrains-mono-600-normal-latin.woff2?v=18be452724bf') format('woff2');
+  src: url('jetbrains-mono-normal-latin.woff2?v=18be452724bf') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }

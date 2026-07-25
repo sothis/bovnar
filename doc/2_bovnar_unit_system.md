@@ -101,7 +101,7 @@ Two distinct namespaces share the annotation slot:
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
 
-Annotations are **descriptive**, not prescriptive. Bovnar validates form and type; it does not perform dimensional analysis, unit conversion, or exchange-rate arithmetic. That responsibility belongs to the consuming application.
+Annotations are **descriptive**, not prescriptive: the *validator* checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — `bvn_units_compatible`, `bvn_unit_convert_factor`, `bvn_unit_convert_value` and the exact-rational `bvn_unit_convert_rational` (§12.4), plus the reader's `want_unit` hook, which converts at read time (§7c of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).
 
 ### Design Principles
 
@@ -225,6 +225,18 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `kat`  | `katal`, `katals` | katal | `bu_katal` | mol·s⁻¹ |
 | `rad`  | `radian`, `radians` | radian | `bu_radian` | dimensionless (plane angle; m/m) |
 | `sr`   | `steradian`, `steradians` | steradian | `bu_steradian` | dimensionless (solid angle; m²/m²) |
+
+> **Photometry: the steradian is carried, not dropped.** `lm`, `lx` and `ph` are
+> defined *through* the steradian, so they carry its quantity kind (§3.12 and
+> §10 of [`unit_ambiguities.md`](unit_ambiguities.md)); `cd` and `sb` do not.
+> The SI dimension vector cannot tell them apart — every photometric unit reduces
+> to candela in base dimensions — so without the kind the library both refused
+> `lm ↔ cd·sr` and converted `lm ↔ cd` at factor 1, which is the same claim with
+> the `sr` silently dropped. What holds now:
+>
+> | Converts | Refused |
+> |----------|---------|
+> | `lm` ↔ `cd·sr`, `lx` ↔ `lm/m²` ↔ `cd·sr/m²`, `ph` ↔ `lx`, `sb` ↔ `cd/m²` | `lm` ↔ `cd` (flux vs intensity), `lx` ↔ `cd/m²` and `ph` ↔ `sb` (illuminance vs luminance) |
 
 ### 3.3 Non-SI Units Accepted for Use with SI
 
@@ -390,6 +402,13 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `grad`   | `gradian`, `gradians`, `gon` | gradian | `bu_grad` | π/200 rad |
 | `rev`    | `turn`, `revolution`, `revolutions`, `turns` | revolution | `bu_revolution` | 2π rad |
 
+> Angle is one **shared** quantity kind, so `°` → `rad` works and only the factor
+> is irrational. What the kind stops is an angle drifting into a plain count:
+> `rev/min` is an angular rate and `rpm` a cycle rate, and they differ by exactly
+> 2π. `sr` carries the kind at weight 2, because a steradian *is* `rad²` — and so
+> do the photometric units built on it (`lm` = cd·sr, `lx` = lm/m², `ph` = lm/cm²;
+> see the note under §3.2).
+
 ### 3.13 CGS Units
 
 | Symbol | Long forms | Name | Enum value | SI equivalent |
@@ -402,6 +421,13 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `sb`   | `stilb`, `stilbs` | stilb (luminance) | `bu_stilb` | 10⁴ cd/m² |
 | `ph`   | `phot`, `phots` | phot (illuminance) | `bu_phot` | 10⁴ lx |
 | `Gal`  | `galileo`, `galileos` | galileo (acceleration) | `bu_galileo` | 10⁻² m/s² |
+
+> **`sb` and `ph` are not the same quantity**, though the SI dimension vector says
+> they are: both reduce to cd·m⁻² and both are 10⁴ of their SI counterpart. The
+> stilb is a *luminance* (cd/cm²), the phot an *illuminance* (lm/cm²), and a lumen
+> is a candela-**steradian**. Bovnar carries that steradian as a quantity kind, so
+> `ph` converts with `lx` and `sb` with `cd/m²`, and neither converts with the
+> other — see §3.12 and the note under §3.2.
 
 ### 3.14 Radiation Units
 
@@ -548,7 +574,7 @@ Speeds people write as one token. `mi/h` and `k~m/h` express the same quantities
 as compounds and remain valid; these are separate base units, not shorthands the
 parser expands, so an annotation of `mph` does **not** reconcile with an inline
 `mi/h` (the comparison is structural — see §2.2). Neither accepts a prefix: they
-already carry one, or have no meaningful prefixed form. `kn` (the knot, §3.13)
+already carry one, or have no meaningful prefixed form. `kn` (the knot, §3.9)
 belongs to the same family.
 
 | Symbol | Long forms | Name | Enum value | Factor |
@@ -573,7 +599,7 @@ average — the same caveat that applies to `dB` and `Np`.
 
 > **`pH` vs `p~H`:** the two differ by one character and by seven orders of
 > dimension. `pH` is the acidity scale; `p~H` is the picohenry. Case matters too:
-> `ph` is the phot (§3.15). This is exactly why acidity had to become a unit —
+> `ph` is the phot (§3.13). This is exactly why acidity had to become a unit —
 > without it, `pH` resolves as a compact prefixed henry.
 
 ### 3.28 Water Hardness
@@ -754,7 +780,7 @@ Several prefix symbols overlap with base unit symbols. A base unit symbol is mat
 | `d`    | deci      | day          |
 | `h`    | hecto     | hour         |
 | `T`    | tera      | tesla        |
-| `f`    | femto     | farad        |
+| `f`    | femto     | *(none)* — the farad is `F`, uppercase |
 | `a`    | atto      | *(none)*     |
 | `u`    | micro (ASCII alias for `µ`) | dalton |
 | `S`    | *(none)*  | siemens      |
@@ -783,6 +809,8 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 - **IEC prefixes** (`Ki`…`Qi`) are only permitted on `b` and `B`. `Ki~m` → `error_unit_illegal`.
 - **SI sub-kilo prefixes** (`d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`, `da`, `h`) are forbidden on `b` and `B`.
 - **German units** (`bu_pfund` through `bu_scheffel`) accept only `si_none`/`iec_none`.
+- **Ratio units** (`%`, `‰`, `‱`, `pcm`, `ppm`, `ppb`) likewise: a prefixed per-cent is meaningless. `k~%` → `error_unit_illegal` (§3.25).
+- **Scales that are already a scale** — `pH`, `mph`, `kph`, the five water-hardness degrees, `gpg`, `CF`, `PSU`, `JTU` — take no prefix either. Each carries its reason in §3.26–§3.28.2; `NTU`, `FNU`, `FTU` and `FAU` *do* take one, because a milli-NTU is a real ultrapure-water measurement.
 - **Currency units** accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.
 
 ```bovnar
@@ -1747,6 +1775,21 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 | `BVN_UNIT_ASCII_EXP` | ASCII caret form (`^N`) for all exponents |
 | `BVN_UNIT_REDUCE` | Reduce via `bvn_unit_reduce` before serializing |
 
+> **`BVN_UNIT_REDUCE` changes the unit, and this function does not change the value.**
+> Reduction folds every prefix out, so `k~g` serializes as `"g"` — a string that
+> denotes a quantity 1000× smaller than what you passed in. `bvn_unit_to_string_ex`
+> returns only the reduced unit and discards `bvn_unit_reduce`'s `scale`, so a
+> direct caller must apply that scale to its own value. The **writer** does this
+> for you (5 `k~m` is written as `5000 m`, in exact rational arithmetic); nothing
+> else does. Where the reduction folds cleanly into a named unit the scale comes
+> back as a prefix and nothing is lost — `k~g·m/s²` → `"N"`, `k~N` → `"k~N"`.
+>
+> The collapse never *substitutes* one named unit for another. `Sv` and `Gy` share
+> a dimension vector, as do `Bq`, `Bd` and `Hz`, and `W`, `VA` and `var`; each
+> reduces to itself. Rewriting an equivalent dose as an absorbed dose in the
+> document would be a stronger act than offering the conversion, which §12.4 still
+> does when a caller asks.
+
 ```c
 char buf[64];
 value_unit_t u = /* k~g·m/s² */;
@@ -1811,7 +1854,9 @@ int32_t        bvn_exponent_to_int (unit_exponent_t e);
 unit_exponent_t bvn_int_to_exponent(int32_t n);
 ```
 
-For affine units (`bu_celsius`, `bu_fahrenheit`), `*is_affine` is set to `true` and `*affine_offset` receives the additive offset applied after multiplying by the returned factor. An affine unit is valid at exponent 1 only.
+For affine units (`bu_celsius`, `bu_fahrenheit`), `*is_affine` is set to `true` and `*affine_offset` receives the additive offset applied after multiplying by the returned factor.
+
+**An affine unit has an SI value only alone, at exponent 1.** `°C²`, `°C·°F`, `°C/h` and `°C·m` all set `*ok = false`; `bvn_unit_convert_value` and `bvn_unit_convert_rational` refuse them, and the reader turns that into `error_unit_mismatch` (38). The offset is a number of kelvin, and a product whose SI unit is `K·s⁻¹` or `K·m` has nowhere to put it: the earlier code added it unscaled, so `20 °C/h` converted to `K/h` as 983360 and `20 °C·m` to `K·m` as 293.15 whatever the metres did. Both are arithmetic on a quantity that does not exist. `°C/h` still **parses** and is still a legal annotation — a consumer that means a temperature *difference* can read the components itself and apply its own semantics; what the library will not do is hand back a number for it. This matches pint, which forbids an offset unit inside a product outright.
 
 ```c
 bool ok, affine;

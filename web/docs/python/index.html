@@ -319,8 +319,9 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <span class="n">conv</span> <span class="o">=</span> <span class="n">unit_to_si_factor</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>
 <span class="c1"># conv.factor, conv.is_affine, conv.affine_offset</span>
 
-<span class="c1"># Check dimensional compatibility</span>
-<span class="n">ok</span> <span class="o">=</span> <span class="n">units_compatible</span><span class="p">(</span><span class="n">vu_a</span><span class="p">,</span> <span class="n">vu_b</span><span class="p">)</span>     <span class="c1"># True if same SI dimension vector</span>
+<span class="c1"># Check convertibility: same SI dimension vector AND same quantity kinds</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">units_compatible</span><span class="p">(</span><span class="n">vu_a</span><span class="p">,</span> <span class="n">vu_b</span><span class="p">)</span>     <span class="c1"># b vs B is False — the dimensions agree,</span>
+                                      <span class="c1"># the kinds do not</span>
 
 <span class="c1"># Conversion factor between two compatible units</span>
 <span class="n">c</span> <span class="o">=</span> <span class="n">unit_convert_factor</span><span class="p">(</span><span class="n">vu_from</span><span class="p">,</span> <span class="n">vu_to</span><span class="p">)</span>
@@ -330,14 +331,15 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <span class="n">dims</span> <span class="o">=</span> <span class="n">unit_dimension_vector</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>       <span class="c1"># e.g. [1, 0, -1, 0, 0, 0, 0] for m/s</span>
 
 <span class="c1"># Reduce a compound unit to its canonical named SI unit</span>
-<span class="n">r</span> <span class="o">=</span> <span class="n">unit_reduce</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># r.unit, r.scale</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">unit_reduce</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># r.unit, r.scale — multiply your value by</span>
+                                      <span class="c1"># r.scale, the reduction folded it out</span>
 
 <span class="c1"># Convert a scalar value between units (handles affine conversions)</span>
 <span class="n">kelvin</span> <span class="o">=</span> <span class="n">convert_value</span><span class="p">(</span><span class="mf">25.0</span><span class="p">,</span> <span class="n">vu_celsius</span><span class="p">,</span> <span class="n">vu_kelvin</span><span class="p">)</span>
 
 <span class="c1"># Serialise with formatting options (see UnitFlags below)</span>
 <span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>   <span class="c1"># use ^N instead of Unicode superscripts</span>
-<span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span><span class="p">)</span>      <span class="c1"># reduce to canonical named unit first</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span><span class="p">)</span>      <span class="c1"># reduce first — but see the warning below</span>
 <span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>
 
 <span class="c1"># Exponent enum ↔ integer conversions</span>
@@ -355,6 +357,16 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span> <span class="c1"># use ^N exponent notation instead of Unicode superscripts</span>
 </code></pre></div>
 
+<blockquote>
+<p><strong><code>UnitFlags.REDUCE</code> returns the reduced unit, not a rescaled value.</strong> Reduction
+folds every prefix out, so <code>unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)</code>
+is <code>"g"</code> — a string denoting a quantity 1000× smaller than the unit you passed.
+The scale is available from <code>unit_reduce(vu).scale</code>, and applying it to your own
+value is your job. (The writer does this for you; nothing else does.) Where the
+reduction folds cleanly into a named unit nothing is lost: <code>k~g·m/s²</code> → <code>"N"</code>,
+<code>k~N</code> → <code>"k~N"</code>. The collapse never substitutes one named unit for another, so a
+<code>Sv</code> stays a <code>Sv</code> rather than becoming a <code>Gy</code>.</p>
+</blockquote>
 <p><code>UnitFlags</code> is an <code>IntFlag</code> and its values may be OR-combined:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>
 </code></pre></div>

@@ -133,6 +133,9 @@ DERIVED = {
     'Torr':    (101325 / 760,       "atm / 760"),
     'mmHg':    (133.322387415,      "conventional mmHg"),
     'cal':     (4.184,              "thermochemical calorie"),
+    'ft_lb':   (FT * LB * G0,       "foot × lbf"),
+    'slug':    (LB * G0 / FT,       "lbf·s²/ft"),
+    'inHg':    (25.4 * 133.322387415, "25.4 conventional mmHg"),
     'erg':     (1e-7,               "10⁻⁷ J"),
     'eV':      (1.602176634e-19,    "elementary charge × volt (exact, SI 2019)"),
     'thm':     (1e5 * 1054.804,     "10⁵ BTU(59 °F) — US therm"),
@@ -182,10 +185,10 @@ DERIVED = {
     'prf':     (PR_FUSS,            "Prussian foot, 1816"),
     'prz':     (PR_FUSS / 12,       "Fuß / 12"),
     'prln':    (PR_FUSS / 144,      "Zoll / 12"),
-    'rute':    (12 * PR_FUSS,       "12 Fuß", 5e-6),
-    'klafter': (6 * PR_FUSS,        "6 Fuß", 5e-6),
+    'rute':    (12 * PR_FUSS,       "12 Fuß"),
+    'klafter': (6 * PR_FUSS,        "6 Fuß"),
     'elle':    (25.5 * PR_FUSS / 12, "25½ Zoll"),
-    'morgen':  (180 * (12 * PR_FUSS) ** 2, "180 square Ruten", 5e-6),
+    'morgen':  (180 * (12 * PR_FUSS) ** 2, "180 square Ruten"),
     'schffl':  (0.0549615,          "published Prussian Scheffel, 54.9615 L "
                                     "(the 3072-Kubikzoll derivation gives 54.967 L, "
                                     "the era's own conversion having used a slightly "
@@ -210,6 +213,66 @@ DERIVED = {
 # more of it would assert a precision its source never had; those entries carry
 # their own tolerance.
 _DEFAULT_TOL = 1e-9
+
+# Units whose defining relation is an exact RATIONAL — not a measurement, not a
+# published six-figure datum, but arithmetic on values that are exact by
+# definition. For these, "close" is the wrong test: the library advertises
+# lossless conversion and drives it from the exact rational in the table, so a
+# factor that is merely close makes `1 klafter -> prf` report 6.000006 (or, since
+# that has no terminating expansion, refuse the conversion as inexact) while
+# still claiming to be exact. Compared as Fractions below, with no tolerance at
+# all. Each value is written from its definition, independent of the table.
+def _exact_definitions():
+    from fractions import Fraction as F
+    g0  = F(980665, 100000)          # standard gravity
+    lb  = F("0.45359237")            # international pound
+    ft  = F("0.3048")                # international foot
+    prf = F("0.313853")              # Prussian foot, 1816 — the historical datum
+    mmhg = F("133.322387415")        # conventional millimetre of mercury
+    return {
+        # exact multiples of the Prussian Fuß
+        'prussian_zoll':  (prf / 12,            "Fuß / 12"),
+        'prussian_line':  (prf / 144,           "Zoll / 12"),
+        'prussian_elle':  (F(51, 2) * prf / 12, "25½ Zoll"),
+        'klafter':        (6 * prf,             "6 Fuß"),
+        'prussian_rute':  (12 * prf,            "12 Fuß"),
+        'morgen':         (180 * (12 * prf) ** 2, "180 square Ruten"),
+        # exact products of the 1959 pound/foot and standard gravity
+        'pound_force':    (lb * g0,             "lb × g₀"),
+        'kip':            (1000 * lb * g0,      "1000 lbf"),
+        'foot_pound':     (ft * lb * g0,        "ft × lbf"),
+        'slug':           (lb * g0 / ft,        "lbf·s²/ft"),
+        'psi':            (lb * g0 / (ft / 12) ** 2, "lbf / in²"),
+        'horsepower':     (550 * ft * lb * g0,  "550 ft·lbf/s"),
+        'metric_horsepower': (75 * g0,          "75 kgf·m/s"),
+        # exact multiples of the conventional mmHg
+        'inch_hg':        (F(254, 10) * mmhg,   "25.4 mmHg"),
+        'torr':           (F(101325) / 760,     "atm / 760"),
+    }
+
+
+def test_exactly_defined_factors_are_exactly_right():
+    """The factors the lossless path depends on, compared as rationals.
+
+    gen_units only refuses a decimal of 16+ significant digits — the repr of a
+    double — so a factor rounded to six or eleven digits sails through and the
+    exact-rational engine then reports it as exact. That is how the Klafter came
+    to be 6.000006 Prussian Fuß, and ft·lbf 2.3e-11 short of its own definition.
+    """
+    import gen_units
+    with open(os.path.join(_ROOT, "src", "gendata", "units.bvnr"),
+              encoding="utf-8") as f:
+        units = {u["name"]: u for u in bvnr_data.load(f.read())["units"]}
+    wrong = []
+    for name, (want, how) in _exact_definitions().items():
+        assert name in units, f"{name} is no longer in the unit table"
+        got = gen_units.exact_rational(units[name], "factor")
+        if got != want:
+            wrong.append("  %-18s table %s, but %s is %s (off by %.2g relative)"
+                         % (name, got, how, want, abs(float((got - want) / want))))
+    assert not wrong, (
+        "%d factor(s) are not exactly their own definition:\n%s"
+        % (len(wrong), "\n".join(wrong)))
 
 
 def test_generated_tables_match_the_source(factors):

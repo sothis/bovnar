@@ -615,7 +615,7 @@ static const iec_entry_t iec_table[] = {
 };
 /*
  * Compact spellings that must NOT resolve as prefix+unit even though the tables
- * would let them ("pH" is acidity, not picohenry). Generated from the
+ * would let them ("usb" is the bus, not the microstilb). Generated from the
  * .compact_exceptions list in src/gendata/units.bvnr, where each entry carries
  * its reason; the separated form (p~H) is unaffected. Consulted only on the
  * compact path, which is otherwise the parse-error path, so this cannot reject
@@ -1534,6 +1534,21 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 		 * library itself would call incompatible with the one it replaced. Same
 		 * for rad/s against Hz. Require the kind vectors to agree too. */
 		if (!bvni_kinds_match(u, probe))
+			continue;
+		/*
+		 * Never SUBSTITUTE one named unit for another. This function exists to
+		 * fold a compound back into the named unit it spells out — kg·m/s² -> N,
+		 * A·s -> C — and to restore the prefix that bvn_unit_reduce folded into
+		 * the scale (k~N reduces to N with scale 1000, and comes back k~N, same
+		 * base). What it must not do is rewrite a unit that ALREADY names its
+		 * quantity: Sv and Gy share a dimension vector and carry no kind, so the
+		 * first match in the table won and BVN_UNIT_REDUCE turned an equivalent
+		 * dose into an absorbed dose — in the document, not merely in a
+		 * conversion. Same for Bq -> Hz, Bd -> Hz, var -> W, rem -> c~Gy. Those
+		 * conversions stay available through bvn_unit_convert_factor, which is a
+		 * caller asking for one; a serialisation is not.
+		 */
+		if (u.num_components == 1 && u.components[0].base != nd)
 			continue;
 		/*
 		 * Only an (almost-)exact power of ten maps onto a single SI

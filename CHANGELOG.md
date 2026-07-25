@@ -46,6 +46,56 @@ reading the grown by-value structs at the wrong size.
   cannot make silently — the stored number is unchanged, but what it converts to moves by 0.03 % —
   so it is called out here rather than buried: anything that round-tripped an Elle through SI before
   this release carries the old factor.
+- **Fixed: six factors were rounded before being stored, and the lossless path believed them** —
+  `klafter`, `rute` and `morgen` are exact multiples of the 1816 Prussian Fuß (6, 12, and 180 square
+  Ruten) but were stored to six digits, so `1 klafter` was 6.000006 Fuß; `ft_lb` and `slug` are exact
+  products of the international pound, foot and standard gravity but were stored 11 digits in, and
+  `inHg` is exactly 25.4 conventional mmHg but was stored as 3386.388645 rather than
+  3386.388640341. None of them tripped `gen_units`' exactness guard, which only refuses a decimal of
+  16+ significant digits — the repr of a double — so the exact-rational engine reported all six as
+  *exact* while being wrong in the 7th to 12th digit. The visible symptoms: `1 klafter → prf` failed
+  with `error_unit_inexact` (6.000006 has no terminating expansion) instead of returning 6, and
+  `1 ft_lb → J` returned a losslessly-labelled value 2.3×10⁻¹¹ short of its own definition. All six
+  now carry the exact value, three of them via `.factor_num`/`.factor_den`. As with the Elle above,
+  what a stored number converts to moves — by at most 1.6×10⁻⁶, and only for those six units.
+  `test_exactly_defined_factors_are_exactly_right` now compares fifteen exactly-defined factors as
+  **rationals**, with no tolerance, which is the check that would have caught all of them; the three
+  Prussian entries no longer carry the 5×10⁻⁶ tolerance that had been accommodating the rounding.
+- **Fixed: `lm` converted to `cd`, while `lm ↔ cd·sr` was refused** — the steradian carries a
+  quantity kind (it *is* `rad²`), but the photometric units defined through it did not, so the table
+  contradicted itself: it refused luminous flux against candela-steradian on the kind rule and
+  converted it to a bare candela at factor 1, which is the same claim with the `sr` dropped. `lm`,
+  `lx` and `ph` now carry the steradian's weight; `cd` and `sb` deliberately do not. Luminous flux
+  no longer converts into luminous intensity, and illuminance (`lx`, `ph`) no longer into luminance
+  (`cd/m²`, `sb`) — a distinction the SI dimension vector cannot express, since every photometric
+  unit reduces to candela in base dimensions. `lm ↔ cd·sr`, `lx ↔ lm/m²`, `ph ↔ lx` and `sb ↔ cd/m²`
+  all work, and `cd·sr` now reduces to `lm` under `BVN_UNIT_REDUCE`. The pint bridge follows:
+  `bvnr_lumen`/`bvnr_lux`/`bvnr_phot` are defined from `candela · bvnr_steradian`.
+- **Fixed: `BVN_UNIT_REDUCE` rewrote one named unit as another** — the named-SI collapse matched on
+  the dimension vector and took the first hit, so serialising with `BVN_UNIT_REDUCE` turned `Sv`
+  into `Gy`, `rem` into `c~Gy`, `Bq` and `Bd` into `Hz`, `var` and `VA` into `W`, and `cd` into `lm`.
+  Offering those conversions when a caller asks is deliberate and documented; rewriting the
+  annotation *in the document* is a stronger act, and it changed what a stored value claimed to be.
+  The collapse now never substitutes a different base unit for a single-component unit. What it is
+  for is untouched: `A·s` → `C`, `mol/s` → `kat`, `k~g·m/s²` → `N`, and a prefix folded into the
+  scale still comes back (`k~N` → `k~N`).
+- **Fixed: an affine scale inside a product produced a meaningless number** — `bvn_unit_to_si_factor`
+  accepted `°C` at exponent 1 anywhere in a compound and added its offset unscaled, so
+  `20 °C/h → K/h` came out as 983360 and `20 °C·m → K·m` as 293.15 regardless of the metres. The
+  offset is a number of kelvin and a product whose SI unit is `K·s⁻¹` or `K·m` has nowhere to put
+  it. An affine unit now has an SI value only when it is the whole unit: `°C/h`, `°C·m`, `°C²` and
+  `°C·°F` all set `*ok = false`, and the reader reports `error_unit_mismatch` rather than a number.
+  `°C/h` still **parses** and remains a legal annotation — a consumer meaning a temperature
+  *difference* can read the components and apply its own semantics. A lone `°C` is unaffected, and
+  all eight temperature scales still inter-convert exactly. This matches pint, which forbids an
+  offset unit in a product outright; the bridge's own refusal is no longer stricter than the
+  reference it is bridging to.
+- **Hardened: "kilo and up" on `b`/`B` is now a magnitude test** — `bvn_prefix_unit_valid` compared
+  prefix *enum ids* (`>= si_kilo`), which agreed with magnitude only because `prefixes.bvnr` happens
+  to list prefixes in ascending order — while that same file requires ids to be append-only, so the
+  first sub-kilo prefix ever added would have been given a high id and silently become legal on bit
+  and byte. It now reads the exponent, and `gen_prefixes.py` additionally refuses a list that is not
+  in ascending exponent order.
 - **Conversion factors are now checked against their own definitions** — a new pure-Python test
   (`test_unit_factors_derived.py`, registered as `bvnr_py_unit_factors`) re-derives 119 factors from
   the relations that define them: a furlong is 660 international feet, an acre 43560 square feet, an

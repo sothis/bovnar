@@ -93,7 +93,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 | `G`  | gauss (`bu_gauss`)    | giga   |
 | `P`  | poise (`bu_poise`)    | peta   |
 | `R`  | röntgen (`bu_roentgen`) | ronna |
-| `f`  | farad (`bu_farad`)    | femto  |
+| `f`  | *(nothing — `error_unit_illegal`; the farad is `F`, uppercase)* | femto  |
 | `u`  | dalton (`bu_dalton`)  | micro (ASCII alias for `µ`) |
 | `S`  | siemens (`bu_siemens`) | *(not a prefix — `S` has no prefix role)* |
 

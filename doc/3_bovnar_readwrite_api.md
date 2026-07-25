@@ -708,6 +708,8 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
 
+`BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §24.)
+
 These flags can be OR-combined: `BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP`. The flags are fixed at open time. To change serialisation behaviour, destroy the writer and open a new one with the updated `unit_flags`. The getter `bvnr_writer_unit_flags(w)` is used internally by the Python FFI layer to retrieve the live flags before each unit serialisation call; there is no public setter.
 
 ```c
@@ -1166,6 +1168,8 @@ Serialise a `value_unit_t` back into its canonical string form. Numerator compon
 | `BVN_UNIT_ASCII_EXP` | Use `^N` ASCII caret notation instead of Unicode superscripts |
 
 These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internally, passing the flags from `bvnr_writer_unit_flags(w)`.
+
+> **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (`k~g·m/s²` → `"N"`, `k~N` → `"k~N"`). The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`.
 
 > **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§22) to emit a complete, correct type annotation in one call.
 

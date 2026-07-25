@@ -33,7 +33,7 @@ DOCS = [
     ("1_bovnar_spec.md",         "Specification",
      "The complete format specification (spec 1.1): grammar, types, units, limits."),
     ("2_bovnar_unit_system.md",  "Unit system",
-     "The 163 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors."),
+     "The 180 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors."),
     ("3_bovnar_readwrite_api.md","Read & Write C API",
      "The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h)."),
     ("4_bovnar_python_bindings.md","Python bindings",
@@ -190,7 +190,7 @@ def build_index_md_de(sections):
         for slug, title, desc in [
             ("tutorial", "Tutorial", "Einführung in das Lesen und Schreiben von Bovnar-Dokumenten."),
             ("spec", "Spezifikation", "Die vollständige Formatspezifikation (Spec 1.1)."),
-            ("units", "Einheitensystem", "163 physikalische Einheiten, SI/IEC-Präfixe und 216 Währungen."),
+            ("units", "Einheitensystem", "180 physikalische Einheiten, SI/IEC-Präfixe und 216 Währungen."),
             ("api", "C-Lese-/Schreib-API", "Die C-Reader-/Writer-/DOM-API-Referenz."),
             ("python", "Python-Bindings", "Das reine ctypes-Python-Paket."),
             ("grammar", "EBNF-Grammatik", "Die formale Grammatik, kommentiert gegen die Referenzimplementierung."),

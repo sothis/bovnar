@@ -232,17 +232,23 @@ double bvn_unit_to_si_factor(value_unit_t u,
 			comp_total = 1.0 / comp_total;
 		f *= comp_total;
 		if (conv->is_affine) {
-			if (uexp == 1) {
-				if (*is_affine) {
-					*ok = false;
-					return f;
-				}
-				*is_affine     = true;
-				*affine_offset = conv->affine_offset;
-			} else {
+			/* An affine scale has an SI meaning only ALONE and at exponent 1.
+			 * The offset is a number of kelvin; there is nowhere to add it in a
+			 * product whose SI unit is K/s or K*m, and the code that tried
+			 * added it unscaled — so 20 °C/h converted to K/h as 983360, and
+			 * 20 °C*m to K*m as 293.15 whatever the metres did. Both are
+			 * arithmetic on a quantity that does not exist. Refusing is what
+			 * the reader turns into error_unit_mismatch, and it agrees with
+			 * pint, which forbids an offset unit in a product outright.
+			 * `°C/h` still PARSES and is still a valid annotation — a consumer
+			 * that means a temperature difference can read the components
+			 * itself; what it no longer gets is a wrong SI value. */
+			if (uexp != 1 || u.num_components != 1) {
 				*ok = false;
 				return f;
 			}
+			*is_affine     = true;
+			*affine_offset = conv->affine_offset;
 		}
 	}
 	/* Extreme prefix/exponent combinations (e.g. Q~m^9, or several huge
@@ -305,7 +311,17 @@ bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
  *                  2*pi wrong. Same for rad/s against Hz, which are angular
  *                  frequency and frequency.
  *                  Steradian carries weight 2 because a steradian IS rad^2, so
- *                  sr <-> rad^2 keeps working.
+ *                  sr <-> rad^2 keeps working. The photometric units built ON
+ *                  the steradian carry that same weight: a lumen IS cd*sr and a
+ *                  lux IS lm/m^2, so without it the table contradicted itself —
+ *                  it refused lm <-> cd*sr on the kind rule while happily
+ *                  converting lm <-> cd at factor 1, which is the same claim
+ *                  with the sr silently dropped. With the weight, luminous flux
+ *                  (lm, weight 2) stops converting into luminous intensity (cd,
+ *                  weight 0) and illuminance (lx, ph) stops converting into
+ *                  luminance (sb, cd/m^2) — the distinction the SI dimension
+ *                  vector cannot carry, since every photometric unit reduces to
+ *                  candela in base dimensions.
  *   logarithmic  — Np, dB and pH are separate kinds. They are logarithms of a
  *                  ratio, not linear quantities (20 dB is a ratio of 100, not
  *                  twice 10 dB), so no factor can relate them; dB is ambiguous
@@ -374,6 +390,12 @@ static const bvni_kind_entry_t bvni_kind_table[] = {
 	{ bu_grad,       BVNI_KIND_ANGLE,       1 },
 	{ bu_revolution, BVNI_KIND_ANGLE,       1 },
 	{ bu_steradian,  BVNI_KIND_ANGLE,       2 },
+	/* lm = cd*sr, lx = lm/m^2, ph = lm/cm^2 — each carries one steradian.
+	 * bu_candela and bu_stilb (cd/cm^2) deliberately do NOT: they are luminous
+	 * intensity and luminance, which is exactly what this separates them from. */
+	{ bu_lumen,      BVNI_KIND_ANGLE,       2 },
+	{ bu_lux,        BVNI_KIND_ANGLE,       2 },
+	{ bu_phot,       BVNI_KIND_ANGLE,       2 },
 	{ bu_neper,      BVNI_KIND_LOG_NEPER,   1 },
 	{ bu_decibel,    BVNI_KIND_LOG_DECIBEL, 1 },
 	{ bu_ph_scale,   BVNI_KIND_LOG_PH,      1 },
@@ -711,9 +733,11 @@ static bool bvn_unit_to_si_rational(value_unit_t u,
 		/* accumulate into the running factor */
 		if (!rat_mul(tn, td, fnum, fden, cfn, cfd)) { ok = false; break; }
 		if (!bvn_int_copy(fnum, tn) || !bvn_int_copy(fden, td)) { ok = false; break; }
-		/* affine offset: only a lone linear temperature carries one */
+		/* affine offset: only a lone linear temperature carries one — the unit
+		 * must BE that temperature, not contain it (see bvn_unit_to_si_factor). */
 		if (conv->is_affine) {
-			if (uexp != 1 || have_affine) { ok = false; break; }
+			if (uexp != 1 || have_affine || u.num_components != 1) {
+				ok = false; break; }
 			have_affine = true;
 			if (!rat_set_decstr(onum, oden, conv->offset_num, conv->offset_den)) {
 				ok = false; break; }
@@ -1122,7 +1146,19 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 	}
 	if (prefix.system == prefix_iec)
 		return (prefix.id.iec == iec_none) || is_info;
-	if (is_info && prefix.system == prefix_si)
-		return prefix.id.si == si_none || prefix.id.si >= si_kilo;
+	if (is_info && prefix.system == prefix_si) {
+		if (prefix.id.si == si_none)
+			return true;
+		/* "kilo and up" is a statement about MAGNITUDE, so test the exponent.
+		 * The old `prefix.id.si >= si_kilo` tested the enum id instead, which
+		 * only agreed because prefixes.bvnr happens to list them in ascending
+		 * order — while that same file requires ids to be append-only, so the
+		 * first sub-kilo prefix ever added would have been handed a high id and
+		 * silently become legal on bit and byte. gen_prefixes.py now also
+		 * refuses a non-monotonic list, but this no longer depends on it. */
+		if ((uint32_t)prefix.id.si >= BVN_SI_PREFIX_COUNT)
+			return false;
+		return bvni_si_pfx_table[prefix.id.si].exp >= 3;
+	}
 	return true;
 }

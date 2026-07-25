@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 163 physical base units.
+# units.bvnr — single source of truth for all 180 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -1221,10 +1221,14 @@
     .id      = <uint:16> 105;
     .name    = "slug";
     .symbol  = "slug";
-    .factor  = 14.593902937;
+    .factor  = 14.593902937206364;
     .dims    = { .mass = 1; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: lbf·s²/ft = (0.45359237·9.80665)/0.3048 kg. The denominator
+    # carries a 127, so the decimal does not terminate — the stored one rounds.
+    .factor_num = <sint:64> 8896443230521;
+    .factor_den = <sint:64>  609600000000;
     .prefix  = default;
     .aliases = ["slugs", "slug"];
   },
@@ -1309,7 +1313,10 @@
     .id      = <uint:16> 113;
     .name    = "inch_hg";
     .symbol  = "inHg";
-    .factor  = 3386.388645;
+    # Exactly 25.4 conventional millimetres of mercury: 25.4·133.322387415 Pa.
+    # A terminating decimal, so no rational override is needed — but it has to be
+    # written out in full, or `inHg -> mmHg` is no longer exactly 25.4.
+    .factor  = 3386.388640341;
     .dims    = { .length = -1; .mass = 1; .time = -2; };
     .affine  = false;
     .offset  = 0.0;
@@ -1342,10 +1349,15 @@
     .id      = <uint:16> 115;
     .name    = "foot_pound";
     .symbol  = "ft_lb";
-    .factor  = 1.3558179483;
+    .factor  = 1.3558179483314004;
     .dims    = { .length = 2; .mass = 1; .time = -2; };
     .affine  = false;
     .offset  = 0.0;
+    # Exact rational: ft·lbf = 0.3048·0.45359237·9.80665 J. The product
+    # terminates, but at 17 significant digits — one more than a double's repr
+    # can carry — so the truth has to be stated rather than recovered.
+    .factor_num = <sint:64> 3389544870828501;
+    .factor_den = <sint:64> 2500000000000000;
     .prefix  = default;
     .aliases = ["foot_pounds", "foot_pound", "ft_lb"];
   },
@@ -1653,7 +1665,10 @@
     .id      = <uint:16> 356;
     .name    = "prussian_rute";
     .symbol  = "rute";
-    .factor  = 3.76624;
+    # Exactly 12 Prussian Fuß. Written in full: rounding it to 3.76624 made
+    # `rute -> prf` 12.000012 rather than 12, which the exact-rational path then
+    # reported as a non-terminating conversion instead of a clean integer.
+    .factor  = 3.766236;
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;
@@ -1664,7 +1679,9 @@
     .id      = <uint:16> 357;
     .name    = "klafter";
     .symbol  = "klafter";
-    .factor  = 1.88312;
+    # Exactly 6 Prussian Fuß — half a Rute. See the Rute above for why the last
+    # two digits matter.
+    .factor  = 1.883118;
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;
@@ -1686,7 +1703,9 @@
     .id      = <uint:16> 359;
     .name    = "morgen";
     .symbol  = "morgen";
-    .factor  = 2553.22;
+    # Exactly 180 square Ruten = 180·(12·0.313853)² m². Terminates at 15
+    # significant digits, so the decimal still recovers the rational exactly.
+    .factor  = 2553.21604938528;
     .dims    = { .length = 2; };
     .affine  = false;
     .offset  = 0.0;

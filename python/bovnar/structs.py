@@ -481,7 +481,17 @@ def make_unit_compound(components: list[dict]) -> ValueUnit:
             f"Too many unit components: {len(components)} > {MAX_UNIT_COMPONENTS}")
     vu = ValueUnit()
     vu.num_components = len(components)
+    _KEYS = {'base', 'exp', 'si_prefix', 'iec_prefix'}
     for i, comp in enumerate(components):
+        # An unrecognised key used to be dropped in silence, which is how
+        # {'base': ..., 'prefix': SIPrefix.KILO} built an UNPREFIXED unit and
+        # every downstream check agreed it was fine. The keys differ by one word
+        # from the obvious guess, so the typo is the likely case, not the rare one.
+        unknown = set(comp) - _KEYS
+        if unknown:
+            raise ValueError(
+                f"component {i}: unknown key(s) {sorted(unknown)}; "
+                f"expected any of {sorted(_KEYS)}")
         c = vu.components[i]
         c.base     = int(comp['base'])
         c.exponent = int(comp.get('exp', Exponent.LINEAR))

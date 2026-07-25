@@ -64,10 +64,10 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_german_mile = 7420.44 * meter',
     # gradian (gon): pint's native `gradian` alias is absent in some pint
     # versions, so define it from bovnar's factor (pi/200 rad) for stability.
-    'bvnr_klafter = 1.88312 * meter',
+    'bvnr_klafter = 1.883118 * meter',
     'bvnr_lot = 0.015625 * kilogram',
     'bvnr_maxwell = 1e-08 * meter**2 * kilogram * second**-2 * ampere**-1',
-    'bvnr_morgen = 2553.22 * meter**2',
+    'bvnr_morgen = 2553.21604938528 * meter**2',
     'bvnr_newton_temp = 3.0303030303030303 * kelvin; offset: 273.15',
     'bvnr_oersted = 79.57747154594767 * meter**-1 * ampere',
     'bvnr_per_cent_mille = 1e-05',
@@ -83,12 +83,11 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_val = 0.5 * mole',
     'bvnr_grains_per_gallon = 0.17103352162411276 * mole * meter**-3',
     'bvnr_conductivity_factor = 0.01 * siemens * meter**-1',
-    'bvnr_phot = 10000.0 * meter**-2 * candela',
     'bvnr_ppb = 1e-09',
     'bvnr_prussian_elle = 0.666937625 * meter',
     'bvnr_prussian_fuss = 0.313853 * meter',
     'bvnr_prussian_line = 0.002179534722222222 * meter',
-    'bvnr_prussian_rute = 3.76624 * meter',
+    'bvnr_prussian_rute = 3.766236 * meter',
     'bvnr_prussian_zoll = 0.026154416666666666 * meter',
     'bvnr_quintal = 100.0 * kilogram',
     # Réaumur: pint's `degree_Reaumur` definition differs across versions
@@ -126,8 +125,8 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
      20: 'weber',                        # WEBER
      21: 'tesla',                        # TESLA
      22: 'henry',                        # HENRY
-     23: 'lumen',                        # LUMEN
-     24: 'lux',                          # LUX
+     23: 'bvnr_lumen',                   # LUMEN
+     24: 'bvnr_lux',                     # LUX
      25: 'becquerel',                    # BECQUEREL
      26: 'gray',                         # GRAY
      27: 'sievert',                      # SIEVERT
@@ -348,6 +347,18 @@ _ANGLE_DERIVED: list[str] = [
     'bvnr_arcminute = %.17g * bvnr_radian' % (math.pi / 10800.0),
     'bvnr_arcsecond = %.17g * bvnr_radian' % (math.pi / 648000.0),
     'bvnr_steradian = bvnr_radian ** 2',
+    # The photometric units built on the steradian carry it here too, because
+    # bovnar's kind table gives them the steradian's weight: a lumen IS
+    # candela·steradian and a lux IS lumen/m². Defined from pint's `candela`
+    # rather than from pint's own `lumen`/`lux`, whose SI dimensionality is bare
+    # candela — that is what let pint convert lm to cd and lx to sb at factor 1
+    # while bovnar refused the same conversions written as cd·sr and cd·sr/m².
+    # `candela` (luminous intensity) and pint's native `stilb` (cd/cm²,
+    # luminance) stay steradian-free, which is exactly what separates them from
+    # luminous flux and illuminance.
+    'bvnr_lumen = candela * bvnr_steradian',
+    'bvnr_lux = bvnr_lumen * meter**-2',
+    'bvnr_phot = 10000.0 * bvnr_lux',
 ]
 
 # What isolate_kinds=False falls back to: pint's native where one exists, plain
@@ -365,6 +376,9 @@ _KIND_NATIVE_FALLBACK: list[str] = [
     'bvnr_arcminute = arcminute',
     'bvnr_arcsecond = arcsecond',
     'bvnr_steradian = steradian',
+    'bvnr_lumen = lumen',
+    'bvnr_lux = lux',
+    'bvnr_phot = 10000.0 * lux',
     'bvnr_ph_scale = 1.0',
     'bvnr_ntu = 1.0',
     'bvnr_fnu = 1.0',

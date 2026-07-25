@@ -144,7 +144,7 @@
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
-<p>Annotations are <strong>descriptive</strong>, not prescriptive. Bovnar validates form and type; it does not perform dimensional analysis, unit conversion, or exchange-rate arithmetic. That responsibility belongs to the consuming application.</p>
+<p>Annotations are <strong>descriptive</strong>, not prescriptive: the <em>validator</em> checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — <code>bvn_units_compatible</code>, <code>bvn_unit_convert_factor</code>, <code>bvn_unit_convert_value</code> and the exact-rational <code>bvn_unit_convert_rational</code> (§12.4), plus the reader's <code>want_unit</code> hook, which converts at read time (§7c of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).</p>
 <h3 id="design-principles">Design Principles</h3>
 <ul>
 <li><strong>SI-first.</strong> All SI base units, all 22 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.</li>
@@ -489,6 +489,29 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Photometry: the steradian is carried, not dropped.</strong> <code>lm</code>, <code>lx</code> and <code>ph</code> are
+defined <em>through</em> the steradian, so they carry its quantity kind (§3.12 and
+§10 of <a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>); <code>cd</code> and <code>sb</code> do not.
+The SI dimension vector cannot tell them apart — every photometric unit reduces
+to candela in base dimensions — so without the kind the library both refused
+<code>lm ↔ cd·sr</code> and converted <code>lm ↔ cd</code> at factor 1, which is the same claim with
+the <code>sr</code> silently dropped. What holds now:</p>
+<table>
+<thead>
+<tr>
+<th>Converts</th>
+<th>Refused</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lm</code> ↔ <code>cd·sr</code>, <code>lx</code> ↔ <code>lm/m²</code> ↔ <code>cd·sr/m²</code>, <code>ph</code> ↔ <code>lx</code>, <code>sb</code> ↔ <code>cd/m²</code></td>
+<td><code>lm</code> ↔ <code>cd</code> (flux vs intensity), <code>lx</code> ↔ <code>cd/m²</code> and <code>ph</code> ↔ <code>sb</code> (illuminance vs luminance)</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
 <h3 id="33-non-si-units-accepted-for-use-with-si">3.3 Non-SI Units Accepted for Use with SI</h3>
 <table>
 <thead>
@@ -1283,6 +1306,14 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p>Angle is one <strong>shared</strong> quantity kind, so <code>°</code> → <code>rad</code> works and only the factor
+is irrational. What the kind stops is an angle drifting into a plain count:
+<code>rev/min</code> is an angular rate and <code>rpm</code> a cycle rate, and they differ by exactly
+2π. <code>sr</code> carries the kind at weight 2, because a steradian <em>is</em> <code>rad²</code> — and so
+do the photometric units built on it (<code>lm</code> = cd·sr, <code>lx</code> = lm/m², <code>ph</code> = lm/cm²;
+see the note under §3.2).</p>
+</blockquote>
 <h3 id="313-cgs-units">3.13 CGS Units</h3>
 <table>
 <thead>
@@ -1353,6 +1384,14 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong><code>sb</code> and <code>ph</code> are not the same quantity</strong>, though the SI dimension vector says
+they are: both reduce to cd·m⁻² and both are 10⁴ of their SI counterpart. The
+stilb is a <em>luminance</em> (cd/cm²), the phot an <em>illuminance</em> (lm/cm²), and a lumen
+is a candela-<strong>steradian</strong>. Bovnar carries that steradian as a quantity kind, so
+<code>ph</code> converts with <code>lx</code> and <code>sb</code> with <code>cd/m²</code>, and neither converts with the
+other — see §3.12 and the note under §3.2.</p>
+</blockquote>
 <h3 id="314-radiation-units">3.14 Radiation Units</h3>
 <table>
 <thead>
@@ -1881,7 +1920,7 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 as compounds and remain valid; these are separate base units, not shorthands the
 parser expands, so an annotation of <code>mph</code> does <strong>not</strong> reconcile with an inline
 <code>mi/h</code> (the comparison is structural — see §2.2). Neither accepts a prefix: they
-already carry one, or have no meaningful prefixed form. <code>kn</code> (the knot, §3.13)
+already carry one, or have no meaningful prefixed form. <code>kn</code> (the knot, §3.9)
 belongs to the same family.</p>
 <table>
 <thead>
@@ -1941,7 +1980,7 @@ average — the same caveat that applies to <code>dB</code> and <code>Np</code>.
 <blockquote>
 <p><strong><code>pH</code> vs <code>p~H</code>:</strong> the two differ by one character and by seven orders of
 dimension. <code>pH</code> is the acidity scale; <code>p~H</code> is the picohenry. Case matters too:
-<code>ph</code> is the phot (§3.15). This is exactly why acidity had to become a unit —
+<code>ph</code> is the phot (§3.13). This is exactly why acidity had to become a unit —
 without it, <code>pH</code> resolves as a compact prefixed henry.</p>
 </blockquote>
 <h3 id="328-water-hardness">3.28 Water Hardness</h3>
@@ -2469,7 +2508,7 @@ takes no prefix.</p>
 <tr>
 <td><code>f</code></td>
 <td>femto</td>
-<td>farad</td>
+<td><em>(none)</em> — the farad is <code>F</code>, uppercase</td>
 </tr>
 <tr>
 <td><code>a</code></td>
@@ -2568,6 +2607,8 @@ takes no prefix.</p>
 <li><strong>IEC prefixes</strong> (<code>Ki</code>…<code>Qi</code>) are only permitted on <code>b</code> and <code>B</code>. <code>Ki~m</code> → <code>error_unit_illegal</code>.</li>
 <li><strong>SI sub-kilo prefixes</strong> (<code>d</code>, <code>c</code>, <code>m</code>, <code>µ</code>, <code>n</code>, <code>p</code>, <code>f</code>, <code>a</code>, <code>z</code>, <code>y</code>, <code>r</code>, <code>q</code>, <code>da</code>, <code>h</code>) are forbidden on <code>b</code> and <code>B</code>.</li>
 <li><strong>German units</strong> (<code>bu_pfund</code> through <code>bu_scheffel</code>) accept only <code>si_none</code>/<code>iec_none</code>.</li>
+<li><strong>Ratio units</strong> (<code>%</code>, <code>‰</code>, <code>‱</code>, <code>pcm</code>, <code>ppm</code>, <code>ppb</code>) likewise: a prefixed per-cent is meaningless. <code>k~%</code> → <code>error_unit_illegal</code> (§3.25).</li>
+<li><strong>Scales that are already a scale</strong> — <code>pH</code>, <code>mph</code>, <code>kph</code>, the five water-hardness degrees, <code>gpg</code>, <code>CF</code>, <code>PSU</code>, <code>JTU</code> — take no prefix either. Each carries its reason in §3.26–§3.28.2; <code>NTU</code>, <code>FNU</code>, <code>FTU</code> and <code>FAU</code> <em>do</em> take one, because a milli-NTU is a real ultrapure-water measurement.</li>
 <li><strong>Currency units</strong> accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.</li>
 </ul>
 <div class="codehilite"><pre><code class="language-bovnar">.valid1   = &lt;uint:64,Ki~B&gt;  8;     # OK: IEC prefix on byte
@@ -4791,6 +4832,21 @@ groups raise <code>error_unit_illegal</code>.</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong><code>BVN_UNIT_REDUCE</code> changes the unit, and this function does not change the value.</strong>
+Reduction folds every prefix out, so <code>k~g</code> serializes as <code>"g"</code> — a string that
+denotes a quantity 1000× smaller than what you passed in. <code>bvn_unit_to_string_ex</code>
+returns only the reduced unit and discards <code>bvn_unit_reduce</code>'s <code>scale</code>, so a
+direct caller must apply that scale to its own value. The <strong>writer</strong> does this
+for you (5 <code>k~m</code> is written as <code>5000 m</code>, in exact rational arithmetic); nothing
+else does. Where the reduction folds cleanly into a named unit the scale comes
+back as a prefix and nothing is lost — <code>k~g·m/s²</code> → <code>"N"</code>, <code>k~N</code> → <code>"k~N"</code>.</p>
+<p>The collapse never <em>substitutes</em> one named unit for another. <code>Sv</code> and <code>Gy</code> share
+a dimension vector, as do <code>Bq</code>, <code>Bd</code> and <code>Hz</code>, and <code>W</code>, <code>VA</code> and <code>var</code>; each
+reduces to itself. Rewriting an equivalent dose as an absorbed dose in the
+document would be a stronger act than offering the conversion, which §12.4 still
+does when a caller asks.</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code><span class="kt">char</span><span class="w"> </span><span class="n">buf</span><span class="p">[</span><span class="mi">64</span><span class="p">];</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* k~g·m/s² */</span><span class="p">;</span>
 <span class="n">bvn_unit_to_string</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">buf</span><span class="p">));</span>
@@ -4844,7 +4900,8 @@ groups raise <code>error_unit_illegal</code>.</p>
 <span class="n">unit_exponent_t</span><span class="w"> </span><span class="nf">bvn_int_to_exponent</span><span class="p">(</span><span class="kt">int32_t</span><span class="w"> </span><span class="n">n</span><span class="p">);</span>
 </code></pre></div>
 
-<p>For affine units (<code>bu_celsius</code>, <code>bu_fahrenheit</code>), <code>*is_affine</code> is set to <code>true</code> and <code>*affine_offset</code> receives the additive offset applied after multiplying by the returned factor. An affine unit is valid at exponent 1 only.</p>
+<p>For affine units (<code>bu_celsius</code>, <code>bu_fahrenheit</code>), <code>*is_affine</code> is set to <code>true</code> and <code>*affine_offset</code> receives the additive offset applied after multiplying by the returned factor.</p>
+<p><strong>An affine unit has an SI value only alone, at exponent 1.</strong> <code>°C²</code>, <code>°C·°F</code>, <code>°C/h</code> and <code>°C·m</code> all set <code>*ok = false</code>; <code>bvn_unit_convert_value</code> and <code>bvn_unit_convert_rational</code> refuse them, and the reader turns that into <code>error_unit_mismatch</code> (38). The offset is a number of kelvin, and a product whose SI unit is <code>K·s⁻¹</code> or <code>K·m</code> has nowhere to put it: the earlier code added it unscaled, so <code>20 °C/h</code> converted to <code>K/h</code> as 983360 and <code>20 °C·m</code> to <code>K·m</code> as 293.15 whatever the metres did. Both are arithmetic on a quantity that does not exist. <code>°C/h</code> still <strong>parses</strong> and is still a legal annotation — a consumer that means a temperature <em>difference</em> can read the components itself and apply its own semantics; what the library will not do is hand back a number for it. This matches pint, which forbids an offset unit inside a product outright.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="p">,</span><span class="w"> </span><span class="n">affine</span><span class="p">;</span>
 <span class="kt">double</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;°C&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>

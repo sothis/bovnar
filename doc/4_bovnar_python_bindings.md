@@ -267,8 +267,9 @@ ok = prefix_unit_valid(p, BaseUnit.METER)  # False
 conv = unit_to_si_factor(vu)
 # conv.factor, conv.is_affine, conv.affine_offset
 
-# Check dimensional compatibility
-ok = units_compatible(vu_a, vu_b)     # True if same SI dimension vector
+# Check convertibility: same SI dimension vector AND same quantity kinds
+ok = units_compatible(vu_a, vu_b)     # b vs B is False — the dimensions agree,
+                                      # the kinds do not
 
 # Conversion factor between two compatible units
 c = unit_convert_factor(vu_from, vu_to)
@@ -278,14 +279,15 @@ c = unit_convert_factor(vu_from, vu_to)
 dims = unit_dimension_vector(vu)       # e.g. [1, 0, -1, 0, 0, 0, 0] for m/s
 
 # Reduce a compound unit to its canonical named SI unit
-r = unit_reduce(vu)                   # r.unit, r.scale
+r = unit_reduce(vu)                   # r.unit, r.scale — multiply your value by
+                                      # r.scale, the reduction folded it out
 
 # Convert a scalar value between units (handles affine conversions)
 kelvin = convert_value(25.0, vu_celsius, vu_kelvin)
 
 # Serialise with formatting options (see UnitFlags below)
 s = unit_to_str_ex(vu, UnitFlags.ASCII_EXP)   # use ^N instead of Unicode superscripts
-s = unit_to_str_ex(vu, UnitFlags.REDUCE)      # reduce to canonical named unit first
+s = unit_to_str_ex(vu, UnitFlags.REDUCE)      # reduce first — but see the warning below
 s = unit_to_str_ex(vu, UnitFlags.REDUCE | UnitFlags.ASCII_EXP)
 
 # Exponent enum ↔ integer conversions
@@ -305,6 +307,15 @@ UnitFlags.NONE      # 0 — no special formatting
 UnitFlags.REDUCE    # reduce to a canonical named SI unit before serialising
 UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 ```
+
+> **`UnitFlags.REDUCE` returns the reduced unit, not a rescaled value.** Reduction
+> folds every prefix out, so `unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)`
+> is `"g"` — a string denoting a quantity 1000× smaller than the unit you passed.
+> The scale is available from `unit_reduce(vu).scale`, and applying it to your own
+> value is your job. (The writer does this for you; nothing else does.) Where the
+> reduction folds cleanly into a named unit nothing is lost: `k~g·m/s²` → `"N"`,
+> `k~N` → `"k~N"`. The collapse never substitutes one named unit for another, so a
+> `Sv` stays a `Sv` rather than becoming a `Gy`.
 
 `UnitFlags` is an `IntFlag` and its values may be OR-combined:
 

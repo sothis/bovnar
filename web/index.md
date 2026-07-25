@@ -87,7 +87,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 
 - [Tutorial](https://www.bovnar.io/doc/0_bovnar_tutorial.md) — A guided introduction to writing and reading Bovnar documents.
 - [Specification](https://www.bovnar.io/doc/1_bovnar_spec.md) — The complete format specification (spec 1.1): grammar, types, units, limits.
-- [Unit system](https://www.bovnar.io/doc/2_bovnar_unit_system.md) — The 163 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
+- [Unit system](https://www.bovnar.io/doc/2_bovnar_unit_system.md) — The 180 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
 - [Read & Write C API](https://www.bovnar.io/doc/3_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).
 - [Python bindings](https://www.bovnar.io/doc/4_bovnar_python_bindings.md) — The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
 - [EBNF grammar](https://www.bovnar.io/doc/5_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.

@@ -2301,6 +2301,135 @@ static void test_named_si_collapse_respects_kinds(void)
 }
 
 
+static void test_affine_unit_in_a_product_has_no_si_value(void)
+{
+	printf("  an affine scale inside a product is refused, not guessed...\n");
+	/* The offset is a number of kelvin. In a product whose SI unit is K/s or
+	 * K*m there is nowhere to add it, and the code that tried added it
+	 * unscaled: 20 °C/h converted to K/h as 983360, and 20 °C*m to K*m as
+	 * 293.15 regardless of the metres. Both are arithmetic on a quantity that
+	 * does not exist, delivered with no diagnostic. */
+	static const struct { value_base_unit_t other; unit_exponent_t exp;
+			      const char *what; } cases[] = {
+		{ bu_hour,  exp_neg_linear, "°C/h" },
+		{ bu_meter, exp_linear,     "°C*m" },
+		{ bu_second, exp_neg_linear, "°C/s" },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		value_unit_t u = bvni_test_u2(bu_celsius, exp_linear,
+					      cases[i].other, cases[i].exp);
+		bool aff = false, ok = true; double off = 0.0;
+		bvn_unit_to_si_factor(u, &aff, &off, &ok);
+		ASSERT_TRUE(!ok, "an affine base in a product has no SI factor");
+
+		/* and the conversion built on it must fail rather than answer */
+		value_unit_t k = bvni_test_u2(bu_kelvin, exp_linear,
+					      cases[i].other, cases[i].exp);
+		double out = 12345.0;
+		ASSERT_TRUE(!bvn_unit_convert_value(20.0, u, k, &out),
+			    "converting an affine product is refused");
+		ASSERT_TRUE(out == 12345.0, "the output is left untouched");
+	}
+	/* Alone, it still converts exactly as before. */
+	double out = 0.0;
+	ASSERT_TRUE(bvn_unit_convert_value(20.0, BVN_UNIT_NO_PREFIX(bu_celsius),
+					   BVN_UNIT_NO_PREFIX(bu_kelvin), &out),
+		    "a lone affine unit still converts");
+	ASSERT_TRUE(fabs(out - 293.15) < 1e-9, "20 °C is 293.15 K");
+}
+
+static void test_photometric_units_carry_the_steradian(void)
+{
+	printf("  luminous flux is not luminous intensity...\n");
+	/* lm = cd*sr and lx = lm/m². Without the steradian's kind weight the table
+	 * refused lm <-> cd*sr on the kind rule while converting lm <-> cd at
+	 * factor 1 — the same claim with the sr silently dropped. */
+	value_unit_t lm     = BVN_UNIT_NO_PREFIX(bu_lumen);
+	value_unit_t cd     = BVN_UNIT_NO_PREFIX(bu_candela);
+	value_unit_t cd_sr  = bvni_test_u2(bu_candela, exp_linear,
+					   bu_steradian, exp_linear);
+	ASSERT_TRUE(!bvn_units_compatible(lm, cd),
+		    "a lumen is not a candela");
+	ASSERT_TRUE(bvn_units_compatible(lm, cd_sr),
+		    "a lumen IS a candela-steradian");
+
+	value_unit_t lx     = BVN_UNIT_NO_PREFIX(bu_lux);
+	value_unit_t cd_m2  = bvni_test_u2(bu_candela, exp_linear,
+					   bu_meter, exp_neg_square);
+	value_unit_t lm_m2  = bvni_test_u2(bu_lumen, exp_linear,
+					   bu_meter, exp_neg_square);
+	ASSERT_TRUE(!bvn_units_compatible(lx, cd_m2),
+		    "illuminance is not luminance");
+	ASSERT_TRUE(bvn_units_compatible(lx, lm_m2),
+		    "a lux IS a lumen per square metre");
+	/* phot is illuminance (lm/cm²), stilb is luminance (cd/cm²): same SI
+	 * dimension vector, and they must stay apart for the same reason. */
+	ASSERT_TRUE(!bvn_units_compatible(BVN_UNIT_NO_PREFIX(bu_phot),
+					  BVN_UNIT_NO_PREFIX(bu_stilb)),
+		    "a phot is not a stilb");
+	ASSERT_TRUE(bvn_units_compatible(BVN_UNIT_NO_PREFIX(bu_phot), lx),
+		    "a phot IS an illuminance");
+}
+
+static void test_named_si_collapse_never_substitutes_a_named_unit(void)
+{
+	printf("  the named-SI collapse does not rewrite one named unit as another...\n");
+	/* Sv and Gy share a dimension vector and carry no kind, so the first match
+	 * in bvni_si_named_derived won and BVN_UNIT_REDUCE wrote an equivalent dose
+	 * out as an absorbed dose — in the document, not merely in a conversion. */
+	static const struct { value_base_unit_t base; const char *keep; } same[] = {
+		{ bu_sievert,     "Sv"  },
+		{ bu_becquerel,   "Bq"  },
+		{ bu_baud,        "Bd"  },
+		{ bu_var,         "var" },
+		{ bu_volt_ampere, "VA"  },
+		{ bu_rem,         "rem" },
+		{ bu_candela,     "cd"  },
+	};
+	for (size_t i = 0; i < sizeof same / sizeof same[0]; i++) {
+		char buf[80];
+		int32_t n = bvn_unit_to_string_ex(BVN_UNIT_NO_PREFIX(same[i].base),
+						  buf, sizeof buf, BVN_UNIT_REDUCE);
+		ASSERT_TRUE(n > 0 && strcmp(buf, same[i].keep) == 0,
+			    "a named unit reduces to itself, not to a sibling");
+	}
+	/* What the collapse is FOR still works: a compound folds into the named
+	 * unit it spells out, and a prefix folded into the scale comes back. */
+	char buf[80];
+	value_unit_t as = bvni_test_u2(bu_ampere, exp_linear,
+				       bu_second, exp_linear);
+	ASSERT_TRUE(bvn_unit_to_string_ex(as, buf, sizeof buf, BVN_UNIT_REDUCE) > 0 &&
+		    strcmp(buf, "C") == 0, "A·s still collapses to C");
+	value_unit_t kN = BVN_UNIT_NO_PREFIX(bu_newton);
+	kN.components[0].prefix.system = prefix_si;
+	kN.components[0].prefix.id.si  = si_kilo;
+	ASSERT_TRUE(bvn_unit_to_string_ex(kN, buf, sizeof buf, BVN_UNIT_REDUCE) > 0 &&
+		    strcmp(buf, "k~N") == 0, "k~N keeps its prefix through REDUCE");
+}
+
+static void test_info_prefix_rule_follows_magnitude_not_enum_order(void)
+{
+	printf("  \"kilo and up\" on bit/byte is a magnitude test...\n");
+	/* The rule used to compare enum ids, which only agreed with magnitude
+	 * because prefixes.bvnr happens to be listed in ascending order — while
+	 * that file requires ids to be append-only. */
+	static const struct { si_prefix_id_t p; bool want; } cases[] = {
+		{ si_none,   true  }, { si_kilo,  true  }, { si_mega, true },
+		{ si_quetta, true  }, { si_hecto, false }, { si_deca, false },
+		{ si_milli,  false }, { si_quecto, false },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		value_unit_prefix_t pfx = { prefix_si, .id.si = cases[i].p };
+		ASSERT_TRUE(bvn_prefix_unit_valid(pfx, bu_byte) == cases[i].want,
+			    "the info prefix rule admits exactly kilo and up");
+		ASSERT_TRUE(bvn_prefix_unit_valid(pfx, bu_bit) == cases[i].want,
+			    "and says the same for the bit");
+		/* every one of them is fine on an ordinary unit */
+		ASSERT_TRUE(bvn_prefix_unit_valid(pfx, bu_meter),
+			    "an ordinary unit takes any SI prefix");
+	}
+}
+
 static void test_prefixed_currency_converts(void)
 {
 	printf("  a prefixed currency converts to its unprefixed form...\n");
@@ -2397,6 +2526,10 @@ int main(void)
 	test_logarithmic_units_refuse();
 	test_angle_is_its_own_quantity_kind();
 	test_named_si_collapse_respects_kinds();
+	test_named_si_collapse_never_substitutes_a_named_unit();
+	test_affine_unit_in_a_product_has_no_si_value();
+	test_photometric_units_carry_the_steradian();
+	test_info_prefix_rule_follows_magnitude_not_enum_order();
 	test_rational_to_str_reports_too_long();
 	test_wide_denominator_renders_in_every_base();
 	test_unit_reduce();

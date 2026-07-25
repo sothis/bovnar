@@ -64,8 +64,30 @@ _CAVEATS = set(SEMANTIC_CAVEATS)            # DECIBEL, NEPER, PH_SCALE, VAL
 _KIND_UNITS = {bu.name for bu in BaseUnit
                if not bu.name.startswith('_')
                and BASE_UNIT_TO_PINT.get(int(bu)) in KIND_DIMENSIONS}
-_ANGLE_UNITS = {'DEGREE', 'GRAD', 'REVOLUTION', 'ARCMINUTE', 'ARCSECOND',
-                'STERADIAN'}          # share [angle] with RADIAN
+
+def _shares_the_angle_dimension():
+    """Units carrying [angle] in pint, because bovnar puts them in the angle
+    kind: the angle family itself, and the photometric units built on the
+    steradian (lm = cd·sr, lx = lm/m², ph = lm/cm²). Asked of the registry
+    rather than listed by hand — the hand-written list did not grow when the
+    photometric units joined the kind, and the SI-dimension check below then
+    failed for a unit that was behaving correctly."""
+    reg = build_registry()
+    out = set()
+    for bu in BaseUnit:
+        if bu.name.startswith('_') or int(bu) == 0:
+            continue
+        if int(bu) in CURRENCY_TOKENS:
+            continue
+        token = BASE_UNIT_TO_PINT.get(int(bu))
+        if token is None:
+            continue
+        if any(str(d) == '[angle]' for d in reg.Unit(token).dimensionality):
+            out.add(bu.name)
+    return out
+
+
+_ANGLE_UNITS = _shares_the_angle_dimension()
 _ISOLATED = _KIND_UNITS | _ANGLE_UNITS
 
 

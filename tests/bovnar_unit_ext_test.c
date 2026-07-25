@@ -1212,9 +1212,13 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_rem,           1e-2,                         1e-17);
 	CHK(bu_neper,         1.0,                          1e-15);
 	CHK(bu_kilogram_force, 9.80665,                     1e-12);
-	CHK(bu_inch_hg,       3386.388645,                  1e-6);
+	/* Each of these is an exact multiple of a datum, so it is written as that
+	 * arithmetic rather than as a restated constant: the four below were pinned
+	 * to the ROUNDED value the table used to carry, which is how a Klafter came
+	 * to be 6.000006 Fuss with a test agreeing. */
+	CHK(bu_inch_hg,       25.4*133.322387415,           1e-9);
 	CHK(bu_rpm,           1.0/60.0,                     1e-18);
-	CHK(bu_foot_pound,    1.3558179483,                 1e-10);
+	CHK(bu_foot_pound,    0.3048*0.45359237*9.80665,    1e-15);
 	CHK(bu_dram,          1.7718451953125e-3,            1e-18);
 	CHK(bu_pennyweight,   1.55517384e-3,                1e-14);
 	CHK(bu_chain,         20.1168,                      1e-12);
@@ -1241,10 +1245,10 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_prussian_zoll, 3.13853e-1/12.0,              1e-18);
 	CHK(bu_prussian_fuss, 3.13853e-1,                   1e-16);
 	CHK(bu_prussian_elle, 6.669376250e-1,               1e-16);   /* 25.5 Zoll */
-	CHK(bu_prussian_rute, 3.76624,                      1e-15);
-	CHK(bu_klafter,       1.88312,                      1e-15);
+	CHK(bu_prussian_rute, 12.0*3.13853e-1,              1e-15);
+	CHK(bu_klafter,       6.0*3.13853e-1,               1e-15);
 	CHK(bu_german_mile,   7420.44,                      1e-12);
-	CHK(bu_morgen,        2553.22,                      1e-12);
+	CHK(bu_morgen,        180.0*(12.0*3.13853e-1)*(12.0*3.13853e-1), 1e-11);
 	CHK(bu_scheffel,      54.961e-3,                    1e-18);
 	CHK(bu_survey_foot,   1200.0/3937.0,               1e-16);
 	CHK(bu_league,        4828.032,                    1e-12);

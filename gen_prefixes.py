@@ -67,6 +67,17 @@ def check(prefixes, sysname):
             raise SystemExit("%s: exponent %d used by both %s and %s"
                              % (sysname, e, seen_exp[e], p["name"]))
         seen_exp[e] = p["name"]
+    # The enum ids must ALSO rank by magnitude. Several places read the ordering
+    # as an ordering — a range check over the id is how the C side spells "this
+    # prefix is at least kilo" — and this file's own rule is that ids are
+    # append-only, so a newly added small prefix would land at the top of the
+    # numbering and read as a large one. Keeping the list sorted by exponent is
+    # what makes the two agree, so say so here rather than leave it to luck.
+    exps = [p["exp"] for p in prefixes]
+    if exps != sorted(exps):
+        raise SystemExit(
+            "%s prefixes must be listed in ascending exponent order, so that "
+            "the enum id ranks by magnitude: %s" % (sysname, exps))
 
 
 def enumerator(sysname, p):

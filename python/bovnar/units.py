@@ -156,7 +156,18 @@ def unit_to_si_factor(unit: ValueUnit) -> SIConversion:
 
 
 def units_compatible(a: ValueUnit, b: ValueUnit) -> bool:
-    """Return True when *a* and *b* have the same SI dimension vector."""
+    """Return True when *a* and *b* may be inter-converted.
+
+    That is the same SI dimension vector AND the same amount of every
+    dimensionless quantity kind. The second half is not a formality: bit and
+    byte, the five turbidity scales, pH, practical salinity and the angle family
+    all have the empty dimension vector, so the dimension test alone calls them
+    interchangeable when they are not.
+
+      units_compatible(parse_unit("b"),  parse_unit("B"))    → False
+      units_compatible(parse_unit("lm"), parse_unit("cd"))   → False (lm = cd·sr)
+      units_compatible(parse_unit("°"),  parse_unit("rad"))  → True  (one kind)
+    """
     return bool(get_library().bvn_units_compatible(a, b))
 
 
@@ -171,10 +182,16 @@ def unit_convert_factor(from_unit: ValueUnit,
     The C function signals two distinct outcomes via the pair (ok, requires_affine):
 
       ok=True,  requires_affine=False → straightforward multiplicative factor
-      ok=False, requires_affine=True  → affine conversion required (e.g. °C ↔ K);
-                                        the returned factor is still valid but a plain
-                                        multiply is not sufficient — use convert_value
-      ok=False, requires_affine=False → units are dimensionally incompatible; raises
+      ok=True,  requires_affine=True  → both sides are affine and share an offset
+                                        (°C ↔ °Ré), so the factor alone is correct
+      ok=False, requires_affine=True  → an affine conversion the offsets do not
+                                        cancel (°C ↔ K). **factor is 0.0**, not a
+                                        usable multiplier — call convert_value,
+                                        which does the two-step conversion
+      ok=False, requires_affine=False → units are incompatible; raises
+
+    Because the affine cases are distinguished only by requires_affine, a caller
+    that multiplies by .factor without checking it silently scales by zero.
 
     When requires_affine is True, use convert_value which handles the two-step
     affine conversion automatically, or call unit_to_si_factor on both units and
@@ -213,7 +230,13 @@ def unit_reduce(unit: ValueUnit) -> ReducedUnit:
 
     Example – kg·m·s⁻² reduces to N (newton) with scale 1.0.
 
-    OverflowError is raised when the accumulated scale factor exceeds float range.
+    *scale* is the factor the reduction moved out of the unit and into the
+    number: reducing k~m gives (m, 1000.0), so a value carrying the reduced unit
+    must be multiplied by r.scale to still mean the same quantity.
+
+    OverflowError is raised when the reduction cannot be represented — the
+    accumulated scale left float range, a summed exponent left the ±9 the format
+    can spell, or more distinct bases survived than a unit may carry.
     """
     lib      = get_library()
     scale    = ctypes.c_double(1.0)
@@ -222,7 +245,9 @@ def unit_reduce(unit: ValueUnit) -> ReducedUnit:
                                     ctypes.byref(scale),
                                     ctypes.byref(overflow))
     if overflow.value:
-        raise OverflowError("unit_reduce: scale factor out of float range")
+        raise OverflowError(
+            "unit_reduce: the reduced unit is not representable (scale out of "
+            "float range, exponent outside ±9, or too many components)")
     return ReducedUnit(reduced, float(scale.value))
 
 
@@ -237,13 +262,31 @@ def unit_to_str_ex(unit: ValueUnit,
       UnitFlags.ASCII_EXP — use ^N exponent notation instead of Unicode
                             superscripts (e.g. m/s^2 instead of m/s²)
 
-    Raises BovnarArgumentError when the output buffer overflows (unit has an
-    unusually long representation — this should not occur in practice).
+    .. warning::
+       UnitFlags.REDUCE returns only the reduced UNIT and discards the scale the
+       reduction folded out, so the string can denote a different magnitude from
+       what you passed in: k~g serialises as "g". If you use REDUCE here you must
+       apply unit_reduce(unit).scale to your value yourself. (The writer does
+       this for you; nothing else does.)
+
+    Raises BovnarArgumentError when *unit* has no serialisation: it is
+    structurally invalid, it carries a bu_none component that has no spelling
+    (anything past a bare "no_unit"), or the rendered form exceeds the 256-byte
+    buffer.
     """
     lib = get_library()
     buf = ctypes.create_string_buffer(256)
     n   = lib.bvn_unit_to_string_ex(unit, buf, 256, int(flags))
     if n < 0:
+        # -1 covers three distinct causes; say which, rather than blaming the
+        # buffer for a unit that unit_valid() itself calls valid.
+        if not unit_valid(unit):
+            raise BovnarArgumentError("unit_to_str_ex: structurally invalid unit")
+        nc = min(int(unit.num_components), len(unit.components))
+        if any(int(unit.components[i].base) == 0 for i in range(nc)) and nc:
+            raise BovnarArgumentError(
+                "unit_to_str_ex: a bu_none component has no spelling outside a "
+                "bare no_unit — this unit cannot be written")
         raise BovnarArgumentError("unit_to_str_ex: output buffer overflow")
     return buf.raw[:n].decode('utf-8')
 

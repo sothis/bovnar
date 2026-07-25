@@ -19,6 +19,7 @@ against the reference parser; where a token is refused, it really is `error_unit
 7. [Look-alike characters](#7-look-alike-characters)
 8. [Temperature scales vs. electrical units](#8-temperature-scales-vs-electrical-units)
 9. [Same dimension, different quantity](#9-same-dimension-different-quantity)
+9a. [An affine scale inside a compound has no value](#9a-an-affine-scale-inside-a-compound-has-no-value)
 10. [A named unit is not its compound](#10-a-named-unit-is-not-its-compound)
 11. [Unit vs. currency](#11-unit-vs-currency)
 12. [Looks like a unit, is not one](#12-looks-like-a-unit-is-not-one)
@@ -161,7 +162,7 @@ several are one keystroke apart in everyday data.
 | `np`* | — | `Np` / `nP` | neper / nanopoise |
 | `ev`* | — | `eV` / `EV` | electronvolt / exavolt |
 | `ph` | phot | `pH` | acidity |
-| `ps`* | — | `PS` / `pS` | metric horsepower / picosiemens |
+| `ps` | **picosecond** — a valid unit, silently | `PS` / `pS` | metric horsepower / picosiemens |
 | `cv`* | — | `CV` / `cV` | metric horsepower (French *chevaux*) / centivolt |
 
 \* not a valid token in that casing — listed because the valid neighbours are easy to mistype.
@@ -246,6 +247,11 @@ conversions in the first group; the second group is protected by an explicit qua
 | `Hz`, `Bq`, `Bd` | s⁻¹ | frequency, radioactivity, symbol rate |
 | `mph`, `kn`, `m/s` | m·s⁻¹ | genuinely interchangeable — just different scales |
 
+> Offering the conversion is not the same as rewriting the annotation.
+> `BVN_UNIT_REDUCE` leaves every unit in this table alone: a `Sv` serialises as
+> `Sv`, never as `Gy`. The collapse folds a *compound* into the named unit it
+> spells out (`A·s` → `C`); it never substitutes one named unit for another.
+
 **Dimensionless but *not* interchangeable — Bovnar refuses these conversions:**
 
 | Unit | Kind | Refused against |
@@ -254,6 +260,7 @@ conversions in the first group; the second group is protected by an explicit qua
 | `B` | information (byte) | `b` |
 | `rad`, `°`, `grad`, `rev`, `arcmin`, `arcsec` | angle (one shared kind, so `°` → `rad` works) | plain numbers, `Hz`, `%` |
 | `sr` | angle, weight 2 (`sr` = `rad²`) | `rad` at exponent 1 |
+| `lm`, `lx`, `ph` | angle, weight 2 — each carries one steradian (`lm` = `cd·sr`) | `cd`, `cd/m²`, `sb`: luminous flux is not luminous intensity, illuminance is not luminance |
 | `dB` | logarithmic | `Np`, `%`, plain numbers |
 | `Np` | logarithmic | `dB`, `%`, plain numbers |
 | `pH` | logarithmic | `%`, `ppm`, plain numbers |
@@ -273,6 +280,28 @@ hardness", write `°aH`.
 The logarithmic kinds are separate because no factor can relate them: 20 dB is a ratio of 100, not
 twice 10 dB, and a pH one unit lower is a tenfold concentration. `rpm` is a *cycle* rate and
 `rev/min` an *angular* rate — they differ by 2π and do not convert into one another either.
+
+---
+
+## 9a. An affine scale inside a compound has no value
+
+`°C`, `°F`, `°De`, `°N`, `°Re` and `°Ro` are *offset* scales: 0 is not nothing.
+That is fine for a lone temperature and meaningless in a product.
+
+| Written | Parses | Converts | Why |
+|---------|--------|----------|-----|
+| `°C` | yes | yes — `20 °C` → `293.15 K` | the offset has somewhere to go |
+| `°C/h` | yes | **no** — `error_unit_mismatch` | the offset is a number of kelvin; `K·s⁻¹` has nowhere to put it |
+| `°C·m` | yes | **no** | ditto |
+| `°C²`, `°C·°F` | yes | **no** | an offset scale is meaningful at exponent 1 only |
+
+The annotation stays legal, because it is a reasonable thing to *write* — people
+do record a rate of change in °C/h. What it means is a temperature **difference**
+per hour, and the difference is what Bovnar cannot infer from the unit: `20 °C/h`
+as a rate is `20 K/h`, while `20 °C` as a reading is `293.15 K`. Rather than pick
+one, the library refuses to produce a number and leaves the components for a
+consumer that knows which was meant. Write `K/h` when you mean the rate — the
+kelvin has no offset and the ambiguity disappears.
 
 ---
 

@@ -97,7 +97,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 
 Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
 
-A compact spelling is refused when the token is a well-known annotation for something else: `pH`, `mph`, `kph` and `usb` are `error_unit_illegal` (write `p~H`, `m~ph`, `k~ph`, `u~sb`).
+A compact spelling is refused when the token is a well-known annotation for something else: `pH`, `mph`, `kph`, `usb` and `kt` are `error_unit_illegal` (write `p~H`, `m~ph`, `k~ph`, `u~sb`, and for `kt` either `k~t` for the kilotonne or `kn` for the knot).
 
 Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 

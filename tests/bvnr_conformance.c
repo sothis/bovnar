@@ -1516,6 +1516,13 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("UNT-027", "units", "compact spelling refused by name (mph)",
 	           ".v = 65.0 mph;",
 	           error_unit_illegal),
+	/* "kt" abbreviates both the kilotonne and the knot in the wild, so the
+	 * compact form refuses it and the author picks: k~t (mass) or kn (speed). */
+	ERROR_CASE("UNT-027b", "units", "compact spelling refused as ambiguous (kt)",
+	           ".m = <float:64,kt> 1.0;",
+	           error_unit_illegal),
+	VALID("UNT-027c", "units", "the separated kilotonne is unaffected",
+	      ".m = <float:64,k~t> 1.0;"),
 	ERROR_CASE("UNT-028", "units", "prefix policy applies to the compact form (IEC)",
 	           ".d = <float:64,Kim> 1.0;",
 	           error_unit_illegal),

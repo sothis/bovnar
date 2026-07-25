@@ -35,8 +35,10 @@ reading the grown by-value structs at the wrong size.
   either spelling, so a round-tripped document stays readable to an older
   reader. Four compact spellings are refused by name, because accepting them
   would turn a parse error into a quietly wrong unit: `pH` (acidity, not
-  picohenry), `mph` and `kph` (speeds, not milli-/kilophot) and `usb` (not
-  microstilb); the list is data, in `.compact_exceptions` in
+  picohenry), `mph` and `kph` (speeds, not milli-/kilophot), `usb` (not
+  microstilb), and `kt` — which abbreviates two units bovnar *does* model, the
+  kilotonne and the knot, so the author picks `k~t` or `kn`; the list is data,
+  in `.compact_exceptions` in
   `src/gendata/units.bvnr`, and the separated forms `p~H`, `m~ph`, `k~ph`,
   `u~sb` are untouched. See unit-system reference §4.3.
 - **Compact prefix form for currencies** — the same spelling rule applied to

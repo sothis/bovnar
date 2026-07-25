@@ -904,4 +904,5 @@
 #   pH  (acidity, not picohenry)      → write p~H
 #   mph (miles per hour, not milliphot) → write m~ph
 #   kph (km per hour, not kilophot)     → write k~ph
+#   kt  (kilotonne AND knot)            → write k~t or kn
 .c_inductance  = <float:64,p~H>       33.0;      # picohenry, spelled out

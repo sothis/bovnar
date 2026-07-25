@@ -314,7 +314,7 @@
 </tbody>
 </table>
 <p>Examples: bare <code>m</code> = metre; <code>m~s</code> and <code>ms</code> = millisecond. Bare <code>d</code> = day; <code>d~s</code> and <code>ds</code> = decisecond. Bare <code>min</code> = minute, so milli-inch needs the separator: <code>m~in</code>.</p>
-<p>A compact spelling is refused when the token is a well-known annotation for something else: <code>pH</code>, <code>mph</code>, <code>kph</code> and <code>usb</code> are <code>error_unit_illegal</code> (write <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code>, <code>u~sb</code>).</p>
+<p>A compact spelling is refused when the token is a well-known annotation for something else: <code>pH</code>, <code>mph</code>, <code>kph</code>, <code>usb</code> and <code>kt</code> are <code>error_unit_illegal</code> (write <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code>, <code>u~sb</code>, and for <code>kt</code> either <code>k~t</code> for the kilotonne or <code>kn</code> for the knot).</p>
 <p>Currencies take the compact prefix too (<code>k$EUR</code> = <code>k~$EUR</code>, §5.4), but their <code>$</code> sigil is never optional.</p>
 <hr />
 <h2 id="2-iec-binary-prefixes">2. IEC Binary Prefixes</h2>

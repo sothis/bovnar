@@ -811,8 +811,8 @@ static value_unit_component_t bvn_parse_single_unit_component(
 	if (len == 0) { *ok = false; return r; }
 	{
 		/* Currencies carry a mandatory '$' sigil (spec 1.0): standalone "$USD",
-		 * or prefixed "<prefix>~$EUR".  A bare code is no longer a currency, so
-		 * the CUP/cup namespace collision can no longer arise. */
+		 * or prefixed "<prefix>[~]$EUR".  A bare code is no longer a currency,
+		 * so the CUP/cup namespace collision can no longer arise. */
 		if (s[0] == '$') {
 			int cid = bvn_parse_currency_str((const uint8_t*)s + 1, len - 1);
 			if (cid > 0) {

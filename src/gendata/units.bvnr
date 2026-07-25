@@ -1906,10 +1906,16 @@
 #   a parse error, so nothing here is about ambiguity inside the unit table —
 #   the longest-suffix match settles every one of those (a bare alias wins, so
 #   "min" stays the minute and "cd" the candela). These are the opposite case:
-#   a token that is a WELL-KNOWN annotation for something bovnar does not model,
-#   which the compact form would otherwise accept as a valid — and quietly
-#   wrong — physical unit. Rejecting them keeps `error_unit_illegal` as the
-#   answer to "mph", which is the whole point of a unit-safe format.
+#   a token that is a WELL-KNOWN annotation for something else, which the
+#   compact form would otherwise accept as a valid — and quietly wrong —
+#   physical unit. Rejecting them keeps `error_unit_illegal` as the answer to
+#   "mph", which is the whole point of a unit-safe format. "Something else" is
+#   usually a quantity bovnar does not model (acidity), but "kt" is the harder
+#   case: it is a standard abbreviation for TWO units bovnar DOES model, the
+#   kilotonne and the knot, and reading a speed as a mass is exactly the
+#   failure this format exists to prevent. A token that cannot be resolved by
+#   knowing the tables is one only the author can resolve, so ask them to:
+#   k~t or kn.
 #
 #   Only the compact spelling is refused. The separated form still parses and
 #   still means what it always did: p~H is picohenry, m~ph milliphot.
@@ -1921,5 +1927,6 @@
   { .spelling = "pH";  .why = "acidity, not picohenry (write p~H)";          },
   { .spelling = "mph"; .why = "miles per hour, not milliphot (write m~ph)";  },
   { .spelling = "kph"; .why = "km per hour, not kilophot (write k~ph)";      },
-  { .spelling = "usb"; .why = "the bus, not microstilb (write u~sb or µ~sb)"; }
+  { .spelling = "usb"; .why = "the bus, not microstilb (write u~sb or µ~sb)"; },
+  { .spelling = "kt";  .why = "kilotonne or knot — say which (k~t or kn)";     }
 ];

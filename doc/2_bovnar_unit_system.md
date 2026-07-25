@@ -651,7 +651,7 @@ The rules are exactly the rules of the separated form, with one addition:
 - **Where two prefixed readings compete, the longer base symbol wins** — for the same reason. `dat` is deci-`at` (technical atmosphere), not deca-tonne; `dau` is deci-`au`, not deca-dalton. Write `da~t` / `da~u` for those.
 - **A prefix cannot be stacked.** `kkg` and `k~kg` are both `error_unit_illegal`.
 - **Prefix–unit validity is unchanged.** `Kim` fails for the same reason `Ki~m` does; so do `mB`, `kPfd`, `kppm`.
-- **A few compact spellings are refused by name.** A token that is a well-known annotation for something Bovnar does not model would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay `error_unit_illegal`:
+- **A few compact spellings are refused by name.** A token that is a well-known annotation for something *else* would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay `error_unit_illegal`:
 
   | Refused | Would have meant | Usually means | Write instead |
   |---------|------------------|---------------|---------------|
@@ -659,8 +659,11 @@ The rules are exactly the rules of the separated form, with one addition:
   | `mph`   | milliphot        | miles per hour | `m~ph` |
   | `kph`   | kilophot         | km per hour   | `k~ph` |
   | `usb`   | microstilb       | the bus       | `u~sb` |
+  | `kt`    | kilotonne        | *also* the knot | `k~t` (mass) or `kn` (speed) |
 
-  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry.
+  The last row is the harder case: `kt` is a standard abbreviation for two units Bovnar *does* model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.
+
+  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry, `k~t` still the kilotonne.
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 

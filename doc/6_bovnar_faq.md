@@ -428,9 +428,15 @@ In four situations, all of which are `error_unit_illegal`:
    (IEC prefixes are for `b`/`B` only), as do `mB`, `kPfd` and `kppm`.
 4. **A spelling refused by name.** `pH`, `mph`, `kph` and `usb` would otherwise
    resolve to picohenry, milliphot, kilophot and microstilb — quietly wrong
-   units for tokens that in practice mean acidity, two speeds and a bus. They
-   stay errors; the separated forms `p~H`, `m~ph`, `k~ph`, `u~sb` still work.
-   The list lives in `src/gendata/units.bvnr`.
+   units for tokens that in practice mean acidity, two speeds and a bus. `kt`
+   is refused for the opposite reason: it is a standard abbreviation for two
+   units Bovnar *does* model, the kilotonne and the knot. They stay errors; the
+   separated forms `p~H`, `m~ph`, `k~ph`, `u~sb`, `k~t` (and `kn` for knots)
+   still work. The list lives in `src/gendata/units.bvnr`.
+
+Symbols are case-sensitive in either spelling, so `Kg`, `KB` and `KG` are
+`error_unit_illegal` rather than silently-accepted variants of `kg` and `kB` —
+`K` is the kelvin, not the kilo prefix.
 
 A prefixed **currency** works the same way — `k$EUR` is `k~$EUR`, since the `$` sigil already separates the two. The sigil itself is never optional: `kUSD` is `error_unit_illegal`, because a bare code is not a currency.
 

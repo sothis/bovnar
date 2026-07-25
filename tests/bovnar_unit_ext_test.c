@@ -539,7 +539,7 @@ static void test_compact_prefix_equivalence(void)
 	assert_compact_matches("cSt",    "c~St");
 	assert_compact_matches("cP",     "c~P");
 	assert_compact_matches("mGal",   "m~Gal");
-	assert_compact_matches("kt",     "k~t");
+	assert_compact_matches("Mt",     "M~t");
 	assert_compact_matches("mseconds", "m~seconds");     /* long-name alias */
 
 	/* IEC prefixes, which only the information units accept. */
@@ -692,6 +692,7 @@ static void test_compact_prefix_exceptions(void)
 	assert_unit_rejected("mph");
 	assert_unit_rejected("kph");
 	assert_unit_rejected("usb");
+	assert_unit_rejected("kt");    /* kilotonne or knot — the author must say */
 
 	/* The exponent suffix is stripped before the check, so a decorated form is
 	 * refused too. */
@@ -716,6 +717,15 @@ static void test_compact_prefix_exceptions(void)
 		ASSERT_TRUE(ok, "u~sb (microstilb) still parses");
 		ASSERT_EQ_INT(u.components[0].base,         bu_stilb, "u~sb base");
 		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_micro, "u~sb prefix");
+
+		u = bvn_parse_unit((const uint8_t *)"k~t", &ok);
+		ASSERT_TRUE(ok, "k~t (kilotonne) still parses");
+		ASSERT_EQ_INT(u.components[0].base,         bu_tonne, "k~t base");
+		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_kilo,  "k~t prefix");
+
+		u = bvn_parse_unit((const uint8_t *)"kn", &ok);
+		ASSERT_TRUE(ok, "kn (knot) still parses");
+		ASSERT_EQ_INT(u.components[0].base, bu_knot, "kn base");
 	}
 
 	/* A refusal is per-spelling, not per-unit: other compact prefixes on the

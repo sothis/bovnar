@@ -385,10 +385,15 @@ written <code>m~in</code>).</p>
    (IEC prefixes are for <code>b</code>/<code>B</code> only), as do <code>mB</code>, <code>kPfd</code> and <code>kppm</code>.</li>
 <li><strong>A spelling refused by name.</strong> <code>pH</code>, <code>mph</code>, <code>kph</code> and <code>usb</code> would otherwise
    resolve to picohenry, milliphot, kilophot and microstilb — quietly wrong
-   units for tokens that in practice mean acidity, two speeds and a bus. They
-   stay errors; the separated forms <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code>, <code>u~sb</code> still work.
-   The list lives in <code>src/gendata/units.bvnr</code>.</li>
+   units for tokens that in practice mean acidity, two speeds and a bus. <code>kt</code>
+   is refused for the opposite reason: it is a standard abbreviation for two
+   units Bovnar <em>does</em> model, the kilotonne and the knot. They stay errors; the
+   separated forms <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code>, <code>u~sb</code>, <code>k~t</code> (and <code>kn</code> for knots)
+   still work. The list lives in <code>src/gendata/units.bvnr</code>.</li>
 </ol>
+<p>Symbols are case-sensitive in either spelling, so <code>Kg</code>, <code>KB</code> and <code>KG</code> are
+<code>error_unit_illegal</code> rather than silently-accepted variants of <code>kg</code> and <code>kB</code> —
+<code>K</code> is the kelvin, not the kilo prefix.</p>
 <p>A prefixed <strong>currency</strong> works the same way — <code>k$EUR</code> is <code>k~$EUR</code>, since the <code>$</code> sigil already separates the two. The sigil itself is never optional: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is not a currency.</p>
 <hr />
 <p><strong>What is the difference between <code>M~B</code> (megabytes) and <code>Mi~B</code> (mebibytes)?</strong></p>

@@ -917,6 +917,69 @@ class TestCompactPrefixForm:
 
 
 @needs_lib
+class TestCompactPrefixFormAgainstTheTable:
+    """Sweep src/gendata/units.bvnr, not just the hand-picked cases above.
+
+    gen_units.py checks the exception list at BUILD time against a Python
+    re-implementation of the parse rules; these check the shipped library at
+    TEST time, so the two cannot drift apart silently. The alias sweep is the
+    invariant the whole compact form rests on — if a bare alias ever started
+    resolving as prefix+unit, documents written before the compact form would
+    change meaning.
+    """
+
+    @staticmethod
+    def _gendata():
+        import os
+        import sys
+        root = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))))
+        sys.path.insert(0, root)
+        import bvnr_data
+        with open(os.path.join(root, "src", "gendata", "units.bvnr"),
+                  encoding="utf-8") as f:
+            return bvnr_data.load(f.read())
+
+    def test_every_bare_alias_still_parses_without_a_prefix(self):
+        doc = self._gendata()
+        broken = []
+        for u in doc["units"]:
+            for alias in u["aliases"]:
+                try:
+                    c = bovnar.parse_unit(alias).components[0]
+                except BovnarArgumentError:
+                    broken.append("%s (%s) no longer parses" % (alias, u["name"]))
+                    continue
+                if int(c.si_prefix) != int(SIPrefix.NONE) or \
+                        int(c.prefix_system) != int(PrefixSystem.SI):
+                    broken.append("%s (%s) parsed as a PREFIXED unit"
+                                  % (alias, u["name"]))
+        assert not broken, "compact form shadowed a bare alias: %s" % broken
+
+    def test_every_compact_exception_is_refused(self):
+        for e in self._gendata()["compact_exceptions"]:
+            with pytest.raises(BovnarArgumentError):
+                bovnar.parse_unit(e["spelling"])
+
+    def test_no_compact_exception_is_dead_weight(self):
+        """A listed spelling must be one the parser would otherwise accept —
+        i.e. inserting the '~' back must yield a real prefixed unit. An entry
+        that blocks nothing is a typo pretending to be a policy."""
+        doc = self._gendata()
+        aliases = sorted({a for u in doc["units"] for a in u["aliases"]},
+                         key=len, reverse=True)
+        for e in doc["compact_exceptions"]:
+            sp = e["spelling"]
+            assert sp not in aliases, \
+                "%s is a bare alias; the compact path never runs for it" % sp
+            base = next((a for a in aliases if sp.endswith(a) and sp != a), None)
+            assert base, "%s ends in no known unit symbol" % sp
+            separated = sp[:-len(base)] + "~" + base
+            bovnar.parse_unit(separated)      # raises if the entry blocks nothing
+            assert e["why"], "%s has no stated reason" % sp
+
+
+@needs_lib
 class TestNewUnitPrefixFactorAndExponent:
 
     def _p(self, s):

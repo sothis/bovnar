@@ -2199,7 +2199,7 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 <li><strong>Where two prefixed readings compete, the longer base symbol wins</strong> — for the same reason. <code>dat</code> is deci-<code>at</code> (technical atmosphere), not deca-tonne; <code>dau</code> is deci-<code>au</code>, not deca-dalton. Write <code>da~t</code> / <code>da~u</code> for those.</li>
 <li><strong>A prefix cannot be stacked.</strong> <code>kkg</code> and <code>k~kg</code> are both <code>error_unit_illegal</code>.</li>
 <li><strong>Prefix–unit validity is unchanged.</strong> <code>Kim</code> fails for the same reason <code>Ki~m</code> does; so do <code>mB</code>, <code>kPfd</code>, <code>kppm</code>.</li>
-<li><strong>A few compact spellings are refused by name.</strong> A token that is a well-known annotation for something Bovnar does not model would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay <code>error_unit_illegal</code>:</li>
+<li><strong>A few compact spellings are refused by name.</strong> A token that is a well-known annotation for something <em>else</em> would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay <code>error_unit_illegal</code>:</li>
 </ul>
 <table>
 <thead>
@@ -2235,9 +2235,16 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 <td>the bus</td>
 <td><code>u~sb</code></td>
 </tr>
+<tr>
+<td><code>kt</code></td>
+<td>kilotonne</td>
+<td><em>also</em> the knot</td>
+<td><code>k~t</code> (mass) or <code>kn</code> (speed)</td>
+</tr>
 </tbody>
 </table>
-<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry.</p>
+<p>The last row is the harder case: <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.</p>
+<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne.</p>
 <p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
 <p>Currencies take the compact prefix too — <code>k$EUR</code> is <code>k~$EUR</code>. The <code>$</code> sigil already separates the prefix from the code (no prefix symbol and no currency code contains a <code>$</code>), so nothing is left for the <code>~</code> to resolve. What the sigil rule still requires is the sigil itself: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is never a currency (§10.4).</p>
 <hr />

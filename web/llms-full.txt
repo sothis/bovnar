@@ -61,7 +61,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 335-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 337-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -4472,7 +4472,7 @@ The rules are exactly the rules of the separated form, with one addition:
 - **Where two prefixed readings compete, the longer base symbol wins** — for the same reason. `dat` is deci-`at` (technical atmosphere), not deca-tonne; `dau` is deci-`au`, not deca-dalton. Write `da~t` / `da~u` for those.
 - **A prefix cannot be stacked.** `kkg` and `k~kg` are both `error_unit_illegal`.
 - **Prefix–unit validity is unchanged.** `Kim` fails for the same reason `Ki~m` does; so do `mB`, `kPfd`, `kppm`.
-- **A few compact spellings are refused by name.** A token that is a well-known annotation for something Bovnar does not model would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay `error_unit_illegal`:
+- **A few compact spellings are refused by name.** A token that is a well-known annotation for something *else* would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay `error_unit_illegal`:
 
   | Refused | Would have meant | Usually means | Write instead |
   |---------|------------------|---------------|---------------|
@@ -4480,8 +4480,11 @@ The rules are exactly the rules of the separated form, with one addition:
   | `mph`   | milliphot        | miles per hour | `m~ph` |
   | `kph`   | kilophot         | km per hour   | `k~ph` |
   | `usb`   | microstilb       | the bus       | `u~sb` |
+  | `kt`    | kilotonne        | *also* the knot | `k~t` (mass) or `kn` (speed) |
 
-  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry.
+  The last row is the harder case: `kt` is a standard abbreviation for two units Bovnar *does* model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.
+
+  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry, `k~t` still the kilotonne.
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 
@@ -9165,7 +9168,8 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* decodes.  A prefix cannot be stacked ("kkg", "k~kg" are both       *)
 (* error_unit_illegal), prefix-unit validity is unchanged, and the    *)
 (* few compact spellings listed in .compact_exceptions               *)
-(* (src/gendata/units.bvnr: "pH", "mph", "kph", "usb") stay errors   *)
+(* (src/gendata/units.bvnr: "pH", "mph", "kph", "usb", "kt") stay    *)
+(* errors                                                            *)
 (* because they are well-known annotations for something else.       *)
 (* A prefixed CURRENCY behaves the same way ("k~$EUR" = "k$EUR");    *)
 (* the '$' sigil separates prefix from code and stays MANDATORY, so  *)
@@ -10188,9 +10192,15 @@ In four situations, all of which are `error_unit_illegal`:
    (IEC prefixes are for `b`/`B` only), as do `mB`, `kPfd` and `kppm`.
 4. **A spelling refused by name.** `pH`, `mph`, `kph` and `usb` would otherwise
    resolve to picohenry, milliphot, kilophot and microstilb — quietly wrong
-   units for tokens that in practice mean acidity, two speeds and a bus. They
-   stay errors; the separated forms `p~H`, `m~ph`, `k~ph`, `u~sb` still work.
-   The list lives in `src/gendata/units.bvnr`.
+   units for tokens that in practice mean acidity, two speeds and a bus. `kt`
+   is refused for the opposite reason: it is a standard abbreviation for two
+   units Bovnar *does* model, the kilotonne and the knot. They stay errors; the
+   separated forms `p~H`, `m~ph`, `k~ph`, `u~sb`, `k~t` (and `kn` for knots)
+   still work. The list lives in `src/gendata/units.bvnr`.
+
+Symbols are case-sensitive in either spelling, so `Kg`, `KB` and `KG` are
+`error_unit_illegal` rather than silently-accepted variants of `kg` and `kB` —
+`K` is the kelvin, not the kilo prefix.
 
 A prefixed **currency** works the same way — `k$EUR` is `k~$EUR`, since the `$` sigil already separates the two. The sigil itself is never optional: `kUSD` is `error_unit_illegal`, because a bare code is not a currency.
 
@@ -11216,7 +11226,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (335 cases) ──→ for each test case:                │
+│  Test corpus (337 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -11596,14 +11606,14 @@ specifies:
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
-| `units` | 41 | SI/IEC prefixes, compact prefix form, compound, inline, errors |
+| `units` | 43 | SI/IEC prefixes, compact prefix form, compound, inline, errors |
 | `special_numbers` | 5 | `nan`, `inf`, `ninf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 16 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **335** | |
+| **Total** | **337** | |
 
 ---
 
@@ -11613,7 +11623,7 @@ The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
 natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading `# Subtest:` comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 22), not the 335 cases.
+parent plan therefore counts the groups (currently 22), not the 337 cases.
 
 ```
 TAP version 14
@@ -11816,7 +11826,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 
 Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
 
-A compact spelling is refused when the token is a well-known annotation for something else: `pH`, `mph`, `kph` and `usb` are `error_unit_illegal` (write `p~H`, `m~ph`, `k~ph`, `u~sb`).
+A compact spelling is refused when the token is a well-known annotation for something else: `pH`, `mph`, `kph`, `usb` and `kt` are `error_unit_illegal` (write `p~H`, `m~ph`, `k~ph`, `u~sb`, and for `kt` either `k~t` for the kilotonne or `kn` for the knot).
 
 Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 

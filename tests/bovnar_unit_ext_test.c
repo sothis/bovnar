@@ -792,6 +792,8 @@ static void test_water_hardness_units(void)
 		{ "\xc2\xb0" "rH", 40.0780   },
 		{ "\xc2\xb0" "aH", 100.0860  },
 		{ "m~val/L",       2.0      },
+		{ "m~eq/L",        2.0      },   /* the English spelling of mval/L */
+		{ "gpg",           5.8468   },
 	};
 	for (unsigned i = 0; i < sizeof(scale) / sizeof(scale[0]); i++) {
 		bool sok = false;
@@ -826,6 +828,32 @@ static void test_water_hardness_units(void)
 	assert_unit_rejected("m~\xc2\xb0" "dH");
 	assert_unit_rejected("k~\xc2\xb0" "fH");
 	assert_compact_matches("mval", "m~val");
+
+	/* Electrical conductivity needs no unit of its own: siemens per length says
+	 * it exactly, in every spelling the field uses. "mho" is the pre-SI name for
+	 * the siemens and still turns up in older US water and soil data. */
+	{
+		bool eok = false;
+		value_unit_t ec = bvn_parse_unit((const uint8_t *)"\xc2\xb5S/cm", &eok);
+		ASSERT_TRUE(eok, "µS/cm parses");
+		ASSERT_EQ_INT(ec.num_components, 2, "µS/cm has two components");
+		ASSERT_EQ_INT(ec.components[0].base, bu_siemens, "…siemens");
+		ASSERT_EQ_INT(ec.components[1].base, bu_meter,   "…per metre");
+		ASSERT_TRUE(bvn_units_compatible(ec, bvn_parse_unit((const uint8_t *)"S/m", &eok)),
+			    "µS/cm and S/m are the same quantity");
+		ASSERT_TRUE(bvn_unit_convert_value(1.0, bvn_parse_unit((const uint8_t *)"m~mho/c~m", &eok),
+						   bvn_parse_unit((const uint8_t *)"m~S/c~m", &eok), &out) &&
+			    out == 1.0, "a mho is a siemens");
+	}
+
+	/* gpg is an amount concentration and converts with the other hardness
+	 * scales; gr/gal is a MASS concentration and deliberately does not. */
+	{
+		bool gok = false;
+		ASSERT_TRUE(!bvn_units_compatible(bvn_parse_unit((const uint8_t *)"gpg", &gok),
+						  bvn_parse_unit((const uint8_t *)"gr/gal", &gok)),
+			    "gpg is not the compound gr/gal");
+	}
 
 	/* Water chemistry says "ppm" for °aH, but bovnar's ppm is the
 	 * dimensionless 10^-6 — the two must not be interchangeable. */
@@ -989,7 +1017,8 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_russian_hardness   == 386, "bu_russian_hardness == 386");
 	ASSERT_TRUE((int)bu_american_hardness  == 387, "bu_american_hardness == 387");
 	ASSERT_TRUE((int)bu_val                == 388, "bu_val == 388");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 389, "sentinel == 389");
+	ASSERT_TRUE((int)bu_grains_per_gallon  == 389, "bu_grains_per_gallon == 389");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 390, "sentinel == 390");
 }
 
 static void test_nonsi_si_factors(void)

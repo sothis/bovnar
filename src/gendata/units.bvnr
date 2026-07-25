@@ -247,7 +247,10 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
-    .aliases = ["siemens", "S"];
+    # "mho" is the pre-SI name for the same unit, still current in older US water
+    # and soil data (µmho/cm). ℧ is U+2127 INVERTED OHM SIGN — distinct from the
+    # ohm's Ω U+2126, so the two cannot be confused.
+    .aliases = ["siemens", "mhos", "mho", "S", "℧"];
   },
   {
     .id      = <uint:16>  20;
@@ -2051,7 +2054,25 @@
     .affine  = false;
     .offset  = 0.0;
     .prefix  = default;
-    .aliases = ["vals", "val"];
+    # "meq/L" is the English spelling of "mval/L" — same unit, same caveat.
+    .aliases = ["vals", "val", "eq"];
+  },
+  {
+    # 1 gpg = 1 grain CaCO₃ per US gallon = 64.79891 mg / 3.785411784 L
+    #       = 17.1181 mg/L / M(CaCO₃) = 0.171034 mmol/L. The US water-softener
+    # scale, and the reason it is a unit rather than the compound gr/gal: as a
+    # compound that is a MASS concentration, which does not convert to the other
+    # hardness scales. Both spellings stay valid and mean different things.
+    .id      = <uint:16> 389;
+    .name    = "grains_per_gallon";
+    .symbol  = "gpg";
+    .factor  = 0.17103352162411276;
+    .dims    = { .length = -3; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = none;
+    .aliases = ["grains_per_gallon", "gpg"];
   }
 ];
 

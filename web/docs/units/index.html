@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Unit &amp; Currency System</title>
-<meta name="description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 172 units and 216 currencies with dimensions and exact conversion factors.">
+<meta name="description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 173 units and 216 currencies with dimensions and exact conversion factors.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/docs/units/">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:title" content="Bovnar Unit &amp; Currency System">
-<meta property="og:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 172 units and 216 currencies with dimensions and exact conversion factors.">
+<meta property="og:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 173 units and 216 currencies with dimensions and exact conversion factors.">
 <meta property="og:url" content="https://www.bovnar.io/docs/units/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
@@ -26,13 +26,13 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit &amp; Currency System">
-<meta name="twitter:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 172 units and 216 currencies with dimensions and exact conversion factors.">
+<meta name="twitter:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 173 units and 216 currencies with dimensions and exact conversion factors.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/2_bovnar_unit_system.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 172 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-25", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 173 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-25", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -77,6 +77,7 @@
    - 3.26 <a href="#326-named-speed-units">Named Speed Units</a>
    - 3.27 <a href="#327-acidity">Acidity</a>
    - 3.28 <a href="#328-water-hardness">Water Hardness</a>
+   - 3.28.1 <a href="#3281-conductivity-and-dissolved-solids">Conductivity and Dissolved Solids</a>
    - 3.26 <a href="#326-sentinel-value">Sentinel Value</a></li>
 <li><a href="#4-prefixes">Prefixes</a>
    - 4.1 <a href="#41-si-prefixes">SI Prefixes</a>
@@ -138,7 +139,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 172 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 173 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -249,7 +250,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </table>
 <hr />
 <h2 id="3-physical-base-units">3. Physical Base Units</h2>
-<p>Bovnar supports 172 named physical base units. Currency codes are a separate namespace and are covered in §9.</p>
+<p>Bovnar supports 173 named physical base units. Currency codes are a separate namespace and are covered in §9.</p>
 <blockquote>
 <p><strong>Reading this section:</strong> The <em>Symbol</em> column gives the canonical serialized form. <em>Long forms</em> are accepted on input but never produced on output. <em>Enum value</em> is the <code>value_base_unit_t</code> constant used in the C API.</p>
 </blockquote>
@@ -396,7 +397,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tr>
 <tr>
 <td><code>S</code></td>
-<td><code>siemens</code></td>
+<td><code>siemens</code>, <code>mho</code>, <code>mhos</code>, <code>℧</code></td>
 <td>siemens</td>
 <td><code>bu_siemens</code></td>
 <td>kg⁻¹·m⁻²·A²·s³</td>
@@ -655,8 +656,8 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 <td>1852 m (exact)</td>
 </tr>
 <tr>
-<td><code>Å</code> (U+212B)</td>
-<td><code>angstrom</code>, <code>angstroms</code>, Å (U+00C5)</td>
+<td><code>Å</code> (U+212B)</td>
+<td><code>angstrom</code>, <code>angstroms</code>, Å (U+00C5), Å (U+0041 U+030A)</td>
 <td>ångström</td>
 <td><code>bu_angstrom</code></td>
 <td>10⁻¹⁰ m</td>
@@ -1693,7 +1694,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tbody>
 </table>
 <blockquote>
-<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–388</strong> (<code>bu_ph_scale</code> … <code>bu_val</code>), and a further unit would be appended there. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>383</strong> (verified by static assert <code>bu_kilometer_per_hour + 1 == 383</code>, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.</p>
+<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–389</strong> (<code>bu_ph_scale</code> … <code>bu_grains_per_gallon</code>), and a further unit would be appended there. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>383</strong> (verified by static assert <code>bu_kilometer_per_hour + 1 == 383</code>, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.</p>
 </blockquote>
 <h3 id="321-additional-length-units">3.21 Additional Length Units</h3>
 <table>
@@ -2000,6 +2001,14 @@ carries mol·m⁻³ (which is exactly mmol·L⁻¹), converts into every other, 
 <td>0.009991</td>
 </tr>
 <tr>
+<td><code>gpg</code></td>
+<td><code>grains_per_gallon</code></td>
+<td>grains per US gallon</td>
+<td><code>bu_grains_per_gallon</code></td>
+<td>1 grain CaCO₃ / US gallon</td>
+<td>0.171034</td>
+</tr>
+<tr>
 <td><code>val</code></td>
 <td><code>vals</code></td>
 <td>equivalent (water analysis)</td>
@@ -2019,6 +2028,7 @@ carries mol·m⁻³ (which is exactly mmol·L⁻¹), converts into every other, 
 <th><code>°fH</code></th>
 <th><code>°rH</code></th>
 <th><code>°aH</code></th>
+<th><code>gpg</code></th>
 <th><code>mval/L</code></th>
 </tr>
 </thead>
@@ -2030,11 +2040,15 @@ carries mol·m⁻³ (which is exactly mmol·L⁻¹), converts into every other, 
 <td>10.0086</td>
 <td>40.078</td>
 <td>100.086</td>
+<td>5.8468</td>
 <td>2.000</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
+<p><strong><code>gpg</code> is a unit, <code>gr/gal</code> is a compound, and they are not the same thing.</strong> <code>gpg</code> is an amount
+concentration and converts with the other hardness scales; <code>gr/gal</code> (grain per US gallon) is a
+<em>mass</em> concentration and deliberately does not. Both spellings stay valid.</p>
 <p><strong><code>val</code> is the equivalent as <em>water analysis</em> uses it.</strong> The ions counted are divalent, so one
 equivalent is half a mole and <code>m~val/L</code> = 0.5 mmol/L, which is what the hardness tables state.
 An equivalent of a <em>monovalent</em> species is one mole — Bovnar cannot know the species from the
@@ -2042,11 +2056,59 @@ unit, so for that case write the amount directly (<code>m~mol/L</code>). There i
 <code>eq</code> / <code>equivalent</code> alias.</p>
 <p><strong>Exactness.</strong> Every degree is derived from a molar mass (IUPAC 2021: Ca 40.078, C 12.011,
 O 15.999 g·mol⁻¹), so the factors are measurement-derived rather than exact rationals. They carry
-<code>.exact = false</code>: a lossless (rational) conversion reports <code>error_unit_inexact</code> instead of
-inventing precision, while the ordinary double-precision path converts normally.</p>
+<code>.exact = false</code>, which means a <strong>read-time lossless conversion</strong> (<code>want_unit</code>, §7c of the
+read/write API) refuses them with <code>error_unit_inexact</code> (47) rather than inventing precision —
+the same answer it gives for a π-based angle. <code>bvn_unit_convert_value</code> and
+<code>bvn_unit_to_si_factor</code>, which work in double precision, convert normally.</p>
+<p><strong><code>mval/L</code> and <code>meq/L</code> are one unit.</strong> <code>eq</code> is an accepted spelling of <code>val</code>, so the German and
+English conventions both work and both carry the divalent caveat above.</p>
 <p><strong><code>dH</code> is not <code>°dH</code>.</strong> Without the degree sign the token is the decihenry, and it stays that way.
 Likewise water chemistry writes the American scale as "ppm"; Bovnar's <code>ppm</code> is the dimensionless
 10⁻⁶ and is <em>not</em> interchangeable with <code>°aH</code>. See <a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+</blockquote>
+<h3 id="3281-conductivity-and-dissolved-solids">3.28.1 Conductivity and Dissolved Solids</h3>
+<p>Two quantities that water data quotes constantly and that need <strong>no unit of their own</strong> — the
+existing tables already say them exactly.</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Write</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Electrical conductivity (EC)</td>
+<td><code>µS/cm</code>, <code>uS/cm</code>, <code>mS/cm</code>, <code>dS/m</code>, <code>S/m</code></td>
+<td>siemens per length; <code>dS/m</code> is the soil-salinity convention and equals <code>mS/cm</code></td>
+</tr>
+<tr>
+<td>… in pre-SI spelling</td>
+<td><code>µmho/cm</code>, <code>mmho/cm</code></td>
+<td><code>mho</code>, <code>mhos</code> and <code>℧</code> (U+2127) are accepted spellings of the siemens</td>
+</tr>
+<tr>
+<td>Total dissolved solids (TDS)</td>
+<td><code>mg/L</code>, <code>µg/L</code>, <code>g/L</code>, <code>k~g/m³</code></td>
+<td>mass concentration</td>
+</tr>
+<tr>
+<td>Resistivity (the reciprocal)</td>
+<td><code>MΩ·cm</code>, <code>M~Ω·c~m</code></td>
+<td>ultrapure-water convention</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>"ppm" for TDS.</strong> Water data writes TDS in "ppm", meaning milligrams per litre. Bovnar's <code>ppm</code>
+is the dimensionless 10⁻⁶ — for a dilute aqueous solution at 1 kg/L the two are <em>numerically</em>
+the same, so writing <code>ppm</code> is defensible here in a way it is not for hardness (§3.28), but the
+dimensions differ: <code>ppm</code> is a ratio, <code>mg/L</code> is a concentration, and they do not convert into one
+another. Pick the one you mean.</p>
+<p><strong>TDS meter scales.</strong> A conductivity meter reading "TDS ppm" applies a conversion factor to EC
+(the 500/442/700 scales). That factor is a property of the instrument and the water, not of a
+unit — record the EC in <code>µS/cm</code> and the factor separately, or record the TDS as <code>mg/L</code>.</p>
 </blockquote>
 <h3 id="329-sentinel-value">3.29 Sentinel Value</h3>
 <p><code>bu_none</code> (value <code>0</code>) is the internal representation of "no base unit", used for the <code>no_unit</code> keyword and as the default when no unit annotation is present.</p>
@@ -4268,7 +4330,7 @@ groups raise <code>error_unit_illegal</code>.</p>
 </code></pre></div>
 
 <h4 id="value_base_unit_t"><code>value_base_unit_t</code></h4>
-<p>Non-German physical units occupy positions 1–133 (<code>bu_bit</code> … <code>bu_bushel</code>). Currency codes occupy positions 134–347 — an unnamed slot range (no <code>bu_*</code> enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (<code>bu_pfund</code> … <code>bu_scheffel</code>). Additional physical units occupy positions 361–367 (<code>bu_survey_foot</code> … <code>bu_baud</code>), historical temperature scales 368–371 (<code>bu_delisle</code> … <code>bu_romer</code>), and dimensionless ratio units 372–377 (<code>bu_percent</code> … <code>bu_ppb</code>). Physical units resume past the currency extension at 380–388 (<code>bu_ph_scale</code> … <code>bu_val</code>). <code>bvn_unit_is_currency(base)</code> returns <code>true</code> for any value in the range 134–347 or the extension slots 378–379 (<code>bu_zwg</code>, <code>bu_xcg</code>).</p>
+<p>Non-German physical units occupy positions 1–133 (<code>bu_bit</code> … <code>bu_bushel</code>). Currency codes occupy positions 134–347 — an unnamed slot range (no <code>bu_*</code> enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (<code>bu_pfund</code> … <code>bu_scheffel</code>). Additional physical units occupy positions 361–367 (<code>bu_survey_foot</code> … <code>bu_baud</code>), historical temperature scales 368–371 (<code>bu_delisle</code> … <code>bu_romer</code>), and dimensionless ratio units 372–377 (<code>bu_percent</code> … <code>bu_ppb</code>). Physical units resume past the currency extension at 380–389 (<code>bu_ph_scale</code> … <code>bu_grains_per_gallon</code>). <code>bvn_unit_is_currency(base)</code> returns <code>true</code> for any value in the range 134–347 or the extension slots 378–379 (<code>bu_zwg</code>, <code>bu_xcg</code>).</p>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">value_base_unit_e</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">bu_none</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">            </span><span class="cm">/* dimensionless / no unit        */</span>
 

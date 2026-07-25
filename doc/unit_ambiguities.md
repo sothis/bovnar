@@ -187,7 +187,7 @@ and always emits one canonical form.
 |---------|--------------------|------------------|
 | micro prefix | `µ` U+00B5 · `μ` U+03BC (Greek mu) · `u` (ASCII) | `µ` U+00B5 |
 | ohm | `Ω` U+2126 · `Ω` U+03A9 (Greek omega) · `ohm` · `Ohm` | `Ω` U+2126 |
-| ångström | `Å` U+212B · `Å` U+00C5 · `Å` U+0041 U+030A (A + combining ring) · `angstrom`, `angstroms` | `Å` U+212B |
+| ångström | `Å` U+212B · `Å` U+00C5 · `Å` U+0041 U+030A (A + combining ring) · `angstrom`, `angstroms` | `Å` U+212B |
 | degree | `°` U+00B0 · `deg` · `degr` · `degree` · `degrees` | `°` U+00B0 |
 
 A document that has been through Unicode normalisation (NFC/NFD/NFKC/NFKD) still parses: every
@@ -347,7 +347,8 @@ their *mass*-per-litre definitions are not comparable and the amount concentrati
 | French | `°fH` | 10 mg CaCO₃ / L | 10.0086 °fH |
 | Russian | `°rH` | 1 mg Ca / L | 40.078 °rH |
 | American | `°aH` | 1 mg CaCO₃ / L (called "ppm") | 100.086 °aH |
-| Equivalents | `m~val/L` | ½ mmol/L (divalent ions) | 2.000 mval/L |
+| US grains | `gpg` | 1 grain CaCO₃ / US gallon | 5.8468 gpg |
+| Equivalents | `m~val/L`, `m~eq/L` | ½ mmol/L (divalent ions) | 2.000 mval/L |
 | Amount | `m~mol/L` | — | 1 |
 
 The traps, in order of how easily they bite:
@@ -359,6 +360,22 @@ The traps, in order of how easily they bite:
 | `mval/L` for a monovalent species | `val` here is the *water-analysis* equivalent: 1 val = ½ mol | write `m~mol/L` for the amount directly |
 | Expecting an exact conversion | the degrees are derived from molar masses, so they carry `.exact = false` | ordinary conversion works; a lossless one reports `error_unit_inexact` |
 | `mmol/l` as a "unit" | it is the compound `m~mol/L`, not a base unit | write `mmol/L`, `m~mol/L` or `mmol/l` — all the same |
+| `gr/gal` for `gpg` | `gr/gal` is a *mass* concentration, `gpg` an *amount* concentration; they do not convert | write `gpg` for the hardness scale |
+
+**Conductivity and dissolved solids** need no units of their own, and that is the trap: people look
+for one.
+
+| Quantity | Write | Not |
+|----------|-------|-----|
+| Electrical conductivity | `µS/cm`, `mS/cm`, `dS/m`, `S/m` | a base unit — there isn't one, and none is needed |
+| … in the pre-SI spelling | `µmho/cm` (`mho`, `mhos`, `℧` are the siemens) | `mho` was unknown before this; it is an alias now |
+| Total dissolved solids | `mg/L` | `ppm` — that is the dimensionless 10⁻⁶ |
+| Resistivity | `MΩ·cm` | — |
+
+For TDS the `ppm` question is softer than for hardness: at 1 kg/L, 1 mg/L *is* 1 ppm by mass, so
+`ppm` states a real (dimensionless) quantity. It simply is not the same dimension as `mg/L`, so the
+two never convert into one another. A meter's "TDS ppm" reading is EC times an instrument factor —
+record the EC and the factor, or the TDS as `mg/L`.
 
 ---
 
@@ -411,6 +428,10 @@ usually where the money is.
 | hardness "in ppm" | `°aH` | `ppm` (dimensionless 10⁻⁶) |
 | hardness in equivalents | `m~val/L`, `mval/l` | `m~mol/L` (that is twice the value) |
 | hardness in millimoles | `m~mol/L`, `mmol/L` | — it needs no unit of its own |
+| hardness in US grains | `gpg` | `gr/gal` (a mass concentration) |
+| conductivity | `µS/cm`, `mS/cm`, `dS/m` | — no base unit exists or is needed |
+| conductivity, older US data | `µmho/cm` | — `mho` is the siemens |
+| dissolved solids | `mg/L` | `ppm` (dimensionless 10⁻⁶) |
 
 ---
 

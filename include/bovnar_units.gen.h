@@ -171,3 +171,4 @@
 	bu_russian_hardness = 386,
 	bu_american_hardness = 387,
 	bu_val          = 388,
+	bu_grains_per_gallon = 389,

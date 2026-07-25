@@ -30,7 +30,7 @@
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
-#define BVN_VALUE_BASE_UNIT_COUNT  389
+#define BVN_VALUE_BASE_UNIT_COUNT  390
 typedef char bvn_internal_dims_event_check[
 	(ev_stream_end + 1 == BVN_EVENT_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_error_check[
@@ -48,5 +48,5 @@ typedef char bvn_internal_dims_iec_prefix_check[
  * BVN_VALUE_BASE_UNIT_COUNT are indexed BY the enum value, so an undersized
  * count is an out-of-bounds read, not a cosmetic mismatch. */
 typedef char bvn_internal_dims_value_base_unit_check[
-	(bu_val + 1 == BVN_VALUE_BASE_UNIT_COUNT) ? 1 : -1];
+	(bu_grains_per_gallon + 1 == BVN_VALUE_BASE_UNIT_COUNT) ? 1 : -1];
 #endif

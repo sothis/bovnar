@@ -951,3 +951,14 @@
 .tap_water_amount  = <float:32,m~mol/L>   2.59;   # the SI-coherent form
 .clark_spelling    = <float:32,°Clark>   18.2;    # °Clark is the same unit as °e
 .long_form         = <float:32,german_hardness> 14.5;   # ASCII spelling
+
+# Conductivity and dissolved solids need no units of their own — siemens per
+# length and mass per volume already say them. "mho" is the pre-SI name for the
+# siemens, so older US datasets parse as written.
+.conductivity      = <float:32,µS/cm>   543.0;   # EC, the everyday spelling
+.conductivity_soil = <float:32,dS/m>      0.543; # the same value, soil convention
+.conductivity_old  = <float:32,µmho/cm> 543.0;   # µ~S/c~m as well
+.tds               = <float:32,mg/L>    350.0;   # total dissolved solids
+.resistivity       = <float:32,MΩ·cm>    18.2;   # ultrapure water
+.hardness_us_grain = <float:32,gpg>      15.1;   # US water-softener scale
+.hardness_meq      = <float:32,m~eq/L>    5.17;  # same unit as m~val/L

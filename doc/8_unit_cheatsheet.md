@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 1.1 · 172 physical units · 166 fiat currencies · 50 cryptocurrencies
+> Spec version 1.1 · 173 physical units · 166 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -169,7 +169,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `Ω`   | `ohm`, `ohms`, `Ohm` | ohm | `bu_ohm` | kg·m²·A⁻²·s⁻³ — U+2126 OHM SIGN; U+03A9 (Greek capital omega) also accepted on input, canonical output is always U+2126 |
 | `F`   | `farad`, `farads` | farad | `bu_farad` | kg⁻¹·m⁻²·A²·s⁴ |
 | `C`   | `coulomb`, `coulombs` | coulomb | `bu_coulomb` | A·s |
-| `S`   | `siemens` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
+| `S`   | `siemens`, `mho`, `mhos`, `℧` | siemens | `bu_siemens` | kg⁻¹·m⁻²·A²·s³ |
 | `Wb`  | `weber`, `webers` | weber | `bu_weber` | kg·m²·A⁻¹·s⁻² |
 | `T`   | `tesla`, `teslas` | tesla | `bu_tesla` | kg·A⁻¹·s⁻² |
 | `H`   | `henry`, `henrys`, `henries` | henry | `bu_henry` | kg·m²·A⁻²·s⁻² |
@@ -507,17 +507,24 @@ Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These 
 Six scales for one quantity — the concentration of dissolved alkaline-earth ions. All carry
 mol·m⁻³ and convert into each other and into `m~mol/L`. None takes a prefix.
 
-| Symbol | Long form | Defined as | 1 mmol/L = |
-|--------|-----------|------------|------------|
-| `°dH` | `german_hardness` | 10 mg CaO / L | 5.6077 |
-| `°e`, `°Clark` | `english_hardness`, `clark_degree` | 1 grain CaCO₃ / imp. gallon | 7.0217 |
-| `°fH` | `french_hardness` | 10 mg CaCO₃ / L | 10.0086 |
-| `°rH` | `russian_hardness` | 1 mg Ca / L | 40.078 |
-| `°aH` | `american_hardness` | 1 mg CaCO₃ / L ("ppm") | 100.086 |
-| `val` | `vals` | ½ mol (divalent, water analysis) | 2.000 `mval/L` |
+| Symbol | Long form | Enum value | Defined as | 1 mmol/L = |
+|--------|-----------|------------|------------|------------|
+| `°dH` | `german_hardness` | `bu_german_hardness` | 10 mg CaO / L | 5.6077 |
+| `°e`, `°Clark` | `english_hardness`, `clark_degree` | `bu_english_hardness` | 1 grain CaCO₃ / imp. gallon | 7.0217 |
+| `°fH` | `french_hardness` | `bu_french_hardness` | 10 mg CaCO₃ / L | 10.0086 |
+| `°rH` | `russian_hardness` | `bu_russian_hardness` | 1 mg Ca / L | 40.078 |
+| `°aH` | `american_hardness` | `bu_american_hardness` | 1 mg CaCO₃ / L ("ppm") | 100.086 |
+| `gpg` | `grains_per_gallon` | `bu_grains_per_gallon` | 1 grain CaCO₃ / US gallon | 5.8468 |
+| `val` | `vals`, `eq` | `bu_val` | ½ mol (divalent, water analysis) | 2.000 `mval/L` |
 
 > Keep the degree sign: `dH` without it is the **decihenry**. Water chemistry's "ppm" is `°aH`,
-> not Bovnar's dimensionless `ppm`. Millimoles per litre is just the compound `m~mol/L`.
+> not Bovnar's dimensionless `ppm`. Millimoles per litre is just the compound `m~mol/L`, and
+> `meq/L` is the same unit as `mval/L`. `gpg` (amount concentration) is not `gr/gal` (mass
+> concentration).
+
+**Conductivity and dissolved solids need no units of their own:** EC is `µS/cm`, `mS/cm`, `dS/m`
+or `S/m` (`µmho/cm` too — `mho`/`℧` are the siemens); TDS is `mg/L`; resistivity is `MΩ·cm`.
+"TDS in ppm" means mg/L, while Bovnar's `ppm` is the dimensionless 10⁻⁶.
 
 ## 5. Currencies
 
@@ -801,5 +808,5 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–388 (172 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–389 (173 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*

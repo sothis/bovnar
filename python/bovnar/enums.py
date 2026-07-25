@@ -562,8 +562,9 @@ class BaseUnit(IntEnum):
     RUSSIAN_HARDNESS   = 386   # °rH
     AMERICAN_HARDNESS  = 387   # °aH (water chemistry's "ppm")
     VAL                = 388
+    GRAINS_PER_GALLON  = 389   # gpg — the US water-softener hardness scale
 
-    _SENTINEL = 389
+    _SENTINEL = 390
 
 
 # Currency-range sentinels (mirrors C #defines)

@@ -108,7 +108,7 @@ class TestEnumContiguity:
         assert int(CURRENCY_CRYPTO_LAST) == 347
 
     def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 389
+        assert int(BaseUnit._SENTINEL) == 390
 
     def test_fiat_range_size(self):
         assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 164
@@ -576,7 +576,7 @@ class TestPhysicalUnitCollisions:
 
 class TestBaseUnitSentinel:
     def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 389
+        assert int(BaseUnit._SENTINEL) == 390
 
     def test_sentinel_is_one_past_last_enum_member(self):
         # Physical units resumed at 380 after the appended currencies, so the
@@ -586,7 +586,7 @@ class TestBaseUnitSentinel:
         # indexed by the enum value.
         last = max(int(u) for u in BaseUnit if u is not BaseUnit._SENTINEL)
         assert int(BaseUnit._SENTINEL) == last + 1
-        assert last == int(BaseUnit.VAL)
+        assert last == int(BaseUnit.GRAINS_PER_GALLON)
 
 
 # ── TestPrefixRulesC ───────────────────────────────────────────────────────

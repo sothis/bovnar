@@ -39,6 +39,16 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Conductivity, dissolved solids and two more hardness spellings** — a review of what water data
+  actually writes. **EC and TDS need no new units**: `µS/cm`, `mS/cm`, `dS/m`, `S/m` and `mg/L`
+  already say them exactly, and `MΩ·cm` covers resistivity. What was missing were spellings:
+  `mho`, `mhos` and `℧` (U+2127) are now accepted names for the siemens, so the `µmho/cm` in older
+  US water and soil data parses; `eq` is accepted for `val`, so `meq/L` and `mval/L` are one unit;
+  and `gpg` (grains of CaCO₃ per US gallon, the US water-softener scale, 0.171034 mmol/L) joins the
+  hardness family as `bu_grains_per_gallon` — note it is an *amount* concentration and so converts
+  with the other scales, where the compound `gr/gal` is a *mass* concentration and does not.
+  Documented alongside: "TDS in ppm" means mg/L, while bovnar's `ppm` is the dimensionless 10⁻⁶ —
+  numerically the same for dilute water at 1 kg/L, but a different dimension, so they never convert.
 - **Water hardness: `°dH`, `°e`/`°Clark`, `°fH`, `°rH`, `°aH`, and `val`** — six scales for one
   quantity, the concentration of dissolved alkaline-earth ions. Each is defined as a mass of a
   reference compound per litre, but the scales count *different* compounds (CaO, CaCO₃, Ca), so

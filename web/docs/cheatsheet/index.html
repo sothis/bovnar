@@ -40,7 +40,7 @@
 <h1>Bovnar (BVNR) — Units &amp; Currencies Reference</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/8_unit_cheatsheet.md">Markdown</a> and <a href="/doc/pdf/bovnar-cheatsheet.pdf">PDF</a>.</p>
 <blockquote>
-<p>Spec version 1.1 · 172 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
+<p>Spec version 1.1 · 173 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
 </blockquote>
 <hr />
 <h2 id="contents">Contents</h2>
@@ -573,7 +573,7 @@
 </tr>
 <tr>
 <td><code>S</code></td>
-<td><code>siemens</code></td>
+<td><code>siemens</code>, <code>mho</code>, <code>mhos</code>, <code>℧</code></td>
 <td>siemens</td>
 <td><code>bu_siemens</code></td>
 <td>kg⁻¹·m⁻²·A²·s³</td>
@@ -2083,6 +2083,7 @@ mol·m⁻³ and convert into each other and into <code>m~mol/L</code>. None take
 <tr>
 <th>Symbol</th>
 <th>Long form</th>
+<th>Enum value</th>
 <th>Defined as</th>
 <th>1 mmol/L =</th>
 </tr>
@@ -2091,36 +2092,49 @@ mol·m⁻³ and convert into each other and into <code>m~mol/L</code>. None take
 <tr>
 <td><code>°dH</code></td>
 <td><code>german_hardness</code></td>
+<td><code>bu_german_hardness</code></td>
 <td>10 mg CaO / L</td>
 <td>5.6077</td>
 </tr>
 <tr>
 <td><code>°e</code>, <code>°Clark</code></td>
 <td><code>english_hardness</code>, <code>clark_degree</code></td>
+<td><code>bu_english_hardness</code></td>
 <td>1 grain CaCO₃ / imp. gallon</td>
 <td>7.0217</td>
 </tr>
 <tr>
 <td><code>°fH</code></td>
 <td><code>french_hardness</code></td>
+<td><code>bu_french_hardness</code></td>
 <td>10 mg CaCO₃ / L</td>
 <td>10.0086</td>
 </tr>
 <tr>
 <td><code>°rH</code></td>
 <td><code>russian_hardness</code></td>
+<td><code>bu_russian_hardness</code></td>
 <td>1 mg Ca / L</td>
 <td>40.078</td>
 </tr>
 <tr>
 <td><code>°aH</code></td>
 <td><code>american_hardness</code></td>
+<td><code>bu_american_hardness</code></td>
 <td>1 mg CaCO₃ / L ("ppm")</td>
 <td>100.086</td>
 </tr>
 <tr>
+<td><code>gpg</code></td>
+<td><code>grains_per_gallon</code></td>
+<td><code>bu_grains_per_gallon</code></td>
+<td>1 grain CaCO₃ / US gallon</td>
+<td>5.8468</td>
+</tr>
+<tr>
 <td><code>val</code></td>
-<td><code>vals</code></td>
+<td><code>vals</code>, <code>eq</code></td>
+<td><code>bu_val</code></td>
 <td>½ mol (divalent, water analysis)</td>
 <td>2.000 <code>mval/L</code></td>
 </tr>
@@ -2128,8 +2142,13 @@ mol·m⁻³ and convert into each other and into <code>m~mol/L</code>. None take
 </table>
 <blockquote>
 <p>Keep the degree sign: <code>dH</code> without it is the <strong>decihenry</strong>. Water chemistry's "ppm" is <code>°aH</code>,
-not Bovnar's dimensionless <code>ppm</code>. Millimoles per litre is just the compound <code>m~mol/L</code>.</p>
+not Bovnar's dimensionless <code>ppm</code>. Millimoles per litre is just the compound <code>m~mol/L</code>, and
+<code>meq/L</code> is the same unit as <code>mval/L</code>. <code>gpg</code> (amount concentration) is not <code>gr/gal</code> (mass
+concentration).</p>
 </blockquote>
+<p><strong>Conductivity and dissolved solids need no units of their own:</strong> EC is <code>µS/cm</code>, <code>mS/cm</code>, <code>dS/m</code>
+or <code>S/m</code> (<code>µmho/cm</code> too — <code>mho</code>/<code>℧</code> are the siemens); TDS is <code>mg/L</code>; resistivity is <code>MΩ·cm</code>.
+"TDS in ppm" means mg/L, while Bovnar's <code>ppm</code> is the dimensionless 10⁻⁶.</p>
 <h2 id="5-currencies">5. Currencies</h2>
 <h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
 <p>As of spec 1.0 a currency code carries a <strong>mandatory <code>$</code> sigil</strong>: write <code>$USD</code>,
@@ -3551,7 +3570,7 @@ abbreviations that are deliberately not units — is in <a href="unit_ambiguitie
 </table>
 <p>No bare token is simultaneously a valid physical unit and a currency: currencies live entirely under <code>$</code>, physical units entirely without it.</p>
 <hr />
-<p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–388 (172 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
+<p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–389 (173 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
 <em><code>BVN_VALUE_BASE_UNIT_COUNT</code> = 380 (<code>bu_xcg + 1</code>)</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>

@@ -69,6 +69,7 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_russian_hardness = 0.024951344877488894 * mole * meter**-3',
     'bvnr_american_hardness = 0.009991407389644906 * mole * meter**-3',
     'bvnr_val = 0.5 * mole',
+    'bvnr_grains_per_gallon = 0.17103352162411276 * mole * meter**-3',
     'bvnr_phot = 10000.0 * meter**-2 * candela',
     'bvnr_ppb = 1e-09',
     'bvnr_prussian_elle = 0.66716 * meter',
@@ -264,6 +265,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     386: 'bvnr_russian_hardness',        # RUSSIAN_HARDNESS
     387: 'bvnr_american_hardness',       # AMERICAN_HARDNESS
     388: 'bvnr_val',                     # VAL
+    389: 'bvnr_grains_per_gallon',       # GRAINS_PER_GALLON
 
     # Defined to match bovnar magnitude exactly (pint native uses a different convention)
      71: 'bvnr_therm',                   # THERM

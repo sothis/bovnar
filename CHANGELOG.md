@@ -39,6 +39,15 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Conversion factors are now checked against their own definitions** — a new pure-Python test
+  (`test_unit_factors_derived.py`, registered as `bvnr_py_unit_factors`) re-derives 119 factors from
+  the relations that define them: a furlong is 660 international feet, an acre 43560 square feet, an
+  oersted 1000/4π A/m, a Prussian Zoll a twelfth of the 1816 Fuß, a German hardness degree 10 mg CaO
+  per litre over the molar mass of CaO. This closes a gap the review exposed: the pint bridge
+  validates bovnar against pint, but for the ~40 units bovnar defines itself the pint definition is
+  *generated from bovnar's factor*, so that check was circular and a wrong number would have agreed
+  with itself. Units defined by arithmetic on exact constants must match to 1e-9; historical ones
+  carry the tolerance their sources actually publish.
 - **The pint bridge now enforces bovnar's quantity kinds** — it did not, and the gap ran the wrong
   way: pint would convert an `NTU` into an `FNU`, a byte into 8 bits, an angle into a plain number,
   a `pH` into a percentage. Fourteen such conversions were possible in pint that bovnar refuses.

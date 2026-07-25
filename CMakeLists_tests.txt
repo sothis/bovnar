@@ -649,6 +649,16 @@ if(_bvnr_have_pytest)
         "currency"
         30)
 
+    # Conversion factors re-derived from each unit's DEFINITION. The pint bridge
+    # checks bovnar against pint, but for the ~40 units bovnar defines itself
+    # the pint definition is generated FROM bovnar's factor -- circular, so a
+    # wrong number would agree with itself. This closes that from the other
+    # side and needs no library, only the gendata document.
+    _bvnr_pytest_pure(bvnr_py_unit_factors
+        test_unit_factors_derived.py
+        "units;gendata"
+        30)
+
     # ── integration tests (require libbvnr.so) ────────────────────────
 
     _bvnr_pytest_lib(bvnr_py_reader
@@ -1020,7 +1030,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 122)   # 116 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 123)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────

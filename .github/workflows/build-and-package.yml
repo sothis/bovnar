@@ -176,6 +176,13 @@ jobs:
     # unambiguous and does not also block seeing whether the build itself works.
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history, as the packaging jobs already take: bvnr_html_docs
+          # regenerates pages whose meta tags and schema.org dates come from
+          # `git log -- doc/<file>`. The default depth-1 checkout has no per-file
+          # history -- its one grafted commit answers for every path -- so every
+          # doc dated as written today and all ten pages read as stale.
+          fetch-depth: 0
 
       # Ahead of Configure, not somewhere after CTest: CMakeLists_tests.txt
       # probes for pytest at CONFIGURE time and skips the 19 bvnr_py_* gates

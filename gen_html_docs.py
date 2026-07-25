@@ -32,9 +32,32 @@ import markdown
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
+def shallow_clone():
+    """True when ROOT is a git repo that was cloned without its history.
+
+    git_date() cannot be trusted there: a shallow clone grafts the boundary
+    commit into a parentless root, so `git log -- doc/anything.md` answers with
+    that one commit for *every* path and both dates below silently collapse to
+    the day of the clone. That is not a fallback, it is wrong data -- it would
+    date all ten pages "written and last touched today" in their meta tags and
+    schema.org graph, which --check then reports as ten stale pages and a plain
+    run would write out for real. Callers refuse instead of guessing.
+
+    Not a git repo at all is a different case and stays supported: git_date()
+    falls back to file mtimes, which is the best a source tarball can offer."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", ROOT, "rev-parse", "--is-shallow-repository"],
+            capture_output=True, text=True, check=True)
+        return out.stdout.strip() == "true"
+    except Exception:
+        return False
+
+
 def git_date(relpath, first=False):
     """Last- (or, first=True, first-) commit date YYYY-MM-DD of a repo file;
-    falls back to the file mtime, then today."""
+    falls back to the file mtime, then today. Meaningless in a shallow clone --
+    see shallow_clone(), which main() checks before any of this runs."""
     args = ["git", "-C", ROOT, "log", "--format=%cs", "--", relpath]
     if first:
         args = ["git", "-C", ROOT, "log", "--diff-filter=A", "--follow",
@@ -562,6 +585,12 @@ def build_doc_page(src, slug, pdf, title, desc):
 
 def main():
     check = "--check" in sys.argv[1:]
+    if shallow_clone():
+        print("gen_html_docs.py: shallow git clone -- the per-file commit dates "
+              "these pages embed are unavailable here, so every page would be "
+              "dated today. Fetch the full history ('git fetch --unshallow', or "
+              "fetch-depth: 0 for actions/checkout) and re-run.", file=sys.stderr)
+        return 2
     targets = {}
     for src, slug, pdf, title, desc in DOCS:
         targets[os.path.join(OUT_DIR, slug, "index.html")] = \

@@ -762,6 +762,80 @@ static void test_compact_prefix_exceptions(void)
 	assert_compact_matches("Mt",  "M~t");
 }
 
+/*
+ * Water hardness: six scales for one quantity — the concentration of dissolved
+ * alkaline-earth ions. Each is defined as a mass of a different reference
+ * compound per litre (CaO, CaCO3, Ca), so amount concentration is their only
+ * correct common ground; the numbers below are the published conversion table,
+ * which is what a reader will check them against.
+ */
+static void test_water_hardness_units(void)
+{
+	printf("  water hardness scales...\n");
+	bool ok = false;
+	double out = 0.0;
+	value_unit_t dH  = bvn_parse_unit((const uint8_t *)"\xc2\xb0" "dH", &ok);
+	ASSERT_TRUE(ok, "°dH parses");
+	value_unit_t mmol_l = bvn_parse_unit((const uint8_t *)"m~mol/L", &ok);
+	ASSERT_TRUE(ok, "m~mol/L parses");
+
+	ASSERT_EQ_INT(dH.components[0].base, bu_german_hardness, "°dH base");
+	ASSERT_TRUE(bvn_units_compatible(dH, mmol_l),
+		    "a hardness degree is an amount concentration");
+
+	/* 1 mmol/L = 5.6077 °dH = 7.0217 °e = 10.0086 °fH = 40.078 °rH
+	 *          = 100.086 °aH = 2.000 mval/L  (source table, rounded to 3-4 sf) */
+	struct { const char *sym; double per_mmol_l; } scale[] = {
+		{ "\xc2\xb0" "dH",  5.6077   },
+		{ "\xc2\xb0" "e",   7.0217   },
+		{ "\xc2\xb0" "fH", 10.0086   },
+		{ "\xc2\xb0" "rH", 40.0780   },
+		{ "\xc2\xb0" "aH", 100.0860  },
+		{ "m~val/L",       2.0      },
+	};
+	for (unsigned i = 0; i < sizeof(scale) / sizeof(scale[0]); i++) {
+		bool sok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)scale[i].sym, &sok);
+		char msg[96];
+		snprintf(msg, sizeof(msg), "%s parses", scale[i].sym);
+		ASSERT_TRUE(sok, msg);
+		if (!sok) continue;
+		snprintf(msg, sizeof(msg), "1 m~mol/L in %s", scale[i].sym);
+		ASSERT_TRUE(bvn_unit_convert_value(1.0, mmol_l, u, &out), msg);
+		ASSERT_EQ_DBL(out, scale[i].per_mmol_l, scale[i].per_mmol_l * 1e-4, msg);
+	}
+
+	/* The Clark degree is the English degree, not a scale of its own. */
+	{
+		value_unit_t e = bvn_parse_unit((const uint8_t *)"\xc2\xb0" "e", &ok);
+		value_unit_t clark = bvn_parse_unit((const uint8_t *)"\xc2\xb0" "Clark", &ok);
+		ASSERT_TRUE(ok, "°Clark parses");
+		ASSERT_EQ_INT(clark.components[0].base, e.components[0].base,
+			      "°Clark and °e are one unit");
+	}
+
+	/* The degree sign is load-bearing: "dH" was, and stays, the decihenry. */
+	{
+		value_unit_t dh_lower = bvn_parse_unit((const uint8_t *)"dH", &ok);
+		ASSERT_TRUE(ok, "dH still parses");
+		ASSERT_EQ_INT(dh_lower.components[0].base, bu_henry, "dH is the henry");
+		ASSERT_EQ_INT(dh_lower.components[0].prefix.id.si, si_deci, "...deci-");
+	}
+
+	/* Hardness degrees take no prefix; val does (m~val is the useful one). */
+	assert_unit_rejected("m~\xc2\xb0" "dH");
+	assert_unit_rejected("k~\xc2\xb0" "fH");
+	assert_compact_matches("mval", "m~val");
+
+	/* Water chemistry says "ppm" for °aH, but bovnar's ppm is the
+	 * dimensionless 10^-6 — the two must not be interchangeable. */
+	{
+		value_unit_t aH = bvn_parse_unit((const uint8_t *)"\xc2\xb0" "aH", &ok);
+		ASSERT_TRUE(!bvn_units_compatible(aH, BVN_UNIT_NO_PREFIX(bu_ppm)),
+			    "the hardness ppm is not the dimensionless ppm");
+	}
+}
+
 static void test_unit_to_string_new_units(void)
 {
 	printf("  bvn_unit_to_string for rad/sr...\n");
@@ -909,7 +983,13 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_ph_scale           == 380, "bu_ph_scale == 380");
 	ASSERT_TRUE((int)bu_mile_per_hour      == 381, "bu_mile_per_hour == 381");
 	ASSERT_TRUE((int)bu_kilometer_per_hour == 382, "bu_kilometer_per_hour == 382");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 383, "sentinel == 383");
+	ASSERT_TRUE((int)bu_german_hardness    == 383, "bu_german_hardness == 383");
+	ASSERT_TRUE((int)bu_english_hardness   == 384, "bu_english_hardness == 384");
+	ASSERT_TRUE((int)bu_french_hardness    == 385, "bu_french_hardness == 385");
+	ASSERT_TRUE((int)bu_russian_hardness   == 386, "bu_russian_hardness == 386");
+	ASSERT_TRUE((int)bu_american_hardness  == 387, "bu_american_hardness == 387");
+	ASSERT_TRUE((int)bu_val                == 388, "bu_val == 388");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 389, "sentinel == 389");
 }
 
 static void test_nonsi_si_factors(void)
@@ -1820,6 +1900,7 @@ int main(void)
 	test_compact_prefix_precedence();
 	test_compact_prefix_exceptions();
 	test_compact_currency_form();
+	test_water_hardness_units();
 	test_unit_to_string_new_units();
 
 	printf("\n--- non-SI unit tests ---\n");

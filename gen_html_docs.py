@@ -105,7 +105,7 @@ DOCS = [
      "system, physical units, numeric bases, limits, and error semantics."),
     ("2_bovnar_unit_system.md", "units", "bovnar-unit-system",
      "Bovnar Unit & Currency System",
-     "Every Bovnar physical unit, SI and IEC prefix, and currency — 166 units and "
+     "Every Bovnar physical unit, SI and IEC prefix, and currency — 172 units and "
      "216 currencies with dimensions and exact conversion factors."),
     ("3_bovnar_readwrite_api.md", "api", "bovnar-readwrite-api",
      "Bovnar C Read & Write API",

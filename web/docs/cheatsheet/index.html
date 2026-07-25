@@ -40,7 +40,7 @@
 <h1>Bovnar (BVNR) — Units &amp; Currencies Reference</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/8_unit_cheatsheet.md">Markdown</a> and <a href="/doc/pdf/bovnar-cheatsheet.pdf">PDF</a>.</p>
 <blockquote>
-<p>Spec version 1.1 · 166 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
+<p>Spec version 1.1 · 172 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
 </blockquote>
 <hr />
 <h2 id="contents">Contents</h2>
@@ -74,7 +74,9 @@
    - 4.23 <a href="#423-textile-linear-density">Textile Linear Density</a>
    - 4.24 <a href="#424-old-german-units">Old German Units</a>
    - 4.25 <a href="#425-additional-physical-units-361367">Additional Physical Units</a>
-   - 4.26 <a href="#426-ratio-and-proportion-372377">Ratio and Proportion</a></li>
+   - 4.26 <a href="#426-ratio-and-proportion-372377">Ratio and Proportion</a>
+   - 4.27 <a href="#427-named-speeds--acidity">Named Speeds &amp; Acidity</a>
+   - 4.28 <a href="#428-water-hardness">Water Hardness</a></li>
 <li><a href="#5-currencies">Currencies</a>
    - 5.1 <a href="#51-the-mandatory-currency-sigil">The Mandatory Currency Sigil</a>
    - 5.2 <a href="#52-iso-4217-fiat-currencies">ISO 4217 Fiat Currencies</a>
@@ -2033,6 +2035,101 @@
 </tbody>
 </table>
 <hr />
+<h3 id="427-named-speeds--acidity">4.27 Named Speeds &amp; Acidity</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mph</code></td>
+<td>—</td>
+<td>mile per hour</td>
+<td><code>bu_mile_per_hour</code></td>
+<td>0.44704 m·s⁻¹ (exact)</td>
+</tr>
+<tr>
+<td><code>kph</code></td>
+<td><code>kmh</code></td>
+<td>kilometre per hour</td>
+<td><code>bu_kilometer_per_hour</code></td>
+<td>5/18 m·s⁻¹ (exact)</td>
+</tr>
+<tr>
+<td><code>pH</code></td>
+<td>—</td>
+<td>acidity</td>
+<td><code>bu_ph_scale</code></td>
+<td>1 (dimensionless, own logarithmic kind)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>mi/h</code> and <code>k~m/h</code> are the same quantities written as compounds; both spellings are valid, but a
+named unit and its compound do not reconcile inside one value. <code>pH</code> is not <code>p~H</code> (picohenry), and
+<code>ph</code> is the phot.</p>
+</blockquote>
+<h3 id="428-water-hardness">4.28 Water Hardness</h3>
+<p>Six scales for one quantity — the concentration of dissolved alkaline-earth ions. All carry
+mol·m⁻³ and convert into each other and into <code>m~mol/L</code>. None takes a prefix.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long form</th>
+<th>Defined as</th>
+<th>1 mmol/L =</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>°dH</code></td>
+<td><code>german_hardness</code></td>
+<td>10 mg CaO / L</td>
+<td>5.6077</td>
+</tr>
+<tr>
+<td><code>°e</code>, <code>°Clark</code></td>
+<td><code>english_hardness</code>, <code>clark_degree</code></td>
+<td>1 grain CaCO₃ / imp. gallon</td>
+<td>7.0217</td>
+</tr>
+<tr>
+<td><code>°fH</code></td>
+<td><code>french_hardness</code></td>
+<td>10 mg CaCO₃ / L</td>
+<td>10.0086</td>
+</tr>
+<tr>
+<td><code>°rH</code></td>
+<td><code>russian_hardness</code></td>
+<td>1 mg Ca / L</td>
+<td>40.078</td>
+</tr>
+<tr>
+<td><code>°aH</code></td>
+<td><code>american_hardness</code></td>
+<td>1 mg CaCO₃ / L ("ppm")</td>
+<td>100.086</td>
+</tr>
+<tr>
+<td><code>val</code></td>
+<td><code>vals</code></td>
+<td>½ mol (divalent, water analysis)</td>
+<td>2.000 <code>mval/L</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Keep the degree sign: <code>dH</code> without it is the <strong>decihenry</strong>. Water chemistry's "ppm" is <code>°aH</code>,
+not Bovnar's dimensionless <code>ppm</code>. Millimoles per litre is just the compound <code>m~mol/L</code>.</p>
+</blockquote>
 <h2 id="5-currencies">5. Currencies</h2>
 <h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
 <p>As of spec 1.0 a currency code carries a <strong>mandatory <code>$</code> sigil</strong>: write <code>$USD</code>,
@@ -3454,7 +3551,7 @@ abbreviations that are deliberately not units — is in <a href="unit_ambiguitie
 </table>
 <p>No bare token is simultaneously a valid physical unit and a currency: currencies live entirely under <code>$</code>, physical units entirely without it.</p>
 <hr />
-<p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–382 (166 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
+<p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–388 (172 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
 <em><code>BVN_VALUE_BASE_UNIT_COUNT</code> = 380 (<code>bu_xcg + 1</code>)</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>

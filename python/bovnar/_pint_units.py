@@ -61,6 +61,14 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_per_myriad = 0.0001',
     'bvnr_pfund = 0.5 * kilogram',
     'bvnr_ph_scale = 1.0',   # pint parses "pH" as picohenry, so never call it that
+    # Water hardness: amount concentration of alkaline-earth ions. pint has no
+    # hardness units at all, so all six come from bovnar's own factors.
+    'bvnr_german_hardness = 0.17832623000517145 * mole * meter**-3',
+    'bvnr_english_hardness = 0.1424151981625826 * mole * meter**-3',
+    'bvnr_french_hardness = 0.09991407389644906 * mole * meter**-3',
+    'bvnr_russian_hardness = 0.024951344877488894 * mole * meter**-3',
+    'bvnr_american_hardness = 0.009991407389644906 * mole * meter**-3',
+    'bvnr_val = 0.5 * mole',
     'bvnr_phot = 10000.0 * meter**-2 * candela',
     'bvnr_ppb = 1e-09',
     'bvnr_prussian_elle = 0.66716 * meter',
@@ -250,6 +258,12 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     375: 'bvnr_per_cent_mille',          # PER_CENT_MILLE
     377: 'bvnr_ppb',                     # PPB
     380: 'bvnr_ph_scale',                # PH_SCALE
+    383: 'bvnr_german_hardness',         # GERMAN_HARDNESS
+    384: 'bvnr_english_hardness',        # ENGLISH_HARDNESS
+    385: 'bvnr_french_hardness',         # FRENCH_HARDNESS
+    386: 'bvnr_russian_hardness',        # RUSSIAN_HARDNESS
+    387: 'bvnr_american_hardness',       # AMERICAN_HARDNESS
+    388: 'bvnr_val',                     # VAL
 
     # Defined to match bovnar magnitude exactly (pint native uses a different convention)
      71: 'bvnr_therm',                   # THERM
@@ -268,6 +282,7 @@ SEMANTIC_CAVEATS: dict[str, str] = {
     'BYTE': 'bovnar treats byte as a dimensionless tag (=1); pint relates byte=8*bit. Label round-trips; byte<->bit conversion differs.',
     'DECIBEL': 'bovnar dB is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
     'NEPER': 'bovnar Np is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
+    'VAL': 'bovnar val is the equivalent AS USED IN WATER ANALYSIS (divalent ions): 1 val = 0.5 mol. For a monovalent species an equivalent is 1 mol, which neither library can infer from the unit alone.',
     'PH_SCALE': 'bovnar pH is a linear dimensionless tag (=1), as pint has no acidity unit at all ("pH" parses there as the picohenry). The scale is logarithmic, so summing or averaging pH values is not meaningful in either library.',
 }
 

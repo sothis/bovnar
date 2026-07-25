@@ -1949,6 +1949,109 @@
     .factor_den = <sint:64> 18;
     .prefix  = none;
     .aliases = ["kph", "kmh"];
+  },
+
+  # ── Water hardness ──────────────────────────────────────────────────────
+  # Six scales for the same physical quantity: the concentration of dissolved
+  # alkaline-earth ions (Ca²⁺, Mg²⁺). Each is DEFINED as a mass of a reference
+  # compound per litre, but the scales use different compounds — °dH counts CaO,
+  # the others CaCO₃ or Ca — so mass concentration is NOT their common ground and
+  # comparing them that way would be wrong by the ratio of two molar masses.
+  # Amount concentration is: every scale converts to mol/m³ (which is mmol/L
+  # exactly), and that is what the published conversion tables tabulate.
+  #
+  #   1 °dH = 10 mg CaO/L      / M(CaO)   = 0.178326 mmol/L
+  #   1 °fH = 10 mg CaCO₃/L    / M(CaCO₃) = 0.099914 mmol/L
+  #   1 °e  = 1 grain CaCO₃ per imperial gallon = 14.2538 mg/L → 0.142415 mmol/L
+  #   1 °aH = 1 mg CaCO₃/L     / M(CaCO₃) = 0.009991 mmol/L   (the "ppm" scale)
+  #   1 °rH = 1 mg Ca/L        / M(Ca)    = 0.024951 mmol/L
+  #   1 mval/L = 0.5 mmol/L    (an equivalent of a DIVALENT ion — see .val)
+  #
+  # Molar masses are IUPAC 2021 standard atomic weights (Ca 40.078, C 12.011,
+  # O 15.999 g/mol), so every factor here is measurement-derived rather than an
+  # exact rational: .exact = false, and a lossless conversion reports
+  # error_unit_inexact rather than inventing precision.
+  #
+  # mmol/L needs no unit of its own: it is the compound m~mol/L.
+  {
+    .id      = <uint:16> 383;
+    .name    = "german_hardness";
+    .symbol  = "°dH";
+    .factor  = 0.17832623000517145;
+    .dims    = { .length = -3; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = none;
+    # NOT "dH" without the degree sign: that already parses as the decihenry.
+    .aliases = ["german_hardness", "°dH"];
+  },
+  {
+    .id      = <uint:16> 384;
+    .name    = "english_hardness";
+    .symbol  = "°e";
+    .factor  = 0.1424151981625826;
+    .dims    = { .length = -3; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = none;
+    # The Clark degree IS the English degree — one unit, two spellings.
+    .aliases = ["english_hardness", "clark_degree", "°Clark", "°e"];
+  },
+  {
+    .id      = <uint:16> 385;
+    .name    = "french_hardness";
+    .symbol  = "°fH";
+    .factor  = 0.09991407389644906;
+    .dims    = { .length = -3; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = none;
+    .aliases = ["french_hardness", "°fH"];
+  },
+  {
+    .id      = <uint:16> 386;
+    .name    = "russian_hardness";
+    .symbol  = "°rH";
+    .factor  = 0.024951344877488894;
+    .dims    = { .length = -3; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = none;
+    .aliases = ["russian_hardness", "°rH"];
+  },
+  {
+    .id      = <uint:16> 387;
+    .name    = "american_hardness";
+    .symbol  = "°aH";
+    .factor  = 0.009991407389644906;
+    .dims    = { .length = -3; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = none;
+    # Water chemistry calls this scale "ppm" (mg CaCO₃ per litre). Bovnar's `ppm`
+    # is the dimensionless 10⁻⁶ and stays that way — this is the hardness one.
+    .aliases = ["american_hardness", "°aH"];
+  },
+  {
+    .id      = <uint:16> 388;
+    .name    = "val";
+    .symbol  = "val";
+    # The equivalent AS USED IN WATER ANALYSIS: the ions counted are divalent, so
+    # one equivalent is half a mole and m~val/L = 0.5 mmol/L, which is what the
+    # hardness tables state. An equivalent of a MONOVALENT species is one mole —
+    # bovnar cannot know the species, so for that case write the amount directly
+    # (m~mol/L). This is why there is no generic "eq"/"equivalent" alias here.
+    .factor  = 0.5;
+    .dims    = { .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["vals", "val"];
   }
 ];
 

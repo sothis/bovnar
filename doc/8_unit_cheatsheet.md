@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 1.1 · 166 physical units · 166 fiat currencies · 50 cryptocurrencies
+> Spec version 1.1 · 172 physical units · 166 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -36,6 +36,8 @@
    - 4.24 [Old German Units](#424-old-german-units)
    - 4.25 [Additional Physical Units](#425-additional-physical-units-361367)
    - 4.26 [Ratio and Proportion](#426-ratio-and-proportion-372377)
+   - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
+   - 4.28 [Water Hardness](#428-water-hardness)
 5. [Currencies](#5-currencies)
    - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
    - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
@@ -488,6 +490,35 @@ Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These 
 
 ---
 
+### 4.27 Named Speeds & Acidity
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `mph`  | — | mile per hour | `bu_mile_per_hour` | 0.44704 m·s⁻¹ (exact) |
+| `kph`  | `kmh` | kilometre per hour | `bu_kilometer_per_hour` | 5/18 m·s⁻¹ (exact) |
+| `pH`   | — | acidity | `bu_ph_scale` | 1 (dimensionless, own logarithmic kind) |
+
+> `mi/h` and `k~m/h` are the same quantities written as compounds; both spellings are valid, but a
+> named unit and its compound do not reconcile inside one value. `pH` is not `p~H` (picohenry), and
+> `ph` is the phot.
+
+### 4.28 Water Hardness
+
+Six scales for one quantity — the concentration of dissolved alkaline-earth ions. All carry
+mol·m⁻³ and convert into each other and into `m~mol/L`. None takes a prefix.
+
+| Symbol | Long form | Defined as | 1 mmol/L = |
+|--------|-----------|------------|------------|
+| `°dH` | `german_hardness` | 10 mg CaO / L | 5.6077 |
+| `°e`, `°Clark` | `english_hardness`, `clark_degree` | 1 grain CaCO₃ / imp. gallon | 7.0217 |
+| `°fH` | `french_hardness` | 10 mg CaCO₃ / L | 10.0086 |
+| `°rH` | `russian_hardness` | 1 mg Ca / L | 40.078 |
+| `°aH` | `american_hardness` | 1 mg CaCO₃ / L ("ppm") | 100.086 |
+| `val` | `vals` | ½ mol (divalent, water analysis) | 2.000 `mval/L` |
+
+> Keep the degree sign: `dH` without it is the **decihenry**. Water chemistry's "ppm" is `°aH`,
+> not Bovnar's dimensionless `ppm`. Millimoles per litre is just the compound `m~mol/L`.
+
 ## 5. Currencies
 
 ### 5.1 The Mandatory Currency Sigil
@@ -770,5 +801,5 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–382 (166 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–388 (172 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*

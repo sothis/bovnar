@@ -551,7 +551,19 @@ class BaseUnit(IntEnum):
     MILE_PER_HOUR      = 381
     KILOMETER_PER_HOUR = 382
 
-    _SENTINEL = 383
+    # Water hardness (383-387): six scales for one quantity, the concentration
+    # of dissolved alkaline-earth ions. All carry mol*m^-3, so they convert into
+    # each other and into m~mol/L. VAL is the equivalent as water analysis uses
+    # it (divalent: 1 val = 0.5 mol).
+
+    GERMAN_HARDNESS    = 383   # °dH
+    ENGLISH_HARDNESS   = 384   # °e, °Clark
+    FRENCH_HARDNESS    = 385   # °fH
+    RUSSIAN_HARDNESS   = 386   # °rH
+    AMERICAN_HARDNESS  = 387   # °aH (water chemistry's "ppm")
+    VAL                = 388
+
+    _SENTINEL = 389
 
 
 # Currency-range sentinels (mirrors C #defines)

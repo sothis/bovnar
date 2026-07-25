@@ -22,8 +22,9 @@ against the reference parser; where a token is refused, it really is `error_unit
 10. [A named unit is not its compound](#10-a-named-unit-is-not-its-compound)
 11. [Unit vs. currency](#11-unit-vs-currency)
 12. [Looks like a unit, is not one](#12-looks-like-a-unit-is-not-one)
-13. [Same name, different definition](#13-same-name-different-definition)
-14. [Quick index: if you mean X, write Y](#14-quick-index-if-you-mean-x-write-y)
+13. [Water hardness: six scales, one quantity](#13-water-hardness-six-scales-one-quantity)
+14. [Same name, different definition](#14-same-name-different-definition)
+15. [Quick index: if you mean X, write Y](#15-quick-index-if-you-mean-x-write-y)
 
 ---
 
@@ -169,6 +170,7 @@ Common miscasings that are **errors**, not silent variants — `K` is the kelvin
 
 | Written | Result | Intended | Write |
 |---------|--------|----------|-------|
+| `dH` | decihenry — a valid unit, silently | German hardness degree | `°dH` |
 | `Kg`, `KG` | `error_unit_illegal` | kilogram | `kg` or `k~g` |
 | `KB` | `error_unit_illegal` | kilobyte | `kB` or `k~B` |
 | `NM` | `error_unit_illegal` | nautical mile | `nmi` |
@@ -211,6 +213,19 @@ The degree sign is not decoration: without it the token is a different quantity 
 ASCII aliases avoid the question: `degC`, `degF`, `degRa`, `degN`, `degDe`, `degRe`, `degRo`.
 `K` (kelvin) is absolute and needs no degree sign.
 
+The water-hardness degrees carry the same warning, and one of them is genuinely dangerous:
+
+| With `°` | Means | Without `°` | Means |
+|----------|-------|-------------|-------|
+| `°dH` | German hardness degree | `dH` | **decihenry** — a valid unit, so this misreads silently |
+| `°e` | English (Clark) hardness degree | `e` | `error_unit_illegal` |
+| `°fH` | French hardness degree | `fH` | femtohenry |
+| `°rH` | Russian hardness degree | `rH` | rontohenry |
+| `°aH` | American hardness degree | `aH` | attohenry |
+
+Their ASCII long forms avoid the question entirely: `german_hardness`, `english_hardness`
+(or `clark_degree`), `french_hardness`, `russian_hardness`, `american_hardness`.
+
 ---
 
 ## 9. Same dimension, different quantity
@@ -241,6 +256,11 @@ conversions in the first group; the second group is protected by an explicit qua
 | `Np` | logarithmic | `dB`, `%`, plain numbers |
 | `pH` | logarithmic | `%`, `ppm`, plain numbers |
 | `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb` | pure ratios | *(freely interconvertible, and with a plain number: 1 % → 0.01)* |
+
+Water chemistry calls the American hardness scale "ppm" (milligrams of CaCO₃ per litre). Bovnar's
+`ppm` is the **dimensionless** 10⁻⁶ and the hardness scale is `°aH`, an amount concentration — the
+two carry different dimensions and do not convert into one another. If your source says "ppm
+hardness", write `°aH`.
 
 The logarithmic kinds are separate because no factor can relate them: 20 dB is a ratio of 100, not
 twice 10 dB, and a pH one unit lower is a tenfold concentration. `rpm` is a *cycle* rate and
@@ -314,7 +334,35 @@ Two that *are* accepted but rarely mean what the writer intended:
 
 ---
 
-## 13. Same name, different definition
+## 13. Water hardness: six scales, one quantity
+
+All six measure the concentration of dissolved alkaline-earth ions, and Bovnar converts freely
+between them and `m~mol/L`. What differs is the reference compound each scale counts, which is why
+their *mass*-per-litre definitions are not comparable and the amount concentration is.
+
+| Scale | Symbol | Defined as | 1 mmol/L equals |
+|-------|--------|------------|-----------------|
+| German | `°dH` | 10 mg CaO / L | 5.6077 °dH |
+| English / Clark | `°e`, `°Clark` | 1 grain CaCO₃ / imperial gallon | 7.0217 °e |
+| French | `°fH` | 10 mg CaCO₃ / L | 10.0086 °fH |
+| Russian | `°rH` | 1 mg Ca / L | 40.078 °rH |
+| American | `°aH` | 1 mg CaCO₃ / L (called "ppm") | 100.086 °aH |
+| Equivalents | `m~val/L` | ½ mmol/L (divalent ions) | 2.000 mval/L |
+| Amount | `m~mol/L` | — | 1 |
+
+The traps, in order of how easily they bite:
+
+| Trap | Why | Do this |
+|------|-----|---------|
+| `dH` instead of `°dH` | `dH` is the decihenry — an accepted unit, so nothing errors | keep the `°`, or write `german_hardness` |
+| "ppm" for hardness | Bovnar's `ppm` is the dimensionless 10⁻⁶ | write `°aH` |
+| `mval/L` for a monovalent species | `val` here is the *water-analysis* equivalent: 1 val = ½ mol | write `m~mol/L` for the amount directly |
+| Expecting an exact conversion | the degrees are derived from molar masses, so they carry `.exact = false` | ordinary conversion works; a lossless one reports `error_unit_inexact` |
+| `mmol/l` as a "unit" | it is the compound `m~mol/L`, not a base unit | write `mmol/L`, `m~mol/L` or `mmol/l` — all the same |
+
+---
+
+## 14. Same name, different definition
 
 Not parser ambiguities — real-world ones. Bovnar keeps these distinct, and the distinction is
 usually where the money is.
@@ -333,7 +381,7 @@ usually where the money is.
 
 ---
 
-## 14. Quick index: if you mean X, write Y
+## 15. Quick index: if you mean X, write Y
 
 | If you mean | Write | Not |
 |-------------|-------|-----|
@@ -359,6 +407,10 @@ usually where the money is.
 | degree Celsius | `°C`, `degC` | `C` (coulomb) |
 | thousand US dollars | `k$USD`, `k~$USD` | `kUSD` |
 | a plain count | omit the unit, or `no_unit` | `%` (that is 10⁻²) |
+| German water hardness | `°dH`, `german_hardness` | `dH` (decihenry) |
+| hardness "in ppm" | `°aH` | `ppm` (dimensionless 10⁻⁶) |
+| hardness in equivalents | `m~val/L`, `mval/l` | `m~mol/L` (that is twice the value) |
+| hardness in millimoles | `m~mol/L`, `mmol/L` | — it needs no unit of its own |
 
 ---
 

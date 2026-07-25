@@ -929,3 +929,25 @@
 .speed_limit_alias = <uint:8,kmh>      130;      # "kmh" is the same unit
 .wind_speed        = <float:32,kn>     18.5;     # the knot, unchanged
 .speed_compound    = <float:32,k~m/h> 130.0;     # same quantity, compound form
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 33. Water hardness — six scales for one quantity
+# ══════════════════════════════════════════════════════════════════════════════
+# All of these measure the concentration of dissolved alkaline-earth ions, so
+# they carry mol·m⁻³ and convert into each other and into m~mol/L. Keep the
+# degree sign: "dH" without it is the decihenry, which parses happily and means
+# something else entirely. Millimoles per litre needs no unit of its own.
+#
+#   1 mmol/L = 5.6077 °dH = 7.0217 °e = 10.0086 °fH = 40.078 °rH
+#            = 100.086 °aH = 2.000 mval/L
+
+.tap_water_de      = <float:32,°dH>      14.5;    # "hart" in German terms
+.tap_water_uk      = <float:32,°e>       18.2;    # English (Clark) degrees
+.tap_water_fr      = <float:32,°fH>      25.9;    # French degrees
+.tap_water_ru      = <float:32,°rH>     103.7;    # Russian degrees
+.tap_water_us      = <float:32,°aH>     258.8;    # American degrees ("ppm CaCO3")
+.tap_water_eq      = <float:32,m~val/L>   5.17;   # milliequivalents per litre
+.tap_water_amount  = <float:32,m~mol/L>   2.59;   # the SI-coherent form
+.clark_spelling    = <float:32,°Clark>   18.2;    # °Clark is the same unit as °e
+.long_form         = <float:32,german_hardness> 14.5;   # ASCII spelling

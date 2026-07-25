@@ -39,6 +39,21 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Water hardness: `°dH`, `°e`/`°Clark`, `°fH`, `°rH`, `°aH`, and `val`** — six scales for one
+  quantity, the concentration of dissolved alkaline-earth ions. Each is defined as a mass of a
+  reference compound per litre, but the scales count *different* compounds (CaO, CaCO₃, Ca), so
+  mass concentration is not their common ground and comparing them that way is wrong by the ratio
+  of two molar masses. They are modelled as amount concentration (mol·m⁻³ = mmol·L⁻¹), which is
+  what the published conversion tables tabulate and what makes every scale convert into every
+  other and into `m~mol/L` — the latter needs no unit of its own. Factors are derived from IUPAC
+  2021 molar masses and therefore carry `.exact = false`: a lossless conversion reports
+  `error_unit_inexact` rather than inventing precision. None of the degrees takes a prefix. `val`
+  is the equivalent **as water analysis uses it** — the ions are divalent, so 1 val = ½ mol and
+  `m~val/L` = 0.5 mmol/L; for a monovalent species an equivalent is 1 mol, which no unit can
+  convey, so there is deliberately no generic `eq`/`equivalent` alias. Two spellings matter:
+  `dH` without the degree sign is the decihenry and stays that way, and water chemistry's "ppm"
+  is `°aH`, not Bovnar's dimensionless `ppm`. Enum values 383-388;
+  `BVN_VALUE_BASE_UNIT_COUNT` grows to 389.
 - **Three units: `pH`, `mph`, `kph`** — the acidity scale (dimensionless, no
   prefix, modelled for the same reason `dB` and `Np` are) and two named speeds
   (`mph` = 0.44704 m/s exactly; `kph` = 5/18 m/s, stated as an exact rational

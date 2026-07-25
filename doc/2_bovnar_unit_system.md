@@ -37,6 +37,7 @@
    - 3.25 [Ratio and Proportion Units](#325-ratio-and-proportion-units)
    - 3.26 [Named Speed Units](#326-named-speed-units)
    - 3.27 [Acidity](#327-acidity)
+   - 3.28 [Water Hardness](#328-water-hardness)
    - 3.26 [Sentinel Value](#326-sentinel-value)
 4. [Prefixes](#4-prefixes)
    - 4.1 [SI Prefixes](#41-si-prefixes)
@@ -93,7 +94,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 166 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 172 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -178,7 +179,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 166 named physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 172 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -486,7 +487,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–382** (`bu_ph_scale`, `bu_mile_per_hour`, `bu_kilometer_per_hour`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–388** (`bu_ph_scale` … `bu_val`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -569,7 +570,48 @@ average — the same caveat that applies to `dB` and `Np`.
 > `ph` is the phot (§3.15). This is exactly why acidity had to become a unit —
 > without it, `pH` resolves as a compact prefixed henry.
 
-### 3.28 Sentinel Value
+### 3.28 Water Hardness
+
+Six scales for one physical quantity: the concentration of dissolved
+alkaline-earth ions (Ca²⁺, Mg²⁺). Each is *defined* as a mass of a reference compound per litre,
+but the scales use **different** compounds — `°dH` counts CaO, most of the others CaCO₃, `°rH`
+counts Ca — so mass concentration is not their common ground. Amount concentration is: every scale
+carries mol·m⁻³ (which is exactly mmol·L⁻¹), converts into every other, and into `m~mol/L`.
+
+None of them takes a prefix. **Millimoles per litre needs no unit of its own** — it is the compound
+`m~mol/L` (or `mmol/L`).
+
+| Symbol | Long form | Name | Enum value | Defined as | Factor (mol·m⁻³ = mmol·L⁻¹) |
+|--------|-----------|------|------------|------------|------------------------------|
+| `°dH` | `german_hardness` | German degree | `bu_german_hardness` | 10 mg CaO / L | 0.178326 |
+| `°e`, `°Clark` | `english_hardness`, `clark_degree` | English (Clark) degree | `bu_english_hardness` | 1 grain CaCO₃ / imperial gallon | 0.142415 |
+| `°fH` | `french_hardness` | French degree | `bu_french_hardness` | 10 mg CaCO₃ / L | 0.099914 |
+| `°rH` | `russian_hardness` | Russian degree | `bu_russian_hardness` | 1 mg Ca / L | 0.024951 |
+| `°aH` | `american_hardness` | American degree | `bu_american_hardness` | 1 mg CaCO₃ / L | 0.009991 |
+| `val` | `vals` | equivalent (water analysis) | `bu_val` | ½ mol — see below | 0.5 (as `mol`, not a concentration) |
+
+Reading across, with 1 mmol·L⁻¹ as the reference:
+
+| 1 mmol/L equals | `°dH` | `°e` | `°fH` | `°rH` | `°aH` | `mval/L` |
+|-----------------|-------|------|-------|-------|-------|----------|
+| | 5.6077 | 7.0217 | 10.0086 | 40.078 | 100.086 | 2.000 |
+
+> **`val` is the equivalent as *water analysis* uses it.** The ions counted are divalent, so one
+> equivalent is half a mole and `m~val/L` = 0.5 mmol/L, which is what the hardness tables state.
+> An equivalent of a *monovalent* species is one mole — Bovnar cannot know the species from the
+> unit, so for that case write the amount directly (`m~mol/L`). There is deliberately no generic
+> `eq` / `equivalent` alias.
+
+> **Exactness.** Every degree is derived from a molar mass (IUPAC 2021: Ca 40.078, C 12.011,
+> O 15.999 g·mol⁻¹), so the factors are measurement-derived rather than exact rationals. They carry
+> `.exact = false`: a lossless (rational) conversion reports `error_unit_inexact` instead of
+> inventing precision, while the ordinary double-precision path converts normally.
+
+> **`dH` is not `°dH`.** Without the degree sign the token is the decihenry, and it stays that way.
+> Likewise water chemistry writes the American scale as "ppm"; Bovnar's `ppm` is the dimensionless
+> 10⁻⁶ and is *not* interchangeable with `°aH`. See [`unit_ambiguities.md`](unit_ambiguities.md).
+
+### 3.29 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
 
@@ -1296,7 +1338,7 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–382 (`bu_ph_scale`, `bu_mile_per_hour`, `bu_kilometer_per_hour`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
+Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–388 (`bu_ph_scale` … `bu_val`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
 
 ```c
 typedef enum value_base_unit_e {

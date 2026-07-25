@@ -176,3 +176,6 @@
 	bu_turbidity_fnu = 391,
 	bu_practical_salinity = 392,
 	bu_conductivity_factor = 393,
+	bu_turbidity_ftu = 394,
+	bu_turbidity_fau = 395,
+	bu_turbidity_jtu = 396,

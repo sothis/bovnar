@@ -76,6 +76,9 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_ntu = 1.0',
     'bvnr_fnu = 1.0',
     'bvnr_psu = 1.0',
+    'bvnr_ftu = 1.0',
+    'bvnr_fau = 1.0',
+    'bvnr_jtu = 1.0',
     'bvnr_conductivity_factor = 0.01 * siemens * meter**-1',
     'bvnr_phot = 10000.0 * meter**-2 * candela',
     'bvnr_ppb = 1e-09',
@@ -277,6 +280,9 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     391: 'bvnr_fnu',                     # TURBIDITY_FNU
     392: 'bvnr_psu',                     # PRACTICAL_SALINITY
     393: 'bvnr_conductivity_factor',     # CONDUCTIVITY_FACTOR
+    394: 'bvnr_ftu',                     # TURBIDITY_FTU
+    395: 'bvnr_fau',                     # TURBIDITY_FAU
+    396: 'bvnr_jtu',                     # TURBIDITY_JTU
 
     # Defined to match bovnar magnitude exactly (pint native uses a different convention)
      71: 'bvnr_therm',                   # THERM
@@ -297,6 +303,9 @@ SEMANTIC_CAVEATS: dict[str, str] = {
     'NEPER': 'bovnar Np is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
     'TURBIDITY_NTU': "bovnar keeps NTU in its own quantity kind, so it converts only to itself; in pint it is plain dimensionless and would happily 'convert' to FNU or to a bare number. NTU (white light) and FNU (near-infrared) agree only on a formazin standard.",
     'TURBIDITY_FNU': 'see TURBIDITY_NTU: the two are separate methods, and only bovnar enforces that.',
+    'TURBIDITY_FTU': 'formazin turbidity with the geometry unstated; bovnar keeps it in its own kind precisely because the method is unknown, while pint would convert it to NTU or FNU as if it were either.',
+    'TURBIDITY_FAU': 'attenuation at 0°, not sideways scatter — a different optical quantity from FNU, though pint sees both as dimensionless.',
+    'TURBIDITY_JTU': 'the Jackson candle method: its relation to the formazin scales is nonlinear and sample-dependent, so no factor exists. pint has no way to express that.',
     'PRACTICAL_SALINITY': 'PSS-78 practical salinity is a conductivity ratio, not a mass fraction (S_P 35 is about 35.165 g/kg). bovnar isolates it as its own kind; in pint it is dimensionless and would convert to per-mille, which is wrong by about half a percent.',
     'VAL': 'bovnar val is the equivalent AS USED IN WATER ANALYSIS (divalent ions): 1 val = 0.5 mol. For a monovalent species an equivalent is 1 mol, which neither library can infer from the unit alone.',
     'PH_SCALE': 'bovnar pH is a linear dimensionless tag (=1), as pint has no acidity unit at all ("pH" parses there as the picohenry). The scale is logarithmic, so summing or averaging pH values is not meaningful in either library.',

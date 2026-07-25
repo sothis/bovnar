@@ -40,7 +40,7 @@
 <h1>Bovnar (BVNR) — Units &amp; Currencies Reference</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/8_unit_cheatsheet.md">Markdown</a> and <a href="/doc/pdf/bovnar-cheatsheet.pdf">PDF</a>.</p>
 <blockquote>
-<p>Spec version 1.1 · 177 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
+<p>Spec version 1.1 · 180 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
 </blockquote>
 <hr />
 <h2 id="contents">Contents</h2>
@@ -2176,6 +2176,27 @@ or <code>S/m</code> (<code>µmho/cm</code> too — <code>mho</code>/<code>℧</c
 <td>itself only</td>
 </tr>
 <tr>
+<td><code>FTU</code></td>
+<td><code>formazin_turbidity</code></td>
+<td><code>bu_turbidity_ftu</code></td>
+<td>formazin, geometry unstated</td>
+<td>itself only</td>
+</tr>
+<tr>
+<td><code>FAU</code></td>
+<td><code>formazin_attenuation</code></td>
+<td><code>bu_turbidity_fau</code></td>
+<td>attenuation at 0° (ISO 7027)</td>
+<td>itself only</td>
+</tr>
+<tr>
+<td><code>JTU</code></td>
+<td><code>jackson_turbidity</code></td>
+<td><code>bu_turbidity_jtu</code></td>
+<td>visual candle method (historical)</td>
+<td>itself only</td>
+</tr>
+<tr>
 <td><code>PSU</code></td>
 <td><code>practical_salinity</code></td>
 <td><code>bu_practical_salinity</code></td>
@@ -2192,9 +2213,12 @@ or <code>S/m</code> (<code>µmho/cm</code> too — <code>mho</code>/<code>℧</c
 </tbody>
 </table>
 <blockquote>
-<p>NTU and FNU agree on a formazin standard and not on real water, so Bovnar refuses to convert
-between them; report the method. PSU is a conductivity ratio, <strong>not</strong> a mass fraction — for
-absolute salinity write <code>g/k~g</code>. <code>CF</code> is uppercase only: <code>cF</code> is the centifarad.</p>
+<p>The five turbidity scales agree on a formazin standard and not on real water — and <code>FAU</code> is not
+even the same optical quantity (attenuation, not scatter), while <code>JTU</code> is visual and relates to
+formazin only near 40 units. Bovnar refuses every conversion between them; report the method.
+<code>JTU</code> and <code>PSU</code> take no prefix. PSU is a conductivity ratio, <strong>not</strong> a mass fraction — for
+absolute salinity write <code>g/k~g</code>. Case matters: <code>cF</code> is the centifarad and <code>fau</code> the
+femto-astronomical-unit.</p>
 </blockquote>
 <h2 id="5-currencies">5. Currencies</h2>
 <h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
@@ -3617,7 +3641,7 @@ abbreviations that are deliberately not units — is in <a href="unit_ambiguitie
 </table>
 <p>No bare token is simultaneously a valid physical unit and a currency: currencies live entirely under <code>$</code>, physical units entirely without it.</p>
 <hr />
-<p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–393 (177 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
+<p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
 <em><code>BVN_VALUE_BASE_UNIT_COUNT</code> = 380 (<code>bu_xcg + 1</code>)</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>

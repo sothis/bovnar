@@ -887,6 +887,28 @@ static void test_water_quality_scales(void)
 	 * and not on real water, so no factor relates them — reporting the method
 	 * is the whole point, and silently trading one for the other would undo it. */
 	ASSERT_TRUE(!bvn_units_compatible(ntu, fnu), "NTU and FNU are separate kinds");
+
+	/* Five turbidity scales, one per method, and no pair of them relates: the
+	 * formazin ones (NTU/FNU/FTU) agree only on a formazin standard, FAU
+	 * measures attenuation rather than scatter, and JTU is the visual candle
+	 * method whose relation to formazin is nonlinear and sample-dependent. */
+	{
+		static const value_base_unit_t turb[] = {
+			bu_turbidity_ntu, bu_turbidity_fnu, bu_turbidity_ftu,
+			bu_turbidity_fau, bu_turbidity_jtu
+		};
+		for (unsigned i = 0; i < sizeof(turb) / sizeof(turb[0]); i++) {
+			for (unsigned j = 0; j < sizeof(turb) / sizeof(turb[0]); j++) {
+				value_unit_t a = BVN_UNIT_NO_PREFIX(turb[i]);
+				value_unit_t b = BVN_UNIT_NO_PREFIX(turb[j]);
+				bool want = (i == j);
+				char msg[80];
+				snprintf(msg, sizeof(msg),
+					 "turbidity kinds %u/%u compatible == %d", i, j, want);
+				ASSERT_TRUE(bvn_units_compatible(a, b) == want, msg);
+			}
+		}
+	}
 	ASSERT_TRUE(!bvn_unit_convert_value(1.0, ntu, fnu, &out),
 		    "1 NTU -> FNU is refused rather than answered with 1");
 	ASSERT_TRUE(!bvn_units_compatible(ntu, none), "turbidity is not a plain number");
@@ -907,6 +929,21 @@ static void test_water_quality_scales(void)
 	ASSERT_TRUE(!bvn_units_compatible(psu, none), "PSU is not a plain number");
 	ASSERT_TRUE(!bvn_units_compatible(psu, ntu), "PSU is not a turbidity");
 	assert_unit_rejected("m~PSU");     /* the scale is bounded by construction */
+	/* JTU likewise: the candle method cannot resolve below roughly 25 JTU, so a
+	 * milli-JTU is not a measurement. FTU and FAU are ordinary instrument
+	 * scales and do take prefixes. */
+	assert_unit_rejected("m~JTU");
+	assert_compact_matches("mFTU", "m~FTU");
+	assert_compact_matches("mFAU", "m~FAU");
+	/* "fau" lowercase is the femto-astronomical-unit and must stay that way. */
+	{
+		bool fok = false;
+		value_unit_t fau_lower = bvn_parse_unit((const uint8_t *)"fau", &fok);
+		ASSERT_TRUE(fok, "fau parses");
+		ASSERT_EQ_INT(fau_lower.components[0].base, bu_astronomical_unit,
+			      "fau is the astronomical unit");
+		ASSERT_EQ_INT(fau_lower.components[0].prefix.id.si, si_femto, "…femto-");
+	}
 
 	/* CF is a conductivity, just rescaled: 1 CF = 0.1 mS/cm = 100 µS/cm. */
 	{
@@ -1087,7 +1124,10 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_turbidity_fnu      == 391, "bu_turbidity_fnu == 391");
 	ASSERT_TRUE((int)bu_practical_salinity == 392, "bu_practical_salinity == 392");
 	ASSERT_TRUE((int)bu_conductivity_factor == 393, "bu_conductivity_factor == 393");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 394, "sentinel == 394");
+	ASSERT_TRUE((int)bu_turbidity_ftu       == 394, "bu_turbidity_ftu == 394");
+	ASSERT_TRUE((int)bu_turbidity_fau       == 395, "bu_turbidity_fau == 395");
+	ASSERT_TRUE((int)bu_turbidity_jtu       == 396, "bu_turbidity_jtu == 396");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 397, "sentinel == 397");
 }
 
 static void test_nonsi_si_factors(void)

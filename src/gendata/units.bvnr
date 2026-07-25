@@ -2145,6 +2145,55 @@
     .offset  = 0.0;
     .prefix  = none;
     .aliases = ["conductivity_factor", "CF"];
+  },
+  {
+    # The generic formazin turbidity unit: ISO 7027's original (1984) name,
+    # still used when the optical geometry is not stated. That is exactly what
+    # it tells a reader — the sample was compared against formazin, by an
+    # unspecified method — so it cannot be an alias of NTU or FNU without
+    # inventing the geometry. Its own kind, like the rest of them.
+    .id      = <uint:16> 394;
+    .name    = "turbidity_ftu";
+    .symbol  = "FTU";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["formazin_turbidity", "FTU"];
+  },
+  {
+    # ISO 7027 ATTENUATION: the detector sits at 0°, in the transmitted beam,
+    # and measures how much light the sample removes — not how much it scatters
+    # sideways. A different optical quantity from FNU, not the same one measured
+    # differently, and the instrument of choice above ~40 FNU where nephelometry
+    # saturates.
+    .id      = <uint:16> 395;
+    .name    = "turbidity_fau";
+    .symbol  = "FAU";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["formazin_attenuation", "FAU"];
+  },
+  {
+    # The Jackson candle turbidimeter: the depth of water at which a candle
+    # flame stops being visible. Visual, obsolete, and NOT convertible to the
+    # formazin scales — the published "1 JTU ≈ 1 NTU" holds near 40 units and
+    # nowhere else, being nonlinear and sample-dependent. The method cannot
+    # resolve below roughly 25 JTU either, so a milli-JTU is not a measurement:
+    # no prefixes.
+    .id      = <uint:16> 396;
+    .name    = "turbidity_jtu";
+    .symbol  = "JTU";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = none;
+    .aliases = ["jackson_turbidity", "JTU"];
   }
 ];
 

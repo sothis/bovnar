@@ -940,6 +940,95 @@ class TestCompactPrefixForm:
 
 
 @needs_lib
+class TestWaterAnalysisUnits:
+    """Conductivity, dissolved solids, hardness and the instrument scales —
+    the spellings water data actually uses, and the ones that mean something
+    else."""
+
+    @pytest.mark.parametrize("tok,canonical", [
+        ("µS/cm",   "µ~S/c~m"),     # EC, the everyday spelling
+        ("uS/cm",   "µ~S/c~m"),
+        ("mS/cm",   "m~S/c~m"),
+        ("dS/m",    "d~S/m"),       # soil salinity
+        ("µmho/cm", "µ~S/c~m"),     # pre-SI name for the same unit
+        ("mho",     "S"),
+        ("℧",       "S"),
+        ("mg/L",    "m~g/L"),       # TDS
+        ("mg/l",    "m~g/L"),
+        ("meq/L",   "m~val/L"),     # English spelling of mval/L
+        ("mval/l",  "m~val/L"),
+        ("gpg",     "gpg"),
+        ("°dH",     "°dH"),
+        ("CF",      "CF"),
+        ("mNTU",    "m~NTU"),
+    ])
+    def test_spelling_resolves(self, tok, canonical):
+        assert bovnar.unit_to_str(bovnar.parse_unit(tok)) == canonical
+
+    def test_conductivity_is_a_compound_not_a_unit(self):
+        # EC needs no base unit of its own: siemens per length says it exactly.
+        ec = bovnar.parse_unit("µS/cm")
+        assert ec.num_components == 2
+        assert ec.components[0].base_unit == BaseUnit.SIEMENS
+        assert ec.components[1].base_unit == BaseUnit.METER
+        assert units_compatible(ec, bovnar.parse_unit("S/m"))
+
+    def test_hardness_scales_interconvert(self):
+        mmol = bovnar.parse_unit("m~mol/L")
+        for tok, per_mmol in [("°dH", 5.6077), ("°e", 7.0217), ("°fH", 10.0086),
+                              ("°rH", 40.078), ("°aH", 100.086), ("gpg", 5.8468),
+                              ("m~val/L", 2.0)]:
+            f = unit_convert_factor(mmol, bovnar.parse_unit(tok)).factor
+            assert abs(f - per_mmol) <= per_mmol * 2e-4, (tok, f, per_mmol)
+
+    def test_conductivity_factor_is_a_rescaled_ec(self):
+        # CF = EC in mS/cm x 10, and unlike the turbidity scales it really is
+        # the quantity it rescales, so it converts exactly.
+        cf = bovnar.parse_unit("CF")
+        assert abs(unit_convert_factor(cf, bovnar.parse_unit("m~S/c~m")).factor - 0.1) < 1e-12
+        assert abs(unit_convert_factor(cf, bovnar.parse_unit("µ~S/c~m")).factor - 100.0) < 1e-9
+
+    def test_gpg_is_not_the_compound_grain_per_gallon(self):
+        # gpg is an amount concentration (it converts with the other hardness
+        # scales); gr/gal is a mass concentration. Different dimensions.
+        assert not units_compatible(bovnar.parse_unit("gpg"),
+                                    bovnar.parse_unit("gr/gal"))
+
+    @pytest.mark.parametrize("a,b", [
+        ("NTU", "FNU"), ("NTU", "FTU"), ("NTU", "FAU"), ("NTU", "JTU"),
+        ("FNU", "FTU"), ("FNU", "FAU"), ("FNU", "JTU"),
+        ("FTU", "FAU"), ("FTU", "JTU"), ("FAU", "JTU"),
+        ("NTU", "no_unit"), ("JTU", "%"), ("PSU", "‰"), ("PSU", "g/k~g"),
+        ("PSU", "NTU"),
+    ])
+    def test_instrument_scales_do_not_interconvert(self, a, b):
+        # One kind per measurement method: the formazin scales agree only on a
+        # formazin standard, FAU measures attenuation rather than scatter, JTU
+        # is visual with no fixed relation to any of them, and practical
+        # salinity is a conductivity ratio rather than a mass fraction.
+        assert not units_compatible(bovnar.parse_unit(a), bovnar.parse_unit(b))
+
+    @pytest.mark.parametrize("tok", ["NTU", "FNU", "FTU", "FAU", "JTU", "PSU"])
+    def test_each_scale_converts_to_itself(self, tok):
+        u = bovnar.parse_unit(tok)
+        assert units_compatible(u, u)
+        assert unit_convert_factor(u, u).factor == 1.0
+
+    @pytest.mark.parametrize("tok,base,prefix", [
+        ("cF",  BaseUnit.FARAD,             SIPrefix.CENTI),   # not CF
+        ("fau", BaseUnit.ASTRONOMICAL_UNIT, SIPrefix.FEMTO),   # not FAU
+        ("dH",  BaseUnit.HENRY,             SIPrefix.DECI),    # not °dH
+    ])
+    def test_lowercase_neighbours_keep_their_meaning(self, tok, base, prefix):
+        c = bovnar.parse_unit(tok).components[0]
+        assert c.base_unit == base and c.si_prefix == prefix
+
+    def test_the_hardness_ppm_is_not_the_dimensionless_ppm(self):
+        assert not units_compatible(bovnar.parse_unit("°aH"),
+                                    bovnar.parse_unit("ppm"))
+
+
+@needs_lib
 class TestCompactPrefixFormAgainstTheTable:
     """Sweep src/gendata/units.bvnr, not just the hand-picked cases above.
 

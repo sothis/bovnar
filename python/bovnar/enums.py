@@ -573,8 +573,11 @@ class BaseUnit(IntEnum):
     TURBIDITY_FNU      = 391   # near-infrared, ISO 7027
     PRACTICAL_SALINITY = 392   # PSS-78; a conductivity ratio, not a mass fraction
     CONDUCTIVITY_FACTOR = 393  # CF = EC in mS/cm × 10
+    TURBIDITY_FTU      = 394   # formazin, geometry unstated (ISO 7027:1984)
+    TURBIDITY_FAU      = 395   # attenuation at 0°, not scatter
+    TURBIDITY_JTU      = 396   # Jackson candle method; no formazin relation
 
-    _SENTINEL = 394
+    _SENTINEL = 397
 
 
 # Currency-range sentinels (mirrors C #defines)

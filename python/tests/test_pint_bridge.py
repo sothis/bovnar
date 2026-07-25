@@ -118,7 +118,8 @@ class TestUnitTableIntegrity:
         # semantics differ from pint's; a new one must be a deliberate addition,
         # never a silent one.
         assert _CAVEATS == {'BYTE', 'DECIBEL', 'NEPER', 'PH_SCALE', 'VAL',
-                            'TURBIDITY_NTU', 'TURBIDITY_FNU', 'PRACTICAL_SALINITY'}
+                            'TURBIDITY_NTU', 'TURBIDITY_FNU', 'PRACTICAL_SALINITY',
+                            'TURBIDITY_FTU', 'TURBIDITY_FAU', 'TURBIDITY_JTU'}
 
 
 @needs_lib

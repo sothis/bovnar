@@ -319,14 +319,19 @@ bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
  *                  wrong-by-orders-of-magnitude answer this table exists to
  *                  refuse.
  *
- *   turbidity    — NTU and FNU are separate kinds. Both are dimensionless
- *                  formazin-calibrated scales and are numerically equal ON a
- *                  formazin standard, which is exactly the trap: NTU is
- *                  white-light (EPA 180.1) and FNU near-infrared (ISO 7027),
- *                  and on real water the two optics disagree by an amount that
- *                  depends on particle size and colour. No factor relates them,
- *                  which is why every standard demands the method be reported
- *                  rather than the number alone.
+ *   turbidity    — NTU, FNU, FTU, FAU and JTU are five separate kinds, one per
+ *                  measurement method. The formazin-calibrated ones are
+ *                  numerically equal ON a formazin standard, which is exactly
+ *                  the trap: NTU is white-light (EPA 180.1), FNU near-infrared
+ *                  (ISO 7027), FTU the same family with the geometry left
+ *                  unstated, and on real water those optics disagree by an
+ *                  amount that depends on particle size and colour. FAU is not
+ *                  even the same optical quantity — it measures attenuation in
+ *                  the transmitted beam rather than sideways scatter. JTU is
+ *                  the visual candle method, whose relation to formazin is
+ *                  nonlinear and sample-dependent. No factor relates any pair
+ *                  of them, which is why every standard demands the method be
+ *                  reported rather than the number alone.
  *   salinity     — practical salinity (PSS-78) is a conductivity RATIO, so it
  *                  is dimensionless by construction and "PSU" is a label, not a
  *                  unit. It is not a mass fraction: S_P 35 is about 35.165 g/kg
@@ -348,6 +353,9 @@ typedef enum {
 	BVNI_KIND_LOG_PH,
 	BVNI_KIND_TURBIDITY_NTU,
 	BVNI_KIND_TURBIDITY_FNU,
+	BVNI_KIND_TURBIDITY_FTU,
+	BVNI_KIND_TURBIDITY_FAU,
+	BVNI_KIND_TURBIDITY_JTU,
 	BVNI_KIND_SALINITY_PSU,
 	BVNI_KIND_COUNT
 } bvni_quantity_kind_t;
@@ -371,6 +379,9 @@ static const bvni_kind_entry_t bvni_kind_table[] = {
 	{ bu_ph_scale,   BVNI_KIND_LOG_PH,      1 },
 	{ bu_turbidity_ntu,      BVNI_KIND_TURBIDITY_NTU, 1 },
 	{ bu_turbidity_fnu,      BVNI_KIND_TURBIDITY_FNU, 1 },
+	{ bu_turbidity_ftu,      BVNI_KIND_TURBIDITY_FTU, 1 },
+	{ bu_turbidity_fau,      BVNI_KIND_TURBIDITY_FAU, 1 },
+	{ bu_turbidity_jtu,      BVNI_KIND_TURBIDITY_JTU, 1 },
 	{ bu_practical_salinity, BVNI_KIND_SALINITY_PSU,  1 },
 };
 #define BVNI_KIND_TABLE_COUNT \

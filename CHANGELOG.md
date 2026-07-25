@@ -39,6 +39,17 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Three more turbidity scales: `FTU`, `FAU`, `JTU`** — completing the set, each as its own
+  quantity kind for a different reason. `FTU` is formazin turbidity with the optical geometry
+  **unstated** (ISO 7027's original 1984 name), which is precisely why it cannot be an alias of NTU
+  or FNU: not saying which optics were used is its entire content. `FAU` is not a nephelometric
+  measurement at all — it reads attenuation in the transmitted beam at 0° rather than sideways
+  scatter, and is the instrument of choice above ~40 FNU where nephelometry saturates. `JTU` is the
+  visual candle turbidimeter, whose published "1 JTU ≈ 1 NTU" holds near 40 units and nowhere else,
+  being nonlinear and sample-dependent; it takes no prefix, the method being unable to resolve
+  below roughly 25 JTU. With NTU and FNU that makes five turbidity scales, no two of which convert.
+  Case still matters: `fau` is the femto-astronomical-unit. Enum values 394-396;
+  `BVN_VALUE_BASE_UNIT_COUNT` grows to 397.
 - **Water-quality scales: `NTU`, `FNU`, `PSU` and `CF`** — three instrument scales and one rescaled
   conductivity. NTU (white light, EPA 180.1) and FNU (near-infrared, ISO 7027) are both
   formazin-calibrated and numerically equal *on a formazin standard*, which is exactly why they get

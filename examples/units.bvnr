@@ -973,3 +973,6 @@
 .salinity          = <float:32,PSU>      34.7;   # practical salinity (PSS-78)
 .salinity_absolute = <float:32,g/k~g>    35.165; # what PSU is NOT
 .nutrient_ec       = <float:32,CF>        5.4;   # = 0.54 mS/cm = 540 µS/cm
+.turbidity_unspec  = <float:32,FTU>       4.2;   # formazin, geometry unstated
+.turbidity_atten   = <float:32,FAU>      60.0;   # attenuation at 0°, high turbidity
+.turbidity_candle  = <float:32,JTU>      40.0;   # the historical visual method

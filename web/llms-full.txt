@@ -61,7 +61,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 358-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 364-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -2327,7 +2327,7 @@ ev_data
 
 ### 11.1 Base Units
 
-The unit system supports **177 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/2_bovnar_unit_system.md`](2_bovnar_unit_system.md)**.
+The unit system supports **180 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/2_bovnar_unit_system.md`](2_bovnar_unit_system.md)**.
 
 **SI base units and digital units**
 
@@ -3917,7 +3917,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 177 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -4002,7 +4002,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 177 named physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 180 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -4310,7 +4310,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–393** (`bu_ph_scale` … `bu_conductivity_factor`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -4469,21 +4469,46 @@ existing tables already say them exactly.
 
 ### 3.28.2 Turbidity and Salinity
 
-Three scales defined by a **measurement method** rather than by a physical quantity. They are
+Six scales defined by a **measurement method** rather than by a physical quantity. They are
 dimensionless, and each carries its own quantity kind, so none of them converts to another or to a
 plain number — the conversion a factor cannot express is refused instead of guessed.
 
-| Symbol | Long form | Name | Enum value | Method |
-|--------|-----------|------|------------|--------|
-| `NTU` | `nephelometric_turbidity` | nephelometric turbidity unit | `bu_turbidity_ntu` | white light, 90° detector (EPA 180.1) |
-| `FNU` | `formazin_nephelometric` | formazin nephelometric unit | `bu_turbidity_fnu` | near-infrared 860 nm, 90° detector (ISO 7027) |
-| `PSU` | `practical_salinity` | practical salinity unit | `bu_practical_salinity` | PSS-78 conductivity ratio |
+| Symbol | Long form | Name | Enum value | Method | Prefixes |
+|--------|-----------|------|------------|--------|----------|
+| `NTU` | `nephelometric_turbidity` | nephelometric turbidity unit | `bu_turbidity_ntu` | white light, 90° detector (EPA 180.1) | yes |
+| `FNU` | `formazin_nephelometric` | formazin nephelometric unit | `bu_turbidity_fnu` | near-infrared 860 nm, 90° detector (ISO 7027) | yes |
+| `FTU` | `formazin_turbidity` | formazin turbidity unit | `bu_turbidity_ftu` | formazin-calibrated, geometry **unstated** (ISO 7027:1984) | yes |
+| `FAU` | `formazin_attenuation` | formazin attenuation unit | `bu_turbidity_fau` | attenuation at 0°, in the transmitted beam (ISO 7027) | yes |
+| `JTU` | `jackson_turbidity` | Jackson turbidity unit | `bu_turbidity_jtu` | visual candle turbidimeter (historical) | no |
+| `PSU` | `practical_salinity` | practical salinity unit | `bu_practical_salinity` | PSS-78 conductivity ratio | no |
 
-> **NTU is not FNU.** Both are calibrated against formazin and are numerically equal *on a formazin
-> standard* — which is exactly the trap. On real water the white-light and near-infrared optics
-> respond differently to particle size and colour, which is why every standard demands the method be
-> reported alongside the number. Bovnar refuses the conversion rather than implying a factor exists.
-> `NTU` and `FNU` accept prefixes (`m~NTU` is real in ultrapure-water work).
+None of the five turbidity scales converts to any other:
+
+| | `NTU` | `FNU` | `FTU` | `FAU` | `JTU` |
+|---|---|---|---|---|---|
+| **`NTU`** | ✓ | — | — | — | — |
+| **`FNU`** | — | ✓ | — | — | — |
+| **`FTU`** | — | — | ✓ | — | — |
+| **`FAU`** | — | — | — | ✓ | — |
+| **`JTU`** | — | — | — | — | ✓ |
+
+> **One kind per method, and that is the whole content of the table.** The formazin-calibrated
+> scales (`NTU`, `FNU`, `FTU`) are numerically equal *on a formazin standard* — which is exactly the
+> trap. On real water white light and near-infrared respond differently to particle size and colour,
+> so the number alone does not say what was measured; `FTU` says even less, since its geometry is
+> unstated by definition. `FAU` is not the same optical quantity at all: it measures how much light
+> the sample removes from the beam, not how much it scatters sideways, and it is the instrument of
+> choice above ~40 FNU where nephelometry saturates. `JTU` is the visual candle method, whose
+> published equivalence to formazin ("1 JTU ≈ 1 NTU") holds near 40 units and nowhere else, being
+> nonlinear and sample-dependent. Bovnar refuses every one of these conversions rather than implying
+> a factor exists — report the method.
+>
+> `NTU`, `FNU`, `FTU` and `FAU` accept prefixes (`m~NTU` is real in ultrapure-water work). `JTU`
+> does not: the candle method cannot resolve below roughly 25 JTU, so a milli-JTU is not a
+> measurement.
+>
+> Watch the case. `fau` is the femto-astronomical-unit, `cF` the centifarad — the turbidity and
+> conductivity scales are uppercase only. See [`unit_ambiguities.md`](unit_ambiguities.md).
 
 > **PSU is not per-mille.** Practical salinity is a conductivity ratio, so it is dimensionless by
 > construction and `PSU` is a label rather than a unit — SI-minded texts write *S*_P = 35 with no
@@ -5219,7 +5244,7 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–393 (`bu_ph_scale` … `bu_conductivity_factor`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
+Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–396 (`bu_ph_scale` … `bu_turbidity_jtu`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
 
 ```c
 typedef enum value_base_unit_e {
@@ -8903,7 +8928,7 @@ unversioned document is treated as 1.0) are exposed as:
 (*    "…"  = literal terminal   (*…*) = comment                       *)
 (*  Updated: 2026-06-17 — drop the residual "1.1 (draft)" label (spec   *)
 (*    1.1 is released); note datetime also accepts a width parameter;    *)
-(*    reframe base-unit as a lookup into the full 177-unit / 523-spelling *)
+(*    reframe base-unit as a lookup into the full 180-unit / 529-spelling *)
 (*    table (NOT the closed SI subset it previously claimed).             *)
 (*  2026-06-16 — consistency pass vs the implementation:               *)
 (*    allow ws/comments before the assignment ";" and the "/" array    *)
@@ -9325,8 +9350,8 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*   Ri (2^90) and Qi (2^100) were added in IEC 80000-13:2022 ed. 2. *)
 (*                                                                     *)
 (* base-unit  = a symbol looked up in the fixed unit table by              *)
-(*   bvn_parse_unit (src/utils/bovnar_utils.c): 177 named units with        *)
-(*   523 accepted spellings (canonical symbols plus long-form and plural    *)
+(*   bvn_parse_unit (src/utils/bovnar_utils.c): 180 named units with        *)
+(*   529 accepted spellings (canonical symbols plus long-form and plural    *)
 (*   aliases), spanning SI, imperial / US customary, CGS, radiation,        *)
 (*   surveying, culinary, Old German and digital-storage quantities.        *)
 (*   Doc 2 (the unit-system spec) is the authoritative registry; the SI     *)
@@ -10445,7 +10470,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-177 named base units across the following categories:
+180 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -11376,7 +11401,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (358 cases) ──→ for each test case:                │
+│  Test corpus (364 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -11756,14 +11781,14 @@ specifies:
 | `structs` | 7 | Nesting, empty, unmatched braces |
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
-| `units` | 64 | SI/IEC prefixes, compact prefix form, compound, inline, errors |
+| `units` | 70 | SI/IEC prefixes, compact prefix form, compound, inline, errors |
 | `special_numbers` | 5 | `nan`, `inf`, `ninf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 16 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **358** | |
+| **Total** | **364** | |
 
 ---
 
@@ -11773,7 +11798,7 @@ The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
 natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading `# Subtest:` comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 22), not the 358 cases.
+parent plan therefore counts the groups (currently 22), not the 364 cases.
 
 ```
 TAP version 14
@@ -11879,7 +11904,7 @@ ctest --output-on-failure
 
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 1.1 · 177 physical units · 166 fiat currencies · 50 cryptocurrencies
+> Spec version 1.1 · 180 physical units · 166 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -12411,12 +12436,18 @@ or `S/m` (`µmho/cm` too — `mho`/`℧` are the siemens); TDS is `mg/L`; resist
 |--------|-----------|------------|---------------------|-------------|
 | `NTU` | `nephelometric_turbidity` | `bu_turbidity_ntu` | white light, 90° (EPA 180.1) | itself only |
 | `FNU` | `formazin_nephelometric` | `bu_turbidity_fnu` | near-IR 860 nm, 90° (ISO 7027) | itself only |
+| `FTU` | `formazin_turbidity` | `bu_turbidity_ftu` | formazin, geometry unstated | itself only |
+| `FAU` | `formazin_attenuation` | `bu_turbidity_fau` | attenuation at 0° (ISO 7027) | itself only |
+| `JTU` | `jackson_turbidity` | `bu_turbidity_jtu` | visual candle method (historical) | itself only |
 | `PSU` | `practical_salinity` | `bu_practical_salinity` | PSS-78 conductivity ratio | itself only |
 | `CF` | `conductivity_factor` | `bu_conductivity_factor` | EC in mS/cm × 10 | `µS/cm`, `mS/cm`, `S/m` |
 
-> NTU and FNU agree on a formazin standard and not on real water, so Bovnar refuses to convert
-> between them; report the method. PSU is a conductivity ratio, **not** a mass fraction — for
-> absolute salinity write `g/k~g`. `CF` is uppercase only: `cF` is the centifarad.
+> The five turbidity scales agree on a formazin standard and not on real water — and `FAU` is not
+> even the same optical quantity (attenuation, not scatter), while `JTU` is visual and relates to
+> formazin only near 40 units. Bovnar refuses every conversion between them; report the method.
+> `JTU` and `PSU` take no prefix. PSU is a conductivity ratio, **not** a mass fraction — for
+> absolute salinity write `g/k~g`. Case matters: `cF` is the centifarad and `fau` the
+> femto-astronomical-unit.
 
 ## 5. Currencies
 
@@ -12700,7 +12731,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–393 (177 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*
 
 <!-- ==================== Streaming & framing (https://www.bovnar.io/doc/9_bovnar_streaming.md) ==================== -->

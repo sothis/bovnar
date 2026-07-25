@@ -172,6 +172,7 @@ Common miscasings that are **errors**, not silent variants — `K` is the kelvin
 |---------|--------|----------|-------|
 | `dH` | decihenry — a valid unit, silently | German hardness degree | `°dH` |
 | `cF` | centifarad — a valid unit, silently | hydroponic conductivity factor | `CF` |
+| `fau` | femto-astronomical-unit — a valid unit, silently | formazin attenuation unit | `FAU` |
 | `Kg`, `KG` | `error_unit_illegal` | kilogram | `kg` or `k~g` |
 | `KB` | `error_unit_illegal` | kilobyte | `kB` or `k~B` |
 | `NM` | `error_unit_illegal` | nautical mile | `nmi` |
@@ -256,8 +257,11 @@ conversions in the first group; the second group is protected by an explicit qua
 | `dB` | logarithmic | `Np`, `%`, plain numbers |
 | `Np` | logarithmic | `dB`, `%`, plain numbers |
 | `pH` | logarithmic | `%`, `ppm`, plain numbers |
-| `NTU` | turbidity, white light | `FNU`, `%`, plain numbers |
-| `FNU` | turbidity, near-infrared | `NTU`, `%`, plain numbers |
+| `NTU` | turbidity, white light 90° | every other turbidity scale, `%`, plain numbers |
+| `FNU` | turbidity, near-infrared 90° | ditto |
+| `FTU` | turbidity, geometry unstated | ditto |
+| `FAU` | turbidity, attenuation 0° | ditto |
+| `JTU` | turbidity, visual candle | ditto |
 | `PSU` | practical salinity | `‰`, `g/kg`, plain numbers |
 | `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb` | pure ratios | *(freely interconvertible, and with a plain number: 1 % → 0.01)* |
 
@@ -370,10 +374,17 @@ The traps, in order of how easily they bite:
 
 | Token | Means | Not | Because |
 |-------|-------|-----|---------|
-| `NTU` | white-light turbidity (EPA 180.1) | `FNU` | equal on a formazin standard, different on real water — the optics respond differently to particle size and colour |
-| `FNU` | near-infrared turbidity (ISO 7027) | `NTU` | same reason, from the other side |
+| `NTU` | white-light turbidity, 90° (EPA 180.1) | `FNU`, `FTU`, `FAU`, `JTU` | equal on a formazin standard, different on real water — the optics respond differently to particle size and colour |
+| `FNU` | near-infrared turbidity, 90° (ISO 7027) | the other four | same reason, from the other side |
+| `FTU` | formazin turbidity, **geometry unstated** | the other four | it does not say which optics were used; that is its entire content |
+| `FAU` | formazin *attenuation*, 0° (ISO 7027) | the nephelometric three | measures light removed from the beam, not scattered sideways — a different optical quantity, used above ~40 FNU |
+| `JTU` | Jackson candle turbidimeter (historical) | the formazin four | "1 JTU ≈ 1 NTU" holds near 40 units and nowhere else — nonlinear and sample-dependent |
 | `PSU` | practical salinity (PSS-78, a conductivity ratio) | `‰`, `g/kg` | *S*_P 35 is ≈ 35.165 g/kg — equating them is wrong by ~0.5 %; write `g/k~g` for absolute salinity |
 | `CF` | hydroponic conductivity factor (EC in mS/cm × 10) | `cF` — that is the **centifarad** | uppercase only |
+
+`JTU` and `PSU` take no prefix (the candle method cannot resolve below ~25 JTU; practical salinity
+is bounded by construction). The other turbidity scales do — `m~NTU` is real in ultrapure-water
+work.
 
 Bovnar refuses every conversion in the "Not" column rather than implying a factor exists. `CF` is
 the exception in the other direction: it really is a conductivity, so `1 CF = 0.1 mS/cm = 100 µS/cm`
@@ -449,8 +460,11 @@ usually where the money is.
 | conductivity | `µS/cm`, `mS/cm`, `dS/m` | — no base unit exists or is needed |
 | conductivity, older US data | `µmho/cm` | — `mho` is the siemens |
 | dissolved solids | `mg/L` | `ppm` (dimensionless 10⁻⁶) |
-| turbidity, white light | `NTU` | `FNU` |
-| turbidity, near-IR | `FNU` | `NTU` |
+| turbidity, white light 90° | `NTU` | `FNU`, `FTU` |
+| turbidity, near-IR 90° | `FNU` | `NTU`, `FTU` |
+| turbidity, method unstated | `FTU` | `NTU` or `FNU` — those claim a geometry |
+| turbidity, attenuation | `FAU` | `FNU` (a different optical quantity) |
+| turbidity, candle method | `JTU` | any formazin scale |
 | practical salinity | `PSU` | `‰` or `g/kg` |
 | absolute salinity | `g/k~g` | `PSU` |
 | hydroponic EC scale | `CF` | `cF` (centifarad) |

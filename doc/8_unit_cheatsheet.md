@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 1.1 · 177 physical units · 166 fiat currencies · 50 cryptocurrencies
+> Spec version 1.1 · 180 physical units · 166 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -532,12 +532,18 @@ or `S/m` (`µmho/cm` too — `mho`/`℧` are the siemens); TDS is `mg/L`; resist
 |--------|-----------|------------|---------------------|-------------|
 | `NTU` | `nephelometric_turbidity` | `bu_turbidity_ntu` | white light, 90° (EPA 180.1) | itself only |
 | `FNU` | `formazin_nephelometric` | `bu_turbidity_fnu` | near-IR 860 nm, 90° (ISO 7027) | itself only |
+| `FTU` | `formazin_turbidity` | `bu_turbidity_ftu` | formazin, geometry unstated | itself only |
+| `FAU` | `formazin_attenuation` | `bu_turbidity_fau` | attenuation at 0° (ISO 7027) | itself only |
+| `JTU` | `jackson_turbidity` | `bu_turbidity_jtu` | visual candle method (historical) | itself only |
 | `PSU` | `practical_salinity` | `bu_practical_salinity` | PSS-78 conductivity ratio | itself only |
 | `CF` | `conductivity_factor` | `bu_conductivity_factor` | EC in mS/cm × 10 | `µS/cm`, `mS/cm`, `S/m` |
 
-> NTU and FNU agree on a formazin standard and not on real water, so Bovnar refuses to convert
-> between them; report the method. PSU is a conductivity ratio, **not** a mass fraction — for
-> absolute salinity write `g/k~g`. `CF` is uppercase only: `cF` is the centifarad.
+> The five turbidity scales agree on a formazin standard and not on real water — and `FAU` is not
+> even the same optical quantity (attenuation, not scatter), while `JTU` is visual and relates to
+> formazin only near 40 units. Bovnar refuses every conversion between them; report the method.
+> `JTU` and `PSU` take no prefix. PSU is a conductivity ratio, **not** a mass fraction — for
+> absolute salinity write `g/k~g`. Case matters: `cF` is the centifarad and `fau` the
+> femto-astronomical-unit.
 
 ## 5. Currencies
 
@@ -821,5 +827,5 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–393 (177 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*

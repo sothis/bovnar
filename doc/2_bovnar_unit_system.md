@@ -96,7 +96,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 177 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -181,7 +181,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 177 named physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 180 named physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -489,7 +489,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–393** (`bu_ph_scale` … `bu_conductivity_factor`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -648,21 +648,46 @@ existing tables already say them exactly.
 
 ### 3.28.2 Turbidity and Salinity
 
-Three scales defined by a **measurement method** rather than by a physical quantity. They are
+Six scales defined by a **measurement method** rather than by a physical quantity. They are
 dimensionless, and each carries its own quantity kind, so none of them converts to another or to a
 plain number — the conversion a factor cannot express is refused instead of guessed.
 
-| Symbol | Long form | Name | Enum value | Method |
-|--------|-----------|------|------------|--------|
-| `NTU` | `nephelometric_turbidity` | nephelometric turbidity unit | `bu_turbidity_ntu` | white light, 90° detector (EPA 180.1) |
-| `FNU` | `formazin_nephelometric` | formazin nephelometric unit | `bu_turbidity_fnu` | near-infrared 860 nm, 90° detector (ISO 7027) |
-| `PSU` | `practical_salinity` | practical salinity unit | `bu_practical_salinity` | PSS-78 conductivity ratio |
+| Symbol | Long form | Name | Enum value | Method | Prefixes |
+|--------|-----------|------|------------|--------|----------|
+| `NTU` | `nephelometric_turbidity` | nephelometric turbidity unit | `bu_turbidity_ntu` | white light, 90° detector (EPA 180.1) | yes |
+| `FNU` | `formazin_nephelometric` | formazin nephelometric unit | `bu_turbidity_fnu` | near-infrared 860 nm, 90° detector (ISO 7027) | yes |
+| `FTU` | `formazin_turbidity` | formazin turbidity unit | `bu_turbidity_ftu` | formazin-calibrated, geometry **unstated** (ISO 7027:1984) | yes |
+| `FAU` | `formazin_attenuation` | formazin attenuation unit | `bu_turbidity_fau` | attenuation at 0°, in the transmitted beam (ISO 7027) | yes |
+| `JTU` | `jackson_turbidity` | Jackson turbidity unit | `bu_turbidity_jtu` | visual candle turbidimeter (historical) | no |
+| `PSU` | `practical_salinity` | practical salinity unit | `bu_practical_salinity` | PSS-78 conductivity ratio | no |
 
-> **NTU is not FNU.** Both are calibrated against formazin and are numerically equal *on a formazin
-> standard* — which is exactly the trap. On real water the white-light and near-infrared optics
-> respond differently to particle size and colour, which is why every standard demands the method be
-> reported alongside the number. Bovnar refuses the conversion rather than implying a factor exists.
-> `NTU` and `FNU` accept prefixes (`m~NTU` is real in ultrapure-water work).
+None of the five turbidity scales converts to any other:
+
+| | `NTU` | `FNU` | `FTU` | `FAU` | `JTU` |
+|---|---|---|---|---|---|
+| **`NTU`** | ✓ | — | — | — | — |
+| **`FNU`** | — | ✓ | — | — | — |
+| **`FTU`** | — | — | ✓ | — | — |
+| **`FAU`** | — | — | — | ✓ | — |
+| **`JTU`** | — | — | — | — | ✓ |
+
+> **One kind per method, and that is the whole content of the table.** The formazin-calibrated
+> scales (`NTU`, `FNU`, `FTU`) are numerically equal *on a formazin standard* — which is exactly the
+> trap. On real water white light and near-infrared respond differently to particle size and colour,
+> so the number alone does not say what was measured; `FTU` says even less, since its geometry is
+> unstated by definition. `FAU` is not the same optical quantity at all: it measures how much light
+> the sample removes from the beam, not how much it scatters sideways, and it is the instrument of
+> choice above ~40 FNU where nephelometry saturates. `JTU` is the visual candle method, whose
+> published equivalence to formazin ("1 JTU ≈ 1 NTU") holds near 40 units and nowhere else, being
+> nonlinear and sample-dependent. Bovnar refuses every one of these conversions rather than implying
+> a factor exists — report the method.
+>
+> `NTU`, `FNU`, `FTU` and `FAU` accept prefixes (`m~NTU` is real in ultrapure-water work). `JTU`
+> does not: the candle method cannot resolve below roughly 25 JTU, so a milli-JTU is not a
+> measurement.
+>
+> Watch the case. `fau` is the femto-astronomical-unit, `cF` the centifarad — the turbidity and
+> conductivity scales are uppercase only. See [`unit_ambiguities.md`](unit_ambiguities.md).
 
 > **PSU is not per-mille.** Practical salinity is a conductivity ratio, so it is dimensionless by
 > construction and `PSU` is a label rather than a unit — SI-minded texts write *S*_P = 35 with no
@@ -1398,7 +1423,7 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–393 (`bu_ph_scale` … `bu_conductivity_factor`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
+Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–396 (`bu_ph_scale` … `bu_turbidity_jtu`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
 
 ```c
 typedef enum value_base_unit_e {

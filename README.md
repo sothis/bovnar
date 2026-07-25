@@ -312,7 +312,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 | Command | Description |
 |---|---|
 | `bovnar validate <file>` | Validate a `.bvnr` file; exit non-zero on the first error. |
-| `bovnar query <path> <file>` | Print a single value by dotted path, e.g. `.sensor.temperature`. |
+| `bovnar query <path> <file>` | Print a single **value** by dotted path, e.g. `.sensor.temperature` — the number alone, so it pipes into other tools; the unit is deliberately not printed, so read `25` from a `°C` field as 25 °C and not 25 K. Floats print as the shortest decimal that reads back as the same double; a `float_dec` or `float:128` wider than a double is rounded on the way through the DOM, so use the reader or the Python bindings when you need the stored digits verbatim. |
 | `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
 | `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |
 | `bovnar events [-c] [-d] [-p] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream and re-emits the source's `#!bovnar` version directive, so its debug output round-trips even for spec-1.1-gated values.) |

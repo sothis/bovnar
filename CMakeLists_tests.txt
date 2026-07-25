@@ -986,6 +986,24 @@ add_test(
 set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
     LABELS "cli;query" TIMEOUT 30)
 
+# `query` printed every float through "%g" -- six significant digits -- so an
+# exact-decimal money value came out as 1.23457e+07, cents and notation both
+# gone, in a format whose premise is that the number is not to be guessed at.
+foreach(_qcase "money;12345678.99" "big;1234567.89" "plain;1.5")
+    list(GET _qcase 0 _qkey)
+    list(GET _qcase 1 _qwant)
+    add_test(
+        NAME    bvnr_cli_query_float_precision_${_qkey}
+        COMMAND "${CMAKE_COMMAND}"
+                -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+                -DFILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/float_precision.bvnr
+                -DQPATH=.${_qkey}
+                "-DNEEDLE=${_qwant}"
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/query_expect.cmake)
+    set_tests_properties(bvnr_cli_query_float_precision_${_qkey} PROPERTIES
+        LABELS "cli;query" TIMEOUT 30)
+endforeach()
+
 # /-separated dimension rows must survive `query`, which prints a value someone
 # reads or pipes onward. They used to be flattened, so ".rows" and ".flat" below
 # printed identically.
@@ -1030,9 +1048,10 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 124)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 127)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
+                                    #           + 3 cli_query_float_precision
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

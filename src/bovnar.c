@@ -235,7 +235,32 @@ static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 	case BVN_DOM_FLOAT: {
 		double v;
 		bvn_dom_get_float(node, &v);
-		printf("%g", v);
+		/* "%g" is six significant digits. In a format built on exact numerics
+		 * that silently reported the wrong number: an exact-decimal money value
+		 * of 12345678.99 printed as "1.23457e+07", losing the cents and the
+		 * notation with them, and a float:128 came back at a fraction of its
+		 * width. Use the library's own formatter, which emits the shortest
+		 * decimal that reads back as the same double.
+		 *
+		 * That is as exact as this path can be, not as exact as the document:
+		 * the DOM carries every float as a C double, so a float_dec or a
+		 * float:128 has already been rounded before it reaches here. A consumer
+		 * that needs the stored digits verbatim must read the value itself —
+		 * the reader hands over the literal untouched.
+		 *
+		 * Shortest-round-trip rather than bvn_format_double: that one emits the
+		 * canonical DOCUMENT form, which is always scientific, and turning "1.5"
+		 * into "1.5e+0" for someone reading a value off the command line trades
+		 * one wrong answer for an unreadable one. Widening %g until the text
+		 * parses back to the same double gives full precision AND the plain
+		 * notation for values that have one. */
+		char fb[64];
+		for (int prec = 1; prec <= 17; prec++) {
+			snprintf(fb, sizeof fb, "%.*g", prec, v);
+			if (strtod(fb, NULL) == v)
+				break;
+		}
+		fputs(fb, stdout);
 		break;
 	}
 	case BVN_DOM_BOOL: {
@@ -2972,7 +2997,7 @@ static void usage(const char *prog)
 		"Usage: %s <command> [options] [file]\n"
 		"Commands:\n"
 		"  validate      Validate a .bvnr file\n"
-		"  query <path>  Query a value by path (e.g. .sensor.temperature)\n"
+		"  query <path>  Query a value by path (e.g. .sensor.temperature)\n                Prints the VALUE only -- no unit -- so it pipes cleanly.\n"
 		"  pretty-print  Pretty-print a .bvnr file\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
 		"                  Override with --from <fmt> --to <fmt> if needed\n"

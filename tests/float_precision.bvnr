@@ -1,0 +1,9 @@
+#!bovnar 1.1
+# Values whose printed form "%g" silently truncated: `bovnar query` reported the
+# money below as 1.23457e+07, losing the cents in a format built on exact
+# decimals. The DOM carries floats as C doubles, so the shortest text that reads
+# back as the same double is the most this path can promise -- but it is 17
+# significant digits, not six.
+.money  = <float_dec:64,$USD> 12345678.99;
+.big    = <float:64,m>        1234567.89;
+.plain  = <float:64,m>        1.5;

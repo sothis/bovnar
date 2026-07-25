@@ -4843,7 +4843,14 @@ else does. Where the reduction folds cleanly into a named unit the scale comes
 back as a prefix and nothing is lost — <code>k~g·m/s²</code> → <code>"N"</code>, <code>k~N</code> → <code>"k~N"</code>.</p>
 <p>The collapse never <em>substitutes</em> one named unit for another. <code>Sv</code> and <code>Gy</code> share
 a dimension vector, as do <code>Bq</code>, <code>Bd</code> and <code>Hz</code>, and <code>W</code>, <code>VA</code> and <code>var</code>; each
-reduces to itself. Rewriting an equivalent dose as an absorbed dose in the
+reduces to itself. A lone base at an exponent other than 1 is a different case
+and still collapses — <code>s⁻¹</code> is what <code>Hz</code> names, and <code>m~s⁻¹</code> comes back <code>k~Hz</code>.</p>
+<p><strong>An overflowing reduction returns <code>-1</code> rather than a unit.</strong> When a summed
+exponent leaves the ±9 range the format can spell, more bases survive than a
+unit may carry, or the folded scale leaves float range, <code>bvn_unit_reduce</code> drops
+a component — so the result is a <em>different</em> unit, not a shorter spelling of the
+same one. <code>m⁹·m²</code> is <code>m¹¹</code>, and it used to serialise as <code>"no_unit"</code>. Without
+<code>BVN_UNIT_REDUCE</code> these units write normally. Rewriting an equivalent dose as an absorbed dose in the
 document would be a stronger act than offering the conversion, which §12.4 still
 does when a caller asks.</p>
 </blockquote>

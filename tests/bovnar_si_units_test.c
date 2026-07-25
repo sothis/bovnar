@@ -2393,6 +2393,50 @@ static void test_named_si_collapse_never_substitutes_a_named_unit(void)
 		ASSERT_TRUE(n > 0 && strcmp(buf, same[i].keep) == 0,
 			    "a named unit reduces to itself, not to a sibling");
 	}
+	/* An OVERFLOWING reduction is refused, not formatted. bvn_unit_reduce drops
+	 * a component when its summed exponent leaves ±9, so m⁹·m² — which is m¹¹ —
+	 * reduced to nothing and serialised as "no_unit": dimensionless, and not
+	 * compatible with what it replaced. The flag was already raised and was
+	 * being read only to skip the cosmetic collapse. */
+	{
+		static const char *overflowing[] = { "m⁹·m²", "m⁹·m⁹", "s⁹·s³",
+						     "m⁹·m²·s", "k~m⁹·m²" };
+		for (size_t i = 0; i < sizeof overflowing / sizeof overflowing[0]; i++) {
+			bool pok = false;
+			value_unit_t u = bvn_parse_unit((const uint8_t *)overflowing[i], &pok);
+			char b[80];
+			ASSERT_TRUE(pok, "the over-range product parses");
+			ASSERT_TRUE(bvn_unit_to_string_ex(u, b, sizeof b,
+							  BVN_UNIT_REDUCE) < 0,
+				    "an overflowing reduction is refused, not written");
+			/* without REDUCE it is an ordinary unit and still writes */
+			ASSERT_TRUE(bvn_unit_to_string_ex(u, b, sizeof b,
+							  BVN_UNIT_FLAGS_NONE) > 0,
+				    "the unreduced form is unaffected");
+		}
+	}
+	/* The guard must be narrow. A lone base at exponent ONE already names its
+	 * quantity; a lone base at any OTHER exponent is a compound in all but
+	 * spelling, and collapsing it is what this function is for. Guarding on the
+	 * component count alone stopped s⁻¹ becoming Hz — and cost more than that,
+	 * because m~s⁻¹ reduces to s⁻¹ with a scale of 1000 that the collapse used
+	 * to give back as the k~ on k~Hz. Without it the scale is simply dropped. */
+	{
+		static const struct { const char *in, *want; } collapses[] = {
+			{ "s⁻¹",   "Hz"   },   /* the named form of the same quantity  */
+			{ "m~s⁻¹", "k~Hz" },   /* per millisecond IS kilohertz         */
+			{ "k~s⁻¹", "m~Hz" },
+		};
+		for (size_t i = 0; i < sizeof collapses / sizeof collapses[0]; i++) {
+			bool pok = false;
+			value_unit_t u = bvn_parse_unit((const uint8_t *)collapses[i].in, &pok);
+			char b[80];
+			ASSERT_TRUE(pok, "the exponent form parses");
+			ASSERT_TRUE(bvn_unit_to_string_ex(u, b, sizeof b, BVN_UNIT_REDUCE) > 0 &&
+				    strcmp(b, collapses[i].want) == 0,
+				    "a lone base at a non-unit exponent still collapses");
+		}
+	}
 	/* What the collapse is FOR still works: a compound folds into the named
 	 * unit it spells out, and a prefix folded into the scale comes back. */
 	char buf[80];

@@ -271,8 +271,15 @@ def unit_to_str_ex(unit: ValueUnit,
 
     Raises BovnarArgumentError when *unit* has no serialisation: it is
     structurally invalid, it carries a bu_none component that has no spelling
-    (anything past a bare "no_unit"), or the rendered form exceeds the 256-byte
-    buffer.
+    (anything past a bare "no_unit"), the reduction overflows under REDUCE (see
+    below), or the rendered form exceeds the 256-byte buffer.
+
+    Under REDUCE, a reduction that **overflows** — a summed exponent past the ±9
+    the format can spell, more surviving bases than a unit may carry, or a folded
+    scale out of float range — is refused rather than written. It drops a
+    component, so what it would produce is a *different* unit: ``m⁹·m²`` is
+    ``m¹¹`` and used to come back as ``"no_unit"``. Without REDUCE such a unit
+    serialises normally.
     """
     lib = get_library()
     buf = ctypes.create_string_buffer(256)

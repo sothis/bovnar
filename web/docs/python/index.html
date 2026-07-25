@@ -368,7 +368,9 @@ The scale is available from <code>unit_reduce(vu).scale</code>, and applying it 
 value is your job. (The writer does this for you; nothing else does.) Where the
 reduction folds cleanly into a named unit nothing is lost: <code>k~g·m/s²</code> → <code>"N"</code>,
 <code>k~N</code> → <code>"k~N"</code>. The collapse never substitutes one named unit for another, so a
-<code>Sv</code> stays a <code>Sv</code> rather than becoming a <code>Gy</code>.</p>
+<code>Sv</code> stays a <code>Sv</code> rather than becoming a <code>Gy</code>. A lone base at an exponent other than 1 does
+still collapse (<code>s⁻¹</code> → <code>"Hz"</code>), and a reduction that overflows the ±9 exponent range
+raises <code>BovnarArgumentError</code> instead of returning a unit that lost a dimension.</p>
 </blockquote>
 <p><code>UnitFlags</code> is an <code>IntFlag</code> and its values may be OR-combined:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>

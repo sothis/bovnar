@@ -318,7 +318,9 @@ UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 > value is your job. (The writer does this for you; nothing else does.) Where the
 > reduction folds cleanly into a named unit nothing is lost: `k~g·m/s²` → `"N"`,
 > `k~N` → `"k~N"`. The collapse never substitutes one named unit for another, so a
-> `Sv` stays a `Sv` rather than becoming a `Gy`.
+> `Sv` stays a `Sv` rather than becoming a `Gy`. A lone base at an exponent other than 1 does
+> still collapse (`s⁻¹` → `"Hz"`), and a reduction that overflows the ±9 exponent range
+> raises `BovnarArgumentError` instead of returning a unit that lost a dimension.
 
 `UnitFlags` is an `IntFlag` and its values may be OR-combined:
 

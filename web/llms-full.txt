@@ -5607,7 +5607,15 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 >
 > The collapse never *substitutes* one named unit for another. `Sv` and `Gy` share
 > a dimension vector, as do `Bq`, `Bd` and `Hz`, and `W`, `VA` and `var`; each
-> reduces to itself. Rewriting an equivalent dose as an absorbed dose in the
+> reduces to itself. A lone base at an exponent other than 1 is a different case
+> and still collapses — `s⁻¹` is what `Hz` names, and `m~s⁻¹` comes back `k~Hz`.
+>
+> **An overflowing reduction returns `-1` rather than a unit.** When a summed
+> exponent leaves the ±9 range the format can spell, more bases survive than a
+> unit may carry, or the folded scale leaves float range, `bvn_unit_reduce` drops
+> a component — so the result is a *different* unit, not a shorter spelling of the
+> same one. `m⁹·m²` is `m¹¹`, and it used to serialise as `"no_unit"`. Without
+> `BVN_UNIT_REDUCE` these units write normally. Rewriting an equivalent dose as an absorbed dose in the
 > document would be a stronger act than offering the conversion, which §12.4 still
 > does when a caller asks.
 
@@ -7211,7 +7219,7 @@ Serialise a `value_unit_t` back into its canonical string form. Numerator compon
 
 These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internally, passing the flags from `bvnr_writer_unit_flags(w)`.
 
-> **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (`k~g·m/s²` → `"N"`, `k~N` → `"k~N"`). The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`.
+> **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (`k~g·m/s²` → `"N"`, `k~N` → `"k~N"`). The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
 
 > **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§22) to emit a complete, correct type annotation in one call.
 
@@ -8012,7 +8020,9 @@ UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 > value is your job. (The writer does this for you; nothing else does.) Where the
 > reduction folds cleanly into a named unit nothing is lost: `k~g·m/s²` → `"N"`,
 > `k~N` → `"k~N"`. The collapse never substitutes one named unit for another, so a
-> `Sv` stays a `Sv` rather than becoming a `Gy`.
+> `Sv` stays a `Sv` rather than becoming a `Gy`. A lone base at an exponent other than 1 does
+> still collapse (`s⁻¹` → `"Hz"`), and a reduction that overflows the ±9 exponent range
+> raises `BovnarArgumentError` instead of returning a unit that lost a dimension.
 
 `UnitFlags` is an `IntFlag` and its values may be OR-combined:
 

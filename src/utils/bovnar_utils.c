@@ -1547,8 +1547,19 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 		 * conversion. Same for Bq -> Hz, Bd -> Hz, var -> W, rem -> c~Gy. Those
 		 * conversions stay available through bvn_unit_convert_factor, which is a
 		 * caller asking for one; a serialisation is not.
+		 *
+		 * The test is deliberately narrow: a lone base at exponent ONE is a unit
+		 * that already names its quantity, and swapping it is the defect above.
+		 * A lone base at any other exponent is a compound in all but spelling —
+		 * s⁻¹ IS the thing hertz names — and collapsing it is the whole point of
+		 * this function. Guarding on the component count alone conflated the two
+		 * and cost more than it saved: s⁻¹ stopped becoming Hz, and m~s⁻¹ (which
+		 * reduces to s⁻¹ with a scale of 1000, and used to come back as k~Hz)
+		 * lost that prefix with the scale still folded out.
 		 */
-		if (u.num_components == 1 && u.components[0].base != nd)
+		if (u.num_components == 1 &&
+		    u.components[0].exponent == exp_linear &&
+		    u.components[0].base != nd)
 			continue;
 		/*
 		 * Only an (almost-)exact power of ten maps onto a single SI
@@ -1606,8 +1617,26 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 		if (!bvn_unit_valid(u))
 			return -1;
 		u = bvn_unit_reduce(u, &scale, &overflow);
-		if (!overflow)
-			u = bvni_reduce_to_named_si(u, scale);
+		/*
+		 * An overflowing reduction does not produce a shorter spelling of the
+		 * same unit — it produces a DIFFERENT one. bvn_unit_reduce raises this
+		 * flag when a summed exponent leaves the ±9 the format can spell, when
+		 * more bases survive than a unit may carry, or when the folded scale
+		 * leaves float range; in each case a component is dropped, so m⁹·m²
+		 * (which is m¹¹) came back with no components at all and formatted as
+		 * "no_unit", and m⁹·m²·s as "s". Dimensionless, and not compatible with
+		 * what it replaced — the wrong-unit-is-worse-than-a-refused-one failure
+		 * this format exists to prevent, handed to the caller as a success.
+		 *
+		 * The flag was already computed and was consulted only to skip the
+		 * cosmetic named-SI collapse. Refuse instead: -1 is this function's
+		 * existing answer for a unit it cannot write (see the bu_none guard
+		 * below), it is what bvnr_writer already demanded of this path, and it
+		 * is what the Python binding's unit_reduce() already raises on.
+		 */
+		if (overflow)
+			return -1;
+		u = bvni_reduce_to_named_si(u, scale);
 	} else {
 		if (!bvn_unit_valid(u))
 			return -1;

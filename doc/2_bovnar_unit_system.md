@@ -1786,7 +1786,15 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 >
 > The collapse never *substitutes* one named unit for another. `Sv` and `Gy` share
 > a dimension vector, as do `Bq`, `Bd` and `Hz`, and `W`, `VA` and `var`; each
-> reduces to itself. Rewriting an equivalent dose as an absorbed dose in the
+> reduces to itself. A lone base at an exponent other than 1 is a different case
+> and still collapses — `s⁻¹` is what `Hz` names, and `m~s⁻¹` comes back `k~Hz`.
+>
+> **An overflowing reduction returns `-1` rather than a unit.** When a summed
+> exponent leaves the ±9 range the format can spell, more bases survive than a
+> unit may carry, or the folded scale leaves float range, `bvn_unit_reduce` drops
+> a component — so the result is a *different* unit, not a shorter spelling of the
+> same one. `m⁹·m²` is `m¹¹`, and it used to serialise as `"no_unit"`. Without
+> `BVN_UNIT_REDUCE` these units write normally. Rewriting an equivalent dose as an absorbed dose in the
 > document would be a stronger act than offering the conversion, which §12.4 still
 > does when a caller asks.
 

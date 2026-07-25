@@ -342,9 +342,36 @@ _bold "=== WASM differential test ==="
 # Compares the WebAssembly build (dist/wasm) against this build's native CLI over
 # the example corpus + malformed snippets. Guards the exact regression that once
 # shipped: a stale dist/wasm whose parser disagreed with the sources (e.g. rejected
-# the k~m unit). Needs node (sourcing emsdk_env.sh puts one on PATH) and a built
-# dist/wasm; skips cleanly otherwise. Set NODE=/path/to/node to override.
-NODE_BIN="${NODE:-node}"
+# the k~m unit). Needs node and a built dist/wasm; skips cleanly otherwise.
+#
+# Finding node: an explicit NODE=/path/to/node wins, then one on PATH, then the
+# copy emsdk ships — which is the interpreter wasm/build_wasm.sh itself just ran
+# under. emsdk_env.sh exports EMSDK_NODE and EMSDK; a shell that never sourced it
+# still has the default ~/emsdk install root. Without that last step the test
+# skipped on exactly the machines equipped to build the artifact it checks, and a
+# silent skip here is how a stale dist/wasm ships.
+_find_node() {
+    local root candidate
+    if [[ -n "${NODE:-}" ]]; then
+        printf '%s' "${NODE}"; return
+    fi
+    if command -v node > /dev/null 2>&1; then
+        printf 'node'; return
+    fi
+    if [[ -x "${EMSDK_NODE:-}" ]]; then
+        printf '%s' "${EMSDK_NODE}"; return
+    fi
+    for root in "${EMSDK:-}" "${HOME:-}/emsdk"; do
+        [[ -n "${root}" && -d "${root}/node" ]] || continue
+        # Several SDK versions may be installed side by side; take the newest.
+        candidate=$(ls -d "${root}"/node/*/bin/node 2>/dev/null | sort -V | tail -1)
+        if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+            printf '%s' "${candidate}"; return
+        fi
+    done
+    printf 'node'   # nothing found: the command -v check below reports the skip
+}
+NODE_BIN="$(_find_node)"
 WASM_DIST="${SRC_DIR}/dist/wasm/index.mjs"
 WASM_DIFF="${SRC_DIR}/wasm/test/diff_test.mjs"
 
@@ -358,7 +385,8 @@ elif [[ ! -e "${WASM_DIST}" ]]; then
     _yellow "  SKIP  wasm diff_test  (no dist/wasm; run wasm/build_wasm.sh)"
     (( SKIP++ )) || true
 elif ! command -v "${NODE_BIN}" > /dev/null 2>&1; then
-    _yellow "  SKIP  wasm diff_test  (no ${NODE_BIN}; set NODE=/path/to/node)"
+    _yellow "  SKIP  wasm diff_test  (no node on PATH and none in \$EMSDK/~/emsdk;" \
+            "set NODE=/path/to/node)"
     (( SKIP++ )) || true
 else
     printf '  %-52s ' "node wasm/test/diff_test.mjs"

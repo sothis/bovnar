@@ -316,11 +316,39 @@ def _sha(js):
         hashlib.sha256(js.encode()).digest()).decode()
 
 
-CSP = ("default-src 'none'; "
-       f"script-src 'self' '{_sha(THEME_INIT_JS)}' '{_sha(THEME_TOGGLE_JS)}' "
-       f"'{_sha(BACK_TOP_JS)}' '{_sha(BOVNAR_HL_JS)}'; "
-       "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
-       "base-uri 'none'; form-action 'none'")
+# Same rule gen_csp.py applies to the hand-written pages: mask comment bodies
+# first (a page that mentions "<script>" in prose otherwise opens a phantom
+# element), then skip anything with src= or a non-executable type=.
+_SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.S)
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_DATA_TYPE_RE = re.compile(r'type\s*=\s*["\']?(application/(ld\+)?json)', re.I)
+_HAS_SRC_RE = re.compile(r"\bsrc\s*=", re.I)
+
+
+def inline_scripts_of(text):
+    masked = _COMMENT_RE.sub(lambda m: " " * len(m.group(0)), text)
+    return [text[m.start(2):m.end(2)] for m in _SCRIPT_RE.finditer(masked)
+            if not _HAS_SRC_RE.search(m.group(1))
+            and not _DATA_TYPE_RE.search(m.group(1))]
+
+
+def csp_for(scripts):
+    """The CSP meta for a page carrying exactly `scripts` inline.
+
+    Built per page rather than as one constant listing every hash the generator
+    knows. The highlighter hook is only emitted where there are .bvnr blocks to
+    colour, so a shared constant left its hash standing on the five pages without
+    them — an allowance for a script that is not there. Harmless (a hash permits
+    one exact byte sequence, not a class of them) but it is drift, and it is the
+    kind nobody sees: the page works either way. Deriving the list from what the
+    page actually emits makes --check an exact-match test instead of a
+    nothing-is-blocked one.
+    """
+    hashes = " ".join("'%s'" % _sha(js) for js in scripts)
+    return ("default-src 'none'; "
+            f"script-src 'self' {hashes}; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+            "base-uri 'none'; form-action 'none'")
 
 THEME_TOGGLE_BTN = (
     '<button type="button" class="theme-toggle" id="theme-toggle" '
@@ -396,7 +424,11 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
     # The highlighter is only worth 13 kB to a page that has .bvnr blocks to
     # colour; the docs index and the cheatsheet have none.
     bvnr_hl = ""
-    if 'class="language-bovnar"' in body:
+    has_hl = 'class="language-bovnar"' in body
+    # exactly the inline scripts this page emits, in no particular order
+    page_csp = csp_for([THEME_INIT_JS, THEME_TOGGLE_JS, BACK_TOP_JS]
+                       + ([BOVNAR_HL_JS] if has_hl else []))
+    if has_hl:
         bvnr_hl = (f'<script src="/bovnar_highlight.js'
                    f'{css_stamp("bovnar_highlight.js")}"></script>\n'
                    f'<script>{BOVNAR_HL_JS}</script>\n')
@@ -404,7 +436,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="{CSP}">
+<meta http-equiv="Content-Security-Policy" content="{page_csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>{THEME_INIT_JS}</script>
 <title>{esc(title)}</title>
@@ -634,6 +666,29 @@ def main():
             build_doc_page(src, slug, pdf, title, desc)
     targets[os.path.join(OUT_DIR, "index.html")] = build_index_page()
 
+    # Every page's CSP must name exactly the inline scripts that page carries.
+    # gen_csp.py polices index.html, impressum.html and 404.html; these eleven are
+    # generated here and were covered by nothing, so a hash that stopped matching
+    # its script would have shipped a page whose own JavaScript the browser
+    # refuses to run — silently, since the page renders either way. Checked on
+    # the text about to be written, so it holds for --check and for a real run.
+    csp_bad = []
+    for path, text in targets.items():
+        declared = set(re.findall(r"'sha256-([A-Za-z0-9+/=]+)'",
+                                  re.search(r'Content-Security-Policy" content="'
+                                            r'([^"]*)"', text).group(1)))
+        actual = {base64.b64encode(hashlib.sha256(js.encode()).digest()).decode()
+                  for js in inline_scripts_of(text)}
+        if declared != actual:
+            csp_bad.append("%s (%d script(s), %d hash(es); %d unhashed, %d orphan)"
+                           % (os.path.relpath(path, ROOT), len(actual),
+                              len(declared), len(actual - declared),
+                              len(declared - actual)))
+    if csp_bad:
+        print("gen_html_docs.py: CSP does not match the page's own scripts: "
+              + "; ".join(csp_bad), file=sys.stderr)
+        return 1
+
     if check:
         stale = [os.path.relpath(p, ROOT) for p, t in targets.items()
                  if (not os.path.exists(p)) or open(p, encoding="utf-8").read() != t]
@@ -641,7 +696,8 @@ def main():
             print("gen_html_docs.py --check: stale/missing: " + ", ".join(stale),
                   file=sys.stderr)
             return 1
-        print(f"gen_html_docs.py --check: {len(targets)} HTML doc pages are current")
+        print(f"gen_html_docs.py --check: {len(targets)} HTML doc pages are "
+              f"current, and each CSP names exactly its own inline scripts")
         return 0
 
     print("==> Generating HTML doc pages (gen_html_docs.py)")

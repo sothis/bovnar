@@ -117,7 +117,8 @@ class TestUnitTableIntegrity:
         # Every entry is a unit whose LABEL round-trips but whose VALUE
         # semantics differ from pint's; a new one must be a deliberate addition,
         # never a silent one.
-        assert _CAVEATS == {'BYTE', 'DECIBEL', 'NEPER', 'PH_SCALE', 'VAL'}
+        assert _CAVEATS == {'BYTE', 'DECIBEL', 'NEPER', 'PH_SCALE', 'VAL',
+                            'TURBIDITY_NTU', 'TURBIDITY_FNU', 'PRACTICAL_SALINITY'}
 
 
 @needs_lib

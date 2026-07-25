@@ -171,6 +171,7 @@ Common miscasings that are **errors**, not silent variants — `K` is the kelvin
 | Written | Result | Intended | Write |
 |---------|--------|----------|-------|
 | `dH` | decihenry — a valid unit, silently | German hardness degree | `°dH` |
+| `cF` | centifarad — a valid unit, silently | hydroponic conductivity factor | `CF` |
 | `Kg`, `KG` | `error_unit_illegal` | kilogram | `kg` or `k~g` |
 | `KB` | `error_unit_illegal` | kilobyte | `kB` or `k~B` |
 | `NM` | `error_unit_illegal` | nautical mile | `nmi` |
@@ -255,6 +256,9 @@ conversions in the first group; the second group is protected by an explicit qua
 | `dB` | logarithmic | `Np`, `%`, plain numbers |
 | `Np` | logarithmic | `dB`, `%`, plain numbers |
 | `pH` | logarithmic | `%`, `ppm`, plain numbers |
+| `NTU` | turbidity, white light | `FNU`, `%`, plain numbers |
+| `FNU` | turbidity, near-infrared | `NTU`, `%`, plain numbers |
+| `PSU` | practical salinity | `‰`, `g/kg`, plain numbers |
 | `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb` | pure ratios | *(freely interconvertible, and with a plain number: 1 % → 0.01)* |
 
 Water chemistry calls the American hardness scale "ppm" (milligrams of CaCO₃ per litre). Bovnar's
@@ -362,6 +366,19 @@ The traps, in order of how easily they bite:
 | `mmol/l` as a "unit" | it is the compound `m~mol/L`, not a base unit | write `mmol/L`, `m~mol/L` or `mmol/l` — all the same |
 | `gr/gal` for `gpg` | `gr/gal` is a *mass* concentration, `gpg` an *amount* concentration; they do not convert | write `gpg` for the hardness scale |
 
+**Turbidity and salinity are instrument scales**, and the trap is that they look interchangeable.
+
+| Token | Means | Not | Because |
+|-------|-------|-----|---------|
+| `NTU` | white-light turbidity (EPA 180.1) | `FNU` | equal on a formazin standard, different on real water — the optics respond differently to particle size and colour |
+| `FNU` | near-infrared turbidity (ISO 7027) | `NTU` | same reason, from the other side |
+| `PSU` | practical salinity (PSS-78, a conductivity ratio) | `‰`, `g/kg` | *S*_P 35 is ≈ 35.165 g/kg — equating them is wrong by ~0.5 %; write `g/k~g` for absolute salinity |
+| `CF` | hydroponic conductivity factor (EC in mS/cm × 10) | `cF` — that is the **centifarad** | uppercase only |
+
+Bovnar refuses every conversion in the "Not" column rather than implying a factor exists. `CF` is
+the exception in the other direction: it really is a conductivity, so `1 CF = 0.1 mS/cm = 100 µS/cm`
+converts exactly.
+
 **Conductivity and dissolved solids** need no units of their own, and that is the trap: people look
 for one.
 
@@ -432,6 +449,11 @@ usually where the money is.
 | conductivity | `µS/cm`, `mS/cm`, `dS/m` | — no base unit exists or is needed |
 | conductivity, older US data | `µmho/cm` | — `mho` is the siemens |
 | dissolved solids | `mg/L` | `ppm` (dimensionless 10⁻⁶) |
+| turbidity, white light | `NTU` | `FNU` |
+| turbidity, near-IR | `FNU` | `NTU` |
+| practical salinity | `PSU` | `‰` or `g/kg` |
+| absolute salinity | `g/k~g` | `PSU` |
+| hydroponic EC scale | `CF` | `cF` (centifarad) |
 
 ---
 

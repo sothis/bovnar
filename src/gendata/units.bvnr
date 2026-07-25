@@ -2073,6 +2073,78 @@
     .exact   = false;
     .prefix  = none;
     .aliases = ["grains_per_gallon", "gpg"];
+  },
+
+  # ── Water quality: instrument scales ────────────────────────────────────
+  # Turbidity and practical salinity are defined by a MEASUREMENT METHOD, not by
+  # a physical quantity a factor could relate them to. They are dimensionless
+  # here and each carries its own quantity kind in bovnar_si_units.c, so they
+  # convert only to themselves — see the comment on bvni_kind_table.
+  {
+    # ISO/EPA nephelometric turbidity, white-light source, 90° detector
+    # (EPA 180.1). Numerically equal to FNU on a formazin standard and NOT on
+    # real water: the two optics respond differently to particle size and
+    # colour, which is exactly why every standard demands the method be
+    # reported. Prefixes are allowed — ultrapure-water work really does write
+    # m~NTU.
+    .id      = <uint:16> 390;
+    .name    = "turbidity_ntu";
+    .symbol  = "NTU";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["nephelometric_turbidity", "NTU"];
+  },
+  {
+    # ISO 7027 nephelometric turbidity, near-infrared LED at 860 nm, 90°
+    # detector. See NTU above for why these are separate kinds rather than
+    # aliases of one another.
+    .id      = <uint:16> 391;
+    .name    = "turbidity_fnu";
+    .symbol  = "FNU";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["formazin_nephelometric", "FNU"];
+  },
+  {
+    # Practical salinity on the PSS-78 scale: defined as a conductivity RATIO,
+    # so it is dimensionless by construction and "PSU" is a label rather than a
+    # unit — which is why SI-minded texts write S_P = 35 with no unit at all.
+    # It is emphatically not a mass fraction: S_P 35 corresponds to roughly
+    # 35.165 g/kg absolute salinity, so equating PSU with ‰ or g/kg is wrong by
+    # about half a percent. Its own kind keeps that conversion out of reach; for
+    # absolute salinity write the mass fraction directly (g/k~g).
+    # The scale is bounded (0…42 by construction), so no prefixes.
+    .id      = <uint:16> 392;
+    .name    = "practical_salinity";
+    .symbol  = "PSU";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = none;
+    .aliases = ["practical_salinity", "PSU"];
+  },
+  {
+    # The hydroponic conductivity factor: CF = EC in mS/cm × 10, so 1 CF is
+    # exactly 0.1 mS/cm = 0.01 S/m. Unlike the scales above this IS a
+    # conductivity — a rescaled one — so it carries siemens-per-metre dimensions
+    # and converts to µS/cm and mS/cm, which is the whole point of having it.
+    # Only the uppercase spelling: "cF" is the centifarad.
+    .id      = <uint:16> 393;
+    .name    = "conductivity_factor";
+    .symbol  = "CF";
+    .factor  = 0.01;
+    .dims    = { .length = -3; .mass = -1; .time = 3; .current = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = none;
+    .aliases = ["conductivity_factor", "CF"];
   }
 ];
 

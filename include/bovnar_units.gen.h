@@ -172,3 +172,7 @@
 	bu_american_hardness = 387,
 	bu_val          = 388,
 	bu_grains_per_gallon = 389,
+	bu_turbidity_ntu = 390,
+	bu_turbidity_fnu = 391,
+	bu_practical_salinity = 392,
+	bu_conductivity_factor = 393,

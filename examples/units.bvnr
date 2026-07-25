@@ -962,3 +962,14 @@
 .resistivity       = <float:32,MΩ·cm>    18.2;   # ultrapure water
 .hardness_us_grain = <float:32,gpg>      15.1;   # US water-softener scale
 .hardness_meq      = <float:32,m~eq/L>    5.17;  # same unit as m~val/L
+
+# Instrument scales. NTU and FNU are both formazin-calibrated and agree on a
+# formazin standard — and not on real water, so they are separate units and
+# bovnar refuses to convert between them. PSU is a conductivity ratio, not a
+# mass fraction. CF is a rescaled EC and does convert.
+.turbidity_white   = <float:32,NTU>       4.2;   # EPA 180.1, white light
+.turbidity_nir     = <float:32,FNU>       4.4;   # ISO 7027, near-infrared
+.turbidity_upw     = <float:32,m~NTU>    20.0;   # ultrapure water: 0.02 NTU
+.salinity          = <float:32,PSU>      34.7;   # practical salinity (PSS-78)
+.salinity_absolute = <float:32,g/k~g>    35.165; # what PSU is NOT
+.nutrient_ec       = <float:32,CF>        5.4;   # = 0.54 mS/cm = 540 µS/cm

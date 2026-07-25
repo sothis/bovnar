@@ -70,6 +70,13 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_american_hardness = 0.009991407389644906 * mole * meter**-3',
     'bvnr_val = 0.5 * mole',
     'bvnr_grains_per_gallon = 0.17103352162411276 * mole * meter**-3',
+    # Water-quality instrument scales. pint has no concept of bovnar's
+    # quantity kinds, so these three are plain dimensionless there — see
+    # SEMANTIC_CAVEATS.
+    'bvnr_ntu = 1.0',
+    'bvnr_fnu = 1.0',
+    'bvnr_psu = 1.0',
+    'bvnr_conductivity_factor = 0.01 * siemens * meter**-1',
     'bvnr_phot = 10000.0 * meter**-2 * candela',
     'bvnr_ppb = 1e-09',
     'bvnr_prussian_elle = 0.66716 * meter',
@@ -266,6 +273,10 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     387: 'bvnr_american_hardness',       # AMERICAN_HARDNESS
     388: 'bvnr_val',                     # VAL
     389: 'bvnr_grains_per_gallon',       # GRAINS_PER_GALLON
+    390: 'bvnr_ntu',                     # TURBIDITY_NTU
+    391: 'bvnr_fnu',                     # TURBIDITY_FNU
+    392: 'bvnr_psu',                     # PRACTICAL_SALINITY
+    393: 'bvnr_conductivity_factor',     # CONDUCTIVITY_FACTOR
 
     # Defined to match bovnar magnitude exactly (pint native uses a different convention)
      71: 'bvnr_therm',                   # THERM
@@ -284,6 +295,9 @@ SEMANTIC_CAVEATS: dict[str, str] = {
     'BYTE': 'bovnar treats byte as a dimensionless tag (=1); pint relates byte=8*bit. Label round-trips; byte<->bit conversion differs.',
     'DECIBEL': 'bovnar dB is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
     'NEPER': 'bovnar Np is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
+    'TURBIDITY_NTU': "bovnar keeps NTU in its own quantity kind, so it converts only to itself; in pint it is plain dimensionless and would happily 'convert' to FNU or to a bare number. NTU (white light) and FNU (near-infrared) agree only on a formazin standard.",
+    'TURBIDITY_FNU': 'see TURBIDITY_NTU: the two are separate methods, and only bovnar enforces that.',
+    'PRACTICAL_SALINITY': 'PSS-78 practical salinity is a conductivity ratio, not a mass fraction (S_P 35 is about 35.165 g/kg). bovnar isolates it as its own kind; in pint it is dimensionless and would convert to per-mille, which is wrong by about half a percent.',
     'VAL': 'bovnar val is the equivalent AS USED IN WATER ANALYSIS (divalent ions): 1 val = 0.5 mol. For a monovalent species an equivalent is 1 mol, which neither library can infer from the unit alone.',
     'PH_SCALE': 'bovnar pH is a linear dimensionless tag (=1), as pint has no acidity unit at all ("pH" parses there as the picohenry). The scale is logarithmic, so summing or averaging pH values is not meaningful in either library.',
 }

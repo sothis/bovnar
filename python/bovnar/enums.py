@@ -564,7 +564,17 @@ class BaseUnit(IntEnum):
     VAL                = 388
     GRAINS_PER_GALLON  = 389   # gpg — the US water-softener hardness scale
 
-    _SENTINEL = 390
+    # Water-quality instrument scales (390-393). NTU, FNU and PSU are
+    # dimensionless and each carries its own quantity kind, so none of them
+    # converts to another or to a plain number. CF is a rescaled conductivity
+    # and does carry siemens-per-metre dimensions.
+
+    TURBIDITY_NTU      = 390   # white light, EPA 180.1
+    TURBIDITY_FNU      = 391   # near-infrared, ISO 7027
+    PRACTICAL_SALINITY = 392   # PSS-78; a conductivity ratio, not a mass fraction
+    CONDUCTIVITY_FACTOR = 393  # CF = EC in mS/cm × 10
+
+    _SENTINEL = 394
 
 
 # Currency-range sentinels (mirrors C #defines)

@@ -39,6 +39,20 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Water-quality scales: `NTU`, `FNU`, `PSU` and `CF`** — three instrument scales and one rescaled
+  conductivity. NTU (white light, EPA 180.1) and FNU (near-infrared, ISO 7027) are both
+  formazin-calibrated and numerically equal *on a formazin standard*, which is exactly why they get
+  separate quantity kinds: on real water the two optics disagree by an amount that depends on
+  particle size and colour, so no factor relates them and every standard demands the method be
+  reported. PSU (PSS-78 practical salinity) is a conductivity ratio, dimensionless by construction
+  and **not** a mass fraction — *S*_P 35 is about 35.165 g/kg, so letting it convert to `‰` or
+  `g/kg` would be wrong by half a percent; write `g/k~g` for absolute salinity. All three convert
+  only to themselves. `CF` is the opposite case: the hydroponic conductivity factor really is a
+  conductivity, EC in mS/cm × 10, so it carries siemens-per-metre dimensions and converts exactly —
+  1 CF = 0.1 mS/cm = 100 µS/cm. Uppercase only: `cF` is the centifarad. `NTU`/`FNU` take prefixes
+  (`m~NTU` is real in ultrapure-water work); `PSU` and `CF` do not. Enum values 390-393;
+  `BVN_VALUE_BASE_UNIT_COUNT` grows to 394. The pint bridge carries a caveat for each of the three
+  scales, because pint has no notion of quantity kinds and would happily trade an NTU for an FNU.
 - **Conductivity, dissolved solids and two more hardness spellings** — a review of what water data
   actually writes. **EC and TDS need no new units**: `µS/cm`, `mS/cm`, `dS/m`, `S/m` and `mg/L`
   already say them exactly, and `MΩ·cm` covers resistivity. What was missing were spellings:

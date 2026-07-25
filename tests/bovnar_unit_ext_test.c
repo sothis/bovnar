@@ -864,6 +864,71 @@ static void test_water_hardness_units(void)
 	}
 }
 
+/*
+ * Turbidity, salinity and the hydroponic conductivity factor. The first three
+ * are dimensionless instrument scales, each in its own quantity kind, so the
+ * interesting assertions are the conversions that must NOT happen. CF is the
+ * opposite case: a rescaled conductivity, so it must convert.
+ */
+static void test_water_quality_scales(void)
+{
+	printf("  turbidity, salinity and the conductivity factor...\n");
+	bool ok = false;
+	double out = 0.0;
+	value_unit_t ntu = bvn_parse_unit((const uint8_t *)"NTU", &ok);
+	ASSERT_TRUE(ok, "NTU parses");
+	value_unit_t fnu = bvn_parse_unit((const uint8_t *)"FNU", &ok);
+	ASSERT_TRUE(ok, "FNU parses");
+	value_unit_t psu = bvn_parse_unit((const uint8_t *)"PSU", &ok);
+	ASSERT_TRUE(ok, "PSU parses");
+	value_unit_t none = BVN_UNIT_NO_PREFIX(bu_none);
+
+	/* NTU is white light, FNU near-infrared. They agree on a formazin standard
+	 * and not on real water, so no factor relates them — reporting the method
+	 * is the whole point, and silently trading one for the other would undo it. */
+	ASSERT_TRUE(!bvn_units_compatible(ntu, fnu), "NTU and FNU are separate kinds");
+	ASSERT_TRUE(!bvn_unit_convert_value(1.0, ntu, fnu, &out),
+		    "1 NTU -> FNU is refused rather than answered with 1");
+	ASSERT_TRUE(!bvn_units_compatible(ntu, none), "turbidity is not a plain number");
+	ASSERT_TRUE(!bvn_units_compatible(ntu, BVN_UNIT_NO_PREFIX(bu_percent)),
+		    "nor a percentage");
+	ASSERT_TRUE(bvn_units_compatible(ntu, ntu) &&
+		    bvn_unit_convert_value(4.0, ntu, ntu, &out) && out == 4.0,
+		    "NTU -> NTU is the identity");
+	/* Ultrapure-water work writes m~NTU, so prefixes stay inside the kind. */
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, BVN_UNIT_SI(bu_turbidity_ntu, si_milli),
+					   ntu, &out) && out == 0.001,
+		    "m~NTU scales within its own kind");
+
+	/* Practical salinity is a conductivity ratio, not a mass fraction: S_P 35
+	 * is ~35.165 g/kg, so a conversion to per-mille would be wrong by ~0.5%. */
+	ASSERT_TRUE(!bvn_units_compatible(psu, BVN_UNIT_NO_PREFIX(bu_per_mille)),
+		    "PSU is not per-mille");
+	ASSERT_TRUE(!bvn_units_compatible(psu, none), "PSU is not a plain number");
+	ASSERT_TRUE(!bvn_units_compatible(psu, ntu), "PSU is not a turbidity");
+	assert_unit_rejected("m~PSU");     /* the scale is bounded by construction */
+
+	/* CF is a conductivity, just rescaled: 1 CF = 0.1 mS/cm = 100 µS/cm. */
+	{
+		value_unit_t cf = bvn_parse_unit((const uint8_t *)"CF", &ok);
+		value_unit_t mS_cm = bvn_parse_unit((const uint8_t *)"m~S/c~m", &ok);
+		value_unit_t uS_cm = bvn_parse_unit((const uint8_t *)"\xc2\xb5S/cm", &ok);
+		ASSERT_TRUE(ok, "CF and the EC compounds parse");
+		ASSERT_TRUE(bvn_units_compatible(cf, mS_cm), "CF is a conductivity");
+		ASSERT_TRUE(bvn_unit_convert_value(1.0, cf, mS_cm, &out) &&
+			    fabs(out - 0.1) < 1e-12, "1 CF = 0.1 mS/cm");
+		ASSERT_TRUE(bvn_unit_convert_value(1.0, cf, uS_cm, &out) &&
+			    fabs(out - 100.0) < 1e-9, "1 CF = 100 µS/cm");
+		ASSERT_TRUE(bvn_unit_convert_value(1.0, mS_cm, cf, &out) &&
+			    fabs(out - 10.0) < 1e-12, "1 mS/cm = 10 CF");
+		/* "cF" is the centifarad and must stay that way. */
+		value_unit_t cfarad = bvn_parse_unit((const uint8_t *)"cF", &ok);
+		ASSERT_TRUE(ok, "cF parses");
+		ASSERT_EQ_INT(cfarad.components[0].base, bu_farad, "cF is the farad");
+		ASSERT_EQ_INT(cfarad.components[0].prefix.id.si, si_centi, "…centi-");
+	}
+}
+
 static void test_unit_to_string_new_units(void)
 {
 	printf("  bvn_unit_to_string for rad/sr...\n");
@@ -1018,7 +1083,11 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_american_hardness  == 387, "bu_american_hardness == 387");
 	ASSERT_TRUE((int)bu_val                == 388, "bu_val == 388");
 	ASSERT_TRUE((int)bu_grains_per_gallon  == 389, "bu_grains_per_gallon == 389");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 390, "sentinel == 390");
+	ASSERT_TRUE((int)bu_turbidity_ntu      == 390, "bu_turbidity_ntu == 390");
+	ASSERT_TRUE((int)bu_turbidity_fnu      == 391, "bu_turbidity_fnu == 391");
+	ASSERT_TRUE((int)bu_practical_salinity == 392, "bu_practical_salinity == 392");
+	ASSERT_TRUE((int)bu_conductivity_factor == 393, "bu_conductivity_factor == 393");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 394, "sentinel == 394");
 }
 
 static void test_nonsi_si_factors(void)
@@ -1930,6 +1999,7 @@ int main(void)
 	test_compact_prefix_exceptions();
 	test_compact_currency_form();
 	test_water_hardness_units();
+	test_water_quality_scales();
 	test_unit_to_string_new_units();
 
 	printf("\n--- non-SI unit tests ---\n");

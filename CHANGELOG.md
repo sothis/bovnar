@@ -39,6 +39,20 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **The pint bridge now enforces bovnar's quantity kinds** — it did not, and the gap ran the wrong
+  way: pint would convert an `NTU` into an `FNU`, a byte into 8 bits, an angle into a plain number,
+  a `pH` into a percentage. Fourteen such conversions were possible in pint that bovnar refuses.
+  Each kind now gets its own pint **dimension**, the same device the currency table already uses to
+  stop `100 USD` becoming `100 EUR`, so pint raises `DimensionalityError` exactly where bovnar
+  raises. Conversions within a kind are untouched — `m~NTU → NTU`, `° → rad`, `sr = rad²` — as are
+  all dimensioned conversions. `is_kind_scale(unit)` reports the isolation, as `is_currency_unit`
+  does for money. The cost is interop with pint's *natives*: a bovnar byte no longer converts to
+  pint's `megabyte`, so `build_registry(isolate_kinds=False)` restores the aliasing, and pint's
+  permissiveness with it. `SEMANTIC_CAVEATS` shrinks to what isolation cannot fix — `DECIBEL`,
+  `NEPER`, `PH_SCALE` (pint will still *add* two of them, which the scales do not support) and
+  `VAL` (the divalent convention). The invariant is now a test:
+  `TestPintAgreesWithBovnarOnWhatConverts` asserts pint refuses everything bovnar refuses, over
+  every kind plus dimensioned controls.
 - **Three more turbidity scales: `FTU`, `FAU`, `JTU`** — completing the set, each as its own
   quantity kind for a different reason. `FTU` is formazin turbidity with the optical geometry
   **unstated** (ISO 7027's original 1984 name), which is precisely why it cannot be an alias of NTU

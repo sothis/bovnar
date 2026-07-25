@@ -136,7 +136,20 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 		char ubuf[512];
 		bvn_unit_flags_t uflags = bvnr_writer_unit_flags(w);
 		int32_t ulen = bvn_unit_to_string_ex(vu, ubuf, sizeof(ubuf), uflags);
-		if (ulen < 0) return bvn_writer_set_error(w, error_unit_too_long);
+		if (ulen < 0) {
+			/* -1 is not only "the text did not fit". It also means the unit has
+			 * no spelling (a bu_none component) and, under BVN_UNIT_REDUCE, that
+			 * the reduction drops a component and so cannot express this unit at
+			 * all. Reporting those as error_unit_too_long sends the caller after
+			 * a buffer that was never the problem. Ask again with a buffer
+			 * nothing could overflow — a unit is capped at 8 components and an
+			 * alias at 31 bytes, so this cannot fail for length — and if it still
+			 * refuses, the length was not the cause. */
+			char probe[1024];
+			int32_t again = bvn_unit_to_string_ex(vu, probe, sizeof probe, uflags);
+			return bvn_writer_set_error(
+				w, again < 0 ? error_unit_illegal : error_unit_too_long);
+		}
 		d.type   = token_is_unit;
 		d.data   = (const void *)ubuf;
 		d.length = (uint32_t)ulen;

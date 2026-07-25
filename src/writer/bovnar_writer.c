@@ -1107,6 +1107,21 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 				  ? bvn_validate_uint_range(out, width, base)
 				  : bvn_validate_sint_range(out, width, base);
 			if (!fits) goto done;
+		} else if (d->value_type.family == vt_float_fix) {
+			/* float_fix has a declared RANGE too, and it is the tightest of the
+			 * families: q16 in 32 bits leaves 15 integer bits. The check above
+			 * covered only uint/sint, so a rescale that overflowed the Q format
+			 * sailed through — <float_fix:32,q16,k~m> 30000 was written out as
+			 * <float_fix:32,q16,m> 30000000, reported as success, and rejected by
+			 * this library's own reader with error_value_out_of_range. Same
+			 * predicate the validator applies on the way in, so the writer cannot
+			 * emit what the reader will refuse. float/float_dec need no such
+			 * test: neither pins a magnitude the rescale could leave. */
+			if (!bvn_is_special_number_string(out) &&
+			    !bvn_float_str_fits_fix(out, 10u,
+						    bvn_effective_width(d->value_type),
+						    bvn_effective_q(d->value_type)))
+				goto done;
 		}
 		*text = out;
 		*len  = l;

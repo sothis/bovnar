@@ -1610,6 +1610,31 @@ static void test_unit_reduce_rescales_the_value(void)
 				  f64, "20"), 0, "20 ms as a float writes");
 	ASSERT_TRUE(strcmp(out, ".d=0.02 s") == 0, "...as 0.02 s");
 
+	/* float_fix has a declared RANGE too, and the tightest of any family: q16 in
+	 * 32 bits leaves 15 integer bits. The re-check above covered only uint/sint,
+	 * so a rescale that overflowed the Q format was written out and reported as
+	 * success -- <float_fix:32,q16,k~m> 30000 became <float_fix:32,q16,m>
+	 * 30000000, which this library's own reader rejects. */
+	{
+		value_type_spec_t q16 = { .family = vt_float_fix, .width = 32,
+					  .base = 16 };
+		ASSERT_EQ_INT(reduce_emit(out, sizeof out,
+					  BVN_UNIT_SI(bu_meter, si_kilo), q16, "30000"),
+			      (int)error_value_out_of_range,
+			      "30000 km in metres overflows q16/32 and is refused");
+		value_type_spec_t q30 = { .family = vt_float_fix, .width = 32,
+					  .base = 30 };
+		ASSERT_EQ_INT(reduce_emit(out, sizeof out,
+					  BVN_UNIT_SI(bu_meter, si_kilo), q30, "1"),
+			      (int)error_value_out_of_range,
+			      "1 km in metres needs 10 integer bits; q30/32 has 1");
+		/* one that does fit still writes, rescaled */
+		ASSERT_EQ_INT(reduce_emit(out, sizeof out,
+					  BVN_UNIT_SI(bu_meter, si_kilo), q16, "1.5"),
+			      0, "1.5 km fits q16/32 as 1500 m");
+		ASSERT_TRUE(strcmp(out, ".d=1500 m") == 0, "...and is rescaled");
+	}
+
 	/* nan/inf carry no finite value, so no scale applies. */
 	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
 				  f64, "nan"), 0, "nan writes");
@@ -1690,6 +1715,46 @@ static int reduce_canon(const char *in, char *out, size_t cap)
 	bvnr_reader_destroy(r);
 	bvnr_writer_destroy(w);
 	return ok ? 0 : -1;
+}
+
+static void test_write_type_annotation_names_the_real_failure(void)
+{
+	printf("  a unit REDUCE cannot express is illegal, not too long...\n");
+	/* bvn_unit_to_string_ex returns -1 for several reasons, and this helper
+	 * reported every one of them as error_unit_too_long -- sending the caller
+	 * after a buffer that was never the problem. Under BVN_UNIT_REDUCE, m9*m2
+	 * (which is m11) cannot be reduced without dropping a component, so it is
+	 * refused; the diagnostic has to say which refusal it was. */
+	struct { const char *unit; bvn_unit_flags_t flags; error_code_t want; } cases[] = {
+		{ "m\xe2\x81\xb9" "\xc2\xb7" "m\xc2\xb2", BVN_UNIT_REDUCE, error_unit_illegal },
+		{ "m\xe2\x81\xb9" "\xc2\xb7" "m\xc2\xb2", BVN_UNIT_FLAGS_NONE, error_none },
+		{ "m/s",                                     BVN_UNIT_REDUCE, error_none },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		char out[512];
+		bvnr_sink_t sink;
+		bvnr_sink_to_mem(&sink, out, sizeof out);
+		bvnr_writer_t *w = bvnr_writer_create();
+		bvnr_write_flags_t wf;
+		memset(&wf, 0, sizeof wf);
+		wf.unit_flags = cases[i].flags;
+		bvnr_open_write_sink(w, &sink, false, &wf);
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_start, &d);
+		d.type = token_is_identifier; d.data = "k"; d.length = 1;
+		bvnr_write_event(w, ev_assignment_start, &d);
+		bool pok = false;
+		value_unit_t vu = bvn_parse_unit((const uint8_t *)cases[i].unit, &pok);
+		ASSERT_TRUE(pok, "the test unit parses");
+		value_type_spec_t vt;
+		memset(&vt, 0, sizeof vt);
+		vt.family = vt_float; vt.width = 64;
+		bvnr_write_type_annotation(w, vt, vu);
+		ASSERT_EQ_INT((int)bvnr_writer_get_error(w), (int)cases[i].want,
+			      "the annotation writer names the real failure");
+		bvnr_writer_destroy(w);
+	}
 }
 
 static void test_unit_reduce_annotation_matches_the_value(void)
@@ -2013,6 +2078,7 @@ int main(void)
 {
 	test_unit_reduce_rescales_the_value();
 	test_unit_reduce_annotation_matches_the_value();
+	test_write_type_annotation_names_the_real_failure();
 	test_writer_refuses_unreadable_output();
 	test_writer_event_grammar();
 	test_writer_accepts_only_readable_streams();

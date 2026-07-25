@@ -285,8 +285,10 @@ def unit_to_str_ex(unit: ValueUnit,
     buf = ctypes.create_string_buffer(256)
     n   = lib.bvn_unit_to_string_ex(unit, buf, 256, int(flags))
     if n < 0:
-        # -1 covers three distinct causes; say which, rather than blaming the
-        # buffer for a unit that unit_valid() itself calls valid.
+        # -1 covers four distinct causes; say which, rather than blaming the
+        # buffer for a unit that unit_valid() itself calls valid. (Adding the
+        # overflow refusal in C without adding its branch here put the third
+        # case back under the message this triage exists to stop giving.)
         if not unit_valid(unit):
             raise BovnarArgumentError("unit_to_str_ex: structurally invalid unit")
         nc = min(int(unit.num_components), len(unit.components))
@@ -294,6 +296,14 @@ def unit_to_str_ex(unit: ValueUnit,
             raise BovnarArgumentError(
                 "unit_to_str_ex: a bu_none component has no spelling outside a "
                 "bare no_unit — this unit cannot be written")
+        if int(flags) & int(UnitFlags.REDUCE):
+            try:
+                unit_reduce(unit)
+            except OverflowError as exc:
+                raise BovnarArgumentError(
+                    "unit_to_str_ex: REDUCE cannot express this unit — %s. The "
+                    "reduction drops a component, so the result would be a "
+                    "different unit; serialise it without REDUCE." % exc) from None
         raise BovnarArgumentError("unit_to_str_ex: output buffer overflow")
     return buf.raw[:n].decode('utf-8')
 

@@ -1118,11 +1118,29 @@ endif()
 # web/docs/**/index.html is committed, so an edited doc/*.md that never went
 # through the generator ships a page contradicting the Markdown beside it -- the
 # drift every other generator here is already gated on.
+#
+# The interpreter alone is not enough, exactly as above: gen_html_docs.py renders
+# through python-markdown, a third-party module the runner does not ship. Without
+# it the test failed on the import line with "No module named 'markdown'" -- a
+# missing tool reported as a doc-drift failure. Probe for the module and skip the
+# registration when it is absent, the way a missing interpreter already does.
+# CI installs it and then asserts this test exists, so the skip cannot quietly
+# become how the check stops running there.
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py)
-    add_test(NAME bvnr_html_docs
-             COMMAND ${Python3_EXECUTABLE}
-                     ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py --check)
-    set_tests_properties(bvnr_html_docs PROPERTIES LABELS "web;docs" TIMEOUT 120)
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} -c "import markdown"
+        RESULT_VARIABLE _bvnr_markdown_probe
+        OUTPUT_QUIET ERROR_QUIET)
+    if(_bvnr_markdown_probe EQUAL 0)
+        add_test(NAME bvnr_html_docs
+                 COMMAND ${Python3_EXECUTABLE}
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py --check)
+        set_tests_properties(bvnr_html_docs PROPERTIES LABELS "web;docs" TIMEOUT 120)
+    else()
+        message(STATUS
+            "markdown not importable by ${Python3_EXECUTABLE} -- skipping the "
+            "generated HTML doc check. Run 'pip install markdown' to enable it.")
+    endif()
 endif()
 
 # ── ?v= cache-bust stamps still match the files they label ──────────────────

@@ -193,8 +193,14 @@ jobs:
       # importorskip()s it: skipping is how bvnr_py_numpy silently tested nothing
       # (and, worse, failed -- a collection-time skip exits 5). The runner has no
       # numpy, so without this the bridge ships unexercised by CI.
+      #
+      # markdown is what gen_html_docs.py imports; without it bvnr_html_docs
+      # fails with "No module named 'markdown'" rather than checking anything.
+      # It is a hard requirement of this job, not an optional extra -- the
+      # generated web/docs pages are committed, so this is the only gate that
+      # catches a doc/*.md edit that never went through the generator.
       - name: Install Python test dependencies
-        run: python3 -m pip install --quiet pytest numpy
+        run: python3 -m pip install --quiet pytest numpy markdown
 
       # -DPython3_EXECUTABLE pins the resolution to the interpreter just
       # provisioned instead of leaving FindPython3 to choose among the several on
@@ -206,6 +212,18 @@ jobs:
 
       - name: Build
         run: cmake --build build -j"$(nproc)"
+
+      # The module-dependent gates skip themselves at configure time when their
+      # import is missing, so a broken install step above would turn a failing
+      # suite into a quietly smaller one. Assert the registrations exist before
+      # trusting the run that follows.
+      - name: Optional-dependency gates registered
+        run: |
+          set -euo pipefail
+          for t in bvnr_html_docs bvnr_py_numpy bvnr_py_all; do
+            ctest --test-dir build -N -R "^$t$" | grep -q "$t" \
+              || { echo "::error::$t was not registered -- a Python dependency is missing"; exit 1; }
+          done
 
       - name: CTest
         run: ctest --test-dir build -j"$(nproc)" --output-on-failure

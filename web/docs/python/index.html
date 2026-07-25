@@ -627,7 +627,7 @@ units with more than 8 components, non-integer exponents, or exponents outside
 <p>A module-level default <code>pint.UnitRegistry</code> is built on first use. To share a
 registry across calls — or to register bovnar's custom units onto your own —
 pass <code>ureg=</code>:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar._pint_units</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_registry</span><span class="p">,</span> <span class="n">is_currency_unit</span>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar._pint_units</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_registry</span><span class="p">,</span> <span class="n">is_currency_unit</span><span class="p">,</span> <span class="n">is_kind_scale</span>
 
 <span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">()</span>                       <span class="c1"># fresh registry with bovnar units</span>
 <span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">(</span><span class="n">my_existing_registry</span><span class="p">)</span>   <span class="c1"># extend an existing one</span>
@@ -663,8 +663,8 @@ enforces Bovnar's rule natively:</p>
 
 <p>Conversions <em>within</em> a kind keep working, because that is what a shared
 dimension means: <code>m~NTU → NTU</code>, <code>° → rad</code> (1 rad = 57.29578°), <code>sr = rad²</code>.
-<code>is_kind_scale(unit)</code> reports whether a pint unit carries one of these
-dimensions, as <code>is_currency_unit</code> does for money.</p>
+<code>bovnar._pint_units.is_kind_scale(unit)</code> reports whether a pint unit carries
+one of these dimensions, as <code>is_currency_unit</code> does for money.</p>
 <p>The cost is interoperability with pint's <strong>native</strong> units: a Bovnar-derived
 byte no longer converts to pint's <code>megabyte</code>, nor a Bovnar radian to pint's
 <code>degree</code>. If you need that more than you need the refusals:</p>

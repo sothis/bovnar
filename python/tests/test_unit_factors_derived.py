@@ -212,6 +212,67 @@ DERIVED = {
 _DEFAULT_TOL = 1e-9
 
 
+def test_generated_tables_match_the_source(factors):
+    """The C tables are generated from units.bvnr; check the generated text
+    against the document rather than trusting the generator that wrote both.
+    Skipped when the build directory has not produced them yet."""
+    import re
+    from decimal import Decimal
+    from fractions import Fraction
+    gen = os.path.join(_ROOT, "build", "generated")
+    conv_path = os.path.join(gen, "bovnar_si_conv_table.gen.inc")
+    if not os.path.exists(conv_path):
+        pytest.skip("generated tables not built")
+    with open(os.path.join(_ROOT, "src", "gendata", "units.bvnr"),
+              encoding="utf-8") as f:
+        units = bvnr_data.load(f.read())["units"]
+    dim_names = ["length", "mass", "time", "current", "temperature",
+                 "amount", "luminosity"]
+    rows = {}
+    for line in open(conv_path, encoding="utf-8"):
+        m = re.match(r'\s*\[(bu_\w+)\s*\]\s*=\s*\{\s*bu_\w+,\s*([^,]+),'
+                     r'\s*\{([^}]*)\},\s*(true|false),\s*([^,]+),'
+                     r'\s*"(-?\d+)",\s*"(\d+)",\s*"(-?\d+)",\s*"(\d+)",'
+                     r'\s*(true|false)', line)
+        if m:
+            rows[m.group(1)] = m.groups()[1:]
+    assert len(rows) == len(units), (
+        f"si_conv_table has {len(rows)} rows for {len(units)} units")
+    for u in units:
+        key = "bu_" + u["name"]
+        factor, dims, affine, offset, fn, fd, on, od, exact = rows[key]
+        assert float(factor) == float(u["factor"]), key
+        want = [0] * 7
+        if isinstance(u["dims"], dict):
+            for name, value in u["dims"].items():
+                want[dim_names.index(name)] = value
+        assert [int(x) for x in dims.split(",")] == want, f"{key} dims"
+        assert (affine == "true") == bool(u["affine"]), f"{key} affine"
+        assert float(offset) == float(u["offset"]), f"{key} offset"
+        assert (exact == "true") == bool(u.get("exact", True)), f"{key} exact"
+        # the generator reduces the rational, so compare as fractions
+        stated = (Fraction(int(u["factor_num"]), int(u["factor_den"]))
+                  if u.get("factor_num") is not None
+                  else Fraction(Decimal(repr(float(u["factor"])))))
+        assert Fraction(int(fn), int(fd)) == stated, f"{key} rational"
+
+
+def test_the_parse_table_is_ordered_longest_first():
+    """The suffix matcher takes the FIRST match, so a shorter alias appearing
+    before a longer one silently changes what a token parses as."""
+    import re
+    path = os.path.join(_ROOT, "build", "generated", "bovnar_bu_table.gen.inc")
+    if not os.path.exists(path):
+        pytest.skip("generated tables not built")
+    lengths = [int(m.group(1)) for line in open(path, encoding="utf-8")
+               for m in [re.match(r'\s*\{\s*.+?,\s*(\d+),\s*bu_\w+\s*\},', line)]
+               if m]
+    assert lengths, "no rows parsed out of bovnar_bu_table.gen.inc"
+    assert lengths == sorted(lengths, reverse=True), \
+        "bu_table is not sorted longest-first"
+    assert max(lengths) < 32, "an alias exceeds BU_LEN_INDEX_SIZE"
+
+
 @pytest.mark.parametrize("symbol", sorted(DERIVED), ids=str)
 def test_factor_matches_its_definition(symbol, factors):
     entry = DERIVED[symbol]

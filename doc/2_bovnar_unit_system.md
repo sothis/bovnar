@@ -547,7 +547,7 @@ they do **not** accept SI or IEC prefixes (a prefixed `%` is meaningless).
 Speeds people write as one token. `mi/h` and `k~m/h` express the same quantities
 as compounds and remain valid; these are separate base units, not shorthands the
 parser expands, so an annotation of `mph` does **not** reconcile with an inline
-`mi/h` (the comparison is structural — see §5.5). Neither accepts a prefix: they
+`mi/h` (the comparison is structural — see §2.2). Neither accepts a prefix: they
 already carry one, or have no meaningful prefixed form. `kn` (the knot, §3.13)
 belongs to the same family.
 

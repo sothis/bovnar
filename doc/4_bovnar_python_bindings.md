@@ -545,7 +545,7 @@ registry across calls — or to register bovnar's custom units onto your own —
 pass `ureg=`:
 
 ```python
-from bovnar._pint_units import build_registry, is_currency_unit
+from bovnar._pint_units import build_registry, is_currency_unit, is_kind_scale
 
 ureg = build_registry()                       # fresh registry with bovnar units
 ureg = build_registry(my_existing_registry)   # extend an existing one
@@ -586,8 +586,8 @@ q.to("bvnr_ntu")        # 4.2 — a conversion within the kind is fine
 
 Conversions *within* a kind keep working, because that is what a shared
 dimension means: `m~NTU → NTU`, `° → rad` (1 rad = 57.29578°), `sr = rad²`.
-`is_kind_scale(unit)` reports whether a pint unit carries one of these
-dimensions, as `is_currency_unit` does for money.
+`bovnar._pint_units.is_kind_scale(unit)` reports whether a pint unit carries
+one of these dimensions, as `is_currency_unit` does for money.
 
 The cost is interoperability with pint's **native** units: a Bovnar-derived
 byte no longer converts to pint's `megabyte`, nor a Bovnar radian to pint's

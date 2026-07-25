@@ -74,6 +74,8 @@
    - 3.23 <a href="#323-acceleration">Acceleration</a>
    - 3.24 <a href="#324-signal-rate">Signal Rate</a>
    - 3.25 <a href="#325-ratio-and-proportion-units">Ratio and Proportion Units</a>
+   - 3.26 <a href="#326-named-speed-units">Named Speed Units</a>
+   - 3.27 <a href="#327-acidity">Acidity</a>
    - 3.26 <a href="#326-sentinel-value">Sentinel Value</a></li>
 <li><a href="#4-prefixes">Prefixes</a>
    - 4.1 <a href="#41-si-prefixes">SI Prefixes</a>
@@ -135,7 +137,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 163 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 166 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -246,7 +248,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </table>
 <hr />
 <h2 id="3-physical-base-units">3. Physical Base Units</h2>
-<p>Bovnar supports 163 named physical base units. Currency codes are a separate namespace and are covered in §9.</p>
+<p>Bovnar supports 166 named physical base units. Currency codes are a separate namespace and are covered in §9.</p>
 <blockquote>
 <p><strong>Reading this section:</strong> The <em>Symbol</em> column gives the canonical serialized form. <em>Long forms</em> are accepted on input but never produced on output. <em>Enum value</em> is the <code>value_base_unit_t</code> constant used in the C API.</p>
 </blockquote>
@@ -1690,7 +1692,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tbody>
 </table>
 <blockquote>
-<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>380</strong> (verified by static assert <code>bu_xcg + 1 == 380</code>). Currencies begin at 134, immediately after the last non-German physical unit.</p>
+<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–382</strong> (<code>bu_ph_scale</code>, <code>bu_mile_per_hour</code>, <code>bu_kilometer_per_hour</code>), and a further unit would be appended there. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>383</strong> (verified by static assert <code>bu_kilometer_per_hour + 1 == 383</code>, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.</p>
 </blockquote>
 <h3 id="321-additional-length-units">3.21 Additional Length Units</h3>
 <table>
@@ -1868,7 +1870,75 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 </tr>
 </tbody>
 </table>
-<h3 id="326-sentinel-value">3.26 Sentinel Value</h3>
+<h3 id="326-named-speed-units">3.26 Named Speed Units</h3>
+<p>Speeds people write as one token. <code>mi/h</code> and <code>k~m/h</code> express the same quantities
+as compounds and remain valid; these are separate base units, not shorthands the
+parser expands, so an annotation of <code>mph</code> does <strong>not</strong> reconcile with an inline
+<code>mi/h</code> (the comparison is structural — see §5.5). Neither accepts a prefix: they
+already carry one, or have no meaningful prefixed form. <code>kn</code> (the knot, §3.13)
+belongs to the same family.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mph</code></td>
+<td>—</td>
+<td>mile per hour</td>
+<td><code>bu_mile_per_hour</code></td>
+<td>0.44704 m·s⁻¹ (exact)</td>
+</tr>
+<tr>
+<td><code>kph</code></td>
+<td><code>kmh</code></td>
+<td>kilometre per hour</td>
+<td><code>bu_kilometer_per_hour</code></td>
+<td>5/18 m·s⁻¹ (exact; the decimal does not terminate)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="327-acidity">3.27 Acidity</h3>
+<p>The pH scale: dimensionless by construction, being a negative decimal logarithm
+of hydrogen-ion activity. It carries a factor of 1 and accepts <strong>no</strong> prefix — a
+milli-pH is not a quantity. It is modelled for the same reason <code>dB</code> and <code>Np</code> are:
+a logarithmic scale is still a statement about what the number means, and <code>7.2</code>
+alone is not.</p>
+<p>Because the scale is logarithmic, the value is a label, not something to sum or
+average — the same caveat that applies to <code>dB</code> and <code>Np</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pH</code></td>
+<td>—</td>
+<td>pH (acidity)</td>
+<td><code>bu_ph_scale</code></td>
+<td>1 (dimensionless)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong><code>pH</code> vs <code>p~H</code>:</strong> the two differ by one character and by seven orders of
+dimension. <code>pH</code> is the acidity scale; <code>p~H</code> is the picohenry. Case matters too:
+<code>ph</code> is the phot (§3.15). This is exactly why acidity had to become a unit —
+without it, <code>pH</code> resolves as a compact prefixed henry.</p>
+</blockquote>
+<h3 id="328-sentinel-value">3.28 Sentinel Value</h3>
 <p><code>bu_none</code> (value <code>0</code>) is the internal representation of "no base unit", used for the <code>no_unit</code> keyword and as the default when no unit annotation is present.</p>
 <hr />
 <h2 id="4-prefixes">4. Prefixes</h2>
@@ -2212,24 +2282,6 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 </thead>
 <tbody>
 <tr>
-<td><code>pH</code></td>
-<td>picohenry</td>
-<td>acidity</td>
-<td><code>p~H</code></td>
-</tr>
-<tr>
-<td><code>mph</code></td>
-<td>milliphot</td>
-<td>miles per hour</td>
-<td><code>m~ph</code></td>
-</tr>
-<tr>
-<td><code>kph</code></td>
-<td>kilophot</td>
-<td>km per hour</td>
-<td><code>k~ph</code></td>
-</tr>
-<tr>
 <td><code>usb</code></td>
 <td>microstilb</td>
 <td>the bus</td>
@@ -2243,6 +2295,10 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 </tr>
 </tbody>
 </table>
+<p><code>pH</code>, <code>mph</code> and <code>kph</code> were on this list until the quantities they name became
+  units of their own (§3.26, §3.27). A bare alias outranks any prefixed reading,
+  so they now need no exception — and <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code> still mean what they
+  always did.</p>
 <p>The last row is the harder case: <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.</p>
 <p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne.</p>
 <p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
@@ -4101,7 +4157,7 @@ groups raise <code>error_unit_illegal</code>.</p>
 </code></pre></div>
 
 <h4 id="value_base_unit_t"><code>value_base_unit_t</code></h4>
-<p>Non-German physical units occupy positions 1–133 (<code>bu_bit</code> … <code>bu_bushel</code>). Currency codes occupy positions 134–347 — an unnamed slot range (no <code>bu_*</code> enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (<code>bu_pfund</code> … <code>bu_scheffel</code>). Additional physical units occupy positions 361–367 (<code>bu_survey_foot</code> … <code>bu_baud</code>), historical temperature scales 368–371 (<code>bu_delisle</code> … <code>bu_romer</code>), and dimensionless ratio units 372–377 (<code>bu_percent</code> … <code>bu_ppb</code>). <code>bvn_unit_is_currency(base)</code> returns <code>true</code> for any value in the range 134–347 or the extension slots 378–379 (<code>bu_zwg</code>, <code>bu_xcg</code>).</p>
+<p>Non-German physical units occupy positions 1–133 (<code>bu_bit</code> … <code>bu_bushel</code>). Currency codes occupy positions 134–347 — an unnamed slot range (no <code>bu_*</code> enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (<code>bu_pfund</code> … <code>bu_scheffel</code>). Additional physical units occupy positions 361–367 (<code>bu_survey_foot</code> … <code>bu_baud</code>), historical temperature scales 368–371 (<code>bu_delisle</code> … <code>bu_romer</code>), and dimensionless ratio units 372–377 (<code>bu_percent</code> … <code>bu_ppb</code>). Physical units resume past the currency extension at 380–382 (<code>bu_ph_scale</code>, <code>bu_mile_per_hour</code>, <code>bu_kilometer_per_hour</code>). <code>bvn_unit_is_currency(base)</code> returns <code>true</code> for any value in the range 134–347 or the extension slots 378–379 (<code>bu_zwg</code>, <code>bu_xcg</code>).</p>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">value_base_unit_e</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">bu_none</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">            </span><span class="cm">/* dimensionless / no unit        */</span>
 

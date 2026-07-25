@@ -544,7 +544,14 @@ class BaseUnit(IntEnum):
     ZWG  = 378  # Zimbabwe Gold       - minor unit: 2
     XCG  = 379  # Caribbean Guilder   - minor unit: 2
 
-    _SENTINEL = 380
+    # Physical units resume after the appended currencies (380-). A new unit
+    # goes here, at the end, so no existing value ever shifts.
+
+    PH_SCALE           = 380   # acidity; dimensionless, takes no prefix
+    MILE_PER_HOUR      = 381
+    KILOMETER_PER_HOUR = 382
+
+    _SENTINEL = 383
 
 
 # Currency-range sentinels (mirrors C #defines)

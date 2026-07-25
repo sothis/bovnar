@@ -227,7 +227,10 @@ class TestBaseUnit:
 
     def test_count(self):
 
-        assert len(BaseUnit) == 381
+        # 380 defined codes + NONE + _SENTINEL, minus the 134..347 currency
+        # slots that have no named enumerator. Adding a unit or a currency
+        # moves this by exactly one per addition.
+        assert len(BaseUnit) == 384
 
 class TestExponent:
     def test_positive_exponents(self):

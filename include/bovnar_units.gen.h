@@ -162,3 +162,6 @@
 	bu_per_cent_mille = 375,
 	bu_ppm          = 376,
 	bu_ppb          = 377,
+	bu_ph_scale     = 380,
+	bu_mile_per_hour = 381,
+	bu_kilometer_per_hour = 382,

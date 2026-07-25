@@ -896,7 +896,7 @@ class TestCompactPrefixForm:
         "kkg", "k~kg",       # a prefix cannot be stacked
         "k~~g", "kg~",       # malformed separated form, not a compact one
         "Kim", "mB",         # prefix policy still applies
-        "pH", "mph", "kph",  # refused by name (units.bvnr .compact_exceptions)
+        "usb", "kt",         # refused by name (units.bvnr .compact_exceptions)
         "kWh", "mcg",        # never were units, still are not
         "kUSD", "k$XYZ",     # the currency sigil and a known code stay required
         "Ki$USD", "kg$USD",
@@ -909,11 +909,34 @@ class TestCompactPrefixForm:
         ("p~H",  BaseUnit.HENRY, SIPrefix.PICO),
         ("m~ph", BaseUnit.PHOT,  SIPrefix.MILLI),
         ("nH",   BaseUnit.HENRY, SIPrefix.NANO),
+        ("u~sb", BaseUnit.STILB, SIPrefix.MICRO),
+        ("k~t",  BaseUnit.TONNE, SIPrefix.KILO),
     ])
     def test_refusal_is_per_spelling(self, tok, base, prefix):
         c = self._parse(tok).components[0]
         assert c.base_unit == base
         assert c.si_prefix == prefix
+
+    @pytest.mark.parametrize("tok,base", [
+        ("pH",  BaseUnit.PH_SCALE),            # acidity, not picohenry
+        ("mph", BaseUnit.MILE_PER_HOUR),       # speed, not milliphot
+        ("kph", BaseUnit.KILOMETER_PER_HOUR),
+        ("kmh", BaseUnit.KILOMETER_PER_HOUR),
+        ("ph",  BaseUnit.PHOT),                # still the phot: case matters
+        ("kn",  BaseUnit.KNOT),
+    ])
+    def test_tokens_that_became_real_units(self, tok, base):
+        # These were refused compact spellings until the units they name were
+        # added; being bare aliases now, the bare-alias-wins rule keeps the
+        # prefixed reading out without any exception entry.
+        c = self._parse(tok).components[0]
+        assert c.base_unit == base
+        assert c.si_prefix == SIPrefix.NONE
+
+    @pytest.mark.parametrize("tok", ["m~pH", "k~pH", "m~mph", "k~kph"])
+    def test_the_new_units_take_no_prefix(self, tok):
+        with pytest.raises(BovnarArgumentError):
+            self._parse(tok)
 
 
 @needs_lib

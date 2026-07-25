@@ -1510,12 +1510,24 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("UNT-025", "units", "separated prefix on a compact form",
 	           ".m = <float:64,k~kg> 1.0;",
 	           error_unit_illegal),
-	ERROR_CASE("UNT-026", "units", "compact spelling refused by name (pH)",
-	           ".acidity = <float:64,pH> 7.0;",
+	/* pH, mph and kph name real units, so a bare alias — not an exception
+	 * entry — is what keeps them from reading as picohenry and milli/kilophot. */
+	VALID("UNT-026", "units", "pH is the acidity scale, not the picohenry",
+	      ".acidity = <float:64,pH> 7.0;"),
+	ERROR_CASE("UNT-026b", "units", "the acidity scale takes no prefix",
+	           ".acidity = <float:64,m~pH> 7.0;",
 	           error_unit_illegal),
-	ERROR_CASE("UNT-027", "units", "compact spelling refused by name (mph)",
-	           ".v = 65.0 mph;",
-	           error_unit_illegal),
+	VALID("UNT-026c", "units", "the picohenry keeps its separated spelling",
+	      ".ind = <float:64,p~H> 33.0;"),
+	VALID("UNT-027", "units", "mph is a speed",
+	      ".v = 65.0 mph;"),
+	/* A named speed unit is its own component, not a shorthand the validator
+	 * expands: mph and mi/h have the same dimension and the same SI factor, but
+	 * annotation-vs-inline reconciliation is structural, so mixing the two
+	 * spellings in one value is a mismatch. Same as knot vs its compound. */
+	ERROR_CASE("UNT-027a", "units", "mph does not reconcile with the compound mi/h",
+	           ".v = <float:64,mph> 65.0 mi/h;",
+	           error_unit_mismatch),
 	/* "kt" abbreviates both the kilotonne and the knot in the wild, so the
 	 * compact form refuses it and the author picks: k~t (mass) or kn (speed). */
 	ERROR_CASE("UNT-027b", "units", "compact spelling refused as ambiguous (kt)",
@@ -1523,6 +1535,8 @@ static const cf_case_t g_cases[] = {
 	           error_unit_illegal),
 	VALID("UNT-027c", "units", "the separated kilotonne is unaffected",
 	      ".m = <float:64,k~t> 1.0;"),
+	VALID("UNT-027d", "units", "the compact microstilb stays refused",
+	      ".x = <float:64,u~sb> 1.0;"),
 	ERROR_CASE("UNT-028", "units", "prefix policy applies to the compact form (IEC)",
 	           ".d = <float:64,Kim> 1.0;",
 	           error_unit_illegal),

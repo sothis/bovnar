@@ -685,19 +685,37 @@ static void test_compact_prefix_exceptions(void)
 {
 	printf("  compact spellings that are refused by name...\n");
 
-	/* Tokens that are well-known annotations for something bovnar does not
-	 * model. Accepting them would turn a parse error into a quietly wrong unit
-	 * (pH as inductance, mph as illuminance), so they stay errors. */
-	assert_unit_rejected("pH");
-	assert_unit_rejected("mph");
-	assert_unit_rejected("kph");
+	/* Tokens that are well-known annotations for something else. Accepting them
+	 * would turn a parse error into a quietly wrong unit, so they stay errors:
+	 * "usb" is not the microstilb, and "kt" abbreviates BOTH the kilotonne and
+	 * the knot — two units bovnar models — so only the author can resolve it. */
 	assert_unit_rejected("usb");
-	assert_unit_rejected("kt");    /* kilotonne or knot — the author must say */
+	assert_unit_rejected("kt");
 
 	/* The exponent suffix is stripped before the check, so a decorated form is
 	 * refused too. */
-	assert_unit_rejected("pH^2");
-	assert_unit_rejected("mph^-1");
+	assert_unit_rejected("usb^2");
+	assert_unit_rejected("kt^-1");
+
+	/* pH, mph and kph were on that list until the units they name were added.
+	 * A bare alias outranks any prefixed reading, so they now need no entry —
+	 * and the prefixed readings they used to be mistaken for are still there
+	 * under their own spellings. */
+	{
+		bool ok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)"pH", &ok);
+		ASSERT_TRUE(ok, "pH parses");
+		ASSERT_EQ_INT(u.components[0].base, bu_ph_scale, "pH is the acidity scale");
+		u = bvn_parse_unit((const uint8_t *)"mph", &ok);
+		ASSERT_TRUE(ok, "mph parses");
+		ASSERT_EQ_INT(u.components[0].base, bu_mile_per_hour, "mph is a speed");
+		u = bvn_parse_unit((const uint8_t *)"kph", &ok);
+		ASSERT_TRUE(ok, "kph parses");
+		ASSERT_EQ_INT(u.components[0].base, bu_kilometer_per_hour, "kph is a speed");
+		u = bvn_parse_unit((const uint8_t *)"ph", &ok);
+		ASSERT_TRUE(ok, "ph parses");
+		ASSERT_EQ_INT(u.components[0].base, bu_phot, "ph is still the phot");
+	}
 
 	/* Only the compact spelling is refused; the separated one is spec-1.0
 	 * syntax and keeps its meaning. */
@@ -712,6 +730,13 @@ static void test_compact_prefix_exceptions(void)
 		ASSERT_TRUE(ok, "m~ph (milliphot) still parses");
 		ASSERT_EQ_INT(u.components[0].base,         bu_phot,  "m~ph base");
 		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli, "m~ph prefix");
+
+	/* The units added for pH/mph/kph take no prefix at all: a milli-pH is not a
+	 * quantity, and a kilo-kph is a prefix on a prefix. */
+	assert_unit_rejected("m~pH");
+	assert_unit_rejected("k~pH");
+	assert_unit_rejected("m~mph");
+	assert_unit_rejected("k~kph");
 
 		u = bvn_parse_unit((const uint8_t *)"u~sb", &ok);
 		ASSERT_TRUE(ok, "u~sb (microstilb) still parses");
@@ -733,7 +758,8 @@ static void test_compact_prefix_exceptions(void)
 	assert_compact_matches("nH",  "n~H");
 	assert_compact_matches("mH",  "m~H");
 	assert_compact_matches("nph", "n~ph");
-	assert_compact_matches("msb", "m~sb");
+	assert_compact_matches("ksb", "k~sb");
+	assert_compact_matches("Mt",  "M~t");
 }
 
 static void test_unit_to_string_new_units(void)
@@ -879,7 +905,11 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_per_cent_mille     == 375, "bu_per_cent_mille == 375");
 	ASSERT_TRUE((int)bu_ppm                == 376, "bu_ppm == 376");
 	ASSERT_TRUE((int)bu_ppb                == 377, "bu_ppb == 377");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 380, "sentinel == 380");
+	/* 378..379 are the appended currencies; physical units resume at 380. */
+	ASSERT_TRUE((int)bu_ph_scale           == 380, "bu_ph_scale == 380");
+	ASSERT_TRUE((int)bu_mile_per_hour      == 381, "bu_mile_per_hour == 381");
+	ASSERT_TRUE((int)bu_kilometer_per_hour == 382, "bu_kilometer_per_hour == 382");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 383, "sentinel == 383");
 }
 
 static void test_nonsi_si_factors(void)

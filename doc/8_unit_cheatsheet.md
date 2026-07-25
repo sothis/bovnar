@@ -1,6 +1,6 @@
 # Bovnar (BVNR) — Units & Currencies Reference
 
-> Spec version 1.1 · 163 physical units · 166 fiat currencies · 50 cryptocurrencies
+> Spec version 1.1 · 166 physical units · 166 fiat currencies · 50 cryptocurrencies
 
 ---
 
@@ -97,7 +97,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 
 Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
 
-A compact spelling is refused when the token is a well-known annotation for something else: `pH`, `mph`, `kph`, `usb` and `kt` are `error_unit_illegal` (write `p~H`, `m~ph`, `k~ph`, `u~sb`, and for `kt` either `k~t` for the kilotonne or `kn` for the knot).
+A compact spelling is refused when the token means something else in the wild: `usb` and `kt` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
 
 Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 
@@ -767,5 +767,5 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, and 372–377 (163 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–382 (166 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*

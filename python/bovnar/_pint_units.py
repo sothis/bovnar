@@ -60,6 +60,7 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_per_cent_mille = 1e-05',
     'bvnr_per_myriad = 0.0001',
     'bvnr_pfund = 0.5 * kilogram',
+    'bvnr_ph_scale = 1.0',   # pint parses "pH" as picohenry, so never call it that
     'bvnr_phot = 10000.0 * meter**-2 * candela',
     'bvnr_ppb = 1e-09',
     'bvnr_prussian_elle = 0.66716 * meter',
@@ -211,6 +212,8 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     372: 'percent',                      # PERCENT
     373: 'permille',                     # PER_MILLE
     376: 'ppm',                          # PPM
+    381: 'mile_per_hour',                # MILE_PER_HOUR
+    382: 'kilometer_per_hour',           # KILOMETER_PER_HOUR
 
     # Affine temperature scales mapped to pint native offset units
      34: 'degC',                         # CELSIUS
@@ -246,6 +249,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     374: 'bvnr_per_myriad',              # PER_MYRIAD
     375: 'bvnr_per_cent_mille',          # PER_CENT_MILLE
     377: 'bvnr_ppb',                     # PPB
+    380: 'bvnr_ph_scale',                # PH_SCALE
 
     # Defined to match bovnar magnitude exactly (pint native uses a different convention)
      71: 'bvnr_therm',                   # THERM
@@ -264,6 +268,7 @@ SEMANTIC_CAVEATS: dict[str, str] = {
     'BYTE': 'bovnar treats byte as a dimensionless tag (=1); pint relates byte=8*bit. Label round-trips; byte<->bit conversion differs.',
     'DECIBEL': 'bovnar dB is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
     'NEPER': 'bovnar Np is a linear dimensionless tag (=1); pint models it as a logarithmic unit.',
+    'PH_SCALE': 'bovnar pH is a linear dimensionless tag (=1), as pint has no acidity unit at all ("pH" parses there as the picohenry). The scale is logarithmic, so summing or averaging pH values is not meaningful in either library.',
 }
 
 

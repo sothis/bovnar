@@ -113,8 +113,11 @@ class TestUnitTableIntegrity:
             assert math.isclose(k_bovnar, k_pint, rel_tol=1e-6, abs_tol=1e-9), \
                 f"{name} at {value}: bovnar={k_bovnar} pint={k_pint}"
 
-    def test_caveats_are_exactly_the_known_three(self):
-        assert _CAVEATS == {'BYTE', 'DECIBEL', 'NEPER'}
+    def test_caveats_are_exactly_the_known_set(self):
+        # Every entry is a unit whose LABEL round-trips but whose VALUE
+        # semantics differ from pint's; a new one must be a deliberate addition,
+        # never a silent one.
+        assert _CAVEATS == {'BYTE', 'DECIBEL', 'NEPER', 'PH_SCALE'}
 
 
 @needs_lib

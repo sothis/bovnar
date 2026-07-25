@@ -9,8 +9,11 @@
 # STABLE IDS (ABI)
 #   .id is the value_base_unit_t enum value. Append-only: NEVER renumber or
 #   reuse an id — downstream C and the Python bindings are pinned to these
-#   integers. Physical units occupy 1..133 and 348..377; the gap 134..347
-#   belongs to currencies (see currencies.bvnr).
+#   integers. Physical units occupy 1..133, 348..377 and 380..; the gap
+#   134..347 belongs to currencies (see currencies.bvnr), as do 378..379 —
+#   currencies appended after that gap was frozen. A new physical unit goes at
+#   the end (380+) and must move the last-enumerator check in
+#   src/utils/bvn_internal_dims.h with it.
 #
 # FIELDS (one record per unit)
 #   .id       value_base_unit_t enum value (stable; see above)
@@ -1897,6 +1900,55 @@
     .offset  = 0.0;
     .prefix  = ratio;
     .aliases = ["ppb"];
+  },
+  {
+    # The acidity scale: dimensionless by construction (a negative decimal
+    # logarithm of an activity), so it has no conversion factor and takes no
+    # prefix — a milli-pH is not a quantity. Modelled for the same reason the
+    # decibel and the neper are: a logarithmic scale is still a statement about
+    # what the number means, and "7.2" alone is not. Without it "pH" parses as
+    # p~H, the picohenry, which is why it also has to be a UNIT rather than
+    # merely a refused spelling.
+    .id      = <uint:16> 380;
+    .name    = "ph_scale";
+    .symbol  = "pH";
+    .factor  = 1.0;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = none;
+    .aliases = ["pH"];
+  },
+  {
+    # 1 mph = 1609.344 m / 3600 s = 0.44704 m/s exactly. Like the knot, this is
+    # a customary speed unit people write as one token; unlike a compound it
+    # cannot be prefixed (a kilo-mph is not a thing), hence .prefix = none.
+    .id      = <uint:16> 381;
+    .name    = "mile_per_hour";
+    .symbol  = "mph";
+    .factor  = 0.44704;
+    .dims    = { .length = 1; .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = none;
+    .aliases = ["mph"];
+  },
+  {
+    # 1 kph = 1000 m / 3600 s = 5/18 m/s, which does not terminate in base 10 —
+    # the stored decimal is only the rounded double, so the exact rational is
+    # stated. "kmh" is the other spelling in the wild; "km/h" is the compound
+    # and needs nothing here.
+    .id      = <uint:16> 382;
+    .name    = "kilometer_per_hour";
+    .symbol  = "kph";
+    .factor  = 0.2777777777777778;
+    .dims    = { .length = 1; .time = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64>  5;
+    .factor_den = <sint:64> 18;
+    .prefix  = none;
+    .aliases = ["kph", "kmh"];
   }
 ];
 
@@ -1924,9 +1976,6 @@
 #   .why       why it is refused — the reading a user would actually intend
 
 .compact_exceptions = [
-  { .spelling = "pH";  .why = "acidity, not picohenry (write p~H)";          },
-  { .spelling = "mph"; .why = "miles per hour, not milliphot (write m~ph)";  },
-  { .spelling = "kph"; .why = "km per hour, not kilophot (write k~ph)";      },
   { .spelling = "usb"; .why = "the bus, not microstilb (write u~sb or µ~sb)"; },
   { .spelling = "kt";  .why = "kilotonne or knot — say which (k~t or kn)";     }
 ];

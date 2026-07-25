@@ -62,7 +62,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 337-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 341-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -363,7 +363,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 337-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 341-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -591,7 +591,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (337 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (341 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Streaming, Framing & Multiplexing](doc/9_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 

@@ -255,8 +255,9 @@ typedef enum value_base_unit_e {
 	 * block, rather than inside the 134-347 currency region, so that adding one
 	 * never shifts an existing enum value (ABI stability). They are recognised
 	 * as currencies via the BVN_CURRENCY_EXT_* range in bovnar_currency.h, not
-	 * by the contiguous 134-347 bounds. Keep the final enumerator here last: the
-	 * BVN_VALUE_BASE_UNIT_COUNT check in bvn_internal_dims.h depends on it.
+	 * by the contiguous 134-347 bounds. They are NOT the highest enumerators —
+	 * physical units resumed at 380 above — so the BVN_VALUE_BASE_UNIT_COUNT
+	 * check in bvn_internal_dims.h tracks the last unit, not the last currency.
 	 */
 	bu_zwg = 378, bu_xcg
 } value_base_unit_t;

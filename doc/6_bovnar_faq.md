@@ -426,13 +426,17 @@ In four situations, all of which are `error_unit_illegal`:
    at most one prefix.
 3. **A prefix the unit does not accept.** `Kim` fails exactly as `Ki~m` does
    (IEC prefixes are for `b`/`B` only), as do `mB`, `kPfd` and `kppm`.
-4. **A spelling refused by name.** `pH`, `mph`, `kph` and `usb` would otherwise
-   resolve to picohenry, milliphot, kilophot and microstilb — quietly wrong
-   units for tokens that in practice mean acidity, two speeds and a bus. `kt`
-   is refused for the opposite reason: it is a standard abbreviation for two
-   units Bovnar *does* model, the kilotonne and the knot. They stay errors; the
-   separated forms `p~H`, `m~ph`, `k~ph`, `u~sb`, `k~t` (and `kn` for knots)
-   still work. The list lives in `src/gendata/units.bvnr`.
+4. **A spelling refused by name.** `usb` would otherwise resolve to the
+   microstilb, and `kt` to the kilotonne — but `kt` is equally the standard
+   abbreviation for the knot, and only the author knows which was meant. Both
+   stay errors; write `u~sb`, and `k~t` (mass) or `kn` (speed). The list lives
+   in `src/gendata/units.bvnr`.
+
+   `pH`, `mph` and `kph` were on that list until Bovnar gained the units they
+   name — the acidity scale and two speeds. A bare unit alias outranks any
+   prefixed reading, so they now parse as themselves and need no exception,
+   while `p~H` (picohenry), `m~ph` and `k~ph` (milli-/kilophot) still mean what
+   they always did.
 
 Symbols are case-sensitive in either spelling, so `Kg`, `KB` and `KG` are
 `error_unit_illegal` rather than silently-accepted variants of `kg` and `kB` —
@@ -531,7 +535,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-163 named base units across the following categories:
+166 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).

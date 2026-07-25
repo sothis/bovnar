@@ -33,14 +33,30 @@ reading the grown by-value structs at the wrong size.
   (`Kim` fails exactly as `Ki~m` does, as do `mB`, `kPfd`, `kppm`), and **the
   canonical output form is unaffected** — `bvn_unit_to_string` and the writers emit `k~g` for
   either spelling, so a round-tripped document stays readable to an older
-  reader. Four compact spellings are refused by name, because accepting them
-  would turn a parse error into a quietly wrong unit: `pH` (acidity, not
-  picohenry), `mph` and `kph` (speeds, not milli-/kilophot), `usb` (not
-  microstilb), and `kt` — which abbreviates two units bovnar *does* model, the
-  kilotonne and the knot, so the author picks `k~t` or `kn`; the list is data,
-  in `.compact_exceptions` in
-  `src/gendata/units.bvnr`, and the separated forms `p~H`, `m~ph`, `k~ph`,
-  `u~sb` are untouched. See unit-system reference §4.3.
+  reader. Two compact spellings are refused by name, because accepting them
+  would turn a parse error into a quietly wrong unit: `usb` (not the
+  microstilb) and `kt` — which abbreviates two units bovnar *does* model, the
+  kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
+  in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
+  `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Three units: `pH`, `mph`, `kph`** — the acidity scale (dimensionless, no
+  prefix, modelled for the same reason `dB` and `Np` are) and two named speeds
+  (`mph` = 0.44704 m/s exactly; `kph` = 5/18 m/s, stated as an exact rational
+  because the decimal does not terminate; `kmh` is an accepted spelling). All
+  three were compact spellings the parser had to refuse, because `pH` reads as
+  the picohenry and `mph`/`kph` as milli- and kilophot; naming the quantities
+  resolves that properly, since a bare alias always outranks a prefixed reading.
+  The compound forms `mi/h` and `k~m/h` are unaffected and still mean the same
+  quantities — but a named speed is its own component, so an annotation of
+  `mph` does not reconcile with an inline `mi/h` (the same structural rule that
+  has always applied to `kn`). Enum values are appended past the currency
+  extension at **380-382**, so nothing shifts; `BVN_VALUE_BASE_UNIT_COUNT` grows
+  to 383 and its static assert now tracks the highest enumerator
+  (`bu_kilometer_per_hour`) rather than the last currency. The Python `BaseUnit`
+  enum and the pint bridge gain the three: `mph`/`kph` map to pint's native
+  `mile_per_hour`/`kilometer_per_hour`, while pH is defined as `bvnr_ph_scale`
+  (pint parses "pH" as the picohenry too) and carries a semantic caveat, as `dB`
+  and `Np` do, because the scale is logarithmic.
 - **Compact prefix form for currencies** — the same spelling rule applied to
   money: `k$USD`, `M$EUR` and `G$ETH` parse as the prefixed currencies they
   look like. The `$` sigil separates the prefix from the code on its own —

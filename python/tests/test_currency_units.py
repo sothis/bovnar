@@ -108,7 +108,7 @@ class TestEnumContiguity:
         assert int(CURRENCY_CRYPTO_LAST) == 347
 
     def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 380
+        assert int(BaseUnit._SENTINEL) == 383
 
     def test_fiat_range_size(self):
         assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 164
@@ -575,13 +575,18 @@ class TestPhysicalUnitCollisions:
 
 
 class TestBaseUnitSentinel:
-    def test_sentinel_is_380(self):
-        assert int(BaseUnit._SENTINEL) == 380
+    def test_sentinel_value(self):
+        assert int(BaseUnit._SENTINEL) == 383
 
     def test_sentinel_is_one_past_last_enum_member(self):
-        # XCG (the last appended currency) is now the final real enumerator,
-        # past the unit block; the sentinel is one beyond it.
-        assert int(BaseUnit._SENTINEL) == int(BaseUnit.XCG) + 1
+        # Physical units resumed at 380 after the appended currencies, so the
+        # final real enumerator is a unit again, not XCG. Whatever is last, the
+        # sentinel is one beyond it — that is what C's
+        # BVN_VALUE_BASE_UNIT_COUNT asserts, and the tables it sizes are
+        # indexed by the enum value.
+        last = max(int(u) for u in BaseUnit if u is not BaseUnit._SENTINEL)
+        assert int(BaseUnit._SENTINEL) == last + 1
+        assert last == int(BaseUnit.KILOMETER_PER_HOUR)
 
 
 # ── TestPrefixRulesC ───────────────────────────────────────────────────────

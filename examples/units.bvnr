@@ -901,8 +901,31 @@
 .c_milli_inch  = <float:64,m~in>       1.0;      # milli-inch needs the tilde
 
 # Refused compactly, because the token means something else in the wild:
-#   pH  (acidity, not picohenry)      → write p~H
-#   mph (miles per hour, not milliphot) → write m~ph
-#   kph (km per hour, not kilophot)     → write k~ph
-#   kt  (kilotonne AND knot)            → write k~t or kn
+#   usb (the bus, not microstilb)     → write u~sb
+#   kt  (kilotonne AND knot)          → write k~t or kn
 .c_inductance  = <float:64,p~H>       33.0;      # picohenry, spelled out
+.c_kilotonne   = <float:64,k~t>        2.5;      # "kt" would not say which
+
+# pH, mph and kph name units of their own, so the bare alias wins and no
+# exception is needed — see section 32.
+.c_acidity     = <float:32,pH>         7.2;
+.c_speed       = <float:32,mph>       65.0;
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 32. Acidity and named speeds
+# ══════════════════════════════════════════════════════════════════════════════
+# pH is dimensionless and takes no prefix (a milli-pH is not a quantity); it is
+# modelled for the same reason dB and Np are — a logarithmic scale still says
+# what the number means. mph and kph are speed base units like the knot; the
+# compounds mi/h and k~m/h remain valid and mean the same quantity, but they are
+# structurally different units, so an annotation of one does not reconcile with
+# an inline of the other.
+
+.pool_acidity      = <float:32,pH>     7.2;      # p~H would be a picohenry
+.stomach_acidity   = <float:32,pH>     1.5;
+.speed_limit_us    = <uint:8,mph>       65;      # 0.44704 m/s exactly
+.speed_limit_de    = <uint:8,kph>      130;      # 5/18 m/s exactly
+.speed_limit_alias = <uint:8,kmh>      130;      # "kmh" is the same unit
+.wind_speed        = <float:32,kn>     18.5;     # the knot, unchanged
+.speed_compound    = <float:32,k~m/h> 130.0;     # same quantity, compound form

@@ -251,7 +251,7 @@ SI prefixes are written before the base unit symbol, either with the `~` separat
 
 `<float:32,kΩ>` means exactly the same thing as `<float:32,k~Ω>` — the `~` is optional on a physical unit, and `kg`, `km`, `MHz`, `MiB` all parse as you would expect. Two things to know about the compact spelling. A token that is *itself* a unit always wins (`min` is the minute, so milli-inch has to be written `m~in`), and the writer always emits the `~` form, so a document you write out comes back canonical. A prefixed **currency** works the same way (`k$EUR` = `k~$EUR`), but its `$` sigil is never optional.
 
-IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, `Ri`, `Qi`) follow the same rule:
+IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, and the forward-looking `Ri`, `Qi` — IEC 80000-13 itself stops at `Yi`) follow the same rule:
 
 ```bovnar
 .ram  = <uint:64,Gi~B>  8;     # 8 gibibytes

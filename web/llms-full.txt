@@ -359,7 +359,7 @@ SI prefixes are written before the base unit symbol, either with the `~` separat
 
 `<float:32,kΩ>` means exactly the same thing as `<float:32,k~Ω>` — the `~` is optional on a physical unit, and `kg`, `km`, `MHz`, `MiB` all parse as you would expect. Two things to know about the compact spelling. A token that is *itself* a unit always wins (`min` is the minute, so milli-inch has to be written `m~in`), and the writer always emits the `~` form, so a document you write out comes back canonical. A prefixed **currency** works the same way (`k$EUR` = `k~$EUR`), but its `$` sigil is never optional.
 
-IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, `Ri`, `Qi`) follow the same rule:
+IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, and the forward-looking `Ri`, `Qi` — IEC 80000-13 itself stops at `Yi`) follow the same rule:
 
 ```bovnar
 .ram  = <uint:64,Gi~B>  8;     # 8 gibibytes
@@ -3918,7 +3918,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 Two distinct namespaces share the annotation slot:
 
 - **Physical units** — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
-- **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.
+- **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
 
@@ -5638,7 +5638,9 @@ int32_t bvn_unit_prefix_exponent(value_unit_t u);
 
 `bvn_unit_prefix_factor` returns the multiplicative scale contributed by the prefixes, ignoring base-unit identity. For `si_none`/`iec_none` prefixes the factor is 1.0.
 
-`bvn_unit_prefix_exponent` returns the sum of `(prefix_base_exponent × |unit_exponent|)` across all components.
+`bvn_unit_prefix_exponent` returns the sum of `(prefix_base_exponent × unit_exponent)` across all components — the component exponent **signed**, not its magnitude, so `m/k~m` is `-3` and `k~m⁻¹` is `-3` while `k~m` is `+3`.
+
+> **The sum is only meaningful when one prefix system is in play.** SI exponents are powers of ten and IEC exponents powers of two, and this function adds them into a single integer: `Ki~B/k~s` returns `7`, which is neither 2⁷ nor 10⁷ — the actual scale is 1.024. For a mixed unit use `bvn_unit_prefix_factor`, which multiplies the two systems' factors correctly, or read the components yourself.
 
 ### 12.4 SI Conversion API
 
@@ -6490,6 +6492,7 @@ skipped:
 |-----------|-------|
 | `*want` dimensionally incompatible with the value's unit (seconds for a length; one currency for another) | `error_unit_mismatch` |
 | the true factor is irrational (a π-based angle, e.g. degree → radian) | `error_unit_inexact` |
+| the value's unit puts an affine scale inside a compound (`°C/h`, `°C·m`, `°C²`): the offset is a number of kelvin and the product has nowhere to add it | `error_unit_mismatch` |
 | the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
 | the literal is finite but too extreme to build an exact rational from (e.g. `1e1000000`) | `error_value_out_of_range` |
 | `*want_base` is not a base bvnr writes, or the result is negative in base 64/85, or out of memory | `error_invalid_argument` |
@@ -7384,6 +7387,18 @@ int32_t           bvn_dom_get_unit_string(const bvn_dom_node_t *node, char *buf,
 double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
 ```
 
+`bvn_dom_get_value_in_base_units` scales a numeric node into coherent SI —
+`1.5 k~m` → `1500.0`, and for an affine scale it applies the offset too, so
+`25 °C` → `298.15`. Two caveats it cannot signal:
+
+- **It returns `0.0` for every failure**, which a caller cannot tell from a
+  genuine zero. A non-numeric node, a currency (no SI mapping), a structurally
+  invalid unit, and an affine unit inside a compound (`°C/h`) all give `0.0`, as
+  does `0.0 m`. When the difference matters, read `bvn_dom_get_unit` and call
+  `bvn_unit_to_si_factor` yourself — it has an `ok` out-param.
+- **It is `double`.** A value wider than a double is rounded here. The lossless
+  route is the reader's `want_unit` hook (§7c) or `bvn_unit_convert_rational`.
+
 ### Typed value accessors
 
 Each accessor returns `false` (leaving the out-param **unchanged** — no clamping
@@ -7906,8 +7921,11 @@ vu = bovnar.parse_unit("k~g·m/s²")
 # Convert a ValueUnit back to its canonical string
 s = bovnar.unit_to_str(vu)     # → "k~g·m/s²"
 
-# Scalar SI/IEC prefix factor for a unit string
+# Scalar SI/IEC PREFIX factor for a unit string — the prefix only, never the
+# base unit's own factor. Use units.unit_to_si_factor() for the full SI scale.
 f = bovnar.unit_factor("M~Hz") # → 1_000_000.0
+f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix)
+f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
 ### Extended unit functions
@@ -8731,7 +8749,7 @@ for as long as any derived `DomNode` is in use.
 | `node.unit` | `ValueUnit` |
 | `node.unit_str` | Unit as a string via `bvn_dom_get_unit_string`, or `''` |
 | `node.is_null()` | `True` for null values |
-| `node.value_in_base_units()` | Numeric value scaled to SI base units (`float`) |
+| `node.value_in_base_units()` | Numeric value scaled to SI base units (`float`); an affine unit gets its offset applied (`25 °C` → `298.15`). Returns `0.0` for *any* failure — non-numeric node, currency, affine-in-compound — which is indistinguishable from a genuine zero, and it rounds to `double`. Use `units.unit_to_si_factor()` (which reports `ok`) or the `want_unit` hook when either matters |
 | `node.as_i64()` / `as_u64()` | Signed / unsigned 64-bit integer |
 | `node.as_i32()` / `as_u32()` | Signed / unsigned 32-bit integer |
 | `node.as_i16()` / `as_u16()` | Signed / unsigned 16-bit integer |
@@ -9446,7 +9464,6 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* few compact spellings listed in .compact_exceptions               *)
 (* (src/gendata/units.bvnr: "usb", "kt") stay errors because they    *)
 (* name something else, or two things at once.                       *)
-(* because they are well-known annotations for something else.       *)
 (* A prefixed CURRENCY behaves the same way ("k~$EUR" = "k$EUR");    *)
 (* the '$' sigil separates prefix from code and stays MANDATORY, so  *)
 (* "kUSD" is error_unit_illegal just as bare "USD" is.              *)
@@ -9456,7 +9473,8 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*   (µ = U+00B5 0xC2 0xB5; Greek μ = U+03BC; ASCII "u" alias)       *)
 (*                                                                     *)
 (* iec-prefix = "Ki"|"Mi"|"Gi"|"Ti"|"Pi"|"Ei"|"Zi"|"Yi"|"Ri"|"Qi" ; *)
-(*   Ri (2^90) and Qi (2^100) were added in IEC 80000-13:2022 ed. 2. *)
+(*   Ri (2^90) and Qi (2^100) are a forward-looking EXTENSION, not     *)
+(*   part of IEC 80000-13, which stops at yobi (Yi, 2^80).             *)
 (*                                                                     *)
 (* base-unit  = a symbol looked up in the fixed unit table by              *)
 (*   bvn_parse_unit (src/utils/bovnar_utils.c): 180 named units with        *)
@@ -10607,6 +10625,12 @@ a mismatch is `error_unit_mismatch`.
 - **13 Old German units** — **Pfund** (`Pfd`), **Zentner** (`Ztr`), **Doppelzentner**, **Lot** (mass); **Prussian line, Zoll, Fuß, Elle, Rute**, **Klafter**, and **German (geographical) mile** (length); **Morgen** (area); **Scheffel** (volume). None accept an SI or IEC prefix.
 - **7 surveying & signalling units** — **US survey foot**, **league**, **cable length**, **hand** (length); **quintal**, **scruple** (mass); **baud** (`Bd`, signalling rate).
 - **6 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb** — dimensionless scaling factors that take no prefix.
+- **1 acidity scale** — **pH** (`pH`), a logarithm of hydrogen-ion activity; its own quantity kind, so it never converts to a percentage or a plain number.
+- **2 named speed units** — **mile per hour** (`mph`), **kilometre per hour** (`kph`, also `kmh`). Neither takes a prefix; `mi/h` and `k~m/h` remain valid as compounds.
+- **7 water-analysis units** — the five hardness degrees **German** (`°dH`), **English/Clark** (`°e`), **French** (`°fH`), **Russian** (`°rH`), **American** (`°aH`), plus **grains per US gallon** (`gpg`) and the **equivalent** (`val`, ½ mol as water analysis uses it). The six degrees are amount concentrations and all inter-convert.
+- **5 turbidity scales** — **NTU**, **FNU**, **FTU**, **FAU**, **JTU**: one quantity kind each, because each names a *measurement method* and no factor relates any pair of them.
+- **1 salinity scale** — **PSU** (practical salinity, PSS-78): a conductivity ratio, so not a mass fraction and not convertible to `‰`.
+- **1 conductivity scale** — **CF** (hydroponic conductivity factor, 1 CF = 0.1 mS/cm exactly), which *does* convert, being a rescaled conductivity.
 
 The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `°Ra` (also accepted as `Ra`); note `R` alone is reserved for röntgen. Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
@@ -12132,8 +12156,10 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | exbi  | `Ei`   | 2⁶⁰      | `iec_exbi`  |
 | zebi  | `Zi`   | 2⁷⁰      | `iec_zebi`  |
 | yobi  | `Yi`   | 2⁸⁰      | `iec_yobi`  |
-| robi  | `Ri`   | 2⁹⁰      | `iec_robi`  |
-| quebi | `Qi`   | 2¹⁰⁰     | `iec_quebi` |
+| robi †| `Ri`   | 2⁹⁰      | `iec_robi`  |
+| quebi †| `Qi`   | 2¹⁰⁰     | `iec_quebi` |
+
+† `Ri`/`Qi` are a forward-looking extension: IEC 80000-13 stops at yobi (`Yi`, 2⁸⁰).
 
 ---
 

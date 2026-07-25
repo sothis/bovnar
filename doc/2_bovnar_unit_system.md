@@ -97,7 +97,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 Two distinct namespaces share the annotation slot:
 
 - **Physical units** — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
-- **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.
+- **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
 
@@ -1817,7 +1817,9 @@ int32_t bvn_unit_prefix_exponent(value_unit_t u);
 
 `bvn_unit_prefix_factor` returns the multiplicative scale contributed by the prefixes, ignoring base-unit identity. For `si_none`/`iec_none` prefixes the factor is 1.0.
 
-`bvn_unit_prefix_exponent` returns the sum of `(prefix_base_exponent × |unit_exponent|)` across all components.
+`bvn_unit_prefix_exponent` returns the sum of `(prefix_base_exponent × unit_exponent)` across all components — the component exponent **signed**, not its magnitude, so `m/k~m` is `-3` and `k~m⁻¹` is `-3` while `k~m` is `+3`.
+
+> **The sum is only meaningful when one prefix system is in play.** SI exponents are powers of ten and IEC exponents powers of two, and this function adds them into a single integer: `Ki~B/k~s` returns `7`, which is neither 2⁷ nor 10⁷ — the actual scale is 1.024. For a mixed unit use `bvn_unit_prefix_factor`, which multiplies the two systems' factors correctly, or read the components yourself.
 
 ### 12.4 SI Conversion API
 

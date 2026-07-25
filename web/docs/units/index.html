@@ -141,7 +141,7 @@
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
 <li><strong>Physical units</strong> — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
-<li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical: HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01) and 50 cryptocurrency tickers.</li>
+<li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
 <p>Annotations are <strong>descriptive</strong>, not prescriptive: the <em>validator</em> checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — <code>bvn_units_compatible</code>, <code>bvn_unit_convert_factor</code>, <code>bvn_unit_convert_value</code> and the exact-rational <code>bvn_unit_convert_rational</code> (§12.4), plus the reader's <code>want_unit</code> hook, which converts at read time (§7c of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).</p>
@@ -4867,7 +4867,10 @@ does when a caller asks.</p>
 </code></pre></div>
 
 <p><code>bvn_unit_prefix_factor</code> returns the multiplicative scale contributed by the prefixes, ignoring base-unit identity. For <code>si_none</code>/<code>iec_none</code> prefixes the factor is 1.0.</p>
-<p><code>bvn_unit_prefix_exponent</code> returns the sum of <code>(prefix_base_exponent × |unit_exponent|)</code> across all components.</p>
+<p><code>bvn_unit_prefix_exponent</code> returns the sum of <code>(prefix_base_exponent × unit_exponent)</code> across all components — the component exponent <strong>signed</strong>, not its magnitude, so <code>m/k~m</code> is <code>-3</code> and <code>k~m⁻¹</code> is <code>-3</code> while <code>k~m</code> is <code>+3</code>.</p>
+<blockquote>
+<p><strong>The sum is only meaningful when one prefix system is in play.</strong> SI exponents are powers of ten and IEC exponents powers of two, and this function adds them into a single integer: <code>Ki~B/k~s</code> returns <code>7</code>, which is neither 2⁷ nor 10⁷ — the actual scale is 1.024. For a mixed unit use <code>bvn_unit_prefix_factor</code>, which multiplies the two systems' factors correctly, or read the components yourself.</p>
+</blockquote>
 <h3 id="124-si-conversion-api">12.4 SI Conversion API</h3>
 <p>Functions in <code>bovnar_si_units.h</code> provide dimensional analysis, compatibility checking, and value conversion between compatible physical units. <strong>These functions reject currency units</strong> — <code>bvn_find_si_conv</code> returns <code>NULL</code> for any <code>value_base_unit_t</code> for which <code>bvn_unit_is_currency</code> is true, causing <code>*ok = false</code>.</p>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* Full SI factor (physical units only) */</span>

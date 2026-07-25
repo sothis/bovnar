@@ -282,8 +282,11 @@ treatment):</p>
 <span class="c1"># Convert a ValueUnit back to its canonical string</span>
 <span class="n">s</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>     <span class="c1"># → &quot;k~g·m/s²&quot;</span>
 
-<span class="c1"># Scalar SI/IEC prefix factor for a unit string</span>
+<span class="c1"># Scalar SI/IEC PREFIX factor for a unit string — the prefix only, never the</span>
+<span class="c1"># base unit&#39;s own factor. Use units.unit_to_si_factor() for the full SI scale.</span>
 <span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;M~Hz&quot;</span><span class="p">)</span> <span class="c1"># → 1_000_000.0</span>
+<span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;in&quot;</span><span class="p">)</span>   <span class="c1"># → 1.0  (NOT 0.0254 — the inch has no prefix)</span>
+<span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;h&quot;</span><span class="p">)</span>    <span class="c1"># → 1.0  (NOT 3600.0)</span>
 </code></pre></div>
 
 <h3 id="extended-unit-functions">Extended unit functions</h3>
@@ -1271,7 +1274,7 @@ for as long as any derived <code>DomNode</code> is in use.</p>
 </tr>
 <tr>
 <td><code>node.value_in_base_units()</code></td>
-<td>Numeric value scaled to SI base units (<code>float</code>)</td>
+<td>Numeric value scaled to SI base units (<code>float</code>); an affine unit gets its offset applied (<code>25 °C</code> → <code>298.15</code>). Returns <code>0.0</code> for <em>any</em> failure — non-numeric node, currency, affine-in-compound — which is indistinguishable from a genuine zero, and it rounds to <code>double</code>. Use <code>units.unit_to_si_factor()</code> (which reports <code>ok</code>) or the <code>want_unit</code> hook when either matters</td>
 </tr>
 <tr>
 <td><code>node.as_i64()</code> / <code>as_u64()</code></td>

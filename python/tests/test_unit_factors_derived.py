@@ -348,6 +348,33 @@ def test_factor_matches_its_definition(symbol, factors):
         f"(relative difference {abs(got - want) / want:.3g}, tolerance {tol:g})")
 
 
+def test_the_faq_category_breakdown_adds_up():
+    """doc/6 answers "how many base units?" with a headline and then a list.
+
+    The headline was updated when units were added; the list was not, so it
+    claimed 180 while its own categories summed to 163 — the seventeen water,
+    turbidity, salinity, acidity and named-speed units were simply absent. A sum
+    is the one kind of stale number a search for the old figure cannot find,
+    because it appears nowhere in the text.
+    """
+    import re
+    with open(os.path.join(_ROOT, "src", "gendata", "units.bvnr"),
+              encoding="utf-8") as f:
+        total = len(bvnr_data.load(f.read())["units"])
+    with open(os.path.join(_ROOT, "doc", "6_bovnar_faq.md"), encoding="utf-8") as f:
+        faq = f.read()
+    m = re.search(r"(\d+) named base units across the following categories:\n\n"
+                  r"((?:- \*\*.*\n)+)", faq)
+    assert m, "the FAQ's unit-count answer has moved; update this test"
+    headline = int(m.group(1))
+    counts = [int(n) for n in re.findall(r"^- \*\*(\d+) ", m.group(2), re.M)]
+    assert headline == total, (
+        f"doc/6 says {headline} base units, units.bvnr has {total}")
+    assert sum(counts) == total, (
+        f"doc/6's category list sums to {sum(counts)}, but there are {total} "
+        f"units — a category is missing or miscounted")
+
+
 def test_the_derivation_set_covers_the_self_defined_units(factors):
     """The point of this module is the units pint cannot check independently.
     If a new one is added without a derivation here, say so."""

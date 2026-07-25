@@ -227,8 +227,11 @@ vu = bovnar.parse_unit("k~g·m/s²")
 # Convert a ValueUnit back to its canonical string
 s = bovnar.unit_to_str(vu)     # → "k~g·m/s²"
 
-# Scalar SI/IEC prefix factor for a unit string
+# Scalar SI/IEC PREFIX factor for a unit string — the prefix only, never the
+# base unit's own factor. Use units.unit_to_si_factor() for the full SI scale.
 f = bovnar.unit_factor("M~Hz") # → 1_000_000.0
+f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix)
+f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
 ### Extended unit functions
@@ -1052,7 +1055,7 @@ for as long as any derived `DomNode` is in use.
 | `node.unit` | `ValueUnit` |
 | `node.unit_str` | Unit as a string via `bvn_dom_get_unit_string`, or `''` |
 | `node.is_null()` | `True` for null values |
-| `node.value_in_base_units()` | Numeric value scaled to SI base units (`float`) |
+| `node.value_in_base_units()` | Numeric value scaled to SI base units (`float`); an affine unit gets its offset applied (`25 °C` → `298.15`). Returns `0.0` for *any* failure — non-numeric node, currency, affine-in-compound — which is indistinguishable from a genuine zero, and it rounds to `double`. Use `units.unit_to_si_factor()` (which reports `ok`) or the `want_unit` hook when either matters |
 | `node.as_i64()` / `as_u64()` | Signed / unsigned 64-bit integer |
 | `node.as_i32()` / `as_u32()` | Signed / unsigned 32-bit integer |
 | `node.as_i16()` / `as_u16()` | Signed / unsigned 16-bit integer |

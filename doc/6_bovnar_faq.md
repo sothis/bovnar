@@ -567,6 +567,12 @@ a mismatch is `error_unit_mismatch`.
 - **13 Old German units** — **Pfund** (`Pfd`), **Zentner** (`Ztr`), **Doppelzentner**, **Lot** (mass); **Prussian line, Zoll, Fuß, Elle, Rute**, **Klafter**, and **German (geographical) mile** (length); **Morgen** (area); **Scheffel** (volume). None accept an SI or IEC prefix.
 - **7 surveying & signalling units** — **US survey foot**, **league**, **cable length**, **hand** (length); **quintal**, **scruple** (mass); **baud** (`Bd`, signalling rate).
 - **6 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb** — dimensionless scaling factors that take no prefix.
+- **1 acidity scale** — **pH** (`pH`), a logarithm of hydrogen-ion activity; its own quantity kind, so it never converts to a percentage or a plain number.
+- **2 named speed units** — **mile per hour** (`mph`), **kilometre per hour** (`kph`, also `kmh`). Neither takes a prefix; `mi/h` and `k~m/h` remain valid as compounds.
+- **7 water-analysis units** — the five hardness degrees **German** (`°dH`), **English/Clark** (`°e`), **French** (`°fH`), **Russian** (`°rH`), **American** (`°aH`), plus **grains per US gallon** (`gpg`) and the **equivalent** (`val`, ½ mol as water analysis uses it). The six degrees are amount concentrations and all inter-convert.
+- **5 turbidity scales** — **NTU**, **FNU**, **FTU**, **FAU**, **JTU**: one quantity kind each, because each names a *measurement method* and no factor relates any pair of them.
+- **1 salinity scale** — **PSU** (practical salinity, PSS-78): a conductivity ratio, so not a mass fraction and not convertible to `‰`.
+- **1 conductivity scale** — **CF** (hydroponic conductivity factor, 1 CF = 0.1 mS/cm exactly), which *does* convert, being a rescaled conductivity.
 
 The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `°Ra` (also accepted as `Ra`); note `R` alone is reserved for röntgen. Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 

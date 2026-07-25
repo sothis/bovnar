@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-23">
+<meta property="article:modified_time" content="2026-07-25">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar C Read &amp; Write API">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/3_bovnar_readwrite_api.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar C Read & Write API", "description": "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), including read-time lossless unit and base conversion.", "url": "https://www.bovnar.io/docs/api/", "mainEntityOfPage": "https://www.bovnar.io/docs/api/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-23", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar C Read & Write API", "item": "https://www.bovnar.io/docs/api/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar C Read & Write API", "description": "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), including read-time lossless unit and base conversion.", "url": "https://www.bovnar.io/docs/api/", "mainEntityOfPage": "https://www.bovnar.io/docs/api/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-25", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar C Read & Write API", "item": "https://www.bovnar.io/docs/api/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -453,6 +453,10 @@ skipped:</p>
 <tr>
 <td>the true factor is irrational (a π-based angle, e.g. degree → radian)</td>
 <td><code>error_unit_inexact</code></td>
+</tr>
+<tr>
+<td>the value's unit puts an affine scale inside a compound (<code>°C/h</code>, <code>°C·m</code>, <code>°C²</code>): the offset is a number of kelvin and the product has nowhere to add it</td>
+<td><code>error_unit_mismatch</code></td>
 </tr>
 <tr>
 <td>the exact result has no terminating expansion in <code>*want_base</code> (e.g. <code>1 m → mile</code> in base 10), and <code>want_unit_allow_nonterminating</code> is off</td>
@@ -1278,6 +1282,18 @@ or out-of-range index returns NULL.</p>
 <span class="kt">double</span><span class="w">            </span><span class="nf">bvn_dom_get_value_in_base_units</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">);</span>
 </code></pre></div>
 
+<p><code>bvn_dom_get_value_in_base_units</code> scales a numeric node into coherent SI —
+<code>1.5 k~m</code> → <code>1500.0</code>, and for an affine scale it applies the offset too, so
+<code>25 °C</code> → <code>298.15</code>. Two caveats it cannot signal:</p>
+<ul>
+<li><strong>It returns <code>0.0</code> for every failure</strong>, which a caller cannot tell from a
+  genuine zero. A non-numeric node, a currency (no SI mapping), a structurally
+  invalid unit, and an affine unit inside a compound (<code>°C/h</code>) all give <code>0.0</code>, as
+  does <code>0.0 m</code>. When the difference matters, read <code>bvn_dom_get_unit</code> and call
+  <code>bvn_unit_to_si_factor</code> yourself — it has an <code>ok</code> out-param.</li>
+<li><strong>It is <code>double</code>.</strong> A value wider than a double is rounded here. The lossless
+  route is the reader's <code>want_unit</code> hook (§7c) or <code>bvn_unit_convert_rational</code>.</li>
+</ul>
 <h3 id="typed-value-accessors">Typed value accessors</h3>
 <p>Each accessor returns <code>false</code> (leaving the out-param <strong>unchanged</strong> — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit

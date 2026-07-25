@@ -119,8 +119,10 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | exbi  | `Ei`   | 2⁶⁰      | `iec_exbi`  |
 | zebi  | `Zi`   | 2⁷⁰      | `iec_zebi`  |
 | yobi  | `Yi`   | 2⁸⁰      | `iec_yobi`  |
-| robi  | `Ri`   | 2⁹⁰      | `iec_robi`  |
-| quebi | `Qi`   | 2¹⁰⁰     | `iec_quebi` |
+| robi †| `Ri`   | 2⁹⁰      | `iec_robi`  |
+| quebi †| `Qi`   | 2¹⁰⁰     | `iec_quebi` |
+
+† `Ri`/`Qi` are a forward-looking extension: IEC 80000-13 stops at yobi (`Yi`, 2⁸⁰).
 
 ---
 

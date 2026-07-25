@@ -451,6 +451,7 @@ skipped:
 |-----------|-------|
 | `*want` dimensionally incompatible with the value's unit (seconds for a length; one currency for another) | `error_unit_mismatch` |
 | the true factor is irrational (a π-based angle, e.g. degree → radian) | `error_unit_inexact` |
+| the value's unit puts an affine scale inside a compound (`°C/h`, `°C·m`, `°C²`): the offset is a number of kelvin and the product has nowhere to add it | `error_unit_mismatch` |
 | the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
 | the literal is finite but too extreme to build an exact rational from (e.g. `1e1000000`) | `error_value_out_of_range` |
 | `*want_base` is not a base bvnr writes, or the result is negative in base 64/85, or out of memory | `error_invalid_argument` |
@@ -1344,6 +1345,18 @@ value_unit_t      bvn_dom_get_unit(const bvn_dom_node_t *node);
 int32_t           bvn_dom_get_unit_string(const bvn_dom_node_t *node, char *buf, size_t bufsize);
 double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
 ```
+
+`bvn_dom_get_value_in_base_units` scales a numeric node into coherent SI —
+`1.5 k~m` → `1500.0`, and for an affine scale it applies the offset too, so
+`25 °C` → `298.15`. Two caveats it cannot signal:
+
+- **It returns `0.0` for every failure**, which a caller cannot tell from a
+  genuine zero. A non-numeric node, a currency (no SI mapping), a structurally
+  invalid unit, and an affine unit inside a compound (`°C/h`) all give `0.0`, as
+  does `0.0 m`. When the difference matters, read `bvn_dom_get_unit` and call
+  `bvn_unit_to_si_factor` yourself — it has an `ok` out-param.
+- **It is `double`.** A value wider than a double is rounded here. The lossless
+  route is the reader's `want_unit` hook (§7c) or `bvn_unit_convert_rational`.
 
 ### Typed value accessors
 

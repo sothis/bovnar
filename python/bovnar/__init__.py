@@ -219,6 +219,23 @@ def dom_parse(data: bytes | bytearray | str | memoryview) -> DomDoc:
 
 
 def unit_factor(unit_str: str) -> float:
+    """Return the SI/IEC **prefix** scale of *unit_str* — the prefix alone.
+
+    This is ``bvn_unit_prefix_factor``: it reports what the prefixes contribute
+    and nothing about the base unit itself, so a unit with no prefix is 1.0
+    however far it is from SI.
+
+      unit_factor("M~Hz")  → 1000000.0
+      unit_factor("Gi~B")  → 1073741824.0
+      unit_factor("in")    → 1.0          # not 0.0254
+      unit_factor("h")     → 1.0          # not 3600.0
+
+    For the full conversion to coherent SI — the one most callers want — use
+    :func:`bovnar.units.unit_to_si_factor`, which also reports the affine offset
+    and refuses a unit that has no SI mapping.
+
+    Raises BovnarArgumentError if *unit_str* does not parse.
+    """
     import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()

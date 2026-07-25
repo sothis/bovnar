@@ -705,6 +705,8 @@ The rules are exactly the rules of the separated form, with one addition:
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 
+For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see [`unit_ambiguities.md`](unit_ambiguities.md).
+
 Currencies take the compact prefix too — `k$EUR` is `k~$EUR`. The `$` sigil already separates the prefix from the code (no prefix symbol and no currency code contains a `$`), so nothing is left for the `~` to resolve. What the sigil rule still requires is the sigil itself: `kUSD` is `error_unit_illegal`, because a bare code is never a currency (§10.4).
 
 ---

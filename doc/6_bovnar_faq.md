@@ -442,6 +442,10 @@ Symbols are case-sensitive in either spelling, so `Kg`, `KB` and `KG` are
 `error_unit_illegal` rather than silently-accepted variants of `kg` and `kB` —
 `K` is the kelvin, not the kilo prefix.
 
+Every token that could be read two ways is listed in
+[`unit_ambiguities.md`](unit_ambiguities.md), with the spelling to use for each
+meaning.
+
 A prefixed **currency** works the same way — `k$EUR` is `k~$EUR`, since the `$` sigil already separates the two. The sigil itself is never optional: `kUSD` is `error_unit_illegal`, because a bare code is not a currency.
 
 ---

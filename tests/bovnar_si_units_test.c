@@ -2143,6 +2143,30 @@ static void test_logarithmic_units_refuse(void)
 	ASSERT_TRUE(bvn_unit_convert_value(1.0, BVN_UNIT_SI(bu_decibel, si_milli),
 					   dB, &out) && out == 0.001,
 		    "prefixed dB still scales within its own kind");
+	/* pH is the same argument in another field: -log10(activity), so pH 7 is
+	 * not "7 of" anything and one unit down is ten times the concentration.
+	 * Carrying the empty dimension and factor 1.0, it would otherwise convert
+	 * into a plain count or a percentage — wrong by orders of magnitude and
+	 * silent, which is the failure this kind table exists to refuse. */
+	{
+		value_unit_t pH = BVN_UNIT_NO_PREFIX(bu_ph_scale);
+		value_unit_t pct = BVN_UNIT_NO_PREFIX(bu_percent);
+		double phout = -1.0;
+
+		ASSERT_TRUE(!bvn_units_compatible(pH, none),
+			    "pH is not a plain number");
+		ASSERT_TRUE(!bvn_units_compatible(pH, pct),
+			    "pH is not a percentage");
+		ASSERT_TRUE(!bvn_unit_convert_value(7.2, pH, pct, &phout),
+			    "7.2 pH -> % is refused rather than answered with 720");
+		ASSERT_TRUE(!bvn_units_compatible(pH, dB) &&
+			    !bvn_units_compatible(pH, Np),
+			    "each logarithmic scale is its own kind");
+		ASSERT_TRUE(bvn_units_compatible(pH, pH) &&
+			    bvn_unit_convert_value(7.2, pH, pH, &phout) && phout == 7.2,
+			    "pH -> pH is the identity");
+	}
+
 	/* And the pre-existing kinds are untouched. */
 	ASSERT_TRUE(!bvn_units_compatible(B, BVN_UNIT_NO_PREFIX(bu_bit)),
 		    "byte and bit stay separate kinds");

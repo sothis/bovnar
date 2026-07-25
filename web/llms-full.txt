@@ -4526,6 +4526,8 @@ The rules are exactly the rules of the separated form, with one addition:
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 
+For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see [`unit_ambiguities.md`](unit_ambiguities.md).
+
 Currencies take the compact prefix too — `k$EUR` is `k~$EUR`. The `$` sigil already separates the prefix from the code (no prefix symbol and no currency code contains a `$`), so nothing is left for the `~` to resolve. What the sigil rule still requires is the sigil itself: `kUSD` is `error_unit_illegal`, because a bare code is never a currency (§10.4).
 
 ---
@@ -10244,6 +10246,10 @@ Symbols are case-sensitive in either spelling, so `Kg`, `KB` and `KG` are
 `error_unit_illegal` rather than silently-accepted variants of `kg` and `kB` —
 `K` is the kelvin, not the kilo prefix.
 
+Every token that could be read two ways is listed in
+[`unit_ambiguities.md`](unit_ambiguities.md), with the spelling to use for each
+meaning.
+
 A prefixed **currency** works the same way — `k$EUR` is `k~$EUR`, since the `$` sigil already separates the two. The sigil itself is never optional: `kUSD` is `error_unit_illegal`, because a bare code is not a currency.
 
 ---
@@ -12522,6 +12528,9 @@ All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are fo
 ---
 
 ## 6. Symbol Disambiguation
+
+> The full token-by-token treatment — case traps, look-alike code points, same-dimension quantities, and
+> abbreviations that are deliberately not units — is in [`unit_ambiguities.md`](unit_ambiguities.md).
 
 As of spec 1.0 a currency is written **only** with the `$` sigil (§5.1), so the bare form is always a physical-unit lookup and the namespaces never collide:
 

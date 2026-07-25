@@ -397,6 +397,9 @@ written <code>m~in</code>).</p>
 <p>Symbols are case-sensitive in either spelling, so <code>Kg</code>, <code>KB</code> and <code>KG</code> are
 <code>error_unit_illegal</code> rather than silently-accepted variants of <code>kg</code> and <code>kB</code> —
 <code>K</code> is the kelvin, not the kilo prefix.</p>
+<p>Every token that could be read two ways is listed in
+<a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>, with the spelling to use for each
+meaning.</p>
 <p>A prefixed <strong>currency</strong> works the same way — <code>k$EUR</code> is <code>k~$EUR</code>, since the <code>$</code> sigil already separates the two. The sigil itself is never optional: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is not a currency.</p>
 <hr />
 <p><strong>What is the difference between <code>M~B</code> (megabytes) and <code>Mi~B</code> (mebibytes)?</strong></p>

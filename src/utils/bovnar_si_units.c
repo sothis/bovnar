@@ -306,11 +306,18 @@ bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
  *                  frequency and frequency.
  *                  Steradian carries weight 2 because a steradian IS rad^2, so
  *                  sr <-> rad^2 keeps working.
- *   logarithmic  — Np and dB are separate kinds. They are logarithms of a
+ *   logarithmic  — Np, dB and pH are separate kinds. They are logarithms of a
  *                  ratio, not linear quantities (20 dB is a ratio of 100, not
  *                  twice 10 dB), so no factor can relate them; dB is ambiguous
  *                  on its own besides, being 8.686 or 4.343 per neper depending
- *                  on whether the quantity is a power or a field.
+ *                  on whether the quantity is a power or a field. pH is the
+ *                  same argument in a different field: it is -log10(activity),
+ *                  so pH 7 is not "7 of" anything and a pH one unit lower is a
+ *                  tenfold concentration. Without its own kind it would carry
+ *                  the empty dimension and a factor of 1, and therefore convert
+ *                  freely into a plain count or a percentage — the exact
+ *                  wrong-by-orders-of-magnitude answer this table exists to
+ *                  refuse.
  *
  * Percent, per-mille, ppm and friends are deliberately NOT here: those are pure
  * ratios and converting 1 % to 0.01 is exactly right.
@@ -321,6 +328,7 @@ typedef enum {
 	BVNI_KIND_ANGLE,
 	BVNI_KIND_LOG_NEPER,
 	BVNI_KIND_LOG_DECIBEL,
+	BVNI_KIND_LOG_PH,
 	BVNI_KIND_COUNT
 } bvni_quantity_kind_t;
 typedef struct {
@@ -340,6 +348,7 @@ static const bvni_kind_entry_t bvni_kind_table[] = {
 	{ bu_steradian,  BVNI_KIND_ANGLE,       2 },
 	{ bu_neper,      BVNI_KIND_LOG_NEPER,   1 },
 	{ bu_decibel,    BVNI_KIND_LOG_DECIBEL, 1 },
+	{ bu_ph_scale,   BVNI_KIND_LOG_PH,      1 },
 };
 #define BVNI_KIND_TABLE_COUNT \
 	((uint32_t)(sizeof(bvni_kind_table) / sizeof(bvni_kind_table[0])))

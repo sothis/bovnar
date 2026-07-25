@@ -752,6 +752,9 @@ All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are fo
 
 ## 6. Symbol Disambiguation
 
+> The full token-by-token treatment — case traps, look-alike code points, same-dimension quantities, and
+> abbreviations that are deliberately not units — is in [`unit_ambiguities.md`](unit_ambiguities.md).
+
 As of spec 1.0 a currency is written **only** with the `$` sigil (§5.1), so the bare form is always a physical-unit lookup and the namespaces never collide:
 
 | Token | Bare form (no `$`) | `$`-sigil form |

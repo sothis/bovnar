@@ -161,6 +161,7 @@ bovnar/
 │   ├── 6_bovnar_faq.md             # Frequently asked questions
 │   ├── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
 │   ├── 8_unit_cheatsheet.md        # Units & currencies quick reference
+│   ├── unit_ambiguities.md        # Which spelling means what, and why
 │   └── 9_bovnar_streaming.md       # Streaming, framing & multiplexing
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
@@ -593,6 +594,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
 | [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (341 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 | [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
+| [Unit Ambiguities](doc/unit_ambiguities.md) | Every token that could mean two things — what the parser reads it as, and how to write the other meaning. Case traps, look-alike characters, same-dimension quantities, and abbreviations that are deliberately not units. |
 | [Streaming, Framing & Multiplexing](doc/9_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).

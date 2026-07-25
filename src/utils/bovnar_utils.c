@@ -614,6 +614,27 @@ static const iec_entry_t iec_table[] = {
 	{NULL, 0, iec_none}
 };
 /*
+ * Compact spellings that must NOT resolve as prefix+unit even though the tables
+ * would let them ("pH" is acidity, not picohenry). Generated from the
+ * .compact_exceptions list in src/gendata/units.bvnr, where each entry carries
+ * its reason; the separated form (p~H) is unaffected. Consulted only on the
+ * compact path, which is otherwise the parse-error path, so this cannot reject
+ * anything that parsed before.
+ */
+typedef struct { const char* a; uint32_t len; } compact_except_t;
+static const compact_except_t compact_except_table[] = {
+#include "bovnar_compact_except.gen.inc"
+	{NULL, 0}
+};
+static bool bvn_compact_form_refused(const char* s, uint32_t len)
+{
+	for (const compact_except_t* e = compact_except_table; e->a; e++) {
+		if (e->len == len && memcmp(s, e->a, len) == 0)
+			return true;
+	}
+	return false;
+}
+/*
  * Recompute the length index from bu_table and verify it equals the precomputed
  * bu_first_for_len / bu_max_len literals above. This is the guard that keeps the
  * baked-in constants honest: it is not used on the parse path (which reads the
@@ -761,15 +782,17 @@ static unit_exponent_t bvn_negate_exponent(unit_exponent_t e)
 	}
 }
 /*
- * Parse one unit component "[prefix~]base[^exp]" into its structured form.
+ * Parse one unit component "[prefix[~]]base[^exp]" into its structured form.
  *
  * Order of operations matters: the exponent suffix is removed first, then the
  * remainder is resolved as base ± prefix. Currencies are checked before the SI
- * table because a currency code may itself look like a prefixed unit, and they
- * use an explicit '~' to separate an (SI/IEC) prefix from the currency. For
+ * table because a currency code may itself look like a prefixed unit; their '$'
+ * sigil is what dispatches them, and it separates an (SI/IEC) prefix from the
+ * code on its own, so the '~' between the two is optional. For
  * physical units the base symbol is matched as the longest suffix (via the
- * length index) and whatever precedes it must be a known prefix followed by
- * '~'. bvn_prefix_unit_valid rejects nonsensical prefix/unit pairings (e.g. a
+ * length index) and whatever precedes it must be a known prefix, written either
+ * with the '~' separator ("k~g") or compactly ("kg" — see the branch below).
+ * bvn_prefix_unit_valid rejects nonsensical prefix/unit pairings (e.g. a
  * binary IEC prefix on a non-information unit). *ok reports validity.
  */
 static value_unit_component_t bvn_parse_single_unit_component(
@@ -799,40 +822,46 @@ static value_unit_component_t bvn_parse_single_unit_component(
 			*ok = false;   /* '$' introduces a currency and nothing else */
 			return r;
 		}
-		for (uint32_t ti = 1; ti + 1 < len; ti++) {
-			if (s[ti] != '~') continue;
-			uint32_t pfx_len  = ti;
-			uint32_t curr_off = ti + 1;
-			if (curr_off >= len || s[curr_off] != '$')
-				break;     /* no sigil after '~' -> not a currency component */
-			uint32_t code_off = curr_off + 1;
+		/* A '$' anywhere past the start means everything before it is the
+		 * prefix, written with the separator ("k~$EUR") or compactly
+		 * ("k$EUR"). The sigil itself already separates the two, so the
+		 * compact form is unambiguous by construction — no currency code and
+		 * no prefix symbol can contain a '$'. A component with no '$' at all
+		 * is a physical unit and falls through below. */
+		const char* sig = (const char*)memchr(s, '$', len);
+		if (sig) {
+			uint32_t sig_off = (uint32_t)(sig - s);
+			uint32_t pfx_len = (s[sig_off - 1] == '~') ? sig_off - 1 : sig_off;
+			uint32_t code_off = sig_off + 1;
 			uint32_t code_len = len - code_off;
-			int cid = bvn_parse_currency_str(
-				(const uint8_t*)s + code_off, code_len);
-			if (cid > 0) {
-				r.base = (value_base_unit_t)cid;
-				for (const iec_entry_t* e = iec_table; e->a; e++) {
-					if (e->len == pfx_len && memcmp(s, e->a, pfx_len) == 0) {
-						r.prefix.system = prefix_iec;
-						r.prefix.id.iec = e->p;
-						if (!bvn_prefix_unit_valid(r.prefix, r.base))
-							*ok = false;
-						return r;
-					}
-				}
-				for (const si_entry_t* e = si_table; e->a; e++) {
-					if (e->len == pfx_len && memcmp(s, e->a, pfx_len) == 0) {
-						r.prefix.system = prefix_si;
-						r.prefix.id.si  = e->p;
-						if (!bvn_prefix_unit_valid(r.prefix, r.base))
-							*ok = false;
-						return r;
-					}
-				}
+			int cid = pfx_len ? bvn_parse_currency_str(
+				(const uint8_t*)s + code_off, code_len) : 0;
+			if (cid <= 0) {
+				/* Unknown code, an empty prefix ("~$EUR"), or a prefix that is
+				 * itself sigil-led: '$' introduces a currency and nothing else. */
 				*ok = false;
 				return r;
 			}
-			*ok = false;   /* '$' after '~' but unknown currency code */
+			r.base = (value_base_unit_t)cid;
+			for (const iec_entry_t* e = iec_table; e->a; e++) {
+				if (e->len == pfx_len && memcmp(s, e->a, pfx_len) == 0) {
+					r.prefix.system = prefix_iec;
+					r.prefix.id.iec = e->p;
+					if (!bvn_prefix_unit_valid(r.prefix, r.base))
+						*ok = false;
+					return r;
+				}
+			}
+			for (const si_entry_t* e = si_table; e->a; e++) {
+				if (e->len == pfx_len && memcmp(s, e->a, pfx_len) == 0) {
+					r.prefix.system = prefix_si;
+					r.prefix.id.si  = e->p;
+					if (!bvn_prefix_unit_valid(r.prefix, r.base))
+						*ok = false;
+					return r;
+				}
+			}
+			*ok = false;   /* not a known prefix before the sigil */
 			return r;
 		}
 	}
@@ -857,11 +886,25 @@ static value_unit_component_t bvn_parse_single_unit_component(
 		r.prefix.id.si  = si_none;
 		return r;
 	}
-	if (plen < 2 || s[plen - 1] != '~') {
+	/* Whatever precedes the base symbol is the prefix, written either with the
+	 * '~' separator ("k~g") or compactly ("kg"). The compact form is reachable
+	 * only here, where a missing separator used to end the parse, so widening
+	 * it cannot change how any existing document decodes: the base symbol is
+	 * still the LONGEST matching alias suffix, which keeps a bare unit ahead of
+	 * any prefixed reading ("min" is the minute, not milli-inch). A remainder
+	 * that still contains a '~' is a malformed separated form, not a compact
+	 * one, and stays an error — as does a spelling that is compact but refused
+	 * by name (see compact_except_table). */
+	uint32_t plen2;
+	if (plen >= 2 && s[plen - 1] == '~') {
+		plen2 = plen - 1;
+	} else if (memchr(s, '~', plen) != NULL ||
+	           bvn_compact_form_refused(s, len)) {
 		*ok = false;
 		return r;
+	} else {
+		plen2 = plen;
 	}
-	uint32_t plen2 = plen - 1;
 	for (const iec_entry_t* e = iec_table; e->a; e++) {
 		if (e->len == plen2 &&
 			memcmp(s, e->a, plen2) == 0) {

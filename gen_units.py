@@ -10,6 +10,7 @@ Reads the document with the built-in bvnr_data reader (no libbvnr) and emits:
     <gendir>/bovnar_bu_table.gen.inc         bu_table rows (aliases, byte lengths)
     <gendir>/bovnar_bu_index.gen.inc         bu_first_for_len / bu_max_len
     <gendir>/bovnar_prefix_policy.gen.inc    per-unit prefix-policy entries
+    <gendir>/bovnar_compact_except.gen.inc   compact spellings refused as units
 
 The public *.gen.h enum header goes to include/ (committed). The *.gen.inc
 snippets are build artifacts: <gendir> is $BVNR_GENERATED_DIR (set by CMake,
@@ -294,9 +295,68 @@ def gen_prefix_policy(units):
     return "".join(out)
 
 
+def compact_decompose(spelling, units, prefixes):
+    """Split a compact spelling the way bvn_parse_single_unit_component does:
+    longest matching alias suffix, and whatever precedes it must be a prefix.
+    Returns (prefix_name, unit_name) or None if the spelling would not parse as
+    a compact prefixed unit in the first place."""
+    aliases = {}
+    for u in units:
+        for a in u["aliases"]:
+            aliases.setdefault(byte_len(a), {})[a] = u["name"]
+    if spelling in aliases.get(byte_len(spelling), {}):
+        return None                      # a bare alias: the compact form never runs
+    pfx = {}
+    for system in ("si_prefixes", "iec_prefixes"):
+        for p in prefixes[system]:
+            for a in p["aliases"]:
+                pfx[a] = p["name"]
+    for blen in sorted(aliases, reverse=True):
+        for alias, uname in aliases[blen].items():
+            if not spelling.endswith(alias) or spelling == alias:
+                continue
+            head = spelling[:-len(alias)]
+            return (pfx[head], uname) if head in pfx else None
+    return None
+
+
+def load_compact_exceptions(doc, units, path):
+    """The compact spellings that must stay a parse error (see units.bvnr).
+
+    Each one is checked against the parse rules the C side will apply: an entry
+    that would never have been accepted anyway is dead weight — most likely a
+    typo — and a silently ignored denial is worse than a build failure."""
+    excs = doc.get("compact_exceptions", [])
+    prefixes = bvnr_data.load(
+        open(os.path.join(os.path.dirname(os.path.abspath(path)),
+                          "prefixes.bvnr"), "rb").read())
+    out, seen = [], set()
+    for e in excs:
+        sp = e["spelling"]
+        if sp in seen:
+            raise SystemExit("duplicate compact exception %r" % sp)
+        seen.add(sp)
+        if compact_decompose(sp, units, prefixes) is None:
+            raise SystemExit(
+                "compact exception %r does not parse as a compact prefixed "
+                "unit, so refusing it changes nothing — fix or drop it" % sp)
+        out.append((sp, e["why"]))
+    return out
+
+
+def gen_compact_except(excs):
+    out = [BANNER]
+    for sp, why in excs:
+        out.append("\t{ %-8s %2d },  /* %s */\n"
+                   % (c_string_literal(sp) + ",", byte_len(sp), why))
+    return "".join(out)
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(GENDATA, "units.bvnr")
     units = load_units(path)
+    with open(path, "rb") as f:
+        excs = load_compact_exceptions(bvnr_data.load(f.read()), units, path)
 
     rows = parse_rows(units)
     # WIRED fragments are written into the source tree where they are #include'd
@@ -312,14 +372,17 @@ def main():
         os.path.join(utl, "bovnar_bu_table.gen.inc"):      gen_parse_table(rows),
         os.path.join(utl, "bovnar_bu_index.gen.inc"):      gen_bu_index(rows),
         os.path.join(utl, "bovnar_prefix_policy.gen.inc"): gen_prefix_policy(units),
+        os.path.join(utl, "bovnar_compact_except.gen.inc"): gen_compact_except(excs),
     }
     for dest, text in artifacts.items():
         bvnr_data.write_if_changed(dest, text)
 
-    print("generated %d units (%d parse rows)" % (len(units), len(rows)))
+    print("generated %d units (%d parse rows, %d compact exceptions)"
+          % (len(units), len(rows), len(excs)))
     print("  wired: bovnar_units.gen.h, bovnar_si_conv_table.gen.inc,")
     print("         bovnar_base_unit_str.gen.inc, bovnar_bu_table.gen.inc,")
-    print("         bovnar_bu_index.gen.inc, bovnar_prefix_policy.gen.inc")
+    print("         bovnar_bu_index.gen.inc, bovnar_prefix_policy.gen.inc,")
+    print("         bovnar_compact_except.gen.inc")
 
 
 if __name__ == "__main__":

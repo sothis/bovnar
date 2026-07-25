@@ -98,8 +98,9 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 6.  All 24 SI prefixes on a common base unit (meter)
 # ══════════════════════════════════════════════════════════════════════════════
-# Prefix–base unit pairs are written as "prefix~base" (mandatory tilde).
-# A bare "m" alone is the meter base unit, not a prefixed unit.
+# Prefix–base unit pairs are written as "prefix~base", or compactly without the
+# tilde ("km"); section 31 covers the compact form. A bare "m" alone is the
+# meter base unit, not a prefixed unit.
 
 .pfx_quetta = <float:64,Q~m>  1.0;     # quettameter  10³⁰ m
 .pfx_ronna  = <float:64,R~m>  1.0;     # ronnameter   10²⁷ m
@@ -131,8 +132,8 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 7.  All 10 IEC binary prefixes on byte (B)
 # ══════════════════════════════════════════════════════════════════════════════
-# IEC prefixes follow the same "prefix~base" tilde convention.
-# They are recognised by the two-character "Xi" pattern.
+# IEC prefixes follow the same "prefix~base" convention, tilde optional
+# ("MiB" = "Mi~B"). They are recognised by the two-character "Xi" pattern.
 
 .iec_kibi  = <uint:64,Ki~B>  1024;     # kibibyte  2¹⁰  B  = 1 024 B
 .iec_mebi  = <uint:64,Mi~B>  1;        # mebibyte  2²⁰  B  = 1 048 576 B
@@ -858,3 +859,49 @@
 .corn_contract         = <uint:32,bsh>   5000;            # CBOT corn futures contract
 .bsh_long              = <float:32,bushel>   1.0;         # long-form spelling
 .bsh_plural            = <float:32,bushels> 60.0;         # 60 bushels
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 31. Compact prefix form — the tilde is optional on a physical unit
+# ══════════════════════════════════════════════════════════════════════════════
+# "kg" is "k~g": both spellings parse to the same value_unit_t, so they compare
+# equal, reconcile against each other, and convert identically. The separated
+# form stays canonical — bvn_unit_to_string emits "k~g" whichever was read.
+#
+# The base symbol is matched as the LONGEST alias suffix, which is what makes
+# this safe: a bare unit alias always outranks a prefixed reading of the same
+# token, so no spelling that already parsed can mean something new.
+
+.c_mass        = <float:64,kg>        72.5;      # k~g   — kilogram
+.c_distance    = <float:64,km>         1.5;      # k~m   — kilometer
+.c_period      = <float:64,ms>        16.7;      # m~s   — millisecond
+.c_frequency   = <float:64,MHz>     2400.0;      # M~Hz  — megahertz
+.c_pressure    = <float:64,hPa>     1013.25;     # h~Pa  — hectopascal
+.c_amount      = <float:64,mmol>       2.5;      # m~mol — millimole
+.c_volume      = <float:64,mL>       250.0;      # m~L   — millilitre
+.c_energy      = <float:64,MeV>       13.6;      # M~eV  — megaelectronvolt
+.c_memory      = <uint:64,MiB>       512;        # Mi~B  — mebibyte (IEC)
+.c_link        = <uint:64,Gbit>       10;        # G~bit — gigabit
+.c_force       = <float:64,kg·m/s²>    9.81;     # compounds work unchanged
+.c_inline      = 88.5 km/h;                      # inline unit suffix too
+
+# Currencies take the compact prefix as well — the '$' sigil already separates
+# the prefix from the code. The sigil itself stays mandatory: "kUSD" is an error.
+.c_fund_nav    = <float_dec:64,k$USD>  250.0;    # k~$USD — thousands of USD
+.c_gdp         = <float_dec:64,M$EUR> 42800.0;   # M~$EUR — millions of EUR
+.c_gas_price   = <float_dec:64,G$ETH>   35.0;    # G~$ETH — Gwei
+
+# Both spellings of one unit reconcile: the annotation and the inline unit below
+# are the same unit written two ways.
+.c_reconciles  = <float:64,k~m>        1.5 km;
+
+# The bare unit always wins, so these are NOT prefixed readings:
+.c_minute      = <float:64,min>        1.0;      # the minute, not milli-inch
+.c_candela     = <float:64,cd>         1.0;      # the candela, not centi-day
+.c_milli_inch  = <float:64,m~in>       1.0;      # milli-inch needs the tilde
+
+# Refused compactly, because the token means something else in the wild:
+#   pH  (acidity, not picohenry)      → write p~H
+#   mph (miles per hour, not milliphot) → write m~ph
+#   kph (km per hour, not kilophot)     → write k~ph
+.c_inductance  = <float:64,p~H>       33.0;      # picohenry, spelled out

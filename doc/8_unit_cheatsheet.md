@@ -47,7 +47,7 @@
 
 ## 1. SI Prefixes
 
-Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
+Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are both the kilometre. The canonical output form always keeps the `~`.
 
 | Name   | Symbol | Factor | Enum (`si_prefix_id_t`) |
 |--------|--------|--------|--------------------------|
@@ -80,7 +80,7 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 > `µ` is U+00B5 MICRO SIGN (UTF-8 `0xC2 0xB5`). U+03BC (Greek small letter mu) is also accepted on input; the canonical output is always U+00B5. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` = `µ~m`); the canonical output is always `µ`.
 > `da` is a two-character prefix: `da~m` = decametre.
 
-**Prefix–base ambiguities** — resolved by the mandatory `~`:
+**Prefix–base ambiguities** — the base unit is the longest alias suffix, so a bare token is always the unit; `~` selects the prefix reading:
 
 | Bare token | Is a base unit | With `~` becomes prefix |
 |------------|----------------|--------------------------|
@@ -95,13 +95,17 @@ Written as `prefix~base` (mandatory `~` separator). Example: `k~m` = kilometre.
 | `u`  | dalton (`bu_dalton`)  | micro (ASCII alias for `µ`) |
 | `S`  | siemens (`bu_siemens`) | *(not a prefix — `S` has no prefix role)* |
 
-Examples: bare `m` = metre; `m~s` = millisecond. Bare `d` = day; `d~s` = decisecond.
+Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
+
+A compact spelling is refused when the token is a well-known annotation for something else: `pH`, `mph`, `kph` and `usb` are `error_unit_illegal` (write `p~H`, `m~ph`, `k~ph`, `u~sb`).
+
+Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 
 ---
 
 ## 2. IEC Binary Prefixes
 
-Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base`: `Ki~B` = kibibyte.
+Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly: `Ki~B` and `KiB` are both the kibibyte.
 
 | Name  | Symbol | Factor   | Enum (`iec_prefix_id_t`) |
 |-------|--------|----------|--------------------------|
@@ -489,7 +493,7 @@ Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These 
 ### 5.1 The Mandatory Currency Sigil
 
 As of spec 1.0 a currency code carries a **mandatory `$` sigil**: write `$USD`,
-`$BTC`, `k~$EUR`, `$USD/oz_t`. The codes listed in the tables below are the bare
+`$BTC`, `k~$EUR` (or compactly `k$EUR`), `$USD/oz_t`. The codes listed in the tables below are the bare
 ISO 4217 / crypto identifiers — prefix each with `$` when you use it in a document.
 A bare code (no `$`) is **not** a currency; it is matched against the physical-unit
 table and raises `error_unit_illegal` if it is not a unit. This removes every
@@ -735,14 +739,14 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 
 ### 5.4 Currency Prefix Rules
 
-All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are forbidden on all currencies (`error_unit_illegal`).
+All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are forbidden on all currencies (`error_unit_illegal`). The `~` is optional — the `$` sigil already separates the prefix from the code — but the sigil is not: `kUSD` is `error_unit_illegal`.
 
 | Example | Meaning |
 |---------|---------|
-| `k~USD` | thousands of USD (×10³) |
-| `M~EUR` | millions of EUR (×10⁶) |
-| `G~ETH` | giga-ETH = Gwei scale (×10⁹) |
-| `m~USD` | milli-USD = one tenth of a cent (×10⁻³) |
+| `k~$USD` (or `k$USD`) | thousands of USD (×10³) |
+| `M~$EUR` (or `M$EUR`) | millions of EUR (×10⁶) |
+| `G~$ETH` (or `G$ETH`) | giga-ETH = Gwei scale (×10⁹) |
+| `m~$USD` (or `m$USD`) | milli-USD = one tenth of a cent (×10⁻³) |
 
 ---
 

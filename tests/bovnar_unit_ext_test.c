@@ -455,6 +455,277 @@ static void test_alias_with_prefix(void)
 	ASSERT_FALSE(ok, "Ki~seconds (iec on second alias) rejected");
 }
 
+/*
+ * Compact (tilde-less) prefixed spellings: "kg" for "k~g".
+ *
+ * The three sections below cover the three things that make the form safe. It
+ * resolves to exactly the same value_unit_t as the separated spelling; a bare
+ * unit alias always wins over a prefixed reading, so nothing that parsed before
+ * can parse differently now; and a prefix still cannot be stacked, smuggled in
+ * past a stray '~', or attached to a unit whose policy forbids it.
+ */
+static void assert_compact_matches(const char *compact, const char *separated)
+{
+	bool okc = false, oks = false;
+	value_unit_t c = bvn_parse_unit((const uint8_t *)compact,   &okc);
+	value_unit_t s = bvn_parse_unit((const uint8_t *)separated, &oks);
+	char msg[128];
+	snprintf(msg, sizeof(msg), "%s parses", compact);
+	ASSERT_TRUE(okc, msg);
+	snprintf(msg, sizeof(msg), "%s parses", separated);
+	ASSERT_TRUE(oks, msg);
+	if (!okc || !oks)
+		return;
+	snprintf(msg, sizeof(msg), "%s == %s (component count)", compact, separated);
+	ASSERT_EQ_INT(c.num_components, s.num_components, msg);
+	for (uint32_t i = 0; i < c.num_components && i < s.num_components; i++) {
+		snprintf(msg, sizeof(msg), "%s == %s (base %u)", compact, separated, i);
+		ASSERT_EQ_INT(c.components[i].base, s.components[i].base, msg);
+		snprintf(msg, sizeof(msg), "%s == %s (prefix system %u)", compact, separated, i);
+		ASSERT_EQ_INT(c.components[i].prefix.system, s.components[i].prefix.system, msg);
+		snprintf(msg, sizeof(msg), "%s == %s (prefix id %u)", compact, separated, i);
+		ASSERT_EQ_INT(c.components[i].prefix.id.si, s.components[i].prefix.id.si, msg);
+		snprintf(msg, sizeof(msg), "%s == %s (exponent %u)", compact, separated, i);
+		ASSERT_EQ_INT(c.components[i].exponent, s.components[i].exponent, msg);
+	}
+	snprintf(msg, sizeof(msg), "%s prefix factor == %s", compact, separated);
+	ASSERT_EQ_DBL(bvn_unit_prefix_factor(c), bvn_unit_prefix_factor(s), 0.0, msg);
+}
+
+static void assert_unit_rejected(const char *spelling)
+{
+	bool ok = true;
+	char msg[128];
+	(void)bvn_parse_unit((const uint8_t *)spelling, &ok);
+	snprintf(msg, sizeof(msg), "%s rejected", spelling);
+	ASSERT_FALSE(ok, msg);
+}
+
+static void assert_parses_bare(const char *spelling, value_base_unit_t base)
+{
+	bool ok = false;
+	char msg[128];
+	value_unit_t u = bvn_parse_unit((const uint8_t *)spelling, &ok);
+	snprintf(msg, sizeof(msg), "%s parses", spelling);
+	ASSERT_TRUE(ok, msg);
+	if (!ok)
+		return;
+	snprintf(msg, sizeof(msg), "%s is the bare unit, not a prefixed reading", spelling);
+	ASSERT_EQ_INT(u.components[0].base, base, msg);
+	snprintf(msg, sizeof(msg), "%s carries no prefix", spelling);
+	ASSERT_EQ_INT(u.components[0].prefix.id.si, si_none, msg);
+}
+
+static void test_compact_prefix_equivalence(void)
+{
+	printf("  compact prefix form parses as the separated form...\n");
+
+	/* SI prefixes on SI, metric and non-SI bases, single- and multi-byte. */
+	assert_compact_matches("kg",     "k~g");
+	assert_compact_matches("km",     "k~m");
+	assert_compact_matches("cm",     "c~m");
+	assert_compact_matches("ms",     "m~s");
+	assert_compact_matches("us",     "u~s");
+	assert_compact_matches("\xc2\xb5s", "\xc2\xb5~s");   /* µs */
+	assert_compact_matches("MHz",    "M~Hz");
+	assert_compact_matches("hPa",    "h~Pa");
+	assert_compact_matches("mmol",   "m~mol");
+	assert_compact_matches("mL",     "m~L");
+	assert_compact_matches("MeV",    "M~eV");
+	assert_compact_matches("kDa",    "k~Da");
+	assert_compact_matches("Mpc",    "M~pc");
+	assert_compact_matches("kcal",   "k~cal");
+	assert_compact_matches("mrem",   "m~rem");
+	assert_compact_matches("cSt",    "c~St");
+	assert_compact_matches("cP",     "c~P");
+	assert_compact_matches("mGal",   "m~Gal");
+	assert_compact_matches("kt",     "k~t");
+	assert_compact_matches("mseconds", "m~seconds");     /* long-name alias */
+
+	/* IEC prefixes, which only the information units accept. */
+	assert_compact_matches("KiB",    "Ki~B");
+	assert_compact_matches("MiB",    "Mi~B");
+	assert_compact_matches("GiB",    "Gi~B");
+	assert_compact_matches("Kib",    "Ki~b");
+	assert_compact_matches("MB",     "M~B");
+	assert_compact_matches("Gbit",   "G~bit");
+
+	/* Currencies take the compact prefix too. The '$' sigil separates prefix
+	 * from code on its own, so there is nothing here for the '~' to resolve. */
+	assert_compact_matches("k$USD",  "k~$USD");
+	assert_compact_matches("M$EUR",  "M~$EUR");
+	assert_compact_matches("G$ETH",  "G~$ETH");
+	assert_compact_matches("m$USD",  "m~$USD");
+	assert_compact_matches("da$USD", "da~$USD");
+	assert_compact_matches("u$USD",  "u~$USD");
+	assert_compact_matches("k$USD/h", "k~$USD/h");
+
+	/* Compound expressions, exponents and groups compose unchanged. */
+	assert_compact_matches("kg\xc2\xb7m/s^2", "k~g\xc2\xb7m/s^2");
+	assert_compact_matches("km/h",   "k~m/h");
+	assert_compact_matches("MB/s",   "M~B/s");
+	assert_compact_matches("mg/L",   "m~g/L");
+	assert_compact_matches("km^2",   "k~m^2");
+	assert_compact_matches("kg/(m\xc2\xb7s^2)", "k~g/(m\xc2\xb7s^2)");
+
+	/* The canonical output form is unchanged: a compact spelling is an input
+	 * alias, so a document that round-trips through the writer comes back out
+	 * separated and stays readable to a reader that predates this. */
+	{
+		bool ok = false;
+		char buf[64];
+		value_unit_t u = bvn_parse_unit((const uint8_t *)"kg", &ok);
+		ASSERT_TRUE(ok, "kg parses");
+		ASSERT_TRUE(bvn_unit_to_string(u, buf, sizeof(buf)) > 0, "kg to_string");
+		ASSERT_TRUE(strcmp(buf, "k~g") == 0, "kg serialises back as k~g");
+
+		u = bvn_parse_unit((const uint8_t *)"MiB", &ok);
+		ASSERT_TRUE(ok, "MiB parses");
+		ASSERT_TRUE(bvn_unit_to_string(u, buf, sizeof(buf)) > 0, "MiB to_string");
+		ASSERT_TRUE(strcmp(buf, "Mi~B") == 0, "MiB serialises back as Mi~B");
+
+		u = bvn_parse_unit((const uint8_t *)"k$USD", &ok);
+		ASSERT_TRUE(ok, "k$USD parses");
+		ASSERT_TRUE(bvn_unit_to_string(u, buf, sizeof(buf)) > 0, "k$USD to_string");
+		ASSERT_TRUE(strcmp(buf, "k~$USD") == 0, "k$USD serialises back as k~$USD");
+	}
+}
+
+static void test_compact_currency_form(void)
+{
+	printf("  compact prefix form on currencies...\n");
+
+	/* The sigil is still mandatory — it is what dispatches a component to the
+	 * currency table — and it must introduce a known code. */
+	assert_unit_rejected("kUSD");        /* no sigil: a bare code is not money */
+	assert_unit_rejected("k$XYZ");       /* sigil, unknown code               */
+	assert_unit_rejected("k$");          /* sigil, no code                    */
+	assert_unit_rejected("$");
+	assert_unit_rejected("~$EUR");       /* empty prefix                      */
+	assert_unit_rejected("k~~$EUR");     /* malformed separated form          */
+	assert_unit_rejected("kg$USD");      /* "kg" is not a prefix              */
+
+	/* IEC prefixes are forbidden on money in either spelling. */
+	assert_unit_rejected("Ki$USD");
+	assert_unit_rejected("Ki~$USD");
+
+	/* An unprefixed currency is unchanged. */
+	{
+		bool ok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)"$BTC", &ok);
+		ASSERT_TRUE(ok, "$BTC parses");
+		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_none, "$BTC has no prefix");
+	}
+}
+
+static void test_compact_prefix_precedence(void)
+{
+	printf("  compact prefix form never outranks a bare unit alias...\n");
+
+	/* Every bare alias that a prefix+base reading could also spell. The bare
+	 * unit wins because the base symbol is matched as the LONGEST alias suffix,
+	 * which is what keeps existing documents decoding identically. */
+	assert_parses_bare("min", bu_minute);                /* not milli-inch    */
+	assert_parses_bare("cd",  bu_candela);               /* not centi-day     */
+	assert_parses_bare("ft",  bu_foot);                  /* not femto-tonne   */
+	assert_parses_bare("pt",  bu_pint);                  /* not pico-tonne    */
+	assert_parses_bare("qt",  bu_quart);                 /* not quecto-tonne  */
+	assert_parses_bare("ct",  bu_carat);                 /* not centi-tonne   */
+	assert_parses_bare("yd",  bu_yard);                  /* not yocto-day     */
+	assert_parses_bare("rd",  bu_rod);                   /* not ronto-day     */
+	assert_parses_bare("ch",  bu_chain);                 /* not centi-hour    */
+	assert_parses_bare("ph",  bu_phot);                  /* not pico-hour     */
+	assert_parses_bare("at",  bu_atmosphere_technical);  /* not atto-tonne    */
+	assert_parses_bare("au",  bu_astronomical_unit);     /* not atto-dalton   */
+	assert_parses_bare("kat", bu_katal);                 /* not kilo-at       */
+	assert_parses_bare("nmi", bu_nautical_mile);         /* not nano-mile     */
+	assert_parses_bare("PS",  bu_metric_horsepower);     /* not peta-siemens  */
+	assert_parses_bare("dB",  bu_decibel);               /* not deci-byte     */
+
+	/* Where two prefixed readings compete, the longest base suffix decides, so
+	 * the result is deterministic rather than ambiguous: "at"/"au" beat "t"/"u". */
+	assert_compact_matches("dat", "d~at");
+	assert_compact_matches("dau", "d~au");
+
+	/* A prefix cannot be stacked, in either spelling or in combination. */
+	assert_unit_rejected("kkg");
+	assert_unit_rejected("k~kg");
+	assert_unit_rejected("kmm");
+	assert_unit_rejected("k~mm");
+	assert_unit_rejected("kKiB");
+	assert_unit_rejected("k~KiB");
+
+	/* A remainder that still contains a '~' is a malformed separated form, not
+	 * a compact one. */
+	assert_unit_rejected("k~~g");
+	assert_unit_rejected("~g");
+	assert_unit_rejected("k~");
+	assert_unit_rejected("kg~");
+
+	/* Unknown prefixes stay unknown — the compact form widens the accepted
+	 * spellings, not the tables. */
+	assert_unit_rejected("mcg");            /* micrograms, spelled the US way */
+	assert_unit_rejected("kWh");            /* needs a separator: kW\xc2\xb7h */
+	assert_unit_rejected("cc");
+	assert_unit_rejected("zzm");
+
+	/* Per-unit prefix policy is enforced identically in both spellings. */
+	assert_unit_rejected("Kim");            /* IEC prefix on a length unit    */
+	assert_unit_rejected("Ki~m");
+	assert_unit_rejected("mB");             /* SI prefix < kilo on a byte     */
+	assert_unit_rejected("m~B");
+	assert_unit_rejected("mb");             /* ... and on a bit               */
+	assert_unit_rejected("kPfd");           /* prefix on a German unit        */
+	assert_unit_rejected("k~Pfd");
+	assert_unit_rejected("kppm");           /* prefix on a ratio unit         */
+	assert_unit_rejected("k~ppm");
+}
+
+static void test_compact_prefix_exceptions(void)
+{
+	printf("  compact spellings that are refused by name...\n");
+
+	/* Tokens that are well-known annotations for something bovnar does not
+	 * model. Accepting them would turn a parse error into a quietly wrong unit
+	 * (pH as inductance, mph as illuminance), so they stay errors. */
+	assert_unit_rejected("pH");
+	assert_unit_rejected("mph");
+	assert_unit_rejected("kph");
+	assert_unit_rejected("usb");
+
+	/* The exponent suffix is stripped before the check, so a decorated form is
+	 * refused too. */
+	assert_unit_rejected("pH^2");
+	assert_unit_rejected("mph^-1");
+
+	/* Only the compact spelling is refused; the separated one is spec-1.0
+	 * syntax and keeps its meaning. */
+	{
+		bool ok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)"p~H", &ok);
+		ASSERT_TRUE(ok, "p~H (picohenry) still parses");
+		ASSERT_EQ_INT(u.components[0].base,         bu_henry, "p~H base");
+		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_pico,  "p~H prefix");
+
+		u = bvn_parse_unit((const uint8_t *)"m~ph", &ok);
+		ASSERT_TRUE(ok, "m~ph (milliphot) still parses");
+		ASSERT_EQ_INT(u.components[0].base,         bu_phot,  "m~ph base");
+		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_milli, "m~ph prefix");
+
+		u = bvn_parse_unit((const uint8_t *)"u~sb", &ok);
+		ASSERT_TRUE(ok, "u~sb (microstilb) still parses");
+		ASSERT_EQ_INT(u.components[0].base,         bu_stilb, "u~sb base");
+		ASSERT_EQ_INT(u.components[0].prefix.id.si, si_micro, "u~sb prefix");
+	}
+
+	/* A refusal is per-spelling, not per-unit: other compact prefixes on the
+	 * same bases keep working. */
+	assert_compact_matches("nH",  "n~H");
+	assert_compact_matches("mH",  "m~H");
+	assert_compact_matches("nph", "n~ph");
+	assert_compact_matches("msb", "m~sb");
+}
+
 static void test_unit_to_string_new_units(void)
 {
 	printf("  bvn_unit_to_string for rad/sr...\n");
@@ -1505,6 +1776,10 @@ int main(void)
 	test_prefix_unit_valid_function();
 	test_prefix_enforcement_via_parse();
 	test_alias_with_prefix();
+	test_compact_prefix_equivalence();
+	test_compact_prefix_precedence();
+	test_compact_prefix_exceptions();
+	test_compact_currency_form();
 	test_unit_to_string_new_units();
 
 	printf("\n--- non-SI unit tests ---\n");

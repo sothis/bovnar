@@ -278,8 +278,8 @@ class TestUnitParsing:
         assert bovnar.unit_to_str(vu) == canonical
 
     def test_u_micro_prefix_and_dalton_base_coexist(self):
-        # "u" is BOTH the micro prefix (before ~) and the dalton base (bare or
-        # after ~); the mandatory ~ keeps them unambiguous. "u~u" = micro-dalton.
+        # "u" is BOTH the micro prefix and the dalton base; longest-suffix
+        # matching keeps them unambiguous. "u~u" (and "uu") = micro-dalton.
         vu = self._parse("u~u")
         assert vu.components[0].si_prefix == SIPrefix.MICRO
         assert vu.components[0].base_unit == BaseUnit.DALTON
@@ -828,6 +828,92 @@ class TestNewUnitParsing:
 
     def test_gills_uk_plural(self):
         assert self._base("gills_uk") == BaseUnit.GILL_UK
+
+
+@needs_lib
+class TestCompactPrefixForm:
+    """A prefix may be written without the '~' separator: "kg" == "k~g".
+
+    The compact spelling is an input alias only — it parses to the same
+    ValueUnit and serialises back to the separated canonical form, so nothing
+    downstream (the pint bridge, the writer, a stored document) sees a new
+    spelling unless a human typed it.
+    """
+
+    def _parse(self, s):
+        return bovnar.parse_unit(s)
+
+    @pytest.mark.parametrize("compact,separated", [
+        ("kg",    "k~g"),
+        ("km",    "k~m"),
+        ("ms",    "m~s"),
+        ("us",    "u~s"),
+        ("µs", "µ~s"),
+        ("MHz",   "M~Hz"),
+        ("hPa",   "h~Pa"),
+        ("mmol",  "m~mol"),
+        ("mL",    "m~L"),
+        ("MeV",   "M~eV"),
+        ("Mpc",   "M~pc"),
+        ("KiB",   "Ki~B"),
+        ("MiB",   "Mi~B"),
+        ("Gbit",  "G~bit"),
+        ("km/h",  "k~m/h"),
+        ("kg·m/s²", "k~g·m/s²"),
+        ("k$USD", "k~$USD"),      # currencies too: the '$' sigil separates
+        ("M$EUR", "M~$EUR"),
+        ("G$ETH", "G~$ETH"),
+    ])
+    def test_compact_equals_separated(self, compact, separated):
+        a, b = self._parse(compact), self._parse(separated)
+        assert a.num_components == b.num_components
+        for i in range(a.num_components):
+            ca, cb = a.components[i], b.components[i]
+            assert ca.base_unit     == cb.base_unit
+            assert ca.prefix_system == cb.prefix_system
+            assert ca.si_prefix     == cb.si_prefix
+            assert ca.exp           == cb.exp
+        assert unit_prefix_factor(a) == unit_prefix_factor(b)
+
+    def test_serialises_back_to_the_separated_form(self):
+        assert bovnar.unit_to_str(self._parse("kg")) == "k~g"
+        assert bovnar.unit_to_str(self._parse("MiB")) == "Mi~B"
+
+    @pytest.mark.parametrize("tok,base", [
+        ("min", BaseUnit.MINUTE),                # not milli-inch
+        ("cd",  BaseUnit.CANDELA),               # not centi-day
+        ("ft",  BaseUnit.FOOT),                  # not femto-tonne
+        ("at",  BaseUnit.ATMOSPHERE_TECHNICAL),  # not atto-tonne
+        ("au",  BaseUnit.ASTRONOMICAL_UNIT),     # not atto-dalton
+        ("PS",  BaseUnit.METRIC_HORSEPOWER),     # not peta-siemens
+    ])
+    def test_bare_alias_wins(self, tok, base):
+        c = self._parse(tok).components[0]
+        assert c.base_unit == base
+        assert c.si_prefix == SIPrefix.NONE
+
+    @pytest.mark.parametrize("tok", [
+        "kkg", "k~kg",       # a prefix cannot be stacked
+        "k~~g", "kg~",       # malformed separated form, not a compact one
+        "Kim", "mB",         # prefix policy still applies
+        "pH", "mph", "kph",  # refused by name (units.bvnr .compact_exceptions)
+        "kWh", "mcg",        # never were units, still are not
+        "kUSD", "k$XYZ",     # the currency sigil and a known code stay required
+        "Ki$USD", "kg$USD",
+    ])
+    def test_rejected(self, tok):
+        with pytest.raises(BovnarArgumentError):
+            self._parse(tok)
+
+    @pytest.mark.parametrize("tok,base,prefix", [
+        ("p~H",  BaseUnit.HENRY, SIPrefix.PICO),
+        ("m~ph", BaseUnit.PHOT,  SIPrefix.MILLI),
+        ("nH",   BaseUnit.HENRY, SIPrefix.NANO),
+    ])
+    def test_refusal_is_per_spelling(self, tok, base, prefix):
+        c = self._parse(tok).components[0]
+        assert c.base_unit == base
+        assert c.si_prefix == prefix
 
 
 @needs_lib

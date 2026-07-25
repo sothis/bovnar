@@ -1929,7 +1929,7 @@ unit-factor    = unit-component | &quot;(&quot; unit-expr &quot;)&quot;
 
 unit-sep       = &quot;*&quot; | &quot;/&quot; | &quot;·&quot;       (* &quot;·&quot; = U+00B7 MIDDLE DOT *)
 
-unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
+unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 </code></pre></div>
 
 <p><strong>Separators:</strong></p>
@@ -1964,12 +1964,15 @@ unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
 <p><strong>Parenthesised grouping.</strong> A <code>(…)</code> group is a sub-expression evaluated independently; like any factor it obeys the latching denominator, so a <code>/</code> before a group negates the group's net exponents as a whole. Thus <code>k~g/(m·s²)</code> parses to <code>kg·m⁻¹·s⁻²</code> (identical to <code>k~g/m·s²</code>), while <code>(k~g/m)·s²</code> is <code>kg·m⁻¹·s²</code>. An explicit separator is required before a group (<code>m·(s)</code>, not <code>m(s)</code>); a group is not followed by its own exponent (<code>(m·s)²</code> is rejected); parentheses must balance and nest no deeper than 16. The <code>bvnr_write_*</code> helpers and <code>bvn_unit_to_string</code>, which build the unit from a parsed <code>value_unit</code>, emit the canonical, parenless form (<code>k~g/(m·s²)</code> → <code>k~g/m·s²</code>); the reader-driven pretty-print / canonicalize path preserves the source spelling verbatim unless a unit flag such as <code>BVN_UNIT_REDUCE</code> is set.</p>
 <p><strong>Within each <code>unit-component</code>:</strong></p>
 <ul>
-<li>When a prefix is present, the separator <code>~</code> between the prefix and the base unit is <strong>mandatory</strong>.</li>
 <li>A bare base unit with no prefix requires no separator.</li>
+<li>When a prefix is present on a <strong>physical</strong> unit, the <code>~</code> separator is optional: <code>k~g</code> and <code>kg</code> are the same unit, as are <code>Mi~B</code> and <code>MiB</code>. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (<code>min</code> is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been <code>error_unit_illegal</code>, and no existing document decodes differently because of it. Prefixes still cannot be stacked (<code>kkg</code>, <code>k~kg</code> → <code>error_unit_illegal</code>), prefix–unit validity is unchanged, and a handful of compact spellings are refused by name because they are well-known annotations for something else (<code>pH</code>, <code>mph</code>, <code>kph</code>, <code>usb</code>). See §4.3 of the unit-system reference.</li>
+<li>The same holds for a <strong>currency</strong>: <code>k~$EUR</code> and <code>k$EUR</code> are the same unit. The <code>$</code> sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and <code>kUSD</code> is <code>error_unit_illegal</code> just as bare <code>USD</code> is.</li>
+<li>The canonical output form always carries the separator: <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers emit <code>k~g</code> whichever spelling was read.</li>
 </ul>
 <div class="codehilite"><pre><code class="language-bovnar"># Simple (single-component) units — same as before
 .time = &lt;float:64,s&gt; 2.5;               # seconds
 .speed = &lt;float:64,k~m&gt; 1.5;            # kilometers (kilo-meter)
+.alt = &lt;float:64,km&gt; 10.5;              # same unit, compact spelling
 
 # Compound units
 .velocity = &lt;float:64,m/s&gt; 9.81;        # meters per second
@@ -3275,6 +3278,14 @@ revisions:</p>
 <li>the <strong>unit and currency tables</strong> — new physical units, prefixes, and ISO 4217 /
   crypto currency codes may be added (a document never depends on a code being
   <em>absent</em>);</li>
+<li>the <strong>accepted input spellings</strong> of a unit — new aliases, and the compact
+  prefix form (<code>kg</code> for <code>k~g</code>, §11.4). This is the same
+  additive direction as a new unit: a spelling is only ever accepted where the
+  parser previously raised <code>error_unit_illegal</code>, the base symbol is still
+  matched as the longest alias suffix so no existing spelling changes meaning,
+  and the <strong>canonical output form is unaffected</strong> — the writer keeps emitting
+  the separated <code>k~g</code>, so a document that round-trips stays readable to a
+  reader that predates the spelling;</li>
 <li><strong>new error codes</strong> appended after the current maximum (existing numeric values
   never change) — 1.1 appends <code>error_invalid_spec_version</code> (42),
   <code>error_unsupported_spec_version</code> (43), <code>error_invalid_codepoint</code> (44),

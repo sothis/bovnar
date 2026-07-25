@@ -310,6 +310,7 @@ set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_bu_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_bu_index.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_prefix_policy.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_compact_except.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_si_pfx_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_iec_pfx_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_si_prefix_str.gen.inc

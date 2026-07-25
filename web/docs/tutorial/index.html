@@ -250,17 +250,17 @@
 .voltage  = &lt;float:32,V&gt;    3.3;      # volts
 .temp     = &lt;float:32,°C&gt;   23.5;     # degrees Celsius (UTF-8 is fine)</code></pre></div>
 <h3 id="si-prefixes">SI Prefixes</h3>
-<p>SI prefixes are written before the base unit symbol with a <strong>mandatory <code>~</code></strong> separator:</p>
+<p>SI prefixes are written before the base unit symbol, either with the <code>~</code> separator or compactly without it:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.k_ohm  = &lt;float:32,k~Ω&gt;   4.7;     # kilo-ohm
 .milli  = &lt;float:32,m~V&gt;   330.0;   # millivolt
 .micro  = &lt;float:32,µ~s&gt;   50.0;    # microsecond (µ = U+00B5)
 .giga   = &lt;float:64,G~Hz&gt;  2.4;     # gigahertz
 .kibi   = &lt;uint:64,Ki~B&gt;   1024;    # kibibytes (IEC binary prefix)
 .mebi   = &lt;uint:64,Mi~B&gt;   4096;    # mebibytes</code></pre></div>
-<p>The <code>~</code> between prefix and unit is non-optional. <code>&lt;float:32,kΩ&gt;</code> (no <code>~</code>) would either fail to parse or be interpreted differently. Every prefix listed in the SI table uses the same pattern: <code>prefix~unit</code>.</p>
+<p><code>&lt;float:32,kΩ&gt;</code> means exactly the same thing as <code>&lt;float:32,k~Ω&gt;</code> — the <code>~</code> is optional on a physical unit, and <code>kg</code>, <code>km</code>, <code>MHz</code>, <code>MiB</code> all parse as you would expect. Two things to know about the compact spelling. A token that is <em>itself</em> a unit always wins (<code>min</code> is the minute, so milli-inch has to be written <code>m~in</code>), and the writer always emits the <code>~</code> form, so a document you write out comes back canonical. A prefixed <strong>currency</strong> works the same way (<code>k$EUR</code> = <code>k~$EUR</code>), but its <code>$</code> sigil is never optional.</p>
 <p>IEC binary prefixes (<code>Ki</code>, <code>Mi</code>, <code>Gi</code>, <code>Ti</code>, <code>Pi</code>, <code>Ei</code>, <code>Zi</code>, <code>Yi</code>, <code>Ri</code>, <code>Qi</code>) follow the same rule:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.ram  = &lt;uint:64,Gi~B&gt;  8;     # 8 gibibytes
-.disk = &lt;uint:64,Ti~B&gt;  2;     # 2 tebibytes</code></pre></div>
+.disk = &lt;uint:64,TiB&gt;   2;     # 2 tebibytes (compact spelling of Ti~B)</code></pre></div>
 <h3 id="compound-units">Compound Units</h3>
 <p>Compound units are built from multiple components joined by <code>*</code> (or the middle dot <code>·</code>, U+00B7) for multiplication, and <code>/</code> for division:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.velocity     = &lt;float:64,m/s&gt;         9.81;   # meters per second
@@ -723,7 +723,7 @@ ev_data                        → value = &quot;42&quot;, type = {uint, 64}
 
 # ── Units ──────────────────────────────────────────────────────────
 &lt;float:64,s&gt;           # seconds
-&lt;float:64,k~m&gt;         # kilometers (SI prefix~unit, `~` mandatory)
+&lt;float:64,k~m&gt;         # kilometers (SI prefix~unit; `km` is the same unit)
 &lt;float:64,m/s&gt;         # meters per second
 &lt;float:64,m/s²&gt;        # meters per second squared
 &lt;float:64,k~g·m/s²&gt;    # kilogram-meters per second squared

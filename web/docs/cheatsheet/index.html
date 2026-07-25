@@ -84,7 +84,7 @@
 </ol>
 <hr />
 <h2 id="1-si-prefixes">1. SI Prefixes</h2>
-<p>Written as <code>prefix~base</code> (mandatory <code>~</code> separator). Example: <code>k~m</code> = kilometre.</p>
+<p>Written as <code>prefix~base</code>, or compactly without the separator: <code>k~m</code> and <code>km</code> are both the kilometre. The canonical output form always keeps the <code>~</code>.</p>
 <table>
 <thead>
 <tr>
@@ -251,7 +251,7 @@
 <p><code>µ</code> is U+00B5 MICRO SIGN (UTF-8 <code>0xC2 0xB5</code>). U+03BC (Greek small letter mu) is also accepted on input; the canonical output is always U+00B5. ASCII <code>u</code> is accepted as an input-only alias for <code>µ</code> (e.g. <code>u~m</code> = <code>µ~m</code>); the canonical output is always <code>µ</code>.
 <code>da</code> is a two-character prefix: <code>da~m</code> = decametre.</p>
 </blockquote>
-<p><strong>Prefix–base ambiguities</strong> — resolved by the mandatory <code>~</code>:</p>
+<p><strong>Prefix–base ambiguities</strong> — the base unit is the longest alias suffix, so a bare token is always the unit; <code>~</code> selects the prefix reading:</p>
 <table>
 <thead>
 <tr>
@@ -313,10 +313,12 @@
 </tr>
 </tbody>
 </table>
-<p>Examples: bare <code>m</code> = metre; <code>m~s</code> = millisecond. Bare <code>d</code> = day; <code>d~s</code> = decisecond.</p>
+<p>Examples: bare <code>m</code> = metre; <code>m~s</code> and <code>ms</code> = millisecond. Bare <code>d</code> = day; <code>d~s</code> and <code>ds</code> = decisecond. Bare <code>min</code> = minute, so milli-inch needs the separator: <code>m~in</code>.</p>
+<p>A compact spelling is refused when the token is a well-known annotation for something else: <code>pH</code>, <code>mph</code>, <code>kph</code> and <code>usb</code> are <code>error_unit_illegal</code> (write <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code>, <code>u~sb</code>).</p>
+<p>Currencies take the compact prefix too (<code>k$EUR</code> = <code>k~$EUR</code>, §5.4), but their <code>$</code> sigil is never optional.</p>
 <hr />
 <h2 id="2-iec-binary-prefixes">2. IEC Binary Prefixes</h2>
-<p>Used <strong>only</strong> on <code>b</code> (bit) and <code>B</code> (byte). Written as <code>prefix~base</code>: <code>Ki~B</code> = kibibyte.</p>
+<p>Used <strong>only</strong> on <code>b</code> (bit) and <code>B</code> (byte). Written as <code>prefix~base</code> or compactly: <code>Ki~B</code> and <code>KiB</code> are both the kibibyte.</p>
 <table>
 <thead>
 <tr>
@@ -2034,7 +2036,7 @@
 <h2 id="5-currencies">5. Currencies</h2>
 <h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
 <p>As of spec 1.0 a currency code carries a <strong>mandatory <code>$</code> sigil</strong>: write <code>$USD</code>,
-<code>$BTC</code>, <code>k~$EUR</code>, <code>$USD/oz_t</code>. The codes listed in the tables below are the bare
+<code>$BTC</code>, <code>k~$EUR</code> (or compactly <code>k$EUR</code>), <code>$USD/oz_t</code>. The codes listed in the tables below are the bare
 ISO 4217 / crypto identifiers — prefix each with <code>$</code> when you use it in a document.
 A bare code (no <code>$</code>) is <strong>not</strong> a currency; it is matched against the physical-unit
 table and raises <code>error_unit_illegal</code> if it is not a unit. This removes every
@@ -3375,7 +3377,7 @@ Minor units are <strong>bold</strong> when they differ from 2. <code>numeric_cod
 </tbody>
 </table>
 <h3 id="54-currency-prefix-rules">5.4 Currency Prefix Rules</h3>
-<p>All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are forbidden on all currencies (<code>error_unit_illegal</code>).</p>
+<p>All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are forbidden on all currencies (<code>error_unit_illegal</code>). The <code>~</code> is optional — the <code>$</code> sigil already separates the prefix from the code — but the sigil is not: <code>kUSD</code> is <code>error_unit_illegal</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3385,19 +3387,19 @@ Minor units are <strong>bold</strong> when they differ from 2. <code>numeric_cod
 </thead>
 <tbody>
 <tr>
-<td><code>k~USD</code></td>
+<td><code>k~$USD</code> (or <code>k$USD</code>)</td>
 <td>thousands of USD (×10³)</td>
 </tr>
 <tr>
-<td><code>M~EUR</code></td>
+<td><code>M~$EUR</code> (or <code>M$EUR</code>)</td>
 <td>millions of EUR (×10⁶)</td>
 </tr>
 <tr>
-<td><code>G~ETH</code></td>
+<td><code>G~$ETH</code> (or <code>G$ETH</code>)</td>
 <td>giga-ETH = Gwei scale (×10⁹)</td>
 </tr>
 <tr>
-<td><code>m~USD</code></td>
+<td><code>m~$USD</code> (or <code>m$USD</code>)</td>
 <td>milli-USD = one tenth of a cent (×10⁻³)</td>
 </tr>
 </tbody>

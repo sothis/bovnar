@@ -238,7 +238,7 @@ The unit goes inside the angle brackets, after the other parameters:
 
 ### SI Prefixes
 
-SI prefixes are written before the base unit symbol with a **mandatory `~`** separator:
+SI prefixes are written before the base unit symbol, either with the `~` separator or compactly without it:
 
 ```bovnar
 .k_ohm  = <float:32,k~Ω>   4.7;     # kilo-ohm
@@ -249,13 +249,13 @@ SI prefixes are written before the base unit symbol with a **mandatory `~`** sep
 .mebi   = <uint:64,Mi~B>   4096;    # mebibytes
 ```
 
-The `~` between prefix and unit is non-optional. `<float:32,kΩ>` (no `~`) would either fail to parse or be interpreted differently. Every prefix listed in the SI table uses the same pattern: `prefix~unit`.
+`<float:32,kΩ>` means exactly the same thing as `<float:32,k~Ω>` — the `~` is optional on a physical unit, and `kg`, `km`, `MHz`, `MiB` all parse as you would expect. Two things to know about the compact spelling. A token that is *itself* a unit always wins (`min` is the minute, so milli-inch has to be written `m~in`), and the writer always emits the `~` form, so a document you write out comes back canonical. A prefixed **currency** works the same way (`k$EUR` = `k~$EUR`), but its `$` sigil is never optional.
 
 IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, `Ri`, `Qi`) follow the same rule:
 
 ```bovnar
 .ram  = <uint:64,Gi~B>  8;     # 8 gibibytes
-.disk = <uint:64,Ti~B>  2;     # 2 tebibytes
+.disk = <uint:64,TiB>   2;     # 2 tebibytes (compact spelling of Ti~B)
 ```
 
 ### Compound Units
@@ -906,7 +906,7 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 
 # ── Units ──────────────────────────────────────────────────────────
 <float:64,s>           # seconds
-<float:64,k~m>         # kilometers (SI prefix~unit, `~` mandatory)
+<float:64,k~m>         # kilometers (SI prefix~unit; `km` is the same unit)
 <float:64,m/s>         # meters per second
 <float:64,m/s²>        # meters per second squared
 <float:64,k~g·m/s²>    # kilogram-meters per second squared

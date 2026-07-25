@@ -1872,7 +1872,7 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 <p><code>bu_none</code> (value <code>0</code>) is the internal representation of "no base unit", used for the <code>no_unit</code> keyword and as the default when no unit annotation is present.</p>
 <hr />
 <h2 id="4-prefixes">4. Prefixes</h2>
-<p>Prefixes are attached to a base unit symbol with a mandatory <code>~</code> separator: <code>prefix~baseunit</code>.</p>
+<p>A prefix is attached to a base unit symbol either with the <code>~</code> separator — <code>prefix~baseunit</code>, the canonical form — or <strong>compactly</strong>, without it: <code>kg</code> is <code>k~g</code>, <code>MiB</code> is <code>Mi~B</code>. Both spellings parse to the same <code>value_unit_t</code>; the writer always emits the separated form, so a document that round-trips through the library comes back canonical. See §4.3 for what the compact form does and does not accept.</p>
 <h3 id="41-si-prefixes">4.1 SI Prefixes</h3>
 <p>All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10³⁰).</p>
 <table>
@@ -2038,10 +2038,10 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 </tbody>
 </table>
 <blockquote>
-<p><strong>Encoding note:</strong> <code>µ</code> is U+00B5 (MICRO SIGN), UTF-8: <code>0xC2 0xB5</code>. U+03BC (GREEK SMALL LETTER MU) is a distinct code point but is also accepted on input; the canonical output form is always U+00B5. ASCII <code>u</code> is accepted as an input-only alias for <code>µ</code> (e.g. <code>u~m</code> parses as <code>µ~m</code>); the canonical output form is always <code>µ</code>. Note <code>u</code> is also the bare symbol for the dalton, but the two never collide — a prefix only appears before <code>~</code>, a base only bare or after <code>~</code>.</p>
+<p><strong>Encoding note:</strong> <code>µ</code> is U+00B5 (MICRO SIGN), UTF-8: <code>0xC2 0xB5</code>. U+03BC (GREEK SMALL LETTER MU) is a distinct code point but is also accepted on input; the canonical output form is always U+00B5. ASCII <code>u</code> is accepted as an input-only alias for <code>µ</code> (e.g. <code>u~m</code> parses as <code>µ~m</code>); the canonical output form is always <code>µ</code>. Note <code>u</code> is also the bare symbol for the dalton, but the two never collide: the base unit is whatever the longest alias suffix says, so <code>u</code> is the dalton and the <code>u</code> in <code>um</code> or <code>u~m</code> is the prefix.</p>
 </blockquote>
 <h4 id="prefixsymbol-ambiguities">Prefix–Symbol Ambiguities</h4>
-<p>Several prefix symbols overlap with base unit symbols. The <code>~</code> separator is the disambiguator: <code>m~</code> introduces the milli prefix; bare <code>m</code> is the meter.</p>
+<p>Several prefix symbols overlap with base unit symbols. A base unit symbol is matched as the <strong>longest alias suffix</strong> of the component, so a bare unit always wins over a prefixed reading of the same token: <code>min</code> is the minute, never milli-inch, and <code>cd</code> is the candela, never centi-day. Where that is not the reading you want, the <code>~</code> separator states it: <code>m~in</code> is milli-inch, <code>m~</code> introduces the milli prefix, bare <code>m</code> is the meter.</p>
 <table>
 <thead>
 <tr>
@@ -2181,16 +2181,77 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 .invalid1 = &lt;uint:64,Ki~m&gt;  1;     # ERROR: IEC prefix on meter
 .invalid2 = &lt;uint:32,m~B&gt;   512;   # ERROR: SI milli on byte
 .invalid3 = &lt;float_dec:64,Ki~$USD&gt; 1;     # ERROR: IEC prefix on currency</code></pre></div>
+<h3 id="43-compact-prefix-form">4.3 Compact Prefix Form</h3>
+<p>A prefixed physical unit may be written without the <code>~</code> separator, in the spelling the rest of the world already uses:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.mass      = &lt;float:64,kg&gt;   72.5;      # same unit as k~g
+.distance  = &lt;float:64,km&gt;    1.5;      # k~m
+.period    = &lt;float:64,ms&gt;   16.7;      # m~s
+.frequency = &lt;float:64,MHz&gt; 2400.0;     # M~Hz
+.pressure  = &lt;float:64,hPa&gt; 1013.25;    # h~Pa
+.energy    = &lt;float:64,MeV&gt;   13.6;     # M~eV
+.amount    = &lt;float:64,mmol&gt;   2.5;     # m~mol
+.memory    = &lt;uint:64,MiB&gt;   512;       # Mi~B
+.force     = &lt;float:64,kg·m/s²&gt; 9.81;   # compounds, exponents and groups too</code></pre></div>
+<p>Both spellings produce the same <code>value_unit_t</code>, so they reconcile against each other (<code>&lt;float:64,k~m&gt; 1.5 km</code> is valid) and against a stored annotation. <strong>The canonical output form is unchanged</strong>: <code>bvn_unit_to_string</code> emits <code>k~g</code> for either spelling, so a compact unit is an input convenience that never propagates into what the library writes.</p>
+<p>The rules are exactly the rules of the separated form, with one addition:</p>
+<ul>
+<li><strong>A bare unit alias always wins.</strong> The base symbol is the longest alias suffix, so <code>min</code> is the minute (not milli-inch), <code>cd</code> the candela (not centi-day), <code>ft</code> the foot (not femto-tonne), <code>at</code> the technical atmosphere (not atto-tonne), <code>dB</code> the decibel (not deci-byte). The separated form reaches the other reading: <code>m~in</code>, <code>c~d</code>, <code>f~t</code>.</li>
+<li><strong>Where two prefixed readings compete, the longer base symbol wins</strong> — for the same reason. <code>dat</code> is deci-<code>at</code> (technical atmosphere), not deca-tonne; <code>dau</code> is deci-<code>au</code>, not deca-dalton. Write <code>da~t</code> / <code>da~u</code> for those.</li>
+<li><strong>A prefix cannot be stacked.</strong> <code>kkg</code> and <code>k~kg</code> are both <code>error_unit_illegal</code>.</li>
+<li><strong>Prefix–unit validity is unchanged.</strong> <code>Kim</code> fails for the same reason <code>Ki~m</code> does; so do <code>mB</code>, <code>kPfd</code>, <code>kppm</code>.</li>
+<li><strong>A few compact spellings are refused by name.</strong> A token that is a well-known annotation for something Bovnar does not model would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay <code>error_unit_illegal</code>:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Refused</th>
+<th>Would have meant</th>
+<th>Usually means</th>
+<th>Write instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pH</code></td>
+<td>picohenry</td>
+<td>acidity</td>
+<td><code>p~H</code></td>
+</tr>
+<tr>
+<td><code>mph</code></td>
+<td>milliphot</td>
+<td>miles per hour</td>
+<td><code>m~ph</code></td>
+</tr>
+<tr>
+<td><code>kph</code></td>
+<td>kilophot</td>
+<td>km per hour</td>
+<td><code>k~ph</code></td>
+</tr>
+<tr>
+<td><code>usb</code></td>
+<td>microstilb</td>
+<td>the bus</td>
+<td><code>u~sb</code></td>
+</tr>
+</tbody>
+</table>
+<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry.</p>
+<p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
+<p>Currencies take the compact prefix too — <code>k$EUR</code> is <code>k~$EUR</code>. The <code>$</code> sigil already separates the prefix from the code (no prefix symbol and no currency code contains a <code>$</code>), so nothing is left for the <code>~</code> to resolve. What the sigil rule still requires is the sigil itself: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is never a currency (§10.4).</p>
 <hr />
 <h2 id="5-unit-notation-grammar">5. Unit Notation Grammar</h2>
 <h3 id="51-simple-units">5.1 Simple Units</h3>
-<div class="codehilite"><pre><span></span><code>unit-component = [ prefix &quot;~&quot; ] base-unit [ unit-exponent ]
+<div class="codehilite"><pre><span></span><code>unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 </code></pre></div>
 
+<p>The <code>~</code> separator is optional (<code>km</code> = <code>k~m</code>, <code>k$USD</code> = <code>k~$USD</code>; §4.3). The currency <code>$</code> sigil is not.</p>
 <div class="codehilite"><pre><code class="language-bovnar">.temperature = &lt;float:64,K&gt;      300.0;   # kelvin
 .distance    = &lt;float:64,k~m&gt;    1.5;     # kilometer
 .frequency   = &lt;float:64,M~Hz&gt;   2400;    # megahertz
 .storage     = &lt;uint:64,Ki~B&gt;    1024;    # kibibytes
+.altitude    = &lt;float:64,km&gt;     10.5;    # kilometer, compact spelling
 .fund_nav    = &lt;float_dec:64,k~$USD&gt; 250.0; # $250,000</code></pre></div>
 <h3 id="52-compound-units">5.2 Compound Units</h3>
 <div class="codehilite"><pre><span></span><code><span class="k">compound-unit  </span><span class="o">=</span> <span class="s2">&quot;no_unit&quot;</span>
@@ -2198,7 +2259,7 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 
 <span class="k">unit-sep       </span><span class="err">=</span> <span class="s2">&quot;*&quot;</span> <span class="p">|</span> <span class="s2">&quot;/&quot;</span> <span class="p">|</span> <span class="s2">&quot;·&quot;</span>           <span class="cm">(* · = U+00B7 MIDDLE DOT *)</span>
 
-<span class="k">unit-component </span><span class="err">=</span> <span class="p">[</span> <span class="k">prefix </span><span class="s2">&quot;~&quot;</span> <span class="p">]</span> <span class="k">base-unit </span><span class="p">[</span> <span class="k">unit-exponent </span><span class="p">]</span>
+<span class="k">unit-component </span><span class="err">=</span> <span class="p">[</span> <span class="k">prefix </span><span class="p">[</span> <span class="s2">&quot;~&quot;</span> <span class="p">]</span> <span class="p">]</span> <span class="k">base-unit </span><span class="p">[</span> <span class="k">unit-exponent </span><span class="p">]</span>
 
 <span class="k">unit-exponent  </span><span class="err">=</span> <span class="p">[</span> <span class="k">exp-sign </span><span class="p">]</span> <span class="k">exp-digit</span>
                <span class="p">|</span> <span class="s2">&quot;^&quot;</span> <span class="p">[</span> <span class="s2">&quot;-&quot;</span> <span class="p">|</span> <span class="s2">&quot;+&quot;</span> <span class="p">]</span> <span class="k">ASCII-digit</span>
@@ -2436,7 +2497,7 @@ groups raise <code>error_unit_illegal</code>.</p>
 <h2 id="9-currency-codes">9. Currency Codes</h2>
 <p>Currency amounts are dimensional quantities in financial computing. <code>$19.99 USD</code> carries a denomination dimension just as <code>9.81 m/s²</code> carries an acceleration dimension. Bovnar extends the unit system with 216 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.</p>
 <h3 id="91-the--sigil-rule">9.1 The <code>$</code> Sigil Rule</h3>
-<p>As of spec 1.0 a currency is recognised <strong>only</strong> in its <code>$</code>-sigil form (<code>$USD</code>, <code>$BTC</code>, or prefixed <code>k~$EUR</code>). The sigil — and nothing else — dispatches a component to the currency table; see §10.4 for the full rules and rationale.</p>
+<p>As of spec 1.0 a currency is recognised <strong>only</strong> in its <code>$</code>-sigil form (<code>$USD</code>, <code>$BTC</code>, or prefixed <code>k~$EUR</code> / <code>k$EUR</code>). The sigil — and nothing else — dispatches a component to the currency table; see §10.4 for the full rules and rationale.</p>
 <p>Classification happens at the lookup stage, per unit component:</p>
 <ol>
 <li>A component introduced by <code>$</code> (after any SI/IEC prefix and its <code>~</code>) is looked up in the <strong>currency table</strong>. If the code is not found there, <code>error_unit_illegal</code> is raised — a <code>$</code> introduces a currency and nothing else.</li>
@@ -3775,11 +3836,12 @@ groups raise <code>error_unit_illegal</code>.</p>
 </tbody>
 </table>
 <h3 id="94-prefix-rules-for-currency-units">9.4 Prefix Rules for Currency Units</h3>
-<p><strong>All SI prefixes</strong> are permitted on all currency units. <code>k~USD</code> denotes "values in thousands of USD" — a common scale annotation in financial reporting.</p>
+<p><strong>All SI prefixes</strong> are permitted on all currency units. <code>k~$USD</code> denotes "values in thousands of USD" — a common scale annotation in financial reporting. As with a physical unit (§4.3), the <code>~</code> is optional: <code>k$USD</code> is the same unit, because the <code>$</code> sigil already separates the prefix from the code.</p>
 <div class="codehilite"><pre><code class="language-bovnar">.fund_nav   = &lt;float_dec:64,k~$USD&gt;    250.0;   # $250,000
-.gdp        = &lt;float_dec:64,M~$EUR&gt; 42800.0;    # €42.8 billion
+.gdp        = &lt;float_dec:64,M$EUR&gt;  42800.0;    # €42.8 billion — compact prefix
 .eth_gwei   = &lt;float_dec:64,G~$ETH&gt;    35.0;    # 35 Gwei gas price</code></pre></div>
-<p><strong>IEC binary prefixes</strong> (<code>Ki~</code>, <code>Mi~</code>, …) are <strong>forbidden</strong> on all currency units. <code>bvn_currency_prefix_valid()</code> returns <code>false</code> for any IEC prefix; the parser raises <code>error_unit_illegal</code>.</p>
+<p>The sigil itself is <strong>not</strong> optional in either spelling: <code>kUSD</code> is <code>error_unit_illegal</code>, exactly as bare <code>USD</code> is.</p>
+<p><strong>IEC binary prefixes</strong> (<code>Ki~</code>, <code>Mi~</code>, …) are <strong>forbidden</strong> on all currency units, compact spelling included (<code>Ki$USD</code> is an error too). <code>bvn_currency_prefix_valid()</code> returns <code>false</code> for any IEC prefix; the parser raises <code>error_unit_illegal</code>.</p>
 <h3 id="95-compound-currency-expressions">9.5 Compound Currency Expressions</h3>
 <p>Currency codes participate in compound unit expressions using the existing separators:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.gold_spot    = &lt;float_dec:64,$USD/oz_t&gt;    2351.40;  # $/troy oz
@@ -3878,7 +3940,7 @@ groups raise <code>error_unit_illegal</code>.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>$USD</code>, <code>$BTC</code>, <code>k~$EUR</code></td>
+<td><code>$USD</code>, <code>$BTC</code>, <code>k~$EUR</code>, <code>k$EUR</code></td>
 <td>currency table (sigil present)</td>
 <td>currency, or <code>error_unit_illegal</code> if the code is unknown</td>
 </tr>
@@ -3994,12 +4056,13 @@ groups raise <code>error_unit_illegal</code>.</p>
 .price   = &lt;float_dec:64,$USD&gt;      19.99;   # US Dollar
 .btc     = &lt;uint:64,$BTC&gt;        54782000;   # Bitcoin (satoshis)
 .fund    = &lt;float_dec:64,k~$EUR&gt;   250.0;    # kilo-Euro (prefix before the sigil)
+.aum     = &lt;float_dec:64,M$EUR&gt;    42.8;     # mega-Euro, compact prefix (= M~$EUR)
 .spot    = &lt;float_dec:64,$USD/oz_t&gt; 2351.40; # currency / physical-unit compound
 
 # A bare code is no longer a currency:
 .volume  = &lt;float_dec:32,cup&gt;        2.0;    # the physical &#x27;cup&#x27;, unambiguously
 # .bad   = &lt;float_dec:64,USD&gt; 1.0;            # error_unit_illegal: bare &#x27;USD&#x27; is not a unit (needs &#x27;$&#x27;)</code></pre></div>
-<p>The sigil attaches directly before the currency code, after any SI/IEC prefix and its <code>~</code> (<code>k~$EUR</code>, <code>M~$USDT</code>). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this <strong>breaks</strong> any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning &amp; Stability section of the specification).</p>
+<p>The sigil attaches directly before the currency code, after any SI/IEC prefix and its optional <code>~</code> (<code>k~$EUR</code> or <code>k$EUR</code>, <code>M~$USDT</code> or <code>M$USDT</code>; §4.3). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this <strong>breaks</strong> any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning &amp; Stability section of the specification).</p>
 <hr />
 <h2 id="11-c-data-model">11. C Data Model</h2>
 <h3 id="111-enumerations">11.1 Enumerations</h3>
@@ -4295,7 +4358,7 @@ groups raise <code>error_unit_illegal</code>.</p>
 <li><code>memcmp</code> against <code>"no_unit"</code> → return <code>BVN_UNIT_NONE</code> immediately on match.</li>
 <li>Scan for separator characters to distinguish simple vs. compound paths.</li>
 <li>For compound units, split on <code>0x2A</code> (<code>*</code>), <code>0x2F</code> (<code>/</code>), <code>0xC2 0xB7</code> (<code>·</code>); parse each slice as a component; negate denominator exponents.</li>
-<li>For each component, if it is introduced by the <code>$</code> sigil (after any prefix and its <code>~</code>), look the code up in the currency table; otherwise look it up in the physical unit table only. A bare code is never a currency.</li>
+<li>For each component, if it is introduced by the <code>$</code> sigil (after any prefix and its optional <code>~</code>), look the code up in the currency table; otherwise look it up in the physical unit table only. A bare code is never a currency.</li>
 </ol>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="p">;</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;k~g·m/s²&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>

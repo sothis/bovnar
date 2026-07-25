@@ -9,7 +9,9 @@ it in lockstep. The highest spec a build understands is reported by
 
 ## [Unreleased]
 
-Reference-implementation only; the on-the-wire format is unchanged. **The ABI
+The on-the-wire format grows only additively: the unit parser accepts one new
+input spelling (the compact prefix form, below), every existing document parses
+to exactly the same values, and the canonical output form is unchanged. **The ABI
 breaks**: `bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see
 below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
@@ -17,6 +19,34 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **Compact prefix form for physical units** — a prefix may now be written
+  without the `~` separator: `kg`, `km`, `ms`, `MHz`, `hPa`, `mmol`, `MeV`,
+  `KiB`, `MiB`, `kg·m/s²` all parse, each to exactly the `value_unit_t` its
+  separated spelling produces. The barrier this removes is the first thing every
+  newcomer hit; the safety property that made it possible is that the base
+  symbol is matched as the **longest alias suffix**, so a bare unit alias always
+  outranks a prefixed reading of the same token (`min` is the minute, never
+  milli-inch; `cd` the candela, never centi-day) and a compact spelling is only
+  ever accepted where the parser previously raised `error_unit_illegal` — no
+  existing document decodes differently. Prefixes still cannot be stacked
+  (`kkg`, `k~kg` → `error_unit_illegal`), per-unit prefix policy is unchanged
+  (`Kim` fails exactly as `Ki~m` does, as do `mB`, `kPfd`, `kppm`), and **the
+  canonical output form is unaffected** — `bvn_unit_to_string` and the writers emit `k~g` for
+  either spelling, so a round-tripped document stays readable to an older
+  reader. Four compact spellings are refused by name, because accepting them
+  would turn a parse error into a quietly wrong unit: `pH` (acidity, not
+  picohenry), `mph` and `kph` (speeds, not milli-/kilophot) and `usb` (not
+  microstilb); the list is data, in `.compact_exceptions` in
+  `src/gendata/units.bvnr`, and the separated forms `p~H`, `m~ph`, `k~ph`,
+  `u~sb` are untouched. See unit-system reference §4.3.
+- **Compact prefix form for currencies** — the same spelling rule applied to
+  money: `k$USD`, `M$EUR` and `G$ETH` parse as the prefixed currencies they
+  look like. The `$` sigil separates the prefix from the code on its own —
+  no prefix symbol and no currency code contains a `$` — so the compact form is
+  unambiguous by construction. The sigil rule itself is unchanged and the sigil
+  stays mandatory: `kUSD` is `error_unit_illegal` exactly as bare `USD` is, IEC
+  prefixes remain forbidden on money in either spelling (`Ki$USD`, `Ki~$USD`),
+  and the writer still emits `k~$USD`. See unit-system reference §9.4.
 - **Lossless read-time unit / base conversion** — an optional `want_unit` hook on
   `bvnr_read_flags_t`. When set, the reader calls it for every numeric value and,
   if the caller names a target unit and output base, delivers the value converted

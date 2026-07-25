@@ -388,27 +388,51 @@ Place the unit symbol inside the angle brackets after the other type parameters:
 
 ---
 
-**How do SI prefixes work, and why is the `~` separator mandatory?**
+**How do SI prefixes work, and what is the `~` separator for?**
 
-An SI prefix is written before the unit symbol with a mandatory `~` separator:
-`k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz). The
-`~` is required because without it there is no general way to distinguish
-a two-character unit symbol from a one-character prefix followed by a
-one-character unit — `mV` would be ambiguous. The `~` resolves all such
-cases unambiguously:
+An SI prefix is written before the unit symbol, either with the `~` separator —
+`k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz) — or compactly, in the
+spelling everyone else uses: `km`, `mV`, `GHz`. Both parse to the same unit.
+The `~` form is canonical: it is what the writer emits, and it is the form that
+says *exactly* which reading you mean, which matters for the handful of tokens
+that are a unit in their own right (`min` is the minute, so milli-inch must be
+written `m~in`).
 
 ```bovnar
 .k_ohm = <float:32,k~Ω> 4.7;
 .micro = <float:32,µ~s> 50.0;
-.giga  = <float:64,G~Hz> 2.4;
+.giga  = <float:64,GHz> 2.4;      # same as G~Hz
 ```
 
 IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, …) follow the same rule:
 
 ```bovnar
 .ram  = <uint:64,Gi~B> 8;
-.disk = <uint:64,Ti~B> 2;
+.disk = <uint:64,TiB> 2;          # same as Ti~B
 ```
+
+---
+
+**When is the compact spelling *not* accepted?**
+
+In four situations, all of which are `error_unit_illegal`:
+
+1. **A bare unit alias already owns the token.** The base unit is matched as the
+   longest alias suffix, so `min` is the minute (not milli-inch), `cd` the
+   candela (not centi-day), `ft` the foot (not femto-tonne), `dB` the decibel
+   (not deci-byte). That is what guarantees no existing document changed meaning
+   when the compact form was introduced. Use `~` for the other reading.
+2. **Stacked prefixes.** `kkg` and `k~kg` are both errors — a component carries
+   at most one prefix.
+3. **A prefix the unit does not accept.** `Kim` fails exactly as `Ki~m` does
+   (IEC prefixes are for `b`/`B` only), as do `mB`, `kPfd` and `kppm`.
+4. **A spelling refused by name.** `pH`, `mph`, `kph` and `usb` would otherwise
+   resolve to picohenry, milliphot, kilophot and microstilb — quietly wrong
+   units for tokens that in practice mean acidity, two speeds and a bus. They
+   stay errors; the separated forms `p~H`, `m~ph`, `k~ph`, `u~sb` still work.
+   The list lives in `src/gendata/units.bvnr`.
+
+A prefixed **currency** works the same way — `k$EUR` is `k~$EUR`, since the `$` sigil already separates the two. The sigil itself is never optional: `kUSD` is `error_unit_illegal`, because a bare code is not a currency.
 
 ---
 

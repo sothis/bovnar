@@ -1485,6 +1485,56 @@ static const cf_case_t g_cases[] = {
 	           ".x = <float:64,zzz_invalid_unit> 1.0;",
 	           error_unit_illegal),
 
+	/* Compact prefix form: a prefix may be written without the '~' separator
+	 * ("kg" for "k~g"). It is only ever reachable where the separated form
+	 * would have been a parse error, so it decides nothing that was previously
+	 * decided — the cases below pin down both halves of that claim. */
+	VALID("UNT-018", "units", "compact SI prefix in an annotation",
+	      ".m = <float:64,kg> 1.5;"),
+	VALID("UNT-019", "units", "compact IEC prefix in an annotation",
+	      ".mem = <uint:64,MiB> 512;"),
+	VALID("UNT-020", "units", "compact prefix as an inline unit suffix",
+	      ".d = 1.5 km;"),
+	VALID("UNT-021", "units", "compact prefix in a compound unit",
+	      ".f = <float:64,kg·m/s^2> 1.0;"),
+	VALID("UNT-022", "units", "compact and separated spellings reconcile",
+	      ".d = <float:64,k~m> 1.5 km;"),
+	/* A bare unit alias outranks any prefixed reading of the same token, so
+	 * "min" is the minute and NOT milli-inch — the two must not reconcile. */
+	ERROR_CASE("UNT-023", "units", "bare alias outranks the compact reading",
+	           ".t = <float:64,min> 1.0 m~in;",
+	           error_unit_mismatch),
+	ERROR_CASE("UNT-024", "units", "compact form does not stack prefixes",
+	           ".m = <float:64,kkg> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-025", "units", "separated prefix on a compact form",
+	           ".m = <float:64,k~kg> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-026", "units", "compact spelling refused by name (pH)",
+	           ".acidity = <float:64,pH> 7.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-027", "units", "compact spelling refused by name (mph)",
+	           ".v = 65.0 mph;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-028", "units", "prefix policy applies to the compact form (IEC)",
+	           ".d = <float:64,Kim> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-029", "units", "prefix policy applies to the compact form (SI)",
+	           ".sz = <uint:64,mB> 1;",
+	           error_unit_illegal),
+	/* A currency takes the compact prefix as well — the '$' sigil separates
+	 * prefix from code on its own — but the sigil itself stays mandatory. */
+	VALID("UNT-030", "units", "compact prefix on a currency",
+	      ".nav = <float_dec:64,k$USD> 250.0;"),
+	VALID("UNT-031", "units", "compact prefixed currency in a compound unit",
+	      ".rate = <float_dec:64,k$EUR/h> 1.5;"),
+	ERROR_CASE("UNT-032", "units", "compact prefix does not make a bare code a currency",
+	           ".nav = <float_dec:64,kUSD> 250.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-033", "units", "IEC prefix on a currency, compact spelling",
+	           ".nav = <float_dec:64,Ki$USD> 1.0;",
+	           error_unit_illegal),
+
 	/* ── SPECIAL NUMBERS ─────────────────────────────────────────── */
 	VALID("SPC-001", "special_numbers", "nan with float:64",
 	      ".x = <float:64> nan;"),

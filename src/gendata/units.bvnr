@@ -25,6 +25,14 @@
 #   .prefix   prefix policy: default | info | german | ratio | none
 #   .aliases  every accepted INPUT spelling, real UTF-8 (matched exactly);
 #             include the canonical symbol when it is itself parseable
+#
+# COMPACT PREFIX FORM
+#   A prefixed unit may be written with the '~' separator ("k~g") or compactly,
+#   without it ("kg"). The compact form is resolved by the same longest-suffix
+#   match as any other spelling, so a bare alias always wins over a prefixed
+#   reading ("min" is the minute, never milli-inch) and no existing document can
+#   change meaning. .compact_exceptions below lists the few compact spellings
+#   that must stay a parse error anyway; see the comment on that list.
 
 .schema_version = <uint:16> 1;
 
@@ -1890,4 +1898,28 @@
     .prefix  = ratio;
     .aliases = ["ppb"];
   }
+];
+
+# Compact spellings that must NOT resolve as prefix+unit.
+#
+#   The compact form is only ever reachable where the '~' form would have been
+#   a parse error, so nothing here is about ambiguity inside the unit table —
+#   the longest-suffix match settles every one of those (a bare alias wins, so
+#   "min" stays the minute and "cd" the candela). These are the opposite case:
+#   a token that is a WELL-KNOWN annotation for something bovnar does not model,
+#   which the compact form would otherwise accept as a valid — and quietly
+#   wrong — physical unit. Rejecting them keeps `error_unit_illegal` as the
+#   answer to "mph", which is the whole point of a unit-safe format.
+#
+#   Only the compact spelling is refused. The separated form still parses and
+#   still means what it always did: p~H is picohenry, m~ph milliphot.
+#
+#   .spelling  the exact compact token to refuse (matched byte-for-byte)
+#   .why       why it is refused — the reading a user would actually intend
+
+.compact_exceptions = [
+  { .spelling = "pH";  .why = "acidity, not picohenry (write p~H)";          },
+  { .spelling = "mph"; .why = "miles per hour, not milliphot (write m~ph)";  },
+  { .spelling = "kph"; .why = "km per hour, not kilophot (write k~ph)";      },
+  { .spelling = "usb"; .why = "the bus, not microstilb (write u~sb or µ~sb)"; }
 ];

@@ -1378,7 +1378,7 @@ unit-factor    = unit-component | "(" unit-expr ")"
 
 unit-sep       = "*" | "/" | "·"       (* "·" = U+00B7 MIDDLE DOT *)
 
-unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
+unit-component = [ prefix [ "~" ] ] base-unit [ unit-exponent ]
 ```
 
 **Separators:**
@@ -1397,13 +1397,16 @@ The `/` separator divides the preceding components by the following ones. The fi
 
 **Within each `unit-component`:**
 
-- When a prefix is present, the separator `~` between the prefix and the base unit is **mandatory**.
 - A bare base unit with no prefix requires no separator.
+- When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and a handful of compact spellings are refused by name because they are well-known annotations for something else (`pH`, `mph`, `kph`, `usb`). See §4.3 of the unit-system reference.
+- The same holds for a **currency**: `k~$EUR` and `k$EUR` are the same unit. The `$` sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and `kUSD` is `error_unit_illegal` just as bare `USD` is.
+- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g` whichever spelling was read.
 
 ```bovnar
 # Simple (single-component) units — same as before
 .time = <float:64,s> 2.5;               # seconds
 .speed = <float:64,k~m> 1.5;            # kilometers (kilo-meter)
+.alt = <float:64,km> 10.5;              # same unit, compact spelling
 
 # Compound units
 .velocity = <float:64,m/s> 9.81;        # meters per second
@@ -2455,6 +2458,14 @@ revisions:
 - the **unit and currency tables** — new physical units, prefixes, and ISO 4217 /
   crypto currency codes may be added (a document never depends on a code being
   *absent*);
+- the **accepted input spellings** of a unit — new aliases, and the compact
+  prefix form (`kg` for `k~g`, §11.4). This is the same
+  additive direction as a new unit: a spelling is only ever accepted where the
+  parser previously raised `error_unit_illegal`, the base symbol is still
+  matched as the longest alias suffix so no existing spelling changes meaning,
+  and the **canonical output form is unaffected** — the writer keeps emitting
+  the separated `k~g`, so a document that round-trips stays readable to a
+  reader that predates the spelling;
 - **new error codes** appended after the current maximum (existing numeric values
   never change) — 1.1 appends `error_invalid_spec_version` (42),
   `error_unsupported_spec_version` (43), `error_invalid_codepoint` (44),

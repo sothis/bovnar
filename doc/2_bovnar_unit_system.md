@@ -541,7 +541,7 @@ they do **not** accept SI or IEC prefixes (a prefixed `%` is meaningless).
 
 ## 4. Prefixes
 
-Prefixes are attached to a base unit symbol with a mandatory `~` separator: `prefix~baseunit`.
+A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`; the writer always emits the separated form, so a document that round-trips through the library comes back canonical. See §4.3 for what the compact form does and does not accept.
 
 ### 4.1 SI Prefixes
 
@@ -575,11 +575,11 @@ All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10
 | ronto  | `r`    | 10⁻²⁷  | `si_ronto`  |
 | quecto | `q`    | 10⁻³⁰  | `si_quecto` |
 
-> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point but is also accepted on input; the canonical output form is always U+00B5. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` parses as `µ~m`); the canonical output form is always `µ`. Note `u` is also the bare symbol for the dalton, but the two never collide — a prefix only appears before `~`, a base only bare or after `~`.
+> **Encoding note:** `µ` is U+00B5 (MICRO SIGN), UTF-8: `0xC2 0xB5`. U+03BC (GREEK SMALL LETTER MU) is a distinct code point but is also accepted on input; the canonical output form is always U+00B5. ASCII `u` is accepted as an input-only alias for `µ` (e.g. `u~m` parses as `µ~m`); the canonical output form is always `µ`. Note `u` is also the bare symbol for the dalton, but the two never collide: the base unit is whatever the longest alias suffix says, so `u` is the dalton and the `u` in `um` or `u~m` is the prefix.
 
 #### Prefix–Symbol Ambiguities
 
-Several prefix symbols overlap with base unit symbols. The `~` separator is the disambiguator: `m~` introduces the milli prefix; bare `m` is the meter.
+Several prefix symbols overlap with base unit symbols. A base unit symbol is matched as the **longest alias suffix** of the component, so a bare unit always wins over a prefixed reading of the same token: `min` is the minute, never milli-inch, and `cd` is the candela, never centi-day. Where that is not the reading you want, the `~` separator states it: `m~in` is milli-inch, `m~` introduces the milli prefix, bare `m` is the meter.
 
 | Symbol | As prefix | As base unit |
 |--------|-----------|--------------|
@@ -627,6 +627,45 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 .invalid3 = <float_dec:64,Ki~$USD> 1;     # ERROR: IEC prefix on currency
 ```
 
+### 4.3 Compact Prefix Form
+
+A prefixed physical unit may be written without the `~` separator, in the spelling the rest of the world already uses:
+
+```bovnar
+.mass      = <float:64,kg>   72.5;      # same unit as k~g
+.distance  = <float:64,km>    1.5;      # k~m
+.period    = <float:64,ms>   16.7;      # m~s
+.frequency = <float:64,MHz> 2400.0;     # M~Hz
+.pressure  = <float:64,hPa> 1013.25;    # h~Pa
+.energy    = <float:64,MeV>   13.6;     # M~eV
+.amount    = <float:64,mmol>   2.5;     # m~mol
+.memory    = <uint:64,MiB>   512;       # Mi~B
+.force     = <float:64,kg·m/s²> 9.81;   # compounds, exponents and groups too
+```
+
+Both spellings produce the same `value_unit_t`, so they reconcile against each other (`<float:64,k~m> 1.5 km` is valid) and against a stored annotation. **The canonical output form is unchanged**: `bvn_unit_to_string` emits `k~g` for either spelling, so a compact unit is an input convenience that never propagates into what the library writes.
+
+The rules are exactly the rules of the separated form, with one addition:
+
+- **A bare unit alias always wins.** The base symbol is the longest alias suffix, so `min` is the minute (not milli-inch), `cd` the candela (not centi-day), `ft` the foot (not femto-tonne), `at` the technical atmosphere (not atto-tonne), `dB` the decibel (not deci-byte). The separated form reaches the other reading: `m~in`, `c~d`, `f~t`.
+- **Where two prefixed readings compete, the longer base symbol wins** — for the same reason. `dat` is deci-`at` (technical atmosphere), not deca-tonne; `dau` is deci-`au`, not deca-dalton. Write `da~t` / `da~u` for those.
+- **A prefix cannot be stacked.** `kkg` and `k~kg` are both `error_unit_illegal`.
+- **Prefix–unit validity is unchanged.** `Kim` fails for the same reason `Ki~m` does; so do `mB`, `kPfd`, `kppm`.
+- **A few compact spellings are refused by name.** A token that is a well-known annotation for something Bovnar does not model would otherwise become a valid — and quietly wrong — unit, which is the failure mode the format exists to prevent. These stay `error_unit_illegal`:
+
+  | Refused | Would have meant | Usually means | Write instead |
+  |---------|------------------|---------------|---------------|
+  | `pH`    | picohenry        | acidity       | `p~H` |
+  | `mph`   | milliphot        | miles per hour | `m~ph` |
+  | `kph`   | kilophot         | km per hour   | `k~ph` |
+  | `usb`   | microstilb       | the bus       | `u~sb` |
+
+  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry.
+
+Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
+
+Currencies take the compact prefix too — `k$EUR` is `k~$EUR`. The `$` sigil already separates the prefix from the code (no prefix symbol and no currency code contains a `$`), so nothing is left for the `~` to resolve. What the sigil rule still requires is the sigil itself: `kUSD` is `error_unit_illegal`, because a bare code is never a currency (§10.4).
+
 ---
 
 ## 5. Unit Notation Grammar
@@ -634,14 +673,17 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 ### 5.1 Simple Units
 
 ```
-unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
+unit-component = [ prefix [ "~" ] ] base-unit [ unit-exponent ]
 ```
+
+The `~` separator is optional (`km` = `k~m`, `k$USD` = `k~$USD`; §4.3). The currency `$` sigil is not.
 
 ```bovnar
 .temperature = <float:64,K>      300.0;   # kelvin
 .distance    = <float:64,k~m>    1.5;     # kilometer
 .frequency   = <float:64,M~Hz>   2400;    # megahertz
 .storage     = <uint:64,Ki~B>    1024;    # kibibytes
+.altitude    = <float:64,km>     10.5;    # kilometer, compact spelling
 .fund_nav    = <float_dec:64,k~$USD> 250.0; # $250,000
 ```
 
@@ -653,7 +695,7 @@ compound-unit  = "no_unit"
 
 unit-sep       = "*" | "/" | "·"           (* · = U+00B7 MIDDLE DOT *)
 
-unit-component = [ prefix "~" ] base-unit [ unit-exponent ]
+unit-component = [ prefix [ "~" ] ] base-unit [ unit-exponent ]
 
 unit-exponent  = [ exp-sign ] exp-digit
                | "^" [ "-" | "+" ] ASCII-digit
@@ -791,7 +833,7 @@ Currency amounts are dimensional quantities in financial computing. `$19.99 USD`
 
 ### 9.1 The `$` Sigil Rule
 
-As of spec 1.0 a currency is recognised **only** in its `$`-sigil form (`$USD`, `$BTC`, or prefixed `k~$EUR`). The sigil — and nothing else — dispatches a component to the currency table; see §10.4 for the full rules and rationale.
+As of spec 1.0 a currency is recognised **only** in its `$`-sigil form (`$USD`, `$BTC`, or prefixed `k~$EUR` / `k$EUR`). The sigil — and nothing else — dispatches a component to the currency table; see §10.4 for the full rules and rationale.
 
 Classification happens at the lookup stage, per unit component:
 
@@ -1038,15 +1080,17 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 
 ### 9.4 Prefix Rules for Currency Units
 
-**All SI prefixes** are permitted on all currency units. `k~USD` denotes "values in thousands of USD" — a common scale annotation in financial reporting.
+**All SI prefixes** are permitted on all currency units. `k~$USD` denotes "values in thousands of USD" — a common scale annotation in financial reporting. As with a physical unit (§4.3), the `~` is optional: `k$USD` is the same unit, because the `$` sigil already separates the prefix from the code.
 
 ```bovnar
 .fund_nav   = <float_dec:64,k~$USD>    250.0;   # $250,000
-.gdp        = <float_dec:64,M~$EUR> 42800.0;    # €42.8 billion
+.gdp        = <float_dec:64,M$EUR>  42800.0;    # €42.8 billion — compact prefix
 .eth_gwei   = <float_dec:64,G~$ETH>    35.0;    # 35 Gwei gas price
 ```
 
-**IEC binary prefixes** (`Ki~`, `Mi~`, …) are **forbidden** on all currency units. `bvn_currency_prefix_valid()` returns `false` for any IEC prefix; the parser raises `error_unit_illegal`.
+The sigil itself is **not** optional in either spelling: `kUSD` is `error_unit_illegal`, exactly as bare `USD` is.
+
+**IEC binary prefixes** (`Ki~`, `Mi~`, …) are **forbidden** on all currency units, compact spelling included (`Ki$USD` is an error too). `bvn_currency_prefix_valid()` returns `false` for any IEC prefix; the parser raises `error_unit_illegal`.
 
 ### 9.5 Compound Currency Expressions
 
@@ -1109,7 +1153,7 @@ The mandatory `$` sigil (§9.1, normative rule in §10.4) makes the two namespac
 
 | Written token | Looked up in | Result |
 |---|---|---|
-| `$USD`, `$BTC`, `k~$EUR` | currency table (sigil present) | currency, or `error_unit_illegal` if the code is unknown |
+| `$USD`, `$BTC`, `k~$EUR`, `k$EUR` | currency table (sigil present) | currency, or `error_unit_illegal` if the code is unknown |
 | `m`, `Hz`, `cup`, `BTU`, `k~g` (no `$`) | physical unit table only | physical unit, or `error_unit_illegal` if unknown |
 | `USD`, `CUP`, `XYZ` (no `$`) | physical unit table only | `error_unit_illegal` — not physical units, and a bare code is never a currency |
 
@@ -1158,6 +1202,7 @@ A currency code carries a **mandatory `$` sigil** as of spec 1.0. This is the re
 .price   = <float_dec:64,$USD>      19.99;   # US Dollar
 .btc     = <uint:64,$BTC>        54782000;   # Bitcoin (satoshis)
 .fund    = <float_dec:64,k~$EUR>   250.0;    # kilo-Euro (prefix before the sigil)
+.aum     = <float_dec:64,M$EUR>    42.8;     # mega-Euro, compact prefix (= M~$EUR)
 .spot    = <float_dec:64,$USD/oz_t> 2351.40; # currency / physical-unit compound
 
 # A bare code is no longer a currency:
@@ -1165,7 +1210,7 @@ A currency code carries a **mandatory `$` sigil** as of spec 1.0. This is the re
 # .bad   = <float_dec:64,USD> 1.0;            # error_unit_illegal: bare 'USD' is not a unit (needs '$')
 ```
 
-The sigil attaches directly before the currency code, after any SI/IEC prefix and its `~` (`k~$EUR`, `M~$USDT`). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this **breaks** any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning & Stability section of the specification).
+The sigil attaches directly before the currency code, after any SI/IEC prefix and its optional `~` (`k~$EUR` or `k$EUR`, `M~$USDT` or `M$USDT`; §4.3). It is accepted in inline units and type annotations alike, and the writer emits it on output so values round-trip. Because this **breaks** any document that used bare currency codes, it was made before the 1.0 freeze — afterwards it would be an incompatible change (see the Versioning & Stability section of the specification).
 
 ---
 
@@ -1496,7 +1541,7 @@ Single-pass parsing algorithm:
 1. `memcmp` against `"no_unit"` → return `BVN_UNIT_NONE` immediately on match.
 2. Scan for separator characters to distinguish simple vs. compound paths.
 3. For compound units, split on `0x2A` (`*`), `0x2F` (`/`), `0xC2 0xB7` (`·`); parse each slice as a component; negate denominator exponents.
-4. For each component, if it is introduced by the `$` sigil (after any prefix and its `~`), look the code up in the currency table; otherwise look it up in the physical unit table only. A bare code is never a currency.
+4. For each component, if it is introduced by the `$` sigil (after any prefix and its optional `~`), look the code up in the currency table; otherwise look it up in the physical unit table only. A bare code is never a currency.
 
 ```c
 bool ok;

@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# post-checkout -- catch a translated edition stranded by a branch switch.
+#
+# web/<lang>/index.html is a build artifact: gen_i18n.py produces it from
+# web/index.html plus web/i18n/<lang>.json, and .gitignore keeps it out of the
+# repository so there is only ever one copy to keep in sync. The cost of that
+# choice is that git cannot restore it across a checkout. Run gen_i18n.py, switch
+# branches, and the translated page on disk still belongs to the branch you left
+# -- with nothing in `git status` to say so, because git does not track it.
+#
+# gen_i18n.py --check already detects exactly this. It just never ran at the
+# moment the drift appeared, which is the one moment the drift is explicable.
+# This hook runs it there.
+#
+# Advisory only: git ignores a post-checkout exit status, and a stale artifact
+# is not a reason to refuse a checkout. Nothing here writes to the working tree
+# -- regenerating behind your back would trade a visible inconsistency for an
+# invisible one, and on a branch with untranslated strings it would fail anyway.
+#
+# Enable in a fresh clone (git never tracks .git/hooks):
+#   git config core.hooksPath githooks
+
+set -u
+
+# $1 previous HEAD, $2 new HEAD, $3 is 1 for a branch checkout and 0 for a file
+# checkout. Only a branch checkout can strand an edition.
+[ "${3:-0}" = "1" ] || exit 0
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" || exit 0
+
+# The hook lives in the worktree, so it can outlive the script it calls -- check
+# out a commit from before gen_i18n.py existed and this must simply stand down.
+[ -f gen_i18n.py ] || exit 0
+command -v python3 >/dev/null 2>&1 || exit 0
+
+status=0
+for table in web/i18n/*.json; do
+    [ -e "$table" ] || continue          # no locales yet: the glob is literal
+    lang=$(basename "$table" .json)
+
+    # --check exits 0 for an edition that was never built, so a fresh clone stays
+    # quiet; it only objects to one that exists and disagrees with its sources.
+    out=$(python3 gen_i18n.py --check "$lang" 2>&1) && continue
+
+    # Report what gen_i18n.py actually said rather than assuming staleness: the
+    # same non-zero exit also covers an untranslated table, and telling someone
+    # to regenerate when the real fix is to translate wastes their next minute.
+    [ "$status" = 0 ] && printf '\n' >&2
+    status=1
+    printf '%s\n' "$out" | grep -m1 '^error:' >&2 ||
+        printf 'error: gen_i18n.py --check %s failed\n' "$lang" >&2
+
+    # An untranslated table gets its own remedy line from gen_i18n.py -- quote
+    # that rather than the regenerate command, which would not fix it. Only a
+    # stale edition, which says so in the error line alone, needs regenerating.
+    hint=$(printf '%s\n' "$out" | grep -m1 '^Run:') || hint=""
+    if [ -n "$hint" ]; then
+        printf '       %s\n' "$hint" >&2
+    else
+        printf '       fix: ./gen_i18n.py %s\n' "$lang" >&2
+    fi
+done
+
+[ "$status" = 0 ] || printf '\n' >&2
+exit 0

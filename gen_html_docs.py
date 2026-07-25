@@ -551,8 +551,28 @@ def build_index_page():
         f"{SITE}/docs/", body, schema)
 
 
+# A doc source that has lost its content still renders — as an empty page that
+# --check then happily calls "current", because the generated file matches the
+# source it was generated from. That is how doc/4 shipped empty for one commit:
+# a tool truncated it, the page regenerated to match, and every gate agreed.
+# Nothing downstream can catch this, so catch it here, at the only point that
+# sees the source.
+MIN_DOC_BYTES = 2000
+
+
 def build_doc_page(src, slug, pdf, title, desc):
-    text = open(os.path.join(DOC_DIR, src), encoding="utf-8").read()
+    path = os.path.join(DOC_DIR, src)
+    text = open(path, encoding="utf-8").read()
+    if len(text.encode("utf-8")) < MIN_DOC_BYTES or "\n" not in text.strip():
+        raise SystemExit(
+            "gen_html_docs.py: %s is %d bytes — a documentation source this "
+            "short has almost certainly been truncated by a tool. Restore it "
+            "(git checkout) rather than publishing an empty page."
+            % (src, len(text.encode("utf-8"))))
+    if not src.endswith(".ebnf") and not re.search(r"^#\s+\S", text, re.M):
+        raise SystemExit(
+            "gen_html_docs.py: %s has no top-level heading; refusing to "
+            "generate a page from it." % src)
     extra_head = ""
     if src.endswith(".ebnf"):
         body_md = "```\n" + text + "\n```"

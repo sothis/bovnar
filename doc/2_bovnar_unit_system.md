@@ -472,7 +472,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 | `prln` | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.17953×10⁻³ m |
 | `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61544×10⁻² m |
 | `prf`  | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
-| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.67160×10⁻¹ m ⚠ |
+| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.669376×10⁻¹ m (25½ Zoll) |
 | `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.76624 m |
 | `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m |
 | `dt_mi` | `deutsche_meile`, `german_mile` | Geographische Meile | `bu_german_mile` | 7420.44 m |
@@ -489,15 +489,9 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 |--------|-----------|------|------------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-> ⚠ **The Elle does not derive from the Fuß.** Every other Prussian unit here
-> reproduces its historical definition from the 1816 Fuß (0.313853 m) to within
-> 1.1×10⁻⁶ — Zoll = Fuß/12, Rute = 12 Fuß, Klafter = 6 Fuß, Morgen = 180 square
-> Ruten. The Elle is defined as 25½ Zoll, which gives 0.666938 m, and published
-> tables give 66.694 cm; the shipped value is 0.66716 m, off by 3.3×10⁻⁴ and a
-> multiple of the Zoll (25.5085) that is not a round number. The value is left
-> as shipped because changing a factor changes what stored data converts to;
-> `test_unit_factors_derived.py` pins the discrepancy so it cannot drift
-> unnoticed, and retiring that test is the marker for correcting it.
+> Every Prussian unit here reproduces its historical definition from the 1816 Fuß (0.313853 m):
+> Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
+> square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
 > The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
 

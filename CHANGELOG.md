@@ -39,6 +39,13 @@ reading the grown by-value structs at the wrong size.
   kilotonne and the knot, so the author picks `k~t` or `kn`. The list is data,
   in `.compact_exceptions` in `src/gendata/units.bvnr`, and the separated forms
   `u~sb` and `k~t` are untouched. See unit-system reference §4.3.
+- **Fixed: the Prussian Elle was 3.3×10⁻⁴ off its own definition** — 0.66716 m, which is 25.5085
+  Zoll, a number no definition produces. The Elle is 25½ Zoll = 0.666937625 m from the 1816 Fuß, and
+  published tables give 66.694 cm; every other Prussian unit already derived to within 1.1×10⁻⁶.
+  A value stored in `elle` now converts correctly. This is the one class of change a 1.x revision
+  cannot make silently — the stored number is unchanged, but what it converts to moves by 0.03 % —
+  so it is called out here rather than buried: anything that round-tripped an Elle through SI before
+  this release carries the old factor.
 - **Conversion factors are now checked against their own definitions** — a new pure-Python test
   (`test_unit_factors_derived.py`, registered as `bvnr_py_unit_factors`) re-derives 119 factors from
   the relations that define them: a furlong is 660 international feet, an acre 43560 square feet, an

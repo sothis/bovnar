@@ -1627,7 +1627,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 <td><code>prussian_elle</code>, <code>preussische_elle</code></td>
 <td>Prussian Elle</td>
 <td><code>bu_prussian_elle</code></td>
-<td>6.67160×10⁻¹ m ⚠</td>
+<td>6.669376×10⁻¹ m (25½ Zoll)</td>
 </tr>
 <tr>
 <td><code>rute</code></td>
@@ -1695,15 +1695,9 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 </tbody>
 </table>
 <blockquote>
-<p>⚠ <strong>The Elle does not derive from the Fuß.</strong> Every other Prussian unit here
-reproduces its historical definition from the 1816 Fuß (0.313853 m) to within
-1.1×10⁻⁶ — Zoll = Fuß/12, Rute = 12 Fuß, Klafter = 6 Fuß, Morgen = 180 square
-Ruten. The Elle is defined as 25½ Zoll, which gives 0.666938 m, and published
-tables give 66.694 cm; the shipped value is 0.66716 m, off by 3.3×10⁻⁴ and a
-multiple of the Zoll (25.5085) that is not a round number. The value is left
-as shipped because changing a factor changes what stored data converts to;
-<code>test_unit_factors_derived.py</code> pins the discrepancy so it cannot drift
-unnoticed, and retiring that test is the marker for correcting it.</p>
+<p>Every Prussian unit here reproduces its historical definition from the 1816 Fuß (0.313853 m):
+Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
+square Ruten. <code>test_unit_factors_derived.py</code> checks each of them against that definition.</p>
 <p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–396</strong> (<code>bu_ph_scale</code> … <code>bu_turbidity_jtu</code>), and a further unit would be appended there. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>383</strong> (verified by static assert <code>bu_kilometer_per_hour + 1 == 383</code>, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.</p>
 </blockquote>
 <h3 id="321-additional-length-units">3.21 Additional Length Units</h3>

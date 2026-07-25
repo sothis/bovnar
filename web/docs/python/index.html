@@ -39,10 +39,1744 @@
 <main>
 <h1>Bovnar Python Bindings</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/4_bovnar_python_bindings.md">Markdown</a> and <a href="/doc/pdf/bovnar-python-bindings.pdf">PDF</a>.</p>
+<blockquote>
+<p><strong>Version:</strong> 1.1</p>
+</blockquote>
+<p>Pure-<code>ctypes</code> Python bindings for the <strong>Bovnar (BVNR)</strong> typed serialisation
+library (spec v1.1).</p>
+<p>No compiled extension module is needed — the bindings load <code>libbvnr.so</code> at
+import time via the standard <code>ctypes.CDLL</code> machinery.</p>
+<hr />
+<h2 id="requirements">Requirements</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python ≥ 3.10</td>
+<td><code>dataclasses</code>, <code>enum.IntEnum</code>, union-type annotations (<code>X \| Y</code>)</td>
+</tr>
+<tr>
+<td><code>libbvnr.so</code></td>
+<td>Runtime only; see <em>Library discovery</em> below</td>
+</tr>
+<tr>
+<td><code>numpy</code> ≥ 1.24</td>
+<td><strong>Optional</strong> — only for the NumPy bridge (<code>pip install bovnar[numpy]</code>)</td>
+</tr>
+<tr>
+<td><code>pint</code> ≥ 0.22</td>
+<td><strong>Optional</strong> — only for the pint bridge (<code>pip install bovnar[pint]</code>)</td>
+</tr>
+<tr>
+<td>pytest ≥ 7</td>
+<td>Test suite only (<code>pip install bovnar[dev]</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>numpy</code> and <code>pint</code> are imported <strong>lazily, on first use</strong> of their respective
+bridge functions — importing <code>bovnar</code> never requires either to be installed.</p>
+<hr />
+<h2 id="installation">Installation</h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Editable install from source (recommended during development)</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</code></pre></div>
 
+<p>Optional extras pull in the dependencies for the bridges:</p>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bovnar[numpy]&quot;</span><span class="w">   </span><span class="c1"># NumPy bridge</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bovnar[pint]&quot;</span><span class="w">    </span><span class="c1"># pint bridge</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bovnar[all]&quot;</span><span class="w">     </span><span class="c1"># both numpy and pint</span>
+</code></pre></div>
+
+<hr />
+<h2 id="library-discovery">Library discovery</h2>
+<p>The bindings search for <code>libbvnr.so</code> in this order:</p>
+<ol>
+<li><strong><code>LIBBOVNAR_PATH</code></strong> — absolute path to the <code>.so</code> file, e.g.
+   <code>bash
+   export LIBBOVNAR_PATH=/opt/bovnar/lib/libbvnr.so</code></li>
+<li><strong><code>LIBBOVNAR_DIR</code></strong> — directory that <em>contains</em> the <code>.so</code>, e.g.
+   <code>bash
+   export LIBBOVNAR_DIR=/opt/bovnar/lib</code></li>
+<li><strong><code>ctypes.util.find_library('bvnr')</code></strong> — standard <code>ldconfig</code> / <code>LD_LIBRARY_PATH</code> search.</li>
+<li><strong>In-tree build paths</strong> — <code>../../build/</code>, <code>../../build/release/</code>, <code>../../</code>,
+   <code>.</code> (resolved relative to the <code>_ffi.py</code> file; useful when building Bovnar
+   alongside the bindings from a mono-repo).</li>
+</ol>
+<p>If the library cannot be found a <code>BovnarLibraryNotFound</code> exception is raised
+with the list of searched paths.</p>
+<hr />
+<h2 id="quick-start">Quick-start</h2>
+<h3 id="high-level-api-loads--dumps">High-level API (<code>loads</code> / <code>dumps</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="c1"># Serialise a Python dict to BVNR bytes</span>
+<span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;sensor_id&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+    <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">3.7</span><span class="p">,</span>
+    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;outdoor&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;active&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">bvnr_bytes</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># Deserialise back to a Python dict</span>
+<span class="n">recovered</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">bvnr_bytes</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">recovered</span><span class="p">[</span><span class="s2">&quot;sensor_id&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
+</code></pre></div>
+
+<p><code>loads</code> accepts an optional <code>typed</code> flag that wraps typed values in <code>Quantity</code>
+objects instead of decoding them to native Python scalars.  This preserves the
+original text representation, exact type width, numeral base, and physical unit
+for lossless round-trips:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;.pressure = &lt;float:32,Pa&gt; 101325.0;&quot;</span>
+<span class="n">doc</span>  <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">bvnr</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">q</span>    <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;pressure&quot;</span><span class="p">]</span>     <span class="c1"># Quantity(&#39;101325.0&#39;, FLOAT [Pa])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">raw</span><span class="p">)</span>               <span class="c1"># &#39;101325.0&#39;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">unit_str</span><span class="p">())</span>        <span class="c1"># &#39;Pa&#39;</span>
+
+<span class="c1"># dumps() accepts Quantity values — annotation and raw text are re-emitted as-is</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">==</span> <span class="n">doc</span>
+</code></pre></div>
+
+<p><code>dumps()</code> starts with a 4 MiB write buffer and doubles it automatically on
+overflow, up to 256 MiB.  The <code>cap</code> keyword argument that existed in earlier
+versions is no longer accepted.</p>
+<h3 id="sax-style-streaming-reader">SAX-style streaming reader</h3>
+<p>The verified callback receives exactly <strong>two</strong> positional arguments: the event
+code and the data payload.  There is no userdata/context argument — capture
+external state via closure instead.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">on_event</span><span class="p">(</span><span class="n">ev</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">ev</span> <span class="o">==</span> <span class="n">Event</span><span class="o">.</span><span class="n">ASSIGNMENT_START</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;key:&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">raw_str</span><span class="p">())</span>
+    <span class="k">elif</span> <span class="n">ev</span> <span class="o">==</span> <span class="n">Event</span><span class="o">.</span><span class="n">DATA</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;value bytes:&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">raw_bytes</span><span class="p">())</span>
+    <span class="k">return</span> <span class="kc">True</span>   <span class="c1"># returning False stops parsing (raises BovnarParseError)</span>
+
+<span class="k">with</span> <span class="n">Reader</span><span class="p">()</span> <span class="k">as</span> <span class="n">r</span><span class="p">:</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">read_mem</span><span class="p">(</span><span class="n">bvnr_bytes</span><span class="p">,</span> <span class="n">on_verified</span><span class="o">=</span><span class="n">on_event</span><span class="p">)</span>
+</code></pre></div>
+
+<p>The <code>BvnrData</code> payload passed to a callback exposes:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data.raw_str(encoding='utf-8')</code></td>
+<td><code>str</code></td>
+<td>The token bytes decoded as text</td>
+</tr>
+<tr>
+<td><code>data.raw_bytes()</code></td>
+<td><code>bytes</code></td>
+<td>The raw token bytes</td>
+</tr>
+<tr>
+<td><code>data.converted_str()</code></td>
+<td><code>str \| None</code></td>
+<td>Exact <code>want_unit</code> conversion result as a positional string, or <code>None</code> if no conversion / it does not terminate in its base</td>
+</tr>
+<tr>
+<td><code>data.converted_in_base(base)</code></td>
+<td><code>str \| None</code></td>
+<td>The exact conversion re-rendered in <code>base</code></td>
+</tr>
+<tr>
+<td><code>data.converted_rational()</code></td>
+<td><code>tuple[int, int] \| None</code></td>
+<td>The exact conversion as <code>(numerator, denominator)</code></td>
+</tr>
+<tr>
+<td><code>data.frac_str()</code></td>
+<td><code>str \| None</code></td>
+<td>Verbatim ISO sub-second digits of a <code>datetime</code> literal (spec 1.1), or <code>None</code></td>
+</tr>
+</tbody>
+</table>
+<p>It also carries the <code>converted</code> (bool) and <code>value_type</code> / <code>value_unit</code> fields directly.</p>
+<h3 id="generator--iterator-interface">Generator / iterator interface</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reader</span>
+
+<span class="k">with</span> <span class="n">Reader</span><span class="p">()</span> <span class="k">as</span> <span class="n">r</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">payload</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">iter_mem</span><span class="p">(</span><span class="n">bvnr_bytes</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">payload</span><span class="o">.</span><span class="n">event</span><span class="p">,</span> <span class="n">payload</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="dom-random-access-api">DOM (random-access) API</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="n">doc</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dom_parse</span><span class="p">(</span><span class="n">bvnr_bytes</span><span class="p">)</span>
+
+<span class="c1"># Top-level key lookup</span>
+<span class="n">node</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;sensor_id&quot;</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">as_i64</span><span class="p">())</span>        <span class="c1"># → 42</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">value_type</span><span class="p">)</span>      <span class="c1"># ValueTypeSpec(family=UINT, width=64, base=0)</span>
+
+<span class="c1"># Struct traversal</span>
+<span class="n">cfg</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">]</span>
+<span class="n">host</span> <span class="o">=</span> <span class="n">cfg</span><span class="p">[</span><span class="s2">&quot;host&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">as_str</span><span class="p">()</span>
+
+<span class="c1"># Array access</span>
+<span class="n">arr</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;values&quot;</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">arr</span><span class="p">)):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">as_float</span><span class="p">())</span>
+
+<span class="c1"># Convert entire document to a plain Python dict (drops type/unit info)</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+</code></pre></div>
+
+<h3 id="low-level-writer">Low-level writer</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.writer</span><span class="w"> </span><span class="kn">import</span> <span class="n">Writer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.enums</span><span class="w">  </span><span class="kn">import</span> <span class="n">BaseUnit</span><span class="p">,</span> <span class="n">SIPrefix</span>
+
+<span class="k">with</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">()</span> <span class="k">as</span> <span class="n">w</span><span class="p">:</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">write_float</span><span class="p">(</span><span class="s2">&quot;velocity&quot;</span><span class="p">,</span> <span class="mf">9.81</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+                  <span class="n">unit_si_base</span><span class="o">=</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">METER</span><span class="p">,</span>
+                  <span class="n">unit_si_prefix</span><span class="o">=</span><span class="n">SIPrefix</span><span class="o">.</span><span class="n">NONE</span><span class="p">)</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">write_uint</span><span class="p">(</span><span class="s2">&quot;count&quot;</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+
+<span class="n">output</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span>
+</code></pre></div>
+
+<h3 id="streaming--framing-bovnarstream">Streaming / framing (<code>bovnar.stream</code>)</h3>
+<p>Bindings for the streaming layer (see
+<a href="https://www.bovnar.io/docs/streaming/">Streaming, Framing &amp; Multiplexing</a> for the full
+treatment):</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">stream</span>
+
+<span class="c1"># Multi-document record framing</span>
+<span class="n">blob</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">dump_documents</span><span class="p">([{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}])</span>   <span class="c1"># list[dict] -&gt; bytes</span>
+<span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">)</span>                      <span class="c1"># bytes -&gt; list[dict]</span>
+<span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="n">continue_past_failed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># bad docs -&gt; None</span>
+
+<span class="c1"># Octet multiplexing: (channel, payload) of any size, interleaved &amp; reassembled</span>
+<span class="n">multiplexed</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">mux_dump</span><span class="p">([(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;world&quot;</span><span class="p">)])</span>
+<span class="n">messages</span>    <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">mux_load</span><span class="p">(</span><span class="n">multiplexed</span><span class="p">)</span>             <span class="c1"># [(1, b&quot;hello&quot;), (42, b&quot;world&quot;)]</span>
+
+<span class="c1"># Document-in-document</span>
+<span class="n">outer</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">embed_document</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;v&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;payload&quot;</span><span class="p">)</span>
+<span class="n">inner</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">parse_embedded</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">outer</span><span class="p">)[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span>   <span class="c1"># {&quot;v&quot;: 1}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="unit-helpers">Unit helpers</h2>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="c1"># Parse a unit string into a ValueUnit struct</span>
+<span class="n">vu</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~g·m/s²&quot;</span><span class="p">)</span>
+
+<span class="c1"># Convert a ValueUnit back to its canonical string</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>     <span class="c1"># → &quot;k~g·m/s²&quot;</span>
+
+<span class="c1"># Scalar SI/IEC prefix factor for a unit string</span>
+<span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;M~Hz&quot;</span><span class="p">)</span> <span class="c1"># → 1_000_000.0</span>
+</code></pre></div>
+
+<h3 id="extended-unit-functions">Extended unit functions</h3>
+<p>The following functions operate on <code>ValueUnit</code> objects and are available both
+from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">unit_valid</span><span class="p">,</span> <span class="n">unit_prefix_factor</span><span class="p">,</span> <span class="n">unit_prefix_exponent</span><span class="p">,</span>
+    <span class="n">prefix_unit_valid</span><span class="p">,</span>
+    <span class="n">unit_to_si_factor</span><span class="p">,</span> <span class="n">units_compatible</span><span class="p">,</span>
+    <span class="n">unit_convert_factor</span><span class="p">,</span> <span class="n">unit_dimension_vector</span><span class="p">,</span>
+    <span class="n">unit_reduce</span><span class="p">,</span> <span class="n">unit_to_str_ex</span><span class="p">,</span>
+    <span class="n">exponent_to_int</span><span class="p">,</span> <span class="n">int_to_exponent</span><span class="p">,</span>
+    <span class="n">convert_value</span><span class="p">,</span>
+    <span class="n">UnitFlags</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Validate a ValueUnit struct</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">unit_valid</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># True when vu is structurally valid</span>
+
+<span class="c1"># Prefix scale factor (SI or IEC) for a ValueUnit</span>
+<span class="n">f</span> <span class="o">=</span> <span class="n">unit_prefix_factor</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>            <span class="c1"># e.g. 1000.0 for k~m, 2**30 for Gi~B</span>
+
+<span class="c1"># Prefix exponent (base-10 for SI, base-2 for IEC)</span>
+<span class="n">e</span> <span class="o">=</span> <span class="n">unit_prefix_exponent</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>          <span class="c1"># e.g. 3 for kilo, -3 for milli, 30 for gibi</span>
+
+<span class="c1"># Validate a prefix for a base unit (IEC prefixes are only valid on bit/byte)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValueUnitPrefix</span><span class="p">,</span> <span class="n">IECPrefix</span><span class="p">,</span> <span class="n">BaseUnit</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">ValueUnitPrefix</span><span class="o">.</span><span class="n">make_iec</span><span class="p">(</span><span class="n">IECPrefix</span><span class="o">.</span><span class="n">GIBI</span><span class="p">)</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">prefix_unit_valid</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">BaseUnit</span><span class="o">.</span><span class="n">BYTE</span><span class="p">)</span>   <span class="c1"># True</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">prefix_unit_valid</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">BaseUnit</span><span class="o">.</span><span class="n">METER</span><span class="p">)</span>  <span class="c1"># False</span>
+
+<span class="c1"># Full SI conversion including affine terms (e.g. Celsius → Kelvin)</span>
+<span class="n">conv</span> <span class="o">=</span> <span class="n">unit_to_si_factor</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>
+<span class="c1"># conv.factor, conv.is_affine, conv.affine_offset</span>
+
+<span class="c1"># Check dimensional compatibility</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">units_compatible</span><span class="p">(</span><span class="n">vu_a</span><span class="p">,</span> <span class="n">vu_b</span><span class="p">)</span>     <span class="c1"># True if same SI dimension vector</span>
+
+<span class="c1"># Conversion factor between two compatible units</span>
+<span class="n">c</span> <span class="o">=</span> <span class="n">unit_convert_factor</span><span class="p">(</span><span class="n">vu_from</span><span class="p">,</span> <span class="n">vu_to</span><span class="p">)</span>
+<span class="c1"># c.factor, c.requires_affine</span>
+
+<span class="c1"># 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]</span>
+<span class="n">dims</span> <span class="o">=</span> <span class="n">unit_dimension_vector</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>       <span class="c1"># e.g. [1, 0, -1, 0, 0, 0, 0] for m/s</span>
+
+<span class="c1"># Reduce a compound unit to its canonical named SI unit</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">unit_reduce</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># r.unit, r.scale</span>
+
+<span class="c1"># Convert a scalar value between units (handles affine conversions)</span>
+<span class="n">kelvin</span> <span class="o">=</span> <span class="n">convert_value</span><span class="p">(</span><span class="mf">25.0</span><span class="p">,</span> <span class="n">vu_celsius</span><span class="p">,</span> <span class="n">vu_kelvin</span><span class="p">)</span>
+
+<span class="c1"># Serialise with formatting options (see UnitFlags below)</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>   <span class="c1"># use ^N instead of Unicode superscripts</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span><span class="p">)</span>      <span class="c1"># reduce to canonical named unit first</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>
+
+<span class="c1"># Exponent enum ↔ integer conversions</span>
+<span class="n">n</span>   <span class="o">=</span> <span class="n">exponent_to_int</span><span class="p">(</span><span class="n">Exponent</span><span class="o">.</span><span class="n">NEG_SQUARE</span><span class="p">)</span>  <span class="c1"># → -2</span>
+<span class="n">exp</span> <span class="o">=</span> <span class="n">int_to_exponent</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>                    <span class="c1"># → Exponent.NEG_SQUARE</span>
+</code></pre></div>
+
+<p><code>SI_DIM_NAMES</code> is the ordered tuple <code>('m', 'kg', 's', 'A', 'K', 'mol', 'cd')</code>
+— the index positions used by <code>unit_dimension_vector</code>.</p>
+<h3 id="unitflags"><code>UnitFlags</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitFlags</span>   <span class="c1"># also from bovnar.units</span>
+
+<span class="n">UnitFlags</span><span class="o">.</span><span class="n">NONE</span>      <span class="c1"># 0 — no special formatting</span>
+<span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span>    <span class="c1"># reduce to a canonical named SI unit before serialising</span>
+<span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span> <span class="c1"># use ^N exponent notation instead of Unicode superscripts</span>
+</code></pre></div>
+
+<p><code>UnitFlags</code> is an <code>IntFlag</code> and its values may be OR-combined:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="valueunitprefix"><code>ValueUnitPrefix</code></h3>
+<p><code>ValueUnitPrefix</code> is the public mirror of the C <code>value_unit_prefix_t</code> struct.
+It can be constructed with class methods or extracted from a <code>ValueUnitComponent</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValueUnitPrefix</span><span class="p">,</span> <span class="n">SIPrefix</span><span class="p">,</span> <span class="n">IECPrefix</span>
+
+<span class="n">p_si</span>  <span class="o">=</span> <span class="n">ValueUnitPrefix</span><span class="o">.</span><span class="n">make_si</span><span class="p">(</span><span class="n">SIPrefix</span><span class="o">.</span><span class="n">KILO</span><span class="p">)</span>
+<span class="n">p_iec</span> <span class="o">=</span> <span class="n">ValueUnitPrefix</span><span class="o">.</span><span class="n">make_iec</span><span class="p">(</span><span class="n">IECPrefix</span><span class="o">.</span><span class="n">GIBI</span><span class="p">)</span>
+
+<span class="n">vu</span>   <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;Gi~B&quot;</span><span class="p">)</span>
+<span class="n">comp</span> <span class="o">=</span> <span class="n">vu</span><span class="o">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">p</span>    <span class="o">=</span> <span class="n">comp</span><span class="o">.</span><span class="n">prefix</span>   <span class="c1"># ValueUnitPrefix extracted from a component</span>
+</code></pre></div>
+
+<h3 id="inline-unit-suffix">Inline unit suffix</h3>
+<p>In addition to the unit embedded in a type annotation (<code>&lt;float:64,m/s&gt;</code>), the
+Bovnar format supports an <strong>inline unit suffix</strong> placed directly after a scalar
+value, before the terminating <code>;</code>:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.speed = 9.81 m/s;           # inline suffix, no annotation
+.mass  = &lt;float:64&gt; 70.5 k~g;# annotation without unit, inline adopted
+.dist  = &lt;float:64,m&gt; 1.5 m; # annotation and inline both say &#x27;m&#x27; — valid</code></pre></div>
+<p>From the Python layer, inline and annotation units are <strong>identical</strong>: both
+reach the application as <code>data.value_unit</code> inside the <code>Event.DATA</code> payload.
+No extra code is required to consume inline units.</p>
+<p>The validator raises <code>ErrorCode.UNIT_MISMATCH</code> (38 / <code>BovnarParseError</code>) when
+an inline suffix is present and a type-annotation unit is also present but the
+two do not resolve to the same <code>value_unit_t</code>. Inline unit suffixes inside
+array elements always raise <code>ErrorCode.UNEXPECTED_INPUT_BYTE</code>.</p>
+<hr />
+<h2 id="quantity"><code>Quantity</code></h2>
+<p><code>Quantity</code> is a typed, unit-annotated scalar value that preserves the original
+text representation, type width, numeral base, and physical unit across a
+<code>loads</code> / <code>dumps</code> round-trip.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Quantity</span><span class="p">,</span> <span class="n">ValueTypeSpec</span><span class="p">,</span> <span class="n">ValueUnit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValueTypeFamily</span>
+</code></pre></div>
+
+<h3 id="construction">Construction</h3>
+<p><code>Quantity</code> is normally produced by <code>loads(..., typed=True)</code> rather than
+constructed by hand, but direct construction is supported:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.structs</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_type_spec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.enums</span><span class="w">   </span><span class="kn">import</span> <span class="n">ValueTypeFamily</span>
+
+<span class="n">vt</span> <span class="o">=</span> <span class="n">make_type_spec</span><span class="p">(</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">FLOAT</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
+<span class="n">q</span>  <span class="o">=</span> <span class="n">Quantity</span><span class="p">(</span><span class="s1">&#39;101325.0&#39;</span><span class="p">,</span> <span class="n">vt</span><span class="p">)</span>          <span class="c1"># dimensionless</span>
+<span class="n">q2</span> <span class="o">=</span> <span class="n">Quantity</span><span class="p">(</span><span class="s1">&#39;9.81&#39;</span><span class="p">,</span>     <span class="n">vt</span><span class="p">,</span> <span class="n">vu</span><span class="p">)</span>      <span class="c1"># vu is a ValueUnit, e.g. from parse_unit</span>
+</code></pre></div>
+
+<p>For exact numeric input there is also the <code>Quantity.from_number</code> constructor,
+which stores the value as an exact decimal literal (so writing it with <code>dumps</code>
+is lossless to the format's precision):</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fractions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Fraction</span>
+
+<span class="n">Quantity</span><span class="o">.</span><span class="n">from_number</span><span class="p">(</span><span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;19.99&#39;</span><span class="p">))</span>                          <span class="c1"># float_dec:64</span>
+<span class="n">Quantity</span><span class="o">.</span><span class="n">from_number</span><span class="p">(</span><span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;1.1&#39;</span><span class="p">),</span> <span class="n">family</span><span class="o">=</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">FLOAT</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+<span class="n">Quantity</span><span class="o">.</span><span class="n">from_number</span><span class="p">(</span><span class="n">Fraction</span><span class="p">(</span><span class="mi">837</span><span class="p">,</span> <span class="mi">256</span><span class="p">),</span>
+                     <span class="n">family</span><span class="o">=</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">FLOAT_FIX</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">frac</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+</code></pre></div>
+
+<p>It accepts a <code>Decimal</code>, <code>Fraction</code> (must be a terminating decimal), <code>int</code>,
+<code>str</code> (a verbatim literal), or <code>float</code> (only as precise as the double), and
+validates the width for the chosen family.</p>
+<h3 id="properties-and-methods">Properties and methods</h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q.raw</code></td>
+<td><code>str \| None</code></td>
+<td>Original text token as it appeared in the BVNR stream</td>
+</tr>
+<tr>
+<td><code>q.vtype</code></td>
+<td><code>ValueTypeSpec</code></td>
+<td>Type family, bit width, and numeral base</td>
+</tr>
+<tr>
+<td><code>q.unit</code></td>
+<td><code>ValueUnit</code></td>
+<td>Physical unit (<code>BVN_UNIT_NONE</code> when dimensionless)</td>
+</tr>
+<tr>
+<td><code>q.value</code></td>
+<td>property</td>
+<td>Decode <code>raw</code> to the closest native Python scalar (<code>int</code>, <code>float</code>, <code>str</code>, <code>bool</code>) — <strong>lossy</strong> for <code>float_dec</code> / <code>float_fix</code> / <code>float:128</code>+ (goes through a C <code>double</code>)</td>
+</tr>
+<tr>
+<td><code>q.unit_str()</code></td>
+<td><code>str</code></td>
+<td>Canonical unit string (e.g. <code>'m/s²'</code>), or <code>''</code> when dimensionless</td>
+</tr>
+<tr>
+<td><code>q.decimal()</code></td>
+<td><code>Decimal</code></td>
+<td><strong>Exact</strong> value as <code>decimal.Decimal</code> from the verbatim literal — lossless at any width; raises for non-numeric families</td>
+</tr>
+<tr>
+<td><code>q.fraction()</code></td>
+<td><code>Fraction</code></td>
+<td>Exact value as <code>fractions.Fraction</code> (for <code>float_fix</code>, the exact <code>mantissa / 2**frac</code>)</td>
+</tr>
+<tr>
+<td><code>q.fixed_point()</code></td>
+<td><code>(int, int)</code></td>
+<td><code>(mantissa, frac_bits)</code> of a <code>float_fix</code> value; the value is <code>mantissa / 2**frac_bits</code></td>
+</tr>
+<tr>
+<td><code>q.stored_value()</code></td>
+<td><code>Decimal</code></td>
+<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal()</code> only when the literal carries more precision than the format holds</td>
+</tr>
+<tr>
+<td><code>q.ieee_bits()</code></td>
+<td><code>bytes</code></td>
+<td>IEEE-754 interchange bytes (binary16…256 for <code>float</code>, decimal16…256 for <code>float_dec</code>), little-endian word order</td>
+</tr>
+<tr>
+<td><code>q.epoch_name</code></td>
+<td><code>str \| None</code></td>
+<td>For a <code>datetime</code>, the epoch name (<code>"unix"</code>, <code>"tai"</code>, …); <code>None</code> otherwise</td>
+</tr>
+<tr>
+<td><code>q.epoch_mjd</code></td>
+<td><code>int \| None</code></td>
+<td>For a <code>datetime</code>, the epoch's Modified Julian Day; <code>None</code> otherwise</td>
+</tr>
+<tr>
+<td><code>q.datetime_fraction</code></td>
+<td><code>str \| None</code></td>
+<td>For a <code>datetime</code> written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); <code>None</code> otherwise</td>
+</tr>
+</tbody>
+</table>
+<h3 id="lossless-numeric-access-float_dec-float_fix-float128256">Lossless numeric access (<code>float_dec</code>, <code>float_fix</code>, <code>float:128</code>/<code>256</code>)</h3>
+<p><code>q.value</code> decodes through a C <code>double</code>, which loses precision for the
+decimal-float, fixed-point, and wide binary-float families. The accessors above
+instead use the verbatim literal text (and bovnar's arbitrary-precision
+<code>bvn_float</code>), so the full precision the format carries is reachable from Python:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">q</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.p=&lt;float_dec:64&gt; 3.141592653589793238462643383279503;&#39;</span><span class="p">,</span>
+                 <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;p&#39;</span><span class="p">]</span>
+<span class="n">q</span><span class="o">.</span><span class="n">value</span>          <span class="c1"># 3.141592653589793   (lossy C double)</span>
+<span class="n">q</span><span class="o">.</span><span class="n">decimal</span><span class="p">()</span>      <span class="c1"># Decimal(&#39;3.141592653589793238462643383279503&#39;)  (exact literal)</span>
+<span class="n">q</span><span class="o">.</span><span class="n">stored_value</span><span class="p">()</span> <span class="c1"># Decimal(&#39;3.141592653589793&#39;)  (the decimal64-rounded value)</span>
+
+<span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.x=&lt;float_fix:32,q8&gt; 3.27;&#39;</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
+<span class="n">f</span><span class="o">.</span><span class="n">fraction</span><span class="p">()</span>     <span class="c1"># Fraction(837, 256)</span>
+<span class="n">f</span><span class="o">.</span><span class="n">fixed_point</span><span class="p">()</span>  <span class="c1"># (837, 8)</span>
+</code></pre></div>
+
+<p>These materialise over the <strong>full</strong> representable range, including exponents the
+C parser cannot otherwise reach (beyond ~1e9865). <code>decimal()</code> / <code>fraction()</code>
+work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
+the bit-exact <code>stored_value()</code> / <code>ieee_bits()</code> apply to the IEEE encodings
+(<code>float:16/32/64/128/256</code>), which are also exposed directly as <code>bovnar.BvnFloat</code>.</p>
+<h3 id="dumps-integration"><code>dumps()</code> integration</h3>
+<p><code>_emit_value</code> dispatches on <code>Quantity</code> before the plain <code>int</code> / <code>float</code> path,
+so any dict that came from <code>loads(..., typed=True)</code> can be passed directly to
+<code>dumps()</code> and will produce identical output:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr</span>  <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;.speed = &lt;float:32,m/s&gt; 9.81;&quot;</span>
+<span class="n">doc</span>   <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">bvnr</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">out</span>   <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">out</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="n">bvnr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</code></pre></div>
+
+<p>The annotation is suppressed when <code>_needs_annotation</code> returns <code>False</code> — i.e.
+when the type is <code>FLOAT:64</code> with no unit and no non-decimal base (matching the
+C library's own default-annotation omission rules).</p>
+<p><code>dumps()</code> also accepts bare <code>decimal.Decimal</code> (written as an exact
+<code>float_dec:64</code> literal) and terminating <code>fractions.Fraction</code> values directly —
+a non-terminating fraction (e.g. <code>Fraction(1, 3)</code>) raises <code>BovnarArgumentError</code>.</p>
+<hr />
+<h2 id="write_array-helper"><code>write_array</code> helper</h2>
+<p><code>write_array</code> is a high-level helper exported from the top-level <code>bovnar</code>
+namespace. It handles both flat and multi-dimensional arrays.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">write_array</span><span class="p">,</span> <span class="n">Writer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.structs</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_type_spec</span><span class="p">,</span> <span class="n">make_unit_si</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValueTypeFamily</span><span class="p">,</span> <span class="n">BaseUnit</span>
+
+<span class="k">with</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">()</span> <span class="k">as</span> <span class="n">w</span><span class="p">:</span>
+    <span class="c1"># Single-row array</span>
+    <span class="n">write_array</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="s2">&quot;primes&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span>
+
+    <span class="c1"># Multi-row array (rows separated by /)</span>
+    <span class="n">write_array</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="s2">&quot;matrix&quot;</span><span class="p">,</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]])</span>
+
+    <span class="c1"># Typed array: whole-array type annotation</span>
+    <span class="n">vt</span> <span class="o">=</span> <span class="n">make_type_spec</span><span class="p">(</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">UINT</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>
+    <span class="n">write_array</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="s2">&quot;ports&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mi">80</span><span class="p">,</span> <span class="mi">443</span><span class="p">,</span> <span class="mi">8080</span><span class="p">],</span> <span class="n">vt</span><span class="o">=</span><span class="n">vt</span><span class="p">)</span>
+</code></pre></div>
+
+<p>Element types accepted per element: <code>int</code>, <code>float</code>, <code>str</code>, <code>bool</code>, <code>None</code>,
+<code>dict</code> (written as a struct), or nested <code>list</code>/<code>tuple</code> (written as a nested
+array). When <em>rows</em> is a flat sequence it is treated as a single-row array;
+when all top-level elements are themselves <code>list</code> or <code>tuple</code> it is treated as a
+multi-row array.</p>
+<hr />
+<h2 id="pint-bridge">pint bridge</h2>
+<p>bovnar units interoperate with <a href="https://pint.readthedocs.io/">pint</a> through a
+hand-verified translation table (<code>bovnar._pint_units</code>). pint is an <strong>optional</strong>
+dependency, imported lazily on first use; importing <code>bovnar</code> never requires it.
+Install with <code>pip install "bovnar[pint]"</code> (or <code>bovnar[all]</code>).</p>
+<p>The four bridge functions are exported from the top-level <code>bovnar</code> namespace
+(and from <code>bovnar._pint_bridge</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Direction</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_pint(value, vu, *, ureg=None)</code></td>
+<td>bovnar → pint</td>
+<td>Wrap a scalar/ndarray + <code>ValueUnit</code> in a pint <code>Quantity</code></td>
+</tr>
+<tr>
+<td><code>to_pint_unit(vu, *, ureg=None)</code></td>
+<td>bovnar → pint</td>
+<td><code>ValueUnit</code> → pint <code>Unit</code> (dimensionless when no real unit)</td>
+</tr>
+<tr>
+<td><code>from_pint(qty, *, ureg=None, validate=True)</code></td>
+<td>pint → bovnar</td>
+<td><code>Quantity</code> → <code>(magnitude, ValueUnit)</code></td>
+</tr>
+<tr>
+<td><code>from_pint_unit(unit, *, ureg=None, validate=True)</code></td>
+<td>pint → bovnar</td>
+<td><code>Unit</code> / <code>Quantity</code> / <code>str</code> → <code>ValueUnit</code></td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="n">vu</span>  <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~m&quot;</span><span class="p">)</span>        <span class="c1"># kilometre</span>
+<span class="n">qty</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_pint</span><span class="p">(</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">vu</span><span class="p">)</span>         <span class="c1"># &lt;Quantity(5.0, &#39;kilometer&#39;)&gt;</span>
+
+<span class="n">mag</span><span class="p">,</span> <span class="n">vu2</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">from_pint</span><span class="p">(</span><span class="n">qty</span><span class="p">)</span>      <span class="c1"># (5.0, ValueUnit for km)</span>
+<span class="n">vu3</span>      <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">from_pint_unit</span><span class="p">(</span><span class="s2">&quot;newton&quot;</span><span class="p">)</span>     <span class="c1"># str/Unit/Quantity all accepted</span>
+</code></pre></div>
+
+<h3 id="prefixes-ride-in-the-unit-never-the-magnitude">Prefixes ride in the unit, never the magnitude</h3>
+<p>bovnar's <code>k~m</code> maps to pint <code>kilometer</code> — the prefix is kept inside the unit
+<em>name</em>, never folded into the magnitude. A wrapped value is therefore returned
+unscaled, so a wrapped numpy array is never silently rescaled.</p>
+<h3 id="affine-temperature-units">Affine temperature units</h3>
+<p>Offset/affine scales (<code>°C</code>, <code>°F</code>, Réaumur, Delisle, Newton, Rømer) cannot carry
+a prefix or exponent — pint forbids it and bovnar never emits it. A prefixed or
+exponentiated affine unit raises <code>BovnarArgumentError</code> rather than a cryptic
+pint error.</p>
+<h3 id="validation">Validation</h3>
+<p><code>from_pint</code> / <code>from_pint_unit</code> validate the resulting <code>ValueUnit</code> by default
+(<code>validate=True</code>); a pint unit that maps to a structurally invalid bovnar unit
+(e.g. a prefix not permitted on that base) raises <code>BovnarArgumentError</code>. pint
+units with more than 8 components, non-integer exponents, or exponents outside
+<code>[-9, 9]</code> also raise.</p>
+<h3 id="registry-control-build_registry">Registry control: <code>build_registry</code></h3>
+<p>A module-level default <code>pint.UnitRegistry</code> is built on first use. To share a
+registry across calls — or to register bovnar's custom units onto your own —
+pass <code>ureg=</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar._pint_units</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_registry</span><span class="p">,</span> <span class="n">is_currency_unit</span>
+
+<span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">()</span>                       <span class="c1"># fresh registry with bovnar units</span>
+<span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">(</span><span class="n">my_existing_registry</span><span class="p">)</span>   <span class="c1"># extend an existing one</span>
+<span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">(</span><span class="n">with_currencies</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># skip the currency dimensions</span>
+<span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">(</span><span class="n">isolate_kinds</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>    <span class="c1"># alias kinds onto pint&#39;s natives</span>
+
+<span class="n">qty</span>  <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_pint</span><span class="p">(</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">vu</span><span class="p">,</span> <span class="n">ureg</span><span class="o">=</span><span class="n">ureg</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>build_registry</code> registers bovnar's custom physical-unit definitions — units
+where pint's own definition differs or is missing (e.g. <code>bvnr_gauss</code>,
+<code>bvnr_var</code>, the historical German units) — plus, by default, the ISO 4217 +
+crypto currencies as custom dimensions. <code>is_currency_unit(unit)</code> reports whether
+a pint unit involves a currency dimension (holds for products such as
+<code>USD/year</code>).</p>
+<h3 id="quantity-kinds-isolate_kinds">Quantity kinds: <code>isolate_kinds</code></h3>
+<p>Bovnar tracks <strong>quantity kinds</strong> for units that carry no SI dimension yet are
+not interchangeable — bit vs byte, an angle vs a plain count, <code>dB</code> vs <code>Np</code> vs
+<code>pH</code>, one kind per turbidity method, and practical salinity. pint has no such
+concept: to pint they are all dimensionless, so left to itself it will convert
+an <code>NTU</code> into an <code>FNU</code>, a byte into 8 bits or a <code>pH</code> into a percentage —
+precisely the answers Bovnar exists to withhold.</p>
+<p><code>build_registry</code> therefore gives <strong>each kind its own pint dimension</strong>, the same
+device the currency table uses to stop <code>100 USD</code> becoming <code>100 EUR</code>. pint then
+enforces Bovnar's rule natively:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">()</span>                       <span class="c1"># isolate_kinds=True by default</span>
+<span class="n">q</span>    <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_pint</span><span class="p">(</span><span class="mf">4.2</span><span class="p">,</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;NTU&quot;</span><span class="p">),</span> <span class="n">ureg</span><span class="o">=</span><span class="n">ureg</span><span class="p">)</span>
+
+<span class="n">q</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;bvnr_fnu&quot;</span><span class="p">)</span>        <span class="c1"># pint.DimensionalityError — as bovnar refuses it</span>
+<span class="n">q</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;dimensionless&quot;</span><span class="p">)</span>   <span class="c1"># pint.DimensionalityError</span>
+<span class="n">q</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;bvnr_ntu&quot;</span><span class="p">)</span>        <span class="c1"># 4.2 — a conversion within the kind is fine</span>
+</code></pre></div>
+
+<p>Conversions <em>within</em> a kind keep working, because that is what a shared
+dimension means: <code>m~NTU → NTU</code>, <code>° → rad</code> (1 rad = 57.29578°), <code>sr = rad²</code>.
+<code>is_kind_scale(unit)</code> reports whether a pint unit carries one of these
+dimensions, as <code>is_currency_unit</code> does for money.</p>
+<p>The cost is interoperability with pint's <strong>native</strong> units: a Bovnar-derived
+byte no longer converts to pint's <code>megabyte</code>, nor a Bovnar radian to pint's
+<code>degree</code>. If you need that more than you need the refusals:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">ureg</span> <span class="o">=</span> <span class="n">build_registry</span><span class="p">(</span><span class="n">isolate_kinds</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>    <span class="c1"># alias onto pint&#39;s natives</span>
+</code></pre></div>
+
+<p>which restores both the interop and pint's permissiveness. The default is
+fidelity.</p>
+<h3 id="semantic-caveats">Semantic caveats</h3>
+<p>What survives kind isolation is recorded in
+<code>bovnar._pint_units.SEMANTIC_CAVEATS</code>: <code>DECIBEL</code>, <code>NEPER</code> and <code>PH_SCALE</code>, whose
+labels and refusals now match but whose <em>arithmetic</em> does not (pint will add two
+decibels; 20 dB is a ratio of 100, not twice 10 dB), and <code>VAL</code>, where the
+divalent water-analysis convention is a fact no unit system can infer. Consult
+that dict when exact round-trip semantics matter.</p>
+<p>The mapping is <strong>not 1:1</strong> by construction (bovnar <code>b</code>=bit vs pint barn,
+<code>R</code>=roentgen vs pint's gas constant). The translation table is locked against
+silent drift by <code>TestUnitTableIntegrity</code>, which re-derives every physical unit's
+dimension and magnitude from bovnar and asserts the pint bridge reproduces both,
+and by <code>TestPintAgreesWithBovnarOnWhatConverts</code>, which asserts that pint refuses
+every conversion bovnar refuses — the invariant that was missing when pint was
+quietly the more permissive of the two.</p>
+<hr />
+<h2 id="numpy-bridge">NumPy bridge</h2>
+<p>The NumPy bridge converts between bovnar arrays and <code>numpy.ndarray</code>. numpy is an
+<strong>optional</strong> dependency, imported lazily on first use. Install with
+<code>pip install "bovnar[numpy]"</code> (or <code>bovnar[all]</code>).</p>
+<p>All five functions are exported from the top-level <code>bovnar</code> namespace (and from
+<code>bovnar._numpy</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Direction</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_numpy(src, *, dtype=None, return_unit=False)</code></td>
+<td>bovnar → numpy</td>
+<td>Array → <code>ndarray</code> (optionally <code>(ndarray, unit_str)</code>)</td>
+</tr>
+<tr>
+<td><code>to_pint_array(src, *, dtype=None, ureg=None)</code></td>
+<td>bovnar → pint</td>
+<td>Array → pint <code>Quantity</code> (ndarray data + unit)</td>
+</tr>
+<tr>
+<td><code>from_numpy(writer, key, arr, *, unit=None, float_format=None)</code></td>
+<td>numpy → bovnar</td>
+<td>Write an <code>ndarray</code> into a <code>Writer</code></td>
+</tr>
+<tr>
+<td><code>from_pint_array(writer, key, qty)</code></td>
+<td>pint → bovnar</td>
+<td>Write a pint <code>Quantity</code> (magnitude + unit) into a <code>Writer</code></td>
+</tr>
+<tr>
+<td><code>array_to_bvnr(key, arr, *, unit=None, pretty=True, float_format=None)</code></td>
+<td>numpy → bovnar</td>
+<td><code>ndarray</code> → bovnar bytes (convenience)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reading-to_numpy">Reading: <code>to_numpy</code></h3>
+<p><em>src</em> is either a <code>DomNode</code> for an ARRAY (random-access, from <code>dom_parse</code>) or
+the nested list/tuple that <code>loads(..., typed=True)</code> produces. Both
+<code>/</code>-separated rows and bracket nesting collapse to the same <code>ndarray</code> shape.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="c1"># from a typed loads() result</span>
+<span class="n">doc</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a=&lt;uint:8&gt;[1,2,3];&#39;</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">arr</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">])</span>               <span class="c1"># dtype uint8</span>
+
+<span class="c1"># with the whole-array unit</span>
+<span class="n">arr</span><span class="p">,</span> <span class="n">unit</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span>
+    <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a=&lt;float:32,m/s&gt;[1,2,3]/[4,5,6];&#39;</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;a&#39;</span><span class="p">],</span>
+    <span class="n">return_unit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>                         <span class="c1"># unit == &#39;m/s&#39;, arr.shape == (2, 3)</span>
+
+<span class="c1"># from a DOM node</span>
+<span class="n">arr</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">dom_parse</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a=&lt;sint:16&gt;[10,-20,30];&#39;</span><span class="p">)[</span><span class="s1">&#39;a&#39;</span><span class="p">])</span>
+</code></pre></div>
+
+<p>The bovnar <code>(family, width)</code> maps directly to the numpy dtype (<code>uint:8</code> →
+<code>uint8</code>, <code>float:32</code> → <code>float32</code>, …). Pass <code>dtype=</code> to coerce.</p>
+<p>The families with no exact native numpy dtype — <code>float_dec</code>, <code>float_fix</code>, and
+the wide binary floats <code>float:128</code>/<code>256</code> (and any width above 64) — decode to
+an <strong>object array of exact <code>decimal.Decimal</code></strong> on the typed
+(<code>loads(..., typed=True)</code>) path, which is lossless; pass <code>dtype='float64'</code> for
+the lossy native conversion. The DOM (<code>dom_parse</code>) path only has a C <code>double</code>
+for these, so it raises and points you at the typed path or <code>dtype='float64'</code>.
+Integers wider than 64 bits likewise come back as an object array of Python
+ints (<code>dtype=object</code>), which is exact.</p>
+<p>A <strong><code>datetime</code></strong> array on the <strong>unix</strong> epoch (spec 1.1) maps to/from
+<code>datetime64[s]</code> — the integer epoch-seconds carrier is unix-relative, so it
+round-trips losslessly. A non-unix epoch (<code>tai</code>, <code>gps</code>, …) is <em>not</em>
+unix-relative, so <code>to_numpy</code> refuses it (mapping it to <code>datetime64</code> would
+mis-date every value) and points you at <code>dtype='int64'</code> for the raw seconds.
+On the write side a <code>datetime64[*]</code> array is coarsened to whole seconds and
+written as <code>&lt;datetime:64,unix&gt;</code>; <code>NaT</code> has no bovnar representation and is
+rejected, and <code>array_to_bvnr</code> prepends the <code>#!bovnar 1.1</code> directive so its
+output re-parses.</p>
+<p><strong>Strict by default:</strong></p>
+<ul>
+<li>an array that mixes numeric encodings (e.g. <code>uint:8</code> and <code>float:64</code>) raises
+  unless you pass <code>dtype=</code> to coerce to one;</li>
+<li>bovnar 1.0 arrays are rectangular and homogeneous, so the result is always a
+  regular ndarray — there is no ragged case to handle;</li>
+<li>a <code>null</code> element cannot fill a dtype with no null slot — integer, <code>bool</code>, or
+  string (which would otherwise silently become <code>0</code>/<code>False</code>/<code>'None'</code>); pass
+  <code>dtype=float</code> (→ <code>NaN</code>) or <code>dtype=object</code> (→ <code>None</code>);</li>
+<li>the unit is a whole-array property (numpy has one dtype per array) — mixed
+  units raise, as does mixing a dimensioned element with a dimensionless one;
+  the unit is returned alongside the data, never baked into elements.</li>
+</ul>
+<h3 id="writing-from_numpy--array_to_bvnr">Writing: <code>from_numpy</code> / <code>array_to_bvnr</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Writer</span>
+
+<span class="k">with</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">()</span> <span class="k">as</span> <span class="n">w</span><span class="p">:</span>
+    <span class="n">bovnar</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="s2">&quot;velocity&quot;</span><span class="p">,</span>
+                      <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.5</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;m/s&quot;</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span>
+
+<span class="c1"># one-shot convenience</span>
+<span class="n">raw</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">array_to_bvnr</span><span class="p">(</span><span class="s2">&quot;matrix&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="c1"># exact decimal/fixed/wide-binary float arrays via float_format</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
+<span class="n">prices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;19.99&quot;</span><span class="p">),</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.01&quot;</span><span class="p">)],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">array_to_bvnr</span><span class="p">(</span><span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="n">prices</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;$USD&quot;</span><span class="p">)</span>            <span class="c1"># -&gt; &lt;float_dec:64,$USD&gt;</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">array_to_bvnr</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="n">prices</span><span class="p">,</span> <span class="n">float_format</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="mi">128</span><span class="p">))</span>   <span class="c1"># binary128</span>
+</code></pre></div>
+
+<ul>
+<li><code>from_numpy</code> requires a 1-D-or-higher array; write a 0-D scalar with the
+  scalar <code>Writer</code> API instead.</li>
+<li><em>unit</em> may be a bovnar unit string, a <code>ValueUnit</code>, or a pint <code>Unit</code>/<code>Quantity</code>
+  (anything else raises <code>BovnarArgumentError</code>).</li>
+<li>Units apply to <strong>numeric</strong> arrays only — a unit on a <code>bool</code> or string array
+  raises <code>BovnarArgumentError</code>.</li>
+<li>An <strong>object array of <code>Decimal</code>/<code>Fraction</code></strong> is written as an exact
+  decimal/fixed/wide-binary float. <code>float_format=(family, width[, frac])</code> —
+  family <code>'float'</code>, <code>'float_dec'</code> (the default for a Decimal object array), or
+  <code>'float_fix'</code> — selects the target; it is required to disambiguate an object
+  array that is not purely <code>Decimal</code>/<code>Fraction</code>.</li>
+<li>A <strong>masked array</strong> with any masked entry is rejected (it would otherwise
+  serialise the underlying value of a masked cell); fill or unmask it first.</li>
+<li><code>array_to_bvnr</code> grows its write buffer like <code>dumps()</code> (4 MiB, doubling up to
+  256 MiB).</li>
+</ul>
+<h3 id="pint-arrays">pint arrays</h3>
+<p><code>to_pint_array</code> and <code>from_pint_array</code> bridge straight through to pint
+Quantities backed by ndarrays, reusing the unit translation above:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">q</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">to_pint_array</span><span class="p">(</span>
+    <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a=&lt;float:64,k~m&gt;[1,2,3];&#39;</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;a&#39;</span><span class="p">])</span>
+<span class="c1"># q is a pint Quantity: magnitude ndarray [1, 2, 3], unit &#39;kilometer&#39;</span>
+
+<span class="k">with</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">()</span> <span class="k">as</span> <span class="n">w</span><span class="p">:</span>
+    <span class="n">bovnar</span><span class="o">.</span><span class="n">from_pint_array</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span>
+</code></pre></div>
+
+<p>A <code>datetime</code> array has no pint unit, so <code>to_pint_array</code> rejects it rather than
+wrap it as a meaningless dimensionless quantity — use <code>to_numpy</code> for the
+<code>datetime64</code> array (or <code>dtype='int64'</code> for the raw epoch seconds).</p>
+<hr />
+<h2 id="currency-helpers">Currency helpers</h2>
+<p>The <code>bovnar.currency</code> submodule (exposed as <code>bovnar.currency</code>) provides
+metadata for the ISO 4217 fiat and cryptocurrency <code>BaseUnit</code> members. It is pure
+Python — no library or optional dependency required.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">currency</span><span class="p">,</span> <span class="n">BaseUnit</span>
+
+<span class="n">currency</span><span class="o">.</span><span class="n">is_currency</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">USD</span><span class="p">)</span>   <span class="c1"># True</span>
+<span class="n">currency</span><span class="o">.</span><span class="n">is_fiat</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">USD</span><span class="p">)</span>       <span class="c1"># True</span>
+<span class="n">currency</span><span class="o">.</span><span class="n">is_crypto</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">BTC</span><span class="p">)</span>     <span class="c1"># True</span>
+
+<span class="n">info</span> <span class="o">=</span> <span class="n">currency</span><span class="o">.</span><span class="n">currency_info</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">USD</span><span class="p">)</span>
+<span class="n">info</span><span class="o">.</span><span class="n">code</span>           <span class="c1"># &#39;USD&#39;</span>
+<span class="n">info</span><span class="o">.</span><span class="n">numeric_code</span>   <span class="c1"># 840 (ISO 4217 numeric; 0 for crypto)</span>
+<span class="n">info</span><span class="o">.</span><span class="n">minor_unit</span>     <span class="c1"># 2   (decimal places: 1 major = 10^minor minor units)</span>
+<span class="n">info</span><span class="o">.</span><span class="n">name</span>           <span class="c1"># &#39;US Dollar&#39;</span>
+
+<span class="n">currency</span><span class="o">.</span><span class="n">minor_unit</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">JPY</span><span class="p">)</span>    <span class="c1"># 0</span>
+<span class="n">currency</span><span class="o">.</span><span class="n">currency_code</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">EUR</span><span class="p">)</span> <span class="c1"># &#39;EUR&#39;</span>
+<span class="n">currency</span><span class="o">.</span><span class="n">from_code</span><span class="p">(</span><span class="s1">&#39;GBP&#39;</span><span class="p">)</span>            <span class="c1"># BaseUnit.GBP</span>
+
+<span class="k">for</span> <span class="n">ci</span> <span class="ow">in</span> <span class="n">currency</span><span class="o">.</span><span class="n">all_fiat</span><span class="p">():</span>       <span class="c1"># all_crypto() / all_currencies() also exist</span>
+    <span class="o">...</span>
+</code></pre></div>
+
+<p><code>CurrencyInfo</code> is a frozen dataclass; <code>currency_info</code>, <code>minor_unit</code>,
+<code>currency_name</code>, <code>currency_code</code>, and <code>from_code</code> raise for non-currency bases
+or unknown codes.</p>
+<hr />
+<h2 id="reader-reference"><code>Reader</code> reference</h2>
+<h3 id="construction-1">Construction</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">with</span> <span class="n">Reader</span><span class="p">()</span> <span class="k">as</span> <span class="n">r</span><span class="p">:</span>
+    <span class="o">...</span>
+</code></pre></div>
+
+<p><code>Reader.__init__</code> calls <code>bvnr_reader_create</code> immediately.  Use as a context
+manager or call <code>r.close()</code> explicitly to release the C object.</p>
+<h3 id="read_memdata--on_verified-on_unverified-max_file_size-continue_on_error-strict_version-want_unit-want_unit_allow_nonterminating-max_conversion_length"><code>read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)</code></h3>
+<p>Parse BVNR from a <code>bytes</code>, <code>bytearray</code>, or <code>memoryview</code> object.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>bytes \| bytearray \| memoryview</code></td>
+<td>—</td>
+<td>Input buffer</td>
+</tr>
+<tr>
+<td><code>on_verified</code></td>
+<td><code>Callable[[Event, BvnrData \| None], bool] \| None</code></td>
+<td><code>None</code></td>
+<td>Callback for validated events</td>
+</tr>
+<tr>
+<td><code>on_unverified</code></td>
+<td><code>Callable[[Event, BvnrData \| None], bool] \| None</code></td>
+<td><code>None</code></td>
+<td>Callback for raw pre-validation events</td>
+</tr>
+<tr>
+<td><code>max_file_size</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (unlimited)</td>
+<td>Hard limit on bytes consumed</td>
+</tr>
+<tr>
+<td><code>continue_on_error</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Enable resync mode</td>
+</tr>
+<tr>
+<td><code>strict_version</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Reject a declared spec version newer than this build (<code>error_unsupported_spec_version</code>)</td>
+</tr>
+<tr>
+<td><code>want_unit</code></td>
+<td><code>Callable[[BvnrData], tuple \| None] \| None</code></td>
+<td><code>None</code></td>
+<td>Optional read-time lossless unit/base conversion hook. Called per numeric value; return <code>(unit, base)</code> to request a conversion (the exact result arrives on the payload as <code>converted</code>/<code>converted_text</code>), or <code>None</code> to leave the value untouched. An inexact conversion aborts the parse (<code>error_unit_inexact</code>).</td>
+</tr>
+<tr>
+<td><code>want_unit_allow_nonterminating</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational with <code>converted_text</code> <code>None</code> instead of aborting with <code>error_unit_inexact</code></td>
+</tr>
+<tr>
+<td><code>max_conversion_length</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 1024)</td>
+<td>Longest converted text a conversion may produce, in characters; a longer exact result aborts with <code>error_value_out_of_range</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="read_fdfd--on_verified-on_unverified-max_file_size-continue_on_error-strict_version-want_unit-want_unit_allow_nonterminating-max_conversion_length"><code>read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)</code></h3>
+<p>Parse BVNR from an open POSIX file descriptor. Parameters identical to
+<code>read_mem</code> except the first argument is a non-negative <code>int</code> fd.</p>
+<h3 id="read_filepath--on_verified-on_unverified-max_file_size-continue_on_error-strict_version-want_unit-want_unit_allow_nonterminating-max_conversion_length"><code>read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)</code></h3>
+<p>Convenience wrapper: opens <code>path</code> with <code>os.O_RDONLY</code>, calls <code>read_fd</code>, closes
+the fd in a <code>finally</code> block. The <code>max_file_size</code> default is <code>MAX_FILESIZE_BYTES</code>
+(16 MiB) rather than unlimited.</p>
+<h3 id="iter_memdata--verified_only-max_file_size"><code>iter_mem(data, *, verified_only, max_file_size)</code></h3>
+<p>Generator that collects all events from <code>read_mem</code> and yields
+<code>EventPayload(event, raw, value_type, value_unit)</code> objects.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>verified_only</code></td>
+<td><code>True</code></td>
+<td>When <code>False</code>, both callbacks fire and events may appear twice</td>
+</tr>
+<tr>
+<td><code>max_file_size</code></td>
+<td><code>0</code></td>
+<td>Forwarded to <code>read_mem</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>EventPayload</code> fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event</code></td>
+<td><code>Event</code></td>
+<td>The event code</td>
+</tr>
+<tr>
+<td><code>raw</code></td>
+<td><code>bytes</code></td>
+<td>Raw token bytes</td>
+</tr>
+<tr>
+<td><code>value_type</code></td>
+<td><code>ValueTypeSpec \| None</code></td>
+<td>Type annotation if present</td>
+</tr>
+<tr>
+<td><code>value_unit</code></td>
+<td><code>ValueUnit \| None</code></td>
+<td>Unit if present</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code> (property)</td>
+<td><code>raw</code> decoded as UTF-8 (with <code>errors='replace'</code>)</td>
+</tr>
+<tr>
+<td><code>converted</code></td>
+<td><code>bool</code></td>
+<td><code>True</code> when a <code>want_unit</code> conversion was applied to this value</td>
+</tr>
+<tr>
+<td><code>converted_text</code></td>
+<td><code>str \| None</code></td>
+<td>Exact converted value as a positional string; <code>None</code> if the conversion does not terminate in <code>converted_base</code></td>
+</tr>
+<tr>
+<td><code>converted_base</code></td>
+<td><code>int</code></td>
+<td>Base the converted text is rendered in</td>
+</tr>
+</tbody>
+</table>
+<h3 id="error-state-properties">Error-state properties</h3>
+<p>These properties query the C reader object after a failed parse.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error_code</code></td>
+<td><code>ErrorCode</code></td>
+<td>Most recent error code</td>
+</tr>
+<tr>
+<td><code>error_line</code></td>
+<td><code>int</code></td>
+<td>1-based line number of the error</td>
+</tr>
+<tr>
+<td><code>error_column</code></td>
+<td><code>int</code></td>
+<td>1-based column of the error</td>
+</tr>
+<tr>
+<td><code>error_offset</code></td>
+<td><code>int</code></td>
+<td>Byte offset of the error</td>
+</tr>
+<tr>
+<td><code>recovery_count</code></td>
+<td><code>int</code></td>
+<td>Number of times resync was entered (incremented at error entry, not at resync completion)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="max_filesize_bytes"><code>MAX_FILESIZE_BYTES</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">MAX_FILESIZE_BYTES</span>   <span class="c1"># 16 * 1024 * 1024  (16 MiB)</span>
+</code></pre></div>
+
+<p>Default <code>max_file_size</code> cap used by <code>Reader.read_file</code>.</p>
+<hr />
+<h2 id="writer-reference"><code>Writer</code> reference</h2>
+<h3 id="construction-class-methods">Construction class methods</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Writer.to_mem(buf=None, cap=4194304, *, pretty=True)</code></td>
+<td>Write to an in-process buffer. <code>buf</code> may be a pre-allocated <code>bytearray</code>; when <code>None</code> an internal buffer of size <code>cap</code> is allocated.</td>
+</tr>
+<tr>
+<td><code>Writer.to_fd(fd, *, pretty=True)</code></td>
+<td>Write to an open POSIX file descriptor.</td>
+</tr>
+<tr>
+<td><code>Writer.to_file(path, *, pretty=True)</code></td>
+<td>Open <code>path</code> for writing (<code>O_WRONLY\|O_CREAT\|O_TRUNC</code>, mode <code>0o644</code>) and write to it; the fd is closed when the writer is finished or destroyed.</td>
+</tr>
+</tbody>
+</table>
+<p>All three are used as context managers.  On clean exit (<code>exc_type is None</code>)
+the context manager calls <code>finish()</code> automatically.</p>
+<h3 id="output-retrieval">Output retrieval</h3>
+<table>
+<thead>
+<tr>
+<th>Method / property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>w.get_output() -&gt; bytes</code></td>
+<td>Return the bytes written so far (mem writers only).</td>
+</tr>
+<tr>
+<td><code>w.bytes_written</code></td>
+<td>Number of bytes written (all writer modes).</td>
+</tr>
+<tr>
+<td><code>w.finish()</code></td>
+<td>Flush and seal the output. Raises <code>BovnarWriteError</code> if any struct is still open.</td>
+</tr>
+<tr>
+<td><code>w.destroy()</code></td>
+<td>Release the underlying C writer object immediately.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="scalar-write-methods">Scalar write methods</h3>
+<p>All scalar writers accept keyword-only unit parameters.  Unit resolution
+priority: <code>unit_str</code> (parsed via <code>bvn_parse_unit_n</code>) → <code>unit_iec_base</code> →
+<code>unit_si_base</code> → <code>BVN_UNIT_NONE</code> (no annotation emitted).</p>
+<h4 id="write_uintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_iec_basenone-unit_iec_prefixiecprefixnone"><code>write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)</code></h4>
+<p>Write an unsigned integer. <code>base</code> selects the numeral system (10 or 16 for
+inline values; any Bovnar-supported base for <code>write_bvni</code>).</p>
+<h4 id="write_sintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<p>Write a signed integer.</p>
+<h4 id="write_floatkey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<p>Write an IEEE 754 binary float.</p>
+<h4 id="write_float_fixkey-value--width64-q0-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<p>Write a Q-format fixed-point value. <code>q</code> is the number of fractional bits
+(<code>0 ≤ q &lt; width</code>).</p>
+<h4 id="write_float_deckey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float_dec(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<p>Write an IEEE 754-2008 decimal float.</p>
+<h4 id="write_stringkey-value"><code>write_string(key, value)</code></h4>
+<p>Write a bare quoted UTF-8 string with no type annotation:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.host = &quot;localhost&quot;;</code></pre></div>
+<p>To emit an explicit <code>&lt;utf8&gt;</code> annotation, use the low-level <code>emit</code> API with
+<code>Event.TYPE_ANNOTATION_START</code> / <code>TYPE_ANNOTATION_END</code> before <code>Event.DATA</code>.</p>
+<h4 id="write_boolkey-value"><code>write_bool(key, value)</code></h4>
+<p>Write a <code>bool</code> value (<code>token_is_bool</code>) — serialized as the bare keyword
+<code>true</code> or <code>false</code>. On read-back it decodes to a Python <code>bool</code>.</p>
+<h4 id="write_nullkey"><code>write_null(key)</code></h4>
+<p>Write a null value (empty slot).</p>
+<h3 id="extended-integer-writers">Extended integer writers</h3>
+<h4 id="write_bvnikey-value--width64-base10-signednone-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<p>Arbitrary-width integer writer that supports all Bovnar numeral bases (<strong>2–62, 64, and 85</strong>). Non-decimal values are formatted using Python's own
+big-integer arithmetic and emitted as quoted strings.  <code>signed</code> defaults to
+<code>True</code> when <code>value &lt; 0</code>.</p>
+<h4 id="write_bvnf_basekey-value_str--width0-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_bvnf_base(key, value_str, *, width=0, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<p>Write a float from a pre-formatted string in base 10 or 16. <code>base</code> must be
+10 or 16; any other value raises <code>BovnarArgumentError</code>.</p>
+<h3 id="struct-helpers">Struct helpers</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">begin_struct</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>   <span class="c1"># emit ASSIGNMENT_START + STRUCT_START, increment depth</span>
+<span class="n">w</span><span class="o">.</span><span class="n">end_struct</span><span class="p">()</span>        <span class="c1"># emit STRUCT_END, decrement depth</span>
+</code></pre></div>
+
+<p><code>finish()</code> verifies that the struct depth is zero; an unclosed struct raises
+<code>BovnarWriteError(GOT_INCOMPLETE_BVNR_STREAM)</code>.</p>
+<h3 id="version-directive">Version directive</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">write_version</span><span class="p">(</span><span class="n">major</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">minor</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># emit a leading &quot;#!bovnar 1.1&quot; directive</span>
+</code></pre></div>
+
+<p>Emits a leading <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code> directive. Must be called before any
+value is written; calling it after output has begun raises
+<code>BovnarWriteError(INVALID_ARGUMENT)</code>. Use it to self-declare the spec version a
+document targets (spec-1.1 constructs such as datetime literals need it to
+re-read).</p>
+<h3 id="array-helpers">Array helpers</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">begin_array_row</span><span class="p">()</span>   <span class="c1"># emit ARRAY_ROW_START</span>
+<span class="n">w</span><span class="o">.</span><span class="n">end_array_row</span><span class="p">()</span>     <span class="c1"># emit ARRAY_ROW_END</span>
+<span class="n">w</span><span class="o">.</span><span class="n">new_array_dim</span><span class="p">()</span>     <span class="c1"># emit ARRAY_DIM_START (the / separator between rows)</span>
+</code></pre></div>
+
+<h3 id="low-level-emit">Low-level <code>emit</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vu</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+<p>Send an arbitrary event to the C writer. <code>key</code> and <code>value</code> are encoded as
+UTF-8. When both <code>vt</code> and <code>value</code> are supplied the token type is inferred:
+<code>_TOKEN_IS_STRING</code> for <code>ValueTypeFamily.UTF8</code>, <code>_TOKEN_IS_NUMBER</code> otherwise.</p>
+<hr />
+<h2 id="dom-api">DOM API</h2>
+<p>The DOM API parses a complete BVNR document into an in-memory tree for
+random-access queries without writing a SAX callback.</p>
+<h3 id="dom_parsedata---domdoc"><code>dom_parse(data) -&gt; DomDoc</code></h3>
+<p>Top-level convenience function (mirrors <code>DomDoc.parse</code>).</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+<span class="n">doc</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dom_parse</span><span class="p">(</span><span class="n">bvnr_bytes</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="domdoc"><code>DomDoc</code></h3>
+<p>Owning wrapper around <code>bvn_dom_doc_t</code>. Destroying the object frees the entire
+tree; any <code>DomNode</code> derived from it becomes invalid after that point.</p>
+<table>
+<thead>
+<tr>
+<th>Method / property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DomDoc.parse(data)</code></td>
+<td>Class method. Parse <code>bytes \| bytearray \| memoryview</code>.</td>
+</tr>
+<tr>
+<td><code>DomDoc.parse_fd(fd)</code></td>
+<td>Class method. Parse from an open file descriptor.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>File-size limits:</strong> <code>DomDoc.parse_fd</code> and <code>DomDoc.parse_file</code> apply an internal
+ceiling of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB). This is 16× larger than
+<code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). Use <code>bvn_dom_parse_fd_ex</code>
+directly if you need a different limit.
+| <code>DomDoc.parse_file(path)</code> | Class method. Open path and parse (fd closed in <code>finally</code>). Applies an internal hard cap of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) via the C function <code>bvn_dom_parse_fd</code>. This ceiling is distinct from <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). |
+| <code>doc.parse_error</code> | <code>ErrorCode</code> — <code>NONE</code> on success. |
+| <code>doc[key]</code> | Return top-level <code>DomNode</code> by key; raises <code>KeyError</code> when absent. |
+| <code>key in doc</code> | <code>True</code> when the top-level key exists. |
+| <code>len(doc)</code> | Number of top-level entries. |
+| <code>iter(doc)</code> | Iterate over <code>(key, DomNode)</code> pairs. |
+| <code>doc.entries()</code> | Return all top-level <code>(key, DomNode)</code> pairs as a list. |
+| <code>doc.lookup(path)</code> | Dot-separated path lookup, e.g. <code>'server.tls.cert'</code>. Returns <code>None</code> when absent. |
+| <code>doc.to_dict()</code> | Convert entire document to a plain Python dict, dropping type and unit info. |</p>
+</blockquote>
+<h3 id="domnode"><code>DomNode</code></h3>
+<p>Non-owning view into a <code>bvn_dom_node_t</code>. The parent <code>DomDoc</code> must remain alive
+for as long as any derived <code>DomNode</code> is in use.</p>
+<table>
+<thead>
+<tr>
+<th>Property / method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>node.dom_type</code></td>
+<td><code>DomType</code> enum value</td>
+</tr>
+<tr>
+<td><code>node.value_type</code></td>
+<td><code>ValueTypeSpec</code></td>
+</tr>
+<tr>
+<td><code>node.unit</code></td>
+<td><code>ValueUnit</code></td>
+</tr>
+<tr>
+<td><code>node.unit_str</code></td>
+<td>Unit as a string via <code>bvn_dom_get_unit_string</code>, or <code>''</code></td>
+</tr>
+<tr>
+<td><code>node.is_null()</code></td>
+<td><code>True</code> for null values</td>
+</tr>
+<tr>
+<td><code>node.value_in_base_units()</code></td>
+<td>Numeric value scaled to SI base units (<code>float</code>)</td>
+</tr>
+<tr>
+<td><code>node.as_i64()</code> / <code>as_u64()</code></td>
+<td>Signed / unsigned 64-bit integer</td>
+</tr>
+<tr>
+<td><code>node.as_i32()</code> / <code>as_u32()</code></td>
+<td>Signed / unsigned 32-bit integer</td>
+</tr>
+<tr>
+<td><code>node.as_i16()</code> / <code>as_u16()</code></td>
+<td>Signed / unsigned 16-bit integer</td>
+</tr>
+<tr>
+<td><code>node.as_i8()</code> / <code>as_u8()</code></td>
+<td>Signed / unsigned 8-bit integer</td>
+</tr>
+<tr>
+<td><code>node.as_float()</code></td>
+<td><code>float</code> (64-bit)</td>
+</tr>
+<tr>
+<td><code>node.as_bool()</code></td>
+<td><code>bool</code> for <code>BOOL</code> nodes</td>
+</tr>
+<tr>
+<td><code>node.as_str()</code></td>
+<td>Python <code>str</code> for <code>STRING</code>, <code>SYMBOL</code>, or <code>REFERENCE</code> nodes</td>
+</tr>
+<tr>
+<td><code>node.as_bytes()</code></td>
+<td><code>bytes</code> for <code>OCTET_STREAM</code> nodes</td>
+</tr>
+<tr>
+<td><code>node.as_int_str(base=10)</code></td>
+<td>Integer value as a string in the given base; result C string is freed before return</td>
+</tr>
+<tr>
+<td><code>node.datetime_fraction</code></td>
+<td><code>str</code> of the verbatim ISO sub-second digits for a <code>datetime</code> written as a literal with a fraction (spec 1.1), else <code>None</code>; the carrier value is unchanged and still read via <code>to_python()</code></td>
+</tr>
+<tr>
+<td><code>node[key]</code></td>
+<td>Child <code>DomNode</code> by string key (STRUCT) or integer index (ARRAY)</td>
+</tr>
+<tr>
+<td><code>key in node</code></td>
+<td>Membership test for STRUCT nodes</td>
+</tr>
+<tr>
+<td><code>len(node)</code></td>
+<td>Element count for STRUCT or ARRAY nodes</td>
+</tr>
+<tr>
+<td><code>iter(node)</code></td>
+<td>For STRUCT: iterate <code>(key, DomNode)</code> pairs; for ARRAY: iterate elements</td>
+</tr>
+<tr>
+<td><code>node.entries()</code></td>
+<td>List of <code>(key, DomNode)</code> pairs (STRUCT nodes only)</td>
+</tr>
+<tr>
+<td><code>node.array_dims()</code></td>
+<td>Number of <code>/</code>-separated dimensions (ARRAY nodes only)</td>
+</tr>
+<tr>
+<td><code>node.to_python()</code></td>
+<td>Recursively convert to a native Python value (drops type/unit info)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="domtype"><code>DomType</code></h3>
+<div class="codehilite"><pre><span></span><code>NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
+REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
+</code></pre></div>
+
+<hr />
+<h2 id="running-the-test-suite">Running the test suite</h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Run everything (library-dependent tests are skipped when libbvnr.so is absent)</span>
+pytest
+
+<span class="c1"># Run only the pure-Python tests (no library required)</span>
+pytest<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;not needs_lib&quot;</span>
+
+<span class="c1"># Run only integration tests (requires libbvnr.so)</span>
+pytest<span class="w"> </span>-m<span class="w"> </span>needs_lib
+
+<span class="c1"># Verbose with short tracebacks (already the default via pyproject.toml)</span>
+pytest<span class="w"> </span>-v<span class="w"> </span>--tb<span class="o">=</span>short
+</code></pre></div>
+
+<p>The NumPy- and pint-bridge tests <code>pytest.importorskip</code> their dependency, so they
+are skipped automatically when <code>numpy</code> / <code>pint</code> is not installed. Install
+<code>bovnar[all]</code> to run the full suite.</p>
+<hr />
+<h2 id="package-layout">Package layout</h2>
+<div class="codehilite"><pre><span></span><code>bovnar/
+├── __init__.py      # loads() / dumps() / dom_parse() / unit helpers — public API
+├── _ffi.py          # ctypes FFI: library discovery + argtypes/restype
+├── _bvnfloat.py     # BvnFloat: arbitrary-precision float + IEEE binary/decimal/fixed encoders
+├── _numpy.py        # NumPy bridge: to_numpy/from_numpy/to_pint_array/array_to_bvnr (numpy optional)
+├── _pint_bridge.py  # pint bridge: to_pint/from_pint/to_pint_unit/from_pint_unit (pint optional)
+├── _pint_units.py   # verified bovnar↔pint unit table + build_registry()
+├── currency.py      # ISO 4217 / crypto currency metadata (pure Python)
+├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
+├── enums.py         # Python IntEnum mirrors of C enums
+├── exceptions.py    # BovnarError hierarchy
+├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
+├── reader.py        # Reader class + EventPayload dataclass
+├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
+├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
+└── writer.py        # Writer class
+
+tests/
+├── conftest.py                   # shared fixtures, needs_lib marker
+├── test_analytics.py             # analytic / benchmarking tests (needs_lib)
+├── test_array_parser.py          # array parsing integration tests (needs_lib)
+├── test_currency_units.py        # currency unit round-trip tests (needs_lib)
+├── test_dom.py                   # DOM API integration tests (needs_lib)
+├── test_enums.py                 # pure-Python enum tests
+├── test_example_numpy_roundtrip.py # NumPy bridge end-to-end example (needs_lib + numpy)
+├── test_lossless_floats.py       # exact decimal/fixed/float128-256 round-trips (needs_lib)
+├── test_numpy_bridge.py          # NumPy bridge tests (needs_lib + numpy)
+├── test_pint_bridge.py           # pint bridge + unit-table integrity (needs_lib + pint)
+├── test_reader.py                # integration: Reader (needs_lib)
+├── test_structs.py               # pure-Python struct / helper tests
+├── test_unit_physics.py          # unit physics / conversion tests (needs_lib)
+├── test_units.py                 # mixed: unit parsing / serialisation (needs_lib for FFI)
+├── test_write_array.py           # write_array integration tests (needs_lib)
+└── test_writer.py                # integration: Writer (needs_lib)
+</code></pre></div>
+
+<hr />
+<h2 id="error-handling">Error handling</h2>
+<p>All errors surface as subclasses of <code>BovnarError</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Exception</th>
+<th>When raised</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BovnarLibraryNotFound</code></td>
+<td><code>libbvnr.so</code> not found at import</td>
+</tr>
+<tr>
+<td><code>BovnarParseError</code></td>
+<td>Parse error in <code>Reader</code> (carries <code>code</code>, <code>line</code>, <code>column</code>, <code>offset</code>, <code>byte</code>)</td>
+</tr>
+<tr>
+<td><code>BovnarWriteError</code></td>
+<td>Write error in <code>Writer</code> (carries <code>code</code>, <code>offset</code>)</td>
+</tr>
+<tr>
+<td><code>BovnarArgumentError</code></td>
+<td>Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer)</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>unit_convert_factor</code> error semantics:</strong> The C function uses the
+<code>(ok, requires_affine)</code> pair to signal three distinct outcomes:</p>
+<table>
+<thead>
+<tr>
+<th>ok</th>
+<th>requires_affine</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>True</code></td>
+<td><code>False</code></td>
+<td>Multiplicative conversion; <code>factor</code> is ready to use</td>
+</tr>
+<tr>
+<td><code>False</code></td>
+<td><code>True</code></td>
+<td>Affine conversion required (e.g. °C ↔ K); <code>factor</code> is still valid but a plain multiply is insufficient</td>
+</tr>
+<tr>
+<td><code>False</code></td>
+<td><code>False</code></td>
+<td>Units are dimensionally incompatible → <code>BovnarArgumentError</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>BovnarArgumentError</code> is raised <strong>only</strong> when both <code>ok=False</code> and
+<code>requires_affine=False</code>.  When <code>requires_affine=True</code>, call <code>convert_value</code>
+which handles the two-step affine path automatically, or call <code>unit_to_si_factor</code>
+on both units and perform the conversion manually.</p>
+<p><strong>Callbacks returning <code>False</code>:</strong> When an <code>on_verified</code> or <code>on_unverified</code>
+callback returns <code>False</code>, the C parser stops and <code>bvnr_read</code> returns failure.
+The Python layer then calls <code>_raise_error()</code> and raises <code>BovnarParseError</code> with
+whatever error code the reader recorded.  <code>BovnarCallbackAbort</code> is defined in
+<code>exceptions.py</code> but is not raised by the current implementation.</p>
+<p><strong>Callbacks raising exceptions:</strong> If the callback itself raises a Python
+exception, that exception is captured, the C callback returns <code>False</code> to stop
+the parse, and the original exception is re-raised from <code>read_mem</code> / <code>read_fd</code>
+after the C call returns.</p>
+<hr />
+<h2 id="ffi-details">FFI details</h2>
+<h3 id="on_error_func-signature"><code>ON_ERROR_FUNC</code> signature</h3>
+<p>The error callback type matches the C <code>bvnr_on_error_fn</code> signature exactly:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bvnr_on_error_fn</span><span class="p">)(</span>
+<span class="w">    </span><span class="kt">void</span><span class="o">*</span><span class="w">        </span><span class="n">userdata</span><span class="p">,</span>
+<span class="w">    </span><span class="n">error_code_t</span><span class="w"> </span><span class="n">err</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w">     </span><span class="n">line</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w">     </span><span class="n">column</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">     </span><span class="n">byte</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w">     </span><span class="n">offset</span><span class="p">);</span>
+</code></pre></div>
+
+<p>In Python this is declared as:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">ON_ERROR_FUNC</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">CFUNCTYPE</span><span class="p">(</span>
+    <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>   <span class="c1"># userdata</span>
+    <span class="n">ctypes</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>      <span class="c1"># error_code_t err</span>
+    <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint64</span><span class="p">,</span>   <span class="c1"># line</span>
+    <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint64</span><span class="p">,</span>   <span class="c1"># column</span>
+    <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint32</span><span class="p">,</span>   <span class="c1"># byte</span>
+    <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint64</span><span class="p">,</span>   <span class="c1"># offset</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<h3 id="bvnrwriteflags-layout"><code>BvnrWriteFlags</code> layout</h3>
+<p><code>BvnrWriteFlags</code> mirrors the C <code>bvnr_write_flags_s</code> struct in full, including
+the trailing <code>unit_flags</code> field (<code>bvn_unit_flags_t</code>, a <code>uint32_t</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Flag constant (C)</th>
+<th>Value</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BVN_UNIT_FLAGS_NONE</code></td>
+<td><code>0</code></td>
+<td>Default: full Unicode exponent characters</td>
+</tr>
+<tr>
+<td><code>BVN_UNIT_REDUCE</code></td>
+<td><code>1 &lt;&lt; 0</code></td>
+<td>Reduce compound units before serialising</td>
+</tr>
+<tr>
+<td><code>BVN_UNIT_ASCII_EXP</code></td>
+<td><code>1 &lt;&lt; 1</code></td>
+<td>Use <code>^N</code> ASCII exponent notation instead of Unicode superscripts</td>
+</tr>
+</tbody>
+</table>
+<p>The writer respects the <code>unit_flags</code> stored inside the C writer object when
+serialising unit annotations. <code>_emit_annotation</code> retrieves the live flags via
+<code>bvnr_writer_unit_flags(w)</code> and passes them to <code>bvn_unit_to_string_ex</code>.</p>
+<h3 id="write_string-behaviour"><code>write_string</code> behaviour</h3>
+<p><code>Writer.write_string</code> emits a bare quoted string with no type annotation,
+matching <code>bvnr_write_string</code> in the C library:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.host = &quot;localhost&quot;;</code></pre></div>
+<p>To write a string with an explicit <code>&lt;utf8&gt;</code> annotation, use the low-level
+<code>emit</code> API with <code>Event.TYPE_ANNOTATION_START</code> / <code>TYPE_ANNOTATION_END</code> events
+before the <code>Event.DATA</code> event.</p>
+<h3 id="_resolve_unit-default"><code>_resolve_unit</code> default</h3>
+<p>When no unit arguments are supplied to <code>write_uint</code>, <code>write_sint</code>,
+<code>write_float</code>, etc., the unit resolves to <code>BVN_UNIT_NONE</code> (zero components),
+matching the C convenience helpers. No unit annotation is emitted in this
+case. Passing <code>unit_si_base</code> or <code>unit_iec_base</code> produces a unit with one
+component; the <code>_SENTINEL</code>-only <code>no_unit</code> keyword is only produced when the
+caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>BaseUnit.NONE</code>.</p>
+<hr />
+<h2 id="baseunit-enum"><code>BaseUnit</code> enum</h2>
+<p>The <code>BaseUnit</code> enum mirrors the full C <code>value_base_unit_e</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Range</th>
+<th>Members</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>NONE</code></td>
+</tr>
+<tr>
+<td>1–2</td>
+<td><code>BIT</code>, <code>BYTE</code></td>
+</tr>
+<tr>
+<td>3–9</td>
+<td>SI base units (<code>SECOND</code> … <code>CANDELA</code>)</td>
+</tr>
+<tr>
+<td>10–28</td>
+<td>Named SI derived units (<code>HERTZ</code> … <code>KATAL</code>)</td>
+</tr>
+<tr>
+<td>29–44</td>
+<td>Non-SI accepted units (<code>LITER</code> … <code>YEAR</code>)</td>
+</tr>
+<tr>
+<td>45–54</td>
+<td>Imperial/US length (<code>INCH</code> … <code>FATHOM</code>)</td>
+</tr>
+<tr>
+<td>55–62</td>
+<td>Imperial/US mass (<code>POUND</code> … <code>CARAT</code>)</td>
+</tr>
+<tr>
+<td>63</td>
+<td><code>FAHRENHEIT</code></td>
+</tr>
+<tr>
+<td>64–67</td>
+<td>Pressure (<code>ATMOSPHERE</code> … <code>PSI</code>)</td>
+</tr>
+<tr>
+<td>68–71</td>
+<td>Energy (<code>CALORIE</code> … <code>THERM</code>)</td>
+</tr>
+<tr>
+<td>72</td>
+<td><code>HORSEPOWER</code></td>
+</tr>
+<tr>
+<td>73–75</td>
+<td>Force (<code>POUND_FORCE</code>, <code>DYNE</code>, <code>KIP</code>)</td>
+</tr>
+<tr>
+<td>76</td>
+<td><code>KNOT</code></td>
+</tr>
+<tr>
+<td>77–85</td>
+<td>US volume (<code>GALLON</code> … <code>BARREL</code>)</td>
+</tr>
+<tr>
+<td>86–87</td>
+<td>Area (<code>ACRE</code>, <code>BARN</code>)</td>
+</tr>
+<tr>
+<td>88–90</td>
+<td>Angle (<code>ARCMINUTE</code>, <code>ARCSECOND</code>, <code>GRAD</code>)</td>
+</tr>
+<tr>
+<td>91–98</td>
+<td>CGS units (<code>POISE</code> … <code>GALILEO</code>)</td>
+</tr>
+<tr>
+<td>99–101</td>
+<td>Radiation (<code>CURIE</code>, <code>ROENTGEN</code>, <code>REM</code>)</td>
+</tr>
+<tr>
+<td>102–103</td>
+<td>Logarithmic (<code>NEPER</code>, <code>DECIBEL</code>)</td>
+</tr>
+<tr>
+<td>104</td>
+<td><code>RANKINE</code></td>
+</tr>
+<tr>
+<td>105</td>
+<td><code>SLUG</code></td>
+</tr>
+<tr>
+<td>106</td>
+<td><code>THOU</code></td>
+</tr>
+<tr>
+<td>107–109</td>
+<td>UK imperial volume (<code>PINT_UK</code>, <code>FLUID_OUNCE_UK</code>, <code>QUART_UK</code>)</td>
+</tr>
+<tr>
+<td>110–111</td>
+<td>Electrical power (<code>VAR</code>, <code>VOLT_AMPERE</code>)</td>
+</tr>
+<tr>
+<td>112</td>
+<td><code>KILOGRAM_FORCE</code></td>
+</tr>
+<tr>
+<td>113</td>
+<td><code>INCH_HG</code></td>
+</tr>
+<tr>
+<td>114</td>
+<td><code>RPM</code></td>
+</tr>
+<tr>
+<td>115</td>
+<td><code>FOOT_POUND</code></td>
+</tr>
+<tr>
+<td>116–117</td>
+<td>Mass additional (<code>DRAM</code>, <code>PENNYWEIGHT</code>)</td>
+</tr>
+<tr>
+<td>118–119</td>
+<td>Length additional (<code>CHAIN</code>, <code>ROD</code>)</td>
+</tr>
+<tr>
+<td>120–121</td>
+<td>Volume additional (<code>GILL</code>, <code>GILL_UK</code>)</td>
+</tr>
+<tr>
+<td>122</td>
+<td><code>STANDARD_GRAVITY</code></td>
+</tr>
+<tr>
+<td>123</td>
+<td><code>METRIC_HORSEPOWER</code></td>
+</tr>
+<tr>
+<td>124</td>
+<td><code>REVOLUTION</code></td>
+</tr>
+<tr>
+<td>125–126</td>
+<td>Time additional (<code>MONTH</code>, <code>FORTNIGHT</code>)</td>
+</tr>
+<tr>
+<td>127</td>
+<td><code>ATMOSPHERE_TECHNICAL</code></td>
+</tr>
+<tr>
+<td>128–129</td>
+<td>Textile linear density (<code>TEX</code>, <code>DENIER</code>)</td>
+</tr>
+<tr>
+<td>130–133</td>
+<td>Apothecary/dry volume (<code>FLUID_DRAM</code>, <code>MINIM</code>, <code>PECK</code>, <code>BUSHEL</code>)</td>
+</tr>
+<tr>
+<td>134–297</td>
+<td>ISO 4217 fiat currencies (<code>AED</code> … <code>ZWL</code>) — see <code>CURRENCY_FIAT_FIRST</code> / <code>CURRENCY_FIAT_LAST</code></td>
+</tr>
+<tr>
+<td>298–347</td>
+<td>Cryptocurrencies (<code>BTC</code> … <code>RUNE</code>) — see <code>CURRENCY_CRYPTO_FIRST</code> / <code>CURRENCY_CRYPTO_LAST</code></td>
+</tr>
+<tr>
+<td>348–360</td>
+<td>Historical German units (<code>PFUND</code>, <code>ZENTNER</code>, <code>DOPPELZENTNER</code>, <code>LOT</code>, Prussian line/zoll/fuss/elle/rute, <code>KLAFTER</code>, <code>GERMAN_MILE</code>, <code>MORGEN</code>, <code>SCHEFFEL</code>)</td>
+</tr>
+<tr>
+<td>361–367</td>
+<td>Additional physical units (<code>SURVEY_FOOT</code>, <code>LEAGUE</code>, <code>CABLE</code>, <code>HAND</code>, <code>QUINTAL</code>, <code>SCRUPLE</code>, <code>BAUD</code>)</td>
+</tr>
+<tr>
+<td>368–371</td>
+<td>Temperature scales (<code>DELISLE</code>, <code>NEWTON_TEMP</code>, <code>REAUMUR</code>, <code>ROMER</code>)</td>
+</tr>
+<tr>
+<td>372–377</td>
+<td>Ratio/proportion units (<code>PERCENT</code>, <code>PER_MILLE</code>, <code>PER_MYRIAD</code>, <code>PER_CENT_MILLE</code>, <code>PPM</code>, <code>PPB</code>)</td>
+</tr>
+<tr>
+<td>378–379</td>
+<td>Appended fiat currencies (<code>ZWG</code>, <code>XCG</code>) — added past the unit block for ABI stability; see <code>CURRENCY_EXT_FIRST</code> / <code>CURRENCY_EXT_LAST</code></td>
+</tr>
+<tr>
+<td>380</td>
+<td><code>_SENTINEL</code> (internal bound; do not use)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note on <code>CUP</code>:</strong> the Cuban-Peso currency is exposed as <strong><code>BaseUnit.CUP_</code></strong> (trailing
+underscore), not <code>BaseUnit.CUP</code>. The plain name <code>CUP</code> is the US-cup volume unit
+(enum value 81); since Python enum member names must be unique, the currency at
+value 167 takes the suffixed name. This affects the Python member name only — the
+<code>.bvnr</code> wire token is still the bare uppercase <code>CUP</code>, and case stays load-bearing
+(<code>cup</code> = volume, <code>CUP</code> = currency).</p>
+</blockquote>
+<hr />
+<h2 id="spec-11-additions">Spec 1.1 additions</h2>
+<p>These bindings target the <strong>Bovnar spec (v1.1)</strong>; spec 1.0 remains the
+frozen baseline. The 1.1 features (all gated on a <code>#!bovnar 1.1</code> directive — an
+unversioned document is treated as 1.0) are exposed as:</p>
+<ul>
+<li><strong>Version:</strong> <code>bovnar.version()</code> (library version string), <code>bovnar.spec_version()</code>
+  → <code>(major, minor)</code> of the highest spec understood, and
+  <code>bovnar.peek_version(data)</code> → the <code>(major, minor)</code> a document declares, or
+  <code>None</code>. <code>Reader.declared_version</code> gives the same after a read; <code>read_mem</code>/
+  <code>read_fd</code>/<code>read_file</code> accept <code>strict_version=True</code> to reject a too-new version
+  (<code>ErrorCode.UNSUPPORTED_SPEC_VERSION</code>). <code>loads</code> does not take <code>strict_version</code>;
+  use a <code>Reader</code> when you need it.</li>
+<li><strong>Richer escapes:</strong> <code>\u{…}</code> and <code>\xHH</code> in string literals are decoded by the C
+  reader, so <code>loads</code> returns the resulting text transparently. A surrogate /
+  out-of-range <code>\u</code> is <code>ErrorCode.INVALID_CODEPOINT</code>.</li>
+<li><strong>Datetime family:</strong> <code>loads</code> decodes a <code>&lt;datetime:width,epoch&gt;</code> value to a
+  plain <code>int</code> (signed epoch seconds). With <code>typed=True</code> it is a <code>Quantity</code> whose
+  <code>.epoch_name</code> (<code>"unix"</code>, <code>"tai"</code>, …) and <code>.epoch_mjd</code> recover the epoch.
+  <code>dumps()</code> emits the <code>&lt;datetime:…&gt;</code> annotation and prepends <code>#!bovnar 1.1</code>
+  automatically when the object contains a datetime. With <code>typed=True</code> the
+  sub-second fraction of an ISO-8601 literal (spec 1.1) is preserved on the
+  <code>Quantity</code> and re-emitted, so a <code>loads(typed=True)</code>→<code>dumps()</code> round-trip is
+  lossless (<code>…T12:00:00.5Z</code> survives verbatim). The plain (non-typed) value is
+  only the whole-second <code>int</code> carrier, so a non-typed <code>loads</code>→<code>dumps</code> drops the
+  fraction; to read it explicitly use the DOM tier (<code>DomNode.datetime_fraction</code>)
+  or the streaming reader (<code>bvnr_data_t.frac_data</code> via a callback).
+  <code>ValueTypeFamily.DATETIME</code> is the family enum member.</li>
+<li><strong>Reference array indexing:</strong> <code>&amp;.matrix[0][1]</code> paths are stored verbatim and
+  resolved by <code>DomDoc.lookup("matrix[0][1]")</code> at the DOM layer.</li>
+</ul>
+<p><code>ErrorCode</code> adds <code>INVALID_SPEC_VERSION</code> (42), <code>UNSUPPORTED_SPEC_VERSION</code> (43),
+<code>INVALID_CODEPOINT</code> (44), <code>INVALID_DATETIME_LITERAL</code> (45), and
+<code>DATETIME_LITERAL_UNSUPPORTED_EPOCH</code> (46).</p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
+<script src="/bovnar_highlight.js?v=667c4a367efc"></script>
+<script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
 <script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
 </body>

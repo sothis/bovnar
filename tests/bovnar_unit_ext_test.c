@@ -1240,7 +1240,7 @@ static void test_nonsi_si_factors(void)
 	CHK(bu_prussian_line, 3.13853e-1/144.0,              1e-19);
 	CHK(bu_prussian_zoll, 3.13853e-1/12.0,              1e-18);
 	CHK(bu_prussian_fuss, 3.13853e-1,                   1e-16);
-	CHK(bu_prussian_elle, 6.67160e-1,                   1e-16);
+	CHK(bu_prussian_elle, 6.669376250e-1,               1e-16);   /* 25.5 Zoll */
 	CHK(bu_prussian_rute, 3.76624,                      1e-15);
 	CHK(bu_klafter,       1.88312,                      1e-15);
 	CHK(bu_german_mile,   7420.44,                      1e-12);

@@ -432,7 +432,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 | `prln`    | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.17953×10⁻³ m |
 | `prz`     | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61544×10⁻² m |
 | `prf`     | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
-| `elle`    | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.67160×10⁻¹ m |
+| `elle`    | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.669376×10⁻¹ m |
 | `rute`    | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.76624 m |
 | `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m |
 | `dt_mi`   | `deutsche_meile`, `german_mile` | Geographische Meile | `bu_german_mile` | 7420.44 m |

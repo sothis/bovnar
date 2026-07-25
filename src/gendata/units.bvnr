@@ -1638,7 +1638,11 @@
     .id      = <uint:16> 355;
     .name    = "prussian_elle";
     .symbol  = "elle";
-    .factor  = 0.66716;
+    # 25½ Zoll = 25.5 × 0.313853/12 m. Was 0.66716, which is 25.5085 Zoll — a
+    # number no definition produces, and 3.3e-4 off where every other Prussian
+    # unit here derives from the Fuß to within 1.1e-6. Published tables give
+    # 66.694 cm, agreeing with the definition.
+    .factor  = 0.666937625;
     .dims    = { .length = 1; };
     .affine  = false;
     .offset  = 0.0;

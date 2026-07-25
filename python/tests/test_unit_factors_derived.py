@@ -184,6 +184,7 @@ DERIVED = {
     'prln':    (PR_FUSS / 144,      "Zoll / 12"),
     'rute':    (12 * PR_FUSS,       "12 Fuß", 5e-6),
     'klafter': (6 * PR_FUSS,        "6 Fuß", 5e-6),
+    'elle':    (25.5 * PR_FUSS / 12, "25½ Zoll"),
     'morgen':  (180 * (12 * PR_FUSS) ** 2, "180 square Ruten", 5e-6),
     'schffl':  (0.0549615,          "published Prussian Scheffel, 54.9615 L "
                                     "(the 3072-Kubikzoll derivation gives 54.967 L, "
@@ -223,36 +224,13 @@ def test_factor_matches_its_definition(symbol, factors):
         f"(relative difference {abs(got - want) / want:.3g}, tolerance {tol:g})")
 
 
-def test_the_prussian_elle_is_the_one_that_does_not_derive(factors):
-    """A finding, recorded rather than silently patched.
-
-    Every other Prussian unit reproduces its definition from the 1816 Fuß to
-    within 1.1e-6: Zoll = Fuß/12 exactly, Rute = 12 Fuß, Klafter = 6 Fuß,
-    Morgen = 180 square Ruten. The Elle does not. Its historical definition is
-    25½ Zoll, which gives 0.666938 m, and published tables give 66.694 cm — the
-    shipped value is 0.66716 m, off by 3.3e-4, three hundred times the error of
-    its siblings and a multiple of the Zoll that is not a round number.
-
-    Changing a factor changes what a stored value converts to, so this test
-    pins the discrepancy and its size instead of quietly correcting it. If the
-    value is corrected, this test should be deleted and `elle` moved into
-    DERIVED as 25.5 * PR_FUSS / 12."""
-    elle = factors['elle']
-    from_definition = 25.5 * PR_FUSS / 12
-    assert math.isclose(elle, 0.66716, rel_tol=1e-9), (
-        "the shipped Elle changed; if it was corrected, retire this test")
-    off = abs(elle - from_definition) / from_definition
-    assert 3.0e-4 < off < 3.6e-4, (
-        f"the gap moved: Elle {elle!r} vs 25.5 Zoll {from_definition!r} ({off:.3g})")
-
-
 def test_the_derivation_set_covers_the_self_defined_units(factors):
     """The point of this module is the units pint cannot check independently.
     If a new one is added without a derivation here, say so."""
     unchecked = {
-        # primitive, instrument-defined, or (elle) checked by its own test above
+        # primitive or instrument-defined, not derivable by arithmetic
         'b', 'B', 'Bd', 'pH', 'NTU', 'FNU', 'FTU', 'FAU', 'JTU', 'PSU',
-        'var', 'VA', 'dB', 'Np', 'slug', 'tex', 'den', 'sc', 'gi', 'elle',
+        'var', 'VA', 'dB', 'Np', 'slug', 'tex', 'den', 'sc', 'gi',
     }
     self_defined = {'fur', 'fath', 'thm', 'ac', 'G', 'Mx', 'Oe', 'ph', 'var',
                     'rpm', 'ch', 'rd', 'Pfd', 'Ztr', 'dz', 'lot', 'prln',

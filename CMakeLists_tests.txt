@@ -1030,8 +1030,9 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 123)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 124)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
+                                    #           + web_links
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1151,6 +1152,25 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_doc
             "markdown not importable by ${Python3_EXECUTABLE} -- skipping the "
             "generated HTML doc check. Run 'pip install markdown' to enable it.")
     endif()
+endif()
+
+# ── Every internal link on the site goes somewhere ──────────────────────────
+# bvnr_html_docs above proves each page matches its source; it says nothing about
+# whether the page's links resolve, and a page can be perfectly fresh and still
+# link into thin air. That is not hypothetical: gen_html_docs rewrites an
+# inter-doc link to its HTML page, and a document with NO html page fell through
+# with the relative href its Markdown wrote, so three published pages pointed at
+# /docs/<page>/unit_ambiguities.md while the file served from /doc/. Every
+# generator was green throughout.
+#
+# The check also refuses a link to a path publish_web.sh excludes from the
+# upload, which is the one dead link a checkout cannot see -- the file is right
+# there locally and simply never reaches the server. Pure stdlib, no network.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_web_links.py)
+    add_test(NAME bvnr_web_links
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_web_links.py)
+    set_tests_properties(bvnr_web_links PROPERTIES LABELS "web;docs" TIMEOUT 120)
 endif()
 
 # ── ?v= cache-bust stamps still match the files they label ──────────────────

@@ -492,7 +492,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 <blockquote>
 <p><strong>Photometry: the steradian is carried, not dropped.</strong> <code>lm</code>, <code>lx</code> and <code>ph</code> are
 defined <em>through</em> the steradian, so they carry its quantity kind (§3.12 and
-§10 of <a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>); <code>cd</code> and <code>sb</code> do not.
+§10 of <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>); <code>cd</code> and <code>sb</code> do not.
 The SI dimension vector cannot tell them apart — every photometric unit reduces
 to candela in base dimensions — so without the kind the library both refused
 <code>lm ↔ cd·sr</code> and converted <code>lm ↔ cd</code> at factor 1, which is the same claim with
@@ -2107,7 +2107,7 @@ the same answer it gives for a π-based angle. <code>bvn_unit_convert_value</cod
 English conventions both work and both carry the divalent caveat above.</p>
 <p><strong><code>dH</code> is not <code>°dH</code>.</strong> Without the degree sign the token is the decihenry, and it stays that way.
 Likewise water chemistry writes the American scale as "ppm"; Bovnar's <code>ppm</code> is the dimensionless
-10⁻⁶ and is <em>not</em> interchangeable with <code>°aH</code>. See <a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+10⁻⁶ and is <em>not</em> interchangeable with <code>°aH</code>. See <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
 </blockquote>
 <h3 id="3281-conductivity-and-dissolved-solids">3.28.1 Conductivity and Dissolved Solids</h3>
 <p>Two quantities that water data quotes constantly and that need <strong>no unit of their own</strong> — the
@@ -2294,7 +2294,7 @@ a factor exists — report the method.</p>
 does not: the candle method cannot resolve below roughly 25 JTU, so a milli-JTU is not a
 measurement.</p>
 <p>Watch the case. <code>fau</code> is the femto-astronomical-unit, <code>cF</code> the centifarad — the turbidity and
-conductivity scales are uppercase only. See <a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+conductivity scales are uppercase only. See <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
 <p><strong>PSU is not per-mille.</strong> Practical salinity is a conductivity ratio, so it is dimensionless by
 construction and <code>PSU</code> is a label rather than a unit — SI-minded texts write <em>S</em>_P = 35 with no
 unit at all. It is <strong>not</strong> a mass fraction: <em>S</em>_P 35 corresponds to about 35.165 g/kg absolute
@@ -2668,7 +2668,7 @@ takes no prefix.</p>
 <p>The last row is the harder case: <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.</p>
 <p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne.</p>
 <p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
-<p>For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see <a href="unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+<p>For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
 <p>Currencies take the compact prefix too — <code>k$EUR</code> is <code>k~$EUR</code>. The <code>$</code> sigil already separates the prefix from the code (no prefix symbol and no currency code contains a <code>$</code>), so nothing is left for the <code>~</code> to resolve. What the sigil rule still requires is the sigil itself: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is never a currency (§10.4).</p>
 <hr />
 <h2 id="5-unit-notation-grammar">5. Unit Notation Grammar</h2>

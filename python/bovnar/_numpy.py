@@ -53,6 +53,7 @@ from .enums import ValueTypeFamily as F
 from .dom import DomNode, DomType
 from .quantity import Quantity
 from .structs import ValueUnit, make_type_spec, make_unit_none
+from .enums import PrefixSystem
 from .exceptions import BovnarArgumentError
 
 __all__ = ['to_numpy', 'to_pint_array', 'from_numpy', 'from_pint_array',
@@ -227,6 +228,38 @@ def _is_exact_decimal_quantity(q) -> bool:
     return _is_exact_decimal_family(int(q.vtype.family), int(q.vtype.width or 64))
 
 
+def _unit_key(unit):
+    """Order-insensitive identity of a unit, for deciding array uniformity.
+
+    Unit multiplication commutes, so ``m·s`` and ``s·m`` are ONE unit — that is
+    why ``bvn_unit_equal`` matches components as a multiset, and the spec
+    requires logically equivalent notations to compare equal (unit-system
+    reference §2.2). The canonical STRING does not carry that property: the
+    formatter splits numerator from denominator but preserves source order
+    within each group, so ``m·s`` and ``s·m`` serialise differently. Keying
+    uniqueness on the string therefore rejected an array that merely spelled one
+    unit two ways, with "array mixes units ['m·s', 's·m']".
+
+    Mirrors bvn_unit_component_identical: base, exponent, prefix system, and the
+    prefix id from whichever arm of the union that system selects.
+    """
+    n = min(int(unit.num_components), len(unit.components))
+    out = []
+    for i in range(n):
+        c = unit.components[i]
+        sysid = int(c.prefix.system)
+        pid = int(c.prefix.id.iec) if sysid == int(PrefixSystem.IEC) \
+            else int(c.prefix.id.si)
+        out.append((int(c.base), int(c.exponent), sysid, pid))
+    return tuple(sorted(out))
+
+
+def _record_unit(acc, unit, display):
+    """Remember one unit under its order-insensitive key, keeping the FIRST
+    spelling seen as the one to report."""
+    acc['units'].setdefault(_unit_key(unit), (unit, display))
+
+
 def _leaf(obj, acc):
     if obj is None:
         acc['null'] = True
@@ -237,7 +270,7 @@ def _leaf(obj, acc):
             acc['dtypes'].add('object')
             us = obj.unit_str()
             if us:
-                acc['units'][us] = obj.unit
+                _record_unit(acc, obj.unit, us)
             else:
                 acc['bare_numeric'] = True
             val = obj.decimal()                   # exact Decimal, or None for a null
@@ -249,7 +282,7 @@ def _leaf(obj, acc):
             acc['dtypes'].add(dt)
         us = obj.unit_str()
         if us:
-            acc['units'][us] = obj.unit
+            _record_unit(acc, obj.unit, us)
         elif int(obj.vtype.family) in _NUMERIC_FAMILIES:
             acc['bare_numeric'] = True
         val = obj.value                           # a typed null decodes to None
@@ -288,7 +321,7 @@ def _leaf(obj, acc):
         if us == 'no_unit':
             us = ''
         if us:
-            acc['units'][us] = obj.unit
+            _record_unit(acc, obj.unit, us)
         elif obj.dom_type in (DomType.INT, DomType.FLOAT):
             acc['bare_numeric'] = True
         val = obj.to_python()
@@ -406,7 +439,9 @@ def _extract(src, dtype):
             f"a value is out of range for a {np_dtype} array: {e}; "
             f"pass dtype=object or a wider dtype") from e
 
-    units = list(acc['units'])
+    # Keyed order-insensitively (see _unit_key), so two spellings of one unit
+    # are one entry; the display strings are what the messages below show.
+    units = [display for _unit, display in acc['units'].values()]
     if len(units) > 1:
         raise BovnarArgumentError(
             f"array mixes units {units}; a numpy array carries a single unit")
@@ -418,7 +453,8 @@ def _extract(src, dtype):
             f"array mixes a unit ({units[0]}) with dimensionless numeric "
             f"value(s); give every element the same unit, or drop it")
     if units:
-        return arr, acc['units'][units[0]], units[0]
+        unit, display = next(iter(acc['units'].values()))
+        return arr, unit, display
     return arr, make_unit_none(), ''
 
 

@@ -292,6 +292,41 @@ class TestMixedUnitDimensionless:
         a, u = to_numpy(loads(b'.a=[1,2,3];', typed=True)['a'], return_unit=True)
         assert u == '' and a.tolist() == [1, 2, 3]
 
+    @pytest.mark.parametrize("a,b", [
+        ('m·s',   's·m'),        # one unit, two orders
+        ('k~g·m', 'm·k~g'),      # prefixes travel with their component
+        ('A·s',   's·A'),
+    ])
+    def test_two_spellings_of_one_unit_are_not_a_mix(self, a, b):
+        """Unit multiplication commutes: `m·s` and `s·m` are the SAME unit, and
+        bvn_unit_equal says so — it matches components as a multiset precisely
+        because the spec requires logically equivalent notations to compare
+        equal. The canonical string does not have that property (the formatter
+        preserves source order within numerator and denominator), so keying
+        array uniformity on it rejected these as 'array mixes units'."""
+        import bovnar
+        from bovnar.quantity import Quantity
+        from bovnar.structs import make_type_spec
+        from bovnar.enums import ValueTypeFamily
+        vt = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
+        qs = [Quantity('1.0', vt, bovnar.parse_unit(a)),
+              Quantity('2.0', vt, bovnar.parse_unit(b))]
+        arr, u = to_numpy(qs, return_unit=True)
+        assert len(arr) == 2
+        assert u == a, "the first spelling seen is the one reported"
+
+    def test_genuinely_different_units_still_rejected(self):
+        """The order-insensitive key must not blur two real units together."""
+        import bovnar
+        from bovnar.quantity import Quantity
+        from bovnar.structs import make_type_spec
+        from bovnar.enums import ValueTypeFamily
+        vt = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
+        qs = [Quantity('1.0', vt, bovnar.parse_unit('m·s')),
+              Quantity('2.0', vt, bovnar.parse_unit('m·h'))]
+        with pytest.raises(BovnarArgumentError, match="mixes units"):
+            to_numpy(qs)
+
 
 @needs_lib
 class TestFromNumpy:

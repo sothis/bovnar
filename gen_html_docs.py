@@ -211,7 +211,17 @@ def render_markdown(text):
 
 
 def rewrite_links(body):
-    """Point inter-doc Markdown links at their HTML pages."""
+    """Point inter-doc Markdown links at their HTML pages.
+
+    A document that has no HTML page of its own is still SERVED, as raw Markdown
+    under /doc/ (web/doc is a symlink to doc/, and publish_web.sh excludes only
+    the working files). Such a link has to become absolute: left as the relative
+    "unit_ambiguities.md" the Markdown source writes, it resolves against the
+    page's own directory — /docs/units/unit_ambiguities.md — and 404s. Three
+    published pages (units, cheatsheet, faq) linked to the ambiguity reference
+    that way, so every "see unit_ambiguities.md" on the live site was dead while
+    /doc/unit_ambiguities.md served fine.
+    """
     def repl(m):
         href = m.group(1)
         frag = ""
@@ -224,6 +234,13 @@ def rewrite_links(body):
         slug = SRC_TO_SLUG.get(key)
         if slug:
             return f'href="{SITE}/docs/{slug}/{frag}"'
+        # No HTML page — but if the target really is a document we ship, point at
+        # the raw copy. Requiring it to exist keeps a genuine typo visible as a
+        # broken relative link rather than dressing it up as a plausible URL.
+        if (path and not path.startswith(("http:", "https:", "/", "#", "mailto:"))
+                and key.endswith((".md", ".ebnf", ".svg"))
+                and os.path.exists(os.path.join(DOC_DIR, key))):
+            return f'href="/doc/{key}{frag}"'
         return m.group(0)
     return re.sub(r'href="([^"]+)"', repl, body)
 

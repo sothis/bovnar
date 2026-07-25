@@ -140,6 +140,19 @@ It is not related to `Da` (dalton) — case separates them (§6).
 Symbols are matched byte for byte. These pairs differ only in case and mean unrelated things;
 several are one keystroke apart in everyday data.
 
+Start with the **bare** symbols, because the prefixed rows below are built from
+them and they are the three most common symbols in the whole table:
+
+| Lower | Means | Upper | Means |
+|-------|-------|-------|-------|
+| `s` | second | `S` | siemens |
+| `h` | hour | `H` | henry |
+| `g` | gram | `G` | gauss |
+| `kn` | knot | `kN` | **kilonewton** — the same trap as `gn`/`GN` and `fn`/`fN` below |
+| `grad` | gradian (also `gradian`, `gon`) | `Grad` | **gigaradian** — and German writes *Grad* for the degree, so a German-language source is the likely way to type this by accident. Worse than the others: both are angles, so it *converts*, by a factor of 10⁹ |
+
+Then the prefixed pairs:
+
 | Lower | Means | Upper / mixed | Means |
 |-------|-------|---------------|-------|
 | `ms` | millisecond | `mS` | millisiemens |
@@ -196,6 +209,14 @@ and always emits one canonical form.
 A document that has been through Unicode normalisation (NFC/NFD/NFKC/NFKD) still parses: every
 variant above maps to the same unit, which the normalisation test sweep enforces over the whole
 table.
+
+> **The canonical output is deliberately not NFC.** U+2126 (ohm) and U+212B (ångström) both have
+> *singleton* NFC decompositions — to U+03A9 and U+00C5 — so a document this library writes is not
+> Unicode-normalised, and running it through NFC **changes its bytes**. It still parses, and
+> re-serialising returns U+2126/U+212B, so the round trip is a semantic fixed point but not a byte
+> fixed point. That matters if you hash, sign or byte-diff bovnar output (the conformance suite's
+> byte-for-byte comparison included): normalise before hashing, or do not normalise at all — but do
+> not assume the two are the same file.
 
 `u` is both the ASCII micro prefix and the bare symbol for the dalton — rule 2 keeps them apart:
 `u` alone is the dalton, `us` is a microsecond, `uu` is a micro-dalton.

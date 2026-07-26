@@ -331,6 +331,7 @@
     "pg.jumpTo": "zu Zeile $L, Spalte $C springen",
     "pg.docTier": "Dokument",
     "pg.docTierWhole": "dokumentweite Regel — keine einzelne Position",
+    "pg.docTierAt": "dokumentweite Regel — erste Fundstelle in Zeile $L, Spalte $C",
     "pg.noErrors": "keine Fehler",
     "pg.parserUnavailable": "Parser nicht verfügbar",
     "pg.ready": "bereit",

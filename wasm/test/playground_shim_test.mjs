@@ -263,10 +263,16 @@ const shapes = [
    they are the cases the playground used to call green. The expected code comes
    from the CLI, not from a literal here. */
 const docTier = [
-  { name: 'struct shape mismatch', text: '.a = [{.b=3;},{.c=4;}];\n' },
-  { name: 'duplicate key',         text: '.x = 1;\n.x = 2;\n' },
-  { name: 'heterogeneous array',   text: '.mix = [1,"two"];\n' },
-  { name: 'ragged nested array',   text: '.r = [[1,2],[3,4,5]];\n' },
+  { name: 'struct shape mismatch', at: [1, 1],  text: '.a = [{.b=3;},{.c=4;}];\n' },
+  { name: 'duplicate key',         at: [2, 1],  text: '.x = 1;\n.x = 2;\n' },
+  { name: 'heterogeneous array',   at: [1, 1],  text: '.mix = [1,"two"];\n' },
+  { name: 'ragged nested array',   at: [1, 1],  text: '.r = [[1,2],[3,4,5]];\n' },
+  /* the site is a node, not the first line: an indented repeat inside a struct,
+     and a repeat inside an array element */
+  { name: 'duplicate key in a struct', at: [4, 5],
+    text: '.s = {\n    .x = 1;\n    .y = 2;\n    .x = 9;\n};\n' },
+  { name: 'duplicate key in an element', at: [1, 14],
+    text: '.rs = [{.b=1;.b=2;},{.b=3;.b=4;}];\n' },
 ];
 
 /*
@@ -384,6 +390,17 @@ for (const { name, text } of docTier) {
   const plain = P.parseFaithful(text).errors;
   ok(!plain.some(e => e.tier === 'document'),
      `error ${name}: reported without documentTier: ${show(plain.map(e => e.code))}`);
+}
+
+/* bvn_dom_doc_get_parse_error is a code with no site, but each of these rules is
+   a property of a node in the tree, so the shim recovers one — without it the
+   playground can only say "document" and offer no jump to the offending key. */
+console.log('# a document-tier violation points at the node it is about');
+for (const { name, text, at } of docTier) {
+  const e = P.parseFaithful(text, { documentTier: true }).errors
+    .find(x => x.tier === 'document');
+  ok(e && e.line === at[0] && e.col === at[1],
+     `site ${name}: ${e ? e.line + ':' + e.col : 'none'}, expected ${at[0]}:${at[1]}`);
 }
 
 console.log('# a document the CLI accepts reports no errors');

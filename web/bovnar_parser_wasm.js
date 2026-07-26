@@ -89,13 +89,26 @@
     // only advances and each match index is >= the previous pos), so count
     // newlines only over the span since the last query. lastIdx is reset if a
     // caller ever asks for an earlier offset, so a non-monotonic use stays correct.
-    var lastIdx = 0, lastLine = 1;
+    var lastIdx = 0, lastLine = 1, lastNL = -1;
     function lineAt(idx) {
       if (idx > masked.length) idx = masked.length;
-      if (idx < lastIdx) { lastIdx = 0; lastLine = 1; }
-      for (var i = lastIdx; i < idx; i++) if (masked.charCodeAt(i) === 10) lastLine++;
+      if (idx < lastIdx) { lastIdx = 0; lastLine = 1; lastNL = -1; }
+      for (var i = lastIdx; i < idx; i++)
+        if (masked.charCodeAt(i) === 10) { lastLine++; lastNL = i; }
       lastIdx = idx;
       return lastLine;
+    }
+    /* The DISPLAY column the C lexer reports: 1-based, one per code point, and a
+       tab advances to the next multiple of 4 (the playground's jumpTo converts it
+       back). Only ever asked for at a key, so it walks a single line. */
+    function colAt(idx) {
+      var col = 1;
+      for (var i = lastNL + 1; i < idx; i++) {
+        var c = masked.charCodeAt(i);
+        if (c === 9) col = (((col - 1) >> 2) + 1) * 4 + 1;
+        else if (c < 0xdc00 || c > 0xdfff) col++;   // skip a surrogate pair's tail
+      }
+      return col;
     }
     return function next(key) {
       var needle = '.' + key;
@@ -108,12 +121,13 @@
         if (/[\s{};]/.test(before) && (after === '=' || after === '{')) {
           pos = j;
           var semi = masked.indexOf(';', j); if (semi < 0) semi = masked.length;
-          return { line: lineAt(i),
+          var line = lineAt(i);            /* lineAt first: colAt needs its newline */
+          return { line: line, col: colAt(i),
                    synthesized: after === '=' ? !/^\s*=\s*</.test(masked.slice(j, semi)) : false };
         }
         i = masked.indexOf(needle, i + 1);
       }
-      return { line: lineAt(pos), synthesized: false };
+      return { line: lineAt(pos), col: 1, synthesized: false };
     };
   }
 
@@ -200,7 +214,7 @@
   function buildTree(events, scan) {
     var root = { type: 'stream', children: [] };
     var stack = [{ kind: 'struct', node: root }];
-    var key = null, line = 1, synth = false;
+    var key = null, line = 1, col = 1, synth = false;
     /* The unit exactly as the current annotation spells it. bvn_unit_to_string
        canonicalises (`m·s⁻¹` and `deg` come back as `m/s` and `°`), and a reader
        echoing a document back — the demos print the decoded unit beside the
@@ -249,7 +263,7 @@
     function attach(value) {
       var row = openRow();
       if (row) { row.elements.push(value); return null; }
-      var assign = { type: 'assignment', key: key, line: line, col: 1,
+      var assign = { type: 'assignment', key: key, line: line, col: col,
                      ann: null, value: value };
       top().node.children.push(assign);
       key = null;
@@ -260,7 +274,8 @@
       switch (e.ev) {
         case 'assign_start': {
           settle();
-          var s = scan(e.text); key = e.text; line = s.line; synth = s.synthesized;
+          var s = scan(e.text); key = e.text; line = s.line; col = s.col;
+          synth = s.synthesized;
           annUnit = null;
           break;
         }
@@ -400,6 +415,95 @@
    * frame, so charging it to the demos would be a third more work per frame for
    * a verdict nothing there displays.
    */
+  /*
+   * bvn_dom_doc_get_parse_error is a code and nothing else — no offset, no line.
+   * But every one of these rules is a property of a node in the tree that is
+   * already built, so the site can be recovered: the second occurrence of a
+   * repeated key, the array whose elements disagree. Best effort by design; when
+   * nothing matches, the error keeps its positionless form and the playground
+   * renders it without a jump target rather than sending the caret somewhere
+   * invented.
+   */
+  function elementKind(v) {
+    if (!v) return '?';
+    if (v.type === 'struct' || v.type === 'array' || v.type === 'octet') return v.type;
+    if (v.type === 'null') return null;          /* a null element matches anything */
+    if (v.type === 'reference') return 'reference';
+    return v.kind === 'special' ? 'number' : v.kind;
+  }
+  function structShape(v) {
+    var keys = [];
+    for (var i = 0; i < v.children.length; i++) keys.push(v.children[i].key);
+    return keys.sort().join('\u0000');
+  }
+  function elementsAgree(row, shape) {
+    var kind = null, structShapeSeen = null, len = null;
+    for (var i = 0; i < row.length; i++) {
+      var k = elementKind(row[i]);
+      if (k === null) continue;                  /* nulls are shape-free */
+      if (shape === 'kind') {
+        if (kind === null) kind = k; else if (kind !== k) return false;
+      } else if (shape === 'struct' && row[i].type === 'struct') {
+        var sh = structShape(row[i]);
+        if (structShapeSeen === null) structShapeSeen = sh;
+        else if (structShapeSeen !== sh) return false;
+      } else if (shape === 'length' && row[i].type === 'array') {
+        var n = row[i].rows.length ? row[i].rows[0].elements.length : 0;
+        if (len === null) len = n; else if (len !== n) return false;
+      }
+    }
+    return true;
+  }
+  function arrayBreaks(v, code) {
+    var r;
+    if (code === 'array_element_type_mismatch') {
+      for (r = 0; r < v.rows.length; r++)
+        if (!elementsAgree(v.rows[r].elements, 'kind')) return true;
+    } else if (code === 'struct_shape_mismatch') {
+      for (r = 0; r < v.rows.length; r++)
+        if (!elementsAgree(v.rows[r].elements, 'struct')) return true;
+    } else if (code === 'array_row_size_mismatch') {
+      for (r = 1; r < v.rows.length; r++)
+        if (v.rows[r].elements.length !== v.rows[0].elements.length) return true;
+      for (r = 0; r < v.rows.length; r++)
+        if (!elementsAgree(v.rows[r].elements, 'length')) return true;
+    }
+    return false;
+  }
+  function locateDocError(code, tree) {
+    function walk(children) {
+      var seen = {}, i, a, hit;
+      for (i = 0; i < children.length; i++) {
+        a = children[i];
+        if (code === 'duplicate_struct_key' && a.key != null) {
+          /* the SECOND one: the first is the definition, the repeat is the fault */
+          if (Object.prototype.hasOwnProperty.call(seen, a.key)) return a;
+          seen[a.key] = 1;
+        }
+        if (a.value && a.value.type === 'struct') {
+          hit = walk(a.value.children);
+          if (hit) return hit;
+        } else if (a.value && a.value.type === 'array') {
+          if (arrayBreaks(a.value, code)) return a;
+          hit = walkArray(a.value);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    }
+    /* a struct or sub-array nested inside a row can break the rule too */
+    function walkArray(v) {
+      var hit, r, i, el;
+      for (r = 0; r < v.rows.length; r++)
+        for (i = 0; i < v.rows[r].elements.length; i++) {
+          el = v.rows[r].elements[i];
+          if (el.type === 'struct') { hit = walk(el.children); if (hit) return hit; }
+          else if (el.type === 'array') { hit = walkArray(el); if (hit) return hit; }
+        }
+      return null;
+    }
+    try { return walk(tree.children); } catch (_) { return null; }
+  }
   function docTierError(text) {
     try {
       var d = wasm.toJSON(text);
@@ -449,6 +553,10 @@
        at "line 0", and pay for the extra DOM pass on every animation frame. */
     if (raw.faithfulErrors === undefined) {
       var docErr = raw.errors.length ? null : docTierError(text);
+      if (docErr) {
+        var site = locateDocError(docErr.code, raw.tree);
+        if (site) { docErr.line = site.line; docErr.col = site.col; }
+      }
       raw.faithfulErrors = docErr ? raw.errors.concat([docErr]) : raw.errors;
     }
     return { events: raw.events, errors: raw.faithfulErrors, tree: raw.tree };

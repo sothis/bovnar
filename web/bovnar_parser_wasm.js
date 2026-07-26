@@ -183,6 +183,13 @@
     var root = { type: 'stream', children: [] };
     var stack = [{ kind: 'struct', node: root }];
     var key = null, line = 1, synth = false;
+    /* The unit exactly as the current annotation spells it. bvn_unit_to_string
+       canonicalises (`m·s⁻¹` and `deg` come back as `m/s` and `°`), and a reader
+       echoing a document back — the demos print the decoded unit beside the
+       value — has to be able to show the spelling that was written. Only ever
+       attached to a value that HAS a unit: a datetime's epoch arrives in the
+       same parameter slot, and `<datetime:64,tai>` does not make `tai` a unit. */
+    var annUnit = null;
     var oct = null;       // the octet node currently collecting chunks
     /* struct_close events already spent by a resynced array_row_end (below) */
     var swallowStructClose = 0;
@@ -193,6 +200,9 @@
       /* bvn_dom_array_dims() is the '/'-row count (src/dom/bovnar_dom_builder.c),
          which is exactly the number of rows opened here. */
       f.node.dims = f.node.rows.length;
+      var e0 = f.node.rows[0] && f.node.rows[0].elements[0];
+      if (f.assign && f.unitText && !f.assign.unitText && e0 && e0.unit)
+        f.assign.unitText = f.unitText;
       /* The C emits ONE type annotation for an array — the element type — and it
          belongs to the array's assignment. Reconstruct it from the first element
          that actually carries one, exactly as the scalar path does: the
@@ -233,8 +243,13 @@
         case 'assign_start': {
           settle();
           var s = scan(e.text); key = e.text; line = s.line; synth = s.synthesized;
+          annUnit = null;
           break;
         }
+        case 'type_start': annUnit = null; break;
+        case 'type_param':
+          if (e.tok === 'unit' && e.text && e.text !== 'no_unit') annUnit = e.text;
+          break;
         case 'struct_open': {
           settle();
           var snode = { type: 'struct', children: [] };
@@ -274,8 +289,12 @@
           var parent = top();
           var assign = attach(anode);
           if (!assign && parent.kind === 'array') assign = parent.assign;
+          /* An EXPLICIT annotation precedes the row; a synthesised one is emitted
+             inside it, after this point — so annUnit here is the spelling the
+             document actually wrote, and null when it wrote none. */
           var frame = { kind: 'array', node: anode, row: { elements: [] },
-                        assign: assign, synth: synth, pendingDim: false };
+                        assign: assign, synth: synth, unitText: annUnit,
+                        pendingDim: false };
           anode.rows.push(frame.row);
           stack.push(frame);
           break;
@@ -321,6 +340,7 @@
           // family, so emitting annFromValue for them would render a bogus
           // "synthesised → family vt_undefined" node in the playground tree.
           if (a && NUMERIC[node.familyName]) a.ann = annFromValue(node, synth);
+          if (a && annUnit && node.unit) a.unitText = annUnit;
           break;
         }
         case 'stream_end': settle(); break;

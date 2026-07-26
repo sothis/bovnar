@@ -608,7 +608,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 |---|---|
 | [Specification (v1.1)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Tutorial](doc/0_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
-| [Unit System Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
+| [Unit & Currency Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |

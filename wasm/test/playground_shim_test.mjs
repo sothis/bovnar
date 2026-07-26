@@ -369,19 +369,27 @@ for (const { name, text, after } of resync) {
   ok(show(got) === show(after), `resync ${name}: top level is ${show(got)}, expected ${show(after)}`);
 }
 
-console.log('# document-tier violations reach the on_error channel');
+/* The document tier is a second full pass with no line:column to report, so it
+   is opt-in: the playground asks for it, and the demos — which re-parse a
+   freshly encoded frame every animation step — must not be charged for it or
+   handed a finding they would show at line 0. Both halves are pinned here
+   because that division has now been got wrong in both directions. */
+console.log('# document-tier violations reach the on_error channel, when asked for');
 for (const { name, text } of docTier) {
   const cli = cliValidate(text);
   ok(!cli.ok, `${name}: the CLI accepts it — the case no longer tests what it claims`);
-  const errs = P.parseFaithful(text).errors;
+  const errs = P.parseFaithful(text, { documentTier: true }).errors;
   ok(errs.some(e => e.code === cli.error_name),
      `error ${name}: cli=${cli.error_name} shim=${show(errs.map(e => e.code))}`);
+  const plain = P.parseFaithful(text).errors;
+  ok(!plain.some(e => e.tier === 'document'),
+     `error ${name}: reported without documentTier: ${show(plain.map(e => e.code))}`);
 }
 
 console.log('# a document the CLI accepts reports no errors');
 for (const { name, text } of [...examples, ...shapes]) {
   if (!cliValidate(text).ok) continue;
-  const errs = P.parseFaithful(text).errors;
+  const errs = P.parseFaithful(text, { documentTier: true }).errors;
   ok(errs.length === 0, `clean ${name}: ${show(errs.map(e => e.code))}`);
 }
 

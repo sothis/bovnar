@@ -147,10 +147,28 @@
              unit: e.unit || null, epoch: e.epoch || null,
              valueType: vt, valueUnit: e.unit || null };
   }
+  /*
+   * value_type_spec_t.base is three different things depending on the family,
+   * and the C says which by the parameter event it emits beside it: type_base
+   * for a real radix (uint/sint/float), type_q for float_fix's fixed-point
+   * scaling, and nothing at all for float_dec. A datetime puts its epoch there
+   * as a small dense index (bovnar.h: 0 = unix, 1 = tai) and reports the name
+   * separately. Reconstructing the annotation from the resolved value therefore
+   * has to branch the same way the reader does, or `<float_fix:16,q8,°C>` reads
+   * as "base 8" and `<datetime:64,tai>` as "base 1" — a radix neither value has.
+   *
+   * A radix of 0 means "no explicit base", which resolves to decimal: the CLI
+   * prints that as <uint:64,_10,no_unit>, and so does this.
+   */
   function annFromValue(v, synthesized) {
     var params = [];
     if (v.width != null) params.push({ kind: 'width', text: String(v.width), value: v.width });
-    if (v.base != null)  params.push({ kind: 'base',  text: '_' + v.base,    value: v.base });
+    if (v.familyName === 'float_fix') {
+      if (v.base != null) params.push({ kind: 'q', text: 'q' + v.base, value: v.base });
+    } else if (v.familyName !== 'datetime' && v.familyName !== 'float_dec' && v.base != null) {
+      var base = v.base || 10;
+      params.push({ kind: 'base', text: '_' + base, value: base });
+    }
     if (v.unit)          params.push({ kind: 'unit',  text: v.unit });
     if (v.epoch)         params.push({ kind: 'epoch', text: v.epoch });
     return { synthesized: synthesized, familyName: v.familyName,
@@ -420,12 +438,15 @@
     return lastRaw;
   }
 
-  function wasmFaithful(text) {
+  function wasmFaithful(text, opts) {
     var raw = rawParse(text);
     if (!raw.tree) raw.tree = buildTree(raw.events, makeScan(text));
-    /* Memoised beside the tree, and kept OUT of raw.errors: that array is the
-       one parseBovnar replays to the demos, which have no channel for a
-       positionless document-tier error and would render it at line 0. */
+    if (!(opts && opts.documentTier))
+      return { events: raw.events, errors: raw.errors, tree: raw.tree };
+    /* Memoised beside the tree, and kept OUT of raw.errors: that array is what
+       the demos read, and they have no channel for a positionless
+       document-tier error -- they would refuse a config over an error reported
+       at "line 0", and pay for the extra DOM pass on every animation frame. */
     if (raw.faithfulErrors === undefined) {
       var docErr = raw.errors.length ? null : docTierError(text);
       raw.faithfulErrors = docErr ? raw.errors.concat([docErr]) : raw.errors;
@@ -600,13 +621,22 @@
   }
 
   /* ── dispatcher: WASM once ready, empty results until then ───────────────── */
-  function parseFaithful(text) {
+  /*
+   * parseFaithful(text[, { documentTier: true }]) -> { events, errors, tree }
+   *
+   * The document tier is opt-in because it is a second full pass (bvn_dom_parse
+   * plus the JSON projection, ~64 us against ~204 us for the parse itself on a
+   * demo-sized frame) and its finding has no line:column. The playground asks
+   * for it; the demos, which re-parse a freshly encoded frame every animation
+   * step, do not.
+   */
+  function parseFaithful(text, opts) {
     // A throw inside the shim used to return the same empty result as "WASM not
     // loaded yet", so the playground reported a green "ok - 0 events - no errors"
     // for a document it had actually failed on. Flag it so the caller can tell.
     var failed = false;
     if (wasm) {
-      try { return wasmFaithful(text); }
+      try { return wasmFaithful(text, opts); }
       catch (e) { failed = true; if (window.console) console.warn('bovnar wasm parseFaithful failed', e); }
     }
     return { events: [], errors: [], tree: { type: 'stream', children: [] }, failed: failed };

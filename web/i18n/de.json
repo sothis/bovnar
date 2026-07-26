@@ -304,6 +304,7 @@
     "Reactor control HMI — tank, gauges and trend driven by the decoded .bvnr telemetry stream. The same values are shown as text in the panel.": "Bedienoberfläche der Reaktorsteuerung — Behälter, Anzeigen und Trend, gespeist aus dem dekodierten .bvnr-Telemetriestrom. Dieselben Werte stehen als Text im Telemetriefeld.",
     "Bovnar playground editor — type .bvnr source to parse": "Bovnar-Playground-Editor — .bvnr-Quelltext zum Parsen eingeben",
     "# type bovnar here…&#10;.key = &lt;uint:32&gt; 42;": "# hier bovnar eingeben…&#10;.key = &lt;uint:32&gt; 42;",
+    "Verified event tree — scrollable": "Verifizierter Event-Baum — scrollbar",
     "type": "Typ",
     "bit-width": "Bitbreite",
     "unit": "Einheit",

@@ -269,11 +269,45 @@ const docTier = [
   { name: 'ragged nested array',   text: '.r = [[1,2],[3,4,5]];\n' },
 ];
 
-/* Rejected by the streaming reader, mid-document: resync must keep the tree and
-   the event stream coherent for everything that follows. */
+/*
+ * Rejected by the streaming reader, mid-document: resync must keep the tree and
+ * the event stream coherent for everything that follows, and `after` names the
+ * assignments that must still be assignments at the top level.
+ *
+ * The reader does not unwind a broken element the way it built it -- for a bad
+ * field inside an array's element struct it ends the ROW first and only then
+ * closes the struct. Read literally that leaves the row open for the rest of the
+ * document and every later assignment lands in it as an ELEMENT, key and all
+ * dropped: `.c` and `.d` below were gone from the tree entirely, and the array
+ * reported three elements. A truncated document is the other end of the same
+ * problem -- it gets no ev_stream_end at all, so nothing closes what is open.
+ */
 const resync = [
-  { name: 'range error then more',  text: '.small = <uint:8> 999;\n.ok = [1,2];\n.after = {.z = 1;};\n' },
-  { name: 'bad field in a struct',  text: '.s = {.bad = <uint:8> 999;};\n.t = 1;\n' },
+  /* the offending assignment is skipped, not repaired -- resync shows every
+     well-formed assignment PAST an error, which is why `small` is absent here */
+  { name: 'range error then more',    after: ['ok', 'after'],
+    text: '.small = <uint:8> 999;\n.ok = [1,2];\n.after = {.z = 1;};\n' },
+  { name: 'bad field in a struct',    after: ['s', 't'],
+    text: '.s = {.bad = <uint:8> 999;};\n.t = 1;\n' },
+  { name: 'bad array element',        after: ['a', 'b'],
+    text: '.a = [1, <uint:8> 999, 3];\n.b = 2;\n' },
+  { name: 'bad field in an element',  after: ['a', 'c', 'd'],
+    text: '.a = [{.b = <uint:8> 999;}, {.b=1;}];\n.c = 42;\n.d = 7;\n' },
+  /* The struct_close that follows such a row end has already been spent closing
+     the element. Spending it twice pops the ENCLOSING struct, and `.z` -- a
+     field of `.s` -- surfaces at the top level. */
+  { name: 'bad element inside a struct', after: ['s', 't'],
+    text: '.s = {.a = [{.b = <uint:8> 999;}, {.b=1;}]; .z = 5;};\n.t = 1;\n' },
+  { name: 'bad element, struct ends after', after: ['s', 't'],
+    text: '.s = {.a = [{.b = <uint:8> 999;}];};\n.t = 1;\n' },
+  { name: 'unterminated array',       after: ['a', 'b'],
+    text: '.a = [1, 2;\n.b = 2;\n' },
+  { name: 'unterminated array in a struct', after: ['s', 't'],
+    text: '.s = {.a = [1,2;};\n.t = 1;\n' },
+  { name: 'ragged dimension rows',    after: ['a', 'b'],
+    text: '.a = [1,2]/[3];\n.b = 1;\n' },
+  { name: 'truncated document',       after: ['a'],
+    text: '.a = {.x = 1;\n.b = 2;\n' },
 ];
 
 function cliValidate(text) {
@@ -327,6 +361,12 @@ for (const { name, text } of [...examples, ...shapes]) {
   })(P.parseFaithful(text).tree.children);
   ok(keys.every(k => typeof k === 'string' && k.length > 0),
      `keys ${name}: ${show(keys)}`);
+}
+
+console.log('# an assignment after a resynced error is still an assignment');
+for (const { name, text, after } of resync) {
+  const got = P.parseFaithful(text).tree.children.map(a => a.key);
+  ok(show(got) === show(after), `resync ${name}: top level is ${show(got)}, expected ${show(after)}`);
 }
 
 console.log('# document-tier violations reach the on_error channel');

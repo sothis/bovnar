@@ -184,6 +184,8 @@
     var stack = [{ kind: 'struct', node: root }];
     var key = null, line = 1, synth = false;
     var oct = null;       // the octet node currently collecting chunks
+    /* struct_close events already spent by a resynced array_row_end (below) */
+    var swallowStructClose = 0;
     function top() { return stack[stack.length - 1]; }
     /* the row currently accepting elements, or null between rows / in a struct */
     function openRow() { var f = top(); return f.kind === 'array' ? f.row : null; }
@@ -209,6 +211,10 @@
     }
     function settle() {
       while (top().kind === 'array' && !top().row) closeArray(stack.pop());
+    }
+    function haveArray() {
+      for (var k = 0; k < stack.length; k++) if (stack[k].kind === 'array') return true;
+      return false;
     }
     /* An element of the open row, or a keyed assignment in the enclosing scope.
        Returns the assignment when it made one (null for an array element). */
@@ -241,6 +247,11 @@
         // stream emits array_row_end → struct_close, so an array that is the
         // struct's last field is still on the stack here.
         case 'struct_close':
+          /* Already closed by the row end that preceded it — spending it again
+             would pop the ENCLOSING struct, and every field after it (`.z` in
+             `.s = {.a = [{bad}]; .z = 5;};`) would leave the struct it is
+             written in. */
+          if (swallowStructClose) { swallowStructClose--; break; }
           while (stack.length > 1 && top().kind === 'array') closeArray(stack.pop());
           if (stack.length > 1) stack.pop();
           break;
@@ -270,6 +281,14 @@
           break;
         }
         case 'array_row_end':
+          /* Resync unwinds a broken element in the opposite order: the reader
+             ends the ROW while the element struct is still open, and only then
+             emits struct_close. Taken literally that leaves the row open for the
+             rest of the document, and every following assignment lands in it as
+             an element — `.a = [{.b = <uint:8> 999;}, …]; .c = 42; .d = 7;` came
+             back as a three-element array with no .c and no .d at all. The row
+             ends where it was opened, so unwind to that array. */
+          if (haveArray()) while (top().kind !== 'array') { stack.pop(); swallowStructClose++; }
           settle();                    /* the innermost sub-array closed first */
           if (top().kind === 'array') top().row = null;
           break;
@@ -335,6 +354,13 @@
    * author wrote). The error carries no position -- bvn_dom_doc_get_parse_error
    * is a code, not a site -- so it is flagged as document-tier and rendered
    * without a line:column jump target.
+   *
+   * Called from parseFaithful, NOT from the shared rawParse: the playground is
+   * the only surface that shows this channel, and the demos re-parse a freshly
+   * encoded frame every animation step -- a text the memo below can never hit.
+   * The pass costs ~64 us against ~204 us for the parse itself on a demo-sized
+   * frame, so charging it to the demos would be a third more work per frame for
+   * a verdict nothing there displays.
    */
   function docTierError(text) {
     try {
@@ -369,12 +395,7 @@
       events = wasm.events(text).events || [];
       errObj = wasm.errors(text);
     }
-    var errors = mapErrors(errObj);
-    if (!errors.length) {
-      var docErr = docTierError(text);
-      if (docErr) errors.push(docErr);
-    }
-    lastRaw = { events: events, errors: errors };
+    lastRaw = { events: events, errors: mapErrors(errObj) };
     lastText = text;
     return lastRaw;
   }
@@ -382,7 +403,14 @@
   function wasmFaithful(text) {
     var raw = rawParse(text);
     if (!raw.tree) raw.tree = buildTree(raw.events, makeScan(text));
-    return raw;
+    /* Memoised beside the tree, and kept OUT of raw.errors: that array is the
+       one parseBovnar replays to the demos, which have no channel for a
+       positionless document-tier error and would render it at line 0. */
+    if (raw.faithfulErrors === undefined) {
+      var docErr = raw.errors.length ? null : docTierError(text);
+      raw.faithfulErrors = docErr ? raw.errors.concat([docErr]) : raw.errors;
+    }
+    return { events: raw.events, errors: raw.faithfulErrors, tree: raw.tree };
   }
 
   /* ── parseBovnar: translate the verified event stream to the live cb ─────
@@ -422,6 +450,27 @@
     function settle() {
       while (top().kind === 'array' && !top().row) { stack.pop(); endValue(); }
     }
+    function haveArray() {
+      for (var k = 0; k < stack.length; k++) if (stack[k].kind === 'array') return true;
+      return false;
+    }
+    /* Close what is still open. A document that dies mid-container gets no
+       ev_stream_end at all — the reader stops at the error — so without this the
+       last assignment, struct and row are never closed and a consumer's nesting
+       never returns to the top. ev_stream_end itself is NOT synthesised: its
+       absence is how the C says the document was cut short. */
+    function drain() {
+      while (stack.length > 1) {
+        var f = stack.pop();
+        if (f.kind === 'array') { if (f.row) E(EV.ARRAY_ROW_END); }
+        else E(EV.STRUCT_END);
+        endValue();
+      }
+      flushPending();
+    }
+    var sawStreamEnd = false;
+    /* struct_close events already accounted for by a resynced array_row_end */
+    var swallowStructClose = 0;
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       switch (e.ev) {
@@ -456,6 +505,7 @@
         // closing the struct, so it stays parented to this struct rather than
         // the outer scope.
         case 'struct_close':
+          if (swallowStructClose) { swallowStructClose--; break; }
           while (stack.length > 1 && top().kind === 'array') { stack.pop(); endValue(); }
           flushPending();      /* last field resynced away */
           E(EV.STRUCT_END);
@@ -476,6 +526,17 @@
           E(EV.ARRAY_ROW_START);
           break;
         case 'array_row_end':
+          /* see buildTree: resync ends the row while the element struct is still
+             open. Close that struct here — the row it lives in is over — and
+             swallow the struct_close that follows, so the stream stays nested
+             instead of ending a row inside a struct it also never left. */
+          while (haveArray() && top().kind !== 'array') {
+            flushPending();              /* the field the resync abandoned */
+            stack.pop();
+            E(EV.STRUCT_END);
+            swallowStructClose++;
+            endValue();
+          }
           settle();                      /* the innermost sub-array closed first */
           E(EV.ARRAY_ROW_END);
           if (top().kind === 'array') top().row = false;
@@ -497,13 +558,14 @@
           }
           break;
         case 'stream_end':
-          settle();
-          flushPending();
+          drain();
+          sawStreamEnd = true;
           E(EV.STREAM_END);
           break;
         default: break;
       }
     }
+    if (!sawStreamEnd) drain();
     // Same pass as the events above -- this was a second full walk of the
     // document. mapErrors already normalised error_name onto .code/.message.
     var errs = raw.errors;

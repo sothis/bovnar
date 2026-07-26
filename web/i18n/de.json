@@ -328,6 +328,8 @@
     "demo.blurb.ind": "<strong>Dasselbe Format, eine Fertigungshalle.</strong> Eine SPS streamt Reaktorregister als <code>&lt;float_fix:16,q8,°C&gt;</code> — Festkomma-Skalierung und Einheit <em>inline</em>, genau wie im Gerät — und HMI und PID-Regelkreis arbeiten ausschließlich mit <em>dekodierten</em> Werten. Schalten Sie <em>Skalierungsfehler</em> ein und sehen Sie das klassische Modbus-Desaster, das ein selbstbeschreibendes Register gar nicht auslösen kann.",
     "pg.synthesised": "synthetisiert",
     "pg.jumpTo": "zu Zeile $L, Spalte $C springen",
+    "pg.docTier": "Dokument",
+    "pg.docTierWhole": "dokumentweite Regel — keine einzelne Position",
     "pg.noErrors": "keine Fehler",
     "pg.parserUnavailable": "Parser nicht verfügbar",
     "pg.ready": "bereit",

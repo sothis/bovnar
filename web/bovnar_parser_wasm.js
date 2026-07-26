@@ -157,85 +157,192 @@
              family: 'vt_' + v.familyName, params: params };
   }
 
-  /* ── parseFaithful: assemble the tree from the verified event stream ───── */
+  /* ── parseFaithful: assemble the tree from the verified event stream ─────
+   *
+   * Arrays live on the SAME container stack as structs, because in bovnar an
+   * array element is a value like any other — including a struct or another
+   * array. A flat "one array being built" variable cannot express that: it made
+   * a struct inside an array open a keyed assignment in the enclosing scope
+   * (stealing the array's key), committed the array — empty — at that struct's
+   * first field, and dropped every following element on the floor. `.a =
+   * [{.b=3;},{.c=4;}];` rendered as two top-level structs, one of them keyed
+   * `null`, around a phantom 1×0 array.
+   *
+   * The stack has to be lazy about closing an array because the C stream has no
+   * "array end" event: a row ends with ev_array_row_end, and only the NEXT event
+   * says whether the array continues with a '/'-dimension row (announced by
+   * ev_array_dim_start), whether a sibling sub-array begins, or whether the
+   * array is over. So settle() pops arrays whose last row has closed, and runs
+   * before any event that proves the array cannot continue.
+   *
+   * Elements land in the innermost OPEN row; that single rule is what makes a
+   * struct inside an array an element instead of an assignment. The resulting
+   * shape matches bvnr_wasm_doc's DOM projection node for node.
+   */
   function buildTree(events, scan) {
     var root = { type: 'stream', children: [] };
-    var stack = [root];
+    var stack = [{ kind: 'struct', node: root }];
     var key = null, line = 1, synth = false;
-    var arr = null;       // { assign, value } while building an array
-    var oct = null;       // { assign, value } while building an octet stream
+    var oct = null;       // the octet node currently collecting chunks
     function top() { return stack[stack.length - 1]; }
-    function finishArray() {
-      if (arr) { arr.value.dims = arr.value.rows.length; top().children.push(arr.assign); arr = null; }
+    /* the row currently accepting elements, or null between rows / in a struct */
+    function openRow() { var f = top(); return f.kind === 'array' ? f.row : null; }
+    function closeArray(f) {
+      /* bvn_dom_array_dims() is the '/'-row count (src/dom/bovnar_dom_builder.c),
+         which is exactly the number of rows opened here. */
+      f.node.dims = f.node.rows.length;
+      /* The C emits ONE type annotation for an array — the element type — and it
+         belongs to the array's assignment. Reconstruct it from the first element
+         that actually carries one, exactly as the scalar path does: the
+         annotation precedes the first TYPED element, which in `[null, 1]` is not
+         the first element. */
+      if (!f.assign || f.assign.ann) return;
+      for (var r = 0; r < f.node.rows.length; r++) {
+        var els = f.node.rows[r].elements;
+        for (var c = 0; c < els.length; c++) {
+          if (els[c].type === 'scalar' && NUMERIC[els[c].familyName]) {
+            f.assign.ann = annFromValue(els[c], f.synth);
+            return;
+          }
+        }
+      }
+    }
+    function settle() {
+      while (top().kind === 'array' && !top().row) closeArray(stack.pop());
+    }
+    /* An element of the open row, or a keyed assignment in the enclosing scope.
+       Returns the assignment when it made one (null for an array element). */
+    function attach(value) {
+      var row = openRow();
+      if (row) { row.elements.push(value); return null; }
+      var assign = { type: 'assignment', key: key, line: line, col: 1,
+                     ann: null, value: value };
+      top().node.children.push(assign);
+      key = null;
+      return assign;
     }
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       switch (e.ev) {
         case 'assign_start': {
-          finishArray();
+          settle();
           var s = scan(e.text); key = e.text; line = s.line; synth = s.synthesized;
           break;
         }
         case 'struct_open': {
+          settle();
           var snode = { type: 'struct', children: [] };
-          top().children.push({ type: 'assignment', key: key, line: line, col: 1, ann: null, value: snode });
-          stack.push(snode); key = null;
-          break;
-        }
-        // Commit a pending array BEFORE popping the struct: the C stream emits
-        // array_row_end → struct_close, so an array that is the struct's last field
-        // would otherwise be finished (on the next assign_start / stream_end) after
-        // its parent struct is already popped, mis-parenting it to the outer scope.
-        case 'struct_close': finishArray(); stack.pop(); break;
-        case 'array_row_start': {
-          if (!arr) {
-            var anode = { type: 'array', dims: 0, rows: [] };
-            arr = { assign: { type: 'assignment', key: key, line: line, col: 1, ann: null, value: anode }, value: anode };
-          }
-          arr.value.rows.push({ elements: [] });
-          break;
-        }
-        case 'octet_start': {
-          var onode = { type: 'octet', chunks: [], total: 0 };
-          oct = { assign: { type: 'assignment', key: key, line: line, col: 1, ann: null, value: onode }, value: onode };
+          attach(snode);
+          stack.push({ kind: 'struct', node: snode });
           key = null;
           break;
         }
+        // Close anything still open inside the struct before popping it: the C
+        // stream emits array_row_end → struct_close, so an array that is the
+        // struct's last field is still on the stack here.
+        case 'struct_close':
+          while (stack.length > 1 && top().kind === 'array') closeArray(stack.pop());
+          if (stack.length > 1) stack.pop();
+          break;
+        case 'array_row_start': {
+          /* Pop finished sub-arrays — but never one waiting for its next
+             '/'-dimension row, which this event is about to open. */
+          while (top().kind === 'array' && !top().row && !top().pendingDim)
+            closeArray(stack.pop());
+          if (top().kind === 'array' && top().pendingDim) {
+            top().pendingDim = false;
+            top().row = { elements: [] };
+            top().node.rows.push(top().row);
+            break;
+          }
+          /* A new array: an element of the open row (a nested sub-array), or the
+             value of the pending assignment. A sub-array shares its parent's
+             assignment so the element annotation the C emitted in the innermost
+             first row still lands on the array that was assigned. */
+          var anode = { type: 'array', dims: 0, rows: [] };
+          var parent = top();
+          var assign = attach(anode);
+          if (!assign && parent.kind === 'array') assign = parent.assign;
+          var frame = { kind: 'array', node: anode, row: { elements: [] },
+                        assign: assign, synth: synth, pendingDim: false };
+          anode.rows.push(frame.row);
+          stack.push(frame);
+          break;
+        }
+        case 'array_row_end':
+          settle();                    /* the innermost sub-array closed first */
+          if (top().kind === 'array') top().row = null;
+          break;
+        case 'array_dim_start':
+          /* The next row continues THIS array rather than starting a new one. */
+          if (top().kind === 'array') top().pendingDim = true;
+          break;
+        case 'octet_start': {
+          settle();
+          /* attached here, not at octet_end, so its chunks accumulate into a node
+             that is already parented — an octet stream in an array row is an
+             element like any other value */
+          oct = { type: 'octet', chunks: [], total: 0 };
+          attach(oct);
+          break;
+        }
         case 'octet_end':
-          if (oct) { top().children.push(oct.assign); oct = null; }
+          oct = null;
           break;
         case 'data': {
           if (e.tok === 'octet_stream') {
-            if (oct) { oct.value.chunks.push({ length: e.bytes || 0 }); oct.value.total += (e.bytes || 0); }
+            if (oct) { oct.chunks.push({ length: e.bytes || 0 }); oct.total += (e.bytes || 0); }
             break;
           }
+          settle();
           var node = scalarNode(e);
-          if (arr) {
-            arr.value.rows[arr.value.rows.length - 1].elements.push(node);
-          } else {
-            // Only numeric families carry a meaningful (synthesised or explicit)
-            // type annotation; reference/symbol/null/string/bool values have no
-            // family, so emitting annFromValue for them would render a bogus
-            // "synthesised → family vt_undefined" node in the playground tree.
-            top().children.push({ type: 'assignment', key: key, line: line, col: 1,
-                                  ann: NUMERIC[node.familyName] ? annFromValue(node, synth) : null,
-                                  value: node });
-            key = null;
-          }
+          var a = attach(node);
+          // Only numeric families carry a meaningful (synthesised or explicit)
+          // type annotation; reference/symbol/null/string/bool values have no
+          // family, so emitting annFromValue for them would render a bogus
+          // "synthesised → family vt_undefined" node in the playground tree.
+          if (a && NUMERIC[node.familyName]) a.ann = annFromValue(node, synth);
           break;
         }
-        case 'stream_end': finishArray(); break;
+        case 'stream_end': settle(); break;
         default: break;   /* type_* events are folded into the data node's resolved type */
       }
     }
-    finishArray();
+    /* Resync can truncate a document mid-container. Every node is already
+       attached where it belongs, so this only finishes the arrays' bookkeeping. */
+    while (stack.length > 1) {
+      var f = stack.pop();
+      if (f.kind === 'array') closeArray(f);
+    }
     return root;
   }
   function mapErrors(errObj) {
     return (errObj.errors || []).map(function (e) {
       return { code: e.error_name, codeNum: e.error, message: e.error_name,
-               line: e.line, col: e.column, offset: e.offset };
+               line: e.line, col: e.column, offset: e.offset, tier: 'stream' };
     });
+  }
+  /*
+   * The streaming pass alone is not the whole of validity: array homogeneity,
+   * struct shape and duplicate keys are document-tier rules (spec §7.4, §12.4),
+   * checked when the document is materialised. bvnr_read() never sees them, so
+   * the playground reported a green "ok · no errors" for documents `bovnar
+   * validate` rejects -- `.a = [{.b=3;},{.c=4;}];` (struct_shape_mismatch),
+   * `.x=1; .x=2;` (duplicate_struct_key), `[1,"two"]` (array_element_type_mismatch).
+   * src/bovnar.c had exactly this hole in `bovnar events` and closed it the same
+   * way: run the DOM pass too, and only when the streaming tier came back clean
+   * (a resynced document is already reported, and its DOM is not the one the
+   * author wrote). The error carries no position -- bvn_dom_doc_get_parse_error
+   * is a code, not a site -- so it is flagged as document-tier and rendered
+   * without a line:column jump target.
+   */
+  function docTierError(text) {
+    try {
+      var d = wasm.toJSON(text);
+      if (!d || d.ok || !d.error) return null;
+      return { code: d.error_name, codeNum: d.error, message: d.error_name,
+               line: 0, col: 0, offset: 0, tier: 'document' };
+    } catch (_) { return null; }
   }
   /* Single source of both streams, shared by parseFaithful and parseBovnar.
      bvnr_wasm_parse runs ONE reader carrying both callbacks; the two older
@@ -262,7 +369,12 @@
       events = wasm.events(text).events || [];
       errObj = wasm.errors(text);
     }
-    lastRaw = { events: events, errors: mapErrors(errObj) };
+    var errors = mapErrors(errObj);
+    if (!errors.length) {
+      var docErr = docTierError(text);
+      if (docErr) errors.push(docErr);
+    }
+    lastRaw = { events: events, errors: errors };
     lastText = text;
     return lastRaw;
   }
@@ -273,21 +385,53 @@
     return raw;
   }
 
-  /* ── parseBovnar: translate the verified event stream to the live cb ───── */
+  /* ── parseBovnar: translate the verified event stream to the live cb ─────
+   *
+   * ev_assignment_end is this shim's own event — bvnr_event_t has no such
+   * member — so it is on us to close each assignment exactly once, when its
+   * VALUE ends. That needs the same container stack buildTree uses, and for the
+   * same reason: a struct or an array inside an array row is an element, not an
+   * assignment, and must not close one. A single "an array is open" flag emitted
+   * an assignment_end at the first field of a struct inside an array, one more
+   * after each element struct, and never closed the assignment that actually
+   * owned the array. */
   function wasmBovnar(text, cb) {
     var raw = rawParse(text);
     var events = raw.events;
     var scan = makeScan(text);
-    var line = 0, arrayOpen = false;
+    var line = 0;
     function E(type, data) { cb({ type: type, data: data || {}, line: line }); }
+    var stack = [{ kind: 'struct' }];
+    function top() { return stack[stack.length - 1]; }
+    /* true while the innermost container is an array row accepting elements —
+       i.e. a value ending right now is an element and closes no assignment */
+    function inRow() { var f = top(); return f.kind === 'array' && !!f.row; }
+    function endValue() {
+      if (inRow()) return;              /* an element closes no assignment */
+      E(EV.ASSIGNMENT_END);
+      top().pending = false;
+    }
+    /* In resync mode a malformed assignment is skipped after its
+       ev_assignment_start, so its value events never arrive. Close it when the
+       next event proves it is over, or the stream would carry an
+       ev_assignment_start with no end and a consumer's nesting would drift for
+       the rest of the document. */
+    function flushPending() { if (!inRow() && top().pending) endValue(); }
+    /* close every array whose last row has ended (see buildTree: the C stream
+       has no array-end event, so this is deferred until an event proves it) */
+    function settle() {
+      while (top().kind === 'array' && !top().row) { stack.pop(); endValue(); }
+    }
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       switch (e.ev) {
         case 'stream_start': E(EV.STREAM_START); break;
         case 'assign_start':
-          if (arrayOpen) { E(EV.ASSIGNMENT_END); arrayOpen = false; }
+          settle();
+          flushPending();              /* the previous assignment was resynced away */
           line = scan(e.text).line;
           E(EV.ASSIGNMENT_START, { key: e.text });
+          top().pending = true;
           break;
         case 'type_start': E(EV.TYPE_ANN_START); break;
         case 'type_family': E(EV.TYPE_ANN_FAMILY, { family: e.family }); break;
@@ -303,28 +447,58 @@
           break;
         }
         case 'type_end': E(EV.TYPE_ANN_END); break;
-        case 'struct_open': E(EV.STRUCT_START); break;
+        case 'struct_open':
+          settle();
+          E(EV.STRUCT_START);
+          stack.push({ kind: 'struct' });
+          break;
+        // Close a struct-trailing array (array_row_end → struct_close) before
+        // closing the struct, so it stays parented to this struct rather than
+        // the outer scope.
         case 'struct_close':
-          // Flush a struct-trailing array (array_row_end → struct_close) before
-          // closing, so it stays parented to this struct rather than the outer scope.
-          if (arrayOpen) { E(EV.ASSIGNMENT_END); arrayOpen = false; }
-          E(EV.STRUCT_END); E(EV.ASSIGNMENT_END); break;
-        case 'array_row_start': E(EV.ARRAY_ROW_START); arrayOpen = true; break;
-        case 'array_row_end': E(EV.ARRAY_ROW_END); break;
-        case 'array_dim_start': E(EV.ARRAY_DIM_START); break;
-        case 'octet_start': E(EV.OCTET_STREAM_START); break;
-        case 'octet_end': E(EV.OCTET_STREAM_END); E(EV.ASSIGNMENT_END); break;
+          while (stack.length > 1 && top().kind === 'array') { stack.pop(); endValue(); }
+          flushPending();      /* last field resynced away */
+          E(EV.STRUCT_END);
+          if (stack.length > 1) stack.pop();
+          endValue();          /* a struct that is an array element closes nothing */
+          break;
+        case 'array_row_start':
+          /* pop finished sub-arrays, but never one awaiting its '/'-dimension row */
+          while (top().kind === 'array' && !top().row && !top().pendingDim) {
+            stack.pop(); endValue();
+          }
+          if (top().kind === 'array' && top().pendingDim) {
+            top().pendingDim = false;
+            top().row = true;
+          } else {
+            stack.push({ kind: 'array', row: true, pendingDim: false });
+          }
+          E(EV.ARRAY_ROW_START);
+          break;
+        case 'array_row_end':
+          settle();                      /* the innermost sub-array closed first */
+          E(EV.ARRAY_ROW_END);
+          if (top().kind === 'array') top().row = false;
+          break;
+        case 'array_dim_start':
+          if (top().kind === 'array') top().pendingDim = true;
+          E(EV.ARRAY_DIM_START);
+          break;
+        case 'octet_start': settle(); E(EV.OCTET_STREAM_START); break;
+        case 'octet_end': E(EV.OCTET_STREAM_END); endValue(); break;
         case 'data':
           if (e.tok === 'octet_stream') {
             E(EV.DATA, { kind: 'octet', value: null, text: '', length: e.bytes });
           } else {
+            settle();
             E(EV.DATA, { kind: dataKind(e), value: dataValue(e),
                          text: e.text != null ? e.text : '', unit: e.unit || null });
-            if (!arrayOpen) E(EV.ASSIGNMENT_END);
+            endValue();
           }
           break;
         case 'stream_end':
-          if (arrayOpen) { E(EV.ASSIGNMENT_END); arrayOpen = false; }
+          settle();
+          flushPending();
           E(EV.STREAM_END);
           break;
         default: break;

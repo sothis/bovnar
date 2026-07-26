@@ -1048,10 +1048,11 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 127)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 128)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
+                                    #           + conformance_doc_examples
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1082,6 +1083,25 @@ add_test(
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conformance_counts.cmake)
 set_tests_properties(bvnr_conformance_doc_counts PROPERTIES
     LABELS "conformance;docs" TIMEOUT 60)
+
+# ── doc/7's worked examples are what the adapter actually emits ──────────────
+# doc/7 tells a third-party implementor that conformance means output
+# "byte-for-byte identical to the reference", so its worked examples are what
+# somebody copies. Nothing checked them, and the suite structurally could not:
+# bvnr_conformance_iut_self compares the adapter's log against the reference's
+# INTERNAL capture, and those two formatters are line-for-line duplicates -- both
+# agreeing says nothing about either matching the document. Four of six examples
+# were wrong, including the only one with an explicit annotation.
+if(Python3_Interpreter_FOUND AND NOT WIN32
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_conformance_doc.py)
+    add_test(NAME bvnr_conformance_doc_examples
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_conformance_doc.py
+                     $<TARGET_FILE:bvnr_conformance_iut>)
+    set_tests_properties(bvnr_conformance_doc_examples PROPERTIES
+        LABELS "conformance;docs;iut" TIMEOUT 60
+        DEPENDS bvnr_conformance_iut)
+endif()
 
 # ── WebAssembly artifact freshness ──────────────────────────────────────────
 # The committed web/ module is presented as the reference implementation. It

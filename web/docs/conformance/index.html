@@ -402,24 +402,24 @@ OCTET_STREAM_END
 <td></td>
 </tr>
 <tr>
-<td><code>TYPE_ANN_START &lt;family&gt;</code></td>
-<td>family: <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>, <code>utf8</code>, <code>bool</code>, <code>datetime</code></td>
+<td><code>TYPE_ANN_START &lt;ann&gt;</code></td>
+<td>ann: the <strong>whole annotation body</strong>, safe-escaped — the text between <code>&lt;</code> and <code>&gt;</code> verbatim, e.g. <code>float:64,m/s</code>, not <code>float</code>. It is the bare family keyword only when the annotation was <em>synthesised</em> for an untyped value (see below)</td>
 <td></td>
 </tr>
 <tr>
-<td><code>TYPE_FAMILY &lt;family&gt;</code></td>
-<td>Same as TYPE_ANN_START</td>
+<td><code>TYPE_FAMILY &lt;ann&gt;</code></td>
+<td>Same bytes as TYPE_ANN_START</td>
 <td></td>
 </tr>
 <tr>
 <td><code>TYPE_PARAM_WIDTH &lt;N&gt;</code></td>
 <td>N: effective width (0 → 64)</td>
-<td>Only for numeric types</td>
+<td>Emitted when the annotation carries a width, and for a synthesised one</td>
 </tr>
 <tr>
 <td><code>TYPE_PARAM_BASE &lt;N&gt;</code></td>
 <td>N: effective base (0 → 10)</td>
-<td>Only for numeric types</td>
+<td>Emitted only when the annotation <strong>states</strong> a base (<code>_16</code>), or was synthesised. <code>&lt;float:64,m/s&gt;</code> names no base and produces no such line — the events mirror the parameters actually present</td>
 </tr>
 <tr>
 <td><code>TYPE_PARAM_Q &lt;N&gt;</code></td>
@@ -429,11 +429,11 @@ OCTET_STREAM_END
 <tr>
 <td><code>TYPE_PARAM_UNIT &lt;unit&gt;</code></td>
 <td>unit: unit string, safe-escaped</td>
-<td>Only for numeric types</td>
+<td>Emitted when the annotation carries a unit — and also for a <code>datetime</code>, whose <strong>epoch name</strong> travels in this line (<code>TYPE_PARAM_UNIT tai</code>). A datetime is not a numeric type; the epoch shares the unit parameter slot because it occupies the same position in the grammar</td>
 </tr>
 <tr>
-<td><code>TYPE_ANN_END &lt;family&gt;</code></td>
-<td>Same as TYPE_ANN_START</td>
+<td><code>TYPE_ANN_END &lt;ann&gt;</code></td>
+<td>Same bytes as TYPE_ANN_START</td>
 <td></td>
 </tr>
 <tr>
@@ -563,15 +563,31 @@ DATA string hello
 <p><strong>Input:</strong> <code>.v = &lt;float:64,m/s&gt; 9.81;</code></p>
 <div class="codehilite"><pre><span></span><code>STREAM_START
 ASSIGNMENT_START v
-TYPE_ANN_START float
-TYPE_FAMILY float
+TYPE_ANN_START float:64,m/s
+TYPE_FAMILY float:64,m/s
 TYPE_PARAM_WIDTH 64
-TYPE_PARAM_BASE 10
 TYPE_PARAM_UNIT m/s
-TYPE_ANN_END float
+TYPE_ANN_END float:64,m/s
 DATA number 9.81
 </code></pre></div>
 
+<p>Note what an <strong>explicit</strong> annotation does differently from the synthesised one
+above, because this is where an adapter is most likely to diverge: the three
+<code>TYPE_ANN_*</code>/<code>TYPE_FAMILY</code> lines carry the annotation body verbatim rather than
+the family keyword, and there is no <code>TYPE_PARAM_BASE</code> line at all — the source
+named no base, and the event stream mirrors the parameters that are there.</p>
+<p><strong>Input:</strong> <code>#!bovnar 1.1</code> + <code>.t = &lt;datetime:64,tai&gt; 1000;</code> (the datetime family is spec-1.1 gated, so the directive is required)</p>
+<div class="codehilite"><pre><span></span><code>STREAM_START
+ASSIGNMENT_START t
+TYPE_ANN_START datetime:64,tai
+TYPE_FAMILY datetime:64,tai
+TYPE_PARAM_WIDTH 64
+TYPE_PARAM_UNIT tai
+TYPE_ANN_END datetime:64,tai
+DATA number 1000
+</code></pre></div>
+
+<p>The epoch arrives as <code>TYPE_PARAM_UNIT</code>, not as a parameter of its own.</p>
 <p><strong>Input:</strong> <code>.x = ok;</code> (symbol)</p>
 <div class="codehilite"><pre><span></span><code>STREAM_START
 ASSIGNMENT_START x
@@ -589,16 +605,13 @@ TYPE_PARAM_BASE 10
 TYPE_PARAM_UNIT no_unit
 TYPE_ANN_END uint
 DATA array_number 1
-TYPE_ANN_START uint
-TYPE_FAMILY uint
-TYPE_PARAM_WIDTH 64
-TYPE_PARAM_BASE 10
-TYPE_PARAM_UNIT no_unit
-TYPE_ANN_END uint
 DATA array_number 2
 ARRAY_ROW_END
 </code></pre></div>
 
+<p>The element annotation is emitted <strong>once per row</strong>, not once per element: the
+array's element type is established at the first element and the rest inherit
+it.</p>
 <p><strong>Input:</strong> <code>.x = &lt;uint:8&gt; 999;</code> (error — value out of range)</p>
 <div class="codehilite"><pre><span></span><code>ERROR value_out_of_range
 </code></pre></div>

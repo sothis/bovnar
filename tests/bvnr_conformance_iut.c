@@ -76,7 +76,17 @@
  *   ERROR <code_name>
  *
  *   Where <code_name> is the value returned by bvn_error_to_string(),
- *   e.g. "value_out_of_range".
+ *   e.g. "value_out_of_range". One code is the adapter's own rather than the
+ *   library's: "event_log_overflow", when the document's log does not fit
+ *   EVLOG_CAP. It is reported instead of a truncated log, never alongside one.
+ *
+ * NOTE ON <family> IN THE LINES BELOW
+ *   TYPE_ANN_START / TYPE_FAMILY / TYPE_ANN_END carry the WHOLE annotation body
+ *   -- "float:64,m/s", not "float". They read as the bare family keyword only
+ *   for an annotation the reader SYNTHESISED for an untyped value. doc/7 showed
+ *   the keyword form for an explicit annotation and was wrong; see the worked
+ *   examples there, which check_conformance_doc.py now replays through this
+ *   binary.
  * ========================================================================= */
 
 #define READ_CHUNK  4096u
@@ -88,11 +98,23 @@ static char  g_out[EVLOG_CAP];
 static size_t g_out_used = 0;
 static bool  g_error_mode = false;
 static error_code_t g_error_code = error_none;
+/* Set when anything had to be dropped for want of room. A truncated event log is
+ * not a shorter log -- it is an invalid one, and the cut can land mid-event
+ * ("DATA  1"), so it cannot be told apart from a formatting difference by the
+ * driver that compares it. This adapter used to truncate in silence and still
+ * exit 0: a 190 kB document produced 262143 bytes of log, a mangled last line,
+ * and every appearance of success. Refusing is the same rule the library applies
+ * to itself -- bvn_rational_to_str will not truncate an exact expansion, and the
+ * writer refuses rather than emit a number it cannot represent. A third-party
+ * adapter written from this file inherits whichever habit it finds here. */
+static bool  g_out_overflow = false;
 
 static void out_putc(char c)
 {
 	if (g_out_used + 1 < EVLOG_CAP)
 		g_out[g_out_used++] = c;
+	else
+		g_out_overflow = true;
 }
 
 static void out_puts(const char *s)
@@ -101,6 +123,8 @@ static void out_puts(const char *s)
 	if (g_out_used + n < EVLOG_CAP) {
 		memcpy(g_out + g_out_used, s, n);
 		g_out_used += n;
+	} else {
+		g_out_overflow = true;
 	}
 }
 
@@ -352,6 +376,18 @@ int main(int argc, char *argv[])
 
 	if (!ok || err != error_none) {
 		fprintf(stdout, "ERROR %s\n", bvn_error_to_string(err));
+		return 1;
+	}
+
+	if (g_out_overflow) {
+		/* Report on stdout in the protocol's error shape so a driver sees a
+		 * refusal rather than a log, and on stderr so a human sees why. */
+		fprintf(stdout, "ERROR event_log_overflow\n");
+		fprintf(stderr,
+			"bvnr_conformance_iut: the event log for this document exceeds "
+			"%u bytes; raise EVLOG_CAP. Refusing rather than emitting a "
+			"truncated log, which would differ from the reference in a way "
+			"indistinguishable from a formatting bug.\n", (unsigned)EVLOG_CAP);
 		return 1;
 	}
 

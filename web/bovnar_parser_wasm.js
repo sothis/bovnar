@@ -174,15 +174,30 @@
    * A radix of 0 means "no explicit base", which resolves to decimal: the CLI
    * prints that as <uint:64,_10,no_unit>, and so does this.
    */
+  /*
+   * The radix the carrier is actually written in. uint/sint/float keep it in the
+   * slot — 0 meaning "not written", which is decimal, and float admits only _10
+   * or _16. The other three cannot take a base parameter at all: the reader
+   * answers error_illegal_value_type for <float_fix:…,_16>, <float_dec:…,_16>
+   * and <datetime:…,_16>, because their carriers are decimal by definition — a
+   * Q-format fraction, an IEEE 754-2008 decimal, and a signed second count
+   * "validated exactly like sint (signed, decimal)" (spec §6.2). Their slot is
+   * busy holding something else (q, nothing, the epoch index), so the radix is
+   * stated here rather than read out of it.
+   */
+  function annBase(v) {
+    switch (v.familyName) {
+      case 'float_fix': case 'float_dec': case 'datetime': return 10;
+      default: return v.base || 10;
+    }
+  }
   function annFromValue(v, synthesized) {
     var params = [];
     if (v.width != null) params.push({ kind: 'width', text: String(v.width), value: v.width });
-    if (v.familyName === 'float_fix') {
-      if (v.base != null) params.push({ kind: 'q', text: 'q' + v.base, value: v.base });
-    } else if (v.familyName !== 'datetime' && v.familyName !== 'float_dec' && v.base != null) {
-      var base = v.base || 10;
-      params.push({ kind: 'base', text: '_' + base, value: base });
-    }
+    var base = annBase(v);
+    params.push({ kind: 'base', text: '_' + base, value: base });
+    if (v.familyName === 'float_fix' && v.base != null)
+      params.push({ kind: 'q', text: 'q' + v.base, value: v.base });
     /* Dimensionless is a statement, not an absence: bvn_unit_to_string answers
        "no_unit" for such a value and the CLI prints it — <uint:64,_10,no_unit>.
        The reader only emits the parameter for the synthesised default and for an

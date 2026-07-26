@@ -341,13 +341,20 @@ char *bvnr_wasm_validate(const char *buf, int len)
 	memset(&flags, 0, sizeof(flags));
 	flags.continue_on_error = false;
 	/* Match every other front end: the CLI (src/bovnar.c), the Python bindings
-	 * and the DOM builder all raise this to 255. Left at the library default of
-	 * 64, the browser rejected a document the same bvnr_read() accepts natively
-	 * -- and this very binary's DOM path already allows 255, so the playground
-	 * disagreed with itself as well as with the CLI. The page states that the
-	 * playground runs the reference reader and delivers the same events; that
-	 * has to hold at the limits too. */
+	 * and the DOM builder all raise BOTH of these to 255. Left at the library
+	 * default of 64, the browser rejected a document the same bvnr_read()
+	 * accepts natively -- and this very binary's DOM path already allows 255, so
+	 * the playground disagreed with itself as well as with the CLI. The page
+	 * states that the playground runs the reference reader and delivers the same
+	 * events; that has to hold at the limits too.
+	 *
+	 * The array half of that was missed when the struct half was fixed, and it
+	 * behaved exactly as described above: 65 nested arrays parsed natively and
+	 * raised error_array_nesting_too_high in the browser, while doc()/toJSON()
+	 * -- which reach the reader through bvn_dom_parse, where the DOM builder
+	 * sets its own 255 -- accepted the same document in the same module. */
 	flags.max_struct_nesting = 255;
+	flags.max_array_nesting  = 255;
 
 	bool opened = r && bvnr_open_read_mem(r, buf, (uint64_t)len, NULL, 0, &flags);
 	if (opened) bvnr_read(r);
@@ -561,6 +568,7 @@ static char *events_impl(const char *buf, int len,
 	bvnr_read_flags_t flags;
 	memset(&flags, 0, sizeof(flags));
 	flags.max_struct_nesting = 255;   /* see bvnr_wasm_validate */
+	flags.max_array_nesting  = 255;
 	flags.userdata = &ud;
 	flags.on_verified = evt_cb;
 	/* resync: emit verified events for every well-formed assignment, skipping
@@ -680,6 +688,7 @@ char *bvnr_wasm_errors(const char *buf, int len)
 	bvnr_read_flags_t flags;
 	memset(&flags, 0, sizeof(flags));
 	flags.max_struct_nesting = 255;   /* see bvnr_wasm_validate */
+	flags.max_array_nesting  = 255;
 	flags.userdata          = &ctx;
 	flags.on_error          = err_collect;
 	flags.continue_on_error = true;   /* resync: report all errors, keep going */
@@ -761,6 +770,7 @@ char *bvnr_wasm_parse(const char *buf, int len)
 	bvnr_read_flags_t flags;
 	memset(&flags, 0, sizeof(flags));
 	flags.max_struct_nesting = 255;   /* see bvnr_wasm_validate */
+	flags.max_array_nesting  = 255;
 	flags.userdata          = &ud;
 	flags.on_verified       = both_evt_cb;
 	flags.on_error          = both_err_cb;

@@ -1074,8 +1074,9 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 133)   # 117 base + i18n_de + wrapper_sync + cache_stamps
-                                    #         + playground_shim (DISABLED without node)
+set(BVNR_EXPECTED_TEST_COUNT 134)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+                                    #         + playground_shim + wasm_cli_diff
+                                    #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
@@ -1206,6 +1207,31 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
     endif()
     set_tests_properties(bvnr_playground_shim PROPERTIES
         LABELS "wasm;web" TIMEOUT 120)
+endif()
+
+# ── The WASM build answers like the native CLI ──────────────────────────────
+# wasm/test/diff_test.mjs has compared the two since it was written and has
+# never run automatically: validate() and toJSON() against `bovnar validate` and
+# `bovnar convert`, over the example corpus plus deliberately malformed
+# snippets. It is the only test that holds the shipped WebAssembly artifact to
+# the C implementation's own answers -- the artifact stamp beside it proves the
+# module was built from these sources, not that it behaves like them.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/diff_test.mjs)
+    if(NODE_EXECUTABLE)
+        add_test(
+            NAME    bvnr_wasm_cli_diff
+            COMMAND ${NODE_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/diff_test.mjs)
+        set_tests_properties(bvnr_wasm_cli_diff PROPERTIES
+            ENVIRONMENT "BOVNAR_CLI=$<TARGET_FILE:bovnar>")
+    else()
+        add_test(NAME bvnr_wasm_cli_diff COMMAND ${CMAKE_COMMAND} -E echo
+                 "no node found -- install node or source emsdk to run this gate")
+        set_tests_properties(bvnr_wasm_cli_diff PROPERTIES DISABLED TRUE)
+    endif()
+    set_tests_properties(bvnr_wasm_cli_diff PROPERTIES
+        LABELS "wasm;web" TIMEOUT 300)
 endif()
 
 # ── Content-Security-Policy still authorises the pages' inline scripts ───────

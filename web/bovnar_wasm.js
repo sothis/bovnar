@@ -23,7 +23,7 @@
 // `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
 // through verbatim — required if the document embeds octet streams with NULs).
 
-import createBovnar from './bovnar_wasm_core.js?v=964527c6b184';
+import createBovnar from './bovnar_wasm_core.js?v=de8ef8c4df0b';
 
 const enc = new TextEncoder();
 

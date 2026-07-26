@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=7945170b613c')
+  import('./bovnar_wasm.js?v=37cb2ae6d30a')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
@@ -746,11 +746,18 @@
       cb({ type: EV.ERROR, data: { msg: errs[k].message, code: errs[k].code }, line: errs[k].line });
   }
 
-  function peekVersion(text) {
-    var m = /^﻿?\s*#!bovnar[ \t]+(\d+)\.(\d+)[ \t]*$/m.exec(text || '');
-    if (!m || /^0\d/.test(m[1]) || /^0\d/.test(m[2])) return null;
-    return { major: parseInt(m[1], 10), minor: parseInt(m[2], 10) };
-  }
+  /*
+   * peekVersion() lived here: a regex for the `#!bovnar` directive, exported
+   * beside the parser. Nothing on the site called it, and it did not agree with
+   * the reader it sat next to -- /m let it match a directive on ANY line, so a
+   * `#!bovnar 1.1` written after a comment or after an assignment read as 1.1
+   * where the C declares no version at all and then refuses the 1.1 construct
+   * with error_illegal_value_type. A second implementation of a spec rule, on
+   * the public surface of the page that promises the reference one.
+   *
+   * The C already answers this: bvnr_wasm_parse and bvnr_wasm_errors report
+   * declared_version straight from bvnr_reader_get_declared_version(). Use that.
+   */
 
   /* ── dispatcher: WASM once ready, empty results until then ───────────────── */
   /*
@@ -778,6 +785,6 @@
   }
 
   window.BovnarParser = { parseFaithful: parseFaithful, parseBovnar: parseBovnar,
-                          peekVersion: peekVersion, EV: EV,
+                          EV: EV,
                           isWasmReady: function () { return !!wasm; } };
 })();

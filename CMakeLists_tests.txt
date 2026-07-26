@@ -1181,9 +1181,12 @@ endif()
 # reference.
 #
 # node ships inside emsdk, so anyone who can build the WASM already has one --
-# look there too rather than losing the gate to a PATH that lacks it.
+# look there too rather than losing the gate to a PATH that lacks it. PATHS, not
+# HINTS: HINTS are searched BEFORE the system PATH, which would pin the gate to
+# emsdk's node on a machine that has one installed properly. This is the
+# fallback, so it goes last.
 file(GLOB BVNR_EMSDK_NODE_BIN "$ENV{EMSDK}/node/*/bin" "$ENV{HOME}/emsdk/node/*/bin")
-find_program(NODE_EXECUTABLE NAMES node nodejs HINTS ${BVNR_EMSDK_NODE_BIN})
+find_program(NODE_EXECUTABLE NAMES node nodejs PATHS ${BVNR_EMSDK_NODE_BIN})
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
    AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/playground_shim_test.mjs)
     # Registered either way, and DISABLED rather than dropped when there is no

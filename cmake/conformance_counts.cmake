@@ -7,7 +7,18 @@
 # The suite prints a per-group TAP plan and a total, both of which are compared
 # against the table in doc/7_bovnar_conformance.md.
 # The TAP stream goes to stdout, the summary line to stderr; look at both.
-execute_process(COMMAND ${CONFORMANCE} OUTPUT_VARIABLE _out
+#
+# Launch through CMAKE_CROSSCOMPILING_EMULATOR when there is one, the way
+# query_expect.cmake and events_ok.cmake already do. Without it the MinGW cross
+# build ran the .exe directly and the shell tried to execute a PE binary as a
+# script -- "MZ...: not found", "Syntax error: \"(\" unexpected" -- so this gate
+# was permanently red on the Windows target, and red in a way that says nothing
+# about whether the counts actually drifted.
+set(_cmd ${CONFORMANCE})
+if(EMULATOR)
+    set(_cmd ${EMULATOR} ${CONFORMANCE})
+endif()
+execute_process(COMMAND ${_cmd} OUTPUT_VARIABLE _out
                 RESULT_VARIABLE _rc ERROR_VARIABLE _err)
 if(NOT _rc EQUAL 0)
     message(FATAL_ERROR "conformance suite failed to run: ${_rc}\n${_err}")

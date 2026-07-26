@@ -1094,6 +1094,7 @@ add_test(
     NAME    bvnr_conformance_doc_counts
     COMMAND "${CMAKE_COMMAND}"
             -DCONFORMANCE=$<TARGET_FILE:bvnr_conformance>
+            -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
             -DDOCFILE=${CMAKE_CURRENT_SOURCE_DIR}/doc/7_bovnar_conformance.md
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conformance_counts.cmake)
 set_tests_properties(bvnr_conformance_doc_counts PROPERTIES

@@ -123,6 +123,10 @@ server {
         add_header Link '</index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
 
+        # 3. Revalidate. See "Cache-Control" below -- a document with no
+        #    Cache-Control is not uncached, it is cached by guesswork.
+        add_header Cache-Control "no-cache" always;
+
         include snippets/bovnar-headers.conf;
 
         try_files /index.html =404;
@@ -133,6 +137,7 @@ server {
         if ($bvnr_wants_md) { return 302 /de/index.md; }
         add_header Link '</de/index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
+        add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files /de/index.html =404;
     }
@@ -145,6 +150,8 @@ server {
         default_type  text/markdown;
         charset       utf-8;
         charset_types text/markdown;
+        add_header Cache-Control "no-cache" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
@@ -158,6 +165,8 @@ server {
         default_type  text/plain;
         charset       utf-8;
         charset_types text/plain;
+        add_header Cache-Control "no-cache" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
@@ -183,6 +192,8 @@ server {
     }
 
     location / {
+        add_header Cache-Control "no-cache" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri $uri/ =404;
     }
 
@@ -246,6 +257,17 @@ RewriteRule ^$ /index.md [R=302,L]
   `./gen_font_stamps.py` now derives those stamps (and the pages' stamp for
   `fonts.css` itself) from the bytes, gated by the `bvnr_font_stamps` test — the
   same contract `cmake/cache_stamps.cmake` gives the WASM artifacts.
+- **Documents send `Cache-Control: no-cache`.** Only the stamped-asset location
+  set `Cache-Control` for a long time; HTML, `.md` and `.ebnf` sent none at all,
+  which is not the same as "do not cache". RFC 9111 §4.2.2 lets a browser invent
+  a freshness lifetime from `Last-Modified` — commonly a tenth of the file's age
+  — and these documents sit unchanged for weeks between publishes, so the
+  invented lifetime ran to days. A returning visitor kept a months-old landing
+  page, and the inline documentation viewer kept re-rendering months-old
+  Markdown, without issuing a single request. `no-cache` still lets the browser
+  store the copy; it only forbids reusing it without asking, and the `ETag`
+  makes the answer a 304. The stamped assets are untouched — that is the whole
+  point of stamping them.
 
 ## Optional: consolidate the raw `.md` to the HTML docs for search
 
@@ -445,6 +467,7 @@ server {
         if ($bvnr_wants_md) { return 302 /index.md; }
         add_header Link '</index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
+        add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files /index.html =404;
     }
@@ -454,6 +477,7 @@ server {
         if ($bvnr_wants_md) { return 302 /de/index.md; }
         add_header Link '</de/index.md>; rel="alternate"; type="text/markdown"' always;
         add_header Vary 'Accept' always;
+        add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files /de/index.html =404;
     }
@@ -466,6 +490,7 @@ server {
         charset       utf-8;
         charset_types text/markdown;
         add_header Link "$bvnr_canon_hdr" always;
+        add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
@@ -480,6 +505,8 @@ server {
         default_type  text/plain;
         charset       utf-8;
         charset_types text/plain;
+        add_header Cache-Control "no-cache" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
@@ -508,7 +535,18 @@ server {
         try_files $uri =404;
     }
 
+    # Documents carry no ?v= stamp, so they need the opposite of the asset rule
+    # above: revalidate every time. Sending no Cache-Control at all is not
+    # "no caching" -- RFC 9111 lets a browser guess a freshness lifetime from
+    # Last-Modified (commonly a tenth of the file's age), and these files sit
+    # unchanged for weeks between publishes, so the guess ran to days. A
+    # returning visitor kept a months-old landing page and months-old .md behind
+    # the inline doc viewer, fetching nothing and asking nothing. "no-cache"
+    # still stores the copy; it just makes the browser ask, and the ETag turns
+    # that into a 304.
     location / {
+        add_header Cache-Control "no-cache" always;
+        include snippets/bovnar-headers.conf;
         try_files $uri $uri/ =404;
     }
 

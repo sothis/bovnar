@@ -68,6 +68,13 @@ CASES = [
     ("trailing comment",     ".x = 1;   # remark"),
     ("comment with ;",       "# a; b\n.x = 1;"),
     ("type annotation",      ".x = <uint:16> 7;"),
+    # bvnr_data skips `<...>` annotations wholesale (its docstring says so —
+    # codegen only needs the value), so this pins the VALUE surviving an
+    # annotation, not unit parity. It cannot test the latter: bvnr_data
+    # accepts every unit, including ones the reference refuses (`kt`, `usb`,
+    # a nonexistent symbol). That is in scope for a gendata reader — and the
+    # real gendata files below ARE parsed by both, so a bad annotation in one
+    # of them still fails here.
     ("annotation with unit", ".x = <float:64,k~m> 1.5;"),
     ("brace in string",      '.x = "}";'),
     ("hash in string",       '.x = "# not a comment";'),

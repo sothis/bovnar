@@ -73,7 +73,7 @@ static void exercise_node_getters(const bvn_dom_node_t *node)
 	if (vu.num_components > BVNR_MAX_UNIT_COMPONENTS + 1u)
 		__builtin_trap();
 
-	char ubuf[256];
+	char ubuf[BVNR_UNIT_STRING_MAX];
 	(void)bvn_dom_get_unit_string(node, ubuf, sizeof(ubuf));
 
 	double base_val = bvn_dom_get_value_in_base_units(node);

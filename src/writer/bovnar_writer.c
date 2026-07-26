@@ -1032,7 +1032,7 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 	 * rescale at all — using bvn_unit_reduce's raw scale there would multiply by
 	 * 1000 twice over. Round-tripping the emitted text is what keeps the digits
 	 * and the annotation in step whatever the formatter decides. */
-	char    ubuf[512];
+	char    ubuf[BVNR_UNIT_STRING_MAX];
 	int32_t ulen = bvn_unit_to_string_ex(d->value_unit, ubuf, sizeof ubuf,
 					     s->unit_flags);
 	if (ulen < 0) { s->ser_error = error_unit_illegal; return -1; }
@@ -1295,7 +1295,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				 * parse back (a unit this build does not know) is passed
 				 * through unchanged rather than dropped. */
 				const uint8_t *ut = (const uint8_t *)d->data;
-				char           ubuf[512];
+				char           ubuf[BVNR_UNIT_STRING_MAX];
 				const char    *emit = (const char *)d->data;
 				uint32_t       elen = d->length;
 				if (s->unit_flags != BVN_UNIT_FLAGS_NONE &&
@@ -1504,7 +1504,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			if (!s->emitted_unit &&
 			    d->value_unit.num_components > 0u &&
 			    !BVN_UNIT_IS_NO_UNIT(d->value_unit)) {
-				char ubuf[256];
+				char ubuf[BVNR_UNIT_STRING_MAX];
 				/* Honour the writer's unit_flags (reduce / ASCII-exponent)
 				 * so a value-side inline unit canonicalises identically to
 				 * one given in the annotation, which uses

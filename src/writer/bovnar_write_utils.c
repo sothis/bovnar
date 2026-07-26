@@ -133,7 +133,7 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 			return false;
 	}
 	if (vu.num_components > 0) {
-		char ubuf[512];
+		char ubuf[BVNR_UNIT_STRING_MAX];
 		bvn_unit_flags_t uflags = bvnr_writer_unit_flags(w);
 		int32_t ulen = bvn_unit_to_string_ex(vu, ubuf, sizeof(ubuf), uflags);
 		if (ulen < 0) {

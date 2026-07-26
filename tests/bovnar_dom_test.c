@@ -143,7 +143,7 @@ static void test_parse_basic_dom(void)
 		uint64_t v = 0;
 		ASSERT_TRUE(bvn_dom_get_u64(timeout, &v), "get_uint must succeed for timeout");
 		ASSERT_EQ_UINT(v, 30, "timeout value must be 30");
-		char ubuf[64] = {0};
+		char ubuf[BVNR_UNIT_STRING_MAX] = {0};
 		ASSERT_EQ_INT(bvn_dom_get_unit_string(timeout, ubuf, sizeof(ubuf)), 1, "unit string length for seconds");
 		ASSERT_EQ_STR(ubuf, "s", "timeout unit string");
 	}

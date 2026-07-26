@@ -1,6 +1,8 @@
-# Bovnar (BVNR) — Frequently Asked Questions
+# Bovnar — Frequently Asked Questions
 
-> **Applies to:** Bovnar specification v1.1
+> **Spec version:** 1.1
+> **Status:** Non-normative — answers indexed to the specification
+> **Scope:** Common questions on syntax, types, units, numbers, limits, and the C and Python APIs.
 
 ---
 
@@ -21,6 +23,8 @@
 13. [Python Bindings](#13-python-bindings)
 14. [Limits and Performance](#14-limits-and-performance)
 15. [Why C99 and Not C23?](#15-why-c99-and-not-c23)
+
+- [See also](#see-also)
 
 ---
 
@@ -1396,4 +1400,14 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification (v1.1)*
+## See also
+
+- [Specification](1_bovnar_spec.md) — the normative answer behind every entry here
+- [Tutorial](0_bovnar_tutorial.md) — the guided introduction, if a question here assumes too much
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the registry behind §4
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C functions named in §12
+- [Python Bindings](4_bovnar_python_bindings.md) — the package described in §13
+
+---
+
+*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.1).*

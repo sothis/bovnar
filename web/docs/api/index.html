@@ -40,57 +40,76 @@
 <h1>Bovnar — Read &amp; Write API</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/3_bovnar_readwrite_api.md">Markdown</a> and <a href="/doc/pdf/bovnar-readwrite-api.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1</p>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Reference — the C reader, writer, and DOM as implemented
+<strong>Scope:</strong> Every function needed to read and write Bovnar streams, in the order you call them.</p>
 </blockquote>
-<p>This document covers every function you need to read and write Bovnar streams, in the order you call them. Nothing else is included.</p>
 <p>The writer uses the same event/data model as the reader — <code>bvnr_event_t</code> and <code>bvnr_data_t</code> — so the two APIs are deliberately symmetric. Learn one, the other follows.</p>
 <hr />
-<h2 id="contents">Contents</h2>
-<p><strong>Reader</strong></p>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
-<li><a href="#1-bvnr_reader_create--bvnr_reader_destroy"><code>bvnr_reader_create</code> / <code>bvnr_reader_destroy</code></a></li>
-<li><a href="#2-bvnr_source_from_fd"><code>bvnr_source_from_fd</code></a></li>
-<li><a href="#3-bvnr_source_from_mem"><code>bvnr_source_from_mem</code></a></li>
-<li><a href="#4-bvnr_open_read_source"><code>bvnr_open_read_source</code></a></li>
-<li><a href="#5-bvnr_open_read_mem"><code>bvnr_open_read_mem</code></a></li>
-<li><a href="#6-bvnr_read"><code>bvnr_read</code></a></li>
-<li><a href="#7-bvnr_reader_get_error-and-friends"><code>bvnr_reader_get_error</code> and friends</a>
-7a. <a href="#7a-version-directive-spec-11">Version directive (spec 1.1)</a>
-7b. <a href="#7b-datetime-family-spec-11">Datetime family (spec 1.1)</a>
-7c. <a href="#7c-read-time-lossless-unit--base-conversion-want_unit">Read-time lossless unit / base conversion (<code>want_unit</code>)</a></li>
-<li><a href="#8-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double"><code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></a></li>
+<li><a href="#1-reader">Reader</a><ul>
+<li>1.1 <a href="#11-bvnr_reader_create--bvnr_reader_destroy"><code>bvnr_reader_create</code> / <code>bvnr_reader_destroy</code></a></li>
+<li>1.2 <a href="#12-bvnr_source_from_fd"><code>bvnr_source_from_fd</code></a></li>
+<li>1.3 <a href="#13-bvnr_source_from_mem"><code>bvnr_source_from_mem</code></a></li>
+<li>1.4 <a href="#14-bvnr_open_read_source"><code>bvnr_open_read_source</code></a></li>
+<li>1.5 <a href="#15-bvnr_open_read_mem"><code>bvnr_open_read_mem</code></a></li>
+<li>1.6 <a href="#16-bvnr_read"><code>bvnr_read</code></a></li>
+<li>1.7 <a href="#17-bvnr_reader_get_error-and-friends"><code>bvnr_reader_get_error</code> and friends</a></li>
+<li>1.8 <a href="#18-version-directive-spec-11">Version directive (spec 1.1)</a></li>
+<li>1.9 <a href="#19-datetime-family-spec-11">Datetime family (spec 1.1)</a></li>
+<li>1.10 <a href="#110-read-time-lossless-unit--base-conversion-want_unit">Read-time lossless unit / base conversion (<code>want_unit</code>)</a></li>
+<li>1.11 <a href="#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double"><code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></a></li>
+</ul>
+</li>
+<li><a href="#2-writer">Writer</a><ul>
+<li>2.1 <a href="#21-bvnr_writer_create--bvnr_writer_destroy"><code>bvnr_writer_create</code> / <code>bvnr_writer_destroy</code></a></li>
+<li>2.2 <a href="#22-bvnr_sink_to_fd"><code>bvnr_sink_to_fd</code></a></li>
+<li>2.3 <a href="#23-bvnr_sink_to_mem"><code>bvnr_sink_to_mem</code></a></li>
+<li>2.4 <a href="#24-bvnr_sink_bytes_written"><code>bvnr_sink_bytes_written</code></a></li>
+<li>2.5 <a href="#25-bvnr_open_write_sink"><code>bvnr_open_write_sink</code></a></li>
+<li>2.6 <a href="#26-bvnr_open_write_mem"><code>bvnr_open_write_mem</code></a></li>
+<li>2.7 <a href="#27-bvnr_write_event"><code>bvnr_write_event</code></a></li>
+<li>2.8 <a href="#28-bvnr_write_version"><code>bvnr_write_version</code></a></li>
+<li>2.9 <a href="#29-bvnr_write_finish"><code>bvnr_write_finish</code></a></li>
+<li>2.10 <a href="#210-bvnr_writer_get_error-and-friends"><code>bvnr_writer_get_error</code> and friends</a></li>
+<li>2.11 <a href="#211-bvn_format_uint64--bvn_format_int64--bvn_format_double"><code>bvn_format_uint64</code> / <code>bvn_format_int64</code> / <code>bvn_format_double</code></a></li>
+<li>2.12 <a href="#212-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit"><code>bvnr_write_bvnf_base</code> / <code>bvnr_write_bvnf_base_unit</code></a></li>
+<li>2.13 <a href="#213-bvnr_write_bvni--bvnr_write_bvni_unit"><code>bvnr_write_bvni</code> / <code>bvnr_write_bvni_unit</code></a></li>
+<li>2.14 <a href="#214-bvn_type_float_base"><code>BVN_TYPE_FLOAT_BASE</code></a></li>
+</ul>
+</li>
+<li><a href="#3-shared">Shared</a><ul>
+<li>3.1 <a href="#31-bvnr_write_type_annotation"><code>bvnr_write_type_annotation</code></a></li>
+<li>3.2 <a href="#32-bvn_parse_unit--bvn_parse_unit_n"><code>bvn_parse_unit</code> / <code>bvn_parse_unit_n</code></a></li>
+<li>3.3 <a href="#33-bvn_unit_to_string--bvn_unit_to_string_ex"><code>bvn_unit_to_string</code> / <code>bvn_unit_to_string_ex</code></a></li>
+<li>3.4 <a href="#34-bvn_unit_convert_value-bovnar_si_unitsh"><code>bvn_unit_convert_value</code> <em>(bovnar_si_units.h)</em></a></li>
+<li>3.5 <a href="#35-bvn_error_to_string"><code>bvn_error_to_string</code></a></li>
+</ul>
+</li>
+<li><a href="#4-dom-api-bovnar_domh">DOM API (<code>bovnar_dom.h</code>)</a><ul>
+<li>4.1 <a href="#41-parsing-and-lifetime">Parsing and lifetime</a></li>
+<li>4.2 <a href="#42-navigation">Navigation</a></li>
+<li>4.3 <a href="#43-type-inspection">Type inspection</a></li>
+<li>4.4 <a href="#44-typed-value-accessors">Typed value accessors</a></li>
+<li>4.5 <a href="#45-building-a-tree">Building a tree</a></li>
+<li>4.6 <a href="#46-minimal-example">Minimal example</a></li>
+</ul>
+</li>
+<li><a href="#5-complete-read-example">Complete Read Example</a></li>
+<li><a href="#6-inline-unit-suffix--reading">Inline Unit Suffix — Reading</a><ul>
+<li>6.1 <a href="#61-reading-inline-unit-values">Reading inline unit values</a></li>
+</ul>
+</li>
+<li><a href="#7-complete-write-example">Complete Write Example</a></li>
 </ol>
-<p><strong>Writer</strong></p>
-<ol start="9">
-<li><a href="#9-bvnr_writer_create--bvnr_writer_destroy"><code>bvnr_writer_create</code> / <code>bvnr_writer_destroy</code></a></li>
-<li><a href="#10-bvnr_sink_to_fd"><code>bvnr_sink_to_fd</code></a></li>
-<li><a href="#11-bvnr_sink_to_mem"><code>bvnr_sink_to_mem</code></a></li>
-<li><a href="#12-bvnr_sink_bytes_written"><code>bvnr_sink_bytes_written</code></a></li>
-<li><a href="#13-bvnr_open_write_sink"><code>bvnr_open_write_sink</code></a></li>
-<li><a href="#14-bvnr_open_write_mem"><code>bvnr_open_write_mem</code></a></li>
-<li><a href="#15-bvnr_write_event"><code>bvnr_write_event</code></a></li>
-<li><a href="#16-bvnr_write_finish"><code>bvnr_write_finish</code></a></li>
-<li><a href="#17-bvnr_writer_get_error-and-friends"><code>bvnr_writer_get_error</code> and friends</a></li>
-<li><a href="#18-bvn_format_uint64--bvn_format_int64--bvn_format_double"><code>bvn_format_uint64</code> / <code>bvn_format_int64</code> / <code>bvn_format_double</code></a></li>
-<li><a href="#19-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit"><code>bvnr_write_bvnf_base</code> / <code>bvnr_write_bvnf_base_unit</code></a></li>
-<li><a href="#20-bvnr_write_bvni--bvnr_write_bvni_unit"><code>bvnr_write_bvni</code> / <code>bvnr_write_bvni_unit</code></a></li>
-<li><a href="#21-bvn_type_float_base"><code>BVN_TYPE_FLOAT_BASE</code></a></li>
-</ol>
-<p><strong>Shared</strong></p>
-<ol start="22">
-<li><a href="#22-bvnr_write_type_annotation"><code>bvnr_write_type_annotation</code></a></li>
-<li><a href="#23-bvn_parse_unit--bvn_parse_unit_n"><code>bvn_parse_unit</code></a></li>
-<li><a href="#24-bvn_unit_to_string--bvn_unit_to_string_ex"><code>bvn_unit_to_string</code></a></li>
-<li><a href="#25-bvn_error_to_string"><code>bvn_error_to_string</code></a></li>
-</ol>
-<p><strong>DOM</strong></p>
-<ol start="26">
-<li><a href="#dom-api-bovnar_domh">DOM API (<code>bovnar_dom.h</code>)</a></li>
-</ol>
+<ul>
+<li><a href="#see-also">See also</a></li>
+</ul>
 <hr />
-<h2 id="reader">Reader</h2>
+<h2 id="1-reader">1. Reader</h2>
 <hr />
-<h3 id="1-bvnr_reader_create--bvnr_reader_destroy">1. <code>bvnr_reader_create</code> / <code>bvnr_reader_destroy</code></h3>
+<h3 id="11-bvnr_reader_create--bvnr_reader_destroy">1.1 <code>bvnr_reader_create</code> / <code>bvnr_reader_destroy</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_reader_create</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
 <span class="kt">void</span><span class="w">           </span><span class="nf">bvnr_reader_destroy</span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">);</span>
 </code></pre></div>
@@ -105,7 +124,7 @@
 </code></pre></div>
 
 <hr />
-<h3 id="2-bvnr_source_from_fd">2. <code>bvnr_source_from_fd</code></h3>
+<h3 id="12-bvnr_source_from_fd">1.2 <code>bvnr_source_from_fd</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">bvnr_source_from_fd</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="p">);</span>
 </code></pre></div>
 
@@ -123,7 +142,7 @@
 </code></pre></div>
 
 <hr />
-<h3 id="3-bvnr_source_from_mem">3. <code>bvnr_source_from_mem</code></h3>
+<h3 id="13-bvnr_source_from_mem">1.3 <code>bvnr_source_from_mem</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">bvnr_source_from_mem</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
 </code></pre></div>
 
@@ -141,7 +160,7 @@
 </code></pre></div>
 
 <hr />
-<h3 id="4-bvnr_open_read_source">4. <code>bvnr_open_read_source</code></h3>
+<h3 id="14-bvnr_open_read_source">1.4 <code>bvnr_open_read_source</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_open_read_source</span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w">        </span><span class="o">*</span><span class="n">r</span><span class="p">,</span>
 <span class="w">                         </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_source_t</span><span class="w">  </span><span class="o">*</span><span class="n">src</span><span class="p">,</span>
 <span class="w">                         </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w">    </span><span class="o">*</span><span class="n">src_mirror</span><span class="p">,</span>
@@ -168,7 +187,7 @@
 <span class="p">}</span><span class="w"> </span><span class="n">bvnr_read_flags_t</span><span class="p">;</span>
 </code></pre></div>
 
-<p><code>on_verified</code> is the callback you will implement almost always. <code>on_unverified</code> fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: <code>want_unit</code> (§7c) runs ahead of <strong>both</strong> callbacks, so with it installed an <code>on_unverified</code> consumer also sees a populated <code>converted</code>/<code>conv</code> on <code>ev_data</code>. Both callbacks must return <code>true</code> to continue parsing, <code>false</code> to abort (sets <code>error_scanner_callback_failed</code>).</p>
+<p><code>on_verified</code> is the callback you will implement almost always. <code>on_unverified</code> fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: <code>want_unit</code> (§1.10) runs ahead of <strong>both</strong> callbacks, so with it installed an <code>on_unverified</code> consumer also sees a populated <code>converted</code>/<code>conv</code> on <code>ev_data</code>. Both callbacks must return <code>true</code> to continue parsing, <code>false</code> to abort (sets <code>error_scanner_callback_failed</code>).</p>
 <p>The <code>options</code> pointer is not stored; the struct is read during <code>bvnr_open_read_source</code> only, so it may live on the stack.</p>
 <p><strong><code>max_text_bytes</code> is not a total-size cap.</strong> It counts the bytes the <em>text</em>
 scanner consumes; an octet stream's binary payload does not count towards it. A
@@ -197,7 +216,7 @@ boundary: a document needing N is accepted at N and refused at N-1.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="5-bvnr_open_read_mem">5. <code>bvnr_open_read_mem</code></h3>
+<h3 id="15-bvnr_open_read_mem">1.5 <code>bvnr_open_read_mem</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_open_read_mem</span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w">     </span><span class="o">*</span><span class="n">r</span><span class="p">,</span>
 <span class="w">                         </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w">        </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span>
 <span class="w">                         </span><span class="kt">uint64_t</span><span class="w">           </span><span class="n">len</span><span class="p">,</span>
@@ -214,7 +233,7 @@ boundary: a document needing N is accepted at N and refused at N-1.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="6-bvnr_read">6. <code>bvnr_read</code></h3>
+<h3 id="16-bvnr_read">1.6 <code>bvnr_read</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_read</span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">);</span>
 </code></pre></div>
 
@@ -231,7 +250,7 @@ boundary: a document needing N is accepted at N and refused at N-1.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="7-bvnr_reader_get_error-and-friends">7. <code>bvnr_reader_get_error</code> and friends</h3>
+<h3 id="17-bvnr_reader_get_error-and-friends">1.7 <code>bvnr_reader_get_error</code> and friends</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">error_code_t</span><span class="w"> </span><span class="nf">bvnr_reader_get_error</span><span class="w">     </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">);</span>
 <span class="kt">uint64_t</span><span class="w">     </span><span class="nf">bvnr_reader_get_error_line</span><span class="w">   </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">);</span>
 <span class="kt">uint64_t</span><span class="w">     </span><span class="nf">bvnr_reader_get_error_column</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">);</span>
@@ -290,7 +309,7 @@ more than in most formats: unit symbols are routinely non-ASCII (<code>µ~m</cod
 </code></pre></div>
 
 <hr />
-<h3 id="7a-version-directive-spec-11">7a. Version directive (spec 1.1)</h3>
+<h3 id="18-version-directive-spec-11">1.8 Version directive (spec 1.1)</h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w">        </span><span class="nf">bvnr_reader_get_declared_version</span><span class="p">(</span>
 <span class="w">                </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="o">*</span><span class="n">major</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="o">*</span><span class="n">minor</span><span class="p">);</span>
 <span class="kt">bool</span><span class="w">        </span><span class="nf">bvnr_peek_version</span><span class="p">(</span>
@@ -317,10 +336,10 @@ highest spec version this build understands (<code>BVNR_SPEC_VERSION_*</code>).<
 </code></pre></div>
 
 <p>To emit a directive, call <code>bvnr_write_version</code> right after opening the writer
-(see §13), or set <code>bvnr_write_flags_t.emit_version</code> to stamp the current spec
+(see §2.5), or set <code>bvnr_write_flags_t.emit_version</code> to stamp the current spec
 version automatically.</p>
 <hr />
-<h3 id="7b-datetime-family-spec-11">7b. Datetime family (spec 1.1)</h3>
+<h3 id="19-datetime-family-spec-11">1.9 Datetime family (spec 1.1)</h3>
 <div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_datetime_epoch_name</span><span class="w"> </span><span class="p">(</span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">);</span>
 <span class="kt">int32_t</span><span class="w">     </span><span class="nf">bvnr_datetime_epoch_mjd</span><span class="w">  </span><span class="p">(</span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">);</span>
 <span class="kt">int32_t</span><span class="w">     </span><span class="nf">bvnr_datetime_epoch_index</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">);</span>
@@ -375,7 +394,7 @@ NUL-terminated</strong> — bound the read by <code>frac_length</code>.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="7c-read-time-lossless-unit--base-conversion-want_unit">7c. Read-time lossless unit / base conversion (<code>want_unit</code>)</h3>
+<h3 id="110-read-time-lossless-unit--base-conversion-want_unit">1.10 Read-time lossless unit / base conversion (<code>want_unit</code>)</h3>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* bvnr_read_flags_t */</span>
 <span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">want_unit</span><span class="p">)(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">userdata</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span>
 <span class="w">                  </span><span class="n">value_unit_t</span><span class="w"> </span><span class="o">*</span><span class="n">want</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">want_base</span><span class="p">);</span>
@@ -400,7 +419,7 @@ NUL-terminated</strong> — bound the read by <code>frac_length</code>.</p>
 </code></pre></div>
 
 <p>By default the reader hands you every numeric value exactly as written and you
-convert it yourself (§24a, <code>bvn_unit_convert_rational</code>). Set <code>want_unit</code> to have
+convert it yourself (§3.4, <code>bvn_unit_convert_rational</code>). Set <code>want_unit</code> to have
 the reader do it for you — <strong>losslessly</strong>, in exact arbitrary-precision
 arithmetic, for a value of any width and any base.</p>
 <p>When <code>want_unit</code> is non-NULL, the reader calls it for every numeric value (with
@@ -524,7 +543,7 @@ no exact rational to hand over in the first place.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="8-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double">8. <code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></h3>
+<h3 id="111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double">1.11 <code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_parse_uint64</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_parse_int64</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="kt">int64_t</span><span class="w">  </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_parse_double</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w">   </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
@@ -581,9 +600,9 @@ no exact rational to hand over in the first place.</p>
 </code></pre></div>
 
 <hr />
-<h2 id="writer">Writer</h2>
+<h2 id="2-writer">2. Writer</h2>
 <hr />
-<h3 id="9-bvnr_writer_create--bvnr_writer_destroy">9. <code>bvnr_writer_create</code> / <code>bvnr_writer_destroy</code></h3>
+<h3 id="21-bvnr_writer_create--bvnr_writer_destroy">2.1 <code>bvnr_writer_create</code> / <code>bvnr_writer_destroy</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_writer_create</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
 <span class="kt">void</span><span class="w">           </span><span class="nf">bvnr_writer_destroy</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
 </code></pre></div>
@@ -598,7 +617,7 @@ no exact rational to hand over in the first place.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="10-bvnr_sink_to_fd">10. <code>bvnr_sink_to_fd</code></h3>
+<h3 id="22-bvnr_sink_to_fd">2.2 <code>bvnr_sink_to_fd</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">bvnr_sink_to_fd</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="p">);</span>
 </code></pre></div>
 
@@ -609,7 +628,7 @@ no exact rational to hand over in the first place.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="11-bvnr_sink_to_mem">11. <code>bvnr_sink_to_mem</code></h3>
+<h3 id="23-bvnr_sink_to_mem">2.3 <code>bvnr_sink_to_mem</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">bvnr_sink_to_mem</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">cap</span><span class="p">);</span>
 </code></pre></div>
 
@@ -620,7 +639,7 @@ no exact rational to hand over in the first place.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="12-bvnr_sink_bytes_written">12. <code>bvnr_sink_bytes_written</code></h3>
+<h3 id="24-bvnr_sink_bytes_written">2.4 <code>bvnr_sink_bytes_written</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">uint64_t</span><span class="w"> </span><span class="nf">bvnr_sink_bytes_written</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">);</span>
 </code></pre></div>
 
@@ -636,7 +655,7 @@ into the sink yourself. To size writer output, ask the writer:</p>
 </code></pre></div>
 
 <hr />
-<h3 id="13-bvnr_open_write_sink">13. <code>bvnr_open_write_sink</code></h3>
+<h3 id="25-bvnr_open_write_sink">2.5 <code>bvnr_open_write_sink</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_open_write_sink</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w">        </span><span class="o">*</span><span class="n">w</span><span class="p">,</span>
 <span class="w">                            </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w">    </span><span class="o">*</span><span class="n">sink</span><span class="p">,</span>
 <span class="w">                            </span><span class="kt">bool</span><span class="w">                  </span><span class="n">pretty</span><span class="p">,</span>
@@ -707,7 +726,7 @@ have no effect. The writer never internally limits array items, text bytes, or f
 </tr>
 </tbody>
 </table>
-<p><code>BVN_UNIT_REDUCE</code> folds every prefix out of the unit, and the <strong>writer scales the value to match</strong>: <code>5</code> with unit <code>k~m</code> is written as <code>5000 m</code>, not <code>5 m</code>. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with <code>error_value_out_of_range</code> rather than rounding. The rescaled value must also still satisfy the type it was declared with: an <code>uint</code>/<code>sint</code> that is no longer integral or no longer fits its width, and a <code>float_fix</code> that no longer fits its Q format (<code>&lt;float_fix:32,q16&gt;</code> leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of <code>bvn_unit_to_string_ex</code> gets no such help — see the note on that function in §24.)</p>
+<p><code>BVN_UNIT_REDUCE</code> folds every prefix out of the unit, and the <strong>writer scales the value to match</strong>: <code>5</code> with unit <code>k~m</code> is written as <code>5000 m</code>, not <code>5 m</code>. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with <code>error_value_out_of_range</code> rather than rounding. The rescaled value must also still satisfy the type it was declared with: an <code>uint</code>/<code>sint</code> that is no longer integral or no longer fits its width, and a <code>float_fix</code> that no longer fits its Q format (<code>&lt;float_fix:32,q16&gt;</code> leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of <code>bvn_unit_to_string_ex</code> gets no such help — see the note on that function in §3.3.)</p>
 <p>These flags can be OR-combined: <code>BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP</code>. The flags are fixed at open time. To change serialisation behaviour, destroy the writer and open a new one with the updated <code>unit_flags</code>. The getter <code>bvnr_writer_unit_flags(w)</code> is used internally by the Python FFI layer to retrieve the live flags before each unit serialisation call; there is no public setter.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="n">sink</span><span class="p">;</span>
 <span class="n">bvnr_sink_to_fd</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="n">fd</span><span class="p">);</span>
@@ -718,7 +737,7 @@ have no effect. The writer never internally limits array items, text bytes, or f
 </code></pre></div>
 
 <hr />
-<h3 id="14-bvnr_open_write_mem">14. <code>bvnr_open_write_mem</code></h3>
+<h3 id="26-bvnr_open_write_mem">2.6 <code>bvnr_open_write_mem</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_open_write_mem</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w">      </span><span class="o">*</span><span class="n">w</span><span class="p">,</span>
 <span class="w">                           </span><span class="kt">void</span><span class="w">               </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span>
 <span class="w">                           </span><span class="kt">uint64_t</span><span class="w">            </span><span class="n">cap</span><span class="p">,</span>
@@ -734,7 +753,7 @@ have no effect. The writer never internally limits array items, text bytes, or f
 </code></pre></div>
 
 <hr />
-<h3 id="15-bvnr_write_event">15. <code>bvnr_write_event</code></h3>
+<h3 id="27-bvnr_write_event">2.7 <code>bvnr_write_event</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_event</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_event_t</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">);</span>
 </code></pre></div>
 
@@ -769,7 +788,7 @@ ev_data                      (data-&gt;data = value string, data-&gt;value_type/
 
 <p>The maximum bit-width accepted for <code>uint</code> and <code>sint</code> is <code>BVN_MAX_INT_WIDTH</code> (defined as <code>32768u</code> in <code>bovnar.h</code>). The validator and writer reject any declared <code>uint</code>/<code>sint</code> width exceeding this limit with <code>error_illegal_value_type</code>.</p>
 <blockquote>
-<p><strong>Critical:</strong> The writer dispatches <code>ev_type_annotation_type_family_parameter</code> events on <code>d-&gt;type</code>, not on <code>d-&gt;value_type</code>. For each parameter event, <code>d.type</code> must be set to the appropriate <code>token_type_t</code> value: <code>token_is_type_width</code> for the width parameter, <code>token_is_type_base</code> for the base parameter, <code>token_is_type_q</code> for the Q (fractional bits) parameter of <code>float_fix</code>, and <code>token_is_unit</code> for the unit parameter. An unrecognised <code>d.type</code> causes the writer to emit nothing for that event — the annotation will be silently incomplete. <strong>Use <code>bvnr_write_type_annotation</code> (see §22) to avoid this complexity entirely.</strong></p>
+<p><strong>Critical:</strong> The writer dispatches <code>ev_type_annotation_type_family_parameter</code> events on <code>d-&gt;type</code>, not on <code>d-&gt;value_type</code>. For each parameter event, <code>d.type</code> must be set to the appropriate <code>token_type_t</code> value: <code>token_is_type_width</code> for the width parameter, <code>token_is_type_base</code> for the base parameter, <code>token_is_type_q</code> for the Q (fractional bits) parameter of <code>float_fix</code>, and <code>token_is_unit</code> for the unit parameter. An unrecognised <code>d.type</code> causes the writer to emit nothing for that event — the annotation will be silently incomplete. <strong>Use <code>bvnr_write_type_annotation</code> (see §3.1) to avoid this complexity entirely.</strong></p>
 </blockquote>
 <p><strong>Example: write <code>.port = &lt;uint:16&gt; 8080;</code></strong></p>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* Helper: emit a fully-typed uint16 assignment */</span>
@@ -843,7 +862,7 @@ ev_data                      (data-&gt;data = value string, data-&gt;value_type/
 </code></pre></div>
 
 <hr />
-<h3 id="15a-bvnr_write_version">15a. <code>bvnr_write_version</code></h3>
+<h3 id="28-bvnr_write_version">2.8 <code>bvnr_write_version</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_version</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">major</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">minor</span><span class="p">);</span>
 </code></pre></div>
 
@@ -861,7 +880,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="16-bvnr_write_finish">16. <code>bvnr_write_finish</code></h3>
+<h3 id="29-bvnr_write_finish">2.9 <code>bvnr_write_finish</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_finish</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
 </code></pre></div>
 
@@ -875,7 +894,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="17-bvnr_writer_get_error-and-friends">17. <code>bvnr_writer_get_error</code> and friends</h3>
+<h3 id="210-bvnr_writer_get_error-and-friends">2.10 <code>bvnr_writer_get_error</code> and friends</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">error_code_t</span><span class="w">     </span><span class="nf">bvnr_writer_get_error</span><span class="w">       </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
 <span class="kt">uint64_t</span><span class="w">         </span><span class="nf">bvnr_writer_get_error_offset</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
 <span class="kt">uint64_t</span><span class="w">         </span><span class="nf">bvnr_writer_bytes_written</span><span class="w">   </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
@@ -893,7 +912,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="18-bvn_format_uint64--bvn_format_int64--bvn_format_double">18. <code>bvn_format_uint64</code> / <code>bvn_format_int64</code> / <code>bvn_format_double</code></h3>
+<h3 id="211-bvn_format_uint64--bvn_format_int64--bvn_format_double">2.11 <code>bvn_format_uint64</code> / <code>bvn_format_int64</code> / <code>bvn_format_double</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">int32_t</span><span class="w"> </span><span class="nf">bvn_format_uint64</span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">bufsize</span><span class="p">,</span>
 <span class="w">                            </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">base</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">min_digits</span><span class="p">);</span>
 
@@ -926,7 +945,7 @@ spec version right after open.</p>
 
 <p>These strings are then placed into <code>bvnr_data_t.data</code> / <code>.length</code> before calling <code>bvnr_write_event(w, ev_data, &amp;d)</code>.</p>
 <hr />
-<h3 id="19-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit">19. <code>bvnr_write_bvnf_base</code> / <code>bvnr_write_bvnf_base_unit</code></h3>
+<h3 id="212-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit">2.12 <code>bvnr_write_bvnf_base</code> / <code>bvnr_write_bvnf_base_unit</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_bvnf_base</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
 <span class="w">                            </span><span class="k">const</span><span class="w"> </span><span class="n">bvn_float_t</span><span class="w"> </span><span class="o">*</span><span class="n">f</span><span class="p">,</span>
 <span class="w">                            </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">base</span><span class="p">);</span>
@@ -961,7 +980,7 @@ spec version right after open.</p>
 <p><code>width</code> 0 uses the precision stored in the <code>bvn_float_t</code> itself. An invalid width (not 0, not 16, not a positive multiple of 32, or greater than <code>BVN_FLOAT_MAX_PREC</code>) causes the call to return <code>false</code> with <code>error_illegal_value_type</code>.</p>
 <p>These functions supersede calling <code>bvnr_write_bvnf</code> / <code>bvnr_write_bvnf_unit</code> when base 16 output or widths greater than 128 are needed. <code>bvnr_write_bvnf</code> and <code>bvnr_write_bvnf_unit</code> remain available as convenience wrappers that always use base 10.</p>
 <hr />
-<h3 id="20-bvnr_write_bvni--bvnr_write_bvni_unit">20. <code>bvnr_write_bvni</code> / <code>bvnr_write_bvni_unit</code></h3>
+<h3 id="213-bvnr_write_bvni--bvnr_write_bvni_unit">2.13 <code>bvnr_write_bvni</code> / <code>bvnr_write_bvni_unit</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_bvni</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
 <span class="w">                      </span><span class="k">const</span><span class="w"> </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">n</span><span class="p">,</span>
 <span class="w">                      </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">base</span><span class="p">);</span>
@@ -996,7 +1015,7 @@ spec version right after open.</p>
 
 <p><code>width</code> 0 defaults to 64 bits for range validation. A <code>width</code> that cannot hold the value causes the call to return <code>false</code> with <code>error_value_out_of_range</code>.</p>
 <hr />
-<h3 id="21-bvn_type_float_base">21. <code>BVN_TYPE_FLOAT_BASE</code></h3>
+<h3 id="214-bvn_type_float_base">2.14 <code>BVN_TYPE_FLOAT_BASE</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="cp">#define BVN_TYPE_FLOAT_BASE(w, b)  </span><span class="cm">/* value_type_spec_t */</span>
 </code></pre></div>
 
@@ -1009,9 +1028,9 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h2 id="shared">Shared</h2>
+<h2 id="3-shared">3. Shared</h2>
 <hr />
-<h3 id="22-bvnr_write_type_annotation">22. <code>bvnr_write_type_annotation</code></h3>
+<h3 id="31-bvnr_write_type_annotation">3.1 <code>bvnr_write_type_annotation</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_type_annotation</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span>
 <span class="w">                                 </span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span>
 <span class="w">                                 </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">vu</span><span class="p">);</span>
@@ -1036,7 +1055,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="23-bvn_parse_unit--bvn_parse_unit_n">23. <code>bvn_parse_unit</code> / <code>bvn_parse_unit_n</code></h3>
+<h3 id="32-bvn_parse_unit--bvn_parse_unit_n">3.2 <code>bvn_parse_unit</code> / <code>bvn_parse_unit_n</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="n">value_unit_t</span><span class="w"> </span><span class="nf">bvn_parse_unit</span><span class="w">  </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ok</span><span class="p">);</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="nf">bvn_parse_unit_n</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ok</span><span class="p">);</span>
 </code></pre></div>
@@ -1061,7 +1080,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="24-bvn_unit_to_string--bvn_unit_to_string_ex">24. <code>bvn_unit_to_string</code> / <code>bvn_unit_to_string_ex</code></h3>
+<h3 id="33-bvn_unit_to_string--bvn_unit_to_string_ex">3.3 <code>bvn_unit_to_string</code> / <code>bvn_unit_to_string_ex</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">int32_t</span><span class="w"> </span><span class="nf">bvn_unit_to_string</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">bufsize</span><span class="p">);</span>
 
 <span class="kt">int32_t</span><span class="w"> </span><span class="nf">bvn_unit_to_string_ex</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">bufsize</span><span class="p">,</span>
@@ -1096,7 +1115,7 @@ spec version right after open.</p>
 <p>These flags can be OR-combined. The writer uses <code>bvn_unit_to_string_ex</code> internally, passing the flags from <code>bvnr_writer_unit_flags(w)</code>.</p>
 <blockquote>
 <p><strong><code>BVN_UNIT_REDUCE</code> here returns only the reduced UNIT.</strong> <code>bvn_unit_to_string_ex</code> discards the scale <code>bvn_unit_reduce</code> folded out, so <code>k~g</code> serialises as <code>"g"</code> — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply <code>bvn_unit_reduce</code>'s <code>scale</code> to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (<code>k~g·m/s²</code> → <code>"N"</code>, <code>k~N</code> → <code>"k~N"</code>). The collapse never substitutes one named unit for another: <code>Sv</code> stays <code>Sv</code>, <code>Bq</code> stays <code>Bq</code>. A lone base at an exponent other than 1 still collapses, though — <code>s⁻¹</code> becomes <code>Hz</code> and <code>m~s⁻¹</code> becomes <code>k~Hz</code>. And a reduction that <strong>overflows</strong> (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns <code>-1</code>: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.</p>
-<p><strong>Note on writer usage:</strong> When driving the writer manually via <code>bvnr_write_event</code>, do <strong>not</strong> pass a unit string in <code>bvnr_data_t.data</code> for the <code>ev_type_annotation_start</code> event — the serialiser ignores that field and derives the annotation from <code>data-&gt;value_type</code> and the subsequent parameter events. Use <code>bvnr_write_type_annotation</code> (§22) to emit a complete, correct type annotation in one call.</p>
+<p><strong>Note on writer usage:</strong> When driving the writer manually via <code>bvnr_write_event</code>, do <strong>not</strong> pass a unit string in <code>bvnr_data_t.data</code> for the <code>ev_type_annotation_start</code> event — the serialiser ignores that field and derives the annotation from <code>data-&gt;value_type</code> and the subsequent parameter events. Use <code>bvnr_write_type_annotation</code> (§3.1) to emit a complete, correct type annotation in one call.</p>
 </blockquote>
 <div class="codehilite"><pre><span></span><code><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_COMPOUND2</span><span class="p">(</span>
 <span class="w">    </span><span class="n">bu_gram</span><span class="p">,</span><span class="w">   </span><span class="n">si_kilo</span><span class="p">,</span><span class="w">  </span><span class="n">exp_linear</span><span class="p">,</span>
@@ -1111,7 +1130,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <hr />
-<h3 id="24a-bvn_unit_convert_value-bovnar_si_unitsh">24a. <code>bvn_unit_convert_value</code> <em>(bovnar_si_units.h)</em></h3>
+<h3 id="34-bvn_unit_convert_value-bovnar_si_unitsh">3.4 <code>bvn_unit_convert_value</code> <em>(bovnar_si_units.h)</em></h3>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_unit_convert_value</span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">from</span><span class="p">,</span>
 <span class="w">                            </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">to</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
 </code></pre></div>
@@ -1119,7 +1138,7 @@ spec version right after open.</p>
 <p>Convert one numeric quantity from unit <code>from</code> into unit <code>to</code>, writing the result
 to <code>*out</code>. Handles both the simple multiplicative case (<code>5 k~m → 5000 m</code>) and the
 affine case (<code>25 °C → 298.15 K</code>), routing the latter through SI base units. This
-is the same routine the reader's <code>want_unit</code> hook (§7c) uses, and the C
+is the same routine the reader's <code>want_unit</code> hook (§1.10) uses, and the C
 equivalent of the Python <code>convert_value</code>.</p>
 <p>Returns <code>false</code> — leaving <code>*out</code> untouched — when the two units are
 dimensionally <strong>incompatible</strong> or have no SI mapping. That boolean is the
@@ -1135,7 +1154,7 @@ dimensionally <strong>incompatible</strong> or have no SI mapping. That boolean 
 <p>For the standalone factor (without applying it) or to detect the affine case,
 see <code>bvn_unit_convert_factor</code> in <code>bovnar_si_units.h</code>.</p>
 <p><code>bvn_unit_convert_value</code> works in <code>double</code>, so it is lossy for wide values. For a
-<strong>lossless</strong> conversion — the engine behind the reader's <code>want_unit</code> hook (§7c) —
+<strong>lossless</strong> conversion — the engine behind the reader's <code>want_unit</code> hook (§1.10) —
 use the exact-rational pair, also in <code>bovnar_si_units.h</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w">    </span><span class="nf">bvn_unit_convert_rational</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">vnum</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">vden</span><span class="p">,</span>
 <span class="w">                                  </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">from</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">to</span><span class="p">,</span>
@@ -1185,7 +1204,7 @@ declared factors: every non-irrational unit carries an exact rational <code>to_s
 factor (see <code>src/gendata/units.bvnr</code>), and <code>gen_units.py</code> refuses to generate a
 table in which a rounded decimal is passed off as exact.</p>
 <hr />
-<h3 id="25-bvn_error_to_string">25. <code>bvn_error_to_string</code></h3>
+<h3 id="35-bvn_error_to_string">3.5 <code>bvn_error_to_string</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_error_to_string</span><span class="p">(</span><span class="n">error_code_t</span><span class="w"> </span><span class="n">code</span><span class="p">);</span>
 </code></pre></div>
 
@@ -1221,23 +1240,23 @@ table in which a rounded decimal is passed off as exact.</p>
 <td><code>error_unit_mismatch</code></td>
 <td>38</td>
 <td><code>"unit_mismatch"</code></td>
-<td>Inline unit suffix present, type-annotation unit also present, and the two differ; or a <code>want_unit</code> target dimensionally incompatible with the value's unit (§7c)</td>
+<td>Inline unit suffix present, type-annotation unit also present, and the two differ; or a <code>want_unit</code> target dimensionally incompatible with the value's unit (§1.10)</td>
 </tr>
 <tr>
 <td><code>error_unit_inexact</code></td>
 <td>47</td>
 <td><code>"unit_inexact"</code></td>
-<td>A <code>want_unit</code> conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without <code>want_unit_allow_nonterminating</code> (§7c)</td>
+<td>A <code>want_unit</code> conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without <code>want_unit_allow_nonterminating</code> (§1.10)</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="dom-api-bovnar_domh">DOM API (<code>bovnar_dom.h</code>)</h2>
+<h2 id="4-dom-api-bovnar_domh">4. DOM API (<code>bovnar_dom.h</code>)</h2>
 <p>The SAX reader above streams events. When you instead want the whole document in
 memory for random-access queries — without writing a callback — use the DOM API
 in <code>include/bovnar_dom.h</code>. It parses a document into a tree of <code>bvn_dom_node_t</code>
 owned by a <code>bvn_dom_doc_t</code>, which you navigate and read with typed accessors.</p>
-<h3 id="parsing-and-lifetime">Parsing and lifetime</h3>
+<h3 id="41-parsing-and-lifetime">4.1 Parsing and lifetime</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_doc_create</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
 <span class="kt">void</span><span class="w">           </span><span class="nf">bvn_dom_doc_destroy</span><span class="p">(</span><span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="n">doc</span><span class="p">);</span><span class="w">   </span><span class="cm">/* frees the whole tree; NULL-safe */</span>
 <span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_parse</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
@@ -1254,7 +1273,7 @@ The <code>bvn_dom_parse_fd*</code> variants instead return NULL on <strong>any</
 accumulated input at <code>max_bytes</code>, but only <em>downward</em>: <code>0</code> or any value above the
 built-in hard cap <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) is clamped to that cap — there
 is no unlimited mode. Free every returned doc with <code>bvn_dom_doc_destroy</code>.</p>
-<h3 id="navigation">Navigation</h3>
+<h3 id="42-navigation">4.2 Navigation</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_lookup</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">path</span><span class="p">);</span><span class="w"> </span><span class="cm">/* dot path, e.g. &quot;server.tls.cert&quot; */</span>
 <span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_struct_get</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">);</span>
 <span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_array_at</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">index</span><span class="p">);</span>
@@ -1268,7 +1287,7 @@ is no unlimited mode. Free every returned doc with <code>bvn_dom_doc_destroy</co
 
 <p>Each <code>bvn_dom_entry_t</code> is <code>{ char *key; bvn_dom_node_t *value; }</code>. A missing key
 or out-of-range index returns NULL.</p>
-<h3 id="type-inspection">Type inspection</h3>
+<h3 id="43-type-inspection">4.3 Type inspection</h3>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">bvn_dom_type_e</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">BVN_DOM_NULL</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_INT</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_FLOAT</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_STRING</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_SYMBOL</span><span class="p">,</span>
 <span class="w">    </span><span class="n">BVN_DOM_REFERENCE</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_STRUCT</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_ARRAY</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_OCTET_STREAM</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_DOM_BOOL</span>
@@ -1292,9 +1311,9 @@ or out-of-range index returns NULL.</p>
   does <code>0.0 m</code>. When the difference matters, read <code>bvn_dom_get_unit</code> and call
   <code>bvn_unit_to_si_factor</code> yourself — it has an <code>ok</code> out-param.</li>
 <li><strong>It is <code>double</code>.</strong> A value wider than a double is rounded here. The lossless
-  route is the reader's <code>want_unit</code> hook (§7c) or <code>bvn_unit_convert_rational</code>.</li>
+  route is the reader's <code>want_unit</code> hook (§1.10) or <code>bvn_unit_convert_rational</code>.</li>
 </ul>
-<h3 id="typed-value-accessors">Typed value accessors</h3>
+<h3 id="44-typed-value-accessors">4.4 Typed value accessors</h3>
 <p>Each accessor returns <code>false</code> (leaving the out-param <strong>unchanged</strong> — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit
 the target type. Pointer results are <strong>borrowed</strong> — valid only until the owning
@@ -1321,7 +1340,7 @@ is still the whole-second epoch count read via <code>bvn_dom_get_i64</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_get_datetime_fraction</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">len_out</span><span class="p">);</span>
 </code></pre></div>
 
-<h3 id="building-a-tree">Building a tree</h3>
+<h3 id="45-building-a-tree">4.5 Building a tree</h3>
 <p>The DOM is also writable, e.g. to construct a document programmatically and hand
 it to a serialiser. <code>bvn_dom_node_alloc</code> / the <code>bvn_dom_node_from_*</code> constructors
 make nodes; the <code>*_add</code>/<code>*_append</code> functions attach them.</p>
@@ -1341,7 +1360,7 @@ on <strong>every</strong> failure path the node is destroyed internally — so n
 yourself after the call (doing so double-frees). <code>bvn_dom_node_from_bigint</code> is the
 one exception with <em>asymmetric</em> ownership: on success it takes ownership of the
 <code>bvn_int_t</code>; on failure (NULL return) it does not, and you still own it.</p>
-<h3 id="minimal-example">Minimal example</h3>
+<h3 id="46-minimal-example">4.6 Minimal example</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_dom_parse</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="n">len</span><span class="p">);</span>
 <span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">doc</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* out of memory */</span><span class="w"> </span><span class="p">}</span>
 <span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">bvn_dom_doc_get_parse_error</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">error_none</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -1355,7 +1374,7 @@ one exception with <em>asymmetric</em> ownership: on success it takes ownership 
 </code></pre></div>
 
 <hr />
-<h2 id="complete-read-example">Complete Read Example</h2>
+<h2 id="5-complete-read-example">5. Complete Read Example</h2>
 <div class="codehilite"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fcntl.h&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;inttypes.h&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
@@ -1450,7 +1469,7 @@ one exception with <em>asymmetric</em> ownership: on success it takes ownership 
 </code></pre></div>
 
 <hr />
-<h2 id="inline-unit-suffix--reading">Inline Unit Suffix — Reading</h2>
+<h2 id="6-inline-unit-suffix--reading">6. Inline Unit Suffix — Reading</h2>
 <p>A scalar value may carry an <strong>inline unit suffix</strong> directly after the literal, before its terminating <code>;</code>:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.speed = 9.81 m/s;            # no annotation; inline unit
 .mass  = &lt;float:64&gt; 70.5 k~g; # annotation without unit; inline unit adopted
@@ -1459,7 +1478,7 @@ one exception with <em>asymmetric</em> ownership: on success it takes ownership 
 <p>The only behavioral difference occurs when <strong>both</strong> are present and <strong>disagree</strong>: the validator raises <code>error_unit_mismatch</code> (38) and parsing fails:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.bad = &lt;float:64,m&gt; 1.0 s;    /* annotation says m, inline says s → error */</code></pre></div>
 <p>Inline unit suffixes are <strong>illegal inside array elements</strong>. The lexer rejects them with <code>error_unexpected_input_byte</code>.</p>
-<h3 id="reading-inline-unit-values">Reading inline unit values</h3>
+<h3 id="61-reading-inline-unit-values">6.1 Reading inline unit values</h3>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* The callback below works identically whether the unit came from a</span>
 <span class="cm"> * type annotation or from an inline suffix — no change needed.        */</span>
 <span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">on_verified</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ud</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_event_t</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="w"> </span><span class="o">*</span><span class="n">d</span><span class="p">)</span>
@@ -1486,7 +1505,7 @@ one exception with <em>asymmetric</em> ownership: on success it takes ownership 
 </code></pre></div>
 
 <hr />
-<h2 id="complete-write-example">Complete Write Example</h2>
+<h2 id="7-complete-write-example">7. Complete Write Example</h2>
 <div class="codehilite"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;inttypes.h&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string.h&gt;</span>
@@ -1549,7 +1568,16 @@ one exception with <em>asymmetric</em> ownership: on success it takes ownership 
 </code></pre></div>
 
 <hr />
-<p><em>End of Bovnar Read &amp; Write API Reference (v1.1)</em></p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/spec/#16-reference-api">Specification §16 — Reference API</a> — the normative summary of these entry points</li>
+<li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the unit model behind <code>bvn_parse_unit</code> and <code>want_unit</code></li>
+<li><a href="https://www.bovnar.io/docs/streaming/">Streaming, Framing &amp; Multiplexing</a> — protocols layered on this event API</li>
+<li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the same API from Python</li>
+<li><a href="https://www.bovnar.io/docs/faq/#12-c-api">FAQ §12 — C API</a> — common questions about these functions</li>
+</ul>
+<hr />
+<p><em>End of Bovnar — Read &amp; Write API (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

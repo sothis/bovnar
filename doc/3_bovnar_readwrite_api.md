@@ -1,64 +1,69 @@
-
 # Bovnar — Read & Write API
 
 > **Spec version:** 1.1
-
-This document covers every function you need to read and write Bovnar streams, in the order you call them. Nothing else is included.
+> **Status:** Reference — the C reader, writer, and DOM as implemented
+> **Scope:** Every function needed to read and write Bovnar streams, in the order you call them.
 
 The writer uses the same event/data model as the reader — `bvnr_event_t` and `bvnr_data_t` — so the two APIs are deliberately symmetric. Learn one, the other follows.
 
 ---
 
-## Contents
+## Table of Contents
 
-**Reader**
+1. [Reader](#1-reader)
+    - 1.1 [`bvnr_reader_create` / `bvnr_reader_destroy`](#11-bvnr_reader_create--bvnr_reader_destroy)
+    - 1.2 [`bvnr_source_from_fd`](#12-bvnr_source_from_fd)
+    - 1.3 [`bvnr_source_from_mem`](#13-bvnr_source_from_mem)
+    - 1.4 [`bvnr_open_read_source`](#14-bvnr_open_read_source)
+    - 1.5 [`bvnr_open_read_mem`](#15-bvnr_open_read_mem)
+    - 1.6 [`bvnr_read`](#16-bvnr_read)
+    - 1.7 [`bvnr_reader_get_error` and friends](#17-bvnr_reader_get_error-and-friends)
+    - 1.8 [Version directive (spec 1.1)](#18-version-directive-spec-11)
+    - 1.9 [Datetime family (spec 1.1)](#19-datetime-family-spec-11)
+    - 1.10 [Read-time lossless unit / base conversion (`want_unit`)](#110-read-time-lossless-unit--base-conversion-want_unit)
+    - 1.11 [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
+2. [Writer](#2-writer)
+    - 2.1 [`bvnr_writer_create` / `bvnr_writer_destroy`](#21-bvnr_writer_create--bvnr_writer_destroy)
+    - 2.2 [`bvnr_sink_to_fd`](#22-bvnr_sink_to_fd)
+    - 2.3 [`bvnr_sink_to_mem`](#23-bvnr_sink_to_mem)
+    - 2.4 [`bvnr_sink_bytes_written`](#24-bvnr_sink_bytes_written)
+    - 2.5 [`bvnr_open_write_sink`](#25-bvnr_open_write_sink)
+    - 2.6 [`bvnr_open_write_mem`](#26-bvnr_open_write_mem)
+    - 2.7 [`bvnr_write_event`](#27-bvnr_write_event)
+    - 2.8 [`bvnr_write_version`](#28-bvnr_write_version)
+    - 2.9 [`bvnr_write_finish`](#29-bvnr_write_finish)
+    - 2.10 [`bvnr_writer_get_error` and friends](#210-bvnr_writer_get_error-and-friends)
+    - 2.11 [`bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`](#211-bvn_format_uint64--bvn_format_int64--bvn_format_double)
+    - 2.12 [`bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`](#212-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit)
+    - 2.13 [`bvnr_write_bvni` / `bvnr_write_bvni_unit`](#213-bvnr_write_bvni--bvnr_write_bvni_unit)
+    - 2.14 [`BVN_TYPE_FLOAT_BASE`](#214-bvn_type_float_base)
+3. [Shared](#3-shared)
+    - 3.1 [`bvnr_write_type_annotation`](#31-bvnr_write_type_annotation)
+    - 3.2 [`bvn_parse_unit` / `bvn_parse_unit_n`](#32-bvn_parse_unit--bvn_parse_unit_n)
+    - 3.3 [`bvn_unit_to_string` / `bvn_unit_to_string_ex`](#33-bvn_unit_to_string--bvn_unit_to_string_ex)
+    - 3.4 [`bvn_unit_convert_value` *(bovnar_si_units.h)*](#34-bvn_unit_convert_value-bovnar_si_unitsh)
+    - 3.5 [`bvn_error_to_string`](#35-bvn_error_to_string)
+4. [DOM API (`bovnar_dom.h`)](#4-dom-api-bovnar_domh)
+    - 4.1 [Parsing and lifetime](#41-parsing-and-lifetime)
+    - 4.2 [Navigation](#42-navigation)
+    - 4.3 [Type inspection](#43-type-inspection)
+    - 4.4 [Typed value accessors](#44-typed-value-accessors)
+    - 4.5 [Building a tree](#45-building-a-tree)
+    - 4.6 [Minimal example](#46-minimal-example)
+5. [Complete Read Example](#5-complete-read-example)
+6. [Inline Unit Suffix — Reading](#6-inline-unit-suffix--reading)
+    - 6.1 [Reading inline unit values](#61-reading-inline-unit-values)
+7. [Complete Write Example](#7-complete-write-example)
 
-1. [`bvnr_reader_create` / `bvnr_reader_destroy`](#1-bvnr_reader_create--bvnr_reader_destroy)
-2. [`bvnr_source_from_fd`](#2-bvnr_source_from_fd)
-3. [`bvnr_source_from_mem`](#3-bvnr_source_from_mem)
-4. [`bvnr_open_read_source`](#4-bvnr_open_read_source)
-5. [`bvnr_open_read_mem`](#5-bvnr_open_read_mem)
-6. [`bvnr_read`](#6-bvnr_read)
-7. [`bvnr_reader_get_error` and friends](#7-bvnr_reader_get_error-and-friends)
-7a. [Version directive (spec 1.1)](#7a-version-directive-spec-11)
-7b. [Datetime family (spec 1.1)](#7b-datetime-family-spec-11)
-7c. [Read-time lossless unit / base conversion (`want_unit`)](#7c-read-time-lossless-unit--base-conversion-want_unit)
-8. [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#8-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
-
-**Writer**
-
-9. [`bvnr_writer_create` / `bvnr_writer_destroy`](#9-bvnr_writer_create--bvnr_writer_destroy)
-10. [`bvnr_sink_to_fd`](#10-bvnr_sink_to_fd)
-11. [`bvnr_sink_to_mem`](#11-bvnr_sink_to_mem)
-12. [`bvnr_sink_bytes_written`](#12-bvnr_sink_bytes_written)
-13. [`bvnr_open_write_sink`](#13-bvnr_open_write_sink)
-14. [`bvnr_open_write_mem`](#14-bvnr_open_write_mem)
-15. [`bvnr_write_event`](#15-bvnr_write_event)
-16. [`bvnr_write_finish`](#16-bvnr_write_finish)
-17. [`bvnr_writer_get_error` and friends](#17-bvnr_writer_get_error-and-friends)
-18. [`bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`](#18-bvn_format_uint64--bvn_format_int64--bvn_format_double)
-19. [`bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`](#19-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit)
-20. [`bvnr_write_bvni` / `bvnr_write_bvni_unit`](#20-bvnr_write_bvni--bvnr_write_bvni_unit)
-21. [`BVN_TYPE_FLOAT_BASE`](#21-bvn_type_float_base)
-
-**Shared**
-
-22. [`bvnr_write_type_annotation`](#22-bvnr_write_type_annotation)
-23. [`bvn_parse_unit`](#23-bvn_parse_unit--bvn_parse_unit_n)
-24. [`bvn_unit_to_string`](#24-bvn_unit_to_string--bvn_unit_to_string_ex)
-25. [`bvn_error_to_string`](#25-bvn_error_to_string)
-
-**DOM**
-
-26. [DOM API (`bovnar_dom.h`)](#dom-api-bovnar_domh)
+- [See also](#see-also)
 
 ---
 
-## Reader
+## 1. Reader
 
 ---
 
-### 1. `bvnr_reader_create` / `bvnr_reader_destroy`
+### 1.1 `bvnr_reader_create` / `bvnr_reader_destroy`
 
 ```c
 bvnr_reader_t *bvnr_reader_create(void);
@@ -78,7 +83,7 @@ bvnr_reader_destroy(r);
 
 ---
 
-### 2. `bvnr_source_from_fd`
+### 1.2 `bvnr_source_from_fd`
 
 ```c
 void bvnr_source_from_fd(bvnr_source_t *s, int fd);
@@ -100,7 +105,7 @@ bvnr_source_from_fd(&src, fd);
 
 ---
 
-### 3. `bvnr_source_from_mem`
+### 1.3 `bvnr_source_from_mem`
 
 ```c
 void bvnr_source_from_mem(bvnr_source_t *s, const void *buf, uint64_t len);
@@ -122,7 +127,7 @@ bvnr_source_from_mem(&src, payload, sizeof(payload) - 1);
 
 ---
 
-### 4. `bvnr_open_read_source`
+### 1.4 `bvnr_open_read_source`
 
 ```c
 bool bvnr_open_read_source(bvnr_reader_t        *r,
@@ -152,7 +157,7 @@ typedef struct bvnr_read_flags_s {
 } bvnr_read_flags_t;
 ```
 
-`on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: `want_unit` (§7c) runs ahead of **both** callbacks, so with it installed an `on_unverified` consumer also sees a populated `converted`/`conv` on `ev_data`. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
+`on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: `want_unit` (§1.10) runs ahead of **both** callbacks, so with it installed an `on_unverified` consumer also sees a populated `converted`/`conv` on `ev_data`. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
@@ -187,7 +192,7 @@ if (!bvnr_open_read_source(r, &src, NULL, &opts)) {
 
 ---
 
-### 5. `bvnr_open_read_mem`
+### 1.5 `bvnr_open_read_mem`
 
 ```c
 bool bvnr_open_read_mem(bvnr_reader_t     *r,
@@ -209,7 +214,7 @@ if (!bvnr_open_read_mem(r, payload, payload_len, NULL, 0, &opts))
 
 ---
 
-### 6. `bvnr_read`
+### 1.6 `bvnr_read`
 
 ```c
 bool bvnr_read(bvnr_reader_t *r);
@@ -232,7 +237,7 @@ if (!bvnr_read(r)) {
 
 ---
 
-### 7. `bvnr_reader_get_error` and friends
+### 1.7 `bvnr_reader_get_error` and friends
 
 ```c
 error_code_t bvnr_reader_get_error     (const bvnr_reader_t *r);
@@ -274,7 +279,7 @@ if (!bvnr_read(r)) {
 
 ---
 
-### 7a. Version directive (spec 1.1)
+### 1.8 Version directive (spec 1.1)
 
 ```c
 bool        bvnr_reader_get_declared_version(
@@ -306,12 +311,12 @@ if (bvnr_reader_get_declared_version(r, &maj, &min))
 ```
 
 To emit a directive, call `bvnr_write_version` right after opening the writer
-(see §13), or set `bvnr_write_flags_t.emit_version` to stamp the current spec
+(see §2.5), or set `bvnr_write_flags_t.emit_version` to stamp the current spec
 version automatically.
 
 ---
 
-### 7b. Datetime family (spec 1.1)
+### 1.9 Datetime family (spec 1.1)
 
 ```c
 const char *bvnr_datetime_epoch_name (value_type_spec_t vt);
@@ -376,7 +381,7 @@ if (d->frac_data && d->frac_length) {
 
 ---
 
-### 7c. Read-time lossless unit / base conversion (`want_unit`)
+### 1.10 Read-time lossless unit / base conversion (`want_unit`)
 
 ```c
 /* bvnr_read_flags_t */
@@ -403,7 +408,7 @@ uint32_t max_conversion_length;           /* work limit; 0 = 1024 */
 ```
 
 By default the reader hands you every numeric value exactly as written and you
-convert it yourself (§24a, `bvn_unit_convert_rational`). Set `want_unit` to have
+convert it yourself (§3.4, `bvn_unit_convert_rational`). Set `want_unit` to have
 the reader do it for you — **losslessly**, in exact arbitrary-precision
 arithmetic, for a value of any width and any base.
 
@@ -514,7 +519,7 @@ bvnr_read_flags_t opts = { .on_verified = on_event, .want_unit = want_unit };
 
 ---
 
-### 8. `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`
+### 1.11 `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`
 
 ```c
 bool bvn_parse_uint64(const char *s, value_type_spec_t vt, uint64_t *out);
@@ -576,11 +581,11 @@ static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 
 ---
 
-## Writer
+## 2. Writer
 
 ---
 
-### 9. `bvnr_writer_create` / `bvnr_writer_destroy`
+### 2.1 `bvnr_writer_create` / `bvnr_writer_destroy`
 
 ```c
 bvnr_writer_t *bvnr_writer_create(void);
@@ -600,7 +605,7 @@ bvnr_writer_destroy(w);
 
 ---
 
-### 10. `bvnr_sink_to_fd`
+### 2.2 `bvnr_sink_to_fd`
 
 ```c
 void bvnr_sink_to_fd(bvnr_sink_t *s, int fd);
@@ -616,7 +621,7 @@ bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 
 ---
 
-### 11. `bvnr_sink_to_mem`
+### 2.3 `bvnr_sink_to_mem`
 
 ```c
 void bvnr_sink_to_mem(bvnr_sink_t *s, void *buf, uint64_t cap);
@@ -632,7 +637,7 @@ bvnr_sink_to_mem(&sink, out, sizeof(out));
 
 ---
 
-### 12. `bvnr_sink_bytes_written`
+### 2.4 `bvnr_sink_bytes_written`
 
 ```c
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t *s);
@@ -654,7 +659,7 @@ bvnr_writer_destroy(w);                       /* read the count before destroyin
 
 ---
 
-### 13. `bvnr_open_write_sink`
+### 2.5 `bvnr_open_write_sink`
 
 ```c
 bool bvnr_open_write_sink(bvnr_writer_t        *w,
@@ -709,7 +714,7 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
 
-`BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §24.)
+`BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §3.3.)
 
 These flags can be OR-combined: `BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP`. The flags are fixed at open time. To change serialisation behaviour, destroy the writer and open a new one with the updated `unit_flags`. The getter `bvnr_writer_unit_flags(w)` is used internally by the Python FFI layer to retrieve the live flags before each unit serialisation call; there is no public setter.
 
@@ -724,7 +729,7 @@ if (!bvnr_open_write_sink(w, &sink, /*pretty=*/true, &opts))
 
 ---
 
-### 14. `bvnr_open_write_mem`
+### 2.6 `bvnr_open_write_mem`
 
 ```c
 bool bvnr_open_write_mem(bvnr_writer_t      *w,
@@ -745,7 +750,7 @@ if (!bvnr_open_write_mem(w, out, sizeof(out), false, &opts))
 
 ---
 
-### 15. `bvnr_write_event`
+### 2.7 `bvnr_write_event`
 
 ```c
 bool bvnr_write_event(bvnr_writer_t *w, bvnr_event_t ev, bvnr_data_t *data);
@@ -788,7 +793,7 @@ The `BVN_TYPE_*` macros build `value_type_spec_t` literals conveniently:
 
 The maximum bit-width accepted for `uint` and `sint` is `BVN_MAX_INT_WIDTH` (defined as `32768u` in `bovnar.h`). The validator and writer reject any declared `uint`/`sint` width exceeding this limit with `error_illegal_value_type`.
 
-> **Critical:** The writer dispatches `ev_type_annotation_type_family_parameter` events on `d->type`, not on `d->value_type`. For each parameter event, `d.type` must be set to the appropriate `token_type_t` value: `token_is_type_width` for the width parameter, `token_is_type_base` for the base parameter, `token_is_type_q` for the Q (fractional bits) parameter of `float_fix`, and `token_is_unit` for the unit parameter. An unrecognised `d.type` causes the writer to emit nothing for that event — the annotation will be silently incomplete. **Use `bvnr_write_type_annotation` (see §22) to avoid this complexity entirely.**
+> **Critical:** The writer dispatches `ev_type_annotation_type_family_parameter` events on `d->type`, not on `d->value_type`. For each parameter event, `d.type` must be set to the appropriate `token_type_t` value: `token_is_type_width` for the width parameter, `token_is_type_base` for the base parameter, `token_is_type_q` for the Q (fractional bits) parameter of `float_fix`, and `token_is_unit` for the unit parameter. An unrecognised `d.type` causes the writer to emit nothing for that event — the annotation will be silently incomplete. **Use `bvnr_write_type_annotation` (see §3.1) to avoid this complexity entirely.**
 
 **Example: write `.port = <uint:16> 8080;`**
 
@@ -869,7 +874,7 @@ static bool write_struct_end(bvnr_writer_t *w)
 
 ---
 
-### 15a. `bvnr_write_version`
+### 2.8 `bvnr_write_version`
 
 ```c
 bool bvnr_write_version(bvnr_writer_t *w, uint16_t major, uint16_t minor);
@@ -892,7 +897,7 @@ bvnr_write_finish(w);
 
 ---
 
-### 16. `bvnr_write_finish`
+### 2.9 `bvnr_write_finish`
 
 ```c
 bool bvnr_write_finish(bvnr_writer_t *w);
@@ -912,7 +917,7 @@ bvnr_writer_destroy(w);
 
 ---
 
-### 17. `bvnr_writer_get_error` and friends
+### 2.10 `bvnr_writer_get_error` and friends
 
 ```c
 error_code_t     bvnr_writer_get_error       (const bvnr_writer_t *w);
@@ -936,7 +941,7 @@ if (!bvnr_write_event(w, ev_data, &d)) {
 
 ---
 
-### 18. `bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`
+### 2.11 `bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`
 
 ```c
 int32_t bvn_format_uint64(char *buf, size_t bufsize,
@@ -974,7 +979,7 @@ These strings are then placed into `bvnr_data_t.data` / `.length` before calling
 
 ---
 
-### 19. `bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`
+### 2.12 `bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`
 
 ```c
 bool bvnr_write_bvnf_base(bvnr_writer_t *w, const char *key,
@@ -1019,7 +1024,7 @@ These functions supersede calling `bvnr_write_bvnf` / `bvnr_write_bvnf_unit` whe
 
 ---
 
-### 20. `bvnr_write_bvni` / `bvnr_write_bvni_unit`
+### 2.13 `bvnr_write_bvni` / `bvnr_write_bvni_unit`
 
 ```c
 bool bvnr_write_bvni(bvnr_writer_t *w, const char *key,
@@ -1061,7 +1066,7 @@ bvn_int_free(n);
 
 ---
 
-### 21. `BVN_TYPE_FLOAT_BASE`
+### 2.14 `BVN_TYPE_FLOAT_BASE`
 
 ```c
 #define BVN_TYPE_FLOAT_BASE(w, b)  /* value_type_spec_t */
@@ -1079,11 +1084,11 @@ value_type_spec_t vt10 = BVN_TYPE_FLOAT_BASE(64u, 10u);
 
 ---
 
-## Shared
+## 3. Shared
 
 ---
 
-### 22. `bvnr_write_type_annotation`
+### 3.1 `bvnr_write_type_annotation`
 
 ```c
 bool bvnr_write_type_annotation(bvnr_writer_t *w,
@@ -1114,7 +1119,7 @@ if (!bvnr_write_type_annotation(w, vt, vu)) return false;
 
 ---
 
-### 23. `bvn_parse_unit` / `bvn_parse_unit_n`
+### 3.2 `bvn_parse_unit` / `bvn_parse_unit_n`
 
 ```c
 value_unit_t bvn_parse_unit  (const uint8_t *unit, bool *ok);
@@ -1147,7 +1152,7 @@ value_unit_t u2 = bvn_parse_unit_n(annotation + 9, 3, &ok); /* "m/s" */
 
 ---
 
-### 24. `bvn_unit_to_string` / `bvn_unit_to_string_ex`
+### 3.3 `bvn_unit_to_string` / `bvn_unit_to_string_ex`
 
 ```c
 int32_t bvn_unit_to_string(value_unit_t u, char *buf, size_t bufsize);
@@ -1172,7 +1177,7 @@ These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internal
 
 > **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (`k~g·m/s²` → `"N"`, `k~N` → `"k~N"`). The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
 
-> **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§22) to emit a complete, correct type annotation in one call.
+> **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§3.1) to emit a complete, correct type annotation in one call.
 
 ```c
 value_unit_t u = BVN_UNIT_COMPOUND2(
@@ -1189,7 +1194,7 @@ n = bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
 
 ---
 
-### 24a. `bvn_unit_convert_value` *(bovnar_si_units.h)*
+### 3.4 `bvn_unit_convert_value` *(bovnar_si_units.h)*
 
 ```c
 bool bvn_unit_convert_value(double value, value_unit_t from,
@@ -1199,7 +1204,7 @@ bool bvn_unit_convert_value(double value, value_unit_t from,
 Convert one numeric quantity from unit `from` into unit `to`, writing the result
 to `*out`. Handles both the simple multiplicative case (`5 k~m → 5000 m`) and the
 affine case (`25 °C → 298.15 K`), routing the latter through SI base units. This
-is the same routine the reader's `want_unit` hook (§7c) uses, and the C
+is the same routine the reader's `want_unit` hook (§1.10) uses, and the C
 equivalent of the Python `convert_value`.
 
 Returns `false` — leaving `*out` untouched — when the two units are
@@ -1219,7 +1224,7 @@ For the standalone factor (without applying it) or to detect the affine case,
 see `bvn_unit_convert_factor` in `bovnar_si_units.h`.
 
 `bvn_unit_convert_value` works in `double`, so it is lossy for wide values. For a
-**lossless** conversion — the engine behind the reader's `want_unit` hook (§7c) —
+**lossless** conversion — the engine behind the reader's `want_unit` hook (§1.10) —
 use the exact-rational pair, also in `bovnar_si_units.h`:
 
 ```c
@@ -1262,7 +1267,7 @@ table in which a rounded decimal is passed off as exact.
 
 ---
 
-### 25. `bvn_error_to_string`
+### 3.5 `bvn_error_to_string`
 
 ```c
 const char *bvn_error_to_string(error_code_t code);
@@ -1281,19 +1286,19 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 |------|-------|--------|---------|
 | `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, >8 components) |
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
-| `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§7c) |
-| `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§7c) |
+| `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
+| `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
 
 ---
 
-## DOM API (`bovnar_dom.h`)
+## 4. DOM API (`bovnar_dom.h`)
 
 The SAX reader above streams events. When you instead want the whole document in
 memory for random-access queries — without writing a callback — use the DOM API
 in `include/bovnar_dom.h`. It parses a document into a tree of `bvn_dom_node_t`
 owned by a `bvn_dom_doc_t`, which you navigate and read with typed accessors.
 
-### Parsing and lifetime
+### 4.1 Parsing and lifetime
 
 ```c
 bvn_dom_doc_t *bvn_dom_doc_create(void);
@@ -1313,7 +1318,7 @@ accumulated input at `max_bytes`, but only *downward*: `0` or any value above th
 built-in hard cap `BVN_DOM_FD_MAX_BYTES` (256 MiB) is clamped to that cap — there
 is no unlimited mode. Free every returned doc with `bvn_dom_doc_destroy`.
 
-### Navigation
+### 4.2 Navigation
 
 ```c
 bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc, const char *path); /* dot path, e.g. "server.tls.cert" */
@@ -1330,7 +1335,7 @@ uint32_t               bvn_dom_doc_count(const bvn_dom_doc_t *doc);
 Each `bvn_dom_entry_t` is `{ char *key; bvn_dom_node_t *value; }`. A missing key
 or out-of-range index returns NULL.
 
-### Type inspection
+### 4.3 Type inspection
 
 ```c
 typedef enum bvn_dom_type_e {
@@ -1356,9 +1361,9 @@ double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
   does `0.0 m`. When the difference matters, read `bvn_dom_get_unit` and call
   `bvn_unit_to_si_factor` yourself — it has an `ok` out-param.
 - **It is `double`.** A value wider than a double is rounded here. The lossless
-  route is the reader's `want_unit` hook (§7c) or `bvn_unit_convert_rational`.
+  route is the reader's `want_unit` hook (§1.10) or `bvn_unit_convert_rational`.
 
-### Typed value accessors
+### 4.4 Typed value accessors
 
 Each accessor returns `false` (leaving the out-param **unchanged** — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit
@@ -1392,7 +1397,7 @@ is still the whole-second epoch count read via `bvn_dom_get_i64`:
 const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node, uint32_t *len_out);
 ```
 
-### Building a tree
+### 4.5 Building a tree
 
 The DOM is also writable, e.g. to construct a document programmatically and hand
 it to a serialiser. `bvn_dom_node_alloc` / the `bvn_dom_node_from_*` constructors
@@ -1416,7 +1421,7 @@ yourself after the call (doing so double-frees). `bvn_dom_node_from_bigint` is t
 one exception with *asymmetric* ownership: on success it takes ownership of the
 `bvn_int_t`; on failure (NULL return) it does not, and you still own it.
 
-### Minimal example
+### 4.6 Minimal example
 
 ```c
 bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
@@ -1433,7 +1438,7 @@ bvn_dom_doc_destroy(doc);
 
 ---
 
-## Complete Read Example
+## 5. Complete Read Example
 
 ```c
 #include <fcntl.h>
@@ -1531,7 +1536,7 @@ int main(int argc, char **argv)
 
 ---
 
-## Inline Unit Suffix — Reading
+## 6. Inline Unit Suffix — Reading
 
 A scalar value may carry an **inline unit suffix** directly after the literal, before its terminating `;`:
 
@@ -1551,7 +1556,7 @@ The only behavioral difference occurs when **both** are present and **disagree**
 
 Inline unit suffixes are **illegal inside array elements**. The lexer rejects them with `error_unexpected_input_byte`.
 
-### Reading inline unit values
+### 6.1 Reading inline unit values
 
 ```c
 /* The callback below works identically whether the unit came from a
@@ -1581,7 +1586,7 @@ static bool on_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 
 ---
 
-## Complete Write Example
+## 7. Complete Write Example
 
 ```c
 #include <inttypes.h>
@@ -1647,4 +1652,14 @@ int main(void)
 
 ---
 
-*End of Bovnar Read & Write API Reference (v1.1)*
+## See also
+
+- [Specification §16 — Reference API](1_bovnar_spec.md#16-reference-api) — the normative summary of these entry points
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit model behind `bvn_parse_unit` and `want_unit`
+- [Streaming, Framing & Multiplexing](9_bovnar_streaming.md) — protocols layered on this event API
+- [Python Bindings](4_bovnar_python_bindings.md) — the same API from Python
+- [FAQ §12 — C API](6_bovnar_faq.md#12-c-api) — common questions about these functions
+
+---
+
+*End of Bovnar — Read & Write API (Bovnar spec 1.1).*

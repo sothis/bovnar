@@ -125,7 +125,7 @@ DOCS = [
      "the C and Python APIs."),
     ("7_bovnar_conformance.md", "conformance", "bovnar-conformance",
      "Bovnar Conformance Testing",
-     "The Bovnar 319-case conformance test suite and the IUT protocol for validating "
+     "The Bovnar 364-case conformance test suite and the IUT protocol for validating "
      "third-party implementations."),
     ("8_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",
      "Bovnar Unit & Currency Cheat Sheet",

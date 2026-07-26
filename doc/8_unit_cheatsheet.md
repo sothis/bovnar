@@ -1,49 +1,54 @@
-# Bovnar (BVNR) — Units & Currencies Reference
+# Bovnar — Units & Currencies Cheat Sheet
 
-> Spec version 1.1 · 180 physical units · 166 fiat currencies · 50 cryptocurrencies
+> **Spec version:** 1.1
+> **Status:** Reference — the symbol tables of the unit and currency registry
+> **Scope:** 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
-## Contents
+## Table of Contents
 
 1. [SI Prefixes](#1-si-prefixes)
 2. [IEC Binary Prefixes](#2-iec-binary-prefixes)
 3. [Prefix Validity Rules](#3-prefix-validity-rules)
 4. [Physical Units](#4-physical-units)
-   - 4.1 [SI Base Units](#41-si-base-units)
-   - 4.2 [Named SI-Derived Units](#42-named-si-derived-units)
-   - 4.3 [Non-SI Units Accepted with SI](#43-non-si-units-accepted-with-si)
-   - 4.4 [Imperial & US Customary — Length](#44-imperial--us-customary--length)
-   - 4.5 [Imperial & US Customary — Mass](#45-imperial--us-customary--mass)
-   - 4.6 [Temperature](#46-temperature)
-   - 4.7 [Pressure](#47-pressure)
-   - 4.8 [Energy](#48-energy)
-   - 4.9 [Power](#49-power)
-   - 4.10 [Force](#410-force)
-   - 4.11 [Speed & Rotation](#411-speed--rotation)
-   - 4.12 [Acceleration](#412-acceleration)
-   - 4.13 [Volume — US Liquid](#413-volume--us-liquid)
-   - 4.14 [Volume — UK Imperial](#414-volume--uk-imperial)
-   - 4.15 [Volume — US Apothecary & Dry](#415-volume--us-apothecary--dry)
-   - 4.16 [Area](#416-area)
-   - 4.17 [Angle](#417-angle)
-   - 4.18 [Digital](#418-digital)
-   - 4.19 [CGS Units](#419-cgs-units)
-   - 4.20 [Radiation](#420-radiation)
-   - 4.21 [Logarithmic](#421-logarithmic)
-   - 4.22 [Electrical Power](#422-electrical-power)
-   - 4.23 [Textile Linear Density](#423-textile-linear-density)
-   - 4.24 [Old German Units](#424-old-german-units)
-   - 4.25 [Additional Physical Units](#425-additional-physical-units-361367)
-   - 4.26 [Ratio and Proportion](#426-ratio-and-proportion-372377)
-   - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
-   - 4.28 [Water Hardness](#428-water-hardness)
+    - 4.1 [SI Base Units](#41-si-base-units)
+    - 4.2 [Named SI-Derived Units](#42-named-si-derived-units)
+    - 4.3 [Non-SI Units Accepted with SI](#43-non-si-units-accepted-with-si)
+    - 4.4 [Imperial & US Customary — Length](#44-imperial--us-customary--length)
+    - 4.5 [Imperial & US Customary — Mass](#45-imperial--us-customary--mass)
+    - 4.6 [Temperature](#46-temperature)
+    - 4.7 [Pressure](#47-pressure)
+    - 4.8 [Energy](#48-energy)
+    - 4.9 [Power](#49-power)
+    - 4.10 [Force](#410-force)
+    - 4.11 [Speed & Rotation](#411-speed--rotation)
+    - 4.12 [Acceleration](#412-acceleration)
+    - 4.13 [Volume — US Liquid](#413-volume--us-liquid)
+    - 4.14 [Volume — UK Imperial](#414-volume--uk-imperial)
+    - 4.15 [Volume — US Apothecary & Dry](#415-volume--us-apothecary--dry)
+    - 4.16 [Area](#416-area)
+    - 4.17 [Angle](#417-angle)
+    - 4.18 [Digital](#418-digital)
+    - 4.19 [CGS Units](#419-cgs-units)
+    - 4.20 [Radiation](#420-radiation)
+    - 4.21 [Logarithmic](#421-logarithmic)
+    - 4.22 [Electrical Power](#422-electrical-power)
+    - 4.23 [Textile Linear Density](#423-textile-linear-density)
+    - 4.24 [Old German Units](#424-old-german-units)
+    - 4.25 [Additional Physical Units (361–367)](#425-additional-physical-units-361367)
+    - 4.26 [Ratio and Proportion (372–377)](#426-ratio-and-proportion-372377)
+    - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
+    - 4.28 [Water Hardness](#428-water-hardness)
+    - 4.29 [Water-Quality Instrument Scales](#429-water-quality-instrument-scales)
 5. [Currencies](#5-currencies)
-   - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
-   - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
-   - 5.3 [Cryptocurrencies](#53-cryptocurrencies)
-   - 5.4 [Currency Prefix Rules](#54-currency-prefix-rules)
+    - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
+    - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
+    - 5.3 [Cryptocurrencies](#53-cryptocurrencies)
+    - 5.4 [Currency Prefix Rules](#54-currency-prefix-rules)
 6. [Symbol Disambiguation](#6-symbol-disambiguation)
+
+- [See also](#see-also)
 
 ---
 
@@ -547,6 +552,8 @@ or `S/m` (`µmho/cm` too — `mho`/`℧` are the siemens); TDS is `mg/L`; resist
 > absolute salinity write `g/k~g`. Case matters: `cF` is the centifarad and `fau` the
 > femto-astronomical-unit.
 
+---
+
 ## 5. Currencies
 
 ### 5.1 The Mandatory Currency Sigil
@@ -829,5 +836,18 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
+## See also
+
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the full registry: dimensions, factors, prefix policy, and the C API
+- [Unit Ambiguities](unit_ambiguities.md) — which reading wins when a token could mean two things
+- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit attaches to a value
+- [FAQ §4 — Units](6_bovnar_faq.md#4-units) — the questions these tables raise most often
+
+---
+
 *Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*
+
+---
+
+*End of Bovnar — Units & Currencies Cheat Sheet (Bovnar spec 1.1).*

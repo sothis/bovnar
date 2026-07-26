@@ -98,7 +98,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Python bindings](https://www.bovnar.io/doc/4_bovnar_python_bindings.md) — The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
 - [EBNF grammar](https://www.bovnar.io/doc/5_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
 - [FAQ](https://www.bovnar.io/doc/6_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
-- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md) — The 319-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md) — The 364-case conformance suite and the IUT protocol for third-party implementations.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/8_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
 - [Streaming & framing](https://www.bovnar.io/doc/9_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 
@@ -106,14 +106,62 @@ Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bo
 
 <!-- ==================== Tutorial (https://www.bovnar.io/doc/0_bovnar_tutorial.md) ==================== -->
 
-# Bovnar (BVNR) — A Practical Tutorial
+# Bovnar — Tutorial
 
-**Format version:** 1.1
-**Audience:** Developers building systems where data carries physical measurements.
+> **Spec version:** 1.1
+> **Status:** Non-normative — a guided, example-driven introduction
+> **Scope:** Writing and reading Bovnar documents by hand: types, units, arrays, structs, references, and the event model.
 
 ---
 
-## Why Bovnar Exists
+## Table of Contents
+
+1. [Why Bovnar Exists](#1-why-bovnar-exists)
+2. [The Absolute Minimum: A Valid Bovnar File](#2-the-absolute-minimum-a-valid-bovnar-file)
+3. [Keys: Identifiers](#3-keys-identifiers)
+4. [Value Tokens: What Can Follow the `=` Sign](#4-value-tokens-what-can-follow-the--sign)
+5. [Numbers and the Type Annotation](#5-numbers-and-the-type-annotation)
+    - 5.1 [Bare Literals](#51-bare-literals)
+    - 5.2 [Type Annotation Syntax](#52-type-annotation-syntax)
+    - 5.3 [Type Families](#53-type-families)
+    - 5.4 [Parameters](#54-parameters)
+6. [Units](#6-units)
+    - 6.1 [Simple Units](#61-simple-units)
+    - 6.2 [SI Prefixes](#62-si-prefixes)
+    - 6.3 [Compound Units](#63-compound-units)
+    - 6.4 [Explicitly Dimensionless: `no_unit`](#64-explicitly-dimensionless-no_unit)
+    - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
+7. [Fixed-Point Numbers: `float_fix`](#7-fixed-point-numbers-float_fix)
+8. [Decimal Floating-Point: `float_dec`](#8-decimal-floating-point-float_dec)
+9. [Strings](#9-strings)
+    - 9.1 [Escape Sequences](#91-escape-sequences)
+    - 9.2 [String Concatenation](#92-string-concatenation)
+10. [Symbols](#10-symbols)
+11. [Booleans](#11-booleans)
+12. [Null Values](#12-null-values)
+13. [References](#13-references)
+14. [Arrays](#14-arrays)
+    - 14.1 [Multi-Dimensional Rows](#141-multi-dimensional-rows)
+    - 14.2 [Per-Element Type Annotations](#142-per-element-type-annotations)
+    - 14.3 [Structs as Array Elements](#143-structs-as-array-elements)
+15. [Structs](#15-structs)
+16. [Octet Streams: Inline Binary](#16-octet-streams-inline-binary)
+17. [Putting It Together: Realistic Examples](#17-putting-it-together-realistic-examples)
+    - 17.1 [Hardware Configuration](#171-hardware-configuration)
+    - 17.2 [Scientific Measurement Batch](#172-scientific-measurement-batch)
+    - 17.3 [Multi-Dimensional Matrix](#173-multi-dimensional-matrix)
+    - 17.4 [Mixed Binary and Text](#174-mixed-binary-and-text)
+18. [Common Mistakes and the Errors They Produce](#18-common-mistakes-and-the-errors-they-produce)
+19. [Error Recovery Mode](#19-error-recovery-mode)
+20. [Size Limits](#20-size-limits)
+21. [Event Model (C API Overview)](#21-event-model-c-api-overview)
+22. [Quick-Reference: Syntax Cheat Sheet](#22-quick-reference-syntax-cheat-sheet)
+
+- [See also](#see-also)
+
+---
+
+## 1. Why Bovnar Exists
 
 Bovnar is **unit-safe serialization for scientific and industrial systems**. In those domains, the expensive failures are rarely bad syntax — they are unit confusion. A thrust value sent in pounds-force and read as newtons. An altitude in feet read as meters. The number parsed perfectly; the dimension was wrong, and nothing in the data said otherwise.
 
@@ -125,7 +173,7 @@ The format also supports raw binary embedding, multi-dimensional arrays with a c
 
 ---
 
-## The Absolute Minimum: A Valid Bovnar File
+## 2. The Absolute Minimum: A Valid Bovnar File
 
 A Bovnar file is a sequence of **assignments**. Every assignment looks like this:
 
@@ -159,7 +207,7 @@ The format is UTF-8 throughout. A UTF-8 BOM is accepted only at the very first b
 
 ---
 
-## Keys: Identifiers
+## 3. Keys: Identifiers
 
 A key is the bare word after the leading dot. Identifiers follow these rules:
 
@@ -188,7 +236,7 @@ This would fail:
 
 ---
 
-## Value Tokens: What Can Appear After `=`
+## 4. Value Tokens: What Can Follow the `=` Sign
 
 There are ten categories of raw values:
 
@@ -209,9 +257,9 @@ Each is covered in depth below, starting with numbers because that is where Bovn
 
 ---
 
-## Numbers and the Type Annotation
+## 5. Numbers and the Type Annotation
 
-### Bare Literals
+### 5.1 Bare Literals
 
 Numbers are written as plain text. Positive integers default to `uint:64`, negative integers to `sint:64`, and anything with a `.` or `e` to `float:64`:
 
@@ -227,7 +275,7 @@ Numbers are written as plain text. Positive integers default to `uint:64`, negat
 
 This automatic type assignment is called **default type synthesis**. It is convenient for quick files and config work. For anything where precision matters, you add an explicit type annotation.
 
-### Type Annotation Syntax
+### 5.2 Type Annotation Syntax
 
 The annotation is enclosed in angle brackets and placed **between `=` and the value** — not on the key, not after the value:
 
@@ -243,7 +291,7 @@ Placing the annotation anywhere else is a hard error:
 .port<uint:16> = 443;      # WRONG: annotation must come after '='
 ```
 
-### Type Families
+### 5.3 Type Families
 
 There are seven core type families (spec 1.0), plus `datetime` added in spec 1.1:
 
@@ -258,7 +306,7 @@ There are seven core type families (spec 1.0), plus `datetime` added in spec 1.1
 | `bool` | Boolean (`true`/`false`); takes no parameters |
 | `datetime` | Timestamp: signed epoch-seconds, or an ISO-8601 literal like `2026-06-15T12:00:00Z` (spec 1.1; needs a `#!bovnar 1.1` directive) |
 
-### Parameters
+### 5.4 Parameters
 
 After the family keyword you may add parameters separated by commas after a `:`. The three parameter classes are **width**, **base**, and **unit**. They are identified by their syntactic form and may appear in any order:
 
@@ -329,11 +377,11 @@ Only these exact spellings are reserved: any other bare word (e.g. `infinity`, `
 
 ---
 
-## Units
+## 6. Units
 
 This is the feature most unique to Bovnar. Physical units are a first-class part of the type annotation, not a comment or a string field you hope someone reads.
 
-### Simple Units
+### 6.1 Simple Units
 
 The unit goes inside the angle brackets, after the other parameters:
 
@@ -344,7 +392,7 @@ The unit goes inside the angle brackets, after the other parameters:
 .temp     = <float:32,°C>   23.5;     # degrees Celsius (UTF-8 is fine)
 ```
 
-### SI Prefixes
+### 6.2 SI Prefixes
 
 SI prefixes are written before the base unit symbol, either with the `~` separator or compactly without it:
 
@@ -366,7 +414,7 @@ IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, and the for
 .disk = <uint:64,TiB>   2;     # 2 tebibytes (compact spelling of Ti~B)
 ```
 
-### Compound Units
+### 6.3 Compound Units
 
 Compound units are built from multiple components joined by `*` (or the middle dot `·`, U+00B7) for multiplication, and `/` for division:
 
@@ -398,7 +446,7 @@ Exponents can be written as Unicode superscripts (`²`, `³`, `⁻¹`) or with a
 
 The maximum number of unit components in a compound unit is 8. More than that causes a parse error.
 
-### Explicitly Dimensionless: `no_unit`
+### 6.4 Explicitly Dimensionless: `no_unit`
 
 When you want to be explicit that a value carries no physical dimension, use the keyword `no_unit`:
 
@@ -409,7 +457,7 @@ When you want to be explicit that a value carries no physical dimension, use the
 
 Explicitly writing `no_unit` yields `BVN_UNIT_NONE` (`num_components == 0`). Omitting the unit parameter entirely yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components == 1`, `base == bu_none`). Both are semantically dimensionless and compare as compatible via `bvn_units_compatible`, and both serialise to `"no_unit"` via `bvn_unit_to_string`, but they are structurally distinct internal states. The explicit `no_unit` is useful for documentation: it tells a reader that the author actively chose dimensionless, not that they forgot.
 
-### Inline Unit Suffix
+### 6.5 Inline Unit Suffix
 
 For untyped or partially-typed values, you can append a unit suffix directly after the value literal, separated by at least one whitespace character:
 
@@ -436,7 +484,7 @@ If a type annotation also specifies a unit and you additionally write an inline 
 
 ---
 
-## Fixed-Point Numbers: `float_fix`
+## 7. Fixed-Point Numbers: `float_fix`
 
 Fixed-point (Q-format) numbers store a value as a signed integer, with the binary point shifted by a declared number of fractional bits. The wire representation is an integer; the mathematical value is `raw_integer × 2⁻Q`.
 
@@ -458,7 +506,7 @@ Constraints:
 
 ---
 
-## Decimal Floating-Point: `float_dec`
+## 8. Decimal Floating-Point: `float_dec`
 
 `float_dec` is IEEE 754-2008 decimal floating-point — useful in financial and metrological contexts where exact decimal representation matters (binary floats cannot represent `0.1` exactly; decimal floats can):
 
@@ -472,7 +520,7 @@ Rules are similar to `float_fix`: no base parameter, same set of valid widths.
 
 ---
 
-## Strings
+## 9. Strings
 
 Strings are enclosed in double quotes. The `<utf8>` annotation is optional — a bare quoted literal is automatically synthesised as `utf8`:
 
@@ -482,7 +530,7 @@ Strings are enclosed in double quotes. The `<utf8>` annotation is optional — a
 .empty    = "";
 ```
 
-### Escape Sequences
+### 9.1 Escape Sequences
 
 Seven escape sequences are defined in spec 1.0:
 
@@ -505,7 +553,7 @@ Raw whitespace bytes (HT, LF, VT, FF, CR) are accepted unescaped inside string l
 violets are blue";
 ```
 
-### String Concatenation
+### 9.2 String Concatenation
 
 Adjacent string literals separated only by whitespace or comments are concatenated at lex time:
 
@@ -527,7 +575,7 @@ This is the idiomatic way to write a long string across multiple lines or to con
 
 ---
 
-## Symbols
+## 10. Symbols
 
 A symbol is a bare word in value position — no quotes. It is its own token type, distinct from strings:
 
@@ -545,7 +593,7 @@ Eight bare words are **reserved keywords** and are *not* symbols: `null`, `true`
 
 ---
 
-## Booleans
+## 11. Booleans
 
 `true`, `false`, `on`, and `off` are reserved keywords carrying the `bool` type family. `on` is an alias for `true` and `off` for `false`; all four collapse to a boolean value and serialize canonically as `true` / `false`:
 
@@ -559,7 +607,7 @@ A bare boolean synthesises a `<bool>` annotation automatically. The `<bool>` fam
 
 ---
 
-## Null Values
+## 12. Null Values
 
 A null is the explicit absence of a value. It appears as an empty slot — nothing between `=` and `;` — or, equivalently, the reserved keyword `null`; extra commas inside an array also produce nulls:
 
@@ -578,7 +626,7 @@ Inside arrays, null elements arise from leading, trailing, or consecutive commas
 
 ---
 
-## References
+## 13. References
 
 A reference is a dotted path to another key in the document, introduced by `&`. The parser stores the path as a string token; it does not resolve it — resolution is entirely up to the application:
 
@@ -637,7 +685,7 @@ suffixes are rejected in a 1.0 or unversioned document.
 
 ---
 
-## Arrays
+## 14. Arrays
 
 An array is enclosed in square brackets. A single row is a comma-separated list of values:
 
@@ -646,7 +694,7 @@ An array is enclosed in square brackets. A single row is a comma-separated list 
 .names  = ["Alice", "Bob", "Carol"];
 ```
 
-### Multi-Dimensional Rows
+### 14.1 Multi-Dimensional Rows
 
 Multiple rows are separated by `/`. Each bracketed group is one row:
 
@@ -667,7 +715,7 @@ The `/`-separated dimension rows of a single array must have a **consistent elem
 .bad2 = [[1, 2]/[3, 4, 5]];    # error_array_row_size_mismatch: 2 vs 3 (one /-array's own rows)
 ```
 
-### Per-Element Type Annotations
+### 14.2 Per-Element Type Annotations
 
 Each element may carry its own annotation, placed immediately after the comma (or the opening bracket for the first element):
 
@@ -684,7 +732,7 @@ A single annotation before `[` applies to all elements — it is a whole-array a
 
 Per-element annotations can still appear inside a whole-array-annotated array.
 
-### Structs as Array Elements
+### 14.3 Structs as Array Elements
 
 Arrays of structs are the standard idiom for a list of records:
 
@@ -697,7 +745,7 @@ Arrays of structs are the standard idiom for a list of records:
 
 ---
 
-## Structs
+## 15. Structs
 
 A struct is a nested scope, grouping zero or more assignments inside `{…}`. Every field inside is a complete assignment with `.key = value;` syntax. The struct value at the parent level ends with `};`:
 
@@ -736,7 +784,7 @@ An unmatched closing brace — a `}` with no matching `{` — is `error_illegal_
 
 ---
 
-## Octet Streams: Inline Binary
+## 16. Octet Streams: Inline Binary
 
 When you need to embed raw binary data without Base64 overhead, a NUL byte (`0x00`) in value position switches the parser into binary chunk mode.
 
@@ -761,9 +809,9 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 ---
 
-## Putting It Together: Realistic Examples
+## 17. Putting It Together: Realistic Examples
 
-### Hardware Configuration
+### 17.1 Hardware Configuration
 
 ```bovnar
 # Sensor node configuration
@@ -789,7 +837,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 };
 ```
 
-### Scientific Measurement Batch
+### 17.2 Scientific Measurement Batch
 
 ```bovnar
 .experiment = "thermal_runaway_001";
@@ -811,7 +859,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 .alarm     = triggered;
 ```
 
-### Multi-Dimensional Matrix
+### 17.3 Multi-Dimensional Matrix
 
 ```bovnar
 # 3×3 rotation matrix in float64
@@ -820,7 +868,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
                 /[0.0, 0.5,   0.866];
 ```
 
-### Mixed Binary and Text
+### 17.4 Mixed Binary and Text
 
 ```bovnar
 .packet = {
@@ -834,7 +882,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 ---
 
-## Common Mistakes and the Errors They Produce
+## 18. Common Mistakes and the Errors They Produce
 
 Understanding the error codes is essential for debugging. The parser reports line, column, the offending byte, and a byte-offset into the stream.
 
@@ -916,7 +964,7 @@ they are rejected only in a 1.0 or unversioned document.)
 
 ---
 
-## Error Recovery Mode
+## 19. Error Recovery Mode
 
 The parser supports an optional `continue_on_error` mode. When enabled, a parse error invokes the `on_error` callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The `recovery_count` counter (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. When the resync state machine reaches a `;` at the original nesting depth, it resumes normal parsing.
 
@@ -924,7 +972,7 @@ This mode is intended for log streams and unreliable transports — situations w
 
 ---
 
-## Size Limits
+## 20. Size Limits
 
 All limits are configurable via `bvnr_read_flags_t`. The defaults are intentionally permissive — 2 147 483 647 for array items and text bytes, and **unlimited** (`0`) for file size. Production deployments should set explicit caps:
 
@@ -945,7 +993,7 @@ Setting most fields to `0` in `bvnr_read_flags_t` causes the reader to substitut
 
 ---
 
-## Event Model (C API Overview)
+## 21. Event Model (C API Overview)
 
 The C reader is a two-phase, callback-driven SAX-style parser. You supply two optional callbacks: `on_unverified` receives events before semantic validation, `on_verified` receives them after. For normal consumption, `on_verified` is sufficient.
 
@@ -995,7 +1043,7 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 
 ---
 
-## Quick-Reference: Syntax Cheat Sheet
+## 22. Quick-Reference: Syntax Cheat Sheet
 
 ```bovnar
 # ── Assignments ────────────────────────────────────────────────────
@@ -1065,40 +1113,150 @@ nan  inf  ninf
 
 ---
 
-*Bovnar Specification (v1.1) — format by the Bovnar project.*
+## See also
+
+- [Specification](1_bovnar_spec.md) — the normative rules behind everything shown here
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — every unit and currency the parser accepts
+- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — the symbol tables, for looking one up quickly
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C API sketched in the event-model section
+- [Python Bindings](4_bovnar_python_bindings.md) — the same document set, read and written from Python
+- [FAQ](6_bovnar_faq.md) — the questions this tutorial raises next
+
+---
+
+*End of Bovnar — Tutorial (Bovnar spec 1.1).*
 
 <!-- ==================== Specification (https://www.bovnar.io/doc/1_bovnar_spec.md) ==================== -->
 
-# Bovnar Specification
+# Bovnar — Specification
 
-> **Version:** 1.1
-> **Status:** Released (1.x line; additive over the frozen 1.0 baseline)
-> **Last updated:** 2026-06-21
+> **Spec version:** 1.1
+> **Status:** Normative — released (1.x line; additive over the frozen 1.0 baseline)
+> **Scope:** Grammar, lexical structure, type system, units, limits, and error semantics.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
+    - 1.1 [Design Goals](#11-design-goals)
+    - 1.2 [Architecture](#12-architecture)
+    - 1.3 [Stream Model](#13-stream-model)
 2. [File Format at a Glance](#2-file-format-at-a-glance)
+    - 2.1 [Key Syntax Rules](#21-key-syntax-rules)
 3. [Character Encoding & BOM](#3-character-encoding--bom)
+    - 3.1 [UTF-8](#31-utf-8)
+    - 3.2 [Byte Order Mark (BOM)](#32-byte-order-mark-bom)
+    - 3.3 [Byte Classes](#33-byte-classes)
+    - 3.4 [Version Directive (spec 1.1)](#34-version-directive-spec-11)
 4. [Lexical Structure](#4-lexical-structure)
+    - 4.1 [Whitespace & Comments](#41-whitespace--comments)
+    - 4.2 [Identifiers (Keys)](#42-identifiers-keys)
+    - 4.3 [String Literals](#43-string-literals)
+    - 4.4 [Symbols](#44-symbols)
+    - 4.5 [References](#45-references)
+    - 4.6 [Numbers](#46-numbers)
+    - 4.7 [Null Values](#47-null-values)
 5. [Type Annotations](#5-type-annotations)
+    - 5.1 [Syntax](#51-syntax)
+    - 5.2 [Parameters](#52-parameters)
+    - 5.3 [Parameter Order](#53-parameter-order)
+    - 5.4 [Examples](#54-examples)
+    - 5.5 [Non-decimal Base with Bare Numbers](#55-non-decimal-base-with-bare-numbers)
 6. [Value Tokens](#6-value-tokens)
+    - 6.1 [Type/Value Compatibility](#61-typevalue-compatibility)
+    - 6.2 [Validation Rules per Numeric Type](#62-validation-rules-per-numeric-type)
+    - 6.3 [Digit Validation](#63-digit-validation)
+    - 6.4 [Special Number Semantics](#64-special-number-semantics)
+    - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
 7. [Arrays](#7-arrays)
+    - 7.1 [Row Syntax](#71-row-syntax)
+    - 7.2 [Null Elements](#72-null-elements)
+    - 7.3 [Row-Size Consistency](#73-row-size-consistency)
+    - 7.4 [Element Homogeneity](#74-element-homogeneity)
+    - 7.5 [Array Elements with Type Annotations](#75-array-elements-with-type-annotations)
+    - 7.6 [Constraints](#76-constraints)
 8. [Structs (Scopes)](#8-structs-scopes)
+    - 8.1 [Syntax](#81-syntax)
+    - 8.2 [Nesting](#82-nesting)
+    - 8.3 [Empty Structs](#83-empty-structs)
+    - 8.4 [Structs as Array Elements](#84-structs-as-array-elements)
+    - 8.5 [Unmatched Braces](#85-unmatched-braces)
 9. [Octet Streams (Binary Mode)](#9-octet-streams-binary-mode)
+    - 9.1 [Overview](#91-overview)
+    - 9.2 [Wire Protocol](#92-wire-protocol)
+    - 9.3 [Events](#93-events)
+    - 9.4 [Example](#94-example)
+    - 9.5 [Constraints](#95-constraints)
 10. [Default Type Synthesis](#10-default-type-synthesis)
+    - 10.1 [Rules](#101-rules)
+    - 10.2 [Event Sequence](#102-event-sequence)
+    - 10.3 [Examples](#103-examples)
 11. [Units System](#11-units-system)
+    - 11.1 [Base Units](#111-base-units)
+    - 11.2 [SI Prefixes](#112-si-prefixes)
+    - 11.3 [IEC Binary Prefixes](#113-iec-binary-prefixes)
+    - 11.4 [Unit Notation](#114-unit-notation)
+    - 11.5 [Unit Exponents](#115-unit-exponents)
+    - 11.6 [Examples](#116-examples)
+    - 11.7 [Compound Unit Constraints](#117-compound-unit-constraints)
+    - 11.8 [The `no_unit` Keyword](#118-the-no_unit-keyword)
 12. [Validation & Constraints](#12-validation--constraints)
+    - 12.1 [UTF-8 Validation](#121-utf-8-validation)
+    - 12.2 [Size Limits](#122-size-limits)
+    - 12.3 [Value Validation](#123-value-validation)
+    - 12.4 [Array Validation](#124-array-validation)
+    - 12.5 [Struct Validation](#125-struct-validation)
+    - 12.6 [Identifier Validation](#126-identifier-validation)
+    - 12.7 [String Validation](#127-string-validation)
+    - 12.8 [Unit Validation](#128-unit-validation)
+    - 12.9 [Octet Stream Validation](#129-octet-stream-validation)
 13. [Error Handling & Recovery](#13-error-handling--recovery)
+    - 13.1 [Error Model](#131-error-model)
+    - 13.2 [Recovery Mode](#132-recovery-mode)
+    - 13.3 [EOF in Resync](#133-eof-in-resync)
 14. [Formal EBNF](#14-formal-ebnf)
 15. [Complete Examples](#15-complete-examples)
+    - 15.1 [Simple Configuration](#151-simple-configuration)
+    - 15.2 [Typed Scientific Data](#152-typed-scientific-data)
+    - 15.3 [Inline Unit Suffix](#153-inline-unit-suffix)
+    - 15.4 [Binary Data with Octet Stream](#154-binary-data-with-octet-stream)
+    - 15.5 [Arrays with Mixed Dimensions](#155-arrays-with-mixed-dimensions)
+    - 15.6 [Deeply Nested Struct](#156-deeply-nested-struct)
+    - 15.7 [References and Symbols](#157-references-and-symbols)
+    - 15.8 [Compound Unit Examples](#158-compound-unit-examples)
+    - 15.9 [Fixed-Point and Decimal Float Examples](#159-fixed-point-and-decimal-float-examples)
+    - 15.10 [Error Examples](#1510-error-examples)
 16. [Reference API](#16-reference-api)
+    - 16.1 [Core Types](#161-core-types)
+    - 16.2 [Type Construction Macros](#162-type-construction-macros)
+    - 16.3 [Unit Macros](#163-unit-macros)
+    - 16.4 [Reader Setup](#164-reader-setup)
+    - 16.5 [Source/Sink Creation](#165-sourcesink-creation)
+    - 16.6 [Reading](#166-reading)
+    - 16.7 [Error Queries](#167-error-queries)
+    - 16.8 [Utility Functions](#168-utility-functions)
+    - 16.9 [Typed Write Helpers](#169-typed-write-helpers)
+    - 16.10 [Error Codes](#1610-error-codes)
 17. [Versioning & Stability](#17-versioning--stability)
+
 - [Appendix A: Event Sequence Reference](#appendix-a-event-sequence-reference)
+    - A.1 [Simple Assignment (Untyped)](#a1-simple-assignment-untyped)
+    - A.2 [Typed Assignment](#a2-typed-assignment)
+    - A.3 [Compound Unit Assignment](#a3-compound-unit-assignment)
+    - A.4 [Array](#a4-array)
+    - A.5 [Struct](#a5-struct)
+    - A.6 [Octet Stream](#a6-octet-stream)
 - [Appendix B: Implementation Notes](#appendix-b-implementation-notes)
+    - B.1 [Keyword State Machine](#b1-keyword-state-machine)
+    - B.2 [Special Number Keywords](#b2-special-number-keywords)
+    - B.3 [Default Width, Base, and Q](#b3-default-width-base-and-q)
+    - B.4 [Type Equality](#b4-type-equality)
+    - B.5 [Numeric Type Check](#b5-numeric-type-check)
+    - B.6 [Unit Component Access](#b6-unit-component-access)
+    - B.7 [Fixed-point and Decimal Float Wire Representations](#b7-fixed-point-and-decimal-float-wire-representations)
 - [Appendix C: Limits Summary](#appendix-c-limits-summary)
+- [See also](#see-also)
 
 ---
 
@@ -1106,7 +1264,7 @@ nan  inf  ninf
 
 **Bovnar** (BVNR) is **unit-safe serialization for scientific and industrial systems**: a **typed, self-describing, text-binary hybrid** format that carries a validated physical unit with every value. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich, unit-aware type annotation system.
 
-### Design Goals
+### 1.1 Design Goals
 
 - **Unit-safe** – every value may carry a physical unit that is validated against a built-in unit table; a unit that conflicts with the type annotation is a parse error (`error_unit_mismatch`)
 - **Self-describing** – values carry explicit type metadata (family, bit-width, base, measurement unit)
@@ -1116,7 +1274,7 @@ nan  inf  ninf
 - **Streamable** – parsed incrementally via a pull-based reader; events emitted to callbacks
 - **Error-recoverable** – optional resync mode for parsing through minor corruption
 
-### Architecture
+### 1.2 Architecture
 
 The reference implementation is a **two-phase** parser:
 
@@ -1127,7 +1285,7 @@ The reference implementation is a **two-phase** parser:
 
 Both phases receive the same stream of events (`bvnr_event_t`). The validator sits between them.
 
-### Stream Model
+### 1.3 Stream Model
 
 ```
 stream_begin →
@@ -1159,7 +1317,7 @@ Each assignment is:
 };
 ```
 
-### Key Syntax Rules
+### 2.1 Key Syntax Rules
 
 | Construct | Syntax | Example |
 |-----------|--------|---------|
@@ -3815,13 +3973,25 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar Specification (v1.1)*
+## See also
+
+- [Tutorial](0_bovnar_tutorial.md) — the same format taught by example, start here if this is your first Bovnar document
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the full registry behind §11, with dimensions and conversion factors
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C reader, writer, and DOM that implement §16
+- [EBNF Grammar](5_bovnar.ebnf) — the formal grammar referenced by §14
+- [FAQ](6_bovnar_faq.md) — the questions this document answers indirectly
+- [Conformance Test Tool](7_bovnar_conformance.md) — how an implementation proves it follows this specification
+
+---
+
+*End of Bovnar — Specification (Bovnar spec 1.1).*
 
 <!-- ==================== Unit system (https://www.bovnar.io/doc/2_bovnar_unit_system.md) ==================== -->
 
-# Bovnar Quantity Annotation System — Unit and Currency Reference
+# Bovnar — Unit & Currency Reference
 
-> **Applies to:** Bovnar (BVNR) specification version 1.1
+> **Spec version:** 1.1
+> **Status:** Normative — the unit and currency registry the parser validates against
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
 ---
@@ -3829,61 +3999,66 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 ## Table of Contents
 
 1. [Overview](#1-overview)
+    - 1.1 [Design Principles](#11-design-principles)
 2. [Syntax — Annotation as a Type Parameter](#2-syntax--annotation-as-a-type-parameter)
+    - 2.1 [Parameter Ordering Flexibility](#21-parameter-ordering-flexibility)
+    - 2.2 [Inline Unit Suffix](#22-inline-unit-suffix)
+    - 2.3 [Applicable Type Families](#23-applicable-type-families)
 3. [Physical Base Units](#3-physical-base-units)
-   - 3.1 [SI Base Units](#31-si-base-units)
-   - 3.2 [Named SI-Derived Units](#32-named-si-derived-units)
-   - 3.3 [Non-SI Units Accepted for Use with SI](#33-non-si-units-accepted-for-use-with-si)
-   - 3.4 [Imperial and US Customary Units](#34-imperial-and-us-customary-units)
-   - 3.5 [Pressure Units](#35-pressure-units)
-   - 3.6 [Energy Units](#36-energy-units)
-   - 3.7 [Power Units](#37-power-units)
-   - 3.8 [Force Units](#38-force-units)
-   - 3.9 [Speed and Rotational Frequency](#39-speed-and-rotational-frequency-units)
-   - 3.10 [Volume Units](#310-volume-units)
-   - 3.11 [Area Units](#311-area-units)
-   - 3.12 [Angle Units](#312-angle-units)
-   - 3.13 [CGS Units](#313-cgs-units)
-   - 3.14 [Radiation Units](#314-radiation-units)
-   - 3.15 [Logarithmic Units](#315-logarithmic-units)
-   - 3.16 [Electrical Power Units](#316-electrical-power-units)
-   - 3.17 [Digital Units](#317-digital-units)
-   - 3.18 [Textile Linear Density](#318-textile-linear-density)
-   - 3.19 [US Apothecary / Dry Volume](#319-us-apothecary--dry-volume)
-   - 3.20 [Old German Units](#320-old-german-units)
-   - 3.21 [Additional Length Units](#321-additional-length-units)
-   - 3.22 [Additional Mass Units](#322-additional-mass-units)
-   - 3.23 [Acceleration](#323-acceleration)
-   - 3.24 [Signal Rate](#324-signal-rate)
-   - 3.25 [Ratio and Proportion Units](#325-ratio-and-proportion-units)
-   - 3.26 [Named Speed Units](#326-named-speed-units)
-   - 3.27 [Acidity](#327-acidity)
-   - 3.28 [Water Hardness](#328-water-hardness)
-   - 3.28.1 [Conductivity and Dissolved Solids](#3281-conductivity-and-dissolved-solids)
-   - 3.28.2 [Turbidity and Salinity](#3282-turbidity-and-salinity)
-   - 3.29 [Sentinel Value](#329-sentinel-value)
+    - 3.1 [SI Base Units](#31-si-base-units)
+    - 3.2 [Named SI-Derived Units](#32-named-si-derived-units)
+    - 3.3 [Non-SI Units Accepted for Use with SI](#33-non-si-units-accepted-for-use-with-si)
+    - 3.4 [Imperial and US Customary Units](#34-imperial-and-us-customary-units)
+    - 3.5 [Pressure Units](#35-pressure-units)
+    - 3.6 [Energy Units](#36-energy-units)
+    - 3.7 [Power Units](#37-power-units)
+    - 3.8 [Force Units](#38-force-units)
+    - 3.9 [Speed and Rotational Frequency Units](#39-speed-and-rotational-frequency-units)
+    - 3.10 [Volume Units](#310-volume-units)
+    - 3.11 [Area Units](#311-area-units)
+    - 3.12 [Angle Units](#312-angle-units)
+    - 3.13 [CGS Units](#313-cgs-units)
+    - 3.14 [Radiation Units](#314-radiation-units)
+    - 3.15 [Logarithmic Units](#315-logarithmic-units)
+    - 3.16 [Electrical Power Units](#316-electrical-power-units)
+    - 3.17 [Digital Units](#317-digital-units)
+    - 3.18 [Textile Linear Density](#318-textile-linear-density)
+    - 3.19 [US Apothecary / Dry Volume](#319-us-apothecary--dry-volume)
+    - 3.20 [Old German Units](#320-old-german-units)
+    - 3.21 [Additional Length Units](#321-additional-length-units)
+    - 3.22 [Additional Mass Units](#322-additional-mass-units)
+    - 3.23 [Acceleration](#323-acceleration)
+    - 3.24 [Signal Rate](#324-signal-rate)
+    - 3.25 [Ratio and Proportion Units](#325-ratio-and-proportion-units)
+    - 3.26 [Named Speed Units](#326-named-speed-units)
+    - 3.27 [Acidity](#327-acidity)
+    - 3.28 [Water Hardness](#328-water-hardness)
+    - 3.29 [Conductivity and Dissolved Solids](#329-conductivity-and-dissolved-solids)
+    - 3.30 [Turbidity and Salinity](#330-turbidity-and-salinity)
+    - 3.31 [Sentinel Value](#331-sentinel-value)
 4. [Prefixes](#4-prefixes)
-   - 4.1 [SI Prefixes](#41-si-prefixes)
-   - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
+    - 4.1 [SI Prefixes](#41-si-prefixes)
+    - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
+    - 4.3 [Compact Prefix Form](#43-compact-prefix-form)
 5. [Unit Notation Grammar](#5-unit-notation-grammar)
-   - 5.1 [Simple Units](#51-simple-units)
-   - 5.2 [Compound Units](#52-compound-units)
-   - 5.3 [Separators](#53-separators)
-   - 5.4 [Denominator Semantics](#54-denominator-semantics)
+    - 5.1 [Simple Units](#51-simple-units)
+    - 5.2 [Compound Units](#52-compound-units)
+    - 5.3 [Separators](#53-separators)
+    - 5.4 [Denominator Semantics](#54-denominator-semantics)
 6. [Exponents](#6-exponents)
-   - 6.1 [Unicode Superscript Form](#61-unicode-superscript-form)
-   - 6.2 [ASCII Caret Form](#62-ascii-caret-form)
-   - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
+    - 6.1 [Unicode Superscript Form](#61-unicode-superscript-form)
+    - 6.2 [ASCII Caret Form](#62-ascii-caret-form)
+    - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
 7. [The `no_unit` Keyword](#7-the-no_unit-keyword)
 8. [Constraints and Limits](#8-constraints-and-limits)
 9. [Currency Codes](#9-currency-codes)
-   - 9.1 [The `$` Sigil Rule](#91-the--sigil-rule)
-   - 9.2 [ISO 4217 Fiat Currencies and Precious Metals](#92-iso-4217-fiat-currencies-and-precious-metals)
-   - 9.3 [Cryptocurrencies](#93-cryptocurrencies)
-   - 9.4 [Prefix Rules for Currency Units](#94-prefix-rules-for-currency-units)
-   - 9.5 [Compound Currency Expressions](#95-compound-currency-expressions)
-   - 9.6 [Compatibility Rules](#96-compatibility-rules)
-   - 9.7 [Type Pairing Recommendations](#97-type-pairing-recommendations)
+    - 9.1 [The `$` Sigil Rule](#91-the--sigil-rule)
+    - 9.2 [ISO 4217 Fiat Currencies and Precious Metals](#92-iso-4217-fiat-currencies-and-precious-metals)
+    - 9.3 [Cryptocurrencies](#93-cryptocurrencies)
+    - 9.4 [Prefix Rules for Currency Units](#94-prefix-rules-for-currency-units)
+    - 9.5 [Compound Currency Expressions](#95-compound-currency-expressions)
+    - 9.6 [Compatibility Rules](#96-compatibility-rules)
+    - 9.7 [Type Pairing Recommendations](#97-type-pairing-recommendations)
 10. [Symbol Disambiguation](#10-symbol-disambiguation)
     - 10.1 [The Namespace Rule as Disambiguator](#101-the-namespace-rule-as-disambiguator)
     - 10.2 [Exhaustive Conflict Table](#102-exhaustive-conflict-table)
@@ -3901,6 +4076,10 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
     - 12.5 [Currency API](#125-currency-api)
     - 12.6 [Python API](#126-python-api)
 13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
+    - 13.1 [Full event sequence — physical unit](#131-full-event-sequence--physical-unit)
+    - 13.2 [Full event sequence — currency unit](#132-full-event-sequence--currency-unit)
+    - 13.3 [Inline unit suffix — event stream view](#133-inline-unit-suffix--event-stream-view)
+    - 13.4 [Practical callback](#134-practical-callback)
 14. [Validation Errors](#14-validation-errors)
 15. [Annotated Examples](#15-annotated-examples)
     - 15.1 [Physical Quantities](#151-physical-quantities)
@@ -3908,6 +4087,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
     - 15.3 [Compound SI Quantities](#153-compound-si-quantities)
     - 15.4 [Currency Amounts and Rates](#154-currency-amounts-and-rates)
     - 15.5 [Error Cases](#155-error-cases)
+- [See also](#see-also)
 
 ---
 
@@ -3924,7 +4104,7 @@ Both namespaces are syntactically unified: the same grammar, the same `~` prefix
 
 Annotations are **descriptive**, not prescriptive: the *validator* checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — `bvn_units_compatible`, `bvn_unit_convert_factor`, `bvn_unit_convert_value` and the exact-rational `bvn_unit_convert_rational` (§12.4), plus the reader's `want_unit` hook, which converts at read time (§7c of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).
 
-### Design Principles
+### 1.1 Design Principles
 
 - **SI-first.** All SI base units, all 22 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.
 - **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … yobi) are supported for digital storage quantities, plus `Ri`/`Qi` (robi, quebi) as a forward-looking extension — those two are a proposal, not part of IEC 80000-13, which stops at yobi.
@@ -3987,7 +4167,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 .v = <float:64,m> 1.0 s;           # ERROR: error_unit_mismatch
 ```
 
-### Applicable Type Families
+### 2.3 Applicable Type Families
 
 | Type family | Unit / currency parameter |
 |-------------|--------------------------|
@@ -4049,7 +4229,7 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 
 > **Photometry: the steradian is carried, not dropped.** `lm`, `lx` and `ph` are
 > defined *through* the steradian, so they carry its quantity kind (§3.12 and
-> §10 of [`unit_ambiguities.md`](unit_ambiguities.md)); `cd` and `sb` do not.
+> §11 of [Unit Ambiguities](unit_ambiguities.md)); `cd` and `sb` do not.
 > The SI dimension vector cannot tell them apart — every photometric unit reduces
 > to candela in base dimensions — so without the kind the library both refused
 > `lm ↔ cd·sr` and converted `lm ↔ cd` at factor 1, which is the same claim with
@@ -4474,7 +4654,7 @@ Reading across, with 1 mmol·L⁻¹ as the reference:
 > Likewise water chemistry writes the American scale as "ppm"; Bovnar's `ppm` is the dimensionless
 > 10⁻⁶ and is *not* interchangeable with `°aH`. See [`unit_ambiguities.md`](unit_ambiguities.md).
 
-### 3.28.1 Conductivity and Dissolved Solids
+### 3.29 Conductivity and Dissolved Solids
 
 Two quantities that water data quotes constantly and that need **no unit of their own** — the
 existing tables already say them exactly.
@@ -4497,7 +4677,7 @@ existing tables already say them exactly.
 > (the 500/442/700 scales). That factor is a property of the instrument and the water, not of a
 > unit — record the EC in `µS/cm` and the factor separately, or record the TDS as `mg/L`.
 
-### 3.28.2 Turbidity and Salinity
+### 3.30 Turbidity and Salinity
 
 Six scales defined by a **measurement method** rather than by a physical quantity. They are
 dimensionless, and each carries its own quantity kind, so none of them converts to another or to a
@@ -4547,7 +4727,7 @@ None of the five turbidity scales converts to any other:
 > salinity write the mass fraction directly: `g/k~g`. The scale is bounded by construction, so it
 > takes no prefix.
 
-### 3.29 Sentinel Value
+### 3.31 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
 
@@ -4631,7 +4811,7 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 - **SI sub-kilo prefixes** (`d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`, `da`, `h`) are forbidden on `b` and `B`.
 - **German units** (`bu_pfund` through `bu_scheffel`) accept only `si_none`/`iec_none`.
 - **Ratio units** (`%`, `‰`, `‱`, `pcm`, `ppm`, `ppb`) likewise: a prefixed per-cent is meaningless. `k~%` → `error_unit_illegal` (§3.25).
-- **Scales that are already a scale** — `pH`, `mph`, `kph`, the five water-hardness degrees, `gpg`, `CF`, `PSU`, `JTU` — take no prefix either. Each carries its reason in §3.26–§3.28.2; `NTU`, `FNU`, `FTU` and `FAU` *do* take one, because a milli-NTU is a real ultrapure-water measurement.
+- **Scales that are already a scale** — `pH`, `mph`, `kph`, the five water-hardness degrees, `gpg`, `CF`, `PSU`, `JTU` — take no prefix either. Each carries its reason in §3.26–§3.30; `NTU`, `FNU`, `FTU` and `FAU` *do* take one, because a milli-NTU is a real ultrapure-water measurement.
 - **Currency units** accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.
 
 ```bovnar
@@ -5814,7 +5994,7 @@ Unit information flows into the application through two paths:
 
 In both cases the effective unit is reported in the `bvnr_data_t.value_unit` field of the `ev_data` event.
 
-### Full event sequence — physical unit
+### 13.1 Full event sequence — physical unit
 
 ```
 Input: .force = <float:64,k~g·m/s²> 9.81;
@@ -5832,7 +6012,7 @@ ev_type_annotation_end
 ev_data   data="9.81"
 ```
 
-### Full event sequence — currency unit
+### 13.2 Full event sequence — currency unit
 
 ```
 Input: .price = <float_dec:64,$USD> 19.99;
@@ -5850,7 +6030,7 @@ ev_data   data="19.99"
 
 For events with an explicit type annotation but no unit parameter, the unit event is **not emitted**. For `no_unit`, the unit event IS emitted with `BVN_UNIT_NONE` (`num_components=0`). For synthesised (default) type annotations, the unit event IS emitted with `BVN_UNIT_NO_PREFIX(bu_none)`.
 
-### Inline unit suffix — event stream view
+### 13.3 Inline unit suffix — event stream view
 
 ```
 Input: .distance = 1500 m;
@@ -5869,7 +6049,7 @@ ev_data   data="1500"
 
 The `value_unit` field of `ev_data` always reflects the final, reconciled unit.
 
-### Practical callback
+### 13.4 Practical callback
 
 ```c
 bool my_verified_handler(void* userdata, bvnr_event_t ev, bvnr_data_t* d)
@@ -6058,71 +6238,86 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1.*
+## See also
+
+- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit is attached to a value
+- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in this registry, in table form
+- [Unit Ambiguities](unit_ambiguities.md) — every token that could plausibly mean two things
+- [Read & Write API](3_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
+- [Python Bindings](4_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
+
+---
+
+*End of Bovnar — Unit & Currency Reference (Bovnar spec 1.1).*
 
 <!-- ==================== Read & Write C API (https://www.bovnar.io/doc/3_bovnar_readwrite_api.md) ==================== -->
-
 
 # Bovnar — Read & Write API
 
 > **Spec version:** 1.1
-
-This document covers every function you need to read and write Bovnar streams, in the order you call them. Nothing else is included.
+> **Status:** Reference — the C reader, writer, and DOM as implemented
+> **Scope:** Every function needed to read and write Bovnar streams, in the order you call them.
 
 The writer uses the same event/data model as the reader — `bvnr_event_t` and `bvnr_data_t` — so the two APIs are deliberately symmetric. Learn one, the other follows.
 
 ---
 
-## Contents
+## Table of Contents
 
-**Reader**
+1. [Reader](#1-reader)
+    - 1.1 [`bvnr_reader_create` / `bvnr_reader_destroy`](#11-bvnr_reader_create--bvnr_reader_destroy)
+    - 1.2 [`bvnr_source_from_fd`](#12-bvnr_source_from_fd)
+    - 1.3 [`bvnr_source_from_mem`](#13-bvnr_source_from_mem)
+    - 1.4 [`bvnr_open_read_source`](#14-bvnr_open_read_source)
+    - 1.5 [`bvnr_open_read_mem`](#15-bvnr_open_read_mem)
+    - 1.6 [`bvnr_read`](#16-bvnr_read)
+    - 1.7 [`bvnr_reader_get_error` and friends](#17-bvnr_reader_get_error-and-friends)
+    - 1.8 [Version directive (spec 1.1)](#18-version-directive-spec-11)
+    - 1.9 [Datetime family (spec 1.1)](#19-datetime-family-spec-11)
+    - 1.10 [Read-time lossless unit / base conversion (`want_unit`)](#110-read-time-lossless-unit--base-conversion-want_unit)
+    - 1.11 [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
+2. [Writer](#2-writer)
+    - 2.1 [`bvnr_writer_create` / `bvnr_writer_destroy`](#21-bvnr_writer_create--bvnr_writer_destroy)
+    - 2.2 [`bvnr_sink_to_fd`](#22-bvnr_sink_to_fd)
+    - 2.3 [`bvnr_sink_to_mem`](#23-bvnr_sink_to_mem)
+    - 2.4 [`bvnr_sink_bytes_written`](#24-bvnr_sink_bytes_written)
+    - 2.5 [`bvnr_open_write_sink`](#25-bvnr_open_write_sink)
+    - 2.6 [`bvnr_open_write_mem`](#26-bvnr_open_write_mem)
+    - 2.7 [`bvnr_write_event`](#27-bvnr_write_event)
+    - 2.8 [`bvnr_write_version`](#28-bvnr_write_version)
+    - 2.9 [`bvnr_write_finish`](#29-bvnr_write_finish)
+    - 2.10 [`bvnr_writer_get_error` and friends](#210-bvnr_writer_get_error-and-friends)
+    - 2.11 [`bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`](#211-bvn_format_uint64--bvn_format_int64--bvn_format_double)
+    - 2.12 [`bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`](#212-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit)
+    - 2.13 [`bvnr_write_bvni` / `bvnr_write_bvni_unit`](#213-bvnr_write_bvni--bvnr_write_bvni_unit)
+    - 2.14 [`BVN_TYPE_FLOAT_BASE`](#214-bvn_type_float_base)
+3. [Shared](#3-shared)
+    - 3.1 [`bvnr_write_type_annotation`](#31-bvnr_write_type_annotation)
+    - 3.2 [`bvn_parse_unit` / `bvn_parse_unit_n`](#32-bvn_parse_unit--bvn_parse_unit_n)
+    - 3.3 [`bvn_unit_to_string` / `bvn_unit_to_string_ex`](#33-bvn_unit_to_string--bvn_unit_to_string_ex)
+    - 3.4 [`bvn_unit_convert_value` *(bovnar_si_units.h)*](#34-bvn_unit_convert_value-bovnar_si_unitsh)
+    - 3.5 [`bvn_error_to_string`](#35-bvn_error_to_string)
+4. [DOM API (`bovnar_dom.h`)](#4-dom-api-bovnar_domh)
+    - 4.1 [Parsing and lifetime](#41-parsing-and-lifetime)
+    - 4.2 [Navigation](#42-navigation)
+    - 4.3 [Type inspection](#43-type-inspection)
+    - 4.4 [Typed value accessors](#44-typed-value-accessors)
+    - 4.5 [Building a tree](#45-building-a-tree)
+    - 4.6 [Minimal example](#46-minimal-example)
+5. [Complete Read Example](#5-complete-read-example)
+6. [Inline Unit Suffix — Reading](#6-inline-unit-suffix--reading)
+    - 6.1 [Reading inline unit values](#61-reading-inline-unit-values)
+7. [Complete Write Example](#7-complete-write-example)
 
-1. [`bvnr_reader_create` / `bvnr_reader_destroy`](#1-bvnr_reader_create--bvnr_reader_destroy)
-2. [`bvnr_source_from_fd`](#2-bvnr_source_from_fd)
-3. [`bvnr_source_from_mem`](#3-bvnr_source_from_mem)
-4. [`bvnr_open_read_source`](#4-bvnr_open_read_source)
-5. [`bvnr_open_read_mem`](#5-bvnr_open_read_mem)
-6. [`bvnr_read`](#6-bvnr_read)
-7. [`bvnr_reader_get_error` and friends](#7-bvnr_reader_get_error-and-friends)
-7a. [Version directive (spec 1.1)](#7a-version-directive-spec-11)
-7b. [Datetime family (spec 1.1)](#7b-datetime-family-spec-11)
-7c. [Read-time lossless unit / base conversion (`want_unit`)](#7c-read-time-lossless-unit--base-conversion-want_unit)
-8. [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#8-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
-
-**Writer**
-
-9. [`bvnr_writer_create` / `bvnr_writer_destroy`](#9-bvnr_writer_create--bvnr_writer_destroy)
-10. [`bvnr_sink_to_fd`](#10-bvnr_sink_to_fd)
-11. [`bvnr_sink_to_mem`](#11-bvnr_sink_to_mem)
-12. [`bvnr_sink_bytes_written`](#12-bvnr_sink_bytes_written)
-13. [`bvnr_open_write_sink`](#13-bvnr_open_write_sink)
-14. [`bvnr_open_write_mem`](#14-bvnr_open_write_mem)
-15. [`bvnr_write_event`](#15-bvnr_write_event)
-16. [`bvnr_write_finish`](#16-bvnr_write_finish)
-17. [`bvnr_writer_get_error` and friends](#17-bvnr_writer_get_error-and-friends)
-18. [`bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`](#18-bvn_format_uint64--bvn_format_int64--bvn_format_double)
-19. [`bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`](#19-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit)
-20. [`bvnr_write_bvni` / `bvnr_write_bvni_unit`](#20-bvnr_write_bvni--bvnr_write_bvni_unit)
-21. [`BVN_TYPE_FLOAT_BASE`](#21-bvn_type_float_base)
-
-**Shared**
-
-22. [`bvnr_write_type_annotation`](#22-bvnr_write_type_annotation)
-23. [`bvn_parse_unit`](#23-bvn_parse_unit--bvn_parse_unit_n)
-24. [`bvn_unit_to_string`](#24-bvn_unit_to_string--bvn_unit_to_string_ex)
-25. [`bvn_error_to_string`](#25-bvn_error_to_string)
-
-**DOM**
-
-26. [DOM API (`bovnar_dom.h`)](#dom-api-bovnar_domh)
+- [See also](#see-also)
 
 ---
 
-## Reader
+## 1. Reader
 
 ---
 
-### 1. `bvnr_reader_create` / `bvnr_reader_destroy`
+### 1.1 `bvnr_reader_create` / `bvnr_reader_destroy`
 
 ```c
 bvnr_reader_t *bvnr_reader_create(void);
@@ -6142,7 +6337,7 @@ bvnr_reader_destroy(r);
 
 ---
 
-### 2. `bvnr_source_from_fd`
+### 1.2 `bvnr_source_from_fd`
 
 ```c
 void bvnr_source_from_fd(bvnr_source_t *s, int fd);
@@ -6164,7 +6359,7 @@ bvnr_source_from_fd(&src, fd);
 
 ---
 
-### 3. `bvnr_source_from_mem`
+### 1.3 `bvnr_source_from_mem`
 
 ```c
 void bvnr_source_from_mem(bvnr_source_t *s, const void *buf, uint64_t len);
@@ -6186,7 +6381,7 @@ bvnr_source_from_mem(&src, payload, sizeof(payload) - 1);
 
 ---
 
-### 4. `bvnr_open_read_source`
+### 1.4 `bvnr_open_read_source`
 
 ```c
 bool bvnr_open_read_source(bvnr_reader_t        *r,
@@ -6216,7 +6411,7 @@ typedef struct bvnr_read_flags_s {
 } bvnr_read_flags_t;
 ```
 
-`on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: `want_unit` (§7c) runs ahead of **both** callbacks, so with it installed an `on_unverified` consumer also sees a populated `converted`/`conv` on `ev_data`. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
+`on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: `want_unit` (§1.10) runs ahead of **both** callbacks, so with it installed an `on_unverified` consumer also sees a populated `converted`/`conv` on `ev_data`. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
 
 The `options` pointer is not stored; the struct is read during `bvnr_open_read_source` only, so it may live on the stack.
 
@@ -6251,7 +6446,7 @@ if (!bvnr_open_read_source(r, &src, NULL, &opts)) {
 
 ---
 
-### 5. `bvnr_open_read_mem`
+### 1.5 `bvnr_open_read_mem`
 
 ```c
 bool bvnr_open_read_mem(bvnr_reader_t     *r,
@@ -6273,7 +6468,7 @@ if (!bvnr_open_read_mem(r, payload, payload_len, NULL, 0, &opts))
 
 ---
 
-### 6. `bvnr_read`
+### 1.6 `bvnr_read`
 
 ```c
 bool bvnr_read(bvnr_reader_t *r);
@@ -6296,7 +6491,7 @@ if (!bvnr_read(r)) {
 
 ---
 
-### 7. `bvnr_reader_get_error` and friends
+### 1.7 `bvnr_reader_get_error` and friends
 
 ```c
 error_code_t bvnr_reader_get_error     (const bvnr_reader_t *r);
@@ -6338,7 +6533,7 @@ if (!bvnr_read(r)) {
 
 ---
 
-### 7a. Version directive (spec 1.1)
+### 1.8 Version directive (spec 1.1)
 
 ```c
 bool        bvnr_reader_get_declared_version(
@@ -6370,12 +6565,12 @@ if (bvnr_reader_get_declared_version(r, &maj, &min))
 ```
 
 To emit a directive, call `bvnr_write_version` right after opening the writer
-(see §13), or set `bvnr_write_flags_t.emit_version` to stamp the current spec
+(see §2.5), or set `bvnr_write_flags_t.emit_version` to stamp the current spec
 version automatically.
 
 ---
 
-### 7b. Datetime family (spec 1.1)
+### 1.9 Datetime family (spec 1.1)
 
 ```c
 const char *bvnr_datetime_epoch_name (value_type_spec_t vt);
@@ -6440,7 +6635,7 @@ if (d->frac_data && d->frac_length) {
 
 ---
 
-### 7c. Read-time lossless unit / base conversion (`want_unit`)
+### 1.10 Read-time lossless unit / base conversion (`want_unit`)
 
 ```c
 /* bvnr_read_flags_t */
@@ -6467,7 +6662,7 @@ uint32_t max_conversion_length;           /* work limit; 0 = 1024 */
 ```
 
 By default the reader hands you every numeric value exactly as written and you
-convert it yourself (§24a, `bvn_unit_convert_rational`). Set `want_unit` to have
+convert it yourself (§3.4, `bvn_unit_convert_rational`). Set `want_unit` to have
 the reader do it for you — **losslessly**, in exact arbitrary-precision
 arithmetic, for a value of any width and any base.
 
@@ -6578,7 +6773,7 @@ bvnr_read_flags_t opts = { .on_verified = on_event, .want_unit = want_unit };
 
 ---
 
-### 8. `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`
+### 1.11 `bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`
 
 ```c
 bool bvn_parse_uint64(const char *s, value_type_spec_t vt, uint64_t *out);
@@ -6640,11 +6835,11 @@ static bool on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 
 ---
 
-## Writer
+## 2. Writer
 
 ---
 
-### 9. `bvnr_writer_create` / `bvnr_writer_destroy`
+### 2.1 `bvnr_writer_create` / `bvnr_writer_destroy`
 
 ```c
 bvnr_writer_t *bvnr_writer_create(void);
@@ -6664,7 +6859,7 @@ bvnr_writer_destroy(w);
 
 ---
 
-### 10. `bvnr_sink_to_fd`
+### 2.2 `bvnr_sink_to_fd`
 
 ```c
 void bvnr_sink_to_fd(bvnr_sink_t *s, int fd);
@@ -6680,7 +6875,7 @@ bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 
 ---
 
-### 11. `bvnr_sink_to_mem`
+### 2.3 `bvnr_sink_to_mem`
 
 ```c
 void bvnr_sink_to_mem(bvnr_sink_t *s, void *buf, uint64_t cap);
@@ -6696,7 +6891,7 @@ bvnr_sink_to_mem(&sink, out, sizeof(out));
 
 ---
 
-### 12. `bvnr_sink_bytes_written`
+### 2.4 `bvnr_sink_bytes_written`
 
 ```c
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t *s);
@@ -6718,7 +6913,7 @@ bvnr_writer_destroy(w);                       /* read the count before destroyin
 
 ---
 
-### 13. `bvnr_open_write_sink`
+### 2.5 `bvnr_open_write_sink`
 
 ```c
 bool bvnr_open_write_sink(bvnr_writer_t        *w,
@@ -6773,7 +6968,7 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
 
-`BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §24.)
+`BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §3.3.)
 
 These flags can be OR-combined: `BVN_UNIT_REDUCE | BVN_UNIT_ASCII_EXP`. The flags are fixed at open time. To change serialisation behaviour, destroy the writer and open a new one with the updated `unit_flags`. The getter `bvnr_writer_unit_flags(w)` is used internally by the Python FFI layer to retrieve the live flags before each unit serialisation call; there is no public setter.
 
@@ -6788,7 +6983,7 @@ if (!bvnr_open_write_sink(w, &sink, /*pretty=*/true, &opts))
 
 ---
 
-### 14. `bvnr_open_write_mem`
+### 2.6 `bvnr_open_write_mem`
 
 ```c
 bool bvnr_open_write_mem(bvnr_writer_t      *w,
@@ -6809,7 +7004,7 @@ if (!bvnr_open_write_mem(w, out, sizeof(out), false, &opts))
 
 ---
 
-### 15. `bvnr_write_event`
+### 2.7 `bvnr_write_event`
 
 ```c
 bool bvnr_write_event(bvnr_writer_t *w, bvnr_event_t ev, bvnr_data_t *data);
@@ -6852,7 +7047,7 @@ The `BVN_TYPE_*` macros build `value_type_spec_t` literals conveniently:
 
 The maximum bit-width accepted for `uint` and `sint` is `BVN_MAX_INT_WIDTH` (defined as `32768u` in `bovnar.h`). The validator and writer reject any declared `uint`/`sint` width exceeding this limit with `error_illegal_value_type`.
 
-> **Critical:** The writer dispatches `ev_type_annotation_type_family_parameter` events on `d->type`, not on `d->value_type`. For each parameter event, `d.type` must be set to the appropriate `token_type_t` value: `token_is_type_width` for the width parameter, `token_is_type_base` for the base parameter, `token_is_type_q` for the Q (fractional bits) parameter of `float_fix`, and `token_is_unit` for the unit parameter. An unrecognised `d.type` causes the writer to emit nothing for that event — the annotation will be silently incomplete. **Use `bvnr_write_type_annotation` (see §22) to avoid this complexity entirely.**
+> **Critical:** The writer dispatches `ev_type_annotation_type_family_parameter` events on `d->type`, not on `d->value_type`. For each parameter event, `d.type` must be set to the appropriate `token_type_t` value: `token_is_type_width` for the width parameter, `token_is_type_base` for the base parameter, `token_is_type_q` for the Q (fractional bits) parameter of `float_fix`, and `token_is_unit` for the unit parameter. An unrecognised `d.type` causes the writer to emit nothing for that event — the annotation will be silently incomplete. **Use `bvnr_write_type_annotation` (see §3.1) to avoid this complexity entirely.**
 
 **Example: write `.port = <uint:16> 8080;`**
 
@@ -6933,7 +7128,7 @@ static bool write_struct_end(bvnr_writer_t *w)
 
 ---
 
-### 15a. `bvnr_write_version`
+### 2.8 `bvnr_write_version`
 
 ```c
 bool bvnr_write_version(bvnr_writer_t *w, uint16_t major, uint16_t minor);
@@ -6956,7 +7151,7 @@ bvnr_write_finish(w);
 
 ---
 
-### 16. `bvnr_write_finish`
+### 2.9 `bvnr_write_finish`
 
 ```c
 bool bvnr_write_finish(bvnr_writer_t *w);
@@ -6976,7 +7171,7 @@ bvnr_writer_destroy(w);
 
 ---
 
-### 17. `bvnr_writer_get_error` and friends
+### 2.10 `bvnr_writer_get_error` and friends
 
 ```c
 error_code_t     bvnr_writer_get_error       (const bvnr_writer_t *w);
@@ -7000,7 +7195,7 @@ if (!bvnr_write_event(w, ev_data, &d)) {
 
 ---
 
-### 18. `bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`
+### 2.11 `bvn_format_uint64` / `bvn_format_int64` / `bvn_format_double`
 
 ```c
 int32_t bvn_format_uint64(char *buf, size_t bufsize,
@@ -7038,7 +7233,7 @@ These strings are then placed into `bvnr_data_t.data` / `.length` before calling
 
 ---
 
-### 19. `bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`
+### 2.12 `bvnr_write_bvnf_base` / `bvnr_write_bvnf_base_unit`
 
 ```c
 bool bvnr_write_bvnf_base(bvnr_writer_t *w, const char *key,
@@ -7083,7 +7278,7 @@ These functions supersede calling `bvnr_write_bvnf` / `bvnr_write_bvnf_unit` whe
 
 ---
 
-### 20. `bvnr_write_bvni` / `bvnr_write_bvni_unit`
+### 2.13 `bvnr_write_bvni` / `bvnr_write_bvni_unit`
 
 ```c
 bool bvnr_write_bvni(bvnr_writer_t *w, const char *key,
@@ -7125,7 +7320,7 @@ bvn_int_free(n);
 
 ---
 
-### 21. `BVN_TYPE_FLOAT_BASE`
+### 2.14 `BVN_TYPE_FLOAT_BASE`
 
 ```c
 #define BVN_TYPE_FLOAT_BASE(w, b)  /* value_type_spec_t */
@@ -7143,11 +7338,11 @@ value_type_spec_t vt10 = BVN_TYPE_FLOAT_BASE(64u, 10u);
 
 ---
 
-## Shared
+## 3. Shared
 
 ---
 
-### 22. `bvnr_write_type_annotation`
+### 3.1 `bvnr_write_type_annotation`
 
 ```c
 bool bvnr_write_type_annotation(bvnr_writer_t *w,
@@ -7178,7 +7373,7 @@ if (!bvnr_write_type_annotation(w, vt, vu)) return false;
 
 ---
 
-### 23. `bvn_parse_unit` / `bvn_parse_unit_n`
+### 3.2 `bvn_parse_unit` / `bvn_parse_unit_n`
 
 ```c
 value_unit_t bvn_parse_unit  (const uint8_t *unit, bool *ok);
@@ -7211,7 +7406,7 @@ value_unit_t u2 = bvn_parse_unit_n(annotation + 9, 3, &ok); /* "m/s" */
 
 ---
 
-### 24. `bvn_unit_to_string` / `bvn_unit_to_string_ex`
+### 3.3 `bvn_unit_to_string` / `bvn_unit_to_string_ex`
 
 ```c
 int32_t bvn_unit_to_string(value_unit_t u, char *buf, size_t bufsize);
@@ -7236,7 +7431,7 @@ These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internal
 
 > **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (`k~g·m/s²` → `"N"`, `k~N` → `"k~N"`). The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
 
-> **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§22) to emit a complete, correct type annotation in one call.
+> **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§3.1) to emit a complete, correct type annotation in one call.
 
 ```c
 value_unit_t u = BVN_UNIT_COMPOUND2(
@@ -7253,7 +7448,7 @@ n = bvn_unit_to_string_ex(u, buf, sizeof(buf), BVN_UNIT_ASCII_EXP);
 
 ---
 
-### 24a. `bvn_unit_convert_value` *(bovnar_si_units.h)*
+### 3.4 `bvn_unit_convert_value` *(bovnar_si_units.h)*
 
 ```c
 bool bvn_unit_convert_value(double value, value_unit_t from,
@@ -7263,7 +7458,7 @@ bool bvn_unit_convert_value(double value, value_unit_t from,
 Convert one numeric quantity from unit `from` into unit `to`, writing the result
 to `*out`. Handles both the simple multiplicative case (`5 k~m → 5000 m`) and the
 affine case (`25 °C → 298.15 K`), routing the latter through SI base units. This
-is the same routine the reader's `want_unit` hook (§7c) uses, and the C
+is the same routine the reader's `want_unit` hook (§1.10) uses, and the C
 equivalent of the Python `convert_value`.
 
 Returns `false` — leaving `*out` untouched — when the two units are
@@ -7283,7 +7478,7 @@ For the standalone factor (without applying it) or to detect the affine case,
 see `bvn_unit_convert_factor` in `bovnar_si_units.h`.
 
 `bvn_unit_convert_value` works in `double`, so it is lossy for wide values. For a
-**lossless** conversion — the engine behind the reader's `want_unit` hook (§7c) —
+**lossless** conversion — the engine behind the reader's `want_unit` hook (§1.10) —
 use the exact-rational pair, also in `bovnar_si_units.h`:
 
 ```c
@@ -7326,7 +7521,7 @@ table in which a rounded decimal is passed off as exact.
 
 ---
 
-### 25. `bvn_error_to_string`
+### 3.5 `bvn_error_to_string`
 
 ```c
 const char *bvn_error_to_string(error_code_t code);
@@ -7345,19 +7540,19 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 |------|-------|--------|---------|
 | `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, >8 components) |
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
-| `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§7c) |
-| `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§7c) |
+| `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
+| `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
 
 ---
 
-## DOM API (`bovnar_dom.h`)
+## 4. DOM API (`bovnar_dom.h`)
 
 The SAX reader above streams events. When you instead want the whole document in
 memory for random-access queries — without writing a callback — use the DOM API
 in `include/bovnar_dom.h`. It parses a document into a tree of `bvn_dom_node_t`
 owned by a `bvn_dom_doc_t`, which you navigate and read with typed accessors.
 
-### Parsing and lifetime
+### 4.1 Parsing and lifetime
 
 ```c
 bvn_dom_doc_t *bvn_dom_doc_create(void);
@@ -7377,7 +7572,7 @@ accumulated input at `max_bytes`, but only *downward*: `0` or any value above th
 built-in hard cap `BVN_DOM_FD_MAX_BYTES` (256 MiB) is clamped to that cap — there
 is no unlimited mode. Free every returned doc with `bvn_dom_doc_destroy`.
 
-### Navigation
+### 4.2 Navigation
 
 ```c
 bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc, const char *path); /* dot path, e.g. "server.tls.cert" */
@@ -7394,7 +7589,7 @@ uint32_t               bvn_dom_doc_count(const bvn_dom_doc_t *doc);
 Each `bvn_dom_entry_t` is `{ char *key; bvn_dom_node_t *value; }`. A missing key
 or out-of-range index returns NULL.
 
-### Type inspection
+### 4.3 Type inspection
 
 ```c
 typedef enum bvn_dom_type_e {
@@ -7420,9 +7615,9 @@ double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
   does `0.0 m`. When the difference matters, read `bvn_dom_get_unit` and call
   `bvn_unit_to_si_factor` yourself — it has an `ok` out-param.
 - **It is `double`.** A value wider than a double is rounded here. The lossless
-  route is the reader's `want_unit` hook (§7c) or `bvn_unit_convert_rational`.
+  route is the reader's `want_unit` hook (§1.10) or `bvn_unit_convert_rational`.
 
-### Typed value accessors
+### 4.4 Typed value accessors
 
 Each accessor returns `false` (leaving the out-param **unchanged** — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit
@@ -7456,7 +7651,7 @@ is still the whole-second epoch count read via `bvn_dom_get_i64`:
 const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node, uint32_t *len_out);
 ```
 
-### Building a tree
+### 4.5 Building a tree
 
 The DOM is also writable, e.g. to construct a document programmatically and hand
 it to a serialiser. `bvn_dom_node_alloc` / the `bvn_dom_node_from_*` constructors
@@ -7480,7 +7675,7 @@ yourself after the call (doing so double-frees). `bvn_dom_node_from_bigint` is t
 one exception with *asymmetric* ownership: on success it takes ownership of the
 `bvn_int_t`; on failure (NULL return) it does not, and you still own it.
 
-### Minimal example
+### 4.6 Minimal example
 
 ```c
 bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
@@ -7497,7 +7692,7 @@ bvn_dom_doc_destroy(doc);
 
 ---
 
-## Complete Read Example
+## 5. Complete Read Example
 
 ```c
 #include <fcntl.h>
@@ -7595,7 +7790,7 @@ int main(int argc, char **argv)
 
 ---
 
-## Inline Unit Suffix — Reading
+## 6. Inline Unit Suffix — Reading
 
 A scalar value may carry an **inline unit suffix** directly after the literal, before its terminating `;`:
 
@@ -7615,7 +7810,7 @@ The only behavioral difference occurs when **both** are present and **disagree**
 
 Inline unit suffixes are **illegal inside array elements**. The lexer rejects them with `error_unexpected_input_byte`.
 
-### Reading inline unit values
+### 6.1 Reading inline unit values
 
 ```c
 /* The callback below works identically whether the unit came from a
@@ -7645,7 +7840,7 @@ static bool on_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 
 ---
 
-## Complete Write Example
+## 7. Complete Write Example
 
 ```c
 #include <inttypes.h>
@@ -7711,13 +7906,25 @@ int main(void)
 
 ---
 
-*End of Bovnar Read & Write API Reference (v1.1)*
+## See also
+
+- [Specification §16 — Reference API](1_bovnar_spec.md#16-reference-api) — the normative summary of these entry points
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit model behind `bvn_parse_unit` and `want_unit`
+- [Streaming, Framing & Multiplexing](9_bovnar_streaming.md) — protocols layered on this event API
+- [Python Bindings](4_bovnar_python_bindings.md) — the same API from Python
+- [FAQ §12 — C API](6_bovnar_faq.md#12-c-api) — common questions about these functions
+
+---
+
+*End of Bovnar — Read & Write API (Bovnar spec 1.1).*
 
 <!-- ==================== Python bindings (https://www.bovnar.io/doc/4_bovnar_python_bindings.md) ==================== -->
 
-# Bovnar Python Bindings
+# Bovnar — Python Bindings
 
-> **Version:** 1.1
+> **Spec version:** 1.1
+> **Status:** Reference — the Python package as implemented
+> **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
 library (spec v1.1).
@@ -7727,7 +7934,79 @@ import time via the standard `ctypes.CDLL` machinery.
 
 ---
 
-## Requirements
+## Table of Contents
+
+1. [Requirements](#1-requirements)
+2. [Installation](#2-installation)
+3. [Library discovery](#3-library-discovery)
+4. [Quick-start](#4-quick-start)
+    - 4.1 [High-level API (`loads` / `dumps`)](#41-high-level-api-loads--dumps)
+    - 4.2 [SAX-style streaming reader](#42-sax-style-streaming-reader)
+    - 4.3 [Generator / iterator interface](#43-generator--iterator-interface)
+    - 4.4 [DOM (random-access) API](#44-dom-random-access-api)
+    - 4.5 [Low-level writer](#45-low-level-writer)
+    - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
+5. [Unit helpers](#5-unit-helpers)
+    - 5.1 [Extended unit functions](#51-extended-unit-functions)
+    - 5.2 [`UnitFlags`](#52-unitflags)
+    - 5.3 [`ValueUnitPrefix`](#53-valueunitprefix)
+    - 5.4 [Inline unit suffix](#54-inline-unit-suffix)
+6. [`Quantity`](#6-quantity)
+    - 6.1 [Construction](#61-construction)
+    - 6.2 [Properties and methods](#62-properties-and-methods)
+    - 6.3 [Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)](#63-lossless-numeric-access-float_dec-float_fix-float128256)
+    - 6.4 [`dumps()` integration](#64-dumps-integration)
+7. [`write_array` helper](#7-write_array-helper)
+8. [pint bridge](#8-pint-bridge)
+    - 8.1 [Prefixes ride in the unit, never the magnitude](#81-prefixes-ride-in-the-unit-never-the-magnitude)
+    - 8.2 [Affine temperature units](#82-affine-temperature-units)
+    - 8.3 [Validation](#83-validation)
+    - 8.4 [Registry control: `build_registry`](#84-registry-control-build_registry)
+    - 8.5 [Quantity kinds: `isolate_kinds`](#85-quantity-kinds-isolate_kinds)
+    - 8.6 [Semantic caveats](#86-semantic-caveats)
+9. [NumPy bridge](#9-numpy-bridge)
+    - 9.1 [Reading: `to_numpy`](#91-reading-to_numpy)
+    - 9.2 [Writing: `from_numpy` / `array_to_bvnr`](#92-writing-from_numpy--array_to_bvnr)
+    - 9.3 [pint arrays](#93-pint-arrays)
+10. [Currency helpers](#10-currency-helpers)
+11. [`Reader` reference](#11-reader-reference)
+    - 11.1 [Construction](#111-construction)
+    - 11.2 [`read_mem`](#112-read_mem)
+    - 11.3 [`read_fd`](#113-read_fd)
+    - 11.4 [`read_file`](#114-read_file)
+    - 11.5 [`iter_mem(data, *, verified_only, max_file_size)`](#115-iter_memdata--verified_only-max_file_size)
+    - 11.6 [Error-state properties](#116-error-state-properties)
+    - 11.7 [`MAX_FILESIZE_BYTES`](#117-max_filesize_bytes)
+12. [`Writer` reference](#12-writer-reference)
+    - 12.1 [Construction class methods](#121-construction-class-methods)
+    - 12.2 [Output retrieval](#122-output-retrieval)
+    - 12.3 [Scalar write methods](#123-scalar-write-methods)
+    - 12.4 [Extended integer writers](#124-extended-integer-writers)
+    - 12.5 [Struct helpers](#125-struct-helpers)
+    - 12.6 [Version directive](#126-version-directive)
+    - 12.7 [Array helpers](#127-array-helpers)
+    - 12.8 [Low-level `emit`](#128-low-level-emit)
+13. [DOM API](#13-dom-api)
+    - 13.1 [`dom_parse(data) -> DomDoc`](#131-dom_parsedata---domdoc)
+    - 13.2 [`DomDoc`](#132-domdoc)
+    - 13.3 [`DomNode`](#133-domnode)
+    - 13.4 [`DomType`](#134-domtype)
+14. [Running the test suite](#14-running-the-test-suite)
+15. [Package layout](#15-package-layout)
+16. [Error handling](#16-error-handling)
+17. [FFI details](#17-ffi-details)
+    - 17.1 [`ON_ERROR_FUNC` signature](#171-on_error_func-signature)
+    - 17.2 [`BvnrWriteFlags` layout](#172-bvnrwriteflags-layout)
+    - 17.3 [`write_string` behaviour](#173-write_string-behaviour)
+    - 17.4 [`_resolve_unit` default](#174-_resolve_unit-default)
+18. [`BaseUnit` enum](#18-baseunit-enum)
+19. [Spec 1.1 additions](#19-spec-11-additions)
+
+- [See also](#see-also)
+
+---
+
+## 1. Requirements
 
 | Requirement | Notes |
 |---|---|
@@ -7742,7 +8021,7 @@ bridge functions — importing `bovnar` never requires either to be installed.
 
 ---
 
-## Installation
+## 2. Installation
 
 ```bash
 # Editable install from source (recommended during development)
@@ -7759,7 +8038,7 @@ pip install "bovnar[all]"     # both numpy and pint
 
 ---
 
-## Library discovery
+## 3. Library discovery
 
 The bindings search for `libbvnr.so` in this order:
 
@@ -7781,9 +8060,9 @@ with the list of searched paths.
 
 ---
 
-## Quick-start
+## 4. Quick-start
 
-### High-level API (`loads` / `dumps`)
+### 4.1 High-level API (`loads` / `dumps`)
 
 ```python
 import bovnar
@@ -7824,7 +8103,7 @@ assert bovnar.loads(out, typed=True) == doc
 overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
 versions is no longer accepted.
 
-### SAX-style streaming reader
+### 4.2 SAX-style streaming reader
 
 The verified callback receives exactly **two** positional arguments: the event
 code and the data payload.  There is no userdata/context argument — capture
@@ -7858,7 +8137,7 @@ The `BvnrData` payload passed to a callback exposes:
 
 It also carries the `converted` (bool) and `value_type` / `value_unit` fields directly.
 
-### Generator / iterator interface
+### 4.3 Generator / iterator interface
 
 ```python
 from bovnar.reader import Reader
@@ -7868,7 +8147,7 @@ with Reader() as r:
         print(payload.event, payload.text)
 ```
 
-### DOM (random-access) API
+### 4.4 DOM (random-access) API
 
 ```python
 import bovnar
@@ -7893,7 +8172,7 @@ for i in range(len(arr)):
 d = doc.to_dict()
 ```
 
-### Low-level writer
+### 4.5 Low-level writer
 
 ```python
 from bovnar.writer import Writer
@@ -7908,7 +8187,7 @@ with Writer.to_mem() as w:
 output: bytes = w.get_output()
 ```
 
-### Streaming / framing (`bovnar.stream`)
+### 4.6 Streaming / framing (`bovnar.stream`)
 
 Bindings for the streaming layer (see
 [Streaming, Framing & Multiplexing](9_bovnar_streaming.md) for the full
@@ -7933,7 +8212,7 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 
 ---
 
-## Unit helpers
+## 5. Unit helpers
 
 ```python
 import bovnar
@@ -7951,7 +8230,7 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### Extended unit functions
+### 5.1 Extended unit functions
 
 The following functions operate on `ValueUnit` objects and are available both
 from the top-level `bovnar` namespace and from `bovnar.units`.
@@ -8018,7 +8297,7 @@ exp = int_to_exponent(-2)                    # → Exponent.NEG_SQUARE
 `SI_DIM_NAMES` is the ordered tuple `('m', 'kg', 's', 'A', 'K', 'mol', 'cd')`
 — the index positions used by `unit_dimension_vector`.
 
-### `UnitFlags`
+### 5.2 `UnitFlags`
 
 ```python
 from bovnar import UnitFlags   # also from bovnar.units
@@ -8045,7 +8324,7 @@ UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 s = unit_to_str_ex(vu, UnitFlags.REDUCE | UnitFlags.ASCII_EXP)
 ```
 
-### `ValueUnitPrefix`
+### 5.3 `ValueUnitPrefix`
 
 `ValueUnitPrefix` is the public mirror of the C `value_unit_prefix_t` struct.
 It can be constructed with class methods or extracted from a `ValueUnitComponent`:
@@ -8061,7 +8340,7 @@ comp = vu.components[0]
 p    = comp.prefix   # ValueUnitPrefix extracted from a component
 ```
 
-### Inline unit suffix
+### 5.4 Inline unit suffix
 
 In addition to the unit embedded in a type annotation (`<float:64,m/s>`), the
 Bovnar format supports an **inline unit suffix** placed directly after a scalar
@@ -8084,7 +8363,7 @@ array elements always raise `ErrorCode.UNEXPECTED_INPUT_BYTE`.
 
 ---
 
-## `Quantity`
+## 6. `Quantity`
 
 `Quantity` is a typed, unit-annotated scalar value that preserves the original
 text representation, type width, numeral base, and physical unit across a
@@ -8095,7 +8374,7 @@ from bovnar import Quantity, ValueTypeSpec, ValueUnit
 from bovnar.enums import ValueTypeFamily
 ```
 
-### Construction
+### 6.1 Construction
 
 `Quantity` is normally produced by `loads(..., typed=True)` rather than
 constructed by hand, but direct construction is supported:
@@ -8127,7 +8406,7 @@ It accepts a `Decimal`, `Fraction` (must be a terminating decimal), `int`,
 `str` (a verbatim literal), or `float` (only as precise as the double), and
 validates the width for the chosen family.
 
-### Properties and methods
+### 6.2 Properties and methods
 
 | Name | Type | Description |
 |---|---|---|
@@ -8145,7 +8424,7 @@ validates the width for the chosen family.
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
 
-### Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
+### 6.3 Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
 
 `q.value` decodes through a C `double`, which loses precision for the
 decimal-float, fixed-point, and wide binary-float families. The accessors above
@@ -8170,7 +8449,7 @@ work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
 the bit-exact `stored_value()` / `ieee_bits()` apply to the IEEE encodings
 (`float:16/32/64/128/256`), which are also exposed directly as `bovnar.BvnFloat`.
 
-### `dumps()` integration
+### 6.4 `dumps()` integration
 
 `_emit_value` dispatches on `Quantity` before the plain `int` / `float` path,
 so any dict that came from `loads(..., typed=True)` can be passed directly to
@@ -8193,7 +8472,7 @@ a non-terminating fraction (e.g. `Fraction(1, 3)`) raises `BovnarArgumentError`.
 
 ---
 
-## `write_array` helper
+## 7. `write_array` helper
 
 `write_array` is a high-level helper exported from the top-level `bovnar`
 namespace. It handles both flat and multi-dimensional arrays.
@@ -8223,7 +8502,7 @@ multi-row array.
 
 ---
 
-## pint bridge
+## 8. pint bridge
 
 bovnar units interoperate with [pint](https://pint.readthedocs.io/) through a
 hand-verified translation table (`bovnar._pint_units`). pint is an **optional**
@@ -8250,20 +8529,20 @@ mag, vu2 = bovnar.from_pint(qty)      # (5.0, ValueUnit for km)
 vu3      = bovnar.from_pint_unit("newton")     # str/Unit/Quantity all accepted
 ```
 
-### Prefixes ride in the unit, never the magnitude
+### 8.1 Prefixes ride in the unit, never the magnitude
 
 bovnar's `k~m` maps to pint `kilometer` — the prefix is kept inside the unit
 *name*, never folded into the magnitude. A wrapped value is therefore returned
 unscaled, so a wrapped numpy array is never silently rescaled.
 
-### Affine temperature units
+### 8.2 Affine temperature units
 
 Offset/affine scales (`°C`, `°F`, Réaumur, Delisle, Newton, Rømer) cannot carry
 a prefix or exponent — pint forbids it and bovnar never emits it. A prefixed or
 exponentiated affine unit raises `BovnarArgumentError` rather than a cryptic
 pint error.
 
-### Validation
+### 8.3 Validation
 
 `from_pint` / `from_pint_unit` validate the resulting `ValueUnit` by default
 (`validate=True`); a pint unit that maps to a structurally invalid bovnar unit
@@ -8271,7 +8550,7 @@ pint error.
 units with more than 8 components, non-integer exponents, or exponents outside
 `[-9, 9]` also raise.
 
-### Registry control: `build_registry`
+### 8.4 Registry control: `build_registry`
 
 A module-level default `pint.UnitRegistry` is built on first use. To share a
 registry across calls — or to register bovnar's custom units onto your own —
@@ -8295,7 +8574,7 @@ crypto currencies as custom dimensions. `is_currency_unit(unit)` reports whether
 a pint unit involves a currency dimension (holds for products such as
 `USD/year`).
 
-### Quantity kinds: `isolate_kinds`
+### 8.5 Quantity kinds: `isolate_kinds`
 
 Bovnar tracks **quantity kinds** for units that carry no SI dimension yet are
 not interchangeable — bit vs byte, an angle vs a plain count, `dB` vs `Np` vs
@@ -8333,7 +8612,7 @@ ureg = build_registry(isolate_kinds=False)    # alias onto pint's natives
 which restores both the interop and pint's permissiveness. The default is
 fidelity.
 
-### Semantic caveats
+### 8.6 Semantic caveats
 
 What survives kind isolation is recorded in
 `bovnar._pint_units.SEMANTIC_CAVEATS`: `DECIBEL`, `NEPER` and `PH_SCALE`, whose
@@ -8352,7 +8631,7 @@ quietly the more permissive of the two.
 
 ---
 
-## NumPy bridge
+## 9. NumPy bridge
 
 The NumPy bridge converts between bovnar arrays and `numpy.ndarray`. numpy is an
 **optional** dependency, imported lazily on first use. Install with
@@ -8369,7 +8648,7 @@ All five functions are exported from the top-level `bovnar` namespace (and from
 | `from_pint_array(writer, key, qty)` | pint → bovnar | Write a pint `Quantity` (magnitude + unit) into a `Writer` |
 | `array_to_bvnr(key, arr, *, unit=None, pretty=True, float_format=None)` | numpy → bovnar | `ndarray` → bovnar bytes (convenience) |
 
-### Reading: `to_numpy`
+### 9.1 Reading: `to_numpy`
 
 *src* is either a `DomNode` for an ARRAY (random-access, from `dom_parse`) or
 the nested list/tuple that `loads(..., typed=True)` produces. Both
@@ -8426,7 +8705,7 @@ output re-parses.
   units raise, as does mixing a dimensioned element with a dimensionless one;
   the unit is returned alongside the data, never baked into elements.
 
-### Writing: `from_numpy` / `array_to_bvnr`
+### 9.2 Writing: `from_numpy` / `array_to_bvnr`
 
 ```python
 import numpy as np
@@ -8464,7 +8743,7 @@ bovnar.array_to_bvnr("a", prices, float_format=("float", 128))   # binary128
 * `array_to_bvnr` grows its write buffer like `dumps()` (4 MiB, doubling up to
   256 MiB).
 
-### pint arrays
+### 9.3 pint arrays
 
 `to_pint_array` and `from_pint_array` bridge straight through to pint
 Quantities backed by ndarrays, reusing the unit translation above:
@@ -8484,7 +8763,7 @@ wrap it as a meaningless dimensionless quantity — use `to_numpy` for the
 
 ---
 
-## Currency helpers
+## 10. Currency helpers
 
 The `bovnar.currency` submodule (exposed as `bovnar.currency`) provides
 metadata for the ISO 4217 fiat and cryptocurrency `BaseUnit` members. It is pure
@@ -8517,9 +8796,9 @@ or unknown codes.
 
 ---
 
-## `Reader` reference
+## 11. `Reader` reference
 
-### Construction
+### 11.1 Construction
 
 ```python
 with Reader() as r:
@@ -8529,7 +8808,10 @@ with Reader() as r:
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
 
-### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+### 11.2 `read_mem`
+
+`read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
+strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -8545,18 +8827,22 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `want_unit_allow_nonterminating` | `bool` | `False` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational with `converted_text` `None` instead of aborting with `error_unit_inexact` |
 | `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
 
-### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+### 11.3 `read_fd`
+
+`read_fd(fd, *, …)` — the keyword parameters of `read_mem`, unchanged.
 
 Parse BVNR from an open POSIX file descriptor. Parameters identical to
 `read_mem` except the first argument is a non-negative `int` fd.
 
-### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+### 11.4 `read_file`
+
+`read_file(path, *, …)` — the keyword parameters of `read_mem`, unchanged.
 
 Convenience wrapper: opens `path` with `os.O_RDONLY`, calls `read_fd`, closes
 the fd in a `finally` block. The `max_file_size` default is `MAX_FILESIZE_BYTES`
 (16 MiB) rather than unlimited.
 
-### `iter_mem(data, *, verified_only, max_file_size)`
+### 11.5 `iter_mem(data, *, verified_only, max_file_size)`
 
 Generator that collects all events from `read_mem` and yields
 `EventPayload(event, raw, value_type, value_unit)` objects.
@@ -8579,7 +8865,7 @@ Generator that collects all events from `read_mem` and yields
 | `converted_text` | `str \| None` | Exact converted value as a positional string; `None` if the conversion does not terminate in `converted_base` |
 | `converted_base` | `int` | Base the converted text is rendered in |
 
-### Error-state properties
+### 11.6 Error-state properties
 
 These properties query the C reader object after a failed parse.
 
@@ -8591,7 +8877,7 @@ These properties query the C reader object after a failed parse.
 | `error_offset` | `int` | Byte offset of the error |
 | `recovery_count` | `int` | Number of times resync was entered (incremented at error entry, not at resync completion) |
 
-### `MAX_FILESIZE_BYTES`
+### 11.7 `MAX_FILESIZE_BYTES`
 
 ```python
 from bovnar import MAX_FILESIZE_BYTES   # 16 * 1024 * 1024  (16 MiB)
@@ -8601,9 +8887,9 @@ Default `max_file_size` cap used by `Reader.read_file`.
 
 ---
 
-## `Writer` reference
+## 12. `Writer` reference
 
-### Construction class methods
+### 12.1 Construction class methods
 
 | Method | Description |
 |---|---|
@@ -8614,7 +8900,7 @@ Default `max_file_size` cap used by `Reader.read_file`.
 All three are used as context managers.  On clean exit (`exc_type is None`)
 the context manager calls `finish()` automatically.
 
-### Output retrieval
+### 12.2 Output retrieval
 
 | Method / property | Description |
 |---|---|
@@ -8623,7 +8909,7 @@ the context manager calls `finish()` automatically.
 | `w.finish()` | Flush and seal the output. Raises `BovnarWriteError` if any struct is still open. |
 | `w.destroy()` | Release the underlying C writer object immediately. |
 
-### Scalar write methods
+### 12.3 Scalar write methods
 
 All scalar writers accept keyword-only unit parameters.  Unit resolution
 priority: `unit_str` (parsed via `bvn_parse_unit_n`) → `unit_iec_base` →
@@ -8669,7 +8955,7 @@ Write a `bool` value (`token_is_bool`) — serialized as the bare keyword
 
 Write a null value (empty slot).
 
-### Extended integer writers
+### 12.4 Extended integer writers
 
 #### `write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
 
@@ -8682,7 +8968,7 @@ big-integer arithmetic and emitted as quoted strings.  `signed` defaults to
 Write a float from a pre-formatted string in base 10 or 16. `base` must be
 10 or 16; any other value raises `BovnarArgumentError`.
 
-### Struct helpers
+### 12.5 Struct helpers
 
 ```python
 w.begin_struct(key)   # emit ASSIGNMENT_START + STRUCT_START, increment depth
@@ -8692,7 +8978,7 @@ w.end_struct()        # emit STRUCT_END, decrement depth
 `finish()` verifies that the struct depth is zero; an unclosed struct raises
 `BovnarWriteError(GOT_INCOMPLETE_BVNR_STREAM)`.
 
-### Version directive
+### 12.6 Version directive
 
 ```python
 w.write_version(major=1, minor=1)   # emit a leading "#!bovnar 1.1" directive
@@ -8704,7 +8990,7 @@ value is written; calling it after output has begun raises
 document targets (spec-1.1 constructs such as datetime literals need it to
 re-read).
 
-### Array helpers
+### 12.7 Array helpers
 
 ```python
 w.begin_array_row()   # emit ARRAY_ROW_START
@@ -8712,7 +8998,7 @@ w.end_array_row()     # emit ARRAY_ROW_END
 w.new_array_dim()     # emit ARRAY_DIM_START (the / separator between rows)
 ```
 
-### Low-level `emit`
+### 12.8 Low-level `emit`
 
 ```python
 w.emit(event, *, key=None, value=None, vt=None, vu=None)
@@ -8724,12 +9010,12 @@ UTF-8. When both `vt` and `value` are supplied the token type is inferred:
 
 ---
 
-## DOM API
+## 13. DOM API
 
 The DOM API parses a complete BVNR document into an in-memory tree for
 random-access queries without writing a SAX callback.
 
-### `dom_parse(data) -> DomDoc`
+### 13.1 `dom_parse(data) -> DomDoc`
 
 Top-level convenience function (mirrors `DomDoc.parse`).
 
@@ -8738,7 +9024,7 @@ import bovnar
 doc = bovnar.dom_parse(bvnr_bytes)
 ```
 
-### `DomDoc`
+### 13.2 `DomDoc`
 
 Owning wrapper around `bvn_dom_doc_t`. Destroying the object frees the entire
 tree; any `DomNode` derived from it becomes invalid after that point.
@@ -8762,7 +9048,7 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | `doc.lookup(path)` | Dot-separated path lookup, e.g. `'server.tls.cert'`. Returns `None` when absent. |
 | `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
 
-### `DomNode`
+### 13.3 `DomNode`
 
 Non-owning view into a `bvn_dom_node_t`. The parent `DomDoc` must remain alive
 for as long as any derived `DomNode` is in use.
@@ -8793,7 +9079,7 @@ for as long as any derived `DomNode` is in use.
 | `node.array_dims()` | Number of `/`-separated dimensions (ARRAY nodes only) |
 | `node.to_python()` | Recursively convert to a native Python value (drops type/unit info) |
 
-### `DomType`
+### 13.4 `DomType`
 
 ```
 NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
@@ -8802,7 +9088,7 @@ REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 
 ---
 
-## Running the test suite
+## 14. Running the test suite
 
 ```bash
 # Run everything (library-dependent tests are skipped when libbvnr.so is absent)
@@ -8824,7 +9110,7 @@ are skipped automatically when `numpy` / `pint` is not installed. Install
 
 ---
 
-## Package layout
+## 15. Package layout
 
 ```
 bovnar/
@@ -8865,7 +9151,7 @@ tests/
 
 ---
 
-## Error handling
+## 16. Error handling
 
 All errors surface as subclasses of `BovnarError`:
 
@@ -8903,9 +9189,9 @@ after the C call returns.
 
 ---
 
-## FFI details
+## 17. FFI details
 
-### `ON_ERROR_FUNC` signature
+### 17.1 `ON_ERROR_FUNC` signature
 
 The error callback type matches the C `bvnr_on_error_fn` signature exactly:
 
@@ -8933,7 +9219,7 @@ ON_ERROR_FUNC = ctypes.CFUNCTYPE(
 )
 ```
 
-### `BvnrWriteFlags` layout
+### 17.2 `BvnrWriteFlags` layout
 
 `BvnrWriteFlags` mirrors the C `bvnr_write_flags_s` struct in full, including
 the trailing `unit_flags` field (`bvn_unit_flags_t`, a `uint32_t`):
@@ -8948,7 +9234,7 @@ The writer respects the `unit_flags` stored inside the C writer object when
 serialising unit annotations. `_emit_annotation` retrieves the live flags via
 `bvnr_writer_unit_flags(w)` and passes them to `bvn_unit_to_string_ex`.
 
-### `write_string` behaviour
+### 17.3 `write_string` behaviour
 
 `Writer.write_string` emits a bare quoted string with no type annotation,
 matching `bvnr_write_string` in the C library:
@@ -8961,7 +9247,7 @@ To write a string with an explicit `<utf8>` annotation, use the low-level
 `emit` API with `Event.TYPE_ANNOTATION_START` / `TYPE_ANNOTATION_END` events
 before the `Event.DATA` event.
 
-### `_resolve_unit` default
+### 17.4 `_resolve_unit` default
 
 When no unit arguments are supplied to `write_uint`, `write_sint`,
 `write_float`, etc., the unit resolves to `BVN_UNIT_NONE` (zero components),
@@ -8972,7 +9258,7 @@ caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
 
 ---
 
-## `BaseUnit` enum
+## 18. `BaseUnit` enum
 
 The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
@@ -9034,7 +9320,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ---
 
-## Spec 1.1 additions
+## 19. Spec 1.1 additions
 
 These bindings target the **Bovnar spec (v1.1)**; spec 1.0 remains the
 frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
@@ -9068,6 +9354,20 @@ unversioned document is treated as 1.0) are exposed as:
 `ErrorCode` adds `INVALID_SPEC_VERSION` (42), `UNSUPPORTED_SPEC_VERSION` (43),
 `INVALID_CODEPOINT` (44), `INVALID_DATETIME_LITERAL` (45), and
 `DATETIME_LITERAL_UNSUPPORTED_EPOCH` (46).
+
+---
+
+## See also
+
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C reader, writer, and DOM these bindings wrap
+- [Specification](1_bovnar_spec.md) — the format the package reads and writes
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit model behind `Quantity` and the bridges
+- [Tutorial](0_bovnar_tutorial.md) — the document syntax, by example
+- [FAQ §13 — Python Bindings](6_bovnar_faq.md#13-python-bindings) — common questions about this package
+
+---
+
+*End of Bovnar — Python Bindings (Bovnar spec 1.1).*
 
 <!-- ==================== EBNF grammar (https://www.bovnar.io/doc/5_bovnar.ebnf) ==================== -->
 
@@ -10081,9 +10381,11 @@ byte         = (* any single byte 0x00–0xFF *) ;
 
 <!-- ==================== FAQ (https://www.bovnar.io/doc/6_bovnar_faq.md) ==================== -->
 
-# Bovnar (BVNR) — Frequently Asked Questions
+# Bovnar — Frequently Asked Questions
 
-> **Applies to:** Bovnar specification v1.1
+> **Spec version:** 1.1
+> **Status:** Non-normative — answers indexed to the specification
+> **Scope:** Common questions on syntax, types, units, numbers, limits, and the C and Python APIs.
 
 ---
 
@@ -10104,6 +10406,8 @@ byte         = (* any single byte 0x00–0xFF *) ;
 13. [Python Bindings](#13-python-bindings)
 14. [Limits and Performance](#14-limits-and-performance)
 15. [Why C99 and Not C23?](#15-why-c99-and-not-c23)
+
+- [See also](#see-also)
 
 ---
 
@@ -11479,15 +11783,25 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar FAQ — Specification (v1.1)*
+## See also
+
+- [Specification](1_bovnar_spec.md) — the normative answer behind every entry here
+- [Tutorial](0_bovnar_tutorial.md) — the guided introduction, if a question here assumes too much
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the registry behind §4
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C functions named in §12
+- [Python Bindings](4_bovnar_python_bindings.md) — the package described in §13
+
+---
+
+*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.1).*
 
 <!-- ==================== Conformance (https://www.bovnar.io/doc/7_bovnar_conformance.md) ==================== -->
 
-# Bovnar Conformance Test Tool
+# Bovnar — Conformance Test Tool
 
-> **Version:** 1.1
-> **Protocol:** bvnr-conformance-v1
-> **Last updated:** 2026-06-01
+> **Spec version:** 1.1
+> **Status:** Normative — conformance protocol `bvnr-conformance-v1`
+> **Scope:** The conformance corpus, the IUT protocol, and how to validate a third-party implementation.
 
 ---
 
@@ -11495,15 +11809,33 @@ standard publication by three to five years.
 
 1. [Purpose](#1-purpose)
 2. [Quick Start](#2-quick-start)
+    - 2.1 [Self-test (verify the reference implementation)](#21-self-test-verify-the-reference-implementation)
+    - 2.2 [Testing an external implementation](#22-testing-an-external-implementation)
+    - 2.3 [Filtering by group](#23-filtering-by-group)
 3. [Architecture](#3-architecture)
+    - 3.1 [Validation tiers](#31-validation-tiers)
 4. [Building](#4-building)
 5. [Running](#5-running)
+    - 5.1 [Command-line options](#51-command-line-options)
+    - 5.2 [Examples](#52-examples)
+    - 5.3 [Test groups](#53-test-groups)
 6. [IUT Protocol](#6-iut-protocol)
+    - 6.1 [Communication model](#61-communication-model)
+    - 6.2 [Success response](#62-success-response)
+    - 6.3 [Error response](#63-error-response)
 7. [Writing a Compliant IUT Adapter](#7-writing-a-compliant-iut-adapter)
+    - 7.1 [Event log format reference](#71-event-log-format-reference)
+    - 7.2 [Field details](#72-field-details)
+    - 7.3 [TOKEN_TYPE values for DATA lines](#73-token_type-values-for-data-lines)
+    - 7.4 [Effective width and base](#74-effective-width-and-base)
+    - 7.5 [Example traces](#75-example-traces)
 8. [Test Case Corpus](#8-test-case-corpus)
+    - 8.1 [Coverage summary](#81-coverage-summary)
 9. [Output Format (TAP)](#9-output-format-tap)
 10. [Extending the Corpus](#10-extending-the-corpus)
 11. [CMake Integration](#11-cmake-integration)
+
+- [See also](#see-also)
 
 ---
 
@@ -11526,7 +11858,7 @@ Two use modes are supported:
 
 ## 2. Quick Start
 
-### Self-test (verify the reference implementation)
+### 2.1 Self-test (verify the reference implementation)
 
 ```sh
 cd build
@@ -11534,7 +11866,7 @@ cmake --build . --target bvnr_conformance
 ctest -R bvnr_conformance_self --output-on-failure
 ```
 
-### Testing an external implementation
+### 2.2 Testing an external implementation
 
 ```sh
 # Build your adapter (see Section 7)
@@ -11544,7 +11876,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ./tests/bvnr_conformance --iut ./my_impl_adapter
 ```
 
-### Filtering by group
+### 2.3 Filtering by group
 
 ```sh
 ./tests/bvnr_conformance --filter units
@@ -11577,7 +11909,7 @@ The reference implementation is the single authoritative oracle.  An
 implementation is conformant when its IUT adapter produces output
 byte-for-byte identical to the reference for every test case.
 
-### Validation tiers
+### 3.1 Validation tiers
 
 Most cases exercise the **streaming reader** (`bvnr_read`): the lexer,
 validator, and the `on_verified` event stream the IUT protocol mirrors. A
@@ -11618,7 +11950,7 @@ dependencies beyond libc and POSIX are required.
 
 ## 5. Running
 
-### Command-line options
+### 5.1 Command-line options
 
 ```
 bvnr_conformance [OPTIONS]
@@ -11631,7 +11963,7 @@ Options:
   --help           Show this help and exit
 ```
 
-### Examples
+### 5.2 Examples
 
 ```sh
 # Run self-test (reference vs. reference)
@@ -11653,7 +11985,7 @@ Options:
 ./tests/bvnr_conformance --iut ./my_adapter --filter units
 ```
 
-### Test groups
+### 5.3 Test groups
 
 | Group | Description |
 |-------|-------------|
@@ -11688,7 +12020,7 @@ The **IUT (Implementation Under Test) Protocol** version 1
 (`bvnr-conformance-v1`) defines the interface between the conformance
 driver and a candidate implementation's adapter binary.
 
-### Communication model
+### 6.1 Communication model
 
 ```
 conformance driver                    IUT adapter
@@ -11709,7 +12041,7 @@ conformance driver                    IUT adapter
        │ ←─────────────────────────────── │
 ```
 
-### Success response
+### 6.2 Success response
 
 The IUT must:
 
@@ -11719,7 +12051,7 @@ The IUT must:
 The event log is a sequence of lines, one event per line, in the order
 the events were received from the `on_verified` callback.
 
-### Error response
+### 6.3 Error response
 
 The IUT must:
 
@@ -11745,7 +12077,7 @@ A minimal conforming adapter must:
 4. **Emit the event log** to stdout on success.
 5. **Emit** `ERROR <code_name>\n` to stdout and exit non-zero on failure.
 
-### Event log format reference
+### 7.1 Event log format reference
 
 Each event maps to one line.  Text fields use `\xNN` escaping for any
 byte outside the printable ASCII range `0x20–0x7E` or for the backslash
@@ -11771,7 +12103,7 @@ OCTET_STREAM_START
 OCTET_STREAM_END
 ```
 
-### Field details
+### 7.2 Field details
 
 | Line | Fields | Notes |
 |------|--------|-------|
@@ -11793,7 +12125,7 @@ OCTET_STREAM_END
 | `OCTET_STREAM_START` | — | |
 | `OCTET_STREAM_END` | — | |
 
-### TOKEN_TYPE values for DATA lines
+### 7.3 TOKEN_TYPE values for DATA lines
 
 | Token type | String |
 |------------|--------|
@@ -11811,7 +12143,7 @@ For `octets` token type, the value field is `<N> bytes` (decimal byte
 count, then a space, then the literal string `bytes`), not the raw
 binary data.
 
-### Effective width and base
+### 7.4 Effective width and base
 
 - **Effective width**: if the stored width is 0, emit `64`.
   Use `bvn_effective_width(value_type)`.
@@ -11822,7 +12154,7 @@ These rules ensure that untyped values synthesised to `uint:64,_10`
 produce `TYPE_PARAM_WIDTH 64` and `TYPE_PARAM_BASE 10`, matching the
 reference output exactly.
 
-### Example traces
+### 7.5 Example traces
 
 **Input:** `.x = 42;`
 
@@ -11938,7 +12270,7 @@ specifies:
 | `max_*` | Limit overrides (0 = use defaults) |
 | `expect_key` | Optional: key name expected in event log |
 
-### Coverage summary
+### 8.1 Coverage summary
 
 | Group | Cases | What is tested |
 |-------|-------|---------------|
@@ -12076,54 +12408,72 @@ To run all tests including conformance:
 ctest --output-on-failure
 ```
 
-<!-- ==================== Unit & currency cheatsheet (https://www.bovnar.io/doc/8_unit_cheatsheet.md) ==================== -->
+---
 
-# Bovnar (BVNR) — Units & Currencies Reference
+## See also
 
-> Spec version 1.1 · 180 physical units · 166 fiat currencies · 50 cryptocurrencies
+- [Specification](1_bovnar_spec.md) — the behaviour the corpus tests
+- [EBNF Grammar](5_bovnar.ebnf) — the grammar an implementation under test must accept
+- [Read & Write API](3_bovnar_readwrite_api.md) — the reference reader and writer the adapter drives
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit table a conforming implementation needs
 
 ---
 
-## Contents
+*End of Bovnar — Conformance Test Tool (Bovnar spec 1.1).*
+
+<!-- ==================== Unit & currency cheatsheet (https://www.bovnar.io/doc/8_unit_cheatsheet.md) ==================== -->
+
+# Bovnar — Units & Currencies Cheat Sheet
+
+> **Spec version:** 1.1
+> **Status:** Reference — the symbol tables of the unit and currency registry
+> **Scope:** 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+
+---
+
+## Table of Contents
 
 1. [SI Prefixes](#1-si-prefixes)
 2. [IEC Binary Prefixes](#2-iec-binary-prefixes)
 3. [Prefix Validity Rules](#3-prefix-validity-rules)
 4. [Physical Units](#4-physical-units)
-   - 4.1 [SI Base Units](#41-si-base-units)
-   - 4.2 [Named SI-Derived Units](#42-named-si-derived-units)
-   - 4.3 [Non-SI Units Accepted with SI](#43-non-si-units-accepted-with-si)
-   - 4.4 [Imperial & US Customary — Length](#44-imperial--us-customary--length)
-   - 4.5 [Imperial & US Customary — Mass](#45-imperial--us-customary--mass)
-   - 4.6 [Temperature](#46-temperature)
-   - 4.7 [Pressure](#47-pressure)
-   - 4.8 [Energy](#48-energy)
-   - 4.9 [Power](#49-power)
-   - 4.10 [Force](#410-force)
-   - 4.11 [Speed & Rotation](#411-speed--rotation)
-   - 4.12 [Acceleration](#412-acceleration)
-   - 4.13 [Volume — US Liquid](#413-volume--us-liquid)
-   - 4.14 [Volume — UK Imperial](#414-volume--uk-imperial)
-   - 4.15 [Volume — US Apothecary & Dry](#415-volume--us-apothecary--dry)
-   - 4.16 [Area](#416-area)
-   - 4.17 [Angle](#417-angle)
-   - 4.18 [Digital](#418-digital)
-   - 4.19 [CGS Units](#419-cgs-units)
-   - 4.20 [Radiation](#420-radiation)
-   - 4.21 [Logarithmic](#421-logarithmic)
-   - 4.22 [Electrical Power](#422-electrical-power)
-   - 4.23 [Textile Linear Density](#423-textile-linear-density)
-   - 4.24 [Old German Units](#424-old-german-units)
-   - 4.25 [Additional Physical Units](#425-additional-physical-units-361367)
-   - 4.26 [Ratio and Proportion](#426-ratio-and-proportion-372377)
-   - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
-   - 4.28 [Water Hardness](#428-water-hardness)
+    - 4.1 [SI Base Units](#41-si-base-units)
+    - 4.2 [Named SI-Derived Units](#42-named-si-derived-units)
+    - 4.3 [Non-SI Units Accepted with SI](#43-non-si-units-accepted-with-si)
+    - 4.4 [Imperial & US Customary — Length](#44-imperial--us-customary--length)
+    - 4.5 [Imperial & US Customary — Mass](#45-imperial--us-customary--mass)
+    - 4.6 [Temperature](#46-temperature)
+    - 4.7 [Pressure](#47-pressure)
+    - 4.8 [Energy](#48-energy)
+    - 4.9 [Power](#49-power)
+    - 4.10 [Force](#410-force)
+    - 4.11 [Speed & Rotation](#411-speed--rotation)
+    - 4.12 [Acceleration](#412-acceleration)
+    - 4.13 [Volume — US Liquid](#413-volume--us-liquid)
+    - 4.14 [Volume — UK Imperial](#414-volume--uk-imperial)
+    - 4.15 [Volume — US Apothecary & Dry](#415-volume--us-apothecary--dry)
+    - 4.16 [Area](#416-area)
+    - 4.17 [Angle](#417-angle)
+    - 4.18 [Digital](#418-digital)
+    - 4.19 [CGS Units](#419-cgs-units)
+    - 4.20 [Radiation](#420-radiation)
+    - 4.21 [Logarithmic](#421-logarithmic)
+    - 4.22 [Electrical Power](#422-electrical-power)
+    - 4.23 [Textile Linear Density](#423-textile-linear-density)
+    - 4.24 [Old German Units](#424-old-german-units)
+    - 4.25 [Additional Physical Units (361–367)](#425-additional-physical-units-361367)
+    - 4.26 [Ratio and Proportion (372–377)](#426-ratio-and-proportion-372377)
+    - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
+    - 4.28 [Water Hardness](#428-water-hardness)
+    - 4.29 [Water-Quality Instrument Scales](#429-water-quality-instrument-scales)
 5. [Currencies](#5-currencies)
-   - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
-   - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
-   - 5.3 [Cryptocurrencies](#53-cryptocurrencies)
-   - 5.4 [Currency Prefix Rules](#54-currency-prefix-rules)
+    - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
+    - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
+    - 5.3 [Cryptocurrencies](#53-cryptocurrencies)
+    - 5.4 [Currency Prefix Rules](#54-currency-prefix-rules)
 6. [Symbol Disambiguation](#6-symbol-disambiguation)
+
+- [See also](#see-also)
 
 ---
 
@@ -12627,6 +12977,8 @@ or `S/m` (`µmho/cm` too — `mho`/`℧` are the siemens); TDS is `mg/L`; resist
 > absolute salinity write `g/k~g`. Case matters: `cF` is the centifarad and `fau` the
 > femto-astronomical-unit.
 
+---
+
 ## 5. Currencies
 
 ### 5.1 The Mandatory Currency Sigil
@@ -12909,16 +13261,33 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
+## See also
+
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the full registry: dimensions, factors, prefix policy, and the C API
+- [Unit Ambiguities](unit_ambiguities.md) — which reading wins when a token could mean two things
+- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit attaches to a value
+- [FAQ §4 — Units](6_bovnar_faq.md#4-units) — the questions these tables raise most often
+
+---
+
 *Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*
 
+---
+
+*End of Bovnar — Units & Currencies Cheat Sheet (Bovnar spec 1.1).*
+
 <!-- ==================== Streaming & framing (https://www.bovnar.io/doc/9_bovnar_streaming.md) ==================== -->
 
-# Bovnar Streaming, Framing & Multiplexing
+# Bovnar — Streaming, Framing & Multiplexing
+
+> **Spec version:** 1.1
+> **Status:** Reference — protocols layered on the event API, not part of the wire format
+> **Scope:** Endless streaming, multi-document framing, octet multiplexing, and embedded documents.
 
 This document describes four capabilities layered **on top of** the Bovnar
 lexer/validator event API, *beside* the DOM. None of them change the frozen 1.0
-grammar or wire format (see [doc/1_bovnar_spec.md](1_bovnar_spec.md)); they are
+grammar or wire format (see the [Specification](1_bovnar_spec.md)); they are
 applications built on the SAX-style event pipe and the octet-stream value form.
 
 | # | Capability | Where it lives | Header |
@@ -12936,7 +13305,26 @@ capabilities are sub-protocols carried in or around them.
 
 ---
 
-## 1. Endless streaming (2⁶⁴−1)
+## Table of Contents
+
+1. [Endless streaming](#1-endless-streaming)
+2. [Multi-document record framing](#2-multi-document-record-framing)
+    - 2.1 [Wire format](#21-wire-format)
+    - 2.2 [API](#22-api)
+    - 2.3 [CLI](#23-cli)
+3. [Octet multiplexing (out-of-band channels, cross-chunk)](#3-octet-multiplexing-out-of-band-channels-cross-chunk)
+    - 3.1 [Wire convention (two layers)](#31-wire-convention-two-layers)
+    - 3.2 [API](#32-api)
+    - 3.3 [CLI](#33-cli)
+4. [Document-in-document](#4-document-in-document)
+5. [Python bindings](#5-python-bindings)
+6. [Composition](#6-composition)
+
+- [See also](#see-also)
+
+---
+
+## 1. Endless streaming
 
 Every byte/offset/line/column counter in the core is 64-bit, so a single
 never-ending document — or a single octet stream of unbounded length — is
@@ -12976,7 +13364,7 @@ socket, pipe) without closing it, wrap each in a length-prefixed frame. The
 framing lives beside the lexer; each payload is a complete, standalone document
 parsed by an ordinary reader.
 
-### Wire format
+### 2.1 Wire format
 
 ```
 frame   = "BVF1"            ; 4-byte magic
@@ -12988,7 +13376,7 @@ stream  = { frame }         ; terminated by EOF on a frame boundary
 A clean EOF *before any header byte* ends the sequence successfully; an EOF
 part-way through a header or payload is a truncation error.
 
-### API
+### 2.2 API
 
 ```c
 /* Producer */
@@ -13030,7 +13418,7 @@ So you can parse each document **strictly** (`continue_on_error = false`) yet
 **resiliently** process every frame (`continue_past_failed = true`), reporting the
 bad ones via `on_document` — the natural mode for a log of independent records.
 
-### CLI
+### 2.3 CLI
 
 ```sh
 bovnar frames pack a.bvnr b.bvnr c.bvnr > docs.bvf   # wrap each file in a frame
@@ -13047,7 +13435,7 @@ channel id and message framing are a convention interpreted *above* `ev_data`,
 so to the lexer these are ordinary `0x01` data chunks and `bvnr_data_t` needs no
 channel field. The 1.0 wire format is untouched.
 
-### Wire convention (two layers)
+### 3.1 Wire convention (two layers)
 
 ```
 per octet chunk:    varint(channel)  fragment_bytes
@@ -13072,7 +13460,7 @@ per channel:        concat(fragments in order) = the channel's logical stream,
   `bvnr_mux_send` always satisfies this (the channel id is ≤ 10 bytes and leads
   every chunk).
 
-### API
+### 3.2 API
 
 ```c
 /* Producer */
@@ -13130,7 +13518,7 @@ if (bvnr_demux_error(dm) != error_none) { /* desync, oversize, alloc, or a trunc
 bvnr_demux_destroy(dm);
 ```
 
-### CLI
+### 3.3 CLI
 
 ```sh
 bovnar mux pack 1:req.bvnr 42:log.bvnr > mux.bvnr   # files onto channels 1 and 42
@@ -13173,7 +13561,7 @@ is arbitrarily deep (bounded by your own recursion budget).
 
 ---
 
-## Python bindings
+## 5. Python bindings
 
 All four capabilities are exposed through the `bovnar.stream` module (a thin
 ctypes layer over the C functions, so framing, varint reassembly and the
@@ -13204,7 +13592,9 @@ for `max_document_size` and `max_message`, `0` selects their finite defaults
 value there to raise them. See [Python Bindings](4_bovnar_python_bindings.md)
 and `python/tests/test_stream.py`.
 
-## Composition
+---
+
+## 6. Composition
 
 The four compose cleanly because they live at different layers:
 
@@ -13221,8 +13611,13 @@ your own consumer/producer at the same seam without touching the core.
 
 ## See also
 
-- [Specification §9 — Octet Streams](1_bovnar_spec.md#9-octet-streams-binary-mode)
+- [Specification §9 — Octet Streams](1_bovnar_spec.md#9-octet-streams-binary-mode) — the binary substrate three of these four build on
 - [Read & Write API](3_bovnar_readwrite_api.md) — the underlying event interface
+- [Python Bindings](4_bovnar_python_bindings.md) — the `bovnar.stream` module described in §5
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
 - `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`
+
+---
+
+*End of Bovnar — Streaming, Framing & Multiplexing (Bovnar spec 1.1).*

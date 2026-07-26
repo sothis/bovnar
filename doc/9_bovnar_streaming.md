@@ -1,8 +1,12 @@
-# Bovnar Streaming, Framing & Multiplexing
+# Bovnar — Streaming, Framing & Multiplexing
+
+> **Spec version:** 1.1
+> **Status:** Reference — protocols layered on the event API, not part of the wire format
+> **Scope:** Endless streaming, multi-document framing, octet multiplexing, and embedded documents.
 
 This document describes four capabilities layered **on top of** the Bovnar
 lexer/validator event API, *beside* the DOM. None of them change the frozen 1.0
-grammar or wire format (see [doc/1_bovnar_spec.md](1_bovnar_spec.md)); they are
+grammar or wire format (see the [Specification](1_bovnar_spec.md)); they are
 applications built on the SAX-style event pipe and the octet-stream value form.
 
 | # | Capability | Where it lives | Header |
@@ -20,7 +24,26 @@ capabilities are sub-protocols carried in or around them.
 
 ---
 
-## 1. Endless streaming (2⁶⁴−1)
+## Table of Contents
+
+1. [Endless streaming](#1-endless-streaming)
+2. [Multi-document record framing](#2-multi-document-record-framing)
+    - 2.1 [Wire format](#21-wire-format)
+    - 2.2 [API](#22-api)
+    - 2.3 [CLI](#23-cli)
+3. [Octet multiplexing (out-of-band channels, cross-chunk)](#3-octet-multiplexing-out-of-band-channels-cross-chunk)
+    - 3.1 [Wire convention (two layers)](#31-wire-convention-two-layers)
+    - 3.2 [API](#32-api)
+    - 3.3 [CLI](#33-cli)
+4. [Document-in-document](#4-document-in-document)
+5. [Python bindings](#5-python-bindings)
+6. [Composition](#6-composition)
+
+- [See also](#see-also)
+
+---
+
+## 1. Endless streaming
 
 Every byte/offset/line/column counter in the core is 64-bit, so a single
 never-ending document — or a single octet stream of unbounded length — is
@@ -60,7 +83,7 @@ socket, pipe) without closing it, wrap each in a length-prefixed frame. The
 framing lives beside the lexer; each payload is a complete, standalone document
 parsed by an ordinary reader.
 
-### Wire format
+### 2.1 Wire format
 
 ```
 frame   = "BVF1"            ; 4-byte magic
@@ -72,7 +95,7 @@ stream  = { frame }         ; terminated by EOF on a frame boundary
 A clean EOF *before any header byte* ends the sequence successfully; an EOF
 part-way through a header or payload is a truncation error.
 
-### API
+### 2.2 API
 
 ```c
 /* Producer */
@@ -114,7 +137,7 @@ So you can parse each document **strictly** (`continue_on_error = false`) yet
 **resiliently** process every frame (`continue_past_failed = true`), reporting the
 bad ones via `on_document` — the natural mode for a log of independent records.
 
-### CLI
+### 2.3 CLI
 
 ```sh
 bovnar frames pack a.bvnr b.bvnr c.bvnr > docs.bvf   # wrap each file in a frame
@@ -131,7 +154,7 @@ channel id and message framing are a convention interpreted *above* `ev_data`,
 so to the lexer these are ordinary `0x01` data chunks and `bvnr_data_t` needs no
 channel field. The 1.0 wire format is untouched.
 
-### Wire convention (two layers)
+### 3.1 Wire convention (two layers)
 
 ```
 per octet chunk:    varint(channel)  fragment_bytes
@@ -156,7 +179,7 @@ per channel:        concat(fragments in order) = the channel's logical stream,
   `bvnr_mux_send` always satisfies this (the channel id is ≤ 10 bytes and leads
   every chunk).
 
-### API
+### 3.2 API
 
 ```c
 /* Producer */
@@ -214,7 +237,7 @@ if (bvnr_demux_error(dm) != error_none) { /* desync, oversize, alloc, or a trunc
 bvnr_demux_destroy(dm);
 ```
 
-### CLI
+### 3.3 CLI
 
 ```sh
 bovnar mux pack 1:req.bvnr 42:log.bvnr > mux.bvnr   # files onto channels 1 and 42
@@ -257,7 +280,7 @@ is arbitrarily deep (bounded by your own recursion budget).
 
 ---
 
-## Python bindings
+## 5. Python bindings
 
 All four capabilities are exposed through the `bovnar.stream` module (a thin
 ctypes layer over the C functions, so framing, varint reassembly and the
@@ -288,7 +311,9 @@ for `max_document_size` and `max_message`, `0` selects their finite defaults
 value there to raise them. See [Python Bindings](4_bovnar_python_bindings.md)
 and `python/tests/test_stream.py`.
 
-## Composition
+---
+
+## 6. Composition
 
 The four compose cleanly because they live at different layers:
 
@@ -305,8 +330,13 @@ your own consumer/producer at the same seam without touching the core.
 
 ## See also
 
-- [Specification §9 — Octet Streams](1_bovnar_spec.md#9-octet-streams-binary-mode)
+- [Specification §9 — Octet Streams](1_bovnar_spec.md#9-octet-streams-binary-mode) — the binary substrate three of these four build on
 - [Read & Write API](3_bovnar_readwrite_api.md) — the underlying event interface
+- [Python Bindings](4_bovnar_python_bindings.md) — the `bovnar.stream` module described in §5
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
 - `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`
+
+---
+
+*End of Bovnar — Streaming, Framing & Multiplexing (Bovnar spec 1.1).*

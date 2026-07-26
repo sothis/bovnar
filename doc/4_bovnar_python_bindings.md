@@ -1,6 +1,8 @@
-# Bovnar Python Bindings
+# Bovnar — Python Bindings
 
-> **Version:** 1.1
+> **Spec version:** 1.1
+> **Status:** Reference — the Python package as implemented
+> **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
 library (spec v1.1).
@@ -10,7 +12,79 @@ import time via the standard `ctypes.CDLL` machinery.
 
 ---
 
-## Requirements
+## Table of Contents
+
+1. [Requirements](#1-requirements)
+2. [Installation](#2-installation)
+3. [Library discovery](#3-library-discovery)
+4. [Quick-start](#4-quick-start)
+    - 4.1 [High-level API (`loads` / `dumps`)](#41-high-level-api-loads--dumps)
+    - 4.2 [SAX-style streaming reader](#42-sax-style-streaming-reader)
+    - 4.3 [Generator / iterator interface](#43-generator--iterator-interface)
+    - 4.4 [DOM (random-access) API](#44-dom-random-access-api)
+    - 4.5 [Low-level writer](#45-low-level-writer)
+    - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
+5. [Unit helpers](#5-unit-helpers)
+    - 5.1 [Extended unit functions](#51-extended-unit-functions)
+    - 5.2 [`UnitFlags`](#52-unitflags)
+    - 5.3 [`ValueUnitPrefix`](#53-valueunitprefix)
+    - 5.4 [Inline unit suffix](#54-inline-unit-suffix)
+6. [`Quantity`](#6-quantity)
+    - 6.1 [Construction](#61-construction)
+    - 6.2 [Properties and methods](#62-properties-and-methods)
+    - 6.3 [Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)](#63-lossless-numeric-access-float_dec-float_fix-float128256)
+    - 6.4 [`dumps()` integration](#64-dumps-integration)
+7. [`write_array` helper](#7-write_array-helper)
+8. [pint bridge](#8-pint-bridge)
+    - 8.1 [Prefixes ride in the unit, never the magnitude](#81-prefixes-ride-in-the-unit-never-the-magnitude)
+    - 8.2 [Affine temperature units](#82-affine-temperature-units)
+    - 8.3 [Validation](#83-validation)
+    - 8.4 [Registry control: `build_registry`](#84-registry-control-build_registry)
+    - 8.5 [Quantity kinds: `isolate_kinds`](#85-quantity-kinds-isolate_kinds)
+    - 8.6 [Semantic caveats](#86-semantic-caveats)
+9. [NumPy bridge](#9-numpy-bridge)
+    - 9.1 [Reading: `to_numpy`](#91-reading-to_numpy)
+    - 9.2 [Writing: `from_numpy` / `array_to_bvnr`](#92-writing-from_numpy--array_to_bvnr)
+    - 9.3 [pint arrays](#93-pint-arrays)
+10. [Currency helpers](#10-currency-helpers)
+11. [`Reader` reference](#11-reader-reference)
+    - 11.1 [Construction](#111-construction)
+    - 11.2 [`read_mem`](#112-read_mem)
+    - 11.3 [`read_fd`](#113-read_fd)
+    - 11.4 [`read_file`](#114-read_file)
+    - 11.5 [`iter_mem(data, *, verified_only, max_file_size)`](#115-iter_memdata--verified_only-max_file_size)
+    - 11.6 [Error-state properties](#116-error-state-properties)
+    - 11.7 [`MAX_FILESIZE_BYTES`](#117-max_filesize_bytes)
+12. [`Writer` reference](#12-writer-reference)
+    - 12.1 [Construction class methods](#121-construction-class-methods)
+    - 12.2 [Output retrieval](#122-output-retrieval)
+    - 12.3 [Scalar write methods](#123-scalar-write-methods)
+    - 12.4 [Extended integer writers](#124-extended-integer-writers)
+    - 12.5 [Struct helpers](#125-struct-helpers)
+    - 12.6 [Version directive](#126-version-directive)
+    - 12.7 [Array helpers](#127-array-helpers)
+    - 12.8 [Low-level `emit`](#128-low-level-emit)
+13. [DOM API](#13-dom-api)
+    - 13.1 [`dom_parse(data) -> DomDoc`](#131-dom_parsedata---domdoc)
+    - 13.2 [`DomDoc`](#132-domdoc)
+    - 13.3 [`DomNode`](#133-domnode)
+    - 13.4 [`DomType`](#134-domtype)
+14. [Running the test suite](#14-running-the-test-suite)
+15. [Package layout](#15-package-layout)
+16. [Error handling](#16-error-handling)
+17. [FFI details](#17-ffi-details)
+    - 17.1 [`ON_ERROR_FUNC` signature](#171-on_error_func-signature)
+    - 17.2 [`BvnrWriteFlags` layout](#172-bvnrwriteflags-layout)
+    - 17.3 [`write_string` behaviour](#173-write_string-behaviour)
+    - 17.4 [`_resolve_unit` default](#174-_resolve_unit-default)
+18. [`BaseUnit` enum](#18-baseunit-enum)
+19. [Spec 1.1 additions](#19-spec-11-additions)
+
+- [See also](#see-also)
+
+---
+
+## 1. Requirements
 
 | Requirement | Notes |
 |---|---|
@@ -25,7 +99,7 @@ bridge functions — importing `bovnar` never requires either to be installed.
 
 ---
 
-## Installation
+## 2. Installation
 
 ```bash
 # Editable install from source (recommended during development)
@@ -42,7 +116,7 @@ pip install "bovnar[all]"     # both numpy and pint
 
 ---
 
-## Library discovery
+## 3. Library discovery
 
 The bindings search for `libbvnr.so` in this order:
 
@@ -64,9 +138,9 @@ with the list of searched paths.
 
 ---
 
-## Quick-start
+## 4. Quick-start
 
-### High-level API (`loads` / `dumps`)
+### 4.1 High-level API (`loads` / `dumps`)
 
 ```python
 import bovnar
@@ -107,7 +181,7 @@ assert bovnar.loads(out, typed=True) == doc
 overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
 versions is no longer accepted.
 
-### SAX-style streaming reader
+### 4.2 SAX-style streaming reader
 
 The verified callback receives exactly **two** positional arguments: the event
 code and the data payload.  There is no userdata/context argument — capture
@@ -141,7 +215,7 @@ The `BvnrData` payload passed to a callback exposes:
 
 It also carries the `converted` (bool) and `value_type` / `value_unit` fields directly.
 
-### Generator / iterator interface
+### 4.3 Generator / iterator interface
 
 ```python
 from bovnar.reader import Reader
@@ -151,7 +225,7 @@ with Reader() as r:
         print(payload.event, payload.text)
 ```
 
-### DOM (random-access) API
+### 4.4 DOM (random-access) API
 
 ```python
 import bovnar
@@ -176,7 +250,7 @@ for i in range(len(arr)):
 d = doc.to_dict()
 ```
 
-### Low-level writer
+### 4.5 Low-level writer
 
 ```python
 from bovnar.writer import Writer
@@ -191,7 +265,7 @@ with Writer.to_mem() as w:
 output: bytes = w.get_output()
 ```
 
-### Streaming / framing (`bovnar.stream`)
+### 4.6 Streaming / framing (`bovnar.stream`)
 
 Bindings for the streaming layer (see
 [Streaming, Framing & Multiplexing](9_bovnar_streaming.md) for the full
@@ -216,7 +290,7 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 
 ---
 
-## Unit helpers
+## 5. Unit helpers
 
 ```python
 import bovnar
@@ -234,7 +308,7 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### Extended unit functions
+### 5.1 Extended unit functions
 
 The following functions operate on `ValueUnit` objects and are available both
 from the top-level `bovnar` namespace and from `bovnar.units`.
@@ -301,7 +375,7 @@ exp = int_to_exponent(-2)                    # → Exponent.NEG_SQUARE
 `SI_DIM_NAMES` is the ordered tuple `('m', 'kg', 's', 'A', 'K', 'mol', 'cd')`
 — the index positions used by `unit_dimension_vector`.
 
-### `UnitFlags`
+### 5.2 `UnitFlags`
 
 ```python
 from bovnar import UnitFlags   # also from bovnar.units
@@ -328,7 +402,7 @@ UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 s = unit_to_str_ex(vu, UnitFlags.REDUCE | UnitFlags.ASCII_EXP)
 ```
 
-### `ValueUnitPrefix`
+### 5.3 `ValueUnitPrefix`
 
 `ValueUnitPrefix` is the public mirror of the C `value_unit_prefix_t` struct.
 It can be constructed with class methods or extracted from a `ValueUnitComponent`:
@@ -344,7 +418,7 @@ comp = vu.components[0]
 p    = comp.prefix   # ValueUnitPrefix extracted from a component
 ```
 
-### Inline unit suffix
+### 5.4 Inline unit suffix
 
 In addition to the unit embedded in a type annotation (`<float:64,m/s>`), the
 Bovnar format supports an **inline unit suffix** placed directly after a scalar
@@ -367,7 +441,7 @@ array elements always raise `ErrorCode.UNEXPECTED_INPUT_BYTE`.
 
 ---
 
-## `Quantity`
+## 6. `Quantity`
 
 `Quantity` is a typed, unit-annotated scalar value that preserves the original
 text representation, type width, numeral base, and physical unit across a
@@ -378,7 +452,7 @@ from bovnar import Quantity, ValueTypeSpec, ValueUnit
 from bovnar.enums import ValueTypeFamily
 ```
 
-### Construction
+### 6.1 Construction
 
 `Quantity` is normally produced by `loads(..., typed=True)` rather than
 constructed by hand, but direct construction is supported:
@@ -410,7 +484,7 @@ It accepts a `Decimal`, `Fraction` (must be a terminating decimal), `int`,
 `str` (a verbatim literal), or `float` (only as precise as the double), and
 validates the width for the chosen family.
 
-### Properties and methods
+### 6.2 Properties and methods
 
 | Name | Type | Description |
 |---|---|---|
@@ -428,7 +502,7 @@ validates the width for the chosen family.
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
 
-### Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
+### 6.3 Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
 
 `q.value` decodes through a C `double`, which loses precision for the
 decimal-float, fixed-point, and wide binary-float families. The accessors above
@@ -453,7 +527,7 @@ work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
 the bit-exact `stored_value()` / `ieee_bits()` apply to the IEEE encodings
 (`float:16/32/64/128/256`), which are also exposed directly as `bovnar.BvnFloat`.
 
-### `dumps()` integration
+### 6.4 `dumps()` integration
 
 `_emit_value` dispatches on `Quantity` before the plain `int` / `float` path,
 so any dict that came from `loads(..., typed=True)` can be passed directly to
@@ -476,7 +550,7 @@ a non-terminating fraction (e.g. `Fraction(1, 3)`) raises `BovnarArgumentError`.
 
 ---
 
-## `write_array` helper
+## 7. `write_array` helper
 
 `write_array` is a high-level helper exported from the top-level `bovnar`
 namespace. It handles both flat and multi-dimensional arrays.
@@ -506,7 +580,7 @@ multi-row array.
 
 ---
 
-## pint bridge
+## 8. pint bridge
 
 bovnar units interoperate with [pint](https://pint.readthedocs.io/) through a
 hand-verified translation table (`bovnar._pint_units`). pint is an **optional**
@@ -533,20 +607,20 @@ mag, vu2 = bovnar.from_pint(qty)      # (5.0, ValueUnit for km)
 vu3      = bovnar.from_pint_unit("newton")     # str/Unit/Quantity all accepted
 ```
 
-### Prefixes ride in the unit, never the magnitude
+### 8.1 Prefixes ride in the unit, never the magnitude
 
 bovnar's `k~m` maps to pint `kilometer` — the prefix is kept inside the unit
 *name*, never folded into the magnitude. A wrapped value is therefore returned
 unscaled, so a wrapped numpy array is never silently rescaled.
 
-### Affine temperature units
+### 8.2 Affine temperature units
 
 Offset/affine scales (`°C`, `°F`, Réaumur, Delisle, Newton, Rømer) cannot carry
 a prefix or exponent — pint forbids it and bovnar never emits it. A prefixed or
 exponentiated affine unit raises `BovnarArgumentError` rather than a cryptic
 pint error.
 
-### Validation
+### 8.3 Validation
 
 `from_pint` / `from_pint_unit` validate the resulting `ValueUnit` by default
 (`validate=True`); a pint unit that maps to a structurally invalid bovnar unit
@@ -554,7 +628,7 @@ pint error.
 units with more than 8 components, non-integer exponents, or exponents outside
 `[-9, 9]` also raise.
 
-### Registry control: `build_registry`
+### 8.4 Registry control: `build_registry`
 
 A module-level default `pint.UnitRegistry` is built on first use. To share a
 registry across calls — or to register bovnar's custom units onto your own —
@@ -578,7 +652,7 @@ crypto currencies as custom dimensions. `is_currency_unit(unit)` reports whether
 a pint unit involves a currency dimension (holds for products such as
 `USD/year`).
 
-### Quantity kinds: `isolate_kinds`
+### 8.5 Quantity kinds: `isolate_kinds`
 
 Bovnar tracks **quantity kinds** for units that carry no SI dimension yet are
 not interchangeable — bit vs byte, an angle vs a plain count, `dB` vs `Np` vs
@@ -616,7 +690,7 @@ ureg = build_registry(isolate_kinds=False)    # alias onto pint's natives
 which restores both the interop and pint's permissiveness. The default is
 fidelity.
 
-### Semantic caveats
+### 8.6 Semantic caveats
 
 What survives kind isolation is recorded in
 `bovnar._pint_units.SEMANTIC_CAVEATS`: `DECIBEL`, `NEPER` and `PH_SCALE`, whose
@@ -635,7 +709,7 @@ quietly the more permissive of the two.
 
 ---
 
-## NumPy bridge
+## 9. NumPy bridge
 
 The NumPy bridge converts between bovnar arrays and `numpy.ndarray`. numpy is an
 **optional** dependency, imported lazily on first use. Install with
@@ -652,7 +726,7 @@ All five functions are exported from the top-level `bovnar` namespace (and from
 | `from_pint_array(writer, key, qty)` | pint → bovnar | Write a pint `Quantity` (magnitude + unit) into a `Writer` |
 | `array_to_bvnr(key, arr, *, unit=None, pretty=True, float_format=None)` | numpy → bovnar | `ndarray` → bovnar bytes (convenience) |
 
-### Reading: `to_numpy`
+### 9.1 Reading: `to_numpy`
 
 *src* is either a `DomNode` for an ARRAY (random-access, from `dom_parse`) or
 the nested list/tuple that `loads(..., typed=True)` produces. Both
@@ -709,7 +783,7 @@ output re-parses.
   units raise, as does mixing a dimensioned element with a dimensionless one;
   the unit is returned alongside the data, never baked into elements.
 
-### Writing: `from_numpy` / `array_to_bvnr`
+### 9.2 Writing: `from_numpy` / `array_to_bvnr`
 
 ```python
 import numpy as np
@@ -747,7 +821,7 @@ bovnar.array_to_bvnr("a", prices, float_format=("float", 128))   # binary128
 * `array_to_bvnr` grows its write buffer like `dumps()` (4 MiB, doubling up to
   256 MiB).
 
-### pint arrays
+### 9.3 pint arrays
 
 `to_pint_array` and `from_pint_array` bridge straight through to pint
 Quantities backed by ndarrays, reusing the unit translation above:
@@ -767,7 +841,7 @@ wrap it as a meaningless dimensionless quantity — use `to_numpy` for the
 
 ---
 
-## Currency helpers
+## 10. Currency helpers
 
 The `bovnar.currency` submodule (exposed as `bovnar.currency`) provides
 metadata for the ISO 4217 fiat and cryptocurrency `BaseUnit` members. It is pure
@@ -800,9 +874,9 @@ or unknown codes.
 
 ---
 
-## `Reader` reference
+## 11. `Reader` reference
 
-### Construction
+### 11.1 Construction
 
 ```python
 with Reader() as r:
@@ -812,7 +886,10 @@ with Reader() as r:
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
 
-### `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+### 11.2 `read_mem`
+
+`read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
+strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -828,18 +905,22 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `want_unit_allow_nonterminating` | `bool` | `False` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational with `converted_text` `None` instead of aborting with `error_unit_inexact` |
 | `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
 
-### `read_fd(fd, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+### 11.3 `read_fd`
+
+`read_fd(fd, *, …)` — the keyword parameters of `read_mem`, unchanged.
 
 Parse BVNR from an open POSIX file descriptor. Parameters identical to
 `read_mem` except the first argument is a non-negative `int` fd.
 
-### `read_file(path, *, on_verified, on_unverified, max_file_size, continue_on_error, strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+### 11.4 `read_file`
+
+`read_file(path, *, …)` — the keyword parameters of `read_mem`, unchanged.
 
 Convenience wrapper: opens `path` with `os.O_RDONLY`, calls `read_fd`, closes
 the fd in a `finally` block. The `max_file_size` default is `MAX_FILESIZE_BYTES`
 (16 MiB) rather than unlimited.
 
-### `iter_mem(data, *, verified_only, max_file_size)`
+### 11.5 `iter_mem(data, *, verified_only, max_file_size)`
 
 Generator that collects all events from `read_mem` and yields
 `EventPayload(event, raw, value_type, value_unit)` objects.
@@ -862,7 +943,7 @@ Generator that collects all events from `read_mem` and yields
 | `converted_text` | `str \| None` | Exact converted value as a positional string; `None` if the conversion does not terminate in `converted_base` |
 | `converted_base` | `int` | Base the converted text is rendered in |
 
-### Error-state properties
+### 11.6 Error-state properties
 
 These properties query the C reader object after a failed parse.
 
@@ -874,7 +955,7 @@ These properties query the C reader object after a failed parse.
 | `error_offset` | `int` | Byte offset of the error |
 | `recovery_count` | `int` | Number of times resync was entered (incremented at error entry, not at resync completion) |
 
-### `MAX_FILESIZE_BYTES`
+### 11.7 `MAX_FILESIZE_BYTES`
 
 ```python
 from bovnar import MAX_FILESIZE_BYTES   # 16 * 1024 * 1024  (16 MiB)
@@ -884,9 +965,9 @@ Default `max_file_size` cap used by `Reader.read_file`.
 
 ---
 
-## `Writer` reference
+## 12. `Writer` reference
 
-### Construction class methods
+### 12.1 Construction class methods
 
 | Method | Description |
 |---|---|
@@ -897,7 +978,7 @@ Default `max_file_size` cap used by `Reader.read_file`.
 All three are used as context managers.  On clean exit (`exc_type is None`)
 the context manager calls `finish()` automatically.
 
-### Output retrieval
+### 12.2 Output retrieval
 
 | Method / property | Description |
 |---|---|
@@ -906,7 +987,7 @@ the context manager calls `finish()` automatically.
 | `w.finish()` | Flush and seal the output. Raises `BovnarWriteError` if any struct is still open. |
 | `w.destroy()` | Release the underlying C writer object immediately. |
 
-### Scalar write methods
+### 12.3 Scalar write methods
 
 All scalar writers accept keyword-only unit parameters.  Unit resolution
 priority: `unit_str` (parsed via `bvn_parse_unit_n`) → `unit_iec_base` →
@@ -952,7 +1033,7 @@ Write a `bool` value (`token_is_bool`) — serialized as the bare keyword
 
 Write a null value (empty slot).
 
-### Extended integer writers
+### 12.4 Extended integer writers
 
 #### `write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
 
@@ -965,7 +1046,7 @@ big-integer arithmetic and emitted as quoted strings.  `signed` defaults to
 Write a float from a pre-formatted string in base 10 or 16. `base` must be
 10 or 16; any other value raises `BovnarArgumentError`.
 
-### Struct helpers
+### 12.5 Struct helpers
 
 ```python
 w.begin_struct(key)   # emit ASSIGNMENT_START + STRUCT_START, increment depth
@@ -975,7 +1056,7 @@ w.end_struct()        # emit STRUCT_END, decrement depth
 `finish()` verifies that the struct depth is zero; an unclosed struct raises
 `BovnarWriteError(GOT_INCOMPLETE_BVNR_STREAM)`.
 
-### Version directive
+### 12.6 Version directive
 
 ```python
 w.write_version(major=1, minor=1)   # emit a leading "#!bovnar 1.1" directive
@@ -987,7 +1068,7 @@ value is written; calling it after output has begun raises
 document targets (spec-1.1 constructs such as datetime literals need it to
 re-read).
 
-### Array helpers
+### 12.7 Array helpers
 
 ```python
 w.begin_array_row()   # emit ARRAY_ROW_START
@@ -995,7 +1076,7 @@ w.end_array_row()     # emit ARRAY_ROW_END
 w.new_array_dim()     # emit ARRAY_DIM_START (the / separator between rows)
 ```
 
-### Low-level `emit`
+### 12.8 Low-level `emit`
 
 ```python
 w.emit(event, *, key=None, value=None, vt=None, vu=None)
@@ -1007,12 +1088,12 @@ UTF-8. When both `vt` and `value` are supplied the token type is inferred:
 
 ---
 
-## DOM API
+## 13. DOM API
 
 The DOM API parses a complete BVNR document into an in-memory tree for
 random-access queries without writing a SAX callback.
 
-### `dom_parse(data) -> DomDoc`
+### 13.1 `dom_parse(data) -> DomDoc`
 
 Top-level convenience function (mirrors `DomDoc.parse`).
 
@@ -1021,7 +1102,7 @@ import bovnar
 doc = bovnar.dom_parse(bvnr_bytes)
 ```
 
-### `DomDoc`
+### 13.2 `DomDoc`
 
 Owning wrapper around `bvn_dom_doc_t`. Destroying the object frees the entire
 tree; any `DomNode` derived from it becomes invalid after that point.
@@ -1045,7 +1126,7 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | `doc.lookup(path)` | Dot-separated path lookup, e.g. `'server.tls.cert'`. Returns `None` when absent. |
 | `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
 
-### `DomNode`
+### 13.3 `DomNode`
 
 Non-owning view into a `bvn_dom_node_t`. The parent `DomDoc` must remain alive
 for as long as any derived `DomNode` is in use.
@@ -1076,7 +1157,7 @@ for as long as any derived `DomNode` is in use.
 | `node.array_dims()` | Number of `/`-separated dimensions (ARRAY nodes only) |
 | `node.to_python()` | Recursively convert to a native Python value (drops type/unit info) |
 
-### `DomType`
+### 13.4 `DomType`
 
 ```
 NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
@@ -1085,7 +1166,7 @@ REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 
 ---
 
-## Running the test suite
+## 14. Running the test suite
 
 ```bash
 # Run everything (library-dependent tests are skipped when libbvnr.so is absent)
@@ -1107,7 +1188,7 @@ are skipped automatically when `numpy` / `pint` is not installed. Install
 
 ---
 
-## Package layout
+## 15. Package layout
 
 ```
 bovnar/
@@ -1148,7 +1229,7 @@ tests/
 
 ---
 
-## Error handling
+## 16. Error handling
 
 All errors surface as subclasses of `BovnarError`:
 
@@ -1186,9 +1267,9 @@ after the C call returns.
 
 ---
 
-## FFI details
+## 17. FFI details
 
-### `ON_ERROR_FUNC` signature
+### 17.1 `ON_ERROR_FUNC` signature
 
 The error callback type matches the C `bvnr_on_error_fn` signature exactly:
 
@@ -1216,7 +1297,7 @@ ON_ERROR_FUNC = ctypes.CFUNCTYPE(
 )
 ```
 
-### `BvnrWriteFlags` layout
+### 17.2 `BvnrWriteFlags` layout
 
 `BvnrWriteFlags` mirrors the C `bvnr_write_flags_s` struct in full, including
 the trailing `unit_flags` field (`bvn_unit_flags_t`, a `uint32_t`):
@@ -1231,7 +1312,7 @@ The writer respects the `unit_flags` stored inside the C writer object when
 serialising unit annotations. `_emit_annotation` retrieves the live flags via
 `bvnr_writer_unit_flags(w)` and passes them to `bvn_unit_to_string_ex`.
 
-### `write_string` behaviour
+### 17.3 `write_string` behaviour
 
 `Writer.write_string` emits a bare quoted string with no type annotation,
 matching `bvnr_write_string` in the C library:
@@ -1244,7 +1325,7 @@ To write a string with an explicit `<utf8>` annotation, use the low-level
 `emit` API with `Event.TYPE_ANNOTATION_START` / `TYPE_ANNOTATION_END` events
 before the `Event.DATA` event.
 
-### `_resolve_unit` default
+### 17.4 `_resolve_unit` default
 
 When no unit arguments are supplied to `write_uint`, `write_sint`,
 `write_float`, etc., the unit resolves to `BVN_UNIT_NONE` (zero components),
@@ -1255,7 +1336,7 @@ caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
 
 ---
 
-## `BaseUnit` enum
+## 18. `BaseUnit` enum
 
 The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
@@ -1317,7 +1398,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ---
 
-## Spec 1.1 additions
+## 19. Spec 1.1 additions
 
 These bindings target the **Bovnar spec (v1.1)**; spec 1.0 remains the
 frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
@@ -1352,3 +1433,16 @@ unversioned document is treated as 1.0) are exposed as:
 `INVALID_CODEPOINT` (44), `INVALID_DATETIME_LITERAL` (45), and
 `DATETIME_LITERAL_UNSUPPORTED_EPOCH` (46).
 
+---
+
+## See also
+
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C reader, writer, and DOM these bindings wrap
+- [Specification](1_bovnar_spec.md) — the format the package reads and writes
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit model behind `Quantity` and the bridges
+- [Tutorial](0_bovnar_tutorial.md) — the document syntax, by example
+- [FAQ §13 — Python Bindings](6_bovnar_faq.md#13-python-bindings) — common questions about this package
+
+---
+
+*End of Bovnar — Python Bindings (Bovnar spec 1.1).*

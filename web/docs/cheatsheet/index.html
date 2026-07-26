@@ -37,53 +37,63 @@
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
-<h1>Bovnar (BVNR) — Units &amp; Currencies Reference</h1>
+<h1>Bovnar — Units &amp; Currencies Cheat Sheet</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/8_unit_cheatsheet.md">Markdown</a> and <a href="/doc/pdf/bovnar-cheatsheet.pdf">PDF</a>.</p>
 <blockquote>
-<p>Spec version 1.1 · 180 physical units · 166 fiat currencies · 50 cryptocurrencies</p>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Reference — the symbol tables of the unit and currency registry
+<strong>Scope:</strong> 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
 </blockquote>
 <hr />
-<h2 id="contents">Contents</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#1-si-prefixes">SI Prefixes</a></li>
 <li><a href="#2-iec-binary-prefixes">IEC Binary Prefixes</a></li>
 <li><a href="#3-prefix-validity-rules">Prefix Validity Rules</a></li>
-<li><a href="#4-physical-units">Physical Units</a>
-   - 4.1 <a href="#41-si-base-units">SI Base Units</a>
-   - 4.2 <a href="#42-named-si-derived-units">Named SI-Derived Units</a>
-   - 4.3 <a href="#43-non-si-units-accepted-with-si">Non-SI Units Accepted with SI</a>
-   - 4.4 <a href="#44-imperial--us-customary--length">Imperial &amp; US Customary — Length</a>
-   - 4.5 <a href="#45-imperial--us-customary--mass">Imperial &amp; US Customary — Mass</a>
-   - 4.6 <a href="#46-temperature">Temperature</a>
-   - 4.7 <a href="#47-pressure">Pressure</a>
-   - 4.8 <a href="#48-energy">Energy</a>
-   - 4.9 <a href="#49-power">Power</a>
-   - 4.10 <a href="#410-force">Force</a>
-   - 4.11 <a href="#411-speed--rotation">Speed &amp; Rotation</a>
-   - 4.12 <a href="#412-acceleration">Acceleration</a>
-   - 4.13 <a href="#413-volume--us-liquid">Volume — US Liquid</a>
-   - 4.14 <a href="#414-volume--uk-imperial">Volume — UK Imperial</a>
-   - 4.15 <a href="#415-volume--us-apothecary--dry">Volume — US Apothecary &amp; Dry</a>
-   - 4.16 <a href="#416-area">Area</a>
-   - 4.17 <a href="#417-angle">Angle</a>
-   - 4.18 <a href="#418-digital">Digital</a>
-   - 4.19 <a href="#419-cgs-units">CGS Units</a>
-   - 4.20 <a href="#420-radiation">Radiation</a>
-   - 4.21 <a href="#421-logarithmic">Logarithmic</a>
-   - 4.22 <a href="#422-electrical-power">Electrical Power</a>
-   - 4.23 <a href="#423-textile-linear-density">Textile Linear Density</a>
-   - 4.24 <a href="#424-old-german-units">Old German Units</a>
-   - 4.25 <a href="#425-additional-physical-units-361367">Additional Physical Units</a>
-   - 4.26 <a href="#426-ratio-and-proportion-372377">Ratio and Proportion</a>
-   - 4.27 <a href="#427-named-speeds--acidity">Named Speeds &amp; Acidity</a>
-   - 4.28 <a href="#428-water-hardness">Water Hardness</a></li>
-<li><a href="#5-currencies">Currencies</a>
-   - 5.1 <a href="#51-the-mandatory-currency-sigil">The Mandatory Currency Sigil</a>
-   - 5.2 <a href="#52-iso-4217-fiat-currencies">ISO 4217 Fiat Currencies</a>
-   - 5.3 <a href="#53-cryptocurrencies">Cryptocurrencies</a>
-   - 5.4 <a href="#54-currency-prefix-rules">Currency Prefix Rules</a></li>
+<li><a href="#4-physical-units">Physical Units</a><ul>
+<li>4.1 <a href="#41-si-base-units">SI Base Units</a></li>
+<li>4.2 <a href="#42-named-si-derived-units">Named SI-Derived Units</a></li>
+<li>4.3 <a href="#43-non-si-units-accepted-with-si">Non-SI Units Accepted with SI</a></li>
+<li>4.4 <a href="#44-imperial--us-customary--length">Imperial &amp; US Customary — Length</a></li>
+<li>4.5 <a href="#45-imperial--us-customary--mass">Imperial &amp; US Customary — Mass</a></li>
+<li>4.6 <a href="#46-temperature">Temperature</a></li>
+<li>4.7 <a href="#47-pressure">Pressure</a></li>
+<li>4.8 <a href="#48-energy">Energy</a></li>
+<li>4.9 <a href="#49-power">Power</a></li>
+<li>4.10 <a href="#410-force">Force</a></li>
+<li>4.11 <a href="#411-speed--rotation">Speed &amp; Rotation</a></li>
+<li>4.12 <a href="#412-acceleration">Acceleration</a></li>
+<li>4.13 <a href="#413-volume--us-liquid">Volume — US Liquid</a></li>
+<li>4.14 <a href="#414-volume--uk-imperial">Volume — UK Imperial</a></li>
+<li>4.15 <a href="#415-volume--us-apothecary--dry">Volume — US Apothecary &amp; Dry</a></li>
+<li>4.16 <a href="#416-area">Area</a></li>
+<li>4.17 <a href="#417-angle">Angle</a></li>
+<li>4.18 <a href="#418-digital">Digital</a></li>
+<li>4.19 <a href="#419-cgs-units">CGS Units</a></li>
+<li>4.20 <a href="#420-radiation">Radiation</a></li>
+<li>4.21 <a href="#421-logarithmic">Logarithmic</a></li>
+<li>4.22 <a href="#422-electrical-power">Electrical Power</a></li>
+<li>4.23 <a href="#423-textile-linear-density">Textile Linear Density</a></li>
+<li>4.24 <a href="#424-old-german-units">Old German Units</a></li>
+<li>4.25 <a href="#425-additional-physical-units-361367">Additional Physical Units (361–367)</a></li>
+<li>4.26 <a href="#426-ratio-and-proportion-372377">Ratio and Proportion (372–377)</a></li>
+<li>4.27 <a href="#427-named-speeds--acidity">Named Speeds &amp; Acidity</a></li>
+<li>4.28 <a href="#428-water-hardness">Water Hardness</a></li>
+<li>4.29 <a href="#429-water-quality-instrument-scales">Water-Quality Instrument Scales</a></li>
+</ul>
+</li>
+<li><a href="#5-currencies">Currencies</a><ul>
+<li>5.1 <a href="#51-the-mandatory-currency-sigil">The Mandatory Currency Sigil</a></li>
+<li>5.2 <a href="#52-iso-4217-fiat-currencies">ISO 4217 Fiat Currencies</a></li>
+<li>5.3 <a href="#53-cryptocurrencies">Cryptocurrencies</a></li>
+<li>5.4 <a href="#54-currency-prefix-rules">Currency Prefix Rules</a></li>
+</ul>
+</li>
 <li><a href="#6-symbol-disambiguation">Symbol Disambiguation</a></li>
 </ol>
+<ul>
+<li><a href="#see-also">See also</a></li>
+</ul>
 <hr />
 <h2 id="1-si-prefixes">1. SI Prefixes</h2>
 <p>Written as <code>prefix~base</code>, or compactly without the separator: <code>k~m</code> and <code>km</code> are both the kilometre. The canonical output form always keeps the <code>~</code>.</p>
@@ -2221,6 +2231,7 @@ formazin only near 40 units. Bovnar refuses every conversion between them; repor
 absolute salinity write <code>g/k~g</code>. Case matters: <code>cF</code> is the centifarad and <code>fau</code> the
 femto-astronomical-unit.</p>
 </blockquote>
+<hr />
 <h2 id="5-currencies">5. Currencies</h2>
 <h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
 <p>As of spec 1.0 a currency code carries a <strong>mandatory <code>$</code> sigil</strong>: write <code>$USD</code>,
@@ -3642,8 +3653,18 @@ abbreviations that are deliberately not units — is in <a href="/doc/unit_ambig
 </table>
 <p>No bare token is simultaneously a valid physical unit and a currency: currencies live entirely under <code>$</code>, physical units entirely without it.</p>
 <hr />
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the full registry: dimensions, factors, prefix policy, and the C API</li>
+<li><a href="/doc/unit_ambiguities.md">Unit Ambiguities</a> — which reading wins when a token could mean two things</li>
+<li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — how a unit attaches to a value</li>
+<li><a href="https://www.bovnar.io/docs/faq/#4-units">FAQ §4 — Units</a> — the questions these tables raise most often</li>
+</ul>
+<hr />
 <p><em>Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)</em>
 <em><code>BVN_VALUE_BASE_UNIT_COUNT</code> = 380 (<code>bu_xcg + 1</code>)</em></p>
+<hr />
+<p><em>End of Bovnar — Units &amp; Currencies Cheat Sheet (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

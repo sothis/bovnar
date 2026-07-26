@@ -1,33 +1,132 @@
-# Bovnar Specification
+# Bovnar — Specification
 
-> **Version:** 1.1
-> **Status:** Released (1.x line; additive over the frozen 1.0 baseline)
-> **Last updated:** 2026-06-21
+> **Spec version:** 1.1
+> **Status:** Normative — released (1.x line; additive over the frozen 1.0 baseline)
+> **Scope:** Grammar, lexical structure, type system, units, limits, and error semantics.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
+    - 1.1 [Design Goals](#11-design-goals)
+    - 1.2 [Architecture](#12-architecture)
+    - 1.3 [Stream Model](#13-stream-model)
 2. [File Format at a Glance](#2-file-format-at-a-glance)
+    - 2.1 [Key Syntax Rules](#21-key-syntax-rules)
 3. [Character Encoding & BOM](#3-character-encoding--bom)
+    - 3.1 [UTF-8](#31-utf-8)
+    - 3.2 [Byte Order Mark (BOM)](#32-byte-order-mark-bom)
+    - 3.3 [Byte Classes](#33-byte-classes)
+    - 3.4 [Version Directive (spec 1.1)](#34-version-directive-spec-11)
 4. [Lexical Structure](#4-lexical-structure)
+    - 4.1 [Whitespace & Comments](#41-whitespace--comments)
+    - 4.2 [Identifiers (Keys)](#42-identifiers-keys)
+    - 4.3 [String Literals](#43-string-literals)
+    - 4.4 [Symbols](#44-symbols)
+    - 4.5 [References](#45-references)
+    - 4.6 [Numbers](#46-numbers)
+    - 4.7 [Null Values](#47-null-values)
 5. [Type Annotations](#5-type-annotations)
+    - 5.1 [Syntax](#51-syntax)
+    - 5.2 [Parameters](#52-parameters)
+    - 5.3 [Parameter Order](#53-parameter-order)
+    - 5.4 [Examples](#54-examples)
+    - 5.5 [Non-decimal Base with Bare Numbers](#55-non-decimal-base-with-bare-numbers)
 6. [Value Tokens](#6-value-tokens)
+    - 6.1 [Type/Value Compatibility](#61-typevalue-compatibility)
+    - 6.2 [Validation Rules per Numeric Type](#62-validation-rules-per-numeric-type)
+    - 6.3 [Digit Validation](#63-digit-validation)
+    - 6.4 [Special Number Semantics](#64-special-number-semantics)
+    - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
 7. [Arrays](#7-arrays)
+    - 7.1 [Row Syntax](#71-row-syntax)
+    - 7.2 [Null Elements](#72-null-elements)
+    - 7.3 [Row-Size Consistency](#73-row-size-consistency)
+    - 7.4 [Element Homogeneity](#74-element-homogeneity)
+    - 7.5 [Array Elements with Type Annotations](#75-array-elements-with-type-annotations)
+    - 7.6 [Constraints](#76-constraints)
 8. [Structs (Scopes)](#8-structs-scopes)
+    - 8.1 [Syntax](#81-syntax)
+    - 8.2 [Nesting](#82-nesting)
+    - 8.3 [Empty Structs](#83-empty-structs)
+    - 8.4 [Structs as Array Elements](#84-structs-as-array-elements)
+    - 8.5 [Unmatched Braces](#85-unmatched-braces)
 9. [Octet Streams (Binary Mode)](#9-octet-streams-binary-mode)
+    - 9.1 [Overview](#91-overview)
+    - 9.2 [Wire Protocol](#92-wire-protocol)
+    - 9.3 [Events](#93-events)
+    - 9.4 [Example](#94-example)
+    - 9.5 [Constraints](#95-constraints)
 10. [Default Type Synthesis](#10-default-type-synthesis)
+    - 10.1 [Rules](#101-rules)
+    - 10.2 [Event Sequence](#102-event-sequence)
+    - 10.3 [Examples](#103-examples)
 11. [Units System](#11-units-system)
+    - 11.1 [Base Units](#111-base-units)
+    - 11.2 [SI Prefixes](#112-si-prefixes)
+    - 11.3 [IEC Binary Prefixes](#113-iec-binary-prefixes)
+    - 11.4 [Unit Notation](#114-unit-notation)
+    - 11.5 [Unit Exponents](#115-unit-exponents)
+    - 11.6 [Examples](#116-examples)
+    - 11.7 [Compound Unit Constraints](#117-compound-unit-constraints)
+    - 11.8 [The `no_unit` Keyword](#118-the-no_unit-keyword)
 12. [Validation & Constraints](#12-validation--constraints)
+    - 12.1 [UTF-8 Validation](#121-utf-8-validation)
+    - 12.2 [Size Limits](#122-size-limits)
+    - 12.3 [Value Validation](#123-value-validation)
+    - 12.4 [Array Validation](#124-array-validation)
+    - 12.5 [Struct Validation](#125-struct-validation)
+    - 12.6 [Identifier Validation](#126-identifier-validation)
+    - 12.7 [String Validation](#127-string-validation)
+    - 12.8 [Unit Validation](#128-unit-validation)
+    - 12.9 [Octet Stream Validation](#129-octet-stream-validation)
 13. [Error Handling & Recovery](#13-error-handling--recovery)
+    - 13.1 [Error Model](#131-error-model)
+    - 13.2 [Recovery Mode](#132-recovery-mode)
+    - 13.3 [EOF in Resync](#133-eof-in-resync)
 14. [Formal EBNF](#14-formal-ebnf)
 15. [Complete Examples](#15-complete-examples)
+    - 15.1 [Simple Configuration](#151-simple-configuration)
+    - 15.2 [Typed Scientific Data](#152-typed-scientific-data)
+    - 15.3 [Inline Unit Suffix](#153-inline-unit-suffix)
+    - 15.4 [Binary Data with Octet Stream](#154-binary-data-with-octet-stream)
+    - 15.5 [Arrays with Mixed Dimensions](#155-arrays-with-mixed-dimensions)
+    - 15.6 [Deeply Nested Struct](#156-deeply-nested-struct)
+    - 15.7 [References and Symbols](#157-references-and-symbols)
+    - 15.8 [Compound Unit Examples](#158-compound-unit-examples)
+    - 15.9 [Fixed-Point and Decimal Float Examples](#159-fixed-point-and-decimal-float-examples)
+    - 15.10 [Error Examples](#1510-error-examples)
 16. [Reference API](#16-reference-api)
+    - 16.1 [Core Types](#161-core-types)
+    - 16.2 [Type Construction Macros](#162-type-construction-macros)
+    - 16.3 [Unit Macros](#163-unit-macros)
+    - 16.4 [Reader Setup](#164-reader-setup)
+    - 16.5 [Source/Sink Creation](#165-sourcesink-creation)
+    - 16.6 [Reading](#166-reading)
+    - 16.7 [Error Queries](#167-error-queries)
+    - 16.8 [Utility Functions](#168-utility-functions)
+    - 16.9 [Typed Write Helpers](#169-typed-write-helpers)
+    - 16.10 [Error Codes](#1610-error-codes)
 17. [Versioning & Stability](#17-versioning--stability)
+
 - [Appendix A: Event Sequence Reference](#appendix-a-event-sequence-reference)
+    - A.1 [Simple Assignment (Untyped)](#a1-simple-assignment-untyped)
+    - A.2 [Typed Assignment](#a2-typed-assignment)
+    - A.3 [Compound Unit Assignment](#a3-compound-unit-assignment)
+    - A.4 [Array](#a4-array)
+    - A.5 [Struct](#a5-struct)
+    - A.6 [Octet Stream](#a6-octet-stream)
 - [Appendix B: Implementation Notes](#appendix-b-implementation-notes)
+    - B.1 [Keyword State Machine](#b1-keyword-state-machine)
+    - B.2 [Special Number Keywords](#b2-special-number-keywords)
+    - B.3 [Default Width, Base, and Q](#b3-default-width-base-and-q)
+    - B.4 [Type Equality](#b4-type-equality)
+    - B.5 [Numeric Type Check](#b5-numeric-type-check)
+    - B.6 [Unit Component Access](#b6-unit-component-access)
+    - B.7 [Fixed-point and Decimal Float Wire Representations](#b7-fixed-point-and-decimal-float-wire-representations)
 - [Appendix C: Limits Summary](#appendix-c-limits-summary)
+- [See also](#see-also)
 
 ---
 
@@ -35,7 +134,7 @@
 
 **Bovnar** (BVNR) is **unit-safe serialization for scientific and industrial systems**: a **typed, self-describing, text-binary hybrid** format that carries a validated physical unit with every value. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich, unit-aware type annotation system.
 
-### Design Goals
+### 1.1 Design Goals
 
 - **Unit-safe** – every value may carry a physical unit that is validated against a built-in unit table; a unit that conflicts with the type annotation is a parse error (`error_unit_mismatch`)
 - **Self-describing** – values carry explicit type metadata (family, bit-width, base, measurement unit)
@@ -45,7 +144,7 @@
 - **Streamable** – parsed incrementally via a pull-based reader; events emitted to callbacks
 - **Error-recoverable** – optional resync mode for parsing through minor corruption
 
-### Architecture
+### 1.2 Architecture
 
 The reference implementation is a **two-phase** parser:
 
@@ -56,7 +155,7 @@ The reference implementation is a **two-phase** parser:
 
 Both phases receive the same stream of events (`bvnr_event_t`). The validator sits between them.
 
-### Stream Model
+### 1.3 Stream Model
 
 ```
 stream_begin →
@@ -88,7 +187,7 @@ Each assignment is:
 };
 ```
 
-### Key Syntax Rules
+### 2.1 Key Syntax Rules
 
 | Construct | Syntax | Example |
 |-----------|--------|---------|
@@ -2744,9 +2843,15 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar Specification (v1.1)*
+## See also
 
+- [Tutorial](0_bovnar_tutorial.md) — the same format taught by example, start here if this is your first Bovnar document
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the full registry behind §11, with dimensions and conversion factors
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C reader, writer, and DOM that implement §16
+- [EBNF Grammar](5_bovnar.ebnf) — the formal grammar referenced by §14
+- [FAQ](6_bovnar_faq.md) — the questions this document answers indirectly
+- [Conformance Test Tool](7_bovnar_conformance.md) — how an implementation proves it follows this specification
 
+---
 
-
-
+*End of Bovnar — Specification (Bovnar spec 1.1).*

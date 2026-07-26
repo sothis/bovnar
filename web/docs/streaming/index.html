@@ -37,11 +37,16 @@
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
-<h1>Bovnar Streaming, Framing &amp; Multiplexing</h1>
+<h1>Bovnar — Streaming, Framing &amp; Multiplexing</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/9_bovnar_streaming.md">Markdown</a> and <a href="/doc/pdf/bovnar-streaming.pdf">PDF</a>.</p>
+<blockquote>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Reference — protocols layered on the event API, not part of the wire format
+<strong>Scope:</strong> Endless streaming, multi-document framing, octet multiplexing, and embedded documents.</p>
+</blockquote>
 <p>This document describes four capabilities layered <strong>on top of</strong> the Bovnar
 lexer/validator event API, <em>beside</em> the DOM. None of them change the frozen 1.0
-grammar or wire format (see <a href="https://www.bovnar.io/docs/spec/">doc/1_bovnar_spec.md</a>); they are
+grammar or wire format (see the <a href="https://www.bovnar.io/docs/spec/">Specification</a>); they are
 applications built on the SAX-style event pipe and the octet-stream value form.</p>
 <table>
 <thead>
@@ -85,7 +90,30 @@ everything here is another. Octet streams (spec §9) are the binary substrate �
 opaque, chunked, UTF-8-validation-suspended byte regions — and three of the four
 capabilities are sub-protocols carried in or around them.</p>
 <hr />
-<h2 id="1-endless-streaming-2⁶⁴1">1. Endless streaming (2⁶⁴−1)</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-endless-streaming">Endless streaming</a></li>
+<li><a href="#2-multi-document-record-framing">Multi-document record framing</a><ul>
+<li>2.1 <a href="#21-wire-format">Wire format</a></li>
+<li>2.2 <a href="#22-api">API</a></li>
+<li>2.3 <a href="#23-cli">CLI</a></li>
+</ul>
+</li>
+<li><a href="#3-octet-multiplexing-out-of-band-channels-cross-chunk">Octet multiplexing (out-of-band channels, cross-chunk)</a><ul>
+<li>3.1 <a href="#31-wire-convention-two-layers">Wire convention (two layers)</a></li>
+<li>3.2 <a href="#32-api">API</a></li>
+<li>3.3 <a href="#33-cli">CLI</a></li>
+</ul>
+</li>
+<li><a href="#4-document-in-document">Document-in-document</a></li>
+<li><a href="#5-python-bindings">Python bindings</a></li>
+<li><a href="#6-composition">Composition</a></li>
+</ol>
+<ul>
+<li><a href="#see-also">See also</a></li>
+</ul>
+<hr />
+<h2 id="1-endless-streaming">1. Endless streaming</h2>
 <p>Every byte/offset/line/column counter in the core is 64-bit, so a single
 never-ending document — or a single octet stream of unbounded length — is
 limited only by one policy knob: <code>max_file_size</code> on <code>bvnr_read_flags_t</code> /
@@ -129,7 +157,7 @@ To carry a <strong>sequence of independent documents</strong> over one byte stre
 socket, pipe) without closing it, wrap each in a length-prefixed frame. The
 framing lives beside the lexer; each payload is a complete, standalone document
 parsed by an ordinary reader.</p>
-<h3 id="wire-format">Wire format</h3>
+<h3 id="21-wire-format">2.1 Wire format</h3>
 <div class="codehilite"><pre><span></span><code>frame   = &quot;BVF1&quot;            ; 4-byte magic
           payload_len       ; uint64, little-endian
           payload[payload_len]
@@ -138,7 +166,7 @@ stream  = { frame }         ; terminated by EOF on a frame boundary
 
 <p>A clean EOF <em>before any header byte</em> ends the sequence successfully; an EOF
 part-way through a header or payload is a truncation error.</p>
-<h3 id="api">API</h3>
+<h3 id="22-api">2.2 API</h3>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* Producer */</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_frame_write</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="o">*</span><span class="w"> </span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">doc_len</span><span class="p">);</span>
 
@@ -191,7 +219,7 @@ length-delimited frame, the two are independent:</p>
 <p>So you can parse each document <strong>strictly</strong> (<code>continue_on_error = false</code>) yet
 <strong>resiliently</strong> process every frame (<code>continue_past_failed = true</code>), reporting the
 bad ones via <code>on_document</code> — the natural mode for a log of independent records.</p>
-<h3 id="cli">CLI</h3>
+<h3 id="23-cli">2.3 CLI</h3>
 <div class="codehilite"><pre><span></span><code>bovnar<span class="w"> </span>frames<span class="w"> </span>pack<span class="w"> </span>a.bvnr<span class="w"> </span>b.bvnr<span class="w"> </span>c.bvnr<span class="w"> </span>&gt;<span class="w"> </span>docs.bvf<span class="w">   </span><span class="c1"># wrap each file in a frame</span>
 bovnar<span class="w"> </span>frames<span class="w"> </span>list<span class="w"> </span>docs.bvf<span class="w">                          </span><span class="c1"># list documents + status</span>
 bovnar<span class="w"> </span>frames<span class="w"> </span>list<span class="w"> </span>-<span class="w">                                 </span><span class="c1"># read the frame stream from stdin</span>
@@ -203,7 +231,7 @@ bovnar<span class="w"> </span>frames<span class="w"> </span>list<span class="w">
 channel id and message framing are a convention interpreted <em>above</em> <code>ev_data</code>,
 so to the lexer these are ordinary <code>0x01</code> data chunks and <code>bvnr_data_t</code> needs no
 channel field. The 1.0 wire format is untouched.</p>
-<h3 id="wire-convention-two-layers">Wire convention (two layers)</h3>
+<h3 id="31-wire-convention-two-layers">3.1 Wire convention (two layers)</h3>
 <div class="codehilite"><pre><span></span><code>per octet chunk:    varint(channel)  fragment_bytes
 per channel:        concat(fragments in order) = the channel&#39;s logical stream,
                     a sequence of length-prefixed messages:
@@ -227,7 +255,7 @@ per channel:        concat(fragments in order) = the channel&#39;s logical strea
   <code>bvnr_mux_send</code> always satisfies this (the channel id is ≤ 10 bytes and leads
   every chunk).</li>
 </ul>
-<h3 id="api-1">API</h3>
+<h3 id="32-api">3.2 API</h3>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* Producer */</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_begin</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">);</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_send</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span>
@@ -278,7 +306,7 @@ marks (bounded by 4096 channels). Channels are not reclaimed individually.</p>
 <span class="n">bvnr_demux_destroy</span><span class="p">(</span><span class="n">dm</span><span class="p">);</span>
 </code></pre></div>
 
-<h3 id="cli-1">CLI</h3>
+<h3 id="33-cli">3.3 CLI</h3>
 <div class="codehilite"><pre><span></span><code>bovnar<span class="w"> </span>mux<span class="w"> </span>pack<span class="w"> </span><span class="m">1</span>:req.bvnr<span class="w"> </span><span class="m">42</span>:log.bvnr<span class="w"> </span>&gt;<span class="w"> </span>mux.bvnr<span class="w">   </span><span class="c1"># files onto channels 1 and 42</span>
 bovnar<span class="w"> </span>mux<span class="w"> </span>list<span class="w"> </span>mux.bvnr<span class="w">                            </span><span class="c1"># channel &lt;n&gt;: &lt;len&gt; bytes</span>
 bovnar<span class="w"> </span>mux<span class="w"> </span>pack<span class="w"> </span><span class="m">7</span>:a.bvnr<span class="w"> </span><span class="p">|</span><span class="w"> </span>bovnar<span class="w"> </span>mux<span class="w"> </span>list<span class="w"> </span>-<span class="w">        </span><span class="c1"># pipe producer to consumer</span>
@@ -311,7 +339,7 @@ known key between <code>ev_octet_stream_start</code> and <code>ev_octet_stream_e
 <p>The inner callbacks may themselves embed/extract further documents, so nesting
 is arbitrarily deep (bounded by your own recursion budget).</p>
 <hr />
-<h2 id="python-bindings">Python bindings</h2>
+<h2 id="5-python-bindings">5. Python bindings</h2>
 <p>All four capabilities are exposed through the <code>bovnar.stream</code> module (a thin
 ctypes layer over the C functions, so framing, varint reassembly and the
 strict-vs-resilient document policy behave identically):</p>
@@ -338,7 +366,8 @@ for <code>max_document_size</code> and <code>max_message</code>, <code>0</code> 
 (<code>BVNR_DOC_DEFAULT_MAX</code> / <code>BVNR_MUX_DEFAULT_MAX</code>), so pass an explicit large
 value there to raise them. See <a href="https://www.bovnar.io/docs/python/">Python Bindings</a>
 and <code>python/tests/test_stream.py</code>.</p>
-<h2 id="composition">Composition</h2>
+<hr />
+<h2 id="6-composition">6. Composition</h2>
 <p>The four compose cleanly because they live at different layers:</p>
 <ul>
 <li>A <strong>frame stream</strong> (2) can carry documents that each <strong>embed</strong> sub-documents (4).</li>
@@ -352,12 +381,15 @@ your own consumer/producer at the same seam without touching the core.</p>
 <hr />
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="https://www.bovnar.io/docs/spec/#9-octet-streams-binary-mode">Specification §9 — Octet Streams</a></li>
+<li><a href="https://www.bovnar.io/docs/spec/#9-octet-streams-binary-mode">Specification §9 — Octet Streams</a> — the binary substrate three of these four build on</li>
 <li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — the underlying event interface</li>
+<li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the <code>bovnar.stream</code> module described in §5</li>
 <li><code>include/bovnar_stream.h</code> — full declarations and per-function contracts</li>
 <li><code>tests/bovnar_stream_test.c</code> — round-trip tests for all four capabilities</li>
 <li><code>python/bovnar/stream.py</code> — Python bindings; <code>python/tests/test_stream.py</code></li>
 </ul>
+<hr />
+<p><em>End of Bovnar — Streaming, Framing &amp; Multiplexing (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

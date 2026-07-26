@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Conformance Testing</title>
-<meta name="description" content="The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta name="description" content="The Bovnar 364-case conformance test suite and the IUT protocol for validating third-party implementations.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/docs/conformance/">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:title" content="Bovnar Conformance Testing">
-<meta property="og:description" content="The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta property="og:description" content="The Bovnar 364-case conformance test suite and the IUT protocol for validating third-party implementations.">
 <meta property="og:url" content="https://www.bovnar.io/docs/conformance/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
@@ -26,39 +26,70 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Conformance Testing">
-<meta name="twitter:description" content="The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta name="twitter:description" content="The Bovnar 364-case conformance test suite and the IUT protocol for validating third-party implementations.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/7_bovnar_conformance.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Conformance Testing", "description": "The Bovnar 319-case conformance test suite and the IUT protocol for validating third-party implementations.", "url": "https://www.bovnar.io/docs/conformance/", "mainEntityOfPage": "https://www.bovnar.io/docs/conformance/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-17", "dateModified": "2026-07-26", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Conformance Testing", "item": "https://www.bovnar.io/docs/conformance/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Conformance Testing", "description": "The Bovnar 364-case conformance test suite and the IUT protocol for validating third-party implementations.", "url": "https://www.bovnar.io/docs/conformance/", "mainEntityOfPage": "https://www.bovnar.io/docs/conformance/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-17", "dateModified": "2026-07-26", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Conformance Testing", "item": "https://www.bovnar.io/docs/conformance/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
-<h1>Bovnar Conformance Test Tool</h1>
+<h1>Bovnar — Conformance Test Tool</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/7_bovnar_conformance.md">Markdown</a> and <a href="/doc/pdf/bovnar-conformance.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Version:</strong> 1.1
-<strong>Protocol:</strong> bvnr-conformance-v1
-<strong>Last updated:</strong> 2026-06-01</p>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Normative — conformance protocol <code>bvnr-conformance-v1</code>
+<strong>Scope:</strong> The conformance corpus, the IUT protocol, and how to validate a third-party implementation.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#1-purpose">Purpose</a></li>
-<li><a href="#2-quick-start">Quick Start</a></li>
-<li><a href="#3-architecture">Architecture</a></li>
+<li><a href="#2-quick-start">Quick Start</a><ul>
+<li>2.1 <a href="#21-self-test-verify-the-reference-implementation">Self-test (verify the reference implementation)</a></li>
+<li>2.2 <a href="#22-testing-an-external-implementation">Testing an external implementation</a></li>
+<li>2.3 <a href="#23-filtering-by-group">Filtering by group</a></li>
+</ul>
+</li>
+<li><a href="#3-architecture">Architecture</a><ul>
+<li>3.1 <a href="#31-validation-tiers">Validation tiers</a></li>
+</ul>
+</li>
 <li><a href="#4-building">Building</a></li>
-<li><a href="#5-running">Running</a></li>
-<li><a href="#6-iut-protocol">IUT Protocol</a></li>
-<li><a href="#7-writing-a-compliant-iut-adapter">Writing a Compliant IUT Adapter</a></li>
-<li><a href="#8-test-case-corpus">Test Case Corpus</a></li>
+<li><a href="#5-running">Running</a><ul>
+<li>5.1 <a href="#51-command-line-options">Command-line options</a></li>
+<li>5.2 <a href="#52-examples">Examples</a></li>
+<li>5.3 <a href="#53-test-groups">Test groups</a></li>
+</ul>
+</li>
+<li><a href="#6-iut-protocol">IUT Protocol</a><ul>
+<li>6.1 <a href="#61-communication-model">Communication model</a></li>
+<li>6.2 <a href="#62-success-response">Success response</a></li>
+<li>6.3 <a href="#63-error-response">Error response</a></li>
+</ul>
+</li>
+<li><a href="#7-writing-a-compliant-iut-adapter">Writing a Compliant IUT Adapter</a><ul>
+<li>7.1 <a href="#71-event-log-format-reference">Event log format reference</a></li>
+<li>7.2 <a href="#72-field-details">Field details</a></li>
+<li>7.3 <a href="#73-token_type-values-for-data-lines">TOKEN_TYPE values for DATA lines</a></li>
+<li>7.4 <a href="#74-effective-width-and-base">Effective width and base</a></li>
+<li>7.5 <a href="#75-example-traces">Example traces</a></li>
+</ul>
+</li>
+<li><a href="#8-test-case-corpus">Test Case Corpus</a><ul>
+<li>8.1 <a href="#81-coverage-summary">Coverage summary</a></li>
+</ul>
+</li>
 <li><a href="#9-output-format-tap">Output Format (TAP)</a></li>
 <li><a href="#10-extending-the-corpus">Extending the Corpus</a></li>
 <li><a href="#11-cmake-integration">CMake Integration</a></li>
 </ol>
+<ul>
+<li><a href="#see-also">See also</a></li>
+</ul>
 <hr />
 <h2 id="1-purpose">1. Purpose</h2>
 <p>The Bovnar Conformance Test Tool (<code>bvnr_conformance</code>) verifies that any
@@ -87,13 +118,13 @@ implementations are judged.</p>
 </table>
 <hr />
 <h2 id="2-quick-start">2. Quick Start</h2>
-<h3 id="self-test-verify-the-reference-implementation">Self-test (verify the reference implementation)</h3>
+<h3 id="21-self-test-verify-the-reference-implementation">2.1 Self-test (verify the reference implementation)</h3>
 <div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>build
 cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span>bvnr_conformance
 ctest<span class="w"> </span>-R<span class="w"> </span>bvnr_conformance_self<span class="w"> </span>--output-on-failure
 </code></pre></div>
 
-<h3 id="testing-an-external-implementation">Testing an external implementation</h3>
+<h3 id="22-testing-an-external-implementation">2.2 Testing an external implementation</h3>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Build your adapter (see Section 7)</span>
 cc<span class="w"> </span>-o<span class="w"> </span>my_impl_adapter<span class="w"> </span>my_adapter.c<span class="w"> </span>-lmy_bovnar
 
@@ -101,7 +132,7 @@ cc<span class="w"> </span>-o<span class="w"> </span>my_impl_adapter<span class="
 ./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_impl_adapter
 </code></pre></div>
 
-<h3 id="filtering-by-group">Filtering by group</h3>
+<h3 id="23-filtering-by-group">2.3 Filtering by group</h3>
 <div class="codehilite"><pre><span></span><code>./tests/bvnr_conformance<span class="w"> </span>--filter<span class="w"> </span>units
 ./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_impl_adapter<span class="w"> </span>--filter<span class="w"> </span>arrays
 </code></pre></div>
@@ -128,7 +159,7 @@ cc<span class="w"> </span>-o<span class="w"> </span>my_impl_adapter<span class="
 <p>The reference implementation is the single authoritative oracle.  An
 implementation is conformant when its IUT adapter produces output
 byte-for-byte identical to the reference for every test case.</p>
-<h3 id="validation-tiers">Validation tiers</h3>
+<h3 id="31-validation-tiers">3.1 Validation tiers</h3>
 <p>Most cases exercise the <strong>streaming reader</strong> (<code>bvnr_read</code>): the lexer,
 validator, and the <code>on_verified</code> event stream the IUT protocol mirrors. A
 smaller set — the <code>homogeneity</code> group — exercises the <strong>materialised-document
@@ -175,7 +206,7 @@ cmake<span class="w"> </span>--build<span class="w"> </span>.
 dependencies beyond libc and POSIX are required.</p>
 <hr />
 <h2 id="5-running">5. Running</h2>
-<h3 id="command-line-options">Command-line options</h3>
+<h3 id="51-command-line-options">5.1 Command-line options</h3>
 <div class="codehilite"><pre><span></span><code>bvnr_conformance [OPTIONS]
 
 Options:
@@ -186,7 +217,7 @@ Options:
   --help           Show this help and exit
 </code></pre></div>
 
-<h3 id="examples">Examples</h3>
+<h3 id="52-examples">5.2 Examples</h3>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Run self-test (reference vs. reference)</span>
 ./tests/bvnr_conformance
 
@@ -206,7 +237,7 @@ Options:
 ./tests/bvnr_conformance<span class="w"> </span>--iut<span class="w"> </span>./my_adapter<span class="w"> </span>--filter<span class="w"> </span>units
 </code></pre></div>
 
-<h3 id="test-groups">Test groups</h3>
+<h3 id="53-test-groups">5.3 Test groups</h3>
 <table>
 <thead>
 <tr>
@@ -310,7 +341,7 @@ Options:
 <p>The <strong>IUT (Implementation Under Test) Protocol</strong> version 1
 (<code>bvnr-conformance-v1</code>) defines the interface between the conformance
 driver and a candidate implementation's adapter binary.</p>
-<h3 id="communication-model">Communication model</h3>
+<h3 id="61-communication-model">6.1 Communication model</h3>
 <div class="codehilite"><pre><span></span><code>conformance driver                    IUT adapter
        │                                   │
        │  fork, exec IUT binary            │
@@ -329,7 +360,7 @@ driver and a candidate implementation's adapter binary.</p>
        │ ←─────────────────────────────── │
 </code></pre></div>
 
-<h3 id="success-response">Success response</h3>
+<h3 id="62-success-response">6.2 Success response</h3>
 <p>The IUT must:</p>
 <ol>
 <li>Exit with code <strong>0</strong>.</li>
@@ -337,7 +368,7 @@ driver and a candidate implementation's adapter binary.</p>
 </ol>
 <p>The event log is a sequence of lines, one event per line, in the order
 the events were received from the <code>on_verified</code> callback.</p>
-<h3 id="error-response">Error response</h3>
+<h3 id="63-error-response">6.3 Error response</h3>
 <p>The IUT must:</p>
 <ol>
 <li>Exit with code <strong>non-zero</strong> (typically 1).</li>
@@ -358,7 +389,7 @@ as a template for third-party implementors.</p>
 <li><strong>Emit the event log</strong> to stdout on success.</li>
 <li><strong>Emit</strong> <code>ERROR &lt;code_name&gt;\n</code> to stdout and exit non-zero on failure.</li>
 </ol>
-<h3 id="event-log-format-reference">Event log format reference</h3>
+<h3 id="71-event-log-format-reference">7.1 Event log format reference</h3>
 <p>Each event maps to one line.  Text fields use <code>\xNN</code> escaping for any
 byte outside the printable ASCII range <code>0x20–0x7E</code> or for the backslash
 character <code>0x5C</code>.</p>
@@ -381,7 +412,7 @@ OCTET_STREAM_START
 OCTET_STREAM_END
 </code></pre></div>
 
-<h3 id="field-details">Field details</h3>
+<h3 id="72-field-details">7.2 Field details</h3>
 <table>
 <thead>
 <tr>
@@ -478,7 +509,7 @@ OCTET_STREAM_END
 </tr>
 </tbody>
 </table>
-<h3 id="token_type-values-for-data-lines">TOKEN_TYPE values for DATA lines</h3>
+<h3 id="73-token_type-values-for-data-lines">7.3 TOKEN_TYPE values for DATA lines</h3>
 <table>
 <thead>
 <tr>
@@ -528,7 +559,7 @@ OCTET_STREAM_END
 <p>For <code>octets</code> token type, the value field is <code>&lt;N&gt; bytes</code> (decimal byte
 count, then a space, then the literal string <code>bytes</code>), not the raw
 binary data.</p>
-<h3 id="effective-width-and-base">Effective width and base</h3>
+<h3 id="74-effective-width-and-base">7.4 Effective width and base</h3>
 <ul>
 <li><strong>Effective width</strong>: if the stored width is 0, emit <code>64</code>.
   Use <code>bvn_effective_width(value_type)</code>.</li>
@@ -538,7 +569,7 @@ binary data.</p>
 <p>These rules ensure that untyped values synthesised to <code>uint:64,_10</code>
 produce <code>TYPE_PARAM_WIDTH 64</code> and <code>TYPE_PARAM_BASE 10</code>, matching the
 reference output exactly.</p>
-<h3 id="example-traces">Example traces</h3>
+<h3 id="75-example-traces">7.5 Example traces</h3>
 <p><strong>Input:</strong> <code>.x = 42;</code></p>
 <div class="codehilite"><pre><span></span><code>STREAM_START
 ASSIGNMENT_START x
@@ -667,7 +698,7 @@ specifies:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="coverage-summary">Coverage summary</h3>
+<h3 id="81-coverage-summary">8.1 Coverage summary</h3>
 <table>
 <thead>
 <tr>
@@ -897,6 +928,17 @@ path for every valid test case.</p>
 <p>To run all tests including conformance:</p>
 <div class="codehilite"><pre><span></span><code>ctest<span class="w"> </span>--output-on-failure
 </code></pre></div>
+
+<hr />
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/spec/">Specification</a> — the behaviour the corpus tests</li>
+<li><a href="https://www.bovnar.io/docs/grammar/">EBNF Grammar</a> — the grammar an implementation under test must accept</li>
+<li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — the reference reader and writer the adapter drives</li>
+<li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the unit table a conforming implementation needs</li>
+</ul>
+<hr />
+<p><em>End of Bovnar — Conformance Test Tool (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

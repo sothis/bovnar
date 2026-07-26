@@ -1,8 +1,8 @@
-# Bovnar Conformance Test Tool
+# Bovnar — Conformance Test Tool
 
-> **Version:** 1.1
-> **Protocol:** bvnr-conformance-v1
-> **Last updated:** 2026-06-01
+> **Spec version:** 1.1
+> **Status:** Normative — conformance protocol `bvnr-conformance-v1`
+> **Scope:** The conformance corpus, the IUT protocol, and how to validate a third-party implementation.
 
 ---
 
@@ -10,15 +10,33 @@
 
 1. [Purpose](#1-purpose)
 2. [Quick Start](#2-quick-start)
+    - 2.1 [Self-test (verify the reference implementation)](#21-self-test-verify-the-reference-implementation)
+    - 2.2 [Testing an external implementation](#22-testing-an-external-implementation)
+    - 2.3 [Filtering by group](#23-filtering-by-group)
 3. [Architecture](#3-architecture)
+    - 3.1 [Validation tiers](#31-validation-tiers)
 4. [Building](#4-building)
 5. [Running](#5-running)
+    - 5.1 [Command-line options](#51-command-line-options)
+    - 5.2 [Examples](#52-examples)
+    - 5.3 [Test groups](#53-test-groups)
 6. [IUT Protocol](#6-iut-protocol)
+    - 6.1 [Communication model](#61-communication-model)
+    - 6.2 [Success response](#62-success-response)
+    - 6.3 [Error response](#63-error-response)
 7. [Writing a Compliant IUT Adapter](#7-writing-a-compliant-iut-adapter)
+    - 7.1 [Event log format reference](#71-event-log-format-reference)
+    - 7.2 [Field details](#72-field-details)
+    - 7.3 [TOKEN_TYPE values for DATA lines](#73-token_type-values-for-data-lines)
+    - 7.4 [Effective width and base](#74-effective-width-and-base)
+    - 7.5 [Example traces](#75-example-traces)
 8. [Test Case Corpus](#8-test-case-corpus)
+    - 8.1 [Coverage summary](#81-coverage-summary)
 9. [Output Format (TAP)](#9-output-format-tap)
 10. [Extending the Corpus](#10-extending-the-corpus)
 11. [CMake Integration](#11-cmake-integration)
+
+- [See also](#see-also)
 
 ---
 
@@ -41,7 +59,7 @@ Two use modes are supported:
 
 ## 2. Quick Start
 
-### Self-test (verify the reference implementation)
+### 2.1 Self-test (verify the reference implementation)
 
 ```sh
 cd build
@@ -49,7 +67,7 @@ cmake --build . --target bvnr_conformance
 ctest -R bvnr_conformance_self --output-on-failure
 ```
 
-### Testing an external implementation
+### 2.2 Testing an external implementation
 
 ```sh
 # Build your adapter (see Section 7)
@@ -59,7 +77,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ./tests/bvnr_conformance --iut ./my_impl_adapter
 ```
 
-### Filtering by group
+### 2.3 Filtering by group
 
 ```sh
 ./tests/bvnr_conformance --filter units
@@ -92,7 +110,7 @@ The reference implementation is the single authoritative oracle.  An
 implementation is conformant when its IUT adapter produces output
 byte-for-byte identical to the reference for every test case.
 
-### Validation tiers
+### 3.1 Validation tiers
 
 Most cases exercise the **streaming reader** (`bvnr_read`): the lexer,
 validator, and the `on_verified` event stream the IUT protocol mirrors. A
@@ -133,7 +151,7 @@ dependencies beyond libc and POSIX are required.
 
 ## 5. Running
 
-### Command-line options
+### 5.1 Command-line options
 
 ```
 bvnr_conformance [OPTIONS]
@@ -146,7 +164,7 @@ Options:
   --help           Show this help and exit
 ```
 
-### Examples
+### 5.2 Examples
 
 ```sh
 # Run self-test (reference vs. reference)
@@ -168,7 +186,7 @@ Options:
 ./tests/bvnr_conformance --iut ./my_adapter --filter units
 ```
 
-### Test groups
+### 5.3 Test groups
 
 | Group | Description |
 |-------|-------------|
@@ -203,7 +221,7 @@ The **IUT (Implementation Under Test) Protocol** version 1
 (`bvnr-conformance-v1`) defines the interface between the conformance
 driver and a candidate implementation's adapter binary.
 
-### Communication model
+### 6.1 Communication model
 
 ```
 conformance driver                    IUT adapter
@@ -224,7 +242,7 @@ conformance driver                    IUT adapter
        │ ←─────────────────────────────── │
 ```
 
-### Success response
+### 6.2 Success response
 
 The IUT must:
 
@@ -234,7 +252,7 @@ The IUT must:
 The event log is a sequence of lines, one event per line, in the order
 the events were received from the `on_verified` callback.
 
-### Error response
+### 6.3 Error response
 
 The IUT must:
 
@@ -260,7 +278,7 @@ A minimal conforming adapter must:
 4. **Emit the event log** to stdout on success.
 5. **Emit** `ERROR <code_name>\n` to stdout and exit non-zero on failure.
 
-### Event log format reference
+### 7.1 Event log format reference
 
 Each event maps to one line.  Text fields use `\xNN` escaping for any
 byte outside the printable ASCII range `0x20–0x7E` or for the backslash
@@ -286,7 +304,7 @@ OCTET_STREAM_START
 OCTET_STREAM_END
 ```
 
-### Field details
+### 7.2 Field details
 
 | Line | Fields | Notes |
 |------|--------|-------|
@@ -308,7 +326,7 @@ OCTET_STREAM_END
 | `OCTET_STREAM_START` | — | |
 | `OCTET_STREAM_END` | — | |
 
-### TOKEN_TYPE values for DATA lines
+### 7.3 TOKEN_TYPE values for DATA lines
 
 | Token type | String |
 |------------|--------|
@@ -326,7 +344,7 @@ For `octets` token type, the value field is `<N> bytes` (decimal byte
 count, then a space, then the literal string `bytes`), not the raw
 binary data.
 
-### Effective width and base
+### 7.4 Effective width and base
 
 - **Effective width**: if the stored width is 0, emit `64`.
   Use `bvn_effective_width(value_type)`.
@@ -337,7 +355,7 @@ These rules ensure that untyped values synthesised to `uint:64,_10`
 produce `TYPE_PARAM_WIDTH 64` and `TYPE_PARAM_BASE 10`, matching the
 reference output exactly.
 
-### Example traces
+### 7.5 Example traces
 
 **Input:** `.x = 42;`
 
@@ -453,7 +471,7 @@ specifies:
 | `max_*` | Limit overrides (0 = use defaults) |
 | `expect_key` | Optional: key name expected in event log |
 
-### Coverage summary
+### 8.1 Coverage summary
 
 | Group | Cases | What is tested |
 |-------|-------|---------------|
@@ -590,3 +608,16 @@ To run all tests including conformance:
 ```sh
 ctest --output-on-failure
 ```
+
+---
+
+## See also
+
+- [Specification](1_bovnar_spec.md) — the behaviour the corpus tests
+- [EBNF Grammar](5_bovnar.ebnf) — the grammar an implementation under test must accept
+- [Read & Write API](3_bovnar_readwrite_api.md) — the reference reader and writer the adapter drives
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit table a conforming implementation needs
+
+---
+
+*End of Bovnar — Conformance Test Tool (Bovnar spec 1.1).*

@@ -1,6 +1,7 @@
-# Bovnar Quantity Annotation System — Unit and Currency Reference
+# Bovnar — Unit & Currency Reference
 
-> **Applies to:** Bovnar (BVNR) specification version 1.1
+> **Spec version:** 1.1
+> **Status:** Normative — the unit and currency registry the parser validates against
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
 ---
@@ -8,61 +9,66 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
+    - 1.1 [Design Principles](#11-design-principles)
 2. [Syntax — Annotation as a Type Parameter](#2-syntax--annotation-as-a-type-parameter)
+    - 2.1 [Parameter Ordering Flexibility](#21-parameter-ordering-flexibility)
+    - 2.2 [Inline Unit Suffix](#22-inline-unit-suffix)
+    - 2.3 [Applicable Type Families](#23-applicable-type-families)
 3. [Physical Base Units](#3-physical-base-units)
-   - 3.1 [SI Base Units](#31-si-base-units)
-   - 3.2 [Named SI-Derived Units](#32-named-si-derived-units)
-   - 3.3 [Non-SI Units Accepted for Use with SI](#33-non-si-units-accepted-for-use-with-si)
-   - 3.4 [Imperial and US Customary Units](#34-imperial-and-us-customary-units)
-   - 3.5 [Pressure Units](#35-pressure-units)
-   - 3.6 [Energy Units](#36-energy-units)
-   - 3.7 [Power Units](#37-power-units)
-   - 3.8 [Force Units](#38-force-units)
-   - 3.9 [Speed and Rotational Frequency](#39-speed-and-rotational-frequency-units)
-   - 3.10 [Volume Units](#310-volume-units)
-   - 3.11 [Area Units](#311-area-units)
-   - 3.12 [Angle Units](#312-angle-units)
-   - 3.13 [CGS Units](#313-cgs-units)
-   - 3.14 [Radiation Units](#314-radiation-units)
-   - 3.15 [Logarithmic Units](#315-logarithmic-units)
-   - 3.16 [Electrical Power Units](#316-electrical-power-units)
-   - 3.17 [Digital Units](#317-digital-units)
-   - 3.18 [Textile Linear Density](#318-textile-linear-density)
-   - 3.19 [US Apothecary / Dry Volume](#319-us-apothecary--dry-volume)
-   - 3.20 [Old German Units](#320-old-german-units)
-   - 3.21 [Additional Length Units](#321-additional-length-units)
-   - 3.22 [Additional Mass Units](#322-additional-mass-units)
-   - 3.23 [Acceleration](#323-acceleration)
-   - 3.24 [Signal Rate](#324-signal-rate)
-   - 3.25 [Ratio and Proportion Units](#325-ratio-and-proportion-units)
-   - 3.26 [Named Speed Units](#326-named-speed-units)
-   - 3.27 [Acidity](#327-acidity)
-   - 3.28 [Water Hardness](#328-water-hardness)
-   - 3.28.1 [Conductivity and Dissolved Solids](#3281-conductivity-and-dissolved-solids)
-   - 3.28.2 [Turbidity and Salinity](#3282-turbidity-and-salinity)
-   - 3.29 [Sentinel Value](#329-sentinel-value)
+    - 3.1 [SI Base Units](#31-si-base-units)
+    - 3.2 [Named SI-Derived Units](#32-named-si-derived-units)
+    - 3.3 [Non-SI Units Accepted for Use with SI](#33-non-si-units-accepted-for-use-with-si)
+    - 3.4 [Imperial and US Customary Units](#34-imperial-and-us-customary-units)
+    - 3.5 [Pressure Units](#35-pressure-units)
+    - 3.6 [Energy Units](#36-energy-units)
+    - 3.7 [Power Units](#37-power-units)
+    - 3.8 [Force Units](#38-force-units)
+    - 3.9 [Speed and Rotational Frequency Units](#39-speed-and-rotational-frequency-units)
+    - 3.10 [Volume Units](#310-volume-units)
+    - 3.11 [Area Units](#311-area-units)
+    - 3.12 [Angle Units](#312-angle-units)
+    - 3.13 [CGS Units](#313-cgs-units)
+    - 3.14 [Radiation Units](#314-radiation-units)
+    - 3.15 [Logarithmic Units](#315-logarithmic-units)
+    - 3.16 [Electrical Power Units](#316-electrical-power-units)
+    - 3.17 [Digital Units](#317-digital-units)
+    - 3.18 [Textile Linear Density](#318-textile-linear-density)
+    - 3.19 [US Apothecary / Dry Volume](#319-us-apothecary--dry-volume)
+    - 3.20 [Old German Units](#320-old-german-units)
+    - 3.21 [Additional Length Units](#321-additional-length-units)
+    - 3.22 [Additional Mass Units](#322-additional-mass-units)
+    - 3.23 [Acceleration](#323-acceleration)
+    - 3.24 [Signal Rate](#324-signal-rate)
+    - 3.25 [Ratio and Proportion Units](#325-ratio-and-proportion-units)
+    - 3.26 [Named Speed Units](#326-named-speed-units)
+    - 3.27 [Acidity](#327-acidity)
+    - 3.28 [Water Hardness](#328-water-hardness)
+    - 3.29 [Conductivity and Dissolved Solids](#329-conductivity-and-dissolved-solids)
+    - 3.30 [Turbidity and Salinity](#330-turbidity-and-salinity)
+    - 3.31 [Sentinel Value](#331-sentinel-value)
 4. [Prefixes](#4-prefixes)
-   - 4.1 [SI Prefixes](#41-si-prefixes)
-   - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
+    - 4.1 [SI Prefixes](#41-si-prefixes)
+    - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
+    - 4.3 [Compact Prefix Form](#43-compact-prefix-form)
 5. [Unit Notation Grammar](#5-unit-notation-grammar)
-   - 5.1 [Simple Units](#51-simple-units)
-   - 5.2 [Compound Units](#52-compound-units)
-   - 5.3 [Separators](#53-separators)
-   - 5.4 [Denominator Semantics](#54-denominator-semantics)
+    - 5.1 [Simple Units](#51-simple-units)
+    - 5.2 [Compound Units](#52-compound-units)
+    - 5.3 [Separators](#53-separators)
+    - 5.4 [Denominator Semantics](#54-denominator-semantics)
 6. [Exponents](#6-exponents)
-   - 6.1 [Unicode Superscript Form](#61-unicode-superscript-form)
-   - 6.2 [ASCII Caret Form](#62-ascii-caret-form)
-   - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
+    - 6.1 [Unicode Superscript Form](#61-unicode-superscript-form)
+    - 6.2 [ASCII Caret Form](#62-ascii-caret-form)
+    - 6.3 [Exponent Edge Cases](#63-exponent-edge-cases)
 7. [The `no_unit` Keyword](#7-the-no_unit-keyword)
 8. [Constraints and Limits](#8-constraints-and-limits)
 9. [Currency Codes](#9-currency-codes)
-   - 9.1 [The `$` Sigil Rule](#91-the--sigil-rule)
-   - 9.2 [ISO 4217 Fiat Currencies and Precious Metals](#92-iso-4217-fiat-currencies-and-precious-metals)
-   - 9.3 [Cryptocurrencies](#93-cryptocurrencies)
-   - 9.4 [Prefix Rules for Currency Units](#94-prefix-rules-for-currency-units)
-   - 9.5 [Compound Currency Expressions](#95-compound-currency-expressions)
-   - 9.6 [Compatibility Rules](#96-compatibility-rules)
-   - 9.7 [Type Pairing Recommendations](#97-type-pairing-recommendations)
+    - 9.1 [The `$` Sigil Rule](#91-the--sigil-rule)
+    - 9.2 [ISO 4217 Fiat Currencies and Precious Metals](#92-iso-4217-fiat-currencies-and-precious-metals)
+    - 9.3 [Cryptocurrencies](#93-cryptocurrencies)
+    - 9.4 [Prefix Rules for Currency Units](#94-prefix-rules-for-currency-units)
+    - 9.5 [Compound Currency Expressions](#95-compound-currency-expressions)
+    - 9.6 [Compatibility Rules](#96-compatibility-rules)
+    - 9.7 [Type Pairing Recommendations](#97-type-pairing-recommendations)
 10. [Symbol Disambiguation](#10-symbol-disambiguation)
     - 10.1 [The Namespace Rule as Disambiguator](#101-the-namespace-rule-as-disambiguator)
     - 10.2 [Exhaustive Conflict Table](#102-exhaustive-conflict-table)
@@ -80,6 +86,10 @@
     - 12.5 [Currency API](#125-currency-api)
     - 12.6 [Python API](#126-python-api)
 13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
+    - 13.1 [Full event sequence — physical unit](#131-full-event-sequence--physical-unit)
+    - 13.2 [Full event sequence — currency unit](#132-full-event-sequence--currency-unit)
+    - 13.3 [Inline unit suffix — event stream view](#133-inline-unit-suffix--event-stream-view)
+    - 13.4 [Practical callback](#134-practical-callback)
 14. [Validation Errors](#14-validation-errors)
 15. [Annotated Examples](#15-annotated-examples)
     - 15.1 [Physical Quantities](#151-physical-quantities)
@@ -87,6 +97,7 @@
     - 15.3 [Compound SI Quantities](#153-compound-si-quantities)
     - 15.4 [Currency Amounts and Rates](#154-currency-amounts-and-rates)
     - 15.5 [Error Cases](#155-error-cases)
+- [See also](#see-also)
 
 ---
 
@@ -103,7 +114,7 @@ Both namespaces are syntactically unified: the same grammar, the same `~` prefix
 
 Annotations are **descriptive**, not prescriptive: the *validator* checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — `bvn_units_compatible`, `bvn_unit_convert_factor`, `bvn_unit_convert_value` and the exact-rational `bvn_unit_convert_rational` (§12.4), plus the reader's `want_unit` hook, which converts at read time (§7c of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).
 
-### Design Principles
+### 1.1 Design Principles
 
 - **SI-first.** All SI base units, all 22 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.
 - **Binary-prefix aware.** IEC 80000-13 binary prefixes (kibi … yobi) are supported for digital storage quantities, plus `Ri`/`Qi` (robi, quebi) as a forward-looking extension — those two are a proposal, not part of IEC 80000-13, which stops at yobi.
@@ -166,7 +177,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 .v = <float:64,m> 1.0 s;           # ERROR: error_unit_mismatch
 ```
 
-### Applicable Type Families
+### 2.3 Applicable Type Families
 
 | Type family | Unit / currency parameter |
 |-------------|--------------------------|
@@ -228,7 +239,7 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 
 > **Photometry: the steradian is carried, not dropped.** `lm`, `lx` and `ph` are
 > defined *through* the steradian, so they carry its quantity kind (§3.12 and
-> §10 of [`unit_ambiguities.md`](unit_ambiguities.md)); `cd` and `sb` do not.
+> §11 of [Unit Ambiguities](unit_ambiguities.md)); `cd` and `sb` do not.
 > The SI dimension vector cannot tell them apart — every photometric unit reduces
 > to candela in base dimensions — so without the kind the library both refused
 > `lm ↔ cd·sr` and converted `lm ↔ cd` at factor 1, which is the same claim with
@@ -653,7 +664,7 @@ Reading across, with 1 mmol·L⁻¹ as the reference:
 > Likewise water chemistry writes the American scale as "ppm"; Bovnar's `ppm` is the dimensionless
 > 10⁻⁶ and is *not* interchangeable with `°aH`. See [`unit_ambiguities.md`](unit_ambiguities.md).
 
-### 3.28.1 Conductivity and Dissolved Solids
+### 3.29 Conductivity and Dissolved Solids
 
 Two quantities that water data quotes constantly and that need **no unit of their own** — the
 existing tables already say them exactly.
@@ -676,7 +687,7 @@ existing tables already say them exactly.
 > (the 500/442/700 scales). That factor is a property of the instrument and the water, not of a
 > unit — record the EC in `µS/cm` and the factor separately, or record the TDS as `mg/L`.
 
-### 3.28.2 Turbidity and Salinity
+### 3.30 Turbidity and Salinity
 
 Six scales defined by a **measurement method** rather than by a physical quantity. They are
 dimensionless, and each carries its own quantity kind, so none of them converts to another or to a
@@ -726,7 +737,7 @@ None of the five turbidity scales converts to any other:
 > salinity write the mass fraction directly: `g/k~g`. The scale is bounded by construction, so it
 > takes no prefix.
 
-### 3.29 Sentinel Value
+### 3.31 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
 
@@ -810,7 +821,7 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 - **SI sub-kilo prefixes** (`d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`, `da`, `h`) are forbidden on `b` and `B`.
 - **German units** (`bu_pfund` through `bu_scheffel`) accept only `si_none`/`iec_none`.
 - **Ratio units** (`%`, `‰`, `‱`, `pcm`, `ppm`, `ppb`) likewise: a prefixed per-cent is meaningless. `k~%` → `error_unit_illegal` (§3.25).
-- **Scales that are already a scale** — `pH`, `mph`, `kph`, the five water-hardness degrees, `gpg`, `CF`, `PSU`, `JTU` — take no prefix either. Each carries its reason in §3.26–§3.28.2; `NTU`, `FNU`, `FTU` and `FAU` *do* take one, because a milli-NTU is a real ultrapure-water measurement.
+- **Scales that are already a scale** — `pH`, `mph`, `kph`, the five water-hardness degrees, `gpg`, `CF`, `PSU`, `JTU` — take no prefix either. Each carries its reason in §3.26–§3.30; `NTU`, `FNU`, `FTU` and `FAU` *do* take one, because a milli-NTU is a real ultrapure-water measurement.
 - **Currency units** accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.
 
 ```bovnar
@@ -1993,7 +2004,7 @@ Unit information flows into the application through two paths:
 
 In both cases the effective unit is reported in the `bvnr_data_t.value_unit` field of the `ev_data` event.
 
-### Full event sequence — physical unit
+### 13.1 Full event sequence — physical unit
 
 ```
 Input: .force = <float:64,k~g·m/s²> 9.81;
@@ -2011,7 +2022,7 @@ ev_type_annotation_end
 ev_data   data="9.81"
 ```
 
-### Full event sequence — currency unit
+### 13.2 Full event sequence — currency unit
 
 ```
 Input: .price = <float_dec:64,$USD> 19.99;
@@ -2029,7 +2040,7 @@ ev_data   data="19.99"
 
 For events with an explicit type annotation but no unit parameter, the unit event is **not emitted**. For `no_unit`, the unit event IS emitted with `BVN_UNIT_NONE` (`num_components=0`). For synthesised (default) type annotations, the unit event IS emitted with `BVN_UNIT_NO_PREFIX(bu_none)`.
 
-### Inline unit suffix — event stream view
+### 13.3 Inline unit suffix — event stream view
 
 ```
 Input: .distance = 1500 m;
@@ -2048,7 +2059,7 @@ ev_data   data="1500"
 
 The `value_unit` field of `ev_data` always reflects the final, reconciled unit.
 
-### Practical callback
+### 13.4 Practical callback
 
 ```c
 bool my_verified_handler(void* userdata, bvnr_event_t ev, bvnr_data_t* d)
@@ -2237,4 +2248,14 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar Quantity Annotation System — Unit and Currency Reference, v1.1.*
+## See also
+
+- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit is attached to a value
+- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in this registry, in table form
+- [Unit Ambiguities](unit_ambiguities.md) — every token that could plausibly mean two things
+- [Read & Write API](3_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
+- [Python Bindings](4_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
+
+---
+
+*End of Bovnar — Unit & Currency Reference (Bovnar spec 1.1).*

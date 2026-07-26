@@ -9,6 +9,27 @@
 
 ---
 
+## Table of Contents
+
+- [Links](#links)
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Format at a Glance](#format-at-a-glance)
+- [Where Bovnar Fits](#where-bovnar-fits)
+- [Repository Layout](#repository-layout)
+- [Building](#building)
+- [Command-Line Tool](#command-line-tool)
+- [Running the Tests](#running-the-tests)
+- [C API — Quick Start](#c-api--quick-start)
+- [Python Bindings — Quick Start](#python-bindings--quick-start)
+- [Syntax Highlighting](#syntax-highlighting)
+- [Web Playground](#web-playground)
+- [Use Cases](#use-cases)
+- [Documentation](#documentation)
+- [License](#license)
+
+---
+
 ## Links
 
 - **Website:** https://www.bovnar.io

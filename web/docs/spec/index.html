@@ -37,41 +37,175 @@
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
-<h1>Bovnar Specification</h1>
+<h1>Bovnar — Specification</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/1_bovnar_spec.md">Markdown</a> and <a href="/doc/pdf/bovnar-specification.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Version:</strong> 1.1
-<strong>Status:</strong> Released (1.x line; additive over the frozen 1.0 baseline)
-<strong>Last updated:</strong> 2026-06-21</p>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Normative — released (1.x line; additive over the frozen 1.0 baseline)
+<strong>Scope:</strong> Grammar, lexical structure, type system, units, limits, and error semantics.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
-<li><a href="#1-overview">Overview</a></li>
-<li><a href="#2-file-format-at-a-glance">File Format at a Glance</a></li>
-<li><a href="#3-character-encoding--bom">Character Encoding &amp; BOM</a></li>
-<li><a href="#4-lexical-structure">Lexical Structure</a></li>
-<li><a href="#5-type-annotations">Type Annotations</a></li>
-<li><a href="#6-value-tokens">Value Tokens</a></li>
-<li><a href="#7-arrays">Arrays</a></li>
-<li><a href="#8-structs-scopes">Structs (Scopes)</a></li>
-<li><a href="#9-octet-streams-binary-mode">Octet Streams (Binary Mode)</a></li>
-<li><a href="#10-default-type-synthesis">Default Type Synthesis</a></li>
-<li><a href="#11-units-system">Units System</a></li>
-<li><a href="#12-validation--constraints">Validation &amp; Constraints</a></li>
-<li><a href="#13-error-handling--recovery">Error Handling &amp; Recovery</a></li>
+<li><a href="#1-overview">Overview</a><ul>
+<li>1.1 <a href="#11-design-goals">Design Goals</a></li>
+<li>1.2 <a href="#12-architecture">Architecture</a></li>
+<li>1.3 <a href="#13-stream-model">Stream Model</a></li>
+</ul>
+</li>
+<li><a href="#2-file-format-at-a-glance">File Format at a Glance</a><ul>
+<li>2.1 <a href="#21-key-syntax-rules">Key Syntax Rules</a></li>
+</ul>
+</li>
+<li><a href="#3-character-encoding--bom">Character Encoding &amp; BOM</a><ul>
+<li>3.1 <a href="#31-utf-8">UTF-8</a></li>
+<li>3.2 <a href="#32-byte-order-mark-bom">Byte Order Mark (BOM)</a></li>
+<li>3.3 <a href="#33-byte-classes">Byte Classes</a></li>
+<li>3.4 <a href="#34-version-directive-spec-11">Version Directive (spec 1.1)</a></li>
+</ul>
+</li>
+<li><a href="#4-lexical-structure">Lexical Structure</a><ul>
+<li>4.1 <a href="#41-whitespace--comments">Whitespace &amp; Comments</a></li>
+<li>4.2 <a href="#42-identifiers-keys">Identifiers (Keys)</a></li>
+<li>4.3 <a href="#43-string-literals">String Literals</a></li>
+<li>4.4 <a href="#44-symbols">Symbols</a></li>
+<li>4.5 <a href="#45-references">References</a></li>
+<li>4.6 <a href="#46-numbers">Numbers</a></li>
+<li>4.7 <a href="#47-null-values">Null Values</a></li>
+</ul>
+</li>
+<li><a href="#5-type-annotations">Type Annotations</a><ul>
+<li>5.1 <a href="#51-syntax">Syntax</a></li>
+<li>5.2 <a href="#52-parameters">Parameters</a></li>
+<li>5.3 <a href="#53-parameter-order">Parameter Order</a></li>
+<li>5.4 <a href="#54-examples">Examples</a></li>
+<li>5.5 <a href="#55-non-decimal-base-with-bare-numbers">Non-decimal Base with Bare Numbers</a></li>
+</ul>
+</li>
+<li><a href="#6-value-tokens">Value Tokens</a><ul>
+<li>6.1 <a href="#61-typevalue-compatibility">Type/Value Compatibility</a></li>
+<li>6.2 <a href="#62-validation-rules-per-numeric-type">Validation Rules per Numeric Type</a></li>
+<li>6.3 <a href="#63-digit-validation">Digit Validation</a></li>
+<li>6.4 <a href="#64-special-number-semantics">Special Number Semantics</a></li>
+<li>6.5 <a href="#65-inline-unit-suffix">Inline Unit Suffix</a></li>
+</ul>
+</li>
+<li><a href="#7-arrays">Arrays</a><ul>
+<li>7.1 <a href="#71-row-syntax">Row Syntax</a></li>
+<li>7.2 <a href="#72-null-elements">Null Elements</a></li>
+<li>7.3 <a href="#73-row-size-consistency">Row-Size Consistency</a></li>
+<li>7.4 <a href="#74-element-homogeneity">Element Homogeneity</a></li>
+<li>7.5 <a href="#75-array-elements-with-type-annotations">Array Elements with Type Annotations</a></li>
+<li>7.6 <a href="#76-constraints">Constraints</a></li>
+</ul>
+</li>
+<li><a href="#8-structs-scopes">Structs (Scopes)</a><ul>
+<li>8.1 <a href="#81-syntax">Syntax</a></li>
+<li>8.2 <a href="#82-nesting">Nesting</a></li>
+<li>8.3 <a href="#83-empty-structs">Empty Structs</a></li>
+<li>8.4 <a href="#84-structs-as-array-elements">Structs as Array Elements</a></li>
+<li>8.5 <a href="#85-unmatched-braces">Unmatched Braces</a></li>
+</ul>
+</li>
+<li><a href="#9-octet-streams-binary-mode">Octet Streams (Binary Mode)</a><ul>
+<li>9.1 <a href="#91-overview">Overview</a></li>
+<li>9.2 <a href="#92-wire-protocol">Wire Protocol</a></li>
+<li>9.3 <a href="#93-events">Events</a></li>
+<li>9.4 <a href="#94-example">Example</a></li>
+<li>9.5 <a href="#95-constraints">Constraints</a></li>
+</ul>
+</li>
+<li><a href="#10-default-type-synthesis">Default Type Synthesis</a><ul>
+<li>10.1 <a href="#101-rules">Rules</a></li>
+<li>10.2 <a href="#102-event-sequence">Event Sequence</a></li>
+<li>10.3 <a href="#103-examples">Examples</a></li>
+</ul>
+</li>
+<li><a href="#11-units-system">Units System</a><ul>
+<li>11.1 <a href="#111-base-units">Base Units</a></li>
+<li>11.2 <a href="#112-si-prefixes">SI Prefixes</a></li>
+<li>11.3 <a href="#113-iec-binary-prefixes">IEC Binary Prefixes</a></li>
+<li>11.4 <a href="#114-unit-notation">Unit Notation</a></li>
+<li>11.5 <a href="#115-unit-exponents">Unit Exponents</a></li>
+<li>11.6 <a href="#116-examples">Examples</a></li>
+<li>11.7 <a href="#117-compound-unit-constraints">Compound Unit Constraints</a></li>
+<li>11.8 <a href="#118-the-no_unit-keyword">The <code>no_unit</code> Keyword</a></li>
+</ul>
+</li>
+<li><a href="#12-validation--constraints">Validation &amp; Constraints</a><ul>
+<li>12.1 <a href="#121-utf-8-validation">UTF-8 Validation</a></li>
+<li>12.2 <a href="#122-size-limits">Size Limits</a></li>
+<li>12.3 <a href="#123-value-validation">Value Validation</a></li>
+<li>12.4 <a href="#124-array-validation">Array Validation</a></li>
+<li>12.5 <a href="#125-struct-validation">Struct Validation</a></li>
+<li>12.6 <a href="#126-identifier-validation">Identifier Validation</a></li>
+<li>12.7 <a href="#127-string-validation">String Validation</a></li>
+<li>12.8 <a href="#128-unit-validation">Unit Validation</a></li>
+<li>12.9 <a href="#129-octet-stream-validation">Octet Stream Validation</a></li>
+</ul>
+</li>
+<li><a href="#13-error-handling--recovery">Error Handling &amp; Recovery</a><ul>
+<li>13.1 <a href="#131-error-model">Error Model</a></li>
+<li>13.2 <a href="#132-recovery-mode">Recovery Mode</a></li>
+<li>13.3 <a href="#133-eof-in-resync">EOF in Resync</a></li>
+</ul>
+</li>
 <li><a href="#14-formal-ebnf">Formal EBNF</a></li>
-<li><a href="#15-complete-examples">Complete Examples</a></li>
-<li><a href="#16-reference-api">Reference API</a></li>
-<li><a href="#17-versioning--stability">Versioning &amp; Stability</a>
-- <a href="#appendix-a-event-sequence-reference">Appendix A: Event Sequence Reference</a>
-- <a href="#appendix-b-implementation-notes">Appendix B: Implementation Notes</a>
-- <a href="#appendix-c-limits-summary">Appendix C: Limits Summary</a></li>
+<li><a href="#15-complete-examples">Complete Examples</a><ul>
+<li>15.1 <a href="#151-simple-configuration">Simple Configuration</a></li>
+<li>15.2 <a href="#152-typed-scientific-data">Typed Scientific Data</a></li>
+<li>15.3 <a href="#153-inline-unit-suffix">Inline Unit Suffix</a></li>
+<li>15.4 <a href="#154-binary-data-with-octet-stream">Binary Data with Octet Stream</a></li>
+<li>15.5 <a href="#155-arrays-with-mixed-dimensions">Arrays with Mixed Dimensions</a></li>
+<li>15.6 <a href="#156-deeply-nested-struct">Deeply Nested Struct</a></li>
+<li>15.7 <a href="#157-references-and-symbols">References and Symbols</a></li>
+<li>15.8 <a href="#158-compound-unit-examples">Compound Unit Examples</a></li>
+<li>15.9 <a href="#159-fixed-point-and-decimal-float-examples">Fixed-Point and Decimal Float Examples</a></li>
+<li>15.10 <a href="#1510-error-examples">Error Examples</a></li>
+</ul>
+</li>
+<li><a href="#16-reference-api">Reference API</a><ul>
+<li>16.1 <a href="#161-core-types">Core Types</a></li>
+<li>16.2 <a href="#162-type-construction-macros">Type Construction Macros</a></li>
+<li>16.3 <a href="#163-unit-macros">Unit Macros</a></li>
+<li>16.4 <a href="#164-reader-setup">Reader Setup</a></li>
+<li>16.5 <a href="#165-sourcesink-creation">Source/Sink Creation</a></li>
+<li>16.6 <a href="#166-reading">Reading</a></li>
+<li>16.7 <a href="#167-error-queries">Error Queries</a></li>
+<li>16.8 <a href="#168-utility-functions">Utility Functions</a></li>
+<li>16.9 <a href="#169-typed-write-helpers">Typed Write Helpers</a></li>
+<li>16.10 <a href="#1610-error-codes">Error Codes</a></li>
+</ul>
+</li>
+<li><a href="#17-versioning--stability">Versioning &amp; Stability</a></li>
 </ol>
+<ul>
+<li><a href="#appendix-a-event-sequence-reference">Appendix A: Event Sequence Reference</a><ul>
+<li>A.1 <a href="#a1-simple-assignment-untyped">Simple Assignment (Untyped)</a></li>
+<li>A.2 <a href="#a2-typed-assignment">Typed Assignment</a></li>
+<li>A.3 <a href="#a3-compound-unit-assignment">Compound Unit Assignment</a></li>
+<li>A.4 <a href="#a4-array">Array</a></li>
+<li>A.5 <a href="#a5-struct">Struct</a></li>
+<li>A.6 <a href="#a6-octet-stream">Octet Stream</a></li>
+</ul>
+</li>
+<li><a href="#appendix-b-implementation-notes">Appendix B: Implementation Notes</a><ul>
+<li>B.1 <a href="#b1-keyword-state-machine">Keyword State Machine</a></li>
+<li>B.2 <a href="#b2-special-number-keywords">Special Number Keywords</a></li>
+<li>B.3 <a href="#b3-default-width-base-and-q">Default Width, Base, and Q</a></li>
+<li>B.4 <a href="#b4-type-equality">Type Equality</a></li>
+<li>B.5 <a href="#b5-numeric-type-check">Numeric Type Check</a></li>
+<li>B.6 <a href="#b6-unit-component-access">Unit Component Access</a></li>
+<li>B.7 <a href="#b7-fixed-point-and-decimal-float-wire-representations">Fixed-point and Decimal Float Wire Representations</a></li>
+</ul>
+</li>
+<li><a href="#appendix-c-limits-summary">Appendix C: Limits Summary</a></li>
+<li><a href="#see-also">See also</a></li>
+</ul>
 <hr />
 <h2 id="1-overview">1. Overview</h2>
 <p><strong>Bovnar</strong> (BVNR) is <strong>unit-safe serialization for scientific and industrial systems</strong>: a <strong>typed, self-describing, text-binary hybrid</strong> format that carries a validated physical unit with every value. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich, unit-aware type annotation system.</p>
-<h3 id="design-goals">Design Goals</h3>
+<h3 id="11-design-goals">1.1 Design Goals</h3>
 <ul>
 <li><strong>Unit-safe</strong> – every value may carry a physical unit that is validated against a built-in unit table; a unit that conflicts with the type annotation is a parse error (<code>error_unit_mismatch</code>)</li>
 <li><strong>Self-describing</strong> – values carry explicit type metadata (family, bit-width, base, measurement unit)</li>
@@ -81,7 +215,7 @@
 <li><strong>Streamable</strong> – parsed incrementally via a pull-based reader; events emitted to callbacks</li>
 <li><strong>Error-recoverable</strong> – optional resync mode for parsing through minor corruption</li>
 </ul>
-<h3 id="architecture">Architecture</h3>
+<h3 id="12-architecture">1.2 Architecture</h3>
 <p>The reference implementation is a <strong>two-phase</strong> parser:</p>
 <table>
 <thead>
@@ -105,7 +239,7 @@
 </tbody>
 </table>
 <p>Both phases receive the same stream of events (<code>bvnr_event_t</code>). The validator sits between them.</p>
-<h3 id="stream-model">Stream Model</h3>
+<h3 id="13-stream-model">1.3 Stream Model</h3>
 <div class="codehilite"><pre><span></span><code>stream_begin →
   (assignment)* →
   EOF
@@ -128,7 +262,7 @@
 .a_struct = {
     .nested = true;
 };</code></pre></div>
-<h3 id="key-syntax-rules">Key Syntax Rules</h3>
+<h3 id="21-key-syntax-rules">2.1 Key Syntax Rules</h3>
 <table>
 <thead>
 <tr>
@@ -3565,7 +3699,17 @@ float_dec:
 </tbody>
 </table>
 <hr />
-<p><em>End of Bovnar Specification (v1.1)</em></p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/tutorial/">Tutorial</a> — the same format taught by example, start here if this is your first Bovnar document</li>
+<li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the full registry behind §11, with dimensions and conversion factors</li>
+<li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — the C reader, writer, and DOM that implement §16</li>
+<li><a href="https://www.bovnar.io/docs/grammar/">EBNF Grammar</a> — the formal grammar referenced by §14</li>
+<li><a href="https://www.bovnar.io/docs/faq/">FAQ</a> — the questions this document answers indirectly</li>
+<li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — how an implementation proves it follows this specification</li>
+</ul>
+<hr />
+<p><em>End of Bovnar — Specification (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

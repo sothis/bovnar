@@ -1,11 +1,59 @@
-# Bovnar (BVNR) — A Practical Tutorial
+# Bovnar — Tutorial
 
-**Format version:** 1.1
-**Audience:** Developers building systems where data carries physical measurements.
+> **Spec version:** 1.1
+> **Status:** Non-normative — a guided, example-driven introduction
+> **Scope:** Writing and reading Bovnar documents by hand: types, units, arrays, structs, references, and the event model.
 
 ---
 
-## Why Bovnar Exists
+## Table of Contents
+
+1. [Why Bovnar Exists](#1-why-bovnar-exists)
+2. [The Absolute Minimum: A Valid Bovnar File](#2-the-absolute-minimum-a-valid-bovnar-file)
+3. [Keys: Identifiers](#3-keys-identifiers)
+4. [Value Tokens: What Can Follow the `=` Sign](#4-value-tokens-what-can-follow-the--sign)
+5. [Numbers and the Type Annotation](#5-numbers-and-the-type-annotation)
+    - 5.1 [Bare Literals](#51-bare-literals)
+    - 5.2 [Type Annotation Syntax](#52-type-annotation-syntax)
+    - 5.3 [Type Families](#53-type-families)
+    - 5.4 [Parameters](#54-parameters)
+6. [Units](#6-units)
+    - 6.1 [Simple Units](#61-simple-units)
+    - 6.2 [SI Prefixes](#62-si-prefixes)
+    - 6.3 [Compound Units](#63-compound-units)
+    - 6.4 [Explicitly Dimensionless: `no_unit`](#64-explicitly-dimensionless-no_unit)
+    - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
+7. [Fixed-Point Numbers: `float_fix`](#7-fixed-point-numbers-float_fix)
+8. [Decimal Floating-Point: `float_dec`](#8-decimal-floating-point-float_dec)
+9. [Strings](#9-strings)
+    - 9.1 [Escape Sequences](#91-escape-sequences)
+    - 9.2 [String Concatenation](#92-string-concatenation)
+10. [Symbols](#10-symbols)
+11. [Booleans](#11-booleans)
+12. [Null Values](#12-null-values)
+13. [References](#13-references)
+14. [Arrays](#14-arrays)
+    - 14.1 [Multi-Dimensional Rows](#141-multi-dimensional-rows)
+    - 14.2 [Per-Element Type Annotations](#142-per-element-type-annotations)
+    - 14.3 [Structs as Array Elements](#143-structs-as-array-elements)
+15. [Structs](#15-structs)
+16. [Octet Streams: Inline Binary](#16-octet-streams-inline-binary)
+17. [Putting It Together: Realistic Examples](#17-putting-it-together-realistic-examples)
+    - 17.1 [Hardware Configuration](#171-hardware-configuration)
+    - 17.2 [Scientific Measurement Batch](#172-scientific-measurement-batch)
+    - 17.3 [Multi-Dimensional Matrix](#173-multi-dimensional-matrix)
+    - 17.4 [Mixed Binary and Text](#174-mixed-binary-and-text)
+18. [Common Mistakes and the Errors They Produce](#18-common-mistakes-and-the-errors-they-produce)
+19. [Error Recovery Mode](#19-error-recovery-mode)
+20. [Size Limits](#20-size-limits)
+21. [Event Model (C API Overview)](#21-event-model-c-api-overview)
+22. [Quick-Reference: Syntax Cheat Sheet](#22-quick-reference-syntax-cheat-sheet)
+
+- [See also](#see-also)
+
+---
+
+## 1. Why Bovnar Exists
 
 Bovnar is **unit-safe serialization for scientific and industrial systems**. In those domains, the expensive failures are rarely bad syntax — they are unit confusion. A thrust value sent in pounds-force and read as newtons. An altitude in feet read as meters. The number parsed perfectly; the dimension was wrong, and nothing in the data said otherwise.
 
@@ -17,7 +65,7 @@ The format also supports raw binary embedding, multi-dimensional arrays with a c
 
 ---
 
-## The Absolute Minimum: A Valid Bovnar File
+## 2. The Absolute Minimum: A Valid Bovnar File
 
 A Bovnar file is a sequence of **assignments**. Every assignment looks like this:
 
@@ -51,7 +99,7 @@ The format is UTF-8 throughout. A UTF-8 BOM is accepted only at the very first b
 
 ---
 
-## Keys: Identifiers
+## 3. Keys: Identifiers
 
 A key is the bare word after the leading dot. Identifiers follow these rules:
 
@@ -80,7 +128,7 @@ This would fail:
 
 ---
 
-## Value Tokens: What Can Appear After `=`
+## 4. Value Tokens: What Can Follow the `=` Sign
 
 There are ten categories of raw values:
 
@@ -101,9 +149,9 @@ Each is covered in depth below, starting with numbers because that is where Bovn
 
 ---
 
-## Numbers and the Type Annotation
+## 5. Numbers and the Type Annotation
 
-### Bare Literals
+### 5.1 Bare Literals
 
 Numbers are written as plain text. Positive integers default to `uint:64`, negative integers to `sint:64`, and anything with a `.` or `e` to `float:64`:
 
@@ -119,7 +167,7 @@ Numbers are written as plain text. Positive integers default to `uint:64`, negat
 
 This automatic type assignment is called **default type synthesis**. It is convenient for quick files and config work. For anything where precision matters, you add an explicit type annotation.
 
-### Type Annotation Syntax
+### 5.2 Type Annotation Syntax
 
 The annotation is enclosed in angle brackets and placed **between `=` and the value** — not on the key, not after the value:
 
@@ -135,7 +183,7 @@ Placing the annotation anywhere else is a hard error:
 .port<uint:16> = 443;      # WRONG: annotation must come after '='
 ```
 
-### Type Families
+### 5.3 Type Families
 
 There are seven core type families (spec 1.0), plus `datetime` added in spec 1.1:
 
@@ -150,7 +198,7 @@ There are seven core type families (spec 1.0), plus `datetime` added in spec 1.1
 | `bool` | Boolean (`true`/`false`); takes no parameters |
 | `datetime` | Timestamp: signed epoch-seconds, or an ISO-8601 literal like `2026-06-15T12:00:00Z` (spec 1.1; needs a `#!bovnar 1.1` directive) |
 
-### Parameters
+### 5.4 Parameters
 
 After the family keyword you may add parameters separated by commas after a `:`. The three parameter classes are **width**, **base**, and **unit**. They are identified by their syntactic form and may appear in any order:
 
@@ -221,11 +269,11 @@ Only these exact spellings are reserved: any other bare word (e.g. `infinity`, `
 
 ---
 
-## Units
+## 6. Units
 
 This is the feature most unique to Bovnar. Physical units are a first-class part of the type annotation, not a comment or a string field you hope someone reads.
 
-### Simple Units
+### 6.1 Simple Units
 
 The unit goes inside the angle brackets, after the other parameters:
 
@@ -236,7 +284,7 @@ The unit goes inside the angle brackets, after the other parameters:
 .temp     = <float:32,°C>   23.5;     # degrees Celsius (UTF-8 is fine)
 ```
 
-### SI Prefixes
+### 6.2 SI Prefixes
 
 SI prefixes are written before the base unit symbol, either with the `~` separator or compactly without it:
 
@@ -258,7 +306,7 @@ IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, and the for
 .disk = <uint:64,TiB>   2;     # 2 tebibytes (compact spelling of Ti~B)
 ```
 
-### Compound Units
+### 6.3 Compound Units
 
 Compound units are built from multiple components joined by `*` (or the middle dot `·`, U+00B7) for multiplication, and `/` for division:
 
@@ -290,7 +338,7 @@ Exponents can be written as Unicode superscripts (`²`, `³`, `⁻¹`) or with a
 
 The maximum number of unit components in a compound unit is 8. More than that causes a parse error.
 
-### Explicitly Dimensionless: `no_unit`
+### 6.4 Explicitly Dimensionless: `no_unit`
 
 When you want to be explicit that a value carries no physical dimension, use the keyword `no_unit`:
 
@@ -301,7 +349,7 @@ When you want to be explicit that a value carries no physical dimension, use the
 
 Explicitly writing `no_unit` yields `BVN_UNIT_NONE` (`num_components == 0`). Omitting the unit parameter entirely yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components == 1`, `base == bu_none`). Both are semantically dimensionless and compare as compatible via `bvn_units_compatible`, and both serialise to `"no_unit"` via `bvn_unit_to_string`, but they are structurally distinct internal states. The explicit `no_unit` is useful for documentation: it tells a reader that the author actively chose dimensionless, not that they forgot.
 
-### Inline Unit Suffix
+### 6.5 Inline Unit Suffix
 
 For untyped or partially-typed values, you can append a unit suffix directly after the value literal, separated by at least one whitespace character:
 
@@ -328,7 +376,7 @@ If a type annotation also specifies a unit and you additionally write an inline 
 
 ---
 
-## Fixed-Point Numbers: `float_fix`
+## 7. Fixed-Point Numbers: `float_fix`
 
 Fixed-point (Q-format) numbers store a value as a signed integer, with the binary point shifted by a declared number of fractional bits. The wire representation is an integer; the mathematical value is `raw_integer × 2⁻Q`.
 
@@ -350,7 +398,7 @@ Constraints:
 
 ---
 
-## Decimal Floating-Point: `float_dec`
+## 8. Decimal Floating-Point: `float_dec`
 
 `float_dec` is IEEE 754-2008 decimal floating-point — useful in financial and metrological contexts where exact decimal representation matters (binary floats cannot represent `0.1` exactly; decimal floats can):
 
@@ -364,7 +412,7 @@ Rules are similar to `float_fix`: no base parameter, same set of valid widths.
 
 ---
 
-## Strings
+## 9. Strings
 
 Strings are enclosed in double quotes. The `<utf8>` annotation is optional — a bare quoted literal is automatically synthesised as `utf8`:
 
@@ -374,7 +422,7 @@ Strings are enclosed in double quotes. The `<utf8>` annotation is optional — a
 .empty    = "";
 ```
 
-### Escape Sequences
+### 9.1 Escape Sequences
 
 Seven escape sequences are defined in spec 1.0:
 
@@ -397,7 +445,7 @@ Raw whitespace bytes (HT, LF, VT, FF, CR) are accepted unescaped inside string l
 violets are blue";
 ```
 
-### String Concatenation
+### 9.2 String Concatenation
 
 Adjacent string literals separated only by whitespace or comments are concatenated at lex time:
 
@@ -419,7 +467,7 @@ This is the idiomatic way to write a long string across multiple lines or to con
 
 ---
 
-## Symbols
+## 10. Symbols
 
 A symbol is a bare word in value position — no quotes. It is its own token type, distinct from strings:
 
@@ -437,7 +485,7 @@ Eight bare words are **reserved keywords** and are *not* symbols: `null`, `true`
 
 ---
 
-## Booleans
+## 11. Booleans
 
 `true`, `false`, `on`, and `off` are reserved keywords carrying the `bool` type family. `on` is an alias for `true` and `off` for `false`; all four collapse to a boolean value and serialize canonically as `true` / `false`:
 
@@ -451,7 +499,7 @@ A bare boolean synthesises a `<bool>` annotation automatically. The `<bool>` fam
 
 ---
 
-## Null Values
+## 12. Null Values
 
 A null is the explicit absence of a value. It appears as an empty slot — nothing between `=` and `;` — or, equivalently, the reserved keyword `null`; extra commas inside an array also produce nulls:
 
@@ -470,7 +518,7 @@ Inside arrays, null elements arise from leading, trailing, or consecutive commas
 
 ---
 
-## References
+## 13. References
 
 A reference is a dotted path to another key in the document, introduced by `&`. The parser stores the path as a string token; it does not resolve it — resolution is entirely up to the application:
 
@@ -529,7 +577,7 @@ suffixes are rejected in a 1.0 or unversioned document.
 
 ---
 
-## Arrays
+## 14. Arrays
 
 An array is enclosed in square brackets. A single row is a comma-separated list of values:
 
@@ -538,7 +586,7 @@ An array is enclosed in square brackets. A single row is a comma-separated list 
 .names  = ["Alice", "Bob", "Carol"];
 ```
 
-### Multi-Dimensional Rows
+### 14.1 Multi-Dimensional Rows
 
 Multiple rows are separated by `/`. Each bracketed group is one row:
 
@@ -559,7 +607,7 @@ The `/`-separated dimension rows of a single array must have a **consistent elem
 .bad2 = [[1, 2]/[3, 4, 5]];    # error_array_row_size_mismatch: 2 vs 3 (one /-array's own rows)
 ```
 
-### Per-Element Type Annotations
+### 14.2 Per-Element Type Annotations
 
 Each element may carry its own annotation, placed immediately after the comma (or the opening bracket for the first element):
 
@@ -576,7 +624,7 @@ A single annotation before `[` applies to all elements — it is a whole-array a
 
 Per-element annotations can still appear inside a whole-array-annotated array.
 
-### Structs as Array Elements
+### 14.3 Structs as Array Elements
 
 Arrays of structs are the standard idiom for a list of records:
 
@@ -589,7 +637,7 @@ Arrays of structs are the standard idiom for a list of records:
 
 ---
 
-## Structs
+## 15. Structs
 
 A struct is a nested scope, grouping zero or more assignments inside `{…}`. Every field inside is a complete assignment with `.key = value;` syntax. The struct value at the parent level ends with `};`:
 
@@ -628,7 +676,7 @@ An unmatched closing brace — a `}` with no matching `{` — is `error_illegal_
 
 ---
 
-## Octet Streams: Inline Binary
+## 16. Octet Streams: Inline Binary
 
 When you need to embed raw binary data without Base64 overhead, a NUL byte (`0x00`) in value position switches the parser into binary chunk mode.
 
@@ -653,9 +701,9 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 ---
 
-## Putting It Together: Realistic Examples
+## 17. Putting It Together: Realistic Examples
 
-### Hardware Configuration
+### 17.1 Hardware Configuration
 
 ```bovnar
 # Sensor node configuration
@@ -681,7 +729,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 };
 ```
 
-### Scientific Measurement Batch
+### 17.2 Scientific Measurement Batch
 
 ```bovnar
 .experiment = "thermal_runaway_001";
@@ -703,7 +751,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 .alarm     = triggered;
 ```
 
-### Multi-Dimensional Matrix
+### 17.3 Multi-Dimensional Matrix
 
 ```bovnar
 # 3×3 rotation matrix in float64
@@ -712,7 +760,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
                 /[0.0, 0.5,   0.866];
 ```
 
-### Mixed Binary and Text
+### 17.4 Mixed Binary and Text
 
 ```bovnar
 .packet = {
@@ -726,7 +774,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 ---
 
-## Common Mistakes and the Errors They Produce
+## 18. Common Mistakes and the Errors They Produce
 
 Understanding the error codes is essential for debugging. The parser reports line, column, the offending byte, and a byte-offset into the stream.
 
@@ -808,7 +856,7 @@ they are rejected only in a 1.0 or unversioned document.)
 
 ---
 
-## Error Recovery Mode
+## 19. Error Recovery Mode
 
 The parser supports an optional `continue_on_error` mode. When enabled, a parse error invokes the `on_error` callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The `recovery_count` counter (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. When the resync state machine reaches a `;` at the original nesting depth, it resumes normal parsing.
 
@@ -816,7 +864,7 @@ This mode is intended for log streams and unreliable transports — situations w
 
 ---
 
-## Size Limits
+## 20. Size Limits
 
 All limits are configurable via `bvnr_read_flags_t`. The defaults are intentionally permissive — 2 147 483 647 for array items and text bytes, and **unlimited** (`0`) for file size. Production deployments should set explicit caps:
 
@@ -837,7 +885,7 @@ Setting most fields to `0` in `bvnr_read_flags_t` causes the reader to substitut
 
 ---
 
-## Event Model (C API Overview)
+## 21. Event Model (C API Overview)
 
 The C reader is a two-phase, callback-driven SAX-style parser. You supply two optional callbacks: `on_unverified` receives events before semantic validation, `on_verified` receives them after. For normal consumption, `on_verified` is sufficient.
 
@@ -887,7 +935,7 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 
 ---
 
-## Quick-Reference: Syntax Cheat Sheet
+## 22. Quick-Reference: Syntax Cheat Sheet
 
 ```bovnar
 # ── Assignments ────────────────────────────────────────────────────
@@ -957,5 +1005,15 @@ nan  inf  ninf
 
 ---
 
-*Bovnar Specification (v1.1) — format by the Bovnar project.*
+## See also
 
+- [Specification](1_bovnar_spec.md) — the normative rules behind everything shown here
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — every unit and currency the parser accepts
+- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — the symbol tables, for looking one up quickly
+- [Read & Write API](3_bovnar_readwrite_api.md) — the C API sketched in the event-model section
+- [Python Bindings](4_bovnar_python_bindings.md) — the same document set, read and written from Python
+- [FAQ](6_bovnar_faq.md) — the questions this tutorial raises next
+
+---
+
+*End of Bovnar — Tutorial (Bovnar spec 1.1).*

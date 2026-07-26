@@ -1,14 +1,16 @@
-# Bovnar Unit Ambiguities
+# Bovnar — Unit Ambiguities
 
-**Every token that could plausibly mean two things — what Bovnar reads it as, and how to write the other meaning.**
+> **Spec version:** 1.1
+> **Status:** Reference — companion to the unit registry and the cheat sheet
+> **Scope:** Every token that could plausibly mean two things — what Bovnar reads it as, and how to write the other meaning.
 
-Companion to [`2_bovnar_unit_system.md`](2_bovnar_unit_system.md) (the registry) and
-[`8_unit_cheatsheet.md`](8_unit_cheatsheet.md) (the symbol tables). Every row here was checked
+Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the registry) and
+[Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) (the symbol tables). Every row here was checked
 against the reference parser; where a token is refused, it really is `error_unit_illegal`.
 
 ---
 
-## Contents
+## Table of Contents
 
 1. [How a token is resolved](#1-how-a-token-is-resolved)
 2. [A bare unit outranks a prefixed reading](#2-a-bare-unit-outranks-a-prefixed-reading)
@@ -19,13 +21,15 @@ against the reference parser; where a token is refused, it really is `error_unit
 7. [Look-alike characters](#7-look-alike-characters)
 8. [Temperature scales vs. electrical units](#8-temperature-scales-vs-electrical-units)
 9. [Same dimension, different quantity](#9-same-dimension-different-quantity)
-9a. [An affine scale inside a compound has no value](#9a-an-affine-scale-inside-a-compound-has-no-value)
-10. [A named unit is not its compound](#10-a-named-unit-is-not-its-compound)
-11. [Unit vs. currency](#11-unit-vs-currency)
-12. [Looks like a unit, is not one](#12-looks-like-a-unit-is-not-one)
-13. [Water hardness: six scales, one quantity](#13-water-hardness-six-scales-one-quantity)
-14. [Same name, different definition](#14-same-name-different-definition)
-15. [Quick index: if you mean X, write Y](#15-quick-index-if-you-mean-x-write-y)
+10. [An affine scale inside a compound has no value](#10-an-affine-scale-inside-a-compound-has-no-value)
+11. [A named unit is not its compound](#11-a-named-unit-is-not-its-compound)
+12. [Unit vs. currency](#12-unit-vs-currency)
+13. [Looks like a unit, is not one](#13-looks-like-a-unit-is-not-one)
+14. [Water hardness: six scales, one quantity](#14-water-hardness-six-scales-one-quantity)
+15. [Same name, different definition](#15-same-name-different-definition)
+16. [Quick index: if you mean X, write Y](#16-quick-index-if-you-mean-x-write-y)
+
+- [See also](#see-also)
 
 ---
 
@@ -304,7 +308,7 @@ twice 10 dB, and a pH one unit lower is a tenfold concentration. `rpm` is a *cyc
 
 ---
 
-## 9a. An affine scale inside a compound has no value
+## 10. An affine scale inside a compound has no value
 
 `°C`, `°F`, `°De`, `°N`, `°Re` and `°Ro` are *offset* scales: 0 is not nothing.
 That is fine for a lone temperature and meaningless in a product.
@@ -326,7 +330,7 @@ kelvin has no offset and the ambiguity disappears.
 
 ---
 
-## 10. A named unit is not its compound
+## 11. A named unit is not its compound
 
 A named unit is a single component; the compound that means the same thing is several. Both are
 valid and both convert to the same SI value, but annotation-vs-inline reconciliation is
@@ -345,7 +349,7 @@ Pick one spelling per document and stay with it. `bvn_units_compatible` and
 
 ---
 
-## 11. Unit vs. currency
+## 12. Unit vs. currency
 
 A currency is recognised **only** with the `$` sigil, so the two namespaces cannot collide. The
 classic cases:
@@ -363,7 +367,7 @@ A prefix goes before the sigil, `~` optional: `k~$EUR` and `k$EUR` are both thou
 
 ---
 
-## 12. Looks like a unit, is not one
+## 13. Looks like a unit, is not one
 
 Common abbreviations that are **not** in the table. All are `error_unit_illegal`, which is the
 point: a wrong unit is worse than a refused one.
@@ -392,7 +396,7 @@ Two that *are* accepted but rarely mean what the writer intended:
 
 ---
 
-## 13. Water hardness: six scales, one quantity
+## 14. Water hardness: six scales, one quantity
 
 All six measure the concentration of dissolved alkaline-earth ions, and Bovnar converts freely
 between them and `m~mol/L`. What differs is the reference compound each scale counts, which is why
@@ -457,7 +461,7 @@ record the EC and the factor, or the TDS as `mg/L`.
 
 ---
 
-## 14. Same name, different definition
+## 15. Same name, different definition
 
 Not parser ambiguities — real-world ones. Bovnar keeps these distinct, and the distinction is
 usually where the money is.
@@ -476,7 +480,7 @@ usually where the money is.
 
 ---
 
-## 15. Quick index: if you mean X, write Y
+## 16. Quick index: if you mean X, write Y
 
 | If you mean | Write | Not |
 |-------------|-------|-----|
@@ -521,6 +525,19 @@ usually where the money is.
 
 ---
 
-*Generated claims in this document were verified against the reference implementation. If you find
+## See also
+
+- [Unit & Currency Reference](2_bovnar_unit_system.md) — the registry these readings come from
+- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in one place
+- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — the normative unit rules
+- [FAQ §4 — Units](6_bovnar_faq.md#4-units) — common unit questions
+
+---
+
+*Every claim in this document was verified against the reference implementation. If you find
 a token whose behaviour surprises you and it is not listed here, that is a documentation bug —
 please report it.*
+
+---
+
+*End of Bovnar — Unit Ambiguities (Bovnar spec 1.1).*

@@ -332,8 +332,15 @@ def main():
     tracked = tracked_paths()
     langs = generated_langs()
     dead, unpublished, badfrag, untracked = [], [], [], []
-    checked = ext = staged = unbuilt = gen = 0
+    checked = ext = staged = unbuilt = gen = offsite = 0
     for ap, rel, kind in sources():
+        # A source publish_web.sh excludes has no links on the live site, because
+        # it is not on the live site. Reading it anyway turned its own table of
+        # contents into seven "links to a file that is never uploaded" — every
+        # one of them a fragment pointing at the document it was written in.
+        if is_excluded(rel, excludes):
+            offsite += 1
+            continue
         rel_dir = os.path.dirname(rel)
         for raw in extract(ap, kind):
             lkind, path, frag = classify(raw)
@@ -394,6 +401,9 @@ def main():
                                                 "#" + frag if frag else ""))
     print("checked %d internal link(s) across web/ (%d external, not fetched)"
           % (checked, ext))
+    if offsite:
+        print("  %d source file(s) skipped — publish_web.sh does not upload them"
+              % offsite)
     if staged:
         print("  %d resolved against a publish-time staging directory" % staged)
     if unbuilt:

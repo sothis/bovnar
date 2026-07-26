@@ -1074,13 +1074,14 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 130)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 131)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
                                     #           + conformance_doc_examples
                                     #           + cli_events_long_unit
                                     #           + py_currency_parity
+                                    #           + doc_layout
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1239,6 +1240,24 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_web_li
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_web_links.py)
     set_tests_properties(bvnr_web_links PROPERTIES LABELS "web;docs" TIMEOUT 120)
+endif()
+
+# ── Every document in doc/ has the same shape ───────────────────────────────
+# bvnr_web_links proves a link goes somewhere; nothing proved a document was
+# still built like its ten siblings. Eleven documents written over as many
+# months had drifted into eleven layouts -- four with no table of contents at
+# all, two spellings of the heading for the ones that had it, five different
+# metadata key sets under the title, and section numbering in six of them. None
+# of that fails a build, renders wrong, or breaks a link, so nothing here caught
+# it. The worst of it is the TOC: adding a section is one edit and updating the
+# list at the top is another, and the second one is the one that gets forgotten.
+# The check recomputes each TOC from the headings, using gen_html_docs' own
+# slugify, so a passing TOC is one whose links resolve on the published page too.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_layout.py)
+    add_test(NAME bvnr_doc_layout
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_layout.py)
+    set_tests_properties(bvnr_doc_layout PROPERTIES LABELS "docs" TIMEOUT 60)
 endif()
 
 # ── ?v= cache-bust stamps still match the files they label ──────────────────

@@ -1,11 +1,31 @@
-# Datetime fractional seconds — design note (spec 1.1)
+# Bovnar — Datetime Fractional Seconds (Design Note)
+
+> **Spec version:** 1.1
+> **Status:** Informative — a maintainer's design note, not published behaviour
+> **Scope:** How an ISO-8601 fractional second is preserved beside a whole-second carrier.
 
 As-built reference for the ISO-8601 fractional-second feature. The published
-behaviour lives in `1_bovnar_spec.md` (§ datetime) and the FAQ; this note is for
-maintainers: the design decision, the data flow, the invariants, and the
-non-obvious gotchas that bit during development.
+behaviour lives in the [Specification §5 — Type Annotations](1_bovnar_spec.md#5-type-annotations)
+and the [FAQ §3 — Type System and Annotations](6_bovnar_faq.md#3-type-system-and-annotations);
+this note is for maintainers: the design decision, the data flow, the invariants,
+and the non-obvious gotchas that bit during development.
 
-## The decision
+---
+
+## Table of Contents
+
+1. [The decision](#1-the-decision)
+2. [Data flow](#2-data-flow)
+3. [Invariants](#3-invariants)
+4. [Touch points](#4-touch-points)
+5. [Gotchas (the hard-won ones)](#5-gotchas-the-hard-won-ones)
+6. [Test map](#6-test-map)
+
+- [See also](#see-also)
+
+---
+
+## 1. The decision
 
 ISO 8601 puts no bound on the number of fractional-second digits, and a
 `datetime` value's carrier is a **whole-second** signed integer (epoch seconds,
@@ -29,7 +49,9 @@ the fraction is **preserved verbatim as an out-of-band string** and is
 For sub-second values you actually compute on, use a finer integer carrier
 (milliseconds/microseconds since the epoch). The fraction here is metadata.
 
-## Data flow
+---
+
+## 2. Data flow
 
 ```
 ISO literal text
@@ -51,7 +73,9 @@ round-trip work; it re-serialises the **event stream**, so `frac_data` flows
 straight through. The DOM is a separate consumer surface (it stores the
 fraction for programmatic access); it has no re-serialiser of its own.
 
-## Invariants
+---
+
+## 3. Invariants
 
 1. **`frac_data` is NULL / `frac_length` 0 for every value except a
    `vt_datetime` written as an ISO literal with a `.frac` part.** Every
@@ -77,7 +101,9 @@ fraction for programmatic access); it has no re-serialiser of its own.
    valid only for the duration of the callback, exactly like `data`. The DOM's
    `dt_frac` is node-owned and NUL-terminated.
 
-## Touch points
+---
+
+## 4. Touch points
 
 | Layer | File | What |
 |---|---|---|
@@ -91,7 +117,9 @@ fraction for programmatic access); it has no re-serialiser of its own.
 | Python | `python/bovnar/reader.py`, `dom.py`, `_ffi.py` | snapshot frac in the callback; `DomNode.datetime_fraction` |
 | JS playground | `web/bovnar_parser.js` | `frac` field on the datetime DATA event (both `parseBovnar` and `parseFaithful`) |
 
-## Gotchas (the hard-won ones)
+---
+
+## 5. Gotchas (the hard-won ones)
 
 - **The ctypes mirror must match the C struct.** Appending `frac_data` /
   `frac_length` to `bvnr_data_t` left the Python `BvnrData` 16 bytes short; the
@@ -120,7 +148,9 @@ fraction for programmatic access); it has no re-serialiser of its own.
   requires) before emitting — otherwise it emits the plain integer carrier. It
   also rejects a non-digit `frac_data` (a public-API caller could supply one).
 
-## Test map
+---
+
+## 6. Test map
 
 - Streaming consumer sees frac: `tests/bovnar_extended_reader_test.c`
 - DOM stores/exposes frac: `tests/bovnar_dom_test.c`
@@ -133,3 +163,16 @@ fraction for programmatic access); it has no re-serialiser of its own.
 - ABI mirror guard: `python/tests/test_abi.py` (+ `tests/bvnr_abi_dump.c`)
 - Idempotent pretty-print of a fractional literal: `examples/datetime.bvnr`
   via the CLI idempotency / DOM-canonical tests
+
+---
+
+## See also
+
+- [Specification](1_bovnar_spec.md) — the normative `datetime` family and its epochs
+- [FAQ §3 — Type System and Annotations](6_bovnar_faq.md#3-type-system-and-annotations) — the published answer on datetimes
+- [Read & Write API](3_bovnar_readwrite_api.md) — `bvnr_data_t.frac_data` on the read path
+- [Python Bindings](4_bovnar_python_bindings.md) — how the fraction surfaces in Python
+
+---
+
+*End of Bovnar — Datetime Fractional Seconds (Design Note) (Bovnar spec 1.1).*

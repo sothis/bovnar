@@ -110,14 +110,14 @@ def _component_token(comp) -> tuple[str, int]:
 def _unit_string(vu) -> str:
     """Build a pint-parseable unit string for a bovnar ValueUnit ('' = dimensionless)."""
     # An affine base inside a PRODUCT is refused. bovnar allows it at exponent 1
-    # (see doc/2 §"An affine unit is valid at exponent 1 only") and applies the
-    # offset, so bvn_unit_convert_value(20, °C/h, K/h) is 983360. pint forbids
-    # offset units in compounds by construction and silently rewrites degC to
-    # delta_degree_Celsius, which drops the offset and yields 20 -- a different
-    # number, with no diagnostic, and from_pint() then cannot map
-    # delta_degree_Celsius back at all. Refusing beats answering differently from
-    # the reference implementation; the standalone case (20 °C -> 293.15 K) is
-    # unaffected and still agrees exactly.
+    # (see doc/2 §12.4, "An affine unit has an SI value only alone, at exponent
+    # 1") and applies the offset, so bvn_unit_convert_value(20, °C/h, K/h) is
+    # 983360. pint forbids offset units in compounds by construction and
+    # silently rewrites degC to delta_degree_Celsius, which drops the offset
+    # and yields 20 -- a different number, with no diagnostic, and from_pint()
+    # then cannot map delta_degree_Celsius back at all. Refusing beats
+    # answering differently from the reference implementation; the standalone
+    # case (20 °C -> 293.15 K) is unaffected and still agrees exactly.
     live = [i for i in range(int(vu.num_components))
             if int(vu.components[i].base) != int(BaseUnit.NONE)]
     if len(live) > 1:

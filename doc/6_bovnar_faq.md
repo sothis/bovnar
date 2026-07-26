@@ -674,7 +674,8 @@ Exactly seven:
 In **spec 1.0** that is all — any other character after a backslash is
 `error_illegal_escape_sequence`.
 
-A **spec 1.1** document (declaring `#!bovnar 1.1`, see §3.4) adds two more:
+A **spec 1.1** document (declaring `#!bovnar 1.1`, see the [Specification
+§3.4](1_bovnar_spec.md#34-version-directive-spec-11)) adds two more:
 
 | Escape | Meaning |
 |---|---|

@@ -1242,7 +1242,7 @@ static const cf_case_t g_cases[] = {
 	           ".x = <uint:> 5;",
 	           error_illegal_value_type),
 	/* Each parameter class may appear at most once (EBNF type-param-list,
-	 * spec §501). A repeated class is rejected rather than silently taking
+	 * spec §5.3). A repeated class is rejected rather than silently taking
 	 * the last occurrence — last-wins could otherwise mask a real range
 	 * violation, e.g. "<uint:8,16> 300" accepting 300 under width 16. */
 	ERROR_CASE("TYP-034", "types", "duplicate width parameter",

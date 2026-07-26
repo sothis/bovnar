@@ -102,7 +102,7 @@ static bool want_unit_cb(void *userdata, const bvnr_data_t *data,
 /*
  * want_unit runs ahead of BOTH value callbacks, so an on_unverified consumer
  * sees the same populated conv as on_verified does. That is a documented
- * property (include/bovnar.h, read/write API §7c and §5) rather than an
+ * property (include/bovnar.h, read/write API §1.10 and §1.4) rather than an
  * accident of emission order, so it is pinned here.
  */
 static bool want_on_unverified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)

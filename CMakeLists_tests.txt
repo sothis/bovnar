@@ -1074,14 +1074,14 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 131)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 132)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
                                     #           + conformance_doc_examples
                                     #           + cli_events_long_unit
                                     #           + py_currency_parity
-                                    #           + doc_layout
+                                    #           + doc_layout + doc_refs
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1258,6 +1258,21 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_la
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_layout.py)
     set_tests_properties(bvnr_doc_layout PROPERTIES LABELS "docs" TIMEOUT 60)
+endif()
+
+# ── A "§N.M" in a comment still points at a section that exists ─────────────
+# The code cites the documentation constantly -- a test says what it pins with
+# "doc/3 §1.11 promises …" -- and those citations are the only thread from a
+# subtle test back to the sentence that made it a requirement. Renumbering
+# doc/3's function sections cut every one of them at once, and the whole suite
+# stayed green: bvnr_web_links checks the documents' links, not what the C says
+# about them. Two more had been wrong for longer -- "spec §501", never a section
+# number, and a quoted doc/2 heading the document does not contain.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
+    add_test(NAME bvnr_doc_refs
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
+    set_tests_properties(bvnr_doc_refs PROPERTIES LABELS "docs" TIMEOUT 60)
 endif()
 
 # ── ?v= cache-bust stamps still match the files they label ──────────────────

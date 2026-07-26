@@ -171,7 +171,7 @@
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
-<p>Annotations are <strong>descriptive</strong>, not prescriptive: the <em>validator</em> checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — <code>bvn_units_compatible</code>, <code>bvn_unit_convert_factor</code>, <code>bvn_unit_convert_value</code> and the exact-rational <code>bvn_unit_convert_rational</code> (§12.4), plus the reader's <code>want_unit</code> hook, which converts at read time (§7c of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).</p>
+<p>Annotations are <strong>descriptive</strong>, not prescriptive: the <em>validator</em> checks form and type, and never rejects a document because its units do not add up. The library does provide dimensional analysis and unit conversion as an explicit, opt-in service — <code>bvn_units_compatible</code>, <code>bvn_unit_convert_factor</code>, <code>bvn_unit_convert_value</code> and the exact-rational <code>bvn_unit_convert_rational</code> (§12.4), plus the reader's <code>want_unit</code> hook, which converts at read time (§1.10 of the read/write API). None of that runs unless you ask for it. Exchange-rate arithmetic is the one thing the library genuinely does not do: currencies carry no conversion table, and a cross-currency conversion is always refused rather than guessed (§9.6).</p>
 <h3 id="11-design-principles">1.1 Design Principles</h3>
 <ul>
 <li><strong>SI-first.</strong> All SI base units, all 22 BIPM-2019 named derived units, and all 24 current SI prefixes (quecto … quetta) are supported.</li>
@@ -2126,7 +2126,7 @@ unit, so for that case write the amount directly (<code>m~mol/L</code>). There i
 <code>eq</code> / <code>equivalent</code> alias.</p>
 <p><strong>Exactness.</strong> Every degree is derived from a molar mass (IUPAC 2021: Ca 40.078, C 12.011,
 O 15.999 g·mol⁻¹), so the factors are measurement-derived rather than exact rationals. They carry
-<code>.exact = false</code>, which means a <strong>read-time lossless conversion</strong> (<code>want_unit</code>, §7c of the
+<code>.exact = false</code>, which means a <strong>read-time lossless conversion</strong> (<code>want_unit</code>, §1.10 of the
 read/write API) refuses them with <code>error_unit_inexact</code> (47) rather than inventing precision —
 the same answer it gives for a π-based angle. <code>bvn_unit_convert_value</code> and
 <code>bvn_unit_to_si_factor</code>, which work in double precision, convert normally.</p>

@@ -1717,6 +1717,46 @@ static int reduce_canon(const char *in, char *out, size_t cap)
 	return ok ? 0 : -1;
 }
 
+static void test_unwritable_unit_reports_a_unit_error(void)
+{
+	printf("  a unit with no spelling reports a UNIT error, not a stale one...\n");
+	/* Both value-side sites returned false WITHOUT setting ser_error, so the
+	 * writer reported whatever code was already there — a unit that cannot be
+	 * written surfaced as "sink_buffer_exhausted", sending the caller after a
+	 * buffer that was never involved. A bu_none component past the bare
+	 * "no_unit" shapes has no spelling, which is the reachable trigger. */
+	char out[512];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, sizeof out);
+	bvnr_writer_t *w = bvnr_writer_create();
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	bvnr_open_write_sink(w, &sink, false, &wf);
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	bvnr_write_event(w, ev_stream_start, &d);
+	d.type = token_is_identifier; d.data = "d"; d.length = 1;
+	bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_number;
+	d.value_type.family = vt_float;
+	d.value_type.width  = 64;
+	d.value_unit.num_components = 2;
+	d.value_unit.components[0].base          = bu_meter;
+	d.value_unit.components[0].exponent      = exp_linear;
+	d.value_unit.components[0].prefix.system = prefix_si;
+	d.value_unit.components[0].prefix.id.si  = si_none;
+	d.value_unit.components[1].base          = bu_none;   /* no spelling */
+	d.value_unit.components[1].exponent      = exp_linear;
+	d.value_unit.components[1].prefix.system = prefix_si;
+	d.value_unit.components[1].prefix.id.si  = si_kilo;
+	d.data = "1.5"; d.length = 3;
+	bvnr_write_event(w, ev_data, &d);
+	ASSERT_EQ_INT((int)bvnr_writer_get_error(w), (int)error_unit_illegal,
+		      "the writer names the unit as the problem");
+	bvnr_writer_destroy(w);
+}
+
 static void test_write_type_annotation_names_the_real_failure(void)
 {
 	printf("  a unit REDUCE cannot express is illegal, not too long...\n");
@@ -2079,6 +2119,7 @@ int main(void)
 	test_unit_reduce_rescales_the_value();
 	test_unit_reduce_annotation_matches_the_value();
 	test_write_type_annotation_names_the_real_failure();
+	test_unwritable_unit_reports_a_unit_error();
 	test_writer_refuses_unreadable_output();
 	test_writer_event_grammar();
 	test_writer_accepts_only_readable_streams();

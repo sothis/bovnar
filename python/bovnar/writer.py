@@ -363,6 +363,18 @@ class Writer:
             ubuf = ctypes.create_string_buffer(256)
             unit_flags = lib.bvnr_writer_unit_flags(self._ptr)
             ulen = lib.bvn_unit_to_string_ex(vu, ubuf, 256, unit_flags)
+            if ulen < 0:
+                # Skipping the parameter on failure writes the value with its
+                # unit silently GONE -- the annotation says <float:64> for a
+                # value the caller gave a unit. The C writer refuses the same
+                # document a moment later on the value side, so this was masked;
+                # relying on that is relying on an unrelated check.
+                raise BovnarArgumentError(
+                    "cannot serialise the unit of this %s value: "
+                    "bvn_unit_to_string_ex refused it (a bu_none component has "
+                    "no spelling outside a bare no_unit, or the reduction "
+                    "cannot express it). Writing the value without its unit "
+                    "would change what it means." % family_name)
             if ulen > 0:
                 raw_unit = ubuf.raw[:ulen]
                 _keep_unit = raw_unit

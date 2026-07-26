@@ -1309,7 +1309,15 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					if (pok) {
 						int32_t un = bvn_unit_to_string_ex(
 							pu, ubuf, sizeof ubuf, s->unit_flags);
-						if (un < 0) return false;
+						/* Returning false without SETTING an error leaves the
+						 * writer reporting whatever code was already in
+						 * ser_error -- a unit that cannot be written surfaced
+						 * as "sink_buffer_exhausted", sending the caller after
+						 * a buffer that was never involved. */
+						if (un < 0) {
+							s->ser_error = error_unit_illegal;
+							return false;
+						}
 						emit = ubuf;
 						elen = (uint32_t)un;
 					}
@@ -1505,8 +1513,13 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				 * unit (and thus its meaning) on round-trip. */
 				int32_t un = bvn_unit_to_string_ex(d->value_unit,
 					ubuf, sizeof ubuf, s->unit_flags);
-				if (un <= 0)
+				if (un <= 0) {
+					/* Say WHICH failure. Without this the refusal this comment
+					 * describes was reported as whatever ser_error happened to
+					 * hold. */
+					s->ser_error = error_unit_illegal;
 					return false;
+				}
 				if (!bvn_ser_push_byte(s, ' ')) return false;
 				if (!bvn_ser_push(s, ubuf, (uint32_t)un))
 					return false;

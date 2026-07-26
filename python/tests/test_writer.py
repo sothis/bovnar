@@ -1023,3 +1023,32 @@ class TestHighBaseIntDecode:
         assert loads(b'.a = <uint:32,_16> "ff";')['a'] == 255
         assert loads(b'.a = <sint:32,_2> "-101";')['a'] == -5
         assert loads(b'.a = <uint:64> 12345;')['a'] == 12345
+
+@needs_lib
+def test_a_unit_that_cannot_be_serialised_is_refused_not_dropped():
+    """_emit_annotation skipped the unit parameter when bvn_unit_to_string_ex
+    refused it, writing the value with its unit silently GONE — the annotation
+    saying <float:64> for a value the caller gave a unit. The C writer refuses the
+    same document a moment later on the value side, so it was masked; relying on
+    an unrelated check to catch a dropped unit is not a contract."""
+    import bovnar
+    from bovnar.writer import Writer
+    from bovnar.structs import make_unit_compound, make_type_spec
+    from bovnar.enums import BaseUnit, SIPrefix, ValueTypeFamily
+    from bovnar.exceptions import BovnarArgumentError
+    vt = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
+    # structurally valid, but a bu_none component past the bare "no_unit" shapes
+    # has no spelling
+    u = make_unit_compound([{'base': BaseUnit.METER},
+                            {'base': BaseUnit.NONE, 'si_prefix': SIPrefix.KILO}])
+    w = Writer.to_mem(pretty=False)
+    w.write_version(1, 1)
+    with pytest.raises(BovnarArgumentError, match="unit"):
+        w._write_scalar('d', 'float', vt, u, '1.5')
+
+    # an ordinary unit is unaffected
+    w2 = Writer.to_mem(pretty=False)
+    w2.write_version(1, 1)
+    w2._write_scalar('d', 'float', vt, bovnar.parse_unit('k~g·m/s²'), '1.5')
+    w2.finish()
+    assert 'k~g·m/s²' in w2.get_output().decode()

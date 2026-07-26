@@ -649,6 +649,18 @@ if(_bvnr_have_pytest)
         "currency"
         30)
 
+    # The Python currency table is a hand-written THIRD copy of the catalogue,
+    # after src/gendata/currencies.bvnr and the C table gen_currencies.py builds
+    # from it. It is standalone on purpose (tools import it without libbvnr), but
+    # nothing compared it to the source of truth — so a currency added to the
+    # gendata would regenerate the C side and leave Python reporting a wrong
+    # minor_unit, the field money is formatted with, while every other gate
+    # stayed green. Pure Python on both sides.
+    _bvnr_pytest_pure(bvnr_py_currency_parity
+        test_currency_table_parity.py
+        "currency"
+        30)
+
     # Conversion factors re-derived from each unit's DEFINITION. The pint bridge
     # checks bovnar against pint, but for the ~40 units bovnar defines itself
     # the pint definition is generated FROM bovnar's factor -- circular, so a
@@ -1062,12 +1074,13 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 129)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 130)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
                                     #           + conformance_doc_examples
                                     #           + cli_events_long_unit
+                                    #           + py_currency_parity
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

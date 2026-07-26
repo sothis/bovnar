@@ -4288,7 +4288,51 @@ groups raise <code>error_unit_illegal</code>.</p>
     .eur_usd  = &lt;float_dec:64,$USD/$EUR&gt;        1.0842;
 };</code></pre></div>
 <h3 id="96-compatibility-rules">9.6 Compatibility Rules</h3>
-<p><code>bvn_units_compatible()</code> requires no modification for currencies. Two currency expressions are structurally compatible only if they have identical component sequences including base enum values. Since <code>bu_usd ≠ bu_eur</code>, <code>USD</code> and <code>EUR</code> are already structurally incompatible under the existing comparison logic.</p>
+<p><strong><code>bvn_units_compatible()</code> returns <code>false</code> for every unit containing a currency — including a currency against itself.</strong> It is dimension-based, and a currency deliberately has no SI conversion row, so <code>bvn_unit_dimension_vector</code> fails and the compatibility test fails with it. <code>bvn_units_compatible($USD, $USD)</code> is <code>false</code>.</p>
+<p>Do not use it as the gate before converting money: it refuses the identity. Use the conversion functions directly — <code>bvn_unit_convert_factor</code>, <code>bvn_unit_convert_value</code>, <code>bvn_unit_convert_rational</code> — which carry their own currency path and report success or failure themselves.</p>
+<p>What that path accepts is <strong>the same currency expression, differing at most in prefixes</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$USD</code></td>
+<td><code>$USD</code></td>
+<td>1 (identity)</td>
+</tr>
+<tr>
+<td><code>k~$USD</code></td>
+<td><code>$USD</code></td>
+<td>1000 — a prefix delta is an exact power of ten (or two, for IEC), so it stays lossless</td>
+</tr>
+<tr>
+<td><code>$USD·oz_t⁻¹</code></td>
+<td><code>oz_t⁻¹·$USD</code></td>
+<td>1 — the match is a multiset, because unit multiplication commutes</td>
+</tr>
+<tr>
+<td><code>$USD</code></td>
+<td><code>$EUR</code></td>
+<td>refused — <code>bu_usd ≠ bu_eur</code>, and the library holds no exchange rate</td>
+</tr>
+<tr>
+<td><code>$USD/oz_t</code></td>
+<td><code>$USD/g</code></td>
+<td><strong>refused</strong>, though only the denominator changes and no rate is involved. A compound carrying a currency is matched as a whole; the physical part is not converted independently. Convert the physical quantity separately if you need this</td>
+</tr>
+<tr>
+<td><code>$USD</code></td>
+<td><code>m</code>, <code>no_unit</code>, <code>%</code></td>
+<td>refused</td>
+</tr>
+</tbody>
+</table>
+<p>The mechanism is <code>bvn_unit_prefix_only_delta</code> in <code>bovnar_si_units.c</code>, consulted only <em>after</em> <code>bvn_units_compatible</code> has said no — so a unit that does have an SI row keeps taking the ordinary, fully general path.</p>
 <h3 id="97-type-pairing-recommendations">9.7 Type Pairing Recommendations</h3>
 <table>
 <thead>

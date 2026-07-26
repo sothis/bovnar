@@ -493,7 +493,7 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 		sb_json_cstr(b, evt_family(d->value_type.family));
 		sb_printf(b, ",\"width\":%u", d->value_type.width);
 		sb_printf(b, ",\"base\":%u", d->value_type.base);
-		char unit_buf[160];
+		char unit_buf[BVNR_UNIT_STRING_MAX];
 		if (bvn_unit_to_string(d->value_unit, unit_buf, sizeof(unit_buf)) >= 0 &&
 		    unit_buf[0] && strcmp(unit_buf, "no_unit") != 0) {
 			sb_puts(b, ",\"unit\":");
@@ -528,7 +528,7 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 			sb_puts(b, ",\"converted\":null");
 		}
 		sb_printf(b, ",\"converted_base\":%u", d->conv.base);
-		char ub[160];
+		char ub[BVNR_UNIT_STRING_MAX];
 		if (bvn_unit_to_string(d->conv.unit, ub, sizeof ub) >= 0 && ub[0]) {
 			sb_puts(b, ",\"converted_unit\":");
 			sb_json_cstr(b, ub);
@@ -845,7 +845,7 @@ static void wdoc_type_fields(sb_t *b, const bvn_dom_node_t *node)
 	} else {
 		sb_puts(b, ",\"width\":null,\"base\":null");
 	}
-	char ub[160];
+	char ub[BVNR_UNIT_STRING_MAX];
 	int32_t ul = bvn_dom_get_unit_string(node, ub, sizeof ub);
 	if (ul > 0 && strcmp(ub, "no_unit") != 0) {
 		sb_puts(b, ",\"unit\":");

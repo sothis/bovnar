@@ -19,6 +19,7 @@ default build/generated). A host-side step — needs only Python 3.
 Usage:
     [BVNR_GENERATED_DIR=dir] python3 gen_units.py [path/to/units.bvnr]
 """
+import re
 import sys
 import os
 
@@ -283,6 +284,51 @@ def gen_bu_index(rows):
     return "".join(out)
 
 
+def check_unit_string_bound(units, prefixes):
+    """Refuse to generate a table whose longest unit outgrows BVNR_UNIT_STRING_MAX.
+
+    bvn_unit_to_string returns -1 when the text does not fit AND writes no NUL, so
+    a caller that ignores the return and formats the buffer with "%s" reads past
+    it. That was a real stack-buffer-overflow in `bovnar events -d`. Every unit
+    buffer in the tree is now sized from that macro, which makes the macro a
+    promise about THIS DATA -- so adding a longer prefixable symbol has to fail
+    the build rather than quietly shrink the margin to nothing.
+
+    The bound mirrors the formatter: per component a prefix, a '~', the canonical
+    symbol and an exponent; the six-byte "⁻⁹" counts because an all-negative unit
+    is written as a flat product rather than split over a '/', which is the one
+    shape that renders negative exponents at full width.
+    """
+    hdr = os.path.join(REPO, "include", "bovnar.h")
+    with open(hdr, encoding="utf-8") as f:
+        m = re.search(r"#define\s+BVNR_UNIT_STRING_MAX\s+(\d+)", f.read())
+    if not m:
+        raise SystemExit("gen_units: BVNR_UNIT_STRING_MAX is not defined in "
+                         "include/bovnar.h -- nothing to check the bound against")
+    declared = int(m.group(1))
+    pfx_max = max(byte_len(p["symbol"])
+                  for sysname in ("si_prefixes", "iec_prefixes")
+                  for p in prefixes[sysname])
+    NO_PREFIX = ("german", "ratio", "none")
+    sym_max = max(byte_len(u["symbol"]) + (pfx_max + 1 if u["prefix"] not in NO_PREFIX
+                                           else 0)
+                  for u in units)
+    EXP_MAX = 6                      # "⁻⁹" as bvn_write_exponent_suffix emits it
+    SEP     = 2                      # "·"
+    worst = (BVNR_MAX_UNIT_COMPONENTS * (sym_max + EXP_MAX)
+             + (BVNR_MAX_UNIT_COMPONENTS - 1) * SEP + 1)
+    if worst > declared:
+        raise SystemExit(
+            "gen_units: the longest unit this table can emit needs %d bytes, but "
+            "BVNR_UNIT_STRING_MAX in include/bovnar.h is %d. Raise it (and check "
+            "every buffer sized from it), or shorten the symbol that grew."
+            % (worst, declared))
+    return worst, declared
+
+
+BVNR_MAX_UNIT_COMPONENTS = 8   # must match BVNR_MAX_UNIT_COMPONENTS in bovnar.h
+
+
 def gen_prefix_policy(units):
     out = [BANNER]
     for u in units:
@@ -358,6 +404,10 @@ def main():
     with open(path, "rb") as f:
         excs = load_compact_exceptions(bvnr_data.load(f.read()), units, path)
 
+    prefixes = bvnr_data.load(
+        open(os.path.join(GENDATA, "prefixes.bvnr"), "rb").read())
+    worst_unit_str, unit_str_cap = check_unit_string_bound(units, prefixes)
+
     rows = parse_rows(units)
     # WIRED fragments are written into the source tree where they are #include'd
     # (and where amalgamate.py resolves them by basename). The prefix policy stays
@@ -377,8 +427,10 @@ def main():
     for dest, text in artifacts.items():
         bvnr_data.write_if_changed(dest, text)
 
-    print("generated %d units (%d parse rows, %d compact exceptions)"
-          % (len(units), len(rows), len(excs)))
+    print("generated %d units (%d parse rows, %d compact exceptions; "
+          "longest emitted unit %d bytes, cap %d)"
+          % (len(units), len(rows), len(excs), worst_unit_str,
+             unit_str_cap))
     print("  wired: bovnar_units.gen.h, bovnar_si_conv_table.gen.inc,")
     print("         bovnar_base_unit_str.gen.inc, bovnar_bu_table.gen.inc,")
     print("         bovnar_bu_index.gen.inc, bovnar_prefix_policy.gen.inc,")

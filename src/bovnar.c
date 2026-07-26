@@ -521,9 +521,19 @@ static void evt_format_token(const bvnr_data_t *d, bvnr_event_t e,
 			uint32_t eb = bvn_effective_base(vt);
 			SCAT(":%" PRIu32 ",_%" PRIu32, ew, eb);
 			if (evt_unit_has_real_base(u)) {
-				char unit_buf[128];
-				bvn_unit_to_string(u, unit_buf, sizeof(unit_buf));
-				SCAT(",%s", unit_buf);
+				/* bvn_unit_to_string returns -1 WITHOUT writing a NUL when the
+				 * text does not fit, so ignoring the return handed "%s" an
+				 * unterminated stack buffer — a stack-buffer-overflow that a
+				 * legal document with a long compound unit reached (128 bytes
+				 * held only about seven of the eight components a unit may
+				 * carry). Size from BVNR_UNIT_STRING_MAX, which gen_units.py
+				 * checks against the real table, and still refuse rather than
+				 * print whatever happens to be on the stack. */
+				char unit_buf[BVNR_UNIT_STRING_MAX];
+				if (bvn_unit_to_string(u, unit_buf, sizeof(unit_buf)) < 0)
+					SCAT(",<unprintable unit>");
+				else
+					SCAT(",%s", unit_buf);
 			} else {
 				SCAT(",no_unit");
 			}
@@ -1901,7 +1911,10 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 			!(vu.num_components == 1u &&
 			  vu.components[0].base == bu_none);
 	if (has_unit) {
-		char ub[80];
+		/* Sized from BVNR_UNIT_STRING_MAX so a long-but-legal unit is NAMED in
+		 * the loss report rather than degraded to "a unit". The -1 guard stays:
+		 * the function writes no NUL on failure. */
+		char ub[BVNR_UNIT_STRING_MAX];
 		if (bvn_unit_to_string(vu, ub, sizeof ub) < 0) ub[0] = '\0';
 		L->n_unit++;
 		json_loss_note(L->ex_unit, sizeof L->ex_unit, path, ub[0] ? ub : "a unit");

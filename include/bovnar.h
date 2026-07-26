@@ -67,6 +67,25 @@ extern "C" {
 #define BVNR_SPEC_VERSION_MAJOR		1
 #define BVNR_SPEC_VERSION_MINOR		1
 #define BVNR_MAX_UNIT_COMPONENTS		8
+/*
+ * Bytes a buffer needs to hold ANY unit bvn_unit_to_string can emit, NUL
+ * included. Size unit buffers from this rather than by eye.
+ *
+ * The worst case is 150 bytes + NUL: eight components, each the longest
+ * prefixable canonical symbol ("fl_oz_uk", 8 bytes) with a two-byte prefix, a
+ * '~', and the six-byte "⁻⁹" — negative exponents render at full width only when
+ * EVERY component is negative, because a mixed unit moves them into the
+ * denominator and renders them positive at three bytes. Seven '·' separators at
+ * two bytes each complete it.
+ *
+ * gen_units.py recomputes that bound from src/gendata/units.bvnr on every build
+ * and fails if a new symbol outgrows this, because the margin is data-driven and
+ * the failure is not graceful: bvn_unit_to_string returns -1 WITHOUT writing a
+ * NUL, so a caller that ignores the return and hands the buffer to "%s" reads off
+ * the end of it. That was a live stack-buffer-overflow in `bovnar events -d`,
+ * reachable from a legal document with a long compound unit.
+ */
+#define BVNR_UNIT_STRING_MAX			192u
 #define BVN_MAX_INT_WIDTH			32768u
 /*
  * Sentinel for bvnr_read_flags_t.max_file_size and bvnr_write_flags_t.max_file_size:

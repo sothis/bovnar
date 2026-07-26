@@ -2023,6 +2023,45 @@ static void test_german_unit_prefix_restriction(void)
 #undef PFX_IEC_G
 }
 
+static void test_longest_unit_fits_the_declared_bound(void)
+{
+	printf("  the longest emitted unit fits BVNR_UNIT_STRING_MAX...\n");
+	/* bvn_unit_to_string returns -1 when the text does not fit AND writes no
+	 * NUL, so a caller that ignores the return and hands the buffer to "%s"
+	 * reads past it -- which is exactly what `bovnar events -d` did with a
+	 * 128-byte buffer, a stack-buffer-overflow reachable from a legal document.
+	 * Every unit buffer is now sized from BVNR_UNIT_STRING_MAX, and gen_units.py
+	 * fails the build if the table outgrows it. This pins the worst case the
+	 * generator computes: eight components, the longest prefixable symbol, a
+	 * two-byte prefix and an all-negative exponent set (which is written as a
+	 * flat product, the one shape that renders "\u207b\u2079" at full width). */
+	value_unit_t u;
+	memset(&u, 0, sizeof u);
+	u.num_components = BVNR_MAX_UNIT_COMPONENTS;
+	for (uint32_t i = 0; i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+		u.components[i].base            = bu_fluid_ounce_uk;   /* "fl_oz_uk" */
+		u.components[i].exponent        = exp_neg_nonic;
+		u.components[i].prefix.system   = prefix_si;
+		u.components[i].prefix.id.si    = si_micro;            /* two-byte "\u00b5" */
+	}
+	char buf[BVNR_UNIT_STRING_MAX];
+	int32_t n = bvn_unit_to_string(u, buf, sizeof buf);
+	ASSERT_TRUE(n > 0, "the worst-case unit fits BVNR_UNIT_STRING_MAX");
+	ASSERT_TRUE((size_t)n + 1u <= (size_t)BVNR_UNIT_STRING_MAX,
+		    "...with the NUL inside the bound");
+	ASSERT_EQ_INT(n, 150, "and it is the 150 bytes gen_units.py computes");
+	/* One byte short must REFUSE, not truncate -- and must not be mistaken for
+	 * success by a caller that only checks for a non-empty buffer. */
+	char tight[150];
+	ASSERT_TRUE(bvn_unit_to_string(u, tight, sizeof tight) < 0,
+		    "a buffer one byte short is refused");
+	/* and it round-trips */
+	bool pok = false;
+	value_unit_t back = bvn_parse_unit((const uint8_t *)buf, &pok);
+	ASSERT_TRUE(pok && bvn_unit_equal(u, back),
+		    "the worst-case unit parses back to itself");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -2056,6 +2095,7 @@ int main(void)
 	test_nonsi_prefix_tilde_disambiguation();
 	test_nonsi_compound_units();
 	test_german_unit_prefix_restriction();
+	test_longest_unit_fits_the_declared_bound();
 
 	printf("\n──────────────────────────────────────\n");
 	printf("  Results: %d tests, %d failures\n", tests, failures);

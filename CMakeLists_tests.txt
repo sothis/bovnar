@@ -986,6 +986,20 @@ add_test(
 set_tests_properties(bvnr_cli_query_datetime_fraction PROPERTIES
     LABELS "cli;query" TIMEOUT 30)
 
+# A legal document with a long compound unit overflowed the CLI's stack. The
+# annotation rebuilder in `events -d` used a 128-byte buffer, ignored
+# bvn_unit_to_string's return, and handed the result to "%s" -- but that function
+# writes no NUL when the text does not fit, so it read off the end. Eight
+# components of the longest prefixable symbol need 150 bytes.
+add_test(
+    NAME    bvnr_cli_events_long_unit
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DFILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/long_unit.bvnr
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/events_ok.cmake)
+set_tests_properties(bvnr_cli_events_long_unit PROPERTIES
+    LABELS "cli;events;unit" TIMEOUT 30)
+
 # `query` printed every float through "%g" -- six significant digits -- so an
 # exact-decimal money value came out as 1.23457e+07, cents and notation both
 # gone, in a format whose premise is that the number is not to be guessed at.
@@ -1048,11 +1062,12 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 128)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 129)   # 117 base + i18n_de + wrapper_sync + cache_stamps
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
                                     #           + conformance_doc_examples
+                                    #           + cli_events_long_unit
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser

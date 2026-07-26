@@ -116,6 +116,6 @@ Bovnar steht in der Tradition menschenlesbarer Serialisierungsformate wie [[Java
 <ref name="changelog">{{Internetquelle |url=https://github.com/sothis/bovnar/blob/main/CHANGELOG.md |titel=Bovnar Changelog |werk=GitHub |abruf=2026-07-21 |sprache=en}}</ref>
 </references>
 
-[[:Kategorie:Datenformat]]
-[[:Kategorie:Offenes Format]]
-[[:Kategorie:Freie Software]]
+[[Kategorie:Datenformat]]
+[[Kategorie:Offenes Format]]
+[[Kategorie:Freie Software]]

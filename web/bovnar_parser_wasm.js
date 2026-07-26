@@ -183,7 +183,16 @@
       var base = v.base || 10;
       params.push({ kind: 'base', text: '_' + base, value: base });
     }
-    if (v.unit)          params.push({ kind: 'unit',  text: v.unit });
+    /* Dimensionless is a statement, not an absence: bvn_unit_to_string answers
+       "no_unit" for such a value and the CLI prints it — <uint:64,_10,no_unit>.
+       The reader only emits the parameter for the synthesised default and for an
+       annotation that spells it out (an explicit one that merely omits the unit
+       is a structurally distinct internal state, spec §11), but these rows show
+       the RESOLVED annotation — the same reason base 0 reads as 10 — so every
+       unitless value says so. Except a datetime, whose parameter slot holds the
+       epoch reported below; it has no unit to have none of. */
+    if (v.familyName !== 'datetime')
+      params.push({ kind: 'unit', text: v.unit || 'no_unit' });
     if (v.epoch)         params.push({ kind: 'epoch', text: v.epoch });
     return { synthesized: synthesized, familyName: v.familyName,
              family: 'vt_' + v.familyName, params: params };

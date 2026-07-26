@@ -1074,7 +1074,8 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 132)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 133)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+                                    #         + playground_shim (DISABLED without node)
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links
                                     #           + 3 cli_query_float_precision
@@ -1167,6 +1168,41 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/index.mjs)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/wasm_wrapper_sync.cmake)
     set_tests_properties(bvnr_wasm_wrapper_sync PROPERTIES
         LABELS "wasm;web" TIMEOUT 60)
+endif()
+
+# ── The playground's parser shim still agrees with the C core ───────────────
+# web/bovnar_parser_wasm.js is the one part of the playground that is NOT the C
+# core: it walks the reference event stream and rebuilds the document tree from
+# it. Nothing on the C side can see that walk, and it was wrong -- a struct
+# inside an array row became a keyed assignment in the enclosing scope, so
+# `.a = [{.b=3;},{.c=4;}];` lost its array entirely and four of the shipped
+# examples rendered with `null` keys. The test diffs the shim's tree against
+# bvnr_wasm_doc's DOM projection of the same document, so the core stays the
+# reference.
+#
+# node ships inside emsdk, so anyone who can build the WASM already has one --
+# look there too rather than losing the gate to a PATH that lacks it.
+file(GLOB BVNR_EMSDK_NODE_BIN "$ENV{EMSDK}/node/*/bin" "$ENV{HOME}/emsdk/node/*/bin")
+find_program(NODE_EXECUTABLE NAMES node nodejs HINTS ${BVNR_EMSDK_NODE_BIN})
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/playground_shim_test.mjs)
+    # Registered either way, and DISABLED rather than dropped when there is no
+    # node: ctest then reports it as skipped instead of silently not existing,
+    # and the registration self-check below keeps one number for both cases.
+    if(NODE_EXECUTABLE)
+        add_test(
+            NAME    bvnr_playground_shim
+            COMMAND ${NODE_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/playground_shim_test.mjs)
+        set_tests_properties(bvnr_playground_shim PROPERTIES
+            ENVIRONMENT "BOVNAR_CLI=$<TARGET_FILE:bovnar>")
+    else()
+        add_test(NAME bvnr_playground_shim COMMAND ${CMAKE_COMMAND} -E echo
+                 "no node found -- install node or source emsdk to run this gate")
+        set_tests_properties(bvnr_playground_shim PROPERTIES DISABLED TRUE)
+    endif()
+    set_tests_properties(bvnr_playground_shim PROPERTIES
+        LABELS "wasm;web" TIMEOUT 120)
 endif()
 
 # ── Content-Security-Policy still authorises the pages' inline scripts ───────

@@ -90,6 +90,26 @@ static uint32_t bigint_digit_to_char(uint32_t d, uint32_t base)
 	return 0u;
 }
 /*
+ * True when a bvn_int_t is self-consistent enough to compute with. Every number
+ * the library itself produces satisfies this — bigint_ensure_cap caps nlimbs at
+ * BVN_INT_MAX_LIMBS and never lets nused past nlimbs — but bvn_int_t is a public
+ * struct and the arithmetic entry points below are BVN_API, so a caller can hand
+ * in one that does not. That matters because those entry points size their
+ * scratch from the operands: `na + nb` in bvn_int_mul, `maxn + 1u` in
+ * bigint_addmag_into. With an absurd nused those sums WRAP, and a wrapped `need`
+ * slips through bigint_ensure_cap's `need <= n->nlimbs` early return without
+ * allocating anything — after which the multiply/add loops index limbs that were
+ * never there. Screening the operands makes the wrap unreachable: two sane nused
+ * values are each <= BVN_INT_MAX_LIMBS, so no sum of them can overflow uint32_t.
+ */
+static bool bigint_operand_sane(const bvn_int_t *n)
+{
+	if (n->nlimbs > BVN_INT_MAX_LIMBS) return false;
+	if (n->nused  > n->nlimbs)         return false;
+	if (n->nlimbs && !n->limbs)        return false;
+	return true;
+}
+/*
  * Guarantee at least `need` limbs of capacity. Heap-backed numbers grow
  * geometrically (doubling) to keep repeated appends amortised O(1); fixed-buffer
  * numbers (heap==false) cannot grow and fail instead. A hard ceiling of
@@ -99,7 +119,14 @@ static uint32_t bigint_digit_to_char(uint32_t d, uint32_t base)
 static bool bigint_ensure_cap(bvn_int_t *n, uint32_t need)
 {
 	if (need > BVN_INT_MAX_LIMBS) return false;
-	if (need <= n->nlimbs)        return true;
+	/*
+	 * Returning true here promises the caller `need` writable limbs, so the
+	 * buffer has to be there: a struct claiming capacity it has no allocation
+	 * for (nlimbs > 0, limbs == NULL) would send every caller straight into it.
+	 * Nothing the library builds looks like that, but bvn_int_t is public and
+	 * this is the one place the promise is made, so it is the place to check.
+	 */
+	if (need <= n->nlimbs)        return need == 0u || n->limbs != NULL;
 	if (!n->heap) return false;
 	uint32_t nc = n->nlimbs ? n->nlimbs * 2u : 8u;
 	if (nc < need) nc = need;
@@ -768,11 +795,27 @@ static int bigint_cmpmag(const bvn_int_t *a, const bvn_int_t *b)
 			return a->limbs[(uint32_t)i] > b->limbs[(uint32_t)i] ? 1 : -1;
 	return 0;
 }
-/* acc.magnitude += b.magnitude (signs ignored). */
+/*
+ * acc.magnitude += b.magnitude (signs ignored).
+ *
+ * The bound is re-checked here rather than left to the callers: `maxn + 1u`
+ * must not wrap, because a wrapped 0 would satisfy bigint_ensure_cap's
+ * `need <= n->nlimbs` early return without allocating, and the loop below would
+ * then walk limbs that do not exist. bvn_int_add already screens its operands
+ * with bigint_operand_sane, so this is unreachable through it — but this helper
+ * is what actually depends on the bound, and stating it locally is what makes
+ * that safe to read (and lets -fanalyzer see it too).
+ */
 static bool bigint_addmag_into(bvn_int_t *acc, const bvn_int_t *b)
 {
+	if (acc->nused > BVN_INT_MAX_LIMBS || b->nused > BVN_INT_MAX_LIMBS)
+		return false;
 	uint32_t maxn = (acc->nused > b->nused) ? acc->nused : b->nused;
 	if (!bigint_ensure_cap(acc, maxn + 1u)) return false;
+	/* ensure_cap succeeded for need >= 1, so the buffer exists; restating it
+	 * here keeps the loop below readable without tracing that promise back
+	 * through the helper (and -fanalyzer does not carry it across the call). */
+	if (!acc->limbs) return false;
 	uint64_t carry = 0u;
 	for (uint32_t i = 0; i < maxn; i++) {
 		uint64_t s = (uint64_t)(i < acc->nused ? acc->limbs[i] : 0u)
@@ -788,6 +831,7 @@ static bool bigint_addmag_into(bvn_int_t *acc, const bvn_int_t *b)
 bool bvn_int_mul(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
 {
 	if (!dst || !a || !b) return false;
+	if (!bigint_operand_sane(a) || !bigint_operand_sane(b)) return false;
 	if (bvn_int_is_zero(a) || bvn_int_is_zero(b)) { bvn_int_zero(dst); return true; }
 	uint32_t na = a->nused, nb = b->nused;
 	bvn_int_t *tmp = bvn_int_alloc();
@@ -820,6 +864,7 @@ bool bvn_int_mul(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
 bool bvn_int_add(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
 {
 	if (!dst || !a || !b) return false;
+	if (!bigint_operand_sane(a) || !bigint_operand_sane(b)) return false;
 	bvn_int_t *tmp = bvn_int_alloc();
 	if (!tmp) return false;
 	bool ok = true;
@@ -850,6 +895,7 @@ bool bvn_int_add(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
 bool bvn_int_gcd(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
 {
 	if (!dst || !a || !b) return false;
+	if (!bigint_operand_sane(a) || !bigint_operand_sane(b)) return false;
 	bvn_int_t *x = bvn_int_alloc(), *y = bvn_int_alloc();
 	bvn_int_t *q = bvn_int_alloc(), *r = bvn_int_alloc();
 	bool ok = x && y && q && r;

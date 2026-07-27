@@ -1409,6 +1409,21 @@ static bool bvn_unit_component_identical(const value_unit_component_t *ca,
 {
 	if (ca->base     != cb->base)     return false;
 	if (ca->exponent != cb->exponent) return false;
+	/*
+	 * "No prefix" has two spellings — (prefix_si, si_none) and (prefix_iec,
+	 * iec_none) — and they are indistinguishable everywhere else: both render
+	 * to the same text, both score a factor of 1. The parser only ever emits
+	 * the SI one, but a caller building an unprefixed bit/byte unit by hand
+	 * reaches for prefix_iec naturally, and comparing the system first called
+	 * that unequal to the very text it prints — against this function's own
+	 * contract that equivalent notations match. Settle the absent-prefix case
+	 * before the system is allowed to matter.
+	 */
+	bool a_none = (ca->prefix.system == prefix_iec)
+	            ? ca->prefix.id.iec == iec_none : ca->prefix.id.si == si_none;
+	bool b_none = (cb->prefix.system == prefix_iec)
+	            ? cb->prefix.id.iec == iec_none : cb->prefix.id.si == si_none;
+	if (a_none || b_none) return a_none && b_none;
 	if (ca->prefix.system != cb->prefix.system) return false;
 	if (ca->prefix.system == prefix_si)
 		return ca->prefix.id.si == cb->prefix.id.si;

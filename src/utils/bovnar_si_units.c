@@ -1247,6 +1247,24 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 		return false;
 	if ((uint32_t)base >= BVN_VALUE_BASE_UNIT_COUNT)
 		return false;
+	/*
+	 * The prefix ID has to be in range before anything else looks at it. Only
+	 * the information-unit branch below used to range-check it, so an ID past
+	 * the end of the table stayed "valid" everywhere else — and since this is
+	 * the one gatekeeper the parser, the writer and the conversion helpers all
+	 * share, that leaked straight through the writer: si_prefix_str() has no
+	 * symbol for such an ID and returns "", so bvn_write_unit_component emitted
+	 * the '~' separator with nothing in front of it ("~m"). The writer reported
+	 * success, and the document it produced came back error_unit_illegal on the
+	 * next read. bvn_unit_prefix_factor() meanwhile scored the same unit as 1,
+	 * silently dropping the scale. Rejecting the ID here makes all three agree.
+	 */
+	if (prefix.system == prefix_iec) {
+		if ((uint32_t)prefix.id.iec >= BVN_IEC_PREFIX_COUNT)
+			return false;
+	} else if ((uint32_t)prefix.id.si >= BVN_SI_PREFIX_COUNT) {
+		return false;
+	}
 	if (bvn_unit_is_currency((int)base))
 		return bvn_currency_prefix_valid((int)base, (int)prefix.system);
 	bvn_prefix_policy_t pol = (bvn_prefix_policy_t)bu_prefix_policy[base];
@@ -1267,9 +1285,9 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 		 * order — while that same file requires ids to be append-only, so the
 		 * first sub-kilo prefix ever added would have been handed a high id and
 		 * silently become legal on bit and byte. gen_prefixes.py now also
-		 * refuses a non-monotonic list, but this no longer depends on it. */
-		if ((uint32_t)prefix.id.si >= BVN_SI_PREFIX_COUNT)
-			return false;
+		 * refuses a non-monotonic list, but this no longer depends on it.
+		 * The ID is already known to be in range — the check at the top of the
+		 * function covers every branch now, not just this one. */
 		return bvni_si_pfx_table[prefix.id.si].exp >= 3;
 	}
 	return true;

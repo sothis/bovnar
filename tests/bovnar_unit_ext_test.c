@@ -311,8 +311,146 @@ static void test_prefix_unit_valid_function(void)
 	ASSERT_FALSE(bvn_prefix_unit_valid(PFX_SI(si_deca),  bu_byte),
 				 "si_deca on byte INVALID (positive but below kilo)");
 
+	/*
+	 * A prefix ID past the end of its table has no symbol. Only the
+	 * information-unit branch used to range-check it, so such an ID stayed
+	 * "valid" for every other unit -- and this is the gatekeeper the parser,
+	 * the writer and the conversion helpers all share. The writer then emitted
+	 * the '~' separator with nothing before it ("~m"), reported success, and
+	 * produced a document that came back error_unit_illegal on the next read.
+	 */
+	ASSERT_FALSE(bvn_prefix_unit_valid(PFX_SI(BVN_SI_PREFIX_COUNT), bu_meter),
+				 "SI prefix id one past the table INVALID on meter");
+	ASSERT_FALSE(bvn_prefix_unit_valid(PFX_SI(99), bu_meter),
+				 "far out-of-range SI prefix id INVALID on meter");
+	ASSERT_FALSE(bvn_prefix_unit_valid(PFX_SI(BVN_SI_PREFIX_COUNT), bu_bit),
+				 "SI prefix id one past the table INVALID on bit");
+	ASSERT_FALSE(bvn_prefix_unit_valid(PFX_IEC(BVN_IEC_PREFIX_COUNT), bu_bit),
+				 "IEC prefix id one past the table INVALID on bit");
+	ASSERT_FALSE(bvn_prefix_unit_valid(PFX_IEC(99), bu_byte),
+				 "far out-of-range IEC prefix id INVALID on byte");
+	/* The last in-range id on each side still passes, so the bound is not off
+	 * by one in the other direction. */
+	ASSERT_TRUE(bvn_prefix_unit_valid(PFX_SI(BVN_SI_PREFIX_COUNT - 1), bu_meter),
+				"last in-range SI prefix id still valid on meter");
+	ASSERT_TRUE(bvn_prefix_unit_valid(PFX_IEC(BVN_IEC_PREFIX_COUNT - 1), bu_byte),
+				"last in-range IEC prefix id still valid on byte");
+
 #undef PFX_SI
 #undef PFX_IEC
+}
+
+/*
+ * An out-of-range prefix id must not survive as far as the writer. It used to:
+ * bvn_unit_valid() accepted it, bvn_unit_to_string() rendered "~m", and
+ * bvnr_write_float_unit() emitted that into a document while reporting success.
+ * The result did not parse. Pin the whole chain, not just the predicate.
+ */
+static void test_out_of_range_prefix_id_rejected_end_to_end(void)
+{
+	printf("  out-of-range prefix id rejected end-to-end...\n");
+
+	value_unit_t u;
+	memset(&u, 0, sizeof u);
+	u.num_components              = 1;
+	u.components[0].base          = bu_meter;
+	u.components[0].exponent      = exp_linear;
+	u.components[0].prefix.system = prefix_si;
+	u.components[0].prefix.id.si  = (si_prefix_id_t)99;
+
+	ASSERT_FALSE(bvn_unit_valid(u), "unit with bogus prefix id is invalid");
+
+	char buf[128];
+	ASSERT_TRUE(bvn_unit_to_string(u, buf, sizeof buf) < 0,
+				"bvn_unit_to_string refuses it rather than emitting '~m'");
+
+	uint8_t out[512];
+	bvnr_writer_t *w = bvnr_writer_create();
+	ASSERT_TRUE(w != NULL, "writer created");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_open_write_mem(w, out, sizeof out, false, NULL),
+				"writer opened on memory");
+	ASSERT_FALSE(bvnr_write_float_unit(w, "len", 64, 1.5, u),
+				 "write_float_unit refuses the bogus unit");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_illegal,
+				  "writer reports error_unit_illegal");
+	bvnr_writer_destroy(w);
+
+	/* The legitimate neighbour still writes, and what it writes reads back. */
+	u.components[0].prefix.id.si = si_kilo;
+	uint8_t good[512];
+	w = bvnr_writer_create();
+	ASSERT_TRUE(w != NULL, "writer created (control)");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_open_write_mem(w, good, sizeof good, false, NULL),
+				"writer opened (control)");
+	ASSERT_TRUE(bvnr_write_float_unit(w, "len", 64, 1.5, u),
+				"kilo-metre writes fine");
+	ASSERT_TRUE(bvnr_write_finish(w), "writer finished (control)");
+	uint64_t n = bvnr_writer_bytes_written(w);
+	bvnr_writer_destroy(w);
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "reader created");
+	if (!r) return;
+	ASSERT_TRUE(bvnr_open_read_mem(r, good, n, NULL, 0, NULL), "reader opened");
+	ASSERT_TRUE(bvnr_read(r), "the written document reads back");
+	bvnr_reader_destroy(r);
+}
+
+/*
+ * "No prefix" has two spellings: (prefix_si, si_none) -- what the parser always
+ * produces -- and (prefix_iec, iec_none), which is what a caller building an
+ * unprefixed bit/byte unit by hand naturally writes. They render to identical
+ * text and both score a factor of 1, but bvn_unit_equal compared the prefix
+ * SYSTEM first and so called them different units.
+ */
+static void test_absent_prefix_equal_across_systems(void)
+{
+	printf("  absent prefix compares equal across prefix systems...\n");
+
+	static const value_base_unit_t bases[] = {
+		bu_byte, bu_bit, bu_meter, bu_second,
+	};
+	for (size_t i = 0; i < sizeof bases / sizeof *bases; i++) {
+		value_unit_t si, iec;
+		memset(&si,  0, sizeof si);
+		memset(&iec, 0, sizeof iec);
+		si.num_components               = 1;
+		si.components[0].base           = bases[i];
+		si.components[0].exponent       = exp_linear;
+		si.components[0].prefix.system  = prefix_si;
+		si.components[0].prefix.id.si   = si_none;
+		iec = si;
+		iec.components[0].prefix.system = prefix_iec;
+		iec.components[0].prefix.id.iec = iec_none;
+
+		char t1[64], t2[64], msg[128];
+		int32_t n1 = bvn_unit_to_string(si,  t1, sizeof t1);
+		int32_t n2 = bvn_unit_to_string(iec, t2, sizeof t2);
+
+		snprintf(msg, sizeof msg, "base %d: both spellings render", (int)bases[i]);
+		ASSERT_TRUE(n1 > 0 && n1 == n2, msg);
+		snprintf(msg, sizeof msg, "base %d: same text", (int)bases[i]);
+		ASSERT_TRUE(n1 == n2 && memcmp(t1, t2, (size_t)n1) == 0, msg);
+		snprintf(msg, sizeof msg, "base %d: compares equal", (int)bases[i]);
+		ASSERT_TRUE(bvn_unit_equal(si, iec), msg);
+
+		/* ... and so does the unit the parser hands back for that same text. */
+		bool ok = false;
+		value_unit_t parsed = bvn_parse_unit((const uint8_t *)t1, &ok);
+		snprintf(msg, sizeof msg, "base %d: parsed text parses", (int)bases[i]);
+		ASSERT_TRUE(ok, msg);
+		snprintf(msg, sizeof msg, "base %d: parsed == iec spelling", (int)bases[i]);
+		ASSERT_TRUE(ok && bvn_unit_equal(parsed, iec), msg);
+
+		/* A real prefix must still separate units -- the fix widens equality
+		 * only for the absent-prefix case. */
+		value_unit_t kilo = si;
+		kilo.components[0].prefix.id.si = si_kilo;
+		snprintf(msg, sizeof msg, "base %d: kilo != unprefixed", (int)bases[i]);
+		ASSERT_FALSE(bvn_unit_equal(kilo, iec), msg);
+	}
 }
 
 static void test_prefix_enforcement_via_parse(void)
@@ -2075,6 +2213,8 @@ int main(void)
 	test_parse_new_symbols();
 	test_parse_long_name_aliases();
 	test_prefix_unit_valid_function();
+	test_out_of_range_prefix_id_rejected_end_to_end();
+	test_absent_prefix_equal_across_systems();
 	test_prefix_enforcement_via_parse();
 	test_alias_with_prefix();
 	test_compact_prefix_equivalence();

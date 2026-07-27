@@ -360,6 +360,49 @@ reading the grown by-value structs at the wrong size.
 
 ### Fixed
 
+- **A prefix ID past the end of its table let the writer emit a document it
+  could not read back.** `bvn_prefix_unit_valid` range-checked the prefix ID in
+  exactly one branch — SI prefixes on `bit`/`byte`, where "kilo and up" has to
+  index the table to compare magnitudes. Every other unit skipped the check, and
+  since this function is the single gatekeeper the parser, the writer, the
+  validator and the conversion helpers all share, an out-of-range ID was
+  "valid" everywhere at once. `si_prefix_str()` has no symbol for such an ID and
+  returns `""`, so `bvn_write_unit_component` wrote the `~` separator with
+  nothing in front of it: a unit built with `prefix.id.si = 99` on `bu_meter`
+  formatted as `~m`, `bvnr_write_float_unit` accepted it and reported success,
+  and the resulting `.len=<float:64,~m>1.5e+0;` came back
+  `error_unit_illegal` on the next read — a silently unreadable document out of
+  a writer that said it had succeeded. `bvn_unit_prefix_factor` meanwhile scored
+  the same unit as 1, quietly dropping the scale, so the three disagreed three
+  ways. The ID is now range-checked for both prefix systems before anything
+  looks at it, which makes `bvn_unit_valid` false, `bvn_unit_to_string` return
+  -1, and the writer fail with `error_unit_illegal` at the call instead of in
+  someone else's parser. In-range prefixes are untouched.
+- **`bvn_unit_equal` called the two spellings of "no prefix" different units.**
+  An absent prefix can be written `(prefix_si, si_none)` — what the parser always
+  produces — or `(prefix_iec, iec_none)`, which is the natural thing to reach for
+  when building an unprefixed `bit`/`byte` unit by hand. The two are
+  indistinguishable everywhere else: both render to the same text, both score a
+  factor of 1. But the component comparison tested the prefix *system* before the
+  ID, so a hand-built `B` compared unequal to the `B` the parser hands back for
+  the very text it prints — against the documented contract that logically
+  equivalent notations compare equal, and a spurious unit mismatch for any caller
+  that assembles its expected unit rather than parsing it. The absent-prefix case
+  is now settled before the system is allowed to matter; a real prefix still
+  separates units, so `km` and `m` compare unequal as before.
+- **`bvn_int_mul`/`bvn_int_add`/`bvn_int_gcd` now screen their operands.** These
+  size their scratch from the operand widths — `na + nb`, `maxn + 1u` — and
+  `bvn_int_t` is a public struct, so an operand carrying a nonsensical `nused`
+  made those sums wrap. A wrapped `need` then satisfied `bigint_ensure_cap`'s
+  `need <= nlimbs` early return *without allocating*, and the multiply/add loops
+  walked limbs that were never there. Nothing the library builds looks like that
+  (capacity is capped at `BVN_INT_MAX_LIMBS` and `nused` never passes `nlimbs`),
+  so this was only reachable by handing in a hand-built or uninitialised struct
+  rather than one from `bvn_int_alloc` — but these are `BVN_API`. The three
+  entry points now return false for such an operand, and `bigint_ensure_cap` no
+  longer promises capacity for a buffer that does not exist. Well-formed
+  bignums are unaffected.
+
 - **Clarified when `want_unit` runs relative to the two value callbacks.** The
   header and read/write API said "just before `on_verified`", which is
   imprecise: the hook runs after validation but ahead of **both** callbacks —

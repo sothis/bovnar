@@ -1471,8 +1471,12 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 		unsigned dnum   = (unsigned)(-shift);          /* low bits dropped */
 		uint64_t kept   = full_man >> dnum;
 		uint64_t guard  = (full_man >> (dnum - 1u)) & 1u;
+		/* Both arms are uint64_t: a bare `!= 0u` yields int, which the usual
+		 * arithmetic conversions against `0u` would turn into an unsigned
+		 * conversion (-Wsign-conversion). The value is only ever 0 or 1. */
 		uint64_t sticky = (dnum >= 2u)
-			? ((full_man & (((uint64_t)1u << (dnum - 1u)) - 1u)) != 0u) : 0u;
+			? (uint64_t)((full_man & (((uint64_t)1u << (dnum - 1u)) - 1u)) != 0u)
+			: (uint64_t)0u;
 		if (guard && (sticky || (kept & 1u))) {
 			kept++;
 			if (kept >> (unsigned)prec) { kept >>= 1; f->_exp += 1; }
@@ -1492,8 +1496,12 @@ bool bvn_float_from_double(bvn_float_t *f, double v)
 		unsigned dnum   = (unsigned)(-shift);
 		uint64_t kept   = full_man >> dnum;
 		uint64_t guard  = (full_man >> (dnum - 1u)) & 1u;
+		/* Both arms are uint64_t: a bare `!= 0u` yields int, which the usual
+		 * arithmetic conversions against `0u` would turn into an unsigned
+		 * conversion (-Wsign-conversion). The value is only ever 0 or 1. */
 		uint64_t sticky = (dnum >= 2u)
-			? ((full_man & (((uint64_t)1u << (dnum - 1u)) - 1u)) != 0u) : 0u;
+			? (uint64_t)((full_man & (((uint64_t)1u << (dnum - 1u)) - 1u)) != 0u)
+			: (uint64_t)0u;
 		if (guard && (sticky || (kept & 1u))) {
 			kept++;
 			if (kept >> (unsigned)prec) { kept >>= 1; f->_exp += 1; }

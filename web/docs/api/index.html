@@ -60,6 +60,7 @@
 <li>1.9 <a href="#19-datetime-family-spec-11">Datetime family (spec 1.1)</a></li>
 <li>1.10 <a href="#110-read-time-lossless-unit--base-conversion-want_unit">Read-time lossless unit / base conversion (<code>want_unit</code>)</a></li>
 <li>1.11 <a href="#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double"><code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></a></li>
+<li>1.12 <a href="#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Reader-side unit policy (<code>bvnr_reader_set_unit_policy</code>)</a></li>
 </ul>
 </li>
 <li><a href="#2-writer">Writer</a><ul>
@@ -77,6 +78,7 @@
 <li>2.12 <a href="#212-bvnr_write_bvnf_base--bvnr_write_bvnf_base_unit"><code>bvnr_write_bvnf_base</code> / <code>bvnr_write_bvnf_base_unit</code></a></li>
 <li>2.13 <a href="#213-bvnr_write_bvni--bvnr_write_bvni_unit"><code>bvnr_write_bvni</code> / <code>bvnr_write_bvni_unit</code></a></li>
 <li>2.14 <a href="#214-bvn_type_float_base"><code>BVN_TYPE_FLOAT_BASE</code></a></li>
+<li>2.15 <a href="#215-writer-side-unit-policy-bvnr_writer_set_unit_policy">Writer-side unit policy (<code>bvnr_writer_set_unit_policy</code>)</a></li>
 </ul>
 </li>
 <li><a href="#3-shared">Shared</a><ul>
@@ -94,6 +96,7 @@
 <li>4.4 <a href="#44-typed-value-accessors">Typed value accessors</a></li>
 <li>4.5 <a href="#45-building-a-tree">Building a tree</a></li>
 <li>4.6 <a href="#46-minimal-example">Minimal example</a></li>
+<li>4.7 <a href="#47-parsing-under-a-unit-policy">Parsing under a unit policy</a></li>
 </ul>
 </li>
 <li><a href="#5-complete-read-example">Complete Read Example</a></li>
@@ -599,6 +602,180 @@ no exact rational to hand over in the first place.</p>
 <span class="p">}</span>
 </code></pre></div>
 
+<h3 id="112-reader-side-unit-policy-bvnr_reader_set_unit_policy">1.12 Reader-side unit policy (<code>bvnr_reader_set_unit_policy</code>)</h3>
+<p>What <code>want_unit</code> does through a callback, stated as data: what the document must
+contain, and what unit the consumer wants values delivered in. Everything is
+expressed as unit <strong>text</strong>, so a binding can drive it without a function pointer.</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#define BVNR_MAX_UNIT_TARGETS 8u</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_unit_target_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">;</span><span class="w">   </span><span class="cm">/* &quot;m/s&quot;; parsed when the policy is set */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">    </span><span class="n">base</span><span class="p">;</span><span class="w">   </span><span class="cm">/* output base, 0 = the value&#39;s own */</span>
+<span class="p">}</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_unit_policy_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="w">   </span><span class="o">*</span><span class="n">targets</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">num_targets</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">base</span><span class="p">;</span><span class="w">         </span><span class="cm">/* output base for `normalise` */</span>
+<span class="w">    </span><span class="n">bvnr_unit_normalise_t</span><span class="w">       </span><span class="n">normalise</span><span class="p">;</span><span class="w">    </span><span class="cm">/* none | bvnr_normalise_si */</span>
+<span class="w">    </span><span class="n">bvnr_unit_inexact_policy_t</span><span class="w">  </span><span class="n">on_inexact</span><span class="p">;</span><span class="w">   </span><span class="cm">/* error | leave */</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w">                        </span><span class="n">require_unit</span><span class="p">;</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w">         </span><span class="o">*</span><span class="n">require_dimension_of</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">num_require_dimension_of</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">bvnr_unit_policy_t</span><span class="p">;</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_reader_set_unit_policy</span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Every unit string is parsed by the setter, so a typo is a <code>false</code> return before
+the parse begins rather than an error inside somebody's document; a rejected
+policy leaves the previous one in force. The strings need not outlive the call.
+The policy may be installed before or after <code>bvnr_open_read_*</code>, and it survives
+re-opening the reader on another document — it describes the consumer, not the
+document. Passing <code>NULL</code> clears it.</p>
+<h4 id="per-field-rules">Per-field rules</h4>
+<p>A rule names ONE field, by the dotted key path a value sits at — leading dot
+included, exactly as the document writes its keys. A path ending in <code>.*</code> names
+everything below that point at any depth. Rules are consulted <strong>before</strong>
+everything else in the policy: they are the most specific thing it can say.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_rule_t</span><span class="w"> </span><span class="n">rules</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;.inlet.temperature&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;°C&quot;</span><span class="p">,</span><span class="w">  </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_rule_convert</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;.inlet.*&quot;</span><span class="p">,</span><span class="w">           </span><span class="s">&quot;m&quot;</span><span class="p">,</span><span class="w">   </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_rule_require</span><span class="w"> </span><span class="p">},</span>
+<span class="p">};</span>
+<span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">p</span><span class="p">.</span><span class="n">rules</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rules</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">num_rules</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+</code></pre></div>
+
+<p>Unlike a whole-document target, <strong>a rule is an assertion</strong>: the caller named
+this field, so a value that cannot be applied to it is <code>error_unit_mismatch</code>
+rather than a value passed through quietly — silence would defeat the point of
+naming it. A bare number fails a rule too: ".speed is m/s" is not satisfied by a
+value with no unit. <code>bvnr_rule_require</code> asserts without converting.</p>
+<p>First match wins, so order matters: put <code>".a.b"</code> before <code>".a.*"</code>. A prefix only
+matches at a component boundary, so <code>".in.*"</code> does not claim <code>".inlet.a"</code>. Array
+elements sit at the path of the assignment holding them, so one rule covers a
+whole array. Paths are capped at <code>BVNR_MAX_UNIT_PATH</code> characters and 32 levels
+of nesting; a value deeper than the tracker can describe is at an <strong>unknown</strong>
+path and matches no rule at all, rather than matching the wrong one.</p>
+<h4 id="conversion">Conversion</h4>
+<p>Each numeric value is converted to the first target it can validly convert to,
+so <strong>order is significant</strong>: a list of <code>{"m", "k~m"}</code> never selects <code>k~m</code>. A
+value that matches no target is delivered untouched — that is the normal outcome
+for a value no rule mentions, not a failure. A value already in the unit a
+target names is also left alone (unless that target asks for an output base,
+which makes it a pure base conversion), so <code>converted</code> means "the policy
+restated this value", not "the policy looked at it".</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="w"> </span><span class="n">targets</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;°C&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;m&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">};</span>
+<span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">p</span><span class="p">.</span><span class="n">targets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">targets</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">num_targets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="n">bvnr_reader_set_unit_policy</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="p">);</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>document</th>
+<th>delivered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;float:64,°F&gt; 212.0</code></td>
+<td><code>100</code> in <code>°C</code></td>
+</tr>
+<tr>
+<td><code>&lt;float:64,in&gt; 12.0</code></td>
+<td><code>0.3048</code> in <code>m</code></td>
+</tr>
+<tr>
+<td><code>&lt;float:64,%&gt; 35.0</code></td>
+<td>untouched — no target is a ratio</td>
+</tr>
+<tr>
+<td><code>&lt;float:64&gt; 0.25</code></td>
+<td>untouched — see the fence below</td>
+</tr>
+</tbody>
+</table>
+<p><strong>A value with no unit only ever matches a target that is itself <code>no_unit</code>.</strong> A
+bare number is dimensionally compatible with <code>%</code> and with <code>ppm</code>, so without that
+fence a policy naming <code>"%"</code> would deliver <code>0.25</code> as <code>25</code> — the silent rescale the
+format exists to prevent, arrived at through the machinery meant to prevent it.
+The fence works in both directions: a policy naming <code>no_unit</code> will not restate
+<code>35 %</code> as <code>0.35</code>.</p>
+<p>Selection uses <code>bvn_units_convertible</code>, not <code>bvn_units_compatible</code>. That is what
+keeps <code>k~$USD -&gt; $USD</code> available: a currency carries no dimension by design, so
+<code>bvn_units_compatible</code> reports it incompatible with itself although the
+conversion is exact and well defined.</p>
+<h4 id="normalisation">Normalisation</h4>
+<p><code>normalise = bvnr_normalise_si</code> catches whatever the targets did not, delivering
+it in coherent SI base units with prefixes folded out:</p>
+<table>
+<thead>
+<tr>
+<th>document</th>
+<th>delivered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;float:64,in&gt; 12.0</code></td>
+<td><code>0.3048</code> in <code>m</code></td>
+</tr>
+<tr>
+<td><code>&lt;float:64,°F&gt; 212.0</code></td>
+<td><code>373.15</code> in <code>K</code></td>
+</tr>
+<tr>
+<td><code>&lt;float:64,g&gt; 5.0</code></td>
+<td><code>0.005</code> in <code>k~g</code> — mass normalises to the kilogram</td>
+</tr>
+<tr>
+<td><code>&lt;float:64,%&gt; 35.0</code></td>
+<td>untouched</td>
+</tr>
+<tr>
+<td><code>&lt;float:64,$USD&gt; 5.0</code></td>
+<td>untouched</td>
+</tr>
+</tbody>
+</table>
+<p>Every <strong>dimensionless</strong> unit is left exactly as written — <code>%</code>, <code>ppm</code>, <code>dB</code>, <code>pH</code>,
+<code>rad</code>, <code>°</code>, the turbidity scales — along with the currencies. Normalising a ratio
+would silently restate <code>35 %</code> as <code>0.35</code>, and normalising an angle would need the
+irrational factor between <code>°</code> and <code>rad</code>. See <code>bvn_unit_si_normal_form</code>.</p>
+<h4 id="exactness">Exactness</h4>
+<p>The conversion is the same exact path <code>want_unit</code> uses, and nothing approximate
+is ever delivered. A blanket mode makes every value a conversion candidate,
+though, so a single ordinary factor — <code>42 km/h</code> is <code>35/3 m/s</code>, exact as a
+rational with no terminating base-10 expansion — would otherwise reject a
+document nobody had a complaint about. <code>on_inexact = bvnr_inexact_leave</code> hands
+that value over in its native unit instead, visible as <code>converted == false</code> and
+never as rounded digits. A genuinely irrational factor still aborts, since there
+is nothing exact to hand over either way.</p>
+<h4 id="validation">Validation</h4>
+<p><code>require_unit</code> and <code>require_dimension_of</code> reject a document; they never change a
+value. Both are evaluated on the unit the <strong>document</strong> wrote, before any
+conversion — validate what you were sent, convert for the consumer — so they mean
+the same thing whether or not a conversion was also requested. A failure is
+<code>error_unit_mismatch</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">lengths</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;m&quot;</span><span class="w"> </span><span class="p">};</span>
+<span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">p</span><span class="p">.</span><span class="n">require_unit</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w">   </span><span class="cm">/* reject any bare number */</span>
+<span class="n">p</span><span class="p">.</span><span class="n">require_dimension_of</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="n">lengths</span><span class="p">;</span><span class="cm">/* every value must be a length */</span>
+<span class="n">p</span><span class="p">.</span><span class="n">num_require_dimension_of</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+</code></pre></div>
+
+<p><code>require_dimension_of</code> asks about the dimension, not the unit: <code>5 k~m</code>, <code>12 in</code>
+and <code>3 mi</code> all satisfy <code>{"m"}</code>. A value must satisfy at least one entry. The same
+unitless fence applies — a bare number satisfies a requirement only if one of the
+listed units is itself <code>no_unit</code>.</p>
+<h4 id="where-this-sits-relative-to-want_unit">Where this sits relative to <code>want_unit</code></h4>
+<p>The hook is more specific and wins. For each value the reader asks the hook
+first, then the per-field <code>rules</code>, then <code>targets</code>, and falls back last to
+<code>normalise</code>. Setting several is a legitimate combination: normalise the
+document, name the two fields that need something else, and hand-handle one more
+in the hook.</p>
 <hr />
 <h2 id="2-writer">2. Writer</h2>
 <hr />
@@ -1027,6 +1204,39 @@ spec version right after open.</p>
 <span class="cm">/* equivalent to BVN_TYPE_FLOAT(64) */</span>
 </code></pre></div>
 
+<h3 id="215-writer-side-unit-policy-bvnr_writer_set_unit_policy">2.15 Writer-side unit policy (<code>bvnr_writer_set_unit_policy</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_writer_set_unit_policy</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">);</span>
+</code></pre></div>
+
+<p>The producing half of the contract in 1.12: refuse to <strong>emit</strong> a value a reader
+under the same policy would refuse to read.</p>
+<p>This is the half the format's promise rests on. A reader can only reject a
+document somebody already wrote; only the writer can stop a bare number reaching
+a file in the first place, which is what "hand the file to anyone and they have
+everything required to interpret it" actually depends on.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">lengths</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;m&quot;</span><span class="w"> </span><span class="p">};</span>
+<span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">p</span><span class="p">.</span><span class="n">require_unit</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w">    </span><span class="cm">/* no bare numeric values */</span>
+<span class="n">p</span><span class="p">.</span><span class="n">require_dimension_of</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="n">lengths</span><span class="p">;</span><span class="w"> </span><span class="cm">/* and every one of them a length */</span>
+<span class="n">p</span><span class="p">.</span><span class="n">num_require_dimension_of</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="n">bvnr_writer_set_unit_policy</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>bvnr_write_event</code> (and every <code>bvnr_write_*</code> helper above it) then fails with
+<code>error_unit_mismatch</code>, latched into the writer like any other write error and
+readable with <code>bvnr_writer_get_error</code>. The unit checked is the one the value
+will carry in the output — whether it was given inline on the value or as a
+parameter of its type annotation, and a single annotation covers every element
+of the array under it.</p>
+<p><strong>Validation only.</strong> Only <code>require_unit</code> and <code>require_dimension_of</code> are
+accepted; a policy carrying <code>targets</code>, <code>normalise</code>, <code>base</code> or <code>on_inexact</code> is
+rejected (<code>false</code>) rather than half-honoured. The writer already has a
+value-rewriting mode — <code>BVN_UNIT_REDUCE</code> in <code>bvnr_write_flags_t.unit_flags</code>,
+which folds prefixes out and rescales the value exactly — and a second one
+arriving through a different door, with different rules about exactness, is how
+two features end up disagreeing about what a document says.</p>
+<p>Like the reader's, the policy may be set before or after <code>bvnr_open_write_*</code>,
+survives re-opening the writer on another document, and is cleared with <code>NULL</code>.</p>
 <hr />
 <h2 id="3-shared">3. Shared</h2>
 <hr />
@@ -1371,6 +1581,41 @@ one exception with <em>asymmetric</em> ownership: on success it takes ownership 
 <span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">port</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">bvn_dom_get_u16</span><span class="p">(</span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* use p */</span><span class="w"> </span><span class="p">}</span>
 <span class="p">}</span>
 <span class="n">bvn_dom_doc_destroy</span><span class="p">(</span><span class="n">doc</span><span class="p">);</span>
+</code></pre></div>
+
+<h3 id="47-parsing-under-a-unit-policy">4.7 Parsing under a unit policy</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_parse_policy</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">,</span>
+<span class="w">                                    </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">);</span>
+<span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_parse_fd_policy</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">max_bytes</span><span class="p">,</span>
+<span class="w">                                       </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">);</span>
+</code></pre></div>
+
+<p>The DOM takes the same policy the streaming reader does (1.12), so a
+random-access consumer can assert what it expects to find and store the unit it
+wants back. <code>NULL</code> behaves exactly like the plain forms.</p>
+<p>A validation failure lands in <code>bvn_dom_doc_get_parse_error()</code> as
+<code>error_unit_mismatch</code>, like any other parse error. A policy the library refuses —
+a malformed unit, a rule path naming nothing — is <code>error_invalid_argument</code>, so a
+mistake in the <strong>policy</strong> is never mistaken for a fault in the <strong>document</strong>.</p>
+<p>A value the policy converted is stored <strong>converted</strong>: its digits, its unit and
+its base are the conversion's, because a caller who asked for metres and got the
+document's feet back would have no way to notice. An integer that converts to a
+fraction — 5 g in kilograms is 0.005 — is stored as a float, since that is what
+it now is.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_rule_t</span><span class="w"> </span><span class="n">rules</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;.inlet.temperature&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;°C&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_rule_convert</span><span class="w"> </span><span class="p">},</span>
+<span class="p">};</span>
+<span class="n">bvnr_unit_policy_t</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">p</span><span class="p">.</span><span class="n">rules</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rules</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">num_rules</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+
+<span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_dom_parse_policy</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="p">);</span>
+<span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">n</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_dom_lookup</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;.inlet.temperature&quot;</span><span class="p">);</span>
+<span class="kt">double</span><span class="w"> </span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="n">bvn_dom_get_float</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">v</span><span class="p">);</span><span class="w">      </span><span class="cm">/* 100.0, from a document in °F */</span>
+</code></pre></div>
+
+<p>This is also what <code>bovnar query</code> uses, so the command line has the same reach:</p>
+<div class="codehilite"><pre><span></span><code>bovnar<span class="w"> </span>query<span class="w"> </span>--field<span class="w"> </span>.inlet.temperature<span class="o">=</span>°C<span class="w"> </span>.inlet.temperature<span class="w"> </span>sensors.bvnr
+bovnar<span class="w"> </span>query<span class="w"> </span>--require-unit<span class="w"> </span>.inlet.flow<span class="w"> </span>sensors.bvnr
 </code></pre></div>
 
 <hr />

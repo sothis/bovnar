@@ -33,6 +33,7 @@ from .exceptions import BovnarWriteError, BovnarArgumentError
 from .structs import (
     BvnrSink, BvnrWriteFlags, BvnrData,
     ValueTypeSpec, ValueUnit,
+    build_unit_policy,
     make_type_spec, make_unit_dimensionless, make_unit_none,
     make_unit_si, make_unit_iec,
 )
@@ -180,6 +181,56 @@ class Writer:
             self._lib.bvnr_writer_destroy(self._ptr)
             self._ptr = None
         self._close_owned_fd()
+
+    def set_unit_policy(self, policy) -> None:
+        """Refuse to EMIT a value a reader under `policy` would refuse to read.
+
+        Takes the same :class:`~bovnar.UnitPolicy` the reader does, but only its
+        VALIDATION half: ``require_unit`` and ``require_dimension_of``. A policy
+        carrying ``targets``, ``normalise_si``, ``base`` or ``leave_inexact`` is
+        rejected rather than half-honoured — the writer already rewrites values
+        under ``UnitFlags.REDUCE``, and a second rewriting mode with different
+        rules about exactness is how two features end up disagreeing about what
+        a document says.
+
+        This is the half the format's promise rests on: a reader can only reject
+        a document somebody already wrote.
+
+            w = Writer.to_mem()
+            w.set_unit_policy(UnitPolicy(require_unit=True))
+            w.write_float("speed", 64, 9.81, parse_unit("m/s"))   # fine
+            w.write_float("bare", 64, 0.25)                        # BovnarWriteError
+
+        The unit checked is the one the value will carry in the output, whether
+        it was given inline or as a type-annotation parameter. Pass ``None`` to
+        clear.
+        """
+        if self._ptr is None:
+            raise BovnarArgumentError("Writer has been destroyed")
+        if policy is None:
+            if not self._lib.bvnr_writer_set_unit_policy(self._ptr, None):
+                raise BovnarArgumentError("bvnr_writer_set_unit_policy failed")
+            return
+        if (policy.targets or policy.normalise_si or policy.base
+                or policy.leave_inexact
+                or any(r.convert for r in policy.rules)):
+            raise BovnarArgumentError(
+                "the writer takes only the validation half of a UnitPolicy "
+                "(require_unit / require_dimension_of, and rules with "
+                "convert=False); use UnitFlags.REDUCE for write-side unit "
+                "rewriting")
+        try:
+            cp, keepalive = build_unit_policy(
+                require_unit=policy.require_unit,
+                require_dimension_of=policy.require_dimension_of,
+                rules=policy.rules)
+        except ValueError as e:
+            raise BovnarArgumentError(str(e)) from None
+        if not self._lib.bvnr_writer_set_unit_policy(self._ptr, ctypes.byref(cp)):
+            raise BovnarArgumentError(
+                "unusable unit policy — check the unit spellings in "
+                "require_dimension_of")
+        del keepalive
 
     @property
     def bytes_written(self) -> int:

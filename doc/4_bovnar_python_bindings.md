@@ -29,6 +29,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 5.2 [`UnitFlags`](#52-unitflags)
     - 5.3 [`ValueUnitPrefix`](#53-valueunitprefix)
     - 5.4 [Inline unit suffix](#54-inline-unit-suffix)
+    - 5.5 [`UnitPolicy` — validation and conversion without a callback](#55-unitpolicy--validation-and-conversion-without-a-callback)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Properties and methods](#62-properties-and-methods)
@@ -438,6 +439,124 @@ The validator raises `ErrorCode.UNIT_MISMATCH` (38 / `BovnarParseError`) when
 an inline suffix is present and a type-annotation unit is also present but the
 two do not resolve to the same `value_unit_t`. Inline unit suffixes inside
 array elements always raise `ErrorCode.UNEXPECTED_INPUT_BYTE`.
+
+### 5.5 `UnitPolicy` — validation and conversion without a callback
+
+`Reader.set_unit_policy` states what the document must contain and what unit
+values should arrive in. Everything is unit **text**, so unlike `want_unit` it
+costs no per-value trampoline across the FFI boundary — the C side parses the
+strings once, when the policy is set.
+
+```python
+from bovnar import Reader, UnitPolicy
+
+with Reader() as r:
+    r.set_unit_policy(UnitPolicy(
+        targets=["m/s", "°C"],      # convert to the first one that fits
+        normalise_si=True,          # ...and everything else to SI base units
+        leave_inexact=True,         # step over what cannot be exact
+        require_unit=True,          # reject any bare numeric value
+    ))
+    r.read_file("sensors.bvnr", on_verified=handler)
+```
+
+A policy survives re-reading the same reader on another document — it describes
+the consumer, not the document — and `set_unit_policy(None)` clears it. Every
+unit string is parsed by the call, so a typo raises `BovnarArgumentError`
+before a byte is read, and a rejected policy leaves the previous one in force.
+
+**Conversion.** Each numeric value takes the first target it can validly convert
+to, so order is significant: `["m", "k~m"]` never selects `k~m`. A value that
+matches nothing, or that is already in the unit a target names, arrives
+untouched — `data.converted` is what tells the two apart. Each target may carry
+its own output base as `("m", 16)`.
+
+`normalise_si` catches whatever the targets did not, delivering it in coherent
+SI base units with prefixes folded out. Currencies and every **dimensionless**
+unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`) are left as written rather than
+reinterpreted.
+
+**A value with no unit only ever matches a target that is itself `no_unit`.** A
+bare number is dimensionally compatible with `%` and `ppm`, so without that
+fence a policy naming `"%"` would deliver `0.25` as `25`.
+
+**Exactness.** Nothing approximate is ever delivered. `leave_inexact=True` hands
+over a value the conversion cannot deliver exactly — an irrational factor, a
+non-terminating expansion (`42 km/h` is `35/3 m/s`), an exponent past the work
+limit — in its native unit instead of raising. It applies only to policy-chosen
+targets; a `want_unit` hook keeps its strict all-or-nothing contract.
+
+**Validation.** `require_unit` rejects a document containing any bare numeric
+value; `require_dimension_of=["m"]` requires every numeric value to be validly
+convertible to at least one listed unit. Both are evaluated on the unit the
+**document** wrote, before any conversion, and both raise
+`ErrorCode.UNIT_MISMATCH`.
+
+**Per-field rules** name one field by its key path, and are consulted before
+everything else:
+
+```python
+from bovnar import Reader, UnitPolicy, UnitRule, dom_parse
+
+policy = UnitPolicy(rules=[
+    UnitRule(".inlet.temperature", "°C"),                  # convert this field
+    UnitRule(".inlet.*", "m", convert=False),              # assert the subtree
+])
+```
+
+A path ending in ``".*"`` names a subtree at any depth, and a prefix only
+matches at a component boundary (``".in.*"`` does not claim ``".inlet.a"``).
+Unlike a whole-document target, a rule is an **assertion**: a value it cannot be
+applied to raises ``UNIT_MISMATCH``, because silence would defeat the point of
+naming the field. ``convert=False`` asserts without converting.
+
+**The DOM takes the same policy**, so a random-access consumer gets both halves:
+
+```python
+doc = dom_parse(text, UnitPolicy(rules=[UnitRule(".inlet.temperature", "°C")]))
+doc.lookup(".inlet.temperature").as_float()    # 100.0, from a document in °F
+```
+
+A value the policy converted is STORED converted — digits, unit and base — and
+an integer that converts to a fraction (5 g in kilograms is 0.005) is stored as
+a float. A policy the library refuses raises ``INVALID_ARGUMENT`` rather than a
+parse error, so a mistake in the policy is never mistaken for a fault in the
+document.
+
+**The writer takes the same policy, validation half only.** A reader can only
+reject a document somebody already wrote; `Writer.set_unit_policy` is what stops
+a bare number reaching the file:
+
+```python
+from bovnar import Writer, UnitPolicy
+
+w = Writer.to_mem()
+w.set_unit_policy(UnitPolicy(require_unit=True, require_dimension_of=["m"]))
+w.write_float("tank_level", 12.0, unit_str="in")   # a length — written
+w.write_float("spare", 0.25)                        # BovnarWriteError,
+                                                    # code UNIT_MISMATCH
+```
+
+A policy carrying `targets`, `normalise_si`, `base` or `leave_inexact` raises
+`BovnarArgumentError` there rather than being half-honoured: write-side unit
+rewriting is `UnitFlags.REDUCE`'s job, and two rewriting modes with different
+rules about exactness is how a document ends up meaning two things.
+
+Two module-level helpers back the same decisions outside the reader:
+
+```python
+from bovnar import units_convertible, unit_si_normal_form, parse_unit
+
+# units_compatible is the wrong screen for a conversion target: a currency
+# carries no dimension, so it is reported incompatible with itself.
+units_compatible (parse_unit("k~$USD"), parse_unit("$USD"))   # → False
+units_convertible(parse_unit("k~$USD"), parse_unit("$USD"))   # → True
+
+unit_si_normal_form(parse_unit("in"))   # → m
+unit_si_normal_form(parse_unit("g"))    # → k~g  (the SI base unit for mass)
+unit_si_normal_form(parse_unit("%"))    # → None (dimensionless)
+unit_si_normal_form(parse_unit("lm"))   # → None (carries the steradian's kind)
+```
 
 ---
 

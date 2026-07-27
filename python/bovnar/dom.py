@@ -364,13 +364,41 @@ class DomDoc:
             get_library().bvn_dom_doc_destroy(self._ptr)
             self._ptr = 0
 
+    @staticmethod
+    def _c_policy(policy):
+        """Marshal a UnitPolicy for the DOM entry points, or (None, None)."""
+        if policy is None:
+            return None, None
+        from .structs import build_unit_policy
+        try:
+            cp, keepalive = build_unit_policy(
+                policy.targets, policy.base, policy.normalise_si,
+                policy.leave_inexact, policy.require_unit,
+                policy.require_dimension_of, policy.rules)
+        except ValueError as e:
+            raise BovnarArgumentError(str(e)) from None
+        return cp, keepalive
+
     @classmethod
-    def parse(cls, data: bytes | bytearray | memoryview) -> 'DomDoc':
-        """Parse BVNR bytes into a DOM tree."""
+    def parse(cls, data: bytes | bytearray | memoryview,
+              policy=None) -> 'DomDoc':
+        """Parse BVNR bytes into a DOM tree.
+
+        With a :class:`~bovnar.UnitPolicy`, the same rules the streaming reader
+        applies: a validation failure raises, and a value the policy converted
+        is STORED converted — digits, unit and base. A policy the library
+        refuses raises ``INVALID_ARGUMENT``, so a mistake in the policy is never
+        mistaken for a fault in the document.
+        """
         if isinstance(data, memoryview):
             data = bytes(data)
         raw  = (ctypes.c_uint8 * len(data)).from_buffer_copy(data)
-        ptr  = get_library().bvn_dom_parse(raw, ctypes.c_uint32(len(data)))
+        cp, _keep = cls._c_policy(policy)
+        if cp is None:
+            ptr = get_library().bvn_dom_parse(raw, ctypes.c_uint32(len(data)))
+        else:
+            ptr = get_library().bvn_dom_parse_policy(
+                raw, ctypes.c_uint32(len(data)), ctypes.byref(cp))
         doc  = cls(ptr)
         err  = doc.parse_error
         if err != ErrorCode.NONE:
@@ -378,9 +406,14 @@ class DomDoc:
         return doc
 
     @classmethod
-    def parse_fd(cls, fd: int) -> 'DomDoc':
+    def parse_fd(cls, fd: int, policy=None) -> 'DomDoc':
         """Parse BVNR from an open file descriptor into a DOM tree."""
-        ptr = get_library().bvn_dom_parse_fd(ctypes.c_int(fd))
+        cp, _keep = cls._c_policy(policy)
+        if cp is None:
+            ptr = get_library().bvn_dom_parse_fd(ctypes.c_int(fd))
+        else:
+            ptr = get_library().bvn_dom_parse_fd_policy(
+                ctypes.c_int(fd), ctypes.c_uint64(0), ctypes.byref(cp))
         doc = cls(ptr)
         err = doc.parse_error
         if err != ErrorCode.NONE:
@@ -388,12 +421,12 @@ class DomDoc:
         return doc
 
     @classmethod
-    def parse_file(cls, path: str) -> 'DomDoc':
+    def parse_file(cls, path: str, policy=None) -> 'DomDoc':
         """Parse a BVNR file by path."""
         import os
         fd = os.open(path, os.O_RDONLY)
         try:
-            return cls.parse_fd(fd)
+            return cls.parse_fd(fd, policy)
         finally:
             os.close(fd)
 

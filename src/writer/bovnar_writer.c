@@ -728,6 +728,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.stream_begun = true;
 		if (!bvn_validate_id_for_writer(w, data->data, data->length))
 			return false;
+		/* The key of the value about to be written — all a per-field rule needs
+		 * from the event stream on this side, exactly as on the reader's. */
+		if (w->val.policy.num_rules)
+			bvn_path_set_key(&w->val.path,
+					 (const uint8_t*)data->data, data->length);
 		w->ser.w_awaiting_value = true;
 		return true;
 	case ev_type_annotation_start:
@@ -755,6 +760,38 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		value_type_spec_t vt = data->value_type;
 		if (!bvn_check_type_value_compat(w, tt, vt))
 			return false;
+		/*
+		 * The producer's half of the unit policy (bvnr_writer_set_unit_policy).
+		 * Refuse to EMIT what a reader under the same policy would refuse to
+		 * accept — a numeric value carrying no unit, or one of the wrong
+		 * quantity. This is the half the format's promise rests on: a reader can
+		 * only reject a document a writer has already produced.
+		 *
+		 * The unit a value will carry is whichever of the two places it can come
+		 * from actually has it. Normally that is data->value_unit; when the unit
+		 * was given in the type annotation instead, the annotation's own event
+		 * carried it and left it in val.parsed_unit, with ser.emitted_unit
+		 * recording that it did. That flag is what makes the fallback safe:
+		 * parsed_unit persists past the value it belonged to, and reading it
+		 * unguarded would let one annotated value vouch for the next bare one.
+		 */
+		if (w->val.policy.active && bvn_type_is_numeric(vt) &&
+		    (tt == token_is_number || tt == token_is_array_number ||
+		     tt == token_is_string || tt == token_is_array_string)) {
+			value_unit_t u = data->value_unit;
+			if (BVN_UNIT_IS_UNITLESS(u) && w->ser.emitted_unit)
+				u = w->val.parsed_unit;
+			if (!bvn_unit_policy_accepts(&w->val.policy, u))
+				return bvn_writer_set_error(w, error_unit_mismatch);
+			/* ...and what the policy says about THIS field specifically. The
+			 * writer takes rules in require mode only (a convert rule is
+			 * refused when the policy is set), so this is purely an
+			 * assertion — no value is ever rewritten here. */
+			int32_t ri = bvn_policy_match_rule(&w->val.policy, &w->val.path);
+			if (ri >= 0 &&
+			    !bvn_policy_selects(u, w->val.policy.rule[ri].unit))
+				return bvn_writer_set_error(w, error_unit_mismatch);
+		}
 		if (tt == token_is_null_value) {
 		} else if (tt == token_is_number ||
 				   tt == token_is_array_number) {
@@ -840,6 +877,8 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.stream_begun = true;
 		if (w->ser.struct_depth == 0)
 			return bvn_writer_set_error(w, error_illegal_struct_close);
+		if (w->val.policy.num_rules)
+			bvn_path_pop(&w->val.path);
 		break;
 	case ev_octet_stream_end:
 		w->ser.stream_begun     = true;
@@ -849,6 +888,8 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.stream_begun = true;
 		if (w->ser.struct_depth >= (uint32_t)w->ser.max_struct_nesting)
 			return bvn_writer_set_error(w, error_struct_nesting_too_high);
+		if (w->val.policy.num_rules)
+			bvn_path_push(&w->val.path);
 		w->ser.w_awaiting_value = false;   /* the struct IS the value */
 		break;
 	case ev_array_row_start:
@@ -1581,7 +1622,13 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 }
 static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 {
+	/* Carried across the re-arming memset for the same reason the reader carries
+	 * it: the policy is set through its own call, describes what this PRODUCER
+	 * emits rather than what one document contains, and a caller who set it
+	 * before opening would have no way to notice it had been dropped. */
+	bvn_unit_policy_state_t saved_policy = w->val.policy;
 	memset(w, 0, sizeof(*w));
+	w->val.policy = saved_policy;
 	w->ser.pretty = false;
 	w->ser.indent = 0;
 	w->ser.need_semi = false;

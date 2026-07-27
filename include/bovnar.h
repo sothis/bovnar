@@ -741,6 +741,178 @@ BVN_API uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t* r);
  */
 BVN_API bool bvnr_reader_get_declared_version(
 	const bvnr_reader_t* r, uint16_t* major, uint16_t* minor);
+/* ── Reader-side unit policy ────────────────────────────────────────────────
+ *
+ * What bvnr_read_flags_t.want_unit does through a callback, stated as data: what
+ * the document MUST contain, and what unit the consumer wants values delivered
+ * in. Set with bvnr_reader_set_unit_policy; everything is expressed as unit
+ * TEXT, so a binding can drive it without a function pointer.
+ *
+ * Nothing here weakens the exactness contract. The policy only chooses targets;
+ * the conversion itself is the same exact arbitrary-precision path want_unit
+ * uses, and a value that cannot be delivered exactly is still never rounded.
+ */
+#define BVNR_MAX_UNIT_TARGETS 8u
+/* Per-field rules: how many, and the longest key path one may name (NUL
+ * excluded). A path longer than this is rejected when the policy is set. */
+#define BVNR_MAX_UNIT_RULES   8u
+#define BVNR_MAX_UNIT_PATH    96u
+/* One conversion target: the unit to convert to, and the base to render the
+ * result in (0 keeps the value's own base; anything else must be a base bvnr can
+ * write -- 2..62, 64, 85). */
+typedef struct bvnr_unit_target_s {
+	const char*	unit;
+	uint32_t	base;
+} bvnr_unit_target_t;
+typedef enum bvnr_unit_rule_mode_e {
+	/* The value must be validly convertible to the rule's unit, and is
+	 * delivered converted to it. */
+	bvnr_rule_convert = 0,
+	/* The value must be validly convertible to the rule's unit, and is
+	 * delivered exactly as the document wrote it. "This field is a length,
+	 * in whatever length unit it chose." */
+	bvnr_rule_require = 1
+} bvnr_unit_rule_mode_t;
+/* A rule about ONE field, named by its key path.
+ *
+ * `path` is the dotted path a value sits at, leading dot included, exactly as
+ * the document writes its keys: ".inlet.temperature". A path ending in ".*"
+ * matches every value BELOW that point at any depth (".inlet.*" matches
+ * ".inlet.temperature" and ".inlet.pump.rpm", but not ".inlet" itself). Array
+ * elements sit at the path of the assignment that holds them, so one rule covers
+ * every element of an array.
+ *
+ * Unlike the whole-document `targets` list, a rule is a statement about a field
+ * the caller has NAMED, so a value it cannot be applied to is
+ * error_unit_mismatch rather than a value left alone: silence would defeat the
+ * point of naming it. That includes a value with no unit at all -- ".speed is
+ * m/s" is not satisfied by a bare number. */
+typedef struct bvnr_unit_rule_s {
+	const char*		path;
+	const char*		unit;
+	uint32_t		base;   /* output base for bvnr_rule_convert, 0 = own */
+	bvnr_unit_rule_mode_t	mode;
+} bvnr_unit_rule_t;
+typedef enum bvnr_unit_normalise_e {
+	/* Leave whatever the targets did not match in its native unit. */
+	bvnr_normalise_none = 0,
+	/* Deliver anything the targets did not match in coherent SI base units,
+	 * prefixes folded out (see bvn_unit_si_normal_form). Values with no
+	 * coherent SI form -- currencies, and every DIMENSIONLESS unit (%, ppm,
+	 * dB, pH, rad, °) -- are left alone rather than reinterpreted. */
+	bvnr_normalise_si   = 1
+} bvnr_unit_normalise_t;
+typedef enum bvnr_unit_inexact_policy_e {
+	/* Abort the parse with error_unit_inexact -- the want_unit default, and
+	 * the right one when the caller named a target deliberately. */
+	bvnr_inexact_error  = 0,
+	/* Deliver the value untouched (converted == false) instead of aborting.
+	 * Meant for bvnr_normalise_si, where EVERY value is a conversion candidate
+	 * and one 5/18 factor would otherwise reject an ordinary document. The
+	 * consumer must read `converted` to know which values this happened to.
+	 * Applies only to a result that is exact as a rational but has no
+	 * terminating expansion in the output base; a genuinely irrational factor
+	 * still aborts, since there is nothing exact to hand over either way. */
+	bvnr_inexact_leave  = 1
+} bvnr_unit_inexact_policy_t;
+typedef struct bvnr_unit_policy_s {
+	/* PER-FIELD RULES, matched by key path and consulted before everything
+	 * below -- the most specific thing a policy can say. First match wins, so
+	 * order matters: put ".a.b" before ".a.*". At most BVNR_MAX_UNIT_RULES
+	 * entries, each path at most BVNR_MAX_UNIT_PATH characters.
+	 *
+	 * A rule is an ASSERTION as well as a target: a value at a path a rule
+	 * names must be validly convertible to that rule's unit, or the parse
+	 * fails with error_unit_mismatch. */
+	const bvnr_unit_rule_t*		rules;
+	uint32_t			num_rules;
+	/* CONVERSION. Each numeric value is converted to the first target it can
+	 * validly convert to (bvn_units_convertible), so order is significant: a
+	 * list of {"m", "km"} never selects "km". A value that matches nothing is
+	 * delivered untouched unless `normalise` catches it. At most
+	 * BVNR_MAX_UNIT_TARGETS entries.
+	 *
+	 * A value ALREADY in the unit a target names is left untouched too (unless
+	 * that target asks for an output base, which makes it a pure base
+	 * conversion): `converted` then means "the policy restated this value",
+	 * not "the policy looked at it".
+	 *
+	 * A value with no unit only ever matches a target that is itself
+	 * `no_unit`. A bare number is dimensionally compatible with % and with
+	 * ppm, so without that fence a policy naming "%" would deliver `0.25` as
+	 * `25` -- the silent rescale the format exists to prevent, arrived at
+	 * through the machinery meant to prevent it. */
+	const bvnr_unit_target_t*	targets;
+	uint32_t			num_targets;
+	uint32_t			base;      /* output base for `normalise`,
+						    * 0 = the value's own */
+	bvnr_unit_normalise_t		normalise;
+	bvnr_unit_inexact_policy_t	on_inexact;
+	/* VALIDATION. These reject a document; they never change a value. They are
+	 * evaluated on the unit the DOCUMENT wrote, before any conversion --
+	 * validate what you were sent, convert for the consumer -- so they mean the
+	 * same thing whether or not a conversion was also requested. A failure is
+	 * error_unit_mismatch.
+	 *
+	 * require_unit: every numeric value must carry a unit. A bare number fails,
+	 * whether it was written without a unit parameter or with an explicit
+	 * `no_unit`. */
+	bool				require_unit;
+	/* Every numeric value must be validly convertible to at least one of these
+	 * units -- "this document is lengths and temperatures, in whatever unit it
+	 * chose to write them". A value with NO unit satisfies this only if one of
+	 * the listed units is itself `no_unit`: a bare number is dimensionally
+	 * compatible with % and ppm, and quietly accepting it there is the silent
+	 * factor-of-a-hundred this whole mechanism exists to prevent. At most
+	 * BVNR_MAX_UNIT_TARGETS entries. */
+	const char* const*		require_dimension_of;
+	uint32_t			num_require_dimension_of;
+} bvnr_unit_policy_t;
+/*
+ * Install (or, with policy == NULL, clear) the reader's unit policy. Every unit
+ * string is parsed HERE, so a malformed unit, an out-of-range count or an
+ * unusable base is reported by a false return before the parse begins rather
+ * than as a mid-document error; the previous policy is left untouched when that
+ * happens. The strings themselves need not outlive the call.
+ *
+ * Callable before or after bvnr_open_read_*, and it survives re-opening the
+ * reader on another document -- a policy is a property of the consumer, not of
+ * the document it was first set for.
+ *
+ * Where this sits relative to bvnr_read_flags_t.want_unit: the hook is more
+ * specific and wins. For each value the reader asks the hook first, falls back
+ * to `targets`, and falls back again to `normalise`. Setting both is a
+ * legitimate combination -- normalise the document, hand-handle the one field
+ * that needs something else.
+ */
+BVN_API bool bvnr_reader_set_unit_policy(
+	bvnr_reader_t* r, const bvnr_unit_policy_t* policy);
+/*
+ * The same contract on the producing side: refuse to EMIT a value a reader
+ * under this policy would refuse to accept. bvnr_write_event fails with
+ * error_unit_mismatch, and the writer latches it like any other write error
+ * (query it with bvnr_writer_get_error).
+ *
+ * This is the half the format's promise rests on. A reader can only reject a
+ * document somebody already wrote; only the writer can stop a bare number
+ * reaching a file in the first place, which is what "hand the file to anyone and
+ * they have everything required to interpret it" actually depends on.
+ *
+ * VALIDATION ONLY. Only `require_unit` and `require_dimension_of` are accepted;
+ * a policy carrying `targets`, `normalise`, `base` or `on_inexact` is rejected
+ * (false) rather than half-honoured. The writer already has a value-rewriting
+ * mode — BVN_UNIT_REDUCE in bvnr_write_flags_t.unit_flags, which folds prefixes
+ * out and rescales the value exactly — and a second one arriving through a
+ * different door with different rules about exactness is how two features end up
+ * disagreeing about what a document says.
+ *
+ * The unit checked is the one the value will carry in the output, whether it was
+ * given inline on the value or as a parameter of its type annotation. Like the
+ * reader's, this policy may be set before or after bvnr_open_write_*, survives
+ * re-opening the writer on another document, and is cleared by passing NULL.
+ */
+BVN_API bool bvnr_writer_set_unit_policy(
+	bvnr_writer_t* w, const bvnr_unit_policy_t* policy);
 /*
  * Scan a buffer for a leading "#!bovnar <major>.<minor>" directive without a
  * full parse (an optional UTF-8 BOM and leading whitespace are skipped).

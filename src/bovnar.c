@@ -540,8 +540,194 @@ static void evt_format_token(const bvnr_data_t *d, bvnr_event_t e,
 		}
 		SCAT(">");
 	}
+	/* A read-time conversion, shown next to the value it belongs to. conv.text is
+	 * NULL when the exact result has no terminating expansion in the output base
+	 * and the reader was told to hand over the rational anyway; say so rather
+	 * than printing nothing, or the value looks unconverted. */
+	if (d->converted) {
+		char cu[BVNR_UNIT_STRING_MAX];
+		if (bvn_unit_to_string(d->conv.unit, cu, sizeof(cu)) < 0)
+			cu[0] = '\0';
+		if (d->conv.text) {
+			uint32_t show = d->conv.length > 40 ? 40 : d->conv.length;
+			SCAT(" → \"");
+			for (uint32_t i = 0; i < show && (size_t)pos < bufsize - 8u; i++)
+				buf[pos++] = d->conv.text[i];
+			if (show < d->conv.length)
+				SCAT("…");
+			SCAT("\"");
+		} else {
+			SCAT(" → <non-terminating>");
+		}
+		if (cu[0])
+			SCAT(" %s", cu);
+		if (d->conv.base)
+			SCAT(" _%" PRIu32, d->conv.base);
+	}
 	buf[pos] = '\0';
 #undef SCAT
+}
+/*
+ * Shared parsing for the reader-side unit policy options
+ * (bvnr_reader_set_unit_policy), used by both `events` and `validate` so the two
+ * cannot drift into meaning different things by the same flag.
+ *
+ * Consumes the options it recognises from argv[*argi] onwards and leaves *argi
+ * on the first argument it does not. Returns 0 on success, 2 on a usage error
+ * (already reported), and 1 on a policy the library rejected -- a malformed unit
+ * is caught here, before a byte of the document is read, which is the whole
+ * point of the setter validating up front.
+ */
+typedef struct {
+	bvnr_unit_target_t targets[BVNR_MAX_UNIT_TARGETS];
+	const char        *require[BVNR_MAX_UNIT_TARGETS];
+	bvnr_unit_rule_t   rules[BVNR_MAX_UNIT_RULES];
+	bvnr_unit_policy_t policy;
+	bool               any;
+} cli_unit_policy_t;
+
+/*
+ * "<path>=<unit>" for the per-field flags. argv strings are writable and live
+ * for the whole run, so the '=' is overwritten in place and both halves point
+ * into the original — no allocation, no lifetime question.
+ */
+static bool cli_split_field(const char *cmd, char *arg,
+			    const char **path, const char **unit)
+{
+	char *eq = strchr(arg, '=');
+	if (!eq || eq == arg || !eq[1]) {
+		fprintf(stderr, "%s: expected <path>=<unit>, got '%s'\n", cmd, arg);
+		return false;
+	}
+	*eq   = '\0';
+	*path = arg;
+	*unit = eq + 1;
+	return true;
+}
+
+static int cli_parse_unit_opts(const char *cmd, int argc, char **argv, int *argi,
+			       cli_unit_policy_t *up)
+{
+	const char *a = argv[*argi];
+	if (strcmp(a, "--unit") == 0) {
+		if (*argi + 1 >= argc) {
+			fprintf(stderr, "%s: --unit needs a unit\n", cmd); return 2;
+		}
+		if (up->policy.num_targets >= BVNR_MAX_UNIT_TARGETS) {
+			fprintf(stderr, "%s: at most %u --unit targets\n", cmd,
+				BVNR_MAX_UNIT_TARGETS);
+			return 2;
+		}
+		up->targets[up->policy.num_targets].unit = argv[*argi + 1];
+		up->policy.num_targets++;
+		up->any = true;
+		*argi += 2;
+		return 0;
+	}
+	if (strcmp(a, "--field") == 0 || strcmp(a, "--require-field") == 0) {
+		bool require_only = (a[2] == 'r');
+		if (*argi + 1 >= argc) {
+			fprintf(stderr, "%s: %s needs <path>=<unit>\n", cmd, a);
+			return 2;
+		}
+		if (up->policy.num_rules >= BVNR_MAX_UNIT_RULES) {
+			fprintf(stderr, "%s: at most %u per-field rules\n", cmd,
+				BVNR_MAX_UNIT_RULES);
+			return 2;
+		}
+		const char *path = NULL, *unit = NULL;
+		if (!cli_split_field(cmd, argv[*argi + 1], &path, &unit))
+			return 2;
+		bvnr_unit_rule_t *r = &up->rules[up->policy.num_rules++];
+		r->path = path;
+		r->unit = unit;
+		r->base = 0u;
+		r->mode = require_only ? bvnr_rule_require : bvnr_rule_convert;
+		up->any = true;
+		*argi += 2;
+		return 0;
+	}
+	if (strcmp(a, "--require-dimension") == 0) {
+		if (*argi + 1 >= argc) {
+			fprintf(stderr, "%s: --require-dimension needs a unit\n", cmd);
+			return 2;
+		}
+		if (up->policy.num_require_dimension_of >= BVNR_MAX_UNIT_TARGETS) {
+			fprintf(stderr, "%s: at most %u --require-dimension units\n", cmd,
+				BVNR_MAX_UNIT_TARGETS);
+			return 2;
+		}
+		up->require[up->policy.num_require_dimension_of++] = argv[*argi + 1];
+		up->any = true;
+		*argi += 2;
+		return 0;
+	}
+	if (strcmp(a, "--base") == 0) {
+		if (*argi + 1 >= argc) {
+			fprintf(stderr, "%s: --base needs a number\n", cmd); return 2;
+		}
+		char *end = NULL;
+		unsigned long b = strtoul(argv[*argi + 1], &end, 10);
+		if (!end || *end || b > 85ul) {
+			fprintf(stderr, "%s: --base '%s' is not a base bovnar can write "
+					"(2..62, 64, 85)\n", cmd, argv[*argi + 1]);
+			return 2;
+		}
+		/* Recorded, not applied: the targets are stamped with it in
+		 * cli_apply_unit_policy, once the whole command line has been seen.
+		 * Applying it here made the flag order-dependent — "--base 16 --unit m"
+		 * lost the base, because the later --unit wrote its own slot. */
+		up->policy.base = (uint32_t)b;
+		up->any = true;
+		*argi += 2;
+		return 0;
+	}
+	if (strcmp(a, "--si") == 0) {
+		up->policy.normalise = bvnr_normalise_si;
+		up->any = true;
+		(*argi)++;
+		return 0;
+	}
+	if (strcmp(a, "--leave-inexact") == 0) {
+		up->policy.on_inexact = bvnr_inexact_leave;
+		up->any = true;
+		(*argi)++;
+		return 0;
+	}
+	if (strcmp(a, "--require-unit") == 0) {
+		up->policy.require_unit = true;
+		up->any = true;
+		(*argi)++;
+		return 0;
+	}
+	return -1;                       /* not one of ours */
+}
+
+/* Install what cli_parse_unit_opts collected. Reports the library's refusal in
+ * the caller's terms: the only way this fails is a unit the parser will not
+ * take, and naming it is more use than "invalid argument". */
+static bool cli_apply_unit_policy(const char *cmd, bvnr_reader_t *r,
+				  cli_unit_policy_t *up)
+{
+	if (!up->any)
+		return true;
+	/* One --base covers both places a base can apply: every --unit target and
+	 * the normalisation fallback. Stamped here so the flags may appear in any
+	 * order on the command line. */
+	for (uint32_t i = 0; i < up->policy.num_targets; i++)
+		up->targets[i].base = up->policy.base;
+	for (uint32_t i = 0; i < up->policy.num_rules; i++) {
+		if (up->rules[i].mode == bvnr_rule_convert)
+			up->rules[i].base = up->policy.base;
+	}
+	up->policy.targets              = up->targets;
+	up->policy.rules                = up->rules;
+	up->policy.require_dimension_of = up->require;
+	if (bvnr_reader_set_unit_policy(r, &up->policy))
+		return true;
+	fprintf(stderr, "%s: unusable unit policy — check the unit spellings "
+			"passed to --unit / --require-dimension\n", cmd);
+	return false;
 }
 static bool evt_on_unverified(void *ud, bvnr_event_t e, bvnr_data_t *d);
 static bool evt_on_unverified_tee(void *ud, bvnr_event_t e, bvnr_data_t *d)
@@ -627,6 +813,8 @@ static int cmd_events(int argc, char **argv)
 	bool continue_on_error = false;
 	bool enable_debug      = false;
 	bool debug_pretty      = false;
+	cli_unit_policy_t up;
+	memset(&up, 0, sizeof up);
 	int argi = 0;
 	while (argi < argc && argv[argi][0] == '-') {
 		if (strcmp(argv[argi], "-c") == 0) {
@@ -637,6 +825,11 @@ static int cmd_events(int argc, char **argv)
 		}
 		if (strcmp(argv[argi], "-p") == 0) {
 			debug_pretty = true;      argi++; continue;
+		}
+		{
+			int rc = cli_parse_unit_opts("events", argc, argv, &argi, &up);
+			if (rc == 0) continue;
+			if (rc > 0)  return rc;
 		}
 		if (strcmp(argv[argi], "-") != 0) {
 			fprintf(stderr, "events: unknown option: %s\n", argv[argi]);
@@ -672,6 +865,11 @@ static int cmd_events(int argc, char **argv)
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic pop
 #endif
+	if (!cli_apply_unit_policy("events", rd, &up)) {
+		bvnr_reader_destroy(rd);
+		if (!from_stdin) close(fd);
+		return 2;
+	}
 	bvnr_source_t src;
 	bvnr_source_from_fd(&src, fd);
 	evt_ctx_t *ctx = calloc(1, sizeof(*ctx));
@@ -818,12 +1016,15 @@ static int cmd_events(int argc, char **argv)
 	free(ctx);
 	return ok ? 0 : 1;
 }
-static int cmd_validate(const char *filename)
+static int cmd_validate(const char *filename, cli_unit_policy_t *up)
 {
 	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (!r) { close(fd); return 1; }
+	if (!cli_apply_unit_policy("validate", r, up)) {
+		bvnr_reader_destroy(r); close(fd); return 2;
+	}
 	bvnr_source_t src;
 	bvnr_source_from_fd(&src, fd);
 	bvnr_read_flags_t flags = {0};
@@ -881,11 +1082,28 @@ static int cmd_validate(const char *filename)
 		printf("%s: OK\n", filename);
 	return 0;
 }
-static int cmd_query(const char *path, const char *filename)
+static int cmd_query(const char *path, const char *filename,
+		     cli_unit_policy_t *up)
 {
 	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
-	bvn_dom_doc_t *doc = bvn_dom_parse_fd(fd);
+	/* The DOM takes the same policy the streaming reader does, so a query can
+	 * assert what it expects to find and ask for the unit it wants back. */
+	bvn_dom_doc_t *doc;
+	if (up && up->any) {
+		up->policy.targets              = up->targets;
+		up->policy.rules                = up->rules;
+		up->policy.require_dimension_of = up->require;
+		for (uint32_t i = 0; i < up->policy.num_targets; i++)
+			up->targets[i].base = up->policy.base;
+		for (uint32_t i = 0; i < up->policy.num_rules; i++) {
+			if (up->rules[i].mode == bvnr_rule_convert)
+				up->rules[i].base = up->policy.base;
+		}
+		doc = bvn_dom_parse_fd_policy(fd, 0, &up->policy);
+	} else {
+		doc = bvn_dom_parse_fd(fd);
+	}
 	close(fd);
 	if (!doc) {
 		fprintf(stderr, "Failed to parse %s\n", filename);
@@ -3009,8 +3227,24 @@ static void usage(const char *prog)
 	fprintf(stderr,
 		"Usage: %s <command> [options] [file]\n"
 		"Commands:\n"
-		"  validate      Validate a .bvnr file\n"
-		"  query <path>  Query a value by path (e.g. .sensor.temperature)\n                Prints the VALUE only -- no unit -- so it pipes cleanly.\n"
+		"  validate [opts] <file>\n"
+		"                  Validate a .bvnr file. Unit-policy options:\n"
+		"                    --require-unit             every numeric value must\n"
+		"                                               carry a unit\n"
+		"                    --require-dimension <unit> every value must be\n"
+		"                                               convertible to this unit\n"
+		"                                               (repeatable)\n"
+		"                    --require-field <path>=<unit>\n"
+		"                                               the value at this key path\n"
+		"                                               must be convertible to it;\n"
+		"                                               a path may end in '.*'\n"
+		"                                               (repeatable)\n"
+		"  query [opts] <path> <file>\n"
+		"                  Query a value by path (e.g. .sensor.temperature).\n"
+		"                  Prints the VALUE only -- no unit -- so it pipes cleanly.\n"
+		"                  Takes the same unit-policy options as events, so a\n"
+		"                  query can assert what it expects and ask for the unit\n"
+		"                  it wants back: --field .a.b=m --require-unit ...\n"
 		"  pretty-print  Pretty-print a .bvnr file\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
 		"                  Override with --from <fmt> --to <fmt> if needed\n"
@@ -3022,6 +3256,26 @@ static void usage(const char *prog)
 		"                    -c  Continue parsing on errors (resync mode)\n"
 		"                    -d  Enable debug re-serialisation output to stderr\n"
 		"                    -p  Pretty-print debug output (requires -d)\n"
+		"                    --unit <unit>       convert values to this unit,\n"
+		"                                        first match wins (repeatable)\n"
+		"                    --si                convert anything left over to\n"
+		"                                        coherent SI base units\n"
+		"                    --base <N>          render conversions in base N\n"
+		"                    --leave-inexact     leave a value the conversion\n"
+		"                                        cannot deliver exactly, rather\n"
+		"                                        than failing the parse\n"
+		"                    --field <path>=<unit>\n"
+		"                                        convert the value at this key\n"
+		"                                        path; a path may end in '.*' to\n"
+		"                                        name a subtree (repeatable)\n"
+		"                    --require-unit, --require-dimension <unit>,\n"
+		"                    --require-field <path>=<unit>\n"
+		"                                        as for validate, above\n",
+		prog);
+	/* Split here: one string literal for the whole of usage() grew past the
+	 * 4095 characters C99 requires a compiler to support, which -Wpedantic
+	 * reports. Two calls cost nothing and keep the text strictly conforming. */
+	fprintf(stderr,
 		"  frames pack <file>...\n"
 		"                  Wrap each document in a length-prefixed frame (stdout).\n"
 		"  frames list <file|->\n"
@@ -3056,9 +3310,8 @@ static void usage(const char *prog)
 		"  %s mux pack 1:a.bvnr 2:b.bvnr | %s mux list -\n"
 		"  %s bench --profile scalars --size 4096\n"
 		"  %s bench --profile all --size 1024,65536 --iterations 200 --json\n",
-		prog,
-		prog, prog, prog, prog, prog, prog, prog, prog, prog, prog,
-		prog, prog, prog, prog);
+		prog, prog, prog, prog, prog, prog, prog, prog,
+		prog, prog, prog, prog, prog, prog);
 }
 int main(int argc, char **argv)
 {
@@ -3071,15 +3324,41 @@ int main(int argc, char **argv)
 	 * glob that matched more than intended ("validate *.bvnr") checked only the
 	 * first file and still exited 0. Refuse instead of half-doing the job. */
 	if (strcmp(cmd, "validate") == 0) {
-		if (argc < 3) { fprintf(stderr, "Usage: %s validate <file>\n", argv[0]); return 1; }
-		if (argc > 3) { fprintf(stderr, "validate: takes exactly one file, got %d\n",
-					argc - 2); return 2; }
-		return cmd_validate(argv[2]);
+		cli_unit_policy_t up;
+		memset(&up, 0, sizeof up);
+		int argi = 2;
+		while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
+			int rc = cli_parse_unit_opts("validate", argc, argv, &argi, &up);
+			if (rc == 0) continue;
+			if (rc > 0)  return rc;
+			fprintf(stderr, "validate: unknown option: %s\n", argv[argi]);
+			return 2;
+		}
+		if (argi >= argc) { fprintf(stderr, "Usage: %s validate [--require-unit] "
+					"[--require-dimension <unit>] <file>\n", argv[0]); return 1; }
+		if (argc - argi > 1) { fprintf(stderr, "validate: takes exactly one file, "
+					"got %d\n", argc - argi); return 2; }
+		return cmd_validate(argv[argi], &up);
 	} else if (strcmp(cmd, "query") == 0) {
-		if (argc < 4) { fprintf(stderr, "Usage: %s query <path> <file>\n", argv[0]); return 1; }
-		if (argc > 4) { fprintf(stderr, "query: takes exactly a path and a file, "
-					"got %d arguments\n", argc - 2); return 2; }
-		return cmd_query(argv[2], argv[3]);
+		if (argc < 4) { fprintf(stderr, "Usage: %s query [opts] <path> <file>\n",
+					argv[0]); return 1; }
+		{
+			cli_unit_policy_t up;
+			memset(&up, 0, sizeof up);
+			int argi = 2;
+			while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
+				int rc = cli_parse_unit_opts("query", argc, argv, &argi, &up);
+				if (rc == 0) continue;
+				if (rc > 0)  return rc;
+				fprintf(stderr, "query: unknown option: %s\n", argv[argi]);
+				return 2;
+			}
+			if (argc - argi != 2) {
+				fprintf(stderr, "Usage: %s query [opts] <path> <file>\n", argv[0]);
+				return 2;
+			}
+			return cmd_query(argv[argi], argv[argi + 1], &up);
+		}
 	} else if (strcmp(cmd, "pretty-print") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s pretty-print <file>\n", argv[0]); return 1; }
 		if (argc > 3) { fprintf(stderr, "pretty-print: takes exactly one file, got %d\n",

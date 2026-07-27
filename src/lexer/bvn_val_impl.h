@@ -91,6 +91,81 @@ typedef struct bvnr_serializer_s {
 } bvnr_serializer_t;
 #define BVN_UNIT_IS_NO_UNIT(u) \
 	((u).num_components == 1u && (u).components[0].base == bu_none)
+/* A value carrying no unit at all, in either of the two shapes that means:
+ * `no_unit` written out (num_components == 0) and no unit parameter at all
+ * (one bu_none component). Both must be fenced off from unit-bearing targets,
+ * because a bare number IS dimensionally compatible with % and ppm — see
+ * bvnr_unit_policy_t. */
+#define BVN_UNIT_IS_UNITLESS(u) \
+	((u).num_components == 0u || BVN_UNIT_IS_NO_UNIT(u))
+/* Parsed form of bvnr_unit_policy_t. Held as one struct so bvn_val_init can
+ * carry it across the memset that re-arms the validator for a new document: a
+ * policy belongs to the consumer, not to the document it was set for. */
+/* Parsed form of one bvnr_unit_rule_t. The path is COPIED, because the public
+ * contract is that the caller's strings need not outlive the setter call. */
+typedef struct bvn_unit_rule_state_s {
+	uint8_t		path_len;
+	bool		wildcard;   /* the path ended in ".*"; path holds the prefix */
+	uint8_t		mode;       /* bvnr_unit_rule_mode_t */
+	uint32_t	base;
+	value_unit_t	unit;
+	char		path[BVNR_MAX_UNIT_PATH + 1];
+} bvn_unit_rule_state_t;
+typedef struct bvn_unit_policy_state_s {
+	bool		active;
+	bool		require_unit;
+	uint8_t		normalise;    /* bvnr_unit_normalise_t */
+	uint8_t		on_inexact;   /* bvnr_unit_inexact_policy_t */
+	uint32_t	normalise_base;
+	uint32_t	num_targets;
+	uint32_t	num_require;
+	uint32_t	num_rules;
+	value_unit_t	target[BVNR_MAX_UNIT_TARGETS];
+	uint32_t	target_base[BVNR_MAX_UNIT_TARGETS];
+	value_unit_t	require[BVNR_MAX_UNIT_TARGETS];
+	bvn_unit_rule_state_t rule[BVNR_MAX_UNIT_RULES];
+} bvn_unit_policy_state_t;
+/*
+ * Where the value being read or written sits, as a dotted key path.
+ *
+ * The streaming tiers had no key context at all before per-field rules needed
+ * one — a value arrived knowing its type and unit and nothing about where it
+ * came from. This is the smallest thing that supplies it: a flat text buffer
+ * holding the enclosing struct prefix (".a.b"), a mark per open struct so a
+ * close can truncate back, and the key of the assignment currently in flight.
+ *
+ * `lost` is the honest answer to a path that will not fit — too deep, or a
+ * component longer than the buffer allows. Once one push is lost every deeper
+ * push is lost too, whether or not it would have fitted, so pops stay balanced
+ * and the path can never be silently WRONG: while lost > 0 the position is
+ * unknown and no rule may match it. Matching the wrong field is the one failure
+ * mode a per-field rule must not have.
+ */
+#define BVN_PATH_MAX_DEPTH  32u
+#define BVN_PATH_MAX_BYTES  256u
+#define BVN_PATH_MAX_KEY    64u
+typedef struct bvn_key_path_s {
+	uint32_t	len;                        /* bytes of `buf` in use */
+	uint32_t	depth;                      /* structs pushed into `mark` */
+	uint32_t	lost;                       /* unrepresentable pushes */
+	uint8_t		pending_len;                /* key of the current assignment */
+	bool		pending_lost;
+	uint32_t	mark[BVN_PATH_MAX_DEPTH];
+	char		buf[BVN_PATH_MAX_BYTES];
+	char		pending[BVN_PATH_MAX_KEY];
+} bvn_key_path_t;
+void bvn_path_reset(bvn_key_path_t* p);
+void bvn_path_set_key(bvn_key_path_t* p, const uint8_t* key, uint32_t len);
+void bvn_path_push(bvn_key_path_t* p);
+void bvn_path_pop(bvn_key_path_t* p);
+/* Full path of the value in flight (prefix + pending key) into `out`. Returns
+ * false when the position is unknown — see `lost` above — in which case no rule
+ * may be applied to this value. */
+bool bvn_path_current(const bvn_key_path_t* p, char* out, uint32_t cap,
+		      uint32_t* out_len);
+/* Index of the first rule whose path matches, or -1. */
+int32_t bvn_policy_match_rule(const bvn_unit_policy_state_t* pol,
+			      const bvn_key_path_t* path);
 #define BVN_TYPE_CACHE_KEY_CAP  64u
 #define BVN_IU_CACHE_KEY_CAP    32u
 #define BVN_TYPE_CACHE_UBUF_CAP 64u
@@ -140,6 +215,11 @@ typedef struct bvnr_validator_s {
 			 value_unit_t* want, uint32_t* want_base);
 	bool			want_unit_allow_nonterminating;
 	uint32_t		max_conversion_length;
+	bvn_unit_policy_state_t	policy;
+	bvn_key_path_t		path;
+	/* Rule matched for the value in flight, decided once by the assertion pass
+	 * and reused by the conversion pass; -1 when no rule names this value. */
+	int32_t			cur_rule;
 	/* Scratch for lossless want_unit conversion, allocated lazily and reused per
 	 * value; freed in bvn_val_free. num/den hold the exact converted rational,
 	 * conv_text the rendered string handed to the callback. */
@@ -163,6 +243,14 @@ struct bvnr_writer_s {
 	bvnr_serializer_t	ser;
 	bvnr_validator_t	val;
 };
+/* Does `u` satisfy the policy's require_unit / require_dimension_of? Shared by
+ * the reader and the writer so the two cannot drift into meaning different
+ * things by the same policy — the point of a producer-side check is that it is
+ * the SAME check the consumer will apply. */
+bool bvn_unit_policy_accepts(const bvn_unit_policy_state_t* p, value_unit_t u);
+/* May a value in `native` be delivered as `target`? Dimensionally convertible,
+ * and never bridging a unit-bearing value and a bare one in either direction. */
+bool bvn_policy_selects(value_unit_t native, value_unit_t target);
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts);
 void bvn_val_free(bvnr_validator_t* v);
 bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw);

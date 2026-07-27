@@ -353,6 +353,111 @@ class BvnrReadFlags(ctypes.Structure):
         ('_reserved',             ctypes.c_uint64 * 2),
     ]
 
+class BvnrUnitTarget(ctypes.Structure):
+    """One conversion target: the unit, and the base to render it in."""
+    _fields_ = [
+        ('unit', ctypes.c_char_p),
+        ('base', ctypes.c_uint32),
+    ]
+
+class BvnrUnitRule(ctypes.Structure):
+    """One per-field rule: which key path, which unit, and what to do."""
+    _fields_ = [
+        ('path', ctypes.c_char_p),
+        ('unit', ctypes.c_char_p),
+        ('base', ctypes.c_uint32),
+        ('mode', ctypes.c_int),
+    ]
+
+class BvnrUnitPolicy(ctypes.Structure):
+    """Mirror of bvnr_unit_policy_t (bvnr_reader_set_unit_policy).
+
+    Everything is unit TEXT rather than a built ValueUnit, which is the whole
+    reason this is reachable from Python without a callback: the C side parses
+    the strings when the policy is set. Keep any Python objects holding those
+    strings alive for the duration of the set call -- ctypes does not own them.
+    """
+    _fields_ = [
+        ('rules',                    ctypes.POINTER(BvnrUnitRule)),
+        ('num_rules',                ctypes.c_uint32),
+        ('targets',                  ctypes.POINTER(BvnrUnitTarget)),
+        ('num_targets',              ctypes.c_uint32),
+        ('base',                     ctypes.c_uint32),
+        ('normalise',                ctypes.c_int),
+        ('on_inexact',               ctypes.c_int),
+        ('require_unit',             ctypes.c_bool),
+        ('require_dimension_of',     ctypes.POINTER(ctypes.c_char_p)),
+        ('num_require_dimension_of', ctypes.c_uint32),
+    ]
+
+MAX_UNIT_TARGETS = 8          # BVNR_MAX_UNIT_TARGETS
+MAX_UNIT_RULES   = 8          # BVNR_MAX_UNIT_RULES
+MAX_UNIT_PATH    = 96         # BVNR_MAX_UNIT_PATH
+
+
+def build_unit_policy(targets=(), base=0, normalise_si=False,
+                      leave_inexact=False, require_unit=False,
+                      require_dimension_of=(), rules=()):
+    """Marshal a UnitPolicy into (BvnrUnitPolicy, keepalive).
+
+    Shared by the reader and the writer so the two cannot disagree about what a
+    policy means. The caller MUST keep `keepalive` referenced until the C call
+    returns: it holds the encoded unit strings the struct's pointers refer to.
+
+    Raises ValueError on a count the C side would reject anyway; a malformed
+    unit string is left to the C parser, which reports it against the same
+    table the documents are read with.
+    """
+    if len(targets) > MAX_UNIT_TARGETS:
+        raise ValueError(
+            f"at most {MAX_UNIT_TARGETS} unit targets, got {len(targets)}")
+    if len(require_dimension_of) > MAX_UNIT_TARGETS:
+        raise ValueError(
+            f"at most {MAX_UNIT_TARGETS} required dimensions, "
+            f"got {len(require_dimension_of)}")
+    if len(rules) > MAX_UNIT_RULES:
+        raise ValueError(
+            f"at most {MAX_UNIT_RULES} per-field rules, got {len(rules)}")
+
+    keepalive = []
+    c_rules = (BvnrUnitRule * max(len(rules), 1))()
+    for i, r in enumerate(rules):
+        pth = r.path.encode('utf-8')
+        unt = r.unit.encode('utf-8')
+        keepalive.extend((pth, unt))
+        c_rules[i].path = pth
+        c_rules[i].unit = unt
+        c_rules[i].base = int(r.base)
+        c_rules[i].mode = 0 if r.convert else 1
+    c_targets = (BvnrUnitTarget * max(len(targets), 1))()
+    for i, t in enumerate(targets):
+        unit, tbase = (t, 0) if isinstance(t, str) else (t[0], t[1])
+        enc = unit.encode('utf-8')
+        keepalive.append(enc)
+        c_targets[i].unit = enc
+        c_targets[i].base = int(tbase)
+
+    c_require = (ctypes.c_char_p * max(len(require_dimension_of), 1))()
+    for i, u in enumerate(require_dimension_of):
+        enc = u.encode('utf-8')
+        keepalive.append(enc)
+        c_require[i] = enc
+
+    keepalive.extend((c_targets, c_require, c_rules))
+    cp = BvnrUnitPolicy()
+    cp.rules                    = c_rules
+    cp.num_rules                = len(rules)
+    cp.targets                  = c_targets
+    cp.num_targets              = len(targets)
+    cp.base                     = int(base)
+    cp.normalise                = 1 if normalise_si else 0
+    cp.on_inexact               = 1 if leave_inexact else 0
+    cp.require_unit             = bool(require_unit)
+    cp.require_dimension_of     = c_require
+    cp.num_require_dimension_of = len(require_dimension_of)
+    return cp, keepalive
+
+
 class BvnrWriteFlags(ctypes.Structure):
     _fields_ = [
         ('max_identifier_length', ctypes.c_uint16),

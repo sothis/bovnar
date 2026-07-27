@@ -437,6 +437,19 @@ static bvn_dom_node_t *make_array(value_type_spec_t vt, value_unit_t vu)
  * This is what lets a bare "3.14" land as a float and "42" as an int without an
  * annotation.
  */
+/* Does this text spell a whole number? Asked of a CONVERTED value, whose
+ * digits may be fractional even though the source family was an integer one —
+ * the base does not matter, because '.', 'e' and 'E' are not digits in any base
+ * bvnr writes (base 16 exponents use 'p'). */
+static bool bvn_is_integer_text(const char *s, uint32_t len)
+{
+	for (uint32_t i = 0; i < len; i++) {
+		if (s[i] == '.' || s[i] == 'e' || s[i] == 'E' ||
+		    s[i] == 'p' || s[i] == 'P')
+			return false;
+	}
+	return true;
+}
 static bool number_is_float(const char *s, uint32_t len,
 							value_type_spec_t vt)
 {
@@ -600,6 +613,39 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		uint32_t   len = d->length;
 		value_type_spec_t vt = d->value_type;
 		value_unit_t      vu = d->value_unit;
+		/*
+		 * A unit policy that converts is asking for the CONVERTED value, so that
+		 * is what the tree stores — `bovnar query .x --unit m` would otherwise
+		 * report the document's own digits and the caller would never know the
+		 * conversion had been ignored.
+		 *
+		 * Two things travel with the digits. The base, because a conversion may
+		 * have been asked to render in another one and a node carrying base 10
+		 * over hex digits is unreadable. And the FAMILY, because an integer can
+		 * convert to a fraction — 5 g in kilograms is 0.005 — and number_is_float
+		 * answers from the declared family for uint/sint, so leaving it would
+		 * hand a fractional string to the integer builder. Promoting to float is
+		 * the honest description of what the value now is.
+		 *
+		 * conv.text is NULL exactly when the exact result does not terminate in
+		 * the output base and the reader was told to hand over the rational
+		 * anyway; there are no digits to store then, so the original stands.
+		 */
+		if (d->converted && d->conv.text) {
+			str = d->conv.text;
+			len = d->conv.length;
+			vu  = d->conv.unit;
+			/* Only when the conversion actually MOVED base. Writing the
+			 * base back unconditionally turns a value_type's unset 0 into
+			 * an explicit 10, which is a different thing to the float
+			 * formatter: `100` came back out as `1e+02`. */
+			if (d->conv.base &&
+			    d->conv.base != bvn_effective_base(d->value_type))
+				vt.base = d->conv.base;
+			if ((vt.family == vt_uint || vt.family == vt_sint) &&
+			    !bvn_is_integer_text(str, len))
+				vt.family = vt_float;
+		}
 		bvn_dom_node_t *nd = NULL;
 		switch (d->type) {
 		case token_is_null_value:
@@ -961,7 +1007,8 @@ static error_code_t bvn_dom_check_homogeneous(
 		return error_none;
 	}
 }
-bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
+bvn_dom_doc_t *bvn_dom_parse_policy(const void *data, uint32_t len,
+				    const bvnr_unit_policy_t *policy)
 {
 	bvn_dom_doc_t *doc = bvn_dom_doc_create();
 	if (!doc) return NULL;
@@ -987,6 +1034,16 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
 		builder_cleanup(&b);
 		bvn_dom_doc_destroy(doc);
 		return NULL;
+	}
+	/* The policy is a property of the reader, not of the flags, and it is
+	 * carried across the open — so it may be installed either side of it. A
+	 * policy the parser refuses (a malformed unit, a path that names nothing)
+	 * is reported here rather than as a parse error against the document. */
+	if (policy && !bvnr_reader_set_unit_policy(rd, policy)) {
+		bvnr_reader_destroy(rd);
+		builder_cleanup(&b);
+		doc->parse_error = error_invalid_argument;
+		return doc;
 	}
 	if (!bvnr_open_read_mem(rd, data, len, NULL, 0, &flags)) {
 		bvnr_reader_destroy(rd);
@@ -1024,7 +1081,12 @@ bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
  * until the cap. Because the DOM needs the whole document in memory anyway,
  * slurping first is simpler than driving the reader off the fd directly.
  */
-bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
+bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len)
+{
+	return bvn_dom_parse_policy(data, len, NULL);
+}
+bvn_dom_doc_t *bvn_dom_parse_fd_policy(int fd, uint64_t max_bytes,
+				       const bvnr_unit_policy_t *policy)
 {
 	if (!max_bytes || max_bytes > (uint64_t)BVN_DOM_FD_MAX_BYTES)
 		max_bytes = BVN_DOM_FD_MAX_BYTES;
@@ -1060,9 +1122,13 @@ bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
 		}
 	}
 	if (len > (size_t)UINT32_MAX) { free(buf); return NULL; }
-	bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
+	bvn_dom_doc_t *doc = bvn_dom_parse_policy(buf, (uint32_t)len, policy);
 	free(buf);
 	return doc;
+}
+bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes)
+{
+	return bvn_dom_parse_fd_policy(fd, max_bytes, NULL);
 }
 bvn_dom_doc_t *bvn_dom_parse_fd(int fd)
 {

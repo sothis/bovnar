@@ -1,0 +1,1610 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright (c) 2026 Janos Sonntag
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include "bovnar.h"
+#include "bovnar_si_units.h"
+#include "bovnar_dom.h"
+
+static int failures = 0;
+static int tests = 0;
+
+#define ASSERT_TRUE(cond, msg) do {                                       \
+	tests++;                                                              \
+	if (!(cond)) {                                                        \
+		fprintf(stderr, "FAIL line %d: %s\n", __LINE__, (msg));           \
+		failures++;                                                       \
+	}                                                                     \
+} while (0)
+
+#define ASSERT_EQ_INT(a, b, msg) do {                                     \
+	tests++;                                                              \
+	int64_t _a = (int64_t)(a);                                            \
+	int64_t _b = (int64_t)(b);                                            \
+	if (_a != _b) {                                                       \
+		fprintf(stderr, "FAIL line %d: %s\n  got %lld, expected %lld\n",  \
+				__LINE__, (msg), (long long)_a, (long long)_b);           \
+		failures++;                                                       \
+	}                                                                     \
+} while (0)
+
+#define ASSERT_STR(a, b, msg) do {                                        \
+	tests++;                                                              \
+	if (strcmp((a), (b)) != 0) {                                          \
+		fprintf(stderr, "FAIL line %d: %s\n  got \"%s\", expected \"%s\"\n", \
+				__LINE__, (msg), (a), (b));                               \
+		failures++;                                                       \
+	}                                                                     \
+} while (0)
+
+/*
+ * Suite for the reader-side unit policy (bvnr_reader_set_unit_policy): the
+ * declarative half of what bvnr_read_flags_t.want_unit does through a callback.
+ * Three features share one struct and one code path, so they share one binary:
+ * the assertions (require_unit / require_dimension_of), the opaque target list,
+ * and the SI normalisation mode.
+ *
+ * The interesting cases here are the ones where "convert everything that fits"
+ * fits too much — a bare number is dimensionally a percentage, a currency is
+ * compatible with nothing including itself — and the ones where an ordinary
+ * document contains a value with no exact decimal expansion in the unit the
+ * caller asked for.
+ */
+
+#define POL_MAX_VALUES 16
+
+typedef struct {
+	int      n;
+	bool     converted[POL_MAX_VALUES];
+	char     text[POL_MAX_VALUES][64];    /* conv.text, "" when absent */
+	char     unit[POL_MAX_VALUES][64];    /* conv.unit, or the native unit */
+	char     native[POL_MAX_VALUES][64];  /* always the document's own unit */
+	uint32_t base[POL_MAX_VALUES];
+} pol_ctx_t;
+
+static void pol_unit_str(value_unit_t u, char *buf, size_t cap)
+{
+	if (bvn_unit_to_string(u, buf, cap) < 0)
+		snprintf(buf, cap, "<unprintable>");
+}
+
+static bool pol_on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
+{
+	pol_ctx_t *c = userdata;
+	if (ev != ev_data || !d)
+		return true;
+	if (d->type != token_is_number && d->type != token_is_string &&
+	    d->type != token_is_array_number && d->type != token_is_array_string)
+		return true;
+	if (!bvn_type_is_numeric(d->value_type))
+		return true;
+	if (c->n >= POL_MAX_VALUES)
+		return true;
+	int i = c->n++;
+	c->converted[i] = d->converted;
+	c->base[i]      = d->converted ? d->conv.base : 0u;
+	pol_unit_str(d->value_unit, c->native[i], sizeof c->native[i]);
+	pol_unit_str(d->converted ? d->conv.unit : d->value_unit,
+		     c->unit[i], sizeof c->unit[i]);
+	c->text[i][0] = '\0';
+	if (d->converted && d->conv.text) {
+		size_t n = d->conv.length < sizeof c->text[i] - 1
+			 ? d->conv.length : sizeof c->text[i] - 1;
+		memcpy(c->text[i], d->conv.text, n);
+		c->text[i][n] = '\0';
+	}
+	return true;
+}
+
+/* Drive one document through a reader carrying `policy`, collecting every
+ * numeric value the verified callback sees. */
+static void run_policy(const char *payload, const bvnr_unit_policy_t *policy,
+		       pol_ctx_t *ctx, bool expect_ok, error_code_t expect_err)
+{
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata    = ctx;
+	flags.on_verified = pol_on_verified;
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "policy: reader_create");
+	if (!r) return;
+	ASSERT_TRUE(bvnr_reader_set_unit_policy(r, policy), "policy: set_unit_policy");
+
+	bool opened = bvnr_open_read_mem(r, payload, (uint32_t)strlen(payload),
+					 NULL, 0, &flags);
+	ASSERT_TRUE(opened, "policy: open_read_mem");
+	bool ok = opened && bvnr_read(r);
+	error_code_t err = bvnr_reader_get_error(r);
+	ASSERT_EQ_INT(ok, expect_ok, "policy: read result matches expectation");
+	ASSERT_EQ_INT(err, expect_err, "policy: error code matches expectation");
+	bvnr_reader_destroy(r);
+}
+
+/* ── option 1: the opaque target list ────────────────────────────────────── */
+
+/*
+ * The design note's running document, deliberately awkward: mixed dimensions,
+ * an affine scale, a bare ratio, a prefixed currency. Every value that a target
+ * covers is converted; every value that none covers is delivered untouched,
+ * with data->converted as the only signal telling the two apart.
+ */
+static void test_targets_mixed_document(void)
+{
+	static const bvnr_unit_target_t targets[] = {
+		{ "°C", 0 }, { "m", 0 },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.targets     = targets;
+	p.num_targets = 2;
+
+	pol_ctx_t c = {0};
+	run_policy(
+		".inlet_temp     = <float:64,°F>      212.0;\n"
+		".tank_level     = <float:64,in>      12.0;\n"
+		".duty_cycle     = <float:64,%>       35.0;\n"
+		".spare_capacity = <float:64>         0.25;\n"
+		".unit_price     = <float:64,k~$USD>  5.0;\n",
+		&p, &c, true, error_none);
+
+	ASSERT_EQ_INT(c.n, 5, "targets: five numeric values seen");
+	if (c.n != 5) return;
+	ASSERT_TRUE(c.converted[0], "targets: °F matched the °C target");
+	ASSERT_STR(c.text[0], "100", "targets: 212 °F -> 100 °C exact");
+	ASSERT_TRUE(c.converted[1], "targets: in matched the m target");
+	ASSERT_STR(c.text[1], "0.3048", "targets: 12 in -> 0.3048 m exact");
+	ASSERT_TRUE(!c.converted[2], "targets: % matches no target");
+	ASSERT_TRUE(!c.converted[3], "targets: a bare number matches no target");
+	ASSERT_TRUE(!c.converted[4], "targets: a currency matches no length/temp");
+}
+
+/* "First compatible wins" is the whole selection algorithm, so the order of the
+ * list is semantics, not presentation. */
+static void test_target_order_is_significant(void)
+{
+	static const bvnr_unit_target_t m_first[]  = { { "m", 0 },  { "k~m", 0 } };
+	static const bvnr_unit_target_t km_first[] = { { "k~m", 0 }, { "m", 0 }  };
+	bvnr_unit_policy_t p = {0};
+	pol_ctx_t c = {0};
+
+	p.targets = m_first; p.num_targets = 2;
+	run_policy(".d = 5000 m;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "order: one value");
+	ASSERT_TRUE(c.n == 1 && !c.converted[0],
+		    "order: m target selected first, value already in m");
+
+	memset(&c, 0, sizeof c);
+	p.targets = km_first; p.num_targets = 2;
+	run_policy(".d = 5000 m;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "order: one value");
+	if (c.n == 1) {
+		ASSERT_TRUE(c.converted[0], "order: k~m target selected first");
+		ASSERT_STR(c.text[0], "5", "order: 5000 m -> 5 km");
+	}
+}
+
+/* A target carries its own output base, so one policy can do the unit and the
+ * base in a single step. */
+static void test_target_output_base(void)
+{
+	static const bvnr_unit_target_t targets[] = { { "m", 16 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = targets; p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".d = 5 k~m;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "base: one value");
+	if (c.n != 1) return;
+	ASSERT_TRUE(c.converted[0], "base: converted");
+	ASSERT_STR(c.text[0], "1388", "base: 5000 m rendered in base 16");
+	ASSERT_EQ_INT(c.base[0], 16, "base: reported output base");
+}
+
+/*
+ * The hazard that decides the whole selector design. A value with no unit is
+ * dimensionally compatible with % and with ppm — bvn_units_compatible says so —
+ * so a policy naming "%" would convert a bare 0.25 into 25, and one naming
+ * no_unit would turn 35 % into 0.35. Both directions are fenced off.
+ */
+static void test_unitless_is_fenced_from_the_ratio_units(void)
+{
+	static const bvnr_unit_target_t pct[]  = { { "%", 0 } };
+	static const bvnr_unit_target_t bare[] = { { "no_unit", 0 } };
+	bvnr_unit_policy_t p = {0};
+	pol_ctx_t c = {0};
+
+	p.targets = pct; p.num_targets = 1;
+	run_policy(".spare = <float:64> 0.25;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "fence: one value");
+	ASSERT_TRUE(c.n == 1 && !c.converted[0],
+		    "fence: a bare 0.25 is NOT delivered as 25 %");
+
+	memset(&c, 0, sizeof c);
+	p.targets = bare; p.num_targets = 1;
+	run_policy(".duty = <float:64,%> 35.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "fence: one value");
+	ASSERT_TRUE(c.n == 1 && !c.converted[0],
+		    "fence: 35 % is NOT delivered as a bare 0.35");
+
+	/* ...while a genuine ratio-to-ratio conversion still works: both carry a
+	 * unit, so the fence never comes into it. */
+	static const bvnr_unit_target_t ppm[] = { { "ppm", 0 } };
+	memset(&c, 0, sizeof c);
+	p.targets = ppm; p.num_targets = 1;
+	run_policy(".duty = <float:64,%> 35.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "fence: one value");
+	if (c.n == 1) {
+		ASSERT_TRUE(c.converted[0], "fence: % -> ppm is a real conversion");
+		ASSERT_STR(c.text[0], "350000", "fence: 35 % -> 350000 ppm");
+	}
+}
+
+/*
+ * A currency carries no dimension by design, so bvn_units_compatible calls it
+ * incompatible with itself and a selector built on that predicate would decline
+ * a conversion the engine performs correctly. The policy screens with
+ * bvn_units_convertible instead, which is what keeps this working.
+ */
+static void test_currency_prefix_delta_is_selectable(void)
+{
+	static const bvnr_unit_target_t usd[] = { { "$USD", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = usd; p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".price = <float:64,k~$USD> 5.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "currency: one value");
+	if (c.n != 1) return;
+	ASSERT_TRUE(c.converted[0], "currency: k~$USD -> $USD selected");
+	ASSERT_STR(c.text[0], "5000", "currency: 5 k$USD -> 5000 $USD");
+}
+
+/* A target the value cannot reach at all leaves it alone rather than aborting:
+ * the policy names what it wants, not what the document must be. */
+static void test_unmatched_target_is_not_an_error(void)
+{
+	static const bvnr_unit_target_t sec[] = { { "s", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = sec; p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".d = 5 k~m;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "unmatched: one value");
+	ASSERT_TRUE(c.n == 1 && !c.converted[0], "unmatched: delivered untouched");
+}
+
+/* ── exactness ───────────────────────────────────────────────────────────── */
+
+/*
+ * 42 km/h is 35/3 m/s: exact as a rational, with no terminating expansion in
+ * base 10. The default is the want_unit contract — refuse rather than round.
+ */
+static void test_nonterminating_default_is_error(void)
+{
+	static const bvnr_unit_target_t ms[] = { { "m/s", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = ms; p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".v = <float:64,km/h> 42.0;", &p, &c, false, error_unit_inexact);
+}
+
+/* bvnr_inexact_leave hands that value over in its native unit instead. It is
+ * the mode a blanket policy needs, and `converted` is how a consumer tells. */
+static void test_nonterminating_leave_delivers_native(void)
+{
+	static const bvnr_unit_target_t ms[] = { { "m/s", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets    = ms;
+	p.num_targets = 1;
+	p.on_inexact = bvnr_inexact_leave;
+
+	pol_ctx_t c = {0};
+	run_policy(".v = <float:64,km/h> 42.0;\n.w = <float:64,km/h> 36.0;\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "inexact_leave: two values");
+	if (c.n != 2) return;
+	ASSERT_TRUE(!c.converted[0], "inexact_leave: 42 km/h left native");
+	ASSERT_STR(c.native[0], "k~m/h", "inexact_leave: native unit intact");
+	/* 36 km/h IS 10 m/s exactly — the mode steps over the value it cannot
+	 * deliver, not over the target. */
+	ASSERT_TRUE(c.converted[1], "inexact_leave: 36 km/h still converts");
+	ASSERT_STR(c.text[1], "10", "inexact_leave: 36 km/h -> 10 m/s");
+}
+
+/* An irrational factor (° -> rad is π-based) aborts by default... */
+static void test_irrational_default_is_error(void)
+{
+	static const bvnr_unit_target_t rad[] = { { "rad", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets     = rad;
+	p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".a = 90 °;", &p, &c, false, error_unit_inexact);
+}
+
+/*
+ * ...and is stepped over under bvnr_inexact_leave, like every other value the
+ * conversion cannot deliver exactly. The alternative reading — that an
+ * irrational factor is special because there is no rational to hand over —
+ * belongs to want_unit_allow_nonterminating, whose fallback IS the rational.
+ * This flag's fallback is the native value, and that works for an irrational
+ * factor exactly as well as for a non-terminating one.
+ */
+static void test_irrational_is_left_under_leave(void)
+{
+	static const bvnr_unit_target_t rad[] = { { "rad", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets     = rad;
+	p.num_targets = 1;
+	p.on_inexact  = bvnr_inexact_leave;
+
+	pol_ctx_t c = {0};
+	run_policy(".a = 90 °;\n.b = 2 rad;\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "irrational: two values");
+	if (c.n != 2) return;
+	ASSERT_TRUE(!c.converted[0], "irrational: 90 ° left in degrees");
+	ASSERT_STR(c.native[0], "°", "irrational: native unit intact");
+	ASSERT_TRUE(!c.converted[1], "irrational: 2 rad already in the target unit");
+}
+
+/*
+ * The work limit is a property of the value, not of the caller's configuration,
+ * so bvnr_inexact_leave steps over it too: `1e-9800` is seven characters that
+ * expand to 9800 digits, and refusing to spend that is not a reason to reject
+ * the document around it.
+ */
+static void test_work_limit_is_left_under_leave(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise  = bvnr_normalise_si;
+	p.on_inexact = bvnr_inexact_leave;
+
+	pol_ctx_t c = {0};
+	run_policy(".a = <float:64,in> 1e-9800;\n.b = <float:64,in> 12.0;\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "work limit: two values");
+	if (c.n != 2) return;
+	ASSERT_TRUE(!c.converted[0], "work limit: absurd exponent left alone");
+	ASSERT_TRUE(c.converted[1], "work limit: the next value still converts");
+	ASSERT_STR(c.text[1], "0.3048", "work limit: 12 in -> 0.3048 m");
+}
+
+/* ...and aborts by default, which is the behaviour that keeps an untrusted
+ * document from choosing how much CPU the reader spends. */
+static void test_work_limit_default_is_error(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(".a = <float:64,in> 1e-9800;", &p, &c, false,
+		   error_value_out_of_range);
+}
+
+/*
+ * bvnr_inexact_leave belongs to the policy, not to the reader: a want_unit hook
+ * names one target for one value deliberately, and keeps the strict
+ * all-or-nothing contract it was documented with even when a policy sharing the
+ * reader is set to step over refusals.
+ */
+static bool strict_hook(void *userdata, const bvnr_data_t *data,
+			value_unit_t *want, uint32_t *want_base)
+{
+	(void)userdata; (void)data;
+	bool ok = false;
+	*want      = bvn_parse_unit((const uint8_t *)"m/s", &ok);
+	*want_base = 0u;
+	return ok;
+}
+
+static void test_hook_keeps_the_strict_contract(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise  = bvnr_normalise_si;
+	p.on_inexact = bvnr_inexact_leave;
+
+	pol_ctx_t c = {0};
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata  = &c;
+	flags.on_verified = pol_on_verified;
+	flags.want_unit = strict_hook;
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "strict hook: reader_create");
+	if (!r) return;
+	ASSERT_TRUE(bvnr_reader_set_unit_policy(r, &p), "strict hook: set policy");
+	const char *doc = ".v = <float:64,k~m/h> 42.0;";
+	bool ok = bvnr_open_read_mem(r, doc, (uint32_t)strlen(doc), NULL, 0, &flags)
+		  && bvnr_read(r);
+	ASSERT_TRUE(!ok, "strict hook: the hook's conversion still aborts");
+	ASSERT_EQ_INT(bvnr_reader_get_error(r), error_unit_inexact,
+		      "strict hook: error_unit_inexact");
+	bvnr_reader_destroy(r);
+}
+
+/* ── option 3: SI normalisation ──────────────────────────────────────────── */
+
+static void test_normalise_si(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(
+		".len   = <float:64,in>   12.0;\n"
+		".temp  = <float:64,°F>   212.0;\n"
+		".dist  = <float:64,k~m>  5.0;\n"
+		".mass  = <float:64,g>    5.0;\n",
+		&p, &c, true, error_none);
+
+	ASSERT_EQ_INT(c.n, 4, "normalise: four values");
+	if (c.n != 4) return;
+	ASSERT_TRUE(c.converted[0], "normalise: in converted");
+	ASSERT_STR(c.text[0], "0.3048", "normalise: 12 in -> 0.3048 m");
+	ASSERT_STR(c.unit[0], "m", "normalise: target unit is m");
+	ASSERT_TRUE(c.converted[1], "normalise: °F converted");
+	ASSERT_STR(c.text[1], "373.15", "normalise: 212 °F -> 373.15 K");
+	ASSERT_STR(c.unit[1], "K", "normalise: target unit is K");
+	ASSERT_TRUE(c.converted[2], "normalise: k~m converted");
+	ASSERT_STR(c.text[2], "5000", "normalise: 5 km -> 5000 m");
+	/* Mass normalises to the kilogram, the SI base unit — not to the gram the
+	 * symbol table is built around. */
+	ASSERT_TRUE(c.converted[3], "normalise: g converted");
+	ASSERT_STR(c.text[3], "0.005", "normalise: 5 g -> 0.005 kg");
+	ASSERT_STR(c.unit[3], "k~g", "normalise: target unit is k~g");
+}
+
+/*
+ * Everything dimensionless is left exactly as written. Normalising a ratio would
+ * silently restate 35 % as 0.35, and an angle would need the irrational factor
+ * between ° and rad — so bvn_unit_si_normal_form refuses the lot, and the mode
+ * never has to carry a hand-maintained skip list.
+ */
+static void test_normalise_leaves_dimensionless_alone(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise  = bvnr_normalise_si;
+	p.on_inexact = bvnr_inexact_leave;
+
+	pol_ctx_t c = {0};
+	run_policy(
+		".ratio = <float:64,%>     35.0;\n"
+		".gain  = <float:64,dB>    3.0;\n"
+		".acid  = <float:64,pH>    7.2;\n"
+		".angle = <float:64,°>     90.0;\n"
+		".money = <float:64,$USD>  5.0;\n"
+		".bare  = <float:64>       0.25;\n",
+		&p, &c, true, error_none);
+
+	ASSERT_EQ_INT(c.n, 6, "normalise: six dimensionless values");
+	if (c.n != 6) return;
+	for (int i = 0; i < 6; i++)
+		ASSERT_TRUE(!c.converted[i],
+			    "normalise: dimensionless value left as written");
+}
+
+/*
+ * The photometric units are why bvn_unit_si_normal_form checks its own answer.
+ * lm, lx and ph each carry the steradian's quantity kind, which no SI dimension
+ * vector can express — so a normal form rebuilt from dimensions alone comes back
+ * as cd and cd/m², which is luminous INTENSITY where the value was luminous
+ * FLUX. bvn_unit_convert_rational refuses those pairs, correctly, and before the
+ * self-check a document containing a lumen aborted the moment normalisation was
+ * switched on.
+ */
+static void test_normalise_refuses_a_form_it_cannot_convert(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(
+		".flux  = <float:64,lm> 800.0;\n"
+		".illum = <float:64,lx> 500.0;\n"
+		".phot  = <float:64,ph> 2.0;\n"
+		".dist  = <float:64,k~m> 5.0;\n",
+		&p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 4, "photometric: four values, none rejected");
+	if (c.n != 4) return;
+	ASSERT_TRUE(!c.converted[0], "photometric: lm left alone, not made cd");
+	ASSERT_TRUE(!c.converted[1], "photometric: lx left alone");
+	ASSERT_TRUE(!c.converted[2], "photometric: ph left alone");
+	ASSERT_TRUE(c.converted[3], "photometric: an ordinary length still converts");
+}
+
+/*
+ * An affine scale inside a compound is dimensionally impeccable and completely
+ * unconvertible: `s/°C` has the dimensions of `s/K`, but °C means nothing at an
+ * exponent other than 1, so the engine refuses the pair — correctly. Both halves
+ * of the policy have to survive that. Normalisation must not offer a form it
+ * cannot reach, and a TARGET the caller named explicitly must not abort the
+ * document either: the value is simply delivered in its own unit, like any value
+ * no rule could be applied to.
+ */
+static void test_affine_in_compound_never_aborts(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(".rate = <float:64,s/°C> 5.0;\n.d = <float:64,k~m> 5.0;\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "affine compound: two values, none rejected");
+	if (c.n == 2) {
+		ASSERT_TRUE(!c.converted[0], "affine compound: s/°C left alone");
+		ASSERT_TRUE(c.converted[1], "affine compound: the length still converts");
+	}
+
+	/* ...and through the target list, where the screen cannot see it coming. */
+	static const bvnr_unit_target_t sk[] = { { "s/K", 0 } };
+	memset(&c, 0, sizeof c);
+	memset(&p, 0, sizeof p);
+	p.targets = sk; p.num_targets = 1;
+	run_policy(".rate = <float:64,s/°C> 5.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "affine compound: target list does not abort");
+	if (c.n == 1)
+		ASSERT_TRUE(!c.converted[0], "affine compound: delivered untouched");
+}
+
+/*
+ * Some units have an SI form but only reach it through an irrational factor —
+ * the parsec, the oersted, the water-hardness scales. Under the default they
+ * abort like any other inexact conversion; under bvnr_inexact_leave the mode
+ * steps over them, which is what makes "normalise this document" usable on a
+ * document the caller has not audited unit by unit.
+ */
+static void test_normalise_irrational_factors(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(".d = <float:64,pc> 1.0;", &p, &c, false, error_unit_inexact);
+
+	memset(&c, 0, sizeof c);
+	p.on_inexact = bvnr_inexact_leave;
+	run_policy(".d = <float:64,pc> 1.0;\n.h = <float:64,°dH> 8.0;\n"
+		   ".m = <float:64,k~m> 5.0;\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "irrational normalise: three values");
+	if (c.n != 3) return;
+	ASSERT_TRUE(!c.converted[0], "irrational normalise: parsec left alone");
+	ASSERT_TRUE(!c.converted[1], "irrational normalise: °dH left alone");
+	ASSERT_TRUE(c.converted[2], "irrational normalise: the length still converts");
+}
+
+/* A value already in its SI normal form is not converted to itself: the mode
+ * reports work it did, and doing none is a valid outcome. */
+static void test_normalise_leaves_si_values_alone(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(".d = 5 m;\n.t = 25 s;\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "normalise: two values");
+	if (c.n != 2) return;
+	ASSERT_TRUE(!c.converted[0], "normalise: 5 m already normal");
+	ASSERT_TRUE(!c.converted[1], "normalise: 25 s already normal");
+}
+
+/* Targets are consulted before the normalisation fallback, so one policy can
+ * say "speeds in km/h, everything else in SI". */
+static void test_targets_outrank_normalise(void)
+{
+	static const bvnr_unit_target_t kmh[] = { { "k~m/h", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets     = kmh;
+	p.num_targets = 1;
+	p.normalise   = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(".v = <float:64,m/s> 10.0;\n.len = <float:64,in> 12.0;\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "ladder: two values");
+	if (c.n != 2) return;
+	ASSERT_TRUE(c.converted[0], "ladder: speed took the target, not SI");
+	ASSERT_STR(c.text[0], "36", "ladder: 10 m/s -> 36 km/h");
+	ASSERT_TRUE(c.converted[1], "ladder: length fell through to normalise");
+	ASSERT_STR(c.text[1], "0.3048", "ladder: 12 in -> 0.3048 m");
+}
+
+/* The normalisation fallback has its own output base. */
+static void test_normalise_output_base(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise = bvnr_normalise_si;
+	p.base      = 16;
+
+	pol_ctx_t c = {0};
+	run_policy(".d = 5 k~m;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "normalise base: one value");
+	if (c.n != 1) return;
+	ASSERT_STR(c.text[0], "1388", "normalise base: 5000 m in base 16");
+	ASSERT_EQ_INT(c.base[0], 16, "normalise base: reported");
+}
+
+/* ── option 4: the assertions ────────────────────────────────────────────── */
+
+static void test_require_unit(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.require_unit = true;
+
+	pol_ctx_t c = {0};
+	run_policy(".a = 5 m;\n.b = 25 °C;\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "require_unit: a fully annotated document passes");
+
+	/* A value with no unit parameter at all... */
+	memset(&c, 0, sizeof c);
+	run_policy(".a = 5 m;\n.b = 7;\n", &p, &c, false, error_unit_mismatch);
+
+	/* ...and one that wrote no_unit explicitly. Both are bare numbers; the
+	 * requirement is about what the value carries, not how it was spelled. */
+	memset(&c, 0, sizeof c);
+	run_policy(".a = 5 m;\n.b = <uint:32,no_unit> 7;\n",
+		   &p, &c, false, error_unit_mismatch);
+}
+
+static void test_require_dimension(void)
+{
+	static const char *lengths[] = { "m" };
+	bvnr_unit_policy_t p = {0};
+	p.require_dimension_of     = lengths;
+	p.num_require_dimension_of = 1;
+
+	/* Any length in any unit satisfies it — that is the point of asking about
+	 * the dimension rather than the unit. */
+	pol_ctx_t c = {0};
+	run_policy(".a = 5 k~m;\n.b = 12 in;\n.c = 3 mi;\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "require_dimension: three lengths pass");
+
+	memset(&c, 0, sizeof c);
+	run_policy(".a = 5 k~m;\n.b = 25 °C;\n", &p, &c, false, error_unit_mismatch);
+
+	/* Several requirements: a value must satisfy at least one. */
+	static const char *len_or_temp[] = { "m", "K" };
+	memset(&c, 0, sizeof c);
+	p.require_dimension_of     = len_or_temp;
+	p.num_require_dimension_of = 2;
+	run_policy(".a = 5 k~m;\n.b = 25 °C;\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "require_dimension: length or temperature passes");
+}
+
+/*
+ * The same fence as the conversion side, for the same reason: a bare number is
+ * dimensionally a percentage, so a requirement of "%" would quietly accept an
+ * unannotated value as a ratio. It has to name no_unit to allow one.
+ */
+static void test_require_dimension_fences_unitless(void)
+{
+	static const char *pct[]  = { "%" };
+	static const char *bare[] = { "no_unit" };
+	bvnr_unit_policy_t p = {0};
+	p.require_dimension_of     = pct;
+	p.num_require_dimension_of = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".x = <float:64> 0.25;", &p, &c, false, error_unit_mismatch);
+
+	memset(&c, 0, sizeof c);
+	p.require_dimension_of = bare;
+	run_policy(".x = <float:64> 0.25;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "require_dimension: no_unit admits a bare number");
+}
+
+/*
+ * Assertions are evaluated on the unit the DOCUMENT wrote, before conversion.
+ * Were it the other way round the check would be near-tautological: the value
+ * would be in the unit the policy just asked for. Here the requirement is a
+ * temperature and the target is a temperature, but the document is a length —
+ * so it must fail, and it must fail on the length.
+ */
+static void test_assertions_see_the_native_unit(void)
+{
+	static const bvnr_unit_target_t temp[] = { { "K", 0 } };
+	static const char *temps[] = { "K" };
+	bvnr_unit_policy_t p = {0};
+	p.targets                  = temp;
+	p.num_targets              = 1;
+	p.require_dimension_of     = temps;
+	p.num_require_dimension_of = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".t = 25 °C;\n.d = 5 m;\n", &p, &c, false, error_unit_mismatch);
+	/* The temperature was seen and converted before the length was rejected. */
+	ASSERT_EQ_INT(c.n, 1, "assertions: the temperature came through first");
+	if (c.n == 1)
+		ASSERT_STR(c.text[0], "298.15", "assertions: 25 °C -> 298.15 K");
+}
+
+/* ── the ladder, reader lifecycle, and argument checking ─────────────────── */
+
+static bool ladder_hook(void *userdata, const bvnr_data_t *data,
+			value_unit_t *want, uint32_t *want_base)
+{
+	(void)userdata;
+	/* Claim temperatures only; everything else falls through to the policy. */
+	bool ok = false;
+	value_unit_t kelvin = bvn_parse_unit((const uint8_t *)"K", &ok);
+	if (!ok || !bvn_units_compatible(data->value_unit, kelvin))
+		return false;
+	*want      = kelvin;
+	*want_base = 0u;
+	return true;
+}
+
+/*
+ * want_unit is the most specific selector and wins; the policy catches what the
+ * hook declined. That combination is the point of having a ladder rather than
+ * making the two mutually exclusive.
+ */
+static void test_hook_outranks_policy(void)
+{
+	static const bvnr_unit_target_t targets[] = { { "°C", 0 }, { "m", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets     = targets;
+	p.num_targets = 2;
+
+	pol_ctx_t c = {0};
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata    = &c;
+	flags.on_verified = pol_on_verified;
+	flags.want_unit   = ladder_hook;
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "ladder: reader_create");
+	if (!r) return;
+	ASSERT_TRUE(bvnr_reader_set_unit_policy(r, &p), "ladder: set policy");
+	const char *doc = ".t = 25 °C;\n.d = 12 in;\n";
+	bool ok = bvnr_open_read_mem(r, doc, (uint32_t)strlen(doc), NULL, 0, &flags)
+		  && bvnr_read(r);
+	ASSERT_TRUE(ok, "ladder: read succeeded");
+	ASSERT_EQ_INT(c.n, 2, "ladder: two values");
+	if (c.n == 2) {
+		/* The hook claimed the temperature and asked for K, overriding the
+		 * policy's °C target. */
+		ASSERT_STR(c.unit[0], "K", "ladder: hook won the temperature");
+		ASSERT_STR(c.text[0], "298.15", "ladder: 25 °C -> 298.15 K");
+		ASSERT_STR(c.unit[1], "m", "ladder: policy took the length");
+		ASSERT_STR(c.text[1], "0.3048", "ladder: 12 in -> 0.3048 m");
+	}
+	bvnr_reader_destroy(r);
+}
+
+/*
+ * A policy describes the consumer, not the document, so it survives re-opening
+ * the reader — and it can be installed before the first open, which is the
+ * order most callers will reach for.
+ */
+static void test_policy_survives_reader_reuse(void)
+{
+	static const bvnr_unit_target_t targets[] = { { "m", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = targets; p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata    = &c;
+	flags.on_verified = pol_on_verified;
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "reuse: reader_create");
+	if (!r) return;
+	/* Set BEFORE the first open: bvn_val_init memsets the validator, and the
+	 * policy is deliberately carried across that. */
+	ASSERT_TRUE(bvnr_reader_set_unit_policy(r, &p), "reuse: set policy");
+
+	for (int pass = 0; pass < 2; pass++) {
+		memset(&c, 0, sizeof c);
+		const char *doc = ".d = 5 k~m;";
+		bool ok = bvnr_open_read_mem(r, doc, (uint32_t)strlen(doc),
+					     NULL, 0, &flags) && bvnr_read(r);
+		ASSERT_TRUE(ok, "reuse: read succeeded");
+		ASSERT_EQ_INT(c.n, 1, "reuse: one value");
+		if (c.n == 1) {
+			ASSERT_TRUE(c.converted[0], "reuse: policy still in force");
+			ASSERT_STR(c.text[0], "5000", "reuse: 5 km -> 5000 m");
+		}
+	}
+	bvnr_reader_destroy(r);
+}
+
+/* Every unit string is parsed at set time, so a bad policy is a false return
+ * before the parse rather than an error inside somebody's document — and the
+ * policy already in force is left untouched when one is rejected. */
+static void test_set_policy_argument_checking(void)
+{
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "args: reader_create");
+	if (!r) return;
+
+	static const bvnr_unit_target_t good[] = { { "m", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = good; p.num_targets = 1;
+	ASSERT_TRUE(bvnr_reader_set_unit_policy(r, &p), "args: a good policy");
+
+	static const bvnr_unit_target_t bad_unit[] = { { "not_a_unit_at_all", 0 } };
+	bvnr_unit_policy_t q = {0};
+	q.targets = bad_unit; q.num_targets = 1;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &q), "args: bad unit rejected");
+
+	static const bvnr_unit_target_t bad_base[] = { { "m", 63 } };
+	q.targets = bad_base; q.num_targets = 1;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &q), "args: bad base rejected");
+
+	q.targets = good; q.num_targets = BVNR_MAX_UNIT_TARGETS + 1u;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &q), "args: too many targets");
+
+	q.targets = NULL; q.num_targets = 1;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &q), "args: NULL target array");
+
+	memset(&q, 0, sizeof q);
+	q.normalise = (bvnr_unit_normalise_t)99;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &q), "args: bad normalise mode");
+
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(NULL, &p), "args: NULL reader");
+
+	/* The rejected policies changed nothing: the good one is still installed. */
+	pol_ctx_t c = {0};
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata    = &c;
+	flags.on_verified = pol_on_verified;
+	const char *doc = ".d = 5 k~m;";
+	bool ok = bvnr_open_read_mem(r, doc, (uint32_t)strlen(doc), NULL, 0, &flags)
+		  && bvnr_read(r);
+	ASSERT_TRUE(ok, "args: read succeeded");
+	ASSERT_TRUE(c.n == 1 && c.converted[0] && strcmp(c.text[0], "5000") == 0,
+		    "args: the rejected policies left the good one in force");
+
+	/* NULL clears. */
+	ASSERT_TRUE(bvnr_reader_set_unit_policy(r, NULL), "args: NULL clears");
+	memset(&c, 0, sizeof c);
+	ok = bvnr_open_read_mem(r, doc, (uint32_t)strlen(doc), NULL, 0, &flags)
+	     && bvnr_read(r);
+	ASSERT_TRUE(ok, "args: read succeeded after clear");
+	ASSERT_TRUE(c.n == 1 && !c.converted[0], "args: cleared policy converts nothing");
+
+	bvnr_reader_destroy(r);
+}
+
+/* Array elements are values too, and go through the same path. */
+static void test_policy_applies_to_array_elements(void)
+{
+	static const bvnr_unit_target_t targets[] = { { "m", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = targets; p.num_targets = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".d = <float:64,k~m> [1.0, 2.0, 3.0];", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "array: three elements");
+	if (c.n != 3) return;
+	ASSERT_STR(c.text[0], "1000", "array: element 0 converted");
+	ASSERT_STR(c.text[1], "2000", "array: element 1 converted");
+	ASSERT_STR(c.text[2], "3000", "array: element 2 converted");
+}
+
+/* ── per-field rules ─────────────────────────────────────────────────────── */
+
+static const char *NESTED_DOC =
+	".inlet = {\n"
+	"  .temperature = <float:64,°F> 212.0;\n"
+	"  .flow        = <float:64,in> 12.0;\n"
+	"};\n"
+	".outlet = {\n"
+	"  .temperature = <float:64,°F> 32.0;\n"
+	"};\n";
+
+/* A rule names ONE field. Its siblings, and the same key under a different
+ * parent, are untouched — which is the whole difference from a target list. */
+static void test_rule_exact_path(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".inlet.temperature", "°C", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(NESTED_DOC, &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "rule: three values");
+	if (c.n != 3) return;
+	ASSERT_TRUE(c.converted[0], "rule: .inlet.temperature converted");
+	ASSERT_STR(c.text[0], "100", "rule: 212 °F -> 100 °C");
+	ASSERT_TRUE(!c.converted[1], "rule: its sibling is untouched");
+	ASSERT_TRUE(!c.converted[2], "rule: the same key elsewhere is untouched");
+}
+
+/* A trailing ".*" names a subtree. Everything under it must satisfy the rule —
+ * so a subtree of mixed dimensions is a mismatch, not a partial conversion. */
+static void test_rule_wildcard(void)
+{
+	static const bvnr_unit_rule_t lengths[] = {
+		{ ".inlet.*", "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = lengths; p.num_rules = 1;
+	pol_ctx_t c = {0};
+	run_policy(NESTED_DOC, &p, &c, false, error_unit_mismatch);
+
+	/* On a subtree that IS all lengths, every value converts. */
+	static const bvnr_unit_rule_t all[] = { { ".d.*", "m", 0, bvnr_rule_convert } };
+	memset(&c, 0, sizeof c);
+	p.rules = all;
+	run_policy(".d = {\n .a = <float:64,in> 12.0;\n .b = <float:64,k~m> 1.0;\n};\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "wildcard: two values");
+	if (c.n != 2) return;
+	ASSERT_STR(c.text[0], "0.3048", "wildcard: 12 in -> m");
+	ASSERT_STR(c.text[1], "1000", "wildcard: 1 km -> m");
+}
+
+/*
+ * A prefix is only a prefix at a component boundary. Without that check
+ * ".in.*" would also claim ".inlet.a" — a rule quietly applying to a field
+ * nobody named is the one failure mode per-field rules must not have.
+ */
+static void test_rule_wildcard_respects_component_boundary(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".in.*", "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".in    = { .a = <float:64,in> 12.0; };\n"
+		   ".inlet = { .a = <float:64,in> 12.0; };\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "boundary: two values");
+	if (c.n != 2) return;
+	ASSERT_TRUE(c.converted[0], "boundary: .in.a matched");
+	ASSERT_TRUE(!c.converted[1], "boundary: .inlet.a did NOT match");
+}
+
+/*
+ * A rule is an assertion as well as a target. The caller named this field; a
+ * value that cannot satisfy what they said about it is an error, unlike a
+ * whole-document target that simply finds nothing to apply to.
+ */
+static void test_rule_is_an_assertion(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".speed", "m/s", 0, bvnr_rule_require },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	/* require mode: any speed satisfies it, and the value is delivered as the
+	 * document wrote it. */
+	pol_ctx_t c = {0};
+	run_policy(".speed = <float:64,k~m/h> 42.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "assertion: one value");
+	if (c.n == 1) {
+		ASSERT_TRUE(!c.converted[0], "assertion: require does not convert");
+		ASSERT_STR(c.native[0], "k~m/h", "assertion: delivered as written");
+	}
+	/* the wrong quantity, and a bare number, are both mismatches */
+	memset(&c, 0, sizeof c);
+	run_policy(".speed = <float:64,°C> 42.0;", &p, &c, false, error_unit_mismatch);
+	memset(&c, 0, sizeof c);
+	run_policy(".speed = <float:64> 42.0;", &p, &c, false, error_unit_mismatch);
+}
+
+/* Rules are the most specific thing a policy can say, so they outrank the
+ * whole-document target list and the normalisation fallback alike. */
+static void test_rule_outranks_targets_and_normalise(void)
+{
+	static const bvnr_unit_rule_t rules[]   = { { ".a", "k~m", 0, bvnr_rule_convert } };
+	static const bvnr_unit_target_t tgts[] = { { "m", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+	p.targets = tgts; p.num_targets = 1;
+	p.normalise = bvnr_normalise_si;
+
+	pol_ctx_t c = {0};
+	run_policy(".a = <float:64,in> 12000.0;\n.b = <float:64,in> 12.0;\n",
+		   &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "precedence: two values");
+	if (c.n != 2) return;
+	ASSERT_STR(c.unit[0], "k~m", "precedence: the rule won for .a");
+	ASSERT_STR(c.unit[1], "m", "precedence: .b fell through to the target list");
+}
+
+/* One assignment holds a whole array, so one rule covers every element. */
+static void test_rule_covers_array_elements(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".v", "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".v = <float:64,k~m> [1.0, 2.0, 3.0];", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "array rule: three elements");
+	if (c.n != 3) return;
+	ASSERT_STR(c.text[0], "1000", "array rule: element 0");
+	ASSERT_STR(c.text[2], "3000", "array rule: element 2");
+}
+
+/* A path is only usable if it is known. These are the ways it can be refused
+ * at set time, before a document is touched. */
+static void test_rule_path_argument_checking(void)
+{
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "rule args: reader_create");
+	if (!r) return;
+	bvnr_unit_policy_t p = {0};
+
+	static const bvnr_unit_rule_t no_dot[] = { { "a.b", "m", 0, bvnr_rule_convert } };
+	p.rules = no_dot; p.num_rules = 1;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p),
+		    "rule args: a path must start with '.' — keys always do");
+
+	static const bvnr_unit_rule_t bare_star[] = { { ".*", "m", 0, bvnr_rule_convert } };
+	p.rules = bare_star;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p),
+		    "rule args: '.*' names the whole document — use targets");
+
+	static const bvnr_unit_rule_t bad_unit[] = { { ".a", "nope", 0, bvnr_rule_convert } };
+	p.rules = bad_unit;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p), "rule args: bad unit");
+
+	static const bvnr_unit_rule_t long_path[] = {
+		{ ".aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		  ".aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		  ".aaaaaaaaaaaaaaaaaaaaaa", "m", 0, bvnr_rule_convert }
+	};
+	p.rules = long_path;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p), "rule args: path too long");
+
+	p.rules = no_dot; p.num_rules = BVNR_MAX_UNIT_RULES + 1u;
+	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p), "rule args: too many rules");
+	bvnr_writer_destroy(NULL);
+	bvnr_reader_destroy(r);
+}
+
+/* Deeper than the path buffer can describe, the position is UNKNOWN — and an
+ * unknown position must match nothing rather than match wrongly. */
+static void test_rule_ignores_unrepresentable_paths(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".a.b", "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	/* 40 levels of nesting — past BVN_PATH_MAX_DEPTH (32). Nothing matches, and
+	 * nothing is misapplied; the document still parses. */
+	char doc[4096];
+	size_t pos = 0;
+	for (int i = 0; i < 40; i++)
+		pos += (size_t)snprintf(doc + pos, sizeof doc - pos, ".s%d = {", i);
+	pos += (size_t)snprintf(doc + pos, sizeof doc - pos,
+				" .leaf = <float:64,in> 12.0; ");
+	for (int i = 0; i < 40; i++)
+		pos += (size_t)snprintf(doc + pos, sizeof doc - pos, "};");
+
+	pol_ctx_t c = {0};
+	run_policy(doc, &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "deep: the value still arrives");
+	if (c.n == 1)
+		ASSERT_TRUE(!c.converted[0], "deep: an unknown path matches no rule");
+}
+
+/* ── the writer's half ───────────────────────────────────────────────────── */
+
+/* Open a writer over `buf` carrying `policy`, set BEFORE the open so the
+ * carry-across-init is exercised on every one of these. */
+static bvnr_writer_t *open_writer(char *buf, size_t cap,
+				  const bvnr_unit_policy_t *p, bool *set_ok)
+{
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return NULL;
+	*set_ok = bvnr_writer_set_unit_policy(w, p);
+	if (!*set_ok) return w;
+	if (!bvnr_open_write_mem(w, buf, (uint64_t)cap, false, NULL)) {
+		bvnr_writer_destroy(w);
+		return NULL;
+	}
+	return w;
+}
+
+/*
+ * A reader can only reject a document somebody already wrote. require_unit on
+ * the writer is what stops the bare number reaching the file — the half the
+ * format's promise actually rests on.
+ */
+static void test_writer_require_unit(void)
+{
+	static const bvnr_unit_target_t none[1] = { { NULL, 0 } };
+	(void)none;
+	bvnr_unit_policy_t p = {0};
+	p.require_unit = true;
+
+	char buf[512];
+	bool set_ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer: policy set");
+	if (!w) return;
+	bool ok = false;
+	/* A unit given inline on the value satisfies it... */
+	ok = bvnr_write_float_unit(w, "speed", 64, 9.81,
+				   bvn_parse_unit((const uint8_t *)"m/s", &ok));
+	ASSERT_TRUE(ok, "writer: an annotated value is accepted");
+	/* ...a bare one does not, and the writer latches the reason. */
+	ASSERT_TRUE(!bvnr_write_float(w, "bare", 64, 0.25),
+		    "writer: a bare numeric value is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch,
+		      "writer: refused with error_unit_mismatch");
+	bvnr_writer_destroy(w);
+}
+
+/*
+ * The unit can arrive from either of two places — inline on the value, or as a
+ * parameter of the type annotation, in which case the value event carries no
+ * unit at all. The check has to see both, and must NOT let an annotated value
+ * vouch for a later bare one (val.parsed_unit outlives the value it came from).
+ */
+static void test_writer_sees_the_annotation_unit(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.require_unit = true;
+
+	char buf[512];
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer: policy set");
+	if (!w) return;
+
+	value_unit_t m = bvn_parse_unit((const uint8_t *)"m", &ok);
+	ASSERT_TRUE(ok, "writer: parse m");
+
+	/* Unit in the ANNOTATION, value event has none of its own. */
+	bvnr_data_t d = {0};
+	d.type = token_is_identifier; d.data = "len"; d.length = 3;
+	ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &d),
+		    "writer: assignment_start");
+	ASSERT_TRUE(bvnr_write_type_annotation(w, BVN_TYPE_UINT(32), m),
+		    "writer: annotation carrying the unit");
+	bvnr_data_t v = {0};
+	v.type = token_is_number; v.value_type = BVN_TYPE_UINT(32);
+	v.value_unit = BVN_UNIT_NO_PREFIX(bu_none);   /* nothing on the value */
+	v.data = "5"; v.length = 1;
+	ASSERT_TRUE(bvnr_write_event(w, ev_data, &v),
+		    "writer: the annotation's unit satisfies require_unit");
+
+	/* The next value has no annotation and no inline unit. The previous
+	 * annotation must not carry it. */
+	ASSERT_TRUE(!bvnr_write_float(w, "bare", 64, 1.0),
+		    "writer: a later bare value is still refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch,
+		      "writer: refused with error_unit_mismatch");
+	bvnr_writer_destroy(w);
+}
+
+static void test_writer_require_dimension(void)
+{
+	static const char *lengths[] = { "m" };
+	bvnr_unit_policy_t p = {0};
+	p.require_dimension_of     = lengths;
+	p.num_require_dimension_of = 1;
+
+	char buf[512];
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer: policy set");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_float_unit(w, "a", 64, 12.0,
+			bvn_parse_unit((const uint8_t *)"in", &ok)),
+		    "writer: a length in any unit is accepted");
+	ASSERT_TRUE(!bvnr_write_float_unit(w, "b", 64, 25.0,
+			bvn_parse_unit((const uint8_t *)"°C", &ok)),
+		    "writer: a temperature is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch,
+		      "writer: refused with error_unit_mismatch");
+	bvnr_writer_destroy(w);
+}
+
+/* Non-numeric values carry no unit and are none of the policy's business. */
+static void test_writer_ignores_non_numeric(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.require_unit = true;
+
+	char buf[512];
+	bool set_ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer: policy set");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_string(w, "name", "sensor-1"),
+		    "writer: a string is not subject to a unit requirement");
+	ASSERT_TRUE(bvnr_write_bool(w, "ok", true),
+		    "writer: a bool is not either");
+	ASSERT_TRUE(bvnr_write_null(w, "spare"),
+		    "writer: nor is null");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+		      "writer: nothing latched");
+	bvnr_writer_destroy(w);
+}
+
+/*
+ * The conversion half is refused rather than half-honoured: the writer already
+ * rewrites values under BVN_UNIT_REDUCE, and a second rewriting mode with
+ * different exactness rules is how two features end up disagreeing about what a
+ * document says.
+ */
+static void test_writer_refuses_the_conversion_fields(void)
+{
+	static const bvnr_unit_target_t targets[] = { { "m", 0 } };
+	bvnr_writer_t *w = bvnr_writer_create();
+	ASSERT_TRUE(w != NULL, "writer: create");
+	if (!w) return;
+
+	bvnr_unit_policy_t p = {0};
+	p.targets = targets; p.num_targets = 1;
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(w, &p), "writer: targets refused");
+
+	memset(&p, 0, sizeof p);
+	p.normalise = bvnr_normalise_si;
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(w, &p), "writer: normalise refused");
+
+	memset(&p, 0, sizeof p);
+	p.on_inexact = bvnr_inexact_leave;
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(w, &p), "writer: on_inexact refused");
+
+	memset(&p, 0, sizeof p);
+	p.base = 16;
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(w, &p), "writer: base refused");
+
+	/* ...and a malformed unit is still caught up front, as on the reader. */
+	static const char *bad[] = { "not_a_unit_at_all" };
+	memset(&p, 0, sizeof p);
+	p.require_dimension_of = bad; p.num_require_dimension_of = 1;
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(w, &p), "writer: bad unit refused");
+
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(NULL, &p), "writer: NULL writer");
+	bvnr_writer_destroy(w);
+}
+
+/* One annotation covers every element of an array; each element is its own
+ * value event, and none of them may be refused for lacking a unit of its own. */
+static void test_writer_array_under_one_annotation(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.require_unit = true;
+
+	char buf[512];
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer: policy set");
+	if (!w) return;
+	value_unit_t ms = bvn_parse_unit((const uint8_t *)"m/s", &ok);
+
+	bvnr_data_t d = {0};
+	d.type = token_is_identifier; d.data = "v"; d.length = 1;
+	ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &d), "writer: assign");
+	ASSERT_TRUE(bvnr_write_type_annotation(w, BVN_TYPE_FLOAT(64), ms),
+		    "writer: annotation");
+	bvnr_data_t rs = {0};
+	rs.value_type = BVN_TYPE_FLOAT(64);
+	ASSERT_TRUE(bvnr_write_event(w, ev_array_row_start, &rs), "writer: row");
+	for (int i = 0; i < 3; i++) {
+		bvnr_data_t e = {0};
+		e.type = token_is_array_number;
+		e.value_type = BVN_TYPE_FLOAT(64);
+		e.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
+		e.data = "1.5"; e.length = 3;
+		ASSERT_TRUE(bvnr_write_event(w, ev_data, &e),
+			    "writer: array element covered by the annotation");
+	}
+	ASSERT_TRUE(bvnr_write_event(w, ev_array_row_end, &rs), "writer: row end");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none,
+		      "writer: nothing latched for the array");
+	bvnr_writer_destroy(w);
+}
+
+/*
+ * What the writer refuses, a reader under the same policy would have refused —
+ * which is the property that makes the producer-side check worth having. Write
+ * a document that satisfies the policy, then read it back under it.
+ */
+static void test_writer_and_reader_agree(void)
+{
+	static const char *lengths[] = { "m" };
+	bvnr_unit_policy_t p = {0};
+	p.require_unit             = true;
+	p.require_dimension_of     = lengths;
+	p.num_require_dimension_of = 1;
+
+	char buf[512];
+	memset(buf, 0, sizeof buf);
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "roundtrip: policy set on the writer");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_float_unit(w, "a", 64, 12.0,
+			bvn_parse_unit((const uint8_t *)"in", &ok)), "roundtrip: write in");
+	ASSERT_TRUE(bvnr_write_float_unit(w, "b", 64, 5.0,
+			bvn_parse_unit((const uint8_t *)"k~m", &ok)), "roundtrip: write km");
+	ASSERT_TRUE(bvnr_write_finish(w), "roundtrip: finish");
+	bvnr_writer_destroy(w);
+
+	pol_ctx_t c = {0};
+	run_policy(buf, &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 2, "roundtrip: the reader accepts what the writer emitted");
+}
+
+/* The writer takes rules too — in require mode, since a convert rule would
+ * rewrite the value being written and that door belongs to BVN_UNIT_REDUCE. */
+static void test_writer_rules(void)
+{
+	static const bvnr_unit_rule_t req[] = {
+		{ ".speed", "m/s", 0, bvnr_rule_require },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = req; p.num_rules = 1;
+
+	char buf[512];
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer rules: policy set");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_float_unit(w, "speed", 64, 42.0,
+			bvn_parse_unit((const uint8_t *)"k~m/h", &ok)),
+		    "writer rules: a speed at .speed is accepted");
+	ASSERT_TRUE(bvnr_write_float_unit(w, "other", 64, 25.0,
+			bvn_parse_unit((const uint8_t *)"°C", &ok)),
+		    "writer rules: a field no rule names is not constrained");
+	ASSERT_TRUE(!bvnr_write_float_unit(w, "speed", 64, 25.0,
+			bvn_parse_unit((const uint8_t *)"°C", &ok)),
+		    "writer rules: a temperature at .speed is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch,
+		      "writer rules: error_unit_mismatch");
+	bvnr_writer_destroy(w);
+
+	/* a convert rule is refused outright */
+	static const bvnr_unit_rule_t conv[] = {
+		{ ".speed", "m/s", 0, bvnr_rule_convert },
+	};
+	bvnr_writer_t *w2 = bvnr_writer_create();
+	ASSERT_TRUE(w2 != NULL, "writer rules: create");
+	if (!w2) return;
+	bvnr_unit_policy_t q = {0};
+	q.rules = conv; q.num_rules = 1;
+	ASSERT_TRUE(!bvnr_writer_set_unit_policy(w2, &q),
+		    "writer rules: a convert rule is refused");
+	bvnr_writer_destroy(w2);
+}
+
+/* The writer tracks struct depth for rules the same way the reader does. */
+static void test_writer_rules_are_path_scoped(void)
+{
+	static const bvnr_unit_rule_t req[] = {
+		{ ".inlet.temperature", "K", 0, bvnr_rule_require },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = req; p.num_rules = 1;
+
+	char buf[512];
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer paths: policy set");
+	if (!w) return;
+	value_unit_t metre = bvn_parse_unit((const uint8_t *)"m", &ok);
+
+	/* .temperature at TOP level is not .inlet.temperature */
+	ASSERT_TRUE(bvnr_write_float_unit(w, "temperature", 64, 5.0, metre),
+		    "writer paths: top-level .temperature is unconstrained");
+
+	bvnr_data_t d = {0};
+	d.type = token_is_identifier; d.data = "inlet"; d.length = 5;
+	ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &d),
+		    "writer paths: open .inlet");
+	ASSERT_TRUE(bvnr_write_event(w, ev_struct_start, &d),
+		    "writer paths: struct start");
+	ASSERT_TRUE(!bvnr_write_float_unit(w, "temperature", 64, 5.0, metre),
+		    "writer paths: a length at .inlet.temperature is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch,
+		      "writer paths: error_unit_mismatch");
+	bvnr_writer_destroy(w);
+}
+
+/* ── the DOM tier ────────────────────────────────────────────────────────── */
+
+/*
+ * The DOM takes the same policy, so a random-access consumer can assert what it
+ * expects and store what it asked for. A converted value is stored CONVERTED —
+ * a caller who asked for metres and got the document's feet back would have no
+ * way to notice.
+ */
+static void test_dom_policy(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".inlet.temperature", "°C", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	bvn_dom_doc_t *doc = bvn_dom_parse_policy(NESTED_DOC,
+						  (uint32_t)strlen(NESTED_DOC), &p);
+	ASSERT_TRUE(doc != NULL, "dom: parsed");
+	if (!doc) return;
+	ASSERT_EQ_INT(bvn_dom_doc_get_parse_error(doc), error_none, "dom: no error");
+	bvn_dom_node_t *n = bvn_dom_lookup(doc, ".inlet.temperature");
+	ASSERT_TRUE(n != NULL, "dom: found the node");
+	if (n) {
+		double v = 0.0;
+		ASSERT_TRUE(bvn_dom_get_float(n, &v), "dom: read as float");
+		ASSERT_TRUE(v > 99.999 && v < 100.001,
+			    "dom: 212 °F stored as 100 °C, not as 212");
+		char ub[BVNR_UNIT_STRING_MAX];
+		value_unit_t u = bvn_dom_get_unit(n);
+		if (bvn_unit_to_string(u, ub, sizeof ub) >= 0)
+			ASSERT_STR(ub, "°C", "dom: the stored unit is the converted one");
+	}
+	/* the sibling is untouched */
+	bvn_dom_node_t *f = bvn_dom_lookup(doc, ".inlet.flow");
+	if (f) {
+		double v = 0.0;
+		bvn_dom_get_float(f, &v);
+		ASSERT_TRUE(v > 11.99 && v < 12.01, "dom: the sibling is as written");
+	}
+	bvn_dom_doc_destroy(doc);
+}
+
+/* A validation failure is a parse error like any other... */
+static void test_dom_policy_validation(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.require_unit = true;
+
+	const char *doc_s = ".a = 5 m;\n.b = 7;\n";
+	bvn_dom_doc_t *doc = bvn_dom_parse_policy(doc_s, (uint32_t)strlen(doc_s), &p);
+	ASSERT_TRUE(doc != NULL, "dom validate: parsed");
+	if (!doc) return;
+	ASSERT_EQ_INT(bvn_dom_doc_get_parse_error(doc), error_unit_mismatch,
+		      "dom validate: the bare value is rejected");
+	bvn_dom_doc_destroy(doc);
+}
+
+/* ...and a policy the library refuses is error_invalid_argument, so a mistake
+ * in the POLICY is never mistaken for a fault in the document. */
+static void test_dom_policy_rejects_a_bad_policy(void)
+{
+	static const bvnr_unit_target_t bad[] = { { "not_a_unit_at_all", 0 } };
+	bvnr_unit_policy_t p = {0};
+	p.targets = bad; p.num_targets = 1;
+
+	const char *doc_s = ".a = 5 m;";
+	bvn_dom_doc_t *doc = bvn_dom_parse_policy(doc_s, (uint32_t)strlen(doc_s), &p);
+	ASSERT_TRUE(doc != NULL, "dom bad policy: a doc is still returned");
+	if (!doc) return;
+	ASSERT_EQ_INT(bvn_dom_doc_get_parse_error(doc), error_invalid_argument,
+		      "dom bad policy: error_invalid_argument, not a parse error");
+	bvn_dom_doc_destroy(doc);
+}
+
+/* An integer that converts to a fraction is stored as a float — because that is
+ * what it now is. Storing 0.005 through the integer builder would lose it. */
+static void test_dom_integer_converting_to_a_fraction(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".m", "k~g", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	const char *doc_s = ".m = <uint:32,g> 5;";
+	bvn_dom_doc_t *doc = bvn_dom_parse_policy(doc_s, (uint32_t)strlen(doc_s), &p);
+	ASSERT_TRUE(doc != NULL, "dom frac: parsed");
+	if (!doc) return;
+	ASSERT_EQ_INT(bvn_dom_doc_get_parse_error(doc), error_none, "dom frac: no error");
+	bvn_dom_node_t *n = bvn_dom_lookup(doc, ".m");
+	ASSERT_TRUE(n != NULL, "dom frac: found");
+	if (n) {
+		double v = 0.0;
+		ASSERT_TRUE(bvn_dom_get_float(n, &v), "dom frac: reads as a float");
+		ASSERT_TRUE(v > 0.00499 && v < 0.00501, "dom frac: 5 g is 0.005 kg");
+	}
+	bvn_dom_doc_destroy(doc);
+}
+
+int main(void)
+{
+	test_targets_mixed_document();
+	test_target_order_is_significant();
+	test_target_output_base();
+	test_unitless_is_fenced_from_the_ratio_units();
+	test_currency_prefix_delta_is_selectable();
+	test_unmatched_target_is_not_an_error();
+
+	test_nonterminating_default_is_error();
+	test_nonterminating_leave_delivers_native();
+	test_irrational_default_is_error();
+	test_irrational_is_left_under_leave();
+	test_work_limit_is_left_under_leave();
+	test_work_limit_default_is_error();
+	test_hook_keeps_the_strict_contract();
+
+	test_normalise_si();
+	test_normalise_refuses_a_form_it_cannot_convert();
+	test_affine_in_compound_never_aborts();
+	test_normalise_irrational_factors();
+	test_normalise_leaves_dimensionless_alone();
+	test_normalise_leaves_si_values_alone();
+	test_targets_outrank_normalise();
+	test_normalise_output_base();
+
+	test_require_unit();
+	test_require_dimension();
+	test_require_dimension_fences_unitless();
+	test_assertions_see_the_native_unit();
+
+	test_hook_outranks_policy();
+	test_policy_survives_reader_reuse();
+	test_set_policy_argument_checking();
+	test_policy_applies_to_array_elements();
+
+	test_rule_exact_path();
+	test_rule_wildcard();
+	test_rule_wildcard_respects_component_boundary();
+	test_rule_is_an_assertion();
+	test_rule_outranks_targets_and_normalise();
+	test_rule_covers_array_elements();
+	test_rule_path_argument_checking();
+	test_rule_ignores_unrepresentable_paths();
+
+	test_writer_require_unit();
+	test_writer_sees_the_annotation_unit();
+	test_writer_require_dimension();
+	test_writer_ignores_non_numeric();
+	test_writer_refuses_the_conversion_fields();
+	test_writer_array_under_one_annotation();
+	test_writer_and_reader_agree();
+	test_writer_rules();
+	test_writer_rules_are_path_scoped();
+
+	test_dom_policy();
+	test_dom_policy_validation();
+	test_dom_policy_rejects_a_bad_policy();
+	test_dom_integer_converting_to_a_fraction();
+
+	if (failures == 0) {
+		printf("PASSED %d tests\n", tests);
+		return 0;
+	}
+	fprintf(stderr, "FAILED %d of %d tests\n", failures, tests);
+	return 1;
+}

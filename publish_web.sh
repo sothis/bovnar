@@ -42,6 +42,10 @@ PDF_BUILD_DIR="$ROOT/build/doc/pdf"   # where gen_doc_pdfs.py writes its output
 # target) but are not part of the public site.
 EXCLUDES=(
     "doc/datetime_fractional_seconds.md"
+    # A design evaluation of reader-side unit policy. It describes API that does
+    # not exist and a directive that would need a spec 1.2 -- serving it from the
+    # documentation root would read as a description of what the library does.
+    "doc/parser_level_unit_policy.md"
     "doc/bovnar_pipeline.svg"
     # A draft German Wikipedia article about the format. Working document, not
     # referenced anywhere on the site, and MediaWiki markup a browser would show

@@ -68,6 +68,7 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 <li>5.2 <a href="#52-unitflags"><code>UnitFlags</code></a></li>
 <li>5.3 <a href="#53-valueunitprefix"><code>ValueUnitPrefix</code></a></li>
 <li>5.4 <a href="#54-inline-unit-suffix">Inline unit suffix</a></li>
+<li>5.5 <a href="#55-unitpolicy--validation-and-conversion-without-a-callback"><code>UnitPolicy</code> — validation and conversion without a callback</a></li>
 </ul>
 </li>
 <li><a href="#6-quantity"><code>Quantity</code></a><ul>
@@ -495,6 +496,104 @@ No extra code is required to consume inline units.</p>
 an inline suffix is present and a type-annotation unit is also present but the
 two do not resolve to the same <code>value_unit_t</code>. Inline unit suffixes inside
 array elements always raise <code>ErrorCode.UNEXPECTED_INPUT_BYTE</code>.</p>
+<h3 id="55-unitpolicy--validation-and-conversion-without-a-callback">5.5 <code>UnitPolicy</code> — validation and conversion without a callback</h3>
+<p><code>Reader.set_unit_policy</code> states what the document must contain and what unit
+values should arrive in. Everything is unit <strong>text</strong>, so unlike <code>want_unit</code> it
+costs no per-value trampoline across the FFI boundary — the C side parses the
+strings once, when the policy is set.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reader</span><span class="p">,</span> <span class="n">UnitPolicy</span>
+
+<span class="k">with</span> <span class="n">Reader</span><span class="p">()</span> <span class="k">as</span> <span class="n">r</span><span class="p">:</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">set_unit_policy</span><span class="p">(</span><span class="n">UnitPolicy</span><span class="p">(</span>
+        <span class="n">targets</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;m/s&quot;</span><span class="p">,</span> <span class="s2">&quot;°C&quot;</span><span class="p">],</span>      <span class="c1"># convert to the first one that fits</span>
+        <span class="n">normalise_si</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>          <span class="c1"># ...and everything else to SI base units</span>
+        <span class="n">leave_inexact</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>         <span class="c1"># step over what cannot be exact</span>
+        <span class="n">require_unit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>          <span class="c1"># reject any bare numeric value</span>
+    <span class="p">))</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;sensors.bvnr&quot;</span><span class="p">,</span> <span class="n">on_verified</span><span class="o">=</span><span class="n">handler</span><span class="p">)</span>
+</code></pre></div>
+
+<p>A policy survives re-reading the same reader on another document — it describes
+the consumer, not the document — and <code>set_unit_policy(None)</code> clears it. Every
+unit string is parsed by the call, so a typo raises <code>BovnarArgumentError</code>
+before a byte is read, and a rejected policy leaves the previous one in force.</p>
+<p><strong>Conversion.</strong> Each numeric value takes the first target it can validly convert
+to, so order is significant: <code>["m", "k~m"]</code> never selects <code>k~m</code>. A value that
+matches nothing, or that is already in the unit a target names, arrives
+untouched — <code>data.converted</code> is what tells the two apart. Each target may carry
+its own output base as <code>("m", 16)</code>.</p>
+<p><code>normalise_si</code> catches whatever the targets did not, delivering it in coherent
+SI base units with prefixes folded out. Currencies and every <strong>dimensionless</strong>
+unit (<code>%</code>, <code>ppm</code>, <code>dB</code>, <code>pH</code>, <code>rad</code>, <code>°</code>) are left as written rather than
+reinterpreted.</p>
+<p><strong>A value with no unit only ever matches a target that is itself <code>no_unit</code>.</strong> A
+bare number is dimensionally compatible with <code>%</code> and <code>ppm</code>, so without that
+fence a policy naming <code>"%"</code> would deliver <code>0.25</code> as <code>25</code>.</p>
+<p><strong>Exactness.</strong> Nothing approximate is ever delivered. <code>leave_inexact=True</code> hands
+over a value the conversion cannot deliver exactly — an irrational factor, a
+non-terminating expansion (<code>42 km/h</code> is <code>35/3 m/s</code>), an exponent past the work
+limit — in its native unit instead of raising. It applies only to policy-chosen
+targets; a <code>want_unit</code> hook keeps its strict all-or-nothing contract.</p>
+<p><strong>Validation.</strong> <code>require_unit</code> rejects a document containing any bare numeric
+value; <code>require_dimension_of=["m"]</code> requires every numeric value to be validly
+convertible to at least one listed unit. Both are evaluated on the unit the
+<strong>document</strong> wrote, before any conversion, and both raise
+<code>ErrorCode.UNIT_MISMATCH</code>.</p>
+<p><strong>Per-field rules</strong> name one field by its key path, and are consulted before
+everything else:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reader</span><span class="p">,</span> <span class="n">UnitPolicy</span><span class="p">,</span> <span class="n">UnitRule</span><span class="p">,</span> <span class="n">dom_parse</span>
+
+<span class="n">policy</span> <span class="o">=</span> <span class="n">UnitPolicy</span><span class="p">(</span><span class="n">rules</span><span class="o">=</span><span class="p">[</span>
+    <span class="n">UnitRule</span><span class="p">(</span><span class="s2">&quot;.inlet.temperature&quot;</span><span class="p">,</span> <span class="s2">&quot;°C&quot;</span><span class="p">),</span>                  <span class="c1"># convert this field</span>
+    <span class="n">UnitRule</span><span class="p">(</span><span class="s2">&quot;.inlet.*&quot;</span><span class="p">,</span> <span class="s2">&quot;m&quot;</span><span class="p">,</span> <span class="n">convert</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>              <span class="c1"># assert the subtree</span>
+<span class="p">])</span>
+</code></pre></div>
+
+<p>A path ending in <code>".*"</code> names a subtree at any depth, and a prefix only
+matches at a component boundary (<code>".in.*"</code> does not claim <code>".inlet.a"</code>).
+Unlike a whole-document target, a rule is an <strong>assertion</strong>: a value it cannot be
+applied to raises <code>UNIT_MISMATCH</code>, because silence would defeat the point of
+naming the field. <code>convert=False</code> asserts without converting.</p>
+<p><strong>The DOM takes the same policy</strong>, so a random-access consumer gets both halves:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">doc</span> <span class="o">=</span> <span class="n">dom_parse</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">UnitPolicy</span><span class="p">(</span><span class="n">rules</span><span class="o">=</span><span class="p">[</span><span class="n">UnitRule</span><span class="p">(</span><span class="s2">&quot;.inlet.temperature&quot;</span><span class="p">,</span> <span class="s2">&quot;°C&quot;</span><span class="p">)]))</span>
+<span class="n">doc</span><span class="o">.</span><span class="n">lookup</span><span class="p">(</span><span class="s2">&quot;.inlet.temperature&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">as_float</span><span class="p">()</span>    <span class="c1"># 100.0, from a document in °F</span>
+</code></pre></div>
+
+<p>A value the policy converted is STORED converted — digits, unit and base — and
+an integer that converts to a fraction (5 g in kilograms is 0.005) is stored as
+a float. A policy the library refuses raises <code>INVALID_ARGUMENT</code> rather than a
+parse error, so a mistake in the policy is never mistaken for a fault in the
+document.</p>
+<p><strong>The writer takes the same policy, validation half only.</strong> A reader can only
+reject a document somebody already wrote; <code>Writer.set_unit_policy</code> is what stops
+a bare number reaching the file:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Writer</span><span class="p">,</span> <span class="n">UnitPolicy</span>
+
+<span class="n">w</span> <span class="o">=</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">set_unit_policy</span><span class="p">(</span><span class="n">UnitPolicy</span><span class="p">(</span><span class="n">require_unit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">require_dimension_of</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;m&quot;</span><span class="p">]))</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_float</span><span class="p">(</span><span class="s2">&quot;tank_level&quot;</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">,</span> <span class="n">unit_str</span><span class="o">=</span><span class="s2">&quot;in&quot;</span><span class="p">)</span>   <span class="c1"># a length — written</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_float</span><span class="p">(</span><span class="s2">&quot;spare&quot;</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">)</span>                        <span class="c1"># BovnarWriteError,</span>
+                                                    <span class="c1"># code UNIT_MISMATCH</span>
+</code></pre></div>
+
+<p>A policy carrying <code>targets</code>, <code>normalise_si</code>, <code>base</code> or <code>leave_inexact</code> raises
+<code>BovnarArgumentError</code> there rather than being half-honoured: write-side unit
+rewriting is <code>UnitFlags.REDUCE</code>'s job, and two rewriting modes with different
+rules about exactness is how a document ends up meaning two things.</p>
+<p>Two module-level helpers back the same decisions outside the reader:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">units_convertible</span><span class="p">,</span> <span class="n">unit_si_normal_form</span><span class="p">,</span> <span class="n">parse_unit</span>
+
+<span class="c1"># units_compatible is the wrong screen for a conversion target: a currency</span>
+<span class="c1"># carries no dimension, so it is reported incompatible with itself.</span>
+<span class="n">units_compatible</span> <span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~$USD&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;$USD&quot;</span><span class="p">))</span>   <span class="c1"># → False</span>
+<span class="n">units_convertible</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~$USD&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;$USD&quot;</span><span class="p">))</span>   <span class="c1"># → True</span>
+
+<span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;in&quot;</span><span class="p">))</span>   <span class="c1"># → m</span>
+<span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;g&quot;</span><span class="p">))</span>    <span class="c1"># → k~g  (the SI base unit for mass)</span>
+<span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;%&quot;</span><span class="p">))</span>    <span class="c1"># → None (dimensionless)</span>
+<span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;lm&quot;</span><span class="p">))</span>   <span class="c1"># → None (carries the steradian&#39;s kind)</span>
+</code></pre></div>
+
 <hr />
 <h2 id="6-quantity">6. <code>Quantity</code></h2>
 <p><code>Quantity</code> is a typed, unit-annotated scalar value that preserves the original

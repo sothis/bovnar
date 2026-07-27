@@ -51,6 +51,41 @@ BVN_API value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overfl
 BVN_API bool bvn_unit_dimension_vector(value_unit_t u,
                                 int32_t dims[bvn_si_dim_count]);
 BVN_API bool bvn_units_compatible(value_unit_t a, value_unit_t b);
+/* The predicate to SCREEN a conversion target with: dimensionally compatible,
+ * OR the same unit apart from its prefixes.
+ *
+ * It is not bvn_units_compatible, which reports false for "k~$USD -> $USD" (and
+ * for "$USD -> $USD") because a currency carries no dimension by design,
+ * although both convert exactly. It is not bvn_unit_convert_factor either — that
+ * reports failure for "°F -> °C", since an affine conversion has no single
+ * multiplicative factor, so screening on it drops every temperature.
+ *
+ * It is a screen, NOT a guarantee. `s/°C` is dimensionally compatible with `s/K`
+ * and passes here, and the conversion entry points still refuse it, because an
+ * affine scale means nothing at an exponent other than 1. Code that screens with
+ * this must therefore still handle a conversion that declines — treating that as
+ * "this target does not apply to this value" rather than as an error is what the
+ * reader's unit policy does. */
+BVN_API bool bvn_units_convertible(value_unit_t a, value_unit_t b);
+/* The coherent SI form of `u`: the product of SI base units carrying the same
+ * dimension, prefixes folded out (mass comes back as k~g, the SI base unit for
+ * mass being the kilogram).
+ *
+ * Returns false and leaves *out untouched when there is no such form to name:
+ *   - a currency, which has no dimension vector at all;
+ *   - any DIMENSIONLESS unit (%, ppm, dB, pH, rad, °, the turbidity scales).
+ *     Deliberate: normalising a ratio would silently turn "35 %" into a bare
+ *     0.35, and normalising an angle would need the irrational factor between °
+ *     and rad;
+ *   - a unit whose SI form the conversion engine would then refuse. The
+ *     dimension vector does not determine a unit: lm, lx and ph carry the
+ *     steradian's quantity kind, which no dimension vector can express, so
+ *     rebuilding them from dimensions yields cd and cd/m² — a different
+ *     quantity. `s/°C` has the dimensions of `s/K` and is unconvertible for the
+ *     affine reason above. The form returned here is checked against `u` before
+ *     it is returned, so a form this function gives back is one the conversion
+ *     entry points accept. */
+BVN_API bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t* out);
 BVN_API double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
                                 bool *ok, bool *requires_affine);
 /* Convert `value` from unit `from` into unit `to`, writing the result to *out.

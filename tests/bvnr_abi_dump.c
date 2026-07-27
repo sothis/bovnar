@@ -88,6 +88,32 @@ int main(void)
 	ABI_FIELD(bvnr_converted_t, num);
 	ABI_FIELD(bvnr_converted_t, den);
 
+	/* The unit policy is field-mirrored in the bindings and is passed BY
+	 * POINTER into the library, so a field the binding lays out differently is
+	 * read from the wrong offset — a wrong conversion target rather than a
+	 * crash, which is the failure mode this manifest exists to make impossible. */
+	ABI_STRUCT(bvnr_unit_target_t);
+	ABI_FIELD(bvnr_unit_target_t, unit);
+	ABI_FIELD(bvnr_unit_target_t, base);
+
+	ABI_STRUCT(bvnr_unit_rule_t);
+	ABI_FIELD(bvnr_unit_rule_t, path);
+	ABI_FIELD(bvnr_unit_rule_t, unit);
+	ABI_FIELD(bvnr_unit_rule_t, base);
+	ABI_FIELD(bvnr_unit_rule_t, mode);
+
+	ABI_STRUCT(bvnr_unit_policy_t);
+	ABI_FIELD(bvnr_unit_policy_t, rules);
+	ABI_FIELD(bvnr_unit_policy_t, num_rules);
+	ABI_FIELD(bvnr_unit_policy_t, targets);
+	ABI_FIELD(bvnr_unit_policy_t, num_targets);
+	ABI_FIELD(bvnr_unit_policy_t, base);
+	ABI_FIELD(bvnr_unit_policy_t, normalise);
+	ABI_FIELD(bvnr_unit_policy_t, on_inexact);
+	ABI_FIELD(bvnr_unit_policy_t, require_unit);
+	ABI_FIELD(bvnr_unit_policy_t, require_dimension_of);
+	ABI_FIELD(bvnr_unit_policy_t, num_require_dimension_of);
+
 	/* The flags structs are field-mirrored in the bindings and carry the
 	 * callback function pointers a binding installs for C to invoke, so their
 	 * field offsets matter as much as the total size — emit every field. */

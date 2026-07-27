@@ -30,6 +30,7 @@ from .structs import (
     BvnrSource, BvnrSink,
     BvnrReadFlags, BvnrWriteFlags,
     BvnrData, ValueTypeSpec, ValueUnit, ValueUnitPrefix,
+    BvnrUnitTarget, BvnrUnitRule, BvnrUnitPolicy,
     BvnDomEntry, BvnrDocStreamOpts,
     EVENT_CALLBACK_FUNC, ON_ERROR_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC,
 )
@@ -296,6 +297,18 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_units_compatible.restype  = c_bool
     lib.bvn_units_compatible.argtypes = [ValueUnit, ValueUnit]
 
+    lib.bvn_units_convertible.restype  = c_bool
+    lib.bvn_units_convertible.argtypes = [ValueUnit, ValueUnit]
+
+    lib.bvn_unit_si_normal_form.restype  = c_bool
+    lib.bvn_unit_si_normal_form.argtypes = [ValueUnit, P(ValueUnit)]
+
+    lib.bvnr_reader_set_unit_policy.restype  = c_bool
+    lib.bvnr_reader_set_unit_policy.argtypes = [c_void_p, P(BvnrUnitPolicy)]
+
+    lib.bvnr_writer_set_unit_policy.restype  = c_bool
+    lib.bvnr_writer_set_unit_policy.argtypes = [c_void_p, P(BvnrUnitPolicy)]
+
     lib.bvn_unit_convert_factor.restype  = c_double
     lib.bvn_unit_convert_factor.argtypes = [
         ValueUnit, ValueUnit, P(c_bool), P(c_bool),
@@ -378,6 +391,12 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvn_dom_parse.restype  = c_void_p
     lib.bvn_dom_parse.argtypes = [c_void_p, c_uint32]
+
+    lib.bvn_dom_parse_policy.restype  = c_void_p
+    lib.bvn_dom_parse_policy.argtypes = [c_void_p, c_uint32, P(BvnrUnitPolicy)]
+
+    lib.bvn_dom_parse_fd_policy.restype  = c_void_p
+    lib.bvn_dom_parse_fd_policy.argtypes = [c_int, c_uint64, P(BvnrUnitPolicy)]
 
     lib.bvn_dom_parse_fd.restype  = c_void_p
     lib.bvn_dom_parse_fd.argtypes = [c_int]

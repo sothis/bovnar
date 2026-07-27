@@ -19,6 +19,90 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **Reader-side unit policy (`bvnr_reader_set_unit_policy`)** — what
+  `bvnr_read_flags_t.want_unit` does through a C callback, stated as data: which
+  units the consumer wants values delivered in, and what the document must carry
+  to be accepted at all. Everything is expressed as unit **text**, so a consumer
+  that cannot take the address of a C function can now ask for the feature the
+  callback was the only route to. New symbols and one new struct only — no
+  existing struct changed shape, so this costs nothing in ABI beyond what the
+  release already spends.
+  Three things share the one policy object. `targets` names the units to convert
+  to, first validly-convertible match winning, so order is significant.
+  `normalise = bvnr_normalise_si` catches whatever the targets did not and
+  delivers it in coherent SI base units with prefixes folded out. `require_unit`
+  and `require_dimension_of` reject a document instead of changing it — "every
+  numeric value must carry a unit", "every value must be a length, in whatever
+  unit it chose to write it" — and are evaluated on the unit the document wrote,
+  before any conversion: validate what you were sent, convert for the consumer.
+  The `want_unit` hook still wins where it is installed, so a caller can
+  normalise a document and hand-handle one field.
+  Two refusals are deliberate and are the reason the feature is safe. A value
+  with no unit only ever matches a target (or a requirement) that is itself
+  `no_unit`: a bare number is dimensionally compatible with `%` and `ppm`, so
+  without that fence a policy naming `"%"` would deliver `0.25` as `25` — the
+  silent rescale the format exists to prevent, arrived at through the machinery
+  meant to prevent it. And SI normalisation refuses every *dimensionless* unit
+  (`%`, `ppm`, `dB`, `pH`, `rad`, `°`, the turbidity scales) along with the
+  currencies, rather than restating `35 %` as `0.35` or demanding the irrational
+  factor between `°` and `rad`.
+  Exactness is unchanged — the same exact arbitrary-precision path, nothing
+  approximate ever delivered — with one mode added for the blanket case:
+  `on_inexact = bvnr_inexact_leave` hands over a value whose exact result has no
+  terminating expansion in the output base (`42 km/h` is `35/3 m/s`) in its
+  native unit, visible as `converted == false`, instead of aborting a document
+  nobody had a complaint about. An irrational factor still aborts. See
+  read/write API §1.12, and `doc/parser_level_unit_policy.md` for the evaluation
+  the design came from.
+  **Per-field rules** name one field by the key path it sits at
+  (`.inlet.temperature`, or `.inlet.*` for a subtree), and are consulted before
+  everything else — the most specific thing a policy can say. This is what the
+  streaming validator never had: it tracked no key context at all, so a value
+  arrived knowing its type and unit and nothing about where it came from. Unlike
+  a whole-document target, a rule is an ASSERTION — the caller named this field,
+  so a value that cannot satisfy it is `error_unit_mismatch` rather than one
+  passed through quietly, and a bare number does not satisfy ".speed is m/s"
+  either. A prefix matches only at a component boundary, so `.in.*` never claims
+  `.inlet.a`, and a value nested deeper than the path tracker can describe
+  matches NO rule rather than the wrong one.
+  **The DOM tier takes the policy too** (`bvn_dom_parse_policy`,
+  `bvn_dom_parse_fd_policy`, `dom_parse(..., policy)`), so `bovnar query` can
+  assert what it expects and ask for the unit it wants back. A converted value
+  is STORED converted — digits, unit and base — because a caller who asked for
+  metres and got the document's feet back would have no way to notice; an
+  integer that converts to a fraction is stored as a float, which is what it now
+  is. A policy the library refuses is `error_invalid_argument`, never a parse
+  error against the document.
+  **The writer takes the same policy** (`bvnr_writer_set_unit_policy`,
+  `Writer.set_unit_policy`), and that is the half the format's promise actually
+  rests on: a reader can only reject a document somebody already wrote, so only
+  the writer can stop a bare number reaching a file at all. `bvnr_write_event`
+  and every helper above it then fail with `error_unit_mismatch`. It checks
+  whichever place the unit came from — inline on the value or as a parameter of
+  its type annotation, one annotation covering every element of the array under
+  it — and it deliberately does NOT let an annotated value vouch for the next
+  bare one. Validation only: a policy carrying the conversion fields is refused
+  rather than half-honoured, because the writer already rewrites values under
+  `BVN_UNIT_REDUCE` and a second rewriting mode with different rules about
+  exactness is how two features end up disagreeing about what a document says.
+  Reachable from every consumer, which is the point of stating it as data:
+  Python gets `Reader.set_unit_policy(UnitPolicy(...))` with no per-value ctypes
+  trampoline (python bindings §5.5), and the CLI gets `--unit`, `--si`,
+  `--base`, `--leave-inexact`, `--require-unit` and `--require-dimension` on
+  `events`, plus the two validation flags on `validate`. `bovnar events` now
+  prints a conversion next to the value it belongs to.
+- **`bvn_units_convertible` and `bvn_unit_si_normal_form`** — the two predicates
+  the policy is built on, exposed because every hand-written `want_unit` hook
+  that screens its targets needs the first one and most get it wrong.
+  `bvn_units_convertible` is "can the library actually convert a to b":
+  dimensionally compatible, **or** the same unit apart from its prefixes. That
+  second clause is not pedantry — a currency carries no dimension by design, so
+  `bvn_units_compatible` reports `k~$USD → $USD` (and `$USD → $USD`)
+  incompatible although both convert exactly. `bvn_unit_convert_factor` is not a
+  substitute either: it reports failure for `°F → °C`, since an affine
+  conversion has no single multiplicative factor, so screening on it drops every
+  temperature in the format. `bvn_unit_si_normal_form` returns the coherent SI
+  form of a unit, or false where there is none to name.
 - **Compact prefix form for physical units** — a prefix may now be written
   without the `~` separator: `kg`, `km`, `ms`, `MHz`, `hPa`, `mmol`, `MeV`,
   `KiB`, `MiB`, `kg·m/s²` all parse, each to exactly the `value_unit_t` its

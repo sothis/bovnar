@@ -520,6 +520,118 @@ static bool bvn_unit_prefix_only_delta(value_unit_t a, value_unit_t b,
 	*iec_delta = iec;
 	return true;
 }
+/*
+ * The predicate a conversion SELECTOR wants, as opposed to the one a dimensional
+ * analysis wants.
+ *
+ * bvn_units_compatible answers "do these two carry the same physical dimension",
+ * and a currency deliberately carries none — so it reports false for
+ * "k~$USD -> $USD" and even for "$USD -> $USD", both of which the conversion
+ * entry points perform correctly. Anything picking a target by asking
+ * bvn_units_compatible first therefore silently declines work the library can
+ * do; every hand-written want_unit hook that screens its targets has this hole.
+ *
+ * bvn_unit_convert_factor is not the answer either: it reports ok=false for
+ * "°F -> °C", because an affine conversion has no single multiplicative factor.
+ * Screening on it drops every temperature in the format.
+ *
+ * So: dimensionally compatible, OR the same unit apart from its prefixes. That
+ * is exactly the set bvn_unit_convert_value and bvn_unit_convert_rational
+ * accept, which is what makes this the right question to ask before calling
+ * them.
+ */
+bool bvn_units_convertible(value_unit_t a, value_unit_t b)
+{
+	if (bvn_units_compatible(a, b))
+		return true;
+	int32_t si_delta = 0, iec_delta = 0;
+	return bvn_unit_prefix_only_delta(a, b, &si_delta, &iec_delta);
+}
+/*
+ * The coherent SI form of `u` — the product of SI base units carrying the same
+ * dimension, with every prefix folded out except the kilogram's (the SI base
+ * unit for mass IS the kilogram, so mass comes back as k~g, not g).
+ *
+ * Returns false, leaving *out untouched, when `u` has no coherent SI form to
+ * name: a currency (no dimension vector at all), or a unit whose dimension
+ * vector is entirely zero. That second case covers more than it first appears —
+ * %, ppm, dB, pH, rad, ° and the turbidity scales are all dimensionless — and
+ * refusing them is deliberate rather than a limitation. Normalising a ratio
+ * would silently turn "35 %" into a bare 0.35, and normalising an angle would
+ * ask for the irrational factor between ° and rad. Neither is something a
+ * caller who asked for "SI" is asking for.
+ *
+ * Also false when the dimension vector cannot be spelled as a unit: an exponent
+ * outside the -9..9 the notation carries.
+ */
+bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t *out)
+{
+	static const struct {
+		bvn_si_dim_idx_t  dim;
+		value_base_unit_t base;
+		si_prefix_id_t    prefix;
+	} si_base[] = {
+		{ bvn_si_dim_meter,    bu_meter,   si_none },
+		{ bvn_si_dim_kilogram, bu_gram,    si_kilo },
+		{ bvn_si_dim_second,   bu_second,  si_none },
+		{ bvn_si_dim_ampere,   bu_ampere,  si_none },
+		{ bvn_si_dim_kelvin,   bu_kelvin,  si_none },
+		{ bvn_si_dim_mol,      bu_mol,     si_none },
+		{ bvn_si_dim_candela,  bu_candela, si_none },
+	};
+	if (!out)
+		return false;
+	/* A unit with no usable SI factor has no SI form either, and the dimension
+	 * vector alone will not say so: `s/°C` has perfectly good dimensions, but an
+	 * affine scale means nothing at an exponent other than 1, so the conversion
+	 * entry points refuse it. Asking the factor path is how that is detected
+	 * without restating its rules here. */
+	bool is_affine = false, factor_ok = false;
+	double offset = 0.0;
+	(void)bvn_unit_to_si_factor(u, &is_affine, &offset, &factor_ok);
+	if (!factor_ok)
+		return false;
+	int32_t dims[bvn_si_dim_count];
+	if (!bvn_unit_dimension_vector(u, dims))
+		return false;
+	value_unit_t r;
+	memset(&r, 0, sizeof(r));
+	for (uint32_t i = 0; i < sizeof(si_base) / sizeof(si_base[0]); i++) {
+		int32_t e = dims[si_base[i].dim];
+		if (e == 0)
+			continue;
+		if (e < -9 || e > 9)
+			return false;
+		if (r.num_components >= BVNR_MAX_UNIT_COMPONENTS)
+			return false;
+		value_unit_component_t *c = &r.components[r.num_components++];
+		c->base            = si_base[i].base;
+		c->exponent        = bvn_int_to_exponent(e);
+		c->prefix.system   = prefix_si;
+		c->prefix.id.si    = si_base[i].prefix;
+	}
+	if (r.num_components == 0u)
+		return false;     /* dimensionless — see the comment above */
+	/*
+	 * The dimension vector is not the whole of what a unit means, so the form
+	 * built from it has to be checked against the unit it came from rather than
+	 * assumed equivalent to it. The photometric units are the case that proves
+	 * it: lm, lx and ph each carry the steradian's quantity kind, which no SI
+	 * dimension vector can express (the steradian is dimensionless), so
+	 * reconstructing them from dims alone yields cd and cd/m² — luminous
+	 * INTENSITY where the value was luminous FLUX, and luminance where it was
+	 * illuminance. bvn_unit_convert_rational refuses those pairs, exactly as it
+	 * should; without this check a caller normalising a document would have the
+	 * parse aborted by a unit the library was right to refuse.
+	 *
+	 * Screening here rather than in the caller makes the guarantee structural:
+	 * a form this function returns is one the conversion entry points accept.
+	 */
+	if (!bvn_units_convertible(u, r))
+		return false;
+	*out = r;
+	return true;
+}
 double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 			       bool *ok, bool *requires_affine)
 {

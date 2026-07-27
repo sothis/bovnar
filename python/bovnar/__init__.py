@@ -37,7 +37,7 @@ from .exceptions import (
     BovnarError, BovnarLibraryNotFound,
     BovnarParseError, BovnarWriteError, BovnarArgumentError,
 )
-from .reader   import Reader, EventPayload, MAX_FILESIZE_BYTES
+from .reader   import Reader, EventPayload, UnitPolicy, UnitRule, MAX_FILESIZE_BYTES
 from .writer   import Writer
 from .dom      import DomDoc, DomNode, DomType
 from .quantity import Quantity
@@ -47,7 +47,8 @@ from .units   import (
     unit_valid,
     unit_prefix_factor, unit_prefix_exponent,
     prefix_unit_valid,
-    unit_to_si_factor, units_compatible, unit_convert_factor,
+    unit_to_si_factor, units_compatible, units_convertible,
+    unit_si_normal_form, unit_convert_factor,
     unit_dimension_vector, unit_reduce,
     unit_to_str_ex,
     exponent_to_int, int_to_exponent,
@@ -72,7 +73,7 @@ __all__ = [
     'write_array',
     'Quantity',
 
-    'Reader', 'Writer', 'EventPayload',
+    'Reader', 'Writer', 'EventPayload', 'UnitPolicy', 'UnitRule',
     'DomDoc', 'DomNode', 'DomType',
 
     'ValueTypeSpec', 'ValueUnit', 'ValueUnitComponent', 'ValueUnitPrefix', 'BvnrData',
@@ -89,7 +90,8 @@ __all__ = [
     'unit_valid',
     'unit_prefix_factor', 'unit_prefix_exponent',
     'prefix_unit_valid',
-    'unit_to_si_factor', 'units_compatible', 'unit_convert_factor',
+    'unit_to_si_factor', 'units_compatible', 'units_convertible',
+    'unit_si_normal_form', 'unit_convert_factor',
     'unit_dimension_vector', 'unit_reduce',
     'unit_to_str_ex',
     'exponent_to_int', 'int_to_exponent',
@@ -211,11 +213,18 @@ def dumps(obj: dict, *, pretty: bool = True) -> bytes:
                 raise
 
 
-def dom_parse(data: bytes | bytearray | str | memoryview) -> DomDoc:
-    """Parse BVNR bytes into a DOM tree (random-access, type-preserving)."""
+def dom_parse(data: bytes | bytearray | str | memoryview,
+              policy: 'UnitPolicy | None' = None) -> DomDoc:
+    """Parse BVNR bytes into a DOM tree (random-access, type-preserving).
+
+    With a :class:`UnitPolicy`, the same rules the streaming reader applies:
+    a validation failure raises, and a value the policy converted is STORED
+    converted — digits, unit and base.
+    """
     if isinstance(data, str):
         data = data.encode('utf-8')
-    return DomDoc.parse(bytes(data) if isinstance(data, memoryview) else data)
+    return DomDoc.parse(bytes(data) if isinstance(data, memoryview) else data,
+                        policy)
 
 
 def unit_factor(unit_str: str) -> float:

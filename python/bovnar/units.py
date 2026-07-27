@@ -171,6 +171,45 @@ def units_compatible(a: ValueUnit, b: ValueUnit) -> bool:
     return bool(get_library().bvn_units_compatible(a, b))
 
 
+def units_convertible(a: ValueUnit, b: ValueUnit) -> bool:
+    """Return True when the library can actually convert *a* to *b*.
+
+    This, not units_compatible, is the question to ask before choosing a
+    conversion target. A currency carries no dimension by design, so
+    units_compatible reports False for a pair that converts exactly:
+
+      units_compatible(parse_unit("k~$USD"), parse_unit("$USD"))   → False
+      units_convertible(parse_unit("k~$USD"), parse_unit("$USD"))  → True
+
+    unit_convert_factor is not a substitute either — it fails for °F → °C,
+    because an affine conversion has no single multiplicative factor.
+
+    It is a screen, not a guarantee: an affine scale inside a compound
+    (`s/°C` against `s/K`) passes here and is still refused by the conversion
+    itself, since °C means nothing at an exponent other than 1.
+    """
+    return bool(get_library().bvn_units_convertible(a, b))
+
+
+def unit_si_normal_form(u: ValueUnit) -> ValueUnit | None:
+    """The coherent SI form of *u*, or None when there is none to name.
+
+    Prefixes are folded out, and mass comes back as ``k~g`` — the SI base unit
+    for mass is the kilogram, not the gram. None is returned for a currency and
+    for every DIMENSIONLESS unit (%, ppm, dB, pH, rad, °, the turbidity
+    scales): normalising a ratio would silently restate "35 %" as 0.35, and
+    normalising an angle would need the irrational factor between ° and rad.
+
+      unit_si_normal_form(parse_unit("in"))  → m
+      unit_si_normal_form(parse_unit("g"))   → k~g
+      unit_si_normal_form(parse_unit("%"))   → None
+    """
+    out = ValueUnit()
+    if not get_library().bvn_unit_si_normal_form(u, ctypes.byref(out)):
+        return None
+    return out
+
+
 def unit_convert_factor(from_unit: ValueUnit,
                         to_unit: ValueUnit) -> UnitConversion:
     """
@@ -365,7 +404,8 @@ __all__ = [
     'unit_valid',
     'unit_prefix_factor', 'unit_prefix_exponent',
     'prefix_unit_valid',
-    'unit_to_si_factor', 'units_compatible', 'unit_convert_factor',
+    'unit_to_si_factor', 'units_compatible', 'units_convertible',
+    'unit_si_normal_form', 'unit_convert_factor',
     'unit_dimension_vector', 'unit_reduce',
     'unit_to_str_ex',
     'exponent_to_int', 'int_to_exponent',

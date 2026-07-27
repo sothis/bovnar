@@ -111,9 +111,18 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 {
 	/* A reader is explicitly reusable across documents (bvnr_open_read_source),
 	 * and this memset is what re-arms it. Release the heap the previous document
-	 * left in the conversion scratch first, or every re-open orphans it. */
+	 * left in the conversion scratch first, or every re-open orphans it.
+	 *
+	 * The unit policy is the one thing carried across: it is set through its own
+	 * call rather than through the flags, describes the CONSUMER rather than the
+	 * document, and a caller who set it once and then opened a second document
+	 * would have no way to notice it had been silently dropped. Saving it here
+	 * is also what lets bvnr_reader_set_unit_policy be called either side of the
+	 * open. */
+	bvn_unit_policy_state_t saved_policy = v->policy;
 	bvn_val_free(v);
 	memset(v, 0, sizeof(*v));
+	v->policy = saved_policy;
 	v->value_type             = BVN_TYPE_PLAIN;
 	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
 	v->inferred_default_vtype = BVN_TYPE_PLAIN;
@@ -127,6 +136,404 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 		v->max_conversion_length = opts->max_conversion_length;
 		v->on_error      = opts->on_error;
 	}
+}
+/*
+ * Parse the caller's unit strings once, up front, so that a typo in a target is
+ * a false return from this call rather than an error in the middle of somebody's
+ * document. Nothing is written into the reader until every string has parsed:
+ * a rejected policy leaves the previous one in force, which is the only
+ * behaviour that makes "check the return value" a complete contract.
+ */
+/* ── key paths ───────────────────────────────────────────────────────────── */
+
+void bvn_path_reset(bvn_key_path_t* p)
+{
+	p->len = p->depth = p->lost = 0u;
+	p->pending_len = 0u;
+	p->pending_lost = false;
+}
+void bvn_path_set_key(bvn_key_path_t* p, const uint8_t* key, uint32_t len)
+{
+	if (!key || len == 0u || len > BVN_PATH_MAX_KEY) {
+		/* No key, or one longer than a path component may be: the position of
+		 * this value is unknown rather than empty. */
+		p->pending_len  = 0u;
+		p->pending_lost = true;
+		return;
+	}
+	memcpy(p->pending, key, len);
+	p->pending_len  = (uint8_t)len;
+	p->pending_lost = false;
+}
+void bvn_path_push(bvn_key_path_t* p)
+{
+	/* Once a push is lost every deeper one is too, whether or not it would fit:
+	 * a component under an unknown ancestor is at an unknown path, and keeping
+	 * the rule strictly LIFO is what makes bvn_path_pop correct. */
+	if (p->lost || p->pending_lost || p->depth >= BVN_PATH_MAX_DEPTH ||
+	    (size_t)p->len + 1u + p->pending_len >= BVN_PATH_MAX_BYTES) {
+		p->lost++;
+		return;
+	}
+	p->mark[p->depth++] = p->len;
+	p->buf[p->len++] = '.';
+	memcpy(p->buf + p->len, p->pending, p->pending_len);
+	p->len += p->pending_len;
+	p->pending_len  = 0u;
+	p->pending_lost = false;
+}
+void bvn_path_pop(bvn_key_path_t* p)
+{
+	if (p->lost) { p->lost--; return; }
+	if (p->depth == 0u) { p->len = 0u; return; }
+	p->len = p->mark[--p->depth];
+}
+bool bvn_path_current(const bvn_key_path_t* p, char* out, uint32_t cap,
+		      uint32_t* out_len)
+{
+	if (p->lost || p->pending_lost || p->pending_len == 0u)
+		return false;
+	uint32_t need = p->len + 1u + p->pending_len;
+	if (need + 1u > cap)
+		return false;
+	memcpy(out, p->buf, p->len);
+	out[p->len] = '.';
+	memcpy(out + p->len + 1u, p->pending, p->pending_len);
+	out[need] = '\0';
+	*out_len = need;
+	return true;
+}
+/*
+ * Does `pat` name `path`? Either the whole path, or — for a pattern written
+ * ".a.b.*", stored as the prefix ".a.b" with `wildcard` set — everything below
+ * it at any depth. The separator check is what keeps ".inlet" from matching
+ * ".inlet_pump.x": a prefix is only a prefix at a component boundary.
+ */
+static bool bvn_path_matches(const bvn_unit_rule_state_t* r,
+			     const char* path, uint32_t path_len)
+{
+	if (!r->wildcard)
+		return r->path_len == path_len &&
+		       memcmp(r->path, path, path_len) == 0;
+	if (path_len <= r->path_len)
+		return false;
+	if (memcmp(r->path, path, r->path_len) != 0)
+		return false;
+	return path[r->path_len] == '.';
+}
+int32_t bvn_policy_match_rule(const bvn_unit_policy_state_t* pol,
+			      const bvn_key_path_t* path)
+{
+	if (!pol->num_rules)
+		return -1;
+	char     cur[BVN_PATH_MAX_BYTES + BVN_PATH_MAX_KEY + 2u];
+	uint32_t cur_len = 0u;
+	if (!bvn_path_current(path, cur, (uint32_t)sizeof cur, &cur_len))
+		return -1;
+	for (uint32_t i = 0; i < pol->num_rules; i++) {
+		if (bvn_path_matches(&pol->rule[i], cur, cur_len))
+			return (int32_t)i;
+	}
+	return -1;
+}
+static bool bvn_unit_policy_parse(const bvnr_unit_policy_t* p,
+				  bvn_unit_policy_state_t* out)
+{
+	bvn_unit_policy_state_t np;
+	memset(&np, 0, sizeof(np));
+	if (p->num_targets > BVNR_MAX_UNIT_TARGETS ||
+	    p->num_require_dimension_of > BVNR_MAX_UNIT_TARGETS ||
+	    p->num_rules > BVNR_MAX_UNIT_RULES)
+		return false;
+	if (p->num_targets && !p->targets)
+		return false;
+	if (p->num_require_dimension_of && !p->require_dimension_of)
+		return false;
+	if (p->num_rules && !p->rules)
+		return false;
+	if (p->normalise != bvnr_normalise_none && p->normalise != bvnr_normalise_si)
+		return false;
+	if (p->on_inexact != bvnr_inexact_error && p->on_inexact != bvnr_inexact_leave)
+		return false;
+	if (p->base != 0u && !bvn_rational_base_valid(p->base))
+		return false;
+	for (uint32_t i = 0; i < p->num_targets; i++) {
+		const bvnr_unit_target_t* t = &p->targets[i];
+		if (!t->unit || !t->unit[0])
+			return false;
+		if (t->base != 0u && !bvn_rational_base_valid(t->base))
+			return false;
+		bool ok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t*)t->unit, &ok);
+		if (!ok)
+			return false;
+		np.target[i]      = u;
+		np.target_base[i] = t->base;
+	}
+	for (uint32_t i = 0; i < p->num_require_dimension_of; i++) {
+		const char* s = p->require_dimension_of[i];
+		if (!s || !s[0])
+			return false;
+		bool ok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t*)s, &ok);
+		if (!ok)
+			return false;
+		np.require[i] = u;
+	}
+	for (uint32_t i = 0; i < p->num_rules; i++) {
+		const bvnr_unit_rule_t* rl = &p->rules[i];
+		if (!rl->path || !rl->path[0] || !rl->unit || !rl->unit[0])
+			return false;
+		if (rl->mode != bvnr_rule_convert && rl->mode != bvnr_rule_require)
+			return false;
+		if (rl->base != 0u && !bvn_rational_base_valid(rl->base))
+			return false;
+		size_t plen = strlen(rl->path);
+		if (plen > BVNR_MAX_UNIT_PATH)
+			return false;
+		/* A path names keys, and every key in a document is written with a
+		 * leading dot; a pattern without one could never match anything, so it
+		 * is a mistake worth reporting rather than a rule that silently never
+		 * fires. */
+		if (rl->path[0] != '.')
+			return false;
+		bvn_unit_rule_state_t* rs = &np.rule[i];
+		rs->wildcard = (plen >= 2u && rl->path[plen - 1] == '*' &&
+				rl->path[plen - 2] == '.');
+		if (rs->wildcard) {
+			plen -= 2u;             /* keep ".a.b" from ".a.b.*" */
+			if (plen == 0u)
+				return false;   /* ".*" would name the whole document;
+						 * that is what the target list is for */
+		}
+		memcpy(rs->path, rl->path, plen);
+		rs->path[plen] = '\0';
+		rs->path_len   = (uint8_t)plen;
+		rs->mode       = (uint8_t)rl->mode;
+		rs->base       = rl->base;
+		bool ok = false;
+		rs->unit = bvn_parse_unit((const uint8_t*)rl->unit, &ok);
+		if (!ok)
+			return false;
+	}
+	np.num_rules      = p->num_rules;
+	np.num_targets    = p->num_targets;
+	np.num_require    = p->num_require_dimension_of;
+	np.require_unit   = p->require_unit;
+	np.normalise      = (uint8_t)p->normalise;
+	np.on_inexact     = (uint8_t)p->on_inexact;
+	np.normalise_base = p->base;
+	/* An all-default policy is indistinguishable from none, and saying so here
+	 * keeps every per-value check behind a single predictable branch. */
+	np.active = np.num_targets || np.num_require || np.require_unit ||
+		    np.num_rules ||
+		    np.normalise != (uint8_t)bvnr_normalise_none;
+	*out = np;
+	return true;
+}
+bool bvnr_reader_set_unit_policy(bvnr_reader_t* r, const bvnr_unit_policy_t* p)
+{
+	if (!r)
+		return false;
+	bvn_unit_policy_state_t np;
+	memset(&np, 0, sizeof(np));
+	if (p && !bvn_unit_policy_parse(p, &np))
+		return false;
+	r->val.policy = np;
+	return true;
+}
+/*
+ * The producer's half of the same contract. A reader can only refuse a document
+ * whose units a writer already got wrong, so enforcing "every value carries a
+ * unit" on the way IN is the half that keeps a bare number from reaching a file
+ * at all — which is what the format's promise, that a document carries
+ * everything needed to interpret it, actually rests on.
+ *
+ * Validation only. The conversion fields are REFUSED rather than ignored: the
+ * writer already has a value-rewriting mode in BVN_UNIT_REDUCE (unit_flags), and
+ * a second one arriving through a different door, with different rules about
+ * exactness, is how two features end up disagreeing about what a document says.
+ * A caller who sets them here has assumed something untrue and is told so.
+ */
+bool bvnr_writer_set_unit_policy(bvnr_writer_t* w, const bvnr_unit_policy_t* p)
+{
+	if (!w)
+		return false;
+	bvn_unit_policy_state_t np;
+	memset(&np, 0, sizeof(np));
+	if (p) {
+		if (p->num_targets || p->normalise != bvnr_normalise_none ||
+		    p->base || p->on_inexact != bvnr_inexact_error)
+			return false;
+		/* Per-field rules are welcome — in require mode. A convert rule would
+		 * rewrite the value being written, which is the same door
+		 * BVN_UNIT_REDUCE already owns. */
+		for (uint32_t i = 0; i < p->num_rules; i++) {
+			if (p->rules[i].mode != bvnr_rule_require || p->rules[i].base)
+				return false;
+		}
+		if (!bvn_unit_policy_parse(p, &np))
+			return false;
+	}
+	w->val.policy = np;
+	return true;
+}
+/*
+ * Whether the policy may convert `native` to `target`.
+ *
+ * Two questions, and the second one is the one that bites. bvn_units_convertible
+ * answers "can the engine do this at all" — dimensionally compatible, or the
+ * same unit apart from prefixes, which is what keeps k~$USD -> $USD available.
+ * The unitless test in front of it is a fence the engine itself does not have: a
+ * value with no unit is dimensionally compatible with % and with ppm, so a
+ * policy naming "%" would otherwise convert a bare `0.25` into `25 %`, and one
+ * naming no_unit would turn `35 %` into `0.35`. Both are exactly the silent
+ * rescale the format exists to make impossible, arrived at through the machinery
+ * meant to prevent it. A bare number therefore only ever matches a bare target.
+ */
+bool bvn_policy_selects(value_unit_t native, value_unit_t target)
+{
+	if (BVN_UNIT_IS_UNITLESS(native) != BVN_UNIT_IS_UNITLESS(target))
+		return false;
+	return bvn_units_convertible(native, target);
+}
+/*
+ * The target-resolution ladder, most specific first:
+ *
+ *   want_unit hook  ->  policy targets  ->  policy normalise mode
+ *
+ * The hook wins because it decides per value and can see everything the policy
+ * can; a caller who installs both is asking to normalise the document and
+ * hand-handle one field. Returns false when nothing selected a target, which
+ * leaves the value in its native unit — that is the normal outcome for a value
+ * no rule mentions, not a failure.
+ *
+ * *from_policy tells the conversion path which contract it is under: the hook
+ * promises all-or-nothing exactness, while a blanket policy may be configured to
+ * step over a value it cannot deliver exactly.
+ */
+static bool bvn_resolve_unit_target(bvnr_validator_t* v, const bvnr_data_t* d,
+				    value_unit_t* want, uint32_t* want_base,
+				    bool* from_policy)
+{
+	*from_policy = false;
+	if (v->want_unit) {
+		value_unit_t w = d->value_unit;
+		uint32_t     b = 0u;
+		if (v->want_unit(v->userdata, d, &w, &b)) {
+			*want      = w;
+			*want_base = b;
+			return true;
+		}
+	}
+	if (!v->policy.active)
+		return false;
+	/* A rule about this exact field outranks anything said about the document
+	 * as a whole. bvn_apply_unit_assertions already matched it and proved the
+	 * value can satisfy it. */
+	if (v->cur_rule >= 0) {
+		const bvn_unit_rule_state_t* rl = &v->policy.rule[v->cur_rule];
+		if (rl->mode == (uint8_t)bvnr_rule_require)
+			return false;                  /* assert only, deliver as written */
+		if (rl->base == 0u && bvn_unit_equal(d->value_unit, rl->unit))
+			return false;                  /* already there */
+		*want        = rl->unit;
+		*want_base   = rl->base;
+		*from_policy = true;
+		return true;
+	}
+	for (uint32_t i = 0; i < v->policy.num_targets; i++) {
+		if (!bvn_policy_selects(d->value_unit, v->policy.target[i]))
+			continue;
+		/* The value is already in the unit this target names, and no output
+		 * base was asked for: there is nothing to restate. Skipping keeps
+		 * `converted` meaning "the policy changed this value" rather than
+		 * "the policy looked at it", and saves an exact parse-convert-render
+		 * round trip per already-correct value. A target that DOES name a
+		 * base is a pure base conversion and still runs. */
+		if (v->policy.target_base[i] == 0u &&
+		    bvn_unit_equal(d->value_unit, v->policy.target[i]))
+			return false;
+		*want        = v->policy.target[i];
+		*want_base   = v->policy.target_base[i];
+		*from_policy = true;
+		return true;
+	}
+	if (v->policy.normalise == (uint8_t)bvnr_normalise_si) {
+		value_unit_t si;
+		/* Refuses the currencies and every dimensionless unit, which is what
+		 * keeps "normalise everything" from reinterpreting a percentage or
+		 * demanding the irrational factor between ° and rad. */
+		if (bvn_unit_si_normal_form(d->value_unit, &si) &&
+		    !bvn_unit_equal(si, d->value_unit)) {
+			*want        = si;
+			*want_base   = v->policy.normalise_base;
+			*from_policy = true;
+			return true;
+		}
+	}
+	return false;
+}
+/*
+ * The policy's validation half (bvnr_unit_policy_t.require_*). Runs on the unit
+ * the DOCUMENT wrote, before any conversion and whether or not one was
+ * requested: validate what you were sent, convert for the consumer. Checking
+ * after conversion would be very nearly tautological — the value would be in the
+ * unit the caller just asked for, so "must be a length" would pass because the
+ * policy said "m", not because the document said anything.
+ */
+bool bvn_unit_policy_accepts(const bvn_unit_policy_state_t* p, value_unit_t u)
+{
+	if (!p->active)
+		return true;
+	if (p->require_unit && BVN_UNIT_IS_UNITLESS(u))
+		return false;
+	if (p->num_require) {
+		for (uint32_t i = 0; i < p->num_require; i++) {
+			if (bvn_policy_selects(u, p->require[i]))
+				return true;
+		}
+		return false;
+	}
+	return true;
+}
+static bool bvn_apply_unit_assertions(bvnr_reader_t* r, token_type_t tt,
+				      const bvnr_data_t* d)
+{
+	bvnr_validator_t* v = &r->val;
+	v->cur_rule = -1;
+	if (!v->policy.active)
+		return true;
+	if (tt != token_is_number && tt != token_is_array_number &&
+	    tt != token_is_string && tt != token_is_array_string)
+		return true;
+	if (!bvn_type_is_numeric(d->value_type))
+		return true;
+
+	if (!bvn_unit_policy_accepts(&v->policy, d->value_unit)) {
+		v->last_error = error_unit_mismatch;
+		return false;
+	}
+	/* Per-field rules. Decided here, once, and handed to the conversion pass in
+	 * cur_rule: both passes need the same answer, and matching a path twice per
+	 * value would be the kind of duplication that eventually disagrees.
+	 *
+	 * A rule is an assertion whichever mode it is in. The caller NAMED this
+	 * field; a value that cannot satisfy what they said about it is an error,
+	 * not something to pass through quietly the way an unmatched whole-document
+	 * target is. */
+	if (v->policy.num_rules) {
+		int32_t idx = bvn_policy_match_rule(&v->policy, &v->path);
+		if (idx >= 0) {
+			const bvn_unit_rule_state_t* rl = &v->policy.rule[idx];
+			if (!bvn_policy_selects(d->value_unit, rl->unit)) {
+				v->last_error = error_unit_mismatch;
+				return false;
+			}
+			v->cur_rule = idx;
+		}
+	}
+	return true;
 }
 /*
  * Callbacks receive a non-NULL data pointer even for empty payloads: consumers
@@ -199,7 +606,7 @@ static inline bool bvn_emit_both(bvnr_reader_t* r,
 static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* d)
 {
 	bvnr_validator_t* v = &r->val;
-	if (!v->want_unit)
+	if (!v->want_unit && !v->policy.active)
 		return true;
 	if (tt != token_is_number && tt != token_is_array_number &&
 	    tt != token_is_string && tt != token_is_array_string)
@@ -207,10 +614,29 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	if (!bvn_type_is_numeric(d->value_type))
 		return true;
 
-	value_unit_t want      = d->value_unit;
-	uint32_t     want_base = 0u;
-	if (!v->want_unit(v->userdata, d, &want, &want_base))
-		return true;                 /* caller declined this value */
+	value_unit_t want        = d->value_unit;
+	uint32_t     want_base   = 0u;
+	bool         from_policy = false;
+	if (!bvn_resolve_unit_target(v, d, &want, &want_base, &from_policy))
+		return true;                 /* nothing named a target for this value */
+	/*
+	 * "Step over a value this conversion cannot deliver, rather than rejecting
+	 * the document over it" — bvnr_inexact_leave, and only ever for a target the
+	 * POLICY chose. A blanket mode makes every value a candidate, so one
+	 * irrational factor (a parsec, a water-hardness scale), one non-terminating
+	 * expansion (km/h -> m/s) or one absurd exponent would otherwise reject a
+	 * document nobody had a complaint about.
+	 *
+	 * It covers exactness and the work limit — the two ways a conversion can be
+	 * refused for a property of the VALUE. It deliberately does not cover an
+	 * unusable output base or an allocation failure: those are the caller's
+	 * configuration and the machine's memory, and swallowing either would hide a
+	 * fault instead of stepping over a value. The want_unit hook never takes this
+	 * path at all: a caller who named one target for one value gets the strict
+	 * all-or-nothing contract that hook was documented with.
+	 */
+	const bool leave_on_refusal =
+		from_policy && v->policy.on_inexact == (uint8_t)bvnr_inexact_leave;
 
 	/* Settle the output base before doing any work: 0 keeps the value's own, and
 	 * anything else must be a base bvnr can actually write (2..62, 64, 85).
@@ -270,6 +696,7 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 			}
 			if (mag > (uint64_t)cap) {
 				if (nb != small) free(nb);
+				if (leave_on_refusal) return true;
 				v->last_error = error_value_out_of_range;
 				return false;
 			}
@@ -296,6 +723,7 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 		 * caller asked for a conversion and must not be left holding the
 		 * original unit's digits while believing they were converted. */
 		bvn_int_free(vn); bvn_int_free(vd);
+		if (alloc_ok && leave_on_refusal) return true;
 		v->last_error = alloc_ok ? error_value_out_of_range
 					 : error_invalid_argument;
 		return false;
@@ -313,8 +741,41 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	bool conv_ok = bvn_unit_convert_rational(vn, vd, d->value_unit, want,
 						 v->conv_num, v->conv_den, &exact);
 	bvn_int_free(vn); bvn_int_free(vd);
-	if (!conv_ok) { v->last_error = error_unit_mismatch; return false; }
-	if (!exact)   { v->last_error = error_unit_inexact;  return false; }
+	if (!conv_ok) {
+		/*
+		 * The engine will not perform this conversion at all. For a target the
+		 * POLICY chose that is not an error, it is a non-match discovered one
+		 * step late: a policy names a preference, and a value it cannot be
+		 * applied to is delivered in its own unit exactly like a value no
+		 * target mentioned. Aborting instead would reject a valid document over
+		 * a pair the caller never singled out.
+		 *
+		 * The screen in bvn_policy_selects catches almost all of these, but it
+		 * cannot catch all: `s/°C` is dimensionally compatible with `s/K` and
+		 * still unconvertible, because an affine scale has no meaning at an
+		 * exponent other than 1. Rather than restate the engine's rules in the
+		 * selector and drift from them, the selector stays approximate and this
+		 * is the backstop. Nothing is misrepresented by it — a value left in
+		 * its native unit still carries that unit, and `converted` says it was
+		 * not touched.
+		 *
+		 * A target the HOOK named is different: the caller chose it for this
+		 * value, and a mismatch there is the error it was documented as.
+		 */
+		if (from_policy) return true;
+		v->last_error = error_unit_mismatch;
+		return false;
+	}
+	if (!exact) {
+		/* The true factor is irrational — a parsec, a π-based angle, a water
+		 * hardness scale. No exact rational exists, so unlike the
+		 * non-terminating case below there is nothing to hand over even to a
+		 * caller who can take one; the only alternatives are the native value
+		 * or a refusal. */
+		if (leave_on_refusal) return true;
+		v->last_error = error_unit_inexact;
+		return false;
+	}
 
 	/* Render in the output base. bvn_rational_to_str refuses a short buffer
 	 * rather than truncating, so the buffer is sized from its own bound. */
@@ -346,6 +807,7 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 		 * by default the parse stops. A caller that can consume a rational
 		 * opts in and gets num/den with no text. */
 		if (!v->want_unit_allow_nonterminating) {
+			if (leave_on_refusal) return true;
 			v->last_error = error_unit_inexact;
 			return false;
 		}
@@ -353,6 +815,7 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	} else if (tlen == BVN_RATIONAL_TOO_LONG) {
 		/* Longer than max_conversion_length allows. The value is fine; it is
 		 * the cost of writing it out that the reader declines. */
+		if (leave_on_refusal) return true;
 		v->last_error = error_value_out_of_range;
 		return false;
 	} else if (tlen < 0 || !rexact) {
@@ -1123,6 +1586,11 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 {
 	bvnr_validator_t* v = &r->val;
 	token_type_t      tt = raw->type;
+	/* Every assignment key passes through here as an identifier; remembering it
+	 * is the whole of what per-field rules need from the token stream. Gated on
+	 * there being rules at all, so a reader without them pays one test. */
+	if (tt == token_is_identifier && v->policy.num_rules)
+		bvn_path_set_key(&v->path, raw->str_data, raw->str_len);
 	if (tt == token_is_type) {
 		bool type_ok = true, unit_ok = true, unit_too_long = false;
 		value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
@@ -1480,9 +1948,13 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	 * is a datetime literal that had a `.frac` part). */
 	d.frac_data   = dt_frac;
 	d.frac_length = dt_frac_len;
-	/* Optional read-time unit conversion (bvnr_read_flags_t.want_unit). Runs
-	 * after all type/unit validation, so it sees the value in its native unit
-	 * and can rewrite it (or abort with error_unit_mismatch). */
+	/* The policy's validation half, on the native unit — before any conversion
+	 * can rewrite the unit the document actually wrote. */
+	if (!bvn_apply_unit_assertions(r, tt, &d))
+		return false;
+	/* Optional read-time unit conversion (bvnr_read_flags_t.want_unit, or the
+	 * unit policy). Runs after all type/unit validation, so it sees the value in
+	 * its native unit and can rewrite it (or abort with error_unit_mismatch). */
 	if (!bvn_apply_want_unit(r, tt, &d))
 		return false;
 	return bvn_emit_both(r, raw->event, &d);
@@ -1496,6 +1968,14 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 bool bvn_val_receive_event(bvnr_reader_t* r, bvnr_event_t ev)
 {
 	bvnr_validator_t* v = &r->val;
+	/* Struct depth is what turns a key into a path, and it has to be tracked
+	 * BEFORE the no-callbacks short-circuit below: a validate-only run with
+	 * per-field rules installs no callbacks at all, and would otherwise see
+	 * every value at top level. */
+	if (v->policy.num_rules) {
+		if (ev == ev_struct_start)    bvn_path_push(&v->path);
+		else if (ev == ev_struct_end) bvn_path_pop(&v->path);
+	}
 	if (!v->on_unverified && !v->on_verified) return true;
 	bvnr_data_t d = {0};
 	d.value_type = v->value_type;

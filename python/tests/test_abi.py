@@ -35,6 +35,9 @@ _MIRRORS = {
     S.ValueUnit:          ("value_unit_t", False),
     S.BvnrConverted:      ("bvnr_converted_t", False),
     S.BvnrData:           ("bvnr_data_t", False),
+    S.BvnrUnitTarget:     ("bvnr_unit_target_t", False),
+    S.BvnrUnitRule:       ("bvnr_unit_rule_t", False),
+    S.BvnrUnitPolicy:     ("bvnr_unit_policy_t", False),
     S.BvnrReadFlags:      ("bvnr_read_flags_t", False),
     S.BvnrWriteFlags:     ("bvnr_write_flags_t", False),
     S.BvnrSource:         ("bvnr_source_t", True),
@@ -52,6 +55,7 @@ _FIELD_CHECKED = {
     "value_type_spec_t", "value_unit_prefix_t", "value_unit_component_t",
     "value_unit_t", "bvnr_data_t", "bvnr_converted_t", "bvnr_doc_stream_opts_t",
     "bvn_dom_entry_t", "bvnr_read_flags_t", "bvnr_write_flags_t",
+    "bvnr_unit_target_t", "bvnr_unit_rule_t", "bvnr_unit_policy_t",
 }
 
 

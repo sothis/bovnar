@@ -9,6 +9,7 @@ add_executable(bvnr_si_test              tests/bovnar_si_units_test.c)
 add_executable(bvnr_unit_ext_test        tests/bovnar_unit_ext_test.c)
 add_executable(bvnr_reader_test          tests/bovnar_reader_test.c)
 add_executable(bvnr_want_unit_test       tests/bovnar_want_unit_test.c)
+add_executable(bvnr_unit_policy_test     tests/bovnar_unit_policy_test.c)
 add_executable(bvnr_writer_test          tests/bovnar_writer_test.c)
 add_executable(bvnr_extended_reader_test tests/bovnar_extended_reader_test.c)
 add_executable(bvnr_utils_test           tests/bovnar_utils_test.c)
@@ -77,6 +78,9 @@ target_link_libraries(bvnr_reader_test PRIVATE bvnr_static)
 target_compile_options(bvnr_want_unit_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_want_unit_test PRIVATE bvnr_static)
 
+target_compile_options(bvnr_unit_policy_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_unit_policy_test PRIVATE bvnr_static)
+
 target_compile_options(bvnr_writer_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_writer_test PRIVATE bvnr_static)
 
@@ -140,6 +144,11 @@ add_test(NAME bvnr_si_test COMMAND bvnr_si_test)
 set_tests_properties(bvnr_si_test PROPERTIES
     LABELS "unit;si"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+
+add_test(NAME bvnr_unit_policy_test COMMAND bvnr_unit_policy_test)
+set_tests_properties(bvnr_unit_policy_test PROPERTIES
+    LABELS "unit;si;reader;policy"
+    PASS_REGULAR_EXPRESSION "PASSED")
 
 add_test(NAME bvnr_unit_ext_test COMMAND bvnr_unit_ext_test)
 set_tests_properties(bvnr_unit_ext_test PROPERTIES
@@ -855,6 +864,80 @@ macro(_bvnr_cli_example stem)
         TIMEOUT 30)
 endmacro()
 
+# ── CLI unit policy (bvnr_reader_set_unit_policy) ───────────────────────────
+#
+# The CLI is the only place the policy is driven by a command line rather than a
+# struct, and the flags interact: --base applies to every --unit target AND to
+# the --si fallback, which made it order-dependent until it was stamped after
+# the whole line had been read. Both orders are asserted, because one of them
+# passing proves nothing about the other.
+add_test(NAME bvnr_cli_policy_si
+         COMMAND bovnar events --si --leave-inexact
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+set_tests_properties(bvnr_cli_policy_si PROPERTIES
+    LABELS  "cli;units;policy"
+    TIMEOUT 30
+    # 1 g normalises to the SI base unit for mass, which is the KILOgram.
+    PASS_REGULAR_EXPRESSION "→ \"0.001\" k~g")
+
+add_test(NAME bvnr_cli_policy_unit_then_base
+         COMMAND bovnar events --unit m --base 16
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+set_tests_properties(bvnr_cli_policy_unit_then_base PROPERTIES
+    LABELS  "cli;units;policy"
+    TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "→ \"5dc\" m _16")
+
+add_test(NAME bvnr_cli_policy_base_then_unit
+         COMMAND bovnar events --base 16 --unit m
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+set_tests_properties(bvnr_cli_policy_base_then_unit PROPERTIES
+    LABELS  "cli;units;policy"
+    TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "→ \"5dc\" m _16")
+
+# units.bvnr deliberately contains no_unit values, so --require-unit must reject
+# it -- and reject it as a unit error, not as a generic failure.
+add_test(NAME bvnr_cli_policy_require_unit_rejects
+         COMMAND bovnar validate --require-unit
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+set_tests_properties(bvnr_cli_policy_require_unit_rejects PROPERTIES
+    LABELS  "cli;units;policy"
+    TIMEOUT 30
+    WILL_FAIL TRUE)
+
+# Per-field rules, and the DOM tier taking the same policy: `query` converts the
+# field it was asked about, at a path two levels down.
+add_test(NAME bvnr_cli_policy_query_field
+         COMMAND bovnar query --field .portfolio.snapshot_epoch=m~s
+                 .portfolio.snapshot_epoch
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/crypto_portfolio.bvnr)
+set_tests_properties(bvnr_cli_policy_query_field PROPERTIES
+    LABELS  "cli;units;policy;dom"
+    TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "1716400000000")
+
+# ...and a rule naming a field of the wrong quantity is an error, not silence:
+# that epoch is a time, so requiring a length of it must fail.
+add_test(NAME bvnr_cli_policy_query_field_mismatch
+         COMMAND bovnar query --require-field .portfolio.snapshot_epoch=m
+                 .portfolio.snapshot_epoch
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/crypto_portfolio.bvnr)
+set_tests_properties(bvnr_cli_policy_query_field_mismatch PROPERTIES
+    LABELS  "cli;units;policy;dom"
+    TIMEOUT 30
+    WILL_FAIL TRUE)
+
+# A unit the parser will not take is refused before the document is opened, so
+# the failure names the policy rather than the file.
+add_test(NAME bvnr_cli_policy_bad_unit_refused
+         COMMAND bovnar validate --require-dimension not_a_unit_at_all
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+set_tests_properties(bvnr_cli_policy_bad_unit_refused PROPERTIES
+    LABELS  "cli;units;policy"
+    TIMEOUT 30
+    WILL_FAIL TRUE)
+
 # An inline unit on an un-annotated value must survive canonicalisation by being
 # folded into the synthesised annotation (e.g. "9.81 m/s" -> "<float:64,_10,m/s>").
 # The idempotency test cannot catch a drop here ("no_unit" -> "no_unit" is itself
@@ -1074,7 +1157,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 135)   # 117 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 143)   # 125 base + i18n_de + wrapper_sync + cache_stamps
                                     #         + playground_shim + wasm_cli_diff
                                     #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs

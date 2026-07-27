@@ -23,18 +23,100 @@
 
 
 import ctypes
-from typing import Callable, Generator, IO
+from dataclasses import dataclass, field
+from typing import Callable, Generator, IO, Sequence
 
 from ._ffi import get_library
 from .enums import Event, ErrorCode
 from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
     BvnrSource, BvnrSink, BvnrReadFlags, BvnrData, ValueUnit,
+    build_unit_policy, MAX_UNIT_TARGETS,
     EVENT_CALLBACK_FUNC, WANT_UNIT_FUNC,
     make_unit_dimensionless,
 )
 
 MAX_FILESIZE_BYTES = 16 * 1024 * 1024
+
+
+@dataclass
+class UnitRule:
+    """A rule about ONE field, named by its key path.
+
+    `path` is the dotted path a value sits at, leading dot included, exactly as
+    the document writes its keys: ``".inlet.temperature"``. A path ending in
+    ``".*"`` matches everything below that point at any depth. Array elements
+    sit at the path of the assignment holding them, so one rule covers a whole
+    array.
+
+    Unlike the whole-document `targets` list, a rule is a statement about a
+    field the caller NAMED, so a value it cannot be applied to raises
+    ``UNIT_MISMATCH`` rather than being passed through — silence would defeat
+    the point of naming it. That includes a bare number: ".speed is m/s" is not
+    satisfied by a value with no unit.
+
+    With ``convert=False`` the rule asserts only, and the value is delivered
+    exactly as the document wrote it.
+    """
+    path:    str
+    unit:    str
+    base:    int = 0
+    convert: bool = True
+
+
+@dataclass
+class UnitPolicy:
+    """What the document must contain, and what unit values arrive in.
+
+    The declarative form of the ``want_unit`` callback: everything is unit
+    TEXT, so this is reachable from Python without a per-value trampoline.
+    Install it with :meth:`Reader.set_unit_policy`.
+
+    Per-field rules
+      ``rules`` is a list of :class:`UnitRule`, matched by key path and
+      consulted before everything else — the most specific thing a policy can
+      say. First match wins, so order matters: put ``".a.b"`` before ``".a.*"``.
+
+    Conversion
+      ``targets`` names the units to convert to. Each entry is either ``"m/s"``
+      or ``("m/s", base)``. Each numeric value takes the FIRST target it can
+      validly convert to, so order is significant — ``["m", "k~m"]`` never
+      selects ``k~m``. A value that matches nothing, or that is already in the
+      unit a target names, is delivered untouched; ``data.converted`` is what
+      tells the two apart.
+
+      ``normalise_si`` catches whatever the targets did not, delivering it in
+      coherent SI base units with prefixes folded out. Currencies and every
+      DIMENSIONLESS unit (%, ppm, dB, pH, rad, °) are left as written rather
+      than reinterpreted.
+
+      A value with NO unit only ever matches a target that is itself
+      ``no_unit``. A bare number is dimensionally compatible with % and ppm, so
+      without that fence a policy naming ``"%"`` would deliver 0.25 as 25.
+
+    Exactness
+      Nothing approximate is ever delivered. ``leave_inexact`` hands over a
+      value this conversion cannot deliver exactly — an irrational factor, a
+      non-terminating expansion such as 42 km/h → 35/3 m/s, an exponent past
+      the work limit — in its NATIVE unit instead of failing the parse. Without
+      it, such a value raises. It applies only to policy-chosen targets; a
+      ``want_unit`` hook keeps its strict all-or-nothing contract.
+
+    Validation
+      ``require_unit`` rejects a document containing any bare numeric value.
+      ``require_dimension_of`` requires every numeric value to be validly
+      convertible to at least one of the listed units — "this document is
+      lengths, in whatever unit it wrote them". Both are evaluated on the unit
+      the DOCUMENT wrote, before any conversion, and both raise
+      ``ErrorCode.UNIT_MISMATCH``.
+    """
+    rules:                Sequence['UnitRule'] = field(default_factory=tuple)
+    targets:              Sequence[str | tuple[str, int]] = field(default_factory=tuple)
+    normalise_si:         bool = False
+    base:                 int = 0
+    leave_inexact:        bool = False
+    require_unit:         bool = False
+    require_dimension_of: Sequence[str] = field(default_factory=tuple)
 
 class _CollectingHandler:
 
@@ -477,6 +559,42 @@ class Reader:
     def recovery_count(self) -> int:
         self._check_open()
         return self._lib.bvnr_reader_get_recovery_count(self._ptr)
+
+    def set_unit_policy(self, policy: UnitPolicy | None) -> None:
+        """Install (or, with ``None``, clear) this reader's unit policy.
+
+        Every unit string is parsed here, so a typo raises before a byte of the
+        document is read; a rejected policy leaves the previous one in force.
+        The policy may be set before or after a read and survives re-reading
+        the same reader on another document — it describes the consumer, not
+        the document.
+
+            r = Reader()
+            r.set_unit_policy(UnitPolicy(targets=["m/s", "°C"],
+                                         normalise_si=True,
+                                         leave_inexact=True))
+            r.read_file("sensors.bvnr", on_verified=handler)
+        """
+        self._check_open()
+        if policy is None:
+            if not self._lib.bvnr_reader_set_unit_policy(self._ptr, None):
+                raise BovnarArgumentError("bvnr_reader_set_unit_policy failed")
+            return
+        try:
+            cp, keepalive = build_unit_policy(
+                policy.targets, policy.base, policy.normalise_si,
+                policy.leave_inexact, policy.require_unit,
+                policy.require_dimension_of, policy.rules)
+        except ValueError as e:
+            raise BovnarArgumentError(str(e)) from None
+        # `keepalive` holds the encoded unit strings the struct points at; it
+        # must stay referenced until the call returns, which it does by being a
+        # live local here.
+        if not self._lib.bvnr_reader_set_unit_policy(self._ptr, ctypes.byref(cp)):
+            raise BovnarArgumentError(
+                "unusable unit policy — check the unit spellings in "
+                "targets / require_dimension_of")
+        del keepalive
 
     @property
     def declared_version(self):

@@ -71,6 +71,25 @@ BVN_API bvn_dom_doc_t *bvn_dom_parse(const void *data, uint32_t len);
  * bvn_dom_doc_destroy. */
 BVN_API bvn_dom_doc_t *bvn_dom_parse_fd(int fd);
 BVN_API bvn_dom_doc_t *bvn_dom_parse_fd_ex(int fd, uint64_t max_bytes);
+/* The same two, under a reader unit policy (bvnr_reader_set_unit_policy) — what
+ * the document must contain, and what unit its values should be stored in. NULL
+ * behaves exactly like the plain forms.
+ *
+ * Validation failures land in bvn_dom_doc_get_parse_error() as
+ * error_unit_mismatch, like any other parse error. A policy the library refuses
+ * (a malformed unit, a rule path naming nothing) is error_invalid_argument, so a
+ * mistake in the policy is never mistaken for a fault in the document.
+ *
+ * A value the policy CONVERTED is stored converted: its digits, its unit and its
+ * base are the conversion's, since a caller who asked for metres and got the
+ * document's feet back would have no way to notice. An integer that converts to
+ * a fraction (5 g in kilograms is 0.005) is stored as a float, because that is
+ * what it now is. A conversion the reader could not deliver exactly is governed
+ * by the policy's on_inexact, exactly as in the streaming reader. */
+BVN_API bvn_dom_doc_t *bvn_dom_parse_policy(const void *data, uint32_t len,
+					    const bvnr_unit_policy_t *policy);
+BVN_API bvn_dom_doc_t *bvn_dom_parse_fd_policy(int fd, uint64_t max_bytes,
+					       const bvnr_unit_policy_t *policy);
 BVN_API error_code_t   bvn_dom_doc_get_parse_error(const bvn_dom_doc_t *doc);
 BVN_API bvn_dom_node_t *bvn_dom_lookup(const bvn_dom_doc_t *doc,
 							   const char *path);

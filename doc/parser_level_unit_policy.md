@@ -767,6 +767,12 @@ survived the first round of testing because every test document had one struct
 per key. The fix is that a close RESTORES the key the open consumed, which costs
 nothing because that key is the path component being removed. The general
 lesson: a per-field rule needs a test corpus of document SHAPES, not of units.
+The suite now generates them — nested structs, arrays of scalars, arrays of
+structs, structs inside rows, to a random depth — recording each value's true
+path as it builds each document and then asserting that a rule naming that path
+fires on exactly the values living there. Sixteen thousand such assertions over
+three thousand generated documents found nothing further, which is the only kind
+of evidence worth having about a defect that a hand-written table missed.
 
 **And the DOM followed for free.** Section 3.7 treated a DOM-tier pass as a
 separate option with its own machinery. Once the reader had the policy the DOM

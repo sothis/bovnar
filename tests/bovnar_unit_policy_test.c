@@ -75,7 +75,7 @@ static int tests = 0;
  * caller asked for.
  */
 
-#define POL_MAX_VALUES 16
+#define POL_MAX_VALUES 48
 
 typedef struct {
 	int      n;
@@ -1206,6 +1206,140 @@ static void test_rule_ignores_unrepresentable_paths(void)
 		ASSERT_TRUE(!c.converted[0], "deep: an unknown path matches no rule");
 }
 
+/*
+ * Randomised document SHAPES.
+ *
+ * The array-of-structs defect got past a hand-written table of cases because
+ * every document in it had one struct per key — which is the shape you write
+ * when you are testing units, not when you are testing paths. So this generates
+ * documents instead: nested structs, arrays of scalars, arrays of structs,
+ * structs inside rows, to a random depth, recording each value's true path as
+ * it builds them. Then for every distinct path it installs a rule naming that
+ * path and asserts the rule fires on exactly the values that live there — no
+ * more (a rule must never claim a field it does not name) and no fewer (it must
+ * never quietly stop applying, which is how the defect showed).
+ *
+ * Deterministic seed: a failure here is reproducible, and the shape that caused
+ * it is printed.
+ */
+#define SHAPE_MAX_VALUES 40
+#define SHAPE_ITERATIONS 300
+
+typedef struct {
+	char     doc[8192];
+	size_t   dpos;
+	char     cur[128];      /* path under construction */
+	size_t   cpos;
+	char     vpath[SHAPE_MAX_VALUES][128];
+	int      nval;
+	uint64_t rs;
+} shape_t;
+
+static uint32_t shape_rnd(shape_t *s, uint32_t n)
+{
+	s->rs = s->rs * 6364136223846793005ull + 1442695040888963407ull;
+	return (uint32_t)((s->rs >> 33) % n);
+}
+static void shape_emit_value(shape_t *s)
+{
+	if (s->nval >= SHAPE_MAX_VALUES) return;
+	snprintf(s->vpath[s->nval], sizeof s->vpath[0], "%s", s->cur);
+	s->nval++;
+	s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos,
+				    "<float:64,in> 12.0");
+}
+static void shape_gen_value(shape_t *s, int depth);
+static void shape_gen_struct(shape_t *s, int depth)
+{
+	s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos, "{");
+	uint32_t members = 1u + shape_rnd(s, 3u);
+	for (uint32_t i = 0; i < members; i++) {
+		size_t save = s->cpos;
+		char key = (char)('a' + shape_rnd(s, 6u));
+		s->cpos += (size_t)snprintf(s->cur + s->cpos, sizeof s->cur - s->cpos,
+					    ".%c", key);
+		s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos,
+					    ".%c = ", key);
+		shape_gen_value(s, depth + 1);
+		s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos, "; ");
+		s->cur[save] = '\0'; s->cpos = save;
+	}
+	s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos, "}");
+}
+static void shape_gen_array(shape_t *s, int depth)
+{
+	uint32_t rows = 1u + shape_rnd(s, 3u);
+	bool of_structs = shape_rnd(s, 2u) != 0u && depth < 5;
+	s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos, "[");
+	for (uint32_t i = 0; i < rows; i++) {
+		if (i) s->dpos += (size_t)snprintf(s->doc + s->dpos,
+						   sizeof s->doc - s->dpos, ", ");
+		if (of_structs) shape_gen_struct(s, depth + 1);
+		else            shape_emit_value(s);
+	}
+	s->dpos += (size_t)snprintf(s->doc + s->dpos, sizeof s->doc - s->dpos, "]");
+}
+static void shape_gen_value(shape_t *s, int depth)
+{
+	uint32_t pick = (depth >= 5) ? 0u : shape_rnd(s, 4u);
+	if      (pick == 1u) shape_gen_struct(s, depth);
+	else if (pick == 2u) shape_gen_array(s, depth);
+	else                 shape_emit_value(s);
+}
+
+static void test_rule_paths_over_random_shapes(void)
+{
+	shape_t s;
+	s.rs = 0x243F6A8885A308D3ull;      /* fixed: a failure must be reproducible */
+	uint32_t mismatches = 0, assertions = 0;
+
+	for (uint32_t it = 0; it < SHAPE_ITERATIONS; it++) {
+		s.dpos = 0; s.cpos = 0; s.cur[0] = '\0'; s.nval = 0; s.doc[0] = '\0';
+		uint32_t top = 1u + shape_rnd(&s, 3u);
+		for (uint32_t i = 0; i < top; i++) {
+			size_t save = s.cpos;
+			char key = (char)('m' + shape_rnd(&s, 6u));
+			s.cpos += (size_t)snprintf(s.cur + s.cpos, sizeof s.cur - s.cpos,
+						   ".%c", key);
+			s.dpos += (size_t)snprintf(s.doc + s.dpos, sizeof s.doc - s.dpos,
+						   ".%c = ", key);
+			shape_gen_value(&s, 0);
+			s.dpos += (size_t)snprintf(s.doc + s.dpos, sizeof s.doc - s.dpos, ";\n");
+			s.cur[save] = '\0'; s.cpos = save;
+		}
+		if (s.nval == 0 || s.nval >= SHAPE_MAX_VALUES) continue;
+
+		for (int v = 0; v < s.nval; v++) {
+			bool dup = false;
+			for (int u = 0; u < v; u++)
+				if (strcmp(s.vpath[u], s.vpath[v]) == 0) { dup = true; break; }
+			if (dup) continue;
+
+			static bvnr_unit_rule_t rl;
+			rl.path = s.vpath[v]; rl.unit = "m"; rl.base = 0;
+			rl.mode = bvnr_rule_convert;
+			bvnr_unit_policy_t p = {0};
+			p.rules = &rl; p.num_rules = 1;
+
+			pol_ctx_t c = {0};
+			run_policy(s.doc, &p, &c, true, error_none);
+			assertions++;
+
+			bool ok = (c.n == s.nval);
+			for (int u = 0; ok && u < s.nval && u < POL_MAX_VALUES; u++) {
+				bool want = strcmp(s.vpath[u], s.vpath[v]) == 0;
+				if (c.converted[u] != want) ok = false;
+			}
+			if (!ok && mismatches < 3)
+				fprintf(stderr, "  shape mismatch: rule %s over %s\n",
+					s.vpath[v], s.doc);
+			if (!ok) mismatches++;
+		}
+	}
+	ASSERT_EQ_INT(mismatches, 0, "shapes: every rule fired on exactly its own path");
+	ASSERT_TRUE(assertions > 1000u, "shapes: the generator produced real coverage");
+}
+
 /* ── the writer's half ───────────────────────────────────────────────────── */
 
 /* Open a writer over `buf` carrying `policy`, set BEFORE the open so the
@@ -1710,6 +1844,7 @@ int main(void)
 	test_rule_array_of_structs_two_keys();
 	test_rule_paths_unwind();
 	test_rule_ignores_unrepresentable_paths();
+	test_rule_paths_over_random_shapes();
 
 	test_writer_require_unit();
 	test_writer_sees_the_annotation_unit();

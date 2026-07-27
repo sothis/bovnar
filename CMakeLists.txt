@@ -121,17 +121,22 @@ if(BVNR_WERROR)
         list(APPEND BVNR_C_FLAGS /WX)
     else()
         list(APPEND BVNR_C_FLAGS -Werror)
-        # -fanalyzer is a heuristic whole-program checker, not a warning, and at
-        # low optimisation it loses the invariant that bigint_ensure_cap()
-        # guarantees a non-NULL limbs pointer when it returns true -- so
-        # BVNR_WERROR=ON, documented "for CI", failed to build in three of five
-        # configurations (no CMAKE_BUILD_TYPE, Debug, MinSizeRel) on exactly one
-        # false positive; Release and RelWithDebInfo are clean because the
-        # optimiser propagates the invariant. Keep the diagnostic visible, just
-        # do not let a heuristic decide whether the build succeeds.
-        if(BVNR_ANALYZER AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
-            list(APPEND BVNR_C_FLAGS -Wno-error=analyzer-null-dereference)
-        endif()
+        # -Wno-error=analyzer-null-dereference used to sit here. -fanalyzer had
+        # lost the invariant that bigint_ensure_cap() guarantees a non-NULL limbs
+        # pointer when it returns true, and warned on the three configurations
+        # that do not optimise hard enough to propagate it for the analyzer (no
+        # CMAKE_BUILD_TYPE, Debug, MinSizeRel) -- so BVNR_WERROR, documented "for
+        # CI", could not build in three of five. bigint_ensure_cap now states
+        # that invariant itself rather than leaving it to be inferred (it returns
+        # false instead of promising capacity for a buffer that is not there),
+        # and bigint_addmag_into restates it at the point that depends on it, so
+        # the diagnostic is gone from every configuration and the exemption with
+        # it -- verified across all five.
+        #
+        # This does mean a heuristic can now fail a BVNR_WERROR build. That is
+        # the intended trade: if a future GCC invents a new false positive here,
+        # make the invariant explicit the way those two did, or put an exemption
+        # back for that specific diagnostic -- do not turn BVNR_ANALYZER off.
     endif()
 endif()
 

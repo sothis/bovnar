@@ -141,7 +141,8 @@
 <li>12.3 <a href="#123-prefix-factor-and-exponent-queries">Prefix Factor and Exponent Queries</a></li>
 <li>12.4 <a href="#124-si-conversion-api">SI Conversion API</a></li>
 <li>12.5 <a href="#125-currency-api">Currency API</a></li>
-<li>12.6 <a href="#126-python-api">Python API</a></li>
+<li>12.6 <a href="#126-unit-profile-api-spec-12">Unit Profile API (spec 1.2)</a></li>
+<li>12.7 <a href="#127-python-api">Python API</a></li>
 </ul>
 </li>
 <li><a href="#13-integration-with-the-parser-event-stream">Integration with the Parser Event Stream</a><ul>
@@ -986,7 +987,7 @@ the <code>sr</code> silently dropped. What holds now:</p>
 <td><code>inch_hg</code>, <code>inch_mercury</code></td>
 <td>inch of mercury</td>
 <td><code>bu_inch_hg</code></td>
-<td>3386.388645 Pa</td>
+<td>3386.388640341 Pa (= 25.4 mmHg exactly)</td>
 </tr>
 </tbody>
 </table>
@@ -5052,7 +5053,25 @@ does when a caller asks.</p>
 <span class="n">assert</span><span class="p">(</span><span class="w"> </span><span class="n">bvn_unit_is_currency</span><span class="p">(</span><span class="n">currency</span><span class="p">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">base</span><span class="p">));</span><span class="w"> </span><span class="cm">/* true */</span>
 </code></pre></div>
 
-<h3 id="126-python-api">12.6 Python API</h3>
+<h3 id="126-unit-profile-api-spec-12">12.6 Unit Profile API (spec 1.2)</h3>
+<p>Three functions serve the <code>ucum:</code> notation. <code>bvn_parse_unit</code> itself is unchanged and takes both notations; these cover what a caller needs <em>around</em> it.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">error_code_t</span><span class="w"> </span><span class="nf">bvn_unit_error_code</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w">         </span><span class="nf">bvn_unit_is_profile_only</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">);</span>
+<span class="kt">int32_t</span><span class="w">      </span><span class="nf">bvn_unit_to_ucum</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">bufsize</span><span class="p">);</span>
+</code></pre></div>
+
+<p><strong><code>bvn_unit_error_code</code></strong> says <em>why</em> a unit string <code>bvn_parse_unit</code> rejected is not a unit — <code>error_unit_illegal</code> for malformed input or an unknown atom, <code>error_unit_profile_unknown</code> for an unrecognised namespace, <code>error_unit_profile_unsupported</code> for a valid profile expression with no representation here. It re-parses, so it is for the error path only; a string that does parse returns <code>error_none</code>.</p>
+<p><strong><code>bvn_unit_is_profile_only</code></strong> is true when a unit has no native spelling, which is exactly the units carrying a UCUM arbitrary atom (<code>[IU]</code>, <code>[PFU]</code>, …). For those, <code>bvn_unit_to_string</code> emits the profile form, and re-parsing that output yields the same unit.</p>
+<p><strong><code>bvn_unit_to_ucum</code></strong> writes a UCUM code — without the <code>ucum:</code> prefix — for a unit that has one, returning its length or a negative value. It is <strong>partial by construction</strong>: the Old German units, the water-hardness degrees, the turbidity kinds, <code>PSU</code>, <code>CF</code>, <code>mph</code>, <code>kph</code> and every currency have no UCUM code and are refused rather than approximated.</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">char</span><span class="w"> </span><span class="n">buf</span><span class="p">[</span><span class="n">BVNR_UNIT_STRING_MAX</span><span class="p">];</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;ucum:mm[Hg]&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span><span class="w">   </span><span class="cm">/* == mmHg */</span>
+<span class="n">bvn_unit_to_string</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">buf</span><span class="p">);</span><span class="w">                                 </span><span class="cm">/* &quot;mmHg&quot;    */</span>
+<span class="n">bvn_unit_to_ucum</span><span class="w">  </span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">buf</span><span class="p">);</span><span class="w">                                 </span><span class="cm">/* &quot;mm[Hg]&quot;  */</span>
+</code></pre></div>
+
+<p>Note that the notation is gated on a declared spec 1.2 <strong>in a document</strong> (§11.9 of the specification); these API entry points have no document and therefore no version, so they accept the notation unconditionally.</p>
+<h3 id="127-python-api">12.7 Python API</h3>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseUnit</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.currency</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">is_currency</span><span class="p">,</span> <span class="n">is_fiat</span><span class="p">,</span> <span class="n">is_crypto</span><span class="p">,</span>

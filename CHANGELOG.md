@@ -44,7 +44,9 @@ reading the grown by-value structs at the wrong size.
   compare equal — and are commensurable with nothing, the way currencies
   already are. New API: `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
   `bvn_unit_to_ucum` (`unit_error_code`, `unit_is_profile_only`,
-  `unit_to_ucum` in Python). Requires a `#!bovnar 1.2` directive; the writer
+  `unit_to_ucum` in Python), and `ErrorCode.UNIT_PROFILE_UNKNOWN` /
+  `.UNIT_PROFILE_UNSUPPORTED` in the Python enum. Requires a `#!bovnar 1.2`
+  directive; the writer
   refuses to emit a unit that has no native spelling without one, rather than
   producing a document it cannot read back. The table is
   `src/gendata/ucum.bvnr`; the

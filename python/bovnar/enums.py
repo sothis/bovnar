@@ -664,3 +664,8 @@ class ErrorCode(IntEnum):
     DATETIME_LITERAL_UNSUPPORTED_EPOCH = 46
     UNIT_INEXACT                = 47
     OCTET_STREAM_TRUNCATED      = 48
+    # spec 1.2 -- the UCUM unit profile. Both are raised by the validator for a
+    # "name:" unit: the first when no such profile exists, the second when the
+    # expression is valid in the profile but has no representation here.
+    UNIT_PROFILE_UNKNOWN        = 49
+    UNIT_PROFILE_UNSUPPORTED    = 50

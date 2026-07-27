@@ -268,7 +268,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
 | `Torr` | `torr` | torr | `bu_torr` | 101 325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
-| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
+| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640341 Pa (= 25.4 mmHg exactly) |
 
 > `at ≠ atm`: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 

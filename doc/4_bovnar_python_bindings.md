@@ -25,11 +25,12 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [Extended unit functions](#51-extended-unit-functions)
-    - 5.2 [`UnitFlags`](#52-unitflags)
-    - 5.3 [`ValueUnitPrefix`](#53-valueunitprefix)
-    - 5.4 [Inline unit suffix](#54-inline-unit-suffix)
-    - 5.5 [`UnitPolicy` — validation and conversion without a callback](#55-unitpolicy--validation-and-conversion-without-a-callback)
+    - 5.1 [The UCUM notation (spec 1.2)](#51-the-ucum-notation-spec-12)
+    - 5.2 [Extended unit functions](#52-extended-unit-functions)
+    - 5.3 [`UnitFlags`](#53-unitflags)
+    - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
+    - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
+    - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Properties and methods](#62-properties-and-methods)
@@ -309,7 +310,40 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 Extended unit functions
+### 5.1 The UCUM notation (spec 1.2)
+
+`parse_unit` takes the `ucum:` notation as readily as the native one, and returns
+the same `ValueUnit` either way — so everything else in this chapter works on the
+result unchanged. Three helpers cover what a caller needs around it:
+
+```python
+import bovnar
+
+vu = bovnar.parse_unit("ucum:mm[Hg]")
+bovnar.unit_to_str(vu)              # → "mmHg"   — the native canonical form
+bovnar.unit_to_ucum(vu)             # → "mm[Hg]" — back to a UCUM code
+bovnar.units_compatible(vu, bovnar.parse_unit("k~Pa"))   # → True
+
+iu = bovnar.parse_unit("ucum:[IU]/mL")
+bovnar.unit_is_profile_only(iu)     # → True  — no native spelling exists
+bovnar.unit_to_str(iu)              # → "ucum:[IU].mL-1"
+
+bovnar.unit_error_code("ucum:B[SPL]")   # → 50 (ErrorCode.UNIT_PROFILE_UNSUPPORTED)
+bovnar.unit_error_code("m/s")           # → 0  (ErrorCode.NONE — it parses)
+```
+
+`unit_to_ucum` raises for a unit with no UCUM code, which is every native unit
+outside the transliteration table — the Old German units, the water-hardness
+degrees, the turbidity kinds and every currency.
+
+In a **document** the notation additionally requires a `#!bovnar 1.2` directive;
+without it `loads` raises with `unit_illegal`. `parse_unit` has no document and
+therefore no declared version, so it accepts the notation unconditionally.
+
+See [UCUM Unit Profile](10_bovnar_ucum_profile.md) for the transliteration table
+and the codes that have no representation.
+
+### 5.2 Extended unit functions
 
 The following functions operate on `ValueUnit` objects and are available both
 from the top-level `bovnar` namespace and from `bovnar.units`.
@@ -376,7 +410,7 @@ exp = int_to_exponent(-2)                    # → Exponent.NEG_SQUARE
 `SI_DIM_NAMES` is the ordered tuple `('m', 'kg', 's', 'A', 'K', 'mol', 'cd')`
 — the index positions used by `unit_dimension_vector`.
 
-### 5.2 `UnitFlags`
+### 5.3 `UnitFlags`
 
 ```python
 from bovnar import UnitFlags   # also from bovnar.units
@@ -403,7 +437,7 @@ UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 s = unit_to_str_ex(vu, UnitFlags.REDUCE | UnitFlags.ASCII_EXP)
 ```
 
-### 5.3 `ValueUnitPrefix`
+### 5.4 `ValueUnitPrefix`
 
 `ValueUnitPrefix` is the public mirror of the C `value_unit_prefix_t` struct.
 It can be constructed with class methods or extracted from a `ValueUnitComponent`:
@@ -419,7 +453,7 @@ comp = vu.components[0]
 p    = comp.prefix   # ValueUnitPrefix extracted from a component
 ```
 
-### 5.4 Inline unit suffix
+### 5.5 Inline unit suffix
 
 In addition to the unit embedded in a type annotation (`<float:64,m/s>`), the
 Bovnar format supports an **inline unit suffix** placed directly after a scalar
@@ -440,7 +474,7 @@ an inline suffix is present and a type-annotation unit is also present but the
 two do not resolve to the same `value_unit_t`. Inline unit suffixes inside
 array elements always raise `ErrorCode.UNEXPECTED_INPUT_BYTE`.
 
-### 5.5 `UnitPolicy` — validation and conversion without a callback
+### 5.6 `UnitPolicy` — validation and conversion without a callback
 
 `Reader.set_unit_policy` states what the document must contain and what unit
 values should arrive in. Everything is unit **text**, so unlike `want_unit` it

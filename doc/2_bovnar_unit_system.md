@@ -84,7 +84,8 @@
     - 12.3 [Prefix Factor and Exponent Queries](#123-prefix-factor-and-exponent-queries)
     - 12.4 [SI Conversion API](#124-si-conversion-api)
     - 12.5 [Currency API](#125-currency-api)
-    - 12.6 [Python API](#126-python-api)
+    - 12.6 [Unit Profile API (spec 1.2)](#126-unit-profile-api-spec-12)
+    - 12.7 [Python API](#127-python-api)
 13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
     - 13.1 [Full event sequence — physical unit](#131-full-event-sequence--physical-unit)
     - 13.2 [Full event sequence — currency unit](#132-full-event-sequence--currency-unit)
@@ -339,7 +340,7 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `mmHg` | — | millimetre of mercury | `bu_mmhg` | 133.322387415 Pa |
 | `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
-| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388645 Pa |
+| `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640341 Pa (= 25.4 mmHg exactly) |
 
 ### 3.6 Energy Units
 
@@ -1969,7 +1970,33 @@ assert(!bvn_unit_is_currency(volume.components[0].base));   /* true */
 assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 ```
 
-### 12.6 Python API
+### 12.6 Unit Profile API (spec 1.2)
+
+Three functions serve the `ucum:` notation. `bvn_parse_unit` itself is unchanged and takes both notations; these cover what a caller needs *around* it.
+
+```c
+error_code_t bvn_unit_error_code(const uint8_t *unit, uint32_t len);
+bool         bvn_unit_is_profile_only(value_unit_t u);
+int32_t      bvn_unit_to_ucum(value_unit_t u, char *buf, size_t bufsize);
+```
+
+**`bvn_unit_error_code`** says *why* a unit string `bvn_parse_unit` rejected is not a unit — `error_unit_illegal` for malformed input or an unknown atom, `error_unit_profile_unknown` for an unrecognised namespace, `error_unit_profile_unsupported` for a valid profile expression with no representation here. It re-parses, so it is for the error path only; a string that does parse returns `error_none`.
+
+**`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying a UCUM arbitrary atom (`[IU]`, `[PFU]`, …). For those, `bvn_unit_to_string` emits the profile form, and re-parsing that output yields the same unit.
+
+**`bvn_unit_to_ucum`** writes a UCUM code — without the `ucum:` prefix — for a unit that has one, returning its length or a negative value. It is **partial by construction**: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no UCUM code and are refused rather than approximated.
+
+```c
+char buf[BVNR_UNIT_STRING_MAX];
+bool ok = true;
+value_unit_t u = bvn_parse_unit((const uint8_t *)"ucum:mm[Hg]", &ok);   /* == mmHg */
+bvn_unit_to_string(u, buf, sizeof buf);                                 /* "mmHg"    */
+bvn_unit_to_ucum  (u, buf, sizeof buf);                                 /* "mm[Hg]"  */
+```
+
+Note that the notation is gated on a declared spec 1.2 **in a document** (§11.9 of the specification); these API entry points have no document and therefore no version, so they accept the notation unconditionally.
+
+### 12.7 Python API
 
 ```python
 from bovnar.enums import BaseUnit

@@ -270,7 +270,37 @@ class TestErrorCode:
         assert len(values) == len(set(values))
 
     def test_count(self):
-        assert len(ErrorCode) == 49
+        assert len(ErrorCode) == 51
+
+    def test_matches_the_c_enum(self):
+        """Every code the LIBRARY recognises must have a Python member.
+
+        A hardcoded count cannot catch a code added on the C side: the number
+        and the enum go stale together and agree with each other, which is how
+        UNIT_PROFILE_UNKNOWN and UNIT_PROFILE_UNSUPPORTED went missing. This
+        asks the library instead -- bvn_error_to_string answers "unknown_error"
+        for a value that is not a code, so the real ones are exactly the rest.
+
+        Only membership is checked, not the name: the string is a diagnostic
+        label rather than the enumerator's spelling, and at least one already
+        differs on purpose (code 18 is error_got_incomplete_bvnr_stream and
+        reports "incomplete_bvnr_stream").
+        """
+        import ctypes
+        from bovnar._ffi import get_library
+        lib = get_library()
+        lib.bvn_error_to_string.restype = ctypes.c_char_p
+        lib.bvn_error_to_string.argtypes = [ctypes.c_int]
+        known = {int(e) for e in ErrorCode}
+        # Scan well past the end so a newly appended code cannot hide.
+        for value in range(0, 128):
+            raw = lib.bvn_error_to_string(value)
+            name = raw.decode() if raw else ""
+            if not name or name == "unknown_error":
+                continue
+            assert value in known, (
+                f"the library knows error code {value} ({name!r}) but "
+                f"ErrorCode has no member for it")
 
     def test_roundtrip(self):
         for code in ErrorCode:

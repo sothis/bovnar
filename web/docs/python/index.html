@@ -64,11 +64,12 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
-<li>5.1 <a href="#51-extended-unit-functions">Extended unit functions</a></li>
-<li>5.2 <a href="#52-unitflags"><code>UnitFlags</code></a></li>
-<li>5.3 <a href="#53-valueunitprefix"><code>ValueUnitPrefix</code></a></li>
-<li>5.4 <a href="#54-inline-unit-suffix">Inline unit suffix</a></li>
-<li>5.5 <a href="#55-unitpolicy--validation-and-conversion-without-a-callback"><code>UnitPolicy</code> — validation and conversion without a callback</a></li>
+<li>5.1 <a href="#51-the-ucum-notation-spec-12">The UCUM notation (spec 1.2)</a></li>
+<li>5.2 <a href="#52-extended-unit-functions">Extended unit functions</a></li>
+<li>5.3 <a href="#53-unitflags"><code>UnitFlags</code></a></li>
+<li>5.4 <a href="#54-valueunitprefix"><code>ValueUnitPrefix</code></a></li>
+<li>5.5 <a href="#55-inline-unit-suffix">Inline unit suffix</a></li>
+<li>5.6 <a href="#56-unitpolicy--validation-and-conversion-without-a-callback"><code>UnitPolicy</code> — validation and conversion without a callback</a></li>
 </ul>
 </li>
 <li><a href="#6-quantity"><code>Quantity</code></a><ul>
@@ -382,7 +383,34 @@ treatment):</p>
 <span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;h&quot;</span><span class="p">)</span>    <span class="c1"># → 1.0  (NOT 3600.0)</span>
 </code></pre></div>
 
-<h3 id="51-extended-unit-functions">5.1 Extended unit functions</h3>
+<h3 id="51-the-ucum-notation-spec-12">5.1 The UCUM notation (spec 1.2)</h3>
+<p><code>parse_unit</code> takes the <code>ucum:</code> notation as readily as the native one, and returns
+the same <code>ValueUnit</code> either way — so everything else in this chapter works on the
+result unchanged. Three helpers cover what a caller needs around it:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="n">vu</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;ucum:mm[Hg]&quot;</span><span class="p">)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>              <span class="c1"># → &quot;mmHg&quot;   — the native canonical form</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_ucum</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>             <span class="c1"># → &quot;mm[Hg]&quot; — back to a UCUM code</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">units_compatible</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~Pa&quot;</span><span class="p">))</span>   <span class="c1"># → True</span>
+
+<span class="n">iu</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;ucum:[IU]/mL&quot;</span><span class="p">)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_is_profile_only</span><span class="p">(</span><span class="n">iu</span><span class="p">)</span>     <span class="c1"># → True  — no native spelling exists</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">iu</span><span class="p">)</span>              <span class="c1"># → &quot;ucum:[IU].mL-1&quot;</span>
+
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_error_code</span><span class="p">(</span><span class="s2">&quot;ucum:B[SPL]&quot;</span><span class="p">)</span>   <span class="c1"># → 50 (ErrorCode.UNIT_PROFILE_UNSUPPORTED)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_error_code</span><span class="p">(</span><span class="s2">&quot;m/s&quot;</span><span class="p">)</span>           <span class="c1"># → 0  (ErrorCode.NONE — it parses)</span>
+</code></pre></div>
+
+<p><code>unit_to_ucum</code> raises for a unit with no UCUM code, which is every native unit
+outside the transliteration table — the Old German units, the water-hardness
+degrees, the turbidity kinds and every currency.</p>
+<p>In a <strong>document</strong> the notation additionally requires a <code>#!bovnar 1.2</code> directive;
+without it <code>loads</code> raises with <code>unit_illegal</code>. <code>parse_unit</code> has no document and
+therefore no declared version, so it accepts the notation unconditionally.</p>
+<p>See <a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a> for the transliteration table
+and the codes that have no representation.</p>
+<h3 id="52-extended-unit-functions">5.2 Extended unit functions</h3>
 <p>The following functions operate on <code>ValueUnit</code> objects and are available both
 from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</code>.</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -445,7 +473,7 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 
 <p><code>SI_DIM_NAMES</code> is the ordered tuple <code>('m', 'kg', 's', 'A', 'K', 'mol', 'cd')</code>
 — the index positions used by <code>unit_dimension_vector</code>.</p>
-<h3 id="52-unitflags">5.2 <code>UnitFlags</code></h3>
+<h3 id="53-unitflags">5.3 <code>UnitFlags</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitFlags</span>   <span class="c1"># also from bovnar.units</span>
 
 <span class="n">UnitFlags</span><span class="o">.</span><span class="n">NONE</span>      <span class="c1"># 0 — no special formatting</span>
@@ -469,7 +497,7 @@ raises <code>BovnarArgumentError</code> instead of returning a unit that lost a 
 <div class="codehilite"><pre><span></span><code><span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>
 </code></pre></div>
 
-<h3 id="53-valueunitprefix">5.3 <code>ValueUnitPrefix</code></h3>
+<h3 id="54-valueunitprefix">5.4 <code>ValueUnitPrefix</code></h3>
 <p><code>ValueUnitPrefix</code> is the public mirror of the C <code>value_unit_prefix_t</code> struct.
 It can be constructed with class methods or extracted from a <code>ValueUnitComponent</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValueUnitPrefix</span><span class="p">,</span> <span class="n">SIPrefix</span><span class="p">,</span> <span class="n">IECPrefix</span>
@@ -482,7 +510,7 @@ It can be constructed with class methods or extracted from a <code>ValueUnitComp
 <span class="n">p</span>    <span class="o">=</span> <span class="n">comp</span><span class="o">.</span><span class="n">prefix</span>   <span class="c1"># ValueUnitPrefix extracted from a component</span>
 </code></pre></div>
 
-<h3 id="54-inline-unit-suffix">5.4 Inline unit suffix</h3>
+<h3 id="55-inline-unit-suffix">5.5 Inline unit suffix</h3>
 <p>In addition to the unit embedded in a type annotation (<code>&lt;float:64,m/s&gt;</code>), the
 Bovnar format supports an <strong>inline unit suffix</strong> placed directly after a scalar
 value, before the terminating <code>;</code>:</p>
@@ -496,7 +524,7 @@ No extra code is required to consume inline units.</p>
 an inline suffix is present and a type-annotation unit is also present but the
 two do not resolve to the same <code>value_unit_t</code>. Inline unit suffixes inside
 array elements always raise <code>ErrorCode.UNEXPECTED_INPUT_BYTE</code>.</p>
-<h3 id="55-unitpolicy--validation-and-conversion-without-a-callback">5.5 <code>UnitPolicy</code> — validation and conversion without a callback</h3>
+<h3 id="56-unitpolicy--validation-and-conversion-without-a-callback">5.6 <code>UnitPolicy</code> — validation and conversion without a callback</h3>
 <p><code>Reader.set_unit_policy</code> states what the document must contain and what unit
 values should arrive in. Everything is unit <strong>text</strong>, so unlike <code>want_unit</code> it
 costs no per-value trampoline across the FFI boundary — the C side parses the

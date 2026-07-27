@@ -168,6 +168,7 @@ CF attaches one `units` attribute to a whole netCDF variable. That is the right 
 **Time.** CF encodes time as a UDUNITS string with an embedded reference date (`days since 1970-01-01`), with the calendar in a separate attribute and, as of CF 1.12, a `units_metadata` attribute that *declares* what the producer did about leap seconds. Bovnar makes the epoch part of the type — so it is checked like any other dimension — and implements the IERS leap-second table rather than describing it:
 
 ```bovnar
+#!bovnar 1.1
 .utc_leap = <datetime:64,unix> 2016-12-31T23:59:60Z;   # → 1483228800
 .utc_next = <datetime:64,unix> 2017-01-01T00:00:00Z;   # → 1483228800  (POSIX has no slot for it)
 .tai_leap = <datetime:64,tai>  2016-12-31T23:59:60Z;   # → 1861920036
@@ -197,12 +198,13 @@ Bovnar's ground is where CF does not reach: heterogeneous documents rather than 
 Because UCUM sits at a different layer, it can be a component rather than an alternative. A `ucum:` notation is accepted in the unit slot, alongside the native one:
 
 ```bovnar
+#!bovnar 1.2
 .systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
 .count    = <uint:32,ucum:10*3/uL>     4500;
 .titre    = <float:64,ucum:[IU]/mL>    12.5;
 ```
 
-A UCUM expression is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used — `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and satisfy the same `--require-field` rule. Powers of ten fold into prefixes (`ucum:10*3/uL` is `n~L⁻¹`, 10¹² L⁻¹), UCUM's `/` binds to one term where Bovnar's latches, and annotations are inert as UCUM defines them.
+The `#!bovnar 1.2` directive is required — the notation is gated on the declared version, the way `datetime` is gated on 1.1. A UCUM expression is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used — `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and satisfy the same `--require-field` rule. Powers of ten fold into prefixes (`ucum:10*3/uL` is `n~L⁻¹`, 10¹² L⁻¹), UCUM's `/` binds to one term where Bovnar's latches, and annotations are inert as UCUM defines them.
 
 The enforcement point does not move. A UCUM expression either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
 

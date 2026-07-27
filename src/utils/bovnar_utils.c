@@ -1043,8 +1043,8 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 	}
 	/*
 	 * spec 1.2 — a "name:" namespace hands the string to the unit profile
-	 * (doc/ucum_profile.md). This is the SINGLE door: every path that reaches a
-	 * unit goes through bvn_parse_unit, so a profile unit cannot arrive by a
+	 * (doc/10_bovnar_ucum_profile.md). This is the SINGLE door: every path that
+	 * reaches a unit goes through bvn_parse_unit, so a profile unit cannot arrive by a
 	 * route that skips a check, and the policy strings of bvnr_unit_policy_t
 	 * accept the notation with no change at all.
 	 *

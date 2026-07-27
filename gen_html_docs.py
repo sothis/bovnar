@@ -135,6 +135,10 @@ DOCS = [
      "Bovnar Streaming, Framing & Multiplexing",
      "Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded "
      "documents for transport over sockets and files."),
+    ("10_bovnar_ucum_profile.md", "ucum", "bovnar-ucum-profile",
+     "Bovnar UCUM Unit Profile",
+     "Writing UCUM codes in a Bovnar unit slot: the transliteration table, the "
+     "collisions between the two namespaces, and what has no representation."),
 ]
 
 # filename (and .ebnf) -> clean slug, for inter-doc link rewriting.

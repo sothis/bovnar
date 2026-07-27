@@ -48,6 +48,8 @@ DOCS = [
      "Every unit symbol, prefix, and currency code in one reference table."),
     ("9_bovnar_streaming.md",    "Streaming & framing",
      "Octet streams, frames, multiplexing/demultiplexing, and embedded documents."),
+    ("10_bovnar_ucum_profile.md","UCUM unit profile",
+     "The ucum: notation, its transliteration table, and what it refuses."),
 ]
 
 # External project resources for the llms.txt "Project" section.

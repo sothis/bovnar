@@ -96,5 +96,6 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md) — The 364-case conformance suite and the IUT protocol for third-party implementations.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/8_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
 - [Streaming & framing](https://www.bovnar.io/doc/9_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
+- [UCUM unit profile](https://www.bovnar.io/doc/10_bovnar_ucum_profile.md) — The ucum: notation, its transliteration table, and what it refuses.
 
 Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bovnar.io/docs/). A single-file copy of the whole set is at [https://www.bovnar.io/llms-full.txt](https://www.bovnar.io/llms-full.txt).

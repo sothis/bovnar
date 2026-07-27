@@ -214,7 +214,7 @@ ucum:B[SPL]  →  error_unit_profile_unsupported valid UCUM, no representation h
 cf:m         →  error_unit_profile_unknown    no such profile
 ```
 
-Full specification, the transliteration table, the collisions between the two namespaces (`st` is the stone natively and the stere in UCUM), and an explicit list of what does *not* map: [doc/ucum_profile.md](doc/ucum_profile.md).
+Full specification, the transliteration table, the collisions between the two namespaces (`st` is the stone natively and the stere in UCUM), and an explicit list of what does *not* map: [doc/10_bovnar_ucum_profile.md](doc/10_bovnar_ucum_profile.md).
 
 ---
 

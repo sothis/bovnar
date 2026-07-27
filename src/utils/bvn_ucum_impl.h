@@ -29,7 +29,7 @@
 #include "bovnar.h"
 
 /*
- * The UCUM unit profile (spec 1.2). See doc/ucum_profile.md.
+ * The UCUM unit profile (spec 1.2). See doc/10_bovnar_ucum_profile.md.
  *
  * A "ucum:" expression in the unit slot is translated, at parse time, into an
  * ordinary value_unit_t. Nothing downstream of bvn_parse_unit knows the profile
@@ -42,7 +42,7 @@
  */
 
 /* Every way a profile expression can fail to become a unit. The caller maps
- * these onto error codes; see doc/ucum_profile.md section 3.1. */
+ * these onto error codes; see doc/10_bovnar_ucum_profile.md section 3.1. */
 typedef enum {
 	bvni_ucum_ok = 0,
 	/* Not a valid UCUM expression, or an atom UCUM does not define. */

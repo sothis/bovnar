@@ -291,7 +291,7 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_unit_valid.restype  = c_bool
     lib.bvn_unit_valid.argtypes = [ValueUnit]
 
-    # spec 1.2 -- the UCUM unit profile (doc/ucum_profile.md).
+    # spec 1.2 -- the UCUM unit profile (doc/10_bovnar_ucum_profile.md).
     lib.bvn_unit_error_code.restype  = c_int
     lib.bvn_unit_error_code.argtypes = [c_uint8_p, c_uint32]
 

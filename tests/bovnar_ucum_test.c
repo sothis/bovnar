@@ -23,8 +23,9 @@
  */
 
 /*
- * The UCUM unit profile (spec 1.2). Specified in doc/ucum_profile.md; this file
- * is what holds the specification to the implementation.
+ * The UCUM unit profile (spec 1.2). Specified in
+ * doc/10_bovnar_ucum_profile.md; this file is what holds the specification to
+ * the implementation.
  *
  * The tests are grouped by the claim they defend rather than by the function
  * they call, because most of the claims are about how several pieces agree: a
@@ -201,8 +202,8 @@ static void test_annotations(void)
 	printf("  annotations are inert...\n");
 	/* UCUM defines an annotation as carrying no meaning, and a standalone one as
 	 * the unity. Implemented faithfully, which means two units a clinician reads
-	 * as different compare as the same -- documented in doc/ucum_profile.md 6.3
-	 * as a trap rather than hidden. */
+	 * as different compare as the same -- documented in
+	 * doc/10_bovnar_ucum_profile.md 6.3 as a trap rather than hidden. */
 	chk_str("ucum:mL{total}", "m~L");
 	ASSERT_TRUE(bvn_unit_equal(U("ucum:mL{total}"), U("ucum:mL")),
 	            "an annotation does not change the unit");

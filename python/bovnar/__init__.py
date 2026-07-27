@@ -273,8 +273,9 @@ def unit_to_ucum(unit: ValueUnit) -> str:
     """
     The UCUM code for *unit*, without the ``ucum:`` prefix.
 
-    Partial by construction (doc/ucum_profile.md 5.3): a native unit outside the
-    transliteration table has no UCUM form, which includes the Old German units,
+    Partial by construction (doc/10_bovnar_ucum_profile.md 5.3): a native
+    unit outside the transliteration table has no UCUM form, which includes
+    the Old German units,
     the water-hardness degrees, the turbidity kinds and every currency. Those
     raise rather than returning an invented code.
     """

@@ -27,8 +27,9 @@
  * The UCUM unit profile
  * ===========================================================================
  *
- * Specified in doc/ucum_profile.md. In one paragraph: "ucum:<code>" in the unit
- * slot is an alternative SPELLING, not a second unit model. This file parses the
+ * Specified in doc/10_bovnar_ucum_profile.md. In one paragraph:
+ * "ucum:<code>" in the unit slot is an alternative SPELLING, not a second unit
+ * model. This file parses the
  * UCUM expression, translates it into an ordinary value_unit_t, and hands that
  * back to bvn_parse_unit's caller. Everything downstream -- equality,
  * compatibility, conversion, the reader and writer unit policies, the DOM -- is

@@ -66,6 +66,11 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://www.bovnar.io/docs/ucum/</loc>
+    <lastmod>2026-07-27</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.bovnar.io/doc/pdf/bovnar-tutorial.pdf</loc>
     <lastmod>2026-07-26</lastmod>
     <priority>0.6</priority>
@@ -113,6 +118,11 @@
   <url>
     <loc>https://www.bovnar.io/doc/pdf/bovnar-streaming.pdf</loc>
     <lastmod>2026-07-26</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.bovnar.io/doc/pdf/bovnar-ucum-profile.pdf</loc>
+    <lastmod>2026-07-27</lastmod>
     <priority>0.6</priority>
   </url>
   <url>

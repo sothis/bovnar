@@ -995,7 +995,7 @@ BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsiz
 BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
 BVN_API bool         bvn_unit_valid(value_unit_t u);
-/* spec 1.2 -- the UCUM unit profile (doc/ucum_profile.md).
+/* spec 1.2 -- the UCUM unit profile (doc/10_bovnar_ucum_profile.md).
  *
  * bvn_unit_error_code says WHY a unit string bvn_parse_unit rejected is not a
  * unit: error_unit_illegal for malformed input, error_unit_profile_unknown for

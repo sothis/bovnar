@@ -1,6 +1,6 @@
 # Bovnar — Conformance Test Tool
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Normative — conformance protocol `bvnr-conformance-v1`
 > **Scope:** The conformance corpus, the IUT protocol, and how to validate a third-party implementation.
 
@@ -621,4 +621,4 @@ ctest --output-on-failure
 
 ---
 
-*End of Bovnar — Conformance Test Tool (Bovnar spec 1.2).*
+*End of Bovnar — Conformance Test Tool (Bovnar spec 1.1).*

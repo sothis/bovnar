@@ -1,6 +1,6 @@
 # Bovnar — Parser-Level Unit Policy
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Design note — the evaluation behind the reader, writer and DOM unit policies. Options 1, 2, 3 and 4 shipped; 0, 5 and 6 did not. Section 7.5 records why option 2 was built after all. Nothing here is normative.
 > **Scope:** How the reader could validate and convert units without an application-supplied callback, whether the options combine, and (section 7.4) the producer-side half the evaluation missed.
 
@@ -817,4 +817,4 @@ builder.
 
 ---
 
-*End of Bovnar — Parser-Level Unit Policy (Bovnar spec 1.2).*
+*End of Bovnar — Parser-Level Unit Policy (Bovnar spec 1.1).*

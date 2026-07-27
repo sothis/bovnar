@@ -45,7 +45,7 @@ DOC_DIR = os.path.join(ROOT, "doc")
 
 FENCE = re.compile(r"^(```|~~~)")
 NO_NUMBER = ("Table of Contents", "See also")
-FOOTER = re.compile(r"^\*End of .+ \(Bovnar spec 1\.2\)\.\*$")
+FOOTER = re.compile(r"^\*End of .+ \(Bovnar spec 1\.1\)\.\*$")
 META_KEYS = ["**Spec version:**", "**Status:**", "**Scope:**"]
 
 
@@ -230,7 +230,7 @@ def check(path, verbose=False):
         problems.append("no '## See also' section")
     tail = [l for l in lines if l.strip()]
     title = lines[0][2:].strip() if lines and lines[0].startswith("# ") else ""
-    want = f"*End of {title} (Bovnar spec 1.2).*"
+    want = f"*End of {title} (Bovnar spec 1.1).*"
     if not tail:
         problems.append("empty document")
     elif not FOOTER.match(tail[-1].strip()):

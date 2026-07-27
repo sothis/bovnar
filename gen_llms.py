@@ -31,7 +31,7 @@ DOCS = [
     ("0_bovnar_tutorial.md",     "Tutorial",
      "A guided introduction to writing and reading Bovnar documents."),
     ("1_bovnar_spec.md",         "Specification",
-     "The complete format specification (spec 1.2): grammar, types, units, limits."),
+     "The complete format specification (spec 1.1): grammar, types, units, limits."),
     ("2_bovnar_unit_system.md",  "Unit system",
      "The 180 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors."),
     ("3_bovnar_readwrite_api.md","Read & Write C API",

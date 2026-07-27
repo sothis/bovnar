@@ -2,7 +2,7 @@
 
 **Unit-safe serialization for scientific and industrial systems — with a C99 reference implementation.**
 
-[![Spec version](https://img.shields.io/badge/spec-1.2-blue)](doc/1_bovnar_spec.md)
+[![Spec version](https://img.shields.io/badge/spec-1.1-blue)](doc/1_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
 [![Website](https://img.shields.io/badge/web-bovnar.io-blue)](https://www.bovnar.io)
@@ -273,7 +273,7 @@ bovnar/
 │   └── bovnar_wasm_core.js   # C reference parser compiled to WASM
 ├── doc/
 │   ├── 0_bovnar_tutorial.md
-│   ├── 1_bovnar_spec.md            # Format specification (v1.2)
+│   ├── 1_bovnar_spec.md            # Format specification (v1.1)
 │   ├── 2_bovnar_unit_system.md
 │   ├── 3_bovnar_readwrite_api.md
 │   ├── 4_bovnar_python_bindings.md
@@ -717,7 +717,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 
 | Document | Description |
 |---|---|
-| [Specification (v1.2)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
+| [Specification (v1.1)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Tutorial](doc/0_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
 | [Unit & Currency Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |

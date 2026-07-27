@@ -1,7 +1,7 @@
 # Bovnar — UCUM Unit Profile
 
-> **Spec version:** 1.2 — the notation is gated on a declared 1.2 (§2.2)
-> **Status:** Normative — implemented in `src/utils/bovnar_ucum.c`, pinned by `tests/bovnar_ucum_test.c`. Section 10.4 lists the parts of this document that did NOT ship.
+> **Spec version:** 1.1 — **the notation described here is UNRELEASED.** It is not part of any published specification, and the version it will ship under is not settled (§2.2)
+> **Status:** Implemented in `src/utils/bovnar_ucum.c` and pinned by `tests/bovnar_ucum_test.c`, but **not released**: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 > **Scope:** How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.
 
 Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the native registry and notation
@@ -165,7 +165,10 @@ a type body for no gain.
 ### 2.2 Where a profile unit may appear, and in which documents
 
 **The notation is gated on the declared spec version.** A profile unit needs a `#!bovnar` directive
-declaring 1.2 or later, exactly as the datetime family and the `\x`/`\u` escapes need 1.1. Without
+declaring a version above 1.1 — spelled `#!bovnar 1.2` today — exactly as the datetime family and
+the `\x`/`\u` escapes need a declared 1.1. That version is **not one this build advertises**: the
+notation is unreleased, `bovnar version` reports spec 1.1, and the number it finally ships under is
+not settled. Without
 one it is `error_unit_illegal` — in a 1.1 document `ucum:mm[Hg]` is simply not a unit, the same way
 `<datetime:64>` is simply not a value type in a 1.0 document. A document with **no** directive
 declares nothing and therefore gets neither surface.
@@ -181,7 +184,7 @@ units are unaffected in every version: the bump is additive, and `<float:64,mmHg
 as it always did.
 
 The writer enforces the other half. A unit with no native spelling — one carrying a UCUM arbitrary
-atom — can only be emitted in this notation, so writing one without having emitted a 1.2 directive
+atom — can only be emitted in this notation, so writing one without having emitted the opt-in directive
 is `error_unsupported_spec_version` rather than a document the library cannot read back. A
 *translated* unit needs no such guard: `ucum:mm[Hg]` is written as the native `mmHg`, which every
 version accepts.
@@ -1003,7 +1006,7 @@ large change for §5.2's single loss. It is recorded in §10.4 rather than half-
 
 Two, appended after `error_octet_stream_truncated` (48), moving `BVN_ERROR_COUNT` with them — the
 fuzz harnesses use that count as their bound for "is this a real error code" and trap above it, so
-a stale count turns a legitimate 1.2 error into a fuzz crash.
+a stale count turns a legitimate new error into a fuzz crash.
 
 | Code | Meaning |
 |---|---|
@@ -1142,7 +1145,7 @@ the unit test but not by the conformance corpus.
 ### 9.4 No build switch
 
 The profile is unconditional. There is no `BVNR_WITH_UCUM_PROFILE` option and no addition to a
-feature-report function: a spec-1.2 build has the profile. `error_unit_profile_unknown` therefore
+feature-report function: a build that has the profile has all of it. `error_unit_profile_unknown` therefore
 means only what it says — the namespace is not one this build defines — and today that is every
 namespace except `ucum`. If the profile ever becomes optional, that error code is already the right
 answer for a build without it, which is why it exists as a separate code rather than as
@@ -1240,4 +1243,4 @@ The first two are the ones worth building next, in that order.
 
 ---
 
-*End of Bovnar — UCUM Unit Profile (Bovnar spec 1.2).*
+*End of Bovnar — UCUM Unit Profile (Bovnar spec 1.1).*

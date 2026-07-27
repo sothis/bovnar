@@ -40,8 +40,8 @@
 <h1>Bovnar — UCUM Unit Profile</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/10_bovnar_ucum_profile.md">Markdown</a> and <a href="/doc/pdf/bovnar-ucum-profile.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.2 — the notation is gated on a declared 1.2 (§2.2)
-<strong>Status:</strong> Normative — implemented in <code>src/utils/bovnar_ucum.c</code>, pinned by <code>tests/bovnar_ucum_test.c</code>. Section 10.4 lists the parts of this document that did NOT ship.
+<p><strong>Spec version:</strong> 1.1 — <strong>the notation described here is UNRELEASED.</strong> It is not part of any published specification, and the version it will ship under is not settled (§2.2)
+<strong>Status:</strong> Implemented in <code>src/utils/bovnar_ucum.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, but <strong>not released</strong>: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 <strong>Scope:</strong> How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.</p>
 </blockquote>
 <p>Companion to <a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> (the native registry and notation
@@ -197,7 +197,10 @@ alternative of a quoted form (<code>ucum:"mm[Hg]"</code>), which would put a str
 a type body for no gain.</p>
 <h3 id="22-where-a-profile-unit-may-appear-and-in-which-documents">2.2 Where a profile unit may appear, and in which documents</h3>
 <p><strong>The notation is gated on the declared spec version.</strong> A profile unit needs a <code>#!bovnar</code> directive
-declaring 1.2 or later, exactly as the datetime family and the <code>\x</code>/<code>\u</code> escapes need 1.1. Without
+declaring a version above 1.1 — spelled <code>#!bovnar 1.2</code> today — exactly as the datetime family and
+the <code>\x</code>/<code>\u</code> escapes need a declared 1.1. That version is <strong>not one this build advertises</strong>: the
+notation is unreleased, <code>bovnar version</code> reports spec 1.1, and the number it finally ships under is
+not settled. Without
 one it is <code>error_unit_illegal</code> — in a 1.1 document <code>ucum:mm[Hg]</code> is simply not a unit, the same way
 <code>&lt;datetime:64&gt;</code> is simply not a value type in a 1.0 document. A document with <strong>no</strong> directive
 declares nothing and therefore gets neither surface.</p>
@@ -208,7 +211,7 @@ version must reject, which is the interoperability hazard the directive exists t
 units are unaffected in every version: the bump is additive, and <code>&lt;float:64,mmHg&gt;</code> parses under 1.0
 as it always did.</p>
 <p>The writer enforces the other half. A unit with no native spelling — one carrying a UCUM arbitrary
-atom — can only be emitted in this notation, so writing one without having emitted a 1.2 directive
+atom — can only be emitted in this notation, so writing one without having emitted the opt-in directive
 is <code>error_unsupported_spec_version</code> rather than a document the library cannot read back. A
 <em>translated</em> unit needs no such guard: <code>ucum:mm[Hg]</code> is written as the native <code>mmHg</code>, which every
 version accepts.</p>
@@ -1800,7 +1803,7 @@ large change for §5.2's single loss. It is recorded in §10.4 rather than half-
 <h3 id="74-new-error-codes">7.4 New error codes</h3>
 <p>Two, appended after <code>error_octet_stream_truncated</code> (48), moving <code>BVN_ERROR_COUNT</code> with them — the
 fuzz harnesses use that count as their bound for "is this a real error code" and trap above it, so
-a stale count turns a legitimate 1.2 error into a fuzz crash.</p>
+a stale count turns a legitimate new error into a fuzz crash.</p>
 <table>
 <thead>
 <tr>
@@ -1923,7 +1926,7 @@ addition, not a library change, and it is listed in §10.4. In particular the er
 the unit test but not by the conformance corpus.</p>
 <h3 id="94-no-build-switch">9.4 No build switch</h3>
 <p>The profile is unconditional. There is no <code>BVNR_WITH_UCUM_PROFILE</code> option and no addition to a
-feature-report function: a spec-1.2 build has the profile. <code>error_unit_profile_unknown</code> therefore
+feature-report function: a build that has the profile has all of it. <code>error_unit_profile_unknown</code> therefore
 means only what it says — the namespace is not one this build defines — and today that is every
 namespace except <code>ucum</code>. If the profile ever becomes optional, that error code is already the right
 answer for a build without it, which is why it exists as a separate code rather than as
@@ -2060,7 +2063,7 @@ one paragraph to read rather than four sections to cross-check.</p>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit Cheatsheet</a> — the native spellings the transliteration table targets</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — UCUM Unit Profile (Bovnar spec 1.2).</em></p>
+<p><em>End of Bovnar — UCUM Unit Profile (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

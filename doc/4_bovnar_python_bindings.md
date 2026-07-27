@@ -1,6 +1,6 @@
 # Bovnar — Python Bindings
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Reference — the Python package as implemented
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
@@ -25,7 +25,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [The UCUM notation (spec 1.2)](#51-the-ucum-notation-spec-12)
+    - 5.1 [The UCUM notation (unreleased)](#51-the-ucum-notation-unreleased)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
     - 5.3 [`UnitFlags`](#53-unitflags)
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
@@ -310,9 +310,9 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 The UCUM notation (spec 1.2)
+### 5.1 The UCUM notation (unreleased)
 
-`parse_unit` takes the `ucum:` notation as readily as the native one, and returns
+**This notation is unreleased**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
 result unchanged. Three helpers cover what a caller needs around it:
 
@@ -1553,7 +1553,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ## 19. Spec 1.1 additions
 
-These bindings target the **Bovnar spec (v1.2)**; spec 1.0 remains the
+These bindings target the **Bovnar spec (v1.1)**; spec 1.0 remains the
 frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
 unversioned document is treated as 1.0) are exposed as:
 
@@ -1598,4 +1598,4 @@ unversioned document is treated as 1.0) are exposed as:
 
 ---
 
-*End of Bovnar — Python Bindings (Bovnar spec 1.2).*
+*End of Bovnar — Python Bindings (Bovnar spec 1.1).*

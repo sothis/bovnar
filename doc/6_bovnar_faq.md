@@ -1,6 +1,6 @@
 # Bovnar — Frequently Asked Questions
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Non-normative — answers indexed to the specification
 > **Scope:** Common questions on syntax, types, units, numbers, limits, and the C and Python APIs.
 
@@ -99,17 +99,19 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Spec 1.2. Each minor version has been additive:
-
-- **1.1** added the `#!bovnar` version directive itself, the `\u`/`\x` escapes,
-  the `datetime` family and reference array indexing;
-- **1.2** added the `ucum:` unit notation (see below).
+Spec 1.1 — the additive features documented here: the `#!bovnar` version
+directive itself, the `\u`/`\x` escapes, the `datetime` family and reference
+array indexing. `bvnr_spec_version()` reports it.
 
 Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `#!bovnar` directive is treated as 1.0, and every 1.0 document parses unchanged.
-`bvnr_version_string()` reports the library version and `bvnr_spec_version()` the
-highest spec it understands — these are two different numbers, and only the
-second moved for 1.2.
+`bvnr_version_string()` reports the library version, which is a different number
+from the spec version.
+
+The tree also carries an **unreleased** unit notation (`ucum:`, see below). It is
+not part of a published specification, `bovnar version` does not announce it, and
+a document reaches it only by opting in to a version this build does not
+advertise.
 
 ---
 
@@ -207,10 +209,11 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1 and a `ucum:` unit a declared
-1.2; used in a document that declares less — or nothing — each is rejected. That
-is deliberate: it stops a document from carrying a construct that a conforming
-reader of its own declared version would have to refuse.
+document. A `datetime` value needs a declared 1.1, and the unreleased `ucum:`
+notation a declared version above it; used in a document that declares less — or
+nothing — each is rejected. That is deliberate: it stops a document from carrying
+a construct that a conforming reader of its own declared version would have to
+refuse.
 
 It is recognised only as the very first comment (after an optional BOM and
 whitespace). A reader records the declared version
@@ -562,7 +565,9 @@ documentation-grade data, prefer the explicit form.
 
 **Can I write units as UCUM codes?**
 
-Yes, since spec 1.2. Prefix the unit parameter with the profile namespace:
+The notation exists in the implementation but is **unreleased** — no published
+specification defines it, and the version it will ship under is not settled. It
+is reachable today by opting in explicitly:
 
 ```bovnar
 #!bovnar 1.2
@@ -1477,4 +1482,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.2).*
+*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.1).*

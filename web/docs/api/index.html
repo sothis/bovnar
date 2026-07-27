@@ -40,7 +40,7 @@
 <h1>Bovnar — Read &amp; Write API</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/3_bovnar_readwrite_api.md">Markdown</a> and <a href="/doc/pdf/bovnar-readwrite-api.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.2
+<p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the C reader, writer, and DOM as implemented
 <strong>Scope:</strong> Every function needed to read and write Bovnar streams, in the order you call them.</p>
 </blockquote>
@@ -1497,19 +1497,19 @@ table in which a rounded decimal is passed off as exact.</p>
 <td><code>error_unit_profile_unknown</code></td>
 <td>49</td>
 <td><code>"unit_profile_unknown"</code></td>
-<td>A unit written in the <code>name:</code> profile notation names a profile this build does not have (spec 1.2)</td>
+<td>A unit written in the <code>name:</code> profile notation names a profile this build does not have (unreleased profile)</td>
 </tr>
 <tr>
 <td><code>error_unit_profile_unsupported</code></td>
 <td>50</td>
 <td><code>"unit_profile_unsupported"</code></td>
-<td>A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (spec 1.2)</td>
+<td>A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (unreleased profile)</td>
 </tr>
 <tr>
 <td><code>error_octet_stream_forbidden</code></td>
 <td>51</td>
 <td><code>"octet_stream_forbidden"</code></td>
-<td>The document contains an octet stream and the reader was opened with <code>text_only</code> (spec 1.2). Reported at the stream's opening <code>0x00</code>, before its payload is read</td>
+<td>The document contains an octet stream and the reader was opened with <code>text_only</code>. Reported at the stream's opening <code>0x00</code>, before its payload is read</td>
 </tr>
 </tbody>
 </table>
@@ -1875,7 +1875,7 @@ bovnar<span class="w"> </span>query<span class="w"> </span>--require-unit<span c
 <li><a href="https://www.bovnar.io/docs/faq/#12-c-api">FAQ §12 — C API</a> — common questions about these functions</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Read &amp; Write API (Bovnar spec 1.2).</em></p>
+<p><em>End of Bovnar — Read &amp; Write API (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

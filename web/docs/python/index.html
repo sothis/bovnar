@@ -40,7 +40,7 @@
 <h1>Bovnar — Python Bindings</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/4_bovnar_python_bindings.md">Markdown</a> and <a href="/doc/pdf/bovnar-python-bindings.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.2
+<p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the Python package as implemented
 <strong>Scope:</strong> Installation, the high-level and streaming APIs, the DOM, <code>Quantity</code>, and the NumPy and pint bridges.</p>
 </blockquote>
@@ -64,7 +64,7 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
-<li>5.1 <a href="#51-the-ucum-notation-spec-12">The UCUM notation (spec 1.2)</a></li>
+<li>5.1 <a href="#51-the-ucum-notation-unreleased">The UCUM notation (unreleased)</a></li>
 <li>5.2 <a href="#52-extended-unit-functions">Extended unit functions</a></li>
 <li>5.3 <a href="#53-unitflags"><code>UnitFlags</code></a></li>
 <li>5.4 <a href="#54-valueunitprefix"><code>ValueUnitPrefix</code></a></li>
@@ -383,8 +383,8 @@ treatment):</p>
 <span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;h&quot;</span><span class="p">)</span>    <span class="c1"># → 1.0  (NOT 3600.0)</span>
 </code></pre></div>
 
-<h3 id="51-the-ucum-notation-spec-12">5.1 The UCUM notation (spec 1.2)</h3>
-<p><code>parse_unit</code> takes the <code>ucum:</code> notation as readily as the native one, and returns
+<h3 id="51-the-ucum-notation-unreleased">5.1 The UCUM notation (unreleased)</h3>
+<p><strong>This notation is unreleased</strong>: it is not part of a published specification and the version it will ship under is not settled. <code>parse_unit</code> takes the <code>ucum:</code> notation as readily as the native one, and returns
 the same <code>ValueUnit</code> either way — so everything else in this chapter works on the
 result unchanged. Three helpers cover what a caller needs around it:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
@@ -1980,7 +1980,7 @@ value 167 takes the suffixed name. This affects the Python member name only — 
 </blockquote>
 <hr />
 <h2 id="19-spec-11-additions">19. Spec 1.1 additions</h2>
-<p>These bindings target the <strong>Bovnar spec (v1.2)</strong>; spec 1.0 remains the
+<p>These bindings target the <strong>Bovnar spec (v1.1)</strong>; spec 1.0 remains the
 frozen baseline. The 1.1 features (all gated on a <code>#!bovnar 1.1</code> directive — an
 unversioned document is treated as 1.0) are exposed as:</p>
 <ul>
@@ -2022,7 +2022,7 @@ unversioned document is treated as 1.0) are exposed as:</p>
 <li><a href="https://www.bovnar.io/docs/faq/#13-python-bindings">FAQ §13 — Python Bindings</a> — common questions about this package</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Python Bindings (Bovnar spec 1.2).</em></p>
+<p><em>End of Bovnar — Python Bindings (Bovnar spec 1.1).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

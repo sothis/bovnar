@@ -1,6 +1,6 @@
 # Bovnar — Specification
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Normative — released (1.x line; additive over the frozen 1.0 baseline)
 > **Scope:** Grammar, lexical structure, type system, units, limits, and error semantics.
 
@@ -71,7 +71,7 @@
     - 11.6 [Examples](#116-examples)
     - 11.7 [Compound Unit Constraints](#117-compound-unit-constraints)
     - 11.8 [The `no_unit` Keyword](#118-the-no_unit-keyword)
-    - 11.9 [Unit Profiles (spec 1.2)](#119-unit-profiles-spec-12)
+    - 11.9 [Unit Profiles (unreleased)](#119-unit-profiles-unreleased)
 12. [Validation & Constraints](#12-validation--constraints)
     - 12.1 [UTF-8 Validation](#121-utf-8-validation)
     - 12.2 [Size Limits](#122-size-limits)
@@ -1589,7 +1589,7 @@ Within an explicit annotation, **omitting** the unit parameter yields the same i
 
 A **fully untyped** value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`. All three forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both encodings serialize to `"no_unit"` via `bvn_unit_to_string` — but the untyped-default form (`num_components == 1`) is a structurally distinct internal state from the annotated forms (`num_components == 0`).
 
-### 11.9 Unit Profiles (spec 1.2)
+### 11.9 Unit Profiles (unreleased)
 
 A unit parameter that begins with a lowercase namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged.
 
@@ -2903,4 +2903,4 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar — Specification (Bovnar spec 1.2).*
+*End of Bovnar — Specification (Bovnar spec 1.1).*

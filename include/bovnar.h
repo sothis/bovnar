@@ -65,7 +65,7 @@ extern "C" {
  * level above.
  */
 #define BVNR_SPEC_VERSION_MAJOR		1
-#define BVNR_SPEC_VERSION_MINOR		2
+#define BVNR_SPEC_VERSION_MINOR		1
 #define BVNR_MAX_UNIT_COMPONENTS		8
 /*
  * Bytes a buffer needs to hold ANY unit bvn_unit_to_string can emit, NUL
@@ -246,7 +246,9 @@ typedef enum error_code_e {
 	 * delivered, never pre-allocated) but the loss is reportable instead of
 	 * indistinguishable from an empty stream. */
 	error_octet_stream_truncated        = 48,
-	/* spec 1.2, the UCUM unit profile. The split matters to a producer: one of
+	/* The UCUM unit profile. UNRELEASED: the notation is not part of any
+	 * published specification, and the version it will ship under is not
+	 * settled. The split matters to a producer: one of
 	 * these says "you wrote it wrong", the other says "you wrote it right and
 	 * this build cannot carry it", and the fixes are different. Malformed UCUM,
 	 * and UCUM over an atom UCUM does not define, stay error_unit_illegal. */
@@ -456,7 +458,7 @@ typedef struct bvnr_read_flags_s {
 	 * bvnr_reader_get_declared_version() — but not enforced. Production
 	 * consumers that must not silently misread a future document should set it. */
 	bool		strict_version;
-	/* Refuse a document that contains an octet stream (spec 1.2), with
+	/* Refuse a document that contains an octet stream, with
 	 * error_octet_stream_forbidden at the stream's opening 0x00.
 	 *
 	 * The binary region is the one part of a Bovnar document that is not text,
@@ -1019,7 +1021,8 @@ BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsiz
 BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
 BVN_API bool         bvn_unit_valid(value_unit_t u);
-/* spec 1.2 -- the UCUM unit profile (doc/10_bovnar_ucum_profile.md).
+/* The UCUM unit profile (doc/10_bovnar_ucum_profile.md). UNRELEASED --
+ * see that document's status line.
  *
  * bvn_unit_error_code says WHY a unit string bvn_parse_unit rejected is not a
  * unit: error_unit_illegal for malformed input, error_unit_profile_unknown for

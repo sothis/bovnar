@@ -8,7 +8,7 @@
 | LetzteVersion        = 1.1.0
 | LetzteVersionDatum   = 21. Juni 2026
 | Art                  = [[Serialisierung|Datenserialisierungsformat]]
-| Standard             = Bovnar-Spezifikation 1.2
+| Standard             = Bovnar-Spezifikation 1.1
 | Website              = [https://www.bovnar.io/ bovnar.io]
 }}
 
@@ -56,12 +56,12 @@ Zusammengesetzte Einheiten wie <code>m/s²</code> oder <code>k~g·m·s⁻²</cod
 
 Einheiten tragen mehr als einen Umrechnungsfaktor. Jede besitzt einen Dimensionsvektor über den sieben SI-Basisdimensionen, aus dem die Implementierung ableitet, ob zwei Einheiten dieselbe Größe messen. Größen, die zwar dimensionslos, aber nicht austauschbar sind, werden zusätzlich über eine ''Größenart'' getrennt: Ein Bit geht nicht in ein Byte über, ein Winkel nicht in eine bloße Anzahl, und die mehreren Trübungsskalen – jede über ihr eigenes Messverfahren definiert – nicht ineinander.<ref name="units" /> Affine Skalen wie das Grad Celsius werden nur dort zugelassen, wo ein Offset sinnvoll ist: <code>°C</code> allein rechnet um, eine Zusammensetzung wie <code>°C/h</code> wird zwar geparst, liefert aber keinen Umrechnungsfaktor.
 
-=== UCUM-Notation (Spezifikation 1.2) ===
-Mit Spezifikation 1.2 kommt eine alternative Notation für den Einheiten-Slot hinzu. Ein Einheitenparameter der Form <code>ucum:&lt;code&gt;</code> wird als Code des [[Unified Code for Units of Measure]] (UCUM) gelesen und beim Parsen in dieselbe interne Einheit übersetzt, die auch eine native Schreibweise erzeugt; <code>&lt;float_dec:64,ucum:mm[Hg]&gt;</code> und <code>&lt;float_dec:64,mmHg&gt;</code> sind für jede weitere Stufe nicht zu unterscheiden.<ref name="ucum" />
+=== UCUM-Notation (unveröffentlicht) ===
+In der Referenzimplementierung existiert eine alternative Notation für den Einheiten-Slot, die bislang nicht veröffentlicht ist. Ein Einheitenparameter der Form <code>ucum:&lt;code&gt;</code> wird als Code des [[Unified Code for Units of Measure]] (UCUM) gelesen und beim Parsen in dieselbe interne Einheit übersetzt, die auch eine native Schreibweise erzeugt; <code>&lt;float_dec:64,ucum:mm[Hg]&gt;</code> und <code>&lt;float_dec:64,mmHg&gt;</code> sind für jede weitere Stufe nicht zu unterscheiden.<ref name="ucum" />
 
 Ein UCUM-Ausdruck wird entweder übersetzt oder beim Parsen zurückgewiesen; einen Zwischenzustand, in dem ein Wert eine für den Parser undeutbare Einheit trägt, gibt es nicht. Die Zurückweisungen sind nach Ursache unterschieden, sodass ein Erzeuger einen fehlerhaften Code von einem wohlgeformten unterscheiden kann, der keine Entsprechung hat, und beide von einer unbekannten Notation. UCUMs ''arbiträre'' Einheiten, assaydefinierte Größen wie die internationale Einheit <code>[IU]</code>, werden als Einheiten aufgenommen, die mit nichts kommensurabel sind – auch nicht untereinander –, sodass sie sich vergleichen, aber nie umrechnen lassen.
 
-Da die Notation darüber entscheidet, welche Dokumente gültig sind, ist sie an die Versions-Direktive gebunden: Ein Dokument muss <code>#!bovnar 1.2</code> deklarieren, um sie zu verwenden – genau wie die Typfamilie <code>datetime</code> ein deklariertes 1.1 verlangt. Native Einheitenschreibweisen bleiben in jeder Version unberührt. Das Spezifikationsdokument liegt in der Fassung 1.2 vor; die neueste veröffentlichte Implementierung ist 1.1.0 und damit älter als die Notation, die sie folglich zurückweist. Die beiden Versionsnummern sind unabhängig voneinander – die Bibliothek meldet ihre eigene Version und die höchste von ihr verstandene Spezifikation getrennt.<ref name="changelog" />
+Da die Notation darüber entscheidet, welche Dokumente gültig sind, ist sie an die Versions-Direktive gebunden: Ein Dokument muss sich ausdrücklich dafür entscheiden, bevor es sie verwenden darf – genau wie die Typfamilie <code>datetime</code> ein deklariertes 1.1 verlangt. Native Einheitenschreibweisen bleiben unberührt. Teil einer veröffentlichten Spezifikation ist die Notation nicht – die aktuelle ist 1.1, und die Implementierung meldet auch diese –, sodass offen ist, unter welcher Version sie einmal erscheinen wird.<ref name="changelog" />
 
 === Währungen ===
 Währungen sind eigenständige Einheiten mit verpflichtendem <code>$</code>-Sigil, das Kollisionen zwischen Währungscodes und physikalischen Einheitensymbolen ausschließt. Der Katalog umfasst mit Stand der Spezifikation 1.1 insgesamt 166 Fiat-Währungen nach [[ISO 4217]] (einschließlich Edelmetallcodes) sowie 50 [[Kryptowährung]]en; jede Währung trägt Metadaten zu ihren kleinsten Einheiten (Minor Units) und eigene Präfixregeln.<ref name="units" /> Für Geldbeträge empfiehlt die Dokumentation dezimale Gleitkommatypen (<code>&lt;float_dec:64,$USD&gt; 19.99</code>) oder Ganzzahlen in kleinsten Einheiten (etwa [[Satoshi (Einheit)|Satoshi]] bei <code>$BTC</code>), um binäre Rundungsfehler zu vermeiden.
@@ -77,7 +77,7 @@ Oktett-Ströme betten rohe Binärdaten ohne [[Base64]]-Overhead ein: Eine durch 
 === Versionierung und Stabilität ===
 Ein Dokument kann in der ersten Zeile mit der Direktive <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code> die Spezifikationsversion deklarieren, auf die es sich bezieht; Dokumente ohne Direktive gelten als Spezifikation 1.0. Die Spezifikation definiert einen Stabilitätsvertrag: Mit Version 1.0 wurden Grammatik, Typfamilien, Array-/Struktur-/Referenzregeln und die Fehlercode-Werte eingefroren; 1.x-Versionen dürfen nur additiv erweitern (neue Einheiten, angehängte Fehlercodes, optionale Flags), während inkompatible Änderungen einer Version 2.0 vorbehalten sind. Ein unter Spezifikation 1.0 gültiges Dokument bleibt unter jeder 1.x-Version gültig und dekodiert zu denselben Werten.<ref name="notes10" />
 
-Die Direktive ist dabei mehr als eine Kennzeichnung: Konstrukte, die nach 1.0 hinzugekommen sind, sind an sie gebunden, sodass ein Dokument nur verwenden darf, was seine deklarierte Version bereitstellt. Ein <code>datetime</code>-Wert setzt ein deklariertes 1.1 voraus, die UCUM-Notation ein deklariertes 1.2; ein Dokument, das keines von beidem deklariert – auch eines ganz ohne Direktive –, wird zurückgewiesen, wenn es sie verwendet. Damit kann ein Dokument kein Konstrukt tragen, das ein konformer Leser seiner eigenen deklarierten Version ablehnen müsste.
+Die Direktive ist dabei mehr als eine Kennzeichnung: Konstrukte, die nach 1.0 hinzugekommen sind, sind an sie gebunden, sodass ein Dokument nur verwenden darf, was seine deklarierte Version bereitstellt. Ein <code>datetime</code>-Wert setzt ein deklariertes 1.1 voraus, die unveröffentlichte UCUM-Notation eine darüber liegende Version; ein Dokument, das keines von beidem deklariert – auch eines ganz ohne Direktive –, wird zurückgewiesen, wenn es sie verwendet. Damit kann ein Dokument kein Konstrukt tragen, das ein konformer Leser seiner eigenen deklarierten Version ablehnen müsste.
 
 == Referenzimplementierung ==
 === Architektur ===
@@ -107,7 +107,7 @@ Der Quellcode (C, Python, Build-System) steht unter der [[MIT-Lizenz]], die Doku
 == Geschichte ==
 Bovnar wurde von Janos Sonntag entwickelt. Die erste stabile Version 1.0.0 erschien 2026 und markierte zugleich den Format-Freeze der Spezifikation 1.0; unter anderem wurden dabei das verpflichtende Währungs-Sigil, die Schlüsselwort-Schreibweise der Gleitkomma-Sonderwerte und die Homogenitätsregeln für Arrays endgültig festgelegt.<ref name="notes10" /> Nach der Wartungsversion 1.0.1 folgte am 21. Juni 2026 Version 1.1.0, die die additive Spezifikation 1.1 einführte: die Versions-Direktive <code>#!bovnar</code>, die Typfamilie <code>datetime</code> mit ISO-8601-Literalen, erweiterte String-Escapes (<code>\u{…}</code>, <code>\xHH</code>), Array-Indizierung in Referenzen, native Windows-Unterstützung sowie den Ausbau der Konformitätssuite von 207 auf 306 Fälle.<ref name="notes11" /> Alle unter Spezifikation 1.0 gültigen Dokumente blieben dabei unverändert gültig; die neuen Konstrukte sind pro Dokument per Direktive zuschaltbar.
 
-Aus der Arbeit nach 1.1.0 ging die Spezifikation 1.2 hervor, die die UCUM-Notation für den Einheiten-Slot ergänzt und damit zwei weitere Fehlercodes sowie einen Block assaydefinierter Einheiten. Sie ist ebenfalls additiv und ebenfalls an die Versions-Direktive gebunden und war zum Zeitpunkt der Bearbeitung noch nicht in einer veröffentlichten Version enthalten.<ref name="changelog" />
+Aus der Arbeit nach 1.1.0 ging die UCUM-Notation für den Einheiten-Slot hervor, dazu zwei weitere Fehlercodes und ein Block assaydefinierter Einheiten. Sie ist additiv und an die Versions-Direktive gebunden und war zum Zeitpunkt der Bearbeitung nicht veröffentlicht.<ref name="changelog" />
 
 == Einordnung ==
 Bovnar steht in der Tradition menschenlesbarer Serialisierungsformate wie [[JavaScript Object Notation|JSON]], [[YAML]] oder [[TOML]], unterscheidet sich von diesen jedoch durch die parservalidierte Mitführung physikalischer Einheiten, Währungen, Bitbreiten und Zahlenbasen auf Wertebene, durch native mehrdimensionale Arrays sowie durch die Möglichkeit, rohe Binärdaten ohne Transportkodierung einzubetten. Gegenüber schemabasierten Binärformaten wie [[Protocol Buffers]] verzichtet Bovnar auf ein externes Schema und Codegenerierung: Die Typinformation reist vollständig im Dokument selbst. Die Formatgestaltung nimmt dafür einen höheren Platzbedarf pro Wert in Kauf und ist auf Anwendungsfälle ausgerichtet, in denen dimensionsbezogene Korrektheit, Selbstbeschreibung und Langzeitlesbarkeit Vorrang vor minimaler Größe haben.<ref name="faq" />
@@ -115,12 +115,12 @@ Bovnar steht in der Tradition menschenlesbarer Serialisierungsformate wie [[Java
 == Weblinks ==
 * [https://www.bovnar.io/ Offizielle Website] (englisch, mit interaktivem Playground und Live-Demos)
 * [https://github.com/sothis/bovnar Quellcode-Repository auf GitHub]
-* [https://www.bovnar.io/doc/pdf/bovnar-specification.pdf Bovnar-Spezifikation v1.2] (PDF, englisch)
+* [https://www.bovnar.io/doc/pdf/bovnar-specification.pdf Bovnar-Spezifikation v1.1] (PDF, englisch)
 
 == Einzelnachweise ==
 <references>
 <ref name="web">{{Internetquelle |url=https://www.bovnar.io/ |titel=Bovnar — Unit-safe serialization for science and industry |abruf=2026-07-27 |sprache=en}}</ref>
-<ref name="spec">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-specification.pdf |titel=Bovnar Specification, Version 1.2 |datum=2026-07-27 |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>
+<ref name="spec">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-specification.pdf |titel=Bovnar Specification, Version 1.1 |datum=2026-06-21 |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>
 <ref name="repo">{{Internetquelle |url=https://github.com/sothis/bovnar |titel=sothis/bovnar – Unit-safe serialization for scientific and industrial systems |werk=GitHub |abruf=2026-07-27 |sprache=en}}</ref>
 <ref name="tutorial">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-tutorial.pdf |titel=Bovnar (BVNR) — A Practical Tutorial |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>
 <ref name="units">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-unit-system.pdf |titel=Bovnar Quantity Annotation System — Unit and Currency Reference |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>

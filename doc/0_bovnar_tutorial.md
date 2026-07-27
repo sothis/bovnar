@@ -1,6 +1,6 @@
 # Bovnar — Tutorial
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Non-normative — a guided, example-driven introduction
 > **Scope:** Writing and reading Bovnar documents by hand: types, units, arrays, structs, references, and the event model.
 
@@ -1016,4 +1016,4 @@ nan  inf  ninf
 
 ---
 
-*End of Bovnar — Tutorial (Bovnar spec 1.2).*
+*End of Bovnar — Tutorial (Bovnar spec 1.1).*

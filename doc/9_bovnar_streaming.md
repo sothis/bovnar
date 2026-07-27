@@ -1,6 +1,6 @@
 # Bovnar — Streaming, Framing & Multiplexing
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Reference — protocols layered on the event API, not part of the wire format
 > **Scope:** Endless streaming, multi-document framing, octet multiplexing, and embedded documents.
 
@@ -339,4 +339,4 @@ your own consumer/producer at the same seam without touching the core.
 
 ---
 
-*End of Bovnar — Streaming, Framing & Multiplexing (Bovnar spec 1.2).*
+*End of Bovnar — Streaming, Framing & Multiplexing (Bovnar spec 1.1).*

@@ -1,6 +1,6 @@
 # Bovnar — Units & Currencies Cheat Sheet
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
 > **Scope:** 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
@@ -846,9 +846,9 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, spec 1.2)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, unreleased profile)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 429 (`BVN_UCUM_ARBITRARY_LAST + 1`)*
 
 ---
 
-*End of Bovnar — Units & Currencies Cheat Sheet (Bovnar spec 1.2).*
+*End of Bovnar — Units & Currencies Cheat Sheet (Bovnar spec 1.1).*

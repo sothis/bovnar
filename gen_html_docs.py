@@ -100,8 +100,8 @@ DOCS = [
      "A guided, example-driven introduction to reading and writing Bovnar (BVNR) "
      "documents — types, units, arrays, references, and the streaming API."),
     ("1_bovnar_spec.md", "spec", "bovnar-specification",
-     "Bovnar Specification (v1.2)",
-     "The complete Bovnar (BVNR) format specification, version 1.2: grammar, type "
+     "Bovnar Specification (v1.1)",
+     "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type "
      "system, physical units, numeric bases, limits, and error semantics."),
     ("2_bovnar_unit_system.md", "units", "bovnar-unit-system",
      "Bovnar Unit & Currency System",

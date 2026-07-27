@@ -1,6 +1,6 @@
 # Bovnar — Read & Write API
 
-> **Spec version:** 1.2
+> **Spec version:** 1.1
 > **Status:** Reference — the C reader, writer, and DOM as implemented
 > **Scope:** Every function needed to read and write Bovnar streams, in the order you call them.
 
@@ -1534,9 +1534,9 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
-| `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (spec 1.2) |
-| `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (spec 1.2) |
-| `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | The document contains an octet stream and the reader was opened with `text_only` (spec 1.2). Reported at the stream's opening `0x00`, before its payload is read |
+| `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (unreleased profile) |
+| `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (unreleased profile) |
+| `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | The document contains an octet stream and the reader was opened with `text_only`. Reported at the stream's opening `0x00`, before its payload is read |
 
 ---
 
@@ -1954,4 +1954,4 @@ int main(void)
 
 ---
 
-*End of Bovnar — Read & Write API (Bovnar spec 1.2).*
+*End of Bovnar — Read & Write API (Bovnar spec 1.1).*

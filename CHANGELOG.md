@@ -35,14 +35,12 @@ reading the grown by-value structs at the wrong size.
   On the CLI for `validate` and `events`; `query` refuses the option rather than
   ignoring it, since that path goes through the DOM, which takes no read flags.
 
-- **Spec version 1.2.** `BVNR_SPEC_VERSION_MINOR` is 2, `bovnar version` reports
-  `spec 1.2`, and the writer's `emit_version` option now stamps `#!bovnar 1.2`.
-  The bump is additive: every 1.0 and 1.1 document parses exactly as before, and
-  the only construct 1.2 adds is the unit profile below — which is **gated on the
-  declared version**, the way the datetime family and the `\x`/`\u` escapes are
-  gated on 1.1. A document declaring less, or declaring nothing, cannot use it.
-  Without that gate a document could carry a unit every conforming reader of its
-  own declared version would have to reject.
+- **An unreleased unit notation** (`ucum:`, below). It is **not** a new
+  specification version: `BVNR_SPEC_VERSION_MINOR` is unchanged and
+  `bovnar version` still reports spec 1.1. A document reaches the notation only
+  by opting in to a version this build does not advertise, which keeps it out of
+  every document that does not ask for it and leaves the number it will finally
+  ship under open.
 
 - **The UCUM unit profile** — `ucum:<code>` in a unit slot, translated at parse
   time into the same `value_unit_t` a native spelling produces, so nothing
@@ -61,8 +59,8 @@ reading the grown by-value structs at the wrong size.
   already are. New API: `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
   `bvn_unit_to_ucum` (`unit_error_code`, `unit_is_profile_only`,
   `unit_to_ucum` in Python), and `ErrorCode.UNIT_PROFILE_UNKNOWN` /
-  `.UNIT_PROFILE_UNSUPPORTED` in the Python enum. Requires a `#!bovnar 1.2`
-  directive; the writer
+  `.UNIT_PROFILE_UNSUPPORTED` in the Python enum. Requires the opt-in directive
+  above; the writer
   refuses to emit a unit that has no native spelling without one, rather than
   producing a document it cannot read back. The table is
   `src/gendata/ucum.bvnr`; the

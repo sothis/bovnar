@@ -5,6 +5,7 @@
 ## Links
 
 - **Website:** https://www.bovnar.io
+- **Prebuilt downloads:** https://github.com/sothis/bovnar/releases
 - **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
 - **DOI — Bovnar 1.1.0 Documentation and Specification:** https://zenodo.org/records/21443296
 - **DOI — Bovnar 1.1.0 Source:** https://zenodo.org/records/21443009

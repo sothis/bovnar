@@ -19,6 +19,9 @@ concurrency:
 # Each platform archive (packed by cmake/pack_artifacts.cmake) bundles the
 # documentation (doc/), runnable examples (examples/) and editor syntax
 # highlighters (highlighter/) alongside the headers, libs and CLI.
+# Those uploads are Actions artifacts, which GitHub deletes after 90 days. On a
+# v* tag the `release` job at the bottom re-publishes the same archives as GitHub
+# Release assets, which are permanent and downloadable without an Actions login.
 # Each job smoke-tests the CLI end to end (split one step per command so a
 # failure pinpoints the offending command from the step status alone). The full
 # C/Python suite runs in the `tests` job below: it used to be left to whoever
@@ -436,3 +439,73 @@ jobs:
           merge-multiple: true
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # ── GitHub Release assets ────────────────────────────────────────────────
+  release:
+    name: Attach archives to the release
+    # `tests` is in here alongside the four packaging jobs on purpose: a release
+    # asset is permanent and public, so it must not be able to ship from a tag
+    # whose C/Python/conformance suite went red.
+    needs: [msvc, mingw, linux, source, tests]
+    runs-on: ubuntu-latest
+    # Only on a version tag (e.g. v1.1.0) — the same gate the PyPI publish uses.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write   # create the release and upload its assets
+    steps:
+      # Shallow is enough: this job only needs RELEASE_NOTES_<tag>.md, not history.
+      - uses: actions/checkout@v5
+
+      # No merge-multiple: the two Windows jobs pack archives with the SAME
+      # filename (see the rename below), so flattening them into one directory
+      # would silently drop one. Each artifact lands in staging/<artifact-name>/.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bovnar-*
+          path: staging
+
+      - name: Collect the packed archives
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          # pack_artifacts.cmake names the Windows zip after the TARGET, not the
+          # toolchain, so MSVC and MinGW both produce bovnar-windows-<ver>-<count>
+          # .zip. Actions artifacts have a directory each and so never collided;
+          # a release's asset namespace is flat and one would have overwritten the
+          # other. Fold the toolchain into the name on the way in.
+          for tc in msvc mingw; do
+            src=$(ls staging/bovnar-windows-"$tc"/bovnar-windows-*.zip)
+            base=$(basename "$src" .zip)
+            mv "$src" "assets/${base/bovnar-windows-/bovnar-windows-$tc-}.zip"
+          done
+          mv staging/bovnar-linux/*.tar.xz \
+             staging/bovnar-amalgamate/*.tar.xz \
+             staging/bovnar-source/*.tar.xz assets/
+          ls -l assets
+
+      # Release assets are served over plain HTTPS with no provenance of their
+      # own; ship the digests next to them so a download can be checked.
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd assets && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Publish to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          # The release usually already exists (tags are cut from the GitHub UI),
+          # in which case we only add assets to it. Create it otherwise so pushing
+          # a tag alone is enough, preferring the repo's hand-written notes.
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            if [ -f "RELEASE_NOTES_${tag}.md" ]; then
+              gh release create "$tag" --title "$tag" --notes-file "RELEASE_NOTES_${tag}.md"
+            else
+              gh release create "$tag" --title "$tag" --generate-notes
+            fi
+          fi
+          # --clobber so re-running the workflow on a tag replaces the assets
+          # rather than failing on the existing names.
+          gh release upload "$tag" assets/* --clobber

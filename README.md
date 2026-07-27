@@ -33,6 +33,7 @@
 ## Links
 
 - **Website:** https://www.bovnar.io
+- **Prebuilt downloads:** https://github.com/sothis/bovnar/releases
 - **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
 - **DOI — Bovnar 1.1.0 Documentation and Specification:** https://zenodo.org/records/21443296
 - **DOI — Bovnar 1.1.0 Source:** https://zenodo.org/records/21443009
@@ -231,6 +232,13 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 | `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host), plus `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
+
+These same archives — built and smoke-tested by CI, plus a `-source.tar.xz`
+snapshot of the tag and a `SHA256SUMS` file — are attached to every
+[GitHub release](https://github.com/sothis/bovnar/releases), so a build from
+source is optional. Only there are the two Windows archives named
+`bovnar-windows-msvc-…` and `bovnar-windows-mingw-…`: a release's assets share
+one flat namespace and both toolchains pack the identical filename locally.
 
 ### Build options
 

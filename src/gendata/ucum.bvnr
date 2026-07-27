@@ -1,0 +1,411 @@
+#!bovnar 1.1
+# ucum.bvnr — single source of truth for the UCUM unit profile.
+#
+# HOW THIS WORKS
+#   Hand-edited. gen_ucum.py (at the repo root) regenerates the C profile tables
+#   from this file on every build; never edit the generated *.gen.{h,inc}. To add
+#   or change an atom, edit a record below and rebuild.
+#
+# WHAT IS IN HERE
+#   Three atom lists, one per outcome the profile can reach (doc/ucum_profile.md
+#   section 3.1), plus UCUM's own prefix spellings.
+#
+#     .prefixes    UCUM prefix spelling -> decimal decade. UCUM's spellings, not
+#                  bovnar's: micro is "u", not "µ".
+#
+#     .mapped      A UCUM ATOM that translates onto the native registry. .bovnar
+#                  is a native unit expression parsed by bvn_parse_unit at table
+#                  build time, so it may be compound ("g·gn") or already carry a
+#                  prefix ("k~mmHg"). A UCUM prefix on the atom is applied as a
+#                  DECADE on top of whatever the target already is, which is what
+#                  lets "m[Hg]" -> "k~mmHg" and "mm[Hg]" -> "mmHg" both fall out
+#                  of one rule (see the fold in gen/parse).
+#
+#     .arbitrary   A UCUM arbitrary unit: assay-defined, commensurable with
+#                  nothing, not even with another arbitrary unit. Each gets its
+#                  own value_base_unit_t id, appended after the last native
+#                  enumerator, and NO native alias -- these are reachable only
+#                  through "ucum:" and serialise back the same way.
+#
+#     .unsupported A UCUM atom this profile knows but cannot represent. Listed so
+#                  that it fails as error_unit_profile_unsupported ("you wrote it
+#                  right and we cannot carry it") rather than error_unit_illegal
+#                  ("that is not a UCUM atom"). An atom in NONE of the three
+#                  lists is error_unit_illegal.
+#
+# ATOMS, NOT CODES
+#   Every record is an ATOM. "kg" is not a row -- "g" is, and "k" is a prefix.
+#   "mm[Hg]" is not a row -- "m[Hg]" is. This is what keeps the table small and
+#   what makes prefix handling uniform.
+#
+# WHAT IS DELIBERATELY ABSENT
+#   UCUM's case-insensitive variant. Currencies (UCUM has none). Anything whose
+#   UCUM value this file cannot state exactly: when in doubt an atom goes in
+#   .unsupported, because refusing costs a producer an error message and guessing
+#   costs them a wrong number.
+
+.schema_version = <uint:16> 1;
+
+# ── UCUM prefixes ───────────────────────────────────────────────────────────
+# .decade is the power of ten. The profile applies it as a decade on top of the
+# atom's native target rather than as a bovnar prefix id, so a target that
+# already carries a prefix composes correctly.
+.prefixes = [
+  { .code = "Y";  .decade =  24; },
+  { .code = "Z";  .decade =  21; },
+  { .code = "E";  .decade =  18; },
+  { .code = "P";  .decade =  15; },
+  { .code = "T";  .decade =  12; },
+  { .code = "G";  .decade =   9; },
+  { .code = "M";  .decade =   6; },
+  { .code = "k";  .decade =   3; },
+  { .code = "h";  .decade =   2; },
+  { .code = "da"; .decade =   1; },
+  { .code = "d";  .decade =  -1; },
+  { .code = "c";  .decade =  -2; },
+  { .code = "m";  .decade =  -3; },
+  { .code = "u";  .decade =  -6; },
+  { .code = "n";  .decade =  -9; },
+  { .code = "p";  .decade = -12; },
+  { .code = "f";  .decade = -15; },
+  { .code = "a";  .decade = -18; },
+  { .code = "z";  .decade = -21; },
+  { .code = "y";  .decade = -24; },
+];
+
+# ── Atoms that translate ────────────────────────────────────────────────────
+.mapped = [
+  # SI base units
+  { .code = "m";    .bovnar = "m";   .metric = true; },
+  { .code = "s";    .bovnar = "s";   .metric = true; },
+  { .code = "g";    .bovnar = "g";   .metric = true; },
+  { .code = "K";    .bovnar = "K";   .metric = true; },
+  { .code = "mol";  .bovnar = "mol"; .metric = true; },
+  { .code = "cd";   .bovnar = "cd";  .metric = true; },
+  { .code = "rad";  .bovnar = "rad"; .metric = true; },
+  { .code = "sr";   .bovnar = "sr";  .metric = true; },
+
+  # Named SI-derived units
+  { .code = "Hz";   .bovnar = "Hz";  .metric = true; },
+  { .code = "N";    .bovnar = "N";   .metric = true; },
+  { .code = "Pa";   .bovnar = "Pa";  .metric = true; },
+  { .code = "J";    .bovnar = "J";   .metric = true; },
+  { .code = "W";    .bovnar = "W";   .metric = true; },
+  { .code = "V";    .bovnar = "V";   .metric = true; },
+  { .code = "Ohm";  .bovnar = "Ω";   .metric = true; },
+  { .code = "F";    .bovnar = "F";   .metric = true; },
+  { .code = "C";    .bovnar = "C";   .metric = true; },
+  { .code = "S";    .bovnar = "S";   .metric = true; },
+  { .code = "mho";  .bovnar = "S";   .metric = true; },
+  { .code = "Wb";   .bovnar = "Wb";  .metric = true; },
+  { .code = "T";    .bovnar = "T";   .metric = true; },
+  { .code = "H";    .bovnar = "H";   .metric = true; },
+  { .code = "lm";   .bovnar = "lm";  .metric = true; },
+  { .code = "lx";   .bovnar = "lx";  .metric = true; },
+  { .code = "Bq";   .bovnar = "Bq";  .metric = true; },
+  { .code = "Gy";   .bovnar = "Gy";  .metric = true; },
+  { .code = "Sv";   .bovnar = "Sv";  .metric = true; },
+  { .code = "kat";  .bovnar = "kat"; .metric = true; },
+
+  # Metric non-SI
+  { .code = "L";    .bovnar = "L";     .metric = true; },
+  { .code = "l";    .bovnar = "L";     .metric = true; },
+  { .code = "t";    .bovnar = "t";     .metric = true; },
+  { .code = "u";    .bovnar = "Da";    .metric = true; },
+  { .code = "eV";   .bovnar = "eV";    .metric = true; },
+  { .code = "ar";   .bovnar = "c~ha";  .metric = true; },
+  # The stere is exactly a cubic metre. It is also the sharpest collision in the
+  # two namespaces: bovnar's native "st" is the STONE, 6.35 kg. Both spellings
+  # parse, and their dimensions differ -- which is why translation runs on UCUM's
+  # resolved atom and never by handing the UCUM string to the native parser.
+  { .code = "st";   .bovnar = "m^3";   .metric = true; },
+  { .code = "bar";  .bovnar = "bar";   .metric = true; },
+  { .code = "atm";  .bovnar = "atm";   .metric = false; },
+  { .code = "Ao";   .bovnar = "Å";     .metric = false; },
+  { .code = "b";    .bovnar = "barn";  .metric = false; },
+  { .code = "AU";   .bovnar = "au";    .metric = false; },
+  { .code = "pc";   .bovnar = "pc";    .metric = true; },
+
+  # Time. Bovnar's yr is 31557600 s (365.25 d) and its mo is 2629800 s
+  # (30.4375 d) -- the JULIAN year and month exactly, which is what UCUM's
+  # unqualified "a" and "mo" are. The tropical and gregorian variants have no
+  # native form and are in .unsupported.
+  { .code = "min";  .bovnar = "min"; .metric = false; },
+  { .code = "h";    .bovnar = "h";   .metric = false; },
+  { .code = "d";    .bovnar = "d";   .metric = false; },
+  { .code = "wk";   .bovnar = "wk";  .metric = false; },
+  { .code = "mo";   .bovnar = "mo";  .metric = false; },
+  { .code = "mo_j"; .bovnar = "mo";  .metric = false; },
+  { .code = "a";    .bovnar = "yr";  .metric = false; },
+  { .code = "a_j";  .bovnar = "yr";  .metric = false; },
+
+  # Angle and logarithmic. "B" is the BEL, not the byte -- UCUM writes the byte
+  # "By". 1 B = 10 dB exactly in the logarithmic domain, and bovnar's dB carries
+  # its own quantity kind, so da~dB cannot drift into a plain count.
+  { .code = "deg";   .bovnar = "°";      .metric = false; },
+  { .code = "gon";   .bovnar = "grad";   .metric = false; },
+  { .code = "'";     .bovnar = "arcmin"; .metric = false; },
+  { .code = "''";    .bovnar = "arcsec"; .metric = false; },
+  { .code = "circ";  .bovnar = "rev";    .metric = false; },
+  { .code = "Np";    .bovnar = "Np";     .metric = true;  },
+  { .code = "B";     .bovnar = "da~dB";  .metric = true;  },
+  { .code = "[pH]";  .bovnar = "pH";     .metric = false; },
+
+  # Temperature. The native affine discipline applies unchanged: valid at
+  # exponent 1 only, and a compound containing one yields no conversion value.
+  { .code = "Cel";     .bovnar = "°C";  .metric = true;  },
+  { .code = "[degF]";  .bovnar = "°F";  .metric = false; },
+  { .code = "[degRe]"; .bovnar = "°Re"; .metric = false; },
+  { .code = "[degR]";  .bovnar = "°Ra"; .metric = false; },
+
+  # Length, US and Imperial
+  { .code = "[in_i]";   .bovnar = "in";   .metric = false; },
+  { .code = "[ft_i]";   .bovnar = "ft";   .metric = false; },
+  { .code = "[yd_i]";   .bovnar = "yd";   .metric = false; },
+  { .code = "[mi_i]";   .bovnar = "mi";   .metric = false; },
+  { .code = "[nmi_i]";  .bovnar = "nmi";  .metric = false; },
+  { .code = "[ft_us]";  .bovnar = "ftUS"; .metric = false; },
+  { .code = "[fth_i]";  .bovnar = "fath"; .metric = false; },
+  { .code = "[fur_us]"; .bovnar = "fur";  .metric = false; },
+  { .code = "[ch_us]";  .bovnar = "ch";   .metric = false; },
+  { .code = "[rd_us]";  .bovnar = "rd";   .metric = false; },
+  { .code = "[acr_us]"; .bovnar = "ac";   .metric = false; },
+
+  # Mass
+  { .code = "[lb_av]";    .bovnar = "lb";    .metric = false; },
+  { .code = "[oz_av]";    .bovnar = "oz";    .metric = false; },
+  { .code = "[dr_av]";    .bovnar = "dr";    .metric = false; },
+  { .code = "[gr]";       .bovnar = "gr";    .metric = false; },
+  { .code = "[stone_av]"; .bovnar = "st";    .metric = false; },
+  { .code = "[oz_tr]";    .bovnar = "oz_t";  .metric = false; },
+  { .code = "[pwt_tr]";   .bovnar = "dwt";   .metric = false; },
+  { .code = "[sc_ap]";    .bovnar = "sc";    .metric = false; },
+  { .code = "[car_m]";    .bovnar = "ct";    .metric = false; },
+  # The apothecary ounce IS the troy ounce. The apothecary DRAM is not the
+  # avoirdupois one, though -- 3.8879346 g against 1.7718 g -- so it is refused
+  # below rather than mapped onto bovnar's dr, which is avoirdupois.
+  { .code = "[oz_ap]";    .bovnar = "oz_t";  .metric = false; },
+  { .code = "[ston_av]";  .bovnar = "tn_sh"; .metric = false; },
+  { .code = "[lton_av]";  .bovnar = "tn_l";  .metric = false; },
+  { .code = "[slug]";     .bovnar = "slug";  .metric = false; },
+
+  # Volume
+  { .code = "[gal_us]"; .bovnar = "gal";      .metric = false; },
+  { .code = "[qt_us]";  .bovnar = "qt";       .metric = false; },
+  { .code = "[pt_us]";  .bovnar = "pt";       .metric = false; },
+  { .code = "[foz_us]"; .bovnar = "fl_oz";    .metric = false; },
+  { .code = "[tbs_us]"; .bovnar = "tbsp";     .metric = false; },
+  { .code = "[tsp_us]"; .bovnar = "tsp";      .metric = false; },
+  { .code = "[cup_us]"; .bovnar = "cup";      .metric = false; },
+  { .code = "[gil_us]"; .bovnar = "gi";       .metric = false; },
+  { .code = "[fdr_us]"; .bovnar = "fl_dr";    .metric = false; },
+  { .code = "[min_us]"; .bovnar = "minim";    .metric = false; },
+  { .code = "[pk_us]";  .bovnar = "pk";       .metric = false; },
+  { .code = "[bu_us]";  .bovnar = "bsh";      .metric = false; },
+  { .code = "[bbl_us]"; .bovnar = "bbl";      .metric = false; },
+  { .code = "[gal_br]"; .bovnar = "gal_uk";   .metric = false; },
+  { .code = "[qt_br]";  .bovnar = "qt_uk";    .metric = false; },
+  { .code = "[pt_br]";  .bovnar = "pt_uk";    .metric = false; },
+  { .code = "[foz_br]"; .bovnar = "fl_oz_uk"; .metric = false; },
+  { .code = "[gil_br]"; .bovnar = "gi_uk";    .metric = false; },
+
+  # Pressure, energy, force, power. "m[Hg]" is a METRE of mercury column, so its
+  # native target carries the kilo that makes "mm[Hg]" come out as plain mmHg.
+  { .code = "m[Hg]";    .bovnar = "k~mmHg"; .metric = true;  },
+  { .code = "[psi]";    .bovnar = "psi";    .metric = false; },
+  { .code = "att";      .bovnar = "at";     .metric = false; },
+  # UCUM's unqualified "cal" is the THERMOCHEMICAL calorie, which is what
+  # bovnar's cal is (4.184 J exactly), so both spellings map. The BTU does NOT
+  # line up the same way: bovnar's Btu is the IT one (1055.05585262 J), so only
+  # [Btu_IT] maps and every other BTU variant -- including the unqualified
+  # [Btu] -- is refused below rather than silently mapped 0.07 % wrong.
+  { .code = "cal_th";   .bovnar = "cal";    .metric = true;  },
+  { .code = "cal";      .bovnar = "cal";    .metric = true;  },
+  # The nutrition Calorie is 1000 thermochemical calories.
+  { .code = "[Cal]";    .bovnar = "k~cal";  .metric = false; },
+  { .code = "[Btu_IT]"; .bovnar = "Btu";    .metric = false; },
+  { .code = "erg";      .bovnar = "erg";    .metric = false; },
+  { .code = "[HP]";     .bovnar = "hp";     .metric = false; },
+  { .code = "[kn_i]";   .bovnar = "kn";     .metric = false; },
+  { .code = "dyn";      .bovnar = "dyn";    .metric = false; },
+  # Bovnar has no gram-force, but gram times standard gravity IS one, exactly:
+  # dimensions [1,1,-2,0,0,0,0], factor 0.00980665. A mapping need not be
+  # atom-to-atom.
+  { .code = "gf";       .bovnar = "g·gn";   .metric = false; },
+  { .code = "kgf";      .bovnar = "kgf";    .metric = false; },
+  { .code = "[lbf_av]"; .bovnar = "lbf";    .metric = false; },
+  { .code = "[g]";      .bovnar = "gn";     .metric = false; },
+
+  # CGS and radiation
+  { .code = "P";     .bovnar = "P";     .metric = false; },
+  { .code = "St";    .bovnar = "St";    .metric = false; },
+  { .code = "Gal";   .bovnar = "Gal";   .metric = false; },
+  { .code = "G";     .bovnar = "G";     .metric = false; },
+  { .code = "Mx";    .bovnar = "Mx";    .metric = false; },
+  { .code = "Oe";    .bovnar = "Oe";    .metric = false; },
+  # The biot is ten amperes; the kayser is one reciprocal centimetre.
+  { .code = "Bi";    .bovnar = "da~A";  .metric = false; },
+  { .code = "Ky";    .bovnar = "c~m^-1"; .metric = true;  },
+  { .code = "sb";    .bovnar = "sb";    .metric = false; },
+  { .code = "ph";    .bovnar = "ph";    .metric = false; },
+  { .code = "Ci";    .bovnar = "Ci";    .metric = true;  },
+  { .code = "[RAD]"; .bovnar = "c~Gy";  .metric = true;  },
+  { .code = "[REM]"; .bovnar = "rem";   .metric = true;  },
+  { .code = "R";     .bovnar = "R";     .metric = true;  },
+
+  # Digital and ratio. UCUM's "b" is the BARN and its "By" is the byte; bovnar's
+  # native "b" is the bit and its "B" is the byte. The namespaces disagree on
+  # three letters and the profile keeps them apart (doc/ucum_profile.md 6.2).
+  { .code = "bit";    .bovnar = "b";   .metric = true;  },
+  { .code = "By";     .bovnar = "B";   .metric = true;  },
+  { .code = "Bd";     .bovnar = "Bd";  .metric = true;  },
+  { .code = "%";      .bovnar = "%";   .metric = false; },
+  { .code = "[ppth]"; .bovnar = "‰";   .metric = false; },
+  { .code = "[ppm]";  .bovnar = "ppm"; .metric = false; },
+  { .code = "[ppb]";  .bovnar = "ppb"; .metric = false; },
+
+  # Chemical. UCUM's "eq" is the GENERIC equivalent, one mole. Bovnar's native
+  # "val" is the water-analysis equivalent of a DIVALENT species, factor 0.5 --
+  # mapping eq onto it would be wrong by exactly two on every clinical
+  # electrolyte value, so it maps to mol and val is left alone.
+  { .code = "eq";  .bovnar = "mol";        .metric = true; },
+  { .code = "U";   .bovnar = "u~mol/min";  .metric = true; },
+
+  # Optics. The dioptre is exactly a reciprocal metre.
+  { .code = "[diop]"; .bovnar = "m^-1"; .metric = false; },
+];
+
+# ── UCUM arbitrary units ────────────────────────────────────────────────────
+# Assay-defined; commensurable with nothing, including each other. .id continues
+# the value_base_unit_t enumeration after the last native unit; append-only, and
+# adding one must move the last-enumerator check in src/utils/bvn_internal_dims.h
+# exactly as adding a native unit does.
+#
+# .name is the enumerator suffix (the C constant is bu_<name>). There is no
+# .aliases field on purpose: an arbitrary unit has no native spelling, is
+# reachable only through "ucum:", and serialises back as "ucum:<code>".
+.arbitrary = [
+  { .id = <uint:16> 397; .name = "ucum_iu";        .code = "[IU]";        .metric = true;  },
+  { .id = <uint:16> 398; .name = "ucum_iu_i";      .code = "[iU]";        .metric = true;  },
+  { .id = <uint:16> 399; .name = "ucum_arb_u";     .code = "[arb'U]";     .metric = false; },
+  { .id = <uint:16> 400; .name = "ucum_usp_u";     .code = "[USP'U]";     .metric = false; },
+  { .id = <uint:16> 401; .name = "ucum_gpl_u";     .code = "[GPL'U]";     .metric = false; },
+  { .id = <uint:16> 402; .name = "ucum_mpl_u";     .code = "[MPL'U]";     .metric = false; },
+  { .id = <uint:16> 403; .name = "ucum_apl_u";     .code = "[APL'U]";     .metric = false; },
+  { .id = <uint:16> 404; .name = "ucum_beth_u";    .code = "[beth'U]";    .metric = false; },
+  { .id = <uint:16> 405; .name = "ucum_anti_xa_u"; .code = "[anti'Xa'U]"; .metric = false; },
+  { .id = <uint:16> 406; .name = "ucum_todd_u";    .code = "[todd'U]";    .metric = false; },
+  { .id = <uint:16> 407; .name = "ucum_dye_u";     .code = "[dye'U]";     .metric = false; },
+  { .id = <uint:16> 408; .name = "ucum_smgy_u";    .code = "[smgy'U]";    .metric = false; },
+  { .id = <uint:16> 409; .name = "ucum_bdsk_u";    .code = "[bdsk'U]";    .metric = false; },
+  { .id = <uint:16> 410; .name = "ucum_ka_u";      .code = "[ka'U]";      .metric = false; },
+  { .id = <uint:16> 411; .name = "ucum_knk_u";     .code = "[knk'U]";     .metric = false; },
+  { .id = <uint:16> 412; .name = "ucum_mclg_u";    .code = "[mclg'U]";    .metric = false; },
+  { .id = <uint:16> 413; .name = "ucum_tb_u";      .code = "[tb'U]";      .metric = false; },
+  { .id = <uint:16> 414; .name = "ucum_ccid_50";   .code = "[CCID_50]";   .metric = false; },
+  { .id = <uint:16> 415; .name = "ucum_tcid_50";   .code = "[TCID_50]";   .metric = false; },
+  { .id = <uint:16> 416; .name = "ucum_eid_50";    .code = "[EID_50]";    .metric = false; },
+  { .id = <uint:16> 417; .name = "ucum_pfu";       .code = "[PFU]";       .metric = false; },
+  { .id = <uint:16> 418; .name = "ucum_ffu";       .code = "[FFU]";       .metric = false; },
+  { .id = <uint:16> 419; .name = "ucum_cfu";       .code = "[CFU]";       .metric = false; },
+  { .id = <uint:16> 420; .name = "ucum_bau";       .code = "[BAU]";       .metric = false; },
+  { .id = <uint:16> 421; .name = "ucum_au_allerg"; .code = "[AU]";        .metric = false; },
+  { .id = <uint:16> 422; .name = "ucum_amb_a_1_u"; .code = "[Amb'a'1'U]"; .metric = false; },
+  { .id = <uint:16> 423; .name = "ucum_pnu";       .code = "[PNU]";       .metric = false; },
+  { .id = <uint:16> 424; .name = "ucum_lf";        .code = "[Lf]";        .metric = false; },
+  { .id = <uint:16> 425; .name = "ucum_d_ag_u";    .code = "[D'ag'U]";    .metric = false; },
+  { .id = <uint:16> 426; .name = "ucum_feu";       .code = "[FEU]";       .metric = false; },
+  { .id = <uint:16> 427; .name = "ucum_elu";       .code = "[ELU]";       .metric = false; },
+  { .id = <uint:16> 428; .name = "ucum_eu";        .code = "[EU]";        .metric = false; },
+];
+
+# ── Atoms UCUM defines that have no native representation ───────────────────
+# These are error_unit_profile_unsupported, not error_unit_illegal: the producer
+# wrote valid UCUM and the answer is "we cannot carry that", which calls for a
+# different fix than "that is not a unit". .why is the reason, and is what the
+# generator puts in the C table's comment column.
+.unsupported = [
+  # Special units defined by a function, whose reference the native dB cannot
+  # carry. Translating them to da~dB would discard exactly what distinguishes
+  # them and would let a sound-pressure level compare equal to a voltage level.
+  { .code = "B[SPL]";   .why = "bel SPL — dB carries no reference level"; },
+  { .code = "B[V]";     .why = "bel volt — dB carries no reference level"; },
+  { .code = "B[mV]";    .why = "bel millivolt — dB carries no reference level"; },
+  { .code = "B[uV]";    .why = "bel microvolt — dB carries no reference level"; },
+  { .code = "B[W]";     .why = "bel watt — dB carries no reference level"; },
+  { .code = "B[kW]";    .why = "bel kilowatt — dB carries no reference level"; },
+  { .code = "B[10.nV]"; .why = "bel 10 nanovolt — dB carries no reference level"; },
+  { .code = "[p'diop]"; .why = "prism dioptre — arctangent scale, no native form"; },
+  { .code = "%[slope]"; .why = "percent of slope — arctangent scale, no native form"; },
+  { .code = "[hp'_X]";  .why = "homeopathic potency — logarithmic, no native form"; },
+  { .code = "[hp'_C]";  .why = "homeopathic potency — logarithmic, no native form"; },
+  { .code = "[hp'_M]";  .why = "homeopathic potency — logarithmic, no native form"; },
+  { .code = "[hp'_Q]";  .why = "homeopathic potency — logarithmic, no native form"; },
+  { .code = "[m/s2/Hz^(1/2)]"; .why = "amplitude spectral density — fractional exponent"; },
+
+  # Year and month variants bovnar does not carry. Its yr and mo are the Julian
+  # ones and those DO map; these differ from them by enough to matter.
+  { .code = "a_t";  .why = "tropical year — native yr is the Julian year"; },
+  { .code = "a_g";  .why = "mean gregorian year — native yr is the Julian year"; },
+  { .code = "mo_s"; .why = "synodal month — native mo is the Julian month"; },
+  { .code = "mo_g"; .why = "mean gregorian month — native mo is the Julian month"; },
+
+  # Physical constants used as units.
+  { .code = "[c]";  .why = "speed of light as a unit — no native form"; },
+  { .code = "[h]";  .why = "Planck constant as a unit — no native form"; },
+  { .code = "[k]";  .why = "Boltzmann constant as a unit — no native form"; },
+  { .code = "[eps_0]"; .why = "vacuum permittivity as a unit — no native form"; },
+  { .code = "[mu_0]";  .why = "vacuum permeability as a unit — no native form"; },
+  { .code = "[e]";     .why = "elementary charge as a unit — no native form"; },
+  { .code = "[m_e]";   .why = "electron mass as a unit — no native form"; },
+  { .code = "[m_p]";   .why = "proton mass as a unit — no native form"; },
+  { .code = "[G]";     .why = "gravitational constant as a unit — no native form"; },
+
+  # Osmolality. Deliberately refused rather than guessed: the relation between
+  # an osmole and a mole depends on the dissociation of the species, which a
+  # unit table cannot know.
+  { .code = "osm";  .why = "osmole — species-dependent relation to the mole"; },
+
+  # Columns of liquid other than mercury, and other pressure references bovnar
+  # does not carry.
+  { .code = "m[H2O]"; .why = "metre of water column — no native form"; },
+
+  # Energy conventions bovnar does not carry. Its cal is thermochemical (which
+  # is what UCUM's unqualified cal is, so that one maps) and its Btu is the IT
+  # one -- so every other calorie and EVERY other BTU, the unqualified [Btu]
+  # included, is refused. Mapping [Btu] onto Btu would be wrong by 0.07 %:
+  # small, dimensionally correct, and invisible to every later check.
+  { .code = "[Btu]";    .why = "unqualified BTU is thermochemical; native Btu is the IT one"; },
+  { .code = "[Btu_th]"; .why = "thermochemical BTU; native Btu is the IT one"; },
+  { .code = "[Btu_39]"; .why = "39 degF BTU — no native form"; },
+  { .code = "[Btu_59]"; .why = "59 degF BTU — no native form"; },
+  { .code = "[Btu_60]"; .why = "60 degF BTU — no native form"; },
+  { .code = "[Btu_m]";  .why = "mean BTU — no native form"; },
+  { .code = "cal_IT";   .why = "IT calorie (4.1868 J); native cal is thermochemical"; },
+  { .code = "cal_m";    .why = "mean calorie — no native form"; },
+  { .code = "cal_[15]"; .why = "15 degC calorie — no native form"; },
+  { .code = "cal_[20]"; .why = "20 degC calorie — no native form"; },
+
+  # Apothecary weights other than the ounce and the scruple. The apothecary
+  # dram is 3.8879346 g and bovnar's dr is the AVOIRDUPOIS dram at 1.7718 g --
+  # a factor of 2.2 apart, which is exactly the kind of near-miss that makes an
+  # eager mapping worse than a refusal.
+  { .code = "[dr_ap]";  .why = "apothecary dram; native dr is the avoirdupois dram"; },
+  { .code = "[lb_ap]";  .why = "apothecary pound (12 troy ounces) — no native form"; },
+
+  # Photometric and geometric atoms with no native form.
+  { .code = "Lmb";   .why = "lambert — 1e4/pi cd/m^2, irrational against the native units"; },
+  { .code = "sph";   .why = "spere — 4*pi steradian, not a decade"; },
+  { .code = "[lne]"; .why = "line (1/12 inch) — not a decade off any native length"; },
+
+  # US survey lengths other than the foot.
+  { .code = "[in_us]"; .why = "US survey inch — bovnar carries only the survey foot"; },
+  { .code = "[mi_us]"; .why = "US survey mile — bovnar carries only the survey foot"; },
+
+  # Chemical and clinical atoms with no native form.
+  { .code = "[S]";      .why = "Svedberg unit — no native form"; },
+  { .code = "[HPF]";    .why = "high power field — a microscope field, not a unit"; },
+  { .code = "[LPF]";    .why = "low power field — a microscope field, not a unit"; },
+  { .code = "[drp]";    .why = "drop — volume varies with the dropper"; },
+  { .code = "[MET]";    .why = "metabolic equivalent — 3.5 mL/min/kg, not a decade"; },
+];

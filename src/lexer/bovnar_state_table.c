@@ -305,6 +305,19 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5e] = ACT_copy_type_byte,
 		[0x5f] = ACT_copy_type_byte,
 		[0x7e] = ACT_copy_type_byte,
+		/* spec 1.2 — the UCUM unit profile needs '[', ']', '{', '}' and '\''
+		 * (bracketed atoms, annotations, codes like [arb'U]). This widens the
+		 * class for EVERY unit string, so "<float:64,m[s]>" now reaches
+		 * bvn_parse_unit and fails there as error_unit_illegal instead of
+		 * failing here as error_unexpected_input_byte: one error code moves for
+		 * a family of inputs that were errors before and are errors after.
+		 * ';', '#', '<', '>' and '"' stay OUT, so an unterminated bracket or
+		 * annotation cannot consume the rest of the document. */
+		[0x27] = ACT_copy_type_byte,
+		[0x5b] = ACT_copy_type_byte,
+		[0x5d] = ACT_copy_type_byte,
+		[0x7b] = ACT_copy_type_byte,
+		[0x7d] = ACT_copy_type_byte,
 		BVN_ALPHA_LOWER(ACT_copy_type_byte),
 		BVN_UTF8_CONTINUATION(ACT_copy_type_byte),
 		BVN_UTF8_LEADER(ACT_copy_type_byte),
@@ -329,6 +342,19 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5e] = ACT_copy_type_byte,
 		[0x5f] = ACT_copy_type_byte,
 		[0x7e] = ACT_copy_type_byte,
+		/* spec 1.2 — the UCUM unit profile needs '[', ']', '{', '}' and '\''
+		 * (bracketed atoms, annotations, codes like [arb'U]). This widens the
+		 * class for EVERY unit string, so "<float:64,m[s]>" now reaches
+		 * bvn_parse_unit and fails there as error_unit_illegal instead of
+		 * failing here as error_unexpected_input_byte: one error code moves for
+		 * a family of inputs that were errors before and are errors after.
+		 * ';', '#', '<', '>' and '"' stay OUT, so an unterminated bracket or
+		 * annotation cannot consume the rest of the document. */
+		[0x27] = ACT_copy_type_byte,
+		[0x5b] = ACT_copy_type_byte,
+		[0x5d] = ACT_copy_type_byte,
+		[0x7b] = ACT_copy_type_byte,
+		[0x7d] = ACT_copy_type_byte,
 		BVN_ALPHA_LOWER(ACT_copy_type_byte),
 		BVN_UTF8_CONTINUATION(ACT_copy_type_byte),
 		BVN_UTF8_LEADER(ACT_copy_type_byte),
@@ -758,6 +784,19 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x5e] = ACT_copy_inline_unit_byte,
 		[0x5f] = ACT_copy_inline_unit_byte,
 		[0x7e] = ACT_copy_inline_unit_byte,
+		/* spec 1.2 — the UCUM unit profile needs '[', ']', '{', '}' and '\''
+		 * (bracketed atoms, annotations, codes like [arb'U]). This widens the
+		 * class for EVERY unit string, so "<float:64,m[s]>" now reaches
+		 * bvn_parse_unit and fails there as error_unit_illegal instead of
+		 * failing here as error_unexpected_input_byte: one error code moves for
+		 * a family of inputs that were errors before and are errors after.
+		 * ';', '#', '<', '>' and '"' stay OUT, so an unterminated bracket or
+		 * annotation cannot consume the rest of the document. */
+		[0x27] = ACT_copy_inline_unit_byte,
+		[0x5b] = ACT_copy_inline_unit_byte,
+		[0x5d] = ACT_copy_inline_unit_byte,
+		[0x7b] = ACT_copy_inline_unit_byte,
+		[0x7d] = ACT_copy_inline_unit_byte,
 		[0x24] = ACT_copy_inline_unit_byte,
 		[0x25] = ACT_copy_inline_unit_byte,
 		[0x28] = ACT_copy_inline_unit_byte,

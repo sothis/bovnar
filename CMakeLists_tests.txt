@@ -7,6 +7,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 add_executable(bvnr_dom_test             tests/bovnar_dom_test.c)
 add_executable(bvnr_si_test              tests/bovnar_si_units_test.c)
 add_executable(bvnr_unit_ext_test        tests/bovnar_unit_ext_test.c)
+add_executable(bvnr_ucum_test            tests/bovnar_ucum_test.c)
 add_executable(bvnr_reader_test          tests/bovnar_reader_test.c)
 add_executable(bvnr_want_unit_test       tests/bovnar_want_unit_test.c)
 add_executable(bvnr_unit_policy_test     tests/bovnar_unit_policy_test.c)
@@ -71,6 +72,9 @@ target_link_libraries(bvnr_si_test PRIVATE bvnr_static)
 target_compile_options(bvnr_unit_ext_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_unit_ext_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 target_link_libraries(bvnr_unit_ext_test PRIVATE bvnr_static)
+target_compile_options(bvnr_ucum_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_ucum_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+target_link_libraries(bvnr_ucum_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_reader_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_reader_test PRIVATE bvnr_static)
@@ -153,6 +157,11 @@ set_tests_properties(bvnr_unit_policy_test PROPERTIES
 add_test(NAME bvnr_unit_ext_test COMMAND bvnr_unit_ext_test)
 set_tests_properties(bvnr_unit_ext_test PROPERTIES
     LABELS "unit;si;units_ext"
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+
+add_test(NAME bvnr_ucum_test COMMAND bvnr_ucum_test)
+set_tests_properties(bvnr_ucum_test PROPERTIES
+    LABELS "unit;si;ucum"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
 add_test(NAME bvnr_reader_test COMMAND bvnr_reader_test)
@@ -1157,7 +1166,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 143)   # 125 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 144)   # 125 base + i18n_de + wrapper_sync + cache_stamps
                                     #         + playground_shim + wasm_cli_diff
                                     #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs

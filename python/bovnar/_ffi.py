@@ -291,6 +291,16 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_unit_valid.restype  = c_bool
     lib.bvn_unit_valid.argtypes = [ValueUnit]
 
+    # spec 1.2 -- the UCUM unit profile (doc/ucum_profile.md).
+    lib.bvn_unit_error_code.restype  = c_int
+    lib.bvn_unit_error_code.argtypes = [c_uint8_p, c_uint32]
+
+    lib.bvn_unit_is_profile_only.restype  = c_bool
+    lib.bvn_unit_is_profile_only.argtypes = [ValueUnit]
+
+    lib.bvn_unit_to_ucum.restype  = c_int32
+    lib.bvn_unit_to_ucum.argtypes = [ValueUnit, c_char_p, c_size_t]
+
     lib.bvn_unit_prefix_factor.restype  = c_double
     lib.bvn_unit_prefix_factor.argtypes = [ValueUnit]
 

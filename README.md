@@ -16,6 +16,7 @@
 - [Key Features](#key-features)
 - [Format at a Glance](#format-at-a-glance)
 - [Where Bovnar Fits](#where-bovnar-fits)
+- [Bovnar vs UCUM and CF](#bovnar-vs-ucum-and-cf)
 - [Repository Layout](#repository-layout)
 - [Building](#building)
 - [Command-Line Tool](#command-line-tool)
@@ -119,6 +120,101 @@ Bovnar is built for one thing: data where the **meaning must travel with the val
 This makes Bovnar suited to contexts where dimensional correctness matters, where the receiving party may not share the sender's schema, or where text readability and binary payloads must coexist in the same document. It is built for the place where a wrong unit is a failure: scientific instrumentation and metrology, industrial telemetry and control, IoT sensor networks, long-term measurement archival, and mixed text-binary log streams.
 
 Reach for Bovnar when unit-safety, precision, and self-description are requirements rather than nice-to-haves — when a value must mean exactly the same thing to its writer, its reader, and an archive opened decades later.
+
+---
+
+## Bovnar vs UCUM and CF
+
+Anyone who has worked with units in earnest arrives with the same question: *why not just use UCUM?* Or, from the earth-science side: *isn't this what CF conventions are for?*
+
+Neither is a rival, because neither sits at this layer. **UCUM** is a code system for the unit *string* — it says how a unit is spelled, and says nothing about where the string lives, what it is attached to, or who checks it. **CF** is a metadata convention layered over netCDF, which is the thing actually doing the serialization. Bovnar is the serialization format, with the unit inside the value grammar.
+
+| | UCUM | CF Conventions | Bovnar |
+|---|---|---|---|
+| **What it is** | A code syntax for unit *strings* | A metadata convention over a foreign container | A serialization format with units in the value grammar |
+| **Serializes data?** | No | No — netCDF does | Yes |
+| **The unit binds to** | A string, wherever the application puts it | A variable (an entire array) | A single value |
+| **Who validates, and when** | A UCUM library, if the application calls one | A separate checker, after the fact | The parser, while parsing, always |
+| **External schema needed?** | n/a | Yes (standard-name table) | None |
+| **Character set** | 7-bit ASCII, deliberately | ASCII (UDUNITS) | UTF-8 — `·`, `²`, `Ω`, `°C` |
+
+### The difference is the enforcement point
+
+This is the whole argument, and it is not about vocabulary size:
+
+```bovnar
+.speed = <float:64,m/s> 9.81 k~m/h;
+#                            ^ error_unit_mismatch, at parse time, for every consumer
+```
+
+Nothing had to be configured, no checker had to be run afterwards, and no application had to remember to call a units library. The same holds for assertions the *reader* makes without any callback:
+
+```bash
+$ bovnar validate --require-field '.a=$EUR' prices.bvnr    # the value is $USD
+Validation failed: unit_mismatch at line 2, col 29
+
+$ bovnar events --field '.v=k~m/h' speed.bvnr              # the value is 10.0 m/s
+data  number  "10.0" <float:64,_10,m/s> → "36" k~m/h _10
+```
+
+With UCUM, validation happens when the application thinks to ask for it. With CF, it happens afterwards, in `cf-checker`, against a variable rather than a value. With Bovnar there is no *forgot to validate* — a unit that does not check out stops the parse.
+
+### Per-value binding, not per-variable
+
+CF attaches one `units` attribute to a whole netCDF variable. That is the right model for a homogeneous array and no model at all for a heterogeneous document: configuration next to measurements next to a binary payload next to timestamps. In Bovnar that is the normal case, and every value carries its own unit — including the elements of an array, which the validator holds to a single element type.
+
+### Where Bovnar leads outright
+
+**Time.** CF encodes time as a UDUNITS string with an embedded reference date (`days since 1970-01-01`), with the calendar in a separate attribute and, as of CF 1.12, a `units_metadata` attribute that *declares* what the producer did about leap seconds. Bovnar makes the epoch part of the type — so it is checked like any other dimension — and implements the IERS leap-second table rather than describing it:
+
+```bovnar
+.utc_leap = <datetime:64,unix> 2016-12-31T23:59:60Z;   # → 1483228800
+.utc_next = <datetime:64,unix> 2017-01-01T00:00:00Z;   # → 1483228800  (POSIX has no slot for it)
+.tai_leap = <datetime:64,tai>  2016-12-31T23:59:60Z;   # → 1861920036
+.tai_next = <datetime:64,tai>  2017-01-01T00:00:00Z;   # → 1861920037  (TAI does)
+```
+
+Nine epochs are supported — `unix`, `tai`, `gps`, `mjd`, `ntp`, `galileo`, `glonass`, `y2000`, `beidou` — and mixing them in one array is `array_element_type_mismatch`, because the epoch is part of the type, not a note about it.
+
+**Currency.** Neither UCUM nor CF has monetary units at all. Bovnar treats 216 denominations as dimensions with the same machinery as physical units: `[<float_dec:64,$USD> 1, <float_dec:64,$EUR> 2]` is rejected, and a cross-currency conversion is refused (`error_unit_mismatch`) rather than guessed, because the library carries no exchange-rate table and never will.
+
+**Explicit prefix boundaries.** UCUM splits prefix from atom by longest-match and needs brackets to protect the units that lose that fight. Bovnar's `~` makes the boundary explicit, which separates three units that differ by one character and seven orders of dimension:
+
+| Written | Means | Dimension |
+|---|---|---|
+| `pH` | the acidity scale | dimensionless (its own quantity kind) |
+| `p~H` | picohenry | `m²·kg·s⁻²·A⁻²` |
+| `ph` | phot | illuminance |
+
+### Where Bovnar does not compete
+
+In earth-system science, CF wins and will keep winning. The entire tool ecosystem — xarray, iris, cdo, cf-python — is bound to netCDF, CF has been developed in the open since 2001 with thousands of standard names, and its known weaknesses are priced in. Bovnar's registry of 180 physical units and 216 currencies is not going to displace that, and this README does not claim it will.
+
+Bovnar's ground is where CF does not reach: heterogeneous documents rather than arrays, text and binary payloads in one file, configuration mixed with measurements, log streams, industrial telemetry, financial data with units. That is the space between JSON (no type, no unit) and netCDF (arrays, external schema, binary container).
+
+### Using UCUM codes in Bovnar
+
+Because UCUM sits at a different layer, it can be a component rather than an alternative. A `ucum:` notation is accepted in the unit slot, alongside the native one:
+
+```bovnar
+.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
+.count    = <uint:32,ucum:10*3/uL>     4500;
+.titre    = <float:64,ucum:[IU]/mL>    12.5;
+```
+
+A UCUM expression is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used — `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and satisfy the same `--require-field` rule. Powers of ten fold into prefixes (`ucum:10*3/uL` is `n~L⁻¹`, 10¹² L⁻¹), UCUM's `/` binds to one term where Bovnar's latches, and annotations are inert as UCUM defines them.
+
+The enforcement point does not move. A UCUM expression either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
+
+```
+ucum:mm[Hg]  →  mmHg                          translated
+ucum:[IU]    →  ucum:[IU]                     an assay unit: comparable, never convertible
+ucum:metre   →  error_unit_illegal            not a UCUM atom
+ucum:B[SPL]  →  error_unit_profile_unsupported valid UCUM, no representation here
+cf:m         →  error_unit_profile_unknown    no such profile
+```
+
+Full specification, the transliteration table, the collisions between the two namespaces (`st` is the stone natively and the stere in UCUM), and an explicit list of what does *not* map: [doc/ucum_profile.md](doc/ucum_profile.md).
 
 ---
 

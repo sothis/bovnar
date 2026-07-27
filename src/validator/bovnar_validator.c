@@ -1791,9 +1791,14 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		}
 		if (ulen > 0) {
 			if (v->value_type.family != vt_utf8 && !unit_ok) {
+				/* spec 1.2 — a profile unit distinguishes "that is not a unit"
+				 * from "valid UCUM this build cannot carry" and from "no such
+				 * profile"; bvn_unit_error_code re-parses to tell them apart, on
+				 * the error path only. A natively spelled unit still yields
+				 * error_unit_illegal, unchanged. */
 				v->last_error = unit_too_long
 								? error_unit_too_long
-								: error_unit_illegal;
+								: bvn_unit_error_code(unit_buf, ulen);
 				return false;
 			}
 			d.type   = token_is_unit;
@@ -1984,7 +1989,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			return false;
 		}
 		if (!iu_ok) {
-			v->last_error = error_unit_illegal;
+			v->last_error = bvn_unit_error_code(
+				raw->inline_unit_data, raw->inline_unit_len);
 			return false;
 		}
 		if (v->has_annotation_unit &&

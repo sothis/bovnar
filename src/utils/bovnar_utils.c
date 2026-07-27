@@ -39,6 +39,7 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
+#include "bvn_ucum_impl.h"
 /*
  * ===========================================================================
  * Shared utilities: number parsing/formatting/validation and unit handling
@@ -533,6 +534,8 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_writing_to_sink:           return "writing_to_sink";
 	case error_sink_buffer_exhausted:     return "sink_buffer_exhausted";
 	case error_unit_illegal:              return "unit_illegal";
+	case error_unit_profile_unknown:      return "unit_profile_unknown";
+	case error_unit_profile_unsupported:  return "unit_profile_unsupported";
 	case error_base_requires_string_literal: return "base_requires_string_literal";
 	case error_type_value_mismatch:       return "type_value_mismatch";
 	case error_value_out_of_range:        return "value_out_of_range";
@@ -1038,7 +1041,56 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 		*ok = false;
 		return (value_unit_t){ .num_components = 0 };
 	}
+	/*
+	 * spec 1.2 — a "name:" namespace hands the string to the unit profile
+	 * (doc/ucum_profile.md). This is the SINGLE door: every path that reaches a
+	 * unit goes through bvn_parse_unit, so a profile unit cannot arrive by a
+	 * route that skips a check, and the policy strings of bvnr_unit_policy_t
+	 * accept the notation with no change at all.
+	 *
+	 * A ':' in a unit was already an error before this, and no native alias or
+	 * currency code contains one, so nothing that parsed yesterday changes
+	 * meaning.
+	 */
+	if (bvni_unit_has_profile((const char*)unit, len)) {
+		bvni_ucum_status_t st = bvni_ucum_ok;
+		value_unit_t u = bvni_parse_profile_unit((const char*)unit, len, &st);
+		*ok = (st == bvni_ucum_ok);
+		return u;
+	}
 	return bvn_parse_unit_expr((const char*)unit, len, 0, ok);
+}
+/*
+ * Which error a rejected unit string deserves. Re-parses, deliberately: this is
+ * the error path, where one more pass over at most 255 bytes costs nothing, and
+ * the alternative — threading a status out of bvn_parse_unit — would change the
+ * signature of a public function every caller in the tree already uses.
+ */
+error_code_t bvn_unit_error_code(const uint8_t* unit, uint32_t len)
+{
+	if (!unit || !len)
+		return error_unit_illegal;
+	if (!bvni_unit_has_profile((const char*)unit, len)) {
+		bool ok = true;
+		(void)bvn_parse_unit_expr((const char*)unit, len, 0, &ok);
+		return ok ? error_none : error_unit_illegal;
+	}
+	bvni_ucum_status_t st = bvni_ucum_ok;
+	(void)bvni_parse_profile_unit((const char*)unit, len, &st);
+	switch (st) {
+	case bvni_ucum_ok:              return error_none;
+	case bvni_ucum_unsupported:     return error_unit_profile_unsupported;
+	case bvni_ucum_unknown_profile: return error_unit_profile_unknown;
+	default:                        return error_unit_illegal;
+	}
+}
+bool bvn_unit_is_profile_only(value_unit_t u)
+{
+	return bvni_unit_has_arbitrary(u);
+}
+int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize)
+{
+	return bvni_unit_to_ucum(u, buf, bufsize);
 }
 value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok)
 {
@@ -1065,6 +1117,11 @@ static const char* base_unit_str(value_base_unit_t b)
 	/* Physical-unit canonical symbols — generated from src/gendata/units.bvnr by
 	 * gen_units.py. The default: case below handles currencies. */
 #include "bovnar_base_unit_str.gen.inc"
+	/* UCUM arbitrary units — generated from src/gendata/ucum.bvnr by
+	 * gen_ucum.py. Their canonical spelling IS the UCUM code, because they have
+	 * no native one; bvn_unit_to_string wraps the whole expression in "ucum:"
+	 * when one of these is present. */
+#include "bovnar_ucum_str.gen.inc"
 	default:
 		if (bvn_unit_is_currency((int)b)) {
 			const bvn_currency_info_t *info = bvn_currency_info((int)b);
@@ -1626,6 +1683,28 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 {
 	if (!buf || bufsize < 1)
 		return -1;
+	/*
+	 * spec 1.2 — a unit carrying a UCUM arbitrary atom has NO native spelling,
+	 * so the profile prefix is part of its canonical form and the whole
+	 * expression is written in profile notation. Re-parsing that output yields
+	 * the same value_unit_t, which is what closes the round trip without any
+	 * state living outside the struct.
+	 *
+	 * This runs before the flag handling below on purpose: BVN_UNIT_REDUCE folds
+	 * a unit towards named SI, and an arbitrary unit has no SI form to fold
+	 * towards — its conversion row exists only to keep the table well-formed.
+	 */
+	if (bvni_unit_has_arbitrary(u)) {
+		if (!bvn_unit_valid(u))
+			return -1;
+		if (bufsize < 6)
+			return -1;
+		memcpy(buf, "ucum:", 5);
+		int32_t w = bvni_unit_to_ucum(u, buf + 5, bufsize - 5);
+		if (w < 0)
+			return -1;
+		return w + 5;
+	}
 	if (flags & BVN_UNIT_REDUCE) {
 		double   scale;
 		bool     overflow;
@@ -1767,6 +1846,19 @@ int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize)
 		return -1;
 	if (!bvn_unit_valid(u))
 		return -1;
+	/* spec 1.2 — a unit carrying a UCUM arbitrary atom has no native spelling,
+	 * so its canonical form is the profile one. Same rule as in
+	 * bvn_unit_to_string_ex; the two formatters are separate implementations and
+	 * a unit that printed differently through them would be a round-trip hole. */
+	if (bvni_unit_has_arbitrary(u)) {
+		if (bufsize < 6)
+			return -1;
+		memcpy(buf, "ucum:", 5);
+		int32_t pw = bvni_unit_to_ucum(u, buf + 5, bufsize - 5);
+		if (pw < 0)
+			return -1;
+		return pw + 5;
+	}
 	uint32_t nc = u.num_components < BVNR_MAX_UNIT_COMPONENTS
 	            ? u.num_components : BVNR_MAX_UNIT_COMPONENTS;
 	if (nc == 0) {
@@ -2117,8 +2209,36 @@ value_type_spec_t bvn_parse_type_annotation(
 			if (have_unit) { *type_ok = false; return r; }
 			have_unit = true;
 			uint32_t ustart = pos;
-			while (pos < len && str[pos] != ',')
+			/*
+			 * spec 1.2 — a UCUM annotation may contain a comma ("{cells,total}"),
+			 * and a type-parameter list is comma-separated, so the scan tracks
+			 * brace depth: a ',' at depth 0 ends the parameter, one at depth >= 1
+			 * belongs to it. Bracket depth is tracked too, not because a UCUM
+			 * atom can contain a comma inside brackets — none does — but so that
+			 * an unbalanced '[' is diagnosed as a malformed unit rather than as a
+			 * malformed parameter list.
+			 *
+			 * The depth bound matches the native parenthesis parser's. UCUM
+			 * annotations do not nest, so any depth above 1 is already an error;
+			 * the bound is here so a hostile document cannot drive the SCANNER
+			 * deep before the parser gets to say so.
+			 */
+			uint32_t bdepth = 0, kdepth = 0;
+			while (pos < len) {
+				uint8_t uc = str[pos];
+				if (uc == ',' && bdepth == 0 && kdepth == 0)
+					break;
+				if (uc == '{')      bdepth++;
+				else if (uc == '}') { if (bdepth) bdepth--; }
+				else if (uc == '[') kdepth++;
+				else if (uc == ']') { if (kdepth) kdepth--; }
+				if (bdepth > BVN_UNIT_GROUP_MAX_DEPTH ||
+					kdepth > BVN_UNIT_GROUP_MAX_DEPTH) {
+					*unit_ok = false;
+					return r;
+				}
 				pos++;
+			}
 			uint32_t ulen = pos - ustart;
 			if (ulen > UINT8_MAX) {
 				*unit_ok      = false;

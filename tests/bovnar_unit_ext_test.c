@@ -1265,7 +1265,16 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_turbidity_ftu       == 394, "bu_turbidity_ftu == 394");
 	ASSERT_TRUE((int)bu_turbidity_fau       == 395, "bu_turbidity_fau == 395");
 	ASSERT_TRUE((int)bu_turbidity_jtu       == 396, "bu_turbidity_jtu == 396");
-	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT, 397, "sentinel == 397");
+	/* The last NATIVE unit is 396; the UCUM arbitrary block (spec 1.2) runs
+	 * above it and now carries the count. Pinning both is what makes an
+	 * accidental overlap fail here — bvni_is_arbitrary is a range test, so a
+	 * native unit appended past the block's first id would silently become
+	 * incommensurable with everything. */
+	ASSERT_TRUE((int)bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST,
+	            "native units sit below the arbitrary block");
+	ASSERT_EQ_INT(BVN_UCUM_ARBITRARY_FIRST, 397, "arbitrary block starts at 397");
+	ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT,
+	              BVN_UCUM_ARBITRARY_LAST + 1, "sentinel tracks the last id");
 }
 
 static void test_nonsi_si_factors(void)

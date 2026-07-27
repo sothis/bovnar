@@ -287,6 +287,7 @@ set(BVNR_SOURCES_UTILS
     src/utils/bovnar_utils.c
     src/utils/bovnar_si_units.c
     src/utils/bovnar_currency.c
+    src/utils/bovnar_ucum.c
     src/utils/bvn_int.c
     src/utils/bvn_float.c
     src/utils/bvn_gregorian_date.c
@@ -330,9 +331,11 @@ set(BVNR_GEN_INPUTS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/units.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/prefixes.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/currencies.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/ucum.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_units.py
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_prefixes.py
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_currencies.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen_ucum.py
     ${CMAKE_CURRENT_SOURCE_DIR}/bvnr_data.py)
 set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_si_conv_table.gen.inc
@@ -348,6 +351,14 @@ set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_si_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_iec_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_currency_table.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_prefix.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_conv.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_policy.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_str.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_ucum_reverse.gen.inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_ucum.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_units.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_si_prefix.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_iec_prefix.gen.h)
@@ -383,7 +394,7 @@ endif()
 
 if(_bvnr_regen)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    foreach(_gen gen_units gen_prefixes gen_currencies)
+    foreach(_gen gen_units gen_prefixes gen_currencies gen_ucum)
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E env
                     BVNR_GENERATED_DIR=${BVNR_GENERATED_DIR}
@@ -392,7 +403,7 @@ if(_bvnr_regen)
             RESULT_VARIABLE _bvnr_gen_rc)
         if(NOT _bvnr_gen_rc EQUAL 0)
             message(FATAL_ERROR
-                "Failed to generate the unit/prefix/currency tables (${_gen}.py). "
+                "Failed to generate the unit/prefix/currency/UCUM tables (${_gen}.py). "
                 "These need only Python 3 — check that ${Python3_EXECUTABLE} runs.")
         endif()
     endforeach()

@@ -70,6 +70,7 @@ __all__ = [
     'version', 'spec_version', 'peek_version',
     'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
+    'unit_to_ucum', 'unit_is_profile_only', 'unit_error_code',
     'write_array',
     'Quantity',
 
@@ -266,6 +267,54 @@ def unit_to_str(unit: ValueUnit) -> str:
     if n < 0:
         raise BovnarArgumentError("unit_to_str: output buffer overflow")
     return buf.raw[:n].decode('utf-8')
+
+
+def unit_to_ucum(unit: ValueUnit) -> str:
+    """
+    The UCUM code for *unit*, without the ``ucum:`` prefix.
+
+    Partial by construction (doc/ucum_profile.md 5.3): a native unit outside the
+    transliteration table has no UCUM form, which includes the Old German units,
+    the water-hardness degrees, the turbidity kinds and every currency. Those
+    raise rather than returning an invented code.
+    """
+    import ctypes as _ct
+    from ._ffi import get_library
+    lib = get_library()
+    buf = _ct.create_string_buffer(256)
+    n   = lib.bvn_unit_to_ucum(unit, buf, 256)
+    if n < 0:
+        raise BovnarArgumentError("unit_to_ucum: this unit has no UCUM code")
+    return buf.raw[:n].decode('utf-8')
+
+
+def unit_is_profile_only(unit: ValueUnit) -> bool:
+    """
+    True when *unit* has no native spelling and serialises in profile notation.
+
+    That is exactly the units carrying a UCUM arbitrary atom -- ``[IU]``,
+    ``[PFU]`` and the rest of that block, which are assay-defined and
+    commensurable with nothing, not even with each other.
+    """
+    from ._ffi import get_library
+    return bool(get_library().bvn_unit_is_profile_only(unit))
+
+
+def unit_error_code(unit_str: str) -> int:
+    """
+    Why :func:`parse_unit` rejected *unit_str*, as an ``error_code_t`` value.
+
+    Distinguishes malformed input (``error_unit_illegal``) from an unrecognised
+    profile namespace (``error_unit_profile_unknown``) and from valid UCUM this
+    build cannot represent (``error_unit_profile_unsupported``). Returns
+    ``error_none`` (0) for a string that does parse.
+    """
+    import ctypes as _ct
+    from ._ffi import get_library
+    lib = get_library()
+    raw = unit_str.encode('utf-8')
+    arr = (_ct.c_uint8 * len(raw)).from_buffer_copy(raw)
+    return int(lib.bvn_unit_error_code(arr, _ct.c_uint32(len(raw))))
 
 
 def parse_unit(unit_str: str) -> ValueUnit:

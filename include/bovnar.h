@@ -245,7 +245,19 @@ typedef enum error_code_e {
 	 * than aborting the read, so the partial message is dropped (never
 	 * delivered, never pre-allocated) but the loss is reportable instead of
 	 * indistinguishable from an empty stream. */
-	error_octet_stream_truncated        = 48
+	error_octet_stream_truncated        = 48,
+	/* spec 1.2, the UCUM unit profile. The split matters to a producer: one of
+	 * these says "you wrote it wrong", the other says "you wrote it right and
+	 * this build cannot carry it", and the fixes are different. Malformed UCUM,
+	 * and UCUM over an atom UCUM does not define, stay error_unit_illegal. */
+	/* The namespace before the ':' is not a profile this build supports. A
+	 * consumer reads this as "no UCUM profile compiled in", which a plain
+	 * error_unit_illegal could not be distinguished from. */
+	error_unit_profile_unknown          = 49,
+	/* Valid UCUM over known atoms, with no representation in the unit model: a
+	 * special unit carrying a reference level, a scale factor outside the SI
+	 * prefix decades, an expression wider than BVNR_MAX_UNIT_COMPONENTS. */
+	error_unit_profile_unsupported      = 50
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,
@@ -278,7 +290,18 @@ typedef enum value_base_unit_e {
 	 * physical units resumed at 380 above — so the BVN_VALUE_BASE_UNIT_COUNT
 	 * check in bvn_internal_dims.h tracks the last unit, not the last currency.
 	 */
-	bu_zwg = 378, bu_xcg
+	bu_zwg = 378, bu_xcg,
+	/*
+	 * UCUM arbitrary units (spec 1.2) — generated from src/gendata/ucum.bvnr by
+	 * gen_ucum.py. Assay-defined quantities that are commensurable with nothing,
+	 * not even with each other, so each needs its own id: collapsing them onto
+	 * one would make [IU] and [PFU] compare equal. They have no native spelling
+	 * and are reachable only through the "ucum:" notation.
+	 *
+	 * These ARE the highest enumerators, so BVN_VALUE_BASE_UNIT_COUNT in
+	 * bvn_internal_dims.h now tracks the last of them.
+	 */
+#include "bovnar_ucum.gen.h"
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,
@@ -972,6 +995,23 @@ BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsiz
 BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
 BVN_API bool         bvn_unit_valid(value_unit_t u);
+/* spec 1.2 -- the UCUM unit profile (doc/ucum_profile.md).
+ *
+ * bvn_unit_error_code says WHY a unit string bvn_parse_unit rejected is not a
+ * unit: error_unit_illegal for malformed input, error_unit_profile_unknown for
+ * an unrecognised "name:" namespace, error_unit_profile_unsupported for valid
+ * UCUM this build cannot represent. It re-parses, so it is for the error path
+ * only. Passing a string that DOES parse returns error_none.
+ *
+ * bvn_unit_is_profile_only is true when a unit has no native spelling -- it
+ * contains a UCUM arbitrary atom -- so bvn_unit_to_string emits it in profile
+ * notation. bvn_unit_to_ucum writes a UCUM code (without the "ucum:" prefix) for
+ * a unit that has one, and is partial by construction: it returns -1 for every
+ * native unit outside the transliteration table, which includes the Old German
+ * units, the water-hardness degrees, the turbidity kinds and every currency. */
+BVN_API error_code_t bvn_unit_error_code(const uint8_t* unit, uint32_t len);
+BVN_API bool         bvn_unit_is_profile_only(value_unit_t u);
+BVN_API int32_t      bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
 BVN_API bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
 BVN_API double       bvn_unit_prefix_factor(value_unit_t u);
 BVN_API int32_t      bvn_unit_prefix_exponent(value_unit_t u);

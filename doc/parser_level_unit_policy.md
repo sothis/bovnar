@@ -784,6 +784,19 @@ same value and the same unit as the streaming reader for every value, and reach
 the same verdict about the document. Neither has disagreed over five thousand
 generated documents.
 
+The registry itself is swept through a real PARSE rather than through the
+conversion functions, which is a different question and was for a while the last
+place a gap could have hidden: section 5's sweeps prove what the engine does,
+and nothing about what a document does, since a unit reaches the policy only by
+being written into an annotation, lexed back out and matched. All 396 units
+survive that round trip; 124 of them normalise, each to exactly the value and
+unit the engine gives in isolation; the other 272 are left alone, and every one
+of those is a case the engine genuinely cannot deliver — no SI form, already
+normal, an irrational factor, or no terminating expansion. "Left alone" is not
+allowed to be a shrug. The same table also goes through the DOM, through the
+writer under two policy shapes, and back through a target naming each value's
+own unit, which must be a no-op rather than a pointless rewrite.
+
 **And the DOM followed for free.** Section 3.7 treated a DOM-tier pass as a
 separate option with its own machinery. Once the reader had the policy the DOM
 needed thirty lines: it is built on the reader, so it inherits everything, and

@@ -30,6 +30,7 @@
 #include "bovnar.h"
 #include "bovnar_si_units.h"
 #include "bovnar_dom.h"
+#include "bvn_int.h"
 
 static int failures = 0;
 static int tests = 0;
@@ -1992,6 +1993,204 @@ static void test_dom_and_reader_agree(void)
 	ASSERT_TRUE(compared > 30u, "dom/reader: real coverage");
 }
 
+/*
+ * Every unit in the registry, driven through a real PARSE.
+ *
+ * The conversion engine had been swept exhaustively by calling it directly,
+ * which proves what the engine does and nothing about what a document does. A
+ * unit reaches the policy by being written into an annotation, lexed back out
+ * and matched — three steps the direct sweep skips entirely. So take each of
+ * the registry's units, write a document in it, and check the parse against
+ * what the engine says in isolation:
+ *
+ *   - the canonical spelling of every unit must be re-readable in a document;
+ *   - a value the parse converted must carry exactly the value and unit the
+ *     engine produces for it;
+ *   - a value the parse left alone must be one the engine genuinely cannot
+ *     deliver — no SI form, already normal, an irrational factor, or no
+ *     terminating expansion. "Left alone" is not allowed to be a shrug.
+ */
+static void test_every_unit_through_a_parse(void)
+{
+	uint32_t units = 0, converted = 0, left = 0, mismatches = 0;
+	char ubuf[BVNR_UNIT_STRING_MAX], doc[512], want[256], wunit[128];
+
+	for (int bu = 1; bu < 397; bu++) {
+		value_unit_t u;
+		memset(&u, 0, sizeof u);
+		u.num_components = 1;
+		u.components[0].base     = (value_base_unit_t)bu;
+		u.components[0].exponent = exp_linear;
+		u.components[0].prefix.system = prefix_si;
+		u.components[0].prefix.id.si  = si_none;
+		if (!bvn_unit_valid(u)) continue;
+		if (bvn_unit_to_string(u, ubuf, sizeof ubuf) < 0) continue;
+		if (!ubuf[0] || strcmp(ubuf, "no_unit") == 0) continue;
+		units++;
+
+		snprintf(doc, sizeof doc, ".v = <float:64,%s> 1.0;\n", ubuf);
+		bvnr_unit_policy_t p = {0};
+		p.normalise  = bvnr_normalise_si;
+		p.on_inexact = bvnr_inexact_leave;
+
+		pol_ctx_t c = {0};
+		run_policy(doc, &p, &c, true, error_none);
+		if (c.n != 1) {
+			mismatches++;
+			fprintf(stderr, "  unit %s did not survive a document\n", ubuf);
+			continue;
+		}
+
+		/* what the engine says, called directly */
+		value_unit_t si;
+		bool has_si = bvn_unit_si_normal_form(u, &si);
+		bool deliverable = false;
+		want[0] = wunit[0] = '\0';
+		if (has_si && !bvn_unit_equal(si, u)) {
+			bvn_unit_to_string(si, wunit, sizeof wunit);
+			bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+			bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+			if (vn && vd && on && od) {
+				bvn_int_from_uint64(vn, 1u);
+				bvn_int_from_uint64(vd, 1u);
+				bool exact = false;
+				if (bvn_unit_convert_rational(vn, vd, u, si, on, od, &exact)
+				    && exact) {
+					bool rex = false;
+					int32_t l = bvn_rational_to_str(on, od, 10u, want,
+								        sizeof want, &rex);
+					deliverable = (l >= 0 && rex);
+				}
+			}
+			bvn_int_free(vn); bvn_int_free(vd);
+			bvn_int_free(on); bvn_int_free(od);
+		}
+
+		if (c.converted[0]) {
+			converted++;
+			if (!deliverable || strcmp(c.unit[0], wunit) != 0 ||
+			    strcmp(c.text[0], want) != 0) {
+				mismatches++;
+				fprintf(stderr, "  %s: parse gave [%s %s], engine [%s %s]\n",
+					ubuf, c.text[0], c.unit[0], want, wunit);
+			}
+		} else {
+			left++;
+			if (deliverable) {
+				mismatches++;
+				fprintf(stderr, "  %s: left alone, but the engine delivers "
+					"[%s %s]\n", ubuf, want, wunit);
+			}
+		}
+	}
+	ASSERT_TRUE(units > 380u, "registry: the sweep saw the whole table");
+	ASSERT_TRUE(converted > 50u, "registry: a real share of it normalises");
+	ASSERT_TRUE(left > 50u, "registry: and a real share of it cannot");
+	ASSERT_EQ_INT(mismatches, 0,
+		      "registry: every unit's parse matches the engine in isolation");
+}
+
+/*
+ * The same table, through the other two tiers and the other policy shapes: the
+ * DOM must reach the reader's answer for every unit, the writer must accept
+ * every unit-bearing value under require_unit and under a rule naming that very
+ * unit, and a target naming a value's OWN unit must be a no-op rather than a
+ * pointless rewrite.
+ */
+static void test_every_unit_through_the_other_tiers(void)
+{
+	uint32_t units = 0, bad = 0;
+	char ubuf[BVNR_UNIT_STRING_MAX], doc[512], wbuf[256];
+
+	for (int bu = 1; bu < 397; bu++) {
+		value_unit_t u;
+		memset(&u, 0, sizeof u);
+		u.num_components = 1;
+		u.components[0].base     = (value_base_unit_t)bu;
+		u.components[0].exponent = exp_linear;
+		u.components[0].prefix.system = prefix_si;
+		u.components[0].prefix.id.si  = si_none;
+		if (!bvn_unit_valid(u)) continue;
+		if (bvn_unit_to_string(u, ubuf, sizeof ubuf) < 0) continue;
+		if (!ubuf[0] || strcmp(ubuf, "no_unit") == 0) continue;
+		units++;
+		snprintf(doc, sizeof doc, ".v = <float:64,%s> 1.0;\n", ubuf);
+
+		bvnr_unit_policy_t norm = {0};
+		norm.normalise  = bvnr_normalise_si;
+		norm.on_inexact = bvnr_inexact_leave;
+
+		/* the DOM's answer must be the reader's */
+		pol_ctx_t c = {0};
+		run_policy(doc, &norm, &c, true, error_none);
+		bvn_dom_doc_t *dd = bvn_dom_parse_policy(doc, (uint32_t)strlen(doc), &norm);
+		if (!dd || bvn_dom_doc_get_parse_error(dd) != error_none) {
+			bad++;
+		} else if (c.n == 1) {
+			bvn_dom_node_t *n = bvn_dom_lookup(dd, ".v");
+			char du[128] = {0};
+			double dv = 0.0;
+			if (n) { bvn_dom_get_unit_string(n, du, sizeof du);
+				 bvn_dom_get_float(n, &dv); }
+			const char *wu = c.converted[0] ? c.unit[0] : ubuf;
+			double wv = (c.converted[0] && c.text[0][0])
+				  ? strtod(c.text[0], NULL) : 1.0;
+			double dd_abs = dv - wv; if (dd_abs < 0) dd_abs = -dd_abs;
+			double tol = (wv < 0 ? -wv : wv) * 1e-12 + 1e-15;
+			if (!n || strcmp(du, wu) != 0 || dd_abs > tol) {
+				bad++;
+				fprintf(stderr, "  %s: dom [%.17g %s] vs reader [%s %s]\n",
+					ubuf, dv, du, c.converted[0] ? c.text[0] : "1.0", wu);
+			}
+		}
+		if (dd) bvn_dom_doc_destroy(dd);
+
+		/* the writer accepts it under require_unit, and under a rule naming it */
+		bvnr_unit_policy_t req = {0};
+		req.require_unit = true;
+		bvnr_writer_t *w = bvnr_writer_create();
+		if (w) {
+			bvnr_writer_set_unit_policy(w, &req);
+			bvnr_open_write_mem(w, wbuf, sizeof wbuf, false, NULL);
+			if (!bvnr_write_float_unit(w, "v", 64, 1.0, u)) {
+				bad++;
+				fprintf(stderr, "  writer refused a value in %s\n", ubuf);
+			}
+			bvnr_writer_destroy(w);
+		}
+		bvnr_unit_rule_t rl = { ".v", ubuf, 0, bvnr_rule_require };
+		bvnr_unit_policy_t byrule = {0};
+		byrule.rules = &rl; byrule.num_rules = 1;
+		w = bvnr_writer_create();
+		if (w) {
+			if (!bvnr_writer_set_unit_policy(w, &byrule)) {
+				bad++;
+			} else {
+				bvnr_open_write_mem(w, wbuf, sizeof wbuf, false, NULL);
+				if (!bvnr_write_float_unit(w, "v", 64, 1.0, u)) {
+					bad++;
+					fprintf(stderr, "  %s fails a rule naming itself\n",
+						ubuf);
+				}
+			}
+			bvnr_writer_destroy(w);
+		}
+
+		/* a target naming the value's own unit must do nothing at all */
+		bvnr_unit_target_t t = { ubuf, 0 };
+		bvnr_unit_policy_t self = {0};
+		self.targets = &t; self.num_targets = 1;
+		pol_ctx_t sc = {0};
+		run_policy(doc, &self, &sc, true, error_none);
+		if (sc.n != 1 || sc.converted[0]) {
+			bad++;
+			fprintf(stderr, "  %s converted to itself\n", ubuf);
+		}
+	}
+	ASSERT_TRUE(units > 380u, "tiers: the sweep saw the whole table");
+	ASSERT_EQ_INT(bad, 0, "tiers: dom, writer and self-target agree for every unit");
+}
+
 int main(void)
 {
 	test_targets_mixed_document();
@@ -2057,6 +2256,8 @@ int main(void)
 	test_dom_policy_rejects_a_bad_policy();
 	test_dom_integer_converting_to_a_fraction();
 	test_dom_and_reader_agree();
+	test_every_unit_through_a_parse();
+	test_every_unit_through_the_other_tiers();
 	test_writer_and_reader_agree_over_shapes();
 
 	if (failures == 0) {

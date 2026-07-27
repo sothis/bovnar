@@ -56,12 +56,38 @@ Outside of octet-stream regions the parser enforces strict UTF-8 validity.
 
 **Does Bovnar perform unit conversion or dimensional analysis?**
 
-No. The unit annotation is parsed, validated, and delivered to the application
-through the event API, but Bovnar itself never converts between compatible
-units. That is deliberately left to the application. The Python bindings expose
-helper functions (`unit_convert_factor`, `convert_value`, `units_compatible`)
-that applications can use to implement dimensional checking and conversion on
-top of the parsed unit data.
+Both, but never on its own initiative. Nothing is converted unless the consumer
+asks for it, and a value the library was not asked about is delivered exactly as
+the document wrote it.
+
+Dimensional analysis is always available: `bvn_units_compatible`,
+`bvn_unit_dimension_vector` and `bvn_unit_convert_factor` in C
+(`units_compatible`, `units_convertible`, `unit_convert_factor`,
+`convert_value` in Python) answer whether two units measure the same quantity
+and what relates them.
+
+Conversion happens at read time when you ask for it, in three escalating forms
+(read/write API §1.10 and §1.12):
+
+- **`want_unit`** — a per-value callback that converts to a unit you name. The
+  result is exact: an irrational factor, or one with no terminating expansion in
+  the output base, aborts the parse with `error_unit_inexact` rather than
+  handing back a rounded number.
+- **`bvnr_reader_set_unit_policy`** — the same without a callback. Name target
+  units, per-field rules by key path, or `bvnr_normalise_si` to deliver
+  everything else in coherent SI. A rule is an assertion as well as a target: a
+  value that cannot satisfy it is `error_unit_mismatch`.
+- **The writer half** (`bvnr_writer_set_unit_policy`) holds a *producer* to the
+  same rules.
+
+The CLI exposes all of it: `bovnar events --unit m/s --si`,
+`bovnar validate --require-field '.inlet.temperature=K'`.
+
+What the library will not do is guess. It refuses a cross-currency conversion
+outright, because it carries no exchange rates; it refuses to relate quantities
+that share a dimension but not a kind (a bit is not a byte, `pH` is not a plain
+number, an NTU is not an FNU); and an affine scale such as `°C` has no
+meaningful conversion inside a compound unit, so it yields none.
 
 ---
 

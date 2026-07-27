@@ -1095,6 +1095,89 @@ static void test_rule_path_argument_checking(void)
 	bvnr_reader_destroy(r);
 }
 
+/*
+ * An array of structs has ONE assignment and one key for every element, so the
+ * key arrives once and the first element's push consumes it. Restoring it on
+ * the close is what keeps element two onward at the same path: without it
+ * `.holdings.amount` became `.amount.amount` from the second row on, and a rule
+ * naming that field silently stopped applying to all but the first row of every
+ * table in the document — a rule quietly not firing on a field it names, which
+ * is the failure mode per-field rules exist to not have.
+ */
+static void test_rule_across_array_of_structs(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".holdings.amount", "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".holdings = [\n"
+		   "  { .amount = <float:64,in>  12.0; },\n"
+		   "  { .amount = <float:64,k~m>  1.0; },\n"
+		   "  { .amount = <float:64,in>  24.0; }\n"
+		   "];\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "aos: three rows");
+	if (c.n != 3) return;
+	ASSERT_STR(c.text[0], "0.3048", "aos: row 0");
+	ASSERT_STR(c.text[1], "1000",   "aos: row 1 — not just the first row");
+	ASSERT_STR(c.text[2], "0.6096", "aos: row 2");
+
+	/* ...and the assertion half reaches every row too: a wrong quantity in row
+	 * two must be caught, not skipped. */
+	memset(&c, 0, sizeof c);
+	run_policy(".holdings = [\n"
+		   "  { .amount = <float:64,in> 12.0; },\n"
+		   "  { .amount = <float:64,°C>  5.0; }\n"
+		   "];\n", &p, &c, false, error_unit_mismatch);
+}
+
+/* The same, with a second key per row: the key in flight when a struct opens is
+ * the ARRAY's, never whichever key the previous row happened to end on. */
+static void test_rule_array_of_structs_two_keys(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".h.b", "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 1;
+
+	pol_ctx_t c = {0};
+	run_policy(".h = [\n"
+		   "  { .a = <float:64,°C> 1.0; .b = <float:64,in> 12.0; },\n"
+		   "  { .a = <float:64,°C> 2.0; .b = <float:64,in> 24.0; }\n"
+		   "];\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 4, "aos keys: four values");
+	if (c.n != 4) return;
+	ASSERT_TRUE(!c.converted[0], "aos keys: .h.a row 0 untouched");
+	ASSERT_STR(c.text[1], "0.3048", "aos keys: .h.b row 0");
+	ASSERT_TRUE(!c.converted[2], "aos keys: .h.a row 1 untouched");
+	ASSERT_STR(c.text[3], "0.6096", "aos keys: .h.b row 1");
+}
+
+/* A struct nested inside each row, and a sibling assignment after the array:
+ * the prefix has to unwind to exactly where it started. */
+static void test_rule_paths_unwind(void)
+{
+	static const bvnr_unit_rule_t rules[] = {
+		{ ".h.i.v", "m", 0, bvnr_rule_convert },
+		{ ".after",  "m", 0, bvnr_rule_convert },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = rules; p.num_rules = 2;
+
+	pol_ctx_t c = {0};
+	run_policy(".h = [ { .i = { .v = <float:64,in> 12.0; }; },\n"
+		   "       { .i = { .v = <float:64,in> 24.0; }; } ];\n"
+		   ".after = <float:64,k~m> 1.0;\n", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "unwind: three values");
+	if (c.n != 3) return;
+	ASSERT_STR(c.text[0], "0.3048", "unwind: row 0");
+	ASSERT_STR(c.text[1], "0.6096", "unwind: row 1");
+	ASSERT_STR(c.text[2], "1000",   "unwind: the sibling after the array");
+}
+
 /* Deeper than the path buffer can describe, the position is UNKNOWN — and an
  * unknown position must match nothing rather than match wrongly. */
 static void test_rule_ignores_unrepresentable_paths(void)
@@ -1441,6 +1524,45 @@ static void test_writer_rules_are_path_scoped(void)
 	bvnr_writer_destroy(w);
 }
 
+/* The writer shares the path tracker, so it shares the array-of-structs case:
+ * every row must be held to the rule, not just the first. */
+static void test_writer_rules_across_array_of_structs(void)
+{
+	static const bvnr_unit_rule_t req[] = {
+		{ ".h.amount", "m", 0, bvnr_rule_require },
+	};
+	bvnr_unit_policy_t p = {0};
+	p.rules = req; p.num_rules = 1;
+
+	char buf[1024];
+	bool set_ok = false, ok = false;
+	bvnr_writer_t *w = open_writer(buf, sizeof buf, &p, &set_ok);
+	ASSERT_TRUE(w != NULL && set_ok, "writer aos: policy set");
+	if (!w) return;
+	value_unit_t inch = bvn_parse_unit((const uint8_t *)"in", &ok);
+	value_unit_t degc = bvn_parse_unit((const uint8_t *)"°C", &ok);
+
+	bvnr_data_t d = {0};
+	d.type = token_is_identifier; d.data = "h"; d.length = 1;
+	ASSERT_TRUE(bvnr_write_event(w, ev_assignment_start, &d), "writer aos: assign");
+	bvnr_data_t rs = {0};
+	ASSERT_TRUE(bvnr_write_event(w, ev_array_row_start, &rs), "writer aos: row");
+
+	/* row 0: a length, accepted */
+	ASSERT_TRUE(bvnr_write_event(w, ev_struct_start, &rs), "writer aos: row 0 open");
+	ASSERT_TRUE(bvnr_write_float_unit(w, "amount", 64, 12.0, inch),
+		    "writer aos: row 0 accepted");
+	ASSERT_TRUE(bvnr_write_event(w, ev_struct_end, &rs), "writer aos: row 0 close");
+
+	/* row 1: a temperature at the same path — must be refused */
+	ASSERT_TRUE(bvnr_write_event(w, ev_struct_start, &rs), "writer aos: row 1 open");
+	ASSERT_TRUE(!bvnr_write_float_unit(w, "amount", 64, 25.0, degc),
+		    "writer aos: row 1 is held to the rule too");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch,
+		      "writer aos: error_unit_mismatch");
+	bvnr_writer_destroy(w);
+}
+
 /* ── the DOM tier ────────────────────────────────────────────────────────── */
 
 /*
@@ -1584,6 +1706,9 @@ int main(void)
 	test_rule_outranks_targets_and_normalise();
 	test_rule_covers_array_elements();
 	test_rule_path_argument_checking();
+	test_rule_across_array_of_structs();
+	test_rule_array_of_structs_two_keys();
+	test_rule_paths_unwind();
 	test_rule_ignores_unrepresentable_paths();
 
 	test_writer_require_unit();
@@ -1595,6 +1720,7 @@ int main(void)
 	test_writer_and_reader_agree();
 	test_writer_rules();
 	test_writer_rules_are_path_scoped();
+	test_writer_rules_across_array_of_structs();
 
 	test_dom_policy();
 	test_dom_policy_validation();

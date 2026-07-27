@@ -755,6 +755,19 @@ rule for `.a.b` from ever firing on something else. Matching the wrong field is
 the one failure mode a per-field rule must not have, and it is a failure mode
 the whole-document options simply do not possess.
 
+**And the rule it forced was not enough on its own.** "An unknown path must
+match nothing" is stated above as though it were the whole invariant, and the
+first implementation satisfied it and was still wrong: an array of structs has
+ONE assignment and one key for every row, so the first row's push consumed the
+key and every later row pushed whatever key that row had ended on. The path was
+never unknown — it was confidently wrong, and a rule naming `.holdings.amount`
+quietly stopped applying after the first row of every table in the document.
+Silently not firing is the same defect as firing on the wrong field, and it
+survived the first round of testing because every test document had one struct
+per key. The fix is that a close RESTORES the key the open consumed, which costs
+nothing because that key is the path component being removed. The general
+lesson: a per-field rule needs a test corpus of document SHAPES, not of units.
+
 **And the DOM followed for free.** Section 3.7 treated a DOM-tier pass as a
 separate option with its own machinery. Once the reader had the policy the DOM
 needed thirty lines: it is built on the reader, so it inherits everything, and

@@ -172,6 +172,12 @@ void bvn_path_push(bvn_key_path_t* p)
 	 * the rule strictly LIFO is what makes bvn_path_pop correct. */
 	if (p->lost || p->pending_lost || p->depth >= BVN_PATH_MAX_DEPTH ||
 	    (size_t)p->len + 1u + p->pending_len >= BVN_PATH_MAX_BYTES) {
+		/* The key is gone with the push, so a SIBLING opening in this same
+		 * region has no key either until a fresh assignment supplies one —
+		 * pop cannot recover what was never written down. Saying so keeps an
+		 * unrepresentable region unknown rather than letting a stale key
+		 * describe it. */
+		p->pending_lost = true;
 		p->lost++;
 		return;
 	}
@@ -186,7 +192,31 @@ void bvn_path_pop(bvn_key_path_t* p)
 {
 	if (p->lost) { p->lost--; return; }
 	if (p->depth == 0u) { p->len = 0u; return; }
-	p->len = p->mark[--p->depth];
+	uint32_t mark = p->mark[--p->depth];
+	/*
+	 * Restore the key that was in flight when this struct opened.
+	 *
+	 * An ARRAY OF STRUCTS is why. `.holdings = [ {…}, {…} ]` has one
+	 * assignment and one key for every element: the key arrives once, the
+	 * first element's push consumes it, and without this the second element
+	 * pushed whatever key was last seen INSIDE the first — so
+	 * `.holdings.amount` became `.amount.amount` from element two onward, and a
+	 * rule naming that field silently stopped applying to all but the first row
+	 * of every table in the document.
+	 *
+	 * Nothing has to be remembered to undo it: the key is the component being
+	 * removed, sitting in `buf` between the mark's separator and the end.
+	 */
+	uint32_t klen = p->len - mark - 1u;
+	if (p->len > mark && klen <= BVN_PATH_MAX_KEY) {
+		memcpy(p->pending, p->buf + mark + 1u, klen);
+		p->pending_len  = (uint8_t)klen;
+		p->pending_lost = false;
+	} else {
+		p->pending_len  = 0u;
+		p->pending_lost = true;
+	}
+	p->len = mark;
 }
 bool bvn_path_current(const bvn_key_path_t* p, char* out, uint32_t cap,
 		      uint32_t* out_len)

@@ -296,6 +296,26 @@ class TestFieldRules:
         assert rows[0][3] == "k~m"    # the rule
         assert rows[1][3] == "m"      # the target list
 
+    def test_across_an_array_of_structs(self):
+        """One assignment, one key, many rows: the rule has to reach every row.
+        It used to reach only the first, because the first row's push consumed
+        the key and later rows pushed whatever key that row had ended on."""
+        from bovnar import UnitRule
+        doc = (".holdings = [\n"
+               "  { .amount = <float:64,in>  12.0; },\n"
+               "  { .amount = <float:64,k~m>  1.0; },\n"
+               "  { .amount = <float:64,in>  24.0; }\n"
+               "];\n")
+        rows = collect(doc, UnitPolicy(rules=[UnitRule(".holdings.amount", "m")]))
+        assert [r[1] for r in rows] == ["0.3048", "1000", "0.6096"]
+
+        # and the assertion half reaches every row too
+        bad = (".holdings = [ { .amount = <float:64,in> 12.0; },\n"
+               "              { .amount = <float:64,°C>  5.0; } ];\n")
+        with pytest.raises(BovnarParseError) as e:
+            collect(bad, UnitPolicy(rules=[UnitRule(".holdings.amount", "m")]))
+        assert e.value.code == ErrorCode.UNIT_MISMATCH
+
     def test_bad_rule_paths_are_refused(self):
         from bovnar import Reader, UnitRule
         with Reader() as r:
@@ -331,6 +351,15 @@ class TestDomPolicy:
         with pytest.raises(BovnarParseError) as e:
             dom_parse(".a = 5 m;", UnitPolicy(targets=["not_a_unit_at_all"]))
         assert e.value.code == ErrorCode.INVALID_ARGUMENT
+
+    def test_across_an_array_of_structs(self):
+        from bovnar import dom_parse, UnitRule
+        doc = dom_parse(".h = [ { .a = <float:64,in> 12.0; },\n"
+                        "       { .a = <float:64,in> 24.0; } ];\n",
+                        UnitPolicy(rules=[UnitRule(".h.a", "m")]))
+        rows = doc.lookup(".h")
+        assert abs(rows[0]["a"].as_float() - 0.3048) < 1e-12
+        assert abs(rows[1]["a"].as_float() - 0.6096) < 1e-12
 
     def test_integer_converting_to_a_fraction_becomes_a_float(self):
         from bovnar import dom_parse, UnitRule

@@ -25,7 +25,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [The UCUM notation (unreleased)](#51-the-ucum-notation-unreleased)
+    - 5.1 [The UCUM notation (under implementation)](#51-the-ucum-notation-under-implementation)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
     - 5.3 [`UnitFlags`](#53-unitflags)
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
@@ -310,9 +310,9 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 The UCUM notation (unreleased)
+### 5.1 The UCUM notation (under implementation)
 
-**This notation is unreleased**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
+**This notation is under implementation**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
 result unchanged. Three helpers cover what a caller needs around it:
 

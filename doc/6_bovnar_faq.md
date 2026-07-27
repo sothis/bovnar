@@ -108,7 +108,8 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `bvnr_version_string()` reports the library version, which is a different number
 from the spec version.
 
-The tree also carries an **unreleased** unit notation (`ucum:`, see below). It is
+The tree also carries a unit notation (`ucum:`, see below) that is **under
+implementation**. It is
 not part of a published specification, `bovnar version` does not announce it, and
 a document reaches it only by opting in to a version this build does not
 advertise.
@@ -209,8 +210,8 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1, and the unreleased `ucum:`
-notation a declared version above it; used in a document that declares less — or
+document. A `datetime` value needs a declared 1.1, and the `ucum:` notation (under
+implementation) a declared version above it; used in a document that declares less — or
 nothing — each is rejected. That is deliberate: it stops a document from carrying
 a construct that a conforming reader of its own declared version would have to
 refuse.
@@ -565,7 +566,7 @@ documentation-grade data, prefer the explicit form.
 
 **Can I write units as UCUM codes?**
 
-The notation exists in the implementation but is **unreleased** — no published
+The notation exists in the implementation but is **under implementation** — no published
 specification defines it, and the version it will ship under is not settled. It
 is reachable today by opting in explicitly:
 

@@ -846,7 +846,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, unreleased profile)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, profile under implementation)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 429 (`BVN_UCUM_ARBITRARY_LAST + 1`)*
 
 ---

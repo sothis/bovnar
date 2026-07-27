@@ -53,7 +53,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k~g·m/s²`, and `Gi~B` are written inline; no external schema is needed. A prefix may also be written the way everyone writes it — `kg`, `km`, `MHz`, `MiB`, `k$USD` — with `k~g` remaining the canonical output form.
 - **Currency units** — 166 ISO 4217 fiat currencies and 50 cryptocurrencies are first-class units, written with a mandatory `$` sigil (`<float_dec:64,$USD> 19.99`, `<uint:64,$BTC> 547820000`), each carrying minor-unit metadata and prefix-validity rules.
 - **Inline unit suffix** — `9.81 m/s` is valid without a full type annotation.
-- **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead. Chunks are length-prefixed, so there is no escaping, no expansion, and no byte a payload may not contain — and a reader can skip a binary region without inspecting it. The cost is that such a document is **not** transport-safe through anything that rewrites bytes: line-ending normalisation inside a payload desynchronises the length prefixes and the damage is unrecoverable. A consumer whose pipeline is text-shaped can refuse the binary half outright with `--text-only` (`bvnr_read_flags_t.text_only`).
+- **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead. Chunks are length-prefixed, so there is no escaping, no expansion, and no byte a payload may not contain — and a reader can skip a binary region without inspecting it. The cost is that such a document is **not** transport-safe through anything that rewrites bytes: line-ending normalisation inside a payload desynchronises the length prefixes and the damage is unrecoverable. A consumer whose pipeline is text-shaped can refuse the binary half outright with `--text-only` (`bvnr_read_flags_t.text_only`, under implementation).
 - **Multi-dimensional arrays** — Rows separated by `/`; `[1,2,3]/[4,5,6]` is a native 2D structure.
 - **Schema-free yet type-safe** — Omit annotations and get well-defined defaults (`uint:64`, `float:64`, …); add them and the parser validates on the fly.
 - **Streaming SAX-style reader** — Incremental parsing from memory, a file descriptor, or a socket via a symmetric `on_unverified` / `on_verified` callback pair.
@@ -1203,7 +1203,7 @@ nan  inf  ninf
     - 11.6 [Examples](#116-examples)
     - 11.7 [Compound Unit Constraints](#117-compound-unit-constraints)
     - 11.8 [The `no_unit` Keyword](#118-the-no_unit-keyword)
-    - 11.9 [Unit Profiles (unreleased)](#119-unit-profiles-unreleased)
+    - 11.9 [Unit Profiles (under implementation)](#119-unit-profiles-under-implementation)
 12. [Validation & Constraints](#12-validation--constraints)
     - 12.1 [UTF-8 Validation](#121-utf-8-validation)
     - 12.2 [Size Limits](#122-size-limits)
@@ -2721,7 +2721,9 @@ Within an explicit annotation, **omitting** the unit parameter yields the same i
 
 A **fully untyped** value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`. All three forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both encodings serialize to `"no_unit"` via `bvn_unit_to_string` — but the untyped-default form (`num_components == 1`) is a structurally distinct internal state from the annotated forms (`num_components == 0`).
 
-### 11.9 Unit Profiles (unreleased)
+### 11.9 Unit Profiles (under implementation)
+
+> **Under implementation.** Nothing in this section is part of a released specification. It describes work in the reference implementation, reachable only by opting in to a version the build does not advertise, and the version it will ship under is not settled.
 
 A unit parameter that begins with a lowercase namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged.
 
@@ -4125,7 +4127,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
     - 12.3 [Prefix Factor and Exponent Queries](#123-prefix-factor-and-exponent-queries)
     - 12.4 [SI Conversion API](#124-si-conversion-api)
     - 12.5 [Currency API](#125-currency-api)
-    - 12.6 [Unit Profile API (unreleased)](#126-unit-profile-api-unreleased)
+    - 12.6 [Unit Profile API (under implementation)](#126-unit-profile-api-under-implementation)
     - 12.7 [Python API](#127-python-api)
 13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
     - 13.1 [Full event sequence — physical unit](#131-full-event-sequence--physical-unit)
@@ -4184,7 +4186,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
 > `<float_dec:64,mmHg>` are the same unit to every part of the library. One
 > namespace is defined, `ucum`; everything in this reference applies to the
-> result unchanged. **The notation is unreleased** — it is not part of a
+> result unchanged. **The notation is under implementation** — it is not part of a
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
 > unaffected in every version. See
@@ -4583,7 +4585,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unreleased unit profile occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](10_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](10_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -6013,7 +6015,7 @@ assert(!bvn_unit_is_currency(volume.components[0].base));   /* true */
 assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 ```
 
-### 12.6 Unit Profile API (unreleased)
+### 12.6 Unit Profile API (under implementation)
 
 Three functions serve the `ucum:` notation. `bvn_parse_unit` itself is unchanged and takes both notations; these cover what a caller needs *around* it.
 
@@ -6037,7 +6039,7 @@ bvn_unit_to_string(u, buf, sizeof buf);                                 /* "mmHg
 bvn_unit_to_ucum  (u, buf, sizeof buf);                                 /* "mm[Hg]"  */
 ```
 
-Note that **in a document** the notation is gated on an explicit `#!bovnar 1.2` directive (§11.9 of the specification) — a version this build does not itself advertise, because the notation is unreleased. These API entry points have no document and therefore no version, so they accept the notation unconditionally.
+Note that **in a document** the notation is gated on an explicit `#!bovnar 1.2` directive (§11.9 of the specification) — a version this build does not itself advertise, because the notation is under implementation. These API entry points have no document and therefore no version, so they accept the notation unconditionally.
 
 ### 12.7 Python API
 
@@ -6367,7 +6369,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 1.10 [Read-time lossless unit / base conversion (`want_unit`)](#110-read-time-lossless-unit--base-conversion-want_unit)
     - 1.11 [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
     - 1.12 [Reader-side unit policy (`bvnr_reader_set_unit_policy`)](#112-reader-side-unit-policy-bvnr_reader_set_unit_policy)
-    - 1.13 [Refusing the binary half (`text_only`)](#113-refusing-the-binary-half-text_only)
+    - 1.13 [Refusing the binary half (`text_only`, under implementation)](#113-refusing-the-binary-half-text_only-under-implementation)
 2. [Writer](#2-writer)
     - 2.1 [`bvnr_writer_create` / `bvnr_writer_destroy`](#21-bvnr_writer_create--bvnr_writer_destroy)
     - 2.2 [`bvnr_sink_to_fd`](#22-bvnr_sink_to_fd)
@@ -7087,7 +7089,7 @@ in the hook.
 
 ---
 
-### 1.13 Refusing the binary half (`text_only`)
+### 1.13 Refusing the binary half (`text_only`, under implementation)
 
 ```c
 bvnr_read_flags_t f = {0};
@@ -7878,9 +7880,9 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
-| `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (unreleased profile) |
-| `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (unreleased profile) |
-| `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | The document contains an octet stream and the reader was opened with `text_only`. Reported at the stream's opening `0x00`, before its payload is read |
+| `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (profile under implementation) |
+| `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (profile under implementation) |
+| `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | Under implementation — not in a released version. The document contains an octet stream and the reader was opened with `text_only`. Reported at the stream's opening `0x00`, before its payload is read |
 
 ---
 
@@ -8329,7 +8331,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [The UCUM notation (unreleased)](#51-the-ucum-notation-unreleased)
+    - 5.1 [The UCUM notation (under implementation)](#51-the-ucum-notation-under-implementation)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
     - 5.3 [`UnitFlags`](#53-unitflags)
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
@@ -8614,9 +8616,9 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 The UCUM notation (unreleased)
+### 5.1 The UCUM notation (under implementation)
 
-**This notation is unreleased**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
+**This notation is under implementation**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
 result unchanged. Three helpers cover what a caller needs around it:
 
@@ -11065,7 +11067,8 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `bvnr_version_string()` reports the library version, which is a different number
 from the spec version.
 
-The tree also carries an **unreleased** unit notation (`ucum:`, see below). It is
+The tree also carries a unit notation (`ucum:`, see below) that is **under
+implementation**. It is
 not part of a published specification, `bovnar version` does not announce it, and
 a document reaches it only by opting in to a version this build does not
 advertise.
@@ -11166,8 +11169,8 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1, and the unreleased `ucum:`
-notation a declared version above it; used in a document that declares less — or
+document. A `datetime` value needs a declared 1.1, and the `ucum:` notation (under
+implementation) a declared version above it; used in a document that declares less — or
 nothing — each is rejected. That is deliberate: it stops a document from carrying
 a construct that a conforming reader of its own declared version would have to
 refuse.
@@ -11522,7 +11525,7 @@ documentation-grade data, prefer the explicit form.
 
 **Can I write units as UCUM codes?**
 
-The notation exists in the implementation but is **unreleased** — no published
+The notation exists in the implementation but is **under implementation** — no published
 specification defines it, and the version it will ship under is not settled. It
 is reachable today by opting in explicitly:
 
@@ -13918,7 +13921,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, unreleased profile)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, profile under implementation)*
 *`BVN_VALUE_BASE_UNIT_COUNT` = 429 (`BVN_UCUM_ARBITRARY_LAST + 1`)*
 
 ---
@@ -14274,8 +14277,8 @@ your own consumer/producer at the same seam without touching the core.
 
 # Bovnar — UCUM Unit Profile
 
-> **Spec version:** 1.1 — **the notation described here is UNRELEASED.** It is not part of any published specification, and the version it will ship under is not settled (§2.2)
-> **Status:** Implemented in `src/utils/bovnar_ucum.c` and pinned by `tests/bovnar_ucum_test.c`, but **not released**: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
+> **Spec version:** 1.1 — **the notation described here is UNDER IMPLEMENTATION.** It is not part of any published specification, and the version it will ship under is not settled (§2.2)
+> **Status:** Under implementation — the code is in `src/utils/bovnar_ucum.c` and pinned by `tests/bovnar_ucum_test.c`, but nothing here is released: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 > **Scope:** How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.
 
 Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the native registry and notation
@@ -14441,7 +14444,7 @@ a type body for no gain.
 **The notation is gated on the declared spec version.** A profile unit needs a `#!bovnar` directive
 declaring a version above 1.1 — spelled `#!bovnar 1.2` today — exactly as the datetime family and
 the `\x`/`\u` escapes need a declared 1.1. That version is **not one this build advertises**: the
-notation is unreleased, `bovnar version` reports spec 1.1, and the number it finally ships under is
+notation is under implementation, `bovnar version` reports spec 1.1, and the number it finally ships under is
 not settled. Without
 one it is `error_unit_illegal` — in a 1.1 document `ucum:mm[Hg]` is simply not a unit, the same way
 `<datetime:64>` is simply not a value type in a 1.0 document. A document with **no** directive

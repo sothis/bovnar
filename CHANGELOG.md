@@ -35,7 +35,7 @@ reading the grown by-value structs at the wrong size.
   On the CLI for `validate` and `events`; `query` refuses the option rather than
   ignoring it, since that path goes through the DOM, which takes no read flags.
 
-- **An unreleased unit notation** (`ucum:`, below). It is **not** a new
+- **A unit notation under implementation** (`ucum:`, below). It is **not** a new
   specification version: `BVNR_SPEC_VERSION_MINOR` is unchanged and
   `bovnar version` still reports spec 1.1. A document reaches the notation only
   by opting in to a version this build does not advertise, which keeps it out of

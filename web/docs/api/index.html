@@ -61,7 +61,7 @@
 <li>1.10 <a href="#110-read-time-lossless-unit--base-conversion-want_unit">Read-time lossless unit / base conversion (<code>want_unit</code>)</a></li>
 <li>1.11 <a href="#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double"><code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></a></li>
 <li>1.12 <a href="#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Reader-side unit policy (<code>bvnr_reader_set_unit_policy</code>)</a></li>
-<li>1.13 <a href="#113-refusing-the-binary-half-text_only">Refusing the binary half (<code>text_only</code>)</a></li>
+<li>1.13 <a href="#113-refusing-the-binary-half-text_only-under-implementation">Refusing the binary half (<code>text_only</code>, under implementation)</a></li>
 </ul>
 </li>
 <li><a href="#2-writer">Writer</a><ul>
@@ -778,7 +778,7 @@ first, then the per-field <code>rules</code>, then <code>targets</code>, and fal
 document, name the two fields that need something else, and hand-handle one more
 in the hook.</p>
 <hr />
-<h3 id="113-refusing-the-binary-half-text_only">1.13 Refusing the binary half (<code>text_only</code>)</h3>
+<h3 id="113-refusing-the-binary-half-text_only-under-implementation">1.13 Refusing the binary half (<code>text_only</code>, under implementation)</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
 <span class="n">f</span><span class="p">.</span><span class="n">text_only</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w">              </span><span class="cm">/* an octet stream is error_octet_stream_forbidden */</span>
 </code></pre></div>
@@ -1497,19 +1497,19 @@ table in which a rounded decimal is passed off as exact.</p>
 <td><code>error_unit_profile_unknown</code></td>
 <td>49</td>
 <td><code>"unit_profile_unknown"</code></td>
-<td>A unit written in the <code>name:</code> profile notation names a profile this build does not have (unreleased profile)</td>
+<td>A unit written in the <code>name:</code> profile notation names a profile this build does not have (profile under implementation)</td>
 </tr>
 <tr>
 <td><code>error_unit_profile_unsupported</code></td>
 <td>50</td>
 <td><code>"unit_profile_unsupported"</code></td>
-<td>A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (unreleased profile)</td>
+<td>A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (profile under implementation)</td>
 </tr>
 <tr>
 <td><code>error_octet_stream_forbidden</code></td>
 <td>51</td>
 <td><code>"octet_stream_forbidden"</code></td>
-<td>The document contains an octet stream and the reader was opened with <code>text_only</code>. Reported at the stream's opening <code>0x00</code>, before its payload is read</td>
+<td>Under implementation — not in a released version. The document contains an octet stream and the reader was opened with <code>text_only</code>. Reported at the stream's opening <code>0x00</code>, before its payload is read</td>
 </tr>
 </tbody>
 </table>

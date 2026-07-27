@@ -84,7 +84,7 @@
     - 12.3 [Prefix Factor and Exponent Queries](#123-prefix-factor-and-exponent-queries)
     - 12.4 [SI Conversion API](#124-si-conversion-api)
     - 12.5 [Currency API](#125-currency-api)
-    - 12.6 [Unit Profile API (unreleased)](#126-unit-profile-api-unreleased)
+    - 12.6 [Unit Profile API (under implementation)](#126-unit-profile-api-under-implementation)
     - 12.7 [Python API](#127-python-api)
 13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
     - 13.1 [Full event sequence — physical unit](#131-full-event-sequence--physical-unit)
@@ -143,7 +143,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
 > `<float_dec:64,mmHg>` are the same unit to every part of the library. One
 > namespace is defined, `ucum`; everything in this reference applies to the
-> result unchanged. **The notation is unreleased** — it is not part of a
+> result unchanged. **The notation is under implementation** — it is not part of a
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
 > unaffected in every version. See
@@ -542,7 +542,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unreleased unit profile occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](10_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](10_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -1972,7 +1972,7 @@ assert(!bvn_unit_is_currency(volume.components[0].base));   /* true */
 assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 ```
 
-### 12.6 Unit Profile API (unreleased)
+### 12.6 Unit Profile API (under implementation)
 
 Three functions serve the `ucum:` notation. `bvn_parse_unit` itself is unchanged and takes both notations; these cover what a caller needs *around* it.
 
@@ -1996,7 +1996,7 @@ bvn_unit_to_string(u, buf, sizeof buf);                                 /* "mmHg
 bvn_unit_to_ucum  (u, buf, sizeof buf);                                 /* "mm[Hg]"  */
 ```
 
-Note that **in a document** the notation is gated on an explicit `#!bovnar 1.2` directive (§11.9 of the specification) — a version this build does not itself advertise, because the notation is unreleased. These API entry points have no document and therefore no version, so they accept the notation unconditionally.
+Note that **in a document** the notation is gated on an explicit `#!bovnar 1.2` directive (§11.9 of the specification) — a version this build does not itself advertise, because the notation is under implementation. These API entry points have no document and therefore no version, so they accept the notation unconditionally.
 
 ### 12.7 Python API
 

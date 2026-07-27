@@ -1,7 +1,7 @@
 # Bovnar — UCUM Unit Profile
 
-> **Spec version:** 1.1 — **the notation described here is UNRELEASED.** It is not part of any published specification, and the version it will ship under is not settled (§2.2)
-> **Status:** Implemented in `src/utils/bovnar_ucum.c` and pinned by `tests/bovnar_ucum_test.c`, but **not released**: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
+> **Spec version:** 1.1 — **the notation described here is UNDER IMPLEMENTATION.** It is not part of any published specification, and the version it will ship under is not settled (§2.2)
+> **Status:** Under implementation — the code is in `src/utils/bovnar_ucum.c` and pinned by `tests/bovnar_ucum_test.c`, but nothing here is released: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 > **Scope:** How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.
 
 Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the native registry and notation
@@ -167,7 +167,7 @@ a type body for no gain.
 **The notation is gated on the declared spec version.** A profile unit needs a `#!bovnar` directive
 declaring a version above 1.1 — spelled `#!bovnar 1.2` today — exactly as the datetime family and
 the `\x`/`\u` escapes need a declared 1.1. That version is **not one this build advertises**: the
-notation is unreleased, `bovnar version` reports spec 1.1, and the number it finally ships under is
+notation is under implementation, `bovnar version` reports spec 1.1, and the number it finally ships under is
 not settled. Without
 one it is `error_unit_illegal` — in a 1.1 document `ucum:mm[Hg]` is simply not a unit, the same way
 `<datetime:64>` is simply not a value type in a 1.0 document. A document with **no** directive

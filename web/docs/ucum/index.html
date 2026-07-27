@@ -40,8 +40,8 @@
 <h1>Bovnar — UCUM Unit Profile</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/10_bovnar_ucum_profile.md">Markdown</a> and <a href="/doc/pdf/bovnar-ucum-profile.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1 — <strong>the notation described here is UNRELEASED.</strong> It is not part of any published specification, and the version it will ship under is not settled (§2.2)
-<strong>Status:</strong> Implemented in <code>src/utils/bovnar_ucum.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, but <strong>not released</strong>: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
+<p><strong>Spec version:</strong> 1.1 — <strong>the notation described here is UNDER IMPLEMENTATION.</strong> It is not part of any published specification, and the version it will ship under is not settled (§2.2)
+<strong>Status:</strong> Under implementation — the code is in <code>src/utils/bovnar_ucum.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, but nothing here is released: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 <strong>Scope:</strong> How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.</p>
 </blockquote>
 <p>Companion to <a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> (the native registry and notation
@@ -199,7 +199,7 @@ a type body for no gain.</p>
 <p><strong>The notation is gated on the declared spec version.</strong> A profile unit needs a <code>#!bovnar</code> directive
 declaring a version above 1.1 — spelled <code>#!bovnar 1.2</code> today — exactly as the datetime family and
 the <code>\x</code>/<code>\u</code> escapes need a declared 1.1. That version is <strong>not one this build advertises</strong>: the
-notation is unreleased, <code>bovnar version</code> reports spec 1.1, and the number it finally ships under is
+notation is under implementation, <code>bovnar version</code> reports spec 1.1, and the number it finally ships under is
 not settled. Without
 one it is <code>error_unit_illegal</code> — in a 1.1 document <code>ucum:mm[Hg]</code> is simply not a unit, the same way
 <code>&lt;datetime:64&gt;</code> is simply not a value type in a 1.0 document. A document with <strong>no</strong> directive

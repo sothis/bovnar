@@ -76,7 +76,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **First-class physical units** — SI base units, derived SI units, and IEC binary prefixes. Compound units such as `m/s²`, `k~g·m/s²`, and `Gi~B` are written inline; no external schema is needed. A prefix may also be written the way everyone writes it — `kg`, `km`, `MHz`, `MiB`, `k$USD` — with `k~g` remaining the canonical output form.
 - **Currency units** — 166 ISO 4217 fiat currencies and 50 cryptocurrencies are first-class units, written with a mandatory `$` sigil (`<float_dec:64,$USD> 19.99`, `<uint:64,$BTC> 547820000`), each carrying minor-unit metadata and prefix-validity rules.
 - **Inline unit suffix** — `9.81 m/s` is valid without a full type annotation.
-- **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead. Chunks are length-prefixed, so there is no escaping, no expansion, and no byte a payload may not contain — and a reader can skip a binary region without inspecting it. The cost is that such a document is **not** transport-safe through anything that rewrites bytes: line-ending normalisation inside a payload desynchronises the length prefixes and the damage is unrecoverable. A consumer whose pipeline is text-shaped can refuse the binary half outright with `--text-only` (`bvnr_read_flags_t.text_only`).
+- **Native binary embedding** — Octet streams (`\x00 … \x00`) carry raw bytes without Base64 overhead. Chunks are length-prefixed, so there is no escaping, no expansion, and no byte a payload may not contain — and a reader can skip a binary region without inspecting it. The cost is that such a document is **not** transport-safe through anything that rewrites bytes: line-ending normalisation inside a payload desynchronises the length prefixes and the damage is unrecoverable. A consumer whose pipeline is text-shaped can refuse the binary half outright with `--text-only` (`bvnr_read_flags_t.text_only`, under implementation).
 - **Multi-dimensional arrays** — Rows separated by `/`; `[1,2,3]/[4,5,6]` is a native 2D structure.
 - **Schema-free yet type-safe** — Omit annotations and get well-defined defaults (`uint:64`, `float:64`, …); add them and the parser validates on the fly.
 - **Streaming SAX-style reader** — Incremental parsing from memory, a file descriptor, or a socket via a symmetric `on_unverified` / `on_verified` callback pair.
@@ -193,7 +193,7 @@ In earth-system science, CF wins and will keep winning. The entire tool ecosyste
 
 Bovnar's ground is where CF does not reach: heterogeneous documents rather than arrays, text and binary payloads in one file, configuration mixed with measurements, log streams, industrial telemetry, financial data with units. That is the space between JSON (no type, no unit) and netCDF (arrays, external schema, binary container).
 
-### Using UCUM codes in Bovnar
+### Using UCUM codes in Bovnar (under implementation)
 
 Because UCUM sits at a different layer, it can be a component rather than an alternative. A `ucum:` notation is accepted in the unit slot, alongside the native one:
 
@@ -204,7 +204,7 @@ Because UCUM sits at a different layer, it can be a component rather than an alt
 .titre    = <float:64,ucum:[IU]/mL>    12.5;
 ```
 
-The `#!bovnar 1.2` directive is required — the notation is gated on the declared version, the way `datetime` is gated on 1.1. A UCUM expression is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used — `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and satisfy the same `--require-field` rule. Powers of ten fold into prefixes (`ucum:10*3/uL` is `n~L⁻¹`, 10¹² L⁻¹), UCUM's `/` binds to one term where Bovnar's latches, and annotations are inert as UCUM defines them.
+This notation is **under implementation** and is not in a released version: the current specification is 1.1. A document reaches it only by opting in to a version the build does not advertise, which is why the `#!bovnar 1.2` directive is required. A UCUM expression is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used — `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and satisfy the same `--require-field` rule. Powers of ten fold into prefixes (`ucum:10*3/uL` is `n~L⁻¹`, 10¹² L⁻¹), UCUM's `/` binds to one term where Bovnar's latches, and annotations are inert as UCUM defines them.
 
 The enforcement point does not move. A UCUM expression either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
 
@@ -440,7 +440,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 
 | Command | Description |
 |---|---|
-| `bovnar validate [opts] <file>` | Validate a `.bvnr` file; exit non-zero on the first error. `--require-unit` additionally rejects any numeric value that carries no unit; `--require-dimension <unit>` (repeatable) requires every numeric value to be validly convertible to one of the named units — "this document is lengths, in whatever unit it wrote them". `--text-only` rejects a document containing an octet stream, for a consumer whose transport is not binary-safe. |
+| `bovnar validate [opts] <file>` | Validate a `.bvnr` file; exit non-zero on the first error. `--require-unit` additionally rejects any numeric value that carries no unit; `--require-dimension <unit>` (repeatable) requires every numeric value to be validly convertible to one of the named units — "this document is lengths, in whatever unit it wrote them". `--text-only` (under implementation) rejects a document containing an octet stream, for a consumer whose transport is not binary-safe. |
 | `bovnar query [opts] <path> <file>` | Print a single **value** by dotted path, e.g. `.sensor.temperature` — the number alone, so it pipes into other tools; the unit is deliberately not printed, so read `25` from a `°C` field as 25 °C and not 25 K. Floats print as the shortest decimal that reads back as the same double; a `float_dec` or `float:128` wider than a double is rounded on the way through the DOM, so use the reader or the Python bindings when you need the stored digits verbatim. Takes the same unit-policy options as `events`, so a query can assert what it expects and ask for the unit it wants back: `--field .a.b=m`, `--require-unit`. |
 | `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
 | `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |

@@ -130,7 +130,7 @@
 <li>11.6 <a href="#116-examples">Examples</a></li>
 <li>11.7 <a href="#117-compound-unit-constraints">Compound Unit Constraints</a></li>
 <li>11.8 <a href="#118-the-no_unit-keyword">The <code>no_unit</code> Keyword</a></li>
-<li>11.9 <a href="#119-unit-profiles-unreleased">Unit Profiles (unreleased)</a></li>
+<li>11.9 <a href="#119-unit-profiles-under-implementation">Unit Profiles (under implementation)</a></li>
 </ul>
 </li>
 <li><a href="#12-validation--constraints">Validation &amp; Constraints</a><ul>
@@ -2249,7 +2249,10 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <div class="codehilite"><pre><code class="language-bovnar">.dimensionless = &lt;uint:32,no_unit&gt; 42;</code></pre></div>
 <p>Within an explicit annotation, <strong>omitting</strong> the unit parameter yields the same internal representation as an explicit <code>no_unit</code>: <code>BVN_UNIT_NONE</code> with <code>num_components == 0</code>. (<code>bvn_parse_type_annotation</code> initialises the unit to <code>BVN_UNIT_NONE</code> and only overwrites it when a dimensioned unit parameter is actually present.)</p>
 <p>A <strong>fully untyped</strong> value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing <code>BVN_UNIT_NO_PREFIX(bu_none)</code> with <code>num_components == 1</code> and <code>base == bu_none</code>. All three forms are semantically equivalent — they compare as compatible via <code>bvn_units_compatible</code> and both encodings serialize to <code>"no_unit"</code> via <code>bvn_unit_to_string</code> — but the untyped-default form (<code>num_components == 1</code>) is a structurally distinct internal state from the annotated forms (<code>num_components == 0</code>).</p>
-<h3 id="119-unit-profiles-unreleased">11.9 Unit Profiles (unreleased)</h3>
+<h3 id="119-unit-profiles-under-implementation">11.9 Unit Profiles (under implementation)</h3>
+<blockquote>
+<p><strong>Under implementation.</strong> Nothing in this section is part of a released specification. It describes work in the reference implementation, reachable only by opting in to a version the build does not advertise, and the version it will ship under is not settled.</p>
+</blockquote>
 <p>A unit parameter that begins with a lowercase namespace and a colon — <code>name:code</code> — is a <strong>unit profile</strong>: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged.</p>
 <p>One namespace is defined, <code>ucum</code> (Unified Code for Units of Measure):</p>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2

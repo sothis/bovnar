@@ -320,6 +320,13 @@ typedef struct bvnr_lexer_s {
 	uint32_t		resync_struct_depth;
 	uint8_t			resync_saved_struct_nesting;
 	uint64_t		recovery_count;
+	/* Bytes the text scanner consumed and threw away while recovering, summed
+	 * over the document, and the position recovery last began at. recovery_count
+	 * says how OFTEN recovery happened; without this nothing said how much it
+	 * cost, so "one broken assignment skipped" and "a whole struct gone" looked
+	 * identical from outside. */
+	uint64_t		skipped_bytes;
+	uint64_t		resync_start_bytes;
 	/* Leading "#!bovnar <major>.<minor>" version directive. The first comment's
 	 * bytes (those after '#') are captured into ver_buf as it is lexed, then
 	 * parsed once at first_comment_outro. ver_checked latches after that single

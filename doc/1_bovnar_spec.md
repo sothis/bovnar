@@ -1729,6 +1729,7 @@ When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync
 3. Tracking bracket `[]` and brace `{}` nesting
 4. Parsing resumes at whichever comes first: a `;` at the saved nesting depth, or the **start of the next assignment** — a `.` at the saved nesting depth followed by a byte that can begin an identifier
 5. `recovery_count` (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode
+6. The bytes consumed and discarded while recovering are added to a running total, readable with `bvnr_reader_get_skipped_bytes`. `recovery_count` says how *often* recovery ran; this says what it *cost*, and it is the only way to learn it — the skipped bytes were never parsed, so no callback mentions them. A non-zero total means the document delivered to the callbacks is not the whole document
 
 Both boundaries matter, because they cover different errors. When the error is
 *inside* a statement, that statement's own `;` is the next one, so the `;` rule

@@ -2127,6 +2127,10 @@ uint64_t bvnr_reader_get_error_offset(const bvnr_reader_t* r)
 {
 	return r ? r->val.error_offset : 0;
 }
+uint64_t bvnr_reader_get_skipped_bytes(const bvnr_reader_t* r)
+{
+	return r ? r->lex.skipped_bytes : 0;
+}
 uint64_t bvnr_reader_get_recovery_count(const bvnr_reader_t* r)
 {
 	return r ? r->lex.recovery_count : 0;

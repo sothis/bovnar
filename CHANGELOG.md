@@ -19,6 +19,16 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **`bvnr_reader_get_skipped_bytes`** — how many bytes error recovery consumed
+  and threw away, summed over the document (`Reader.skipped_bytes` in Python,
+  and `bovnar events -c` now prints it). `recovery_count` says how OFTEN the
+  parser recovered and cannot distinguish one skipped assignment from a whole
+  discarded struct — both report a single recovery. The skipped bytes were
+  never parsed, so no callback ever mentions them either: before this there was
+  no way at all for a consumer of `continue_on_error` to learn that values had
+  gone missing. A non-zero total means the document the callbacks saw is not
+  the whole document. Recovery that runs to end-of-input counts everything to
+  the end.
 - **Fixed: error recovery discarded the whole statement after the error** — with
   `continue_on_error`, resync ran to the next `;` at the recovery-relative top
   level and resumed there. That is right when the error is INSIDE a statement:

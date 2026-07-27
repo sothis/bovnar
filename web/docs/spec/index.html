@@ -2639,6 +2639,7 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 <li>Tracking bracket <code>[]</code> and brace <code>{}</code> nesting</li>
 <li>Parsing resumes at whichever comes first: a <code>;</code> at the saved nesting depth, or the <strong>start of the next assignment</strong> — a <code>.</code> at the saved nesting depth followed by a byte that can begin an identifier</li>
 <li><code>recovery_count</code> (accessible via <code>bvnr_reader_get_recovery_count</code>) is incremented immediately when an error triggers entry into resync mode</li>
+<li>The bytes consumed and discarded while recovering are added to a running total, readable with <code>bvnr_reader_get_skipped_bytes</code>. <code>recovery_count</code> says how <em>often</em> recovery ran; this says what it <em>cost</em>, and it is the only way to learn it — the skipped bytes were never parsed, so no callback mentions them. A non-zero total means the document delivered to the callbacks is not the whole document</li>
 </ol>
 <p>Both boundaries matter, because they cover different errors. When the error is
 <em>inside</em> a statement, that statement's own <code>;</code> is the next one, so the <code>;</code> rule

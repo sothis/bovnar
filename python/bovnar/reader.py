@@ -597,6 +597,18 @@ class Reader:
         del keepalive
 
     @property
+    def skipped_bytes(self) -> int:
+        """Bytes the reader consumed and DISCARDED while recovering.
+
+        ``recovery_count`` says how often the parser had to recover; this says
+        what it cost, and it is the only way to learn that: the skipped bytes
+        were never parsed, so no callback ever mentions them. A non-zero value
+        means the document your callbacks saw is not the whole document.
+        """
+        self._check_open()
+        return self._lib.bvnr_reader_get_skipped_bytes(self._ptr)
+
+    @property
     def declared_version(self):
         """The (major, minor) spec version declared by a leading
         ``#!bovnar M.N`` directive, or ``None`` if the document carried none.

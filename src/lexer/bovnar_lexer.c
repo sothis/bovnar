@@ -277,6 +277,7 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 		break;
 	}
 	++l->recovery_count;
+	l->resync_start_bytes  = l->text_bytes;
 	l->in_array_element    = false;
 	l->curr_row_size       = 0;
 	l->array_row_size      = 0;
@@ -1404,6 +1405,11 @@ static bool bvn_resync_reset(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
 	bool ok = true;
+	/* Everything consumed since recovery began was discarded. Both exits — the
+	 * ';' boundary and the next-assignment boundary — come through here, so
+	 * this is the one place the cost has to be counted. */
+	if (l->text_bytes > l->resync_start_bytes)
+		l->skipped_bytes += l->text_bytes - l->resync_start_bytes;
 	while (l->struct_nesting_level > l->resync_saved_struct_nesting) {
 		--l->struct_nesting_level;
 		if (!bvn_val_receive_event(p, ev_struct_end)) {
@@ -2410,6 +2416,12 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				l->next_state == resync_string ||
 				l->next_state == resync_string_escape ||
 				l->next_state == resync_comment) {
+				/* Recovery that never found a boundary: everything from the
+				 * error to the end of the document was discarded, and it is
+				 * counted like any other skip. */
+				if (l->text_bytes > l->resync_start_bytes)
+					l->skipped_bytes +=
+						l->text_bytes - l->resync_start_bytes;
 				bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
 				bvn_notify_error(r);
 				return false;

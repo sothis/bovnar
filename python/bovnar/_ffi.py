@@ -184,6 +184,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_reader_get_recovery_count.restype  = c_uint64
     lib.bvnr_reader_get_recovery_count.argtypes = [c_void_p]
 
+    lib.bvnr_reader_get_skipped_bytes.restype  = c_uint64
+    lib.bvnr_reader_get_skipped_bytes.argtypes = [c_void_p]
+
     lib.bvnr_reader_get_declared_version.restype  = c_bool
     lib.bvnr_reader_get_declared_version.argtypes = [
         c_void_p, P(c_uint16), P(c_uint16),

@@ -1524,6 +1524,74 @@ static void test_resync_dots_that_lead_nowhere(void)
 	}
 }
 
+/*
+ * recovery_count says how OFTEN recovery ran; it cannot distinguish one skipped
+ * assignment from a whole discarded struct. The skipped-byte total is what says
+ * how much the document lost — and it is the only way to learn it, because the
+ * skipped bytes were never parsed, so no callback ever mentions them.
+ */
+static uint64_t skipped_for(const char *src, uint64_t *recoveries)
+{
+	bvnr_read_flags_t f = {
+		.continue_on_error  = true,
+		.max_struct_nesting = 255,
+		.max_array_nesting  = 255,
+	};
+	bvnr_reader_t *r = bvnr_reader_create();
+	if (!r) return 0;
+	(void)(bvnr_open_read_mem(r, src, (uint32_t)strlen(src), NULL, 0, &f)
+	       && bvnr_read(r));
+	uint64_t n = bvnr_reader_get_skipped_bytes(r);
+	if (recoveries) *recoveries = bvnr_reader_get_recovery_count(r);
+	bvnr_reader_destroy(r);
+	return n;
+}
+
+static void test_resync_reports_what_it_discarded(void)
+{
+	uint64_t rec = 0;
+
+	/* a clean document discards nothing */
+	ASSERT_EQ_UINT(skipped_for(".a = 1;\n.b = 2;\n", &rec), 0,
+		       "skipped: a clean parse discards nothing");
+	ASSERT_EQ_UINT(rec, 0, "skipped: and does not recover");
+
+	/* a broken value costs only itself */
+	uint64_t small = skipped_for(".a = @@@; .b = 2;\n", &rec);
+	ASSERT_TRUE(small > 0 && small < 12,
+		    "skipped: a broken value discards a handful of bytes");
+	ASSERT_EQ_UINT(rec, 1, "skipped: one recovery");
+
+	/* the same single recovery, but a far larger loss — which is the whole
+	 * point: recovery_count cannot tell these two apart, and this can */
+	char big[4096];
+	size_t p = (size_t)snprintf(big, sizeof big, ".big = @@@ [");
+	for (int i = 0; i < 300; i++)
+		p += (size_t)snprintf(big + p, sizeof big - p, "%s%d", i ? ", " : "", i);
+	p += (size_t)snprintf(big + p, sizeof big - p, "];\n.c = 3;\n");
+	uint64_t large = skipped_for(big, &rec);
+	ASSERT_EQ_UINT(rec, 1, "skipped: still exactly one recovery");
+	ASSERT_TRUE(large > 500,
+		    "skipped: ...but the byte count shows the whole array went");
+	ASSERT_TRUE(large > small * 10,
+		    "skipped: the two losses are distinguishable, unlike the counts");
+
+	/* two recoveries accumulate */
+	uint64_t two = skipped_for(".a = @@@; .b = @@@; .c = 3;\n", &rec);
+	ASSERT_EQ_UINT(rec, 2, "skipped: two recoveries");
+	ASSERT_TRUE(two >= small, "skipped: the total accumulates across them");
+
+	/* recovery that never finds a boundary counts everything to the end */
+	uint64_t eof = skipped_for(".a = 1;\n@@@ and then nothing closes", &rec);
+	ASSERT_TRUE(eof > 10, "skipped: recovery running to EOF is counted too");
+
+	/* and the fix above means a boundary error now costs almost nothing */
+	uint64_t boundary = skipped_for(".a = 1;\n@@@\n.s = { .b = 2; .c = 3; };\n",
+					&rec);
+	ASSERT_TRUE(boundary < 12,
+		    "skipped: a stray byte no longer takes the struct with it");
+}
+
 static void test_new_bug1_resync_struct_drains_arrays(void)
 {
 	printf("  test_new_bug1_resync_struct_drains_arrays...\n");
@@ -2860,6 +2928,7 @@ int main(void)
 	test_resync_resumes_at_the_next_assignment();
 	test_resync_still_discards_only_the_broken_statement();
 	test_resync_dots_that_lead_nowhere();
+	test_resync_reports_what_it_discarded();
 	test_new_bug1_resync_struct_drains_arrays();
 	test_new_bug2_semicolon_recovery_array_event_balance();
 	test_new_bug3_resync_eof_distinct_error_code();

@@ -943,9 +943,15 @@ static int cmd_events(int argc, char **argv)
 	cwf("  Lexer tokens     : %" PRIu64 "\n", ctx->unverified_count);
 	cwf("  Validated tokens : %" PRIu64 "\n", ctx->verified_count);
 	uint64_t recoveries = bvnr_reader_get_recovery_count(rd);
-	if (recoveries > 0)
+	if (recoveries > 0) {
 		cwf("\n  ⚠ %" PRIu64 " error(s) recovered from via resync.\n",
 			   recoveries);
+		/* How OFTEN recovery ran says nothing about what it cost: one skipped
+		 * assignment and a whole discarded struct both report a single
+		 * recovery. The bytes are the part a reader of this output needs. */
+		cwf("  ⚠ %" PRIu64 " byte(s) of input were discarded and never "
+			   "parsed.\n", bvnr_reader_get_skipped_bytes(rd));
+	}
 	if (!ok) {
 		error_code_t err = bvnr_reader_get_error(rd);
 		cwf("\n  ✗ PARSE ERROR\n");

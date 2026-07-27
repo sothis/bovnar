@@ -733,6 +733,22 @@ BVN_API uint64_t     bvnr_reader_get_error_column(const bvnr_reader_t* r);
 BVN_API uint32_t     bvnr_reader_get_error_byte  (const bvnr_reader_t* r);
 BVN_API uint64_t     bvnr_reader_get_error_offset(const bvnr_reader_t* r);
 BVN_API uint64_t     bvnr_reader_get_recovery_count(const bvnr_reader_t* r);
+/* Bytes the reader consumed and DISCARDED while recovering, summed over the
+ * document. Like bvnr_reader_get_recovery_count, this is meaningful even when
+ * bvnr_read() returned true — and it is the one that says what recovery cost.
+ *
+ * recovery_count says how often the parser had to recover; on its own it cannot
+ * distinguish a single skipped assignment from a whole discarded struct, and a
+ * consumer reading a document under continue_on_error has no other way to learn
+ * that values went missing: the skipped bytes were never parsed, so no callback
+ * ever mentions them. A non-zero value here means the document handed to the
+ * callbacks is not the whole document, and this is how much of it is absent.
+ *
+ * Counted in bytes of TEXT (an octet-stream payload is not scanned as text, so
+ * it does not appear here), from the byte the error was raised on to the byte
+ * recovery resumed at. Recovery that runs to end-of-input counts everything to
+ * the end. */
+BVN_API uint64_t     bvnr_reader_get_skipped_bytes(const bvnr_reader_t* r);
 /*
  * Spec version a document declared via a leading "#!bovnar <major>.<minor>"
  * directive. Returns true and fills major/minor when the document carried a

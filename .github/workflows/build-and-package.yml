@@ -119,11 +119,19 @@ jobs:
           # Full history so the packed artifact's build count is meaningful.
           fetch-depth: 0
 
+      # `git` is in this list because pack_artifacts.cmake shells out to it for
+      # the build count and falls back to 0 when it cannot — a fallback meant for
+      # builds from the source tarball, which has no .git. The MINGW64 shell had
+      # no git at all, so this job alone stamped every Windows archive
+      # bovnar-windows-<version>-0, in the zip name AND in its internal directory
+      # prefix, while MSVC and Linux got the real count. It shipped that way in
+      # the v1.1.0 assets before anyone noticed.
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
           install: >-
+            git
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -482,6 +490,16 @@ jobs:
              staging/bovnar-amalgamate/*.tar.xz \
              staging/bovnar-source/*.tar.xz assets/
           ls -l assets
+
+          # A build count of 0 means pack_artifacts.cmake could not reach git and
+          # took its source-tarball fallback, which stamps the archive -- and the
+          # directory inside it -- <version>-0. That is how the v1.1.0 MinGW zip
+          # shipped mislabelled. Catch any future cause (missing git, a shallow
+          # clone, dubious-ownership) here rather than on a permanent asset.
+          if ls assets | grep -E -- '-0(\.tar\.xz|\.zip)$|-0-'; then
+            echo "::error::an archive is stamped with build count 0 -- git was not reachable in its build job" >&2
+            exit 1
+          fi
 
       # Release assets are served over plain HTTPS with no provenance of their
       # own; ship the digests next to them so a download can be checked.

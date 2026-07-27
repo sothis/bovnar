@@ -124,6 +124,10 @@ typedef enum state_e {
 	resync_string,
 	resync_string_escape,
 	resync_comment,
+	/* A '.' has just been skipped at the recovery-relative top level. It may
+	 * open the next assignment — if the byte after it can start an identifier,
+	 * recovery ends here instead of running on to the next ';'. */
+	resync_dot,
 	dimension_state
 } state_t;
 enum action_id {
@@ -216,6 +220,8 @@ enum action_id {
 	ACT_resync_comment_intro,
 	ACT_resync_comment_byte,
 	ACT_resync_comment_outro,
+	ACT_resync_dot,
+	ACT_resync_resume_identifier,
 	ACT_inline_unit_intro,
 	ACT_copy_inline_unit_byte,
 	ACT_to_inline_unit_outro,
@@ -425,6 +431,8 @@ bool bvn_action_resync_skip              (bvnr_reader_t* p);
 bool bvn_action_resync_open_bracket      (bvnr_reader_t* p);
 bool bvn_action_resync_close_bracket     (bvnr_reader_t* p);
 bool bvn_action_resync_semicolon         (bvnr_reader_t* p);
+bool bvn_action_resync_dot               (bvnr_reader_t* p);
+bool bvn_action_resync_resume_identifier (bvnr_reader_t* p);
 bool bvn_action_resync_string_intro      (bvnr_reader_t* p);
 bool bvn_action_resync_string_byte       (bvnr_reader_t* p);
 bool bvn_action_resync_string_escape     (bvnr_reader_t* p);

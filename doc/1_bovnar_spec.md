@@ -1725,10 +1725,25 @@ typedef void (*bvnr_on_error_fn)(
 When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync mode** after any error:
 
 1. The `on_error` callback is invoked with error details
-2. A **resync state machine** (`state_t: resync, resync_string, resync_string_escape, resync_comment`) skips bytes
+2. A **resync state machine** (`state_t: resync, resync_dot, resync_string, resync_string_escape, resync_comment`) skips bytes
 3. Tracking bracket `[]` and brace `{}` nesting
-4. On encountering `;` at the saved nesting depth, parsing resumes
+4. Parsing resumes at whichever comes first: a `;` at the saved nesting depth, or the **start of the next assignment** — a `.` at the saved nesting depth followed by a byte that can begin an identifier
 5. `recovery_count` (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode
+
+Both boundaries matter, because they cover different errors. When the error is
+*inside* a statement, that statement's own `;` is the next one, so the `;` rule
+discards exactly the broken statement. When the error is *between* statements —
+a stray byte in the whitespace separating two assignments — the next `;` belongs
+to the following, perfectly good statement; resuming only there would discard it
+whole, however large it is, so a single stray byte in front of a large struct
+took the entire struct with it. The assignment boundary stops recovery at the
+first point the document plausibly becomes readable again.
+
+The `.` must be followed by a byte that can begin an identifier, so a `.` inside
+skipped-over junk (`1.5`, `.5`, a `.` in binary corruption) is just another
+skipped byte. A `.` inside a bracket opened *since* recovery began opens no
+assignment either, and is skipped. Neither boundary recovers less than the other
+alone would: `;` remains a boundary in every case it was one before.
 
 **State machine behavior during resync:**
 
@@ -1740,6 +1755,7 @@ When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync
 | `[`, `{` | Increment `resync_depth` |
 | `]`, `}` | Decrement `resync_depth`; if 0, emit array/struct close |
 | `;` at depth 0 | Reset state, resume normal parsing |
+| `.` at depth 0 | Candidate assignment start: resume if the next byte can begin an identifier, else keep skipping |
 
 ### 13.3 EOF in Resync
 

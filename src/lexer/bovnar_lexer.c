@@ -204,7 +204,9 @@ static inline void bvn_notify_error(bvnr_reader_t* p)
  * frame's saved type/unit as we unwind. Struct nesting is intentionally left
  * standing and remembered in resync_saved_struct_nesting: structs are closed
  * later, at the resync boundary, because a stray byte inside a struct should
- * not silently discard the whole enclosing object. All scratch state (string
+ * not silently discard the whole enclosing object. For the same reason recovery
+ * ends at the start of the next assignment as well as at the next ';' — see
+ * bvn_action_resync_resume_identifier. All scratch state (string
  * buffers, UTF-8 progress, accumulator) is reset so the next good token starts
  * clean, and recovery_count is bumped for diagnostics.
  */
@@ -1398,7 +1400,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
  * machine is indistinguishable from having just finished a well-formed
  * assignment, so the next byte resumes normal parsing.
  */
-static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
+static bool bvn_resync_reset(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
 	bool ok = true;
@@ -1434,8 +1436,62 @@ static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
 	p->val.has_annotation_unit = false;
 	bvn_acc_reset(&p->val);
-	l->next_state = value_outro;
 	return ok;
+}
+static bool bvn_resync_semicolon_reset(bvnr_reader_t* p)
+{
+	bool ok = bvn_resync_reset(p);
+	p->lex.next_state = value_outro;
+	return ok;
+}
+/*
+ * A '.' skipped at the recovery-relative top level. Every assignment starts
+ * with one, so this is the earliest point recovery could end — but a '.' also
+ * turns up inside junk, so nothing is decided yet: resync_dot looks at the byte
+ * after it and only resumes if that byte could begin an identifier. Inside a
+ * bracket opened since recovery started there is no assignment to begin, so the
+ * '.' is skipped like any other byte.
+ */
+bool bvn_action_resync_dot(bvnr_reader_t* p)
+{
+	bvnr_lexer_t* l = &p->lex;
+	l->next_state = (l->resync_array_depth > 0 || l->resync_struct_depth > 0)
+		      ? resync : resync_dot;
+	return true;
+}
+/*
+ * The byte after that '.' can start an identifier, so recovery ends HERE rather
+ * than at the next ';'.
+ *
+ * That difference is the whole point. Recovery used to run to the next ';' at
+ * the recovery-relative top level, which is correct when the error happened
+ * inside a statement — that statement's own ';' is the next one, and only the
+ * broken statement is lost. When the error happened BETWEEN statements, though,
+ * the next ';' belongs to the following, perfectly good statement, and it was
+ * swallowed whole: a single stray byte in front of a two-hundred-member struct
+ * discarded the entire struct, and the caller was told only that one recovery
+ * had occurred.
+ *
+ * Resuming here cannot recover LESS than the old rule did, because ';' is still
+ * a boundary and still ends recovery. What it can do that the old rule could
+ * not is stop early, at the point where the document plausibly becomes readable
+ * again. It does not make it newly possible to read an assignment out of
+ * corruption — a ';' inside a corrupt region already ended recovery and resumed
+ * parsing inside it — it changes which corrupt inputs that happens for.
+ *
+ * The state is reset exactly as the ';' path resets it, and then this byte is
+ * consumed as the first character of the identifier, which is where the normal
+ * machine would be one byte into an assignment.
+ */
+bool bvn_action_resync_resume_identifier(bvnr_reader_t* p)
+{
+	bvnr_lexer_t* l = &p->lex;
+	if (!bvn_resync_reset(p))
+		return false;
+	l->str_len    = 0;
+	l->token_type = token_is_identifier;
+	return bvn_push_str(p, l->max_identifier_length,
+			    error_identifier_too_long, identifier_body);
 }
 bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 {
@@ -2350,6 +2406,7 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				break;
 			}
 			if (l->next_state == resync ||
+				l->next_state == resync_dot ||
 				l->next_state == resync_string ||
 				l->next_state == resync_string_escape ||
 				l->next_state == resync_comment) {

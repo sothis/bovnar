@@ -1424,6 +1424,106 @@ static void resync_error_cb(void *ud, error_code_t err,
 	(void)byte;
 }
 
+/*
+ * Recovery used to run to the next ';' at the recovery-relative top level, full
+ * stop. That is right when the error happened INSIDE a statement — that
+ * statement's own ';' is the next one, so only the broken statement is lost.
+ * When the error happened BETWEEN statements, though, the next ';' belonged to
+ * the following, perfectly good statement, and recovery swallowed it whole: a
+ * single stray byte in front of a large struct discarded the entire struct, and
+ * the caller was told only that one recovery had happened.
+ *
+ * Recovery now also ends at the start of the next assignment — a '.' at the
+ * recovery-relative top level followed by a byte that can begin an identifier.
+ * These pin both halves: the boundary case recovers what follows it, and the
+ * in-statement case still discards exactly the broken statement and no more.
+ */
+typedef struct { uint32_t values; char keys[16][16]; uint32_t n; } rec_keys_t;
+
+static bool rec_keys_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	rec_keys_t *c = ud;
+	static char cur[16];
+	if (ev == ev_assignment_start && d && d->data) {
+		uint32_t l = d->length < 15u ? d->length : 15u;
+		memcpy(cur, d->data, l); cur[l] = '\0';
+	}
+	if (ev == ev_data && d &&
+	    (d->type == token_is_number || d->type == token_is_array_number)) {
+		c->values++;
+		if (c->n < 16u) { snprintf(c->keys[c->n], 16, "%s", cur); c->n++; }
+	}
+	return true;
+}
+
+static rec_keys_t run_recovering(const char *src)
+{
+	rec_keys_t ctx = {0};
+	bvnr_read_flags_t f = {
+		.on_verified       = rec_keys_cb,
+		.userdata          = &ctx,
+		.continue_on_error = true,
+		.max_struct_nesting = 255,
+		.max_array_nesting  = 255,
+	};
+	bvnr_reader_t *r = bvnr_reader_create();
+	if (!r) return ctx;
+	(void)(bvnr_open_read_mem(r, src, (uint32_t)strlen(src), NULL, 0, &f)
+	       && bvnr_read(r));
+	bvnr_reader_destroy(r);
+	return ctx;
+}
+
+static void test_resync_resumes_at_the_next_assignment(void)
+{
+	/* a stray token between two statements must cost only itself */
+	rec_keys_t c = run_recovering(".a = 1;\n@@@\n.b = 2;\n.c = 3;\n");
+	ASSERT_EQ_UINT(c.values, 3, "resync: a boundary error costs no valid statement");
+
+	/* ...including when the following statement is a whole struct */
+	c = run_recovering(".a = 1;\n@@@\n.s = { .b = 2; .c = 3; };\n.d = 4;\n");
+	ASSERT_EQ_UINT(c.values, 4, "resync: the struct after the error survives");
+
+	/* ...or a whole array */
+	c = run_recovering(".a = 1;\n@@@\n.v = [1, 2, 3];\n.d = 4;\n");
+	ASSERT_EQ_UINT(c.values, 5, "resync: the array after the error survives");
+
+	/* and a resumed assignment is a member of the struct it sits in */
+	c = run_recovering(".s = { .a = 1; @@@ .b = 2; };\n.c = 3;\n");
+	ASSERT_EQ_UINT(c.values, 3, "resync: resumes inside the enclosing struct");
+}
+
+static void test_resync_still_discards_only_the_broken_statement(void)
+{
+	/* the error is INSIDE .a, so .a is lost and nothing else is */
+	rec_keys_t c = run_recovering(".a = @@@; .b = 2; .c = 3;\n");
+	ASSERT_EQ_UINT(c.values, 2, "resync: the broken statement is still dropped");
+	if (c.n >= 2) {
+		ASSERT_TRUE(strcmp(c.keys[0], "b") == 0, "resync: .b survives");
+		ASSERT_TRUE(strcmp(c.keys[1], "c") == 0, "resync: .c survives");
+	}
+	/* a '.' inside a bracket opened during recovery opens no assignment: the
+	 * error is inside .h, so the whole of .h goes, array rows and all */
+	c = run_recovering(".h = @@@ [ { .a = 1; }, { .b = 2; } ];\n.c = 3;\n");
+	ASSERT_EQ_UINT(c.values, 1, "resync: no resume inside recovery-opened brackets");
+}
+
+static void test_resync_dots_that_lead_nowhere(void)
+{
+	/* a '.' not followed by an identifier byte is just another skipped byte:
+	 * no resume, no extra error, and the same recovery as before. */
+	static const char *cases[] = {
+		".a = 1;\n@@@ 1.5 @@@\n.c = 3;\n",   /* a float in the junk   */
+		".a = 1;\n@@@ .5\n.c = 3;\n",         /* dot then a digit      */
+		".a = 1;\n@@@ .{ }\n.c = 3;\n",       /* dot then a brace      */
+		".a = 1;\n@@@ .....\n.c = 3;\n",      /* a run of dots         */
+	};
+	for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		rec_keys_t c = run_recovering(cases[i]);
+		ASSERT_EQ_UINT(c.values, 2, "resync: a dead-end dot changes nothing");
+	}
+}
+
 static void test_new_bug1_resync_struct_drains_arrays(void)
 {
 	printf("  test_new_bug1_resync_struct_drains_arrays...\n");
@@ -2757,6 +2857,9 @@ int main(void)
 	test_bug4_resync_semicolon_row_balance();
 
 	printf("\nRegression: seven newly identified release-blocking lexer bugs\n");
+	test_resync_resumes_at_the_next_assignment();
+	test_resync_still_discards_only_the_broken_statement();
+	test_resync_dots_that_lead_nowhere();
 	test_new_bug1_resync_struct_drains_arrays();
 	test_new_bug2_semicolon_recovery_array_event_balance();
 	test_new_bug3_resync_eof_distinct_error_code();

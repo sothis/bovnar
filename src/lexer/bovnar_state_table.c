@@ -803,6 +803,32 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		BVN_EACH_256(ACT_resync_skip),
 		[0x22] = ACT_resync_string_intro,
 		[0x23] = ACT_resync_comment_intro,
+		/* Every assignment begins with '.', so a '.' at the recovery-relative
+		 * top level is the earliest point recovery could plausibly end. It is
+		 * only a candidate: resync_dot decides on the byte that follows. */
+		[0x2e] = ACT_resync_dot,
+		[0x3b] = ACT_resync_semicolon,
+		[0x5b] = ACT_resync_open_bracket,
+		[0x5d] = ACT_resync_close_bracket,
+		[0x7b] = ACT_resync_open_bracket,
+		[0x7d] = ACT_resync_close_bracket,
+	},
+	/* Identical to `resync` except that a byte which can START AN IDENTIFIER
+	 * ends recovery here — the '.' just skipped opened the next assignment.
+	 * Every other byte behaves exactly as it would have in `resync`, so a '.'
+	 * that leads nowhere (".5", ".;", a '.' inside binary junk) costs nothing
+	 * but one extra state hop. 0xc2 is excluded for the same reason
+	 * identifier_intro excludes it. */
+	[resync_dot] = {
+		BVN_EACH_256(ACT_resync_skip),
+		BVN_ALPHA_UPPER(ACT_resync_resume_identifier),
+		BVN_ALPHA_LOWER(ACT_resync_resume_identifier),
+		[0x5f] = ACT_resync_resume_identifier,
+		BVN_UTF8_LEADER(ACT_resync_resume_identifier),
+		[0xc2] = ACT_resync_skip,
+		[0x22] = ACT_resync_string_intro,
+		[0x23] = ACT_resync_comment_intro,
+		[0x2e] = ACT_resync_dot,
 		[0x3b] = ACT_resync_semicolon,
 		[0x5b] = ACT_resync_open_bracket,
 		[0x5d] = ACT_resync_close_bracket,
@@ -921,6 +947,8 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_resync_comment_intro]      = bvn_action_resync_comment_intro,
 	[ACT_resync_comment_byte]       = bvn_action_resync_comment_byte,
 	[ACT_resync_comment_outro]      = bvn_action_resync_comment_outro,
+	[ACT_resync_dot]                = bvn_action_resync_dot,
+	[ACT_resync_resume_identifier]  = bvn_action_resync_resume_identifier,
 	[ACT_inline_unit_intro]         = bvn_action_inline_unit_intro,
 	[ACT_copy_inline_unit_byte]     = bvn_action_copy_inline_unit_byte,
 	[ACT_to_inline_unit_outro]      = bvn_action_to_inline_unit_outro,

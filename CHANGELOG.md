@@ -19,6 +19,28 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **Fixed: error recovery discarded the whole statement after the error** — with
+  `continue_on_error`, resync ran to the next `;` at the recovery-relative top
+  level and resumed there. That is right when the error is INSIDE a statement:
+  that statement's own `;` is the next one, so exactly the broken statement is
+  lost and nothing else. When the error is BETWEEN statements — a stray byte in
+  the whitespace separating two assignments — the next `;` belongs to the
+  following, perfectly good statement, and recovery swallowed it whole. A single
+  stray byte in front of a two-hundred-member struct discarded the entire
+  struct: 202 values became 2, `bvnr_read` still returned true, and
+  `recovery_count` still read 1, so nothing told the caller that two hundred
+  values had gone.
+  Recovery now ends at the start of the next assignment as well — a `.` at the
+  recovery-relative top level followed by a byte that can begin an identifier.
+  The `;` remains a boundary in every case it was one before, so this can never
+  recover LESS; what it can do is stop early, at the first point the document
+  plausibly becomes readable again. The same stray byte now costs only itself.
+  It does not make it newly possible to read an assignment out of corruption: a
+  `;` inside a corrupt region already ended recovery and resumed parsing inside
+  it. A `.` that leads nowhere (`1.5`, `.5`, a `.` in binary junk) is just
+  another skipped byte, and a `.` inside a bracket opened since recovery began
+  opens no assignment either. An error inside a statement still discards that
+  statement and no more. See specification §13.2.
 - **Reader-side unit policy (`bvnr_reader_set_unit_policy`)** — what
   `bvnr_read_flags_t.want_unit` does through a C callback, stated as data: which
   units the consumer wants values delivered in, and what the document must carry

@@ -2635,11 +2635,24 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 <p>When <code>bvnr_read_flags_t.continue_on_error</code> is <code>true</code>, the parser enters <strong>resync mode</strong> after any error:</p>
 <ol>
 <li>The <code>on_error</code> callback is invoked with error details</li>
-<li>A <strong>resync state machine</strong> (<code>state_t: resync, resync_string, resync_string_escape, resync_comment</code>) skips bytes</li>
+<li>A <strong>resync state machine</strong> (<code>state_t: resync, resync_dot, resync_string, resync_string_escape, resync_comment</code>) skips bytes</li>
 <li>Tracking bracket <code>[]</code> and brace <code>{}</code> nesting</li>
-<li>On encountering <code>;</code> at the saved nesting depth, parsing resumes</li>
+<li>Parsing resumes at whichever comes first: a <code>;</code> at the saved nesting depth, or the <strong>start of the next assignment</strong> — a <code>.</code> at the saved nesting depth followed by a byte that can begin an identifier</li>
 <li><code>recovery_count</code> (accessible via <code>bvnr_reader_get_recovery_count</code>) is incremented immediately when an error triggers entry into resync mode</li>
 </ol>
+<p>Both boundaries matter, because they cover different errors. When the error is
+<em>inside</em> a statement, that statement's own <code>;</code> is the next one, so the <code>;</code> rule
+discards exactly the broken statement. When the error is <em>between</em> statements —
+a stray byte in the whitespace separating two assignments — the next <code>;</code> belongs
+to the following, perfectly good statement; resuming only there would discard it
+whole, however large it is, so a single stray byte in front of a large struct
+took the entire struct with it. The assignment boundary stops recovery at the
+first point the document plausibly becomes readable again.</p>
+<p>The <code>.</code> must be followed by a byte that can begin an identifier, so a <code>.</code> inside
+skipped-over junk (<code>1.5</code>, <code>.5</code>, a <code>.</code> in binary corruption) is just another
+skipped byte. A <code>.</code> inside a bracket opened <em>since</em> recovery began opens no
+assignment either, and is skipped. Neither boundary recovers less than the other
+alone would: <code>;</code> remains a boundary in every case it was one before.</p>
 <p><strong>State machine behavior during resync:</strong></p>
 <table>
 <thead>
@@ -2672,6 +2685,10 @@ tool's "Validation tiers" (§3 of <code>doc/7_bovnar_conformance.md</code>).</p>
 <tr>
 <td><code>;</code> at depth 0</td>
 <td>Reset state, resume normal parsing</td>
+</tr>
+<tr>
+<td><code>.</code> at depth 0</td>
+<td>Candidate assignment start: resume if the next byte can begin an identifier, else keep skipping</td>
 </tr>
 </tbody>
 </table>

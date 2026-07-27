@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "bovnar.h"
 #include "bovnar_si_units.h"
@@ -1797,6 +1798,200 @@ static void test_dom_integer_converting_to_a_fraction(void)
 	bvn_dom_doc_destroy(doc);
 }
 
+/*
+ * Writer/reader agreement, over generated documents.
+ *
+ * The two sides read the same policy through different code: the writer checks
+ * a unit the caller hands it, at whichever of two places the unit came from,
+ * before serialising; the reader checks a unit it parsed back out of the text.
+ * If those ever diverge, a producer emits a file its own consumer rejects — the
+ * exact failure a producer-side check exists to prevent, arrived at through the
+ * check itself. So: whatever the writer ACCEPTS under a policy must be a
+ * document the reader accepts under that same policy.
+ */
+static const char *WRFUZZ_UNITS[] = { "m", "in", "k~m", "°C", "K", "m/s", "k~m/h" };
+
+static bool wrfuzz_gen(bvnr_writer_t *w, shape_t *s, int depth)
+{
+	uint32_t members = 1u + shape_rnd(s, 3u);
+	for (uint32_t i = 0; i < members; i++) {
+		char key[2] = { (char)('a' + shape_rnd(s, 6u)), '\0' };
+		uint32_t pick = (depth >= 3) ? 0u : shape_rnd(s, 4u);
+		if (pick == 1u) {
+			bvnr_data_t d = {0};
+			d.type = token_is_identifier; d.data = key; d.length = 1;
+			if (!bvnr_write_event(w, ev_assignment_start, &d)) return false;
+			if (!bvnr_write_event(w, ev_struct_start, &d))     return false;
+			if (!wrfuzz_gen(w, s, depth + 1))                  return false;
+			if (!bvnr_write_event(w, ev_struct_end, &d))       return false;
+		} else if (shape_rnd(s, 8u) == 0u) {
+			/* sometimes a bare value, which some policies must refuse */
+			if (!bvnr_write_float(w, key, 64, 1.5)) return false;
+		} else {
+			bool ok = false;
+			value_unit_t vu = bvn_parse_unit(
+				(const uint8_t *)WRFUZZ_UNITS[shape_rnd(s, 7u)], &ok);
+			if (!ok) return false;
+			if (!bvnr_write_float_unit(w, key, 64, 1.5, vu)) return false;
+		}
+	}
+	return true;
+}
+
+static void test_writer_and_reader_agree_over_shapes(void)
+{
+	static const char *dims[]  = { "m", "K", "m/s" };
+	static const bvnr_unit_rule_t rl[] = { { ".a", "m", 0, bvnr_rule_require } };
+	shape_t s;
+	s.rs = 0xB5026F5AA96619E9ull;
+	uint32_t accepted = 0, disagreements = 0;
+	char buf[8192];
+
+	for (uint32_t it = 0; it < 200u; it++) {
+		bvnr_unit_policy_t p = {0};
+		switch (it % 3u) {
+		case 0: p.require_unit = true; break;
+		case 1: p.require_dimension_of = dims; p.num_require_dimension_of = 3; break;
+		default: p.require_unit = true; p.rules = rl; p.num_rules = 1; break;
+		}
+		bvnr_writer_t *w = bvnr_writer_create();
+		if (!w) return;
+		if (!bvnr_writer_set_unit_policy(w, &p)) { bvnr_writer_destroy(w); continue; }
+		memset(buf, 0, sizeof buf);
+		if (!bvnr_open_write_mem(w, buf, sizeof buf, false, NULL)) {
+			bvnr_writer_destroy(w); continue;
+		}
+		bool wok = wrfuzz_gen(w, &s, 0) && bvnr_write_finish(w);
+		error_code_t werr = bvnr_writer_get_error(w);
+		bvnr_writer_destroy(w);
+		if (!wok) {
+			/* the only refusals this generator can provoke */
+			if (werr != error_unit_mismatch && werr != error_sink_buffer_exhausted)
+				disagreements++;
+			continue;
+		}
+		accepted++;
+
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.max_struct_nesting = 255; f.max_array_nesting = 255;
+		bvnr_reader_t *r = bvnr_reader_create();
+		if (!r) return;
+		bvnr_reader_set_unit_policy(r, &p);
+		bool rok = bvnr_open_read_mem(r, buf, (uint32_t)strlen(buf), NULL, 0, &f)
+			   && bvnr_read(r);
+		if (!rok && disagreements < 3)
+			fprintf(stderr, "  writer accepted, reader refused (%s): %s\n",
+				bvn_error_to_string(bvnr_reader_get_error(r)), buf);
+		if (!rok) disagreements++;
+		bvnr_reader_destroy(r);
+	}
+	ASSERT_EQ_INT(disagreements, 0,
+		      "agreement: the reader accepts everything the writer emitted");
+	ASSERT_TRUE(accepted > 50u, "agreement: the generator produced real documents");
+}
+
+/*
+ * DOM/reader agreement. The DOM stores what the streaming reader delivered, so
+ * for the same document under the same policy the two must report the same
+ * value and the same unit for every value — and must agree about whether the
+ * document is acceptable at all.
+ */
+static int    dom_diff_n;
+static double dom_diff_val[POL_MAX_VALUES];
+static char   dom_diff_unit[POL_MAX_VALUES][64];
+
+static void dom_diff_walk(bvn_dom_node_t *n)
+{
+	if (!n || dom_diff_n >= POL_MAX_VALUES) return;
+	switch (bvn_dom_node_type(n)) {
+	case BVN_DOM_STRUCT: {
+		uint32_t c = bvn_dom_struct_count(n);
+		const bvn_dom_entry_t *e = bvn_dom_struct_entries(n);
+		for (uint32_t i = 0; i < c; i++) dom_diff_walk(e[i].value);
+		break; }
+	case BVN_DOM_ARRAY: {
+		uint32_t c = bvn_dom_array_count(n);
+		for (uint32_t i = 0; i < c; i++) dom_diff_walk(bvn_dom_array_at(n, i));
+		break; }
+	case BVN_DOM_INT:
+	case BVN_DOM_FLOAT: {
+		double v = 0.0;
+		bvn_dom_get_float(n, &v);
+		dom_diff_val[dom_diff_n] = v;
+		bvn_dom_get_unit_string(n, dom_diff_unit[dom_diff_n],
+					sizeof dom_diff_unit[0]);
+		dom_diff_n++;
+		break; }
+	default: break;
+	}
+}
+
+static void test_dom_and_reader_agree(void)
+{
+	static const char *DOCS[] = {
+		".a = <float:64,in> 12.0;\n.b = <float:64,k~m> 1.0;\n",
+		".s = { .t = <float:64,°F> 212.0; .u = <float:64,in> 12.0; };\n",
+		".h = [ { .a = <float:64,in> 12.0; }, { .a = <float:64,k~m> 1.0; } ];\n",
+		".v = <float:64,in> [12.0, 24.0, 36.0];\n",
+		".m = <uint:32,g> 5;\n.n = <uint:64,k~m> 3;\n",
+		".mix = <float:64,%> 35.0;\n.bare = <float:64> 0.25;\n"
+		".cur = <float:64,$USD> 5.0;\n",
+	};
+	static const bvnr_unit_target_t tgt[] = { { "m", 0 } };
+	uint32_t compared = 0;
+
+	for (unsigned di = 0; di < sizeof DOCS / sizeof DOCS[0]; di++) {
+		for (int mode = 0; mode < 3; mode++) {
+			bvnr_unit_policy_t p = {0};
+			p.on_inexact = bvnr_inexact_leave;
+			if (mode != 1) p.normalise = bvnr_normalise_si;
+			if (mode != 0) { p.targets = tgt; p.num_targets = 1; }
+
+			pol_ctx_t c = {0};
+			bvnr_read_flags_t f;
+			memset(&f, 0, sizeof f);
+			f.userdata = &c; f.on_verified = pol_on_verified;
+			f.max_struct_nesting = 255; f.max_array_nesting = 255;
+			bvnr_reader_t *r = bvnr_reader_create();
+			if (!r) return;
+			bvnr_reader_set_unit_policy(r, &p);
+			bool rok = bvnr_open_read_mem(r, DOCS[di], (uint32_t)strlen(DOCS[di]),
+						      NULL, 0, &f) && bvnr_read(r);
+			bvnr_reader_destroy(r);
+
+			bvn_dom_doc_t *doc = bvn_dom_parse_policy(
+				DOCS[di], (uint32_t)strlen(DOCS[di]), &p);
+			bool dok = doc && bvn_dom_doc_get_parse_error(doc) == error_none;
+			ASSERT_EQ_INT(dok, rok, "dom/reader: same verdict on the document");
+			if (rok && dok) {
+				dom_diff_n = 0;
+				uint32_t n = bvn_dom_doc_count(doc);
+				const bvn_dom_entry_t *e = bvn_dom_doc_entries(doc);
+				for (uint32_t i = 0; i < n; i++) dom_diff_walk(e[i].value);
+				ASSERT_EQ_INT(dom_diff_n, c.n, "dom/reader: same value count");
+				for (int i = 0; i < c.n && i < dom_diff_n; i++) {
+					const char *txt = c.converted[i] ? c.text[i] : NULL;
+					if (txt && txt[0]) {
+						double want = strtod(txt, NULL);
+						double got  = dom_diff_val[i];
+						double tol  = (want < 0 ? -want : want) * 1e-12 + 1e-15;
+						double dd   = want - got;
+						if (dd < 0) dd = -dd;
+						ASSERT_TRUE(dd <= tol,
+							    "dom/reader: same value");
+					}
+					ASSERT_STR(dom_diff_unit[i], c.unit[i],
+						   "dom/reader: same unit");
+					compared++;
+				}
+			}
+			if (doc) bvn_dom_doc_destroy(doc);
+		}
+	}
+	ASSERT_TRUE(compared > 30u, "dom/reader: real coverage");
+}
+
 int main(void)
 {
 	test_targets_mixed_document();
@@ -1861,6 +2056,8 @@ int main(void)
 	test_dom_policy_validation();
 	test_dom_policy_rejects_a_bad_policy();
 	test_dom_integer_converting_to_a_fraction();
+	test_dom_and_reader_agree();
+	test_writer_and_reader_agree_over_shapes();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

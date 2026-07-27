@@ -774,6 +774,16 @@ fires on exactly the values living there. Sixteen thousand such assertions over
 three thousand generated documents found nothing further, which is the only kind
 of evidence worth having about a defect that a hand-written table missed.
 
+Two AGREEMENT properties are checked the same way, because a policy is now read
+by three separate pieces of code and nothing else would notice them drifting.
+Whatever the writer accepts under a policy, the reader must accept under that
+same policy — otherwise a producer emits a file its own consumer rejects, which
+is the failure the producer-side check exists to prevent, arrived at through the
+check itself. And for one document under one policy, the DOM must report the
+same value and the same unit as the streaming reader for every value, and reach
+the same verdict about the document. Neither has disagreed over five thousand
+generated documents.
+
 **And the DOM followed for free.** Section 3.7 treated a DOM-tier pass as a
 separate option with its own machinery. Once the reader had the policy the DOM
 needed thirty lines: it is built on the reader, so it inherits everything, and

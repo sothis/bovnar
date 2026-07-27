@@ -8,7 +8,7 @@
 | LetzteVersion        = 1.1.0
 | LetzteVersionDatum   = 21. Juni 2026
 | Art                  = [[Serialisierung|Datenserialisierungsformat]]
-| Standard             = Bovnar-Spezifikation 1.1
+| Standard             = Bovnar-Spezifikation 1.2
 | Website              = [https://www.bovnar.io/ bovnar.io]
 }}
 
@@ -30,7 +30,8 @@ Zwischen kompatiblen Einheiten wird nur auf Anforderung umgerechnet. Ein Konsume
 Ein Bovnar-Dokument ist eine Folge von Zuweisungen der Form <code>.schlüssel = wert;</code>. Schlüssel beginnen stets mit einem Punkt, Kommentare mit <code>#</code> und reichen bis zum Zeilenende. Das Dokument ist durchgehend UTF-8-kodiert; außerhalb von Oktett-Strömen erzwingt der Parser strikte UTF-8-Gültigkeit. Auch eine leere Datei ist gültig. Ein Beispiel:
 
 <pre>
-#!bovnar 1.1                                # optionale Versions-Direktive
+#!bovnar 1.1
+# die Direktive muss der erste Kommentar sein; auf ihrer Zeile darf nichts folgen
 .config = {
     .host   = "api.example.com";
     .port   = <uint:16> 443;
@@ -60,7 +61,7 @@ Mit Spezifikation 1.2 kommt eine alternative Notation für den Einheiten-Slot hi
 
 Ein UCUM-Ausdruck wird entweder übersetzt oder beim Parsen zurückgewiesen; einen Zwischenzustand, in dem ein Wert eine für den Parser undeutbare Einheit trägt, gibt es nicht. Die Zurückweisungen sind nach Ursache unterschieden, sodass ein Erzeuger einen fehlerhaften Code von einem wohlgeformten unterscheiden kann, der keine Entsprechung hat, und beide von einer unbekannten Notation. UCUMs ''arbiträre'' Einheiten, assaydefinierte Größen wie die internationale Einheit <code>[IU]</code>, werden als Einheiten aufgenommen, die mit nichts kommensurabel sind – auch nicht untereinander –, sodass sie sich vergleichen, aber nie umrechnen lassen.
 
-Da die Notation darüber entscheidet, welche Dokumente gültig sind, ist sie an die Versions-Direktive gebunden: Ein Dokument muss <code>#!bovnar 1.2</code> deklarieren, um sie zu verwenden – genau wie die Typfamilie <code>datetime</code> ein deklariertes 1.1 verlangt. Native Einheitenschreibweisen bleiben in jeder Version unberührt. Spezifikation 1.2 ist im Entwicklungszweig des Projekts abgeschlossen, aber noch nicht Teil einer veröffentlichten Version.<ref name="changelog" />
+Da die Notation darüber entscheidet, welche Dokumente gültig sind, ist sie an die Versions-Direktive gebunden: Ein Dokument muss <code>#!bovnar 1.2</code> deklarieren, um sie zu verwenden – genau wie die Typfamilie <code>datetime</code> ein deklariertes 1.1 verlangt. Native Einheitenschreibweisen bleiben in jeder Version unberührt. Das Spezifikationsdokument liegt in der Fassung 1.2 vor; die neueste veröffentlichte Implementierung ist 1.1.0 und damit älter als die Notation, die sie folglich zurückweist. Die beiden Versionsnummern sind unabhängig voneinander – die Bibliothek meldet ihre eigene Version und die höchste von ihr verstandene Spezifikation getrennt.<ref name="changelog" />
 
 === Währungen ===
 Währungen sind eigenständige Einheiten mit verpflichtendem <code>$</code>-Sigil, das Kollisionen zwischen Währungscodes und physikalischen Einheitensymbolen ausschließt. Der Katalog umfasst mit Stand der Spezifikation 1.1 insgesamt 166 Fiat-Währungen nach [[ISO 4217]] (einschließlich Edelmetallcodes) sowie 50 [[Kryptowährung]]en; jede Währung trägt Metadaten zu ihren kleinsten Einheiten (Minor Units) und eigene Präfixregeln.<ref name="units" /> Für Geldbeträge empfiehlt die Dokumentation dezimale Gleitkommatypen (<code>&lt;float_dec:64,$USD&gt; 19.99</code>) oder Ganzzahlen in kleinsten Einheiten (etwa [[Satoshi (Einheit)|Satoshi]] bei <code>$BTC</code>), um binäre Rundungsfehler zu vermeiden.
@@ -114,12 +115,12 @@ Bovnar steht in der Tradition menschenlesbarer Serialisierungsformate wie [[Java
 == Weblinks ==
 * [https://www.bovnar.io/ Offizielle Website] (englisch, mit interaktivem Playground und Live-Demos)
 * [https://github.com/sothis/bovnar Quellcode-Repository auf GitHub]
-* [https://www.bovnar.io/doc/pdf/bovnar-specification.pdf Bovnar-Spezifikation v1.1] (PDF, englisch)
+* [https://www.bovnar.io/doc/pdf/bovnar-specification.pdf Bovnar-Spezifikation v1.2] (PDF, englisch)
 
 == Einzelnachweise ==
 <references>
 <ref name="web">{{Internetquelle |url=https://www.bovnar.io/ |titel=Bovnar — Unit-safe serialization for science and industry |abruf=2026-07-27 |sprache=en}}</ref>
-<ref name="spec">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-specification.pdf |titel=Bovnar Specification, Version 1.1 |datum=2026-06-21 |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>
+<ref name="spec">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-specification.pdf |titel=Bovnar Specification, Version 1.2 |datum=2026-07-27 |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>
 <ref name="repo">{{Internetquelle |url=https://github.com/sothis/bovnar |titel=sothis/bovnar – Unit-safe serialization for scientific and industrial systems |werk=GitHub |abruf=2026-07-27 |sprache=en}}</ref>
 <ref name="tutorial">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-tutorial.pdf |titel=Bovnar (BVNR) — A Practical Tutorial |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>
 <ref name="units">{{Internetquelle |url=https://www.bovnar.io/doc/pdf/bovnar-unit-system.pdf |titel=Bovnar Quantity Annotation System — Unit and Currency Reference |abruf=2026-07-27 |sprache=en |format=PDF}}</ref>

@@ -1256,6 +1256,8 @@ ev_octet_stream_end    →  (emitted on the trailing 0x00)
 
 ### 9.4 Example
 
+An octet stream carries raw bytes, so it cannot be written literally in a text document. The form below is the conventional *escaped* notation used throughout this specification: each `\xNN` stands for one byte of the file, not for those four characters. Pasted verbatim into a `.bvnr` file it is `error_unexpected_input_byte`; the writer API emits the real bytes.
+
 ```bovnar
 .data = ;
 .binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;

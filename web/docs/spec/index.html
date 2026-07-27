@@ -1451,6 +1451,7 @@ ev_octet_stream_end    →  (emitted on the trailing 0x00)
 </code></pre></div>
 
 <h3 id="94-example">9.4 Example</h3>
+<p>An octet stream carries raw bytes, so it cannot be written literally in a text document. The form below is the conventional <em>escaped</em> notation used throughout this specification: each <code>\xNN</code> stands for one byte of the file, not for those four characters. Pasted verbatim into a <code>.bvnr</code> file it is <code>error_unexpected_input_byte</code>; the writer API emits the real bytes.</p>
 <div class="codehilite"><pre><code class="language-bovnar">.data = ;
 .binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;</code></pre></div>
 <p>This binary region encodes two chunks: <code>"hello"</code> (5 bytes) and <code>"bye"</code> (3 bytes), producing:</p>

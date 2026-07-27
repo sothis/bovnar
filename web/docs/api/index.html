@@ -1458,6 +1458,18 @@ table in which a rounded decimal is passed off as exact.</p>
 <td><code>"unit_inexact"</code></td>
 <td>A <code>want_unit</code> conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without <code>want_unit_allow_nonterminating</code> (§1.10)</td>
 </tr>
+<tr>
+<td><code>error_unit_profile_unknown</code></td>
+<td>49</td>
+<td><code>"unit_profile_unknown"</code></td>
+<td>A unit written in the <code>name:</code> profile notation names a profile this build does not have (spec 1.2)</td>
+</tr>
+<tr>
+<td><code>error_unit_profile_unsupported</code></td>
+<td>50</td>
+<td><code>"unit_profile_unsupported"</code></td>
+<td>A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (spec 1.2)</td>
+</tr>
 </tbody>
 </table>
 <hr />

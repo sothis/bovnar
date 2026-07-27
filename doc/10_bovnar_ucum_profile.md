@@ -89,8 +89,9 @@ second unit model. A profile expression is translated, at parse time, into exact
 which notation the document used:
 
 ```bovnar
-.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;   # profile spelling
-.systolic = <float_dec:64,mmHg>        120.00;   # native spelling — same value_unit_t
+#!bovnar 1.2
+.systolic_a = <float_dec:64,ucum:mm[Hg]> 120.00;   # profile spelling
+.systolic_b = <float_dec:64,mmHg>        120.00;   # native spelling — same value_unit_t
 ```
 
 `bvn_unit_equal` reports those two units equal. `bvn_units_compatible`, `bvn_unit_convert_factor`,
@@ -191,6 +192,7 @@ an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annot
 may differ as long as they mean the same thing:
 
 ```bovnar
+#!bovnar 1.2
 .a = <float:64,ucum:mm[Hg]> 120.0;
 .b = 120.0 ucum:mm[Hg];
 .c = <float:64,mmHg> 120.0 ucum:mm[Hg];   # OK — both parse to the same unit
@@ -248,7 +250,7 @@ annotation the unit model ignores anyway.
 ### 2.4 Commas inside an annotation
 
 A type-parameter list is comma-separated, and a UCUM annotation may contain a comma
-(`{cells,total}`). The parameter scanner in `bvn_parse_type_spec` therefore tracks brace depth: a
+(`{cells,total}`). The parameter scanner in `bvn_parse_type_annotation` therefore tracks brace depth: a
 `,` at depth 0 ends the parameter, a `,` at depth ≥ 1 is part of it. Bracket depth needs no such
 treatment — `[` … `]` cannot contain a comma in any UCUM atom — but is tracked anyway so that an
 unbalanced bracket is diagnosed as a malformed unit rather than as a malformed parameter list.
@@ -498,6 +500,7 @@ translation produces ordinary components, a profile unit and a native unit that 
 compare equal, and the annotation/inline agreement check of doc/2 §2.2 works across notations:
 
 ```bovnar
+#!bovnar 1.2
 .v = <float:64,mmHg> 120.0 ucum:mm[Hg];      # OK
 .w = <float:64,ucum:kg.m/s2> 1.0 k~g·m·s⁻²;  # OK
 ```

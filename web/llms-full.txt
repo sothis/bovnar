@@ -2388,6 +2388,8 @@ ev_octet_stream_end    →  (emitted on the trailing 0x00)
 
 ### 9.4 Example
 
+An octet stream carries raw bytes, so it cannot be written literally in a text document. The form below is the conventional *escaped* notation used throughout this specification: each `\xNN` stands for one byte of the file, not for those four characters. Pasted verbatim into a `.bvnr` file it is `error_unexpected_input_byte`; the writer API emits the real bytes.
+
 ```bovnar
 .data = ;
 .binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;
@@ -4576,7 +4578,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further unit would be appended there. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **383** (verified by static assert `bu_kilometer_per_hour + 1 == 383`, which tracks the highest enumerator whichever block it lives in). Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of spec 1.2 occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](10_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -7801,6 +7803,8 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
+| `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (spec 1.2) |
+| `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (spec 1.2) |
 
 ---
 
@@ -10942,12 +10946,17 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Spec 1.1 — the additive features documented here (the `#!bovnar`
-version directive, `\u`/`\x` escapes, the `datetime` family, and reference array
-indexing). Spec 1.0 remains the frozen, stable baseline: a document that declares
-no `#!bovnar` directive is treated as 1.0, and every 1.0 document parses
-unchanged. `bvnr_version_string()` reports the library version (`1.1.0`) and
-`bvnr_spec_version()` the highest spec it understands.
+Spec 1.2. Each minor version has been additive:
+
+- **1.1** added the `#!bovnar` version directive itself, the `\u`/`\x` escapes,
+  the `datetime` family and reference array indexing;
+- **1.2** added the `ucum:` unit notation (see below).
+
+Spec 1.0 remains the frozen, stable baseline: a document that declares no
+`#!bovnar` directive is treated as 1.0, and every 1.0 document parses unchanged.
+`bvnr_version_string()` reports the library version and `bvnr_spec_version()` the
+highest spec it understands — these are two different numbers, and only the
+second moved for 1.2.
 
 ---
 
@@ -11043,6 +11052,12 @@ Yes, since spec 1.1. Put a directive on the first line:
 A document with **no** directive is treated as spec **1.0** — the frozen
 baseline grammar — so existing files need no change. The directive only opts in
 to a newer version.
+
+Opting in is what makes the construct legal, not merely what labels the
+document. A `datetime` value needs a declared 1.1 and a `ucum:` unit a declared
+1.2; used in a document that declares less — or nothing — each is rejected. That
+is deliberate: it stops a document from carrying a construct that a conforming
+reader of its own declared version would have to refuse.
 
 It is recognised only as the very first comment (after an optional BOM and
 whitespace). A reader records the declared version
@@ -11389,6 +11404,35 @@ Both compare as compatible via `bvn_units_compatible` and both serialise to
 `no_unit` signals that the author actively chose dimensionless, whereas an
 omitted unit might mean the author simply did not think about units. For
 documentation-grade data, prefer the explicit form.
+
+---
+
+**Can I write units as UCUM codes?**
+
+Yes, since spec 1.2. Prefix the unit parameter with the profile namespace:
+
+```bovnar
+#!bovnar 1.2
+.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
+.count    = <uint:32,ucum:10*3/uL>     4500;
+```
+
+A UCUM expression is translated at parse time into the same unit a native
+spelling produces, so `ucum:mm[Hg]` and `mmHg` compare equal, convert
+identically, and satisfy the same unit-policy rule. The `#!bovnar 1.2` directive
+is required — without it the notation is `error_unit_illegal`.
+
+The translation either succeeds or fails; nothing is passed through unchecked.
+A code that is not valid UCUM, or names an atom the profile does not know, is
+`error_unit_illegal`; one that is valid but has no representation here is
+`error_unit_profile_unsupported`; an unknown namespace is
+`error_unit_profile_unknown`.
+
+Watch the two vocabularies where they disagree on a spelling — UCUM's `st` is
+the stere and Bovnar's is the stone, UCUM's `B` is the bel and Bovnar's is the
+byte — which is exactly why the namespace is mandatory rather than a fallback.
+The full transliteration table, the collisions, and the codes that have no
+representation are in [UCUM Unit Profile](10_bovnar_ucum_profile.md).
 
 ---
 
@@ -13755,11 +13799,12 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 - [Unit Ambiguities](unit_ambiguities.md) — which reading wins when a token could mean two things
 - [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit attaches to a value
 - [FAQ §4 — Units](6_bovnar_faq.md#4-units) — the questions these tables raise most often
+- [UCUM Unit Profile](10_bovnar_ucum_profile.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50)*
-*`BVN_VALUE_BASE_UNIT_COUNT` = 380 (`bu_xcg + 1`)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, spec 1.2)*
+*`BVN_VALUE_BASE_UNIT_COUNT` = 429 (`BVN_UCUM_ARBITRARY_LAST + 1`)*
 
 ---
 
@@ -14203,8 +14248,9 @@ second unit model. A profile expression is translated, at parse time, into exact
 which notation the document used:
 
 ```bovnar
-.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;   # profile spelling
-.systolic = <float_dec:64,mmHg>        120.00;   # native spelling — same value_unit_t
+#!bovnar 1.2
+.systolic_a = <float_dec:64,ucum:mm[Hg]> 120.00;   # profile spelling
+.systolic_b = <float_dec:64,mmHg>        120.00;   # native spelling — same value_unit_t
 ```
 
 `bvn_unit_equal` reports those two units equal. `bvn_units_compatible`, `bvn_unit_convert_factor`,
@@ -14305,6 +14351,7 @@ an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annot
 may differ as long as they mean the same thing:
 
 ```bovnar
+#!bovnar 1.2
 .a = <float:64,ucum:mm[Hg]> 120.0;
 .b = 120.0 ucum:mm[Hg];
 .c = <float:64,mmHg> 120.0 ucum:mm[Hg];   # OK — both parse to the same unit
@@ -14362,7 +14409,7 @@ annotation the unit model ignores anyway.
 ### 2.4 Commas inside an annotation
 
 A type-parameter list is comma-separated, and a UCUM annotation may contain a comma
-(`{cells,total}`). The parameter scanner in `bvn_parse_type_spec` therefore tracks brace depth: a
+(`{cells,total}`). The parameter scanner in `bvn_parse_type_annotation` therefore tracks brace depth: a
 `,` at depth 0 ends the parameter, a `,` at depth ≥ 1 is part of it. Bracket depth needs no such
 treatment — `[` … `]` cannot contain a comma in any UCUM atom — but is tracked anyway so that an
 unbalanced bracket is diagnosed as a malformed unit rather than as a malformed parameter list.
@@ -14612,6 +14659,7 @@ translation produces ordinary components, a profile unit and a native unit that 
 compare equal, and the annotation/inline agreement check of doc/2 §2.2 works across notations:
 
 ```bovnar
+#!bovnar 1.2
 .v = <float:64,mmHg> 120.0 ucum:mm[Hg];      # OK
 .w = <float:64,ucum:kg.m/s2> 1.0 k~g·m·s⁻²;  # OK
 ```

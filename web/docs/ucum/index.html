@@ -141,8 +141,9 @@ standing risk it is.</p>
 second unit model. A profile expression is translated, at parse time, into exactly the same
 <code>value_unit_t</code> a native expression produces, and from that point on nothing downstream can tell
 which notation the document used:</p>
-<div class="codehilite"><pre><code class="language-bovnar">.systolic = &lt;float_dec:64,ucum:mm[Hg]&gt; 120.00;   # profile spelling
-.systolic = &lt;float_dec:64,mmHg&gt;        120.00;   # native spelling — same value_unit_t</code></pre></div>
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
+.systolic_a = &lt;float_dec:64,ucum:mm[Hg]&gt; 120.00;   # profile spelling
+.systolic_b = &lt;float_dec:64,mmHg&gt;        120.00;   # native spelling — same value_unit_t</code></pre></div>
 <p><code>bvn_unit_equal</code> reports those two units equal. <code>bvn_units_compatible</code>, <code>bvn_unit_convert_factor</code>,
 the reader and writer unit policies, <code>bvnr_normalise_si</code>, the DOM and the
 <code>want_unit</code> hook all keep working with no knowledge that a profile exists. That is the whole design
@@ -215,7 +216,8 @@ version accepts.</p>
 an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
 (doc/2 §2.2) is unchanged — the comparison is on the parsed <code>value_unit_t</code>, so the two spellings
 may differ as long as they mean the same thing:</p>
-<div class="codehilite"><pre><code class="language-bovnar">.a = &lt;float:64,ucum:mm[Hg]&gt; 120.0;
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
+.a = &lt;float:64,ucum:mm[Hg]&gt; 120.0;
 .b = 120.0 ucum:mm[Hg];
 .c = &lt;float:64,mmHg&gt; 120.0 ucum:mm[Hg];   # OK — both parse to the same unit
 .d = &lt;float:64,m&gt; 1.0 ucum:s;             # error_unit_mismatch, as always</code></pre></div>
@@ -287,7 +289,7 @@ admitting a byte that terminates the construct it sits inside — is not a trade
 annotation the unit model ignores anyway.</p>
 <h3 id="24-commas-inside-an-annotation">2.4 Commas inside an annotation</h3>
 <p>A type-parameter list is comma-separated, and a UCUM annotation may contain a comma
-(<code>{cells,total}</code>). The parameter scanner in <code>bvn_parse_type_spec</code> therefore tracks brace depth: a
+(<code>{cells,total}</code>). The parameter scanner in <code>bvn_parse_type_annotation</code> therefore tracks brace depth: a
 <code>,</code> at depth 0 ends the parameter, a <code>,</code> at depth ≥ 1 is part of it. Bracket depth needs no such
 treatment — <code>[</code> … <code>]</code> cannot contain a comma in any UCUM atom — but is tracked anyway so that an
 unbalanced bracket is diagnosed as a malformed unit rather than as a malformed parameter list.</p>
@@ -576,7 +578,8 @@ either, and writes a temperature difference as <code>K</code>. See §10.3.</p>
 <p><code>bvn_unit_equal</code> is unchanged: a multiset comparison of (base, exponent, prefix) triples. Because
 translation produces ordinary components, a profile unit and a native unit that mean the same thing
 compare equal, and the annotation/inline agreement check of doc/2 §2.2 works across notations:</p>
-<div class="codehilite"><pre><code class="language-bovnar">.v = &lt;float:64,mmHg&gt; 120.0 ucum:mm[Hg];      # OK
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
+.v = &lt;float:64,mmHg&gt; 120.0 ucum:mm[Hg];      # OK
 .w = &lt;float:64,ucum:kg.m/s2&gt; 1.0 k~g·m·s⁻²;  # OK</code></pre></div>
 <p>Two profile units compare through their translations, so <code>ucum:mL{a}</code> equals <code>ucum:mL{b}</code> equals
 <code>ucum:mL</code>. §3.4 argues that is correct; §6.3 lists what it costs.</p>

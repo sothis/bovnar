@@ -99,12 +99,17 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Spec 1.1 — the additive features documented here (the `#!bovnar`
-version directive, `\u`/`\x` escapes, the `datetime` family, and reference array
-indexing). Spec 1.0 remains the frozen, stable baseline: a document that declares
-no `#!bovnar` directive is treated as 1.0, and every 1.0 document parses
-unchanged. `bvnr_version_string()` reports the library version (`1.1.0`) and
-`bvnr_spec_version()` the highest spec it understands.
+Spec 1.2. Each minor version has been additive:
+
+- **1.1** added the `#!bovnar` version directive itself, the `\u`/`\x` escapes,
+  the `datetime` family and reference array indexing;
+- **1.2** added the `ucum:` unit notation (see below).
+
+Spec 1.0 remains the frozen, stable baseline: a document that declares no
+`#!bovnar` directive is treated as 1.0, and every 1.0 document parses unchanged.
+`bvnr_version_string()` reports the library version and `bvnr_spec_version()` the
+highest spec it understands — these are two different numbers, and only the
+second moved for 1.2.
 
 ---
 
@@ -200,6 +205,12 @@ Yes, since spec 1.1. Put a directive on the first line:
 A document with **no** directive is treated as spec **1.0** — the frozen
 baseline grammar — so existing files need no change. The directive only opts in
 to a newer version.
+
+Opting in is what makes the construct legal, not merely what labels the
+document. A `datetime` value needs a declared 1.1 and a `ucum:` unit a declared
+1.2; used in a document that declares less — or nothing — each is rejected. That
+is deliberate: it stops a document from carrying a construct that a conforming
+reader of its own declared version would have to refuse.
 
 It is recognised only as the very first comment (after an optional BOM and
 whitespace). A reader records the declared version
@@ -546,6 +557,35 @@ Both compare as compatible via `bvn_units_compatible` and both serialise to
 `no_unit` signals that the author actively chose dimensionless, whereas an
 omitted unit might mean the author simply did not think about units. For
 documentation-grade data, prefer the explicit form.
+
+---
+
+**Can I write units as UCUM codes?**
+
+Yes, since spec 1.2. Prefix the unit parameter with the profile namespace:
+
+```bovnar
+#!bovnar 1.2
+.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
+.count    = <uint:32,ucum:10*3/uL>     4500;
+```
+
+A UCUM expression is translated at parse time into the same unit a native
+spelling produces, so `ucum:mm[Hg]` and `mmHg` compare equal, convert
+identically, and satisfy the same unit-policy rule. The `#!bovnar 1.2` directive
+is required — without it the notation is `error_unit_illegal`.
+
+The translation either succeeds or fails; nothing is passed through unchecked.
+A code that is not valid UCUM, or names an atom the profile does not know, is
+`error_unit_illegal`; one that is valid but has no representation here is
+`error_unit_profile_unsupported`; an unknown namespace is
+`error_unit_profile_unknown`.
+
+Watch the two vocabularies where they disagree on a spelling — UCUM's `st` is
+the stere and Bovnar's is the stone, UCUM's `B` is the bel and Bovnar's is the
+byte — which is exactly why the namespace is mandatory rather than a fallback.
+The full transliteration table, the collisions, and the codes that have no
+representation are in [UCUM Unit Profile](10_bovnar_ucum_profile.md).
 
 ---
 

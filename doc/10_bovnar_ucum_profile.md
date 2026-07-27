@@ -1,6 +1,6 @@
 # Bovnar — UCUM Unit Profile
 
-> **Spec version:** 1.2
+> **Spec version:** 1.2 — the notation is gated on a declared 1.2 (§2.2)
 > **Status:** Normative — implemented in `src/utils/bovnar_ucum.c`, pinned by `tests/bovnar_ucum_test.c`. Section 10.4 lists the parts of this document that did NOT ship.
 > **Scope:** How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.
 
@@ -28,7 +28,7 @@ standing risk it is.
     - 1.3 [The one thing that must not change](#13-the-one-thing-that-must-not-change)
 2. [Syntax](#2-syntax)
     - 2.1 [The namespace discriminator](#21-the-namespace-discriminator)
-    - 2.2 [Where a profile unit may appear](#22-where-a-profile-unit-may-appear)
+    - 2.2 [Where a profile unit may appear, and in which documents](#22-where-a-profile-unit-may-appear-and-in-which-documents)
     - 2.3 [Five bytes the lexer has to learn](#23-five-bytes-the-lexer-has-to-learn)
     - 2.4 [Commas inside an annotation](#24-commas-inside-an-annotation)
     - 2.5 [Length budget](#25-length-budget)
@@ -161,10 +161,32 @@ contains a `ucum:` unit, so no document can change meaning when one starts to pa
 alternative of a quoted form (`ucum:"mm[Hg]"`), which would put a string-escape sub-language inside
 a type body for no gain.
 
-### 2.2 Where a profile unit may appear
+### 2.2 Where a profile unit may appear, and in which documents
 
-Everywhere a native unit may: as the unit parameter of a type annotation, and as an inline unit
-suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
+**The notation is gated on the declared spec version.** A profile unit needs a `#!bovnar` directive
+declaring 1.2 or later, exactly as the datetime family and the `\x`/`\u` escapes need 1.1. Without
+one it is `error_unit_illegal` — in a 1.1 document `ucum:mm[Hg]` is simply not a unit, the same way
+`<datetime:64>` is simply not a value type in a 1.0 document. A document with **no** directive
+declares nothing and therefore gets neither surface.
+
+```bovnar
+#!bovnar 1.2
+.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;   # OK
+```
+
+Without the gate a document could carry a unit that every conforming reader of its own declared
+version must reject, which is the interoperability hazard the directive exists to prevent. Native
+units are unaffected in every version: the bump is additive, and `<float:64,mmHg>` parses under 1.0
+as it always did.
+
+The writer enforces the other half. A unit with no native spelling — one carrying a UCUM arbitrary
+atom — can only be emitted in this notation, so writing one without having emitted a 1.2 directive
+is `error_unsupported_spec_version` rather than a document the library cannot read back. A
+*translated* unit needs no such guard: `ucum:mm[Hg]` is written as the native `mmHg`, which every
+version accepts.
+
+Otherwise: everywhere a native unit may appear — as the unit parameter of a type annotation, and as
+an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
 (doc/2 §2.2) is unchanged — the comparison is on the parsed `value_unit_t`, so the two spellings
 may differ as long as they mean the same thing:
 
@@ -1215,4 +1237,4 @@ The first two are the ones worth building next, in that order.
 
 ---
 
-*End of Bovnar — UCUM Unit Profile (Bovnar spec 1.1).*
+*End of Bovnar — UCUM Unit Profile (Bovnar spec 1.2).*

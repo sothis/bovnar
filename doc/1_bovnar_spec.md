@@ -1,6 +1,6 @@
 # Bovnar — Specification
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Normative — released (1.x line; additive over the frozen 1.0 baseline)
 > **Scope:** Grammar, lexical structure, type system, units, limits, and error semantics.
 
@@ -71,6 +71,7 @@
     - 11.6 [Examples](#116-examples)
     - 11.7 [Compound Unit Constraints](#117-compound-unit-constraints)
     - 11.8 [The `no_unit` Keyword](#118-the-no_unit-keyword)
+    - 11.9 [Unit Profiles (spec 1.2)](#119-unit-profiles-spec-12)
 12. [Validation & Constraints](#12-validation--constraints)
     - 12.1 [UTF-8 Validation](#121-utf-8-validation)
     - 12.2 [Size Limits](#122-size-limits)
@@ -1584,6 +1585,33 @@ Within an explicit annotation, **omitting** the unit parameter yields the same i
 
 A **fully untyped** value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`. All three forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both encodings serialize to `"no_unit"` via `bvn_unit_to_string` — but the untyped-default form (`num_components == 1`) is a structurally distinct internal state from the annotated forms (`num_components == 0`).
 
+### 11.9 Unit Profiles (spec 1.2)
+
+A unit parameter that begins with a lowercase namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged.
+
+One namespace is defined, `ucum` (Unified Code for Units of Measure):
+
+```bovnar
+#!bovnar 1.2
+.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;   # the same unit as <...,mmHg>
+```
+
+**Gated on the declared version.** A profile unit requires a `#!bovnar` directive declaring 1.2 or later, exactly as the datetime family and the `\x`/`\u` escapes require 1.1 (§3.4). In a document declaring less — or declaring nothing, which declares less than anything — a profile unit is `error_unit_illegal`, because in that version it is not a unit. A **native** unit is unaffected in every version; the notation is purely additive.
+
+**Three outcomes, and no fourth.** A profile expression becomes a real unit, or it becomes an error. There is no state in which a value carries a unit the parser cannot reason about — every guarantee this section makes is a guarantee about units the parser understands. The refusals are distinguished so a producer can act on them:
+
+| Outcome | Result |
+|---------|--------|
+| Translates onto the unit registry | An ordinary unit; indistinguishable from the native spelling |
+| A UCUM *arbitrary* unit (`[IU]`, `[PFU]`, …) | A unit with no native spelling: comparable, never convertible |
+| Not a valid expression in the profile, or an atom it does not define | `error_unit_illegal` |
+| Valid in the profile, with no representation in this unit system | `error_unit_profile_unsupported` |
+| The namespace is not a profile this implementation supports | `error_unit_profile_unknown` |
+
+**Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
+
+The complete notation, the transliteration table, and the codes that have no representation are specified in [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+
 ---
 
 ## 12. Validation & Constraints
@@ -2871,4 +2899,4 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar — Specification (Bovnar spec 1.1).*
+*End of Bovnar — Specification (Bovnar spec 1.2).*

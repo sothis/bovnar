@@ -1,6 +1,6 @@
 # Bovnar — Frequently Asked Questions
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Non-normative — answers indexed to the specification
 > **Scope:** Common questions on syntax, types, units, numbers, limits, and the C and Python APIs.
 
@@ -1411,4 +1411,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.1).*
+*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.2).*

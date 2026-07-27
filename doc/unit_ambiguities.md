@@ -1,6 +1,6 @@
 # Bovnar — Unit Ambiguities
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — companion to the unit registry and the cheat sheet
 > **Scope:** Every token that could plausibly mean two things — what Bovnar reads it as, and how to write the other meaning.
 
@@ -540,4 +540,4 @@ please report it.*
 
 ---
 
-*End of Bovnar — Unit Ambiguities (Bovnar spec 1.1).*
+*End of Bovnar — Unit Ambiguities (Bovnar spec 1.2).*

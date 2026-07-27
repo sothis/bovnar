@@ -48,6 +48,14 @@ typedef struct bvnr_serializer_s {
 	bool			finished;
 	bool			stream_begun;
 	bool			version_emitted;
+	/* The minor component actually declared, so a guard can require a
+	 * SPECIFIC version rather than merely "some directive was written".
+	 * version_emitted alone cannot tell 1.0 from 1.2, and the spec-1.2 unit
+	 * profile has to know the difference: emitting "ucum:..." under a "#!bovnar
+	 * 1.1" directive would produce a document this library then refuses to
+	 * read. Only ever read alongside version_emitted. */
+	uint16_t		version_major;
+	uint16_t		version_minor;
 	uint32_t		array_depth;
 	uint8_t			max_array_nesting;
 	uint8_t			max_struct_nesting;

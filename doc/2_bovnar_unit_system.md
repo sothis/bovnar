@@ -1,6 +1,6 @@
 # Bovnar — Unit & Currency Reference
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Normative — the unit and currency registry the parser validates against
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
@@ -142,7 +142,9 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
 > `<float_dec:64,mmHg>` are the same unit to every part of the library. One
 > namespace is defined, `ucum`; everything in this reference applies to the
-> result unchanged. See [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+> result unchanged. The notation is spec 1.2 and is gated on a `#!bovnar 1.2`
+> directive — a native unit is unaffected in every version. See
+> [UCUM Unit Profile](10_bovnar_ucum_profile.md).
 
 ### 2.1 Parameter Ordering Flexibility
 
@@ -2266,4 +2268,4 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar — Unit & Currency Reference (Bovnar spec 1.1).*
+*End of Bovnar — Unit & Currency Reference (Bovnar spec 1.2).*

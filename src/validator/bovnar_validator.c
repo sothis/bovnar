@@ -34,6 +34,7 @@
 #include "bvn_float.h"
 #include "bvn_gregorian_date.h"
 #include "bvn_datetime.h"
+#include "bvn_ucum_impl.h"
 /*
  * ===========================================================================
  * Validator (semantic layer)
@@ -1790,6 +1791,26 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 				return false;
 		}
 		if (ulen > 0) {
+			/*
+			 * spec 1.2 — the unit PROFILE notation ("ucum:<code>") is gated on
+			 * the declared version, exactly as the datetime family and the
+			 * \x/\u escapes are gated on 1.1. Without this a document
+			 * declaring 1.0 or 1.1 would carry a unit that every conforming
+			 * reader of that version must reject, which is the interoperability
+			 * hazard the version directive exists to prevent.
+			 *
+			 * The error is error_unit_illegal, not one of the profile codes: in
+			 * a pre-1.2 document "ucum:mm[Hg]" is simply not a unit, the same
+			 * way <datetime> in a 1.0 document is simply not a value type. A
+			 * document with no directive declares nothing and gets neither
+			 * surface.
+			 */
+			if (v->value_type.family != vt_utf8 &&
+				bvni_unit_has_profile((const char*)unit_buf, ulen) &&
+				!bvn_lex_supports_1_2(&r->lex)) {
+				v->last_error = error_unit_illegal;
+				return false;
+			}
 			if (v->value_type.family != vt_utf8 && !unit_ok) {
 				/* spec 1.2 — a profile unit distinguishes "that is not a unit"
 				 * from "valid UCUM this build cannot carry" and from "no such
@@ -1985,6 +2006,14 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		 * <datetime:64> 100 m, which would otherwise be accepted (and the unit
 		 * then silently dropped on emit). */
 		if (v->value_type.family == vt_datetime) {
+			v->last_error = error_unit_illegal;
+			return false;
+		}
+		/* spec 1.2 — the profile notation is gated here too; an inline unit is
+		 * the same unit slot reached by another route. */
+		if (bvni_unit_has_profile((const char*)raw->inline_unit_data,
+		                          raw->inline_unit_len) &&
+			!bvn_lex_supports_1_2(&r->lex)) {
 			v->last_error = error_unit_illegal;
 			return false;
 		}

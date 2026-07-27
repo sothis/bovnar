@@ -500,6 +500,92 @@ static void test_regressions(void)
 	chk_error("nosuch:m", error_unit_profile_unknown);
 }
 
+/* ── the spec-1.2 gate ──────────────────────────────────────────────────── */
+
+static void test_version_gate(void)
+{
+	printf("  the notation is gated on a declared 1.2...\n");
+	/*
+	 * The notation changes which documents are VALID, so it is gated on the
+	 * declared version exactly as the datetime family and the \x/\u escapes are
+	 * gated on 1.1. Without the gate a document could carry a unit that every
+	 * conforming reader of its own declared version has to reject.
+	 *
+	 * bvn_parse_unit itself is NOT gated and must not be: it is an API entry
+	 * point with no document and therefore no declared version. The gate lives
+	 * where a version exists -- the validator, for both unit slots, and the
+	 * writer, for the units that can only be spelled in the notation.
+	 */
+	static const struct { const char* doc; error_code_t want; } cases[] = {
+		{ "#!bovnar 1.2\n.x = <float:64,ucum:m> 1.0;", error_none },
+		{ "#!bovnar 1.2\n.x = 1.0 ucum:m;",            error_none },
+		{ "#!bovnar 2.0\n.x = <float:64,ucum:m> 1.0;", error_none },
+		{ "#!bovnar 1.1\n.x = <float:64,ucum:m> 1.0;", error_unit_illegal },
+		{ "#!bovnar 1.0\n.x = <float:64,ucum:m> 1.0;", error_unit_illegal },
+		{ ".x = <float:64,ucum:m> 1.0;",               error_unit_illegal },
+		{ "#!bovnar 1.1\n.x = 1.0 ucum:m;",            error_unit_illegal },
+		/* A native unit is untouched in every version -- the bump is additive. */
+		{ "#!bovnar 1.0\n.x = <float:64,mmHg> 1.0;",   error_none },
+		{ ".x = <float:64,mmHg> 1.0;",                 error_none },
+	};
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		bvnr_reader_t* r = bvnr_reader_create();
+		tests++;
+		if (!r) { failures++; continue; }
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof(f));
+		error_code_t got = error_none;
+		if (bvnr_open_read_mem(r, cases[i].doc,
+		                       (uint64_t)strlen(cases[i].doc), NULL, 0, &f)) {
+			if (!bvnr_read(r))
+				got = bvnr_reader_get_error(r);
+		}
+		if (got != cases[i].want) {
+			fprintf(stderr, "FAIL: %s -> %s, expected %s\n",
+			        cases[i].doc, bvn_error_to_string(got),
+			        bvn_error_to_string(cases[i].want));
+			failures++;
+		}
+		bvnr_reader_destroy(r);
+	}
+
+	/*
+	 * The writer's half. A unit with no native spelling can only be emitted in
+	 * the notation, so writing one without a 1.2 directive would produce a
+	 * document this library refuses to read -- reported to the caller as
+	 * success. A TRANSLATED unit needs no guard: it is written natively.
+	 */
+	struct { bool emit; uint16_t maj, min; const char* unit; error_code_t want; }
+	wc[] = {
+		{ false, 0, 0, "ucum:[IU]", error_unsupported_spec_version },
+		{ true,  1, 1, "ucum:[IU]", error_unsupported_spec_version },
+		{ true,  1, 2, "ucum:[IU]", error_none },
+		/* translated: native spelling, so no directive is needed */
+		{ false, 0, 0, "ucum:mm[Hg]", error_none },
+		{ true,  1, 0, "ucum:mm[Hg]", error_none },
+	};
+	for (size_t i = 0; i < sizeof(wc) / sizeof(wc[0]); i++) {
+		char buf[512];
+		bvnr_writer_t* w = bvnr_writer_create();
+		tests++;
+		if (!w) { failures++; continue; }
+		error_code_t got = error_none;
+		if (bvnr_open_write_mem(w, buf, sizeof buf, false, NULL)) {
+			if (wc[i].emit)
+				bvnr_write_version(w, wc[i].maj, wc[i].min);
+			bvnr_write_float_unit(w, "t", 64, 12.5, U(wc[i].unit));
+			got = bvnr_writer_get_error(w);
+		}
+		if (got != wc[i].want) {
+			fprintf(stderr, "FAIL: writing %s under %s -> %s, expected %s\n",
+			        wc[i].unit, wc[i].emit ? "a directive" : "no directive",
+			        bvn_error_to_string(got), bvn_error_to_string(wc[i].want));
+			failures++;
+		}
+		bvnr_writer_destroy(w);
+	}
+}
+
 /* ── the policy engine takes the notation unchanged ─────────────────────── */
 
 static void test_policy_strings(void)
@@ -531,6 +617,7 @@ int main(void)
 	test_round_trip();
 	test_to_ucum();
 	test_regressions();
+	test_version_gate();
 	test_policy_strings();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

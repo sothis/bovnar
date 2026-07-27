@@ -1,6 +1,6 @@
 # Bovnar — Units & Currencies Cheat Sheet
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — the symbol tables of the unit and currency registry
 > **Scope:** 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
@@ -850,4 +850,4 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*End of Bovnar — Units & Currencies Cheat Sheet (Bovnar spec 1.1).*
+*End of Bovnar — Units & Currencies Cheat Sheet (Bovnar spec 1.2).*

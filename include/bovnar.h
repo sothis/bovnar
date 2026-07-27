@@ -65,7 +65,7 @@ extern "C" {
  * level above.
  */
 #define BVNR_SPEC_VERSION_MAJOR		1
-#define BVNR_SPEC_VERSION_MINOR		1
+#define BVNR_SPEC_VERSION_MINOR		2
 #define BVNR_MAX_UNIT_COMPONENTS		8
 /*
  * Bytes a buffer needs to hold ANY unit bvn_unit_to_string can emit, NUL

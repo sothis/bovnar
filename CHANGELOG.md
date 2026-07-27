@@ -19,6 +19,15 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **Spec version 1.2.** `BVNR_SPEC_VERSION_MINOR` is 2, `bovnar version` reports
+  `spec 1.2`, and the writer's `emit_version` option now stamps `#!bovnar 1.2`.
+  The bump is additive: every 1.0 and 1.1 document parses exactly as before, and
+  the only construct 1.2 adds is the unit profile below — which is **gated on the
+  declared version**, the way the datetime family and the `\x`/`\u` escapes are
+  gated on 1.1. A document declaring less, or declaring nothing, cannot use it.
+  Without that gate a document could carry a unit every conforming reader of its
+  own declared version would have to reject.
+
 - **The UCUM unit profile** — `ucum:<code>` in a unit slot, translated at parse
   time into the same `value_unit_t` a native spelling produces, so nothing
   downstream can tell the two apart: `<float_dec:64,ucum:mm[Hg]> 120.00` and
@@ -35,7 +44,10 @@ reading the grown by-value structs at the wrong size.
   compare equal — and are commensurable with nothing, the way currencies
   already are. New API: `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
   `bvn_unit_to_ucum` (`unit_error_code`, `unit_is_profile_only`,
-  `unit_to_ucum` in Python). The table is `src/gendata/ucum.bvnr`; the
+  `unit_to_ucum` in Python). Requires a `#!bovnar 1.2` directive; the writer
+  refuses to emit a unit that has no native spelling without one, rather than
+  producing a document it cannot read back. The table is
+  `src/gendata/ucum.bvnr`; the
   specification, the transliteration table and the list of what has NO
   representation are in
   [doc/10_bovnar_ucum_profile.md](doc/10_bovnar_ucum_profile.md).

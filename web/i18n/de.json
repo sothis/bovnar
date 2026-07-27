@@ -226,7 +226,6 @@
     "Tutorial": "Tutorial",
     "Practical introduction for developers. Get productive with Bovnar in minutes.": "Praxisnahe Einführung für Entwickler. In Minuten produktiv mit Bovnar.",
     "Start here": "Hier anfangen",
-    "Specification (v1.1)": "Spezifikation (v1.1)",
     "Full lexical and syntactic grammar, type system, arrays, structs, octet streams, and validation rules.": "Vollständige lexikalische und syntaktische Grammatik, Typsystem, Arrays, Strukturen, Octet-Streams und Validierungsregeln.",
     "Format authority": "Maßgeblich für das Format",
     "Unit &amp; Currency Reference": "Einheiten- &amp; Währungsreferenz",
@@ -295,7 +294,8 @@
     "BOVNAR DOCS": "BOVNAR DOKU",
     "Fetching document…": "Dokument wird geladen…",
     "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>",
-    "382 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.": "382 Testfälle, IUT-Protokoll zur unabhängigen Überprüfung von Implementierungen, TAP-Ausgabe und CTest-Integration."
+    "387 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.": "387 Testfälle, IUT-Protokoll zur unabhängigen Überprüfung von Implementierungen, TAP-Ausgabe und CTest-Integration.",
+    "Specification (v1.2)": "Spezifikation (v1.2)"
   },
   "attrs": {
     "Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.": "Bovnar (BVNR) — einheitensichere Serialisierung für Wissenschaft und Industrie. Jede Messung trägt validierte physikalische Einheit, Bitbreite und Zahlenbasis direkt in sich, ganz ohne externes Schema. C99-Referenzimplementierung, MIT-lizenziert.",
@@ -322,7 +322,6 @@
     "unit": "Einheit",
     "Quick start language": "Sprache für den Schnellstart",
     "Tutorial": "Tutorial",
-    "Specification (v1.1)": "Spezifikation (v1.1)",
     "Unit &amp; Currency Reference": "Einheiten- &amp; Währungsreferenz",
     "Read &amp; Write API": "Lese- &amp; Schreib-API",
     "Python Bindings": "Python-Bindings",
@@ -335,7 +334,8 @@
     "Download all ten documentation PDFs as a ZIP archive": "Alle zehn Dokumentations-PDFs als ZIP-Archiv herunterladen",
     "Documentation": "Dokumentation",
     "Close documentation": "Dokumentation schließen",
-    "Back to top": "Zurück nach oben"
+    "Back to top": "Zurück nach oben",
+    "Specification (v1.2)": "Spezifikation (v1.2)"
   },
   "js": {
     "demo.blurb.fin": "<strong>Dasselbe Format, ein Trading-Desk.</strong> Die Börse serialisiert jeden Tick als <code>&lt;float_dec:64,$USD&gt;</code> — exaktes Dezimalgeld, Währung <em>inline</em> — und Chart und Hauptbuch arbeiten ausschließlich mit <em>dekodierten</em> Werten. Weil Kurse als Dezimalzahl reisen (nicht als Binär-Float), bleibt das Buch auf den Cent genau; beobachten Sie, wie das naive Float-Hauptbuch dagegen driftet.",

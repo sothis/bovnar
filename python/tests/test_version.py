@@ -13,7 +13,7 @@ from bovnar import Reader, ErrorCode, BovnarParseError
 @needs_lib
 def test_runtime_versions():
     assert bovnar.version() == "1.1.0"
-    assert bovnar.spec_version() == (1, 1)
+    assert bovnar.spec_version() == (1, 2)
 
 
 @needs_lib

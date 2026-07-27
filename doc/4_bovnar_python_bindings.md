@@ -1,6 +1,6 @@
 # Bovnar — Python Bindings
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — the Python package as implemented
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
@@ -1519,7 +1519,7 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 
 ## 19. Spec 1.1 additions
 
-These bindings target the **Bovnar spec (v1.1)**; spec 1.0 remains the
+These bindings target the **Bovnar spec (v1.2)**; spec 1.0 remains the
 frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
 unversioned document is treated as 1.0) are exposed as:
 
@@ -1564,4 +1564,4 @@ unversioned document is treated as 1.0) are exposed as:
 
 ---
 
-*End of Bovnar — Python Bindings (Bovnar spec 1.1).*
+*End of Bovnar — Python Bindings (Bovnar spec 1.2).*

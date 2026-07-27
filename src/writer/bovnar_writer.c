@@ -35,6 +35,7 @@
 #include "bovnar_si_units.h"
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
+#include "bvn_ucum_impl.h"
 /*
  * ===========================================================================
  * Writer / serializer
@@ -740,6 +741,25 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.w_in_annotation  = true;
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
+		/*
+		 * A unit with no native spelling — one carrying a UCUM arbitrary atom —
+		 * can only be written in the spec-1.2 profile notation, which the reader
+		 * gates on a DECLARED version. Emitting it under "#!bovnar 1.1", or
+		 * under no directive at all, produces a document this library then
+		 * refuses to read, reported to the caller as success. Same failure the
+		 * datetime and reference-index guards above exist to prevent, and the
+		 * same answer: refuse, because the directive cannot be added
+		 * retroactively.
+		 *
+		 * A TRANSLATED unit needs no gate: ucum:mm[Hg] comes back out as the
+		 * native mmHg, which every version accepts. Only the profile-only units
+		 * force the notation.
+		 */
+		if (bvni_unit_has_arbitrary(data->value_unit) &&
+			!(w->ser.version_emitted &&
+			  (w->ser.version_major > 1u ||
+			   (w->ser.version_major == 1u && w->ser.version_minor >= 2u))))
+			return bvn_writer_set_error(w, error_unsupported_spec_version);
 		return bvn_validate_type_spec_for_writer(w,
 			data->value_type);
 	case ev_type_annotation_type_family:
@@ -1759,6 +1779,8 @@ bool bvn_ser_emit_version(bvnr_serializer_t* s, uint16_t major, uint16_t minor)
 	if (!bvn_ser_push(s, line, (uint32_t)n))
 		return false;
 	s->version_emitted = true;
+	s->version_major   = major;
+	s->version_minor   = minor;
 	return true;
 }
 bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)

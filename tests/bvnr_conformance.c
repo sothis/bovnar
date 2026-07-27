@@ -1619,48 +1619,48 @@ static const cf_case_t g_cases[] = {
 	 * split by cause, because "not a UCUM atom", "valid UCUM we cannot carry"
 	 * and "no such profile" call for different fixes from the producer. */
 	VALID("UPR-001", "unit_profile", "a UCUM code in a type annotation",
-	      ".p = <float_dec:64,ucum:mm[Hg]> 120.00;"),
+	      "#!bovnar 1.2\n.p = <float_dec:64,ucum:mm[Hg]> 120.00;"),
 	VALID("UPR-002", "unit_profile", "a UCUM code as an inline unit",
-	      ".p = 120.0 ucum:mm[Hg];"),
+	      "#!bovnar 1.2\n.p = 120.0 ucum:mm[Hg];"),
 	/* The two notations must be interchangeable to the annotation/inline
 	 * agreement check, which compares the PARSED units and so cannot see which
 	 * spelling produced them. */
 	VALID("UPR-003", "unit_profile", "profile annotation agrees with a native inline unit",
-	      ".p = <float_dec:64,ucum:mm[Hg]> 120.00 mmHg;"),
+	      "#!bovnar 1.2\n.p = <float_dec:64,ucum:mm[Hg]> 120.00 mmHg;"),
 	VALID("UPR-004", "unit_profile", "native annotation agrees with a profile inline unit",
-	      ".p = <float_dec:64,mmHg> 120.00 ucum:mm[Hg];"),
+	      "#!bovnar 1.2\n.p = <float_dec:64,mmHg> 120.00 ucum:mm[Hg];"),
 	VALID("UPR-005", "unit_profile", "an annotation carries no meaning",
-	      ".v = <float:64,ucum:mL{total}> 1.0;"),
+	      "#!bovnar 1.2\n.v = <float:64,ucum:mL{total}> 1.0;"),
 	VALID("UPR-006", "unit_profile", "a standalone annotation is the unity",
-	      ".v = <float:64,ucum:{RBC}> 1.0;"),
+	      "#!bovnar 1.2\n.v = <float:64,ucum:{RBC}> 1.0;"),
 	VALID("UPR-007", "unit_profile", "a UCUM arbitrary unit",
-	      ".t = <float:64,ucum:[IU]/mL> 12.5;"),
+	      "#!bovnar 1.2\n.t = <float:64,ucum:[IU]/mL> 12.5;"),
 	VALID("UPR-008", "unit_profile", "a power of ten folds into a prefix",
-	      ".c = <float:64,ucum:10*3/uL> 7.4;"),
+	      "#!bovnar 1.2\n.c = <float:64,ucum:10*3/uL> 7.4;"),
 	VALID("UPR-009", "unit_profile", "UCUM's '/' binds to one term only",
-	      ".x = <float:64,ucum:kg/m.s2> 1.0;"),
+	      "#!bovnar 1.2\n.x = <float:64,ucum:kg/m.s2> 1.0;"),
 	VALID("UPR-010", "unit_profile", "an annotation may contain a comma",
-	      ".v = <float:64,ucum:mL{a,b}> 1.0;"),
+	      "#!bovnar 1.2\n.v = <float:64,ucum:mL{a,b}> 1.0;"),
 	ERROR_CASE("UPR-011", "unit_profile", "an atom UCUM does not define",
-	           ".x = <float:64,ucum:metre> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:metre> 1.0;",
 	           error_unit_illegal),
 	ERROR_CASE("UPR-012", "unit_profile", "valid UCUM with no representation",
-	           ".x = <float:64,ucum:B[SPL]> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:B[SPL]> 1.0;",
 	           error_unit_profile_unsupported),
 	ERROR_CASE("UPR-013", "unit_profile", "a scale outside the SI prefix decades",
-	           ".x = <float:64,ucum:10*4/L> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:10*4/L> 1.0;",
 	           error_unit_profile_unsupported),
 	ERROR_CASE("UPR-014", "unit_profile", "an unknown profile namespace",
-	           ".x = <float:64,cf:m> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,cf:m> 1.0;",
 	           error_unit_profile_unknown),
 	ERROR_CASE("UPR-015", "unit_profile", "a prefix on a non-metric UCUM atom",
-	           ".x = <float:64,ucum:k[arb'U]> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:k[arb'U]> 1.0;",
 	           error_unit_illegal),
 	ERROR_CASE("UPR-016", "unit_profile", "an unterminated annotation",
-	           ".x = <float:64,ucum:mL{total> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:mL{total> 1.0;",
 	           error_unit_illegal),
 	ERROR_CASE("UPR-017", "unit_profile", "a profile unit that means something else",
-	           ".x = <float:64,ucum:m> 1.0 s;",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:m> 1.0 s;",
 	           error_unit_mismatch),
 	/* The profile's one visible effect on a document that never uses it: the
 	 * lexer now accepts '[' inside a unit, so this reaches bvn_parse_unit and
@@ -1668,8 +1668,28 @@ static const cf_case_t g_cases[] = {
 	 * refuse the same document; an implementation that still reports the byte
 	 * error is reading a pre-profile grammar. */
 	ERROR_CASE("UPR-018", "unit_profile", "a bracket in a NATIVE unit reaches the unit parser",
-	           ".x = <float:64,m[s]> 1.0;",
+	           "#!bovnar 1.2\n.x = <float:64,m[s]> 1.0;",
 	           error_unit_illegal),
+	/* The notation is gated on the declared version, like the datetime family
+	 * and the \x/\u escapes are gated on 1.1. A document that declares less --
+	 * or declares nothing, which declares less than anything -- must not carry
+	 * a unit every conforming reader of that version has to reject. */
+	ERROR_CASE("UPR-019", "unit_profile", "a profile unit in a 1.1 document",
+	           "#!bovnar 1.1\n.x = <float:64,ucum:m> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UPR-020", "unit_profile", "a profile unit in a 1.0 document",
+	           "#!bovnar 1.0\n.x = <float:64,ucum:m> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UPR-021", "unit_profile", "a profile unit with no version directive",
+	           ".x = <float:64,ucum:m> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UPR-022", "unit_profile", "a profile INLINE unit in a 1.1 document",
+	           "#!bovnar 1.1\n.x = 1.0 ucum:m;",
+	           error_unit_illegal),
+	/* And the gate reaches only the profile: a native unit is unchanged in
+	 * every version, which is what makes the bump additive. */
+	VALID("UPR-023", "unit_profile", "a native unit is unaffected by the gate",
+	      "#!bovnar 1.0\n.x = <float:64,mmHg> 1.0;"),
 
 	/* ── SPECIAL NUMBERS ─────────────────────────────────────────── */
 	VALID("SPC-001", "special_numbers", "nan with float:64",

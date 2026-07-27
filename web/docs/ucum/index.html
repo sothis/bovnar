@@ -40,7 +40,7 @@
 <h1>Bovnar — UCUM Unit Profile</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/10_bovnar_ucum_profile.md">Markdown</a> and <a href="/doc/pdf/bovnar-ucum-profile.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.2
+<p><strong>Spec version:</strong> 1.2 — the notation is gated on a declared 1.2 (§2.2)
 <strong>Status:</strong> Normative — implemented in <code>src/utils/bovnar_ucum.c</code>, pinned by <code>tests/bovnar_ucum_test.c</code>. Section 10.4 lists the parts of this document that did NOT ship.
 <strong>Scope:</strong> How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.</p>
 </blockquote>
@@ -67,7 +67,7 @@ standing risk it is.</p>
 </li>
 <li><a href="#2-syntax">Syntax</a><ul>
 <li>2.1 <a href="#21-the-namespace-discriminator">The namespace discriminator</a></li>
-<li>2.2 <a href="#22-where-a-profile-unit-may-appear">Where a profile unit may appear</a></li>
+<li>2.2 <a href="#22-where-a-profile-unit-may-appear-and-in-which-documents">Where a profile unit may appear, and in which documents</a></li>
 <li>2.3 <a href="#23-five-bytes-the-lexer-has-to-learn">Five bytes the lexer has to learn</a></li>
 <li>2.4 <a href="#24-commas-inside-an-annotation">Commas inside an annotation</a></li>
 <li>2.5 <a href="#25-length-budget">Length budget</a></li>
@@ -194,9 +194,25 @@ Validation failed: unit_illegal at line 2, col 25
 contains a <code>ucum:</code> unit, so no document can change meaning when one starts to parse. Contrast the
 alternative of a quoted form (<code>ucum:"mm[Hg]"</code>), which would put a string-escape sub-language inside
 a type body for no gain.</p>
-<h3 id="22-where-a-profile-unit-may-appear">2.2 Where a profile unit may appear</h3>
-<p>Everywhere a native unit may: as the unit parameter of a type annotation, and as an inline unit
-suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
+<h3 id="22-where-a-profile-unit-may-appear-and-in-which-documents">2.2 Where a profile unit may appear, and in which documents</h3>
+<p><strong>The notation is gated on the declared spec version.</strong> A profile unit needs a <code>#!bovnar</code> directive
+declaring 1.2 or later, exactly as the datetime family and the <code>\x</code>/<code>\u</code> escapes need 1.1. Without
+one it is <code>error_unit_illegal</code> — in a 1.1 document <code>ucum:mm[Hg]</code> is simply not a unit, the same way
+<code>&lt;datetime:64&gt;</code> is simply not a value type in a 1.0 document. A document with <strong>no</strong> directive
+declares nothing and therefore gets neither surface.</p>
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
+.systolic = &lt;float_dec:64,ucum:mm[Hg]&gt; 120.00;   # OK</code></pre></div>
+<p>Without the gate a document could carry a unit that every conforming reader of its own declared
+version must reject, which is the interoperability hazard the directive exists to prevent. Native
+units are unaffected in every version: the bump is additive, and <code>&lt;float:64,mmHg&gt;</code> parses under 1.0
+as it always did.</p>
+<p>The writer enforces the other half. A unit with no native spelling — one carrying a UCUM arbitrary
+atom — can only be emitted in this notation, so writing one without having emitted a 1.2 directive
+is <code>error_unsupported_spec_version</code> rather than a document the library cannot read back. A
+<em>translated</em> unit needs no such guard: <code>ucum:mm[Hg]</code> is written as the native <code>mmHg</code>, which every
+version accepts.</p>
+<p>Otherwise: everywhere a native unit may appear — as the unit parameter of a type annotation, and as
+an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
 (doc/2 §2.2) is unchanged — the comparison is on the parsed <code>value_unit_t</code>, so the two spellings
 may differ as long as they mean the same thing:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.a = &lt;float:64,ucum:mm[Hg]&gt; 120.0;
@@ -2041,7 +2057,7 @@ one paragraph to read rather than four sections to cross-check.</p>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit Cheatsheet</a> — the native spellings the transliteration table targets</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — UCUM Unit Profile (Bovnar spec 1.1).</em></p>
+<p><em>End of Bovnar — UCUM Unit Profile (Bovnar spec 1.2).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

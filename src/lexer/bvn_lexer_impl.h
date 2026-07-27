@@ -361,6 +361,16 @@ static inline bool bvn_lex_supports_1_1(const bvnr_lexer_t* l)
 		(l->declared_major > 1u ||
 		 (l->declared_major == 1u && l->declared_minor >= 1u));
 }
+/* True when the document declared a spec version >= 1.2 (gates the 1.2-only
+ * unit profile notation, "ucum:<code>"). Same shape as the 1.1 gate above, and
+ * the same consequence: a document with NO directive declares nothing, so it
+ * gets neither the 1.1 nor the 1.2 surface. */
+static inline bool bvn_lex_supports_1_2(const bvnr_lexer_t* l)
+{
+	return l->has_declared_version &&
+		(l->declared_major > 1u ||
+		 (l->declared_major == 1u && l->declared_minor >= 2u));
+}
 typedef enum bvn_verdir_e {
 	BVN_VERDIR_NONE,
 	BVN_VERDIR_INVALID,

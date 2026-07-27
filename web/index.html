@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-AnJGX8cgeveTyEsMdRtFjskU+JSSy9UfTCiAJbl6Fhc=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-tAlvsuwz2wlNZLVPvf/cnuyrEWX1r0GH6tSoJefq+Vc=' 'sha256-mHLkEm3LbwC1Q/J8xZfLLcYK6GgCudsldrjUeeWuSUk=' 'sha256-m5GBSE6PhoJTVTtcQrzGvWbhuR480c2SkWBwy7frRQ0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-vTP549xpDaK+xa5MvJ+Vlp/tsmjk5wpy5Y3lJpQcuvM=' 'sha256-ULWXdhNgu3znf4yR7iN03altv6e2Jz8SgFzXqlcoXjA=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-1QpVilsK5zzsNzGTPSicl6eqBEn795JEO4rs6g+JBHo=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-tAlvsuwz2wlNZLVPvf/cnuyrEWX1r0GH6tSoJefq+Vc=' 'sha256-mHLkEm3LbwC1Q/J8xZfLLcYK6GgCudsldrjUeeWuSUk=' 'sha256-m5GBSE6PhoJTVTtcQrzGvWbhuR480c2SkWBwy7frRQ0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-vTP549xpDaK+xa5MvJ+Vlp/tsmjk5wpy5Y3lJpQcuvM=' 'sha256-ULWXdhNgu3znf4yR7iN03altv6e2Jz8SgFzXqlcoXjA=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -139,8 +139,8 @@ window.bvnrTcfg = function (key, english) {
      rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
      runs its dynamic import(). The ?v is the build-stamped content hash — it must
      match the dynamic import so the module is reused, not re-fetched. -->
-<link rel="modulepreload" href="bovnar_wasm_core.js?v=2841504e7084">
-<link rel="modulepreload" href="bovnar_wasm.js?v=036af82b8ea6">
+<link rel="modulepreload" href="bovnar_wasm_core.js?v=ec3fc08c958c">
+<link rel="modulepreload" href="bovnar_wasm.js?v=b977e726ede3">
 <!-- Canvas textures for the orbit demo, which sits below a full-height hero.
      They are never <img> elements (the globe samples them offscreen), so they
      cannot affect first paint -- at fetchpriority="high" their 122 KB competed
@@ -4187,10 +4187,10 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <div class="doc-card-tag">Start here</div>
         </div>
       </a>
-      <a href="/docs/spec/" data-doc="1_bovnar_spec.md" data-doc-title="Specification (v1.1)" class="doc-card reveal reveal-delay-1">
+      <a href="/docs/spec/" data-doc="1_bovnar_spec.md" data-doc-title="Specification (v1.2)" class="doc-card reveal reveal-delay-1">
         <div class="doc-card-num">01</div>
         <div>
-          <div class="doc-card-title">Specification (v1.1)</div>
+          <div class="doc-card-title">Specification (v1.2)</div>
           <div class="doc-card-desc">Full lexical and syntactic grammar, type system, arrays, structs, octet streams, and validation rules.</div>
           <div class="doc-card-tag">Format authority</div>
         </div>
@@ -4239,7 +4239,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">07</div>
         <div>
           <div class="doc-card-title">Conformance Test Tool</div>
-          <div class="doc-card-desc">382 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
+          <div class="doc-card-desc">387 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
           <div class="doc-card-tag">Verification</div>
         </div>
       </a>
@@ -4400,7 +4400,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </button>
 </div>
 
-<script src="bovnar_parser_wasm.js?v=eb12a2d4467f"></script>
+<script src="bovnar_parser_wasm.js?v=d933cc7fdb37"></script>
 <script src="bovnar_highlight.js?v=667c4a367efc"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */
@@ -5394,7 +5394,7 @@ function wireDocLinks() {
         // Title from the card, not from the link's own text. A Markdown
         // cross-reference is often written as a bare filename, and that landed
         // verbatim in the title bar -- where every other route into the same
-        // document (card, deep link, Back button) shows "Specification (v1.1)".
+        // document (card, deep link, Back button) shows "Specification (v1.2)".
         // docTitleFor falls back to the filename, so a document with no card
         // behaves exactly as before.
         openDoc(href, docTitleFor(href.split('#')[0]));

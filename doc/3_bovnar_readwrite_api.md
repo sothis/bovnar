@@ -1,6 +1,6 @@
 # Bovnar — Read & Write API
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — the C reader, writer, and DOM as implemented
 > **Scope:** Every function needed to read and write Bovnar streams, in the order you call them.
 
@@ -1907,4 +1907,4 @@ int main(void)
 
 ---
 
-*End of Bovnar — Read & Write API (Bovnar spec 1.1).*
+*End of Bovnar — Read & Write API (Bovnar spec 1.2).*

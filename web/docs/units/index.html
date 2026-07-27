@@ -40,7 +40,7 @@
 <h1>Bovnar — Unit &amp; Currency Reference</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/2_bovnar_unit_system.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-system.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1
+<p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Normative — the unit and currency registry the parser validates against
 <strong>Scope:</strong> Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.</p>
 </blockquote>
@@ -197,7 +197,9 @@ the parameter to a <strong>unit profile</strong>, which translates it into the s
 <code>value_unit_t</code> this document describes — so <code>&lt;float_dec:64,ucum:mm[Hg]&gt;</code> and
 <code>&lt;float_dec:64,mmHg&gt;</code> are the same unit to every part of the library. One
 namespace is defined, <code>ucum</code>; everything in this reference applies to the
-result unchanged. See <a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a>.</p>
+result unchanged. The notation is spec 1.2 and is gated on a <code>#!bovnar 1.2</code>
+directive — a native unit is unaffected in every version. See
+<a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a>.</p>
 </blockquote>
 <h3 id="21-parameter-ordering-flexibility">2.1 Parameter Ordering Flexibility</h3>
 <div class="codehilite"><pre><code class="language-bovnar">.val = &lt;uint:32,_10,no_unit&gt; 42;
@@ -5330,7 +5332,7 @@ ev_data   data=&quot;1500&quot;
 <li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the same unit model from Python, with the NumPy and pint bridges</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Unit &amp; Currency Reference (Bovnar spec 1.1).</em></p>
+<p><em>End of Bovnar — Unit &amp; Currency Reference (Bovnar spec 1.2).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-AnJGX8cgeveTyEsMdRtFjskU+JSSy9UfTCiAJbl6Fhc=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-tAlvsuwz2wlNZLVPvf/cnuyrEWX1r0GH6tSoJefq+Vc=' 'sha256-mHLkEm3LbwC1Q/J8xZfLLcYK6GgCudsldrjUeeWuSUk=' 'sha256-m5GBSE6PhoJTVTtcQrzGvWbhuR480c2SkWBwy7frRQ0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-vTP549xpDaK+xa5MvJ+Vlp/tsmjk5wpy5Y3lJpQcuvM=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-qyxg6YZi2VWnHoB05hH4iGrlznTwXeOaPjb1F8/2ZY0=' 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-AnJGX8cgeveTyEsMdRtFjskU+JSSy9UfTCiAJbl6Fhc=' 'sha256-AnNLbDgzGu4ZL8Tv9+dR6L6v3p4xe56qdDTrkCnziAo=' 'sha256-tAlvsuwz2wlNZLVPvf/cnuyrEWX1r0GH6tSoJefq+Vc=' 'sha256-mHLkEm3LbwC1Q/J8xZfLLcYK6GgCudsldrjUeeWuSUk=' 'sha256-m5GBSE6PhoJTVTtcQrzGvWbhuR480c2SkWBwy7frRQ0=' 'sha256-Zwa2MamrCaP6CIMWgeIUa24rb5W+uHj+AdmIJcluwo4=' 'sha256-vTP549xpDaK+xa5MvJ+Vlp/tsmjk5wpy5Y3lJpQcuvM=' 'sha256-ULWXdhNgu3znf4yR7iN03altv6e2Jz8SgFzXqlcoXjA=' 'sha256-Lba5izdCagmAGG7onl5UfG/W/ugxOexw+biqMR7pYts='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJsdSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZjYjBlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBhODVkNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yOCAxMyBMMTIuNSAzMiBMMjggNTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNibHUpIiBzdHJva2Utd2lkdGg9IjYuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM2IDEzIEw1MS41IDMyIEwzNiA1MSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JsdSkiIHN0cm9rZS13aWR0aD0iNi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiA0NCBMMjAgMzIgWiIgZmlsbD0iIzMzYTc4ZiIvPjxwYXRoIGQ9Ik0zMiAyMCBMMjAgMzIgTDMyIDMyIFoiIGZpbGw9IiM5Y2RjZmUiLz48cGF0aCBkPSJNMzIgMjAgTDQ0IDMyIEwzMiAzMiBaIiBmaWxsPSIjNGVjOWIwIi8+PHBhdGggZD0iTTIwIDMyIEwzMiA0NCBMMzIgMzIgWiIgZmlsbD0iIzNmYjg5ZSIvPjxwYXRoIGQ9Ik00NCAzMiBMMzIgNDQgTDMyIDMyIFoiIGZpbGw9IiMyYzkyODEiLz48L3N2Zz4=">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -539,6 +539,103 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
   transition: color 0.15s, border-color 0.15s !important;
 }
 .nav-lang:hover { color: var(--text) !important; border-color: var(--text3) !important; }
+
+/* ── Downloads menu ──
+   A <details>, not a scripted menu. It opens, closes, keeps its state and is
+   reachable from the keyboard with no JavaScript at all -- which is what the
+   rest of this page promises for everything outside the WASM demos, and a menu
+   holding the only links to the released binaries is the last place to break
+   that promise. The end-of-body script adds the two conveniences markup cannot
+   express (click-away, Escape) and nothing the menu depends on. */
+.nav-dl { position: relative; }
+.nav-dl-menu > summary {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text2);
+  padding: 0 0.85rem;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  /* Both spellings: Firefox draws the disclosure triangle as a list marker,
+     WebKit as a shadow pseudo-element. The caret below replaces it. */
+  list-style: none;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-dl-menu > summary::-webkit-details-marker { display: none; }
+.nav-dl-menu > summary:hover,
+.nav-dl-menu[open] > summary { color: var(--text); background: rgba(255,255,255,0.05); }
+html[data-theme="light"] .nav-dl-menu > summary:hover,
+html[data-theme="light"] .nav-dl-menu[open] > summary { background: rgba(0,0,0,0.05); }
+.nav-dl-caret {
+  font-size: 0.55rem;
+  color: var(--text3);
+  transition: transform 0.15s;
+}
+.nav-dl-menu[open] .nav-dl-caret { transform: rotate(180deg); }
+
+.nav-dl-panel {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  width: 21rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 14px 32px rgba(0,0,0,0.5);
+  padding: 0.7rem 0 0.45rem;
+  /* Above the nav's own stacking context sibling content, below nothing else on
+     the page: the nav is z-index 100 and this hangs out of its bottom edge. */
+  z-index: 101;
+}
+html[data-theme="light"] .nav-dl-panel { box-shadow: 0 14px 32px rgba(0,0,0,0.18); }
+
+.nav-dl-head {
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 0 1rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.nav-dl-head b { color: var(--teal); font-weight: 500; }
+
+.nav-dl-list { list-style: none; margin: 0.4rem 0 0; padding: 0; }
+.nav-dl-list li a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  height: auto;
+  padding: 0.4rem 1rem;
+  font-size: 0.79rem;
+  color: var(--text2);
+}
+.nav-dl-name { flex: 1; }
+.nav-dl-meta {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  color: var(--text3);
+}
+.nav-dl-list li a:hover .nav-dl-meta { color: var(--text2); }
+
+.nav-dl-all {
+  display: block !important;
+  height: auto !important;
+  margin-top: 0.45rem;
+  padding: 0.55rem 1rem 0.15rem !important;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono) !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.03em;
+  color: var(--blue) !important;
+}
+.nav-dl-all:hover { color: var(--text) !important; background: none !important; }
 
 /* ── LAUNCH DEMO (auto-running Mission Control, shown under the hero) ── */
 #launch-demo {
@@ -2504,9 +2601,54 @@ a[data-doc] { cursor: pointer; }
 }
 
 /* ── RESPONSIVE ── */
+
+/* The nav bar had no slack left: at 1320px the eight section links, the GitHub
+   button, the wordmark and the two switches filled it to within 60px, and every
+   width below that was already being paid for by the 900px rule further down.
+   Adding the downloads menu spent ~105px the row did not have, and the whole
+   band from 900px to 1310px overflowed -- the theme toggle simply fell off the
+   right edge. These tiers shed the trailing section links a step at a time on
+   the way down, which is the policy the 900px rule already applies (drop from
+   the end; never the CTA, the language switch or the toggle). The thresholds
+   are each ~20px past where the row actually stops fitting, measured against
+   the real link widths, so a font that renders a little wider does not undo it.
+   Downloads itself is deliberately never hidden: it is the only path on the
+   page to the released binaries, and a section link is a scroll away. */
+@media (max-width: 1340px) { .nav-links li.nav-section:nth-of-type(n+8) { display: none; } }
+@media (max-width: 1230px) { .nav-links li.nav-section:nth-of-type(n+7) { display: none; } }
+@media (max-width: 1080px) { .nav-links li.nav-section:nth-of-type(n+6) { display: none; } }
+@media (max-width:  990px) { .nav-links li.nav-section:nth-of-type(n+5) { display: none; } }
+/* n+4 and below: the 900px block, then the 600px block, both already here. */
+@media (max-width:  840px) { .nav-links li.nav-section:nth-of-type(n+3) { display: none; } }
+@media (max-width:  740px) { .nav-links li.nav-section:nth-of-type(n+2) { display: none; } }
+
+/* Under ~360px there is no section link left to drop -- what remains is the
+   wordmark, the two buttons and the two switches, and each is the only route to
+   what it points at. Take the space out of the padding and the wordmark's own
+   mark instead; the lettering still says whose site this is, and every control
+   survives. Without this the row was 27px over at 320px, which flex resolved by
+   shrinking the GitHub button to its min-content width -- a two-line button. */
+@media (max-width: 380px) {
+  nav { padding: 0 0.55rem; }
+  .nav-brand { margin-right: 0.3rem; }
+  .nav-brand svg { display: none; }
+  .nav-dl-menu > summary { padding: 0 0.4rem; gap: 0.25rem; font-size: 0.76rem; }
+  .nav-cta {
+    padding: 0.35rem 0.55rem !important;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;     /* never let the arrow break onto its own line */
+  }
+  .nav-lang { margin-right: 0.15rem; }
+  .theme-toggle { margin-right: 0.3rem; }
+  .nav-dl-panel { left: 0.55rem; right: 0.55rem; }
+}
+
 @media (max-width: 900px) {
   nav { padding: 0 1rem; }
   .nav-links { gap: 0; }
+  /* 2.5rem of gutter after the wordmark is a luxury once the bar is this full. */
+  .nav-brand { margin-right: 1rem; }
   /* Hide the later section links, never the CTA or the language switch. This
      used to read li:nth-child(n+4):not(:last-child), which silently began
      hiding the GitHub button the moment another <li> was appended after it. */
@@ -2538,10 +2680,35 @@ a[data-doc] { cursor: pointer; }
 
 /* ── phones ── */
 @media (max-width: 600px) {
-  /* nav: drop the section links and keep only the GitHub button, pushed right */
+  /* nav: drop the section links and keep only Downloads + GitHub, pushed right */
   nav { padding: 0 0.85rem; }
   .nav-links li.nav-section { display: none; }
-  .nav-links li:first-child { margin-left: auto; }
+  /* margin-left:auto has no effect on a display:none box, so this has to sit on
+     the first li that is still laid out -- which is now the downloads menu. */
+  .nav-links li.nav-dl { margin-left: auto; }
+
+  /* Downloads costs ~103px, and on a 390px phone the bar was already spending
+     everything it had: the row overflowed to 423px and pushed the theme toggle
+     off the edge. Buy the space back from the two places that are pure spacing
+     at this width -- the 2.5rem gutter after the wordmark, and the ".bvnr" after
+     it, which is decoration rather than the name. */
+  .nav-brand { margin-right: 0.5rem; }
+  .nav-brand .ext { display: none; }
+  .nav-dl-menu > summary { padding: 0 0.6rem; }
+
+  /* Anchored to the li, a 21rem panel runs off the left edge of a narrow phone.
+     The nav is fixed, so the panel can be too: full width under it, inset by the
+     same gutter the bar uses. */
+  .nav-dl-panel {
+    position: fixed;
+    left: 0.85rem;
+    right: 0.85rem;
+    width: auto;
+    /* Inset from both edges it no longer continues the bar, so it gets its own
+       top border and all four corners back. */
+    border-top: 1px solid var(--border);
+    border-radius: 6px;
+  }
 
   /* The annotated .thrust line is ~397px of monospace; below this width it
      wrapped and the absolutely-positioned TYPE/BIT-WIDTH/UNIT callouts landed
@@ -2668,6 +2835,35 @@ a[data-doc] { cursor: pointer; }
     <li class="nav-section"><a href="#quickstart">Quick Start</a></li>
     <li class="nav-section"><a href="#docs">Inline Documentation</a></li>
     <li class="nav-section"><a href="/docs/">Documentation</a></li>
+    <!-- Downloads — the GitHub release assets for the newest tag. CI builds and
+         smoke-tests these archives and attaches them on a v* tag (see the
+         `release` job in .github/workflows/build-and-package.yml); the names
+         carry the version AND the tag's commit count, so there is no
+         name-agnostic "latest" URL GitHub would redirect for. This block is
+         therefore pinned to a tag and is part of cutting a release: tag first,
+         let CI attach the archives, then retag the six hrefs, the version in
+         .nav-dl-head and the sizes, and re-run ./gen_i18n.py --extract de to
+         translate the new keys. check_release_links.py (bvnr_release_links)
+         recomputes all six names from the newest v* tag and fails the suite if
+         this block still names the previous one -- it cannot see the sizes, so
+         those are on you. The "All releases" link never goes stale. -->
+    <li class="nav-dl">
+      <details class="nav-dl-menu" id="nav-downloads">
+        <summary>Downloads<span class="nav-dl-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-dl-panel">
+          <div class="nav-dl-head">Latest release <b>v1.1.0</b></div>
+          <ul class="nav-dl-list">
+            <li><a href="https://github.com/sothis/bovnar/releases/download/v1.1.0/bovnar-linux-1.1.0-383.tar.xz"><span class="nav-dl-name">Linux x64</span><span class="nav-dl-meta">tar.xz · 1.4 MB</span></a></li>
+            <li><a href="https://github.com/sothis/bovnar/releases/download/v1.1.0/bovnar-windows-msvc-1.1.0-383.zip"><span class="nav-dl-name">Windows x64 · MSVC</span><span class="nav-dl-meta">zip · 789 KB</span></a></li>
+            <li><a href="https://github.com/sothis/bovnar/releases/download/v1.1.0/bovnar-windows-mingw-1.1.0-383.zip"><span class="nav-dl-name">Windows x64 · MinGW</span><span class="nav-dl-meta">zip · 1.7 MB</span></a></li>
+            <li><a href="https://github.com/sothis/bovnar/releases/download/v1.1.0/bovnar-1.1.0-383-amalgamate.tar.xz"><span class="nav-dl-name">Single-file amalgamation</span><span class="nav-dl-meta">tar.xz · 315 KB</span></a></li>
+            <li><a href="https://github.com/sothis/bovnar/releases/download/v1.1.0/bovnar-1.1.0-383-source.tar.xz"><span class="nav-dl-name">Source tarball</span><span class="nav-dl-meta">tar.xz · 1.6 MB</span></a></li>
+            <li><a href="https://github.com/sothis/bovnar/releases/download/v1.1.0/SHA256SUMS"><span class="nav-dl-name">Checksums</span><span class="nav-dl-meta">SHA256SUMS</span></a></li>
+          </ul>
+          <a class="nav-dl-all" href="https://github.com/sothis/bovnar/releases">All releases ↗</a>
+        </div>
+      </details>
+    </li>
     <li><a href="https://github.com/sothis/bovnar" class="nav-cta">GitHub ↗</a></li>
   </ul>
   <!-- Language switch (country flag), beside the theme toggle. The whole <a> is
@@ -8209,6 +8405,30 @@ document.querySelectorAll('a[data-doc]').forEach(a => {
     if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 3000 });
     else setTimeout(warm, 1500);
   }
+})();
+</script>
+<script id="bvnr-nav-downloads">
+/* Downloads menu — click-away and Escape.
+   The menu itself is a <details>: it already opens, closes and takes keyboard
+   focus with this script absent, so nothing here is load-bearing. What markup
+   cannot express is dismissing a menu the visitor has visibly moved on from,
+   which for a panel overhanging the whole page is the difference between a menu
+   and an obstruction. */
+(function () {
+  var dl = document.getElementById('nav-downloads');
+  if (!dl) return;
+  document.addEventListener('click', function (e) {
+    /* Includes clicks on the menu's own links: the navigation leaves this page,
+       but a back-button return restores the <details> open over the top of it. */
+    if (dl.open && (!dl.contains(e.target) || e.target.closest('.nav-dl-panel a')))
+      dl.open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !dl.open) return;
+    dl.open = false;
+    var s = dl.querySelector('summary');
+    if (s) s.focus();     /* Escape must not strand focus inside a closed panel */
+  });
 })();
 </script>
 <script id="bvnr-theme-toggle">

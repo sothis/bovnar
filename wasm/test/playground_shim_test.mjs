@@ -410,6 +410,164 @@ for (const { name, text } of [...examples, ...shapes]) {
   ok(errs.length === 0, `clean ${name}: ${show(errs.map(e => e.code))}`);
 }
 
+/*
+ * The elements of one array may each carry their own annotation (§7.5), and
+ * their encodings are free to differ as long as the dimension agrees (§7.4), so
+ * `[<uint:8> 1, <sint:16> -2, <float:64> 3.5]` — a document the CLI accepts —
+ * carries three. The shim used to assume there was only ever one: it hoisted the
+ * first element's onto the assignment and dropped the rest, so the playground
+ * presented that array as a uint:8, a type neither -2 nor 3.5 has, in a tree
+ * whose own badge counted the 20 events it had just been handed.
+ *
+ * The rule that replaced it is about PLACEMENT, so that is what this checks: an
+ * annotation appears where the reader emitted it and nowhere else. One written
+ * before the '[' describes the array and belongs to the assignment; one emitted
+ * inside a row belongs to the element it precedes. Hoisting an in-row annotation
+ * to the assignment because it happens to govern every element would put the
+ * same event in two different places depending on the data.
+ *
+ * Nothing here is a literal: the expectation is walked out of the C stream. Its
+ * container events (row start/end, struct open/close) say exactly which `data`
+ * events are array ELEMENTS — a struct field inside an element is not one — and
+ * an annotation binds to the next element after it. The reader also says which
+ * annotations it invented: a synthesised one always spells out a type_base of 0,
+ * "no explicit base", which no written annotation can produce because `_0` is
+ * not a radix anyone may write.
+ *
+ * With ONE exception, pinned below rather than left to drift. `<utf8>` and
+ * `<bool>` are whole annotations with no parameters at all, and the reader emits
+ * the identical group whether the document wrote one or not — `.a = "x";` and
+ * `.a = <utf8> "x";` are the same eleven events. So for those two families the
+ * stream carries neither parameters to show nor any way to tell synthesised from
+ * explicit, and the tree renders no annotation node rather than invent a tag the
+ * C never stated. The values still carry their family beside them.
+ */
+console.log('# every annotation sits on the element the C emitted it for');
+{
+  /* What the C says: the per-element annotations in document order, whether an
+     array-level one preceded the first row, and the distinct element types. */
+  function streamAnns(text) {
+    const evs = bvnr.events(text).events || [];
+    const stack = [], elements = [], types = new Set();
+    let pending = null, arrayLevel = null, sawRow = false, bare = 0;
+    for (const e of evs) {
+      switch (e.ev) {
+        case 'type_start':  pending = { synth: false, params: 0 }; break;
+        case 'type_param':
+          if (!pending) break;
+          pending.params++;
+          /* the reader's "no explicit base" — only it can emit this */
+          if (e.tok === 'type_base' && !e.base) pending.synth = true;
+          break;
+        /* a parameterless group is `<utf8>`/`<bool>` — see the note above */
+        case 'type_end':    if (pending && !pending.params) { bare++; pending = null; }
+                            break;
+        case 'array_row_start':
+          if (pending && !sawRow) arrayLevel = pending;
+          pending = null; sawRow = true; stack.push('row'); break;
+        case 'array_row_end':  stack.pop(); break;
+        case 'struct_open':    stack.push('struct'); break;
+        case 'struct_close':   stack.pop(); break;
+        case 'data':
+          if (e.tok === 'octet_stream') break;
+          /* an element only when the innermost container is a row — a struct
+             field inside an element is that struct's, not the array's */
+          if (stack[stack.length - 1] === 'row') {
+            elements.push(pending ? { synth: pending.synth } : null);
+            if (e.family) types.add(`${e.family}:${e.width},${e.unit || ''}`);
+          }
+          pending = null;
+          break;
+      }
+    }
+    return { elements, arrayLevel, types, bare };
+  }
+  /* What the tree says: the same elements, in the same order. */
+  function treeAnns(value, out) {
+    if (value.type === 'struct') {
+      for (const a of value.children) treeAnns(a.value, out);
+      return out;
+    }
+    if (value.type !== 'array') return out;
+    for (const row of value.rows)
+      for (const e of row.elements) {
+        if (e.type === 'array' || e.type === 'struct') treeAnns(e, out);
+        else out.push(e.ann ? { synth: e.ann.synthesized } : null);
+      }
+    return out;
+  }
+  const annCases = [
+    { name: 'mixed encodings',        text: '.a = [<uint:8> 1, <sint:16> -2, <float:64> 3.5];\n' },
+    { name: 'bare array',             text: '.a = [1,2,3];\n' },
+    { name: 'array-level annotation', text: '.a = <uint:8> [1,2,3];\n' },
+    { name: 'per-element, agreeing',  text: '.a = [<uint:8> 1, <uint:8> 2];\n' },
+    { name: 'per-element, reverting', text: '.a = [<uint:8> 1, 2];\n' },
+    { name: 'united elements',        text: '.a = [<float:64,m> 1.0, <float:64,m> 2.0];\n' },
+    { name: 'matrix, one type',       text: '.m = [1,2]/[3,4];\n' },
+    { name: 'matrix, mixed row',      text: '.m = [<uint:8> 1,2]/[3,4];\n' },
+    { name: 'null hole',              text: '.a = [ , 1];\n' },
+    { name: 'nested, mixed',          text: '.a = [[<uint:8> 1,2],[3,4]];\n' },
+    /* `bare` marks the pinned exception: these documents DO carry annotation
+       groups, parameterless ones, and the tree deliberately shows none. */
+    { name: 'strings, no annotation', bare: true, text: '.a = ["x","y"];\n' },
+    { name: 'bools, no annotation',   bare: true, text: '.a = [true,false];\n' },
+    { name: 'written <utf8>',         bare: true, text: '.a = [<utf8> "x", "y"];\n' },
+    { name: 'structs as elements',    text: '.a = [{.b = <uint:8> 3;},{.b = <uint:8> 4;}];\n' },
+    { name: 'array inside a struct',  text: '.s = {.q = [<uint:8> 1, <sint:16> -2];};\n' },
+  ];
+  for (const { name, text, bare } of annCases) {
+    ok(cliValidate(text).ok, `${name}: the CLI rejects it — the case tests nothing`);
+    const want = streamAnns(text);
+    ok((want.bare > 0) === !!bare,
+       `ann ${name}: the C emits ${want.bare} parameterless group(s), `
+       + `so this case ${bare ? 'no longer' : 'now'} exercises the pinned exception`);
+    const a = P.parseFaithful(text).tree.children[0];
+    const arr = a && a.value && a.value.type === 'array' ? a.value : null;
+
+    /* the whole of it: element for element, annotation for annotation */
+    const got = treeAnns(a.value, []);
+    ok(show(got) === show(want.elements),
+       `ann ${name}: elements carry ${show(got)}, the C emitted ${show(want.elements)}`);
+
+    /* and the assignment shows one only where the document wrote one there */
+    ok(!!(a.ann) === !!want.arrayLevel,
+       `ann ${name}: assignment ${a.ann ? 'shows' : 'shows no'} annotation, `
+       + `the C emitted ${want.arrayLevel ? 'an array-level one' : 'none before the row'}`);
+    if (a.ann && want.arrayLevel) {
+      ok(a.ann.synthesized === want.arrayLevel.synth,
+         `ann ${name}: array-level tagged ${a.ann.synthesized ? 'synthesised' : 'explicit'}, `
+         + `the C says the other`);
+      /* and it must be a type the C actually resolved, not a near miss */
+      const spelled = `${a.ann.familyName}:`
+        + `${(a.ann.params.find(p => p.kind === 'width') || {}).text},`
+        + `${((a.ann.params.find(p => p.kind === 'unit') || {}).text || '')
+             .replace('no_unit', '')}`;
+      ok(want.types.has(spelled),
+         `ann ${name}: shows ${show(spelled)}, C reports ${show([...want.types])}`);
+    }
+
+    /* mixedTypes is the row summary's hint, and must agree with the C's own
+       count of distinct element types. The key drops the radix on purpose: it is
+       not part of what the tree displays (the "no explicit base" 0 resolves to
+       decimal, as the CLI prints it), so `[1, <uint:64,_10> 2]` is one type and
+       must not be called mixed over a distinction nothing renders. */
+    if (arr)
+      ok(arr.mixedTypes === (want.types.size > 1),
+         `ann ${name}: mixedTypes ${arr.mixedTypes}, but the C reports `
+         + `${want.types.size} element type(s): ${show([...want.types])}`);
+  }
+  /* A scalar's annotation is the assignment's, and reads its tag from the same
+     place — it must keep answering the way the regex it replaced did for the
+     shapes that regex could actually see. */
+  for (const [text, synth] of [['.a = 1;\n', true], ['.a = <uint:8> 1;\n', false],
+                               ['.a = 9.81 m/s;\n', true],
+                               ['.a = <float:32,k~Pa> 101.325;\n', false]]) {
+    const ann = P.parseFaithful(text).tree.children[0].ann;
+    ok(ann && ann.synthesized === synth,
+       `ann scalar ${show(text.trim())}: ${ann ? ann.synthesized : 'no annotation'}, expected ${synth}`);
+  }
+}
+
 /* Spelled out separately from the differential above, which can only compare
    documents the DOM accepts — and the version of this that started it all,
    `.a = [{.b=3;},{.c=4;}];`, is rejected. Every read here is guarded: on the

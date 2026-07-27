@@ -20,9 +20,9 @@
  * BovnarParser` at load time pick up the parser transparently once it arrives.
  *
  * The C event stream carries no per-token position, so line numbers (demo
- * gutters) and the synthesised-vs-explicit annotation flag (a cosmetic tree tag)
- * are recovered from the source text by a forward scan over assignments in
- * document order.
+ * gutters) are recovered from the source text by a forward scan over assignments
+ * in document order. Everything else — including whether an annotation was
+ * written or synthesised — is read out of the stream itself.
  */
 (function () {
   'use strict';
@@ -120,14 +120,12 @@
         var after = masked[j];
         if (/[\s{};]/.test(before) && (after === '=' || after === '{')) {
           pos = j;
-          var semi = masked.indexOf(';', j); if (semi < 0) semi = masked.length;
           var line = lineAt(i);            /* lineAt first: colAt needs its newline */
-          return { line: line, col: colAt(i),
-                   synthesized: after === '=' ? !/^\s*=\s*</.test(masked.slice(j, semi)) : false };
+          return { line: line, col: colAt(i) };
         }
         i = masked.indexOf(needle, i + 1);
       }
-      return { line: lineAt(pos), col: 1, synthesized: false };
+      return { line: lineAt(pos), col: 1 };
     };
   }
 
@@ -238,7 +236,27 @@
   function buildTree(events, scan) {
     var root = { type: 'stream', children: [] };
     var stack = [{ kind: 'struct', node: root }];
-    var key = null, line = 1, col = 1, synth = false;
+    var key = null, line = 1, col = 1;
+    /* Whether the annotation now in effect was SYNTHESISED by the reader rather
+       than written by the author. The stream says so itself: the reader spells
+       the defaults it invented out in full — a synthesised annotation always
+       carries a type_base parameter of 0 ("no explicit base"), which no written
+       annotation can produce, since `_0` is not a radix anyone may write. This
+       used to be guessed from the source text with a `=\s*<` regex, which could
+       only ever see an annotation sitting directly after the `=` and therefore
+       called every per-element annotation in an array (§7.5) synthesised. */
+    var annSynth = false;
+    /* An annotation has completed (ev_type_annotation_end) and no value has
+       claimed it yet. The C emits one group per element whose type differs from
+       the one in effect, so this is how an element learns it carries its own. */
+    var annPending = false;
+    /* assignment -> the synth flag of its ARRAY-LEVEL annotation, the one the
+       document wrote before the '[' (`.a = <uint:8> [1,2];`). That one describes
+       the array itself, so it belongs to the assignment — but it is rebuilt from
+       a resolved element in the post-pass below, long after the flag has moved
+       on. An annotation emitted INSIDE a row is a different thing entirely: it
+       belongs to the element it precedes, and is attached there. */
+    var arrayLevelSynth = new Map();
     /* The unit exactly as the current annotation spells it. bvn_unit_to_string
        canonicalises (`m·s⁻¹` and `deg` come back as `m/s` and `°`), and a reader
        echoing a document back — the demos print the decoded unit beside the
@@ -259,21 +277,6 @@
       var e0 = f.node.rows[0] && f.node.rows[0].elements[0];
       if (f.assign && f.unitText && !f.assign.unitText && e0 && e0.unit)
         f.assign.unitText = f.unitText;
-      /* The C emits ONE type annotation for an array — the element type — and it
-         belongs to the array's assignment. Reconstruct it from the first element
-         that actually carries one, exactly as the scalar path does: the
-         annotation precedes the first TYPED element, which in `[null, 1]` is not
-         the first element. */
-      if (!f.assign || f.assign.ann) return;
-      for (var r = 0; r < f.node.rows.length; r++) {
-        var els = f.node.rows[r].elements;
-        for (var c = 0; c < els.length; c++) {
-          if (els[c].type === 'scalar' && NUMERIC[els[c].familyName]) {
-            f.assign.ann = annFromValue(els[c], f.synth);
-            return;
-          }
-        }
-      }
     }
     function settle() {
       while (top().kind === 'array' && !top().row) closeArray(stack.pop());
@@ -299,14 +302,16 @@
         case 'assign_start': {
           settle();
           var s = scan(e.text); key = e.text; line = s.line; col = s.col;
-          synth = s.synthesized;
           annUnit = null;
           break;
         }
-        case 'type_start': annUnit = null; break;
+        case 'type_start': annUnit = null; annSynth = false; break;
         case 'type_param':
           if (e.tok === 'unit' && e.text && e.text !== 'no_unit') annUnit = e.text;
+          /* the reader's "no explicit base" — see annSynth above */
+          else if (e.tok === 'type_base' && !e.base) annSynth = true;
           break;
+        case 'type_end': annPending = true; break;
         case 'struct_open': {
           settle();
           var snode = { type: 'struct', children: [] };
@@ -346,11 +351,18 @@
           var parent = top();
           var assign = attach(anode);
           if (!assign && parent.kind === 'array') assign = parent.assign;
-          /* An EXPLICIT annotation precedes the row; a synthesised one is emitted
-             inside it, after this point — so annUnit here is the spelling the
-             document actually wrote, and null when it wrote none. */
+          /* An ARRAY-LEVEL annotation precedes the row (`.a = <uint:8> [1,2];`);
+             a per-element one is emitted inside it, after this point — so annUnit
+             here is the spelling the document actually wrote for the array as a
+             whole, and null when it wrote none. An annotation still pending here
+             is that array-level one, and it belongs to this assignment. */
+          if (annPending) {
+            annPending = false;
+            if (assign && !arrayLevelSynth.has(assign))
+              arrayLevelSynth.set(assign, annSynth);
+          }
           var frame = { kind: 'array', node: anode, row: { elements: [] },
-                        assign: assign, synth: synth, unitText: annUnit,
+                        assign: assign, unitText: annUnit,
                         pendingDim: false };
           anode.rows.push(frame.row);
           stack.push(frame);
@@ -390,14 +402,23 @@
             break;
           }
           settle();
+          var inRow = !!openRow();
           var node = scalarNode(e);
           var a = attach(node);
           // Only numeric families carry a meaningful (synthesised or explicit)
           // type annotation; reference/symbol/null/string/bool values have no
           // family, so emitting annFromValue for them would render a bogus
           // "synthesised → family vt_undefined" node in the playground tree.
-          if (a && NUMERIC[node.familyName]) a.ann = annFromValue(node, synth);
+          if (a && NUMERIC[node.familyName]) a.ann = annFromValue(node, annSynth);
           if (a && annUnit && node.unit) a.unitText = annUnit;
+          /* An element claims the annotation that precedes it; that is the whole
+             of §7.5, and it is why the tree can show one per element instead of
+             one per array. The reader emits a group only where the type in effect
+             CHANGES, so an element that simply inherits it carries none — and its
+             row shows the resolved type beside the value, as the C does. */
+          if (annPending && inRow && NUMERIC[node.familyName])
+            node.ann = annFromValue(node, annSynth);
+          annPending = false;
           break;
         }
         case 'stream_end': settle(); break;
@@ -410,6 +431,88 @@
       var f = stack.pop();
       if (f.kind === 'array') closeArray(f);
     }
+    /* ── an array's type annotation ──────────────────────────────────────
+     *
+     * The elements of one array may each carry their own annotation (§7.5), and
+     * their encodings are free to differ as long as the physical dimension
+     * agrees (§7.4) — `[<uint:8> 1, <sint:16> -2, <float:64> 3.5]` is a document
+     * `bovnar validate` accepts. The C says so plainly: it emits one annotation
+     * group per element whose type differs from the one in effect, three of them
+     * for that array. This used to assume there was only ever one, hoist the
+     * first element's onto the assignment and drop the rest — presenting the
+     * array as a uint:8, a type neither -2 nor 3.5 has.
+     *
+     * So an annotation is placed where the stream emitted it, and nowhere else:
+     * one written before the '[' is the array's and hangs off the assignment,
+     * one emitted inside a row is the element's and hangs off that element
+     * (attached above, as the elements arrive). Hoisting an in-row annotation to
+     * the assignment because it HAPPENS to govern every element would put the
+     * same event in two different places depending on the data, in a tree whose
+     * whole claim is that it shows the events in the order the reader delivers
+     * them.
+     *
+     * mixedTypes is what remains of that question, and it is a rendering hint
+     * rather than a placement: it says the elements do not all resolve to one
+     * type, so the row's collapsed one-line summary should print the type beside
+     * each value. When they agree, that would be the same annotation repeated
+     * once per element.
+     */
+    function typeKey(v) {
+      if (v.type !== 'scalar' || !NUMERIC[v.familyName]) return null;
+      return v.familyName + ':' + v.width
+           + (v.familyName === 'float_fix' ? ',q' + v.base : '')
+           + ',' + (v.epoch || '') + ',' + (v.unit || '');
+    }
+    /* Every numeric leaf of this array, its own rows and its sub-arrays' — but
+       NOT a struct element's fields, which are that struct's business and carry
+       no obligation to match anything outside it (§7.4 "fields free"). */
+    function typedLeaves(arr, out) {
+      for (var r = 0; r < arr.rows.length; r++) {
+        var els = arr.rows[r].elements;
+        for (var c = 0; c < els.length; c++) {
+          if (els[c].type === 'array') typedLeaves(els[c], out);
+          else if (typeKey(els[c])) out.push(els[c]);
+        }
+      }
+      return out;
+    }
+    /* One verdict for the whole assignment, sub-arrays included: a matrix must
+       not print its element types on one row and omit them on the next. */
+    function markArray(arr, mixed) {
+      arr.mixedTypes = mixed;
+      for (var r = 0; r < arr.rows.length; r++) {
+        var els = arr.rows[r].elements;
+        for (var c = 0; c < els.length; c++)
+          if (els[c].type === 'array') markArray(els[c], mixed);
+      }
+    }
+    function settleArray(assign) {
+      var leaves = typedLeaves(assign.value, []), mixed = false;
+      for (var i = 1; i < leaves.length; i++)
+        if (typeKey(leaves[i]) !== typeKey(leaves[0])) { mixed = true; break; }
+      markArray(assign.value, mixed);
+      /* Rebuilt from the first resolved element, exactly as the scalar path does
+         — the annotation events carry the declared spelling, and these rows show
+         what the reader resolved it to. */
+      if (arrayLevelSynth.has(assign) && leaves.length)
+        assign.ann = annFromValue(leaves[0], arrayLevelSynth.get(assign));
+    }
+    function visitValue(v) {
+      if (v.type === 'struct') { visitScope(v); return; }
+      if (v.type !== 'array') return;
+      for (var r = 0; r < v.rows.length; r++)
+        for (var c = 0; c < v.rows[r].elements.length; c++)
+          visitValue(v.rows[r].elements[c]);
+    }
+    function visitScope(node) {
+      for (var i = 0; i < node.children.length; i++) {
+        var a = node.children[i];
+        if (!a.value) continue;
+        if (a.value.type === 'array' && !a.ann) settleArray(a);
+        visitValue(a.value);
+      }
+    }
+    visitScope(root);
     return root;
   }
   function mapErrors(errObj) {

@@ -347,6 +347,10 @@ class BvnrReadFlags(ctypes.Structure):
         ('continue_on_error',     ctypes.c_bool),
         ('on_error',              ON_ERROR_FUNC),
         ('strict_version',        ctypes.c_bool),
+        # spec 1.2 -- refuse a document containing an octet stream. Must sit
+        # exactly where the C struct puts it: this is a by-value mirror, and a
+        # field in the wrong place silently misreads every field after it.
+        ('text_only',             ctypes.c_bool),
         ('want_unit_allow_nonterminating', ctypes.c_bool),
         ('max_conversion_length', ctypes.c_uint32),
         ('want_unit',             WANT_UNIT_FUNC),

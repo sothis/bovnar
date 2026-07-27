@@ -669,3 +669,7 @@ class ErrorCode(IntEnum):
     # expression is valid in the profile but has no representation here.
     UNIT_PROFILE_UNKNOWN        = 49
     UNIT_PROFILE_UNSUPPORTED    = 50
+    # spec 1.2 -- the document contains an octet stream and the reader was
+    # opened with text_only. An assertion by the CONSUMER, not a defect in the
+    # document.
+    OCTET_STREAM_FORBIDDEN      = 51

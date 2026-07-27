@@ -36,6 +36,50 @@
 #include "bvn_port.h"
 #include "bovnar.h"
 #include "bovnar_dom.h"
+
+/*
+ * The shortest decimal that reads back as the same double, in plain notation
+ * where the value has one.
+ *
+ * Widening "%.*g" until it round-trips gives full precision, but %g decides the
+ * NOTATION by its own rule -- scientific once the decimal exponent reaches the
+ * precision -- so the notation fell out of how few digits the value happened to
+ * need. 120.0 round-trips at precision 2 and therefore printed as "1.2e+02",
+ * while 123456789.12345679 needed all 17 and printed plainly: one command
+ * rendered comparable numbers two different ways, and the short round ones came
+ * out worst. Precision and notation are separate questions, and more precision
+ * never breaks a round trip -- it only moves %g's threshold -- so once the
+ * precision is known the notation can be chosen deliberately.
+ *
+ * Only positive exponents are widened. Below 1e-4, %g's other threshold, there
+ * is no short plain form to prefer: 1e-05 would become "0.00001" and 1e-300 an
+ * absurdity, and scientific is the conventional rendering there -- Python's
+ * repr and every shortest-round-trip printer agree. The upper bound of 17 is
+ * where a plain integer form stops being shorter than the scientific one.
+ *
+ * NaN and the infinities carry no exponent and fall out at the first check.
+ */
+static void bvn_cli_format_double(char *buf, size_t cap, double v)
+{
+	int prec = 1;
+	for (; prec <= 17; prec++) {
+		snprintf(buf, cap, "%.*g", prec, v);
+		if (strtod(buf, NULL) == v)
+			break;
+	}
+	const char *e = strchr(buf, 'e');
+	if (!e)
+		return;
+	int e10 = atoi(e + 1);
+	if (e10 < 0 || e10 >= 17)
+		return;
+	int wide = (e10 + 1 > prec) ? (e10 + 1) : prec;
+	char alt[64];
+	snprintf(alt, sizeof alt, "%.*g", wide, v);
+	size_t n = strlen(alt);
+	if (strtod(alt, NULL) == v && strchr(alt, 'e') == NULL && n < cap)
+		memcpy(buf, alt, n + 1);
+}
 #include "bovnar_stream.h"
 #include "bvn_datetime.h"
 #include <stdarg.h>
@@ -255,11 +299,7 @@ static void print_dom_node(const bvn_dom_node_t *node, uint32_t indent)
 		 * parses back to the same double gives full precision AND the plain
 		 * notation for values that have one. */
 		char fb[64];
-		for (int prec = 1; prec <= 17; prec++) {
-			snprintf(fb, sizeof fb, "%.*g", prec, v);
-			if (strtod(fb, NULL) == v)
-				break;
-		}
+		bvn_cli_format_double(fb, sizeof fb, v);
 		fputs(fb, stdout);
 		break;
 	}
@@ -584,6 +624,11 @@ typedef struct {
 	bvnr_unit_rule_t   rules[BVNR_MAX_UNIT_RULES];
 	bvnr_unit_policy_t policy;
 	bool               any;
+	/* Not part of the unit policy, but the same KIND of thing and reached by
+	 * the same commands: an assertion the consumer makes about the document
+	 * before reading it. Riding along here is what gives validate, query and
+	 * events the flag from one parse site instead of three. */
+	bool               text_only;
 } cli_unit_policy_t;
 
 /*
@@ -697,6 +742,14 @@ static int cli_parse_unit_opts(const char *cmd, int argc, char **argv, int *argi
 	if (strcmp(a, "--require-unit") == 0) {
 		up->policy.require_unit = true;
 		up->any = true;
+		(*argi)++;
+		return 0;
+	}
+	if (strcmp(a, "--text-only") == 0) {
+		/* Deliberately does NOT set up->any: that flag gates
+		 * bvnr_reader_set_unit_policy, and this is a read flag with no policy
+		 * of its own. Setting it would install an empty policy for nothing. */
+		up->text_only = true;
 		(*argi)++;
 		return 0;
 	}
@@ -888,6 +941,7 @@ static int cmd_events(int argc, char **argv)
 	flags.on_unverified      = evt_on_unverified;
 	flags.on_verified        = evt_on_verified;
 	flags.continue_on_error  = continue_on_error;
+	flags.text_only          = up.text_only;
 	flags.on_error           = evt_on_error;
 	bvnr_canon_observer_t *canon = NULL;
 	if (enable_debug) {
@@ -1037,6 +1091,7 @@ static int cmd_validate(const char *filename, cli_unit_policy_t *up)
 	flags.max_file_size     = UINT32_MAX;
 	flags.max_array_nesting = 255;
 	flags.max_struct_nesting = 255;
+	flags.text_only         = up->text_only;
 	bool ok = bvnr_open_read_source(r, &src, NULL, &flags) && bvnr_read(r);
 	error_code_t err = bvnr_reader_get_error(r);
 	if (!ok) {
@@ -1091,6 +1146,17 @@ static int cmd_validate(const char *filename, cli_unit_policy_t *up)
 static int cmd_query(const char *path, const char *filename,
 		     cli_unit_policy_t *up)
 {
+	/* --text-only is a READ FLAG, and this command goes through the DOM, which
+	 * takes a unit policy but not the read flags. Refusing is the only correct
+	 * answer: an assertion the caller believes is in force but which is quietly
+	 * ignored is worse than no assertion at all, and that is precisely the
+	 * failure this flag exists to prevent. */
+	if (up && up->text_only) {
+		fprintf(stderr, "query: --text-only is not supported here "
+			"(the DOM path takes no read flags); use "
+			"`bovnar validate --text-only` instead\n");
+		return 2;
+	}
 	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	/* The DOM takes the same policy the streaming reader does, so a query can
@@ -1943,11 +2009,8 @@ static void print_json_string_escaped(const char *s, uint32_t len)
 static void print_json_double(double v)
 {
 	if (!isfinite(v)) { fputs("null", stdout); return; }
-	char buf[32];
-	for (int prec = 1; prec <= 17; prec++) {
-		snprintf(buf, sizeof(buf), "%.*g", prec, v);
-		if (strtod(buf, NULL) == v) break;
-	}
+	char buf[64];
+	bvn_cli_format_double(buf, sizeof buf, v);
 	fputs(buf, stdout);
 }
 static void print_json_node(const bvn_dom_node_t *node, int indent, bool pretty)
@@ -3235,6 +3298,8 @@ static void usage(const char *prog)
 		"Commands:\n"
 		"  validate [opts] <file>\n"
 		"                  Validate a .bvnr file. Unit-policy options:\n"
+		"                    --text-only                refuse a document that\n"
+		"                                               contains an octet stream\n"
 		"                    --require-unit             every numeric value must\n"
 		"                                               carry a unit\n"
 		"                    --require-dimension <unit> every value must be\n"
@@ -3274,6 +3339,8 @@ static void usage(const char *prog)
 		"                                        convert the value at this key\n"
 		"                                        path; a path may end in '.*' to\n"
 		"                                        name a subtree (repeatable)\n"
+		"                    --text-only         refuse a document that contains\n"
+		"                                        an octet stream\n"
 		"                    --require-unit, --require-dimension <unit>,\n"
 		"                    --require-field <path>=<unit>\n"
 		"                                        as for validate, above\n",
@@ -3340,7 +3407,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "validate: unknown option: %s\n", argv[argi]);
 			return 2;
 		}
-		if (argi >= argc) { fprintf(stderr, "Usage: %s validate [--require-unit] "
+		if (argi >= argc) { fprintf(stderr, "Usage: %s validate [--text-only] [--require-unit] "
 					"[--require-dimension <unit>] <file>\n", argv[0]); return 1; }
 		if (argc - argi > 1) { fprintf(stderr, "validate: takes exactly one file, "
 					"got %d\n", argc - argi); return 2; }

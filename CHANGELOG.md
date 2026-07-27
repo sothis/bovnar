@@ -19,6 +19,22 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **`--text-only` / `bvnr_read_flags_t.text_only`** — refuse a document that
+  contains an octet stream, with the new `error_octet_stream_forbidden` (51).
+  The format is a text/binary hybrid on purpose: length-prefixed chunks mean no
+  escaping, no expansion, no forbidden byte, and a region a reader can skip
+  without looking at. The cost is that such a document is not transport-safe
+  through anything that rewrites bytes — line-ending normalisation inside a
+  payload desynchronises the length prefixes, unrecoverably, and the result
+  reads as a malformed document rather than a mangled one.
+
+  This is the same move as `--require-unit`: the format permits something, and a
+  consumer that cannot accept it says so where the parser can enforce it instead
+  of hoping. A producer can use it to guarantee a channel stays transport-safe.
+  The refusal fires at the stream's opening `0x00`, before the payload is read.
+  On the CLI for `validate` and `events`; `query` refuses the option rather than
+  ignoring it, since that path goes through the DOM, which takes no read flags.
+
 - **Spec version 1.2.** `BVNR_SPEC_VERSION_MINOR` is 2, `bovnar version` reports
   `spec 1.2`, and the writer's `emit_version` option now stamps `#!bovnar 1.2`.
   The bump is additive: every 1.0 and 1.1 document parses exactly as before, and
@@ -399,6 +415,18 @@ reading the grown by-value structs at the wrong size.
   call. The C equivalent of Python `convert_value` (which delegates to it).
 
 ### Fixed
+
+- **`bovnar query` and `bovnar convert` printed short round numbers in
+  scientific notation.** `120.0` came out as `1.2e+02` and `250.0` as
+  `2.5e+02`, while `123456789.12345679` printed plainly — the same command
+  rendering comparable values two different ways, and the short ones worst. The
+  cause was using `%g`'s own notation rule as a side effect of searching for the
+  shortest round-tripping precision: `%g` switches to scientific once the
+  decimal exponent reaches the precision, and 120.0 round-trips at precision 2.
+  Precision and notation are now decided separately. Values below `1e-4` and at
+  or above `1e17` keep scientific notation, as every shortest-round-trip printer
+  does. No value changed: round-tripping was verified over three million random
+  doubles.
 
 - **A bad first byte in a string discarded every assignment after it.** With
   `continue_on_error`, recovery picks the string sub-machine when the error fired

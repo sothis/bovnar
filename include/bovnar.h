@@ -257,7 +257,16 @@ typedef enum error_code_e {
 	/* Valid UCUM over known atoms, with no representation in the unit model: a
 	 * special unit carrying a reference level, a scale factor outside the SI
 	 * prefix decades, an expression wider than BVNR_MAX_UNIT_COMPONENTS. */
-	error_unit_profile_unsupported      = 50
+	error_unit_profile_unsupported      = 50,
+	/* The document contains an octet stream and the reader was opened with
+	 * bvnr_read_flags_t.text_only. Not a defect in the document -- an octet
+	 * stream is a first-class part of the format -- but an assertion by the
+	 * CONSUMER that this particular channel carries text only. The format is a
+	 * text/binary hybrid by design, and a consumer whose pipeline is not
+	 * (anything that normalises line endings, a log aggregator, a git checkout
+	 * without `-text`) can say so at the door rather than discover it as
+	 * corruption downstream. */
+	error_octet_stream_forbidden        = 51
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,
@@ -447,6 +456,21 @@ typedef struct bvnr_read_flags_s {
 	 * bvnr_reader_get_declared_version() — but not enforced. Production
 	 * consumers that must not silently misread a future document should set it. */
 	bool		strict_version;
+	/* Refuse a document that contains an octet stream (spec 1.2), with
+	 * error_octet_stream_forbidden at the stream's opening 0x00.
+	 *
+	 * The binary region is the one part of a Bovnar document that is not text,
+	 * and it is the one part a text-shaped pipeline destroys silently: LF
+	 * normalisation rewrites 0x0D inside a chunk payload, and the length prefix
+	 * that made the region skippable then points at the wrong byte. The damage
+	 * is unrecoverable and looks like a malformed document rather than a
+	 * mangled one.
+	 *
+	 * This is the same move as the unit policy's assertions: the format permits
+	 * something, and a consumer that cannot accept it says so at the parse,
+	 * where it is checkable, instead of hoping. A producer can use it the same
+	 * way to guarantee that a channel stays transport-safe. */
+	bool		text_only;
 	/* Relaxes the want_unit hook's one unavoidably common refusal. Plenty of
 	 * everyday conversions are exact as a rational but have no finite positional
 	 * expansion in the output base — km/h to m/s is 5/18, m to km in base 2 is

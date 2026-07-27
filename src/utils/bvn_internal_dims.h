@@ -26,7 +26,7 @@
 #define BVN_INTERNAL_DIMS_H_
 #include "bovnar.h"
 #define BVN_EVENT_COUNT             15
-#define BVN_ERROR_COUNT             51
+#define BVN_ERROR_COUNT             52
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
@@ -39,7 +39,7 @@ typedef char bvn_internal_dims_event_check[
  * use as their "is this a real error code" bound: they __builtin_trap() above it,
  * so a stale count turns a legitimate spec-1.1 error into a fuzz crash. */
 typedef char bvn_internal_dims_error_check[
-	(error_unit_profile_unsupported + 1 == BVN_ERROR_COUNT) ? 1 : -1];
+	(error_octet_stream_forbidden + 1 == BVN_ERROR_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_prefix_system_check[
 	(prefix_iec + 1 == BVN_PREFIX_SYSTEM_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_si_prefix_check[

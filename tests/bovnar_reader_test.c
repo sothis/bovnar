@@ -455,6 +455,52 @@ static void test_version_directive_terminated_by_eof(void)
 	}
 }
 
+static void test_text_only_refuses_an_octet_stream(void)
+{
+	/*
+	 * The format is a text/binary hybrid by design, and the binary region is
+	 * the one part a text-shaped pipeline destroys silently: LF normalisation
+	 * rewrites a 0x0D inside a chunk payload, and the length prefix that made
+	 * the region skippable then points at the wrong byte. text_only lets a
+	 * consumer whose transport is not binary-safe say so at the parse, the same
+	 * way the unit policy lets one insist on units the format does not require.
+	 *
+	 * The refusal fires at the OPENING 0x00, before the payload is read: the
+	 * point is that this document should not have arrived here at all, so the
+	 * earliest refusal is the useful one and a megabyte of chunk data is never
+	 * touched.
+	 */
+	static const uint8_t binary[] = {
+		'#','!','b','o','v','n','a','r',' ','1','.','1','\n',
+		'.','a',' ','=',' ','4','2',';','\n',
+		'.','b',' ','=',' ',
+		0x00, 0x01, 0x05, 0x00, 'h','e','l','l','o', 0x00, ';', '\n'
+	};
+	static const char text[] = "#!bovnar 1.1\n.a = 42;\n.b = \"hi\";\n";
+
+	static const struct {
+		const void *doc; uint32_t len; bool text_only; bool ok; int err;
+	} cases[] = {
+		{ text,   (uint32_t)(sizeof text - 1),  false, true,  (int)error_none },
+		{ text,   (uint32_t)(sizeof text - 1),  true,  true,  (int)error_none },
+		{ binary, (uint32_t)sizeof binary,      false, true,  (int)error_none },
+		{ binary, (uint32_t)sizeof binary,      true,  false,
+		  (int)error_octet_stream_forbidden },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.text_only = cases[i].text_only;
+		bvnr_open_read_mem(r, cases[i].doc, cases[i].len, NULL, 0, &f);
+		ASSERT_EQ_INT((int)bvnr_read(r), (int)cases[i].ok,
+			      "text_only refuses exactly the documents with a binary region");
+		ASSERT_EQ_INT((int)bvnr_reader_get_error(r), cases[i].err,
+			      "...and reports error_octet_stream_forbidden when it does");
+		bvnr_reader_destroy(r);
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_reader_test regression suite...\n");
@@ -469,6 +515,7 @@ int main(void)
 	test_resync_enters_the_string_machine_on_the_first_body_byte();
 	test_bom_only_at_offset_zero();
 	test_version_directive_terminated_by_eof();
+	test_text_only_refuses_an_octet_stream();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

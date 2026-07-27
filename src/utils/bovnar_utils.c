@@ -536,6 +536,7 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_unit_illegal:              return "unit_illegal";
 	case error_unit_profile_unknown:      return "unit_profile_unknown";
 	case error_unit_profile_unsupported:  return "unit_profile_unsupported";
+	case error_octet_stream_forbidden:    return "octet_stream_forbidden";
 	case error_base_requires_string_literal: return "base_requires_string_literal";
 	case error_type_value_mismatch:       return "type_value_mismatch";
 	case error_value_out_of_range:        return "value_out_of_range";

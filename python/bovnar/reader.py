@@ -205,6 +205,7 @@ class Reader:
                      max_file_size: int,
                      continue_on_error: bool,
                      strict_version: bool = False,
+                     text_only: bool = False,
                      want_unit=None,
                      want_unit_allow_nonterminating: bool = False,
                      max_conversion_length: int = 0) -> tuple:
@@ -238,6 +239,7 @@ class Reader:
 
         flags.continue_on_error = continue_on_error
         flags.strict_version    = strict_version
+        flags.text_only         = text_only
         flags.want_unit_allow_nonterminating = want_unit_allow_nonterminating
         # 0 selects the C default (BVNR_DEFAULT_MAX_CONVERSION_LENGTH). This is a
         # work limit: rendering an exact expansion is quadratic in its digit
@@ -386,6 +388,7 @@ class Reader:
                  max_file_size: int = 0,
                  continue_on_error: bool = False,
                  strict_version: bool = False,
+                 text_only: bool = False,
                  want_unit: Callable | None = None,
                  want_unit_allow_nonterminating: bool = False,
                  max_conversion_length: int = 0) -> None:
@@ -398,8 +401,8 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, want_unit, want_unit_allow_nonterminating,
-            max_conversion_length
+            strict_version, text_only, want_unit,
+            want_unit_allow_nonterminating, max_conversion_length
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
@@ -435,6 +438,7 @@ class Reader:
                 max_file_size: int = 0,
                 continue_on_error: bool = False,
                 strict_version: bool = False,
+                text_only: bool = False,
                 want_unit: Callable | None = None,
                 want_unit_allow_nonterminating: bool = False,
                 max_conversion_length: int = 0) -> None:
@@ -445,8 +449,8 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, want_unit, want_unit_allow_nonterminating,
-            max_conversion_length
+            strict_version, text_only, want_unit,
+            want_unit_allow_nonterminating, max_conversion_length
         )
 
         src = BvnrSource()

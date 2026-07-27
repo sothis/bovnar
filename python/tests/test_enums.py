@@ -270,7 +270,7 @@ class TestErrorCode:
         assert len(values) == len(set(values))
 
     def test_count(self):
-        assert len(ErrorCode) == 51
+        assert len(ErrorCode) == 52
 
     def test_matches_the_c_enum(self):
         """Every code the LIBRARY recognises must have a Python member.

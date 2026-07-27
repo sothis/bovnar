@@ -1230,6 +1230,8 @@ A `}` seen with `struct_nesting_level == 0` is `error_illegal_struct_close`.
 
 A NUL byte (`0x00`) where a value is expected switches from text mode to binary chunk mode. The parallel UTF-8 validator is suspended for the duration.
 
+> **Transport.** Chunks are length-prefixed rather than delimited, so a payload may contain any byte, needs no escaping, and does not expand — and a reader can skip a region without inspecting it. The consequence is that a document containing an octet stream is **not** safe through a transport that rewrites bytes. Line-ending normalisation on a `0x0D` inside a payload desynchronises the length prefixes, and the result is unrecoverable: it reads as a malformed document rather than a mangled one. Store such documents as binary (`*.bvnr binary` in `.gitattributes`), and where a channel must stay text, have the reader enforce it with `text_only` (read/write API §1.13) rather than assume it.
+
 ### 9.2 Wire Protocol
 
 ```

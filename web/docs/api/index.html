@@ -61,6 +61,7 @@
 <li>1.10 <a href="#110-read-time-lossless-unit--base-conversion-want_unit">Read-time lossless unit / base conversion (<code>want_unit</code>)</a></li>
 <li>1.11 <a href="#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double"><code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></a></li>
 <li>1.12 <a href="#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Reader-side unit policy (<code>bvnr_reader_set_unit_policy</code>)</a></li>
+<li>1.13 <a href="#113-refusing-the-binary-half-text_only">Refusing the binary half (<code>text_only</code>)</a></li>
 </ul>
 </li>
 <li><a href="#2-writer">Writer</a><ul>
@@ -777,6 +778,40 @@ first, then the per-field <code>rules</code>, then <code>targets</code>, and fal
 document, name the two fields that need something else, and hand-handle one more
 in the hook.</p>
 <hr />
+<h3 id="113-refusing-the-binary-half-text_only">1.13 Refusing the binary half (<code>text_only</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">f</span><span class="p">.</span><span class="n">text_only</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w">              </span><span class="cm">/* an octet stream is error_octet_stream_forbidden */</span>
+</code></pre></div>
+
+<p>Bovnar is a text/binary hybrid: an octet stream carries arbitrary bytes inside an
+otherwise readable document, framed by <code>0x00</code> and length-prefixed so a reader can
+skip it without inspecting it (spec §9). That design is what makes binary payloads
+free of escaping and expansion — and it is also the one part of a document that a
+<em>text-shaped</em> pipeline destroys silently. Line-ending normalisation rewrites a
+<code>0x0D</code> inside a chunk payload, the length prefix then points at the wrong byte,
+and what arrives looks like a malformed document rather than a mangled one. A
+<code>git</code> checkout without <code>-text</code>, a <code>sed</code> filter, or a log aggregator that assumes
+lines will each do it.</p>
+<p><code>text_only</code> lets a consumer state that this channel carries text, and have the
+parser enforce it:</p>
+<div class="codehilite"><pre><span></span><code>$ bovnar validate --text-only telemetry.bvnr
+Validation failed: octet_stream_forbidden at line 3, col 6
+</code></pre></div>
+
+<p>This is the same move as <code>--require-unit</code>: the format permits something, and a
+consumer that cannot accept it says so where it is checkable rather than hoping.
+A producer can use it the same way, to guarantee that a channel it publishes
+stays transport-safe.</p>
+<p>The refusal fires at the stream's <strong>opening <code>0x00</code></strong>, before any payload is read
+— the point is that such a document should not have reached this reader at all,
+so the earliest refusal is the useful one, and a large binary region is never
+touched. The flag changes nothing else: a document without an octet stream parses
+identically with it set.</p>
+<p>Available on the CLI for <code>validate</code> and <code>events</code>. <code>query</code> refuses the option
+rather than ignoring it, because that command parses through the DOM, which takes
+a unit policy but not the read flags — an assertion silently not in force is
+worse than none.</p>
+<hr />
 <h2 id="2-writer">2. Writer</h2>
 <hr />
 <h3 id="21-bvnr_writer_create--bvnr_writer_destroy">2.1 <code>bvnr_writer_create</code> / <code>bvnr_writer_destroy</code></h3>
@@ -1469,6 +1504,12 @@ table in which a rounded decimal is passed off as exact.</p>
 <td>50</td>
 <td><code>"unit_profile_unsupported"</code></td>
 <td>A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (spec 1.2)</td>
+</tr>
+<tr>
+<td><code>error_octet_stream_forbidden</code></td>
+<td>51</td>
+<td><code>"octet_stream_forbidden"</code></td>
+<td>The document contains an octet stream and the reader was opened with <code>text_only</code> (spec 1.2). Reported at the stream's opening <code>0x00</code>, before its payload is read</td>
 </tr>
 </tbody>
 </table>

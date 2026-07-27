@@ -1103,6 +1103,18 @@ bool bvn_action_reference_index_close(bvnr_reader_t* p)
  */
 bool bvn_action_octet_stream_intro(bvnr_reader_t* p)
 {
+	/*
+	 * spec 1.2 -- a consumer can refuse the binary half of the format outright.
+	 * The check belongs here, at the opening 0x00, and not after the region has
+	 * been read: the point of the flag is that this document must not have
+	 * reached a text-shaped pipeline at all, so the earliest possible refusal is
+	 * the useful one, and it costs nothing to reject before consuming a payload
+	 * that may be megabytes.
+	 */
+	if (p->lex.text_only) {
+		bvn_lexer_set_error(p, error_octet_stream_forbidden);
+		return false;
+	}
 	p->lex.token_type = token_is_octet_stream;
 	p->lex.next_state = octet_stream_intro;
 	return bvn_val_receive_event(p, ev_octet_stream_start);
@@ -2312,6 +2324,7 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 		l->max_array_nesting     = opts->max_array_nesting;
 		l->continue_on_error     = opts->continue_on_error;
 		l->strict_version        = opts->strict_version;
+		l->text_only             = opts->text_only;
 	}
 	if (!l->max_identifier_length)	l->max_identifier_length	= max_identifier_length;
 	if (!l->max_number_length)		l->max_number_length		= max_number_length;

@@ -332,6 +332,13 @@ typedef struct bvnr_lexer_s {
 	 * parsed once at first_comment_outro. ver_checked latches after that single
 	 * attempt so a *second* leading comment is never mistaken for a directive. */
 	bool			strict_version;
+	/* spec 1.2 -- refuse a document containing an octet stream
+	 * (bvnr_read_flags_t.text_only). Copied here at open time, like
+	 * strict_version above, because the check fires in the lexer: the opening
+	 * 0x00 is the earliest point at which the answer is known, and refusing
+	 * there means never reading a payload the caller has already said it
+	 * cannot accept. */
+	bool			text_only;
 	bool			ver_checked;
 	bool			ver_overflow;
 	bool			has_declared_version;

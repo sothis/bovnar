@@ -1411,6 +1411,9 @@ document, alongside array homogeneity (§7.4).</p>
 <h2 id="9-octet-streams-binary-mode">9. Octet Streams (Binary Mode)</h2>
 <h3 id="91-overview">9.1 Overview</h3>
 <p>A NUL byte (<code>0x00</code>) where a value is expected switches from text mode to binary chunk mode. The parallel UTF-8 validator is suspended for the duration.</p>
+<blockquote>
+<p><strong>Transport.</strong> Chunks are length-prefixed rather than delimited, so a payload may contain any byte, needs no escaping, and does not expand — and a reader can skip a region without inspecting it. The consequence is that a document containing an octet stream is <strong>not</strong> safe through a transport that rewrites bytes. Line-ending normalisation on a <code>0x0D</code> inside a payload desynchronises the length prefixes, and the result is unrecoverable: it reads as a malformed document rather than a mangled one. Store such documents as binary (<code>*.bvnr binary</code> in <code>.gitattributes</code>), and where a channel must stay text, have the reader enforce it with <code>text_only</code> (read/write API §1.13) rather than assume it.</p>
+</blockquote>
 <h3 id="92-wire-protocol">9.2 Wire Protocol</h3>
 <div class="codehilite"><pre><span></span><code>octet-stream = 0x00 { os-chunk } 0x00
 os-chunk     = 0x01 os-length os-data

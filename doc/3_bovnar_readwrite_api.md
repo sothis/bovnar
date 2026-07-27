@@ -23,6 +23,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 1.10 [Read-time lossless unit / base conversion (`want_unit`)](#110-read-time-lossless-unit--base-conversion-want_unit)
     - 1.11 [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
     - 1.12 [Reader-side unit policy (`bvnr_reader_set_unit_policy`)](#112-reader-side-unit-policy-bvnr_reader_set_unit_policy)
+    - 1.13 [Refusing the binary half (`text_only`)](#113-refusing-the-binary-half-text_only)
 2. [Writer](#2-writer)
     - 2.1 [`bvnr_writer_create` / `bvnr_writer_destroy`](#21-bvnr_writer_create--bvnr_writer_destroy)
     - 2.2 [`bvnr_sink_to_fd`](#22-bvnr_sink_to_fd)
@@ -739,6 +740,49 @@ first, then the per-field `rules`, then `targets`, and falls back last to
 `normalise`. Setting several is a legitimate combination: normalise the
 document, name the two fields that need something else, and hand-handle one more
 in the hook.
+
+---
+
+### 1.13 Refusing the binary half (`text_only`)
+
+```c
+bvnr_read_flags_t f = {0};
+f.text_only = true;              /* an octet stream is error_octet_stream_forbidden */
+```
+
+Bovnar is a text/binary hybrid: an octet stream carries arbitrary bytes inside an
+otherwise readable document, framed by `0x00` and length-prefixed so a reader can
+skip it without inspecting it (spec §9). That design is what makes binary payloads
+free of escaping and expansion — and it is also the one part of a document that a
+*text-shaped* pipeline destroys silently. Line-ending normalisation rewrites a
+`0x0D` inside a chunk payload, the length prefix then points at the wrong byte,
+and what arrives looks like a malformed document rather than a mangled one. A
+`git` checkout without `-text`, a `sed` filter, or a log aggregator that assumes
+lines will each do it.
+
+`text_only` lets a consumer state that this channel carries text, and have the
+parser enforce it:
+
+```
+$ bovnar validate --text-only telemetry.bvnr
+Validation failed: octet_stream_forbidden at line 3, col 6
+```
+
+This is the same move as `--require-unit`: the format permits something, and a
+consumer that cannot accept it says so where it is checkable rather than hoping.
+A producer can use it the same way, to guarantee that a channel it publishes
+stays transport-safe.
+
+The refusal fires at the stream's **opening `0x00`**, before any payload is read
+— the point is that such a document should not have reached this reader at all,
+so the earliest refusal is the useful one, and a large binary region is never
+touched. The flag changes nothing else: a document without an octet stream parses
+identically with it set.
+
+Available on the CLI for `validate` and `events`. `query` refuses the option
+rather than ignoring it, because that command parses through the DOM, which takes
+a unit policy but not the read flags — an assertion silently not in force is
+worse than none.
 
 ---
 
@@ -1492,6 +1536,7 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
 | `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (spec 1.2) |
 | `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (spec 1.2) |
+| `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | The document contains an octet stream and the reader was opened with `text_only` (spec 1.2). Reported at the stream's opening `0x00`, before its payload is read |
 
 ---
 

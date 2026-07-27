@@ -26,15 +26,20 @@
 #define BVN_INTERNAL_DIMS_H_
 #include "bovnar.h"
 #define BVN_EVENT_COUNT             15
-#define BVN_ERROR_COUNT             42
+#define BVN_ERROR_COUNT             49
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
 #define BVN_VALUE_BASE_UNIT_COUNT  397
 typedef char bvn_internal_dims_event_check[
 	(ev_stream_end + 1 == BVN_EVENT_COUNT) ? 1 : -1];
+/* Anchored to the LAST enumerator, like the event and unit checks below — not to
+ * a named one in the middle. Pinned to error_duplicate_struct_key it stayed green
+ * across seven new codes (42..48), and BVN_ERROR_COUNT is what the fuzz harnesses
+ * use as their "is this a real error code" bound: they __builtin_trap() above it,
+ * so a stale count turns a legitimate spec-1.1 error into a fuzz crash. */
 typedef char bvn_internal_dims_error_check[
-	(error_duplicate_struct_key + 1 == BVN_ERROR_COUNT) ? 1 : -1];
+	(error_octet_stream_truncated + 1 == BVN_ERROR_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_prefix_system_check[
 	(prefix_iec + 1 == BVN_PREFIX_SYSTEM_COUNT) ? 1 : -1];
 typedef char bvn_internal_dims_si_prefix_check[

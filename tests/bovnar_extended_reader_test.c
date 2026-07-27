@@ -336,6 +336,40 @@ static void test_parse_datetime(void)
 	parse_payload("#!bovnar 1.1\n.t = 2026-06-15;", false, &ctx);
 	ASSERT_TRUE(!ctx.last_had_frac, "date-only literal has no fraction");
 
+	/*
+	 * Anything the reader accepts, the writer must be able to emit. A fraction
+	 * survives a round-trip only as an ISO literal — the whole-second carrier has
+	 * nowhere to put it — so a literal whose UTC civil year falls outside the
+	 * 0000..9999 a 4-digit year can spell was readable and unwritable: it
+	 * validated fine and then failed every pretty-print, canonicalise and convert
+	 * of the document holding it. A tz offset is what makes it reachable, at
+	 * either end: the LOCAL year is in range and only the fold to UTC pushes it
+	 * out.
+	 */
+	parse_payload("#!bovnar 1.1\n.t = 0000-01-01T00:00:00.5+23:59;", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_invalid_datetime_literal,
+		"a fraction whose UTC year underflows the ISO range is rejected");
+
+	parse_payload("#!bovnar 1.1\n.t = 9999-12-31T23:59:59.5-23:59;", false, &ctx);
+	ASSERT_EQ_INT(ctx.last_error, error_invalid_datetime_literal,
+		"a fraction whose UTC year overflows the ISO range is rejected");
+
+	/* Only when a fraction is actually present: without one the integer carrier
+	 * round-trips at any year, so the same instants must stay legal. */
+	parse_payload("#!bovnar 1.1\n.t = 0000-01-01T00:00:00+23:59;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors,
+		"the same out-of-range UTC year without a fraction still parses");
+	parse_payload("#!bovnar 1.1\n.t = 9999-12-31T23:59:59-23:59;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors,
+		"and at the top end too");
+
+	/* An in-range UTC year reached THROUGH an offset stays legal with a
+	 * fraction — the check is on the folded instant, not on the offset. */
+	parse_payload("#!bovnar 1.1\n.t = 2026-06-15T12:00:00.25+05:30;", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "an offset that lands in range keeps its fraction");
+	ASSERT_TRUE(strcmp(ctx.last_frac, "25") == 0,
+		"and delivers the fraction verbatim");
+
 	/* epoch helpers map the base index back to a name and epoch day */
 	value_type_spec_t unix_dt = { .family = vt_datetime, .width = 64, .base = 0 };
 	value_type_spec_t tai_dt  = { .family = vt_datetime, .width = 64, .base = 1 };

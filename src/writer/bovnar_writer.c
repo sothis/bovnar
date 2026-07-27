@@ -1223,13 +1223,16 @@ static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt,
 	 * day, and a 4-digit year; reject anything else (including the untouched-zero
 	 * case above) and emit the plain integer carrier instead.
 	 *
-	 * The year check is singled out because it is the only rejection reason a
-	 * REAL document can reach: everything above (a non-digit fraction, a GNSS
-	 * epoch, an unparseable carrier) describes input the reader could never have
-	 * produced, so the caller supplied it and the integer fallback is the right
-	 * answer. A timezone offset pushing the UTC year past either end is not —
-	 * "0000-01-01T00:00:00.5+23:59" parses, and its fraction must not be dropped
-	 * by a fallback that has nowhere to put it. */
+	 * The year check is singled out because the fraction has nowhere to go if it
+	 * fails: everything above (a non-digit fraction, a GNSS epoch, an unparseable
+	 * carrier) describes a value the reader could never have produced, so the
+	 * caller supplied it and the integer fallback is the right answer, whereas
+	 * dropping sub-second digits the spec promises to round-trip is not.
+	 *
+	 * The reader now refuses such a literal too (bvn_iso_to_epoch_seconds), so a
+	 * parsed document can no longer reach this — it is left in place for the
+	 * public bvnr_write_event() path, where a caller can still hand us a fraction
+	 * against an out-of-range carrier directly. */
 	bool civil_ok = dt->date.month >= 1 && dt->date.month <= 12 &&
 			dt->date.day   >= 1 && dt->date.day   <= 31;
 	if (year_out_of_range)
@@ -1507,10 +1510,13 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					return false;
 				if (!bvn_ser_push_byte(s, 'Z')) return false;
 			} else if (dt_year_oor) {
-				/* The only rejection reason a real document can reach:
-				 * the value is fine, its UTC year simply has no ISO
+				/* The value is fine; its UTC year simply has no ISO
 				 * spelling, and the integer carrier below cannot carry
-				 * the fraction. Refuse instead of losing it. */
+				 * the fraction. Refuse instead of losing it.
+				 *
+				 * The reader refuses such a literal too now, so a parsed
+				 * document no longer reaches this — only a caller driving
+				 * bvnr_write_event() directly can. */
 				s->ser_error = error_invalid_datetime_literal;
 				return false;
 			} else if (d->data && d->length) {

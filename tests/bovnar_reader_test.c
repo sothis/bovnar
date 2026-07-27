@@ -364,6 +364,46 @@ static void test_resync_handles_a_quote_as_the_offending_byte(void)
 	}
 }
 
+static void test_resync_enters_the_string_machine_on_the_first_body_byte(void)
+{
+	/* The string sub-machine was selected for copy_string_byte but not for
+	 * string_intro — the state the FIRST byte of a string body is read in, whose
+	 * transition row is identical. So recovery depended on the string having one
+	 * good character first: with the bad byte in front, the closing quote was read
+	 * as an OPENING one and everything after it was swallowed to the next quote or
+	 * EOF, failing the whole parse with incomplete_bvnr_stream even though a
+	 * perfectly good assignment followed. Both a malformed UTF-8 byte and a
+	 * rejected control byte reach that state, as does the first byte of a
+	 * continuation string and of an array element. */
+	static const struct { const char *doc; const char *keys; } cases[] = {
+		/* bad UTF-8 as the first body byte — the case that used to fail */
+		{ ".a = \"\xff\";\n.b = 2;\n.c = 3;\n",  ".a .b .c " },
+		/* the same byte one character in — the case that always worked */
+		{ ".a = \"x\xff\";\n.b = 2;\n.c = 3;\n", ".a .b .c " },
+		/* a rejected control byte reaches the same state */
+		{ ".a = \"\x01\";\n.b = 2;\n.c = 3;\n",  ".a .b .c " },
+		/* string_intro is re-entered for a continuation string ... */
+		{ ".a = \"ok\" \"\xff\";\n.b = 2;\n",    ".a .b " },
+		/* ... and for an array element */
+		{ ".a = [\"\xff\", \"y\"];\n.b = 2;\n",  ".a .b " },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		resync_keys[0] = '\0';
+		bvnr_reader_t *r = bvnr_reader_create();
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.continue_on_error = true;
+		f.on_verified = resync_key_cb;
+		bvnr_open_read_mem(r, cases[i].doc, (uint64_t)strlen(cases[i].doc),
+				   NULL, 0, &f);
+		ASSERT_TRUE(bvnr_read(r),
+			    "a bad first string byte still leaves a recoverable document");
+		ASSERT_TRUE(strcmp(resync_keys, cases[i].keys) == 0,
+			    "recovery keeps every assignment after a broken string");
+		bvnr_reader_destroy(r);
+	}
+}
+
 static void test_bom_only_at_offset_zero(void)
 {
 	/* Spec 3.2: the BOM is legal only at byte offset 0. The guard tested
@@ -426,6 +466,7 @@ int main(void)
 	test_unterminated_array_is_rejected();
 	test_consumer_abort_is_not_a_document_error();
 	test_resync_handles_a_quote_as_the_offending_byte();
+	test_resync_enters_the_string_machine_on_the_first_body_byte();
 	test_bom_only_at_offset_zero();
 	test_version_directive_terminated_by_eof();
 

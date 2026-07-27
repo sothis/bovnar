@@ -114,11 +114,17 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 	while (sc > 0u) {
 		bvn_dom_node_t *cur = stack[--sc];
 		if (!cur) continue;
+		/* dt_frac sits OUTSIDE the payload union, so every node owns it
+		 * regardless of tag; freeing it inside the BVN_DOM_INT arm tied its
+		 * release to a tag that does not own it. A datetime only ever
+		 * materialises as an INT today, so this was not yet a leak — but a
+		 * field freed on one arm of a switch over an unrelated discriminator
+		 * becomes one the moment that stops holding. */
+		free(cur->dt_frac);   /* spec 1.1 datetime sub-second digits */
 		switch (cur->type) {
 		case BVN_DOM_INT:
 			if (cur->value_type.width > 64u && cur->val.bigint)
 				bvn_int_free(cur->val.bigint);
-			free(cur->dt_frac);   /* spec 1.1 datetime sub-second digits */
 			break;
 		case BVN_DOM_STRING:
 		case BVN_DOM_SYMBOL:

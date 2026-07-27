@@ -256,8 +256,19 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	 * good assignment up to the next quote (or EOF). An error inside a string
 	 * never lands on the closing quote itself, so the next '"' is always the
 	 * real terminator.
+	 *
+	 * string_intro is a string-body state too — it is where the FIRST body byte
+	 * is read, and its transition row is byte-for-byte identical to
+	 * copy_string_byte's. Leaving it out made the fix above depend on the string
+	 * having at least one good character: ".a = \"<bad>\"; .b = 2;" fell to the
+	 * default branch, entered plain resync, and lost .b and everything after it,
+	 * while ".a = \"x<bad>\"; .b = 2;" recovered cleanly. Reachable from any
+	 * string whose first byte is malformed UTF-8 or a rejected control byte —
+	 * including the first byte of a continuation string ("a" "<bad>") and of an
+	 * array element.
 	 */
 	switch (l->next_state) {
+	case string_intro:
 	case copy_string_byte:
 	case escape_from_copy:
 	case esc_x1:

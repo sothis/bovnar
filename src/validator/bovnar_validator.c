@@ -1115,6 +1115,39 @@ static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
 		*err = error_value_out_of_range;
 		return false;
 	}
+	/*
+	 * A fraction only survives a round-trip as an ISO literal — the whole-second
+	 * integer carrier has nowhere to put it — so a literal whose UTC civil year
+	 * falls outside the 0000..9999 a 4-digit ISO year can spell is one this
+	 * library can read and never write back. The writer already refuses it
+	 * (bvn_ser_serialize_event, error_invalid_datetime_literal), which left
+	 * "0000-01-01T00:00:00.5+23:59" validating fine and then failing every
+	 * pretty-print, canonicalise and convert of the document that contained it.
+	 *
+	 * Refuse it here instead, so anything the reader accepts the writer can emit.
+	 * The check is exactly the writer's, and it is asked only when a fraction is
+	 * actually present: without one the integer carrier round-trips perfectly at
+	 * any year, and rejecting those would refuse legal documents.
+	 *
+	 * The offset is what makes this reachable — the LOCAL year is in range and
+	 * only the fold to UTC pushes it out, at either end.
+	 */
+	if (*frac_len > 0u) {
+		bvn_datetime_t back;
+		memset(&back, 0, sizeof back);   /* the converters leave *dt untouched
+						  * on an out-of-range/overflow input */
+		if (strcmp(ep, "tai") == 0)
+			bvn_dt_tai_seconds_to_utc(&back, secs);
+		else
+			bvn_dt_epoch_seconds_to_datetime(&back,
+				(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt), secs);
+		if (back.date.month < 1 || back.date.month > 12 ||
+		    back.date.day   < 1 || back.date.day   > 31 ||
+		    back.date.year  < 0 || back.date.year  > 9999) {
+			*err = error_invalid_datetime_literal;
+			return false;
+		}
+	}
 	*out = secs;
 	return true;
 }

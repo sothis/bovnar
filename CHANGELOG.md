@@ -360,6 +360,36 @@ reading the grown by-value structs at the wrong size.
 
 ### Fixed
 
+- **A bad first byte in a string discarded every assignment after it.** With
+  `continue_on_error`, recovery picks the string sub-machine when the error fired
+  inside a string, so the string's own closing `"` is consumed as the close
+  rather than read as the opening quote of a new string to skip. That switch
+  listed `copy_string_byte` and the escape states but not `string_intro` — the
+  state the FIRST byte of a string body is read in, whose transition row is
+  byte-for-byte identical. So recovery worked or failed depending on whether the
+  string had one good character in front of the bad byte:
+  `.a = "x<bad>"; .b = 2;` recovered and kept `.b`, while `.a = "<bad>"; .b = 2;`
+  read the closing quote as an opening one, swallowed everything to the next
+  quote or end of input, and then failed the whole parse with
+  `error_got_incomplete_bvnr_stream` — losing every later assignment in a
+  document that was perfectly recoverable. Reachable from any string whose first
+  byte is malformed UTF-8 or a rejected ASCII control byte, including the first
+  byte of a continuation string (`"a" "<bad>"`) and of an array element. The
+  first byte of a string body is now treated as the string-body state it is.
+- **A datetime literal could be read but never written back.** Sub-second digits
+  survive a round-trip only as an ISO literal — the whole-second epoch carrier
+  has nowhere to put them — so a literal whose UTC civil year falls outside the
+  `0000`..`9999` a four-digit year can spell was accepted by the reader and
+  refused by the writer, which is the one asymmetry the format cannot afford:
+  `.t = 0000-01-01T00:00:00.5+23:59;` validated fine and then failed every
+  `pretty-print`, `convert` and canonicalisation of the document that held it,
+  reported as a writer error against a document nothing had complained about. A
+  timezone offset is what makes it reachable, at either end — the LOCAL year is
+  in range and only the fold to UTC pushes it out. The reader now rejects such a
+  literal with `error_invalid_datetime_literal`, applying exactly the writer's
+  check, so anything it accepts the writer can emit. Only when a fraction is
+  actually present: without one the integer carrier round-trips at any year, and
+  those instants stay legal.
 - **A prefix ID past the end of its table let the writer emit a document it
   could not read back.** `bvn_prefix_unit_valid` range-checked the prefix ID in
   exactly one branch — SI prefixes on `bit`/`byte`, where "kilo and up" has to

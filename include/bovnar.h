@@ -989,6 +989,20 @@ BVN_API int32_t     bvnr_datetime_epoch_mjd(value_type_spec_t vt);
  * value_type_spec_t.base for a vt_datetime spec. NULL/empty → 0 (unix); an
  * unknown name → -1. Inverse of bvnr_datetime_epoch_name(). */
 BVN_API int32_t     bvnr_datetime_epoch_index(const char* name);
+/*
+ * Parse the body of a type annotation — the text BETWEEN the angle brackets,
+ * e.g. "uint:32,_16,k~g" — into a type spec plus its unit.
+ *
+ * unit_buf receives the unit parameter's raw text, NUL-terminated, and MUST be at
+ * least UINT8_MAX + 1 (256) bytes: a unit parameter may be up to 255 bytes, and
+ * there is no length argument to bound the write. *unit_buf_len returns its
+ * length excluding the NUL (0 when the annotation carries no unit parameter).
+ *
+ * The three flags separate the failure kinds a caller has to tell apart:
+ * type_ok false means the annotation itself is unparseable (fatal); unit_ok false
+ * with unit_too_long true means the unit parameter exceeded 255 bytes; unit_ok
+ * false alone means it was present but not a unit this build knows.
+ */
 BVN_API value_type_spec_t bvn_parse_type_annotation(
 	const uint8_t* str, uint32_t len,
 	bool* type_ok, bool* unit_ok, bool* unit_too_long,

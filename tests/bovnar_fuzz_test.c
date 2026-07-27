@@ -449,6 +449,39 @@ static const seed_entry_t CORPUS[] = {
 	S(".a=1;.b=2;.c=3;.d=4;.e=5;.f=6;\n"),
 	S(".x = <uint:32,no_unit> 42;\n"),
 	S(".x = <uint:64> 0;\n.y = <sint:64> -9223372036854775808;\n"),
+
+	/*
+	 * spec 1.1. Every construct below was previously unreachable from this
+	 * corpus: no seed carried a "#!bovnar" directive, so the version gate never
+	 * opened and the datetime family, the \x / \u escapes and the reference index
+	 * suffix could not be lexed at all — the whole 1.1 surface went unfuzzed, and
+	 * with it every error code from 42 up.
+	 */
+	S("#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;\n"),
+	S("#!bovnar 1.1\n.t = 2026-06-15T12:00:00.123456789+05:30;\n"),
+	S("#!bovnar 1.1\n.t = 2026-06-15;\n"),
+	S("#!bovnar 1.1\n.t = <datetime:64,tai> 2016-12-31T23:59:60Z;\n"),
+	S("#!bovnar 1.1\n.t = <datetime:64,gps> 1234567;\n"),
+	S("#!bovnar 1.1\n.t = <datetime:32,y2000> -1;\n"),
+	S("#!bovnar 1.1\n.a = [<datetime:64> 1, 2, 3]/[4,5,6];\n"),
+
+	S("#!bovnar 1.1\n.s = \"\\x41\\xC3\\xA9\\u{1F600}\";\n"),
+	S("#!bovnar 1.1\n.s = \"\\u{}\";\n"),
+	S("#!bovnar 1.1\n.s = \"\\u{110000}\";\n"),
+	S("#!bovnar 1.1\n.s = \"\\u{D800}\";\n"),
+	S("#!bovnar 1.1\n.s = \"\\xFF\";\n"),
+
+	S("#!bovnar 1.1\n.m = [1,2,3]/[4,5,6];\n.c = &.m[1][2];\n"),
+	S("#!bovnar 1.1\n.m = [[1,2],[3,4]];\n.c = &.m[0][1];\n"),
+	S("#!bovnar 1.1\n.m = [1];\n.c = &.m[99999999999];\n"),
+	S("#!bovnar 1.1\n.c = &.a[];\n"),
+
+	S("#!bovnar 0.9\n.a = 1;\n"),
+	S("#!bovnar 1.2\n.a = 1;\n"),
+	S("#!bovnar 65536.0\n.a = 1;\n"),
+	S("#!bovnar 1.1"),
+	S("#!bovnar1.1\n.a = 1;\n"),
+	S("\xEF\xBB\xBF#!bovnar 1.1\n.a = 1;\n"),
 };
 
 #undef S

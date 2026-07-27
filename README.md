@@ -234,9 +234,11 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 Disable with `-DBVNR_PACKAGE=OFF`.
 
 These same archives — built and smoke-tested by CI, plus a `-source.tar.xz`
-snapshot of the tag and a `SHA256SUMS` file — are attached to every
-[GitHub release](https://github.com/sothis/bovnar/releases), so a build from
-source is optional. Only there are the two Windows archives named
+snapshot of the tag and a `SHA256SUMS` file — are attached to each
+[GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0 onward,
+so a build from source is optional. Earlier tags predate the packaging: 1.0.0
+was POSIX-only and had no packer at all, and carries no assets. Only on a
+release are the two Windows archives named
 `bovnar-windows-msvc-…` and `bovnar-windows-mingw-…`: a release's assets share
 one flat namespace and both toolchains pack the identical filename locally.
 

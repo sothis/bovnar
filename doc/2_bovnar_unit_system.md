@@ -137,6 +137,13 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
                 | unit-param    (* everything else,        e.g. m/s  *)
 ```
 
+> **A unit may also be written in a foreign notation.** A `name:` namespace hands
+> the parameter to a **unit profile**, which translates it into the same
+> `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
+> `<float_dec:64,mmHg>` are the same unit to every part of the library. One
+> namespace is defined, `ucum`; everything in this reference applies to the
+> result unchanged. See [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+
 ### 2.1 Parameter Ordering Flexibility
 
 ```bovnar
@@ -2253,6 +2260,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 - [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit is attached to a value
 - [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in this registry, in table form
 - [Unit Ambiguities](unit_ambiguities.md) — every token that could plausibly mean two things
+- [UCUM Unit Profile](10_bovnar_ucum_profile.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
 - [Read & Write API](3_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
 - [Python Bindings](4_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 

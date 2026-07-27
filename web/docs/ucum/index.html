@@ -286,21 +286,20 @@ it — <code>mL/min/{1.73_m2}</code> does not, but a genuinely chatty annotation
 error: the profile inherits this one, and a producer that needs more than 255 bytes of unit is
 telling you the annotation is a field, not a unit.</p>
 <h3 id="26-grammar">2.6 Grammar</h3>
-<p>Added to <a href="https://www.bovnar.io/docs/grammar/">the EBNF</a> alongside <code>unit-param</code>:</p>
-<div class="codehilite"><pre><span></span><code><span class="k">unit-param      </span><span class="o">=</span> <span class="k">profile-unit </span><span class="p">|</span> <span class="k">native-unit </span><span class="p">;</span>
-
-<span class="k">profile-unit    </span><span class="o">=</span> <span class="k">profile-name </span><span class="p">,</span> <span class="s2">&quot;:&quot;</span> <span class="p">,</span> <span class="k">profile-code </span><span class="p">;</span>
-<span class="k">profile-name    </span><span class="o">=</span> <span class="k">lower-alpha </span><span class="p">,</span> <span class="err">1*7</span><span class="p">(</span> <span class="k">lower-alpha </span><span class="p">)</span> <span class="p">;</span>   <span class="cm">(* &quot;ucum&quot; is the only one defined *)</span>
-<span class="k">profile-code    </span><span class="o">=</span> <span class="err">1*</span><span class="p">(</span> <span class="k">profile-char </span><span class="p">)</span> <span class="p">;</span>                 <span class="cm">(* at most 255 bytes total *)</span>
-<span class="k">profile-char    </span><span class="o">=</span> <span class="cm">(* any byte accepted by copy_type_byte, plus 0x5B 0x5D 0x7B 0x7D;</span>
-<span class="cm">                     a &quot;,&quot; is a profile-char only at brace depth &gt;= 1 *)</span> <span class="p">;</span>
+<p>The formal rules live in <a href="https://www.bovnar.io/docs/grammar/">the EBNF</a> beside <code>unit-param</code>, which is
+where the byte classes of §2.3 are also recorded:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">unit-param   </span><span class="o">=</span> <span class="k">profile-unit </span><span class="p">|</span> <span class="k">native-unit </span><span class="p">;</span>
+<span class="k">profile-unit </span><span class="o">=</span> <span class="k">profile-name </span><span class="p">,</span> <span class="s2">&quot;:&quot;</span> <span class="p">,</span> <span class="k">profile-code </span><span class="p">;</span>
+<span class="k">profile-name </span><span class="o">=</span> <span class="k">lower-alpha </span><span class="p">,</span> <span class="p">{</span><span class="k">lower-alpha</span><span class="p">}</span> <span class="p">;</span>     <span class="cm">(* &quot;ucum&quot; *)</span>
+<span class="k">profile-code </span><span class="o">=</span> <span class="k">profile-char </span><span class="p">,</span> <span class="p">{</span><span class="k">profile-char</span><span class="p">}</span> <span class="p">;</span>
 </code></pre></div>
 
-<p><code>profile-code</code> is deliberately not given a UCUM grammar here. The sub-grammar is <strong>semantic</strong>, as
-the native unit grammar is (doc/2 §5.2): the lexer captures bytes, and <code>bvn_parse_unit</code> — which
-dispatches on the namespace — is what decides whether they are a UCUM expression. The normative
-grammar for what is inside is UCUM's own, and restating it in this file would create a second
-authority to keep in sync with the first.</p>
+<p><code>profile-code</code> is deliberately not given a grammar. The sub-grammar is
+<strong>semantic</strong>, as the native unit sub-grammar is (doc/2 §5.2): the lexer captures
+bytes, and <code>bvn_parse_unit</code> — which dispatches on the namespace — decides whether
+they are a UCUM expression. The normative grammar for what is inside is UCUM's
+own, and restating it here would create a second authority to keep in step with
+the first.</p>
 <hr />
 <h2 id="3-translation">3. Translation</h2>
 <h3 id="31-three-outcomes-and-no-fourth">3.1 Three outcomes, and no fourth</h3>

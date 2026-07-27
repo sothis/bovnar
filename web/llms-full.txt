@@ -62,7 +62,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 364-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 382-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -99,7 +99,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Python bindings](https://www.bovnar.io/doc/4_bovnar_python_bindings.md) — The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
 - [EBNF grammar](https://www.bovnar.io/doc/5_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
 - [FAQ](https://www.bovnar.io/doc/6_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
-- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md) — The 364-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md) — The 382-case conformance suite and the IUT protocol for third-party implementations.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/8_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
 - [Streaming & framing](https://www.bovnar.io/doc/9_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 - [UCUM unit profile](https://www.bovnar.io/doc/10_bovnar_ucum_profile.md) — The ucum: notation, its transliteration table, and what it refuses.
@@ -4146,6 +4146,13 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
                 | unit-param    (* everything else,        e.g. m/s  *)
 ```
 
+> **A unit may also be written in a foreign notation.** A `name:` namespace hands
+> the parameter to a **unit profile**, which translates it into the same
+> `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
+> `<float_dec:64,mmHg>` are the same unit to every part of the library. One
+> namespace is defined, `ucum`; everything in this reference applies to the
+> result unchanged. See [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+
 ### 2.1 Parameter Ordering Flexibility
 
 ```bovnar
@@ -6262,6 +6269,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 - [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit is attached to a value
 - [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in this registry, in table form
 - [Unit Ambiguities](unit_ambiguities.md) — every token that could plausibly mean two things
+- [UCUM Unit Profile](10_bovnar_ucum_profile.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
 - [Read & Write API](3_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
 - [Python Bindings](4_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 
@@ -10073,10 +10081,14 @@ param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
 (*                                                                    *)
 (* Bytes accepted in the accumulated string:                          *)
 (*   A–Z, a–z, 0–9, "$", "%", "(", ")", "*", "+", ",", ".", "/",     *)
-(*   "-", ":", "^", "_", "~"                                          *)
+(*   "-", ":", "^", "_", "~", "'", "[", "]", "{", "}"                *)
 (*   ("~" joins a prefix to its unit, "$" starts a currency, "%" is    *)
 (*   percent, "(" and ")" group a unit expression -- all required by   *)
-(*   inline-unit-char below)                                          *)
+(*   inline-unit-char below.  "'", "[", "]", "{" and "}" are required *)
+(*   by profile-unit: UCUM brackets an atom ("[in_i]"), annotates a    *)
+(*   term ("mL{total}") and uses "'" inside a code ("[arb'U]").       *)
+(*   ";", "#", "<", ">" and '"' stay OUT, so an unterminated bracket  *)
+(*   or annotation cannot consume the rest of the document)           *)
 (*   UTF-8 continuation bytes 0x80–0xBF                               *)
 (*   UTF-8 leader bytes 0xC2–0xF4  (0xC2 IS accepted here, unlike     *)
 (*   identifier / symbol / reference token starts)                    *)
@@ -10125,12 +10137,46 @@ q-param      = "q" , DIGIT , {DIGIT} ;
 (* Parsed against the unit table by bvn_parse_unit.              *)
 (* "no_unit" is a reserved keyword meaning explicitly dimensionless.  *)
 (* Valid for: uint, sint, float, float_fix, float_dec.               *)
-unit-param   = unit-char , {unit-char} ;
+unit-param   = profile-unit | native-unit ;
+native-unit  = unit-char , {unit-char} ;
 unit-char    = (* any byte accepted by copy_type_byte that is not     *)
                (* "," (0x2C) or ">" (0x3E):                          *)
                (* A–Z, a–z, 0–9, "*", "+", ".", "/", "-", ":", "^",  *)
-               (* "_", "~", "$", "%", "(", ")", or a UTF-8 multi-     *)
-               (* byte byte (0x80–0xBF or 0xC2–0xF4)                  *) ;
+               (* "_", "~", "$", "%", "(", ")", "'", "[", "]", "{",  *)
+               (* "}", or a UTF-8 multi-byte byte (0x80–0xBF or       *)
+               (* 0xC2–0xF4)                                          *) ;
+
+(* ── Unit profile: a foreign notation in the unit slot ─────────── *)
+(*                                                                     *)
+(* A "name:" namespace hands the parameter to a unit PROFILE, which    *)
+(* translates it into the same value_unit_t a native expression        *)
+(* produces.  See doc/10_bovnar_ucum_profile.md.  "ucum" is the only   *)
+(* namespace defined; any other is error_unit_profile_unknown, and     *)
+(* a profile expression that is malformed or names an atom the         *)
+(* profile does not know is error_unit_illegal.  There is no third     *)
+(* outcome in which the value carries a unit the library cannot        *)
+(* reason about.                                                       *)
+(*                                                                     *)
+(* No native unit alias or currency code contains a ":", so the        *)
+(* namespace is unambiguous against the whole registry with no         *)
+(* lookahead -- and a ":" in a unit was an error before the profile    *)
+(* existed, so no document can change meaning.                         *)
+(*                                                                     *)
+(* The code is NOT given a grammar here.  Like the native unit         *)
+(* sub-grammar below it is semantic, enforced by bvn_parse_unit; the   *)
+(* normative grammar for what is inside is UCUM's own, and restating   *)
+(* it would create a second authority to keep in step with the first.  *)
+profile-unit = profile-name , ":" , profile-code ;
+profile-name = lower-alpha , {lower-alpha} ;   (* "ucum"              *)
+lower-alpha  = "a"|"b"|"c"|"d"|"e"|"f"|"g"|"h"|"i"|"j"|"k"|"l"|"m"
+             | "n"|"o"|"p"|"q"|"r"|"s"|"t"|"u"|"v"|"w"|"x"|"y"|"z" ;
+profile-code = profile-char , {profile-char} ;
+profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
+               (* UCUM annotation may contain a comma ("{cells,tot}") *)
+               (* and the type-parameter scanner tracks brace and     *)
+               (* bracket depth so that one does not end the          *)
+               (* parameter.  Depth is bounded at 16, as for the      *)
+               (* native "(" grouping.                                *) ;
 
 (* ── Unit sub-grammar (semantic, enforced by bvn_parse_unit) ─── *)
 (*                                                                     *)
@@ -10358,7 +10404,8 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 inline-unit-start = ALPHA | "_" | "$" | "%" | "(" | unit-lead-byte ;
 
 inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "%" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
-                  | "(" | ")" | unit-lead-byte | utf8-continuation ;
+                  | "(" | ")" | "'" | "[" | "]" | "{" | "}"
+                  | unit-lead-byte | utf8-continuation ;
 
 (* unit-lead-byte: the UTF-8 lead-byte range accepted inside a unit — the    *)
 (* full 0xC2-0xF4, BROADER than utf8-leader (0xC3-0xF4).  Unlike identifier, *)
@@ -12275,7 +12322,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (364 cases) ──→ for each test case:                │
+│  Test corpus (382 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -12674,13 +12721,14 @@ specifies:
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
 | `units` | 70 | SI/IEC prefixes, compact prefix form, compound, inline, errors |
+| `unit_profile` | 18 | The `ucum:` notation: the three outcomes and their error codes, annotations, the decade fold, and the one native unit whose error code the profile moved |
 | `special_numbers` | 5 | `nan`, `inf`, `ninf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 16 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **364** | |
+| **Total** | **382** | |
 
 ---
 
@@ -12690,7 +12738,7 @@ The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
 natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading `# Subtest:` comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 22), not the 364 cases.
+parent plan therefore counts the groups (currently 23), not the 382 cases.
 
 ```
 TAP version 14
@@ -14256,23 +14304,22 @@ telling you the annotation is a field, not a unit.
 
 ### 2.6 Grammar
 
-Added to [the EBNF](5_bovnar.ebnf) alongside `unit-param`:
+The formal rules live in [the EBNF](5_bovnar.ebnf) beside `unit-param`, which is
+where the byte classes of §2.3 are also recorded:
 
 ```ebnf
-unit-param      = profile-unit | native-unit ;
-
-profile-unit    = profile-name , ":" , profile-code ;
-profile-name    = lower-alpha , 1*7( lower-alpha ) ;   (* "ucum" is the only one defined *)
-profile-code    = 1*( profile-char ) ;                 (* at most 255 bytes total *)
-profile-char    = (* any byte accepted by copy_type_byte, plus 0x5B 0x5D 0x7B 0x7D;
-                     a "," is a profile-char only at brace depth >= 1 *) ;
+unit-param   = profile-unit | native-unit ;
+profile-unit = profile-name , ":" , profile-code ;
+profile-name = lower-alpha , {lower-alpha} ;     (* "ucum" *)
+profile-code = profile-char , {profile-char} ;
 ```
 
-`profile-code` is deliberately not given a UCUM grammar here. The sub-grammar is **semantic**, as
-the native unit grammar is (doc/2 §5.2): the lexer captures bytes, and `bvn_parse_unit` — which
-dispatches on the namespace — is what decides whether they are a UCUM expression. The normative
-grammar for what is inside is UCUM's own, and restating it in this file would create a second
-authority to keep in sync with the first.
+`profile-code` is deliberately not given a grammar. The sub-grammar is
+**semantic**, as the native unit sub-grammar is (doc/2 §5.2): the lexer captures
+bytes, and `bvn_parse_unit` — which dispatches on the namespace — decides whether
+they are a UCUM expression. The normative grammar for what is inside is UCUM's
+own, and restating it here would create a second authority to keep in step with
+the first.
 
 ---
 

@@ -13,7 +13,7 @@ Bovnar is a self-describing data serialization format: every value carries its o
 - [Python bindings](https://www.bovnar.io/doc/4_bovnar_python_bindings.md): The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
 - [EBNF grammar](https://www.bovnar.io/doc/5_bovnar.ebnf): The formal grammar, annotated against the reference lexer/validator.
 - [FAQ](https://www.bovnar.io/doc/6_bovnar_faq.md): Common questions on types, units, limits, encoding, and the API.
-- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md): The 364-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md): The 382-case conformance suite and the IUT protocol for third-party implementations.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/8_unit_cheatsheet.md): Every unit symbol, prefix, and currency code in one reference table.
 - [Streaming & framing](https://www.bovnar.io/doc/9_bovnar_streaming.md): Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 - [UCUM unit profile](https://www.bovnar.io/doc/10_bovnar_ucum_profile.md): The ucum: notation, its transliteration table, and what it refuses.

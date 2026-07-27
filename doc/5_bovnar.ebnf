@@ -317,10 +317,14 @@ param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
 (*                                                                    *)
 (* Bytes accepted in the accumulated string:                          *)
 (*   A–Z, a–z, 0–9, "$", "%", "(", ")", "*", "+", ",", ".", "/",     *)
-(*   "-", ":", "^", "_", "~"                                          *)
+(*   "-", ":", "^", "_", "~", "'", "[", "]", "{", "}"                *)
 (*   ("~" joins a prefix to its unit, "$" starts a currency, "%" is    *)
 (*   percent, "(" and ")" group a unit expression -- all required by   *)
-(*   inline-unit-char below)                                          *)
+(*   inline-unit-char below.  "'", "[", "]", "{" and "}" are required *)
+(*   by profile-unit: UCUM brackets an atom ("[in_i]"), annotates a    *)
+(*   term ("mL{total}") and uses "'" inside a code ("[arb'U]").       *)
+(*   ";", "#", "<", ">" and '"' stay OUT, so an unterminated bracket  *)
+(*   or annotation cannot consume the rest of the document)           *)
 (*   UTF-8 continuation bytes 0x80–0xBF                               *)
 (*   UTF-8 leader bytes 0xC2–0xF4  (0xC2 IS accepted here, unlike     *)
 (*   identifier / symbol / reference token starts)                    *)
@@ -369,12 +373,46 @@ q-param      = "q" , DIGIT , {DIGIT} ;
 (* Parsed against the unit table by bvn_parse_unit.              *)
 (* "no_unit" is a reserved keyword meaning explicitly dimensionless.  *)
 (* Valid for: uint, sint, float, float_fix, float_dec.               *)
-unit-param   = unit-char , {unit-char} ;
+unit-param   = profile-unit | native-unit ;
+native-unit  = unit-char , {unit-char} ;
 unit-char    = (* any byte accepted by copy_type_byte that is not     *)
                (* "," (0x2C) or ">" (0x3E):                          *)
                (* A–Z, a–z, 0–9, "*", "+", ".", "/", "-", ":", "^",  *)
-               (* "_", "~", "$", "%", "(", ")", or a UTF-8 multi-     *)
-               (* byte byte (0x80–0xBF or 0xC2–0xF4)                  *) ;
+               (* "_", "~", "$", "%", "(", ")", "'", "[", "]", "{",  *)
+               (* "}", or a UTF-8 multi-byte byte (0x80–0xBF or       *)
+               (* 0xC2–0xF4)                                          *) ;
+
+(* ── Unit profile: a foreign notation in the unit slot ─────────── *)
+(*                                                                     *)
+(* A "name:" namespace hands the parameter to a unit PROFILE, which    *)
+(* translates it into the same value_unit_t a native expression        *)
+(* produces.  See doc/10_bovnar_ucum_profile.md.  "ucum" is the only   *)
+(* namespace defined; any other is error_unit_profile_unknown, and     *)
+(* a profile expression that is malformed or names an atom the         *)
+(* profile does not know is error_unit_illegal.  There is no third     *)
+(* outcome in which the value carries a unit the library cannot        *)
+(* reason about.                                                       *)
+(*                                                                     *)
+(* No native unit alias or currency code contains a ":", so the        *)
+(* namespace is unambiguous against the whole registry with no         *)
+(* lookahead -- and a ":" in a unit was an error before the profile    *)
+(* existed, so no document can change meaning.                         *)
+(*                                                                     *)
+(* The code is NOT given a grammar here.  Like the native unit         *)
+(* sub-grammar below it is semantic, enforced by bvn_parse_unit; the   *)
+(* normative grammar for what is inside is UCUM's own, and restating   *)
+(* it would create a second authority to keep in step with the first.  *)
+profile-unit = profile-name , ":" , profile-code ;
+profile-name = lower-alpha , {lower-alpha} ;   (* "ucum"              *)
+lower-alpha  = "a"|"b"|"c"|"d"|"e"|"f"|"g"|"h"|"i"|"j"|"k"|"l"|"m"
+             | "n"|"o"|"p"|"q"|"r"|"s"|"t"|"u"|"v"|"w"|"x"|"y"|"z" ;
+profile-code = profile-char , {profile-char} ;
+profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
+               (* UCUM annotation may contain a comma ("{cells,tot}") *)
+               (* and the type-parameter scanner tracks brace and     *)
+               (* bracket depth so that one does not end the          *)
+               (* parameter.  Depth is bounded at 16, as for the      *)
+               (* native "(" grouping.                                *) ;
 
 (* ── Unit sub-grammar (semantic, enforced by bvn_parse_unit) ─── *)
 (*                                                                     *)
@@ -602,7 +640,8 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 inline-unit-start = ALPHA | "_" | "$" | "%" | "(" | unit-lead-byte ;
 
 inline-unit-char  = ALPHA | DIGIT | "_" | "$" | "%" | "+" | "-" | "." | "/" | ":" | "^" | "*" | "~"
-                  | "(" | ")" | unit-lead-byte | utf8-continuation ;
+                  | "(" | ")" | "'" | "[" | "]" | "{" | "}"
+                  | unit-lead-byte | utf8-continuation ;
 
 (* unit-lead-byte: the UTF-8 lead-byte range accepted inside a unit — the    *)
 (* full 0xC2-0xF4, BROADER than utf8-leader (0xC3-0xF4).  Unlike identifier, *)

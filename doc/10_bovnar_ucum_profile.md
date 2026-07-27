@@ -246,23 +246,22 @@ telling you the annotation is a field, not a unit.
 
 ### 2.6 Grammar
 
-Added to [the EBNF](5_bovnar.ebnf) alongside `unit-param`:
+The formal rules live in [the EBNF](5_bovnar.ebnf) beside `unit-param`, which is
+where the byte classes of §2.3 are also recorded:
 
 ```ebnf
-unit-param      = profile-unit | native-unit ;
-
-profile-unit    = profile-name , ":" , profile-code ;
-profile-name    = lower-alpha , 1*7( lower-alpha ) ;   (* "ucum" is the only one defined *)
-profile-code    = 1*( profile-char ) ;                 (* at most 255 bytes total *)
-profile-char    = (* any byte accepted by copy_type_byte, plus 0x5B 0x5D 0x7B 0x7D;
-                     a "," is a profile-char only at brace depth >= 1 *) ;
+unit-param   = profile-unit | native-unit ;
+profile-unit = profile-name , ":" , profile-code ;
+profile-name = lower-alpha , {lower-alpha} ;     (* "ucum" *)
+profile-code = profile-char , {profile-char} ;
 ```
 
-`profile-code` is deliberately not given a UCUM grammar here. The sub-grammar is **semantic**, as
-the native unit grammar is (doc/2 §5.2): the lexer captures bytes, and `bvn_parse_unit` — which
-dispatches on the namespace — is what decides whether they are a UCUM expression. The normative
-grammar for what is inside is UCUM's own, and restating it in this file would create a second
-authority to keep in sync with the first.
+`profile-code` is deliberately not given a grammar. The sub-grammar is
+**semantic**, as the native unit sub-grammar is (doc/2 §5.2): the lexer captures
+bytes, and `bvn_parse_unit` — which dispatches on the namespace — decides whether
+they are a UCUM expression. The normative grammar for what is inside is UCUM's
+own, and restating it here would create a second authority to keep in step with
+the first.
 
 ---
 

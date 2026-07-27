@@ -19,6 +19,32 @@ reading the grown by-value structs at the wrong size.
 
 ### Added
 
+- **The UCUM unit profile** — `ucum:<code>` in a unit slot, translated at parse
+  time into the same `value_unit_t` a native spelling produces, so nothing
+  downstream can tell the two apart: `<float_dec:64,ucum:mm[Hg]> 120.00` and
+  `<float_dec:64,mmHg> 120.00` compare equal, convert identically, and satisfy
+  the same `--require-field` rule. The DOM, the writer, the streaming reader,
+  the policy engine and the CLI needed no changes at all. A profile expression
+  either becomes a real unit or becomes an error — there is no passthrough
+  that would let an unchecked string reach a value — and the refusals split
+  three ways so a producer can tell them apart: `error_unit_illegal` ("not a
+  UCUM atom"), the new `error_unit_profile_unsupported` ("valid UCUM, no
+  representation here") and the new `error_unit_profile_unknown` ("no such
+  profile"). UCUM's 32 arbitrary units ([IU], [PFU], …) get one
+  `value_base_unit_t` id each at 397..428 — one shared id would have made them
+  compare equal — and are commensurable with nothing, the way currencies
+  already are. New API: `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
+  `bvn_unit_to_ucum` (`unit_error_code`, `unit_is_profile_only`,
+  `unit_to_ucum` in Python). The table is `src/gendata/ucum.bvnr`; the
+  specification, the transliteration table and the list of what has NO
+  representation are in
+  [doc/10_bovnar_ucum_profile.md](doc/10_bovnar_ucum_profile.md).
+
+  The lexer accepts five new bytes in a unit — `'`, `[`, `]`, `{`, `}` — which
+  is the profile's one visible effect on a document that never uses it:
+  `<float:64,m[s]>` was `error_unexpected_input_byte` and is now
+  `error_unit_illegal`. Both refuse the same document.
+
 - **`bvnr_reader_get_skipped_bytes`** — how many bytes error recovery consumed
   and threw away, summed over the document (`Reader.skipped_bytes` in Python,
   and `bovnar events -c` now prints it). `recovery_count` says how OFTEN the

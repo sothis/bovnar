@@ -200,6 +200,53 @@ def check_targets_parse(mapped):
             "registry has:\n%s" % "\n".join(bad))
 
 
+def check_profile_string_bound(mapped, arbitrary, prefixes):
+    """Refuse to generate a table whose longest PROFILE spelling outgrows
+    BVNR_UNIT_STRING_MAX.
+
+    gen_units.py makes exactly this check for the native symbols, and for the
+    same reason: bvn_unit_to_string returns -1 without writing a NUL when the
+    text does not fit, so a caller that ignores the return and formats the
+    buffer with "%s" reads past it. The profile has its own worst case -- the
+    "ucum:" prefix, and codes far longer than any native symbol ("[Amb'a'1'U]"
+    is 11 bytes against the longest native 8) -- and nothing was checking it, so
+    a longer arbitrary unit arriving from a future UCUM revision would have
+    quietly eaten the margin with no build failure to say so.
+
+    The bound mirrors the writer in bvni_unit_to_ucum: "ucum:", then per
+    component a UCUM prefix, the code and a signed one-digit exponent, joined by
+    a one-byte ".".
+    """
+    hdr = os.path.join(REPO, "include", "bovnar.h")
+    with open(hdr, encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"#define\s+BVNR_UNIT_STRING_MAX\s+(\d+)", text)
+    if not m:
+        raise SystemExit("gen_ucum: BVNR_UNIT_STRING_MAX is not defined in "
+                         "include/bovnar.h -- nothing to check the bound against")
+    declared = int(m.group(1))
+    mc = re.search(r"#define\s+BVNR_MAX_UNIT_COMPONENTS\s+(\d+)", text)
+    ncomp = int(mc.group(1)) if mc else 8
+    pfx_max = max((byte_len(p["code"]) for p in prefixes), default=0)
+    # An atom only takes a prefix if UCUM marks it metric, so the worst case is
+    # the longest metric code plus a prefix, against the longest code overall.
+    codes = [(byte_len(r["code"]), bool(r["metric"]))
+             for r in list(mapped) + list(arbitrary)]
+    code_max = max(
+        (n + (pfx_max if metric else 0) for n, metric in codes), default=0)
+    EXP_MAX = 2                      # "-9"
+    SEP     = 1                      # "."
+    worst = (len("ucum:") + ncomp * (code_max + EXP_MAX)
+             + (ncomp - 1) * SEP + 1)
+    if worst > declared:
+        raise SystemExit(
+            "gen_ucum: the longest profile unit this table can emit needs %d "
+            "bytes, but BVNR_UNIT_STRING_MAX in include/bovnar.h is %d. Raise "
+            "it (and check every buffer sized from it), or shorten the code "
+            "that grew." % (worst, declared))
+    return worst, declared
+
+
 def rows_by_length(recs, key="code"):
     """Longest first, then by code, so the C suffix matcher is deterministic."""
     return sorted(recs, key=lambda r: (-byte_len(r[key]), r[key]))
@@ -390,6 +437,7 @@ def main(argv):
     check_codes(doc)
     check_prefixes(prefixes)
     check_targets_parse(mapped)
+    worst, cap = check_profile_string_bound(mapped, arbitrary, prefixes)
     first, last = check_arbitrary_ids(
         arbitrary, os.path.join(os.path.dirname(os.path.abspath(path)),
                                 "units.bvnr"))
@@ -425,9 +473,10 @@ def main(argv):
                 for m in mapped
                 if decompose_target(m["bovnar"], units, pfx)})
     print("gen_ucum: %d mapped, %d arbitrary (%d..%d), %d unsupported, "
-          "%d prefixes, %d reverse rows"
+          "%d prefixes, %d reverse rows; longest emitted profile unit %d "
+          "bytes, cap %d"
           % (len(mapped), len(arbitrary), first, last,
-             len(unsupported), len(prefixes), nrev))
+             len(unsupported), len(prefixes), nrev, worst, cap))
     return 0
 
 

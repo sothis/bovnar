@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-25">
+<meta property="article:modified_time" content="2026-07-27">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar EBNF Grammar">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/plain" href="/doc/5_bovnar.ebnf">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar EBNF Grammar", "description": "The formal EBNF grammar of the Bovnar format, annotated against the reference lexer and validator.", "url": "https://www.bovnar.io/docs/grammar/", "mainEntityOfPage": "https://www.bovnar.io/docs/grammar/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-25", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar EBNF Grammar", "item": "https://www.bovnar.io/docs/grammar/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar EBNF Grammar", "description": "The formal EBNF grammar of the Bovnar format, annotated against the reference lexer and validator.", "url": "https://www.bovnar.io/docs/grammar/", "mainEntityOfPage": "https://www.bovnar.io/docs/grammar/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-27", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar EBNF Grammar", "item": "https://www.bovnar.io/docs/grammar/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -358,10 +358,14 @@ param-type   = (&quot;uint&quot; | &quot;sint&quot; | &quot;float&quot; | &quot;
 (*                                                                    *)
 (* Bytes accepted in the accumulated string:                          *)
 (*   A–Z, a–z, 0–9, &quot;$&quot;, &quot;%&quot;, &quot;(&quot;, &quot;)&quot;, &quot;*&quot;, &quot;+&quot;, &quot;,&quot;, &quot;.&quot;, &quot;/&quot;,     *)
-(*   &quot;-&quot;, &quot;:&quot;, &quot;^&quot;, &quot;_&quot;, &quot;~&quot;                                          *)
+(*   &quot;-&quot;, &quot;:&quot;, &quot;^&quot;, &quot;_&quot;, &quot;~&quot;, &quot;&#39;&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;                *)
 (*   (&quot;~&quot; joins a prefix to its unit, &quot;$&quot; starts a currency, &quot;%&quot; is    *)
 (*   percent, &quot;(&quot; and &quot;)&quot; group a unit expression -- all required by   *)
-(*   inline-unit-char below)                                          *)
+(*   inline-unit-char below.  &quot;&#39;&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot; and &quot;}&quot; are required *)
+(*   by profile-unit: UCUM brackets an atom (&quot;[in_i]&quot;), annotates a    *)
+(*   term (&quot;mL{total}&quot;) and uses &quot;&#39;&quot; inside a code (&quot;[arb&#39;U]&quot;).       *)
+(*   &quot;;&quot;, &quot;#&quot;, &quot;&lt;&quot;, &quot;&gt;&quot; and &#39;&quot;&#39; stay OUT, so an unterminated bracket  *)
+(*   or annotation cannot consume the rest of the document)           *)
 (*   UTF-8 continuation bytes 0x80–0xBF                               *)
 (*   UTF-8 leader bytes 0xC2–0xF4  (0xC2 IS accepted here, unlike     *)
 (*   identifier / symbol / reference token starts)                    *)
@@ -410,12 +414,46 @@ q-param      = &quot;q&quot; , DIGIT , {DIGIT} ;
 (* Parsed against the unit table by bvn_parse_unit.              *)
 (* &quot;no_unit&quot; is a reserved keyword meaning explicitly dimensionless.  *)
 (* Valid for: uint, sint, float, float_fix, float_dec.               *)
-unit-param   = unit-char , {unit-char} ;
+unit-param   = profile-unit | native-unit ;
+native-unit  = unit-char , {unit-char} ;
 unit-char    = (* any byte accepted by copy_type_byte that is not     *)
                (* &quot;,&quot; (0x2C) or &quot;&gt;&quot; (0x3E):                          *)
                (* A–Z, a–z, 0–9, &quot;*&quot;, &quot;+&quot;, &quot;.&quot;, &quot;/&quot;, &quot;-&quot;, &quot;:&quot;, &quot;^&quot;,  *)
-               (* &quot;_&quot;, &quot;~&quot;, &quot;$&quot;, &quot;%&quot;, &quot;(&quot;, &quot;)&quot;, or a UTF-8 multi-     *)
-               (* byte byte (0x80–0xBF or 0xC2–0xF4)                  *) ;
+               (* &quot;_&quot;, &quot;~&quot;, &quot;$&quot;, &quot;%&quot;, &quot;(&quot;, &quot;)&quot;, &quot;&#39;&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;,  *)
+               (* &quot;}&quot;, or a UTF-8 multi-byte byte (0x80–0xBF or       *)
+               (* 0xC2–0xF4)                                          *) ;
+
+(* ── Unit profile: a foreign notation in the unit slot ─────────── *)
+(*                                                                     *)
+(* A &quot;name:&quot; namespace hands the parameter to a unit PROFILE, which    *)
+(* translates it into the same value_unit_t a native expression        *)
+(* produces.  See doc/10_bovnar_ucum_profile.md.  &quot;ucum&quot; is the only   *)
+(* namespace defined; any other is error_unit_profile_unknown, and     *)
+(* a profile expression that is malformed or names an atom the         *)
+(* profile does not know is error_unit_illegal.  There is no third     *)
+(* outcome in which the value carries a unit the library cannot        *)
+(* reason about.                                                       *)
+(*                                                                     *)
+(* No native unit alias or currency code contains a &quot;:&quot;, so the        *)
+(* namespace is unambiguous against the whole registry with no         *)
+(* lookahead -- and a &quot;:&quot; in a unit was an error before the profile    *)
+(* existed, so no document can change meaning.                         *)
+(*                                                                     *)
+(* The code is NOT given a grammar here.  Like the native unit         *)
+(* sub-grammar below it is semantic, enforced by bvn_parse_unit; the   *)
+(* normative grammar for what is inside is UCUM&#39;s own, and restating   *)
+(* it would create a second authority to keep in step with the first.  *)
+profile-unit = profile-name , &quot;:&quot; , profile-code ;
+profile-name = lower-alpha , {lower-alpha} ;   (* &quot;ucum&quot;              *)
+lower-alpha  = &quot;a&quot;|&quot;b&quot;|&quot;c&quot;|&quot;d&quot;|&quot;e&quot;|&quot;f&quot;|&quot;g&quot;|&quot;h&quot;|&quot;i&quot;|&quot;j&quot;|&quot;k&quot;|&quot;l&quot;|&quot;m&quot;
+             | &quot;n&quot;|&quot;o&quot;|&quot;p&quot;|&quot;q&quot;|&quot;r&quot;|&quot;s&quot;|&quot;t&quot;|&quot;u&quot;|&quot;v&quot;|&quot;w&quot;|&quot;x&quot;|&quot;y&quot;|&quot;z&quot; ;
+profile-code = profile-char , {profile-char} ;
+profile-char = (* any unit-char, plus &quot;,&quot; at brace depth &gt;= 1 -- a    *)
+               (* UCUM annotation may contain a comma (&quot;{cells,tot}&quot;) *)
+               (* and the type-parameter scanner tracks brace and     *)
+               (* bracket depth so that one does not end the          *)
+               (* parameter.  Depth is bounded at 16, as for the      *)
+               (* native &quot;(&quot; grouping.                                *) ;
 
 (* ── Unit sub-grammar (semantic, enforced by bvn_parse_unit) ─── *)
 (*                                                                     *)
@@ -643,7 +681,8 @@ inline-unit       = inline-unit-start , { inline-unit-char } ;
 inline-unit-start = ALPHA | &quot;_&quot; | &quot;$&quot; | &quot;%&quot; | &quot;(&quot; | unit-lead-byte ;
 
 inline-unit-char  = ALPHA | DIGIT | &quot;_&quot; | &quot;$&quot; | &quot;%&quot; | &quot;+&quot; | &quot;-&quot; | &quot;.&quot; | &quot;/&quot; | &quot;:&quot; | &quot;^&quot; | &quot;*&quot; | &quot;~&quot;
-                  | &quot;(&quot; | &quot;)&quot; | unit-lead-byte | utf8-continuation ;
+                  | &quot;(&quot; | &quot;)&quot; | &quot;&#39;&quot; | &quot;[&quot; | &quot;]&quot; | &quot;{&quot; | &quot;}&quot;
+                  | unit-lead-byte | utf8-continuation ;
 
 (* unit-lead-byte: the UTF-8 lead-byte range accepted inside a unit — the    *)
 (* full 0xC2-0xF4, BROADER than utf8-leader (0xC3-0xF4).  Unlike identifier, *)

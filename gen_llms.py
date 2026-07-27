@@ -43,7 +43,7 @@ DOCS = [
     ("6_bovnar_faq.md",          "FAQ",
      "Common questions on types, units, limits, encoding, and the API."),
     ("7_bovnar_conformance.md",  "Conformance",
-     "The 364-case conformance suite and the IUT protocol for third-party implementations."),
+     "The 382-case conformance suite and the IUT protocol for third-party implementations."),
     ("8_unit_cheatsheet.md",     "Unit & currency cheatsheet",
      "Every unit symbol, prefix, and currency code in one reference table."),
     ("9_bovnar_streaming.md",    "Streaming & framing",
@@ -197,7 +197,7 @@ def build_index_md_de(sections):
             ("python", "Python-Bindings", "Das reine ctypes-Python-Paket."),
             ("grammar", "EBNF-Grammatik", "Die formale Grammatik, kommentiert gegen die Referenzimplementierung."),
             ("faq", "FAQ", "Häufige Fragen zu Typen, Einheiten, Limits und der API."),
-            ("conformance", "Konformität", "Die 364-Fall-Konformitätssuite und das IUT-Protokoll."),
+            ("conformance", "Konformität", "Die 382-Fall-Konformitätssuite und das IUT-Protokoll."),
             ("cheatsheet", "Einheiten- & Währungs-Spickzettel", "Alle Einheitensymbole, Präfixe und Währungscodes."),
             ("streaming", "Streaming & Framing", "Oktett-Streams, Frames, Multiplexing und eingebettete Dokumente."),
         ])

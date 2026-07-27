@@ -245,7 +245,6 @@
     "Common questions on the format, type system, units, C API, Python bindings, and operational limits.": "Häufige Fragen zum Format, zum Typsystem, zu Einheiten, zur C-API, zur Python-Anbindung und zu den Grenzen im Betrieb.",
     "Common questions": "Häufige Fragen",
     "Conformance Test Tool": "Konformitäts-Testwerkzeug",
-    "364 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.": "364 Testfälle, IUT-Protokoll zur unabhängigen Überprüfung von Implementierungen, TAP-Ausgabe und CTest-Integration.",
     "Verification": "Überprüfung",
     "Units &amp; Currencies Cheat Sheet": "Einheiten- &amp; Währungs-Spickzettel",
     "All 180 physical units, 166 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.": "Alle 180 physikalischen Einheiten, 166 Fiat-Währungen und 50 Kryptowährungen. SI-/IEC-Präfixe, zusammengesetzte Ausdrücke und die Unterscheidung mehrdeutiger Symbole.",
@@ -295,7 +294,8 @@
     "<span class=\"vsb-item\">© 2026 Janos Sonntag</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">MIT</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">C99</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">UTF-8</span>": "<span class=\"vsb-item\">© 2026 Janos Sonntag</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">MIT</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">C99</span>\n      <span class=\"vsb-divider\"></span>\n      <span class=\"vsb-item\">UTF-8</span>",
     "BOVNAR DOCS": "BOVNAR DOKU",
     "Fetching document…": "Dokument wird geladen…",
-    "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>"
+    "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>",
+    "382 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.": "382 Testfälle, IUT-Protokoll zur unabhängigen Überprüfung von Implementierungen, TAP-Ausgabe und CTest-Integration."
   },
   "attrs": {
     "Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.": "Bovnar (BVNR) — einheitensichere Serialisierung für Wissenschaft und Industrie. Jede Messung trägt validierte physikalische Einheit, Bitbreite und Zahlenbasis direkt in sich, ganz ohne externes Schema. C99-Referenzimplementierung, MIT-lizenziert.",

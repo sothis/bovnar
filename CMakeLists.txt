@@ -25,7 +25,9 @@ release wheel builds, where newer GCCs in the manylinux image can ICE on it)"
     ON)
 option(BVNR_LTO
     "Enable link-time optimization for GCC Release/RelWithDebInfo builds (turn \
-OFF for wheel builds; GCC 14's LTO ICEs on bvn_init_run_luts under manylinux)"
+OFF for wheel builds; GCC 14's LTO ICEs on bvn_init_run_luts under manylinux, \
+and GCC 16's does the same under MinGW — that one is forced OFF automatically, \
+see the MINGW guard further down)"
     ON)
 option(BVNR_BUILD_TESTS
     "Build and register the C/Python test suite"
@@ -190,6 +192,29 @@ endif()
 if(MINGW)
     add_compile_definitions(__USE_MINGW_ANSI_STDIO=1)
     add_compile_options(-fno-builtin-printf -fno-builtin-fprintf -fno-builtin-snprintf)
+endif()
+
+# GCC's LTO inliner has now crashed twice on the same function. bvn_init_run_luts
+# is the lexer's pre-main constructor: it calls bvn_build_run_lut nine times, and
+# each of those walks all 256 byte values, so inlining them all gives the inliner
+# one function built out of nine 256-iteration loops. GCC 14 fell over on it under
+# manylinux — that is the wheel-build note on the BVNR_LTO option above, and why
+# pyproject.toml passes BVNR_LTO=OFF — and GCC 16.1 now does the same in the
+# MinGW64 CI job:
+#
+#     during IPA pass: inline
+#     In function 'bvn_init_run_luts':
+#     lto1.exe: internal compiler error: in copy_bb, at tree-inline.cc:2418
+#
+# The source is valid C and builds clean at -O3 without LTO on every compiler we
+# target, so there is nothing to repair in the lexer; the crash is in the
+# compiler. What this can do is stop handing that toolchain the input it chokes
+# on. Scoped to MinGW rather than to GCC generally because the native GNU builds
+# (including the Linux release artifacts) are unaffected and keep their LTO.
+if(BVNR_LTO AND MINGW)
+    message(STATUS
+        "BVNR_LTO: disabled for MinGW (GCC LTO ICEs on bvn_init_run_luts)")
+    set(BVNR_LTO OFF)
 endif()
 
 # LTO tuning uses GCC-only spellings (-flto=auto, -fno-semantic-interposition).

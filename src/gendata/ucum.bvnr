@@ -172,6 +172,13 @@
   { .code = "[nmi_i]";  .bovnar = "nmi";  .metric = false; },
   { .code = "[ft_us]";  .bovnar = "ftUS"; .metric = false; },
   { .code = "[fth_i]";  .bovnar = "fath"; .metric = false; },
+  { .code = "[ly]";     .bovnar = "ly";   .metric = true;  },
+  { .code = "[mil_i]";  .bovnar = "thou"; .metric = false; },
+  # NOT [ch_br], [ft_br], [yd_br] and the rest of the British series. They
+  # sit 7.9e-7 from the international units of the same name -- a genuinely
+  # different foot, and close enough that check_profile_factors.py matched
+  # the British chain to the international one until its tolerance was
+  # tightened to 7.5e-7 on the strength of exactly this pair.
   # [fur_us], [ch_us], [rd_us] and [acr_us] are NOT here. Every one is a US
   # SURVEY unit, built on the survey foot (1200/3937 m), while the native fur,
   # ch, rd and ac are international -- 2 ppm apart for the lengths and 4 ppm
@@ -222,6 +229,8 @@
   # native target carries the kilo that makes "mm[Hg]" come out as plain mmHg.
   { .code = "m[Hg]";    .bovnar = "k~mmHg"; .metric = true;  },
   { .code = "[psi]";    .bovnar = "psi";    .metric = false; },
+  { .code = "tex";      .bovnar = "tex";    .metric = true;  },
+  { .code = "[den]";    .bovnar = "den";    .metric = false; },
   { .code = "att";      .bovnar = "at";     .metric = false; },
   # UCUM's unqualified "cal" is the THERMOCHEMICAL calorie, which is what
   # bovnar's cal is (4.184 J exactly), so both spellings map. The BTU does NOT

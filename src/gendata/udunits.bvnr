@@ -325,7 +325,10 @@
   { .code = "dyne";                   .bovnar = "dyn";  .metric = false; },
   { .code = "gravity";                .bovnar = "gn";   .metric = false; },
   { .code = "standard_free_fall";     .bovnar = "gn";   .metric = false; },
+  { .code = "thermochemical_calorie"; .bovnar = "cal";  .metric = false; },
   { .code = "Btu";                    .bovnar = "Btu";  .metric = false; },
+  { .code = "kip";                    .bovnar = "kip";  .metric = false; },
+  { .code = "metric_horsepower";      .bovnar = "PS";   .metric = false; },
   { .code = "IT_Btu";                 .bovnar = "Btu";  .metric = false; },
   { .code = "therm";                  .bovnar = "thm";  .metric = false; },
   { .code = "US_therm";               .bovnar = "thm";  .metric = false; },
@@ -355,6 +358,10 @@
   { .code = "poise";      .bovnar = "P";     .metric = false; },
   { .code = "stokes";     .bovnar = "St";    .metric = false; },
   { .code = "gauss";      .bovnar = "G";     .metric = false; },
+  # "gal" is the GALILEO, 1 cm/s². The gallon is spelled out -- UDUNITS does
+  # not abbreviate it -- so the two cannot be confused here, but a table built
+  # by guessing at abbreviations would map a volume onto an acceleration.
+  { .code = "gal";        .bovnar = "Gal";   .metric = false; },
   { .code = "maxwell";    .bovnar = "Mx";    .metric = false; },
   { .code = "oersted";    .bovnar = "Oe";    .metric = false; },
   { .code = "abampere";   .bovnar = "da~A";  .metric = false; },
@@ -484,17 +491,13 @@
   # Native cal is 4.184 J. UDUNITS' unqualified "calorie" is the IT calorie,
   # 4.1868 J -- 0.067 % away and dimensionally identical, so it cannot map.
   #
-  # UDUNITS' own "thermochemical_calorie" IS native cal exactly, and would map
-  # but for its length: 22 bytes puts this profile's worst case over
-  # BVNR_UNIT_STRING_MAX (192), which gen_profiles.py refuses. Raising that
-  # constant to 224 would let it in -- it sizes only stack buffers in the
-  # writer and CLI -- and is the one thing standing between a correct
-  # thermochemical calorie and an error message. Until then: write the native
-  # "cal", which is the same unit.
+  # UDUNITS' own "thermochemical_calorie" IS native cal exactly and now maps.
+  # It could not when this block was written: at 22 bytes it put the profile's
+  # worst case over BVNR_UNIT_STRING_MAX, which was 192. That constant is 1024
+  # now, so the spelling fits and the unqualified forms below stay refused.
   { .code = "calorie";                .why = "the unqualified UDUNITS calorie is the IT calorie (4.1868 J); native cal is thermochemical — write the native cal"; },
   { .code = "cal";                    .why = "the unqualified UDUNITS cal is the IT calorie; native cal is thermochemical — write the native cal"; },
   { .code = "IT_calorie";             .why = "IT calorie (4.1868 J); native cal is thermochemical"; },
-  { .code = "thermochemical_calorie"; .why = "is native cal exactly, but the spelling exceeds this profile's BVNR_UNIT_STRING_MAX budget — write the native cal"; },
 
   # ── Scales with no decade to fold into ───────────────────────────────────
   { .code = "shake"; .why = "1e-8 s — there is no SI prefix for 10⁻⁸"; },

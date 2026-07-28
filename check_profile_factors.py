@@ -144,17 +144,28 @@ LENGTH, MASS, TIME, CURRENT, TEMP, AMOUNT, LUM = range(NDIM)
 #
 # A publisher states decimals: UDUNITS writes the horsepower as 7.456999e2 W and
 # the atomic mass unit with the 1986 CODATA value, so a correct row still
-# disagrees in the seventh digit or so. Running this over the whole of both
-# tables, every such disagreement lands at or below 6.9e-7 and there is then a
-# clear gap before anything real. The genuine errors this tool was written to
-# catch are all above it: the US survey foot at 2e-6, the survey acre at 4e-6,
-# the tropical year at 2.1e-5, the IT calorie at 6.7e-4.
+# disagrees in the seventh digit or so. Across all five tables every such
+# disagreement lands at or below 6.83e-7. The genuine errors this tool was
+# written to catch are above it: the US survey foot at 2e-6, the survey acre at
+# 4e-6, the tropical year at 2.1e-5, the IT calorie at 6.7e-4.
 #
-# So 1e-6 sits in the gap. It is empirical and the gap is only a factor of three
-# wide, which is worth saying plainly: a real disagreement between 7e-7 and 2e-6
-# would pass unnoticed. Nothing better is available without tracking each
-# publisher's stated precision through its whole definition chain.
-TOL = 1e-6
+# The gap is MUCH NARROWER than the survey foot suggests, and pretending
+# otherwise would be the dangerous mistake here. UCUM's [ch_br] -- the BRITISH
+# chain, built on a foot that differs from the international one in the seventh
+# digit -- sits 7.87e-7 from bovnar's international chain. That is a genuinely
+# different unit, and at a tolerance of 1e-6 it passed as a match. The real
+# boundary is therefore:
+#
+#     largest publisher rounding seen     6.83e-7   (UDUNITS' 1986 CODATA amu)
+#     smallest genuine difference seen    7.87e-7   (British vs international)
+#
+# 7.5e-7 is the only value that separates them, and it separates them by 10 %.
+# This is a measurement, not a margin: a real disagreement below 6.8e-7 -- the
+# British/international foot ratio applied to a shorter chain, say -- would
+# still pass. Nothing better is available without tracking each publisher's
+# stated precision through its whole definition chain, which is the honest
+# limit of a factor comparison against a source that publishes decimals.
+TOL = 7.5e-7
 
 # Differences that are MODELLING choices rather than errors. bovnar carries bit
 # and byte as two base units of information with no factor between them; UCUM

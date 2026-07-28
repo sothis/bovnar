@@ -83,6 +83,7 @@ is explicit that five tables wrong in the same way would agree with each other p
     - 9.3 [Tests](#93-tests)
     - 9.4 [No build switch](#94-no-build-switch)
     - 9.5 [The factor proof](#95-the-factor-proof)
+    - 9.6 [Synchronisation between the five tables](#96-synchronisation-between-the-five-tables)
 10. [Cost, risk, and what is left out](#10-cost-risk-and-what-is-left-out)
     - 10.1 [What it cost](#101-what-it-cost)
     - 10.2 [What can go wrong](#102-what-can-go-wrong)
@@ -683,8 +684,8 @@ to go. That is the Old German units, the water-hardness degrees, the turbidity k
 starts in Bovnar's native registry may have nowhere to go.
 
 Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **599** combinations survive a native → UCUM → native round trip
-unchanged, **1206** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+`si_none da h k M G T d c m µ n` — **625** combinations survive a native → UCUM → native round trip
+unchanged, **1180** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -1209,7 +1210,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 
 The generator also emits the **reverse** table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 599
+searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 625
 round trips quoted in §5.3 are the check that it agrees with the forward direction.
 
 ### 9.3 Tests
@@ -1288,13 +1289,28 @@ exactly. UCUM's electrical base is charge, which maps to current **and** time, a
 `A` = `C/s` come out as a bare current. UCUM's plane angle is a base and bovnar's radian is
 dimensionless, so that component is dropped.
 
-**The tolerance is calibrated, not chosen.** A publisher states decimals — UDUNITS writes the
-horsepower as `7.456999e2 W` and the atomic mass unit with the 1986 CODATA value — so a correct row
-still disagrees in the seventh digit. Across both tables every such disagreement lands at or below
-`6.9e-7`, and the genuine errors are all above it: the US survey foot at `2e-6`, the survey acre at
-`4e-6`, the tropical year at `2.1e-5`, the IT calorie at `6.7e-4`. `1e-6` sits in the gap. The gap
-is only a factor of three wide, so a real disagreement between `7e-7` and `2e-6` would pass — that
-is a known limit, not an oversight.
+**The tolerance is measured, and the margin is thin.** A publisher states decimals — UDUNITS writes
+the horsepower as `7.456999e2 W` and the atomic mass unit with the 1986 CODATA value — so a correct
+row still disagrees in the seventh digit. The genuine errors are far above that: the US survey foot
+at `2e-6`, the survey acre at `4e-6`, the tropical year at `2.1e-5`, the IT calorie at `6.7e-4`.
+
+What sets the bound is neither of those, but the closest real pair in any of the five vocabularies:
+
+| | |
+|---|---|
+| largest publisher rounding observed | `6.83e-7` — UDUNITS' 1986 CODATA atomic mass unit |
+| smallest genuine difference observed | `7.87e-7` — UCUM's **British** chain against the international one |
+
+`7.5e-7` is the only value that separates them, and it separates them by 10 %. This was found the
+hard way: at the `1e-6` the tool originally used, `ucum:[ch_br]` matched bovnar's international
+chain and was very nearly added to the table as a coverage gap. The British foot, yard, chain and
+rod differ from the international ones only in the seventh digit, which puts a whole family of real
+units inside the noise floor of a decimal comparison. They are refused explicitly in `ucum.bvnr`
+rather than left to the tolerance.
+
+A real disagreement below `6.8e-7` would still pass. That is the honest limit of comparing against
+a source that publishes rounded decimals, and no amount of tuning removes it — only tracking each
+publisher's stated precision through its whole definition chain would.
 
 **Two waivers, both printed on every run** rather than silently skipped, because a waiver nobody
 sees is how a regression hides behind an old excuse:
@@ -1366,6 +1382,37 @@ Arbitrary and special units (`isArbitrary`, `isSpecial`, and any QUDT unit with 
 refused. The standing risk of §10.2 is **reduced everywhere and retired nowhere**: four tables now
 rest on their publishers, and the fifth rests on another publisher's reading of its publisher.
 
+### 9.6 Synchronisation between the five tables
+
+Checking each table against its own publisher leaves a second question open: whether the five agree
+with **each other** about what bovnar's registry contains. §14's concept table asks that of the
+concepts it lists; this asks it of every native unit.
+
+For each of the 180 native units, the check is which profiles map it against which vocabularies
+*define* something equal to it. A unit that three tables carry and a fourth omits — while that
+fourth vocabulary has a perfectly good code for it — is a synchronisation gap, and there were 65 of
+them. They were overwhelmingly one-sided:
+
+| Profile | Units its own vocabulary defines that the table omitted |
+|---|---|
+| `qudt` | 56 |
+| `unece` | 9 |
+| `ucum` | 8 |
+| `udunits` | 5 |
+
+`qudt` was the outlier by an order of magnitude: it had no curie, no dyne, no roentgen, no phot or
+stilb, no poise or stokes, none of the imperial volumes, and neither the volt-ampere nor the var
+although QUDT defines all of them. Closing it took the table from 158 mapped codes to 244.
+
+**The gap could not be closed by the numbers**, and this is the same lesson §9.5's coverage
+suggestion carries. Matching purely on value proposed the lux for a luminance, the rem for the rad,
+and the watt for *both* the volt-ampere and the var — because those pairs are equal in SI and
+differ only in quantity kind (doc/07 §12). Every row was read against the publisher's own label
+before it was accepted.
+
+What remains unclosed is deliberate: ratios of two named units, logarithmic scales with no native
+form, and the British imperial series, whose members sit inside the tolerance of §9.5 and are
+refused by name instead.
 ---
 
 ## 10. Cost, risk, and what is left out

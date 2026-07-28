@@ -238,6 +238,126 @@
   { .code = "MebiBYTE";   .bovnar = "Mi~B";   },
   { .code = "GibiBYTE";   .bovnar = "Gi~B";   },
   { .code = "TebiBYTE";   .bovnar = "Ti~B";   },
+
+  # ── Synchronisation with the other profiles ──────────────────────────────
+  # Every row below names a unit QUDT defines, that bovnar carries natively,
+  # and that ucum.bvnr, udunits.bvnr and unece.bvnr already mapped while this
+  # table did not: 56 of them, which made qudt the least complete of the five
+  # against its own vocabulary. Found by check_profile_factors.py and chosen the
+  # same way the unece block was -- by QUDT's own rdfs:label, never by the
+  # number alone, because dimensions collapse and a value-only match proposed
+  # the lux for a luminance, the rem for the rad, and the watt for both the
+  # volt-ampere and the var.
+
+  # Length
+  { .code = "FUR";        .bovnar = "fur";    },
+  { .code = "FATH";       .bovnar = "fath";   },
+  { .code = "CH";         .bovnar = "ch";     },
+  { .code = "FT_US";      .bovnar = "ftUS";   },
+  { .code = "MilliIN";    .bovnar = "thou";   },
+  { .code = "MilLength";  .bovnar = "thou";   },
+
+  # Mass
+  { .code = "LB_M";       .bovnar = "lb";     },
+  { .code = "OZ_M";       .bovnar = "oz";     },
+  { .code = "Stone_UK";   .bovnar = "st";     },
+  { .code = "TON";        .bovnar = "tn_sh";  },
+  { .code = "TON_US";     .bovnar = "tn_sh";  },
+  { .code = "TON_UK";     .bovnar = "tn_l";   },
+  { .code = "TONNE";      .bovnar = "t";      },
+  { .code = "MegaGM";     .bovnar = "t";      },
+  { .code = "DWT";        .bovnar = "dwt";    },
+  { .code = "PENNYWEIGHT"; .bovnar = "dwt";   },
+  { .code = "SLUG";       .bovnar = "slug";   },
+  { .code = "DeciTONNE";  .bovnar = "qntl";   },   # a tenth of a tonne
+  { .code = "DeciTON_Metric"; .bovnar = "qntl"; },
+  { .code = "AMU";        .bovnar = "Da";     },
+  { .code = "DA";         .bovnar = "Da";     },
+
+  # Volume
+  { .code = "GAL_US";     .bovnar = "gal";      },
+  { .code = "GAL_UK";     .bovnar = "gal_uk";   },
+  { .code = "GAL_IMP";    .bovnar = "gal_uk";   },
+  { .code = "QT_US";      .bovnar = "qt";       },
+  { .code = "QT_UK";      .bovnar = "qt_uk";    },
+  { .code = "PINT_US";    .bovnar = "pt";       },
+  { .code = "PINT_UK";    .bovnar = "pt_uk";    },
+  { .code = "PINT";       .bovnar = "pt_uk";    },   # QUDT's PINT is imperial
+  { .code = "CUP";        .bovnar = "cup";      },
+  { .code = "CUP_US";     .bovnar = "cup";      },
+  { .code = "GI_US";      .bovnar = "gi";       },
+  { .code = "GI_UK";      .bovnar = "gi_uk";    },
+  { .code = "OZ_VOL_US";  .bovnar = "fl_oz";    },
+  { .code = "OZ_VOL_UK";  .bovnar = "fl_oz_uk"; },
+  { .code = "TBSP";       .bovnar = "tbsp";     },
+  { .code = "TSP";        .bovnar = "tsp";      },
+  { .code = "PK_US_DRY";  .bovnar = "pk";       },
+  { .code = "BU_US";      .bovnar = "bsh";      },
+  { .code = "BU_US_DRY";  .bovnar = "bsh";      },
+  { .code = "BBL_US";     .bovnar = "bbl";      },
+  { .code = "BBL_US_PET"; .bovnar = "bbl";      },
+
+  # Force, pressure, energy, power
+  { .code = "LB_F";       .bovnar = "lbf";    },
+  { .code = "KiloGM_F";   .bovnar = "kgf";    },
+  { .code = "KiloPOND";   .bovnar = "kgf";    },
+  { .code = "KIP_F";      .bovnar = "kip";    },
+  { .code = "KiloLB_F";   .bovnar = "kip";    },
+  { .code = "DYN";        .bovnar = "dyn";    },
+  { .code = "G";          .bovnar = "gn";     },   # QUDT's G is standard gravity
+  { .code = "ATM_T";      .bovnar = "at";     },
+  { .code = "IN_HG";      .bovnar = "inHg";   },
+  { .code = "HP";         .bovnar = "hp";     },
+  { .code = "HP_Metric";  .bovnar = "PS";     },
+  { .code = "THM_US";     .bovnar = "thm";    },
+  { .code = "FT-LB_F";    .bovnar = "ft_lb";  },
+  { .code = "LB_F-FT";    .bovnar = "ft_lb";  },
+  # Apparent and reactive power are NOT the watt. doc/07 §12 keeps all three
+  # apart and a value-only match had proposed W for both of these.
+  { .code = "V-A";          .bovnar = "VA";   },
+  { .code = "V-A_Reactive"; .bovnar = "var";  },
+
+  # Electricity and magnetism
+  { .code = "GAUSS";      .bovnar = "G";      },   # native G is the gauss
+  { .code = "Gs";         .bovnar = "G";      },
+  { .code = "MX";         .bovnar = "Mx";     },
+  { .code = "OERSTED";    .bovnar = "Oe";     },
+  { .code = "MHO";        .bovnar = "S";      },
+
+  # Radioactivity and dose
+  { .code = "CI";         .bovnar = "Ci";     },
+  { .code = "R";          .bovnar = "R";      },
+  { .code = "REM";        .bovnar = "rem";    },
+  { .code = "R_man";      .bovnar = "rem";    },
+  # RAD_R is the RAD, the absorbed dose -- 0.01 Gy, not 0.01 Sv. The two are
+  # numerically equal and semantically not, which is the whole of doc/07 §12.
+  { .code = "RAD_R";      .bovnar = "c~Gy";   },
+  { .code = "CentiGRAY";  .bovnar = "c~Gy";   },
+
+  # Photometry. PHOT and STILB are equal in value and different in kind -- an
+  # illuminance against a luminance -- so a value-only match cannot tell them
+  # apart and bvn_units_compatible refuses the pair outright.
+  { .code = "PHOT";       .bovnar = "ph";      },
+  { .code = "STILB";      .bovnar = "sb";      },
+  { .code = "LM-PER-M2";  .bovnar = "lx";      },
+  { .code = "CD-PER-M2";  .bovnar = "cd/m^2";  },   # a LUMINANCE, not the lux
+
+  # Viscosity, acceleration, textile, area
+  { .code = "POISE";             .bovnar = "P";    },
+  { .code = "GM-PER-CentiM-SEC"; .bovnar = "P";    },
+  { .code = "ST";                .bovnar = "St";   },
+  { .code = "CentiM2-PER-SEC";   .bovnar = "St";   },
+  { .code = "GALILEO";           .bovnar = "Gal";  },
+  { .code = "CentiM-PER-SEC2";   .bovnar = "Gal";  },
+  { .code = "TEX";               .bovnar = "tex";  },
+  { .code = "GM-PER-KiloM";      .bovnar = "tex";  },
+  { .code = "MilliGM-PER-M";     .bovnar = "tex";  },
+  { .code = "BARN";              .bovnar = "barn"; },
+
+  # Angle and rotation
+  { .code = "GON";        .bovnar = "grad";   },
+  { .code = "REV";        .bovnar = "rev";    },
+  { .code = "PER-MIN";    .bovnar = "rpm";    },   # reciprocal minute
 ];
 
 # QUDT's units all map onto native ones or are refused; nothing here is

@@ -169,6 +169,7 @@ is explicit that five tables wrong in the same way would agree with each other p
 <li>9.3 <a href="#93-tests">Tests</a></li>
 <li>9.4 <a href="#94-no-build-switch">No build switch</a></li>
 <li>9.5 <a href="#95-the-factor-proof">The factor proof</a></li>
+<li>9.6 <a href="#96-synchronisation-between-the-five-tables">Synchronisation between the five tables</a></li>
 </ul>
 </li>
 <li><a href="#10-cost-risk-and-what-is-left-out">Cost, risk, and what is left out</a><ul>
@@ -771,8 +772,8 @@ to go. That is the Old German units, the water-hardness degrees, the turbidity k
 <em>reader</em> and a partial UCUM <em>writer</em>. A round trip that starts in UCUM returns to UCUM; one that
 starts in Bovnar's native registry may have nowhere to go.</p>
 <p>Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
-<code>si_none da h k M G T d c m µ n</code> — <strong>599</strong> combinations survive a native → UCUM → native round trip
-unchanged, <strong>1206</strong> have no UCUM code, 355 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
+<code>si_none da h k M G T d c m µ n</code> — <strong>625</strong> combinations survive a native → UCUM → native round trip
+unchanged, <strong>1180</strong> have no UCUM code, 355 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
 before the question arises, and <strong>none round-trips to a different unit</strong>. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so <code>test_sweep_round_trip</code> in
 <code>tests/bovnar_ucum_test.c</code> pins all three rather than leaving them as prose.</p>
@@ -2024,7 +2025,7 @@ and QUDT's Turtle vocabularies, resolves every code to a factor and a dimension 
 native target is worth, and compares. <code>unece</code> is reached at one remove; see §9.5.</p>
 <p>The generator also emits the <strong>reverse</strong> table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes <code>bvn_unit_to_ucum</code> deterministic; the 599
+searching the forward table at run time is what makes <code>bvn_unit_to_ucum</code> deterministic; the 625
 round trips quoted in §5.3 are the check that it agrees with the forward direction.</p>
 <h3 id="93-tests">9.3 Tests</h3>
 <p><code>tests/bovnar_ucum_test.c</code> (CTest target <code>bvnr_ucum_test</code>, labels <code>unit;si;ucum</code>, <strong>121
@@ -2144,13 +2145,38 @@ a factor also carries N_A per amount exponent, divided out using UCUM's own valu
 exactly. UCUM's electrical base is charge, which maps to current <strong>and</strong> time, and that is what makes
 <code>A</code> = <code>C/s</code> come out as a bare current. UCUM's plane angle is a base and bovnar's radian is
 dimensionless, so that component is dropped.</p>
-<p><strong>The tolerance is calibrated, not chosen.</strong> A publisher states decimals — UDUNITS writes the
-horsepower as <code>7.456999e2 W</code> and the atomic mass unit with the 1986 CODATA value — so a correct row
-still disagrees in the seventh digit. Across both tables every such disagreement lands at or below
-<code>6.9e-7</code>, and the genuine errors are all above it: the US survey foot at <code>2e-6</code>, the survey acre at
-<code>4e-6</code>, the tropical year at <code>2.1e-5</code>, the IT calorie at <code>6.7e-4</code>. <code>1e-6</code> sits in the gap. The gap
-is only a factor of three wide, so a real disagreement between <code>7e-7</code> and <code>2e-6</code> would pass — that
-is a known limit, not an oversight.</p>
+<p><strong>The tolerance is measured, and the margin is thin.</strong> A publisher states decimals — UDUNITS writes
+the horsepower as <code>7.456999e2 W</code> and the atomic mass unit with the 1986 CODATA value — so a correct
+row still disagrees in the seventh digit. The genuine errors are far above that: the US survey foot
+at <code>2e-6</code>, the survey acre at <code>4e-6</code>, the tropical year at <code>2.1e-5</code>, the IT calorie at <code>6.7e-4</code>.</p>
+<p>What sets the bound is neither of those, but the closest real pair in any of the five vocabularies:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>largest publisher rounding observed</td>
+<td><code>6.83e-7</code> — UDUNITS' 1986 CODATA atomic mass unit</td>
+</tr>
+<tr>
+<td>smallest genuine difference observed</td>
+<td><code>7.87e-7</code> — UCUM's <strong>British</strong> chain against the international one</td>
+</tr>
+</tbody>
+</table>
+<p><code>7.5e-7</code> is the only value that separates them, and it separates them by 10 %. This was found the
+hard way: at the <code>1e-6</code> the tool originally used, <code>ucum:[ch_br]</code> matched bovnar's international
+chain and was very nearly added to the table as a coverage gap. The British foot, yard, chain and
+rod differ from the international ones only in the seventh digit, which puts a whole family of real
+units inside the noise floor of a decimal comparison. They are refused explicitly in <code>ucum.bvnr</code>
+rather than left to the tolerance.</p>
+<p>A real disagreement below <code>6.8e-7</code> would still pass. That is the honest limit of comparing against
+a source that publishes rounded decimals, and no amount of tuning removes it — only tracking each
+publisher's stated precision through its whole definition chain would.</p>
 <p><strong>Two waivers, both printed on every run</strong> rather than silently skipped, because a waiver nobody
 sees is how a regression hides behind an old excuse:</p>
 <ul>
@@ -2232,6 +2258,51 @@ says otherwise is a factor trap rather than a coverage gap.</p>
 <code>conversionMultiplier</code>) have no factor to check — they are exactly the ones carried as opaque or
 refused. The standing risk of §10.2 is <strong>reduced everywhere and retired nowhere</strong>: four tables now
 rest on their publishers, and the fifth rests on another publisher's reading of its publisher.</p>
+<h3 id="96-synchronisation-between-the-five-tables">9.6 Synchronisation between the five tables</h3>
+<p>Checking each table against its own publisher leaves a second question open: whether the five agree
+with <strong>each other</strong> about what bovnar's registry contains. §14's concept table asks that of the
+concepts it lists; this asks it of every native unit.</p>
+<p>For each of the 180 native units, the check is which profiles map it against which vocabularies
+<em>define</em> something equal to it. A unit that three tables carry and a fourth omits — while that
+fourth vocabulary has a perfectly good code for it — is a synchronisation gap, and there were 65 of
+them. They were overwhelmingly one-sided:</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Units its own vocabulary defines that the table omitted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>qudt</code></td>
+<td>56</td>
+</tr>
+<tr>
+<td><code>unece</code></td>
+<td>9</td>
+</tr>
+<tr>
+<td><code>ucum</code></td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>udunits</code></td>
+<td>5</td>
+</tr>
+</tbody>
+</table>
+<p><code>qudt</code> was the outlier by an order of magnitude: it had no curie, no dyne, no roentgen, no phot or
+stilb, no poise or stokes, none of the imperial volumes, and neither the volt-ampere nor the var
+although QUDT defines all of them. Closing it took the table from 158 mapped codes to 244.</p>
+<p><strong>The gap could not be closed by the numbers</strong>, and this is the same lesson §9.5's coverage
+suggestion carries. Matching purely on value proposed the lux for a luminance, the rem for the rad,
+and the watt for <em>both</em> the volt-ampere and the var — because those pairs are equal in SI and
+differ only in quantity kind (doc/07 §12). Every row was read against the publisher's own label
+before it was accepted.</p>
+<p>What remains unclosed is deliberate: ratios of two named units, logarithmic scales with no native
+form, and the British imperial series, whose members sit inside the tolerance of §9.5 and are
+refused by name instead.</p>
 <hr />
 <h2 id="10-cost-risk-and-what-is-left-out">10. Cost, risk, and what is left out</h2>
 <h3 id="101-what-it-cost">10.1 What it cost</h3>

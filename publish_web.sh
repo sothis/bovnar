@@ -47,6 +47,11 @@ EXCLUDES=(
     # referenced anywhere on the site, and MediaWiki markup a browser would show
     # as raw source -- no reason to serve it from the live root.
     "doc/wiki"
+    # An Internet-Draft in xml2rfc's four output formats plus its .refcache.
+    # Work in progress, not referenced from anywhere on the site, and the HTML
+    # wants an rfc-local.css the tree does not carry -- publishing it would put
+    # an unfinished draft under the documentation root with a broken stylesheet.
+    "doc/ietf"
     "httpd.sh"
     # Translation SOURCE tables. They are a build input -- gen_i18n.py has
     # already baked them into web/<lang>/index.html by the time we stage -- and

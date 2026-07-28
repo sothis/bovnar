@@ -41,6 +41,7 @@ DOCS = [
     ("03_bovnar_spec.md",            "bovnar-specification",    "Specification"),
     ("04_bovnar_unit_cheatsheet.md", "bovnar-cheatsheet",       "Units & Currencies Cheat Sheet"),
     ("05_bovnar_unit_system.md",     "bovnar-unit-system",      "Unit & Currency Reference"),
+    ("06_bovnar_unit_policy.md",     "bovnar-unit-policy",      "Unit Policy (Design Note)"),
     ("07_bovnar_unit_ambiguities.md","bovnar-unit-ambiguities", "Unit Ambiguities"),
     ("08_bovnar_readwrite_api.md",   "bovnar-readwrite-api",    "Read & Write API"),
     ("09_bovnar_python_bindings.md", "bovnar-python-bindings",  "Python Bindings"),
@@ -216,30 +217,23 @@ def build_html(title, subtitle, body_html, label):
             f"<body>{cover}{body_html}</body></html>")
 
 
-# Numbered, yet deliberately absent from DOCS. publish_web.sh keeps this one off
-# the site entirely -- it is a design note describing API that does not exist --
-# so building a PDF of it would make the bundle its only published form. Named
-# explicitly rather than left as a hole in DOCS, so the check below still fails
-# on a doc that is missing by accident, which is what it is for.
-UNPUBLISHED = {"06_bovnar_unit_policy.md"}
-
-
 def check_docs_listed():
-    """Every NUMBERED doc must be in DOCS, or in UNPUBLISHED on purpose.
+    """Every NUMBERED doc must be in DOCS.
 
     DOCS is hand-maintained, and a hand-maintained list of files drifts: the
     examples list in CMakeLists_tests.txt had already lost two entries the same
     way. The numbered series is the published documentation set, so a new one
-    silently missing from the PDF bundle is a real omission.
+    silently missing from the PDF bundle is a real omission. The unnumbered
+    files are the working documents publish_web.sh excludes from the site, so
+    they are not required here.
 
-    Numbering used to mean "published", and everything unnumbered was a design
-    note. That stopped being true when the notes were renumbered into the set,
-    so the exception is now stated rather than inferred from the filename.
+    A number therefore means published, again: the unit-policy note was briefly
+    numbered but excluded, which this check could only read as an accident.
     """
     listed = {src for src, _slug, _label in DOCS}
     present = {f for f in os.listdir(DOC_DIR)
                if f[:1].isdigit() and f.rsplit(".", 1)[-1] in ("md", "ebnf")}
-    missing = sorted(present - listed - UNPUBLISHED)
+    missing = sorted(present - listed)
     if missing:
         raise SystemExit(
             "gen_doc_pdfs: these numbered docs exist but are not in DOCS, so "

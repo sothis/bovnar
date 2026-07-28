@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.googletagmanager.com 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
+<title>Bovnar Parser-Level Unit Policy (Design Note)</title>
+<meta name="description" content="Design note, non-normative: how a Bovnar reader could validate and convert units without an application-supplied callback, which options shipped, and why.">
+<meta name="theme-color" content="#1e1e1e">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/docs/policy/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:title" content="Bovnar Parser-Level Unit Policy (Design Note)">
+<meta property="og:description" content="Design note, non-normative: how a Bovnar reader could validate and convert units without an application-supplied callback, which options shipped, and why.">
+<meta property="og:url" content="https://www.bovnar.io/docs/policy/">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
+<meta property="article:published_time" content="2026-07-27">
+<meta property="article:modified_time" content="2026-07-28">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bovnar Parser-Level Unit Policy (Design Note)">
+<meta name="twitter:description" content="Design note, non-normative: how a Bovnar reader could validate and convert units without an application-supplied callback, which options shipped, and why.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
+<link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
+<link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
+<link rel="alternate" type="text/markdown" href="/doc/06_bovnar_unit_policy.md">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Parser-Level Unit Policy (Design Note)", "description": "Design note, non-normative: how a Bovnar reader could validate and convert units without an application-supplied callback, which options shipped, and why.", "url": "https://www.bovnar.io/docs/policy/", "mainEntityOfPage": "https://www.bovnar.io/docs/policy/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Parser-Level Unit Policy (Design Note)", "item": "https://www.bovnar.io/docs/policy/"}]}]}</script>
+</head>
+<body>
+<header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
+<main>
+<h1>Bovnar — Parser-Level Unit Policy</h1>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/06_bovnar_unit_policy.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-policy.pdf">PDF</a>.</p>
+<blockquote>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Design note — the evaluation behind the reader, writer and DOM unit policies. Options 1, 2, 3 and 4 shipped; 0, 5 and 6 did not. Section 7.5 records why option 2 was built after all. Nothing here is normative.
+<strong>Scope:</strong> How the reader could validate and convert units without an application-supplied callback, whether the options combine, and (section 7.4) the producer-side half the evaluation missed.</p>
+</blockquote>
+<p>Companion to <a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> (the registry) and
+<a href="https://www.bovnar.io/docs/api/">Read/Write API</a> (the <code>want_unit</code> hook this note is measured against).
+Every behavioural claim in section 5 was produced by running the reference implementation
+built from this tree; the numbers are transcripts, not estimates.</p>
+<p><strong>What shipped.</strong> Options 4, 1 and 3 were built, as one <code>bvnr_unit_policy_t</code> behind
+<code>bvnr_reader_set_unit_policy</code> — the single-object form section 6.1 argues for, rather than the
+separate setters sketched per-option in section 3. The same policy object also drives the WRITER
+(<code>bvnr_writer_set_unit_policy</code>, validation half only), which this note did not consider at all and
+which section 7.4 argues is the half the format's promise actually rests on. The composition is section 4's ladder exactly:
+hook, then targets, then normalisation, with the assertions evaluated on the native unit.
+Details the evaluation did not anticipate are recorded in sections 7.3 to 7.5, two of them defects
+found only by sweeping the whole unit registry against the implementation. Options 0, 2, 5 and 6
+were not built; the reasoning in sections 3.1, 3.6, 3.7 and 7.2 stands as written. Option 2 WAS
+built in the end — section 7.5 records what its "defer" verdict got wrong, and what it got right.
+The shipped API is documented in <a href="https://www.bovnar.io/docs/api/#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Read/Write API 1.12</a>,
+the Python form in <a href="https://www.bovnar.io/docs/python/#56-unitpolicy--validation-and-conversion-without-a-callback">Python Bindings 5.6</a>,
+and the CLI flags in the README. Section 3.2's claim that every non-C consumer gets the feature
+for free held: the Python binding is a dataclass and one setter, with no per-value trampoline.</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-overview">Overview</a><ul>
+<li>1.1 <a href="#11-what-the-parser-already-enforces">What the parser already enforces</a></li>
+<li>1.2 <a href="#12-what-the-want_unit-hook-costs">What the want_unit hook costs</a></li>
+</ul>
+</li>
+<li><a href="#2-the-design-space">The design space</a><ul>
+<li>2.1 <a href="#21-two-axes">Two axes</a></li>
+<li>2.2 <a href="#22-the-options-at-a-glance">The options at a glance</a></li>
+</ul>
+</li>
+<li><a href="#3-the-options">The options</a><ul>
+<li>3.1 <a href="#31-option-0--prebuilt-hooks-in-the-library">Option 0 — prebuilt hooks in the library</a></li>
+<li>3.2 <a href="#32-option-1--an-opaque-target-list-set-at-open-time">Option 1 — an opaque target list set at open time</a></li>
+<li>3.3 <a href="#33-option-2--key-path-rules">Option 2 — key-path rules</a></li>
+<li>3.4 <a href="#34-option-3--a-normalisation-mode">Option 3 — a normalisation mode</a></li>
+<li>3.5 <a href="#35-option-4--validation-only-assertions">Option 4 — validation-only assertions</a></li>
+<li>3.6 <a href="#36-option-5--an-in-document-declaration">Option 5 — an in-document declaration</a></li>
+<li>3.7 <a href="#37-option-6--a-dom-tier-post-pass">Option 6 — a DOM-tier post-pass</a></li>
+</ul>
+</li>
+<li><a href="#4-composing-4-1-3-and-5">Composing 4, 1, 3 and 5</a><ul>
+<li>4.1 <a href="#41-the-target-resolution-ladder">The target-resolution ladder</a></li>
+<li>4.2 <a href="#42-assertions-evaluate-on-the-native-unit">Assertions evaluate on the native unit</a></li>
+<li>4.3 <a href="#43-why-the-in-document-form-must-be-declarative">Why the in-document form must be declarative</a></li>
+<li>4.4 <a href="#44-precedence-with-the-want_unit-hook">Precedence with the want_unit hook</a></li>
+</ul>
+</li>
+<li><a href="#5-measured-behaviour-the-design-has-to-respect">Measured behaviour the design has to respect</a><ul>
+<li>5.1 <a href="#51-compatible-is-not-the-same-as-convertible">Compatible is not the same as convertible</a></li>
+<li>5.2 <a href="#52-no_unit-is-compatible-with-the-ratio-units">no_unit is compatible with the ratio units</a></li>
+<li>5.3 <a href="#53-what-terminates-and-what-does-not">What terminates and what does not</a></li>
+<li>5.4 <a href="#54-quantity-kinds-already-fence-off-the-dimensionless-units">Quantity kinds already fence off the dimensionless units</a></li>
+</ul>
+</li>
+<li><a href="#6-cost">Cost</a><ul>
+<li>6.1 <a href="#61-abi-and-configuration-surface">ABI and configuration surface</a></li>
+<li>6.2 <a href="#62-fan-out-across-bindings-and-documentation">Fan-out across bindings and documentation</a></li>
+</ul>
+</li>
+<li><a href="#7-recommendation">Recommendation</a><ul>
+<li>7.1 <a href="#71-sequencing">Sequencing</a></li>
+<li>7.2 <a href="#72-what-not-to-build">What not to build</a></li>
+<li>7.3 <a href="#73-what-the-evaluation-missed">What the evaluation missed</a></li>
+<li>7.4 <a href="#74-the-half-this-note-never-considered">The half this note never considered</a></li>
+<li>7.5 <a href="#75-option-2-reconsidered">Option 2, reconsidered</a></li>
+<li><a href="#see-also">See also</a></li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2 id="1-overview">1. Overview</h2>
+<p>Bovnar validates units in the parser today, and converts them only through an
+application-supplied C callback. Those are two different tiers of service for
+one feature, and the gap between them is what this note evaluates: what it would
+take for the reader itself to hold a unit policy — a statement of what the
+document must contain, and what the consumer wants to receive — with no function
+pointer involved.</p>
+<p>The motivation is not C ergonomics. <code>bvn_parse_unit</code> is public, so a C caller can
+already turn <code>"m/s"</code> into a <code>value_unit_t</code> in one line. The motivation is that a
+callback is the one part of the read API that does not survive a language
+boundary cleanly, and unit conversion is the feature most likely to be wanted by
+exactly the consumers that cannot express it.</p>
+<h3 id="11-what-the-parser-already-enforces">1.1 What the parser already enforces</h3>
+<p>Unit checking is not absent from the reader — it is present and strict, but it
+only ever checks the document against <strong>itself</strong>:</p>
+<ul>
+<li>an inline unit suffix that disagrees with the annotation unit is
+  <code>error_unit_mismatch</code>;</li>
+<li>a unit that does not parse, or a prefix the base unit does not accept, is
+  <code>error_unit_illegal</code>;</li>
+<li>a unit string longer than the cap is <code>error_unit_too_long</code>.</li>
+</ul>
+<p>What the reader cannot be told is anything about the document's relationship to
+the <strong>consumer's</strong> expectations. "Every numeric value in this document must carry
+a unit", "this field must be a length, whatever length unit it is written in",
+"deliver everything to me in SI" — none of these are expressible without writing
+code that runs per value.</p>
+<h3 id="12-what-the-want_unit-hook-costs">1.2 What the want_unit hook costs</h3>
+<p><code>bvnr_read_flags_t.want_unit</code> is a per-value callback returning a target
+<code>value_unit_t</code> and an output base. Underneath it sits the part that is genuinely
+hard and is already finished: exact arbitrary-precision conversion, affine
+handling, work limits, and an all-or-nothing exactness contract. Nothing in this
+note proposes to touch that engine — every option below reuses it.</p>
+<p>The costs are all in the interface:</p>
+<p><strong>A function pointer is hostile to bindings.</strong> The Python binding pays a ctypes
+trampoline for every numeric value in the document. The WASM shim has one
+<code>userdata</code> slot and has to share a single struct between the event serialiser and
+the conversion hook. The CLI does not expose conversion at all — there is no
+<code>--unit</code> flag, because wiring one up means writing a callback and threading state
+through it.</p>
+<p><strong>There is no "convert what fits" mode.</strong> The hook decides per value, and once it
+has named a target, an incompatible unit stops the parse. Deciding "convert this
+one only if it is a length" means calling <code>bvn_units_compatible</code> yourself inside
+the callback — which works, and which every caller who wants blanket conversion
+has to reinvent. The WASM shim demonstrates the failure mode: its hook returns a
+target unconditionally, so asking the playground to show a document in <code>m/s</code>
+aborts on the first temperature it meets.</p>
+<p><strong>Validation without conversion needs a callback that never converts.</strong> Checking
+that a field is dimensionally a length means writing a hook, returning <code>false</code>
+from it every time, and doing the dimension comparison by hand on the side.</p>
+<hr />
+<h2 id="2-the-design-space">2. The design space</h2>
+<h3 id="21-two-axes">2.1 Two axes</h3>
+<p>The options below look like six variations on one feature. They are not — they
+sit on two axes, and that is precisely what makes some of them combinable:</p>
+<ul>
+<li>A <strong>predicate</strong> accepts or rejects the document. It never changes what the
+  consumer sees. Option 4 is the only pure predicate.</li>
+<li>A <strong>target selector</strong> answers "what unit should this value be delivered in".
+  Options 1, 3 and 5 are all target selectors, which is why they compete with one
+  another and why combining them requires a precedence order.</li>
+</ul>
+<p>Option 0 and option 6 are neither: they are packaging (a convenience wrapper, and
+a post-pass over the materialised DOM).</p>
+<h3 id="22-the-options-at-a-glance">2.2 The options at a glance</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Mechanism</th>
+<th>Axis</th>
+<th>Spec change</th>
+<th>Needs key tracking</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Prebuilt <code>want_unit</code> implementations</td>
+<td>packaging</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Opaque target list, set at open time</td>
+<td>selector</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Key-path rules</td>
+<td>selector</td>
+<td>no</td>
+<td><strong>yes</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Normalisation mode (no target named)</td>
+<td>selector</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Validation-only assertions</td>
+<td>predicate</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>5</td>
+<td>In-document declaration</td>
+<td>selector or predicate</td>
+<td><strong>yes</strong></td>
+<td>no</td>
+</tr>
+<tr>
+<td>6</td>
+<td>DOM-tier post-pass</td>
+<td>packaging</td>
+<td>no</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-the-options">3. The options</h2>
+<p>Sections 3.1 to 3.7 use one running document. It is deliberately awkward: mixed
+dimensions, an affine scale, a bare ratio, a prefixed currency.</p>
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1
+.wind_speed     = &lt;float:64,km/h&gt;    42.0;
+.inlet_temp     = &lt;float:64,°F&gt;      212.0;
+.tank_level     = &lt;float:64,in&gt;      12.0;
+.duty_cycle     = &lt;float:64,%&gt;       35.0;
+.spare_capacity = &lt;float:64&gt;         0.25;
+.unit_price     = &lt;float:64,k~$USD&gt;  5.0;</code></pre></div>
+<h3 id="31-option-0--prebuilt-hooks-in-the-library">3.1 Option 0 — prebuilt hooks in the library</h3>
+<p>Ship ready-made <code>want_unit</code> implementations plus a caller-allocated context, so
+the common cases need no callback of the caller's own:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">target</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">     </span><span class="n">base</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w">         </span><span class="n">only_if_compatible</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">bvnr_want_fixed_ctx_t</span><span class="p">;</span>
+
+<span class="n">BVN_API</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">bvnr_want_unit_fixed</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">userdata</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="o">*</span><span class="w"> </span><span class="n">data</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">value_unit_t</span><span class="o">*</span><span class="w"> </span><span class="n">want</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="o">*</span><span class="w"> </span><span class="n">want_base</span><span class="p">);</span>
+</code></pre></div>
+
+<p>New symbols only: no ABI risk, no parser semantics, no documentation beyond the
+function's own comment. It also fixes the WASM shim's unconditional-target bug in
+the one place rather than in each embedder.</p>
+<p>It does nothing for the consumers that hurt. Python still pays the trampoline;
+the CLI still has no flag; a caller in any language that cannot take the address
+of a C function is exactly where it was. Worth doing as a by-product of option 1,
+not as an answer to it.</p>
+<h3 id="32-option-1--an-opaque-target-list-set-at-open-time">3.2 Option 1 — an opaque target list set at open time</h3>
+<p>The caller hands over unit <strong>text</strong>, not a struct, plus an output base and a
+policy for the values that do not match. The reader parses the targets once and,
+per numeric value, converts to the first dimensionally compatible one.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_unit_target_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">unit</span><span class="p">;</span><span class="w">   </span><span class="cm">/* unit text, e.g. &quot;m/s&quot;; parsed once when set */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">    </span><span class="n">base</span><span class="p">;</span><span class="w">   </span><span class="cm">/* output base, 0 = keep the value&#39;s own */</span>
+<span class="p">}</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="p">;</span>
+
+<span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="w"> </span><span class="n">targets</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;m/s&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;°C&quot;</span><span class="p">,</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;m&quot;</span><span class="p">,</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span>
+<span class="p">};</span>
+<span class="n">bvnr_reader_set_unit_targets</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">targets</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_unit_leave_incompatible</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Against the running document, with <code>.spare_capacity</code> and <code>.unit_price</code> left alone
+because nothing in the list is compatible with them:</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>native</th>
+<th>target chosen</th>
+<th>delivered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wind_speed</code></td>
+<td><code>km/h</code></td>
+<td><code>m/s</code></td>
+<td>exact <code>35/3</code>, no terminating text (see 5.3)</td>
+</tr>
+<tr>
+<td><code>inlet_temp</code></td>
+<td><code>°F</code></td>
+<td><code>°C</code></td>
+<td><code>100</code></td>
+</tr>
+<tr>
+<td><code>tank_level</code></td>
+<td><code>in</code></td>
+<td><code>m</code></td>
+<td><code>0.3048</code></td>
+</tr>
+<tr>
+<td><code>duty_cycle</code></td>
+<td><code>%</code></td>
+<td>—</td>
+<td>untouched</td>
+</tr>
+<tr>
+<td><code>spare_capacity</code></td>
+<td>none</td>
+<td>—</td>
+<td>untouched</td>
+</tr>
+<tr>
+<td><code>unit_price</code></td>
+<td><code>k~$USD</code></td>
+<td>—</td>
+<td>untouched (but see 5.1)</td>
+</tr>
+</tbody>
+</table>
+<p>This is the smallest change with the largest reach. It needs no key tracking, no
+spec change, and no new conversion machinery — <code>bvn_apply_want_unit</code> in the
+validator already parses the value to an exact rational, converts, renders, and
+enforces the work limits. Option 1 replaces one step of that function, "ask the
+callback", with "walk a table". The selector is <code>bvn_units_compatible</code>, which is
+already public and already used for exactly this test inside careful callbacks.</p>
+<p>Every non-C consumer gets the feature for free, because there is nothing to
+marshal: an array of strings and an integer crosses ctypes, WASM and any FFI
+without a trampoline. The CLI gets <code>bovnar events --unit m/s</code> for the price of an
+argument parse.</p>
+<p>Two properties have to be documented rather than left to be discovered. Rule
+order is semantically significant, because "first compatible wins" is the whole
+selection algorithm — a list of <code>{"m", "km"}</code> never selects <code>km</code>. And a value
+that was left alone is only distinguishable from one that was converted by
+<code>data-&gt;converted</code>, which makes that flag part of the contract rather than a
+convenience.</p>
+<h3 id="33-option-2--key-path-rules">3.3 Option 2 — key-path rules</h3>
+<p>The same as option 1, but selecting by <code>.sensor.inlet_temp</code> rather than by
+dimension. Strictly more expressive: it is the only option that can say "convert
+this field and not that one" when both are temperatures.</p>
+<p>It is also the only option that requires new state on the hot path. The streaming
+validator tracks <strong>no key context at all</strong> — not a current key, not a stack, not a
+depth. Even the CLI's <code>query</code> command sidesteps this by materialising the DOM and
+walking that instead of tracking keys during the parse. Adding a key stack means a
+depth cap, an allocation strategy for long keys, and a decision about what a path
+means inside an array — and the result is a schema language living inside the
+parser, overlapping the DOM tier that already exists for whole-document questions.</p>
+<p>Defer. It is a different feature wearing this one's clothes, and option 1 plus the
+existing <code>want_unit</code> hook covers its use cases at a lower price.</p>
+<h3 id="34-option-3--a-normalisation-mode">3.4 Option 3 — a normalisation mode</h3>
+<p>No target named at all. One enum, and every value that has an SI meaning is
+delivered in coherent SI base units with prefixes folded out.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_reader_set_unit_normalise</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_normalise_si</span><span class="p">);</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>native</th>
+<th>delivered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wind_speed</code></td>
+<td><code>km/h</code></td>
+<td><code>m/s</code>, exact <code>35/3</code></td>
+</tr>
+<tr>
+<td><code>inlet_temp</code></td>
+<td><code>°F</code></td>
+<td><code>K</code>, <code>373.15</code></td>
+</tr>
+<tr>
+<td><code>tank_level</code></td>
+<td><code>in</code></td>
+<td><code>m</code>, <code>0.3048</code></td>
+</tr>
+<tr>
+<td><code>duty_cycle</code></td>
+<td><code>%</code></td>
+<td>dimensionless — see below</td>
+</tr>
+<tr>
+<td><code>spare_capacity</code></td>
+<td>none</td>
+<td>untouched</td>
+</tr>
+<tr>
+<td><code>unit_price</code></td>
+<td><code>k~$USD</code></td>
+<td>no SI meaning; untouched</td>
+</tr>
+</tbody>
+</table>
+<p>This is the most opaque option — zero configuration, deterministic, and it pairs
+conceptually with the writer's existing <code>BVN_UNIT_REDUCE</code> flag: reduce on write,
+normalise on read. Half the machinery is already there, since <code>bvn_unit_reduce</code>
+is implemented and the writer uses it. It is the right answer for canonical
+storage and for diffing two documents that disagree only about units.</p>
+<p>The cost is that it turns every value into a conversion candidate, which
+multiplies the exactness problem described in 5.3 across the whole document
+instead of confining it to the values the caller explicitly targeted. A
+normalisation mode almost certainly cannot ship with the current
+all-or-nothing default; it needs either <code>want_unit_allow_nonterminating</code> on by
+construction, or its own "leave it alone if it is not exact in this base" policy,
+which reintroduces silent skipping and leans even harder on <code>data-&gt;converted</code>.</p>
+<p>The second cost is the definition of "normalise". <code>%</code> and <code>ppm</code> are dimensionless
+with a real factor, so normalising them means multiplying by 1/100 and 1/1000000
+and delivering a bare number — defensible, and not obviously what a caller
+expects. That question has to be answered in the specification of the mode, not
+discovered by its users.</p>
+<h3 id="35-option-4--validation-only-assertions">3.5 Option 4 — validation-only assertions</h3>
+<p>No conversion, no rational arithmetic, no work limits, no exactness pitfalls, and
+nothing that can fail on untrusted input except the check itself:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">lengths</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;m&quot;</span><span class="w"> </span><span class="p">};</span>
+<span class="n">bvnr_reader_require_unit_on_numeric</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w">   </span><span class="cm">/* reject no_unit */</span>
+<span class="n">bvnr_reader_require_dimension_of</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">lengths</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="cm">/* every value must be a length */</span>
+</code></pre></div>
+
+<p>Against the running document, <code>require_unit_on_numeric</code> rejects it at
+<code>.spare_capacity</code> with a unit error, because a bare <code>0.25</code> is exactly the thing a
+fully-annotated document is not supposed to contain.</p>
+<p>This is the cheapest option here by a wide margin — a dimension check is a
+comparison of two seven-element vectors — and it is the only one that answers
+"is this document what I was promised" rather than "convert it for me". It is
+orthogonal to every other option on the list, and worth shipping regardless of
+which conversion mechanism wins.</p>
+<h3 id="36-option-5--an-in-document-declaration">3.6 Option 5 — an in-document declaration</h3>
+<p>A second directive alongside the version directive, declaring the document's own
+unit policy:</p>
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.1
+#!units si</code></pre></div>
+<p>Mechanically this is the cheapest part: the lexer already has a first-line,
+first-comment-only capture path for <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code>, and a second
+directive form slots into it. Everything else about it is expensive, and section
+4.3 argues that its obvious reading — an instruction to the reader — is the wrong
+one.</p>
+<p>The unavoidable costs are a spec version bump to 1.2, the interaction with
+<code>strict_version</code>, writer support for emitting it, and the fan-out through the
+conformance document and the published documentation set.</p>
+<h3 id="37-option-6--a-dom-tier-post-pass">3.7 Option 6 — a DOM-tier post-pass</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_normalise</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;m/s&quot;</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Operates on the materialised DOM rather than the streaming path, so it touches
+neither the hot path nor the read-flags ABI, and it can be built and changed
+freely. It cannot abort a parse, and it does nothing for a streaming consumer —
+which is most of the consumers that care about units. A complement to whatever
+else is chosen, not a substitute for it.</p>
+<hr />
+<h2 id="4-composing-4-1-3-and-5">4. Composing 4, 1, 3 and 5</h2>
+<p>Options 4, 1, 3 and 5 do combine, under one precedence ladder and one change to
+what option 5 means. They combine because of the axis split in 2.1: option 4 is a
+predicate and the other three are selectors, so the only genuine conflict is
+among the selectors, and it is resolved by ordering them.</p>
+<h3 id="41-the-target-resolution-ladder">4.1 The target-resolution ladder</h3>
+<p>Per numeric value, in the slot the <code>want_unit</code> hook occupies today — after unit
+validation, before either value callback, so that an abort still happens before
+the consumer has seen anything:</p>
+<div class="codehilite"><pre><span></span><code>resolve target:   want_unit hook  →  target list (1)  →  normalise mode (3)
+                  most specific ...................................... catch-all
+convert:          the existing exact-rational engine, unchanged
+assert:           the predicates (4), evaluated on the NATIVE unit
+</code></pre></div>
+
+<p>First match wins, specificity descending. Option 3 sits at the bottom as the
+terminal fallback that catches whatever option 1's list did not match, which
+makes the combination useful rather than merely legal: "deliver speeds in <code>m/s</code>
+and temperatures in <code>°C</code>, and normalise anything else to SI" is one target list
+plus one enum.</p>
+<p>Applied to the running document with <code>targets = {"m/s", "°C"}</code> and
+<code>normalise = si</code>:</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>native</th>
+<th>resolved by</th>
+<th>delivered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wind_speed</code></td>
+<td><code>km/h</code></td>
+<td>target list</td>
+<td><code>m/s</code></td>
+</tr>
+<tr>
+<td><code>inlet_temp</code></td>
+<td><code>°F</code></td>
+<td>target list</td>
+<td><code>°C</code>, <code>100</code></td>
+</tr>
+<tr>
+<td><code>tank_level</code></td>
+<td><code>in</code></td>
+<td>normalise fallback</td>
+<td><code>m</code>, <code>0.3048</code></td>
+</tr>
+<tr>
+<td><code>duty_cycle</code></td>
+<td><code>%</code></td>
+<td>normalise fallback</td>
+<td>per the mode's ratio rule (3.4)</td>
+</tr>
+<tr>
+<td><code>spare_capacity</code></td>
+<td>none</td>
+<td>nothing matches</td>
+<td>untouched</td>
+</tr>
+<tr>
+<td><code>unit_price</code></td>
+<td><code>k~$USD</code></td>
+<td>nothing matches</td>
+<td>untouched</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-assertions-evaluate-on-the-native-unit">4.2 Assertions evaluate on the native unit</h3>
+<p>This is the rule that keeps option 4 from colliding with the selectors:
+<strong>validate the document as written, convert for the consumer.</strong></p>
+<p>If assertions ran after conversion they would be very nearly tautological — the
+value is in the unit the caller just asked for, so "must be a length" passes
+because the caller said <code>m</code>, not because the document said anything. Dimension
+requirements and <code>require_unit_on_numeric</code> are statements about what the document
+contains, so they must see what the document contains.</p>
+<p>The concrete consequence, on the running document with both a length requirement
+and a normalise-to-SI mode: <code>.spare_capacity</code> fails the assertion, and it fails
+whether or not normalisation would have left it alone. The predicate does not
+care what the selector decided.</p>
+<h3 id="43-why-the-in-document-form-must-be-declarative">4.3 Why the in-document form must be declarative</h3>
+<p>Option 5 as first framed — a directive that tells the reader to convert — does
+not compose, for two independent reasons.</p>
+<p><strong>Interop.</strong> A transformative directive breaks reader equivalence. A spec-1.1
+reader ignores <code>#!units si</code> and delivers native units; a 1.2 reader delivers
+converted ones. Two conforming readers then disagree about the value the consumer
+receives, in a format whose entire premise is that a document means one thing to
+everyone holding it.</p>
+<p><strong>Trust.</strong> A transformative directive is input-controlled behaviour. A document
+would decide what an application's callbacks receive, which is a strange power to
+hand to a file whose contents are being validated precisely because they are not
+trusted.</p>
+<p>Reframe it as a declaration <strong>about the content</strong> — "the values in this document
+are in SI" — and both problems dissolve. A 1.1 reader that ignores it loses
+nothing, because the values were already whatever they were; the directive only
+adds a claim that a 1.2 reader can check. The parser's job becomes verifying that
+the document keeps its own promise, which is option 4's machinery pointed at a
+target the document supplied instead of one the caller supplied.</p>
+<p>That reframing removes option 5 from the ladder in 4.1 entirely. It stops
+competing with options 1 and 3, the precedence question disappears, and what
+remains is a cheap dimension check with a well-defined failure.</p>
+<p>If a transformative reading is wanted later, it should be gated behind an
+explicit application opt-in and placed <strong>below</strong> option 1 in the ladder — the
+application is the consumer and knows what it needs — but the declarative form is
+what should ship first.</p>
+<h3 id="44-precedence-with-the-want_unit-hook">4.4 Precedence with the want_unit hook</h3>
+<p>The hook stays, at the top of the ladder. Making it the most specific selector
+costs nothing once a ladder exists, and it enables the pattern that a table alone
+cannot express: normalise the whole document, and hand-handle the one field that
+needs different treatment.</p>
+<p>The alternative — refusing to let the hook coexist with a policy, with
+<code>error_invalid_argument</code> — is defensible when there are only two mechanisms and no
+ordering to appeal to. Once there are three, the ordering exists anyway and the
+hook may as well sit in it.</p>
+<hr />
+<h2 id="5-measured-behaviour-the-design-has-to-respect">5. Measured behaviour the design has to respect</h2>
+<p>Every result in this section was produced by linking against <code>libbvnr.a</code> built
+from this tree and calling the public unit API directly. They are the constraints
+that decide whether an opaque selector is safe, and three of the four are not
+what a reasonable designer would assume.</p>
+<h3 id="51-compatible-is-not-the-same-as-convertible">5.1 Compatible is not the same as convertible</h3>
+<p><code>bvn_units_compatible</code> is the obvious selector for "convert this value if the
+target fits". It is not sufficient, because currencies deliberately carry no
+dimension vector and therefore fail the compatibility test even against
+themselves:</p>
+<div class="codehilite"><pre><span></span><code>k~$USD -&gt; $USD    compatible=false   convert_factor_ok=true   f=1000
+$USD   -&gt; $EUR    compatible=false   convert_factor_ok=false
+</code></pre></div>
+
+<p>The exact-rational path performs <code>5 k~$USD -&gt; $USD</code> correctly, yielding <code>5000</code>. A
+selector built on <code>bvn_units_compatible</code> alone silently declines a conversion the
+engine can do, which is why <code>.unit_price</code> is listed as untouched throughout
+section 3. Making it work needs the prefix-only-delta path that
+<code>bovnar_si_units.c</code> currently keeps internal, exposed or mirrored in the selector.</p>
+<p>Note also that <code>bvn_unit_convert_factor</code> is the wrong predicate for a different
+reason: it reports <code>ok=false</code> for <code>°F -&gt; °C</code> and <code>°C -&gt; K</code>, because an affine
+conversion has no single multiplicative factor. Those conversions are perfectly
+well supported by the value and rational entry points. A selector that screens on
+<code>convert_factor_ok</code> would drop every temperature in the format.</p>
+<h3 id="52-no_unit-is-compatible-with-the-ratio-units">5.2 no_unit is compatible with the ratio units</h3>
+<p>The sharpest hazard, and the least visible:</p>
+<div class="codehilite"><pre><span></span><code>no_unit -&gt; %      compatible=true   f=100
+no_unit -&gt; ppm    compatible=true   f=1000000
+ppm     -&gt; %      compatible=true   f=0.0001
+</code></pre></div>
+
+<p>A bare number carries no dimension, and neither does a percentage, so they are
+dimensionally compatible and the engine will happily convert between them. On the
+running document, a policy containing <code>%</code> therefore converts</p>
+<div class="codehilite"><pre><span></span><code>.spare_capacity = &lt;float:64&gt; 0.25;
+</code></pre></div>
+
+<p>into <code>25 %</code> — exactly the kind of silent factor-of-a-hundred misread the format
+exists to prevent, produced by the machinery meant to prevent it.</p>
+<p>Any opaque selector must exclude unitless values explicitly rather than relying on
+compatibility. The test already exists internally as <code>BVN_UNIT_IS_NO_UNIT</code>. The
+<code>ppm -&gt; %</code> row is included to show why the rule cannot simply be "never convert
+dimensionless things": that one is a real, wanted conversion.</p>
+<h3 id="53-what-terminates-and-what-does-not">5.3 What terminates and what does not</h3>
+<p>The library's contract is that a conversion is delivered exactly or not at all.
+An exact <strong>rational</strong> and a terminating <strong>positional expansion</strong> are different
+things, and only the second one can be handed over as digits:</p>
+<div class="codehilite"><pre><span></span><code>100 km/h -&gt; m/s   base 10   exact=1   250/9      text=&lt;nonterminating&gt;
+100 mph  -&gt; m/s   base 10   exact=1   5588/125   text=44.704
+100 °F   -&gt; °C    base 10   exact=1   340/9      text=&lt;nonterminating&gt;
+212 °F   -&gt; °C    base 10   exact=1   100/1      text=100
+ 25 °C   -&gt; K     base 10   exact=1   5963/20    text=298.15
+ 12 in   -&gt; m     base 10   exact=1   381/1250   text=0.3048
+  1 m    -&gt; km    base 10   exact=1   1/1000     text=0.001
+  1 m    -&gt; km    base  2   exact=1   1/1000     text=&lt;nonterminating&gt;
+</code></pre></div>
+
+<p>Three things follow. Metric-to-metric is where the trouble is, not
+customary-to-metric: <code>km/h -&gt; m/s</code> carries a factor of 5/18 and does not
+terminate, while <code>mph -&gt; m/s</code> is exactly 0.44704 and does. Whether a conversion
+terminates depends on the value as well as the units — 212 °F converts cleanly and
+100 °F does not, through the same 5/9 slope. And the output base matters
+independently: <code>1 m -&gt; km</code> is <code>0.001</code> in base 10 and non-terminating in base 2.</p>
+<p>Under the current default, every <code>&lt;nonterminating&gt;</code> row above aborts the parse
+with <code>error_unit_inexact</code>. That is a defensible default for a caller who named one
+target deliberately. It is a poor default for a blanket mode, which is the main
+reason option 3 needs an exactness policy of its own.</p>
+<h3 id="54-quantity-kinds-already-fence-off-the-dimensionless-units">5.4 Quantity kinds already fence off the dimensionless units</h3>
+<p>The one pleasant surprise. Dimensionless does not collapse into one bucket,
+because the library carries a quantity-kind vector alongside the dimension vector:</p>
+<div class="codehilite"><pre><span></span><code>dB  -&gt; %         compatible=false
+pH  -&gt; no_unit   compatible=false
+rad -&gt; °         compatible=true    f=57.2958
+B/s -&gt; Hz        compatible=false
+</code></pre></div>
+
+<p>Decibels, the pH scale, angles, turbidity scales and practical salinity are each
+their own kind, so a normalisation mode does not need a hand-maintained skip list
+to keep them apart — the existing compatibility test already refuses them. The
+concern is narrower than it looks from the unit registry: currencies (5.1) and
+unitless values (5.2), not the logarithmic scales.</p>
+<hr />
+<h2 id="6-cost">6. Cost</h2>
+<h3 id="61-abi-and-configuration-surface">6.1 ABI and configuration surface</h3>
+<p><code>bvnr_read_flags_t</code> has exactly <code>uint64_t _reserved[2]</code> left — sixteen bytes. A
+target pointer plus a count plus two policy enums consumes all of it, and the
+struct is mirrored by hand in the Python bindings, the WASM shim and the ABI dump
+test, so growing it is a five-file change before any behaviour exists.</p>
+<p>Prefer setter functions on the reader — <code>bvnr_reader_set_unit_targets</code>,
+<code>bvnr_reader_set_unit_normalise</code>, <code>bvnr_reader_require_dimension_of</code> — called
+after create and before read. New symbols do not perturb the struct layout, do not
+consume the reserved words, and are the FFI-friendly shape anyway: a binding can
+call a function without describing a struct. If the four options ship together
+they should share one policy object behind one setter rather than four
+independent knobs.</p>
+<h3 id="62-fan-out-across-bindings-and-documentation">6.2 Fan-out across bindings and documentation</h3>
+<p>Any public surface added here lands in more places than the implementation:
+<code>include/bovnar.h</code>, the validator, the ABI dump test, the Python binding structs
+and reader wrapper, the WASM shim, the CLI, plus the specification, the unit
+reference, the read/write API document, the regenerated HTML documentation and
+the LLM text bundle, and the changelog. This is the argument for choosing one
+mechanism and doing it thoroughly rather than shipping three partial ones.</p>
+<p>The design-note tier this document belongs to is deliberately outside that set:
+unnumbered files in <code>doc/</code> are not part of the published documentation series and
+are not required to appear in the PDF bundle.</p>
+<hr />
+<h2 id="7-recommendation">7. Recommendation</h2>
+<p>Build option 4 first, then option 1, then option 3 if normalisation demand turns
+out to be real, and option 5 last if at all — in its declarative form only.</p>
+<p>Option 4 is nearly free, has no exactness pitfalls, cannot fail on untrusted
+input, and closes the one gap that no amount of callback cleverness makes
+pleasant: asserting that a document is fully annotated. Option 1 is the smallest
+change with the largest reach, because it reuses the finished conversion engine
+and gives every binding and the CLI a feature they currently cannot express.</p>
+<p>Together they answer both halves of the original question — validation against
+caller expectation, and conversion without a callback — and they leave the
+<code>want_unit</code> hook in place as the escape hatch for anything more specific.</p>
+<h3 id="71-sequencing">7.1 Sequencing</h3>
+<p>The order matters beyond effort. A format-level directive has to <strong>name</strong> a
+policy, and once that name is in the specification it is frozen. Shipping option 5
+before option 3's normalisation semantics have settled — in particular the ratio
+rule in 3.4 and the exactness policy in 5.3 — commits the format to a definition
+that is still under discussion. The first three options are library work with no
+interoperability consequences and can be revised freely; option 5 is the only one
+that cannot be taken back.</p>
+<h3 id="72-what-not-to-build">7.2 What not to build</h3>
+<p>Option 2 should not be built. It is the only option requiring key tracking in the
+streaming validator, and what it produces is a schema layer inside a parser that
+already has a DOM tier for whole-document questions.</p>
+<p>Option 0 should not be built on its own. As packaging shipped alongside option 1
+it is nearly free; as an answer to the problem it leaves every non-C consumer
+exactly where it was.</p>
+<h3 id="73-what-the-evaluation-missed">7.3 What the evaluation missed</h3>
+<p>Two decisions the implementation forced that this note had not anticipated, kept
+here because both are the kind of question an evaluation is supposed to surface
+and did not.</p>
+<p><strong>A value already in the target unit.</strong> Section 3.2 described selection as "first
+compatible target wins" and stopped there, which quietly makes a policy of
+<code>{"m"}</code> convert every value that is already in metres to itself: <code>converted</code>
+comes back true, the digits come back identical, and each one has paid a full
+exact parse-convert-render round trip. The shipped behaviour skips it, so
+<code>converted</code> means "the policy restated this value" rather than "the policy looked
+at it". A target that names an output base is exempt, because that is a pure base
+conversion and the value really is being restated.</p>
+<p><strong>The unitless fence is needed on the validation side too.</strong> Section 5.2 framed
+<code>no_unit</code> being dimensionally compatible with <code>%</code> and <code>ppm</code> as a hazard for
+conversion, and it is — but the same hole is in <code>require_dimension_of</code>, where a
+requirement of <code>{"%"}</code> would quietly accept an unannotated bare number as a
+ratio. Both halves of the policy now go through one predicate, so the fence
+cannot be present in one and missing in the other. The lesson generalises past
+this feature: a rule that says "compatible" is doing dimensional analysis, and
+dimensional analysis has nothing to say about whether a number was annotated.</p>
+<p><strong>A dimension vector does not determine a unit.</strong> Section 3.4 assumed SI
+normalisation could be built by reading a unit's dimension vector and spelling
+the SI base units back out. Sweeping the registry through the implementation
+proved otherwise in two ways, neither visible from the design.</p>
+<p>The photometric units — <code>lm</code>, <code>lx</code>, <code>ph</code> — each carry the steradian's quantity
+kind, which no SI dimension vector can express, because the steradian is
+dimensionless. Rebuilt from dimensions alone they come back as <code>cd</code> and <code>cd/m²</code>:
+luminous intensity where the value was luminous flux. The conversion engine
+refuses those pairs, correctly, so a document containing a lumen aborted the
+moment normalisation was switched on. And an affine scale inside a compound —
+<code>s/°C</code> — has the dimensions of <code>s/K</code> and is still unconvertible, because °C
+means nothing at an exponent other than 1: 1812 such compounds exist in the
+registry.</p>
+<p>Both are fixed by making the normal form check its own answer rather than trust
+the dimension vector, and section 5's conclusion needs the same qualification:
+<code>bvn_units_convertible</code> is a screen, not a guarantee. That is why a policy target
+the engine ultimately refuses now leaves the value in its native unit instead of
+aborting — a policy names a preference, and a preference that cannot be applied
+is a non-match, not an error.</p>
+<p><strong><code>leave_inexact</code> had borrowed its reasoning from the wrong flag.</strong> The note
+argued that an irrational factor must always abort because "there is nothing
+exact to hand over either way". That is true of <code>want_unit_allow_nonterminating</code>,
+whose fallback <em>is</em> the exact rational — and false of the leave policy, whose
+fallback is the value in its own unit, which exists whatever the factor is. The
+shipped flag therefore steps over irrational factors and work-limit refusals as
+well as non-terminating expansions: one meaning, "deliver what you can, keep the
+rest as written", rather than three cases with different answers.</p>
+<h3 id="74-the-half-this-note-never-considered">7.4 The half this note never considered</h3>
+<p>Every option in section 2 is a READER option. The whole evaluation asked what a
+consumer could demand of a document, and never asked what a producer could be
+held to — which, on reflection, is the more load-bearing question.</p>
+<p>A reader policy can only reject a document that already exists. If the producer
+wrote a bare number, the damage is done at the point the file was created: the
+reader's refusal is a late detection of a fault that was preventable, and every
+consumer of that file has to detect it separately. The format's claim is that a
+document carries everything needed to interpret it, and only the writer is in a
+position to make that true.</p>
+<p>So the same policy object drives <code>bvnr_writer_set_unit_policy</code>, in its
+validation half. <code>require_unit</code> and <code>require_dimension_of</code> mean exactly what
+they mean on the reader — deliberately the same predicate, so a producer and a
+consumer configured alike cannot disagree — and <code>bvnr_write_event</code> fails with
+<code>error_unit_mismatch</code> rather than emitting the value.</p>
+<p>The conversion half is refused there rather than ignored. The writer already has
+a value-rewriting mode in <code>BVN_UNIT_REDUCE</code>, which folds prefixes out and
+rescales exactly; a second one arriving through a different door, with its own
+rules about exactness and its own opinion about dimensionless units, is how two
+features end up disagreeing about what a document says. A caller who sets the
+conversion fields on a writer has assumed something untrue and is told so.</p>
+<p>The interesting implementation detail is where the unit comes from. On the
+reader a value's unit is settled by the time it is delivered; on the writer it
+may arrive on the value event or as a parameter of the type annotation that
+preceded it, and in the second case the value event carries no unit at all. The
+annotation's unit is left in the writer's <code>parsed_unit</code>, which <strong>outlives the
+value it belonged to</strong> — so reading it unguarded would let one annotated value
+vouch for the next bare one. The serialiser's existing <code>emitted_unit</code> flag,
+reset per assignment and per annotation, is what makes the fallback safe. That
+flag existed for an unrelated reason (not double-emitting an inline unit under
+an annotation that already carried one), which is the sort of luck worth
+recording.</p>
+<h3 id="75-option-2-reconsidered">7.5 Option 2, reconsidered</h3>
+<p>Section 3.3 deferred key-path rules and section 7.2 said not to build them. They
+were built. The verdict was wrong in its conclusion and right in its facts,
+which is worth separating.</p>
+<p><strong>What it got right.</strong> Key tracking really was absent — the streaming validator
+had no current key, no stack, no depth, and the CLI's <code>query</code> really did
+sidestep the problem by materialising the DOM. Adding it really did mean a depth
+cap, a byte cap, and a decision about arrays. None of that was overstated.</p>
+<p><strong>What it got wrong</strong> was calling the result "a schema language living inside
+the parser". A rule is one path and one unit; it says nothing about types,
+cardinality, required-ness or ordering, and it has no vocabulary in which to.
+The cost was a flat buffer, a mark per open struct, and a rule that once a push
+is lost every deeper one is too — perhaps eighty lines, no allocation, and no
+new tier. Weighed against the feature it enables, that was not a close call, and
+the note reached the opposite conclusion largely because it had bundled option 2
+with the much larger thing it feared it would become.</p>
+<p><strong>The part the evaluation could not have guessed</strong> is what "and it has no
+vocabulary in which to" costs. A path either is known or is not, and an unknown
+path must match NOTHING. Nesting deeper than the tracker can describe, a key
+longer than a component may be — in every such case the honest answer is that
+the position is unknown, and the dangerous answer is to guess. Hence the rule
+that a lost push makes every deeper push lost too, regardless of whether it
+would have fitted: it keeps pushes and pops balanced, and it is what stops a
+rule for <code>.a.b</code> from ever firing on something else. Matching the wrong field is
+the one failure mode a per-field rule must not have, and it is a failure mode
+the whole-document options simply do not possess.</p>
+<p><strong>And the rule it forced was not enough on its own.</strong> "An unknown path must
+match nothing" is stated above as though it were the whole invariant, and the
+first implementation satisfied it and was still wrong: an array of structs has
+ONE assignment and one key for every row, so the first row's push consumed the
+key and every later row pushed whatever key that row had ended on. The path was
+never unknown — it was confidently wrong, and a rule naming <code>.holdings.amount</code>
+quietly stopped applying after the first row of every table in the document.
+Silently not firing is the same defect as firing on the wrong field, and it
+survived the first round of testing because every test document had one struct
+per key. The fix is that a close RESTORES the key the open consumed, which costs
+nothing because that key is the path component being removed. The general
+lesson: a per-field rule needs a test corpus of document SHAPES, not of units.
+The suite now generates them — nested structs, arrays of scalars, arrays of
+structs, structs inside rows, to a random depth — recording each value's true
+path as it builds each document and then asserting that a rule naming that path
+fires on exactly the values living there. Sixteen thousand such assertions over
+three thousand generated documents found nothing further, which is the only kind
+of evidence worth having about a defect that a hand-written table missed.</p>
+<p>Two AGREEMENT properties are checked the same way, because a policy is now read
+by three separate pieces of code and nothing else would notice them drifting.
+Whatever the writer accepts under a policy, the reader must accept under that
+same policy — otherwise a producer emits a file its own consumer rejects, which
+is the failure the producer-side check exists to prevent, arrived at through the
+check itself. And for one document under one policy, the DOM must report the
+same value and the same unit as the streaming reader for every value, and reach
+the same verdict about the document. Neither has disagreed over five thousand
+generated documents.</p>
+<p>The registry itself is swept through a real PARSE rather than through the
+conversion functions, which is a different question and was for a while the last
+place a gap could have hidden: section 5's sweeps prove what the engine does,
+and nothing about what a document does, since a unit reaches the policy only by
+being written into an annotation, lexed back out and matched. All 396 units
+survive that round trip; 124 of them normalise, each to exactly the value and
+unit the engine gives in isolation; the other 272 are left alone, and every one
+of those is a case the engine genuinely cannot deliver — no SI form, already
+normal, an irrational factor, or no terminating expansion. "Left alone" is not
+allowed to be a shrug. The same table also goes through the DOM, through the
+writer under two policy shapes, and back through a target naming each value's
+own unit, which must be a no-op rather than a pointless rewrite.</p>
+<p><strong>And the DOM followed for free.</strong> Section 3.7 treated a DOM-tier pass as a
+separate option with its own machinery. Once the reader had the policy the DOM
+needed thirty lines: it is built on the reader, so it inherits everything, and
+the only real decision was that a converted value is STORED converted — with one
+wrinkle the note could not have anticipated, that an integer converting to a
+fraction has to be stored as a float, because the DOM decides int-versus-float
+from the declared family and would otherwise hand <code>0.005</code> to the integer
+builder.</p>
+<hr />
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the unit registry and the notation grammar</li>
+<li><a href="https://www.bovnar.io/docs/api/">Read/Write API</a> — the <code>want_unit</code> hook and the read flags this note extends</li>
+<li><a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> — how a unit token is resolved, and the pairs that look interchangeable</li>
+<li><a href="https://www.bovnar.io/docs/streaming/">Streaming</a> — why the reader holds no key context during a parse</li>
+</ul>
+<hr />
+<p><em>End of Bovnar — Parser-Level Unit Policy (Bovnar spec 1.1).</em></p>
+</main>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
+<button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
+<script src="/bovnar_highlight.js?v=667c4a367efc"></script>
+<script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
+<script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
+<script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
+<style>
+#bvnr-consent{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;
+ display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;
+ justify-content:center;padding:.85rem 1.15rem;background:#1b1b1b;color:#ededed;
+ border-top:1px solid #3e3e42;box-shadow:0 -2px 14px rgba(0,0,0,.4);
+ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#bvnr-consent[hidden]{display:none}
+#bvnr-consent p{margin:0;max-width:70ch;color:#ededed}
+#bvnr-consent a{color:#9cdcfe}
+#bvnr-consent .bvnr-consent-actions{display:flex;gap:.5rem;flex:none}
+#bvnr-consent button{font:inherit;padding:.4rem 1rem;border-radius:4px;
+ cursor:pointer;border:1px solid #55555a;background:transparent;color:#ededed}
+#bvnr-consent button:hover{border-color:#3794ff}
+#bvnr-consent button.bvnr-consent-yes{background:#0e639c;border-color:#0e639c;
+ color:#fff}
+#bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
+</style>
+<div id="bvnr-consent" role="region" aria-label="Analytics consent" hidden>
+  <p>This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href="/privacy.html">Privacy notice</a></p>
+  <div class="bvnr-consent-actions">
+    <button type="button" id="bvnr-consent-decline">Decline</button>
+    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Allow analytics</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V';
+  var box = document.getElementById('bvnr-consent');
+  function load() {
+    if (window.__bvnrAnalytics) return;
+    window.__bvnrAnalytics = 1;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', ID);
+  }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  var seen = null;
+  try { seen = localStorage.getItem(KEY); } catch (e) {}
+  if (seen === 'granted') { load(); return; }
+  if (seen === 'denied' || !box) return;
+  box.hidden = false;
+  var yes = document.getElementById('bvnr-consent-accept');
+  var no  = document.getElementById('bvnr-consent-decline');
+  if (yes) yes.addEventListener('click', function () {
+    save('granted'); box.hidden = true; load();
+  });
+  if (no) no.addEventListener('click', function () {
+    save('denied'); box.hidden = true;
+  });
+})();
+</script>
+</body>
+</html>

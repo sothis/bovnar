@@ -20,7 +20,7 @@ found only by sweeping the whole unit registry against the implementation. Optio
 were not built; the reasoning in sections 3.1, 3.6, 3.7 and 7.2 stands as written. Option 2 WAS
 built in the end — section 7.5 records what its "defer" verdict got wrong, and what it got right.
 The shipped API is documented in [Read/Write API 1.12](08_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy),
-the Python form in [Python Bindings 5.5](09_bovnar_python_bindings.md#55-unitpolicy--validation-and-conversion-without-a-callback),
+the Python form in [Python Bindings 5.6](09_bovnar_python_bindings.md#56-unitpolicy--validation-and-conversion-without-a-callback),
 and the CLI flags in the README. Section 3.2's claim that every non-C consumer gets the feature
 for free held: the Python binding is a dataclass and one setter, with no per-value trampoline.
 

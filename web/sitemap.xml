@@ -41,6 +41,11 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://www.bovnar.io/docs/policy/</loc>
+    <lastmod>2026-07-28</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.bovnar.io/docs/ambiguities/</loc>
     <lastmod>2026-07-28</lastmod>
     <priority>0.7</priority>
@@ -97,6 +102,11 @@
   </url>
   <url>
     <loc>https://www.bovnar.io/doc/pdf/bovnar-unit-system.pdf</loc>
+    <lastmod>2026-07-28</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.bovnar.io/doc/pdf/bovnar-unit-policy.pdf</loc>
     <lastmod>2026-07-28</lastmod>
     <priority>0.6</priority>
   </url>

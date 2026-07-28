@@ -393,7 +393,7 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `cup`  | `cups` | US cup | `bu_cup` | 2.365882365×10⁻⁴ m³ |
 | `gi`   | `gill`, `gills` | US gill | `bu_gill` | 1.18294118250×10⁻⁴ m³ |
 | `fl_oz`| `fluid_ounce`, `fluid_ounces` | US fluid ounce | `bu_fluid_ounce` | 2.95735295625×10⁻⁵ m³ |
-| `tbsp` | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.47867648×10⁻⁵ m³ |
+| `tbsp` | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.478676478125×10⁻⁵ m³ (exact) |
 | `tsp`  | `teaspoon`, `teaspoons` | US teaspoon | `bu_teaspoon` | 4.92892159375×10⁻⁶ m³ |
 | `bbl`  | `barrel`, `barrels` | petroleum barrel | `bu_barrel` | 0.158987294928 m³ |
 
@@ -521,16 +521,16 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 | `prln` | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.17953×10⁻³ m |
 | `prz`  | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61544×10⁻² m |
 | `prf`  | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
-| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.669376×10⁻¹ m (25½ Zoll) |
-| `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.76624 m |
-| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m |
+| `elle` | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.66937625×10⁻¹ m (exact; 25½ Zoll) |
+| `rute` | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.766236 m (exact) |
+| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.883118 m (exact) |
 | `dt_mi` | `deutsche_meile`, `german_mile` | Geographische Meile | `bu_german_mile` | 7420.44 m |
 
 #### Historical German Units — Area (Prussian)
 
 | Symbol | Long forms | Name | Enum value | Factor |
 |--------|-----------|------|------------|--------|
-| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.22 m² |
+| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.21604938528 m² (exact) |
 
 #### Historical German Units — Volume (Prussian)
 

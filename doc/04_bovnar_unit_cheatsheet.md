@@ -202,12 +202,12 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `fn`  | `fortnight`, `fortnights` | fortnight | `bu_fortnight` | 1 209 600 s (= 14 d) |
 | `yr`  | `year`, `years` | year (Julian) | `bu_year` | 31 557 600 s |
 | `°`, `deg` | `degr`, `degree`, `degrees` | degree (angle) | `bu_degree` | π/180 rad — U+00B0 |
-| `t`   | `tonne` | tonne | `bu_tonne` | 10³ kg |
-| `bar` | — | bar | `bu_bar` | 10⁵ Pa |
-| `eV`  | `electronvolt` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
-| `Da`  | `dalton`, `amu`, `u` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
+| `t`   | `tonne`, `tonnes` | tonne | `bu_tonne` | 10³ kg |
+| `bar` | `bars` | bar | `bu_bar` | 10⁵ Pa |
+| `eV`  | `electronvolt`, `electronvolts` | electronvolt | `bu_electronvolt` | 1.602176634×10⁻¹⁹ J |
+| `Da`  | `dalton`, `daltons`, `amu`, `u` | dalton | `bu_dalton` | 1.66053906660×10⁻²⁷ kg |
 | `au`  | — | astronomical unit | `bu_astronomical_unit` | 1.495978707×10¹¹ m |
-| `ha`  | `hectare` | hectare | `bu_hectare` | 10⁴ m² |
+| `ha`  | `hectare`, `hectares` | hectare | `bu_hectare` | 10⁴ m² |
 
 ### 4.4 Imperial & US Customary — Length
 
@@ -251,7 +251,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 |--------|-----------|------|------|------------|
 | `°C`, `degC` | `degrC`, `degreeC`, `degreesC`, `celsius` | degree Celsius | `bu_celsius` | K = °C + 273.15 **(affine)** |
 | `°F`, `degF` | `degrF`, `degreeF`, `degreesF`, `fahrenheit` | degree Fahrenheit | `bu_fahrenheit` | K = (°F + 459.67) × 5/9 **(affine)** |
-| `°Ra`, `degRa` | `degrRa`, `degreeRa`, `degreesRa`, `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
+| `°Ra`, `degRa`, `Ra` | `degrRa`, `degreeRa`, `degreesRa`, `rankine` | degree Rankine | `bu_rankine` | K = °Ra × 5/9 (linear) |
 | `°De`, `degDe` | `degrDe`, `degreeDe`, `degreesDe`, `delisle` | degree Delisle | `bu_delisle` | K = 373.15 − °De × 2/3 **(affine)** |
 | `°N`, `degN` | `degrN`, `degreeN`, `degreesN`, `newton_temperature` | degree Newton | `bu_newton_temp` | K = °N × 100/33 + 273.15 **(affine)** |
 | `°Re`, `degRe` | `degrRe`, `degreeRe`, `degreesRe`, `reaumur` | degree Réaumur | `bu_reaumur` | K = °Re × 5/4 + 273.15 **(affine)** |
@@ -323,7 +323,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `cup`   | `cups` | US cup | `bu_cup` | 2.365882365×10⁻⁴ m³ |
 | `gi`    | `gill`, `gills` | US gill | `bu_gill` | 1.18294118250×10⁻⁴ m³ |
 | `fl_oz` | `fluid_ounce`, `fluid_ounces` | US fluid ounce | `bu_fluid_ounce` | 2.95735295625×10⁻⁵ m³ |
-| `tbsp`  | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.47867648×10⁻⁵ m³ |
+| `tbsp`  | `tablespoon`, `tablespoons` | US tablespoon | `bu_tablespoon` | 1.478676478125×10⁻⁵ m³ (exact) |
 | `tsp`   | `teaspoon`, `teaspoons` | US teaspoon | `bu_teaspoon` | 4.92892159375×10⁻⁶ m³ |
 | `bbl`   | `barrel`, `barrels` | petroleum barrel | `bu_barrel` | 0.158987294928 m³ |
 
@@ -343,7 +343,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 
 | Symbol  | Long forms | Name | Enum | Factor |
 |---------|-----------|------|------|--------|
-| `fl_dr` | `fluid_dram`, `fluid_drams` | US fluid dram | `bu_fluid_dram` | 3.6966911953125×10⁻⁶ m³ |
+| `fl_dr`, `fl_drams` | `fluid_dram`, `fluid_drams` | US fluid dram | `bu_fluid_dram` | 3.6966911953125×10⁻⁶ m³ |
 | `minim` | `minims` | US minim | `bu_minim` | 6.16115199218750×10⁻⁸ m³ |
 | `pk`    | `peck`, `pecks` | US dry peck | `bu_peck` | 8.80976754172×10⁻³ m³ |
 | `bsh`   | `bushel`, `bushels` | US bushel | `bu_bushel` | 3.523907016688×10⁻² m³ |
@@ -439,16 +439,16 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 | `prln`    | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.17953×10⁻³ m |
 | `prz`     | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61544×10⁻² m |
 | `prf`     | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
-| `elle`    | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.669376×10⁻¹ m |
-| `rute`    | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.76624 m |
-| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.88312 m |
+| `elle`    | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.66937625×10⁻¹ m (exact) |
+| `rute`    | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.766236 m (exact) |
+| `klafter` | `prussian_klafter` | Klafter | `bu_klafter` | 1.883118 m (exact) |
 | `dt_mi`   | `deutsche_meile`, `german_mile` | Geographische Meile | `bu_german_mile` | 7420.44 m |
 
 #### Area (historical Prussian)
 
 | Symbol   | Long forms | Name | Enum | Factor |
 |----------|-----------|------|------|--------|
-| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.22 m² |
+| `morgen` | `prussian_morgen` | Morgen (Prussian) | `bu_morgen` | 2553.21604938528 m² (exact) |
 
 #### Volume (historical Prussian)
 

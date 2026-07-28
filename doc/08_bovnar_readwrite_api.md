@@ -46,6 +46,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 3.3 [`bvn_unit_to_string` / `bvn_unit_to_string_ex`](#33-bvn_unit_to_string--bvn_unit_to_string_ex)
     - 3.4 [`bvn_unit_convert_value` *(bovnar_si_units.h)*](#34-bvn_unit_convert_value-bovnar_si_unitsh)
     - 3.5 [`bvn_error_to_string`](#35-bvn_error_to_string)
+    - 3.6 [Canonicalising observer (`bvnr_canon_observer_*`)](#36-canonicalising-observer-bvnr_canon_observer_)
 4. [DOM API (`bovnar_dom.h`)](#4-dom-api-bovnar_domh)
     - 4.1 [Parsing and lifetime](#41-parsing-and-lifetime)
     - 4.2 [Navigation](#42-navigation)
@@ -1537,6 +1538,61 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (profile under implementation) |
 | `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (profile under implementation) |
 | `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | Under implementation — not in a released version. The document contains an octet stream and the reader was opened with `text_only`. Reported at the stream's opening `0x00`, before its payload is read |
+
+### 3.6 Canonicalising observer (`bvnr_canon_observer_*`)
+
+An adapter that lets a reader's event stream drive the serializer directly, without
+constructing a `bvnr_writer_t`. Installed as a reader callback it re-emits every event
+to a sink, producing a canonical — or pretty-printed — copy of the input. This is what
+the command-line pretty-printer and canonicaliser are built on.
+
+```c
+typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
+
+bvnr_canon_observer_t *bvnr_canon_observer_create(const bvnr_sink_t *sink, bool pretty);
+void bvnr_canon_observer_set_version(bvnr_canon_observer_t *obs,
+                                     uint16_t major, uint16_t minor);
+bool bvnr_canon_observer_on_event(void *obs, bvnr_event_t ev, bvnr_data_t *data);
+bool bvnr_canon_observer_finish(bvnr_canon_observer_t *obs);
+void bvnr_canon_observer_destroy(bvnr_canon_observer_t *obs);
+```
+
+`pretty` selects the indented form; `false` emits the compact canonical form.
+`bvnr_canon_observer_create` returns `NULL` if the sink is missing or has no push
+function.
+
+`bvnr_canon_observer_on_event` has the signature of a reader callback — `void *` first
+— so the observer handle can be passed as `userdata` and the function used as
+`on_verified` directly. Call `bvnr_canon_observer_finish` after `bvnr_read` returns to
+flush the trailing state, then `bvnr_canon_observer_destroy`.
+
+**It does not re-validate.** The events already came from a validating reader, so the
+observer reproduces faithfully what it is fed rather than checking it a second time.
+For the same reason its array-nesting cap is set to the maximum: the reader has already
+enforced its own limit, and a second, stricter cap here would reject a document the
+reader accepted.
+
+**Version directives.** A canonical copy of a spec-1.1 document needs the directive its
+constructs require in order to re-read. `bvnr_canon_observer_set_version` records one to
+prepend; it is emitted lazily, just before the first event. Call it before any event is
+fed — typically from the reader's callback once `bvnr_reader_get_declared_version`
+resolves (§1.8). A version of `0.0`, or a call made after output has begun, is ignored.
+
+```c
+bvnr_sink_t sink;
+bvnr_sink_to_fd(&sink, STDOUT_FILENO);
+
+bvnr_canon_observer_t *canon = bvnr_canon_observer_create(&sink, /*pretty=*/true);
+
+bvnr_read_flags_t flags = {0};
+flags.userdata    = canon;
+flags.on_verified = bvnr_canon_observer_on_event;
+
+bvnr_open_read_source(r, &src, NULL, &flags);
+bvnr_read(r);
+bvnr_canon_observer_finish(canon);
+bvnr_canon_observer_destroy(canon);
+```
 
 ---
 

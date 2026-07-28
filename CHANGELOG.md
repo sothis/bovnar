@@ -138,8 +138,8 @@ reading the grown by-value structs at the wrong size.
   terminating expansion in the output base (`42 km/h` is `35/3 m/s`) in its
   native unit, visible as `converted == false`, instead of aborting a document
   nobody had a complaint about. An irrational factor still aborts. See
-  read/write API §1.12, and `doc/06_bovnar_unit_policy.md` for the evaluation
-  the design came from.
+  read/write API §1.12, and `doc/06_bovnar_unit_policy.md` for the policy
+  reference.
   **Per-field rules** name one field by the key path it sits at
   (`.inlet.temperature`, or `.inlet.*` for a subtree), and are consulted before
   everything else — the most specific thing a policy can say. This is what the

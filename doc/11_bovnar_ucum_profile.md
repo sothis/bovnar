@@ -6,9 +6,8 @@
 
 Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
 grammar this profile sits beside), [Unit Ambiguities](07_bovnar_unit_ambiguities.md) (how a unit token is
-resolved, and the pairs that look interchangeable), and `doc/06_bovnar_unit_policy.md` (the
-reader- and writer-side unit policies a profile unit has to survive unchanged — a working note, not
-part of the published documentation set).
+resolved, and the pairs that look interchangeable), and [Unit Policy](06_bovnar_unit_policy.md) (the
+reader- and writer-side unit policies a profile unit has to survive unchanged).
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by

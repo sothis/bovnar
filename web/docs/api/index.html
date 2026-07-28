@@ -88,6 +88,7 @@
 <li>3.3 <a href="#33-bvn_unit_to_string--bvn_unit_to_string_ex"><code>bvn_unit_to_string</code> / <code>bvn_unit_to_string_ex</code></a></li>
 <li>3.4 <a href="#34-bvn_unit_convert_value-bovnar_si_unitsh"><code>bvn_unit_convert_value</code> <em>(bovnar_si_units.h)</em></a></li>
 <li>3.5 <a href="#35-bvn_error_to_string"><code>bvn_error_to_string</code></a></li>
+<li>3.6 <a href="#36-canonicalising-observer-bvnr_canon_observer_">Canonicalising observer (<code>bvnr_canon_observer_*</code>)</a></li>
 </ul>
 </li>
 <li><a href="#4-dom-api-bovnar_domh">DOM API (<code>bovnar_dom.h</code>)</a><ul>
@@ -1513,6 +1514,53 @@ table in which a rounded decimal is passed off as exact.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="36-canonicalising-observer-bvnr_canon_observer_">3.6 Canonicalising observer (<code>bvnr_canon_observer_*</code>)</h3>
+<p>An adapter that lets a reader's event stream drive the serializer directly, without
+constructing a <code>bvnr_writer_t</code>. Installed as a reader callback it re-emits every event
+to a sink, producing a canonical — or pretty-printed — copy of the input. This is what
+the command-line pretty-printer and canonicaliser are built on.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_canon_observer_s</span><span class="w"> </span><span class="n">bvnr_canon_observer_t</span><span class="p">;</span>
+
+<span class="n">bvnr_canon_observer_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_canon_observer_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">pretty</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">bvnr_canon_observer_set_version</span><span class="p">(</span><span class="n">bvnr_canon_observer_t</span><span class="w"> </span><span class="o">*</span><span class="n">obs</span><span class="p">,</span>
+<span class="w">                                     </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">major</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">minor</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_canon_observer_on_event</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">obs</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_event_t</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_canon_observer_finish</span><span class="p">(</span><span class="n">bvnr_canon_observer_t</span><span class="w"> </span><span class="o">*</span><span class="n">obs</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">bvnr_canon_observer_destroy</span><span class="p">(</span><span class="n">bvnr_canon_observer_t</span><span class="w"> </span><span class="o">*</span><span class="n">obs</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>pretty</code> selects the indented form; <code>false</code> emits the compact canonical form.
+<code>bvnr_canon_observer_create</code> returns <code>NULL</code> if the sink is missing or has no push
+function.</p>
+<p><code>bvnr_canon_observer_on_event</code> has the signature of a reader callback — <code>void *</code> first
+— so the observer handle can be passed as <code>userdata</code> and the function used as
+<code>on_verified</code> directly. Call <code>bvnr_canon_observer_finish</code> after <code>bvnr_read</code> returns to
+flush the trailing state, then <code>bvnr_canon_observer_destroy</code>.</p>
+<p><strong>It does not re-validate.</strong> The events already came from a validating reader, so the
+observer reproduces faithfully what it is fed rather than checking it a second time.
+For the same reason its array-nesting cap is set to the maximum: the reader has already
+enforced its own limit, and a second, stricter cap here would reject a document the
+reader accepted.</p>
+<p><strong>Version directives.</strong> A canonical copy of a spec-1.1 document needs the directive its
+constructs require in order to re-read. <code>bvnr_canon_observer_set_version</code> records one to
+prepend; it is emitted lazily, just before the first event. Call it before any event is
+fed — typically from the reader's callback once <code>bvnr_reader_get_declared_version</code>
+resolves (§1.8). A version of <code>0.0</code>, or a call made after output has begun, is ignored.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="n">sink</span><span class="p">;</span>
+<span class="n">bvnr_sink_to_fd</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="n">STDOUT_FILENO</span><span class="p">);</span>
+
+<span class="n">bvnr_canon_observer_t</span><span class="w"> </span><span class="o">*</span><span class="n">canon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_canon_observer_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="cm">/*pretty=*/</span><span class="nb">true</span><span class="p">);</span>
+
+<span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="n">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="n">flags</span><span class="p">.</span><span class="n">userdata</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">canon</span><span class="p">;</span>
+<span class="n">flags</span><span class="p">.</span><span class="n">on_verified</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_canon_observer_on_event</span><span class="p">;</span>
+
+<span class="n">bvnr_open_read_source</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">flags</span><span class="p">);</span>
+<span class="n">bvnr_read</span><span class="p">(</span><span class="n">r</span><span class="p">);</span>
+<span class="n">bvnr_canon_observer_finish</span><span class="p">(</span><span class="n">canon</span><span class="p">);</span>
+<span class="n">bvnr_canon_observer_destroy</span><span class="p">(</span><span class="n">canon</span><span class="p">);</span>
+</code></pre></div>
+
 <hr />
 <h2 id="4-dom-api-bovnar_domh">4. DOM API (<code>bovnar_dom.h</code>)</h2>
 <p>The SAX reader above streams events. When you instead want the whole document in

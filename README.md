@@ -450,7 +450,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 | `bovnar frames pack\|list <file…\|->` | Wrap each document in a length-prefixed frame, or list the documents in a frame stream. |
 | `bovnar mux pack\|list <chan:file…\|->` | Multiplex files onto channels in one octet stream, or list the channel/message sizes in a multiplexed stream. |
 | `bovnar version` | Print the library version and supported spec version. |
-| `bovnar bench [options]` | Benchmark parsing throughput across profiles and payload sizes; `--json` for machine-readable output. |
+| `bovnar bench [options]` | Benchmark parsing throughput. `--profile <list>` picks the payload shape (`scalars,typed,structs,arrays,units,mixed`, or `all`), `--size <list>` the payload sizes in bytes. `--iterations <N>` parse rounds per cell (default 100) and `--warmup <N>` warm-up rounds (default 10); `--min-overhead` drops the `on_verified` callback to time the parser alone. `--verbose` for per-run detail, `--json` for machine-readable output. |
 
 ```bash
 bovnar validate examples/units.bvnr

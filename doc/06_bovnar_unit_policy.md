@@ -366,8 +366,9 @@ A malformed unit raises `BovnarArgumentError` before a byte is read.
 
 ### 7.3 Command line
 
-`validate`, `events` and `query` take the validation options; `pretty-print` and `convert` take
-the conversion options as well.
+`validate`, `events` and `query` accept the options below. `pretty-print` and `convert` do not
+take a unit policy at all — `pretty-print` reports the flags as surplus arguments, and `convert`
+ignores them without complaint.
 
 | Flag | Field |
 |---|---|

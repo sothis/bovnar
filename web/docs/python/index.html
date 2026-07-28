@@ -70,6 +70,7 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 <li>5.4 <a href="#54-valueunitprefix"><code>ValueUnitPrefix</code></a></li>
 <li>5.5 <a href="#55-inline-unit-suffix">Inline unit suffix</a></li>
 <li>5.6 <a href="#56-unitpolicy--validation-and-conversion-without-a-callback"><code>UnitPolicy</code> — validation and conversion without a callback</a></li>
+<li>5.7 <a href="#57-building-a-valueunit">Building a <code>ValueUnit</code></a></li>
 </ul>
 </li>
 <li><a href="#6-quantity"><code>Quantity</code></a><ul>
@@ -620,6 +621,39 @@ rules about exactness is how a document ends up meaning two things.</p>
 <span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;g&quot;</span><span class="p">))</span>    <span class="c1"># → k~g  (the SI base unit for mass)</span>
 <span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;%&quot;</span><span class="p">))</span>    <span class="c1"># → None (dimensionless)</span>
 <span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;lm&quot;</span><span class="p">))</span>   <span class="c1"># → None (carries the steradian&#39;s kind)</span>
+</code></pre></div>
+
+<h3 id="57-building-a-valueunit">5.7 Building a <code>ValueUnit</code></h3>
+<p><code>parse_unit</code> builds a unit from text. To build one programmatically — without going
+through the notation — use the <code>make_unit_*</code> constructors, exported from the top-level
+<code>bovnar</code> namespace and from <code>bovnar.structs</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">make_unit_si</span><span class="p">,</span> <span class="n">make_unit_iec</span><span class="p">,</span> <span class="n">make_unit_compound</span><span class="p">,</span>
+                    <span class="n">make_unit_none</span><span class="p">,</span> <span class="n">make_unit_dimensionless</span><span class="p">,</span>
+                    <span class="n">BaseUnit</span><span class="p">,</span> <span class="n">SIPrefix</span><span class="p">,</span> <span class="n">IECPrefix</span><span class="p">,</span> <span class="n">Exponent</span><span class="p">,</span> <span class="n">unit_to_str</span><span class="p">)</span>
+
+<span class="n">make_unit_si</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">GRAM</span><span class="p">,</span> <span class="n">SIPrefix</span><span class="o">.</span><span class="n">KILO</span><span class="p">)</span>              <span class="c1"># k~g</span>
+<span class="n">make_unit_si</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">METER</span><span class="p">,</span> <span class="n">exp</span><span class="o">=</span><span class="n">Exponent</span><span class="o">.</span><span class="n">SQUARE</span><span class="p">)</span>       <span class="c1"># m²</span>
+<span class="n">make_unit_iec</span><span class="p">(</span><span class="n">BaseUnit</span><span class="o">.</span><span class="n">BYTE</span><span class="p">,</span> <span class="n">IECPrefix</span><span class="o">.</span><span class="n">GIBI</span><span class="p">)</span>            <span class="c1"># Gi~B</span>
+
+<span class="n">make_unit_compound</span><span class="p">([</span>                                    <span class="c1"># k~g·m/s²</span>
+    <span class="p">{</span><span class="s2">&quot;base&quot;</span><span class="p">:</span> <span class="n">BaseUnit</span><span class="o">.</span><span class="n">GRAM</span><span class="p">,</span>   <span class="s2">&quot;si_prefix&quot;</span><span class="p">:</span> <span class="n">SIPrefix</span><span class="o">.</span><span class="n">KILO</span><span class="p">,</span> <span class="s2">&quot;exp&quot;</span><span class="p">:</span> <span class="n">Exponent</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;base&quot;</span><span class="p">:</span> <span class="n">BaseUnit</span><span class="o">.</span><span class="n">METER</span><span class="p">,</span>                             <span class="s2">&quot;exp&quot;</span><span class="p">:</span> <span class="n">Exponent</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;base&quot;</span><span class="p">:</span> <span class="n">BaseUnit</span><span class="o">.</span><span class="n">SECOND</span><span class="p">,</span>                            <span class="s2">&quot;exp&quot;</span><span class="p">:</span> <span class="n">Exponent</span><span class="o">.</span><span class="n">NEG_SQUARE</span><span class="p">},</span>
+<span class="p">])</span>
+</code></pre></div>
+
+<p><code>prefix</code> and <code>exp</code> default to none and linear, so a plain base unit is
+<code>make_unit_si(BaseUnit.METER)</code>. A <code>make_unit_compound</code> component accepts the keys
+<code>base</code>, <code>exp</code>, <code>si_prefix</code> and <code>iec_prefix</code> — note that the compound form spells the
+prefix key out, where the scalar constructors take it positionally.</p>
+<p><strong><code>make_unit_none()</code> and <code>make_unit_dimensionless()</code> are not the same thing</strong>, even
+though both render as <code>no_unit</code>. The first is a unit struct with no components at all —
+a value carrying no unit. The second is one component whose base is <code>NONE</code> — a value
+carrying <code>no_unit</code> explicitly. That is exactly the pair <code>UnitPolicy(require_unit=True)</code>
+refuses together (§5.6), and the distinction survives a round trip:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">unit_to_str</span><span class="p">(</span><span class="n">make_unit_none</span><span class="p">())</span>            <span class="c1"># &#39;no_unit&#39;</span>
+<span class="n">unit_to_str</span><span class="p">(</span><span class="n">make_unit_dimensionless</span><span class="p">())</span>   <span class="c1"># &#39;no_unit&#39;</span>
+<span class="nb">bytes</span><span class="p">(</span><span class="n">make_unit_none</span><span class="p">())</span> <span class="o">!=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">make_unit_dimensionless</span><span class="p">())</span>   <span class="c1"># True</span>
 </code></pre></div>
 
 <hr />

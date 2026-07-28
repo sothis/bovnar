@@ -9060,8 +9060,9 @@ A malformed unit raises `BovnarArgumentError` before a byte is read.
 
 ### 7.3 Command line
 
-`validate`, `events` and `query` take the validation options; `pretty-print` and `convert` take
-the conversion options as well.
+`validate`, `events` and `query` accept the options below. `pretty-print` and `convert` do not
+take a unit policy at all — `pretty-print` reports the flags as surplus arguments, and `convert`
+ignores them without complaint.
 
 | Flag | Field |
 |---|---|
@@ -9733,6 +9734,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 3.3 [`bvn_unit_to_string` / `bvn_unit_to_string_ex`](#33-bvn_unit_to_string--bvn_unit_to_string_ex)
     - 3.4 [`bvn_unit_convert_value` *(bovnar_si_units.h)*](#34-bvn_unit_convert_value-bovnar_si_unitsh)
     - 3.5 [`bvn_error_to_string`](#35-bvn_error_to_string)
+    - 3.6 [Canonicalising observer (`bvnr_canon_observer_*`)](#36-canonicalising-observer-bvnr_canon_observer_)
 4. [DOM API (`bovnar_dom.h`)](#4-dom-api-bovnar_domh)
     - 4.1 [Parsing and lifetime](#41-parsing-and-lifetime)
     - 4.2 [Navigation](#42-navigation)
@@ -11225,6 +11227,61 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (profile under implementation) |
 | `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | Under implementation — not in a released version. The document contains an octet stream and the reader was opened with `text_only`. Reported at the stream's opening `0x00`, before its payload is read |
 
+### 3.6 Canonicalising observer (`bvnr_canon_observer_*`)
+
+An adapter that lets a reader's event stream drive the serializer directly, without
+constructing a `bvnr_writer_t`. Installed as a reader callback it re-emits every event
+to a sink, producing a canonical — or pretty-printed — copy of the input. This is what
+the command-line pretty-printer and canonicaliser are built on.
+
+```c
+typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
+
+bvnr_canon_observer_t *bvnr_canon_observer_create(const bvnr_sink_t *sink, bool pretty);
+void bvnr_canon_observer_set_version(bvnr_canon_observer_t *obs,
+                                     uint16_t major, uint16_t minor);
+bool bvnr_canon_observer_on_event(void *obs, bvnr_event_t ev, bvnr_data_t *data);
+bool bvnr_canon_observer_finish(bvnr_canon_observer_t *obs);
+void bvnr_canon_observer_destroy(bvnr_canon_observer_t *obs);
+```
+
+`pretty` selects the indented form; `false` emits the compact canonical form.
+`bvnr_canon_observer_create` returns `NULL` if the sink is missing or has no push
+function.
+
+`bvnr_canon_observer_on_event` has the signature of a reader callback — `void *` first
+— so the observer handle can be passed as `userdata` and the function used as
+`on_verified` directly. Call `bvnr_canon_observer_finish` after `bvnr_read` returns to
+flush the trailing state, then `bvnr_canon_observer_destroy`.
+
+**It does not re-validate.** The events already came from a validating reader, so the
+observer reproduces faithfully what it is fed rather than checking it a second time.
+For the same reason its array-nesting cap is set to the maximum: the reader has already
+enforced its own limit, and a second, stricter cap here would reject a document the
+reader accepted.
+
+**Version directives.** A canonical copy of a spec-1.1 document needs the directive its
+constructs require in order to re-read. `bvnr_canon_observer_set_version` records one to
+prepend; it is emitted lazily, just before the first event. Call it before any event is
+fed — typically from the reader's callback once `bvnr_reader_get_declared_version`
+resolves (§1.8). A version of `0.0`, or a call made after output has begun, is ignored.
+
+```c
+bvnr_sink_t sink;
+bvnr_sink_to_fd(&sink, STDOUT_FILENO);
+
+bvnr_canon_observer_t *canon = bvnr_canon_observer_create(&sink, /*pretty=*/true);
+
+bvnr_read_flags_t flags = {0};
+flags.userdata    = canon;
+flags.on_verified = bvnr_canon_observer_on_event;
+
+bvnr_open_read_source(r, &src, NULL, &flags);
+bvnr_read(r);
+bvnr_canon_observer_finish(canon);
+bvnr_canon_observer_destroy(canon);
+```
+
 ---
 
 ## 4. DOM API (`bovnar_dom.h`)
@@ -11678,6 +11735,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
     - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
     - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
+    - 5.7 [Building a `ValueUnit`](#57-building-a-valueunit)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Properties and methods](#62-properties-and-methods)
@@ -12237,6 +12295,45 @@ unit_si_normal_form(parse_unit("in"))   # → m
 unit_si_normal_form(parse_unit("g"))    # → k~g  (the SI base unit for mass)
 unit_si_normal_form(parse_unit("%"))    # → None (dimensionless)
 unit_si_normal_form(parse_unit("lm"))   # → None (carries the steradian's kind)
+```
+
+### 5.7 Building a `ValueUnit`
+
+`parse_unit` builds a unit from text. To build one programmatically — without going
+through the notation — use the `make_unit_*` constructors, exported from the top-level
+`bovnar` namespace and from `bovnar.structs`.
+
+```python
+from bovnar import (make_unit_si, make_unit_iec, make_unit_compound,
+                    make_unit_none, make_unit_dimensionless,
+                    BaseUnit, SIPrefix, IECPrefix, Exponent, unit_to_str)
+
+make_unit_si(BaseUnit.GRAM, SIPrefix.KILO)              # k~g
+make_unit_si(BaseUnit.METER, exp=Exponent.SQUARE)       # m²
+make_unit_iec(BaseUnit.BYTE, IECPrefix.GIBI)            # Gi~B
+
+make_unit_compound([                                    # k~g·m/s²
+    {"base": BaseUnit.GRAM,   "si_prefix": SIPrefix.KILO, "exp": Exponent.LINEAR},
+    {"base": BaseUnit.METER,                             "exp": Exponent.LINEAR},
+    {"base": BaseUnit.SECOND,                            "exp": Exponent.NEG_SQUARE},
+])
+```
+
+`prefix` and `exp` default to none and linear, so a plain base unit is
+`make_unit_si(BaseUnit.METER)`. A `make_unit_compound` component accepts the keys
+`base`, `exp`, `si_prefix` and `iec_prefix` — note that the compound form spells the
+prefix key out, where the scalar constructors take it positionally.
+
+**`make_unit_none()` and `make_unit_dimensionless()` are not the same thing**, even
+though both render as `no_unit`. The first is a unit struct with no components at all —
+a value carrying no unit. The second is one component whose base is `NONE` — a value
+carrying `no_unit` explicitly. That is exactly the pair `UnitPolicy(require_unit=True)`
+refuses together (§5.6), and the distinction survives a round trip:
+
+```python
+unit_to_str(make_unit_none())            # 'no_unit'
+unit_to_str(make_unit_dimensionless())   # 'no_unit'
+bytes(make_unit_none()) != bytes(make_unit_dimensionless())   # True
 ```
 
 ---
@@ -13602,9 +13699,8 @@ your own consumer/producer at the same seam without touching the core.
 
 Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
 grammar this profile sits beside), [Unit Ambiguities](07_bovnar_unit_ambiguities.md) (how a unit token is
-resolved, and the pairs that look interchangeable), and `doc/06_bovnar_unit_policy.md` (the
-reader- and writer-side unit policies a profile unit has to survive unchanged — a working note, not
-part of the published documentation set).
+resolved, and the pairs that look interchangeable), and [Unit Policy](06_bovnar_unit_policy.md) (the
+reader- and writer-side unit policies a profile unit has to survive unchanged).
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by

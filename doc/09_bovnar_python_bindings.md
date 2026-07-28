@@ -31,6 +31,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
     - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
     - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
+    - 5.7 [Building a `ValueUnit`](#57-building-a-valueunit)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Properties and methods](#62-properties-and-methods)
@@ -590,6 +591,45 @@ unit_si_normal_form(parse_unit("in"))   # → m
 unit_si_normal_form(parse_unit("g"))    # → k~g  (the SI base unit for mass)
 unit_si_normal_form(parse_unit("%"))    # → None (dimensionless)
 unit_si_normal_form(parse_unit("lm"))   # → None (carries the steradian's kind)
+```
+
+### 5.7 Building a `ValueUnit`
+
+`parse_unit` builds a unit from text. To build one programmatically — without going
+through the notation — use the `make_unit_*` constructors, exported from the top-level
+`bovnar` namespace and from `bovnar.structs`.
+
+```python
+from bovnar import (make_unit_si, make_unit_iec, make_unit_compound,
+                    make_unit_none, make_unit_dimensionless,
+                    BaseUnit, SIPrefix, IECPrefix, Exponent, unit_to_str)
+
+make_unit_si(BaseUnit.GRAM, SIPrefix.KILO)              # k~g
+make_unit_si(BaseUnit.METER, exp=Exponent.SQUARE)       # m²
+make_unit_iec(BaseUnit.BYTE, IECPrefix.GIBI)            # Gi~B
+
+make_unit_compound([                                    # k~g·m/s²
+    {"base": BaseUnit.GRAM,   "si_prefix": SIPrefix.KILO, "exp": Exponent.LINEAR},
+    {"base": BaseUnit.METER,                             "exp": Exponent.LINEAR},
+    {"base": BaseUnit.SECOND,                            "exp": Exponent.NEG_SQUARE},
+])
+```
+
+`prefix` and `exp` default to none and linear, so a plain base unit is
+`make_unit_si(BaseUnit.METER)`. A `make_unit_compound` component accepts the keys
+`base`, `exp`, `si_prefix` and `iec_prefix` — note that the compound form spells the
+prefix key out, where the scalar constructors take it positionally.
+
+**`make_unit_none()` and `make_unit_dimensionless()` are not the same thing**, even
+though both render as `no_unit`. The first is a unit struct with no components at all —
+a value carrying no unit. The second is one component whose base is `NONE` — a value
+carrying `no_unit` explicitly. That is exactly the pair `UnitPolicy(require_unit=True)`
+refuses together (§5.6), and the distinction survives a round trip:
+
+```python
+unit_to_str(make_unit_none())            # 'no_unit'
+unit_to_str(make_unit_dimensionless())   # 'no_unit'
+bytes(make_unit_none()) != bytes(make_unit_dimensionless())   # True
 ```
 
 ---

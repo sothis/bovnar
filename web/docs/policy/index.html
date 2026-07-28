@@ -366,8 +366,9 @@ error in somebody else's file. A rejected policy leaves the previous one in forc
 
 <p>A malformed unit raises <code>BovnarArgumentError</code> before a byte is read.</p>
 <h3 id="73-command-line">7.3 Command line</h3>
-<p><code>validate</code>, <code>events</code> and <code>query</code> take the validation options; <code>pretty-print</code> and <code>convert</code> take
-the conversion options as well.</p>
+<p><code>validate</code>, <code>events</code> and <code>query</code> accept the options below. <code>pretty-print</code> and <code>convert</code> do not
+take a unit policy at all — <code>pretty-print</code> reports the flags as surplus arguments, and <code>convert</code>
+ignores them without complaint.</p>
 <table>
 <thead>
 <tr>

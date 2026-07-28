@@ -5255,10 +5255,14 @@ revisions:
   the separated `k~g`, so a document that round-trips stays readable to a
   reader that predates the spelling;
 - **new error codes** appended after the current maximum (existing numeric values
-  never change) — 1.1 appends `error_invalid_spec_version` (42),
-  `error_unsupported_spec_version` (43), `error_invalid_codepoint` (44),
-  `error_invalid_datetime_literal` (45), and
-  `error_datetime_literal_unsupported_epoch` (46);
+  never change). The five the *grammar* of 1.1 required are
+  `error_invalid_spec_version` (42), `error_unsupported_spec_version` (43),
+  `error_invalid_codepoint` (44), `error_invalid_datetime_literal` (45), and
+  `error_datetime_literal_unsupported_epoch` (46) — those carry a `spec 1.1`
+  note in §16.10. Codes have been appended since for facilities beside the
+  wire format and for reader policy. **§16.10 is the list**, and the current
+  maximum is wherever it ends — never a number quoted somewhere else, this
+  paragraph included;
 - the **optional version directive** (§3.4), added in 1.1: it is an ordinary
   comment to any 1.0 reader, so adding one never invalidates a document;
 - new optional reader/writer flags and limits whose defaults preserve current

@@ -31,6 +31,16 @@ What a citation may look like, and how the target document is resolved:
 A citation to an external standard (IEEE 754 §3.5.2, ISO 8601 §4.2) is left
 alone: the skip list is what tells those apart from a citation into doc/.
 
+The same rot reaches a table that quotes source. The spec's §16.10 reprints the
+error_code_t enum, and nothing compared it to include/bovnar.h — so it stopped
+at 48 while the header had run to 51, and §11.9 named two of the three missing
+codes in its own outcome table, leaving the document contradicting itself three
+sections apart. The gap had a sharper edge than a stale list: §17 promises new
+codes are appended above the current maximum, so a reader implementing from the
+spec would have assigned 49 on top of a code that already existed. The enum is
+checked here for the same reason the citations are — it is a claim about the
+tree that only the tree can settle.
+
 Usage:
     python3 check_doc_refs.py            # report and exit 1 on a dead citation
     python3 check_doc_refs.py --verbose  # also list what resolved, and where
@@ -205,6 +215,48 @@ def check_file(path, rel, verbose):
     return problems
 
 
+# ── §16.10's reprint of error_code_t vs the header it reprints ──────────────
+HEADER = os.path.join(ROOT, "include", "bovnar.h")
+ENUM_SECTION = "### 16.10 Error Codes"
+ENUMERATOR = re.compile(r"\b(error_[a-z_0-9]+)\s*=\s*(\d+)")
+
+
+def read_enum(text):
+    """name -> value for every explicitly numbered error_code_t enumerator."""
+    return {n: int(v) for n, v in ENUMERATOR.findall(text)}
+
+
+def check_error_enum(verbose=False):
+    """The spec's §16.10 listing must match include/bovnar.h name for name."""
+    if not os.path.exists(HEADER):
+        return []
+    spec_path = os.path.join(DOC_DIR, SPEC)
+    spec_text = open(spec_path, encoding="utf-8").read()
+    if ENUM_SECTION not in spec_text:
+        return [f"doc/{SPEC}: no \"{ENUM_SECTION}\" section to check the enum against"]
+
+    header = read_enum(open(HEADER, encoding="utf-8").read())
+    listed = read_enum(spec_text.split(ENUM_SECTION, 1)[1])
+    problems = []
+    for name in sorted(set(header) - set(listed), key=lambda n: header[n]):
+        problems.append(
+            f"doc/{SPEC} §16.10: {name} = {header[name]} is in include/bovnar.h "
+            f"but not in the listing")
+    for name in sorted(set(listed) - set(header), key=lambda n: listed[n]):
+        problems.append(
+            f"doc/{SPEC} §16.10: {name} = {listed[name]} is listed but not in "
+            f"include/bovnar.h")
+    for name in sorted(set(listed) & set(header), key=lambda n: header[n]):
+        if listed[name] != header[name]:
+            problems.append(
+                f"doc/{SPEC} §16.10: {name} is {listed[name]} in the listing "
+                f"and {header[name]} in include/bovnar.h")
+    if verbose and not problems:
+        print(f"  ok  doc/{SPEC} §16.10: {len(listed)} error codes match "
+              f"include/bovnar.h")
+    return problems
+
+
 def main(argv):
     verbose = "--verbose" in argv
     load_docs()
@@ -230,7 +282,20 @@ def main(argv):
         print("Renumbering a document means carrying its citations over with "
               "it — see the header of check_doc_refs.py.")
         return 1
-    print(f"check_doc_refs: every section citation across {total} files resolves.")
+
+    enum_problems = check_error_enum(verbose)
+    for msg in enum_problems:
+        print(msg)
+    if enum_problems:
+        print(f"\n{len(enum_problems)} error code(s) disagree between "
+              f"doc/{SPEC} §16.10 and include/bovnar.h.")
+        print("The header is the source; §16.10 reprints it. Adding a code "
+              "means adding it there too — see the header of "
+              "check_doc_refs.py.")
+        return 1
+
+    print(f"check_doc_refs: every section citation across {total} files resolves, "
+          f"and §16.10 matches include/bovnar.h.")
     return 0
 
 

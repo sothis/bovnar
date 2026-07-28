@@ -7,6 +7,11 @@
 # This script stages the site into a temp directory, *resolving that symlink* so
 # the docs land as real files under <webroot>/doc — never as a dangling link.
 #
+# Only the documents named in the WEBDOCS table below are published out of doc/.
+# Anything else there — working notes, drafts, papers under submission — stays
+# private without needing to be listed anywhere. Add a document to WEBDOCS to
+# publish it; that is the only step.
+#
 # The documentation PDFs and the bovnar-docs-pdf.zip bundle are NOT kept in the
 # repository; they are generated under build/doc/pdf/ (git-ignored). Pass --pdf
 # to (re)build them with gen_doc_pdfs.py before uploading. Without --pdf the
@@ -37,40 +42,45 @@ WEB_DIR="$ROOT/web"
 GEN_PDF="$ROOT/gen_doc_pdfs.py"
 PDF_BUILD_DIR="$ROOT/build/doc/pdf"   # where gen_doc_pdfs.py writes its output
 
-# Paths (relative to the web root) that must NOT be published. These are working
-# documents and dev helpers that live under web/ or under doc/ (the symlink
-# target) but are not part of the public site.
+# ── What gets published out of doc/ ─────────────────────────────────────────
+#
+# web/doc is a symlink to ../doc, so everything in doc/ used to reach the live
+# site by default and each thing that should not was subtracted afterwards. That
+# is the wrong way round for a directory that holds working documents next to
+# published ones: the German Wikipedia draft, the Internet-Draft and the JOSS
+# paper each shipped -- or would have -- until someone noticed and added a line.
+# The JOSS paper actually did, and sat readable at /doc/joss_paper/paper.md.
+#
+# So doc/ is now allowlisted: nothing under it is published unless it is named
+# here. A new working document in doc/ is private by default, and forgetting
+# this table means a document is missing from the site -- loud, and the right
+# way for it to fail -- rather than a private draft being world-readable, which
+# is silent and the wrong way.
+#
+# Entries are paths relative to doc/ and may name a file or a directory. The
+# PDFs are NOT here: they are generated into build/doc/pdf/ and dropped into the
+# staging tree separately (step 2 below).
+WEBDOCS=(
+    "01_bovnar_tutorial.md"
+    "02_bovnar_faq.md"
+    "03_bovnar_spec.md"
+    "04_bovnar_unit_cheatsheet.md"
+    "05_bovnar_unit_system.md"
+    "06_bovnar_unit_policy.md"
+    "07_bovnar_unit_ambiguities.md"
+    "08_bovnar_readwrite_api.md"
+    "09_bovnar_python_bindings.md"
+    "10_bovnar_streaming.md"
+    "11_bovnar_ucum_profile.md"
+    "12_bovnar.ebnf"
+    "13_bovnar_conformance.md"
+)
+
+# Paths (relative to the web root) that must NOT be published. These are dev
+# helpers that live under web/ itself. Anything under doc/ is governed by
+# WEBDOCS above and needs no entry here.
 EXCLUDES=(
-    "doc/datetime_fractional_seconds.md"
-    "doc/bovnar_pipeline.svg"
-    # A draft German Wikipedia article about the format. Working document, not
-    # referenced anywhere on the site, and MediaWiki markup a browser would show
-    # as raw source -- no reason to serve it from the live root.
-    "doc/wiki"
-    # An Internet-Draft in xml2rfc's four output formats plus its .refcache.
-    # Work in progress, not referenced from anywhere on the site, and the HTML
-    # wants an rfc-local.css the tree does not carry -- publishing it would put
-    # an unfinished draft under the documentation root with a broken stylesheet.
-    "doc/ietf"
-    # A paper prepared for submission to the Journal of Open Source Software.
-    # The same case as the Internet-Draft above: a submission artifact, not
-    # referenced from anywhere on the site, and served as raw Markdown whose
-    # YAML front matter a reader sees as source. It reached the live root once,
-    # because it lives under doc/ and rides the symlink like a document. It
-    # goes public when JOSS publishes it, not before.
-    "doc/joss_paper"
     "httpd.sh"
-    # Retired document paths kept as pointers for the IANA registration, which
-    # cites five documents by their pre-renumbering name and links into the
-    # GitHub tree. GitHub is where they are needed and the only place they do
-    # anything; the live site answers the same URLs better, with a 301 from
-    # nginx's $bvnr_doc_moved map (web-llm-server-config.md). Uploading them
-    # would put five files in the web root that the redirect makes unreachable.
-    "doc/1_bovnar_spec.md"
-    "doc/2_bovnar_unit_system.md"
-    "doc/5_bovnar.ebnf"
-    "doc/6_bovnar_faq.md"
-    "doc/7_bovnar_conformance.md"
     # Translation SOURCE tables. They are a build input -- gen_i18n.py has
     # already baked them into web/<lang>/index.html by the time we stage -- and
     # they carry the _orphaned graveyard of superseded strings. There is no
@@ -83,8 +93,12 @@ DRY_RUN=0
 RSYNC_DELETE=0
 DEST="${BOVNAR_PUBLISH_DEST:-}"
 
-# 2..(last comment line) — printing past the header dumped shell source.
-usage() { sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+# The header block: line 2 through the last comment line before the first line
+# of code. The range used to be hard-coded (2,32p), which printed shell source
+# when the header was short and truncated the help the moment it grew -- adding
+# five lines above cut --help off mid-sentence. Ending it at the first
+# non-comment line means it cannot drift again.
+usage() { sed -n '2,/^[^#]/p' "${BASH_SOURCE[0]}" | sed -n 's/^# \{0,1\}//p'; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -194,13 +208,51 @@ trap 'rm -rf "$STAGE"' EXIT
 # -L dereferences symlinks (so web/doc -> ../doc becomes a real doc/ tree).
 cp -rL "$WEB_DIR"/. "$STAGE"/
 
+# Rebuild the staged doc/ from WEBDOCS alone. The copy above brought the whole
+# directory across; this throws that away and puts back only what is named, so
+# a document nobody listed cannot reach the server by being in the tree.
+rm -rf "$STAGE/doc"
+mkdir -p "$STAGE/doc"
+for rel in "${WEBDOCS[@]}"; do
+    if [ ! -e "$ROOT/doc/$rel" ]; then
+        echo "publish_web.sh: WEBDOCS names doc/$rel, which does not exist." >&2
+        echo "  A typo here silently drops a document from the site; fix the" >&2
+        echo "  entry or remove it. Nothing has been uploaded." >&2
+        exit 1
+    fi
+    mkdir -p "$STAGE/doc/$(dirname "$rel")"
+    cp -rL "$ROOT/doc/$rel" "$STAGE/doc/$rel"
+done
+
+# Every document with an HTML page under /docs/<slug>/ must ship its Markdown
+# source too: the page advertises it as rel="alternate", the nginx config gives
+# it a rel="canonical" back, and the landing page links it directly. Publishing
+# the page without the source turns all three into 404s, which is exactly the
+# failure this allowlist could newly cause -- so it is checked rather than
+# trusted. gen_html_docs.DOCS is the source of truth for what has a page.
+python3 - "$ROOT" "$STAGE" <<'PYEOF' || exit 1
+import os, sys
+root, stage = sys.argv[1], sys.argv[2]
+sys.path.insert(0, root)          # publish may be run from any directory
+from gen_html_docs import DOCS
+missing = [src for src, *_ in DOCS
+           if not os.path.exists(os.path.join(stage, "doc", src))]
+if missing:
+    sys.stderr.write(
+        "publish_web.sh: these documents have an HTML page under /docs/ but are "
+        "not in WEBDOCS, so the page would link at a raw source that is not "
+        "there: %s\n" % ", ".join(missing))
+    raise SystemExit(1)
+PYEOF
+
 # Drop in the generated PDFs (they live under build/, not in the repo tree).
+# After the doc/ rebuild above, which would otherwise delete them again.
 if ls "$PDF_BUILD_DIR"/* >/dev/null 2>&1; then
     mkdir -p "$STAGE/doc/pdf"
     cp "$PDF_BUILD_DIR"/* "$STAGE/doc/pdf/"
 fi
 
-# Drop excluded paths from the staging tree.
+# Drop excluded paths (web/ dev helpers) from the staging tree.
 for rel in "${EXCLUDES[@]}"; do
     rm -rf "$STAGE/$rel"
 done

@@ -17,15 +17,18 @@ What it checks, over web/**/*.{html,md}, web/sitemap.xml and the manifest:
     produces it (the PDFs into build/doc/pdf/, a language edition into web/<lang>/).
     Resolving against the disk instead passed here and failed in CI, because
     web/de/ is git-ignored: the answer has to be the same from any checkout;
-  * it is not one of publish_web.sh's EXCLUDES — a file that exists locally but
-    is deliberately NOT uploaded is still a 404 on the live site, which is the
-    one class of dead link that looks fine from a checkout;
+  * publish_web.sh will actually upload it — a file that exists locally but is
+    deliberately NOT uploaded is still a 404 on the live site, which is the one
+    class of dead link that looks fine from a checkout;
   * a "#fragment" resolves to an id on the target page (HTML), or to a heading
     slug (Markdown), so a renamed section is caught as well as a moved file.
 
-The EXCLUDES list is PARSED from publish_web.sh rather than restated here: two
-copies of that list would drift, and the drift would silently switch this check
-off for whatever moved.
+"Will be uploaded" is two different questions in two trees. Under web/ the
+publisher subtracts: everything ships except its EXCLUDES. Under doc/ it adds:
+nothing ships except its WEBDOCS, because doc/ holds working documents beside
+published ones and the default there has to be private. Both lists are PARSED
+from publish_web.sh rather than restated here: two copies would drift, and the
+drift would silently switch this check off for whatever moved.
 
 External hosts are reported but never fetched — a test must not depend on the
 network.
@@ -83,17 +86,14 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$", re.M)
 _FENCE_RE = re.compile(r"^(?:```|~~~)")
 
 
-def read_excludes():
-    """The paths publish_web.sh refuses to upload, parsed from the script itself."""
-    path = os.path.join(ROOT, "publish_web.sh")
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    m = re.search(r"^EXCLUDES=\((.*?)^\)", text, re.M | re.S)
+def _read_array(text, name):
+    """Parse a bash array literal out of publish_web.sh."""
+    m = re.search(r"^%s=\((.*?)^\)" % name, text, re.M | re.S)
     if not m:
         raise SystemExit(
-            "check_web_links.py: no EXCLUDES=( ... ) block in publish_web.sh — "
-            "the publisher changed shape and this check would silently pass "
-            "links to unpublished files")
+            "check_web_links.py: no %s=( ... ) block in publish_web.sh — the "
+            "publisher changed shape and this check would silently pass links "
+            "to unpublished files" % name)
     out = []
     for line in m.group(1).splitlines():
         line = line.strip()
@@ -103,13 +103,40 @@ def read_excludes():
         if mm:
             out.append(mm.group(1).strip("/"))
     if not out:
-        raise SystemExit("check_web_links.py: EXCLUDES block parsed empty")
+        raise SystemExit("check_web_links.py: %s block parsed empty" % name)
     return out
 
 
-def is_excluded(rel, excludes):
-    """True when `rel` is an excluded path or lives under an excluded directory."""
+def read_publish_rules():
+    """What publish_web.sh will and will not upload, parsed from the script.
+
+    Two lists, because the publisher treats two trees differently. Under web/ it
+    subtracts: everything ships except EXCLUDES. Under doc/ it adds: nothing
+    ships except WEBDOCS, so that a working document dropped into doc/ is
+    private by default instead of published by default.
+
+    Both are parsed rather than restated here, for the reason in the module
+    docstring: a second copy drifts, and the drift switches this check off for
+    whatever moved.
+    """
+    with open(os.path.join(ROOT, "publish_web.sh"), encoding="utf-8") as f:
+        text = f.read()
+    return _read_array(text, "EXCLUDES"), _read_array(text, "WEBDOCS")
+
+
+def is_excluded(rel, rules):
+    """True when the live site will NOT have `rel`."""
+    excludes, webdocs = rules
     rel = rel.strip("/")
+    # doc/ is allowlisted. doc/pdf/ is the exception: it is not in WEBDOCS
+    # because it is not in the repo -- gen_doc_pdfs.py writes it into build/ and
+    # the publisher stages it from there (see STAGE_OVERLAY above).
+    if rel == "doc" or rel.startswith("doc/"):
+        if rel.startswith("doc/pdf/") or rel == "doc/pdf":
+            return False
+        inner = rel[len("doc/"):] if rel != "doc" else ""
+        return not any(inner == w or inner.startswith(w + "/")
+                       for w in webdocs)
     for e in excludes:
         if rel == e or rel.startswith(e + "/"):
             return True
@@ -328,7 +355,7 @@ def main():
     verbose = "--verbose" in sys.argv
     if not os.path.isdir(WEB):
         raise SystemExit("check_web_links.py: no web/ directory at %s" % WEB)
-    excludes = read_excludes()
+    rules = read_publish_rules()
     tracked = tracked_paths()
     langs = generated_langs()
     dead, unpublished, badfrag, untracked = [], [], [], []
@@ -338,7 +365,7 @@ def main():
         # it is not on the live site. Reading it anyway turned its own table of
         # contents into seven "links to a file that is never uploaded" — every
         # one of them a fragment pointing at the document it was written in.
-        if is_excluded(rel, excludes):
+        if is_excluded(rel, rules):
             offsite += 1
             continue
         rel_dir = os.path.dirname(rel)
@@ -380,7 +407,7 @@ def main():
             if tf is None:
                 dead.append((rel, raw, "no such file: %s" % (sitepath or "/")))
                 continue
-            if is_excluded(served, excludes) or is_excluded(sitepath, excludes):
+            if is_excluded(served, rules) or is_excluded(sitepath, rules):
                 unpublished.append((rel, raw, served))
                 continue
             # Present on disk, but will a clone have it? Only "committed" and

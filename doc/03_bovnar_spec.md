@@ -1502,7 +1502,7 @@ The `/` separator divides the preceding components by the following ones. The fi
 **Within each `unit-component`:**
 
 - A bare base unit with no prefix requires no separator.
-- When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and a handful of compact spellings are refused by name because they are well-known annotations for something else (`pH`, `mph`, `kph`, `usb`). See §4.3 of the unit-system reference.
+- When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and two compact spellings are refused by name because the token is a well-known annotation for something else: `usb` (the bus, not microstilb — write `u~sb`) and `kt` (a standard abbreviation for *two* units this format models, the kilotonne and the knot — write `k~t` or `kn`). `pH`, `mph` and `kph` needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.
 - The same holds for a **currency**: `k~$EUR` and `k$EUR` are the same unit. The `$` sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and `kUSD` is `error_unit_illegal` just as bare `USD` is.
 - The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g` whichever spelling was read.
 
@@ -2566,6 +2566,21 @@ typedef enum error_code_e {
     error_unit_inexact                       = 47,
     /* a multiplexed message was still short when its octet stream ended. */
     error_octet_stream_truncated             = 48,
+    /* under implementation (§11.9) — the namespace before the ':' is not a unit
+     * profile this build supports. Distinct from error_unit_illegal so a
+     * producer can tell "no such profile compiled in" from "malformed unit". */
+    error_unit_profile_unknown               = 49,
+    /* under implementation (§11.9) — valid in the profile and over atoms it
+     * defines, but with no representation in this unit system: a reference
+     * level, a scale factor outside the SI prefix decades, or an expression
+     * wider than BVNR_MAX_UNIT_COMPONENTS. */
+    error_unit_profile_unsupported           = 50,
+    /* the document contains an octet stream and the reader was opened with
+     * text_only. NOT a defect in the document — an octet stream is a
+     * first-class part of the format (§9) — but an assertion by the CONSUMER
+     * that this particular channel carries text, made at the door rather than
+     * discovered as corruption downstream. */
+    error_octet_stream_forbidden             = 51
 } error_code_t;
 ```
 

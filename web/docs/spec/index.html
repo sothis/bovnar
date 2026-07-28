@@ -2104,7 +2104,7 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <p><strong>Within each <code>unit-component</code>:</strong></p>
 <ul>
 <li>A bare base unit with no prefix requires no separator.</li>
-<li>When a prefix is present on a <strong>physical</strong> unit, the <code>~</code> separator is optional: <code>k~g</code> and <code>kg</code> are the same unit, as are <code>Mi~B</code> and <code>MiB</code>. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (<code>min</code> is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been <code>error_unit_illegal</code>, and no existing document decodes differently because of it. Prefixes still cannot be stacked (<code>kkg</code>, <code>k~kg</code> → <code>error_unit_illegal</code>), prefix–unit validity is unchanged, and a handful of compact spellings are refused by name because they are well-known annotations for something else (<code>pH</code>, <code>mph</code>, <code>kph</code>, <code>usb</code>). See §4.3 of the unit-system reference.</li>
+<li>When a prefix is present on a <strong>physical</strong> unit, the <code>~</code> separator is optional: <code>k~g</code> and <code>kg</code> are the same unit, as are <code>Mi~B</code> and <code>MiB</code>. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (<code>min</code> is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been <code>error_unit_illegal</code>, and no existing document decodes differently because of it. Prefixes still cannot be stacked (<code>kkg</code>, <code>k~kg</code> → <code>error_unit_illegal</code>), prefix–unit validity is unchanged, and two compact spellings are refused by name because the token is a well-known annotation for something else: <code>usb</code> (the bus, not microstilb — write <code>u~sb</code>) and <code>kt</code> (a standard abbreviation for <em>two</em> units this format models, the kilotonne and the knot — write <code>k~t</code> or <code>kn</code>). <code>pH</code>, <code>mph</code> and <code>kph</code> needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.</li>
 <li>The same holds for a <strong>currency</strong>: <code>k~$EUR</code> and <code>k$EUR</code> are the same unit. The <code>$</code> sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and <code>kUSD</code> is <code>error_unit_illegal</code> just as bare <code>USD</code> is.</li>
 <li>The canonical output form always carries the separator: <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers emit <code>k~g</code> whichever spelling was read.</li>
 </ul>
@@ -3441,6 +3441,21 @@ All functions return <code>false</code> on serialisation error.</p>
 <span class="w">    </span><span class="n">error_unit_inexact</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="mi">47</span><span class="p">,</span>
 <span class="w">    </span><span class="cm">/* a multiplexed message was still short when its octet stream ended. */</span>
 <span class="w">    </span><span class="n">error_octet_stream_truncated</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="mi">48</span><span class="p">,</span>
+<span class="w">    </span><span class="cm">/* under implementation (§11.9) — the namespace before the &#39;:&#39; is not a unit</span>
+<span class="cm">     * profile this build supports. Distinct from error_unit_illegal so a</span>
+<span class="cm">     * producer can tell &quot;no such profile compiled in&quot; from &quot;malformed unit&quot;. */</span>
+<span class="w">    </span><span class="n">error_unit_profile_unknown</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="mi">49</span><span class="p">,</span>
+<span class="w">    </span><span class="cm">/* under implementation (§11.9) — valid in the profile and over atoms it</span>
+<span class="cm">     * defines, but with no representation in this unit system: a reference</span>
+<span class="cm">     * level, a scale factor outside the SI prefix decades, or an expression</span>
+<span class="cm">     * wider than BVNR_MAX_UNIT_COMPONENTS. */</span>
+<span class="w">    </span><span class="n">error_unit_profile_unsupported</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<span class="w">    </span><span class="cm">/* the document contains an octet stream and the reader was opened with</span>
+<span class="cm">     * text_only. NOT a defect in the document — an octet stream is a</span>
+<span class="cm">     * first-class part of the format (§9) — but an assertion by the CONSUMER</span>
+<span class="cm">     * that this particular channel carries text, made at the door rather than</span>
+<span class="cm">     * discovered as corruption downstream. */</span>
+<span class="w">    </span><span class="n">error_octet_stream_forbidden</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="mi">51</span>
 <span class="p">}</span><span class="w"> </span><span class="n">error_code_t</span><span class="p">;</span>
 </code></pre></div>
 

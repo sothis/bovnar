@@ -41,7 +41,7 @@ DOCS = [
     ("03_bovnar_spec.md",            "bovnar-specification",    "Specification"),
     ("04_bovnar_unit_cheatsheet.md", "bovnar-cheatsheet",       "Units & Currencies Cheat Sheet"),
     ("05_bovnar_unit_system.md",     "bovnar-unit-system",      "Unit & Currency Reference"),
-    ("06_bovnar_unit_policy.md",     "bovnar-unit-policy",      "Unit Policy (Design Note)"),
+    ("06_bovnar_unit_policy.md",     "bovnar-unit-policy",      "Unit Policy Reference"),
     ("07_bovnar_unit_ambiguities.md","bovnar-unit-ambiguities", "Unit Ambiguities"),
     ("08_bovnar_readwrite_api.md",   "bovnar-readwrite-api",    "Read & Write API"),
     ("09_bovnar_python_bindings.md", "bovnar-python-bindings",  "Python Bindings"),

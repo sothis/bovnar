@@ -277,7 +277,7 @@ bovnar/
 │   ├── 03_bovnar_spec.md              # Format specification (v1.1)
 │   ├── 04_bovnar_unit_cheatsheet.md   # Units & currencies quick reference
 │   ├── 05_bovnar_unit_system.md
-│   ├── 06_bovnar_unit_policy.md       # Design note — the unit-policy evaluation
+│   ├── 06_bovnar_unit_policy.md       # Unit policy: validation & conversion
 │   ├── 07_bovnar_unit_ambiguities.md  # Which spelling means what, and why
 │   ├── 08_bovnar_readwrite_api.md
 │   ├── 09_bovnar_python_bindings.md
@@ -724,7 +724,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Specification (v1.1)](doc/03_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Units & Currencies Cheat Sheet](doc/04_bovnar_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Unit & Currency Reference](doc/05_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
-| [Unit Policy](doc/06_bovnar_unit_policy.md) | Design note, non-normative: how the reader could validate and convert units without an application-supplied callback, which of the options shipped, and why. |
+| [Unit Policy](doc/06_bovnar_unit_policy.md) | What a unit policy declares, the order its parts resolve in, what it validates and converts, and the errors it raises — on the reader and the writer. |
 | [Unit Ambiguities](doc/07_bovnar_unit_ambiguities.md) | Every token that could mean two things — what the parser reads it as, and how to write the other meaning. Case traps, look-alike characters, same-dimension quantities, and abbreviations that are deliberately not units. |
 | [Read & Write API](doc/08_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/09_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |

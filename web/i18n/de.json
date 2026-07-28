@@ -239,8 +239,8 @@
     "SI base and derived units, IEC binary prefixes, compound expressions, exponents, and prefix enforcement.": "SI-Basiseinheiten und abgeleitete Einheiten, binäre IEC-Präfixe, zusammengesetzte Ausdrücke, Exponenten und Präfixprüfung.",
     "Physics layer": "Physikalische Ebene",
     "Unit Policy": "Einheitenrichtlinie",
-    "Design note, non-normative: how the reader could validate and convert units without an application-supplied callback, and which options shipped.": "Designnotiz, nicht normativ: wie der Reader Einheiten ohne einen von der Anwendung bereitgestellten Callback validieren und umrechnen könnte — und welche Varianten umgesetzt wurden.",
-    "Design note": "Designnotiz",
+    "What a unit policy validates and what it converts, the order it resolves in, and the errors it raises — on the reader and the writer.": "Was eine Einheitenrichtlinie prüft und was sie umrechnet, in welcher Reihenfolge sie aufgelöst wird und welche Fehler sie auslöst — im Reader wie im Writer.",
+    "Validation &amp; conversion": "Prüfung &amp; Umrechnung",
     "Unit Ambiguities": "Einheiten-Mehrdeutigkeiten",
     "Every token that could mean two things — what the parser reads it as, and how to write the other meaning.": "Jedes Token, das zweierlei bedeuten kann — wie der Parser es liest und wie sich die andere Bedeutung schreiben lässt.",
     "Disambiguation": "Begriffsklärung",
@@ -271,7 +271,7 @@
     "<a href=\"doc/pdf/bovnar-specification.pdf\"   download aria-label=\"Download the Specification as PDF\"><span class=\"doc-dl-num\">03</span> Specification <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-specification.pdf\"   download aria-label=\"Spezifikation als PDF herunterladen\"><span class=\"doc-dl-num\">03</span> Spezifikation <span class=\"doc-dl-ext\">PDF</span></a>",
     "<a href=\"doc/pdf/bovnar-cheatsheet.pdf\"      download aria-label=\"Download the Units &amp; Currencies Cheat Sheet as PDF\"><span class=\"doc-dl-num\">04</span> Units &amp; Currencies Cheat Sheet <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-cheatsheet.pdf\"      download aria-label=\"Einheiten- &amp; Währungs-Spickzettel als PDF herunterladen\"><span class=\"doc-dl-num\">04</span> Einheiten- &amp; Währungs-Spickzettel <span class=\"doc-dl-ext\">PDF</span></a>",
     "<a href=\"doc/pdf/bovnar-unit-system.pdf\"     download aria-label=\"Download the Unit &amp; Currency Reference as PDF\"><span class=\"doc-dl-num\">05</span> Unit &amp; Currency Reference <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-unit-system.pdf\"     download aria-label=\"Einheiten- &amp; Währungsreferenz als PDF herunterladen\"><span class=\"doc-dl-num\">05</span> Einheiten- &amp; Währungsreferenz <span class=\"doc-dl-ext\">PDF</span></a>",
-    "<a href=\"doc/pdf/bovnar-unit-policy.pdf\"     download aria-label=\"Download the Unit Policy design note as PDF\"><span class=\"doc-dl-num\">06</span> Unit Policy <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-unit-policy.pdf\"     download aria-label=\"Einheitenrichtlinie (Designnotiz) als PDF herunterladen\"><span class=\"doc-dl-num\">06</span> Einheitenrichtlinie <span class=\"doc-dl-ext\">PDF</span></a>",
+    "<a href=\"doc/pdf/bovnar-unit-policy.pdf\"     download aria-label=\"Download the Unit Policy reference as PDF\"><span class=\"doc-dl-num\">06</span> Unit Policy <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-unit-policy.pdf\"     download aria-label=\"Einheitenrichtlinie-Referenz als PDF herunterladen\"><span class=\"doc-dl-num\">06</span> Einheitenrichtlinie <span class=\"doc-dl-ext\">PDF</span></a>",
     "<a href=\"doc/pdf/bovnar-unit-ambiguities.pdf\" download aria-label=\"Download the Unit Ambiguities reference as PDF\"><span class=\"doc-dl-num\">07</span> Unit Ambiguities <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-unit-ambiguities.pdf\" download aria-label=\"Einheiten-Mehrdeutigkeiten als PDF herunterladen\"><span class=\"doc-dl-num\">07</span> Einheiten-Mehrdeutigkeiten <span class=\"doc-dl-ext\">PDF</span></a>",
     "<a href=\"doc/pdf/bovnar-readwrite-api.pdf\"   download aria-label=\"Download the Read and Write API reference as PDF\"><span class=\"doc-dl-num\">08</span> Read &amp; Write API <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-readwrite-api.pdf\"   download aria-label=\"Referenz zur Lese- und Schreib-API als PDF herunterladen\"><span class=\"doc-dl-num\">08</span> Lese- &amp; Schreib-API <span class=\"doc-dl-ext\">PDF</span></a>",
     "<a href=\"doc/pdf/bovnar-python-bindings.pdf\" download aria-label=\"Download the Python Bindings reference as PDF\"><span class=\"doc-dl-num\">09</span> Python Bindings <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-python-bindings.pdf\" download aria-label=\"Referenz zur Python-Anbindung als PDF herunterladen\"><span class=\"doc-dl-num\">09</span> Python-Anbindung <span class=\"doc-dl-ext\">PDF</span></a>",
@@ -339,7 +339,7 @@
     "Specification (v1.1)": "Spezifikation (v1.1)",
     "Units &amp; Currencies Cheat Sheet": "Einheiten- &amp; Währungs-Spickzettel",
     "Unit &amp; Currency Reference": "Einheiten- &amp; Währungsreferenz",
-    "Unit Policy (Design Note)": "Einheitenrichtlinie (Designnotiz)",
+    "Unit Policy": "Einheitenrichtlinie",
     "Unit Ambiguities": "Einheiten-Mehrdeutigkeiten",
     "Read &amp; Write API": "Lese- &amp; Schreib-API",
     "Python Bindings": "Python-Bindings",
@@ -446,10 +446,14 @@
       "<a href=\"doc/pdf/bovnar-faq.pdf\"             download aria-label=\"Download the FAQ as PDF\"><span class=\"doc-dl-num\">06</span> FAQ <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-faq.pdf\"             download aria-label=\"FAQ als PDF herunterladen\"><span class=\"doc-dl-num\">06</span> FAQ <span class=\"doc-dl-ext\">PDF</span></a>",
       "<a href=\"doc/pdf/bovnar-conformance.pdf\"     download aria-label=\"Download the Conformance Test Tool reference as PDF\"><span class=\"doc-dl-num\">07</span> Conformance Test Tool <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-conformance.pdf\"     download aria-label=\"Referenz zum Konformitäts-Testwerkzeug als PDF herunterladen\"><span class=\"doc-dl-num\">07</span> Konformitäts-Testwerkzeug <span class=\"doc-dl-ext\">PDF</span></a>",
       "<a href=\"doc/pdf/bovnar-cheatsheet.pdf\"      download aria-label=\"Download the Units &amp; Currencies Cheat Sheet as PDF\"><span class=\"doc-dl-num\">08</span> Units &amp; Currencies Cheat Sheet <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-cheatsheet.pdf\"      download aria-label=\"Einheiten- &amp; Währungs-Spickzettel als PDF herunterladen\"><span class=\"doc-dl-num\">08</span> Einheiten- &amp; Währungs-Spickzettel <span class=\"doc-dl-ext\">PDF</span></a>",
-      "<a href=\"doc/pdf/bovnar-streaming.pdf\"       download aria-label=\"Download the Streaming, Framing and Multiplexing reference as PDF\"><span class=\"doc-dl-num\">09</span> Streaming, Framing &amp; Multiplexing <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-streaming.pdf\"       download aria-label=\"Referenz zu Streaming, Framing und Multiplexing als PDF herunterladen\"><span class=\"doc-dl-num\">09</span> Streaming, Framing &amp; Multiplexing <span class=\"doc-dl-ext\">PDF</span></a>"
+      "<a href=\"doc/pdf/bovnar-streaming.pdf\"       download aria-label=\"Download the Streaming, Framing and Multiplexing reference as PDF\"><span class=\"doc-dl-num\">09</span> Streaming, Framing &amp; Multiplexing <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-streaming.pdf\"       download aria-label=\"Referenz zu Streaming, Framing und Multiplexing als PDF herunterladen\"><span class=\"doc-dl-num\">09</span> Streaming, Framing &amp; Multiplexing <span class=\"doc-dl-ext\">PDF</span></a>",
+      "Design note, non-normative: how the reader could validate and convert units without an application-supplied callback, and which options shipped.": "Designnotiz, nicht normativ: wie der Reader Einheiten ohne einen von der Anwendung bereitgestellten Callback validieren und umrechnen könnte — und welche Varianten umgesetzt wurden.",
+      "Design note": "Designnotiz",
+      "<a href=\"doc/pdf/bovnar-unit-policy.pdf\"     download aria-label=\"Download the Unit Policy design note as PDF\"><span class=\"doc-dl-num\">06</span> Unit Policy <span class=\"doc-dl-ext\">PDF</span></a>": "<a href=\"doc/pdf/bovnar-unit-policy.pdf\"     download aria-label=\"Einheitenrichtlinie (Designnotiz) als PDF herunterladen\"><span class=\"doc-dl-num\">06</span> Einheitenrichtlinie <span class=\"doc-dl-ext\">PDF</span></a>"
     },
     "attrs": {
-      "Download all ten documentation PDFs as a ZIP archive": "Alle zehn Dokumentations-PDFs als ZIP-Archiv herunterladen"
+      "Download all ten documentation PDFs as a ZIP archive": "Alle zehn Dokumentations-PDFs als ZIP-Archiv herunterladen",
+      "Unit Policy (Design Note)": "Einheitenrichtlinie (Designnotiz)"
     }
   }
 }

@@ -120,13 +120,10 @@ DOCS = [
      "Bovnar Unit & Currency System",
      "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and "
      "216 currencies with dimensions and exact conversion factors."),
-    # The title and description both say "design note" on purpose: this is the
-    # evaluation behind the unit policies, not a description of shipped API, and
-    # a search result or a link preview is where that distinction gets lost.
     ("06_bovnar_unit_policy.md", "policy", "bovnar-unit-policy",
-     "Bovnar Parser-Level Unit Policy (Design Note)",
-     "Design note, non-normative: how a Bovnar reader could validate and convert "
-     "units without an application-supplied callback, which options shipped, and why."),
+     "Bovnar Unit Policy Reference",
+     "The Bovnar unit policy: what it validates, what it converts, the order it "
+     "resolves in, and the errors it raises, on both the reader and the writer."),
     ("07_bovnar_unit_ambiguities.md", "ambiguities", "bovnar-unit-ambiguities",
      "Bovnar Unit Ambiguities",
      "Every Bovnar token that could plausibly mean two things — what the parser "

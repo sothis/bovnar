@@ -150,7 +150,7 @@ static void run_policy(const char *payload, const bvnr_unit_policy_t *policy,
 /* ── option 1: the opaque target list ────────────────────────────────────── */
 
 /*
- * The design note's running document, deliberately awkward: mixed dimensions,
+ * The reference's running document, deliberately awkward: mixed dimensions,
  * an affine scale, a bare ratio, a prefixed currency. Every value that a target
  * covers is converted; every value that none covers is delivered untouched,
  * with data->converted as the only signal telling the two apart.

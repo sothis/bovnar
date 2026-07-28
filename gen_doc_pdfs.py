@@ -216,20 +216,30 @@ def build_html(title, subtitle, body_html, label):
             f"<body>{cover}{body_html}</body></html>")
 
 
+# Numbered, yet deliberately absent from DOCS. publish_web.sh keeps this one off
+# the site entirely -- it is a design note describing API that does not exist --
+# so building a PDF of it would make the bundle its only published form. Named
+# explicitly rather than left as a hole in DOCS, so the check below still fails
+# on a doc that is missing by accident, which is what it is for.
+UNPUBLISHED = {"06_bovnar_unit_policy.md"}
+
+
 def check_docs_listed():
-    """Every NUMBERED doc must be in DOCS.
+    """Every NUMBERED doc must be in DOCS, or in UNPUBLISHED on purpose.
 
     DOCS is hand-maintained, and a hand-maintained list of files drifts: the
     examples list in CMakeLists_tests.txt had already lost two entries the same
-    way. The numbered 0_..9_ series is the published documentation set, so a new
-    one silently missing from the PDF bundle is a real omission. The unnumbered
-    files (design notes) are deliberately not part of that set -- nothing links
-    to them from README or the site -- so they are not required here.
+    way. The numbered series is the published documentation set, so a new one
+    silently missing from the PDF bundle is a real omission.
+
+    Numbering used to mean "published", and everything unnumbered was a design
+    note. That stopped being true when the notes were renumbered into the set,
+    so the exception is now stated rather than inferred from the filename.
     """
     listed = {src for src, _slug, _label in DOCS}
     present = {f for f in os.listdir(DOC_DIR)
                if f[:1].isdigit() and f.rsplit(".", 1)[-1] in ("md", "ebnf")}
-    missing = sorted(present - listed)
+    missing = sorted(present - listed - UNPUBLISHED)
     if missing:
         raise SystemExit(
             "gen_doc_pdfs: these numbered docs exist but are not in DOCS, so "

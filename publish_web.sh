@@ -53,6 +53,17 @@ EXCLUDES=(
     # an unfinished draft under the documentation root with a broken stylesheet.
     "doc/ietf"
     "httpd.sh"
+    # Retired document paths kept as pointers for the IANA registration, which
+    # cites five documents by their pre-renumbering name and links into the
+    # GitHub tree. GitHub is where they are needed and the only place they do
+    # anything; the live site answers the same URLs better, with a 301 from
+    # nginx's $bvnr_doc_moved map (web-llm-server-config.md). Uploading them
+    # would put five files in the web root that the redirect makes unreachable.
+    "doc/1_bovnar_spec.md"
+    "doc/2_bovnar_unit_system.md"
+    "doc/5_bovnar.ebnf"
+    "doc/6_bovnar_faq.md"
+    "doc/7_bovnar_conformance.md"
     # Translation SOURCE tables. They are a build input -- gen_i18n.py has
     # already baked them into web/<lang>/index.html by the time we stage -- and
     # they carry the _orphaned graveyard of superseded strings. There is no

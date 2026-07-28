@@ -27,6 +27,8 @@ import markdown
 from weasyprint import HTML
 from pygments.formatters import HtmlFormatter
 
+from gen_html_docs import is_retired_pointer
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DOC_DIR = os.path.join(ROOT, "doc")
 OUT_DIR = os.path.join(ROOT, "build", "doc", "pdf")
@@ -229,10 +231,17 @@ def check_docs_listed():
 
     A number therefore means published, again: the unit-policy note was briefly
     numbered but excluded, which this check could only read as an accident.
+
+    The exception is a retired path kept as a pointer (gen_html_docs.
+    is_retired_pointer): those carry the OLD numbers -- that is the whole point
+    of them -- so by filename alone they look like five published documents
+    missing from the bundle. They are three sentences saying where the document
+    went, and the document they point at is already in DOCS.
     """
     listed = {src for src, _slug, _label in DOCS}
     present = {f for f in os.listdir(DOC_DIR)
-               if f[:1].isdigit() and f.rsplit(".", 1)[-1] in ("md", "ebnf")}
+               if f[:1].isdigit() and f.rsplit(".", 1)[-1] in ("md", "ebnf")
+               and not is_retired_pointer(os.path.join(DOC_DIR, f))}
     missing = sorted(present - listed)
     if missing:
         raise SystemExit(

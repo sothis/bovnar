@@ -157,6 +157,37 @@ DOCS = [
 # filename (and .ebnf) -> clean slug, for inter-doc link rewriting.
 SRC_TO_SLUG = {src: slug for src, slug, *_ in DOCS}
 
+# Retired document paths, kept in doc/ as pointers to the current file.
+#
+# The IANA registration for text/vnd.bovnar cites five documents by their
+# pre-renumbering path, and a published registration cannot be edited in place.
+# The web server 301s those paths, but the registration links into the GitHub
+# tree, which no configuration of ours can redirect -- so the files stay, saying
+# where the document went, until the corrected registration is accepted.
+#
+# A pointer declares itself on line 1 rather than being listed here, because a
+# list of them is one more hand-maintained thing to forget: every tool that
+# walks doc/ tests the line instead. The marker is inside a comment in both
+# formats -- an HTML comment in Markdown, an ISO 14977 comment in EBNF -- so it
+# is invisible when rendered and legal where it sits.
+RETIRED_MARKER = "bovnar:retired-path"
+
+
+def is_retired_pointer(path):
+    """True if doc/<path> is a pointer to a renamed document, not a document.
+
+    Cheap enough to call while walking a directory: reads one line. The two
+    stdlib-only checkers (check_doc_layout.py, check_doc_refs.py) repeat this
+    test rather than importing it, for the same reason check_doc_layout repeats
+    gh_slug -- importing this module would drag markdown and gen_csp into a
+    checker that deliberately needs neither.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return RETIRED_MARKER in fh.readline()
+    except OSError:
+        return False
+
 
 def gh_slug(text):
     """GitHub-style heading slug: lowercase, drop punctuation (keep word chars,

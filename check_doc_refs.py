@@ -47,6 +47,11 @@ SEARCH_DIRS = ["include", "src", "python", "tests", "wasm", "examples",
 SUFFIXES = (".c", ".h", ".py", ".sh", ".cmake", ".mjs", ".js", ".md", ".txt")
 SKIP_DIRS = {"build", "__pycache__", ".git", ".pytest_cache", "node_modules"}
 
+# Marker on line 1 of a retired path kept as a pointer; see
+# gen_html_docs.RETIRED_MARKER for why these files exist. Spelled out rather
+# than imported to keep this checker free of third-party dependencies.
+RETIRED_MARKER = "bovnar:retired-path"
+
 SPEC = "03_bovnar_spec.md"
 
 # Name cues. Only phrases that can mean nothing but a document: "streaming",
@@ -84,6 +89,14 @@ FENCE = re.compile(r"^(```|~~~)")
 def load_docs():
     for name in sorted(os.listdir(DOC_DIR)):
         if not name.endswith(".md"):
+            continue
+        # A retired path kept as a pointer to the renamed document (see
+        # gen_html_docs.RETIRED_MARKER). It cites nothing and defines no
+        # section, so registering it here would only add an old filename to
+        # the set of names a citation can resolve against -- exactly the
+        # ambiguity the rename removed.
+        if RETIRED_MARKER in open(
+                os.path.join(DOC_DIR, name), encoding="utf-8").readline():
             continue
         text = open(os.path.join(DOC_DIR, name), encoding="utf-8").read()
         TEXT[name] = text.lower()

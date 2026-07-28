@@ -44,9 +44,54 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DOC_DIR = os.path.join(ROOT, "doc")
 
 FENCE = re.compile(r"^(```|~~~)")
+# A retired path kept as a pointer to the renamed document (the IANA
+# registration cites five documents by their pre-renumbering path; see
+# gen_html_docs.RETIRED_MARKER). It is three sentences and a link, so it has no
+# TOC, no numbered sections and no footer, and the layout below does not apply.
+# Spelled out here rather than imported for the reason given at gh_slug: this
+# checker takes no third-party dependency, and importing gen_html_docs would
+# give it markdown and gen_csp.
+RETIRED_MARKER = "bovnar:retired-path"
 NO_NUMBER = ("Table of Contents", "See also")
 FOOTER = re.compile(r"^\*End of .+ \(Bovnar spec 1\.1\)\.\*$")
 META_KEYS = ["**Spec version:**", "**Status:**", "**Scope:**"]
+
+
+def is_retired(path):
+    """True if this file is a pointer to a renamed document, not a document."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return RETIRED_MARKER in fh.readline()
+    except OSError:
+        return False
+
+
+def check_retired(name):
+    """A pointer names the document it points at, and that document exists.
+
+    The pointers are skipped by the layout check above, so without this they
+    are the one thing in doc/ nothing looks at — and their whole job is to hold
+    a link that outlives a rename. A pointer to a file the next renumbering
+    moved again is worse than no pointer: it answers the question wrongly.
+    """
+    with open(os.path.join(DOC_DIR, name), encoding="utf-8") as fh:
+        first, body = fh.readline(), fh.read()
+    m = re.search(RETIRED_MARKER + r"\s*->\s*([\w.]+)", first)
+    if not m:
+        return [f"line 1 carries {RETIRED_MARKER} but names no target; "
+                f"expected '{RETIRED_MARKER} -> <current-filename>'"]
+    target = m.group(1)
+    problems = []
+    if not os.path.exists(os.path.join(DOC_DIR, target)):
+        problems.append(f"points at doc/{target}, which does not exist")
+    if target == name:
+        problems.append("points at itself")
+    # Against the body only. Matching the whole file would match the marker on
+    # line 1 and pass every time -- which is what it did.
+    if target not in body:
+        problems.append(f"line 1 names doc/{target} but the body never says so; "
+                        f"a reader who lands here sees no way on")
+    return problems
 
 
 def gh_slug(text):
@@ -253,7 +298,11 @@ def check(path, verbose=False):
 
 def main(argv):
     verbose = "--verbose" in argv
-    docs = sorted(f for f in os.listdir(DOC_DIR) if f.endswith(".md"))
+    everything = sorted(f for f in os.listdir(DOC_DIR)
+                        if f.endswith((".md", ".ebnf")))
+    retired = [f for f in everything
+               if is_retired(os.path.join(DOC_DIR, f))]
+    docs = [f for f in everything if f.endswith(".md") and f not in retired]
     if not docs:
         print("check_doc_layout: no documents found in doc/", file=sys.stderr)
         return 1
@@ -265,11 +314,23 @@ def main(argv):
             print(f"doc/{name}:")
             for p in problems:
                 print(f"   - {p}")
+    for name in retired:
+        problems = check_retired(name)
+        if problems:
+            failed += 1
+            print(f"doc/{name}:")
+            for p in problems:
+                print(f"   - {p}")
+        elif verbose:
+            print(f"  ok  doc/{name}: pointer to a renamed document")
     if failed:
-        print(f"\n{failed} of {len(docs)} documents do not match the layout.")
+        print(f"\n{failed} of {len(docs) + len(retired)} documents do not match "
+              f"the layout.")
         print("The layout is described at the top of check_doc_layout.py.")
         return 1
-    print(f"check_doc_layout: {len(docs)} documents share one layout.")
+    print(f"check_doc_layout: {len(docs)} documents share one layout"
+          + (f", and {len(retired)} retired paths point into them." if retired
+             else "."))
     return 0
 
 

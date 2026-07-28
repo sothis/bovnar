@@ -284,18 +284,30 @@ the `http{}` context beside the other `map`:
 
 ```nginx
 map $uri $bvnr_canon_hdr {
-    default                            "";
-    "/doc/01_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
-    "/doc/03_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
-    "/doc/05_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
-    "/doc/08_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
-    "/doc/09_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
-    "/doc/02_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
-    "/doc/13_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
-    "/doc/04_bovnar_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
-    "/doc/10_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    default                              "";
+    "/doc/01_bovnar_tutorial.md"         "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/02_bovnar_faq.md"              "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/03_bovnar_spec.md"             "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/04_bovnar_unit_cheatsheet.md"  "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/05_bovnar_unit_system.md"      "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/06_bovnar_unit_policy.md"      "<https://www.bovnar.io/docs/policy/>; rel=\"canonical\"";
+    "/doc/07_bovnar_unit_ambiguities.md" "<https://www.bovnar.io/docs/ambiguities/>; rel=\"canonical\"";
+    "/doc/08_bovnar_readwrite_api.md"    "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/09_bovnar_python_bindings.md"  "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/10_bovnar_streaming.md"        "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    "/doc/11_bovnar_ucum_profile.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
+    "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
+    "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
 }
 ```
+
+The map lists all thirteen documents, in document order. It listed nine for a
+while — the unit policy, the ambiguity reference and the UCUM profile joined the
+numbered set after this map was written, and the grammar was left out on the
+argument that `/docs/grammar/` was too niche to have anything to compete with.
+The argument does not survive the file being served at two URLs either way, and
+a map that has to be remembered when a document is added is a map that will be
+out of date again.
 
 Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
 `add_header` whose value evaluates to the empty string, so `/index.md` and
@@ -308,11 +320,78 @@ Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
     include snippets/bovnar-headers.conf;
 ```
 
-`/doc/12_bovnar.ebnf` isn't matched by the `.md` location, and is deliberately left
-out of the canonical map above — it is niche enough not to compete for the
-`/docs/grammar/` ranking. It does still need its own `location` for the MIME type
-(above), or it downloads instead of displaying. The complete assembled config is
-in the next section.
+`/doc/12_bovnar.ebnf` is not matched by the `.md` location — it has its own, for
+the MIME type (above), or it downloads instead of displaying. The same
+`add_header Link "$bvnr_canon_hdr"` line goes there; one map serves both.
+
+## Renamed documents: 301 the old paths
+
+The documentation set has been renumbered twice, most recently when every
+document gained a two-digit prefix. A rename is invisible to everyone already
+holding the old URL, and those URLs are not ours to recall — the **IANA
+registration for `text/vnd.bovnar` cites the specification, the unit system and
+the grammar by their pre-renumbering paths**, as do released tarballs and any
+third-party link. Each rename turned all of them into 404s.
+
+A `map` of old path to current path, plus one `if` in each document location,
+turns them into 301s. `if` is safe in this shape: `return` is one of the two
+directives nginx documents as reliable inside `if` in a location.
+
+```nginx
+map $uri $bvnr_doc_moved {
+    default                             "";
+    "/doc/0_bovnar_tutorial.md"         "/doc/01_bovnar_tutorial.md";
+    "/doc/6_bovnar_faq.md"              "/doc/02_bovnar_faq.md";
+    "/doc/1_bovnar_spec.md"             "/doc/03_bovnar_spec.md";
+    "/doc/8_unit_cheatsheet.md"         "/doc/04_bovnar_unit_cheatsheet.md";
+    "/doc/cheatsheet.md"                "/doc/04_bovnar_unit_cheatsheet.md";
+    "/doc/2_bovnar_unit_system.md"      "/doc/05_bovnar_unit_system.md";
+    "/doc/parser_level_unit_policy.md"  "/doc/06_bovnar_unit_policy.md";
+    "/doc/unit_ambiguities.md"          "/doc/07_bovnar_unit_ambiguities.md";
+    "/doc/3_bovnar_readwrite_api.md"    "/doc/08_bovnar_readwrite_api.md";
+    "/doc/4_bovnar_python_bindings.md"  "/doc/09_bovnar_python_bindings.md";
+    "/doc/9_bovnar_streaming.md"        "/doc/10_bovnar_streaming.md";
+    "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_ucum_profile.md";
+    "/doc/ucum_profile.md"              "/doc/11_bovnar_ucum_profile.md";
+    "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
+    "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
+}
+```
+
+```nginx
+    # first line of BOTH location ~ \.md$ and location ~ \.ebnf$, so the
+    # redirect happens before try_files can answer 404
+    if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
+```
+
+Two things to keep right when adding an entry:
+
+- **No key may name a document that exists today.** `/doc/10_bovnar_ucum_profile.md`
+  is the only two-digit key — the UCUM profile held slot 10 briefly, and
+  streaming holds it now — which is why `/doc/10_bovnar_streaming.md` is a value
+  here and never a key. A key that collides with a live document redirects it
+  away from itself.
+- **A deleted document is not a moved one.** `/doc/iana_media_type.md` (earlier
+  `/doc/9_iana_media_type.md`) explained how to apply for the media type and was
+  removed once the type was registered. It has no successor, so it is absent
+  here and 404 is the honest answer.
+
+The redirects are the stopgap, not the fix: the standing IANA registration keeps
+citing the old paths until the update requested in `doc/ietf/` is accepted. See
+the next section for the part of this that nginx cannot reach.
+
+## What the redirects do *not* cover
+
+The published registration at
+<https://www.iana.org/assignments/media-types/text/vnd.bovnar> cites the
+specification, the unit system, the grammar, the FAQ and the conformance suite
+as **`github.com/sothis/bovnar/blob/main/doc/<old-name>`** URLs, not
+`www.bovnar.io` ones. All five are 404. No configuration of this web server can
+affect them — they are served by GitHub from the repository tree, so the only
+things that fix them are a change to the repository or a corrected registration.
+The `Published specification` field in the registration template in
+`doc/ietf/draft-sonntag-bovnar-00.md` uses `www.bovnar.io` paths, which is what
+the requested registration update would replace them with.
 
 ## Response headers (`/etc/nginx/snippets/bovnar-headers.conf`)
 
@@ -390,20 +469,69 @@ map $arg_v $bvnr_cache_ctl {
     "~^[0-9a-f]{12}$"  "public, max-age=31536000, immutable";
 }
 
+# Renamed documents. The doc set has been renumbered twice -- most recently in
+# "docs+web: renumber the documentation set", which gave every document a
+# two-digit prefix -- and each rename silently broke every URL already published
+# under the old name. Those URLs are not ours to recall: the IANA registration
+# for text/vnd.bovnar cites the specification, the unit system and the grammar
+# by their pre-renumbering paths, and so do released tarballs, the PyPI page's
+# history and whatever anyone else linked. A 301 keeps them working and tells
+# caches and crawlers the name is final, which a 404 cannot.
+#
+# Every key here is a path that was live at some point; none of them collides
+# with a document that exists today (the old single-digit prefixes and the two
+# unprefixed working titles are all retired). /doc/10_bovnar_ucum_profile.md is
+# the one two-digit key: the UCUM profile briefly held slot 10, which streaming
+# occupies now -- so it is listed and /doc/10_bovnar_streaming.md is not.
+#
+# Not listed: /doc/iana_media_type.md (and its earlier /doc/9_iana_media_type.md
+# name). That document was deleted on purpose once the media type was registered
+# -- it described how to apply -- so it has no successor to point at and 404 is
+# the honest answer.
+map $uri $bvnr_doc_moved {
+    default                             "";
+    "/doc/0_bovnar_tutorial.md"         "/doc/01_bovnar_tutorial.md";
+    "/doc/6_bovnar_faq.md"              "/doc/02_bovnar_faq.md";
+    "/doc/1_bovnar_spec.md"             "/doc/03_bovnar_spec.md";
+    "/doc/8_unit_cheatsheet.md"         "/doc/04_bovnar_unit_cheatsheet.md";
+    "/doc/cheatsheet.md"                "/doc/04_bovnar_unit_cheatsheet.md";
+    "/doc/2_bovnar_unit_system.md"      "/doc/05_bovnar_unit_system.md";
+    "/doc/parser_level_unit_policy.md"  "/doc/06_bovnar_unit_policy.md";
+    "/doc/unit_ambiguities.md"          "/doc/07_bovnar_unit_ambiguities.md";
+    "/doc/3_bovnar_readwrite_api.md"    "/doc/08_bovnar_readwrite_api.md";
+    "/doc/4_bovnar_python_bindings.md"  "/doc/09_bovnar_python_bindings.md";
+    "/doc/9_bovnar_streaming.md"        "/doc/10_bovnar_streaming.md";
+    "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_ucum_profile.md";
+    "/doc/ucum_profile.md"              "/doc/11_bovnar_ucum_profile.md";
+    "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
+    "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
+}
+
 # Search consolidation: the full "Link: rel=canonical" value (RFC 8288 — URI in
-# angle brackets) for each raw doc .md; empty for /index.md and /de/index.md, so
-# nginx adds no canonical header there (it omits an empty-valued add_header).
+# angle brackets) for each raw document; empty for /index.md and /de/index.md,
+# so nginx adds no canonical header there (it omits an empty-valued add_header).
+#
+# These keys were left on the pre-renumbering paths when the documents were
+# renamed, so the map had stopped matching anything: every raw .md served since
+# went out with no canonical header, pointing search engines at nothing while
+# the HTML edition under /docs/<slug>/ competed with it. Keys are the current
+# filenames; the old ones now 301 here via $bvnr_doc_moved above, so a request
+# for a renamed document lands on the new path and picks the header up there.
 map $uri $bvnr_canon_hdr {
-    default                            "";
-    "/doc/01_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
-    "/doc/03_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
-    "/doc/05_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
-    "/doc/08_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
-    "/doc/09_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
-    "/doc/02_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
-    "/doc/13_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
-    "/doc/04_bovnar_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
-    "/doc/10_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    default                              "";
+    "/doc/01_bovnar_tutorial.md"         "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/02_bovnar_faq.md"              "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/03_bovnar_spec.md"             "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/04_bovnar_unit_cheatsheet.md"  "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/05_bovnar_unit_system.md"      "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/06_bovnar_unit_policy.md"      "<https://www.bovnar.io/docs/policy/>; rel=\"canonical\"";
+    "/doc/07_bovnar_unit_ambiguities.md" "<https://www.bovnar.io/docs/ambiguities/>; rel=\"canonical\"";
+    "/doc/08_bovnar_readwrite_api.md"    "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/09_bovnar_python_bindings.md"  "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/10_bovnar_streaming.md"        "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    "/doc/11_bovnar_ucum_profile.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
+    "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
+    "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
 }
 
 # 1) Serve the site over HTTPS on the canonical host only
@@ -485,6 +613,10 @@ server {
     # .md as Markdown (RFC 7763) + UTF-8; plus the canonical->HTML header for the
     # doc .md (empty, hence omitted, for /index.md and /de/index.md).
     location ~ \.md$ {
+        # A document that has been renamed: 301 to its current path before
+        # try_files can turn it into a 404 (see the $bvnr_doc_moved map).
+        if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
+
         types         { }
         default_type  text/markdown;
         charset       utf-8;
@@ -501,10 +633,18 @@ server {
     # /docs/ display inline, and /docs/grammar/ advertises it as
     # <link rel="alternate" type="text/plain">, which the server contradicted.
     location ~ \.ebnf$ {
+        # The grammar was 5_bovnar.ebnf until the renumbering; same 301 as the
+        # .md location above, and the IANA registration still cites the old name.
+        if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
+
         types         { }
         default_type  text/plain;
         charset       utf-8;
         charset_types text/plain;
+        # The grammar had no canonical header while its Markdown siblings did,
+        # so /doc/12_bovnar.ebnf and /docs/grammar/ competed as two URLs for one
+        # document. Same map, same reason.
+        add_header Link "$bvnr_canon_hdr" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;

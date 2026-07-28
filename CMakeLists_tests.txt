@@ -1207,7 +1207,8 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 148)   # 129 base + i18n_de + wrapper_sync + cache_stamps
+set(BVNR_EXPECTED_TEST_COUNT 149)   # 129 base + i18n_de + wrapper_sync
+                                    # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
                                     #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs
@@ -1489,6 +1490,30 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_re
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
     set_tests_properties(bvnr_doc_refs PROPERTIES LABELS "docs" TIMEOUT 60)
+endif()
+
+# ── the profile tables against the publications they transliterate ───────────
+# The one thing nothing else covers: every other check proves the tables are
+# self-consistent, and five tables wrong in the same way would agree with each
+# other perfectly (doc/11 §14.3). This reads UCUM's and UDUNITS' own machine-
+# readable definitions and compares each mapped row's factor and dimension
+# against what the reference library says the native target is worth.
+#
+# It SKIPS, green, when the publisher files are not cached: a test must not
+# depend on the network, which is the same rule bvnr_web_links follows. Populate
+# the cache once with
+#     python3 check_profile_factors.py --fetch
+# and every later run checks for real. CI should fetch and then use --strict so
+# that a skip there is a failure rather than a quiet pass.
+if(Python3_Interpreter_FOUND
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_profile_factors.py)
+    add_test(NAME bvnr_profile_factors
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_profile_factors.py
+                     --cache ${CMAKE_CURRENT_BINARY_DIR}/vocab)
+    set_tests_properties(bvnr_profile_factors PROPERTIES
+        LABELS "units;profile;vocab" TIMEOUT 120
+        ENVIRONMENT "LIBBOVNAR_DIR=${CMAKE_CURRENT_BINARY_DIR}")
 endif()
 
 # ── ?v= cache-bust stamps still match the files they label ──────────────────

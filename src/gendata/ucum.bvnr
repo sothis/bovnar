@@ -197,7 +197,6 @@
   { .code = "[oz_ap]";    .bovnar = "oz_t";  .metric = false; },
   { .code = "[ston_av]";  .bovnar = "tn_sh"; .metric = false; },
   { .code = "[lton_av]";  .bovnar = "tn_l";  .metric = false; },
-  { .code = "[slug]";     .bovnar = "slug";  .metric = false; },
 
   # Volume
   { .code = "[gal_us]"; .bovnar = "gal";      .metric = false; },
@@ -242,7 +241,6 @@
   # dimensions [1,1,-2,0,0,0,0], factor 0.00980665. A mapping need not be
   # atom-to-atom.
   { .code = "gf";       .bovnar = "g·gn";   .metric = false; },
-  { .code = "kgf";      .bovnar = "kgf";    .metric = false; },
   { .code = "[lbf_av]"; .bovnar = "lbf";    .metric = false; },
   { .code = "[g]";      .bovnar = "gn";     .metric = false; },
 
@@ -259,8 +257,12 @@
   { .code = "sb";    .bovnar = "sb";    .metric = false; },
   { .code = "ph";    .bovnar = "ph";    .metric = false; },
   { .code = "Ci";    .bovnar = "Ci";    .metric = true;  },
-  { .code = "[RAD]"; .bovnar = "c~Gy";  .metric = true;  },
-  { .code = "[REM]"; .bovnar = "rem";   .metric = true;  },
+  # "RAD" and "REM", NOT "[RAD]"/"[REM]": the bracketed forms are UCUM's
+  # CASE-INSENSITIVE codes, and this profile is the case-sensitive variant
+  # only (doc/11 §10.3). The bracketed spellings were accepted here and are
+  # not codes a conforming case-sensitive producer can emit.
+  { .code = "RAD";   .bovnar = "c~Gy";  .metric = true;  },
+  { .code = "REM";   .bovnar = "rem";   .metric = true;  },
   { .code = "R";     .bovnar = "R";     .metric = true;  },
 
   # Digital and ratio. UCUM's "b" is the BARN and its "By" is the byte; bovnar's

@@ -82,6 +82,7 @@ is explicit that five tables wrong in the same way would agree with each other p
     - 9.2 [What the generator checks, and what it does not](#92-what-the-generator-checks-and-what-it-does-not)
     - 9.3 [Tests](#93-tests)
     - 9.4 [No build switch](#94-no-build-switch)
+    - 9.5 [The factor proof](#95-the-factor-proof)
 10. [Cost, risk, and what is left out](#10-cost-risk-and-what-is-left-out)
     - 10.1 [What it cost](#101-what-it-cost)
     - 10.2 [What can go wrong](#102-what-can-go-wrong)
@@ -682,8 +683,8 @@ to go. That is the Old German units, the water-hardness degrees, the turbidity k
 starts in Bovnar's native registry may have nowhere to go.
 
 Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **601** combinations survive a native → UCUM → native round trip
-unchanged, **1204** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+`si_none da h k M G T d c m µ n` — **599** combinations survive a native → UCUM → native round trip
+unchanged, **1206** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -824,7 +825,6 @@ and month variants do not (§6.4).
 | `[car_m]` | `ct` | `0.0002` |
 | `[ston_av]` | `tn_sh` | `907.18474` |
 | `[lton_av]` | `tn_l` | `1016.0469088` |
-| `[slug]` | `slug` | `14.593902937206364` |
 
 **Volume**
 
@@ -862,7 +862,6 @@ and month variants do not (§6.4).
 | `[kn_i]` | `kn` | `0.5144444444444445` |
 | `dyn` | `dyn` | `1e-05` |
 | `gf` | `g·gn` | `0.00980665` |
-| `kgf` | `kgf` | `9.80665` |
 | `[lbf_av]` | `lbf` | `4.4482216152605` |
 | `[g]` | `gn` | `9.80665` |
 
@@ -883,8 +882,8 @@ no gram-force, but `g·gn` is gram times standard gravity, dimensions `[1,1,-2,0
 | `sb` | `sb` | `10000.0` |
 | `ph` | `ph` | `10000.0` |
 | `Ci` | `Ci` | `37000000000.0` |
-| `[RAD]` | `c~Gy` | `0.01` |
-| `[REM]` | `rem` | `0.01` |
+| `RAD` | `c~Gy` | `0.01` |
+| `REM` | `rem` | `0.01` |
 | `R` | `R` | `0.000258` |
 
 **Digital and ratio**
@@ -1196,18 +1195,21 @@ That last check is the useful one day to day: a typo in a target would otherwise
 `error_unit_illegal` on a UCUM code that is perfectly valid, which is the most confusing failure
 this table can produce.
 
-**What it does not check is the UCUM side.** The design called for the generator to carry UCUM's own
-value for each atom and refuse any row whose factor and dimension vector did not match the native
-target exactly — so that no belief about what a UCUM atom is worth stayed load-bearing. That did not
-ship: `ucum.bvnr` carries the target but not UCUM's value, so the mappings rest on the table author.
-Where a value was uncertain, or where it was certainly *close but not equal* to a native unit, the
-atom went into `.unsupported` instead — which is why `osm`, `[Btu]`, `cal_IT` and `[dr_ap]` are
-refused rather than mapped onto the nearly-right native unit. §10.2 treats this as the standing
-risk, and §10.4 records it as unbuilt.
+**What it does not check is the UCUM side**, and that half now lives in a separate tool rather than
+in the generator. `gen_profiles.py` still carries no UCUM value: `ucum.bvnr` states the target and
+not what the publisher says it is worth. Where a value was uncertain, or certainly *close but not
+equal* to a native unit, the atom went into `.unsupported` instead — which is why `osm`, `[Btu]`,
+`cal_IT` and `[dr_ap]` are refused rather than mapped onto the nearly-right native unit.
+
+`check_profile_factors.py` (CTest target `bvnr_profile_factors`) closes it for the two vocabularies
+that publish machine-readable definitions with factors. It reads UCUM's `ucum-essence.xml` and the
+UDUNITS-2 XML database, resolves every code to a factor and a dimension vector, asks the **reference
+library** — not a second Python implementation of the unit grammar — what the mapped native target
+is worth, and compares. See §9.5.
 
 The generator also emits the **reverse** table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 601
+searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 599
 round trips quoted in §5.3 are the check that it agrees with the forward direction.
 
 ### 9.3 Tests
@@ -1255,6 +1257,66 @@ means only what it says — the namespace is not one this build defines — and 
 namespace except `ucum`. If the profile ever becomes optional, that error code is already the right
 answer for a build without it, which is why it exists as a separate code rather than as
 `error_unit_illegal`.
+
+### 9.5 The factor proof
+
+> `check_profile_factors.py`, CTest target `bvnr_profile_factors`, labels `units;profile;vocab`.
+
+Everything else in this document proves the tables are **self-consistent**. §14.3 is blunt that this
+is not the same as correct: five tables wrong in the same way would agree with each other perfectly.
+This tool is the outside check.
+
+For each mapped row it resolves the publisher's own definition of the code to a factor and a
+dimension vector, asks the reference library what the native target is worth, and compares. The
+native side goes through `bvn_parse_unit` and `bvn_unit_to_si_factor` via the ctypes bindings, never
+through a Python reimplementation of the unit grammar — that is exactly how a table starts
+disagreeing with the parser it feeds (§9.1).
+
+**Three outcomes, and only one fails the build.**
+
+| Outcome | Meaning | Fatal |
+|---|---|---|
+| mismatch | the code exists upstream and means something else — a different dimension, or a factor outside tolerance | **yes** |
+| dead | the table accepts a spelling the publisher does not define; unreachable from a conforming producer | no (`--strict-dead`) |
+| unmapped-but-exact | the publisher defines a code that *is* a native unit and the table does not carry it | no — a coverage suggestion, and carrying a unit is editorial |
+
+**The two systems are not the same system**, and the corrections are the substance of the UCUM
+comparison rather than a detail of it. UCUM's mass base is the gram, so a factor carries 10³ per
+mass exponent that bovnar's does not. UCUM has no amount base — the mole is Avogadro's *number* — so
+a factor also carries N_A per amount exponent, divided out using UCUM's own value so it cancels
+exactly. UCUM's electrical base is charge, which maps to current **and** time, and that is what makes
+`A` = `C/s` come out as a bare current. UCUM's plane angle is a base and bovnar's radian is
+dimensionless, so that component is dropped.
+
+**The tolerance is calibrated, not chosen.** A publisher states decimals — UDUNITS writes the
+horsepower as `7.456999e2 W` and the atomic mass unit with the 1986 CODATA value — so a correct row
+still disagrees in the seventh digit. Across both tables every such disagreement lands at or below
+`6.9e-7`, and the genuine errors are all above it: the US survey foot at `2e-6`, the survey acre at
+`4e-6`, the tropical year at `2.1e-5`, the IT calorie at `6.7e-4`. `1e-6` sits in the gap. The gap
+is only a factor of three wide, so a real disagreement between `7e-7` and `2e-6` would pass — that
+is a known limit, not an oversight.
+
+**Two waivers, both printed on every run** rather than silently skipped, because a waiver nobody
+sees is how a regression hides behind an old excuse:
+
+- **Modelling.** bovnar carries bit and byte as two base units of information with no factor between
+  them; UCUM and UDUNITS both define the byte as the number 8. A different model, not a wrong
+  conversion.
+- **The publisher is wrong.** UCUM defines the phot as `1e-4 lx`. A phot is one lumen per square
+  centimetre, i.e. `1e4 lx` — the value is inverted. Native `ph` is correct and the profile keeps
+  mapping to it. UCUM also rounds the mercury column to `133.3220 kPa`, 2.9 ppm from the exact
+  conventional value native `mmHg` carries.
+
+**It needs the publications, and a test must not fetch.** The files are cached under
+`<build>/vocab/`; populate it once with `python3 check_profile_factors.py --fetch`. Without a cache
+the test **skips green**, which is the same rule `bvnr_web_links` follows. CI should fetch and then
+pass `--strict`, so that a skip there is a failure rather than a quiet pass.
+
+**What it does not cover.** QUDT publishes Turtle with conversion multipliers and could be added;
+UN/ECE Rec 20's conversion factors are prose and are out of reach. Arbitrary and special units
+(`isArbitrary`, `isSpecial`) have no factor to check — they are exactly the ones carried as opaque or
+refused. So the standing risk of §10.2 is now **narrowed to three of the five profiles**, not
+retired.
 
 ---
 
@@ -1353,13 +1415,17 @@ one paragraph to read rather than four sections to cross-check.
 | Not built | Where it is described | Consequence |
 |---|---|---|
 | Verbatim source preservation (`bvnr_data_t.unit_source`, writer re-emission) | §5.2, §7.3 | An annotation is dropped by a document built through the writer API. A parse-and-re-serialise round trip keeps it |
-| The generator's factor proof against UCUM's own values | §9.2 | Every mapping rests on the table author; §10.2 |
+| ~~The generator's factor proof against UCUM's own values~~ | §9.2, §9.5 | **Built** as `check_profile_factors.py`, outside the generator. Covers `ucum` and `udunits`; `unece`, `qudt` and `qudt-qk` still rest on the table author |
 | `BVNR_WITH_UCUM_PROFILE` and feature reporting | §9.4 | The profiles are unconditional, which is a simplification rather than a loss |
-| A machine check of any table against its publisher | §9.2, §10.2 | Five tables now rest on their authors rather than one |
+| A machine check of the three remaining tables against their publishers | §9.2, §10.2 | `ucum` and `udunits` are checked (§9.5); `unece`, `qudt` and `qudt-qk` are not |
 
-The factor proof is the one worth building next, and it grew in importance when the vocabulary
-count went from one to five: §14 can prove the five agree with each other but not that any of them
-agrees with its publisher. Verbatim source preservation is second.
+The factor proof was the one worth building next and is now built (§9.5) — it caught four wrong
+udunits rows and two wrong UCUM spellings on its first run, and it found a defect in UCUM's own
+data. It reaches only `ucum` and `udunits`, because they are the two vocabularies publishing
+machine-readable definitions with factors, so §14's caveat still stands undiminished for `unece`,
+`qudt` and `qudt-qk`: the suite can prove those three agree with the other two, not that any of them
+agrees with its publisher. Extending it to QUDT's Turtle is the next piece. Verbatim source
+preservation is second.
 
 ---
 

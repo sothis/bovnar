@@ -52,6 +52,13 @@ EXCLUDES=(
     # wants an rfc-local.css the tree does not carry -- publishing it would put
     # an unfinished draft under the documentation root with a broken stylesheet.
     "doc/ietf"
+    # A paper prepared for submission to the Journal of Open Source Software.
+    # The same case as the Internet-Draft above: a submission artifact, not
+    # referenced from anywhere on the site, and served as raw Markdown whose
+    # YAML front matter a reader sees as source. It reached the live root once,
+    # because it lives under doc/ and rides the symlink like a document. It
+    # goes public when JOSS publishes it, not before.
+    "doc/joss_paper"
     "httpd.sh"
     # Retired document paths kept as pointers for the IANA registration, which
     # cites five documents by their pre-renumbering name and links into the

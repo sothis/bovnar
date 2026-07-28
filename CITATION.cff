@@ -15,7 +15,9 @@ authors:
     given-names: Janos
     orcid: "https://orcid.org/0009-0008-1299-6534"
 version: 1.1.0
-date-released: "2026-07-19"
+# The release date of version 1.1.0 (tag v1.1.0, and the CHANGELOG entry), not
+# the later date on which the Zenodo archive of it was deposited.
+date-released: "2026-06-21"
 license: MIT
 repository-code: "https://github.com/sothis/bovnar"
 url: "https://www.bovnar.io"

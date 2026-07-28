@@ -512,7 +512,7 @@ parent plan therefore counts the groups (currently 23), not the 387 cases.
 
 ```
 TAP version 14
-1..21
+1..23
 # Subtest: encoding
     ok 1 - [ENC-001] empty stream
     ok 2 - [ENC-002] UTF-8 BOM at byte 0
@@ -520,7 +520,7 @@ TAP version 14
       ---
       message: expected error invalid_byte_order_mark but got none
       ...
-    1..9
+    1..14
 not ok 1 - encoding
 # Subtest: version
     ok 1 - [VER-001] directive declaring the current spec version

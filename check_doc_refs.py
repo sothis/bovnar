@@ -257,6 +257,96 @@ def check_error_enum(verbose=False):
     return problems
 
 
+# ── a document's `typedef struct … } name_t;` vs the header it restates ─────
+#
+# The same rot as §16.10's enum, one layer over: a document reprints a public
+# struct, the header grows a field, and the listing silently becomes a different
+# type from the one it claims to show. Three had drifted at once --
+# bvnr_unit_policy_t was missing `rules`/`num_rules`, the two fields the example
+# directly beneath it assigns; bvnr_read_flags_t in the spec was missing
+# `text_only`, which §16.10 already names as what raises code 51; and
+# bvnr_data_t in doc/05 was missing `converted`/`conv`, the two fields a unit
+# conversion reports through, in the document about units.
+#
+# A listing may be curated on purpose: doc/08 shows "the most important fields"
+# of bvnr_read_flags_t, and regroups bvnr_write_flags_t into what the writer
+# enforces and what is there for symmetry with the reader -- both clearer than
+# declaration order, and both signposted. An ellipsis comment inside the braces
+# is how a listing declares itself curated, and is what exempts it from the
+# field-for-field and ordering comparisons. What it does list must still exist:
+# a curated listing may omit and reorder, never invent.
+INCLUDE_DIR = os.path.join(ROOT, "include")
+STRUCT = re.compile(r"typedef struct\s+\w*\s*\{(.*?)\}\s*(\w+_t)\s*;", re.S)
+ELLIPSIS = re.compile(r"/\*[^*]*\.\.\.")
+
+
+def _struct_fields(body):
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+    body = re.sub(r"//[^\n]*", "", body)
+    out = []
+    for stmt in body.split(";"):
+        stmt = stmt.strip()
+        if not stmt:
+            continue
+        m = re.search(r"([A-Za-z_]\w*)\s*(\[[^\]]*\])?$", stmt)
+        if m:
+            out.append(m.group(1))
+    return out
+
+
+def check_struct_listings(verbose=False):
+    """Every struct a document reprints must match the header declaring it."""
+    if not os.path.isdir(INCLUDE_DIR):
+        return []
+    header_structs = {}
+    for fn in sorted(os.listdir(INCLUDE_DIR)):
+        if not fn.endswith(".h"):
+            continue
+        text = open(os.path.join(INCLUDE_DIR, fn), encoding="utf-8").read()
+        for body, name in STRUCT.findall(text):
+            header_structs[name] = (_struct_fields(body), fn)
+
+    problems = []
+    checked = 0
+    for fn in sorted(os.listdir(DOC_DIR)):
+        if not fn.endswith(".md"):
+            continue
+        rel = f"doc/{fn}"
+        text = open(os.path.join(DOC_DIR, fn), encoding="utf-8").read()
+        for m in STRUCT.finditer(text):
+            body, name = m.group(1), m.group(2)
+            if name not in header_structs:
+                continue
+            line = text[:m.start()].count("\n") + 1
+            listed = _struct_fields(body)
+            actual, where = header_structs[name]
+            checked += 1
+            curated = bool(ELLIPSIS.search(body))
+            missing = [] if curated else [f for f in actual if f not in listed]
+            invented = [f for f in listed if f not in actual]
+            order = [f for f in listed if f in actual]
+            if curated:
+                order = [f for f in actual if f in listed]
+            if missing:
+                problems.append(
+                    f"{rel}:{line}: the {name} listing is missing "
+                    f"{', '.join(missing)} — in include/{where}. Add the "
+                    f"field, or, if the listing is a curated excerpt, say so "
+                    f"with a '/* ... */' comment inside the braces.")
+            if invented:
+                problems.append(
+                    f"{rel}:{line}: the {name} listing has "
+                    f"{', '.join(invented)}, which include/{where} does not "
+                    f"declare.")
+            if order != [f for f in actual if f in listed]:
+                problems.append(
+                    f"{rel}:{line}: the {name} listing orders its fields "
+                    f"differently from include/{where}.")
+    if verbose and not problems:
+        print(f"  ok  {checked} struct listing(s) match include/")
+    return problems
+
+
 def main(argv):
     verbose = "--verbose" in argv
     load_docs()
@@ -294,8 +384,19 @@ def main(argv):
               "check_doc_refs.py.")
         return 1
 
+    struct_problems = check_struct_listings(verbose)
+    for msg in struct_problems:
+        print(msg)
+    if struct_problems:
+        print(f"\n{len(struct_problems)} struct listing(s) disagree with the "
+              f"headers they reprint.")
+        print("The header is the source; a document restating a struct has to "
+              "carry its fields over — see the header of check_doc_refs.py.")
+        return 1
+
     print(f"check_doc_refs: every section citation across {total} files resolves, "
-          f"and §16.10 matches include/bovnar.h.")
+          f"§16.10 matches include/bovnar.h, and every struct listing matches "
+          f"its header.")
     return 0
 
 

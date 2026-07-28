@@ -34,6 +34,21 @@ desktop environments, OS tooling, and developer platforms. The media type
   repo-root `.gitattributes` already carries the `linguist-language=Bovnar`
   override, which activates once the language ships upstream.
 
+### `wasm/` — the `bovnar-wasm` npm package
+- **`package.json`**, **`index.mjs`**, **`index.single.mjs`**, **`bovnar.mjs`**,
+  **`bovnar.single.mjs`**, **`bovnar.wasm`**, **`README.md`** — the C reference
+  parser built for WebAssembly, laid out as a publishable npm package exposing
+  `validate`, `toJSON`, `events` and `version`. The `/single` entry point inlines
+  the `.wasm` as base64 for `file://`, strict-CSP, and no-bundler use.
+- These are **build products**, not hand-edited sources: `wasm/build_wasm.sh`
+  (emscripten) writes the whole directory, and `wasm/index.mjs` is the source the
+  wrapper is copied from. `wasm/built_from.sha256` records a hash of the sources
+  they were built from (the amalgamated `bovnar.c`/`bovnar.h` plus
+  `wasm/bvnr_wasm.c`), and the `bvnr_wasm_freshness` CTest gate fails when the
+  library has moved on and the artifacts have not been rebuilt.
+- The package is **not published to npm yet** — it is versioned and staged here.
+  Consume it from a checkout, or use the copy the site serves under `web/`.
+
 ## Quick verification
 
 ```sh

@@ -1937,7 +1937,22 @@ correction and is the reason this document requests an update at all.
    normalization ({{security-transport}}). A document containing no octet
    stream remains 8-bit UTF-8 text and is unaffected.
 
-2. **Security considerations are substantially expanded.** The existing
+2. **The published specification is cited as this document, and by
+   location-independent URL.** The existing registration cites five files
+   in the reference implementation's repository -
+   `github.com/sothis/bovnar/blob/main/doc/<name>` - naming the
+   specification, the unit system, the grammar, the FAQ and the
+   conformance suite. Those paths are an artifact of one repository's
+   layout at one moment: the documentation set has since been renumbered,
+   and every one of the five citations named a file that no longer exists
+   under that name. Pointer files were restored at the cited paths to keep
+   the published registration resolving, but a registry entry should not
+   depend on a repository preserving a filename indefinitely. The template
+   in {{media-type}} therefore cites this document first, with
+   {{BOVNAR-SPEC}} as the versioned companion, under `www.bovnar.io` URLs
+   that are redirected across renames rather than invalidated by them.
+
+3. **Security considerations are substantially expanded.** The existing
    entry covers input size, nesting depth, reference validation, numeric
    range checking, and opaque binary payloads. {{security}} of this
    document retains all five and adds the parser-differential risk
@@ -1949,21 +1964,21 @@ correction and is the reason this document requests an update at all.
    ({{security-confusable}}), and the bypass of range validation by
    special numeric values ({{security-numeric}}).
 
-3. **Interoperability considerations gain the two facts most likely to
+4. **Interoperability considerations gain the two facts most likely to
    cause disagreement between conforming implementations**: the two
    conformance tiers and the documents that separate them
    ({{conformance}}), and the absence of a canonical form
    ({{interop-canonical}}).
 
-4. **Fragment identifier considerations change from "not applicable" to
+5. **Fragment identifier considerations change from "not applicable" to
    "none defined."** The distinction matters because a fragment syntax is
    plausible for this format and may yet be defined; see
    {{iana-open}}.
 
-5. **The `charset` parameter entry** is unchanged in substance and is
+6. **The `charset` parameter entry** is unchanged in substance and is
    restated to name {{RFC6657}} explicitly.
 
-6. **The contact address changes to `bovnar@mail.de`.** The registration
+7. **The contact address changes to `bovnar@mail.de`.** The registration
    currently names a personal address; the role address is preferred so
    that the contact survives independently of any individual. The person
    named as contact, author, and change controller is unchanged.
@@ -2408,13 +2423,24 @@ os-data      = *OCTET       ; exactly os-length octets
 
 The unit expression accumulated by `unit-param` and `inline-unit` is
 parsed by a second grammar. {{units}} introduces it; this is its complete
-form, including the prefix alternatives that the excerpt there omits. `base-unit` and `currency-code` are the only rules that
-cannot be expressed in ABNF: they are lookups into the registry
-{{BOVNAR-UNITS}}, whose contents may grow in a minor revision
-({{unit-model}}). The prefix sets, by contrast, are closed and are
-enumerated here.
+form, including the prefix alternatives that the excerpt there omits.
+
+`base-unit` and `currency-code` are the only rules the grammar does not
+fully determine. Their productions below bound the *shape* of a token, so
+that the grammar stays closed and mechanically checkable; whether a token
+so shaped names anything is a lookup into the registry {{BOVNAR-UNITS}},
+whose contents may grow in a minor revision ({{unit-model}}). A token
+that satisfies the production and is absent from the registry is
+`error_unit_illegal`, which is the ordinary case of the ABNF being
+necessary and not sufficient ({{grammar-notation}}). The prefix sets, by
+contrast, are closed and are enumerated here in full.
 
 ~~~ abnf
+; resolved-unit is the entry point of the UNIT sub-grammar: the text a
+; unit-param or an inline-unit carries must parse as one of these. It is
+; deliberately not reachable from "stream", because at the document level
+; a unit is an opaque run of unit-char and is resolved afterwards.
+
 resolved-unit = %s"no_unit" / unit-expr
 unit-expr     = unit-factor *( unit-sep unit-factor )
 unit-factor   = unit-component / "(" unit-expr ")"
@@ -2422,9 +2448,23 @@ unit-sep      = "*" / "/" / %xC2.B7
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
               / [ prefix [ "~" ] ] "$" currency-code
 
+; base-unit and currency-code bound the SHAPE of a token only; whether a
+; token so shaped names anything is a registry lookup, per the paragraph
+; above this block.
+;
 ; base-unit is matched as the LONGEST alias suffix, so a token
 ; that is itself a registered unit outranks any prefixed reading
 ; of it. Section 8.3 lists the two spellings refused by name.
+
+base-unit      = 1*base-unit-char
+base-unit-char = ALPHA / "_" / "%"
+               / %xC2.B0                    ; U+00B0 DEGREE SIGN
+               / %xC3.85 / %xCC.8A          ; U+00C5, U+030A (angstrom)
+               / %xCE.A9 / %xE2.84.A6       ; U+03A9, U+2126 (ohm)
+               / %xE2.84.A7                 ; U+2127 MHO
+               / %xE2.84.AB                 ; U+212B ANGSTROM SIGN
+               / %xE2.80.B0 / %xE2.80.B1    ; U+2030, U+2031 (per mille)
+currency-code  = 3*4( %x41-5A )             ; uppercase ASCII, registry lookup
 
 prefix        = si-prefix / iec-prefix
 si-prefix     = "Q" / "R" / "Y" / "Z" / "E" / "P" / "T" / "G" / "M"

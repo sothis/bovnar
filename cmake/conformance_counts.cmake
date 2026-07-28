@@ -63,4 +63,59 @@ foreach(i RANGE ${_last})
             "(row missing, or a different count)")
     endif()
 endforeach()
-message(STATUS "conformance counts match doc/13 (${_actual} cases, ${_ngroups} groups)")
+
+# The illustrative TAP block in §9 carries the same numbers a second time -- the
+# parent plan, the prose group count beside it, and the child plan of the group
+# it walks through. Being an example rather than a table, it escaped the checks
+# above and drifted: it still showed "1..21" and an encoding plan of "1..9" long
+# after the suite had grown to 23 groups and 14 encoding cases. A reader
+# implementing against §9 counts those, so check them too.
+# The sample is a fenced block and contains no backtick, so a backtick-free run
+# after the TAP header is bounded by the closing fence. CMake's regex engine has
+# no lazy quantifier, and a greedy ".*" here ran on to the LAST child plan in the
+# file rather than the sample's first.
+if(NOT _doc MATCHES "TAP version 14\n([^`]*)")
+    message(FATAL_ERROR "no illustrative TAP block in ${DOCFILE} §9")
+endif()
+set(_sample "${CMAKE_MATCH_1}")
+if(NOT _sample MATCHES "^1\\.\\.([0-9]+)\n# Subtest: ([a-z_]+)\n")
+    message(FATAL_ERROR "${DOCFILE} §9's sample TAP block has no parent plan and first subtest")
+endif()
+set(_sample_plan ${CMAKE_MATCH_1})
+set(_sample_group ${CMAKE_MATCH_2})
+if(NOT _sample_plan EQUAL _ngroups)
+    message(FATAL_ERROR
+        "doc/13 §9's sample TAP parent plan says 1..${_sample_plan}; the suite "
+        "reports ${_ngroups} groups")
+endif()
+if(NOT _doc MATCHES "parent plan therefore counts the groups \\(currently ([0-9]+)\\)")
+    message(FATAL_ERROR "doc/13 §9 no longer states the group count in prose")
+endif()
+if(NOT CMAKE_MATCH_1 EQUAL _ngroups)
+    message(FATAL_ERROR
+        "doc/13 §9 says there are currently ${CMAKE_MATCH_1} groups; the suite "
+        "reports ${_ngroups}")
+endif()
+# The child plan closing the sample's first group, against that group's real
+# size. Take the FIRST child plan inside the sample -- the block goes on to show
+# a second group, whose plan must not be read as this one's.
+string(REGEX MATCHALL "    1\\.\\.[0-9]+" _sample_plans "${_sample}")
+if(NOT _sample_plans)
+    message(FATAL_ERROR "doc/13 §9's sample has no child plan for '${_sample_group}'")
+endif()
+list(GET _sample_plans 0 _sample_child)
+string(REPLACE "    1.." "" _sample_child "${_sample_child}")
+list(FIND _groups "# Subtest: ${_sample_group}" _idx)
+if(_idx EQUAL -1)
+    message(FATAL_ERROR "doc/13 §9 walks through group '${_sample_group}', which the suite does not run")
+endif()
+list(GET _plans ${_idx} _real)
+string(REPLACE "    1.." "" _real "${_real}")
+if(NOT _sample_child EQUAL _real)
+    message(FATAL_ERROR
+        "doc/13 §9's sample shows group '${_sample_group}' closing at "
+        "1..${_sample_child}; the suite runs ${_real} cases there")
+endif()
+
+message(STATUS "conformance counts match doc/13 (${_actual} cases, ${_ngroups} groups, "
+               "including §9's sample TAP block)")

@@ -159,9 +159,13 @@ typedef struct bvnr_read_flags_s {
     uint64_t max_file_size;        /* 0 → unlimited / endless (default); set positive to cap */
     uint8_t  max_struct_nesting;   /* 0 → 64 internal default; hard cap 255 */
     uint8_t  max_array_nesting;    /* 0 → 64 internal default; hard cap 255 */
-    /* ... other size limits ... */
+    /* ... the remaining size limits, plus strict_version, text_only (§1.13),
+     * and the want_unit hook and its two knobs (§1.10) ... */
 } bvnr_read_flags_t;
 ```
+
+The full struct is in `include/bovnar.h`, and the specification lists it in
+§16.4.
 
 `on_verified` is the callback you will implement almost always. `on_unverified` fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: `want_unit` (§1.10) runs ahead of **both** callbacks, so with it installed an `on_unverified` consumer also sees a populated `converted`/`conv` on `ev_data`. Both callbacks must return `true` to continue parsing, `false` to abort (sets `error_scanner_callback_failed`).
 
@@ -593,18 +597,32 @@ expressed as unit **text**, so a binding can drive it without a function pointer
 
 ```c
 #define BVNR_MAX_UNIT_TARGETS 8u
+#define BVNR_MAX_UNIT_RULES   8u
+#define BVNR_MAX_UNIT_PATH    96u
 
 typedef struct bvnr_unit_target_s {
     const char *unit;   /* "m/s"; parsed when the policy is set */
     uint32_t    base;   /* output base, 0 = the value's own */
 } bvnr_unit_target_t;
 
+typedef struct bvnr_unit_rule_s {
+    const char            *path;   /* ".inlet.temperature", or ".inlet.*" */
+    const char            *unit;
+    uint32_t               base;   /* output base for bvnr_rule_convert, 0 = own */
+    bvnr_unit_rule_mode_t  mode;   /* bvnr_rule_convert | bvnr_rule_require */
+} bvnr_unit_rule_t;
+
 typedef struct bvnr_unit_policy_s {
+    /* per-field rules — consulted before everything below */
+    const bvnr_unit_rule_t     *rules;
+    uint32_t                    num_rules;
+    /* conversion */
     const bvnr_unit_target_t   *targets;
     uint32_t                    num_targets;
     uint32_t                    base;         /* output base for `normalise` */
     bvnr_unit_normalise_t       normalise;    /* none | bvnr_normalise_si */
     bvnr_unit_inexact_policy_t  on_inexact;   /* error | leave */
+    /* validation — these reject a document and never change a value */
     bool                        require_unit;
     const char * const         *require_dimension_of;
     uint32_t                    num_require_dimension_of;
@@ -882,6 +900,9 @@ Attach `sink` to the writer and configure it. Must be called before any `bvnr_wr
 
 ```c
 typedef struct bvnr_write_flags_s {
+    /* Regrouped for exposition — see include/bovnar.h for the declaration
+       order, and zero-initialise rather than relying on this one. ... */
+
     /* ── Writer enforces these ─────────────────────────────────── */
     uint8_t  max_struct_nesting;      /* 0 → 64 internal default; hard cap 255 */
     uint8_t  max_array_nesting;       /* 0 → 64 internal default; hard cap 255 */
@@ -902,6 +923,8 @@ typedef struct bvnr_write_flags_s {
     uint64_t max_file_size;
     bool     continue_on_error;       /* no-op in the writer */
     bvnr_on_error_fn on_error;        /* no-op in the writer */
+
+    uint64_t _reserved[4];            /* padding for future fields; leave zero */
 } bvnr_write_flags_t;
 ```
 

@@ -32,8 +32,10 @@ pip install --upgrade bovnar     # pure-ctypes bindings + bundled shared library
 Binary wheels are published for **CPython 3.10–3.14** on **Linux** (x86_64,
 aarch64) and **macOS** (arm64, x86_64); an sdist is available for other targets.
 
-**C / embedding:** vendor the single-file amalgamation `dist/bovnar.h` +
-`dist/bovnar.c` (C99, no dependencies), or build the library with CMake. The
+**C / embedding:** vendor the single-file amalgamation — `bovnar.h` + `bovnar.c`
+(C99, no dependencies), shipped as the `…-amalgamate.tar.xz` release asset and
+regenerated into `build/amalgamate/` by every build — or build the library with
+CMake. The
 build understands the highest spec it supports via `bvnr_spec_version()` /
 `BVNR_SPEC_VERSION_MAJOR`·`MINOR` (now `1`·`1`).
 

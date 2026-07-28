@@ -30,7 +30,7 @@ Python bindings for the bovnar streaming/framing layer (bovnar_stream.h):
 
 These wrap the C functions directly, so behaviour (framing, varint reassembly,
 the memory-amplification guards, the strict-vs-resilient document policy) matches
-the native library exactly. See doc/9_bovnar_streaming.md for the conventions.
+the native library exactly. See doc/10_bovnar_streaming.md for the conventions.
 """
 
 import ctypes

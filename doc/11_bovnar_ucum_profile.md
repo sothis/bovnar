@@ -4,9 +4,9 @@
 > **Status:** Under implementation — the code is in `src/utils/bovnar_ucum.c` and pinned by `tests/bovnar_ucum_test.c`, but nothing here is released: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 > **Scope:** How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.
 
-Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the native registry and notation
-grammar this profile sits beside), [Unit Ambiguities](unit_ambiguities.md) (how a unit token is
-resolved, and the pairs that look interchangeable), and `doc/parser_level_unit_policy.md` (the
+Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
+grammar this profile sits beside), [Unit Ambiguities](07_bovnar_unit_ambiguities.md) (how a unit token is
+resolved, and the pairs that look interchangeable), and `doc/06_bovnar_unit_policy.md` (the
 reader- and writer-side unit policies a profile unit has to survive unchanged — a working note, not
 part of the published documentation set).
 
@@ -190,8 +190,8 @@ is `error_unsupported_spec_version` rather than a document the library cannot re
 version accepts.
 
 Otherwise: everywhere a native unit may appear — as the unit parameter of a type annotation, and as
-an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
-(doc/2 §2.2) is unchanged — the comparison is on the parsed `value_unit_t`, so the two spellings
+an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the annotation/inline agreement rule
+(doc/05 §2.2) is unchanged — the comparison is on the parsed `value_unit_t`, so the two spellings
 may differ as long as they mean the same thing:
 
 ```bovnar
@@ -202,12 +202,12 @@ may differ as long as they mean the same thing:
 .d = <float:64,m> 1.0 ucum:s;             # error_unit_mismatch, as always
 ```
 
-A profile unit is a *unit*, so it is confined to the same type families (doc/2 §2.3): `uint`,
+A profile unit is a *unit*, so it is confined to the same type families (doc/05 §2.3): `uint`,
 `sint`, `float`, `float_fix`, `float_dec`. A `ucum:` parameter on `utf8`, `bool` or `datetime` is
 `error_illegal_value_type`, unchanged.
 
 Currencies stay native-only. UCUM has no monetary codes, `ucum:` never yields one, and the `$`
-sigil rule (doc/2 §9.1) is untouched.
+sigil rule (doc/05 §9.1) is untouched.
 
 ### 2.3 Five bytes the lexer has to learn
 
@@ -273,7 +273,7 @@ telling you the annotation is a field, not a unit.
 
 ### 2.6 Grammar
 
-The formal rules live in [the EBNF](5_bovnar.ebnf) beside `unit-param`, which is
+The formal rules live in [the EBNF](12_bovnar.ebnf) beside `unit-param`, which is
 where the byte classes of §2.3 are also recorded:
 
 ```ebnf
@@ -284,7 +284,7 @@ profile-code = profile-char , {profile-char} ;
 ```
 
 `profile-code` is deliberately not given a grammar. The sub-grammar is
-**semantic**, as the native unit sub-grammar is (doc/2 §5.2): the lexer captures
+**semantic**, as the native unit sub-grammar is (doc/05 §5.2): the lexer captures
 bytes, and `bvn_parse_unit` — which dispatches on the namespace — decides whether
 they are a UCUM expression. The normative grammar for what is inside is UCUM's
 own, and restating it here would create a second authority to keep in step with
@@ -318,7 +318,7 @@ that.
 ### 3.2 Atoms and prefixes
 
 UCUM separates prefix from atom by its own rule; Bovnar separates it by longest-alias-suffix match
-with an optional explicit `~` (doc/2 §4.3). Translation happens **after** UCUM's split, on the
+with an optional explicit `~` (doc/05 §4.3). Translation happens **after** UCUM's split, on the
 resolved (prefix, atom) pair, never by handing the raw UCUM string to the native parser. That is
 what keeps the two disambiguation regimes from contaminating each other, and it is why the
 collisions in §6.2 are harmless rather than fatal.
@@ -348,8 +348,8 @@ UCUM's binary prefixes (`Ki`, `Mi`, …) map to `prefix_iec` and are subject to 
 |---|---|---|
 | `.` | `·` | multiplication |
 | `/` | `/` | division — see below |
-| `m2`, `s-1` | `m²`, `s⁻¹` | exponent directly after the atom; range ±9 as natively (doc/2 §6) |
-| `(` `)` | `(` `)` | grouping, mapped through the native group parser (doc/2 §5.2) |
+| `m2`, `s-1` | `m²`, `s⁻¹` | exponent directly after the atom; range ±9 as natively (doc/05 §6) |
+| `(` `)` | `(` `)` | grouping, mapped through the native group parser (doc/05 §5.2) |
 | `1` | *(nothing)* | the unity atom; contributes no component |
 
 The division rule is the one real difference and it must not be papered over. UCUM's `/` is a
@@ -427,7 +427,7 @@ nine-orders-of-magnitude error rather than a cosmetic one. Verified against the 
 | `10*-3.g` | *D* = −3, *e* = +1, *p* = 0 → *p′* = −3  | `m~g` | `1e-06` |
 
 (The last digits are the existing `bvni_ipow` rounding, not something the fold introduces; the
-exact path is `bvn_unit_convert_rational`, doc/2 §12.4.)
+exact path is `bvn_unit_convert_rational`, doc/05 §12.4.)
 
 **What the fold cannot do, and why that is stated rather than fixed.** SI prefix decades are
 ±1, ±2, ±3, and then multiples of three to ±30. There is no prefix for 10⁴, 10⁵, 10⁷ or 10⁸, so
@@ -483,7 +483,7 @@ table where a prefix is used on a logarithmic unit.
 
 ### 3.8 Affine units
 
-Nothing new. `Cel` translates to `°C`, and the native affine discipline (doc/2 §3, and the
+Nothing new. `Cel` translates to `°C`, and the native affine discipline (doc/05 §3, and the
 `.affine`/`.offset` fields in `src/gendata/units.bvnr`) applies unchanged: an affine unit is valid
 at exponent 1 only, and a compound containing one parses but yields no conversion value, because
 the offset is a kelvin count and a product with signature `K·s⁻¹` has nowhere to put it.
@@ -500,7 +500,7 @@ either, and writes a temperature difference as `K`. See §10.3.
 
 `bvn_unit_equal` is unchanged: a multiset comparison of (base, exponent, prefix) triples. Because
 translation produces ordinary components, a profile unit and a native unit that mean the same thing
-compare equal, and the annotation/inline agreement check of doc/2 §2.2 works across notations:
+compare equal, and the annotation/inline agreement check of doc/05 §2.2 works across notations:
 
 ```bovnar
 #!bovnar 1.2
@@ -873,7 +873,7 @@ Verified against the native parser:
 | `B` | byte, information | bel, `da~dB` | a data size read as a level |
 | `b` | bit, information | barn, `1e-28` m² | a data size read as an area |
 | `Gb` | gigabit (`G~b`, factor `1e9`) | *refused* — `b` is non-metric in UCUM, so `G`+`b` is not a legal code | a prefixed reading that exists natively and not in the profile |
-| `a` | *not a unit* | year (Julian) | — (Bovnar declines the ambiguity; see [Unit Ambiguities](unit_ambiguities.md)) |
+| `a` | *not a unit* | year (Julian) | — (Bovnar declines the ambiguity; see [Unit Ambiguities](07_bovnar_unit_ambiguities.md)) |
 | `AU` | *not a unit* | astronomical unit | — (Bovnar spells it `au`) |
 | `gf` | *not a unit* | gram-force | — |
 | `Cel` | *not a unit* | degree Celsius | — |
@@ -1213,7 +1213,7 @@ exact code sees a change.
   reference date embedded in the time unit; none of that fits a per-value unit slot, and the honest
   answer for CF data is a converter, not a profile.
 - **Exchange rates.** Unchanged and unchangeable: currencies carry no conversion table, and a
-  cross-currency conversion is refused rather than guessed (doc/2 §9.6). UCUM has no currencies, so
+  cross-currency conversion is refused rather than guessed (doc/05 §9.6). UCUM has no currencies, so
   the profile never reaches this.
 
 ### 10.4 Specified here but not built
@@ -1234,12 +1234,12 @@ The first two are the ones worth building next, in that order.
 
 ## See also
 
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the native registry and notation grammar this profile sits beside
-- [Unit Ambiguities](unit_ambiguities.md) — how a unit token is resolved natively, and the pairs that look interchangeable
-- [Read/Write API](3_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy) — the unit policy a translated unit passes through unchanged
-- [Read/Write API](3_bovnar_readwrite_api.md) — the data event `unit_source` is added to, and the `want_unit` hook
-- [Conformance Test Tool](7_bovnar_conformance.md) — where the `unit-profile-ucum` group lives
-- [Unit Cheatsheet](8_unit_cheatsheet.md) — the native spellings the transliteration table targets
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the native registry and notation grammar this profile sits beside
+- [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — how a unit token is resolved natively, and the pairs that look interchangeable
+- [Read/Write API](08_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy) — the unit policy a translated unit passes through unchanged
+- [Read/Write API](08_bovnar_readwrite_api.md) — the data event `unit_source` is added to, and the `want_unit` hook
+- [Conformance Test Tool](13_bovnar_conformance.md) — where the `unit-profile-ucum` group lives
+- [Unit Cheatsheet](04_bovnar_unit_cheatsheet.md) — the native spellings the transliteration table targets
 
 ---
 

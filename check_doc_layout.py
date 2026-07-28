@@ -63,7 +63,7 @@ def gh_slug(text):
 def parse(text):
     """Return (lines, headings) where headings is [(lineno, level, title,
     anchor)] for every heading outside a fenced code block. Fences matter:
-    doc/0 alone has twenty '#' comment lines inside ```bovnar blocks."""
+    doc/01 alone has twenty '#' comment lines inside ```bovnar blocks."""
     lines = text.split("\n")
     headings = []
     seen = collections.Counter()

@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.googletagmanager.com 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
+<title>Bovnar Unit Ambiguities</title>
+<meta name="description" content="Every Bovnar token that could plausibly mean two things — what the parser reads it as, and how to write the other meaning.">
+<meta name="theme-color" content="#1e1e1e">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.bovnar.io/docs/ambiguities/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Bovnar">
+<meta property="og:title" content="Bovnar Unit Ambiguities">
+<meta property="og:description" content="Every Bovnar token that could plausibly mean two things — what the parser reads it as, and how to write the other meaning.">
+<meta property="og:url" content="https://www.bovnar.io/docs/ambiguities/">
+<meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
+<meta property="article:published_time" content="2026-07-28">
+<meta property="article:modified_time" content="2026-07-28">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bovnar Unit Ambiguities">
+<meta name="twitter:description" content="Every Bovnar token that could plausibly mean two things — what the parser reads it as, and how to write the other meaning.">
+<meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
+<meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
+<link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
+<link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
+<link rel="alternate" type="text/markdown" href="/doc/07_bovnar_unit_ambiguities.md">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Ambiguities", "description": "Every Bovnar token that could plausibly mean two things — what the parser reads it as, and how to write the other meaning.", "url": "https://www.bovnar.io/docs/ambiguities/", "mainEntityOfPage": "https://www.bovnar.io/docs/ambiguities/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-28", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Ambiguities", "item": "https://www.bovnar.io/docs/ambiguities/"}]}]}</script>
+</head>
+<body>
+<header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
+<main>
+<h1>Bovnar — Unit Ambiguities</h1>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/07_bovnar_unit_ambiguities.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-ambiguities.pdf">PDF</a>.</p>
+<blockquote>
+<p><strong>Spec version:</strong> 1.1
+<strong>Status:</strong> Reference — companion to the unit registry and the cheat sheet
+<strong>Scope:</strong> Every token that could plausibly mean two things — what Bovnar reads it as, and how to write the other meaning.</p>
+</blockquote>
+<p>Companion to <a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> (the registry) and
+<a href="https://www.bovnar.io/docs/cheatsheet/">Unit &amp; Currency Cheat Sheet</a> (the symbol tables). Every row here was checked
+against the reference parser; where a token is refused, it really is <code>error_unit_illegal</code>.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-how-a-token-is-resolved">How a token is resolved</a></li>
+<li><a href="#2-a-bare-unit-outranks-a-prefixed-reading">A bare unit outranks a prefixed reading</a></li>
+<li><a href="#3-two-prefixed-readings-compete">Two prefixed readings compete</a></li>
+<li><a href="#4-refused-outright">Refused outright</a></li>
+<li><a href="#5-prefix-symbol-vs-base-unit-symbol">Prefix symbol vs. base unit symbol</a></li>
+<li><a href="#6-case-decides">Case decides</a></li>
+<li><a href="#7-look-alike-characters">Look-alike characters</a></li>
+<li><a href="#8-temperature-scales-vs-electrical-units">Temperature scales vs. electrical units</a></li>
+<li><a href="#9-same-dimension-different-quantity">Same dimension, different quantity</a></li>
+<li><a href="#10-an-affine-scale-inside-a-compound-has-no-value">An affine scale inside a compound has no value</a></li>
+<li><a href="#11-a-named-unit-is-not-its-compound">A named unit is not its compound</a></li>
+<li><a href="#12-unit-vs-currency">Unit vs. currency</a></li>
+<li><a href="#13-looks-like-a-unit-is-not-one">Looks like a unit, is not one</a></li>
+<li><a href="#14-water-hardness-six-scales-one-quantity">Water hardness: six scales, one quantity</a></li>
+<li><a href="#15-same-name-different-definition">Same name, different definition</a></li>
+<li><a href="#16-quick-index-if-you-mean-x-write-y">Quick index: if you mean X, write Y</a></li>
+</ol>
+<ul>
+<li><a href="#see-also">See also</a></li>
+</ul>
+<hr />
+<h2 id="1-how-a-token-is-resolved">1. How a token is resolved</h2>
+<p>A unit component is resolved in this order. Knowing the order explains every table below.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Rule</th>
+<th>Consequence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>A <code>$</code> anywhere selects the <strong>currency</strong> table</td>
+<td><code>$USD</code>, <code>k$EUR</code>, <code>k~$EUR</code>. A bare code is never a currency: <code>USD</code> is <code>error_unit_illegal</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Otherwise the base symbol is the <strong>longest alias suffix</strong> of the token</td>
+<td><code>min</code> matches the alias <code>min</code> (minute) before it could match <code>in</code> (inch)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Whatever precedes the base is the <strong>prefix</strong>, with <code>~</code> optional</td>
+<td><code>k~g</code> and <code>kg</code> are one unit; the writer always emits <code>k~g</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>The <strong>prefix policy</strong> of that unit must allow it</td>
+<td><code>Ki~m</code> and <code>Kim</code> both fail; IEC prefixes are for <code>b</code>/<code>B</code> only</td>
+</tr>
+<tr>
+<td>5</td>
+<td>A handful of spellings are <strong>refused by name</strong></td>
+<td><code>usb</code>, <code>kt</code> — see §4</td>
+</tr>
+</tbody>
+</table>
+<p>Rule 2 is the load-bearing one: <strong>a token that is itself a unit is always that unit</strong>, never a
+prefixed reading of a shorter one. That is what made the compact form (<code>kg</code> for <code>k~g</code>) safe to
+introduce — it can only ever be accepted where the parser previously raised an error, so no
+document written before it existed changed meaning.</p>
+<p>Rule 3's <code>~</code> is never wrong to write. When in doubt, or when a reader of your file might be in
+doubt, use it: <code>m~in</code> cannot be misread, <code>min</code> can be misremembered.</p>
+<hr />
+<h2 id="2-a-bare-unit-outranks-a-prefixed-reading">2. A bare unit outranks a prefixed reading</h2>
+<p>These 19 tokens are units in their own right. The prefixed reading a reader might expect is
+reachable only with the <code>~</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Bovnar reads it as</th>
+<th>Might be mistaken for</th>
+<th>Write that as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min</code></td>
+<td>minute</td>
+<td>milli-inch</td>
+<td><code>m~in</code></td>
+</tr>
+<tr>
+<td><code>cd</code></td>
+<td>candela</td>
+<td>centi-day</td>
+<td><code>c~d</code></td>
+</tr>
+<tr>
+<td><code>ft</code></td>
+<td>foot</td>
+<td>femto-tonne</td>
+<td><code>f~t</code></td>
+</tr>
+<tr>
+<td><code>pt</code></td>
+<td>pint</td>
+<td>pico-tonne</td>
+<td><code>p~t</code></td>
+</tr>
+<tr>
+<td><code>qt</code></td>
+<td>quart</td>
+<td>quecto-tonne</td>
+<td><code>q~t</code></td>
+</tr>
+<tr>
+<td><code>ct</code></td>
+<td>carat</td>
+<td>centi-tonne</td>
+<td><code>c~t</code></td>
+</tr>
+<tr>
+<td><code>yd</code></td>
+<td>yard</td>
+<td>yocto-day</td>
+<td><code>y~d</code></td>
+</tr>
+<tr>
+<td><code>rd</code></td>
+<td>rod</td>
+<td>ronto-day</td>
+<td><code>r~d</code></td>
+</tr>
+<tr>
+<td><code>ch</code></td>
+<td>chain</td>
+<td>centi-hour</td>
+<td><code>c~h</code></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td>technical atmosphere</td>
+<td>atto-tonne</td>
+<td><code>a~t</code></td>
+</tr>
+<tr>
+<td><code>au</code></td>
+<td>astronomical unit</td>
+<td>atto-dalton</td>
+<td><code>a~u</code></td>
+</tr>
+<tr>
+<td><code>kat</code></td>
+<td>katal</td>
+<td>kilo-(technical atmosphere)</td>
+<td><code>k~at</code></td>
+</tr>
+<tr>
+<td><code>nmi</code></td>
+<td>nautical mile</td>
+<td>nano-mile</td>
+<td><code>n~mi</code></td>
+</tr>
+<tr>
+<td><code>PS</code></td>
+<td>metric horsepower (Pferdestärke)</td>
+<td>peta-siemens</td>
+<td><code>P~S</code></td>
+</tr>
+<tr>
+<td><code>ph</code></td>
+<td>phot</td>
+<td>pico-hour</td>
+<td><code>p~h</code></td>
+</tr>
+<tr>
+<td><code>pH</code></td>
+<td>acidity (pH scale)</td>
+<td>pico-henry</td>
+<td><code>p~H</code></td>
+</tr>
+<tr>
+<td><code>mph</code></td>
+<td>mile per hour</td>
+<td>milli-phot</td>
+<td><code>m~ph</code></td>
+</tr>
+<tr>
+<td><code>kph</code></td>
+<td>kilometre per hour</td>
+<td>kilo-phot</td>
+<td><code>k~ph</code></td>
+</tr>
+<tr>
+<td><code>dB</code></td>
+<td>decibel</td>
+<td>deci-byte</td>
+<td><em>(impossible: an SI prefix below kilo is illegal on <code>B</code>)</em></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>pH</code>, <code>mph</code> and <code>kph</code> are the reason three quantities became units: while they were not in the
+table, the compact form resolved them as the picohenry and the milli-/kilophot. Naming the
+quantity is the durable fix — rule 2 then keeps the prefixed reading out on its own.</p>
+</blockquote>
+<hr />
+<h2 id="3-two-prefixed-readings-compete">3. Two prefixed readings compete</h2>
+<p>When a token can be split in two places, rule 2 decides: the <strong>longer base symbol</strong> wins.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Bovnar reads it as</th>
+<th>The other split</th>
+<th>Write that as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dat</code></td>
+<td>deci-<code>at</code> = deci-(technical atmosphere)</td>
+<td>deca-tonne</td>
+<td><code>da~t</code></td>
+</tr>
+<tr>
+<td><code>dau</code></td>
+<td>deci-<code>au</code> = deci-(astronomical unit)</td>
+<td>deca-dalton</td>
+<td><code>da~u</code> (canonical <code>da~Da</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Both are deterministic, not ambiguous — but neither is guessable. Write <code>d~at</code> / <code>da~t</code> and
+<code>d~au</code> / <code>da~u</code> explicitly; the separated form is unambiguous in both directions.</p>
+<hr />
+<h2 id="4-refused-outright">4. Refused outright</h2>
+<p>Two tokens are <code>error_unit_illegal</code> on purpose, listed in <code>.compact_exceptions</code> in
+<code>src/gendata/units.bvnr</code>. Accepting them would turn a parse error into a quietly wrong unit.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Would have resolved as</th>
+<th>Actually means, in the wild</th>
+<th>Write</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kt</code></td>
+<td>kilo-tonne</td>
+<td>kilotonne <strong>or</strong> knot, depending on the field</td>
+<td><code>k~t</code> (mass) or <code>kn</code> (speed)</td>
+</tr>
+<tr>
+<td><code>usb</code></td>
+<td>micro-stilb</td>
+<td>the bus</td>
+<td><code>u~sb</code> (or <code>µ~sb</code>) if you really mean microstilb</td>
+</tr>
+</tbody>
+</table>
+<p><code>kt</code> is the harder case: both readings are units Bovnar models, so no table lookup can settle it.
+Reading a speed as a mass is exactly the failure this format exists to prevent, so the author is
+asked to say which.</p>
+<hr />
+<h2 id="5-prefix-symbol-vs-base-unit-symbol">5. Prefix symbol vs. base unit symbol</h2>
+<p>Eight symbols are both a prefix and a unit. Bare, they are always the unit; before another unit
+they are always the prefix.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>As a bare unit</th>
+<th>As a prefix</th>
+<th>Example of each</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>m</code></td>
+<td>metre</td>
+<td>milli</td>
+<td><code>m</code> = metre, <code>ms</code> / <code>m~s</code> = millisecond</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>day</td>
+<td>deci</td>
+<td><code>d</code> = day, <code>ds</code> / <code>d~s</code> = decisecond</td>
+</tr>
+<tr>
+<td><code>h</code></td>
+<td>hour</td>
+<td>hecto</td>
+<td><code>h</code> = hour, <code>hPa</code> / <code>h~Pa</code> = hectopascal</td>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td>tesla</td>
+<td>tera</td>
+<td><code>T</code> = tesla, <code>TB</code> / <code>T~B</code> = terabyte</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td>gauss</td>
+<td>giga</td>
+<td><code>G</code> = gauss, <code>GHz</code> / <code>G~Hz</code> = gigahertz</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>poise</td>
+<td>peta</td>
+<td><code>P</code> = poise, <code>PB</code> / <code>P~B</code> = petabyte</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>roentgen</td>
+<td>ronna</td>
+<td><code>R</code> = roentgen, <code>Rm</code> / <code>R~m</code> = ronnametre</td>
+</tr>
+<tr>
+<td><code>u</code></td>
+<td>dalton (ASCII alias of <code>Da</code>)</td>
+<td>micro (ASCII alias of <code>µ</code>)</td>
+<td><code>u</code> = dalton, <code>us</code> / <code>u~s</code> = microsecond, <code>uu</code> = micro-dalton</td>
+</tr>
+</tbody>
+</table>
+<p><code>da</code> (deca) is a two-character prefix: <code>dam</code> = decametre, <code>dag</code> = decagram, <code>das</code> = decasecond.
+It is not related to <code>Da</code> (dalton) — case separates them (§6).</p>
+<hr />
+<h2 id="6-case-decides">6. Case decides</h2>
+<p>Symbols are matched byte for byte. These pairs differ only in case and mean unrelated things;
+several are one keystroke apart in everyday data.</p>
+<p>Start with the <strong>bare</strong> symbols, because the prefixed rows below are built from
+them and they are the three most common symbols in the whole table:</p>
+<table>
+<thead>
+<tr>
+<th>Lower</th>
+<th>Means</th>
+<th>Upper</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s</code></td>
+<td>second</td>
+<td><code>S</code></td>
+<td>siemens</td>
+</tr>
+<tr>
+<td><code>h</code></td>
+<td>hour</td>
+<td><code>H</code></td>
+<td>henry</td>
+</tr>
+<tr>
+<td><code>g</code></td>
+<td>gram</td>
+<td><code>G</code></td>
+<td>gauss</td>
+</tr>
+<tr>
+<td><code>kn</code></td>
+<td>knot</td>
+<td><code>kN</code></td>
+<td><strong>kilonewton</strong> — the same trap as <code>gn</code>/<code>GN</code> and <code>fn</code>/<code>fN</code> below</td>
+</tr>
+<tr>
+<td><code>grad</code></td>
+<td>gradian (also <code>gradian</code>, <code>gon</code>)</td>
+<td><code>Grad</code></td>
+<td><strong>gigaradian</strong> — and German writes <em>Grad</em> for the degree, so a German-language source is the likely way to type this by accident. Worse than the others: both are angles, so it <em>converts</em>, by a factor of 10⁹</td>
+</tr>
+</tbody>
+</table>
+<p>Then the prefixed pairs:</p>
+<table>
+<thead>
+<tr>
+<th>Lower</th>
+<th>Means</th>
+<th>Upper / mixed</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ms</code></td>
+<td>millisecond</td>
+<td><code>mS</code></td>
+<td>millisiemens</td>
+</tr>
+<tr>
+<td><code>pa</code>*</td>
+<td>—</td>
+<td><code>Pa</code> / <code>pA</code></td>
+<td>pascal / picoampere</td>
+</tr>
+<tr>
+<td><code>kg</code></td>
+<td>kilogram</td>
+<td><code>kG</code></td>
+<td>kilogauss</td>
+</tr>
+<tr>
+<td><code>mt</code></td>
+<td>millitonne</td>
+<td><code>Mt</code> / <code>MT</code></td>
+<td>megatonne / megatesla</td>
+</tr>
+<tr>
+<td><code>gt</code>*</td>
+<td>—</td>
+<td><code>Gt</code> / <code>GT</code></td>
+<td>gigatonne / gigatesla</td>
+</tr>
+<tr>
+<td><code>mb</code></td>
+<td>milli-bit → <strong>illegal</strong> (sub-kilo prefix on <code>b</code>)</td>
+<td><code>MB</code> / <code>Mb</code></td>
+<td>megabyte / megabit</td>
+</tr>
+<tr>
+<td><code>kb</code></td>
+<td>kilobit</td>
+<td><code>kB</code></td>
+<td>kilobyte</td>
+</tr>
+<tr>
+<td><code>gib</code></td>
+<td>—</td>
+<td><code>Gib</code> / <code>GiB</code></td>
+<td>gibibit / gibibyte</td>
+</tr>
+<tr>
+<td><code>gal</code></td>
+<td>gallon</td>
+<td><code>Gal</code></td>
+<td>galileo (<code>mgal</code> = milligallon, <code>mGal</code> = milligal)</td>
+</tr>
+<tr>
+<td><code>st</code></td>
+<td>stone</td>
+<td><code>St</code></td>
+<td>stokes (<code>cst</code> = centistone, <code>cSt</code> = centistokes)</td>
+</tr>
+<tr>
+<td><code>ha</code></td>
+<td>hectare</td>
+<td><code>hA</code></td>
+<td>hectoampere</td>
+</tr>
+<tr>
+<td><code>hp</code></td>
+<td>horsepower</td>
+<td><code>hP</code></td>
+<td>hectopoise</td>
+</tr>
+<tr>
+<td><code>gn</code></td>
+<td>standard gravity</td>
+<td><code>GN</code></td>
+<td>giganewton</td>
+</tr>
+<tr>
+<td><code>gr</code></td>
+<td>grain</td>
+<td><code>GR</code></td>
+<td>gigaroentgen</td>
+</tr>
+<tr>
+<td><code>dr</code></td>
+<td>dram</td>
+<td><code>dR</code></td>
+<td>deciroentgen</td>
+</tr>
+<tr>
+<td><code>fn</code></td>
+<td>fortnight</td>
+<td><code>fN</code></td>
+<td>femtonewton</td>
+</tr>
+<tr>
+<td><code>da</code></td>
+<td><em>(prefix deca)</em></td>
+<td><code>Da</code> / <code>dA</code></td>
+<td>dalton / deciampere</td>
+</tr>
+<tr>
+<td><code>np</code>*</td>
+<td>—</td>
+<td><code>Np</code> / <code>nP</code></td>
+<td>neper / nanopoise</td>
+</tr>
+<tr>
+<td><code>ev</code>*</td>
+<td>—</td>
+<td><code>eV</code> / <code>EV</code></td>
+<td>electronvolt / exavolt</td>
+</tr>
+<tr>
+<td><code>ph</code></td>
+<td>phot</td>
+<td><code>pH</code></td>
+<td>acidity</td>
+</tr>
+<tr>
+<td><code>ps</code></td>
+<td><strong>picosecond</strong> — a valid unit, silently</td>
+<td><code>PS</code> / <code>pS</code></td>
+<td>metric horsepower / picosiemens</td>
+</tr>
+<tr>
+<td><code>cv</code>*</td>
+<td>—</td>
+<td><code>CV</code> / <code>cV</code></td>
+<td>metric horsepower (French <em>chevaux</em>) / centivolt</td>
+</tr>
+</tbody>
+</table>
+<p>* not a valid token in that casing — listed because the valid neighbours are easy to mistype.</p>
+<p>Common miscasings that are <strong>errors</strong>, not silent variants — <code>K</code> is the kelvin, not the kilo prefix:</p>
+<table>
+<thead>
+<tr>
+<th>Written</th>
+<th>Result</th>
+<th>Intended</th>
+<th>Write</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dH</code></td>
+<td>decihenry — a valid unit, silently</td>
+<td>German hardness degree</td>
+<td><code>°dH</code></td>
+</tr>
+<tr>
+<td><code>cF</code></td>
+<td>centifarad — a valid unit, silently</td>
+<td>hydroponic conductivity factor</td>
+<td><code>CF</code></td>
+</tr>
+<tr>
+<td><code>fau</code></td>
+<td>femto-astronomical-unit — a valid unit, silently</td>
+<td>formazin attenuation unit</td>
+<td><code>FAU</code></td>
+</tr>
+<tr>
+<td><code>Kg</code>, <code>KG</code></td>
+<td><code>error_unit_illegal</code></td>
+<td>kilogram</td>
+<td><code>kg</code> or <code>k~g</code></td>
+</tr>
+<tr>
+<td><code>KB</code></td>
+<td><code>error_unit_illegal</code></td>
+<td>kilobyte</td>
+<td><code>kB</code> or <code>k~B</code></td>
+</tr>
+<tr>
+<td><code>NM</code></td>
+<td><code>error_unit_illegal</code></td>
+<td>nautical mile</td>
+<td><code>nmi</code></td>
+</tr>
+<tr>
+<td><code>Cal</code></td>
+<td><code>error_unit_illegal</code></td>
+<td>kilocalorie (food calorie)</td>
+<td><code>kcal</code> or <code>k~cal</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-look-alike-characters">7. Look-alike characters</h2>
+<p>Several symbols exist in more than one Unicode code point. Bovnar accepts the variants on input
+and always emits one canonical form.</p>
+<table>
+<thead>
+<tr>
+<th>Meaning</th>
+<th>Accepted spellings</th>
+<th>Canonical output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>micro prefix</td>
+<td><code>µ</code> U+00B5 · <code>μ</code> U+03BC (Greek mu) · <code>u</code> (ASCII)</td>
+<td><code>µ</code> U+00B5</td>
+</tr>
+<tr>
+<td>ohm</td>
+<td><code>Ω</code> U+2126 · <code>Ω</code> U+03A9 (Greek omega) · <code>ohm</code> · <code>Ohm</code></td>
+<td><code>Ω</code> U+2126</td>
+</tr>
+<tr>
+<td>ångström</td>
+<td><code>Å</code> U+212B · <code>Å</code> U+00C5 · <code>Å</code> U+0041 U+030A (A + combining ring) · <code>angstrom</code>, <code>angstroms</code></td>
+<td><code>Å</code> U+212B</td>
+</tr>
+<tr>
+<td>degree</td>
+<td><code>°</code> U+00B0 · <code>deg</code> · <code>degr</code> · <code>degree</code> · <code>degrees</code></td>
+<td><code>°</code> U+00B0</td>
+</tr>
+</tbody>
+</table>
+<p>A document that has been through Unicode normalisation (NFC/NFD/NFKC/NFKD) still parses: every
+variant above maps to the same unit, which the normalisation test sweep enforces over the whole
+table.</p>
+<blockquote>
+<p><strong>The canonical output is deliberately not NFC.</strong> U+2126 (ohm) and U+212B (ångström) both have
+<em>singleton</em> NFC decompositions — to U+03A9 and U+00C5 — so a document this library writes is not
+Unicode-normalised, and running it through NFC <strong>changes its bytes</strong>. It still parses, and
+re-serialising returns U+2126/U+212B, so the round trip is a semantic fixed point but not a byte
+fixed point. That matters if you hash, sign or byte-diff bovnar output (the conformance suite's
+byte-for-byte comparison included): normalise before hashing, or do not normalise at all — but do
+not assume the two are the same file.</p>
+</blockquote>
+<p><code>u</code> is both the ASCII micro prefix and the bare symbol for the dalton — rule 2 keeps them apart:
+<code>u</code> alone is the dalton, <code>us</code> is a microsecond, <code>uu</code> is a micro-dalton.</p>
+<hr />
+<h2 id="8-temperature-scales-vs-electrical-units">8. Temperature scales vs. electrical units</h2>
+<p>The degree sign is not decoration: without it the token is a different quantity entirely.</p>
+<table>
+<thead>
+<tr>
+<th>With <code>°</code></th>
+<th>Means</th>
+<th>Without <code>°</code></th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>°C</code></td>
+<td>degree Celsius</td>
+<td><code>C</code></td>
+<td>coulomb</td>
+</tr>
+<tr>
+<td><code>°F</code></td>
+<td>degree Fahrenheit</td>
+<td><code>F</code></td>
+<td>farad</td>
+</tr>
+<tr>
+<td><code>°N</code></td>
+<td>degree Newton (historical scale)</td>
+<td><code>N</code></td>
+<td>newton</td>
+</tr>
+<tr>
+<td><code>°Ra</code></td>
+<td>degree Rankine</td>
+<td><code>Ra</code></td>
+<td><em>(accepted alias of <code>°Ra</code>)</em></td>
+</tr>
+</tbody>
+</table>
+<p>ASCII aliases avoid the question: <code>degC</code>, <code>degF</code>, <code>degRa</code>, <code>degN</code>, <code>degDe</code>, <code>degRe</code>, <code>degRo</code>.
+<code>K</code> (kelvin) is absolute and needs no degree sign.</p>
+<p>The water-hardness degrees carry the same warning, and one of them is genuinely dangerous:</p>
+<table>
+<thead>
+<tr>
+<th>With <code>°</code></th>
+<th>Means</th>
+<th>Without <code>°</code></th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>°dH</code></td>
+<td>German hardness degree</td>
+<td><code>dH</code></td>
+<td><strong>decihenry</strong> — a valid unit, so this misreads silently</td>
+</tr>
+<tr>
+<td><code>°e</code></td>
+<td>English (Clark) hardness degree</td>
+<td><code>e</code></td>
+<td><code>error_unit_illegal</code></td>
+</tr>
+<tr>
+<td><code>°fH</code></td>
+<td>French hardness degree</td>
+<td><code>fH</code></td>
+<td>femtohenry</td>
+</tr>
+<tr>
+<td><code>°rH</code></td>
+<td>Russian hardness degree</td>
+<td><code>rH</code></td>
+<td>rontohenry</td>
+</tr>
+<tr>
+<td><code>°aH</code></td>
+<td>American hardness degree</td>
+<td><code>aH</code></td>
+<td>attohenry</td>
+</tr>
+</tbody>
+</table>
+<p>Their ASCII long forms avoid the question entirely: <code>german_hardness</code>, <code>english_hardness</code>
+(or <code>clark_degree</code>), <code>french_hardness</code>, <code>russian_hardness</code>, <code>american_hardness</code>.</p>
+<hr />
+<h2 id="9-same-dimension-different-quantity">9. Same dimension, different quantity</h2>
+<p>The SI dimension vector cannot tell these apart — they are all dimensionally equal — yet they are
+not interchangeable in meaning. Bovnar's compatibility check is dimension-based, so it <strong>accepts</strong>
+conversions in the first group; the second group is protected by an explicit quantity-kind rule.</p>
+<p><strong>Dimensionally equal, and Bovnar will convert between them (factor 1) — the distinction is yours to keep:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Units</th>
+<th>Shared dimension</th>
+<th>The distinction Bovnar cannot see</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>J</code> and <code>N·m</code></td>
+<td>kg·m²·s⁻²</td>
+<td>energy vs. torque</td>
+</tr>
+<tr>
+<td><code>Gy</code> and <code>Sv</code></td>
+<td>m²·s⁻²</td>
+<td>absorbed dose vs. equivalent dose</td>
+</tr>
+<tr>
+<td><code>W</code>, <code>VA</code>, <code>var</code></td>
+<td>kg·m²·s⁻³</td>
+<td>active, apparent and reactive power</td>
+</tr>
+<tr>
+<td><code>Hz</code>, <code>Bq</code>, <code>Bd</code></td>
+<td>s⁻¹</td>
+<td>frequency, radioactivity, symbol rate</td>
+</tr>
+<tr>
+<td><code>mph</code>, <code>kn</code>, <code>m/s</code></td>
+<td>m·s⁻¹</td>
+<td>genuinely interchangeable — just different scales</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Offering the conversion is not the same as rewriting the annotation.
+<code>BVN_UNIT_REDUCE</code> leaves every unit in this table alone: a <code>Sv</code> serialises as
+<code>Sv</code>, never as <code>Gy</code>. The collapse folds a <em>compound</em> into the named unit it
+spells out (<code>A·s</code> → <code>C</code>); it never substitutes one named unit for another.</p>
+</blockquote>
+<p><strong>Dimensionless but <em>not</em> interchangeable — Bovnar refuses these conversions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Unit</th>
+<th>Kind</th>
+<th>Refused against</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>b</code></td>
+<td>information (bit)</td>
+<td><code>B</code> — 8 bits are not silently a byte</td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td>information (byte)</td>
+<td><code>b</code></td>
+</tr>
+<tr>
+<td><code>rad</code>, <code>°</code>, <code>grad</code>, <code>rev</code>, <code>arcmin</code>, <code>arcsec</code></td>
+<td>angle (one shared kind, so <code>°</code> → <code>rad</code> works)</td>
+<td>plain numbers, <code>Hz</code>, <code>%</code></td>
+</tr>
+<tr>
+<td><code>sr</code></td>
+<td>angle, weight 2 (<code>sr</code> = <code>rad²</code>)</td>
+<td><code>rad</code> at exponent 1</td>
+</tr>
+<tr>
+<td><code>lm</code>, <code>lx</code>, <code>ph</code></td>
+<td>angle, weight 2 — each carries one steradian (<code>lm</code> = <code>cd·sr</code>)</td>
+<td><code>cd</code>, <code>cd/m²</code>, <code>sb</code>: luminous flux is not luminous intensity, illuminance is not luminance</td>
+</tr>
+<tr>
+<td><code>dB</code></td>
+<td>logarithmic</td>
+<td><code>Np</code>, <code>%</code>, plain numbers</td>
+</tr>
+<tr>
+<td><code>Np</code></td>
+<td>logarithmic</td>
+<td><code>dB</code>, <code>%</code>, plain numbers</td>
+</tr>
+<tr>
+<td><code>pH</code></td>
+<td>logarithmic</td>
+<td><code>%</code>, <code>ppm</code>, plain numbers</td>
+</tr>
+<tr>
+<td><code>NTU</code></td>
+<td>turbidity, white light 90°</td>
+<td>every other turbidity scale, <code>%</code>, plain numbers</td>
+</tr>
+<tr>
+<td><code>FNU</code></td>
+<td>turbidity, near-infrared 90°</td>
+<td>ditto</td>
+</tr>
+<tr>
+<td><code>FTU</code></td>
+<td>turbidity, geometry unstated</td>
+<td>ditto</td>
+</tr>
+<tr>
+<td><code>FAU</code></td>
+<td>turbidity, attenuation 0°</td>
+<td>ditto</td>
+</tr>
+<tr>
+<td><code>JTU</code></td>
+<td>turbidity, visual candle</td>
+<td>ditto</td>
+</tr>
+<tr>
+<td><code>PSU</code></td>
+<td>practical salinity</td>
+<td><code>‰</code>, <code>g/kg</code>, plain numbers</td>
+</tr>
+<tr>
+<td><code>%</code>, <code>‰</code>, <code>‱</code>, <code>pcm</code>, <code>ppm</code>, <code>ppb</code></td>
+<td>pure ratios</td>
+<td><em>(freely interconvertible, and with a plain number: 1 % → 0.01)</em></td>
+</tr>
+</tbody>
+</table>
+<p>Water chemistry calls the American hardness scale "ppm" (milligrams of CaCO₃ per litre). Bovnar's
+<code>ppm</code> is the <strong>dimensionless</strong> 10⁻⁶ and the hardness scale is <code>°aH</code>, an amount concentration — the
+two carry different dimensions and do not convert into one another. If your source says "ppm
+hardness", write <code>°aH</code>.</p>
+<p>The logarithmic kinds are separate because no factor can relate them: 20 dB is a ratio of 100, not
+twice 10 dB, and a pH one unit lower is a tenfold concentration. <code>rpm</code> is a <em>cycle</em> rate and
+<code>rev/min</code> an <em>angular</em> rate — they differ by 2π and do not convert into one another either.</p>
+<hr />
+<h2 id="10-an-affine-scale-inside-a-compound-has-no-value">10. An affine scale inside a compound has no value</h2>
+<p><code>°C</code>, <code>°F</code>, <code>°De</code>, <code>°N</code>, <code>°Re</code> and <code>°Ro</code> are <em>offset</em> scales: 0 is not nothing.
+That is fine for a lone temperature and meaningless in a product.</p>
+<table>
+<thead>
+<tr>
+<th>Written</th>
+<th>Parses</th>
+<th>Converts</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>°C</code></td>
+<td>yes</td>
+<td>yes — <code>20 °C</code> → <code>293.15 K</code></td>
+<td>the offset has somewhere to go</td>
+</tr>
+<tr>
+<td><code>°C/h</code></td>
+<td>yes</td>
+<td><strong>no</strong> — <code>error_unit_mismatch</code></td>
+<td>the offset is a number of kelvin; <code>K·s⁻¹</code> has nowhere to put it</td>
+</tr>
+<tr>
+<td><code>°C·m</code></td>
+<td>yes</td>
+<td><strong>no</strong></td>
+<td>ditto</td>
+</tr>
+<tr>
+<td><code>°C²</code>, <code>°C·°F</code></td>
+<td>yes</td>
+<td><strong>no</strong></td>
+<td>an offset scale is meaningful at exponent 1 only</td>
+</tr>
+</tbody>
+</table>
+<p>The annotation stays legal, because it is a reasonable thing to <em>write</em> — people
+do record a rate of change in °C/h. What it means is a temperature <strong>difference</strong>
+per hour, and the difference is what Bovnar cannot infer from the unit: <code>20 °C/h</code>
+as a rate is <code>20 K/h</code>, while <code>20 °C</code> as a reading is <code>293.15 K</code>. Rather than pick
+one, the library refuses to produce a number and leaves the components for a
+consumer that knows which was meant. Write <code>K/h</code> when you mean the rate — the
+kelvin has no offset and the ambiguity disappears.</p>
+<hr />
+<h2 id="11-a-named-unit-is-not-its-compound">11. A named unit is not its compound</h2>
+<p>A named unit is a single component; the compound that means the same thing is several. Both are
+valid and both convert to the same SI value, but annotation-vs-inline reconciliation is
+<strong>structural</strong>, so mixing the two spellings in one value is <code>error_unit_mismatch</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Named</th>
+<th>Equivalent compound</th>
+<th>Same SI factor?</th>
+<th><code>&lt;float:64,named&gt; 1.0 compound;</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mph</code></td>
+<td><code>mi/h</code></td>
+<td>yes (0.44704 m·s⁻¹)</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+<tr>
+<td><code>kph</code></td>
+<td><code>k~m/h</code></td>
+<td>yes (5/18 m·s⁻¹)</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+<tr>
+<td><code>kn</code></td>
+<td><code>nmi/h</code></td>
+<td>yes</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+<tr>
+<td><code>Hz</code></td>
+<td><code>s^-1</code></td>
+<td>yes</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+<tr>
+<td><code>Pa</code></td>
+<td><code>k~g/(m·s²)</code></td>
+<td>yes</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+</tbody>
+</table>
+<p>Pick one spelling per document and stay with it. <code>bvn_units_compatible</code> and
+<code>bvn_unit_convert_factor</code> relate them, so a consumer can still convert freely.</p>
+<hr />
+<h2 id="12-unit-vs-currency">12. Unit vs. currency</h2>
+<p>A currency is recognised <strong>only</strong> with the <code>$</code> sigil, so the two namespaces cannot collide. The
+classic cases:</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Bare (no <code>$</code>)</th>
+<th>With <code>$</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cup</code> / <code>CUP</code></td>
+<td><code>cup</code> = US cup; <code>CUP</code> = <code>error_unit_illegal</code></td>
+<td><code>$CUP</code> = Cuban Peso</td>
+</tr>
+<tr>
+<td><code>BTU</code></td>
+<td>British thermal unit (<code>Btu</code>, <code>btu</code> too)</td>
+<td><em>(not an ISO 4217 code)</em></td>
+</tr>
+<tr>
+<td><code>SOL</code></td>
+<td><code>error_unit_illegal</code></td>
+<td><code>$SOL</code> = Solana</td>
+</tr>
+<tr>
+<td><code>BAR</code></td>
+<td><code>error_unit_illegal</code> (use lowercase <code>bar</code>)</td>
+<td><em>(not an ISO 4217 code)</em></td>
+</tr>
+<tr>
+<td><code>USD</code></td>
+<td><code>error_unit_illegal</code></td>
+<td><code>$USD</code></td>
+</tr>
+</tbody>
+</table>
+<p>A prefix goes before the sigil, <code>~</code> optional: <code>k~$EUR</code> and <code>k$EUR</code> are both thousands of euro.
+<code>kUSD</code> is an error — the sigil is not optional.</p>
+<hr />
+<h2 id="13-looks-like-a-unit-is-not-one">13. Looks like a unit, is not one</h2>
+<p>Common abbreviations that are <strong>not</strong> in the table. All are <code>error_unit_illegal</code>, which is the
+point: a wrong unit is worse than a refused one.</p>
+<table>
+<thead>
+<tr>
+<th>Written</th>
+<th>Intended</th>
+<th>Write instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kWh</code></td>
+<td>kilowatt-hour</td>
+<td><code>kW·h</code> or <code>k~W·h</code></td>
+</tr>
+<tr>
+<td><code>mAh</code></td>
+<td>milliampere-hour</td>
+<td><code>mA·h</code> or <code>m~A·h</code></td>
+</tr>
+<tr>
+<td><code>mcg</code></td>
+<td>microgram</td>
+<td><code>µg</code>, <code>ug</code> or <code>µ~g</code></td>
+</tr>
+<tr>
+<td><code>cc</code></td>
+<td>cubic centimetre</td>
+<td><code>cm³</code>, <code>cm^3</code> or <code>c~m³</code></td>
+</tr>
+<tr>
+<td><code>sqft</code></td>
+<td>square foot</td>
+<td><code>ft²</code> or <code>ft^2</code></td>
+</tr>
+<tr>
+<td><code>ksi</code></td>
+<td>kilopound per square inch</td>
+<td><code>kpsi</code> or <code>k~psi</code></td>
+</tr>
+<tr>
+<td><code>kts</code></td>
+<td>knots</td>
+<td><code>kn</code></td>
+</tr>
+<tr>
+<td><code>hr</code>, <code>hrs</code></td>
+<td>hour</td>
+<td><code>h</code></td>
+</tr>
+<tr>
+<td><code>Cal</code></td>
+<td>food calorie</td>
+<td><code>kcal</code> or <code>k~cal</code></td>
+</tr>
+<tr>
+<td><code>NM</code></td>
+<td>nautical mile</td>
+<td><code>nmi</code></td>
+</tr>
+<tr>
+<td><code>KB</code>, <code>Kg</code></td>
+<td>kilobyte, kilogram</td>
+<td><code>kB</code>, <code>kg</code></td>
+</tr>
+<tr>
+<td><code>kt</code></td>
+<td>kilotonne or knot</td>
+<td><code>k~t</code> or <code>kn</code> (§4)</td>
+</tr>
+</tbody>
+</table>
+<p>Two that <em>are</em> accepted but rarely mean what the writer intended:</p>
+<table>
+<thead>
+<tr>
+<th>Written</th>
+<th>Bovnar reads</th>
+<th>If you meant…</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fl</code></td>
+<td>femtolitre</td>
+<td>fluid ounce → <code>fl_oz</code></td>
+</tr>
+<tr>
+<td><code>mt</code></td>
+<td>millitonne (= 1 kg)</td>
+<td>metric ton → <code>t</code>; megatonne → <code>Mt</code> or <code>M~t</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-water-hardness-six-scales-one-quantity">14. Water hardness: six scales, one quantity</h2>
+<p>All six measure the concentration of dissolved alkaline-earth ions, and Bovnar converts freely
+between them and <code>m~mol/L</code>. What differs is the reference compound each scale counts, which is why
+their <em>mass</em>-per-litre definitions are not comparable and the amount concentration is.</p>
+<table>
+<thead>
+<tr>
+<th>Scale</th>
+<th>Symbol</th>
+<th>Defined as</th>
+<th>1 mmol/L equals</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>German</td>
+<td><code>°dH</code></td>
+<td>10 mg CaO / L</td>
+<td>5.6077 °dH</td>
+</tr>
+<tr>
+<td>English / Clark</td>
+<td><code>°e</code>, <code>°Clark</code></td>
+<td>1 grain CaCO₃ / imperial gallon</td>
+<td>7.0217 °e</td>
+</tr>
+<tr>
+<td>French</td>
+<td><code>°fH</code></td>
+<td>10 mg CaCO₃ / L</td>
+<td>10.0086 °fH</td>
+</tr>
+<tr>
+<td>Russian</td>
+<td><code>°rH</code></td>
+<td>1 mg Ca / L</td>
+<td>40.078 °rH</td>
+</tr>
+<tr>
+<td>American</td>
+<td><code>°aH</code></td>
+<td>1 mg CaCO₃ / L (called "ppm")</td>
+<td>100.086 °aH</td>
+</tr>
+<tr>
+<td>US grains</td>
+<td><code>gpg</code></td>
+<td>1 grain CaCO₃ / US gallon</td>
+<td>5.8468 gpg</td>
+</tr>
+<tr>
+<td>Equivalents</td>
+<td><code>m~val/L</code>, <code>m~eq/L</code></td>
+<td>½ mmol/L (divalent ions)</td>
+<td>2.000 mval/L</td>
+</tr>
+<tr>
+<td>Amount</td>
+<td><code>m~mol/L</code></td>
+<td>—</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>The traps, in order of how easily they bite:</p>
+<table>
+<thead>
+<tr>
+<th>Trap</th>
+<th>Why</th>
+<th>Do this</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dH</code> instead of <code>°dH</code></td>
+<td><code>dH</code> is the decihenry — an accepted unit, so nothing errors</td>
+<td>keep the <code>°</code>, or write <code>german_hardness</code></td>
+</tr>
+<tr>
+<td>"ppm" for hardness</td>
+<td>Bovnar's <code>ppm</code> is the dimensionless 10⁻⁶</td>
+<td>write <code>°aH</code></td>
+</tr>
+<tr>
+<td><code>mval/L</code> for a monovalent species</td>
+<td><code>val</code> here is the <em>water-analysis</em> equivalent: 1 val = ½ mol</td>
+<td>write <code>m~mol/L</code> for the amount directly</td>
+</tr>
+<tr>
+<td>Expecting an exact conversion</td>
+<td>the degrees are derived from molar masses, so they carry <code>.exact = false</code></td>
+<td>ordinary conversion works; a lossless one reports <code>error_unit_inexact</code></td>
+</tr>
+<tr>
+<td><code>mmol/l</code> as a "unit"</td>
+<td>it is the compound <code>m~mol/L</code>, not a base unit</td>
+<td>write <code>mmol/L</code>, <code>m~mol/L</code> or <code>mmol/l</code> — all the same</td>
+</tr>
+<tr>
+<td><code>gr/gal</code> for <code>gpg</code></td>
+<td><code>gr/gal</code> is a <em>mass</em> concentration, <code>gpg</code> an <em>amount</em> concentration; they do not convert</td>
+<td>write <code>gpg</code> for the hardness scale</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Turbidity and salinity are instrument scales</strong>, and the trap is that they look interchangeable.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Means</th>
+<th>Not</th>
+<th>Because</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NTU</code></td>
+<td>white-light turbidity, 90° (EPA 180.1)</td>
+<td><code>FNU</code>, <code>FTU</code>, <code>FAU</code>, <code>JTU</code></td>
+<td>equal on a formazin standard, different on real water — the optics respond differently to particle size and colour</td>
+</tr>
+<tr>
+<td><code>FNU</code></td>
+<td>near-infrared turbidity, 90° (ISO 7027)</td>
+<td>the other four</td>
+<td>same reason, from the other side</td>
+</tr>
+<tr>
+<td><code>FTU</code></td>
+<td>formazin turbidity, <strong>geometry unstated</strong></td>
+<td>the other four</td>
+<td>it does not say which optics were used; that is its entire content</td>
+</tr>
+<tr>
+<td><code>FAU</code></td>
+<td>formazin <em>attenuation</em>, 0° (ISO 7027)</td>
+<td>the nephelometric three</td>
+<td>measures light removed from the beam, not scattered sideways — a different optical quantity, used above ~40 FNU</td>
+</tr>
+<tr>
+<td><code>JTU</code></td>
+<td>Jackson candle turbidimeter (historical)</td>
+<td>the formazin four</td>
+<td>"1 JTU ≈ 1 NTU" holds near 40 units and nowhere else — nonlinear and sample-dependent</td>
+</tr>
+<tr>
+<td><code>PSU</code></td>
+<td>practical salinity (PSS-78, a conductivity ratio)</td>
+<td><code>‰</code>, <code>g/kg</code></td>
+<td><em>S</em>_P 35 is ≈ 35.165 g/kg — equating them is wrong by ~0.5 %; write <code>g/k~g</code> for absolute salinity</td>
+</tr>
+<tr>
+<td><code>CF</code></td>
+<td>hydroponic conductivity factor (EC in mS/cm × 10)</td>
+<td><code>cF</code> — that is the <strong>centifarad</strong></td>
+<td>uppercase only</td>
+</tr>
+</tbody>
+</table>
+<p><code>JTU</code> and <code>PSU</code> take no prefix (the candle method cannot resolve below ~25 JTU; practical salinity
+is bounded by construction). The other turbidity scales do — <code>m~NTU</code> is real in ultrapure-water
+work.</p>
+<p>Bovnar refuses every conversion in the "Not" column rather than implying a factor exists. <code>CF</code> is
+the exception in the other direction: it really is a conductivity, so <code>1 CF = 0.1 mS/cm = 100 µS/cm</code>
+converts exactly.</p>
+<p><strong>Conductivity and dissolved solids</strong> need no units of their own, and that is the trap: people look
+for one.</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Write</th>
+<th>Not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Electrical conductivity</td>
+<td><code>µS/cm</code>, <code>mS/cm</code>, <code>dS/m</code>, <code>S/m</code></td>
+<td>a base unit — there isn't one, and none is needed</td>
+</tr>
+<tr>
+<td>… in the pre-SI spelling</td>
+<td><code>µmho/cm</code> (<code>mho</code>, <code>mhos</code>, <code>℧</code> are the siemens)</td>
+<td><code>mho</code> was unknown before this; it is an alias now</td>
+</tr>
+<tr>
+<td>Total dissolved solids</td>
+<td><code>mg/L</code></td>
+<td><code>ppm</code> — that is the dimensionless 10⁻⁶</td>
+</tr>
+<tr>
+<td>Resistivity</td>
+<td><code>MΩ·cm</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>For TDS the <code>ppm</code> question is softer than for hardness: at 1 kg/L, 1 mg/L <em>is</em> 1 ppm by mass, so
+<code>ppm</code> states a real (dimensionless) quantity. It simply is not the same dimension as <code>mg/L</code>, so the
+two never convert into one another. A meter's "TDS ppm" reading is EC times an instrument factor —
+record the EC and the factor, or the TDS as <code>mg/L</code>.</p>
+<hr />
+<h2 id="15-same-name-different-definition">15. Same name, different definition</h2>
+<p>Not parser ambiguities — real-world ones. Bovnar keeps these distinct, and the distinction is
+usually where the money is.</p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Members and exact values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ton</td>
+<td><code>t</code> = 1000 kg · <code>tn_sh</code> (short ton) = 907.18474 kg · <code>tn_l</code> (long ton) = 1016.0469088 kg</td>
+</tr>
+<tr>
+<td>Ounce</td>
+<td><code>oz</code> (mass) = 28.349523125 g · <code>oz_t</code> (troy) = 31.1034768 g · <code>fl_oz</code> (volume) = 29.5735295625 mL</td>
+</tr>
+<tr>
+<td>Gallon</td>
+<td><code>gal</code> (US) = 3.785411784 L · <code>gal_uk</code> = 4.54609 L (US is 0.8327× the imperial)</td>
+</tr>
+<tr>
+<td>Pint / quart</td>
+<td><code>pt</code>, <code>qt</code> (US) vs. <code>pt_uk</code>, <code>qt_uk</code> — same 0.8327× ratio</td>
+</tr>
+<tr>
+<td>Pressure ≈ 1 atm</td>
+<td><code>atm</code> = 101325 Pa · <code>at</code> (technical) = 98066.5 Pa · <code>bar</code> = 100000 Pa</td>
+</tr>
+<tr>
+<td>Millimetre of mercury</td>
+<td><code>Torr</code> = 101325/760 Pa ≈ 133.322368 Pa · <code>mmHg</code> = 133.322387415 Pa — <strong>not</strong> the same unit (they differ by 1.4×10⁻⁷ relative)</td>
+</tr>
+<tr>
+<td>Horsepower</td>
+<td><code>hp</code> (mechanical) = 745.6998715822702 W · <code>PS</code> (metric) = 735.49875 W</td>
+</tr>
+<tr>
+<td>Calorie</td>
+<td><code>cal</code> = 4.184 J (thermochemical); the food "Calorie" is <code>kcal</code></td>
+</tr>
+<tr>
+<td>Thou</td>
+<td><code>thou</code> = <code>mil</code> = 25.4 µm — <code>mil</code> is <strong>not</strong> a milliradian, which is <code>mrad</code> / <code>m~rad</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="16-quick-index-if-you-mean-x-write-y">16. Quick index: if you mean X, write Y</h2>
+<table>
+<thead>
+<tr>
+<th>If you mean</th>
+<th>Write</th>
+<th>Not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>millisecond</td>
+<td><code>ms</code>, <code>m~s</code></td>
+<td><code>mS</code> (millisiemens)</td>
+</tr>
+<tr>
+<td>millisiemens</td>
+<td><code>mS</code>, <code>m~S</code></td>
+<td><code>ms</code></td>
+</tr>
+<tr>
+<td>kilogram</td>
+<td><code>kg</code>, <code>k~g</code></td>
+<td><code>Kg</code>, <code>KG</code></td>
+</tr>
+<tr>
+<td>kilobyte / kilobit</td>
+<td><code>kB</code> / <code>kb</code></td>
+<td><code>KB</code></td>
+</tr>
+<tr>
+<td>kilobyte (binary)</td>
+<td><code>KiB</code>, <code>Ki~B</code></td>
+<td><code>kB</code> (decimal, 1000 B)</td>
+</tr>
+<tr>
+<td>megatonne</td>
+<td><code>Mt</code>, <code>M~t</code></td>
+<td><code>MT</code> (megatesla), <code>mt</code> (millitonne)</td>
+</tr>
+<tr>
+<td>kilotonne</td>
+<td><code>k~t</code></td>
+<td><code>kt</code> (refused)</td>
+</tr>
+<tr>
+<td>knot</td>
+<td><code>kn</code></td>
+<td><code>kt</code>, <code>kts</code></td>
+</tr>
+<tr>
+<td>milli-inch</td>
+<td><code>m~in</code></td>
+<td><code>min</code> (minute)</td>
+</tr>
+<tr>
+<td>milliradian</td>
+<td><code>mrad</code>, <code>m~rad</code></td>
+<td><code>mil</code> (thou)</td>
+</tr>
+<tr>
+<td>picohenry</td>
+<td><code>p~H</code></td>
+<td><code>pH</code> (acidity)</td>
+</tr>
+<tr>
+<td>acidity</td>
+<td><code>pH</code></td>
+<td><code>p~H</code> (picohenry)</td>
+</tr>
+<tr>
+<td>phot</td>
+<td><code>ph</code></td>
+<td><code>pH</code></td>
+</tr>
+<tr>
+<td>millilitre</td>
+<td><code>mL</code>, <code>m~L</code></td>
+<td><code>ml</code> is fine too; <code>fl</code> is a femtolitre</td>
+</tr>
+<tr>
+<td>microgram</td>
+<td><code>µg</code>, <code>ug</code>, <code>µ~g</code></td>
+<td><code>mcg</code></td>
+</tr>
+<tr>
+<td>kilowatt-hour</td>
+<td><code>kW·h</code>, <code>k~W·h</code></td>
+<td><code>kWh</code></td>
+</tr>
+<tr>
+<td>cubic centimetre</td>
+<td><code>cm³</code>, <code>cm^3</code></td>
+<td><code>cc</code></td>
+</tr>
+<tr>
+<td>miles per hour</td>
+<td><code>mph</code> (or <code>mi/h</code>)</td>
+<td>mixing both in one value</td>
+</tr>
+<tr>
+<td>kilometres per hour</td>
+<td><code>kph</code>, <code>kmh</code> (or <code>k~m/h</code>)</td>
+<td>mixing both in one value</td>
+</tr>
+<tr>
+<td>degree Celsius</td>
+<td><code>°C</code>, <code>degC</code></td>
+<td><code>C</code> (coulomb)</td>
+</tr>
+<tr>
+<td>thousand US dollars</td>
+<td><code>k$USD</code>, <code>k~$USD</code></td>
+<td><code>kUSD</code></td>
+</tr>
+<tr>
+<td>a plain count</td>
+<td>omit the unit, or <code>no_unit</code></td>
+<td><code>%</code> (that is 10⁻²)</td>
+</tr>
+<tr>
+<td>German water hardness</td>
+<td><code>°dH</code>, <code>german_hardness</code></td>
+<td><code>dH</code> (decihenry)</td>
+</tr>
+<tr>
+<td>hardness "in ppm"</td>
+<td><code>°aH</code></td>
+<td><code>ppm</code> (dimensionless 10⁻⁶)</td>
+</tr>
+<tr>
+<td>hardness in equivalents</td>
+<td><code>m~val/L</code>, <code>mval/l</code></td>
+<td><code>m~mol/L</code> (that is twice the value)</td>
+</tr>
+<tr>
+<td>hardness in millimoles</td>
+<td><code>m~mol/L</code>, <code>mmol/L</code></td>
+<td>— it needs no unit of its own</td>
+</tr>
+<tr>
+<td>hardness in US grains</td>
+<td><code>gpg</code></td>
+<td><code>gr/gal</code> (a mass concentration)</td>
+</tr>
+<tr>
+<td>conductivity</td>
+<td><code>µS/cm</code>, <code>mS/cm</code>, <code>dS/m</code></td>
+<td>— no base unit exists or is needed</td>
+</tr>
+<tr>
+<td>conductivity, older US data</td>
+<td><code>µmho/cm</code></td>
+<td>— <code>mho</code> is the siemens</td>
+</tr>
+<tr>
+<td>dissolved solids</td>
+<td><code>mg/L</code></td>
+<td><code>ppm</code> (dimensionless 10⁻⁶)</td>
+</tr>
+<tr>
+<td>turbidity, white light 90°</td>
+<td><code>NTU</code></td>
+<td><code>FNU</code>, <code>FTU</code></td>
+</tr>
+<tr>
+<td>turbidity, near-IR 90°</td>
+<td><code>FNU</code></td>
+<td><code>NTU</code>, <code>FTU</code></td>
+</tr>
+<tr>
+<td>turbidity, method unstated</td>
+<td><code>FTU</code></td>
+<td><code>NTU</code> or <code>FNU</code> — those claim a geometry</td>
+</tr>
+<tr>
+<td>turbidity, attenuation</td>
+<td><code>FAU</code></td>
+<td><code>FNU</code> (a different optical quantity)</td>
+</tr>
+<tr>
+<td>turbidity, candle method</td>
+<td><code>JTU</code></td>
+<td>any formazin scale</td>
+</tr>
+<tr>
+<td>practical salinity</td>
+<td><code>PSU</code></td>
+<td><code>‰</code> or <code>g/kg</code></td>
+</tr>
+<tr>
+<td>absolute salinity</td>
+<td><code>g/k~g</code></td>
+<td><code>PSU</code></td>
+</tr>
+<tr>
+<td>hydroponic EC scale</td>
+<td><code>CF</code></td>
+<td><code>cF</code> (centifarad)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the registry these readings come from</li>
+<li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit &amp; Currency Cheat Sheet</a> — every symbol in one place</li>
+<li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — the normative unit rules</li>
+<li><a href="https://www.bovnar.io/docs/faq/#4-units">FAQ §4 — Units</a> — common unit questions</li>
+</ul>
+<hr />
+<p><em>Every claim in this document was verified against the reference implementation. If you find
+a token whose behaviour surprises you and it is not listed here, that is a documentation bug —
+please report it.</em></p>
+<hr />
+<p><em>End of Bovnar — Unit Ambiguities (Bovnar spec 1.1).</em></p>
+</main>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
+<button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
+<script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
+<script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
+<style>
+#bvnr-consent{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;
+ display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;
+ justify-content:center;padding:.85rem 1.15rem;background:#1b1b1b;color:#ededed;
+ border-top:1px solid #3e3e42;box-shadow:0 -2px 14px rgba(0,0,0,.4);
+ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#bvnr-consent[hidden]{display:none}
+#bvnr-consent p{margin:0;max-width:70ch;color:#ededed}
+#bvnr-consent a{color:#9cdcfe}
+#bvnr-consent .bvnr-consent-actions{display:flex;gap:.5rem;flex:none}
+#bvnr-consent button{font:inherit;padding:.4rem 1rem;border-radius:4px;
+ cursor:pointer;border:1px solid #55555a;background:transparent;color:#ededed}
+#bvnr-consent button:hover{border-color:#3794ff}
+#bvnr-consent button.bvnr-consent-yes{background:#0e639c;border-color:#0e639c;
+ color:#fff}
+#bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
+</style>
+<div id="bvnr-consent" role="region" aria-label="Analytics consent" hidden>
+  <p>This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href="/privacy.html">Privacy notice</a></p>
+  <div class="bvnr-consent-actions">
+    <button type="button" id="bvnr-consent-decline">Decline</button>
+    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Allow analytics</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V';
+  var box = document.getElementById('bvnr-consent');
+  function load() {
+    if (window.__bvnrAnalytics) return;
+    window.__bvnrAnalytics = 1;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', ID);
+  }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  var seen = null;
+  try { seen = localStorage.getItem(KEY); } catch (e) {}
+  if (seen === 'granted') { load(); return; }
+  if (seen === 'denied' || !box) return;
+  box.hidden = false;
+  var yes = document.getElementById('bvnr-consent-accept');
+  var no  = document.getElementById('bvnr-consent-decline');
+  if (yes) yes.addEventListener('click', function () {
+    save('granted'); box.hidden = true; load();
+  });
+  if (no) no.addEventListener('click', function () {
+    save('denied'); box.hidden = true;
+  });
+})();
+</script>
+</body>
+</html>

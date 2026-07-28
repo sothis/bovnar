@@ -819,7 +819,7 @@ All 24 SI prefixes are allowed on all currency units. IEC binary prefixes are fo
 ## 6. Symbol Disambiguation
 
 > The full token-by-token treatment — case traps, look-alike code points, same-dimension quantities, and
-> abbreviations that are deliberately not units — is in [`unit_ambiguities.md`](unit_ambiguities.md).
+> abbreviations that are deliberately not units — is in [`07_bovnar_unit_ambiguities.md`](07_bovnar_unit_ambiguities.md).
 
 As of spec 1.0 a currency is written **only** with the `$` sigil (§5.1), so the bare form is always a physical-unit lookup and the namespaces never collide:
 
@@ -838,11 +838,11 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ## See also
 
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the full registry: dimensions, factors, prefix policy, and the C API
-- [Unit Ambiguities](unit_ambiguities.md) — which reading wins when a token could mean two things
-- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit attaches to a value
-- [FAQ §4 — Units](6_bovnar_faq.md#4-units) — the questions these tables raise most often
-- [UCUM Unit Profile](10_bovnar_ucum_profile.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the full registry: dimensions, factors, prefix policy, and the C API
+- [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — which reading wins when a token could mean two things
+- [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit attaches to a value
+- [FAQ §4 — Units](02_bovnar_faq.md#4-units) — the questions these tables raise most often
+- [UCUM Unit Profile](11_bovnar_ucum_profile.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
 
 ---
 

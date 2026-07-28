@@ -614,10 +614,10 @@ ctest --output-on-failure
 
 ## See also
 
-- [Specification](1_bovnar_spec.md) — the behaviour the corpus tests
-- [EBNF Grammar](5_bovnar.ebnf) — the grammar an implementation under test must accept
-- [Read & Write API](3_bovnar_readwrite_api.md) — the reference reader and writer the adapter drives
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit table a conforming implementation needs
+- [Specification](03_bovnar_spec.md) — the behaviour the corpus tests
+- [EBNF Grammar](12_bovnar.ebnf) — the grammar an implementation under test must accept
+- [Read & Write API](08_bovnar_readwrite_api.md) — the reference reader and writer the adapter drives
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit table a conforming implementation needs
 
 ---
 

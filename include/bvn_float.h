@@ -176,7 +176,7 @@ BVN_API bool bvn_float_from_bin128(bvn_float_t *f, const uint32_t bits[4]);
 BVN_API bool bvn_float_from_bin256(bvn_float_t *f, const uint32_t bits[8]);
 /*
  * IEEE-style decimal interchange formats (custom binary storage layout, see
- * doc/1_bovnar_spec.md S5.2). to_dec* rounds the stored value to the format's
+ * doc/03_bovnar_spec.md S5.2). to_dec* rounds the stored value to the format's
  * digit width with round-to-nearest-even and emits the CANONICAL cohort member:
  * the shortest coefficient (trailing zeros stripped), with the exponent clamped
  * only as the IEEE exponent range near Emax requires. The encoding is therefore

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.googletagmanager.com 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar UCUM Unit Profile</title>
@@ -21,8 +21,8 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
-<meta property="article:published_time" content="2026-07-27">
-<meta property="article:modified_time" content="2026-07-27">
+<meta property="article:published_time" content="2026-07-28">
+<meta property="article:modified_time" content="2026-07-28">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar UCUM Unit Profile">
@@ -31,22 +31,22 @@
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
-<link rel="alternate" type="text/markdown" href="/doc/10_bovnar_ucum_profile.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar UCUM Unit Profile", "description": "Writing UCUM codes in a Bovnar unit slot: the transliteration table, the collisions between the two namespaces, and what has no representation.", "url": "https://www.bovnar.io/docs/ucum/", "mainEntityOfPage": "https://www.bovnar.io/docs/ucum/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-07-27", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar UCUM Unit Profile", "item": "https://www.bovnar.io/docs/ucum/"}]}]}</script>
+<link rel="alternate" type="text/markdown" href="/doc/11_bovnar_ucum_profile.md">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar UCUM Unit Profile", "description": "Writing UCUM codes in a Bovnar unit slot: the transliteration table, the collisions between the two namespaces, and what has no representation.", "url": "https://www.bovnar.io/docs/ucum/", "mainEntityOfPage": "https://www.bovnar.io/docs/ucum/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-28", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar UCUM Unit Profile", "item": "https://www.bovnar.io/docs/ucum/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
 <h1>Bovnar — UCUM Unit Profile</h1>
-<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/10_bovnar_ucum_profile.md">Markdown</a> and <a href="/doc/pdf/bovnar-ucum-profile.pdf">PDF</a>.</p>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/11_bovnar_ucum_profile.md">Markdown</a> and <a href="/doc/pdf/bovnar-ucum-profile.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.1 — <strong>the notation described here is UNDER IMPLEMENTATION.</strong> It is not part of any published specification, and the version it will ship under is not settled (§2.2)
 <strong>Status:</strong> Under implementation — the code is in <code>src/utils/bovnar_ucum.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, but nothing here is released: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
 <strong>Scope:</strong> How a UCUM expression may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once a foreign vocabulary is admitted.</p>
 </blockquote>
 <p>Companion to <a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> (the native registry and notation
-grammar this profile sits beside), <a href="/doc/unit_ambiguities.md">Unit Ambiguities</a> (how a unit token is
-resolved, and the pairs that look interchangeable), and <code>doc/parser_level_unit_policy.md</code> (the
+grammar this profile sits beside), <a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> (how a unit token is
+resolved, and the pairs that look interchangeable), and <code>doc/06_bovnar_unit_policy.md</code> (the
 reader- and writer-side unit policies a profile unit has to survive unchanged — a working note, not
 part of the published documentation set).</p>
 <p>Every acceptance, refusal and conversion factor quoted below was produced by running the
@@ -216,19 +216,19 @@ is <code>error_unsupported_spec_version</code> rather than a document the librar
 <em>translated</em> unit needs no such guard: <code>ucum:mm[Hg]</code> is written as the native <code>mmHg</code>, which every
 version accepts.</p>
 <p>Otherwise: everywhere a native unit may appear — as the unit parameter of a type annotation, and as
-an inline unit suffix. Parameter ordering stays free (doc/2 §2.1) and the annotation/inline agreement rule
-(doc/2 §2.2) is unchanged — the comparison is on the parsed <code>value_unit_t</code>, so the two spellings
+an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the annotation/inline agreement rule
+(doc/05 §2.2) is unchanged — the comparison is on the parsed <code>value_unit_t</code>, so the two spellings
 may differ as long as they mean the same thing:</p>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
 .a = &lt;float:64,ucum:mm[Hg]&gt; 120.0;
 .b = 120.0 ucum:mm[Hg];
 .c = &lt;float:64,mmHg&gt; 120.0 ucum:mm[Hg];   # OK — both parse to the same unit
 .d = &lt;float:64,m&gt; 1.0 ucum:s;             # error_unit_mismatch, as always</code></pre></div>
-<p>A profile unit is a <em>unit</em>, so it is confined to the same type families (doc/2 §2.3): <code>uint</code>,
+<p>A profile unit is a <em>unit</em>, so it is confined to the same type families (doc/05 §2.3): <code>uint</code>,
 <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>. A <code>ucum:</code> parameter on <code>utf8</code>, <code>bool</code> or <code>datetime</code> is
 <code>error_illegal_value_type</code>, unchanged.</p>
 <p>Currencies stay native-only. UCUM has no monetary codes, <code>ucum:</code> never yields one, and the <code>$</code>
-sigil rule (doc/2 §9.1) is untouched.</p>
+sigil rule (doc/05 §9.1) is untouched.</p>
 <h3 id="23-five-bytes-the-lexer-has-to-learn">2.3 Five bytes the lexer has to learn</h3>
 <p>UCUM needs <code>[</code>, <code>]</code>, <code>{</code>, <code>}</code> and <code>'</code> — the last for codes like <code>[arb'U]</code> and <code>[Amb'a'1'U]</code>. All
 five were rejected by the type-body and inline-unit byte classes:</p>
@@ -316,7 +316,7 @@ where the byte classes of §2.3 are also recorded:</p>
 </code></pre></div>
 
 <p><code>profile-code</code> is deliberately not given a grammar. The sub-grammar is
-<strong>semantic</strong>, as the native unit sub-grammar is (doc/2 §5.2): the lexer captures
+<strong>semantic</strong>, as the native unit sub-grammar is (doc/05 §5.2): the lexer captures
 bytes, and <code>bvn_parse_unit</code> — which dispatches on the namespace — decides whether
 they are a UCUM expression. The normative grammar for what is inside is UCUM's
 own, and restating it here would create a second authority to keep in step with
@@ -363,7 +363,7 @@ escaped the enforcement point, and the format's only distinguishing claim is tha
 that.</p>
 <h3 id="32-atoms-and-prefixes">3.2 Atoms and prefixes</h3>
 <p>UCUM separates prefix from atom by its own rule; Bovnar separates it by longest-alias-suffix match
-with an optional explicit <code>~</code> (doc/2 §4.3). Translation happens <strong>after</strong> UCUM's split, on the
+with an optional explicit <code>~</code> (doc/05 §4.3). Translation happens <strong>after</strong> UCUM's split, on the
 resolved (prefix, atom) pair, never by handing the raw UCUM string to the native parser. That is
 what keeps the two disambiguation regimes from contaminating each other, and it is why the
 collisions in §6.2 are harmless rather than fatal.</p>
@@ -407,12 +407,12 @@ can go wrong, and both are handled by the fold in §3.5 rather than by refusal:<
 <tr>
 <td><code>m2</code>, <code>s-1</code></td>
 <td><code>m²</code>, <code>s⁻¹</code></td>
-<td>exponent directly after the atom; range ±9 as natively (doc/2 §6)</td>
+<td>exponent directly after the atom; range ±9 as natively (doc/05 §6)</td>
 </tr>
 <tr>
 <td><code>(</code> <code>)</code></td>
 <td><code>(</code> <code>)</code></td>
-<td>grouping, mapped through the native group parser (doc/2 §5.2)</td>
+<td>grouping, mapped through the native group parser (doc/05 §5.2)</td>
 </tr>
 <tr>
 <td><code>1</code></td>
@@ -522,7 +522,7 @@ nine-orders-of-magnitude error rather than a cosmetic one. Verified against the 
 </tbody>
 </table>
 <p>(The last digits are the existing <code>bvni_ipow</code> rounding, not something the fold introduces; the
-exact path is <code>bvn_unit_convert_rational</code>, doc/2 §12.4.)</p>
+exact path is <code>bvn_unit_convert_rational</code>, doc/05 §12.4.)</p>
 <p><strong>What the fold cannot do, and why that is stated rather than fixed.</strong> SI prefix decades are
 ±1, ±2, ±3, and then multiples of three to ±30. There is no prefix for 10⁴, 10⁵, 10⁷ or 10⁸, so
 <code>10*4/L</code> and <code>10*5.m</code> are <code>error_unit_profile_unsupported</code>. Two escapes were considered and both
@@ -568,7 +568,7 @@ compare equal to a voltage level. Refusing is the whole point.</p>
 plain count. Verified: <code>da~dB</code> has factor <code>10.0</code>. It is a deliberate call and the one place in the
 table where a prefix is used on a logarithmic unit.</p>
 <h3 id="38-affine-units">3.8 Affine units</h3>
-<p>Nothing new. <code>Cel</code> translates to <code>°C</code>, and the native affine discipline (doc/2 §3, and the
+<p>Nothing new. <code>Cel</code> translates to <code>°C</code>, and the native affine discipline (doc/05 §3, and the
 <code>.affine</code>/<code>.offset</code> fields in <code>src/gendata/units.bvnr</code>) applies unchanged: an affine unit is valid
 at exponent 1 only, and a compound containing one parses but yields no conversion value, because
 the offset is a kelvin count and a product with signature <code>K·s⁻¹</code> has nowhere to put it.</p>
@@ -580,7 +580,7 @@ either, and writes a temperature difference as <code>K</code>. See §10.3.</p>
 <h3 id="41-equality">4.1 Equality</h3>
 <p><code>bvn_unit_equal</code> is unchanged: a multiset comparison of (base, exponent, prefix) triples. Because
 translation produces ordinary components, a profile unit and a native unit that mean the same thing
-compare equal, and the annotation/inline agreement check of doc/2 §2.2 works across notations:</p>
+compare equal, and the annotation/inline agreement check of doc/05 §2.2 works across notations:</p>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
 .v = &lt;float:64,mmHg&gt; 120.0 ucum:mm[Hg];      # OK
 .w = &lt;float:64,ucum:kg.m/s2&gt; 1.0 k~g·m·s⁻²;  # OK</code></pre></div>
@@ -1616,7 +1616,7 @@ Verified against the native parser:</p>
 <td><code>a</code></td>
 <td><em>not a unit</em></td>
 <td>year (Julian)</td>
-<td>— (Bovnar declines the ambiguity; see <a href="/doc/unit_ambiguities.md">Unit Ambiguities</a>)</td>
+<td>— (Bovnar declines the ambiguity; see <a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a>)</td>
 </tr>
 <tr>
 <td><code>AU</code></td>
@@ -2014,7 +2014,7 @@ exact code sees a change.</p>
   reference date embedded in the time unit; none of that fits a per-value unit slot, and the honest
   answer for CF data is a converter, not a profile.</li>
 <li><strong>Exchange rates.</strong> Unchanged and unchangeable: currencies carry no conversion table, and a
-  cross-currency conversion is refused rather than guessed (doc/2 §9.6). UCUM has no currencies, so
+  cross-currency conversion is refused rather than guessed (doc/05 §9.6). UCUM has no currencies, so
   the profile never reaches this.</li>
 </ul>
 <h3 id="104-specified-here-but-not-built">10.4 Specified here but not built</h3>
@@ -2056,7 +2056,7 @@ one paragraph to read rather than four sections to cross-check.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the native registry and notation grammar this profile sits beside</li>
-<li><a href="/doc/unit_ambiguities.md">Unit Ambiguities</a> — how a unit token is resolved natively, and the pairs that look interchangeable</li>
+<li><a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> — how a unit token is resolved natively, and the pairs that look interchangeable</li>
 <li><a href="https://www.bovnar.io/docs/api/#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Read/Write API</a> — the unit policy a translated unit passes through unchanged</li>
 <li><a href="https://www.bovnar.io/docs/api/">Read/Write API</a> — the data event <code>unit_source</code> is added to, and the <code>want_unit</code> hook</li>
 <li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — where the <code>unit-profile-ucum</code> group lives</li>
@@ -2065,11 +2065,67 @@ one paragraph to read rather than four sections to cross-check.</p>
 <hr />
 <p><em>End of Bovnar — UCUM Unit Profile (Bovnar spec 1.1).</em></p>
 </main>
-<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
 <script src="/bovnar_highlight.js?v=667c4a367efc"></script>
 <script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
 <script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
+<style>
+#bvnr-consent{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;
+ display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;
+ justify-content:center;padding:.85rem 1.15rem;background:#1b1b1b;color:#ededed;
+ border-top:1px solid #3e3e42;box-shadow:0 -2px 14px rgba(0,0,0,.4);
+ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#bvnr-consent[hidden]{display:none}
+#bvnr-consent p{margin:0;max-width:70ch;color:#ededed}
+#bvnr-consent a{color:#9cdcfe}
+#bvnr-consent .bvnr-consent-actions{display:flex;gap:.5rem;flex:none}
+#bvnr-consent button{font:inherit;padding:.4rem 1rem;border-radius:4px;
+ cursor:pointer;border:1px solid #55555a;background:transparent;color:#ededed}
+#bvnr-consent button:hover{border-color:#3794ff}
+#bvnr-consent button.bvnr-consent-yes{background:#0e639c;border-color:#0e639c;
+ color:#fff}
+#bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
+</style>
+<div id="bvnr-consent" role="region" aria-label="Analytics consent" hidden>
+  <p>This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href="/privacy.html">Privacy notice</a></p>
+  <div class="bvnr-consent-actions">
+    <button type="button" id="bvnr-consent-decline">Decline</button>
+    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Allow analytics</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V';
+  var box = document.getElementById('bvnr-consent');
+  function load() {
+    if (window.__bvnrAnalytics) return;
+    window.__bvnrAnalytics = 1;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', ID);
+  }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  var seen = null;
+  try { seen = localStorage.getItem(KEY); } catch (e) {}
+  if (seen === 'granted') { load(); return; }
+  if (seen === 'denied' || !box) return;
+  box.hidden = false;
+  var yes = document.getElementById('bvnr-consent-accept');
+  var no  = document.getElementById('bvnr-consent-decline');
+  if (yes) yes.addEventListener('click', function () {
+    save('granted'); box.hidden = true; load();
+  });
+  if (no) no.addEventListener('click', function () {
+    save('denied'); box.hidden = true;
+  });
+})();
+</script>
 </body>
 </html>

@@ -1946,11 +1946,11 @@ int main(void)
 
 ## See also
 
-- [Specification §16 — Reference API](1_bovnar_spec.md#16-reference-api) — the normative summary of these entry points
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit model behind `bvn_parse_unit` and `want_unit`
-- [Streaming, Framing & Multiplexing](9_bovnar_streaming.md) — protocols layered on this event API
-- [Python Bindings](4_bovnar_python_bindings.md) — the same API from Python
-- [FAQ §12 — C API](6_bovnar_faq.md#12-c-api) — common questions about these functions
+- [Specification §16 — Reference API](03_bovnar_spec.md#16-reference-api) — the normative summary of these entry points
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit model behind `bvn_parse_unit` and `want_unit`
+- [Streaming, Framing & Multiplexing](10_bovnar_streaming.md) — protocols layered on this event API
+- [Python Bindings](09_bovnar_python_bindings.md) — the same API from Python
+- [FAQ §12 — C API](02_bovnar_faq.md#12-c-api) — common questions about these functions
 
 ---
 

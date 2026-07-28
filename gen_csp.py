@@ -55,6 +55,155 @@ HAS_SRC = re.compile(r'\bsrc\s*=', re.I)
 CSP_META_RE = re.compile(
     r'<meta http-equiv="Content-Security-Policy" content="[^"]*">\n?')
 
+# ── Google Analytics (GA4) ──────────────────────────────────────────────────
+# One measurement ID for the whole site, defined here because the tag and the
+# policy that admits it have to agree; gen_html_docs.py imports these for the
+# generated doc pages so the snippet exists in exactly one place.
+#
+# The inline gating script is hashed like every other inline script on these
+# pages -- it carries no src, so script_hashes() picks it up on its own. The
+# loader it creates on the granted path still needs its ORIGIN named in
+# script-src: injecting a <script> from JavaScript does not bypass CSP, and a
+# hash cannot cover a remote file. What gtag.js does afterwards needs two more
+# allowances that are easy to miss until the browser console fills with
+# violations: it sends its beacons with fetch/sendBeacon (connect-src) and falls
+# back to an image pixel where that fails (img-src). default-src 'none' means
+# anything not named here is blocked, so an incomplete list fails closed -- the
+# banner works, the visitor consents, and no data is ever collected.
+GA_MEASUREMENT_ID = "G-S8GFD3W21V"
+
+# The tag is CONSENT-GATED: nothing from googletagmanager.com is requested, and
+# no analytics identifier is stored, until the visitor clicks Allow. That is why
+# the loader is not a plain <script src> in <head> -- a <head> tag fires on load,
+# which under GDPR/TTDSG is exactly what may not happen before opt-in. The
+# loader element is created by CONSENT_JS instead, and only on the granted path.
+#
+# Consent is remembered in localStorage, NOT a cookie, so the choice itself
+# needs no consent to store. Three states: absent (ask), "granted", "denied".
+# Everything is wrapped in try/catch because localStorage throws outright in
+# some privacy modes -- and there, failing to read the choice must leave
+# analytics OFF rather than default it on.
+CONSENT_KEY = "bovnar-analytics-consent"
+CONSENT_JS = """
+(function () {
+  var KEY = '%s', ID = '%s';
+  var box = document.getElementById('bvnr-consent');
+  function load() {
+    if (window.__bvnrAnalytics) return;
+    window.__bvnrAnalytics = 1;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', ID);
+  }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  var seen = null;
+  try { seen = localStorage.getItem(KEY); } catch (e) {}
+  if (seen === 'granted') { load(); return; }
+  if (seen === 'denied' || !box) return;
+  box.hidden = false;
+  var yes = document.getElementById('bvnr-consent-accept');
+  var no  = document.getElementById('bvnr-consent-decline');
+  if (yes) yes.addEventListener('click', function () {
+    save('granted'); box.hidden = true; load();
+  });
+  if (no) no.addEventListener('click', function () {
+    save('denied'); box.hidden = true;
+  });
+})();
+""" % (CONSENT_KEY, GA_MEASUREMENT_ID)
+
+# Withdrawing has to be as easy as granting, so the privacy pages carry a button
+# that clears the stored choice; the banner then asks again on the next load.
+CONSENT_RESET_JS = """
+(function () {
+  var btn = document.getElementById('bvnr-consent-reset');
+  var out = document.getElementById('bvnr-consent-state');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    try { localStorage.removeItem('%s'); } catch (e) {}
+    if (out) out.hidden = false;
+  });
+})();
+""" % CONSENT_KEY
+
+# Self-contained so the banner looks the same on the app pages, the doc pages and
+# the 404 card, none of which share a stylesheet. [hidden] needs restating: the
+# attribute's default display:none loses to the display:flex below.
+CONSENT_CSS = """
+#bvnr-consent{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;
+ display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;
+ justify-content:center;padding:.85rem 1.15rem;background:#1b1b1b;color:#ededed;
+ border-top:1px solid #3e3e42;box-shadow:0 -2px 14px rgba(0,0,0,.4);
+ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#bvnr-consent[hidden]{display:none}
+#bvnr-consent p{margin:0;max-width:70ch;color:#ededed}
+#bvnr-consent a{color:#9cdcfe}
+#bvnr-consent .bvnr-consent-actions{display:flex;gap:.5rem;flex:none}
+#bvnr-consent button{font:inherit;padding:.4rem 1rem;border-radius:4px;
+ cursor:pointer;border:1px solid #55555a;background:transparent;color:#ededed}
+#bvnr-consent button:hover{border-color:#3794ff}
+#bvnr-consent button.bvnr-consent-yes{background:#0e639c;border-color:#0e639c;
+ color:#fff}
+#bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
+"""
+
+# The banner is prose, so the translated edition needs its own wording; the
+# English text is what gen_i18n.py extracts and de.json answers for.
+CONSENT_TEXT = {
+    "en": {
+        "label": "Analytics consent",
+        "msg": ("This site can use Google Analytics to count visits. It stays "
+                "off until you allow it — nothing is loaded from Google and "
+                "no analytics identifier is stored before then."),
+        "link": "Privacy notice",
+        "href": "/privacy.html",
+        "yes": "Allow analytics",
+        "no": "Decline",
+    },
+    "de": {
+        "label": "Einwilligung zur Reichweitenmessung",
+        "msg": ("Diese Website kann Google Analytics zur Reichweitenmessung "
+                "einsetzen. Das bleibt deaktiviert, bis Sie zustimmen — "
+                "vorher wird nichts von Google geladen und keine Analyse-Kennung "
+                "gespeichert."),
+        "link": "Datenschutzerklärung",
+        "href": "/datenschutz.html",
+        "yes": "Analyse erlauben",
+        "no": "Ablehnen",
+    },
+}
+
+
+def consent_banner(lang: str = "en") -> str:
+    """The whole gate as one fragment: styles, markup, and the gating script.
+
+    Emitted at the end of <body> rather than in <head> -- CONSENT_JS looks the
+    banner up by id as it runs, so the element has to exist by then, and a page
+    that has not finished parsing has no banner to show.
+    """
+    t = CONSENT_TEXT[lang]
+    return (
+        f"<style>{CONSENT_CSS}</style>\n"
+        f'<div id="bvnr-consent" role="region" aria-label="{t["label"]}" hidden>\n'
+        f'  <p>{t["msg"]} <a href="{t["href"]}">{t["link"]}</a></p>\n'
+        f'  <div class="bvnr-consent-actions">\n'
+        f'    <button type="button" id="bvnr-consent-decline">{t["no"]}</button>\n'
+        f'    <button type="button" id="bvnr-consent-accept" '
+        f'class="bvnr-consent-yes">{t["yes"]}</button>\n'
+        f"  </div>\n"
+        f"</div>\n"
+        f"<script>{CONSENT_JS}</script>")
+
+GA_SCRIPT_SRC = "https://www.googletagmanager.com"
+GA_IMG_SRC = "https://www.google-analytics.com https://www.googletagmanager.com"
+GA_CONNECT_SRC = ("https://*.google-analytics.com https://*.googletagmanager.com "
+                  "https://*.analytics.google.com")
+
 # Directives that never change. default-src 'none' denies anything not named
 # below; the exceptions (base-uri, form-action) do not fall back to it, so they
 # are stated. frame-ancestors is intentionally absent: it is ignored in a <meta>
@@ -65,7 +214,7 @@ STATIC_DIRECTIVES = [
     # 'wasm-unsafe-eval' lets the emscripten parser compile its WebAssembly
     # without opening the door to string eval; 'self' covers the dynamically
     # injected marked/highlight.js and the import() of the WASM glue.
-    "script-src 'self' 'wasm-unsafe-eval' {script_hashes}",
+    "script-src 'self' 'wasm-unsafe-eval' " + GA_SCRIPT_SRC + " {script_hashes}",
     # 'unsafe-inline' for STYLE only, and deliberately. The page has two inline
     # <style> blocks, ~21 style="" attributes, and a <style> the highlighter
     # creates at runtime and fills with the token palette; pinning all of those
@@ -73,24 +222,31 @@ STATIC_DIRECTIVES = [
     # cannot be hashed ahead of time) and style injection is a far weaker vector
     # than script. Scripts carry the strict policy; styles do not.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",          # data: for the inline SVG favicon
+    # data: for the inline SVG favicon; the google hosts for the GA pixel
+    "img-src 'self' data: " + GA_IMG_SRC,
     "font-src 'self'",
-    "connect-src 'self'",            # the doc drawer's XHR to doc/*.md
+    # 'self' is the doc drawer's XHR to doc/*.md; the rest is where gtag.js
+    # sends its measurement beacons.
+    "connect-src 'self' " + GA_CONNECT_SRC,
     "manifest-src 'self'",
     "base-uri 'none'",
     "form-action 'none'",
 ]
 
-# 404.html is a standalone card: one inline theme-boot script, no WASM, no fetch,
-# no manifest, no webfont. It gets its own reduced policy rather than the app one
-# -- the page has no use for 'wasm-unsafe-eval' or connect-src, and a policy is
-# only worth having if it stays as narrow as the page it guards.
+# 404.html is a standalone card: one inline theme-boot script, no WASM, no
+# manifest, no webfont. It gets its own reduced policy rather than the app one --
+# the page has no use for 'wasm-unsafe-eval' or for 'self' anywhere it can be
+# avoided, and a policy is only worth having if it stays as narrow as the page it
+# guards. The one thing it does share with the app pages is the analytics tag: a
+# 404 is exactly the hit worth measuring, so this policy carries the GA hosts and
+# (unlike before the tag) a connect-src, which the beacon needs.
 STANDALONE_DIRECTIVES = [
     "default-src 'none'",
-    "script-src {script_hashes}",
+    "script-src " + GA_SCRIPT_SRC + " {script_hashes}",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    "img-src 'self' data: " + GA_IMG_SRC,
     "font-src 'self'",
+    "connect-src " + GA_CONNECT_SRC,
     "base-uri 'none'",
     "form-action 'none'",
 ]
@@ -101,6 +257,11 @@ PAGES = [
     (WEB / "index.html", STATIC_DIRECTIVES),
     (WEB / "impressum.html", STATIC_DIRECTIVES),
     (WEB / "404.html", STANDALONE_DIRECTIVES),
+    # The two privacy pages are prose + the consent controls: no WASM, no
+    # manifest, nothing fetched but the analytics beacon, so the reduced policy
+    # fits them the same way it fits the 404 card.
+    (WEB / "privacy.html", STANDALONE_DIRECTIVES),
+    (WEB / "datenschutz.html", STANDALONE_DIRECTIVES),
 ]
 
 

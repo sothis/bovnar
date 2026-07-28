@@ -147,7 +147,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
 > unaffected in every version. See
-> [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+> [UCUM Unit Profile](11_bovnar_ucum_profile.md).
 
 ### 2.1 Parameter Ordering Flexibility
 
@@ -251,7 +251,7 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 
 > **Photometry: the steradian is carried, not dropped.** `lm`, `lx` and `ph` are
 > defined *through* the steradian, so they carry its quantity kind (§3.12 and
-> §11 of [Unit Ambiguities](unit_ambiguities.md)); `cd` and `sb` do not.
+> §11 of [Unit Ambiguities](07_bovnar_unit_ambiguities.md)); `cd` and `sb` do not.
 > The SI dimension vector cannot tell them apart — every photometric unit reduces
 > to candela in base dimensions — so without the kind the library both refused
 > `lm ↔ cd·sr` and converted `lm ↔ cd` at factor 1, which is the same claim with
@@ -542,7 +542,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](10_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](11_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -674,7 +674,7 @@ Reading across, with 1 mmol·L⁻¹ as the reference:
 
 > **`dH` is not `°dH`.** Without the degree sign the token is the decihenry, and it stays that way.
 > Likewise water chemistry writes the American scale as "ppm"; Bovnar's `ppm` is the dimensionless
-> 10⁻⁶ and is *not* interchangeable with `°aH`. See [`unit_ambiguities.md`](unit_ambiguities.md).
+> 10⁻⁶ and is *not* interchangeable with `°aH`. See [`07_bovnar_unit_ambiguities.md`](07_bovnar_unit_ambiguities.md).
 
 ### 3.29 Conductivity and Dissolved Solids
 
@@ -740,7 +740,7 @@ None of the five turbidity scales converts to any other:
 > measurement.
 >
 > Watch the case. `fau` is the femto-astronomical-unit, `cF` the centifarad — the turbidity and
-> conductivity scales are uppercase only. See [`unit_ambiguities.md`](unit_ambiguities.md).
+> conductivity scales are uppercase only. See [`07_bovnar_unit_ambiguities.md`](07_bovnar_unit_ambiguities.md).
 
 > **PSU is not per-mille.** Practical salinity is a conductivity ratio, so it is dimensionless by
 > construction and `PSU` is a label rather than a unit — SI-minded texts write *S*_P = 35 with no
@@ -887,7 +887,7 @@ The rules are exactly the rules of the separated form, with one addition:
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 
-For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see [`unit_ambiguities.md`](unit_ambiguities.md).
+For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see [`07_bovnar_unit_ambiguities.md`](07_bovnar_unit_ambiguities.md).
 
 Currencies take the compact prefix too — `k$EUR` is `k~$EUR`. The `$` sigil already separates the prefix from the code (no prefix symbol and no currency code contains a `$`), so nothing is left for the `~` to resolve. What the sigil rule still requires is the sigil itself: `kUSD` is `error_unit_illegal`, because a bare code is never a currency (§10.4).
 
@@ -2288,12 +2288,12 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ## See also
 
-- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — how a unit is attached to a value
-- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in this registry, in table form
-- [Unit Ambiguities](unit_ambiguities.md) — every token that could plausibly mean two things
-- [UCUM Unit Profile](10_bovnar_ucum_profile.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
-- [Read & Write API](3_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
-- [Python Bindings](4_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
+- [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit is attached to a value
+- [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in this registry, in table form
+- [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — every token that could plausibly mean two things
+- [UCUM Unit Profile](11_bovnar_ucum_profile.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
+- [Read & Write API](08_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
+- [Python Bindings](09_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 
 ---
 

@@ -86,16 +86,17 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 
 ## Documentation
 
-- [Tutorial](https://www.bovnar.io/doc/0_bovnar_tutorial.md) — A guided introduction to writing and reading Bovnar documents.
-- [Specification](https://www.bovnar.io/doc/1_bovnar_spec.md) — The complete format specification (spec 1.1): grammar, types, units, limits.
-- [Unit system](https://www.bovnar.io/doc/2_bovnar_unit_system.md) — The 180 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
-- [Read & Write C API](https://www.bovnar.io/doc/3_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).
-- [Python bindings](https://www.bovnar.io/doc/4_bovnar_python_bindings.md) — The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
-- [EBNF grammar](https://www.bovnar.io/doc/5_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
-- [FAQ](https://www.bovnar.io/doc/6_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
-- [Conformance](https://www.bovnar.io/doc/7_bovnar_conformance.md) — The 387-case conformance suite and the IUT protocol for third-party implementations.
-- [Unit & currency cheatsheet](https://www.bovnar.io/doc/8_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
-- [Streaming & framing](https://www.bovnar.io/doc/9_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
-- [UCUM unit profile](https://www.bovnar.io/doc/10_bovnar_ucum_profile.md) — The ucum: notation, its transliteration table, and what it refuses.
+- [Tutorial](https://www.bovnar.io/doc/01_bovnar_tutorial.md) — A guided introduction to writing and reading Bovnar documents.
+- [FAQ](https://www.bovnar.io/doc/02_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
+- [Specification](https://www.bovnar.io/doc/03_bovnar_spec.md) — The complete format specification (spec 1.1): grammar, types, units, limits.
+- [Unit & currency cheatsheet](https://www.bovnar.io/doc/04_bovnar_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
+- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 180 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
+- [Unit ambiguities](https://www.bovnar.io/doc/07_bovnar_unit_ambiguities.md) — Which reading wins when a token could mean two things, and how to write the other.
+- [Read & Write C API](https://www.bovnar.io/doc/08_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).
+- [Python bindings](https://www.bovnar.io/doc/09_bovnar_python_bindings.md) — The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
+- [Streaming & framing](https://www.bovnar.io/doc/10_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
+- [UCUM unit profile](https://www.bovnar.io/doc/11_bovnar_ucum_profile.md) — The ucum: notation, its transliteration table, and what it refuses.
+- [EBNF grammar](https://www.bovnar.io/doc/12_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
+- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 387-case conformance suite and the IUT protocol for third-party implementations.
 
 Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bovnar.io/docs/). A single-file copy of the whole set is at [https://www.bovnar.io/llms-full.txt](https://www.bovnar.io/llms-full.txt).

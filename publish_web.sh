@@ -45,7 +45,7 @@ EXCLUDES=(
     # A design evaluation of reader-side unit policy. It describes API that does
     # not exist and a directive that would need a spec 1.2 -- serving it from the
     # documentation root would read as a description of what the library does.
-    "doc/parser_level_unit_policy.md"
+    "doc/06_bovnar_unit_policy.md"
     "doc/bovnar_pipeline.svg"
     # A draft German Wikipedia article about the format. Working document, not
     # referenced anywhere on the site, and MediaWiki markup a browser would show

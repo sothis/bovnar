@@ -33,7 +33,7 @@ sequence:
    place — it activates highlighting automatically once the language ships, and
    is a harmless no-op until then.
 3. When usage is demonstrable, open the Linguist PR with items 1–3 above and a
-   link to the specification (`doc/1_bovnar_spec.md`) and this project.
+   link to the specification (`doc/03_bovnar_spec.md`) and this project.
 
 ## Checklist for the PR
 

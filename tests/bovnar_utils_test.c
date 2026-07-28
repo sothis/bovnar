@@ -440,7 +440,7 @@ static void test_unit_equal(void)
 
 /*
  * bvn_parse_uint64/int64 take a value_type_spec_t so they can range-check, which
- * is what doc/3 §1.11 promises ("the vt argument supplies the base and bit-width for
+ * is what doc/08 §1.11 promises ("the vt argument supplies the base and bit-width for
  * range checking", "returns false if the string is not representable in the
  * declared type"). Only the base was consulted: <uint:8> accepted 256 and, via
  * strtoull's silent wrap of a sign an unsigned carrier cannot have, "-1" came

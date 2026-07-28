@@ -1007,12 +1007,12 @@ nan  inf  ninf
 
 ## See also
 
-- [Specification](1_bovnar_spec.md) — the normative rules behind everything shown here
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — every unit and currency the parser accepts
-- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — the symbol tables, for looking one up quickly
-- [Read & Write API](3_bovnar_readwrite_api.md) — the C API sketched in the event-model section
-- [Python Bindings](4_bovnar_python_bindings.md) — the same document set, read and written from Python
-- [FAQ](6_bovnar_faq.md) — the questions this tutorial raises next
+- [Specification](03_bovnar_spec.md) — the normative rules behind everything shown here
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — every unit and currency the parser accepts
+- [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — the symbol tables, for looking one up quickly
+- [Read & Write API](08_bovnar_readwrite_api.md) — the C API sketched in the event-model section
+- [Python Bindings](09_bovnar_python_bindings.md) — the same document set, read and written from Python
+- [FAQ](02_bovnar_faq.md) — the questions this tutorial raises next
 
 ---
 

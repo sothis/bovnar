@@ -285,15 +285,15 @@ the `http{}` context beside the other `map`:
 ```nginx
 map $uri $bvnr_canon_hdr {
     default                            "";
-    "/doc/0_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
-    "/doc/1_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
-    "/doc/2_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
-    "/doc/3_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
-    "/doc/4_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
-    "/doc/6_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
-    "/doc/7_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
-    "/doc/8_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
-    "/doc/9_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    "/doc/01_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/03_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/05_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/08_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/09_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/02_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/13_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
+    "/doc/04_bovnar_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/10_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
 }
 ```
 
@@ -308,7 +308,7 @@ Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
     include snippets/bovnar-headers.conf;
 ```
 
-`/doc/5_bovnar.ebnf` isn't matched by the `.md` location, and is deliberately left
+`/doc/12_bovnar.ebnf` isn't matched by the `.md` location, and is deliberately left
 out of the canonical map above — it is niche enough not to compete for the
 `/docs/grammar/` ranking. It does still need its own `location` for the MIME type
 (above), or it downloads instead of displaying. The complete assembled config is
@@ -395,15 +395,15 @@ map $arg_v $bvnr_cache_ctl {
 # nginx adds no canonical header there (it omits an empty-valued add_header).
 map $uri $bvnr_canon_hdr {
     default                            "";
-    "/doc/0_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
-    "/doc/1_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
-    "/doc/2_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
-    "/doc/3_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
-    "/doc/4_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
-    "/doc/6_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
-    "/doc/7_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
-    "/doc/8_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
-    "/doc/9_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    "/doc/01_bovnar_tutorial.md"        "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/03_bovnar_spec.md"            "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/05_bovnar_unit_system.md"     "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/08_bovnar_readwrite_api.md"   "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/09_bovnar_python_bindings.md" "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/02_bovnar_faq.md"             "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/13_bovnar_conformance.md"     "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
+    "/doc/04_bovnar_unit_cheatsheet.md"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/10_bovnar_streaming.md"       "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
 }
 
 # 1) Serve the site over HTTPS on the canonical host only

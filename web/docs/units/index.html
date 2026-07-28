@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.googletagmanager.com 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Unit &amp; Currency System</title>
@@ -21,8 +21,8 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
-<meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-27">
+<meta property="article:published_time" content="2026-07-28">
+<meta property="article:modified_time" content="2026-07-28">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit &amp; Currency System">
@@ -31,14 +31,14 @@
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
-<link rel="alternate" type="text/markdown" href="/doc/2_bovnar_unit_system.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-27", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
+<link rel="alternate" type="text/markdown" href="/doc/05_bovnar_unit_system.md">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-28", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
 <h1>Bovnar — Unit &amp; Currency Reference</h1>
-<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/2_bovnar_unit_system.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-system.pdf">PDF</a>.</p>
+<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/05_bovnar_unit_system.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-system.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Normative — the unit and currency registry the parser validates against
@@ -532,7 +532,7 @@ unaffected in every version. See
 <blockquote>
 <p><strong>Photometry: the steradian is carried, not dropped.</strong> <code>lm</code>, <code>lx</code> and <code>ph</code> are
 defined <em>through</em> the steradian, so they carry its quantity kind (§3.12 and
-§11 of <a href="/doc/unit_ambiguities.md">Unit Ambiguities</a>); <code>cd</code> and <code>sb</code> do not.
+§11 of <a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a>); <code>cd</code> and <code>sb</code> do not.
 The SI dimension vector cannot tell them apart — every photometric unit reduces
 to candela in base dimensions — so without the kind the library both refused
 <code>lm ↔ cd·sr</code> and converted <code>lm ↔ cd</code> at factor 1, which is the same claim with
@@ -2147,7 +2147,7 @@ the same answer it gives for a π-based angle. <code>bvn_unit_convert_value</cod
 English conventions both work and both carry the divalent caveat above.</p>
 <p><strong><code>dH</code> is not <code>°dH</code>.</strong> Without the degree sign the token is the decihenry, and it stays that way.
 Likewise water chemistry writes the American scale as "ppm"; Bovnar's <code>ppm</code> is the dimensionless
-10⁻⁶ and is <em>not</em> interchangeable with <code>°aH</code>. See <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+10⁻⁶ and is <em>not</em> interchangeable with <code>°aH</code>. See <a href="https://www.bovnar.io/docs/ambiguities/"><code>07_bovnar_unit_ambiguities.md</code></a>.</p>
 </blockquote>
 <h3 id="329-conductivity-and-dissolved-solids">3.29 Conductivity and Dissolved Solids</h3>
 <p>Two quantities that water data quotes constantly and that need <strong>no unit of their own</strong> — the
@@ -2334,7 +2334,7 @@ a factor exists — report the method.</p>
 does not: the candle method cannot resolve below roughly 25 JTU, so a milli-JTU is not a
 measurement.</p>
 <p>Watch the case. <code>fau</code> is the femto-astronomical-unit, <code>cF</code> the centifarad — the turbidity and
-conductivity scales are uppercase only. See <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+conductivity scales are uppercase only. See <a href="https://www.bovnar.io/docs/ambiguities/"><code>07_bovnar_unit_ambiguities.md</code></a>.</p>
 <p><strong>PSU is not per-mille.</strong> Practical salinity is a conductivity ratio, so it is dimensionless by
 construction and <code>PSU</code> is a label rather than a unit — SI-minded texts write <em>S</em>_P = 35 with no
 unit at all. It is <strong>not</strong> a mass fraction: <em>S</em>_P 35 corresponds to about 35.165 g/kg absolute
@@ -2708,7 +2708,7 @@ takes no prefix.</p>
 <p>The last row is the harder case: <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.</p>
 <p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne.</p>
 <p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
-<p>For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see <a href="/doc/unit_ambiguities.md"><code>unit_ambiguities.md</code></a>.</p>
+<p>For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see <a href="https://www.bovnar.io/docs/ambiguities/"><code>07_bovnar_unit_ambiguities.md</code></a>.</p>
 <p>Currencies take the compact prefix too — <code>k$EUR</code> is <code>k~$EUR</code>. The <code>$</code> sigil already separates the prefix from the code (no prefix symbol and no currency code contains a <code>$</code>), so nothing is left for the <code>~</code> to resolve. What the sigil rule still requires is the sigil itself: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is never a currency (§10.4).</p>
 <hr />
 <h2 id="5-unit-notation-grammar">5. Unit Notation Grammar</h2>
@@ -5347,7 +5347,7 @@ ev_data   data=&quot;1500&quot;
 <ul>
 <li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — how a unit is attached to a value</li>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit &amp; Currency Cheat Sheet</a> — every symbol in this registry, in table form</li>
-<li><a href="/doc/unit_ambiguities.md">Unit Ambiguities</a> — every token that could plausibly mean two things</li>
+<li><a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> — every token that could plausibly mean two things</li>
 <li><a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a> — writing UCUM codes in a unit slot, and where the two namespaces disagree</li>
 <li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — <code>bvn_parse_unit</code>, <code>bvn_unit_to_string</code>, and read-time conversion</li>
 <li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the same unit model from Python, with the NumPy and pint bridges</li>
@@ -5355,11 +5355,67 @@ ev_data   data=&quot;1500&quot;
 <hr />
 <p><em>End of Bovnar — Unit &amp; Currency Reference (Bovnar spec 1.1).</em></p>
 </main>
-<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · MIT-licensed</footer>
+<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
 <script src="/bovnar_highlight.js?v=667c4a367efc"></script>
 <script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>
 <script>(function(){var root=document.documentElement,btn=document.getElementById('theme-toggle'),meta=document.querySelector('meta[name="theme-color"]');function light(){return root.getAttribute('data-theme')==='light';}function sync(){if(btn)btn.setAttribute('aria-label',light()?'Switch to dark theme':'Switch to light theme');if(meta)meta.setAttribute('content',light()?'#e8e8e8':'#1e1e1e');}sync();if(btn)btn.addEventListener('click',function(){var n=light()?'dark':'light';if(n==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');sync();try{localStorage.setItem('bovnar-theme',n);}catch(e){}});try{var mq=window.matchMedia('(prefers-color-scheme: dark)');mq.addEventListener('change',function(e){var s=localStorage.getItem('bovnar-theme');if(s==='dark'||s==='light')return;if(e.matches)root.removeAttribute('data-theme');else root.setAttribute('data-theme','light');sync();});}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('to-top');if(!b)return;var shown=false,tick=0;function sync(){var y=window.pageYOffset||document.documentElement.scrollTop||0;var want=y>400;if(want===shown)return;shown=want;b.classList.toggle('show',want);}window.addEventListener('scroll',function(){if(tick)return;tick=requestAnimationFrame(function(){tick=0;sync();});},{passive:true});b.addEventListener('click',function(){var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:r?'auto':'smooth'});var h=document.querySelector('header.site .brand');if(h&&h.focus)h.focus({preventScroll:true});});sync();})();</script>
+<style>
+#bvnr-consent{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;
+ display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;
+ justify-content:center;padding:.85rem 1.15rem;background:#1b1b1b;color:#ededed;
+ border-top:1px solid #3e3e42;box-shadow:0 -2px 14px rgba(0,0,0,.4);
+ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#bvnr-consent[hidden]{display:none}
+#bvnr-consent p{margin:0;max-width:70ch;color:#ededed}
+#bvnr-consent a{color:#9cdcfe}
+#bvnr-consent .bvnr-consent-actions{display:flex;gap:.5rem;flex:none}
+#bvnr-consent button{font:inherit;padding:.4rem 1rem;border-radius:4px;
+ cursor:pointer;border:1px solid #55555a;background:transparent;color:#ededed}
+#bvnr-consent button:hover{border-color:#3794ff}
+#bvnr-consent button.bvnr-consent-yes{background:#0e639c;border-color:#0e639c;
+ color:#fff}
+#bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
+</style>
+<div id="bvnr-consent" role="region" aria-label="Analytics consent" hidden>
+  <p>This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href="/privacy.html">Privacy notice</a></p>
+  <div class="bvnr-consent-actions">
+    <button type="button" id="bvnr-consent-decline">Decline</button>
+    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Allow analytics</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V';
+  var box = document.getElementById('bvnr-consent');
+  function load() {
+    if (window.__bvnrAnalytics) return;
+    window.__bvnrAnalytics = 1;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', ID);
+  }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  var seen = null;
+  try { seen = localStorage.getItem(KEY); } catch (e) {}
+  if (seen === 'granted') { load(); return; }
+  if (seen === 'denied' || !box) return;
+  box.hidden = false;
+  var yes = document.getElementById('bvnr-consent-accept');
+  var no  = document.getElementById('bvnr-consent-decline');
+  if (yes) yes.addEventListener('click', function () {
+    save('granted'); box.hidden = true; load();
+  });
+  if (no) no.addEventListener('click', function () {
+    save('denied'); box.hidden = true;
+  });
+})();
+</script>
 </body>
 </html>

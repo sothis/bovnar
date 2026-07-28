@@ -1,15 +1,14 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://www.googletagmanager.com 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-psu6F0sUvBTJ0T5aWzkvE8W0Fgkew8AQHGGE7GjIcNI=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://www.googletagmanager.com 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-LD8n8dA9SkS6MfxHhdVl8pKjTwy+7U/sPjxR8MhkbrM=' 'sha256-Us6Iuoc76xT5BendnzPECQmU1nVkiWE0MaoNaGt+V1U=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#e8e8e8">
 <script>
 /* Apply the theme before first paint to avoid a flash. An explicit toggle wins;
@@ -28,9 +27,9 @@
 })();
 </script>
 <meta name="robots" content="noindex">
-<link rel="canonical" href="https://www.bovnar.io/impressum.html">
-<meta name="description" content="Impressum und rechtliche Angaben für bovnar.io.">
-<title>Impressum — Bovnar</title>
+<link rel="canonical" href="https://www.bovnar.io/privacy.html">
+<meta name="description" content="How bovnar.io handles personal data: server logs, local storage, and consent-gated Google Analytics.">
+<title>Privacy Notice — Bovnar</title>
 <link rel="stylesheet" href="fonts/fonts.css?v=47fe6a616ffc">
 <style>
 :root {
@@ -121,6 +120,15 @@ footer {
   display: flex; gap: 1rem; flex-wrap: wrap; max-width: 760px; margin: 0 auto; width: 100%;
 }
 footer a { color: var(--text2); }
+
+.reset-btn {
+  font: inherit; padding: 0.45rem 1rem; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text);
+}
+.reset-btn:hover { border-color: var(--blue2); color: var(--cyan); }
+code {
+  font-family: var(--mono); font-size: 0.88rem; color: var(--cyan);
+}
 </style>
 </head>
 <body>
@@ -129,74 +137,101 @@ footer a { color: var(--text2); }
 <nav>
   <a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true" style="flex:none;vertical-align:-4px;margin-right:.55rem"><use href="#bvnr-fav"/></svg>BOVNAR<span class="ext">.bvnr</span></a>
   <span class="sep">/</span>
-  <span class="tag">IMPRESSUM</span>
+  <span class="tag">PRIVACY</span>
   <span class="spacer"></span>
+  <a class="link" href="datenschutz.html">Deutsche Fassung</a>
   <a class="link" href="index.html">&larr; Home</a>
-  <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Zum hellen Design wechseln" title="Zwischen hellem und dunklem Design umschalten">
+  <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme">
     <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
   </button>
 </nav>
 
 <main>
-  <h1>Impressum</h1>
-  <p class="lead">Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG).</p>
+  <h1>Privacy Notice</h1>
+  <p class="lead">How this site handles personal data, and what it does not do.</p>
 
-  <h2>Diensteanbieter</h2>
+  <h2>Controller</h2>
   <p class="addr">
-    Janos Sonntag
+    Janos Sonntag<br>
+    E-mail: <a href="mailto:bovnar@mail.de">bovnar@mail.de</a>
+  </p>
+  <p class="muted">Full provider identification is in the <a href="impressum.html">Impressum</a>.</p>
+
+  <h2>What this site does by default</h2>
+  <p class="muted">
+    bovnar.io is a static site. There is no account system, no contact form, no advertising, and
+    no third-party content embedded in a page unless you allow analytics below. Everything the
+    site needs — stylesheets, fonts, scripts, the WebAssembly parser used by the playground — is
+    served from bovnar.io itself, so simply reading a page contacts no other company.
   </p>
 
-  <h2>Kontakt</h2>
+  <h2>Server log data</h2>
+  <p class="muted">
+    Delivering a page requires the web server to process the request, and it records the usual
+    access data in doing so: your IP address, the date and time, the path requested, the referring
+    page, and your browser's user-agent string. This is necessary to operate the service and to
+    detect and defend against attacks, which is our legitimate interest under Art. 6(1)(f) GDPR.
+    These logs are not combined with analytics data and are not used to profile visitors.
+  </p>
+
+  <h2>Storage on your device</h2>
+  <p class="muted">
+    The site sets <strong>no cookies</strong>. It keeps two small values in your browser's local
+    storage, which are never transmitted to the server:
+  </p>
   <p class="addr">
-    E-Mail: <a href="mailto:bovnar@mail.de">bovnar@mail.de</a>
+    <code>bovnar-theme</code> — your light/dark choice<br>
+    <code>bovnar-analytics-consent</code> — your answer to the analytics question
   </p>
-
-  <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
-  <p class="addr">
-    Janos Sonntag
-  </p>
-
-  <h2>Haftung für Inhalte</h2>
   <p class="muted">
-    Als Diensteanbieter bin ich gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach
-    den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG bin ich als Diensteanbieter
-    jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen
-    oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
-    Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den
-    allgemeinen Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst
-    ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei Bekanntwerden
-    entsprechender Rechtsverletzungen entferne ich diese Inhalte umgehend.
+    Both are strictly necessary to honour a preference you expressed, and you can clear them at
+    any time through your browser's site-data settings.
   </p>
 
-  <h2>Haftung für Links</h2>
+  <h2>Analytics — Google Analytics 4</h2>
   <p class="muted">
-    Dieses Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte ich keinen
-    Einfluss habe. Deshalb kann ich für diese fremden Inhalte auch keine Gewähr übernehmen. Für
-    die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten
-    verantwortlich. Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche
-    Rechtsverstöße überprüft; rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht
-    erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete
-    Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen
-    entferne ich derartige Links umgehend.
+    This site can use Google Analytics 4 (measurement ID <code>G-S8GFD3W21V</code>) to count
+    visits and see which documentation pages are read. <strong>It is switched off until you
+    allow it.</strong> Until you click “Allow analytics”, no request is made to Google, no script
+    from Google is loaded, and no analytics identifier is created or stored. Declining, or simply
+    ignoring the banner, leaves analytics off.
+  </p>
+  <p class="muted">
+    If you do consent, the provider is Google Ireland Limited, Gordon House, Barrow Street,
+    Dublin 4, Ireland. Google processes the pages you view, approximate location derived from a
+    shortened IP address, and technical details of your device and browser, and sets identifiers
+    to recognise a returning browser. Data may be transferred to Google LLC in the United States;
+    Google relies on the EU–US Data Privacy Framework and on the European Commission's standard
+    contractual clauses for such transfers. Google's own description is at
+    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>.
+  </p>
+  <p class="muted">
+    The legal basis is your consent under Art. 6(1)(a) GDPR. You may withdraw it at any time with
+    effect for the future — withdrawing is as easy as granting:
+  </p>
+  <p>
+    <button type="button" id="bvnr-consent-reset" class="reset-btn">Withdraw or change my choice</button>
+  </p>
+  <p class="muted" id="bvnr-consent-state" hidden>
+    Your choice has been cleared. Reload any page on this site and the banner will ask again.
   </p>
 
-  <h2>Urheberrecht</h2>
+  <h2>Your rights</h2>
   <p class="muted">
-    Die auf diesen Seiten dargestellten Inhalte unterliegen dem deutschen Urheberrecht, soweit
-    nicht ausdrücklich eine freizügigere Lizenz angegeben ist. Die Software „Bovnar" steht unter
-    der <a href="https://github.com/sothis/bovnar/blob/main/LICENSE" target="_blank" rel="noopener">MIT-Lizenz</a>,
-    die Dokumentation unter <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC&nbsp;BY&nbsp;4.0</a>
-    und die Beispiele unter <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0&nbsp;1.0</a>.
-    Die jeweiligen Lizenzbedingungen sind maßgeblich.
+    Under the GDPR you have the right of access (Art. 15), rectification (Art. 16), erasure
+    (Art. 17), restriction of processing (Art. 18), data portability (Art. 20), and objection
+    (Art. 21), as well as the right to withdraw consent at any time. To exercise any of these,
+    write to the address above. You also have the right to lodge a complaint with a supervisory
+    authority, in particular in the member state of your residence or place of work.
   </p>
+
 </main>
 
 <footer>
   <span>© 2026 Janos Sonntag</span>
-  <span><a href="index.html">Startseite</a></span>
-  <span><a href="datenschutz.html">Datenschutz</a></span>
-  <span><a href="https://github.com/sothis/bovnar" target="_blank" rel="noopener">GitHub ↗</a></span>
+  <span><a href="index.html">Home</a></span>
+  <span><a href="impressum.html">Impressum</a></span>
 </footer>
 
 <script>
@@ -207,7 +242,7 @@ footer a { color: var(--text2); }
   function isLight() { return root.getAttribute('data-theme') === 'light'; }
   function sync() {
     if (btn) {
-      var lbl = isLight() ? 'Zum dunklen Design wechseln' : 'Zum hellen Design wechseln';
+      var lbl = isLight() ? 'Switch to dark theme' : 'Switch to light theme';
       btn.setAttribute('aria-label', lbl);
       btn.setAttribute('title', lbl);
     }
@@ -224,18 +259,17 @@ footer a { color: var(--text2); }
     apply(next === 'light');
     try { localStorage.setItem('bovnar-theme', next); } catch (e) {}
   });
-  /* Follow the desktop theme live, but only until the visitor makes an
-     explicit choice — after that their toggle takes precedence. */
-  try {
-    var mq = window.matchMedia('(prefers-color-scheme: dark)');
-    var onPref = function (e) {
-      var stored = localStorage.getItem('bovnar-theme');
-      if (stored === 'dark' || stored === 'light') return;
-      apply(!e.matches);
-    };
-    if (mq.addEventListener) mq.addEventListener('change', onPref);
-    else if (mq.addListener) mq.addListener(onPref);
-  } catch (e) {}
+})();
+</script>
+<script>
+(function () {
+  var btn = document.getElementById('bvnr-consent-reset');
+  var out = document.getElementById('bvnr-consent-state');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    try { localStorage.removeItem('bovnar-analytics-consent'); } catch (e) {}
+    if (out) out.hidden = false;
+  });
 })();
 </script>
 <style>
@@ -255,11 +289,11 @@ footer a { color: var(--text2); }
  color:#fff}
 #bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
 </style>
-<div id="bvnr-consent" role="region" aria-label="Einwilligung zur Reichweitenmessung" hidden>
-  <p>Diese Website kann Google Analytics zur Reichweitenmessung einsetzen. Das bleibt deaktiviert, bis Sie zustimmen — vorher wird nichts von Google geladen und keine Analyse-Kennung gespeichert. <a href="/datenschutz.html">Datenschutzerklärung</a></p>
+<div id="bvnr-consent" role="region" aria-label="Analytics consent" hidden>
+  <p>This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href="/privacy.html">Privacy notice</a></p>
   <div class="bvnr-consent-actions">
-    <button type="button" id="bvnr-consent-decline">Ablehnen</button>
-    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Analyse erlauben</button>
+    <button type="button" id="bvnr-consent-decline">Decline</button>
+    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Allow analytics</button>
   </div>
 </div>
 <script>
@@ -296,4 +330,3 @@ footer a { color: var(--text2); }
 </script>
 </body>
 </html>
-

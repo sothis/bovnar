@@ -4,8 +4,8 @@
 > **Status:** Reference — companion to the unit registry and the cheat sheet
 > **Scope:** Every token that could plausibly mean two things — what Bovnar reads it as, and how to write the other meaning.
 
-Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the registry) and
-[Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) (the symbol tables). Every row here was checked
+Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the registry) and
+[Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) (the symbol tables). Every row here was checked
 against the reference parser; where a token is refused, it really is `error_unit_illegal`.
 
 ---
@@ -527,10 +527,10 @@ usually where the money is.
 
 ## See also
 
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the registry these readings come from
-- [Unit & Currency Cheat Sheet](8_unit_cheatsheet.md) — every symbol in one place
-- [Specification §11 — Units System](1_bovnar_spec.md#11-units-system) — the normative unit rules
-- [FAQ §4 — Units](6_bovnar_faq.md#4-units) — common unit questions
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the registry these readings come from
+- [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in one place
+- [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — the normative unit rules
+- [FAQ §4 — Units](02_bovnar_faq.md#4-units) — common unit questions
 
 ---
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-XOcoioxV4CFktrq7QfqsgVSHc+5YmPc/viXMF1/OV28='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://www.googletagmanager.com 'sha256-XOcoioxV4CFktrq7QfqsgVSHc+5YmPc/viXMF1/OV28=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, follow">
 <title>404 — Page not found · Bovnar</title>
@@ -105,7 +105,63 @@ code {
   <!-- Every page of the offering has to reach the provider identification
        (§ 5 DDG), and a 404 is a page like any other -- often the first one a
        visitor sees. Small and out of the way, but present. -->
-  <p class="legal"><a href="/impressum.html">Impressum</a></p>
+  <p class="legal"><a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a></p>
 </main>
+<style>
+#bvnr-consent{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;
+ display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;
+ justify-content:center;padding:.85rem 1.15rem;background:#1b1b1b;color:#ededed;
+ border-top:1px solid #3e3e42;box-shadow:0 -2px 14px rgba(0,0,0,.4);
+ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#bvnr-consent[hidden]{display:none}
+#bvnr-consent p{margin:0;max-width:70ch;color:#ededed}
+#bvnr-consent a{color:#9cdcfe}
+#bvnr-consent .bvnr-consent-actions{display:flex;gap:.5rem;flex:none}
+#bvnr-consent button{font:inherit;padding:.4rem 1rem;border-radius:4px;
+ cursor:pointer;border:1px solid #55555a;background:transparent;color:#ededed}
+#bvnr-consent button:hover{border-color:#3794ff}
+#bvnr-consent button.bvnr-consent-yes{background:#0e639c;border-color:#0e639c;
+ color:#fff}
+#bvnr-consent button.bvnr-consent-yes:hover{background:#1177bb}
+</style>
+<div id="bvnr-consent" role="region" aria-label="Analytics consent" hidden>
+  <p>This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href="/privacy.html">Privacy notice</a></p>
+  <div class="bvnr-consent-actions">
+    <button type="button" id="bvnr-consent-decline">Decline</button>
+    <button type="button" id="bvnr-consent-accept" class="bvnr-consent-yes">Allow analytics</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V';
+  var box = document.getElementById('bvnr-consent');
+  function load() {
+    if (window.__bvnrAnalytics) return;
+    window.__bvnrAnalytics = 1;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', ID);
+  }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  var seen = null;
+  try { seen = localStorage.getItem(KEY); } catch (e) {}
+  if (seen === 'granted') { load(); return; }
+  if (seen === 'denied' || !box) return;
+  box.hidden = false;
+  var yes = document.getElementById('bvnr-consent-accept');
+  var no  = document.getElementById('bvnr-consent-decline');
+  if (yes) yes.addEventListener('click', function () {
+    save('granted'); box.hidden = true; load();
+  });
+  if (no) no.addEventListener('click', function () {
+    save('denied'); box.hidden = true;
+  });
+})();
+</script>
 </body>
 </html>

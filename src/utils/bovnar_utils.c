@@ -1044,7 +1044,7 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 	}
 	/*
 	 * spec 1.2 — a "name:" namespace hands the string to the unit profile
-	 * (doc/10_bovnar_ucum_profile.md). This is the SINGLE door: every path that
+	 * (doc/11_bovnar_ucum_profile.md). This is the SINGLE door: every path that
 	 * reaches a unit goes through bvn_parse_unit, so a profile unit cannot arrive by a
 	 * route that skips a check, and the policy strings of bvnr_unit_policy_t
 	 * accept the notation with no change at all.
@@ -2498,7 +2498,7 @@ uint32_t bvn_min_digits_for_type(value_type_spec_t vt)
  * double parsers follow the same base-split structure.
  */
 /* The declared width bounds the value, which is the whole reason these helpers
- * take a value_type_spec_t: doc/3 states "the vt argument supplies the base and
+ * take a value_type_spec_t: doc/08 states "the vt argument supplies the base and
  * bit-width for range checking" and "returns false if the string is not
  * representable in the declared type". Only the base was ever consulted, so
  * bvn_parse_uint64("256", <uint:8>, &u) returned true with 256 and, worse,

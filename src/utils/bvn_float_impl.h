@@ -557,7 +557,7 @@ typedef struct {
  * NOTE: the standard/in-house split is *inferred* from the bias here. That makes
  * the encoding silently dependent on the exact (exp_bits, p, bias) tuple: if
  * decimal16's bias were ever changed it could flip layout. The tuples are fixed
- * by the on-disk format (doc/1_bovnar_spec.md §5.2) and must not be altered.
+ * by the on-disk format (doc/03_bovnar_spec.md §5.2) and must not be altered.
  */
 static inline bool bvnf_dec_is_standard(int exp_bits, int max_coeff_digs, int bias)
 {

@@ -488,7 +488,7 @@ Symbols are case-sensitive in either spelling, so `Kg`, `KB` and `KG` are
 `K` is the kelvin, not the kilo prefix.
 
 Every token that could be read two ways is listed in
-[`unit_ambiguities.md`](unit_ambiguities.md), with the spelling to use for each
+[`07_bovnar_unit_ambiguities.md`](07_bovnar_unit_ambiguities.md), with the spelling to use for each
 meaning.
 
 A prefixed **currency** works the same way — `k$EUR` is `k~$EUR`, since the `$` sigil already separates the two. The sigil itself is never optional: `kUSD` is `error_unit_illegal`, because a bare code is not a currency.
@@ -591,7 +591,7 @@ Watch the two vocabularies where they disagree on a spelling — UCUM's `st` is
 the stere and Bovnar's is the stone, UCUM's `B` is the bel and Bovnar's is the
 byte — which is exactly why the namespace is mandatory rather than a fallback.
 The full transliteration table, the collisions, and the codes that have no
-representation are in [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+representation are in [UCUM Unit Profile](11_bovnar_ucum_profile.md).
 
 ---
 
@@ -747,7 +747,7 @@ In **spec 1.0** that is all — any other character after a backslash is
 `error_illegal_escape_sequence`.
 
 A **spec 1.1** document (declaring `#!bovnar 1.1`, see the [Specification
-§3.4](1_bovnar_spec.md#34-version-directive-spec-11)) adds two more:
+§3.4](03_bovnar_spec.md#34-version-directive-spec-11)) adds two more:
 
 | Escape | Meaning |
 |---|---|
@@ -1475,11 +1475,11 @@ standard publication by three to five years.
 
 ## See also
 
-- [Specification](1_bovnar_spec.md) — the normative answer behind every entry here
-- [Tutorial](0_bovnar_tutorial.md) — the guided introduction, if a question here assumes too much
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the registry behind §4
-- [Read & Write API](3_bovnar_readwrite_api.md) — the C functions named in §12
-- [Python Bindings](4_bovnar_python_bindings.md) — the package described in §13
+- [Specification](03_bovnar_spec.md) — the normative answer behind every entry here
+- [Tutorial](01_bovnar_tutorial.md) — the guided introduction, if a question here assumes too much
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the registry behind §4
+- [Read & Write API](08_bovnar_readwrite_api.md) — the C functions named in §12
+- [Python Bindings](09_bovnar_python_bindings.md) — the package described in §13
 
 ---
 

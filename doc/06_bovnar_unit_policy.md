@@ -4,8 +4,8 @@
 > **Status:** Design note — the evaluation behind the reader, writer and DOM unit policies. Options 1, 2, 3 and 4 shipped; 0, 5 and 6 did not. Section 7.5 records why option 2 was built after all. Nothing here is normative.
 > **Scope:** How the reader could validate and convert units without an application-supplied callback, whether the options combine, and (section 7.4) the producer-side half the evaluation missed.
 
-Companion to [Unit & Currency Reference](2_bovnar_unit_system.md) (the registry) and
-[Read/Write API](3_bovnar_readwrite_api.md) (the `want_unit` hook this note is measured against).
+Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the registry) and
+[Read/Write API](08_bovnar_readwrite_api.md) (the `want_unit` hook this note is measured against).
 Every behavioural claim in section 5 was produced by running the reference implementation
 built from this tree; the numbers are transcripts, not estimates.
 
@@ -19,8 +19,8 @@ Details the evaluation did not anticipate are recorded in sections 7.3 to 7.5, t
 found only by sweeping the whole unit registry against the implementation. Options 0, 2, 5 and 6
 were not built; the reasoning in sections 3.1, 3.6, 3.7 and 7.2 stands as written. Option 2 WAS
 built in the end — section 7.5 records what its "defer" verdict got wrong, and what it got right.
-The shipped API is documented in [Read/Write API 1.12](3_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy),
-the Python form in [Python Bindings 5.5](4_bovnar_python_bindings.md#55-unitpolicy--validation-and-conversion-without-a-callback),
+The shipped API is documented in [Read/Write API 1.12](08_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy),
+the Python form in [Python Bindings 5.5](09_bovnar_python_bindings.md#55-unitpolicy--validation-and-conversion-without-a-callback),
 and the CLI flags in the README. Section 3.2's claim that every non-C consumer gets the feature
 for free held: the Python binding is a dataclass and one setter, with no per-value trampoline.
 
@@ -810,10 +810,10 @@ builder.
 
 ## See also
 
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit registry and the notation grammar
-- [Read/Write API](3_bovnar_readwrite_api.md) — the `want_unit` hook and the read flags this note extends
-- [Unit Ambiguities](unit_ambiguities.md) — how a unit token is resolved, and the pairs that look interchangeable
-- [Streaming](9_bovnar_streaming.md) — why the reader holds no key context during a parse
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit registry and the notation grammar
+- [Read/Write API](08_bovnar_readwrite_api.md) — the `want_unit` hook and the read flags this note extends
+- [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — how a unit token is resolved, and the pairs that look interchangeable
+- [Streaming](10_bovnar_streaming.md) — why the reader holds no key context during a parse
 
 ---
 

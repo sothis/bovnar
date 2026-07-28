@@ -83,7 +83,7 @@
  * NOTE ON <family> IN THE LINES BELOW
  *   TYPE_ANN_START / TYPE_FAMILY / TYPE_ANN_END carry the WHOLE annotation body
  *   -- "float:64,m/s", not "float". They read as the bare family keyword only
- *   for an annotation the reader SYNTHESISED for an untyped value. doc/7 showed
+ *   for an annotation the reader SYNTHESISED for an untyped value. doc/13 showed
  *   the keyword form for an explicit annotation and was wrong; see the worked
  *   examples there, which check_conformance_doc.py now replays through this
  *   binary.

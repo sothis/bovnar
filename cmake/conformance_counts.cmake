@@ -1,11 +1,11 @@
-# Do the conformance case counts in doc/7 still match the suite?
+# Do the conformance case counts in doc/13 still match the suite?
 #
 # The documented total said 306 in six places while the suite ran 319, and a
 # whole group ("limits") was missing from the table. Numbers copied into prose
 # drift; this one had drifted already, so check it rather than fix it again.
 #
 # The suite prints a per-group TAP plan and a total, both of which are compared
-# against the table in doc/7_bovnar_conformance.md.
+# against the table in doc/13_bovnar_conformance.md.
 # The TAP stream goes to stdout, the summary line to stderr; look at both.
 #
 # Launch through CMAKE_CROSSCOMPILING_EMULATOR when there is one, the way
@@ -38,7 +38,7 @@ set(_documented ${CMAKE_MATCH_1})
 if(NOT _actual EQUAL _documented)
     message(FATAL_ERROR
         "conformance case count drifted: the suite runs ${_actual}, "
-        "doc/7_bovnar_conformance.md says ${_documented}.\n"
+        "doc/13_bovnar_conformance.md says ${_documented}.\n"
         "Update the per-group table and its Total row (and the counts quoted in "
         "README.md and web/index.html).")
 endif()
@@ -59,8 +59,8 @@ foreach(i RANGE ${_last})
     string(REPLACE "    1.." "" _p "${_p}")
     if(NOT _doc MATCHES "\\| \\`${_g}\\` \\| ${_p} \\|")
         message(FATAL_ERROR
-            "group '${_g}' runs ${_p} cases; doc/7's table does not say so "
+            "group '${_g}' runs ${_p} cases; doc/13's table does not say so "
             "(row missing, or a different count)")
     endif()
 endforeach()
-message(STATUS "conformance counts match doc/7 (${_actual} cases, ${_ngroups} groups)")
+message(STATUS "conformance counts match doc/13 (${_actual} cases, ${_ngroups} groups)")

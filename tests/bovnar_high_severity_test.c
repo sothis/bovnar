@@ -2726,7 +2726,7 @@ static void test_rb6_read_without_open_does_not_fault(void)
  * BYTE offset. A tool highlighting the error needs to know: in
  * `.x = "café"; .y = @;` the '@' is byte 20 but column 19, and unit symbols in
  * this format are routinely non-ASCII (µ~m, °C, Ω), so the two disagree often.
- * Now documented on the getters and in doc/3, so pinned here.
+ * Now documented on the getters and in doc/08, so pinned here.
  */
 static void test_rb7_error_position_counters(void)
 {

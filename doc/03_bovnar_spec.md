@@ -1360,7 +1360,7 @@ ev_data
 
 ### 11.1 Base Units
 
-The unit system supports **180 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/2_bovnar_unit_system.md`](2_bovnar_unit_system.md)**.
+The unit system supports **180 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/05_bovnar_unit_system.md`](05_bovnar_unit_system.md)**.
 
 **SI base units and digital units**
 
@@ -1421,7 +1421,7 @@ The unit system supports **180 named base units** across SI, IEC-binary, Imperia
 | `au` | astronomical unit | `bu_astronomical_unit` |
 | `ha` | hectare | `bu_hectare` |
 
-> For Imperial/US customary length (`in`, `ft`, `yd`, `mi`, `nmi`, `Å`, `ly`, `pc`, `fur`, `fath`, `ch`, `rd`, `thou`/`mil`), mass (`lb`, `oz`, `gr`, `st`, `tn_sh`, `tn_l`, `oz_t`, `ct`, `slug`, `dr`, `dwt`), temperature (`°F`, `Ra`), pressure (`atm`, `mmHg`, `Torr`, `psi`, `inHg`, `at`), energy (`cal`, `Btu`, `erg`, `thm`, `ft_lb`), power (`hp`, `PS`/`CV`), force (`lbf`, `dyn`, `kip`, `kgf`), speed/frequency/rotation (`kn`, `rpm`, `rev`), volume (US and UK gallons, pints, fluid ounces, and many more), area (`ac`, `barn`), angle (`arcmin`, `arcsec`, `grad`), CGS (`P`, `St`, `G`, `Mx`, `Oe`, `sb`, `ph`, `Gal`), radiation (`Ci`, `R`, `rem`), logarithmic (`Np`, `dB`), electrical power (`var`, `VA`), acceleration (`gn`), time (`mo`, `fn`), textile linear density (`tex`, `den`), and apothecary/dry volume (`fl_dr`, `minim`, `pk`, `bsh`) — see the [Unit System Reference](2_bovnar_unit_system.md).
+> For Imperial/US customary length (`in`, `ft`, `yd`, `mi`, `nmi`, `Å`, `ly`, `pc`, `fur`, `fath`, `ch`, `rd`, `thou`/`mil`), mass (`lb`, `oz`, `gr`, `st`, `tn_sh`, `tn_l`, `oz_t`, `ct`, `slug`, `dr`, `dwt`), temperature (`°F`, `Ra`), pressure (`atm`, `mmHg`, `Torr`, `psi`, `inHg`, `at`), energy (`cal`, `Btu`, `erg`, `thm`, `ft_lb`), power (`hp`, `PS`/`CV`), force (`lbf`, `dyn`, `kip`, `kgf`), speed/frequency/rotation (`kn`, `rpm`, `rev`), volume (US and UK gallons, pints, fluid ounces, and many more), area (`ac`, `barn`), angle (`arcmin`, `arcsec`, `grad`), CGS (`P`, `St`, `G`, `Mx`, `Oe`, `sb`, `ph`, `Gal`), radiation (`Ci`, `R`, `rem`), logarithmic (`Np`, `dB`), electrical power (`var`, `VA`), acceleration (`gn`), time (`mo`, `fn`), textile linear density (`tex`, `den`), and apothecary/dry volume (`fl_dr`, `minim`, `pk`, `bsh`) — see the [Unit System Reference](05_bovnar_unit_system.md).
 
 ### 11.2 SI Prefixes
 
@@ -1616,7 +1616,7 @@ One namespace is defined, `ucum` (Unified Code for Units of Measure):
 
 **Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
 
-The complete notation, the transliteration table, and the codes that have no representation are specified in [UCUM Unit Profile](10_bovnar_ucum_profile.md).
+The complete notation, the transliteration table, and the codes that have no representation are specified in [UCUM Unit Profile](11_bovnar_ucum_profile.md).
 
 ---
 
@@ -1701,7 +1701,7 @@ Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal defaul
 > must apply these four checks (`error_array_row_size_mismatch` for ragged
 > siblings, `error_array_element_type_mismatch`, `error_struct_shape_mismatch`,
 > `error_duplicate_struct_key`) in its document/tree API. See the conformance
-> tool's "Validation tiers" (§3 of `doc/7_bovnar_conformance.md`).
+> tool's "Validation tiers" (§3 of `doc/13_bovnar_conformance.md`).
 
 ### 12.6 Identifier Validation
 
@@ -1802,7 +1802,7 @@ If EOF is reached while in any resync state, `error_got_incomplete_bvnr_stream` 
 
 The complete grammar is maintained as a standalone file:
 
-**[`doc/5_bovnar.ebnf`](5_bovnar.ebnf)**
+**[`doc/12_bovnar.ebnf`](12_bovnar.ebnf)**
 
 The grammar uses ISO/IEC 14977:1996 notation and is derived from and verified against the reference implementation. It covers:
 
@@ -2896,12 +2896,12 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ## See also
 
-- [Tutorial](0_bovnar_tutorial.md) — the same format taught by example, start here if this is your first Bovnar document
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the full registry behind §11, with dimensions and conversion factors
-- [Read & Write API](3_bovnar_readwrite_api.md) — the C reader, writer, and DOM that implement §16
-- [EBNF Grammar](5_bovnar.ebnf) — the formal grammar referenced by §14
-- [FAQ](6_bovnar_faq.md) — the questions this document answers indirectly
-- [Conformance Test Tool](7_bovnar_conformance.md) — how an implementation proves it follows this specification
+- [Tutorial](01_bovnar_tutorial.md) — the same format taught by example, start here if this is your first Bovnar document
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the full registry behind §11, with dimensions and conversion factors
+- [Read & Write API](08_bovnar_readwrite_api.md) — the C reader, writer, and DOM that implement §16
+- [EBNF Grammar](12_bovnar.ebnf) — the formal grammar referenced by §14
+- [FAQ](02_bovnar_faq.md) — the questions this document answers indirectly
+- [Conformance Test Tool](13_bovnar_conformance.md) — how an implementation proves it follows this specification
 
 ---
 

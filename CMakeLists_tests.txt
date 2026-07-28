@@ -236,7 +236,7 @@ set_tests_properties(bvnr_datetime_test PROPERTIES
 #   Reads Bovnar text from stdin, emits the conformance event log to stdout.
 #   Used both for self-testing and as a template for third-party adapters.
 #
-# See doc/7_bovnar_conformance.md for the full protocol specification.
+# See doc/13_bovnar_conformance.md for the full protocol specification.
 
 add_executable(bvnr_conformance     tests/bvnr_conformance.c)
 add_executable(bvnr_conformance_iut tests/bvnr_conformance_iut.c)
@@ -1203,13 +1203,13 @@ add_test(
     COMMAND "${CMAKE_COMMAND}"
             -DCONFORMANCE=$<TARGET_FILE:bvnr_conformance>
             -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
-            -DDOCFILE=${CMAKE_CURRENT_SOURCE_DIR}/doc/7_bovnar_conformance.md
+            -DDOCFILE=${CMAKE_CURRENT_SOURCE_DIR}/doc/13_bovnar_conformance.md
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conformance_counts.cmake)
 set_tests_properties(bvnr_conformance_doc_counts PROPERTIES
     LABELS "conformance;docs" TIMEOUT 60)
 
-# ── doc/7's worked examples are what the adapter actually emits ──────────────
-# doc/7 tells a third-party implementor that conformance means output
+# ── doc/13's worked examples are what the adapter actually emits ──────────────
+# doc/13 tells a third-party implementor that conformance means output
 # "byte-for-byte identical to the reference", so its worked examples are what
 # somebody copies. Nothing checked them, and the suite structurally could not:
 # bvnr_conformance_iut_self compares the adapter's log against the reference's
@@ -1386,7 +1386,7 @@ endif()
 # link into thin air. That is not hypothetical: gen_html_docs rewrites an
 # inter-doc link to its HTML page, and a document with NO html page fell through
 # with the relative href its Markdown wrote, so three published pages pointed at
-# /docs/<page>/unit_ambiguities.md while the file served from /doc/. Every
+# /docs/<page>/07_bovnar_unit_ambiguities.md while the file served from /doc/. Every
 # generator was green throughout.
 #
 # The check also refuses a link to a path publish_web.sh excludes from the
@@ -1437,12 +1437,12 @@ endif()
 
 # ── A "§N.M" in a comment still points at a section that exists ─────────────
 # The code cites the documentation constantly -- a test says what it pins with
-# "doc/3 §1.11 promises …" -- and those citations are the only thread from a
+# "doc/08 §1.11 promises …" -- and those citations are the only thread from a
 # subtle test back to the sentence that made it a requirement. Renumbering
-# doc/3's function sections cut every one of them at once, and the whole suite
+# doc/08's function sections cut every one of them at once, and the whole suite
 # stayed green: bvnr_web_links checks the documents' links, not what the C says
 # about them. Two more had been wrong for longer -- "spec §501", never a section
-# number, and a quoted doc/2 heading the document does not contain.
+# number, and a quoted doc/05 heading the document does not contain.
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
     add_test(NAME bvnr_doc_refs
              COMMAND ${Python3_EXECUTABLE}

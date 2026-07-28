@@ -1455,7 +1455,7 @@ static const cf_case_t g_cases[] = {
 	      ".d = <float:64,m> 1.5 m;"),
 	/* Unit multiplication is commutative: an annotation unit and an inline
 	 * unit that list the same components in a different order denote the
-	 * same unit and must reconcile (spec doc/2_bovnar_unit_system.md). A
+	 * same unit and must reconcile (spec doc/05_bovnar_unit_system.md). A
 	 * positional comparison wrongly rejected these. */
 	VALID("UNT-011a", "units", "annotation vs inline unit reordered (m/s vs s^-1 m)",
 	      ".d = <float:64,m/s> 1.0 s⁻¹·m;"),
@@ -2169,7 +2169,7 @@ static void usage(const char *prog)
 	        "\n"
 	        "Options:\n"
 	        "  --iut <binary>   Path to the IUT binary to test (see protocol\n"
-	        "                   in doc/7_bovnar_conformance.md)\n"
+	        "                   in doc/13_bovnar_conformance.md)\n"
 	        "  --filter <group> Run only cases in the specified group\n"
 	        "                   Groups: encoding, identifiers, strings, numbers,\n"
 	        "                           types, default_synthesis, symbols,\n"

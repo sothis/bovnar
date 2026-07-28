@@ -349,7 +349,7 @@ def test_factor_matches_its_definition(symbol, factors):
 
 
 def test_the_faq_category_breakdown_adds_up():
-    """doc/6 answers "how many base units?" with a headline and then a list.
+    """doc/02 answers "how many base units?" with a headline and then a list.
 
     The headline was updated when units were added; the list was not, so it
     claimed 180 while its own categories summed to 163 — the seventeen water,
@@ -361,7 +361,7 @@ def test_the_faq_category_breakdown_adds_up():
     with open(os.path.join(_ROOT, "src", "gendata", "units.bvnr"),
               encoding="utf-8") as f:
         total = len(bvnr_data.load(f.read())["units"])
-    with open(os.path.join(_ROOT, "doc", "6_bovnar_faq.md"), encoding="utf-8") as f:
+    with open(os.path.join(_ROOT, "doc", "02_bovnar_faq.md"), encoding="utf-8") as f:
         faq = f.read()
     m = re.search(r"(\d+) named base units across the following categories:\n\n"
                   r"((?:- \*\*.*\n)+)", faq)
@@ -369,9 +369,9 @@ def test_the_faq_category_breakdown_adds_up():
     headline = int(m.group(1))
     counts = [int(n) for n in re.findall(r"^- \*\*(\d+) ", m.group(2), re.M)]
     assert headline == total, (
-        f"doc/6 says {headline} base units, units.bvnr has {total}")
+        f"doc/02 says {headline} base units, units.bvnr has {total}")
     assert sum(counts) == total, (
-        f"doc/6's category list sums to {sum(counts)}, but there are {total} "
+        f"doc/02's category list sums to {sum(counts)}, but there are {total} "
         f"units — a category is missing or miscounted")
 
 

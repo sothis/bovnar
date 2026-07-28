@@ -226,6 +226,7 @@
     "Tutorial": "Tutorial",
     "Practical introduction for developers. Get productive with Bovnar in minutes.": "Praxisnahe Einführung für Entwickler. In Minuten produktiv mit Bovnar.",
     "Start here": "Hier anfangen",
+    "Specification (v1.1)": "Spezifikation (v1.1)",
     "Full lexical and syntactic grammar, type system, arrays, structs, octet streams, and validation rules.": "Vollständige lexikalische und syntaktische Grammatik, Typsystem, Arrays, Strukturen, Octet-Streams und Validierungsregeln.",
     "Format authority": "Maßgeblich für das Format",
     "Unit &amp; Currency Reference": "Einheiten- &amp; Währungsreferenz",
@@ -244,6 +245,7 @@
     "Common questions on the format, type system, units, C API, Python bindings, and operational limits.": "Häufige Fragen zum Format, zum Typsystem, zu Einheiten, zur C-API, zur Python-Anbindung und zu den Grenzen im Betrieb.",
     "Common questions": "Häufige Fragen",
     "Conformance Test Tool": "Konformitäts-Testwerkzeug",
+    "387 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.": "387 Testfälle, IUT-Protokoll zur unabhängigen Überprüfung von Implementierungen, TAP-Ausgabe und CTest-Integration.",
     "Verification": "Überprüfung",
     "Units &amp; Currencies Cheat Sheet": "Einheiten- &amp; Währungs-Spickzettel",
     "All 180 physical units, 166 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.": "Alle 180 physikalischen Einheiten, 166 Fiat-Währungen und 50 Kryptowährungen. SI-/IEC-Präfixe, zusammengesetzte Ausdrücke und die Unterscheidung mehrdeutiger Symbole.",
@@ -286,6 +288,7 @@
     "<a href=\"https://github.com/sothis/bovnar/tree/main/highlighter/geany\" target=\"_blank\" rel=\"noopener\">Geany</a>": "<a href=\"https://github.com/sothis/bovnar/tree/main/highlighter/geany\" target=\"_blank\" rel=\"noopener\">Geany</a>",
     "Legal": "Rechtliches",
     "<a href=\"impressum.html\">Impressum</a>": "<a href=\"impressum.html\">Impressum</a>",
+    "<a href=\"privacy.html\">Privacy</a>": "<a href=\"privacy.html\">Datenschutz</a>",
     "<a href=\"https://github.com/sothis/bovnar/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">MIT License</a>": "<a href=\"https://github.com/sothis/bovnar/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">MIT-Lizenz</a>",
     "<a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY 4.0 (docs)</a>": "<a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY 4.0 (Doku)</a>",
     "<a href=\"https://creativecommons.org/publicdomain/zero/1.0/\" target=\"_blank\" rel=\"noopener\">CC0 1.0 (examples)</a>": "<a href=\"https://creativecommons.org/publicdomain/zero/1.0/\" target=\"_blank\" rel=\"noopener\">CC0 1.0 (Beispiele)</a>",
@@ -294,8 +297,9 @@
     "BOVNAR DOCS": "BOVNAR DOKU",
     "Fetching document…": "Dokument wird geladen…",
     "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Could not load document.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Open on GitHub ↗</a>": "<span style=\"color:var(--red);font-size:1.1rem;\">⚠</span>\n        <span id=\"doc-error-msg\">Dokument konnte nicht geladen werden.</span>\n        <a id=\"doc-error-link\" href=\"#\" target=\"_blank\" rel=\"noopener\">Auf GitHub öffnen ↗</a>",
-    "387 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.": "387 Testfälle, IUT-Protokoll zur unabhängigen Überprüfung von Implementierungen, TAP-Ausgabe und CTest-Integration.",
-    "Specification (v1.1)": "Spezifikation (v1.1)"
+    "This site can use Google Analytics to count visits. It stays off until you allow it — nothing is loaded from Google and no analytics identifier is stored before then. <a href=\"/privacy.html\">Privacy notice</a>": "Diese Website kann Google Analytics zur Reichweitenmessung einsetzen. Das bleibt deaktiviert, bis Sie zustimmen — vorher wird nichts von Google geladen und keine Analyse-Kennung gespeichert. <a href=\"/privacy.html\">Datenschutzerklärung</a>",
+    "Decline": "Ablehnen",
+    "Allow analytics": "Analyse erlauben"
   },
   "attrs": {
     "Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.": "Bovnar (BVNR) — einheitensichere Serialisierung für Wissenschaft und Industrie. Jede Messung trägt validierte physikalische Einheit, Bitbreite und Zahlenbasis direkt in sich, ganz ohne externes Schema. C99-Referenzimplementierung, MIT-lizenziert.",
@@ -322,6 +326,7 @@
     "unit": "Einheit",
     "Quick start language": "Sprache für den Schnellstart",
     "Tutorial": "Tutorial",
+    "Specification (v1.1)": "Spezifikation (v1.1)",
     "Unit &amp; Currency Reference": "Einheiten- &amp; Währungsreferenz",
     "Read &amp; Write API": "Lese- &amp; Schreib-API",
     "Python Bindings": "Python-Bindings",
@@ -335,7 +340,7 @@
     "Documentation": "Dokumentation",
     "Close documentation": "Dokumentation schließen",
     "Back to top": "Zurück nach oben",
-    "Specification (v1.1)": "Spezifikation (v1.1)"
+    "Analytics consent": "Einwilligung zur Reichweitenmessung"
   },
   "js": {
     "demo.blurb.fin": "<strong>Dasselbe Format, ein Trading-Desk.</strong> Die Börse serialisiert jeden Tick als <code>&lt;float_dec:64,$USD&gt;</code> — exaktes Dezimalgeld, Währung <em>inline</em> — und Chart und Hauptbuch arbeiten ausschließlich mit <em>dekodierten</em> Werten. Weil Kurse als Dezimalzahl reisen (nicht als Binär-Float), bleibt das Buch auf den Cent genau; beobachten Sie, wie das naive Float-Hauptbuch dagegen driftet.",

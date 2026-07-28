@@ -66,7 +66,7 @@ reading the grown by-value structs at the wrong size.
   `src/gendata/ucum.bvnr`; the
   specification, the transliteration table and the list of what has NO
   representation are in
-  [doc/10_bovnar_ucum_profile.md](doc/10_bovnar_ucum_profile.md).
+  [doc/11_bovnar_ucum_profile.md](doc/11_bovnar_ucum_profile.md).
 
   The lexer accepts five new bytes in a unit — `'`, `[`, `]`, `{`, `}` — which
   is the profile's one visible effect on a document that never uses it:
@@ -138,7 +138,7 @@ reading the grown by-value structs at the wrong size.
   terminating expansion in the output base (`42 km/h` is `35/3 m/s`) in its
   native unit, visible as `converted == false`, instead of aborting a document
   nobody had a complaint about. An irrational factor still aborts. See
-  read/write API §1.12, and `doc/parser_level_unit_policy.md` for the evaluation
+  read/write API §1.12, and `doc/06_bovnar_unit_policy.md` for the evaluation
   the design came from.
   **Per-field rules** name one field by the key path it sits at
   (`.inlet.temperature`, or `.inlet.*` for a subtree), and are consulted before

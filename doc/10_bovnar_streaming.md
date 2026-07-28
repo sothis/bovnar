@@ -6,7 +6,7 @@
 
 This document describes four capabilities layered **on top of** the Bovnar
 lexer/validator event API, *beside* the DOM. None of them change the frozen 1.0
-grammar or wire format (see the [Specification](1_bovnar_spec.md)); they are
+grammar or wire format (see the [Specification](03_bovnar_spec.md)); they are
 applications built on the SAX-style event pipe and the octet-stream value form.
 
 | # | Capability | Where it lives | Header |
@@ -308,7 +308,7 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 **`max_file_size`** only. Note it does **not** lift the framing/mux guards:
 for `max_document_size` and `max_message`, `0` selects their finite defaults
 (`BVNR_DOC_DEFAULT_MAX` / `BVNR_MUX_DEFAULT_MAX`), so pass an explicit large
-value there to raise them. See [Python Bindings](4_bovnar_python_bindings.md)
+value there to raise them. See [Python Bindings](09_bovnar_python_bindings.md)
 and `python/tests/test_stream.py`.
 
 ---
@@ -330,9 +330,9 @@ your own consumer/producer at the same seam without touching the core.
 
 ## See also
 
-- [Specification §9 — Octet Streams](1_bovnar_spec.md#9-octet-streams-binary-mode) — the binary substrate three of these four build on
-- [Read & Write API](3_bovnar_readwrite_api.md) — the underlying event interface
-- [Python Bindings](4_bovnar_python_bindings.md) — the `bovnar.stream` module described in §5
+- [Specification §9 — Octet Streams](03_bovnar_spec.md#9-octet-streams-binary-mode) — the binary substrate three of these four build on
+- [Read & Write API](08_bovnar_readwrite_api.md) — the underlying event interface
+- [Python Bindings](09_bovnar_python_bindings.md) — the `bovnar.stream` module described in §5
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
 - `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`

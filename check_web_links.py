@@ -5,8 +5,8 @@ check_web_links.py — every internal link in the published site resolves.
 The gap this closes: bvnr_html_docs verifies the generated pages are FRESH, not
 that their links go anywhere. gen_html_docs rewrites an inter-doc Markdown link
 to its HTML page via SRC_TO_SLUG, and a document with no HTML page fell through
-with the relative href the Markdown wrote — so "unit_ambiguities.md" on
-/docs/units/ resolved to /docs/units/unit_ambiguities.md and 404'd, on three
+with the relative href the Markdown wrote — so "07_bovnar_unit_ambiguities.md" on
+/docs/units/ resolved to /docs/units/07_bovnar_unit_ambiguities.md and 404'd, on three
 pages, while the file served fine one directory away at /doc/. Nothing in the
 suite noticed, because every page was perfectly up to date with its source.
 

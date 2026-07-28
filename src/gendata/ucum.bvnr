@@ -8,7 +8,7 @@
 #
 # WHAT IS IN HERE
 #   Three atom lists, one per outcome the profile can reach
-#   (doc/10_bovnar_ucum_profile.md section 3.1), plus UCUM's own prefix
+#   (doc/11_bovnar_ucum_profile.md section 3.1), plus UCUM's own prefix
 #   spellings.
 #
 #     .prefixes    UCUM prefix spelling -> decimal decade. UCUM's spellings, not
@@ -257,7 +257,7 @@
   # Digital and ratio. UCUM's "b" is the BARN and its "By" is the byte; bovnar's
   # native "b" is the bit and its "B" is the byte. The namespaces disagree on
   # three letters and the profile keeps them apart
-  # (doc/10_bovnar_ucum_profile.md 6.2).
+  # (doc/11_bovnar_ucum_profile.md 6.2).
   { .code = "bit";    .bovnar = "b";   .metric = true;  },
   { .code = "By";     .bovnar = "B";   .metric = true;  },
   { .code = "Bd";     .bovnar = "Bd";  .metric = true;  },

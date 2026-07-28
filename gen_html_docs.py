@@ -8,7 +8,7 @@ description, canonical URL, and heading structure. This generator produces one
 crawlable page per doc under web/docs/<slug>/index.html, plus a /docs/ index.
 
 Design notes:
-  * Inter-doc links (e.g. "6_bovnar_faq.md#foo") are rewritten to the HTML URL
+  * Inter-doc links (e.g. "02_bovnar_faq.md#foo") are rewritten to the HTML URL
     "/docs/faq/#foo".
   * Heading ids use a GitHub-style slugify so the docs' existing intra-page
     "#anchor" links resolve (the same slugs the raw Markdown assumes).
@@ -28,6 +28,11 @@ import subprocess
 import sys
 
 import markdown
+
+# The analytics tag and the CSP hosts that admit it live in gen_csp.py, next to
+# the policy machinery for the hand-written pages, so the site has one snippet
+# and one measurement ID rather than a copy per generator.
+import gen_csp
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -95,50 +100,54 @@ VERSION = "1.1"
 
 # source, clean URL slug, PDF slug, title, meta description.
 DOCS = [
-    ("0_bovnar_tutorial.md", "tutorial", "bovnar-tutorial",
+    ("01_bovnar_tutorial.md", "tutorial", "bovnar-tutorial",
      "Bovnar Tutorial",
      "A guided, example-driven introduction to reading and writing Bovnar (BVNR) "
      "documents — types, units, arrays, references, and the streaming API."),
-    ("1_bovnar_spec.md", "spec", "bovnar-specification",
-     "Bovnar Specification (v1.1)",
-     "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type "
-     "system, physical units, numeric bases, limits, and error semantics."),
-    ("2_bovnar_unit_system.md", "units", "bovnar-unit-system",
-     "Bovnar Unit & Currency System",
-     "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and "
-     "216 currencies with dimensions and exact conversion factors."),
-    ("3_bovnar_readwrite_api.md", "api", "bovnar-readwrite-api",
-     "Bovnar C Read & Write API",
-     "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), "
-     "including read-time lossless unit and base conversion."),
-    ("4_bovnar_python_bindings.md", "python", "bovnar-python-bindings",
-     "Bovnar Python Bindings",
-     "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the "
-     "DOM, Quantity, and the NumPy and Pint bridges."),
-    ("5_bovnar.ebnf", "grammar", "bovnar-grammar",
-     "Bovnar EBNF Grammar",
-     "The formal EBNF grammar of the Bovnar format, annotated against the reference "
-     "lexer and validator."),
-    ("6_bovnar_faq.md", "faq", "bovnar-faq",
+    ("02_bovnar_faq.md", "faq", "bovnar-faq",
      "Bovnar FAQ",
      "Frequently asked questions about Bovnar types, units, limits, encoding, and "
      "the C and Python APIs."),
-    ("7_bovnar_conformance.md", "conformance", "bovnar-conformance",
-     "Bovnar Conformance Testing",
-     "The Bovnar 387-case conformance test suite and the IUT protocol for validating "
-     "third-party implementations."),
-    ("8_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",
+    ("03_bovnar_spec.md", "spec", "bovnar-specification",
+     "Bovnar Specification (v1.1)",
+     "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type "
+     "system, physical units, numeric bases, limits, and error semantics."),
+    ("04_bovnar_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",
      "Bovnar Unit & Currency Cheat Sheet",
      "A one-page reference of every Bovnar unit symbol, SI/IEC prefix, and ISO 4217 "
      "and cryptocurrency code."),
-    ("9_bovnar_streaming.md", "streaming", "bovnar-streaming",
+    ("05_bovnar_unit_system.md", "units", "bovnar-unit-system",
+     "Bovnar Unit & Currency System",
+     "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and "
+     "216 currencies with dimensions and exact conversion factors."),
+    ("07_bovnar_unit_ambiguities.md", "ambiguities", "bovnar-unit-ambiguities",
+     "Bovnar Unit Ambiguities",
+     "Every Bovnar token that could plausibly mean two things — what the parser "
+     "reads it as, and how to write the other meaning."),
+    ("08_bovnar_readwrite_api.md", "api", "bovnar-readwrite-api",
+     "Bovnar C Read & Write API",
+     "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), "
+     "including read-time lossless unit and base conversion."),
+    ("09_bovnar_python_bindings.md", "python", "bovnar-python-bindings",
+     "Bovnar Python Bindings",
+     "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the "
+     "DOM, Quantity, and the NumPy and Pint bridges."),
+    ("10_bovnar_streaming.md", "streaming", "bovnar-streaming",
      "Bovnar Streaming, Framing & Multiplexing",
      "Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded "
      "documents for transport over sockets and files."),
-    ("10_bovnar_ucum_profile.md", "ucum", "bovnar-ucum-profile",
+    ("11_bovnar_ucum_profile.md", "ucum", "bovnar-ucum-profile",
      "Bovnar UCUM Unit Profile",
      "Writing UCUM codes in a Bovnar unit slot: the transliteration table, the "
      "collisions between the two namespaces, and what has no representation."),
+    ("12_bovnar.ebnf", "grammar", "bovnar-grammar",
+     "Bovnar EBNF Grammar",
+     "The formal EBNF grammar of the Bovnar format, annotated against the reference "
+     "lexer and validator."),
+    ("13_bovnar_conformance.md", "conformance", "bovnar-conformance",
+     "Bovnar Conformance Testing",
+     "The Bovnar 387-case conformance test suite and the IUT protocol for validating "
+     "third-party implementations."),
 ]
 
 # filename (and .ebnf) -> clean slug, for inter-doc link rewriting.
@@ -220,11 +229,11 @@ def rewrite_links(body):
     A document that has no HTML page of its own is still SERVED, as raw Markdown
     under /doc/ (web/doc is a symlink to doc/, and publish_web.sh excludes only
     the working files). Such a link has to become absolute: left as the relative
-    "unit_ambiguities.md" the Markdown source writes, it resolves against the
-    page's own directory — /docs/units/unit_ambiguities.md — and 404s. Three
+    "07_bovnar_unit_ambiguities.md" the Markdown source writes, it resolves against the
+    page's own directory — /docs/units/07_bovnar_unit_ambiguities.md — and 404s. Three
     published pages (units, cheatsheet, faq) linked to the ambiguity reference
-    that way, so every "see unit_ambiguities.md" on the live site was dead while
-    /doc/unit_ambiguities.md served fine.
+    that way, so every "see 07_bovnar_unit_ambiguities.md" on the live site was dead while
+    /doc/07_bovnar_unit_ambiguities.md served fine.
     """
     def repl(m):
         href = m.group(1)
@@ -350,8 +359,12 @@ def csp_for(scripts):
     """
     hashes = " ".join("'%s'" % _sha(js) for js in scripts)
     return ("default-src 'none'; "
-            f"script-src 'self' {hashes}; "
-            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+            f"script-src 'self' {gen_csp.GA_SCRIPT_SRC} {hashes}; "
+            "style-src 'self' 'unsafe-inline'; "
+            f"img-src 'self' data: {gen_csp.GA_IMG_SRC}; font-src 'self'; "
+            # These pages fetch nothing of their own; connect-src exists purely
+            # so the analytics beacon is not blocked by default-src 'none'.
+            f"connect-src {gen_csp.GA_CONNECT_SRC}; "
             "base-uri 'none'; form-action 'none'")
 
 THEME_TOGGLE_BTN = (
@@ -414,7 +427,8 @@ FOOTER = (
     '<footer>Bovnar (BVNR) v' + VERSION +
     ' · <a href="/">Home</a> · <a href="/docs/">All docs</a> · '
     '<a href="https://github.com/sothis/bovnar">Source</a> · '
-    '<a href="/impressum.html">Impressum</a> · MIT-licensed'
+    '<a href="/impressum.html">Impressum</a> · '
+    '<a href="/privacy.html">Privacy</a> · MIT-licensed'
     '</footer>')
 
 
@@ -430,7 +444,8 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
     bvnr_hl = ""
     has_hl = 'class="language-bovnar"' in body
     # exactly the inline scripts this page emits, in no particular order
-    page_csp = csp_for([THEME_INIT_JS, THEME_TOGGLE_JS, BACK_TOP_JS]
+    page_csp = csp_for([THEME_INIT_JS, THEME_TOGGLE_JS, BACK_TOP_JS,
+                        gen_csp.CONSENT_JS]
                        + ([BOVNAR_HL_JS] if has_hl else []))
     if has_hl:
         bvnr_hl = (f'<script src="/bovnar_highlight.js'
@@ -477,6 +492,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 {BACK_TOP_BTN}
 {bvnr_hl}<script>{THEME_TOGGLE_JS}</script>
 <script>{BACK_TOP_JS}</script>
+{gen_csp.consent_banner("en")}
 </body>
 </html>
 """
@@ -606,7 +622,7 @@ def build_index_page():
 
 # A doc source that has lost its content still renders — as an empty page that
 # --check then happily calls "current", because the generated file matches the
-# source it was generated from. That is how doc/4 shipped empty for one commit:
+# source it was generated from. That is how doc/09 shipped empty for one commit:
 # a tool truncated it, the page regenerated to match, and every gate agreed.
 # Nothing downstream can catch this, so catch it here, at the only point that
 # sees the source.

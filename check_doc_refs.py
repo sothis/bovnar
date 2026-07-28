@@ -3,25 +3,25 @@
 check_doc_refs.py — every "§N.M" a comment cites points at a section that exists.
 
 The code cites the documentation constantly: a test explains what it pins with
-"doc/3 §1.11 promises …", a header points at "the spec, §\"Version directive\"".
+"doc/08 §1.11 promises …", a header points at "the spec, §\"Version directive\"".
 Those citations are the only thing tying a subtle test back to the sentence that
 made it a requirement, and nothing checked them — so they rot in two directions.
 
-Renumbering rots them wholesale. doc/3 numbered its function sections 1-25
+Renumbering rots them wholesale. doc/08 numbered its function sections 1-25
 straight through, was renumbered to N.M, and every "§7c" in the test suite
 quietly began pointing at nothing; the documents' own links were all verified,
 which is exactly why it went unnoticed. And they rot one at a time: a comment
-cited "spec §501", which was never a section number, and another quoted a doc/2
+cited "spec §501", which was never a section number, and another quoted a doc/05
 heading — "An affine unit is valid at exponent 1 only" — that the document does
 not contain, in either case describing a rule that is really there under a
 number the reader cannot follow.
 
 What a citation may look like, and how the target document is resolved:
 
-    spec §7.4                 -> doc/1          (also "specification")
-    doc/3 §1.11               -> doc/3          (a "doc/N" anywhere before it)
-    read/write API §1.10      -> doc/3          (a name cue -- see CUES)
-    §11 of [Unit Ambiguities] -> unit_ambiguities.md  (a cue right after it)
+    spec §7.4                 -> doc/03          (also "specification")
+    doc/08 §1.11               -> doc/08          (a "doc/N" anywhere before it)
+    read/write API §1.10      -> doc/08          (a name cue -- see CUES)
+    §11 of [Unit Ambiguities] -> 07_bovnar_unit_ambiguities.md  (a cue right after it)
     §13.2                     -> the spec, from source; from inside doc/X, that
                                  same document -- which is what every bare "§"
                                  in the tree means today, and now the rule.
@@ -47,7 +47,7 @@ SEARCH_DIRS = ["include", "src", "python", "tests", "wasm", "examples",
 SUFFIXES = (".c", ".h", ".py", ".sh", ".cmake", ".mjs", ".js", ".md", ".txt")
 SKIP_DIRS = {"build", "__pycache__", ".git", ".pytest_cache", "node_modules"}
 
-SPEC = "1_bovnar_spec.md"
+SPEC = "03_bovnar_spec.md"
 
 # Name cues. Only phrases that can mean nothing but a document: "streaming",
 # "conformance" and "FAQ" read as ordinary English in this tree and hijacked
@@ -55,16 +55,16 @@ SPEC = "1_bovnar_spec.md"
 # also lives inside "inspection", which is how a citation two words away from
 # "partial inspection" resolved to the specification.
 CUES = [
-    (r"read\s*[/&]\s*write\s+api", "3_bovnar_readwrite_api.md"),
-    (r"unit[- ]system\s+reference", "2_bovnar_unit_system.md"),
-    (r"unit\s*&\s*currency\s+reference", "2_bovnar_unit_system.md"),
-    (r"unit[_ ]ambiguities", "unit_ambiguities.md"),
-    (r"cheat\s*sheet", "8_unit_cheatsheet.md"),
+    (r"read\s*[/&]\s*write\s+api", "08_bovnar_readwrite_api.md"),
+    (r"unit[- ]system\s+reference", "05_bovnar_unit_system.md"),
+    (r"unit\s*&\s*currency\s+reference", "05_bovnar_unit_system.md"),
+    (r"unit[_ ]ambiguities", "07_bovnar_unit_ambiguities.md"),
+    (r"cheat\s*sheet", "04_bovnar_unit_cheatsheet.md"),
     (r"\bspecifications?\b", SPEC),
     (r"\bspec\b", SPEC),
 ]
-# A markdown link into the doc set, "…](3_bovnar_readwrite_api.md#…)".
-LINK = re.compile(r"\]\((?:doc/)?((?:\d_[\w]+|unit_ambiguities|datetime_[\w]+)\.md)")
+# A markdown link into the doc set, "…](08_bovnar_readwrite_api.md#…)".
+LINK = re.compile(r"\]\((?:doc/)?((?:\d+_[\w]+|datetime_[\w]+)\.md)")
 
 # A "§" belonging to somebody else's document. Nothing in doc/ is numbered like
 # these, so without the skip they would all read as dead citations into the spec.
@@ -72,7 +72,7 @@ EXTERNAL = re.compile(
     r"\b(IEEE|ISO|IEC|RFC|BIPM|SI Brochure|Unicode|POSIX|CommonMark|W3C|ECMA|"
     r"UTS|UAX|ITU|ANSI)\b", re.I)
 
-DOCN = re.compile(r"doc/(\d)(?:_[\w.]+)?")
+DOCN = re.compile(r"doc/(\d+)(?:_[\w.]+)?")
 # "§5.3", "§7c", "§A.1", or §"a quoted section name"
 REF = re.compile(r"§\s?(?:\"([^\"]{2,60})\"|([0-9]+(?:\.[0-9]+)*[a-z]?|[A-Z]\.[0-9]+))")
 
@@ -130,7 +130,7 @@ def _cue_doc(window):
 def resolve_doc(text, start, end, default):
     """Which document a citation at [start:end) is talking about.
 
-    In order: the link it is written inside ("[FAQ §13 — …](6_bovnar_faq.md)"),
+    In order: the link it is written inside ("[FAQ §13 — …](02_bovnar_faq.md)"),
     the document named right after it ("§11 of the unit-system reference"), the
     nearest document named before it, and otherwise the default -- the spec from
     source, the containing document from inside doc/."""

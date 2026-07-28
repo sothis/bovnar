@@ -2,7 +2,7 @@
 
 **Unit-safe serialization for scientific and industrial systems — with a C99 reference implementation.**
 
-[![Spec version](https://img.shields.io/badge/spec-1.1-blue)](doc/1_bovnar_spec.md)
+[![Spec version](https://img.shields.io/badge/spec-1.1-blue)](doc/03_bovnar_spec.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
 [![Website](https://img.shields.io/badge/web-bovnar.io-blue)](https://www.bovnar.io)
@@ -216,7 +216,7 @@ ucum:B[SPL]  →  error_unit_profile_unsupported valid UCUM, no representation h
 cf:m         →  error_unit_profile_unknown    no such profile
 ```
 
-Full specification, the transliteration table, the collisions between the two namespaces (`st` is the stone natively and the stere in UCUM), and an explicit list of what does *not* map: [doc/10_bovnar_ucum_profile.md](doc/10_bovnar_ucum_profile.md).
+Full specification, the transliteration table, the collisions between the two namespaces (`st` is the stone natively and the stere in UCUM), and an explicit list of what does *not* map: [doc/11_bovnar_ucum_profile.md](doc/11_bovnar_ucum_profile.md).
 
 ---
 
@@ -272,17 +272,19 @@ bovnar/
 │   ├── bovnar_parser_wasm.js # JS wrapper exposing the WASM parser
 │   └── bovnar_wasm_core.js   # C reference parser compiled to WASM
 ├── doc/
-│   ├── 0_bovnar_tutorial.md
-│   ├── 1_bovnar_spec.md            # Format specification (v1.1)
-│   ├── 2_bovnar_unit_system.md
-│   ├── 3_bovnar_readwrite_api.md
-│   ├── 4_bovnar_python_bindings.md
-│   ├── 5_bovnar.ebnf               # Formal EBNF grammar
-│   ├── 6_bovnar_faq.md             # Frequently asked questions
-│   ├── 7_bovnar_conformance.md     # Conformance test tool and IUT protocol
-│   ├── 8_unit_cheatsheet.md        # Units & currencies quick reference
-│   ├── unit_ambiguities.md        # Which spelling means what, and why
-│   └── 9_bovnar_streaming.md       # Streaming, framing & multiplexing
+│   ├── 01_bovnar_tutorial.md
+│   ├── 02_bovnar_faq.md               # Frequently asked questions
+│   ├── 03_bovnar_spec.md              # Format specification (v1.1)
+│   ├── 04_bovnar_unit_cheatsheet.md   # Units & currencies quick reference
+│   ├── 05_bovnar_unit_system.md
+│   ├── 06_bovnar_unit_policy.md       # Design note — not part of the public site
+│   ├── 07_bovnar_unit_ambiguities.md  # Which spelling means what, and why
+│   ├── 08_bovnar_readwrite_api.md
+│   ├── 09_bovnar_python_bindings.md
+│   ├── 10_bovnar_streaming.md         # Streaming, framing & multiplexing
+│   ├── 11_bovnar_ucum_profile.md      # UCUM codes in a Bovnar unit slot
+│   ├── 12_bovnar.ebnf                 # Formal EBNF grammar
+│   └── 13_bovnar_conformance.md       # Conformance test tool and IUT protocol
 ├── CMakeLists.txt
 └── CMakeLists_tests.txt
 ```
@@ -589,7 +591,7 @@ int main(void)
 }
 ```
 
-See [doc/3_bovnar_readwrite_api.md](doc/3_bovnar_readwrite_api.md) for the complete API reference, including the low-level `bvnr_write_event` interface and the full set of typed write helpers (`bvnr_write_uint`, `bvnr_write_sint`, `bvnr_write_float_unit`, etc.).
+See [doc/08_bovnar_readwrite_api.md](doc/08_bovnar_readwrite_api.md) for the complete API reference, including the low-level `bvnr_write_event` interface and the full set of typed write helpers (`bvnr_write_uint`, `bvnr_write_sint`, `bvnr_write_float_unit`, etc.).
 
 ---
 
@@ -641,7 +643,7 @@ Reader().read_mem(b".velocity = <float:64,m/s> 9.81;", on_verified=on_event)
 
 Beyond `loads`/`dumps`, the package provides `dom_parse()` for random-access tree traversal, `loads(..., typed=True)` to preserve each value's exact type and unit as `Quantity` objects for lossless round-trips, and a `currency` module mirroring the C currency API.
 
-See [doc/4_bovnar_python_bindings.md](doc/4_bovnar_python_bindings.md) for the full API.
+See [doc/09_bovnar_python_bindings.md](doc/09_bovnar_python_bindings.md) for the full API.
 
 ---
 
@@ -717,17 +719,18 @@ cd web && ./httpd.sh          # python3 -m http.server
 
 | Document | Description |
 |---|---|
-| [Specification (v1.1)](doc/1_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
-| [Tutorial](doc/0_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
-| [Unit & Currency Reference](doc/2_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
-| [Read & Write API](doc/3_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
-| [Python Bindings](doc/4_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
-| [Formal EBNF](doc/5_bovnar.ebnf) | Machine-readable grammar. |
-| [FAQ](doc/6_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Conformance Test Tool](doc/7_bovnar_conformance.md) | Conformance suite (387 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
-| [Units & Currencies Cheat Sheet](doc/8_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
-| [Unit Ambiguities](doc/unit_ambiguities.md) | Every token that could mean two things — what the parser reads it as, and how to write the other meaning. Case traps, look-alike characters, same-dimension quantities, and abbreviations that are deliberately not units. |
-| [Streaming, Framing & Multiplexing](doc/9_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
+| [Tutorial](doc/01_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
+| [FAQ](doc/02_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
+| [Specification (v1.1)](doc/03_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
+| [Units & Currencies Cheat Sheet](doc/04_bovnar_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
+| [Unit & Currency Reference](doc/05_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
+| [Unit Ambiguities](doc/07_bovnar_unit_ambiguities.md) | Every token that could mean two things — what the parser reads it as, and how to write the other meaning. Case traps, look-alike characters, same-dimension quantities, and abbreviations that are deliberately not units. |
+| [Read & Write API](doc/08_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
+| [Python Bindings](doc/09_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
+| [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
+| [UCUM Unit Profile](doc/11_bovnar_ucum_profile.md) | Writing UCUM codes in a Bovnar unit slot: the transliteration table, the collisions between the two namespaces, and what has no representation. |
+| [Formal EBNF](doc/12_bovnar.ebnf) | Machine-readable grammar. |
+| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (387 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
 

@@ -36,17 +36,18 @@ VERSION = "1.1"
 
 # source filename -> (output slug, short label used in the footer/header)
 DOCS = [
-    ("0_bovnar_tutorial.md",        "bovnar-tutorial",         "Tutorial"),
-    ("1_bovnar_spec.md",            "bovnar-specification",    "Specification"),
-    ("2_bovnar_unit_system.md",     "bovnar-unit-system",      "Unit & Currency Reference"),
-    ("3_bovnar_readwrite_api.md",   "bovnar-readwrite-api",    "Read & Write API"),
-    ("4_bovnar_python_bindings.md", "bovnar-python-bindings",  "Python Bindings"),
-    ("5_bovnar.ebnf",               "bovnar-grammar",          "EBNF Grammar"),
-    ("6_bovnar_faq.md",             "bovnar-faq",              "FAQ"),
-    ("7_bovnar_conformance.md",     "bovnar-conformance",      "Conformance Test Tool"),
-    ("8_unit_cheatsheet.md",        "bovnar-cheatsheet",       "Units & Currencies Cheat Sheet"),
-    ("9_bovnar_streaming.md",       "bovnar-streaming",        "Streaming, Framing & Multiplexing"),
-    ("10_bovnar_ucum_profile.md",   "bovnar-ucum-profile",     "UCUM Unit Profile"),
+    ("01_bovnar_tutorial.md",        "bovnar-tutorial",         "Tutorial"),
+    ("02_bovnar_faq.md",             "bovnar-faq",              "FAQ"),
+    ("03_bovnar_spec.md",            "bovnar-specification",    "Specification"),
+    ("04_bovnar_unit_cheatsheet.md", "bovnar-cheatsheet",       "Units & Currencies Cheat Sheet"),
+    ("05_bovnar_unit_system.md",     "bovnar-unit-system",      "Unit & Currency Reference"),
+    ("07_bovnar_unit_ambiguities.md","bovnar-unit-ambiguities", "Unit Ambiguities"),
+    ("08_bovnar_readwrite_api.md",   "bovnar-readwrite-api",    "Read & Write API"),
+    ("09_bovnar_python_bindings.md", "bovnar-python-bindings",  "Python Bindings"),
+    ("10_bovnar_streaming.md",       "bovnar-streaming",        "Streaming, Framing & Multiplexing"),
+    ("11_bovnar_ucum_profile.md",   "bovnar-ucum-profile",     "UCUM Unit Profile"),
+    ("12_bovnar.ebnf",               "bovnar-grammar",          "EBNF Grammar"),
+    ("13_bovnar_conformance.md",     "bovnar-conformance",      "Conformance Test Tool"),
 ]
 
 PYGMENTS_CSS = HtmlFormatter(style="default").get_style_defs(".codehilite")

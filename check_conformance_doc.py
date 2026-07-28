@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-check_conformance_doc.py — doc/7's worked examples must be what the adapter emits.
+check_conformance_doc.py — doc/13's worked examples must be what the adapter emits.
 
-doc/7 is the specification a third-party implementor works from: it states that
+doc/13 is the specification a third-party implementor works from: it states that
 an implementation is conformant when its IUT adapter produces output
 "byte-for-byte identical to the reference for every test case". The worked
 examples are therefore normative in practice — they are what somebody copies.
@@ -35,7 +35,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DOC = os.path.join(ROOT, "doc", "7_bovnar_conformance.md")
+DOC = os.path.join(ROOT, "doc", "13_bovnar_conformance.md")
 
 # "**Input:** `<src>`" + optional prose to end of line, blank line, fenced block.
 _EXAMPLE_RE = re.compile(
@@ -66,7 +66,7 @@ def main():
         text = f.read()
     cases = list(examples(text))
     if not cases:
-        print("check_conformance_doc.py: no worked examples found in doc/7 — the "
+        print("check_conformance_doc.py: no worked examples found in doc/13 — the "
               "format changed and this check would pass vacuously", file=sys.stderr)
         return 1
     bad = 0
@@ -78,7 +78,7 @@ def main():
         if got_lines == want_lines:
             continue
         bad += 1
-        print("check_conformance_doc.py: doc/7 example does not match the adapter"
+        print("check_conformance_doc.py: doc/13 example does not match the adapter"
               "\n  input: %s" % label, file=sys.stderr)
         for i in range(max(len(want_lines), len(got_lines))):
             a = want_lines[i] if i < len(want_lines) else "(absent)"
@@ -89,7 +89,7 @@ def main():
         print("check_conformance_doc.py: %d of %d worked example(s) wrong"
               % (bad, len(cases)), file=sys.stderr)
         return 1
-    print("check_conformance_doc.py: all %d worked examples in doc/7 match the "
+    print("check_conformance_doc.py: all %d worked examples in doc/13 match the "
           "reference adapter byte for byte" % len(cases))
     return 0
 

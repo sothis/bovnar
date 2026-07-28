@@ -5,8 +5,8 @@
 > **Scope:** How an ISO-8601 fractional second is preserved beside a whole-second carrier.
 
 As-built reference for the ISO-8601 fractional-second feature. The published
-behaviour lives in the [Specification §5 — Type Annotations](1_bovnar_spec.md#5-type-annotations)
-and the [FAQ §3 — Type System and Annotations](6_bovnar_faq.md#3-type-system-and-annotations);
+behaviour lives in the [Specification §5 — Type Annotations](03_bovnar_spec.md#5-type-annotations)
+and the [FAQ §3 — Type System and Annotations](02_bovnar_faq.md#3-type-system-and-annotations);
 this note is for maintainers: the design decision, the data flow, the invariants,
 and the non-obvious gotchas that bit during development.
 
@@ -135,7 +135,7 @@ fraction for programmatic access); it has no re-serialiser of its own.
   drops the fraction. With `typed=True` the `Quantity` preserves the verbatim
   fraction and re-emits it, so `loads(typed=True)`→`dumps` round-trips it
   losslessly; the DOM accessor and the streaming reader expose it explicitly.
-  (Documented in `4_bovnar_python_bindings.md`.)
+  (Documented in `09_bovnar_python_bindings.md`.)
 - **The atomic GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) never carry a
   fraction** — they reject ISO literals at read time (no round-trippable
   civil⇄seconds inverse). `bvn_ser_datetime_to_civil` also refuses to
@@ -168,10 +168,10 @@ fraction for programmatic access); it has no re-serialiser of its own.
 
 ## See also
 
-- [Specification](1_bovnar_spec.md) — the normative `datetime` family and its epochs
-- [FAQ §3 — Type System and Annotations](6_bovnar_faq.md#3-type-system-and-annotations) — the published answer on datetimes
-- [Read & Write API](3_bovnar_readwrite_api.md) — `bvnr_data_t.frac_data` on the read path
-- [Python Bindings](4_bovnar_python_bindings.md) — how the fraction surfaces in Python
+- [Specification](03_bovnar_spec.md) — the normative `datetime` family and its epochs
+- [FAQ §3 — Type System and Annotations](02_bovnar_faq.md#3-type-system-and-annotations) — the published answer on datetimes
+- [Read & Write API](08_bovnar_readwrite_api.md) — `bvnr_data_t.frac_data` on the read path
+- [Python Bindings](09_bovnar_python_bindings.md) — how the fraction surfaces in Python
 
 ---
 

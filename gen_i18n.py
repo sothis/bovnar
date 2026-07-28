@@ -608,6 +608,18 @@ def localize_document(doc: str, lang: str, table: dict) -> str:
     # The Markdown alternate points at this edition's own Markdown page.
     doc = once(r'(<link rel="alternate" type="text/markdown" href=")/index\.md(")',
                rf'\g<1>/{lang}/index.md\g<2>', doc, "markdown alternate")
+    # The privacy notice exists per language, and href is not a translatable
+    # attribute -- so the consent banner's link is localised here instead. A
+    # German banner pointing at the English notice would be the one link on the
+    # page where the language actually carries legal weight.
+    # Two forms reach here: the banner's root-absolute "/privacy.html" (which
+    # the ../ rewrite above deliberately skips) and the footer's relative link,
+    # by now "../privacy.html".
+    if lang == "de":
+        doc = once(r'(<a href=")/privacy\.html(">)',
+                   r"\g<1>/datenschutz.html\g<2>", doc, "privacy notice link")
+        doc = once(r'(<a href=")\.\./privacy\.html(">)',
+                   r"\g<1>../datenschutz.html\g<2>", doc, "privacy footer link")
     # The structured-data graph is inside a <script>, so it is not a translation
     # unit and rode across verbatim -- leaving the German edition telling every
     # crawler "inLanguage": "en" about the page it had just been served.

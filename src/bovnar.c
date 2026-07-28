@@ -3033,7 +3033,7 @@ static int cmd_bench(int argc, char **argv)
  * ---------------------------------------------------------------------------
  * Thin CLI drivers over the bovnar_stream layer so the multi-document framing
  * and octet-multiplexing conventions can be produced and consumed from the
- * shell. See doc/9_bovnar_streaming.md for the wire conventions.
+ * shell. See doc/10_bovnar_streaming.md for the wire conventions.
  */
 
 /* Read everything available on `fd` into a freshly malloc'd buffer. Does not
@@ -3240,7 +3240,7 @@ static int cmd_mux_list(const char *path)
 	int fd = is_stdin ? STDIN_FILENO : open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return 1; }
 	bvnr_demux_t *dm = bvnr_demux_create(mux_print_msg, NULL, 0);
-	/* `mux pack` writes under the key "mux" and doc/9_bovnar_streaming.md tells
+	/* `mux pack` writes under the key "mux" and doc/10_bovnar_streaming.md tells
 	 * callers to set the same filter. Without it every octet stream in the
 	 * document is demuxed, so an ordinary binary payload is misread as framing
 	 * and printed as garbage channels. */

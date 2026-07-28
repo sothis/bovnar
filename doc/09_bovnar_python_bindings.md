@@ -270,7 +270,7 @@ output: bytes = w.get_output()
 ### 4.6 Streaming / framing (`bovnar.stream`)
 
 Bindings for the streaming layer (see
-[Streaming, Framing & Multiplexing](9_bovnar_streaming.md) for the full
+[Streaming, Framing & Multiplexing](10_bovnar_streaming.md) for the full
 treatment):
 
 ```python
@@ -340,7 +340,7 @@ In a **document** the notation additionally requires a `#!bovnar 1.2` directive;
 without it `loads` raises with `unit_illegal`. `parse_unit` has no document and
 therefore no declared version, so it accepts the notation unconditionally.
 
-See [UCUM Unit Profile](10_bovnar_ucum_profile.md) for the transliteration table
+See [UCUM Unit Profile](11_bovnar_ucum_profile.md) for the transliteration table
 and the codes that have no representation.
 
 ### 5.2 Extended unit functions
@@ -1590,11 +1590,11 @@ unversioned document is treated as 1.0) are exposed as:
 
 ## See also
 
-- [Read & Write API](3_bovnar_readwrite_api.md) — the C reader, writer, and DOM these bindings wrap
-- [Specification](1_bovnar_spec.md) — the format the package reads and writes
-- [Unit & Currency Reference](2_bovnar_unit_system.md) — the unit model behind `Quantity` and the bridges
-- [Tutorial](0_bovnar_tutorial.md) — the document syntax, by example
-- [FAQ §13 — Python Bindings](6_bovnar_faq.md#13-python-bindings) — common questions about this package
+- [Read & Write API](08_bovnar_readwrite_api.md) — the C reader, writer, and DOM these bindings wrap
+- [Specification](03_bovnar_spec.md) — the format the package reads and writes
+- [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit model behind `Quantity` and the bridges
+- [Tutorial](01_bovnar_tutorial.md) — the document syntax, by example
+- [FAQ §13 — Python Bindings](02_bovnar_faq.md#13-python-bindings) — common questions about this package
 
 ---
 

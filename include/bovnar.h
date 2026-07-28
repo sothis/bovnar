@@ -1021,7 +1021,7 @@ BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsiz
 BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
 BVN_API bool         bvn_unit_valid(value_unit_t u);
-/* The UCUM unit profile (doc/10_bovnar_ucum_profile.md). UNRELEASED --
+/* The UCUM unit profile (doc/11_bovnar_ucum_profile.md). UNRELEASED --
  * see that document's status line.
  *
  * bvn_unit_error_code says WHY a unit string bvn_parse_unit rejected is not a

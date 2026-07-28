@@ -55,7 +55,7 @@ DOCS = [
     ("12_bovnar.ebnf",            "EBNF grammar",
      "The formal grammar, annotated against the reference lexer/validator."),
     ("13_bovnar_conformance.md",  "Conformance",
-     "The 387-case conformance suite and the IUT protocol for third-party implementations."),
+     "The 411-case conformance suite and the IUT protocol for third-party implementations."),
 ]
 
 # External project resources for the llms.txt "Project" section.
@@ -203,7 +203,7 @@ def build_index_md_de(sections):
             ("python", "Python-Bindings", "Das reine ctypes-Python-Paket."),
             ("grammar", "EBNF-Grammatik", "Die formale Grammatik, kommentiert gegen die Referenzimplementierung."),
             ("faq", "FAQ", "Häufige Fragen zu Typen, Einheiten, Limits und der API."),
-            ("conformance", "Konformität", "Die 387-Fall-Konformitätssuite und das IUT-Protokoll."),
+            ("conformance", "Konformität", "Die 411-Fall-Konformitätssuite und das IUT-Protokoll."),
             ("cheatsheet", "Einheiten- & Währungs-Spickzettel", "Alle Einheitensymbole, Präfixe und Währungscodes."),
             ("streaming", "Streaming & Framing", "Oktett-Streams, Frames, Multiplexing und eingebettete Dokumente."),
         ])

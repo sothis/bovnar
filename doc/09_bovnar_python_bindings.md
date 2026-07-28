@@ -25,7 +25,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [The UCUM notation (under implementation)](#51-the-ucum-notation-under-implementation)
+    - 5.1 [The unit-profile notations (under implementation)](#51-the-unit-profile-notations-under-implementation)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
     - 5.3 [`UnitFlags`](#53-unitflags)
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
@@ -329,11 +329,12 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 The UCUM notation (under implementation)
+### 5.1 The unit-profile notations (under implementation)
 
-**This notation is under implementation**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
+**These notations are under implementation**: they are not part of a published specification and the version they will ship under is not settled. `parse_unit` takes a profile notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
-result unchanged. Three helpers cover what a caller needs around it:
+result unchanged. Five namespaces are accepted: `ucum:`, `unece:`, `qudt:`,
+`qudt-qk:` and `udunits:`. Four helpers cover what a caller needs around them:
 
 ```python
 import bovnar
@@ -343,23 +344,43 @@ bovnar.unit_to_str(vu)              # → "mmHg"   — the native canonical form
 bovnar.unit_to_ucum(vu)             # → "mm[Hg]" — back to a UCUM code
 bovnar.units_compatible(vu, bovnar.parse_unit("k~Pa"))   # → True
 
+# The same unit, five ways — all one ValueUnit
+kg = bovnar.parse_unit("k~g")
+bovnar.unit_to_profile("ucum",    kg)   # → "kg"
+bovnar.unit_to_profile("unece",   kg)   # → "KGM"
+bovnar.unit_to_profile("qudt",    kg)   # → "KiloGM"
+bovnar.unit_to_profile("udunits", kg)   # → "kg"
+
 iu = bovnar.parse_unit("ucum:[IU]/mL")
 bovnar.unit_is_profile_only(iu)     # → True  — no native spelling exists
 bovnar.unit_to_str(iu)              # → "ucum:[IU].mL-1"
 
+box = bovnar.parse_unit("unece:XBX")
+bovnar.unit_is_profile_only(box)    # → True  — a countable package
+bovnar.unit_to_str(box)             # → "unece:XBX" — in its OWN namespace
+
 bovnar.unit_error_code("ucum:B[SPL]")   # → 50 (ErrorCode.UNIT_PROFILE_UNSUPPORTED)
+bovnar.unit_error_code("udunits:days since 1970-01-01")
+                                        # → 50 — valid UDUNITS, not carryable
+bovnar.unit_error_code("nosuch:m")      # → 49 (ErrorCode.UNIT_PROFILE_UNKNOWN)
 bovnar.unit_error_code("m/s")           # → 0  (ErrorCode.NONE — it parses)
 ```
 
-`unit_to_ucum` raises for a unit with no UCUM code, which is every native unit
-outside the transliteration table — the Old German units, the water-hardness
-degrees, the turbidity kinds and every currency.
+`unit_to_profile` and `unit_to_ucum` raise rather than inventing a code, in three
+situations. A native unit outside that vocabulary's transliteration table has no
+form in it — the Old German units, the water-hardness degrees, the turbidity
+kinds and every currency. An opaque unit belonging to a *different* profile has
+none either: `[IU]` is UCUM's, so `unit_to_profile("unece", …)` refuses it. And a
+**flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single
+unprefixed component, because a flat code is one whole token with no operator to
+build it out of — so `k~m/h` has no UNECE form even though `unece:KMH` parses to
+exactly it.
 
 In a **document** the notation additionally requires a `#!bovnar 1.2` directive;
 without it `loads` raises with `unit_illegal`. `parse_unit` has no document and
 therefore no declared version, so it accepts the notation unconditionally.
 
-See [UCUM Unit Profile](11_bovnar_unit_profiles.md) for the transliteration table
+See [Unit Profiles](11_bovnar_unit_profiles.md) for the transliteration tables
 and the codes that have no representation.
 
 ### 5.2 Extended unit functions
@@ -1599,7 +1620,22 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 368–371 | Temperature scales (`DELISLE`, `NEWTON_TEMP`, `REAUMUR`, `ROMER`) |
 | 372–377 | Ratio/proportion units (`PERCENT`, `PER_MILLE`, `PER_MYRIAD`, `PER_CENT_MILLE`, `PPM`, `PPB`) |
 | 378–379 | Appended fiat currencies (`ZWG`, `XCG`) — added past the unit block for ABI stability; see `CURRENCY_EXT_FIRST` / `CURRENCY_EXT_LAST` |
-| 380 | `_SENTINEL` (internal bound; do not use) |
+| 380 | `PH_SCALE` |
+| 381–382 | Named speed units (`MILE_PER_HOUR`, `KILOMETER_PER_HOUR`) |
+| 383–387 | Water hardness (`GERMAN_HARDNESS`, `ENGLISH_HARDNESS`, `FRENCH_HARDNESS`, `RUSSIAN_HARDNESS`, `AMERICAN_HARDNESS`) |
+| 388–389 | Concentration (`VAL`, `GRAINS_PER_GALLON`) |
+| 390–396 | Turbidity, salinity and conductivity (`TURBIDITY_NTU`, `TURBIDITY_FNU`, `PRACTICAL_SALINITY`, `CONDUCTIVITY_FACTOR`, `TURBIDITY_FTU`, `TURBIDITY_FAU`, `TURBIDITY_JTU`) |
+| 397 | `_SENTINEL` (internal bound; do not use) |
+
+> **The profile opaque block is not in this enum.** The C `value_base_unit_t`
+> continues past 397 with the profile-only units — UCUM's arbitrary atoms and
+> UNECE's package and count codes (doc/11 §7.1) — and `BaseUnit` deliberately
+> stops before them, because they have no native spelling for a Python name to
+> mirror. A unit carrying one is still fully usable: `parse_unit`, `unit_to_str`,
+> `unit_is_profile_only` and the comparison helpers all handle it, and
+> `unit_to_str` returns the profile notation (`"unece:XBX"`). Only the
+> `BaseUnit(...)` *constructor* will refuse such a value, so do not call it on a
+> raw base taken from a profile-only unit.
 
 > **Note on `CUP`:** the Cuban-Peso currency is exposed as **`BaseUnit.CUP_`** (trailing
 > underscore), not `BaseUnit.CUP`. The plain name `CUP` is the US-cup volume unit

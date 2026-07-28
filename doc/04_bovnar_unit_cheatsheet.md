@@ -842,12 +842,12 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — which reading wins when a token could mean two things
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit attaches to a value
 - [FAQ §4 — Units](02_bovnar_faq.md#4-units) — the questions these tables raise most often
-- [UCUM Unit Profile](11_bovnar_unit_profiles.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
+- [Unit Profiles](11_bovnar_unit_profiles.md) — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, profile under implementation)*
-*`BVN_VALUE_BASE_UNIT_COUNT` = 429 (`BVN_UCUM_ARBITRARY_LAST + 1`)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · profile opaque block: 397–453 (57, under implementation — UCUM arbitrary units 397–428, UNECE package and count codes 429–453)*
+*`BVN_VALUE_BASE_UNIT_COUNT` = 454 (`BVN_PROFILE_OPAQUE_LAST + 1`)*
 
 ---
 

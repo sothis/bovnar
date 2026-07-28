@@ -298,6 +298,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_unit_is_profile_only.restype  = c_bool
     lib.bvn_unit_is_profile_only.argtypes = [ValueUnit]
 
+    lib.bvn_unit_to_profile.restype  = c_int32
+    lib.bvn_unit_to_profile.argtypes = [c_char_p, ValueUnit, c_char_p, c_size_t]
+
     lib.bvn_unit_to_ucum.restype  = c_int32
     lib.bvn_unit_to_ucum.argtypes = [ValueUnit, c_char_p, c_size_t]
 

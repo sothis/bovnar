@@ -3494,10 +3494,11 @@ All functions return <code>false</code> on serialisation error.</p>
 <span class="cm">     * profile this build supports. Distinct from error_unit_illegal so a</span>
 <span class="cm">     * producer can tell &quot;no such profile compiled in&quot; from &quot;malformed unit&quot;. */</span>
 <span class="w">    </span><span class="n">error_unit_profile_unknown</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="mi">49</span><span class="p">,</span>
-<span class="w">    </span><span class="cm">/* under implementation (§11.9) — valid in the profile and over atoms it</span>
-<span class="cm">     * defines, but with no representation in this unit system: a reference</span>
-<span class="cm">     * level, a scale factor outside the SI prefix decades, or an expression</span>
-<span class="cm">     * wider than BVNR_MAX_UNIT_COMPONENTS. */</span>
+<span class="w">    </span><span class="cm">/* under implementation (§11.9) — valid in its vocabulary, but with no</span>
+<span class="cm">     * representation in this unit system: a reference level, a scale factor</span>
+<span class="cm">     * outside the SI prefix decades, an expression wider than</span>
+<span class="cm">     * BVNR_MAX_UNIT_COMPONENTS, or a construct the unit slot cannot reach at</span>
+<span class="cm">     * all (UDUNITS reference time). */</span>
 <span class="w">    </span><span class="n">error_unit_profile_unsupported</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
 <span class="w">    </span><span class="cm">/* the document contains an octet stream and the reader was opened with</span>
 <span class="cm">     * text_only. NOT a defect in the document — an octet stream is a</span>

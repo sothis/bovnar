@@ -70,9 +70,11 @@ networks, long-term measurement archival, and mixed text–binary log streams.
 Existing approaches to units in data all sit at a different layer than the wire
 format, and each leaves a gap:
 
-- **UCUM** [@ucum] standardizes how a unit *string* is spelled. It says nothing
-  about where that string lives, what it is attached to, or who checks it —
-  validation happens if and when an application asks for it.
+- **Unit code systems** — UCUM [@ucum], UN/CEFACT Recommendation 20 [@unece20],
+  QUDT [@qudt] and UDUNITS-2 [@udunits] — standardize how a unit *string* is
+  spelled, each for its own community. None says anything about where that
+  string lives, what it is attached to, or who checks it: validation happens if
+  and when an application asks for it.
 - **CF conventions** [@cf] over netCDF [@netcdf] attach a `units` attribute to
   an entire variable, checked after the fact by a separate tool. That is the
   right model for a homogeneous array and no model at all for a heterogeneous
@@ -88,11 +90,15 @@ format, and each leaves a gap:
 
 Bovnar occupies the space between JSON (no type, no unit) and netCDF (arrays,
 external schema, binary container): heterogeneous, self-describing documents in
-which the enforcement point is the parser. Because UCUM addresses a different
-layer, it is a potential component rather than a rival; a `ucum:` profile that
-translates UCUM expressions into native units at parse time is under
-implementation for a future specification version and is not part of the
-released 1.1 format.
+which the enforcement point is the parser. Because these code systems address a
+different layer, they are potential components rather than rivals: unit
+*profiles* that translate a foreign code into a native unit at parse time —
+`ucum:`, `unece:`, `qudt:`, `qudt-qk:` and `udunits:` — are under implementation
+for a future specification version and are not part of the released 1.1 format.
+Because every profile resolves to the same internal representation, a code
+written in one vocabulary compares equal to the same quantity written in
+another, and the reference implementation checks that property across all five
+with a cross-vocabulary test suite.
 
 Beyond units, the format provides several features aimed at measurement data:
 native binary embedding through length-prefixed octet streams (no Base64

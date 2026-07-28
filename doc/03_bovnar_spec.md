@@ -2595,10 +2595,11 @@ typedef enum error_code_e {
      * profile this build supports. Distinct from error_unit_illegal so a
      * producer can tell "no such profile compiled in" from "malformed unit". */
     error_unit_profile_unknown               = 49,
-    /* under implementation (§11.9) — valid in the profile and over atoms it
-     * defines, but with no representation in this unit system: a reference
-     * level, a scale factor outside the SI prefix decades, or an expression
-     * wider than BVNR_MAX_UNIT_COMPONENTS. */
+    /* under implementation (§11.9) — valid in its vocabulary, but with no
+     * representation in this unit system: a reference level, a scale factor
+     * outside the SI prefix decades, an expression wider than
+     * BVNR_MAX_UNIT_COMPONENTS, or a construct the unit slot cannot reach at
+     * all (UDUNITS reference time). */
     error_unit_profile_unsupported           = 50,
     /* the document contains an octet stream and the reader was opened with
      * text_only. NOT a defect in the document — an octet stream is a

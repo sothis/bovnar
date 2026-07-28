@@ -1691,6 +1691,92 @@ static const cf_case_t g_cases[] = {
 	VALID("UPR-023", "unit_profile", "a native unit is unaffected by the gate",
 	      "#!bovnar 1.0\n.x = <float:64,mmHg> 1.0;"),
 
+	/* ── The other four vocabularies ─────────────────────────────────
+	 *
+	 * A profile is a SPELLING, not a second unit model, and the claim that
+	 * matters once there is more than one vocabulary is that they AGREE. Every
+	 * agreement case below is written as an annotation in one notation against
+	 * an inline unit in another: the parser compares the PARSED units, so the
+	 * case passes only if both spellings produced the same value_unit_t. That
+	 * makes the corpus check cross-vocabulary equality without needing any
+	 * comparison facility of its own. */
+	VALID("UPR-024", "unit_profile", "a UNECE Rec 20 code in an annotation",
+	      "#!bovnar 1.2\n.m = <float:64,unece:KGM> 12.5;"),
+	VALID("UPR-025", "unit_profile", "a UNECE code agrees with the native unit",
+	      "#!bovnar 1.2\n.m = <float:64,unece:KGM> 12.5 k~g;"),
+	VALID("UPR-026", "unit_profile", "UNECE and UCUM agree on the kilogram",
+	      "#!bovnar 1.2\n.m = <float:64,unece:KGM> 12.5 ucum:kg;"),
+	/* A flat code is one whole token: KGM is the kilogram, not a "k" prefix on
+	 * a "GM" that Rec 20 never defined. */
+	ERROR_CASE("UPR-027", "unit_profile", "a flat code does not decompose",
+	           "#!bovnar 1.2\n.x = <float:64,unece:kMTR> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UPR-028", "unit_profile", "a flat vocabulary has no operators",
+	           "#!bovnar 1.2\n.x = <float:64,unece:KGM/MTR> 1.0;",
+	           error_unit_illegal),
+	/* Rec 21 packages are countable and commensurable with nothing, through the
+	 * same mechanism UCUM's arbitrary atoms use. */
+	VALID("UPR-029", "unit_profile", "a UNECE package code is a countable unit",
+	      "#!bovnar 1.2\n.q = <uint:32,unece:XBX> 12;"),
+	ERROR_CASE("UPR-030", "unit_profile", "a box is not a pallet",
+	           "#!bovnar 1.2\n.q = <uint:32,unece:XBX> 12 unece:XPX;",
+	           error_unit_mismatch),
+	ERROR_CASE("UPR-031", "unit_profile", "a scaled count has no representation",
+	           "#!bovnar 1.2\n.q = <uint:32,unece:DZN> 1;",
+	           error_unit_profile_unsupported),
+
+	VALID("UPR-032", "unit_profile", "a QUDT unit local name",
+	      "#!bovnar 1.2\n.v = <float:64,qudt:M-PER-SEC> 9.81;"),
+	VALID("UPR-033", "unit_profile", "QUDT agrees with the native unit",
+	      "#!bovnar 1.2\n.v = <float:64,qudt:M-PER-SEC> 9.81 m/s;"),
+	ERROR_CASE("UPR-034", "unit_profile", "a QUDT full IRI is not a local name",
+	           "#!bovnar 1.2\n.v = <float:64,qudt:http://qudt.org/vocab/unit/M> 1.0;",
+	           error_unit_illegal),
+	/* A quantity kind is not a unit; it translates to the COHERENT SI unit of
+	 * the kind, which for mass is the kilogram and not the gram. */
+	VALID("UPR-035", "unit_profile", "a QUDT quantity kind is its coherent SI unit",
+	      "#!bovnar 1.2\n.m = <float:64,qudt-qk:Mass> 72.5 k~g;"),
+	ERROR_CASE("UPR-036", "unit_profile", "the coherent unit of Mass is not the gram",
+	           "#!bovnar 1.2\n.m = <float:64,qudt-qk:Mass> 72.5 g;",
+	           error_unit_mismatch),
+	ERROR_CASE("UPR-037", "unit_profile", "a dimensionless kind has no coherent unit",
+	           "#!bovnar 1.2\n.x = <float:64,qudt-qk:Dimensionless> 1.0;",
+	           error_unit_profile_unsupported),
+	/* The hyphen is legal inside a namespace but may not lead. */
+	ERROR_CASE("UPR-038", "unit_profile", "a namespace may not begin with a hyphen",
+	           "#!bovnar 1.2\n.x = <float:64,-qk:Mass> 1.0;",
+	           error_unit_illegal),
+
+	VALID("UPR-039", "unit_profile", "a UDUNITS expression",
+	      "#!bovnar 1.2\n.f = <float:64,udunits:kg*m-2*s-1> 0.5;"),
+	VALID("UPR-040", "unit_profile", "UDUNITS spelled-out names",
+	      "#!bovnar 1.2\n.d = <float:64,udunits:millimeter> 3.0 m~m;"),
+	VALID("UPR-041", "unit_profile", "UDUNITS '^' and bare exponents agree",
+	      "#!bovnar 1.2\n.a = <float:64,udunits:m^2> 1.0 m²;"),
+	/* Both vocabularies mean the same thing by '/': it inverts the term that
+	 * follows it, which is ordinary left-to-right arithmetic. */
+	VALID("UPR-042", "unit_profile", "UDUNITS and UCUM divide identically",
+	      "#!bovnar 1.2\n.x = <float:64,udunits:kg/m*s> 1.0 ucum:kg/m.s;"),
+	/* Reference time is valid UDUNITS with nowhere to land: a bovnar timestamp
+	 * is <datetime:width,epoch>, whose epoch is a type parameter rather than a
+	 * unit and whose carrier is defined as a count of seconds. */
+	ERROR_CASE("UPR-043", "unit_profile", "UDUNITS reference time has no representation",
+	           "#!bovnar 1.2\n.t = <float:64,udunits:days since 1970-01-01> 1.0;",
+	           error_unit_profile_unsupported),
+	ERROR_CASE("UPR-044", "unit_profile", "a CF coordinate direction is not a unit",
+	           "#!bovnar 1.2\n.lat = <float:64,udunits:degrees_north> 51.5;",
+	           error_unit_profile_unsupported),
+	/* All five vocabularies on one quantity, chained through the annotation /
+	 * inline agreement check. */
+	VALID("UPR-045", "unit_profile", "QUDT and UDUNITS agree on the kilogram",
+	      "#!bovnar 1.2\n.m = <float:64,qudt:KiloGM> 1.0 udunits:kg;"),
+	VALID("UPR-046", "unit_profile", "a quantity kind agrees with a UNECE code",
+	      "#!bovnar 1.2\n.m = <float:64,qudt-qk:Mass> 1.0 unece:KGM;"),
+	/* An unknown namespace is its own outcome, distinct from a bad code. */
+	ERROR_CASE("UPR-047", "unit_profile", "an unknown namespace is not a bad unit",
+	           "#!bovnar 1.2\n.x = <float:64,cf:m> 1.0;",
+	           error_unit_profile_unknown),
+
 	/* ── SPECIAL NUMBERS ─────────────────────────────────────────── */
 	VALID("SPC-001", "special_numbers", "nan with float:64",
 	      ".x = <float:64> nan;"),

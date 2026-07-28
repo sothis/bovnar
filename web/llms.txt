@@ -18,7 +18,7 @@ Bovnar is a self-describing data serialization format: every value carries its o
 - [Streaming & framing](https://www.bovnar.io/doc/10_bovnar_streaming.md): Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 - [Unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md): The ucum:, unece:, qudt:, qudt-qk: and udunits: notations, their transliteration tables, what they refuse, and how they are checked against each other.
 - [EBNF grammar](https://www.bovnar.io/doc/12_bovnar.ebnf): The formal grammar, annotated against the reference lexer/validator.
-- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md): The 387-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md): The 411-case conformance suite and the IUT protocol for third-party implementations.
 
 ## Project
 

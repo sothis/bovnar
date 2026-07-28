@@ -28,6 +28,7 @@ against the reference parser; where a token is refused, it really is `error_unit
 14. [Water hardness: six scales, one quantity](#14-water-hardness-six-scales-one-quantity)
 15. [Same name, different definition](#15-same-name-different-definition)
 16. [Quick index: if you mean X, write Y](#16-quick-index-if-you-mean-x-write-y)
+17. [The same spelling in another namespace](#17-the-same-spelling-in-another-namespace)
 
 - [See also](#see-also)
 
@@ -525,12 +526,52 @@ usually where the money is.
 
 ---
 
+## 17. The same spelling in another namespace
+
+> **Under implementation.** The `namespace:code` notation is not part of a released specification
+> and needs a `#!bovnar 1.2` directive; see [Unit Profiles](11_bovnar_unit_profiles.md).
+
+Everything above is about one token read two ways *inside Bovnar's own registry*. A unit profile
+adds a second axis: the same letters mean different things in different vocabularies, and the
+namespace is what keeps them apart. This is the reason the namespace is **mandatory** rather than a
+fallback — there is no spelling a parser could try natively first and in UCUM second without
+sometimes being wrong.
+
+Every row below was produced by the reference implementation.
+
+| Spelling | Native | In a profile | The trap |
+|---|---|---|---|
+| `st` | the **stone**, 6.35 kg | `ucum:st` → `m³`, the **stere** | The sharpest collision of the set: same two letters, different *dimension* |
+| `B` | the **byte** | `ucum:B` → `da~dB`, the **bel** | UCUM writes the byte `By`. `qudt:BYTE` and `udunits:byte` are the byte |
+| `ar` | *(not a unit)* | `ucum:ar` → `c~ha`, the **are** | The hectare is `ucum:har`, not `ucum:ar` — an easy off-by-100 |
+| `a` | *(not a unit)* | `ucum:a` → `yr`, the **Julian year** | In `udunits:` the same letter is the *prefix* atto, and there is no bare `a` atom, so `udunits:a` is refused |
+| `MI` | *(case-sensitive; not a unit)* | `qudt:MI` → `mi`, the **mile** | A flat vocabulary never decomposes a code, so this is not milli-anything |
+| `KGM` | *(not a unit)* | `unece:KGM` → `k~g` | Likewise not a `k` prefix on a `GM` that Rec 20 never defined |
+| `MTS` | *(not a unit)* | `unece:MTS` → `m/s` | Not a mega-`TS`; and `unece:MTK` one letter away is the square metre |
+
+Two rules make this tractable, and both are worth knowing before writing a profile code:
+
+- **A flat vocabulary's code is one whole token.** `unece:`, `qudt:` and `qudt-qk:` recognise no
+  operators and strip no prefixes, so a code either matches entire or is refused. `unece:KGM/MTR`
+  and `qudt:M/SEC` are `error_unit_illegal`, not compounds.
+- **A whole atom beats a prefix in an expression vocabulary**, exactly as it does natively.
+  `ucum:min` is the minute rather than milli-inch, and `udunits:cal` the calorie rather than
+  centi-`al` — the same longest-alias rule §6 describes for the native registry.
+
+Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
+checked: `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` all compare equal.
+The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 53 concepts, and pins the
+rows above as pairs that must **not** compare equal.
+
+---
+
 ## See also
 
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the registry these readings come from
 - [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in one place
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — the normative unit rules
 - [FAQ §4 — Units](02_bovnar_faq.md#4-units) — common unit questions
+- [Unit Profiles](11_bovnar_unit_profiles.md) — the foreign vocabularies §17 draws on, and the suite that checks them against each other
 
 ---
 

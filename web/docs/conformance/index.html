@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Conformance Testing</title>
-<meta name="description" content="The Bovnar 387-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta name="description" content="The Bovnar 411-case conformance test suite and the IUT protocol for validating third-party implementations.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/docs/conformance/">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:title" content="Bovnar Conformance Testing">
-<meta property="og:description" content="The Bovnar 387-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta property="og:description" content="The Bovnar 411-case conformance test suite and the IUT protocol for validating third-party implementations.">
 <meta property="og:url" content="https://www.bovnar.io/docs/conformance/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
@@ -26,13 +26,13 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Conformance Testing">
-<meta name="twitter:description" content="The Bovnar 387-case conformance test suite and the IUT protocol for validating third-party implementations.">
+<meta name="twitter:description" content="The Bovnar 411-case conformance test suite and the IUT protocol for validating third-party implementations.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/13_bovnar_conformance.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Conformance Testing", "description": "The Bovnar 387-case conformance test suite and the IUT protocol for validating third-party implementations.", "url": "https://www.bovnar.io/docs/conformance/", "mainEntityOfPage": "https://www.bovnar.io/docs/conformance/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-17", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Conformance Testing", "item": "https://www.bovnar.io/docs/conformance/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Conformance Testing", "description": "The Bovnar 411-case conformance test suite and the IUT protocol for validating third-party implementations.", "url": "https://www.bovnar.io/docs/conformance/", "mainEntityOfPage": "https://www.bovnar.io/docs/conformance/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-17", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Conformance Testing", "item": "https://www.bovnar.io/docs/conformance/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -142,7 +142,7 @@ cc<span class="w"> </span>-o<span class="w"> </span>my_impl_adapter<span class="
 <div class="codehilite"><pre><span></span><code>┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (387 cases) ──→ for each test case:                │
+│  Test corpus (411 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -790,8 +790,8 @@ specifies:</p>
 </tr>
 <tr>
 <td><code>unit_profile</code></td>
-<td>23</td>
-<td>The <code>ucum:</code> notation: the three outcomes and their error codes, annotations, the decade fold, and the one native unit whose error code the profile moved</td>
+<td>47</td>
+<td>The five profile notations: the three outcomes and their error codes, annotations, the decade fold, the one native unit whose error code the profile moved, and cross-vocabulary agreement — each agreement case is an annotation in one notation against an inline unit in another, so it passes only if both spellings produced the same unit</td>
 </tr>
 <tr>
 <td><code>special_numbers</code></td>
@@ -825,7 +825,7 @@ specifies:</p>
 </tr>
 <tr>
 <td><strong>Total</strong></td>
-<td><strong>387</strong></td>
+<td><strong>411</strong></td>
 <td></td>
 </tr>
 </tbody>
@@ -836,7 +836,7 @@ specifies:</p>
 natively by CTest and many CI systems. Each case <strong>group</strong> is a TAP 14 <em>subtest</em>:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading <code># Subtest:</code> comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 23), not the 387 cases.</p>
+parent plan therefore counts the groups (currently 23), not the 411 cases.</p>
 <div class="codehilite"><pre><span></span><code>TAP version 14
 1..23
 # Subtest: encoding

@@ -35,7 +35,8 @@ reading the grown by-value structs at the wrong size.
   On the CLI for `validate` and `events`; `query` refuses the option rather than
   ignoring it, since that path goes through the DOM, which takes no read flags.
 
-- **A unit notation under implementation** (`ucum:`, below). It is **not** a new
+- **A unit notation under implementation** (`ucum:`, `unece:`, `qudt:`,
+  `qudt-qk:`, `udunits:` — below). It is **not** a new
   specification version: `BVNR_SPEC_VERSION_MINOR` is unchanged and
   `bovnar version` still reports spec 1.1. A document reaches the notation only
   by opting in to a version this build does not advertise, which keeps it out of
@@ -57,8 +58,9 @@ reading the grown by-value structs at the wrong size.
   `value_base_unit_t` id each at 397..428 — one shared id would have made them
   compare equal — and are commensurable with nothing, the way currencies
   already are. New API: `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
-  `bvn_unit_to_ucum` (`unit_error_code`, `unit_is_profile_only`,
-  `unit_to_ucum` in Python), and `ErrorCode.UNIT_PROFILE_UNKNOWN` /
+  `bvn_unit_to_profile`, `bvn_unit_to_ucum` (`unit_error_code`,
+  `unit_is_profile_only`, `unit_to_profile`, `unit_to_ucum` in Python), and
+  `ErrorCode.UNIT_PROFILE_UNKNOWN` /
   `.UNIT_PROFILE_UNSUPPORTED` in the Python enum. Requires the opt-in directive
   above; the writer
   refuses to emit a unit that has no native spelling without one, rather than
@@ -67,6 +69,41 @@ reading the grown by-value structs at the wrong size.
   specification, the transliteration table and the list of what has NO
   representation are in
   [doc/11_bovnar_unit_profiles.md](doc/11_bovnar_unit_profiles.md).
+
+- **Four more unit profiles, and a cross-vocabulary conformance suite.** The
+  profile mechanism became a registry of namespaces rather than a special case
+  for one: `unece:` (UN/ECE Rec 20 units, plus Rec 21 packages and Rec 20 counts
+  as incommensurable opaque units), `qudt:` (QUDT unit local names), `qudt-qk:`
+  (QUDT quantity kinds, each translated to the **coherent SI unit** of the kind)
+  and `udunits:` (UDUNITS-2, the CF/netCDF units syntax). Two grammars cover all
+  five: an *expression* profile (`ucum`, `udunits`) parses operators, prefixes
+  and exponents, while a *flat* profile (`unece`, `qudt`, `qudt-qk`) matches one
+  whole token and never decomposes it — `unece:KGM` is the kilogram, not a `k`
+  prefix on a `GM` Rec 20 never defined.
+
+  Profile-only units from every namespace now share one **opaque block**, whose
+  ids `gen_profiles.py` assigns rather than the data files hand-numbering them,
+  and each is written back in the namespace that owns it. `gen_ucum.py` becomes
+  `gen_profiles.py` and `bovnar_ucum.c` becomes `bovnar_profiles.c`; the refactor
+  was checked by confirming all seven generated tables came out byte-identical
+  with only `ucum` registered.
+
+  A **cross-vocabulary suite** (53 concepts, 2847 assertions) checks every
+  spelling of a concept against every other one, pairwise: equality, coherent-SI
+  factor, dimension and round-trip, plus a negative table for the pairs that look
+  interchangeable and are not. It found the ampere missing from the UCUM table on
+  its first run — one of the seven SI base units had no UCUM spelling, and no
+  single-vocabulary test had asked.
+
+  Two things are deliberately not carried. UDUNITS **reference time**
+  (`days since 1970-01-01`) is refused as `error_unit_profile_unsupported`: a
+  bovnar timestamp is `<datetime:width,epoch>`, whose epoch lives in the type
+  spec's base slot where a unit-slot expression cannot reach it, and whose
+  carrier is defined as a count of seconds. And **space does not multiply** in
+  `udunits:`, although UDUNITS multiplies with one — a type annotation does not
+  preserve whitespace, so `m s-1` would arrive as `ms-1`, which is valid UDUNITS
+  meaning *reciprocal milliseconds*. Both are recorded in
+  [doc/11 §10.2, §13.2 and §13.3](doc/11_bovnar_unit_profiles.md).
 
   The lexer accepts five new bytes in a unit — `'`, `[`, `]`, `{`, `}` — which
   is the profile's one visible effect on a document that never uses it:

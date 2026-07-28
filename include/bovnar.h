@@ -246,19 +246,20 @@ typedef enum error_code_e {
 	 * delivered, never pre-allocated) but the loss is reportable instead of
 	 * indistinguishable from an empty stream. */
 	error_octet_stream_truncated        = 48,
-	/* The UCUM unit profile. UNRELEASED: the notation is not part of any
-	 * published specification, and the version it will ship under is not
-	 * settled. The split matters to a producer: one of
-	 * these says "you wrote it wrong", the other says "you wrote it right and
-	 * this build cannot carry it", and the fixes are different. Malformed UCUM,
-	 * and UCUM over an atom UCUM does not define, stay error_unit_illegal. */
+	/* The unit profiles. UNRELEASED: the notation is not part of any published
+	 * specification, and the version it will ship under is not settled. The
+	 * split matters to a producer: one of these says "you wrote it wrong", the
+	 * other says "you wrote it right and this build cannot carry it", and the
+	 * fixes are different. A malformed code, and a code over something the
+	 * vocabulary does not define, stay error_unit_illegal. */
 	/* The namespace before the ':' is not a profile this build supports. A
-	 * consumer reads this as "no UCUM profile compiled in", which a plain
+	 * consumer reads this as "no such profile compiled in", which a plain
 	 * error_unit_illegal could not be distinguished from. */
 	error_unit_profile_unknown          = 49,
-	/* Valid UCUM over known atoms, with no representation in the unit model: a
+	/* Valid in its vocabulary, with no representation in the unit model: a
 	 * special unit carrying a reference level, a scale factor outside the SI
-	 * prefix decades, an expression wider than BVNR_MAX_UNIT_COMPONENTS. */
+	 * prefix decades, an expression wider than BVNR_MAX_UNIT_COMPONENTS, or a
+	 * construct the unit slot cannot reach at all (UDUNITS reference time). */
 	error_unit_profile_unsupported      = 50,
 	/* The document contains an octet stream and the reader was opened with
 	 * bvnr_read_flags_t.text_only. Not a defect in the document -- an octet

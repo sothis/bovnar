@@ -4,8 +4,8 @@ Units, prefixes, and currencies are defined once, as **data**, in the `*.bvnr`
 files here; the C tables are generated from them. So the enum, conversion table,
 symbol map, parse/alias tables, prefix scale/policy tables, and currency
 catalogue cannot drift out of sync. Covers 180 physical units (529 accepted
-spellings), 34 SI/IEC prefixes, 216 currencies, and the UCUM profile's atom
-tables.
+spellings), 34 SI/IEC prefixes, 216 currencies, and the atom tables of five unit
+profiles.
 
 Each `.bvnr` file's comment header documents its fields and the editing rules
 (stable, append-only ids). **To add or change an entry, edit a record there and
@@ -18,7 +18,11 @@ rebuild — never edit the generated `*.gen.{h,inc}`.**
 | `units.bvnr` | `src/gendata/` | the data: all 180 physical units |
 | `prefixes.bvnr` | `src/gendata/` | the data: 24 SI + 10 IEC prefixes |
 | `currencies.bvnr` | `src/gendata/` | the data: all 216 currencies |
-| `ucum.bvnr` | `src/gendata/` | the data: the UCUM profile — prefixes, mapped atoms, arbitrary units, and the atoms that are known but refused |
+| `ucum.bvnr` | `src/gendata/` | the data: the UCUM profile — prefixes, mapped atoms, arbitrary (opaque) units, and the atoms that are known but refused |
+| `unece.bvnr` | `src/gendata/` | the data: UN/ECE Rec 20 units, plus Rec 21 packages and Rec 20 counts as opaque units |
+| `qudt.bvnr` | `src/gendata/` | the data: QUDT unit local names |
+| `qudt-qk.bvnr` | `src/gendata/` | the data: QUDT quantity kinds, each mapped to the **coherent SI unit** of the kind |
+| `udunits.bvnr` | `src/gendata/` | the data: UDUNITS-2 atoms and prefixes, the CF/netCDF units syntax |
 | `gen_units.py` / `gen_prefixes.py` / `gen_currencies.py` / `gen_profiles.py` | repo root | the generators |
 | `bvnr_data.py` | repo root | the small built-in `.bvnr` reader they use |
 
@@ -59,8 +63,8 @@ Each hand-written span was replaced with an `#include` of a generated fragment.
 | `<build>/generated/bovnar_si_prefix_str.gen.inc` / `bovnar_iec_prefix_str.gen.inc` | symbol maps in `bovnar_utils.c` |
 | `<build>/generated/bovnar_si_table.gen.inc` / `bovnar_iec_table.gen.inc` | prefix parse tables in `bovnar_utils.c` |
 | `<build>/generated/bovnar_currency_table.gen.inc` | `g_currency_table` in `bovnar_currency.c` |
-| `include/bovnar_profiles.gen.h` | the UCUM arbitrary-unit enumerators and the block's FIRST/LAST bracketing macros |
-| `<build>/generated/bovnar_profile_ucum_prefix.gen.inc` / `bovnar_profile_ucum_atom.gen.inc` / `bovnar_profile_ucum_unsupported.gen.inc` / `bovnar_profile_ucum_reverse.gen.inc` | the profile tables in `bovnar_profiles.c` |
+| `include/bovnar_profiles.gen.h` | every profile's opaque-unit enumerators, the whole block's FIRST/LAST bracketing macros, and a per-profile FIRST/LAST pair. **The ids are assigned by `gen_profiles.py`, not written in the data files** — with several profiles sharing the block, hand-numbering means renumbering every later profile whenever an earlier one grows a row. This header is committed, so a shift shows up in review |
+| `<build>/generated/bovnar_profile_<ns>_prefix.gen.inc` / `…_atom.gen.inc` / `…_unsupported.gen.inc` / `…_reverse.gen.inc` | the per-namespace profile tables in `bovnar_profiles.c`. A *flat* profile (`unece`, `qudt`, `qudt-qk`) has no prefix mechanism and so no `_prefix` file |
 | `<build>/generated/bovnar_profiles_conv.gen.inc` / `bovnar_profiles_policy.gen.inc` | `si_conv_table` and the prefix policy in `bovnar_si_units.c` |
 | `<build>/generated/bovnar_profiles_str.gen.inc` | `base_unit_str()` in `bovnar_utils.c` |
 

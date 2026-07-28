@@ -1732,9 +1732,9 @@ implementations must carry.<a href="#section-1.2-2.1.1" class="pilcrow">¶</a></
             <p id="section-1.2-2.2.1">Against <strong>UCUM</strong> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span> and <strong>CF</strong> <span>[<a href="#CF" class="cite xref">CF</a>]</span>, which standardize unit
 <em>notation</em> for use inside some other format, it specifies the container
 as well, so that the unit is enforced by the parser rather than by a
-downstream convention. A facility for writing a unit in UCUM notation
-exists in the reference implementation but is not part of the format
-this document specifies; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.2-2.2.1" class="pilcrow">¶</a></p>
+downstream convention. A facility for writing a unit in UCUM and other
+foreign notations exists in the reference implementation but is not part
+of the format this document specifies; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.2-2.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-1.2-2.3">
             <p id="section-1.2-2.3.1">Against <strong>schema languages</strong>, it is schema-free. The description
@@ -3477,10 +3477,12 @@ commutes: <code>N·m</code> and <code>m·N</code> are the same unit and do not m
 <a href="#section-8.6" class="section-number selfRef">8.6. </a><a href="#name-unit-profiles" class="section-name selfRef">Unit Profiles</a>
         </h3>
 <p id="section-8.6-1">A facility for expressing a unit in a foreign notation - written
-<code>namespace:code</code>, with <code>ucum</code> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span> as the first namespace - exists in
+<code>namespace:code</code> - exists in
 the reference implementation but is <strong>not part of any released format
 version</strong>, is reachable only by declaring a version the implementation
-does not advertise, and its eventual version number is unsettled.<a href="#section-8.6-1" class="pilcrow">¶</a></p>
+does not advertise, and its eventual version number is unsettled. Five
+namespaces are defined there so far: <code>ucum</code> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span>, <code>unece</code> <span>[<a href="#UNECE20" class="cite xref">UNECE20</a>]</span>,
+<code>qudt</code> and <code>qudt-qk</code> <span>[<a href="#QUDT" class="cite xref">QUDT</a>]</span>, and <code>udunits</code> <span>[<a href="#UDUNITS" class="cite xref">UDUNITS</a>]</span>.<a href="#section-8.6-1" class="pilcrow">¶</a></p>
 <p id="section-8.6-2">It is mentioned here only so that implementers encountering it in
 <span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> know its status. It is not specified by this document,
 and a consumer conforming to this document <span class="bcp14">MUST</span> treat <code>namespace:code</code> in
@@ -4952,6 +4954,10 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
         <dd>
 <span class="refAuthor">NASA</span>, <span class="refTitle">"Mars Climate Orbiter Mishap Investigation Board Phase I Report"</span>, <time datetime="1999-11-10" class="refDate">10 November 1999</time>. </dd>
 <dd class="break"></dd>
+<dt id="QUDT">[QUDT]</dt>
+        <dd>
+<span class="refAuthor">QUDT.org</span>, <span class="refTitle">"QUDT - Quantities, Units, Dimensions and Data Types Ontologies"</span>, <span>n.d.</span>, <span>&lt;<a href="https://qudt.org/">https://qudt.org/</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC3986">[RFC3986]</dt>
         <dd>
 <span class="refAuthor">Berners-Lee, T.</span>, <span class="refAuthor">Fielding, R.</span>, and <span class="refAuthor">L. Masinter</span>, <span class="refTitle">"Uniform Resource Identifier (URI): Generic Syntax"</span>, <span class="seriesInfo">STD 66</span>, <span class="seriesInfo">RFC 3986</span>, <span class="seriesInfo">DOI 10.17487/RFC3986</span>, <time datetime="2005-01" class="refDate">January 2005</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3986">https://www.rfc-editor.org/rfc/rfc3986</a>&gt;</span>. </dd>
@@ -4977,8 +4983,16 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
 <span class="refAuthor">Bray, T.</span> and <span class="refAuthor">P. Hoffman</span>, <span class="refTitle">"Unicode Character Repertoire Subsets"</span>, <span class="seriesInfo">RFC 9839</span>, <span class="seriesInfo">DOI 10.17487/RFC9839</span>, <time datetime="2025-08" class="refDate">August 2025</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9839">https://www.rfc-editor.org/rfc/rfc9839</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="UCUM">[UCUM]</dt>
-      <dd>
+        <dd>
 <span class="refAuthor">Regenstrief Institute</span>, <span class="refTitle">"The Unified Code for Units of Measure"</span>, <span>n.d.</span>, <span>&lt;<a href="https://ucum.org/ucum">https://ucum.org/ucum</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="UDUNITS">[UDUNITS]</dt>
+        <dd>
+<span class="refAuthor">UCAR/Unidata</span>, <span class="refTitle">"UDUNITS-2 - Unidata Units Library"</span>, <span>n.d.</span>, <span>&lt;<a href="https://www.unidata.ucar.edu/software/udunits/">https://www.unidata.ucar.edu/software/udunits/</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="UNECE20">[UNECE20]</dt>
+      <dd>
+<span class="refAuthor">United Nations Economic Commission for Europe</span>, <span class="refTitle">"UN/CEFACT Recommendation 20 - Codes for Units of Measure Used in International Trade"</span>, <span>n.d.</span>, <span>&lt;<a href="https://unece.org/trade/uncefact/cl-recommendations">https://unece.org/trade/uncefact/cl-recommendations</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 </dl>
 </section>

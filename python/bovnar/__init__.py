@@ -70,7 +70,8 @@ __all__ = [
     'version', 'spec_version', 'peek_version',
     'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
-    'unit_to_ucum', 'unit_is_profile_only', 'unit_error_code',
+    'unit_to_profile', 'unit_to_ucum', 'unit_is_profile_only',
+    'unit_error_code',
     'write_array',
     'Quantity',
 
@@ -269,15 +270,41 @@ def unit_to_str(unit: ValueUnit) -> str:
     return buf.raw[:n].decode('utf-8')
 
 
+def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
+    """
+    The code for *unit* in the named vocabulary, without the ``<ns>:`` prefix.
+
+    *namespace* is one of ``ucum``, ``unece``, ``qudt``, ``qudt-qk`` or
+    ``udunits``.
+
+    Partial by construction (doc/11_bovnar_unit_profiles.md 5.3), and in three
+    ways. A native unit outside that vocabulary's transliteration table has no
+    form in it -- the Old German units, the water-hardness degrees, the
+    turbidity kinds and every currency. An opaque unit belonging to a DIFFERENT
+    profile has none either: ``[IU]`` is UCUM's and has no UNECE spelling. And a
+    FLAT vocabulary (``unece``, ``qudt``, ``qudt-qk``) can spell only a single
+    unprefixed component, because a flat code is one whole token with no
+    operator to build it out of -- so ``k~m/h`` has no UNECE form even though
+    ``KMH`` parses to exactly it. All three raise rather than returning an
+    invented code.
+    """
+    import ctypes as _ct
+    from ._ffi import get_library
+    lib = get_library()
+    buf = _ct.create_string_buffer(256)
+    n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), unit, buf, 256)
+    if n < 0:
+        raise BovnarArgumentError(
+            "unit_to_profile: this unit has no %s code" % namespace)
+    return buf.raw[:n].decode('utf-8')
+
+
 def unit_to_ucum(unit: ValueUnit) -> str:
     """
     The UCUM code for *unit*, without the ``ucum:`` prefix.
 
-    Partial by construction (doc/11_bovnar_unit_profiles.md 5.3): a native
-    unit outside the transliteration table has no UCUM form, which includes
-    the Old German units,
-    the water-hardness degrees, the turbidity kinds and every currency. Those
-    raise rather than returning an invented code.
+    ``unit_to_profile('ucum', unit)`` with the same behaviour; kept for callers
+    that predate the other vocabularies.
     """
     import ctypes as _ct
     from ._ffi import get_library
@@ -293,9 +320,12 @@ def unit_is_profile_only(unit: ValueUnit) -> bool:
     """
     True when *unit* has no native spelling and serialises in profile notation.
 
-    That is exactly the units carrying a UCUM arbitrary atom -- ``[IU]``,
-    ``[PFU]`` and the rest of that block, which are assay-defined and
-    commensurable with nothing, not even with each other.
+    That is exactly the units carrying an OPAQUE base unit: UCUM's arbitrary
+    atoms (``[IU]``, ``[PFU]`` and the rest of that block, assay-defined and
+    commensurable with nothing, not even with each other) and UNECE's package
+    and count codes (``XBX``, ``C62``), which are countable and equally
+    incommensurable. Such a unit serialises back in the notation of the
+    namespace that owns it.
     """
     from ._ffi import get_library
     return bool(get_library().bvn_unit_is_profile_only(unit))

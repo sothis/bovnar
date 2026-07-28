@@ -295,7 +295,7 @@ map $uri $bvnr_canon_hdr {
     "/doc/08_bovnar_readwrite_api.md"    "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
     "/doc/09_bovnar_python_bindings.md"  "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
     "/doc/10_bovnar_streaming.md"        "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
-    "/doc/11_bovnar_unit_profiles.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
+    "/doc/11_bovnar_unit_profiles.md"    "<https://www.bovnar.io/docs/profiles/>; rel=\"canonical\"";
     "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
 }
@@ -337,6 +337,14 @@ A `map` of old path to current path, plus one `if` in each document location,
 turns them into 301s. `if` is safe in this shape: `return` is one of the two
 directives nginx documents as reliable inside `if` in a location.
 
+A **rendered page** can be renamed too, and one now has: `/docs/ucum/` became
+`/docs/profiles/` when the UCUM profile document grew to cover five vocabularies
+and was retitled. That path was in the sitemap and is therefore indexed, so it
+gets the same treatment through a second map, `$bvnr_page_moved`, applied in the
+`/docs/` location. The two maps are kept apart because they answer different
+things — one the Markdown source, the other the HTML rendering — and a single map
+keyed on both would 301 a `.md` request to an HTML page.
+
 ```nginx
 map $uri $bvnr_doc_moved {
     default                             "";
@@ -352,9 +360,19 @@ map $uri $bvnr_doc_moved {
     "/doc/4_bovnar_python_bindings.md"  "/doc/09_bovnar_python_bindings.md";
     "/doc/9_bovnar_streaming.md"        "/doc/10_bovnar_streaming.md";
     "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_unit_profiles.md";
+    "/doc/11_bovnar_ucum_profile.md"    "/doc/11_bovnar_unit_profiles.md";
     "/doc/ucum_profile.md"              "/doc/11_bovnar_unit_profiles.md";
     "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
     "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
+}
+
+# Renamed RENDERED pages. Separate from $bvnr_doc_moved above: that one answers
+# the Markdown source, this one the HTML rendering, and a single map keyed on
+# both would 301 a .md request to an HTML page.
+map $uri $bvnr_page_moved {
+    default                             "";
+    "/docs/ucum/"                       "/docs/profiles/";
+    "/docs/ucum"                        "/docs/profiles/";
 }
 ```
 
@@ -362,15 +380,20 @@ map $uri $bvnr_doc_moved {
     # first line of BOTH location ~ \.md$ and location ~ \.ebnf$, so the
     # redirect happens before try_files can answer 404
     if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
+
+    # and the same shape in location /docs/, for a renamed RENDERED page
+    if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
 ```
 
 Two things to keep right when adding an entry:
 
-- **No key may name a document that exists today.** `/doc/10_bovnar_ucum_profile.md`
-  is the only two-digit key — the UCUM profile held slot 10 briefly, and
-  streaming holds it now — which is why `/doc/10_bovnar_streaming.md` is a value
-  here and never a key. A key that collides with a live document redirects it
-  away from itself.
+- **No key may name a document that exists today.** Two keys carry a two-digit
+  prefix. `/doc/10_bovnar_ucum_profile.md` is there because the UCUM profile held
+  slot 10 briefly and streaming holds it now, which is why
+  `/doc/10_bovnar_streaming.md` is a value here and never a key; and
+  `/doc/11_bovnar_ucum_profile.md` is there because that document kept its number
+  and changed its name when it grew to cover five vocabularies. A key that
+  collides with a live document redirects it away from itself.
 - **A deleted document is not a moved one.** `/doc/iana_media_type.md` (earlier
   `/doc/9_iana_media_type.md`) explained how to apply for the media type and was
   removed once the type was registered. It has no successor, so it is absent
@@ -516,9 +539,19 @@ map $uri $bvnr_doc_moved {
     "/doc/4_bovnar_python_bindings.md"  "/doc/09_bovnar_python_bindings.md";
     "/doc/9_bovnar_streaming.md"        "/doc/10_bovnar_streaming.md";
     "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_unit_profiles.md";
+    "/doc/11_bovnar_ucum_profile.md"    "/doc/11_bovnar_unit_profiles.md";
     "/doc/ucum_profile.md"              "/doc/11_bovnar_unit_profiles.md";
     "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
     "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
+}
+
+# Renamed RENDERED pages. Separate from $bvnr_doc_moved above: that one answers
+# the Markdown source, this one the HTML rendering, and a single map keyed on
+# both would 301 a .md request to an HTML page.
+map $uri $bvnr_page_moved {
+    default                             "";
+    "/docs/ucum/"                       "/docs/profiles/";
+    "/docs/ucum"                        "/docs/profiles/";
 }
 
 # Search consolidation: the full "Link: rel=canonical" value (RFC 8288 — URI in
@@ -543,7 +576,7 @@ map $uri $bvnr_canon_hdr {
     "/doc/08_bovnar_readwrite_api.md"    "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
     "/doc/09_bovnar_python_bindings.md"  "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
     "/doc/10_bovnar_streaming.md"        "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
-    "/doc/11_bovnar_unit_profiles.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
+    "/doc/11_bovnar_unit_profiles.md"    "<https://www.bovnar.io/docs/profiles/>; rel=\"canonical\"";
     "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
 }
@@ -626,6 +659,15 @@ server {
 
     # .md as Markdown (RFC 7763) + UTF-8; plus the canonical->HTML header for the
     # doc .md (empty, hence omitted, for /index.md and /de/index.md).
+    # A rendered page that has been renamed: 301 before try_files can 404 it
+    # (see the $bvnr_page_moved map). /docs/ucum/ was indexed before the UCUM
+    # profile document became the unit-profiles document.
+    location /docs/ {
+        if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
+        include snippets/bovnar-headers.conf;
+        try_files $uri $uri/ $uri/index.html =404;
+    }
+
     location ~ \.md$ {
         # A document that has been renamed: 301 to its current path before
         # try_files can turn it into a 404 (see the $bvnr_doc_moved map).

@@ -209,7 +209,7 @@ source and re-run the generator instead.
 |---|---|---|
 | `include/bovnar_units.gen.h` | `src/gendata/units.bvnr` | `gen_units.py` |
 | `include/bovnar_si_prefix.gen.h`, `include/bovnar_iec_prefix.gen.h` | `src/gendata/prefixes.bvnr` | `gen_prefixes.py` |
-| `include/bovnar_profiles.gen.h` | `src/gendata/ucum.bvnr` | `gen_profiles.py` |
+| `include/bovnar_profiles.gen.h` | `src/gendata/ucum.bvnr`, `unece.bvnr`, `qudt.bvnr`, `qudt-qk.bvnr`, `udunits.bvnr` | `gen_profiles.py` |
 | `build/generated/bovnar_currency_table.gen.inc` | `src/gendata/currencies.bvnr` | `gen_currencies.py` |
 | `python/bovnar/_pint_units.py` | the unit registry | `gen_units.py` |
 | `web/docs/*.html` | `doc/*.md` | `gen_html_docs.py` |
@@ -270,8 +270,8 @@ docs: check the documentation against the implementation, not against itself
 ucum: the profile was missing from the grammar, the corpus and the changelog
 ```
 
-Common scopes: `spec`, `docs`, `cli`, `units`, `web`, `python`, `tests`, `ietf`,
-`publish`. Keep one logical change per commit, and put the reasoning in the body
+Common scopes: `spec`, `docs`, `cli`, `units`, `profiles`, `web`, `python`,
+`tests`, `ietf`, `publish`. Keep one logical change per commit, and put the reasoning in the body
 when the subject cannot carry it.
 
 ## Licensing

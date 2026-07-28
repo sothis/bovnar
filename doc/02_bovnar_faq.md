@@ -108,7 +108,8 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `bvnr_version_string()` reports the library version, which is a different number
 from the spec version.
 
-The tree also carries a unit notation (`ucum:`, see below) that is **under
+The tree also carries a unit notation for foreign vocabularies (`ucum:`,
+`unece:`, `qudt:`, `qudt-qk:`, `udunits:` — see below) that is **under
 implementation**. It is
 not part of a published specification, `bovnar version` does not announce it, and
 a document reaches it only by opting in to a version this build does not
@@ -210,7 +211,7 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1, and the `ucum:` notation (under
+document. A `datetime` value needs a declared 1.1, and the unit-profile notation (under
 implementation) a declared version above it; used in a document that declares less — or
 nothing — each is rejected. That is deliberate: it stops a document from carrying
 a construct that a conforming reader of its own declared version would have to
@@ -564,34 +565,47 @@ documentation-grade data, prefer the explicit form.
 
 ---
 
-**Can I write units as UCUM codes?**
+**Can I write units as UCUM, UNECE, QUDT or UDUNITS codes?**
 
-The notation exists in the implementation but is **under implementation** — no published
+Yes — five foreign vocabularies are accepted in the unit slot. The notation
+exists in the implementation but is **under implementation**: no published
 specification defines it, and the version it will ship under is not settled. It
 is reachable today by opting in explicitly:
 
 ```bovnar
 #!bovnar 1.2
-.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
-.count    = <uint:32,ucum:10*3/uL>     4500;
+.systolic = <float_dec:64,ucum:mm[Hg]>    120.00;   # UCUM
+.count    = <uint:32,ucum:10*3/uL>       4500;
+.mass     = <float:64,unece:KGM>           12.5;    # UN/ECE Rec 20
+.velocity = <float:64,qudt:M-PER-SEC>       9.81;   # QUDT
+.length   = <float:64,qudt-qk:Length>       3.0;    # a QUDT quantity KIND
+.flux     = <float:64,udunits:kg*m-2*s-1>   0.5;    # UDUNITS / CF
 ```
 
-A UCUM expression is translated at parse time into the same unit a native
-spelling produces, so `ucum:mm[Hg]` and `mmHg` compare equal, convert
-identically, and satisfy the same unit-policy rule. The `#!bovnar 1.2` directive
-is required — without it the notation is `error_unit_illegal`.
+A profile code is translated at parse time into the same unit a native spelling
+produces, so `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and
+satisfy the same unit-policy rule. That holds *across* vocabularies too:
+`ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` are one
+and the same unit, and a cross-vocabulary suite checks every spelling against
+every other one. The `#!bovnar 1.2` directive is required — without it the
+notation is `error_unit_illegal`.
 
 The translation either succeeds or fails; nothing is passed through unchecked.
-A code that is not valid UCUM, or names an atom the profile does not know, is
-`error_unit_illegal`; one that is valid but has no representation here is
-`error_unit_profile_unsupported`; an unknown namespace is
+A code that is not valid in its vocabulary, or that names something the profile
+does not know, is `error_unit_illegal`; one that is valid but has no
+representation here is `error_unit_profile_unsupported`; an unknown namespace is
 `error_unit_profile_unknown`.
 
-Watch the two vocabularies where they disagree on a spelling — UCUM's `st` is
-the stere and Bovnar's is the stone, UCUM's `B` is the bel and Bovnar's is the
-byte — which is exactly why the namespace is mandatory rather than a fallback.
-The full transliteration table, the collisions, and the codes that have no
-representation are in [UCUM Unit Profile](11_bovnar_unit_profiles.md).
+Watch the places where two vocabularies disagree on a spelling — UCUM's `st` is
+the stere and Bovnar's is the stone, UCUM's `B` is the bel where QUDT's `BYTE`
+is the byte — which is exactly why the namespace is mandatory rather than a
+fallback. A flat vocabulary's code is also never decomposed: `unece:KGM` is the
+kilogram, not a `k` prefix on a `GM`, and `qudt:MI` is the mile rather than a
+milli-anything.
+
+The full transliteration tables, the collisions, the codes that have no
+representation, and the cross-vocabulary suite are in
+[Unit Profiles](11_bovnar_unit_profiles.md).
 
 ---
 

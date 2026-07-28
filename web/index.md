@@ -56,7 +56,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 387-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 411-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -98,6 +98,6 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Streaming & framing](https://www.bovnar.io/doc/10_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 - [Unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md) — The ucum:, unece:, qudt:, qudt-qk: and udunits: notations, their transliteration tables, what they refuse, and how they are checked against each other.
 - [EBNF grammar](https://www.bovnar.io/doc/12_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
-- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 387-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 411-case conformance suite and the IUT protocol for third-party implementations.
 
 Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bovnar.io/docs/). A single-file copy of the whole set is at [https://www.bovnar.io/llms-full.txt](https://www.bovnar.io/llms-full.txt).

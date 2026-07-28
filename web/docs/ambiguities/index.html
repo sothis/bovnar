@@ -66,6 +66,7 @@ against the reference parser; where a token is refused, it really is <code>error
 <li><a href="#14-water-hardness-six-scales-one-quantity">Water hardness: six scales, one quantity</a></li>
 <li><a href="#15-same-name-different-definition">Same name, different definition</a></li>
 <li><a href="#16-quick-index-if-you-mean-x-write-y">Quick index: if you mean X, write Y</a></li>
+<li><a href="#17-the-same-spelling-in-another-namespace">The same spelling in another namespace</a></li>
 </ol>
 <ul>
 <li><a href="#see-also">See also</a></li>
@@ -1596,12 +1597,92 @@ usually where the money is.</p>
 </tbody>
 </table>
 <hr />
+<h2 id="17-the-same-spelling-in-another-namespace">17. The same spelling in another namespace</h2>
+<blockquote>
+<p><strong>Under implementation.</strong> The <code>namespace:code</code> notation is not part of a released specification
+and needs a <code>#!bovnar 1.2</code> directive; see <a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a>.</p>
+</blockquote>
+<p>Everything above is about one token read two ways <em>inside Bovnar's own registry</em>. A unit profile
+adds a second axis: the same letters mean different things in different vocabularies, and the
+namespace is what keeps them apart. This is the reason the namespace is <strong>mandatory</strong> rather than a
+fallback — there is no spelling a parser could try natively first and in UCUM second without
+sometimes being wrong.</p>
+<p>Every row below was produced by the reference implementation.</p>
+<table>
+<thead>
+<tr>
+<th>Spelling</th>
+<th>Native</th>
+<th>In a profile</th>
+<th>The trap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>st</code></td>
+<td>the <strong>stone</strong>, 6.35 kg</td>
+<td><code>ucum:st</code> → <code>m³</code>, the <strong>stere</strong></td>
+<td>The sharpest collision of the set: same two letters, different <em>dimension</em></td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td>the <strong>byte</strong></td>
+<td><code>ucum:B</code> → <code>da~dB</code>, the <strong>bel</strong></td>
+<td>UCUM writes the byte <code>By</code>. <code>qudt:BYTE</code> and <code>udunits:byte</code> are the byte</td>
+</tr>
+<tr>
+<td><code>ar</code></td>
+<td><em>(not a unit)</em></td>
+<td><code>ucum:ar</code> → <code>c~ha</code>, the <strong>are</strong></td>
+<td>The hectare is <code>ucum:har</code>, not <code>ucum:ar</code> — an easy off-by-100</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td><em>(not a unit)</em></td>
+<td><code>ucum:a</code> → <code>yr</code>, the <strong>Julian year</strong></td>
+<td>In <code>udunits:</code> the same letter is the <em>prefix</em> atto, and there is no bare <code>a</code> atom, so <code>udunits:a</code> is refused</td>
+</tr>
+<tr>
+<td><code>MI</code></td>
+<td><em>(case-sensitive; not a unit)</em></td>
+<td><code>qudt:MI</code> → <code>mi</code>, the <strong>mile</strong></td>
+<td>A flat vocabulary never decomposes a code, so this is not milli-anything</td>
+</tr>
+<tr>
+<td><code>KGM</code></td>
+<td><em>(not a unit)</em></td>
+<td><code>unece:KGM</code> → <code>k~g</code></td>
+<td>Likewise not a <code>k</code> prefix on a <code>GM</code> that Rec 20 never defined</td>
+</tr>
+<tr>
+<td><code>MTS</code></td>
+<td><em>(not a unit)</em></td>
+<td><code>unece:MTS</code> → <code>m/s</code></td>
+<td>Not a mega-<code>TS</code>; and <code>unece:MTK</code> one letter away is the square metre</td>
+</tr>
+</tbody>
+</table>
+<p>Two rules make this tractable, and both are worth knowing before writing a profile code:</p>
+<ul>
+<li><strong>A flat vocabulary's code is one whole token.</strong> <code>unece:</code>, <code>qudt:</code> and <code>qudt-qk:</code> recognise no
+  operators and strip no prefixes, so a code either matches entire or is refused. <code>unece:KGM/MTR</code>
+  and <code>qudt:M/SEC</code> are <code>error_unit_illegal</code>, not compounds.</li>
+<li><strong>A whole atom beats a prefix in an expression vocabulary</strong>, exactly as it does natively.
+  <code>ucum:min</code> is the minute rather than milli-inch, and <code>udunits:cal</code> the calorie rather than
+  centi-<code>al</code> — the same longest-alias rule §6 describes for the native registry.</li>
+</ul>
+<p>Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
+checked: <code>ucum:kg</code>, <code>unece:KGM</code>, <code>qudt:KiloGM</code>, <code>udunits:kg</code> and <code>qudt-qk:Mass</code> all compare equal.
+The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 53 concepts, and pins the
+rows above as pairs that must <strong>not</strong> compare equal.</p>
+<hr />
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the registry these readings come from</li>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit &amp; Currency Cheat Sheet</a> — every symbol in one place</li>
 <li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — the normative unit rules</li>
 <li><a href="https://www.bovnar.io/docs/faq/#4-units">FAQ §4 — Units</a> — common unit questions</li>
+<li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — the foreign vocabularies §17 draws on, and the suite that checks them against each other</li>
 </ul>
 <hr />
 <p><em>Every claim in this document was verified against the reference implementation. If you find

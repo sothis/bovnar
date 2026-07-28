@@ -87,7 +87,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 387-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 411-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -302,7 +302,7 @@ bovnar/
 │   ├── 08_bovnar_readwrite_api.md
 │   ├── 09_bovnar_python_bindings.md
 │   ├── 10_bovnar_streaming.md         # Streaming, framing & multiplexing
-│   ├── 11_bovnar_unit_profiles.md      # UCUM codes in a Bovnar unit slot
+│   ├── 11_bovnar_unit_profiles.md     # UCUM/UNECE/QUDT/UDUNITS codes in a unit slot
 │   ├── 12_bovnar.ebnf                 # Formal EBNF grammar
 │   └── 13_bovnar_conformance.md       # Conformance test tool and IUT protocol
 ├── CMakeLists.txt
@@ -516,6 +516,10 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_unit_policy_test` | Unit policy: the `require_*` assertions, the target list, SI normalisation |
 | `bvnr_want_unit_test` | The reader's `want_unit` conversion hook — factor exactness, output bases, refusal modes |
 | `bvnr_ucum_test` | The `ucum:` notation: transliteration, the decade fold, refusals |
+| `bvnr_unece_test` | The `unece:` notation: Rec 20 units, Rec 21 packages as incommensurable counts |
+| `bvnr_qudt_test` | The `qudt:` and `qudt-qk:` notations: local names, and quantity kinds as coherent SI units |
+| `bvnr_udunits_test` | The `udunits:` notation: operators, and the two refusals that carry weight |
+| `bvnr_crossvocab_test` | Cross-vocabulary conformance: do the five vocabularies agree with each other? |
 | `bvnr_currency_test` | Fiat and crypto currency lookup, minor units, prefix rules |
 | `bvnr_utils_test` | Utility functions |
 | `bvnr_int_test` | Arbitrary-precision integer arithmetic |
@@ -523,7 +527,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 387-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 411-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -765,9 +769,9 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Read & Write API](doc/08_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/09_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
-| [UCUM Unit Profile](doc/11_bovnar_unit_profiles.md) | Writing UCUM codes in a Bovnar unit slot: the transliteration table, the collisions between the two namespaces, and what has no representation. |
+| [Unit Profiles](doc/11_bovnar_unit_profiles.md) | Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite. |
 | [Formal EBNF](doc/12_bovnar.ebnf) | Machine-readable grammar. |
-| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (387 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (411 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
 

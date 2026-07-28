@@ -151,7 +151,7 @@ DOCS = [
      "lexer and validator."),
     ("13_bovnar_conformance.md", "conformance", "bovnar-conformance",
      "Bovnar Conformance Testing",
-     "The Bovnar 387-case conformance test suite and the IUT protocol for validating "
+     "The Bovnar 411-case conformance test suite and the IUT protocol for validating "
      "third-party implementations."),
 ]
 

@@ -111,6 +111,21 @@ informative:
     author:
       - org: CF Conventions Committee
     target: https://cfconventions.org/
+  UNECE20:
+    title: "UN/CEFACT Recommendation 20 - Codes for Units of Measure Used in International Trade"
+    author:
+      - org: United Nations Economic Commission for Europe
+    target: https://unece.org/trade/uncefact/cl-recommendations
+  QUDT:
+    title: "QUDT - Quantities, Units, Dimensions and Data Types Ontologies"
+    author:
+      - org: QUDT.org
+    target: https://qudt.org/
+  UDUNITS:
+    title: "UDUNITS-2 - Unidata Units Library"
+    author:
+      - org: UCAR/Unidata
+    target: https://www.unidata.ucar.edu/software/udunits/
   MCO:
     title: "Mars Climate Orbiter Mishap Investigation Board Phase I Report"
     author:
@@ -191,9 +206,9 @@ Bovnar occupies a deliberate position between three neighbours:
 * Against **UCUM** {{UCUM}} and **CF** {{CF}}, which standardize unit
   *notation* for use inside some other format, it specifies the container
   as well, so that the unit is enforced by the parser rather than by a
-  downstream convention. A facility for writing a unit in UCUM notation
-  exists in the reference implementation but is not part of the format
-  this document specifies; see {{unit-profiles}}.
+  downstream convention. A facility for writing a unit in UCUM and other
+  foreign notations exists in the reference implementation but is not part
+  of the format this document specifies; see {{unit-profiles}}.
 
 * Against **schema languages**, it is schema-free. The description
   travels with each value rather than in a separate artifact that can be
@@ -1341,10 +1356,12 @@ An unrecognized unit in either position is `error_unit_illegal`.
 ## Unit Profiles {#unit-profiles}
 
 A facility for expressing a unit in a foreign notation - written
-`namespace:code`, with `ucum` {{UCUM}} as the first namespace - exists in
-the reference implementation but is **not part of any released format
-version**, is reachable only by declaring a version the implementation
-does not advertise, and its eventual version number is unsettled.
+`namespace:code` - exists in the reference implementation but is **not
+part of any released format version**, is reachable only by declaring a
+version the implementation does not advertise, and its eventual version
+number is unsettled. Five namespaces are defined there so far: `ucum`
+{{UCUM}}, `unece` {{UNECE20}}, `qudt` and `qudt-qk` {{QUDT}}, and
+`udunits` {{UDUNITS}}.
 
 It is mentioned here only so that implementers encountering it in
 {{BOVNAR-SPEC}} know its status. It is not specified by this document,

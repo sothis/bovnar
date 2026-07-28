@@ -147,7 +147,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
 > unaffected in every version. See
-> [UCUM Unit Profile](11_bovnar_unit_profiles.md).
+> [Unit Profiles](11_bovnar_unit_profiles.md).
 
 ### 2.1 Parameter Ordering Flexibility
 
@@ -542,7 +542,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](11_bovnar_unit_profiles.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The **opaque block** of the unit profiles (under implementation) occupies **397–453**, above every native unit — a range test is what makes those units incommensurable (see [Unit Profiles](11_bovnar_unit_profiles.md)), so a native unit appended past 397 would silently join them. The block is shared by every profile that contributes profile-only units: UCUM's arbitrary atoms take **397–428** and UNECE's package and count codes **429–453**, and `gen_profiles.py` assigns the ids in registry order rather than the data files hand-numbering them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **454**, held to the highest enumerator by the static assert `BVN_PROFILE_OPAQUE_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_PROFILE_OPAQUE_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -1983,19 +1983,21 @@ assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 
 ### 12.6 Unit Profile API (under implementation)
 
-Three functions serve the `ucum:` notation. `bvn_parse_unit` itself is unchanged and takes both notations; these cover what a caller needs *around* it.
+Four functions serve the profile notations. `bvn_parse_unit` itself is unchanged and takes every notation; these cover what a caller needs *around* it.
 
 ```c
 error_code_t bvn_unit_error_code(const uint8_t *unit, uint32_t len);
 bool         bvn_unit_is_profile_only(value_unit_t u);
+int32_t      bvn_unit_to_profile(const char *ns, value_unit_t u,
+                                 char *buf, size_t bufsize);
 int32_t      bvn_unit_to_ucum(value_unit_t u, char *buf, size_t bufsize);
 ```
 
 **`bvn_unit_error_code`** says *why* a unit string `bvn_parse_unit` rejected is not a unit — `error_unit_illegal` for malformed input or an unknown atom, `error_unit_profile_unknown` for an unrecognised namespace, `error_unit_profile_unsupported` for a valid profile expression with no representation here. It re-parses, so it is for the error path only; a string that does parse returns `error_none`.
 
-**`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying a UCUM arbitrary atom (`[IU]`, `[PFU]`, …). For those, `bvn_unit_to_string` emits the profile form, and re-parsing that output yields the same unit.
+**`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying an **opaque** base unit: a UCUM arbitrary atom (`[IU]`, `[PFU]`, …) or a UNECE package or count code (`XBX`, `C62`, …). For those, `bvn_unit_to_string` emits the profile form in the namespace that *owns* the unit, and re-parsing that output yields the same unit.
 
-**`bvn_unit_to_ucum`** writes a UCUM code — without the `ucum:` prefix — for a unit that has one, returning its length or a negative value. It is **partial by construction**: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no UCUM code and are refused rather than approximated.
+**`bvn_unit_to_profile`** writes a code in the named vocabulary — `ucum`, `unece`, `qudt`, `qudt-qk` or `udunits`, without the `<ns>:` prefix — returning its length or a negative value. **`bvn_unit_to_ucum`** is the `ucum` case, kept for callers that predate the others. Both are **partial by construction**, in three ways: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no code in any of these vocabularies; an opaque unit belonging to a *different* profile has none either; and a **flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single unprefixed component, so `k~m/h` has no UNECE form even though `unece:KMH` parses to exactly it. All three are refused rather than approximated.
 
 ```c
 char buf[BVNR_UNIT_STRING_MAX];
@@ -2300,7 +2302,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit is attached to a value
 - [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in this registry, in table form
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — every token that could plausibly mean two things
-- [UCUM Unit Profile](11_bovnar_unit_profiles.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
+- [Unit Profiles](11_bovnar_unit_profiles.md) — writing UCUM, UNECE, QUDT and UDUNITS codes in a unit slot, and where the vocabularies disagree
 - [Read & Write API](08_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
 - [Python Bindings](09_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 

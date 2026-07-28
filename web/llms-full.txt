@@ -62,7 +62,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 387-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 411-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -104,7 +104,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Streaming & framing](https://www.bovnar.io/doc/10_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 - [Unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md) — The ucum:, unece:, qudt:, qudt-qk: and udunits: notations, their transliteration tables, what they refuse, and how they are checked against each other.
 - [EBNF grammar](https://www.bovnar.io/doc/12_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
-- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 387-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 411-case conformance suite and the IUT protocol for third-party implementations.
 
 Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bovnar.io/docs/). A single-file copy of the whole set is at [https://www.bovnar.io/llms-full.txt](https://www.bovnar.io/llms-full.txt).
 
@@ -1242,7 +1242,8 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `bvnr_version_string()` reports the library version, which is a different number
 from the spec version.
 
-The tree also carries a unit notation (`ucum:`, see below) that is **under
+The tree also carries a unit notation for foreign vocabularies (`ucum:`,
+`unece:`, `qudt:`, `qudt-qk:`, `udunits:` — see below) that is **under
 implementation**. It is
 not part of a published specification, `bovnar version` does not announce it, and
 a document reaches it only by opting in to a version this build does not
@@ -1344,7 +1345,7 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1, and the `ucum:` notation (under
+document. A `datetime` value needs a declared 1.1, and the unit-profile notation (under
 implementation) a declared version above it; used in a document that declares less — or
 nothing — each is rejected. That is deliberate: it stops a document from carrying
 a construct that a conforming reader of its own declared version would have to
@@ -1698,34 +1699,47 @@ documentation-grade data, prefer the explicit form.
 
 ---
 
-**Can I write units as UCUM codes?**
+**Can I write units as UCUM, UNECE, QUDT or UDUNITS codes?**
 
-The notation exists in the implementation but is **under implementation** — no published
+Yes — five foreign vocabularies are accepted in the unit slot. The notation
+exists in the implementation but is **under implementation**: no published
 specification defines it, and the version it will ship under is not settled. It
 is reachable today by opting in explicitly:
 
 ```bovnar
 #!bovnar 1.2
-.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
-.count    = <uint:32,ucum:10*3/uL>     4500;
+.systolic = <float_dec:64,ucum:mm[Hg]>    120.00;   # UCUM
+.count    = <uint:32,ucum:10*3/uL>       4500;
+.mass     = <float:64,unece:KGM>           12.5;    # UN/ECE Rec 20
+.velocity = <float:64,qudt:M-PER-SEC>       9.81;   # QUDT
+.length   = <float:64,qudt-qk:Length>       3.0;    # a QUDT quantity KIND
+.flux     = <float:64,udunits:kg*m-2*s-1>   0.5;    # UDUNITS / CF
 ```
 
-A UCUM expression is translated at parse time into the same unit a native
-spelling produces, so `ucum:mm[Hg]` and `mmHg` compare equal, convert
-identically, and satisfy the same unit-policy rule. The `#!bovnar 1.2` directive
-is required — without it the notation is `error_unit_illegal`.
+A profile code is translated at parse time into the same unit a native spelling
+produces, so `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and
+satisfy the same unit-policy rule. That holds *across* vocabularies too:
+`ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` are one
+and the same unit, and a cross-vocabulary suite checks every spelling against
+every other one. The `#!bovnar 1.2` directive is required — without it the
+notation is `error_unit_illegal`.
 
 The translation either succeeds or fails; nothing is passed through unchecked.
-A code that is not valid UCUM, or names an atom the profile does not know, is
-`error_unit_illegal`; one that is valid but has no representation here is
-`error_unit_profile_unsupported`; an unknown namespace is
+A code that is not valid in its vocabulary, or that names something the profile
+does not know, is `error_unit_illegal`; one that is valid but has no
+representation here is `error_unit_profile_unsupported`; an unknown namespace is
 `error_unit_profile_unknown`.
 
-Watch the two vocabularies where they disagree on a spelling — UCUM's `st` is
-the stere and Bovnar's is the stone, UCUM's `B` is the bel and Bovnar's is the
-byte — which is exactly why the namespace is mandatory rather than a fallback.
-The full transliteration table, the collisions, and the codes that have no
-representation are in [UCUM Unit Profile](11_bovnar_unit_profiles.md).
+Watch the places where two vocabularies disagree on a spelling — UCUM's `st` is
+the stere and Bovnar's is the stone, UCUM's `B` is the bel where QUDT's `BYTE`
+is the byte — which is exactly why the namespace is mandatory rather than a
+fallback. A flat vocabulary's code is also never decomposed: `unece:KGM` is the
+kilogram, not a `k` prefix on a `GM`, and `qudt:MI` is the mile rather than a
+milli-anything.
+
+The full transliteration tables, the collisions, the codes that have no
+representation, and the cross-vocabulary suite are in
+[Unit Profiles](11_bovnar_unit_profiles.md).
 
 ---
 
@@ -5222,10 +5236,11 @@ typedef enum error_code_e {
      * profile this build supports. Distinct from error_unit_illegal so a
      * producer can tell "no such profile compiled in" from "malformed unit". */
     error_unit_profile_unknown               = 49,
-    /* under implementation (§11.9) — valid in the profile and over atoms it
-     * defines, but with no representation in this unit system: a reference
-     * level, a scale factor outside the SI prefix decades, or an expression
-     * wider than BVNR_MAX_UNIT_COMPONENTS. */
+    /* under implementation (§11.9) — valid in its vocabulary, but with no
+     * representation in this unit system: a reference level, a scale factor
+     * outside the SI prefix decades, an expression wider than
+     * BVNR_MAX_UNIT_COMPONENTS, or a construct the unit slot cannot reach at
+     * all (UDUNITS reference time). */
     error_unit_profile_unsupported           = 50,
     /* the document contains an octet stream and the reader was opened with
      * text_only. NOT a defect in the document — an octet stream is a
@@ -6567,12 +6582,12 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — which reading wins when a token could mean two things
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit attaches to a value
 - [FAQ §4 — Units](02_bovnar_faq.md#4-units) — the questions these tables raise most often
-- [UCUM Unit Profile](11_bovnar_unit_profiles.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
+- [Unit Profiles](11_bovnar_unit_profiles.md) — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · UCUM arbitrary units: 397–428 (32, profile under implementation)*
-*`BVN_VALUE_BASE_UNIT_COUNT` = 429 (`BVN_UCUM_ARBITRARY_LAST + 1`)*
+*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · profile opaque block: 397–453 (57, under implementation — UCUM arbitrary units 397–428, UNECE package and count codes 429–453)*
+*`BVN_VALUE_BASE_UNIT_COUNT` = 454 (`BVN_PROFILE_OPAQUE_LAST + 1`)*
 
 ---
 
@@ -6729,7 +6744,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
 > unaffected in every version. See
-> [UCUM Unit Profile](11_bovnar_unit_profiles.md).
+> [Unit Profiles](11_bovnar_unit_profiles.md).
 
 ### 2.1 Parameter Ordering Flexibility
 
@@ -7124,7 +7139,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](11_bovnar_unit_profiles.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The **opaque block** of the unit profiles (under implementation) occupies **397–453**, above every native unit — a range test is what makes those units incommensurable (see [Unit Profiles](11_bovnar_unit_profiles.md)), so a native unit appended past 397 would silently join them. The block is shared by every profile that contributes profile-only units: UCUM's arbitrary atoms take **397–428** and UNECE's package and count codes **429–453**, and `gen_profiles.py` assigns the ids in registry order rather than the data files hand-numbering them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **454**, held to the highest enumerator by the static assert `BVN_PROFILE_OPAQUE_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_PROFILE_OPAQUE_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -8565,19 +8580,21 @@ assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 
 ### 12.6 Unit Profile API (under implementation)
 
-Three functions serve the `ucum:` notation. `bvn_parse_unit` itself is unchanged and takes both notations; these cover what a caller needs *around* it.
+Four functions serve the profile notations. `bvn_parse_unit` itself is unchanged and takes every notation; these cover what a caller needs *around* it.
 
 ```c
 error_code_t bvn_unit_error_code(const uint8_t *unit, uint32_t len);
 bool         bvn_unit_is_profile_only(value_unit_t u);
+int32_t      bvn_unit_to_profile(const char *ns, value_unit_t u,
+                                 char *buf, size_t bufsize);
 int32_t      bvn_unit_to_ucum(value_unit_t u, char *buf, size_t bufsize);
 ```
 
 **`bvn_unit_error_code`** says *why* a unit string `bvn_parse_unit` rejected is not a unit — `error_unit_illegal` for malformed input or an unknown atom, `error_unit_profile_unknown` for an unrecognised namespace, `error_unit_profile_unsupported` for a valid profile expression with no representation here. It re-parses, so it is for the error path only; a string that does parse returns `error_none`.
 
-**`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying a UCUM arbitrary atom (`[IU]`, `[PFU]`, …). For those, `bvn_unit_to_string` emits the profile form, and re-parsing that output yields the same unit.
+**`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying an **opaque** base unit: a UCUM arbitrary atom (`[IU]`, `[PFU]`, …) or a UNECE package or count code (`XBX`, `C62`, …). For those, `bvn_unit_to_string` emits the profile form in the namespace that *owns* the unit, and re-parsing that output yields the same unit.
 
-**`bvn_unit_to_ucum`** writes a UCUM code — without the `ucum:` prefix — for a unit that has one, returning its length or a negative value. It is **partial by construction**: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no UCUM code and are refused rather than approximated.
+**`bvn_unit_to_profile`** writes a code in the named vocabulary — `ucum`, `unece`, `qudt`, `qudt-qk` or `udunits`, without the `<ns>:` prefix — returning its length or a negative value. **`bvn_unit_to_ucum`** is the `ucum` case, kept for callers that predate the others. Both are **partial by construction**, in three ways: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no code in any of these vocabularies; an opaque unit belonging to a *different* profile has none either; and a **flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single unprefixed component, so `k~m/h` has no UNECE form even though `unece:KMH` parses to exactly it. All three are refused rather than approximated.
 
 ```c
 char buf[BVNR_UNIT_STRING_MAX];
@@ -8882,7 +8899,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit is attached to a value
 - [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in this registry, in table form
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — every token that could plausibly mean two things
-- [UCUM Unit Profile](11_bovnar_unit_profiles.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
+- [Unit Profiles](11_bovnar_unit_profiles.md) — writing UCUM, UNECE, QUDT and UDUNITS codes in a unit slot, and where the vocabularies disagree
 - [Read & Write API](08_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
 - [Python Bindings](09_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 
@@ -9370,6 +9387,7 @@ against the reference parser; where a token is refused, it really is `error_unit
 14. [Water hardness: six scales, one quantity](#14-water-hardness-six-scales-one-quantity)
 15. [Same name, different definition](#15-same-name-different-definition)
 16. [Quick index: if you mean X, write Y](#16-quick-index-if-you-mean-x-write-y)
+17. [The same spelling in another namespace](#17-the-same-spelling-in-another-namespace)
 
 - [See also](#see-also)
 
@@ -9867,12 +9885,52 @@ usually where the money is.
 
 ---
 
+## 17. The same spelling in another namespace
+
+> **Under implementation.** The `namespace:code` notation is not part of a released specification
+> and needs a `#!bovnar 1.2` directive; see [Unit Profiles](11_bovnar_unit_profiles.md).
+
+Everything above is about one token read two ways *inside Bovnar's own registry*. A unit profile
+adds a second axis: the same letters mean different things in different vocabularies, and the
+namespace is what keeps them apart. This is the reason the namespace is **mandatory** rather than a
+fallback — there is no spelling a parser could try natively first and in UCUM second without
+sometimes being wrong.
+
+Every row below was produced by the reference implementation.
+
+| Spelling | Native | In a profile | The trap |
+|---|---|---|---|
+| `st` | the **stone**, 6.35 kg | `ucum:st` → `m³`, the **stere** | The sharpest collision of the set: same two letters, different *dimension* |
+| `B` | the **byte** | `ucum:B` → `da~dB`, the **bel** | UCUM writes the byte `By`. `qudt:BYTE` and `udunits:byte` are the byte |
+| `ar` | *(not a unit)* | `ucum:ar` → `c~ha`, the **are** | The hectare is `ucum:har`, not `ucum:ar` — an easy off-by-100 |
+| `a` | *(not a unit)* | `ucum:a` → `yr`, the **Julian year** | In `udunits:` the same letter is the *prefix* atto, and there is no bare `a` atom, so `udunits:a` is refused |
+| `MI` | *(case-sensitive; not a unit)* | `qudt:MI` → `mi`, the **mile** | A flat vocabulary never decomposes a code, so this is not milli-anything |
+| `KGM` | *(not a unit)* | `unece:KGM` → `k~g` | Likewise not a `k` prefix on a `GM` that Rec 20 never defined |
+| `MTS` | *(not a unit)* | `unece:MTS` → `m/s` | Not a mega-`TS`; and `unece:MTK` one letter away is the square metre |
+
+Two rules make this tractable, and both are worth knowing before writing a profile code:
+
+- **A flat vocabulary's code is one whole token.** `unece:`, `qudt:` and `qudt-qk:` recognise no
+  operators and strip no prefixes, so a code either matches entire or is refused. `unece:KGM/MTR`
+  and `qudt:M/SEC` are `error_unit_illegal`, not compounds.
+- **A whole atom beats a prefix in an expression vocabulary**, exactly as it does natively.
+  `ucum:min` is the minute rather than milli-inch, and `udunits:cal` the calorie rather than
+  centi-`al` — the same longest-alias rule §6 describes for the native registry.
+
+Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
+checked: `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` all compare equal.
+The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 53 concepts, and pins the
+rows above as pairs that must **not** compare equal.
+
+---
+
 ## See also
 
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the registry these readings come from
 - [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in one place
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — the normative unit rules
 - [FAQ §4 — Units](02_bovnar_faq.md#4-units) — common unit questions
+- [Unit Profiles](11_bovnar_unit_profiles.md) — the foreign vocabularies §17 draws on, and the suite that checks them against each other
 
 ---
 
@@ -11996,7 +12054,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [The UCUM notation (under implementation)](#51-the-ucum-notation-under-implementation)
+    - 5.1 [The unit-profile notations (under implementation)](#51-the-unit-profile-notations-under-implementation)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
     - 5.3 [`UnitFlags`](#53-unitflags)
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
@@ -12300,11 +12358,12 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 The UCUM notation (under implementation)
+### 5.1 The unit-profile notations (under implementation)
 
-**This notation is under implementation**: it is not part of a published specification and the version it will ship under is not settled. `parse_unit` takes the `ucum:` notation as readily as the native one, and returns
+**These notations are under implementation**: they are not part of a published specification and the version they will ship under is not settled. `parse_unit` takes a profile notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
-result unchanged. Three helpers cover what a caller needs around it:
+result unchanged. Five namespaces are accepted: `ucum:`, `unece:`, `qudt:`,
+`qudt-qk:` and `udunits:`. Four helpers cover what a caller needs around them:
 
 ```python
 import bovnar
@@ -12314,23 +12373,43 @@ bovnar.unit_to_str(vu)              # → "mmHg"   — the native canonical form
 bovnar.unit_to_ucum(vu)             # → "mm[Hg]" — back to a UCUM code
 bovnar.units_compatible(vu, bovnar.parse_unit("k~Pa"))   # → True
 
+# The same unit, five ways — all one ValueUnit
+kg = bovnar.parse_unit("k~g")
+bovnar.unit_to_profile("ucum",    kg)   # → "kg"
+bovnar.unit_to_profile("unece",   kg)   # → "KGM"
+bovnar.unit_to_profile("qudt",    kg)   # → "KiloGM"
+bovnar.unit_to_profile("udunits", kg)   # → "kg"
+
 iu = bovnar.parse_unit("ucum:[IU]/mL")
 bovnar.unit_is_profile_only(iu)     # → True  — no native spelling exists
 bovnar.unit_to_str(iu)              # → "ucum:[IU].mL-1"
 
+box = bovnar.parse_unit("unece:XBX")
+bovnar.unit_is_profile_only(box)    # → True  — a countable package
+bovnar.unit_to_str(box)             # → "unece:XBX" — in its OWN namespace
+
 bovnar.unit_error_code("ucum:B[SPL]")   # → 50 (ErrorCode.UNIT_PROFILE_UNSUPPORTED)
+bovnar.unit_error_code("udunits:days since 1970-01-01")
+                                        # → 50 — valid UDUNITS, not carryable
+bovnar.unit_error_code("nosuch:m")      # → 49 (ErrorCode.UNIT_PROFILE_UNKNOWN)
 bovnar.unit_error_code("m/s")           # → 0  (ErrorCode.NONE — it parses)
 ```
 
-`unit_to_ucum` raises for a unit with no UCUM code, which is every native unit
-outside the transliteration table — the Old German units, the water-hardness
-degrees, the turbidity kinds and every currency.
+`unit_to_profile` and `unit_to_ucum` raise rather than inventing a code, in three
+situations. A native unit outside that vocabulary's transliteration table has no
+form in it — the Old German units, the water-hardness degrees, the turbidity
+kinds and every currency. An opaque unit belonging to a *different* profile has
+none either: `[IU]` is UCUM's, so `unit_to_profile("unece", …)` refuses it. And a
+**flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single
+unprefixed component, because a flat code is one whole token with no operator to
+build it out of — so `k~m/h` has no UNECE form even though `unece:KMH` parses to
+exactly it.
 
 In a **document** the notation additionally requires a `#!bovnar 1.2` directive;
 without it `loads` raises with `unit_illegal`. `parse_unit` has no document and
 therefore no declared version, so it accepts the notation unconditionally.
 
-See [UCUM Unit Profile](11_bovnar_unit_profiles.md) for the transliteration table
+See [Unit Profiles](11_bovnar_unit_profiles.md) for the transliteration tables
 and the codes that have no representation.
 
 ### 5.2 Extended unit functions
@@ -13570,7 +13649,22 @@ The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
 | 368–371 | Temperature scales (`DELISLE`, `NEWTON_TEMP`, `REAUMUR`, `ROMER`) |
 | 372–377 | Ratio/proportion units (`PERCENT`, `PER_MILLE`, `PER_MYRIAD`, `PER_CENT_MILLE`, `PPM`, `PPB`) |
 | 378–379 | Appended fiat currencies (`ZWG`, `XCG`) — added past the unit block for ABI stability; see `CURRENCY_EXT_FIRST` / `CURRENCY_EXT_LAST` |
-| 380 | `_SENTINEL` (internal bound; do not use) |
+| 380 | `PH_SCALE` |
+| 381–382 | Named speed units (`MILE_PER_HOUR`, `KILOMETER_PER_HOUR`) |
+| 383–387 | Water hardness (`GERMAN_HARDNESS`, `ENGLISH_HARDNESS`, `FRENCH_HARDNESS`, `RUSSIAN_HARDNESS`, `AMERICAN_HARDNESS`) |
+| 388–389 | Concentration (`VAL`, `GRAINS_PER_GALLON`) |
+| 390–396 | Turbidity, salinity and conductivity (`TURBIDITY_NTU`, `TURBIDITY_FNU`, `PRACTICAL_SALINITY`, `CONDUCTIVITY_FACTOR`, `TURBIDITY_FTU`, `TURBIDITY_FAU`, `TURBIDITY_JTU`) |
+| 397 | `_SENTINEL` (internal bound; do not use) |
+
+> **The profile opaque block is not in this enum.** The C `value_base_unit_t`
+> continues past 397 with the profile-only units — UCUM's arbitrary atoms and
+> UNECE's package and count codes (doc/11 §7.1) — and `BaseUnit` deliberately
+> stops before them, because they have no native spelling for a Python name to
+> mirror. A unit carrying one is still fully usable: `parse_unit`, `unit_to_str`,
+> `unit_is_profile_only` and the comparison helpers all handle it, and
+> `unit_to_str` returns the profile notation (`"unece:XBX"`). Only the
+> `BaseUnit(...)` *constructor* will refuse such a value, so do not call it on a
+> raw base taken from a profile-only unit.
 
 > **Note on `CUP`:** the Cuban-Peso currency is exposed as **`BaseUnit.CUP_`** (trailing
 > underscore), not `BaseUnit.CUP`. The plain name `CUP` is the US-cup volume unit
@@ -14048,7 +14142,7 @@ is explicit that five tables wrong in the same way would agree with each other p
     - 6.3 [Traps that are not spelling collisions](#63-traps-that-are-not-spelling-collisions)
     - 6.4 [Codes with no Bovnar representation](#64-codes-with-no-bovnar-representation)
 7. [Data model](#7-data-model)
-    - 7.1 [The arbitrary-unit block](#71-the-arbitrary-unit-block)
+    - 7.1 [The opaque block](#71-the-opaque-block)
     - 7.2 [Incommensurability, via the mechanism currencies already use](#72-incommensurability-via-the-mechanism-currencies-already-use)
     - 7.3 [No new field on the data event](#73-no-new-field-on-the-data-event)
     - 7.4 [New error codes](#74-new-error-codes)
@@ -14166,7 +14260,15 @@ A profile unit is a namespace name, an ASCII colon, and a code:
 ucum:mm[Hg]
 ucum:10*3/uL
 ucum:mL{total}
+unece:KGM
+qudt-qk:Mass
 ```
+
+A **namespace name** is lowercase letters and digits, and may contain `-` — but not as its first
+byte. The hyphen exists for `qudt-qk`, where one publisher's vocabulary is split into a unit
+namespace and a quantity-kind namespace that must not be confused with it (§12.3). Because it may
+not lead, `-qk:Mass` is not a namespace at all: it falls through to the native parser, which rejects
+it exactly as it did before profiles existed.
 
 The colon is already an accepted byte inside a type-annotation body (state table
 `copy_type_byte`, `[0x3a]`), and no native unit alias or currency code contains one, so the
@@ -14302,16 +14404,18 @@ where the byte classes of §2.3 are also recorded:
 ```ebnf
 unit-param   = profile-unit | native-unit ;
 profile-unit = profile-name , ":" , profile-code ;
-profile-name = lower-alpha , {lower-alpha} ;     (* "ucum" *)
+profile-name = name-head , {name-tail} ;         (* "ucum", "qudt-qk" *)
+name-head    = lower-alpha | digit ;
+name-tail    = lower-alpha | digit | "-" ;
 profile-code = profile-char , {profile-char} ;
 ```
 
 `profile-code` is deliberately not given a grammar. The sub-grammar is
 **semantic**, as the native unit sub-grammar is (doc/05 §5.2): the lexer captures
 bytes, and `bvn_parse_unit` — which dispatches on the namespace — decides whether
-they are a UCUM expression. The normative grammar for what is inside is UCUM's
-own, and restating it here would create a second authority to keep in step with
-the first.
+they are a valid code in that vocabulary. The normative grammar for what is
+inside is each vocabulary's own, and restating five of them here would create
+five second authorities to keep in step with the first.
 
 ---
 
@@ -14961,7 +15065,7 @@ registry question this document does not answer.
 
 ## 7. Data model
 
-### 7.1 The arbitrary-unit block
+### 7.1 The opaque block
 
 UCUM's arbitrary atoms get a contiguous run of `value_base_unit_t` ids appended after the current
 last enumerator. `src/utils/bvn_internal_dims.h` already documents the id layout and pins
@@ -14970,16 +15074,33 @@ the ordinary "append and move the check" operation the header describes — the 
 count are indexed *by* the enum value, and an undersized count is an out-of-bounds read rather than
 a cosmetic mismatch.
 
-Two constants bracket the run so §7.2 can test membership with two comparisons:
+**The run is shared.** UCUM's arbitrary atoms are not the only units with no native spelling: UNECE's
+package and count codes (§11.3) are the same shape, and a later vocabulary may add more. They all
+occupy one **opaque block**, bracketed so §7.2 can test membership with two comparisons, with a
+second pair of constants per profile so the writer can name the namespace that owns a given id:
 
 ```c
-#define BVN_UCUM_ARBITRARY_FIRST  <first id>
-#define BVN_UCUM_ARBITRARY_LAST   <last id>
+#define BVN_PROFILE_OPAQUE_FIRST       <first id>
+#define BVN_PROFILE_OPAQUE_LAST        <last id>
+
+#define BVN_PROFILE_UCUM_OPAQUE_FIRST  <first ucum id>
+#define BVN_PROFILE_UCUM_OPAQUE_LAST   <last ucum id>
+/* … one pair per profile; FIRST > LAST means the profile contributes none */
 ```
 
-Each entry carries the empty dimension vector, factor `1.0`, `.affine = false`, UCUM's own metric
-flag as its prefix policy, and **no native alias** — the alias table is what makes a unit reachable
-from native notation, and leaving it empty is what keeps these profile-only.
+The per-profile pairs are what stop a unit being spelled in the wrong namespace. A single hardcoded
+`"ucum:"` in the writer would have printed a UNECE package code as `ucum:XBX`, which re-parses as
+nothing at all.
+
+**The ids are assigned by `gen_profiles.py`, not written in the data files.** With one profile a
+hand-written `.id` was reviewable; with several it is a renumbering trap, because inserting a row in
+an earlier profile shifts every id below it. The generator assigns them in registry order and writes
+the result to `include/bovnar_profiles.gen.h`, which is committed — so a shift appears as a diff in
+review rather than as a silent ABI change.
+
+Each entry carries the empty dimension vector, factor `1.0`, `.affine = false`, the vocabulary's own
+metric flag as its prefix policy, and **no native alias** — the alias table is what makes a unit
+reachable from native notation, and leaving it empty is what keeps these profile-only.
 
 ### 7.2 Incommensurability, via the mechanism currencies already use
 
@@ -15011,10 +15132,10 @@ Note the shape of the answer: `bvn_units_compatible` says *false* for `[IU]` aga
 against `$USD` has always behaved — compatibility is a statement about dimension, and neither a
 currency nor an assay unit has one.
 
-`bvni_is_arbitrary` is still a two-comparison range test. The block is contiguous and sits above
-every native unit, and both facts are static assertions in `bvn_internal_dims.h` rather than
-comments: a native unit appended past the block's first id would otherwise become silently
-incommensurable with everything.
+`bvni_is_opaque` is still a two-comparison range test over the whole block, regardless of how many
+profiles contribute to it. The block is contiguous and sits above every native unit, and both facts
+are static assertions in `bvn_internal_dims.h` rather than comments: a native unit appended past the
+block's first id would otherwise become silently incommensurable with everything.
 
 ### 7.3 No new field on the data event
 
@@ -15065,12 +15186,18 @@ int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
  * is for the error path; a string that DOES parse reports error_none. */
 error_code_t bvn_unit_error_code(const uint8_t* unit, uint32_t len);
 
-/* New. True when a unit has no native spelling — it carries a UCUM arbitrary
- * atom — so bvn_unit_to_string emits profile notation. */
+/* New. True when a unit has no native spelling — it carries an OPAQUE base
+ * unit, a UCUM arbitrary atom or a UNECE package/count code — so
+ * bvn_unit_to_string emits profile notation, in the namespace that owns it. */
 bool bvn_unit_is_profile_only(value_unit_t u);
 
-/* New. A UCUM code (without the "ucum:" prefix); negative on failure
- * (section 5.3). */
+/* New. A code in the named vocabulary (without the "<ns>:" prefix); negative on
+ * failure (section 5.3). */
+int32_t bvn_unit_to_profile(const char* ns, value_unit_t u,
+                            char* buf, size_t bufsize);
+
+/* New. bvn_unit_to_profile against "ucum", for callers that predate the other
+ * vocabularies. */
 int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
 ```
 
@@ -15079,11 +15206,14 @@ at all: `bvnr_unit_policy_t` parses its targets with it, so the notation arrives
 
 ### 8.2 Python
 
-`parse_unit`, `unit_to_str`, `units_compatible` and `UnitPolicy` accept and produce the profile
-notation with no signature change. Three additions mirror the C ones:
+`parse_unit`, `unit_to_str`, `units_compatible` and `UnitPolicy` accept and produce every profile
+notation with no signature change. Four additions mirror the C ones:
 
 ```python
-bovnar.unit_to_ucum(vu)          # -> str; raises for a unit with no UCUM code
+bovnar.unit_to_profile(ns, vu)   # -> str; ns is "ucum", "unece", "qudt",
+                                 #    "qudt-qk" or "udunits". Raises when the
+                                 #    unit has no code in that vocabulary
+bovnar.unit_to_ucum(vu)          # -> str; the "ucum" case of the above
 bovnar.unit_is_profile_only(vu)  # -> bool
 bovnar.unit_error_code(s)        # -> int (error_code_t), 0 when s parses
 ```
@@ -15097,7 +15227,9 @@ therefore take profile strings:
 
 ```
 bovnar validate --require-field '.patient.systolic=ucum:mm[Hg]' chart.bvnr
-bovnar events --unit 'ucum:mmol/L' labs.bvnr
+bovnar validate --require-field '.line.qty=unece:XBX'           invoice.bvnr
+bovnar events --unit 'ucum:mmol/L'   labs.bvnr
+bovnar events --unit 'qudt:M-PER-SEC' telemetry.bvnr
 ```
 
 `bovnar pretty-print` emits the canonical form (§5.1), which for a translated unit is the native
@@ -15147,26 +15279,45 @@ risk, and §10.4 records it as unbuilt.
 
 The generator also emits the **reverse** table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 592
+searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 605
 round trips quoted in §5.3 are the check that it agrees with the forward direction.
 
 ### 9.3 Tests
 
-`tests/bovnar_ucum_test.c` (CTest target `bvnr_ucum_test`, labels `unit;si;ucum`) pins the
-behavioural claims of this document: the three outcomes with their exact error codes, equivalence
-with the native spelling, UCUM's non-latching `/`, annotation inertness, every worked fold case in
-§3.5 including the four refused decades, each collision in §6.2, arbitrary-unit incommensurability
-including the `[IU]/L` ↔ `[IU]/mL` case, profile-only round-trip, and the partiality of
-`bvn_unit_to_ucum`.
+`tests/bovnar_ucum_test.c` (CTest target `bvnr_ucum_test`, labels `unit;si;ucum`, **121
+assertions**) pins the behavioural claims of sections 2–10: the three outcomes with their exact
+error codes, equivalence with the native spelling, UCUM's non-latching `/`, annotation inertness,
+every worked fold case in §3.5 including the four refused decades, each collision in §6.2,
+arbitrary-unit incommensurability including the `[IU]/L` ↔ `[IU]/mL` case, profile-only round-trip,
+and the partiality of `bvn_unit_to_ucum`.
+
+One test file per vocabulary, each pinning the section that specifies it:
+
+| Test | Target | Assertions | Specifies |
+|---|---|---|---|
+| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 121 | §2–§10 |
+| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 117 | §11 |
+| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 176 | §12 |
+| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 127 | §13 |
+| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 2847 | §14 |
 
 `tests/bovnar_unit_ext_test.c` pins the block boundary: the last native unit sits below
-`BVN_UCUM_ARBITRARY_FIRST`, and `BVN_VALUE_BASE_UNIT_COUNT` tracks the last arbitrary id.
+`BVN_PROFILE_OPAQUE_FIRST`, and `BVN_VALUE_BASE_UNIT_COUNT` tracks the last opaque id.
 
-**A conformance-corpus group did not ship.** The design called for a `unit-profile-ucum` group in
-`bvnr_conformance` so a third-party implementation could be held to the same rules; that is a corpus
-addition, not a library change, and it is listed in §10.4. In particular the error-code move of §2.3
-— `<float:64,m[s]>` was `error_unexpected_input_byte` and is now `error_unit_illegal` — is pinned by
-the unit test but not by the conformance corpus.
+**The conformance corpus covers the profiles too.** `bvnr_conformance` carries a `unit_profile`
+group of **47 cases** (`UPR-001` … `UPR-047`), so a third-party implementation can be held to the
+same rules rather than only the reference one being tested against itself. It covers the three
+outcomes with their exact error codes, the version gate, annotations, the decade fold, the
+error-code move of §2.3 (`<float:64,m[s]>` was `error_unexpected_input_byte` and is now
+`error_unit_illegal`), and — for the four vocabularies of §11–§13 — flatness, the opaque counts,
+quantity kinds, reference time, and cross-vocabulary agreement.
+
+The agreement cases are written a particular way, and it is worth knowing why: each is an annotation
+in one notation against an *inline unit* in another, for example
+`<float:64,unece:KGM> 12.5 ucum:kg;`. The parser compares the parsed units, so such a case passes
+only if both spellings produced the same `value_unit_t` — which lets the corpus test cross-vocabulary
+equality without needing any comparison facility of its own, and without a conforming implementation
+having to expose one.
 
 ### 9.4 No build switch
 
@@ -15192,7 +15343,7 @@ answer for a build without it, which is why it exists as a separate code rather 
 | Serialisation | One guard at the head of each of the two formatters (§5.1) |
 | ABI | Two error codes; three new functions. **No struct changed** |
 | Bindings | Three `ctypes` declarations and three wrappers |
-| Tests | `tests/bovnar_ucum_test.c`, 105 assertions; two assertions widened in `bovnar_unit_ext_test.c` |
+| Tests | `tests/bovnar_ucum_test.c`, 121 assertions; two assertions widened in `bovnar_unit_ext_test.c`. The other four vocabularies add 3267 more (§9.3) |
 
 The unit parser is the bulk of it. Everything else is small, and — this is what §1.1 buys — the
 DOM, the writer, the streaming reader, the policy engine and the CLI needed no work at all, because
@@ -15219,14 +15370,20 @@ outstanding work, and it is now the largest single item of it.
 **The tables rot.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data files do not, and nothing in
 the build notices.
 
-**A space inside a type annotation is silently deleted.** This predates the profiles and affects
-native units too: `<float:64,k g>` is accepted as `k~g`, and `<float:64,udunits:m s-1>` becomes
-`udunits:ms-1` — reciprocal milliseconds — rather than being refused. The lexer drops the byte
-before the unit slot is scanned, so nothing downstream can tell that the producer wrote two tokens.
-It is why §13.2 cannot support CF's space-separated spelling and why it does not try. The right fix
-is in the lexer: preserve the byte and let the unit parser reject it, so a space-separated unit
-fails loudly instead of joining into a different one. That is a change to the annotation grammar's
-whitespace policy and belongs in its own revision, not in this one.
+**Whitespace inside a type annotation is accepted and not accumulated, and a unit parameter cannot
+opt out.** This is a deliberate rule rather than an oversight — the EBNF records it beside
+`type-param-list`, and it is what lets `<uint:8, 16>` be written with a space after the comma. Its
+consequence in a *unit* parameter is not deliberate: a space **between** parameters and a space
+**inside** a unit are indistinguishable by the time the parameter is scanned, so `<float:64,k g>`
+is accepted as `k~g`, and `<float:64,udunits:m s-1>` becomes `udunits:ms-1` — reciprocal
+milliseconds — rather than being refused.
+
+It is why §13.2 cannot support CF's space-separated spelling and why it does not try. Closing it
+means separating the two cases: keep whitespace skippable around the `,` separators, and make it an
+error inside a unit parameter, so a space-separated unit fails loudly instead of joining into a
+different one. That is a change to the annotation grammar and belongs in its own revision, not in
+this one — but it is a change worth making, because this is the one place in the format where a
+wrong unit is produced silently rather than refused.
 
 **The refusal set is where adopters leave.** §6.4 refuses osmolality, the non-Julian years, the
 referenced bels and four decades of scale. A clinical corpus will meet several of those early, and
@@ -15269,10 +15426,12 @@ one paragraph to read rather than four sections to cross-check.
 |---|---|---|
 | Verbatim source preservation (`bvnr_data_t.unit_source`, writer re-emission) | §5.2, §7.3 | An annotation is dropped by a document built through the writer API. A parse-and-re-serialise round trip keeps it |
 | The generator's factor proof against UCUM's own values | §9.2 | Every mapping rests on the table author; §10.2 |
-| A `unit-profile-ucum` conformance-corpus group | §9.3 | A third-party implementation has no corpus to be held to. The reference implementation is covered by its own test |
-| `BVNR_WITH_UCUM_PROFILE` and feature reporting | §9.4 | The profile is unconditional, which is a simplification rather than a loss |
+| `BVNR_WITH_UCUM_PROFILE` and feature reporting | §9.4 | The profiles are unconditional, which is a simplification rather than a loss |
+| A machine check of any table against its publisher | §9.2, §10.2 | Five tables now rest on their authors rather than one |
 
-The first two are the ones worth building next, in that order.
+The factor proof is the one worth building next, and it grew in importance when the vocabulary
+count went from one to five: §14 can prove the five agree with each other but not that any of them
+agrees with its publisher. Verbatim source preservation is second.
 
 ---
 
@@ -15554,7 +15713,7 @@ perfectly.** §10.2 is where that gap is recorded as the standing risk it remain
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — how a unit token is resolved natively, and the pairs that look interchangeable
 - [Read/Write API](08_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy) — the unit policy a translated unit passes through unchanged
 - [Read/Write API](08_bovnar_readwrite_api.md) — the data event `unit_source` is added to, and the `want_unit` hook
-- [Conformance Test Tool](13_bovnar_conformance.md) — where the `unit-profile-ucum` group lives
+- [Conformance Test Tool](13_bovnar_conformance.md) — where the 47-case `unit_profile` group lives
 - [Unit Cheatsheet](04_bovnar_unit_cheatsheet.md) — the native spellings the transliteration table targets
 
 ---
@@ -15951,12 +16110,12 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*                                                                     *)
 (* A "name:" namespace hands the parameter to a unit PROFILE, which    *)
 (* translates it into the same value_unit_t a native expression        *)
-(* produces.  See doc/11_bovnar_unit_profiles.md.  "ucum" is the only   *)
-(* namespace defined; any other is error_unit_profile_unknown, and     *)
-(* a profile expression that is malformed or names an atom the         *)
-(* profile does not know is error_unit_illegal.  There is no third     *)
-(* outcome in which the value carries a unit the library cannot        *)
-(* reason about.                                                       *)
+(* produces.  See doc/11_bovnar_unit_profiles.md.  Five namespaces are *)
+(* defined -- "ucum", "unece", "qudt", "qudt-qk" and "udunits"; any    *)
+(* other is error_unit_profile_unknown, and a profile expression that  *)
+(* is malformed or names a code the profile does not know is           *)
+(* error_unit_illegal.  There is no third outcome in which the value   *)
+(* carries a unit the library cannot reason about.                     *)
 (*                                                                     *)
 (* No native unit alias or currency code contains a ":", so the        *)
 (* namespace is unambiguous against the whole registry with no         *)
@@ -15965,10 +16124,18 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*                                                                     *)
 (* The code is NOT given a grammar here.  Like the native unit         *)
 (* sub-grammar below it is semantic, enforced by bvn_parse_unit; the   *)
-(* normative grammar for what is inside is UCUM's own, and restating   *)
-(* it would create a second authority to keep in step with the first.  *)
+(* normative grammar for what is inside is each vocabulary's own, and  *)
+(* restating five of them would create five second authorities to keep *)
+(* in step with the first.                                             *)
+(*                                                                     *)
+(* The hyphen in profile-name may not LEAD, which is what keeps "-qk:" *)
+(* from being a namespace; it exists for "qudt-qk", where the          *)
+(* vocabulary itself is split into a unit namespace and a              *)
+(* quantity-kind one.                                                  *)
 profile-unit = profile-name , ":" , profile-code ;
-profile-name = lower-alpha , {lower-alpha} ;   (* "ucum"              *)
+profile-name = name-head , {name-tail} ;   (* "ucum", "qudt-qk"       *)
+name-head    = lower-alpha | digit ;
+name-tail    = lower-alpha | digit | "-" ;
 lower-alpha  = "a"|"b"|"c"|"d"|"e"|"f"|"g"|"h"|"i"|"j"|"k"|"l"|"m"
              | "n"|"o"|"p"|"q"|"r"|"s"|"t"|"u"|"v"|"w"|"x"|"y"|"z" ;
 profile-code = profile-char , {profile-char} ;
@@ -16706,7 +16873,7 @@ cc -o my_impl_adapter my_adapter.c -lmy_bovnar
 ┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (387 cases) ──→ for each test case:                │
+│  Test corpus (411 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -17105,14 +17272,14 @@ specifies:
 | `arrays` | 19 | 1D, 2D, nested, typed, null, limits, /-row size consistency |
 | `octet_streams` | 4 | Single/multi-chunk, sync errors |
 | `units` | 70 | SI/IEC prefixes, compact prefix form, compound, inline, errors |
-| `unit_profile` | 23 | The `ucum:` notation: the three outcomes and their error codes, annotations, the decade fold, and the one native unit whose error code the profile moved |
+| `unit_profile` | 47 | The five profile notations: the three outcomes and their error codes, annotations, the decade fold, the one native unit whose error code the profile moved, and cross-vocabulary agreement — each agreement case is an annotation in one notation against an inline unit in another, so it passes only if both spellings produced the same unit |
 | `special_numbers` | 5 | `nan`, `inf`, `ninf` |
 | `roundtrip` | 5 | Multi-assignment correctness |
 | `recovery` | 2 | Error-resync: valid data after error |
 | `comments` | 6 | Comment styles |
 | `whitespace` | 4 | Whitespace tolerance |
 | `homogeneity` | 16 | DOM-tier: array homogeneity (§7.4), struct shape, key uniqueness (§8.1) — self-test only |
-| **Total** | **387** | |
+| **Total** | **411** | |
 
 ---
 
@@ -17122,7 +17289,7 @@ The tool emits **TAP version 14** (Test Anything Protocol), which is consumed
 natively by CTest and many CI systems. Each case **group** is a TAP 14 *subtest*:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading `# Subtest:` comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 23), not the 387 cases.
+parent plan therefore counts the groups (currently 23), not the 411 cases.
 
 ```
 TAP version 14

@@ -64,7 +64,7 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
-<li>5.1 <a href="#51-the-ucum-notation-under-implementation">The UCUM notation (under implementation)</a></li>
+<li>5.1 <a href="#51-the-unit-profile-notations-under-implementation">The unit-profile notations (under implementation)</a></li>
 <li>5.2 <a href="#52-extended-unit-functions">Extended unit functions</a></li>
 <li>5.3 <a href="#53-unitflags"><code>UnitFlags</code></a></li>
 <li>5.4 <a href="#54-valueunitprefix"><code>ValueUnitPrefix</code></a></li>
@@ -400,10 +400,11 @@ treatment):</p>
 <span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_factor</span><span class="p">(</span><span class="s2">&quot;h&quot;</span><span class="p">)</span>    <span class="c1"># → 1.0  (NOT 3600.0)</span>
 </code></pre></div>
 
-<h3 id="51-the-ucum-notation-under-implementation">5.1 The UCUM notation (under implementation)</h3>
-<p><strong>This notation is under implementation</strong>: it is not part of a published specification and the version it will ship under is not settled. <code>parse_unit</code> takes the <code>ucum:</code> notation as readily as the native one, and returns
+<h3 id="51-the-unit-profile-notations-under-implementation">5.1 The unit-profile notations (under implementation)</h3>
+<p><strong>These notations are under implementation</strong>: they are not part of a published specification and the version they will ship under is not settled. <code>parse_unit</code> takes a profile notation as readily as the native one, and returns
 the same <code>ValueUnit</code> either way — so everything else in this chapter works on the
-result unchanged. Three helpers cover what a caller needs around it:</p>
+result unchanged. Five namespaces are accepted: <code>ucum:</code>, <code>unece:</code>, <code>qudt:</code>,
+<code>qudt-qk:</code> and <code>udunits:</code>. Four helpers cover what a caller needs around them:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
 
 <span class="n">vu</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;ucum:mm[Hg]&quot;</span><span class="p">)</span>
@@ -411,21 +412,41 @@ result unchanged. Three helpers cover what a caller needs around it:</p>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_ucum</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>             <span class="c1"># → &quot;mm[Hg]&quot; — back to a UCUM code</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">units_compatible</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~Pa&quot;</span><span class="p">))</span>   <span class="c1"># → True</span>
 
+<span class="c1"># The same unit, five ways — all one ValueUnit</span>
+<span class="n">kg</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~g&quot;</span><span class="p">)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_profile</span><span class="p">(</span><span class="s2">&quot;ucum&quot;</span><span class="p">,</span>    <span class="n">kg</span><span class="p">)</span>   <span class="c1"># → &quot;kg&quot;</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_profile</span><span class="p">(</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span>   <span class="n">kg</span><span class="p">)</span>   <span class="c1"># → &quot;KGM&quot;</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_profile</span><span class="p">(</span><span class="s2">&quot;qudt&quot;</span><span class="p">,</span>    <span class="n">kg</span><span class="p">)</span>   <span class="c1"># → &quot;KiloGM&quot;</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_profile</span><span class="p">(</span><span class="s2">&quot;udunits&quot;</span><span class="p">,</span> <span class="n">kg</span><span class="p">)</span>   <span class="c1"># → &quot;kg&quot;</span>
+
 <span class="n">iu</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;ucum:[IU]/mL&quot;</span><span class="p">)</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_is_profile_only</span><span class="p">(</span><span class="n">iu</span><span class="p">)</span>     <span class="c1"># → True  — no native spelling exists</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">iu</span><span class="p">)</span>              <span class="c1"># → &quot;ucum:[IU].mL-1&quot;</span>
 
+<span class="n">box</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;unece:XBX&quot;</span><span class="p">)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_is_profile_only</span><span class="p">(</span><span class="n">box</span><span class="p">)</span>    <span class="c1"># → True  — a countable package</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_str</span><span class="p">(</span><span class="n">box</span><span class="p">)</span>             <span class="c1"># → &quot;unece:XBX&quot; — in its OWN namespace</span>
+
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_error_code</span><span class="p">(</span><span class="s2">&quot;ucum:B[SPL]&quot;</span><span class="p">)</span>   <span class="c1"># → 50 (ErrorCode.UNIT_PROFILE_UNSUPPORTED)</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_error_code</span><span class="p">(</span><span class="s2">&quot;udunits:days since 1970-01-01&quot;</span><span class="p">)</span>
+                                        <span class="c1"># → 50 — valid UDUNITS, not carryable</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">unit_error_code</span><span class="p">(</span><span class="s2">&quot;nosuch:m&quot;</span><span class="p">)</span>      <span class="c1"># → 49 (ErrorCode.UNIT_PROFILE_UNKNOWN)</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_error_code</span><span class="p">(</span><span class="s2">&quot;m/s&quot;</span><span class="p">)</span>           <span class="c1"># → 0  (ErrorCode.NONE — it parses)</span>
 </code></pre></div>
 
-<p><code>unit_to_ucum</code> raises for a unit with no UCUM code, which is every native unit
-outside the transliteration table — the Old German units, the water-hardness
-degrees, the turbidity kinds and every currency.</p>
+<p><code>unit_to_profile</code> and <code>unit_to_ucum</code> raise rather than inventing a code, in three
+situations. A native unit outside that vocabulary's transliteration table has no
+form in it — the Old German units, the water-hardness degrees, the turbidity
+kinds and every currency. An opaque unit belonging to a <em>different</em> profile has
+none either: <code>[IU]</code> is UCUM's, so <code>unit_to_profile("unece", …)</code> refuses it. And a
+<strong>flat</strong> vocabulary (<code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>) can spell only a single
+unprefixed component, because a flat code is one whole token with no operator to
+build it out of — so <code>k~m/h</code> has no UNECE form even though <code>unece:KMH</code> parses to
+exactly it.</p>
 <p>In a <strong>document</strong> the notation additionally requires a <code>#!bovnar 1.2</code> directive;
 without it <code>loads</code> raises with <code>unit_illegal</code>. <code>parse_unit</code> has no document and
 therefore no declared version, so it accepts the notation unconditionally.</p>
-<p>See <a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a> for the transliteration table
+<p>See <a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> for the transliteration tables
 and the codes that have no representation.</p>
 <h3 id="52-extended-unit-functions">5.2 Extended unit functions</h3>
 <p>The following functions operate on <code>ValueUnit</code> objects and are available both
@@ -2017,11 +2038,40 @@ caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>B
 </tr>
 <tr>
 <td>380</td>
+<td><code>PH_SCALE</code></td>
+</tr>
+<tr>
+<td>381–382</td>
+<td>Named speed units (<code>MILE_PER_HOUR</code>, <code>KILOMETER_PER_HOUR</code>)</td>
+</tr>
+<tr>
+<td>383–387</td>
+<td>Water hardness (<code>GERMAN_HARDNESS</code>, <code>ENGLISH_HARDNESS</code>, <code>FRENCH_HARDNESS</code>, <code>RUSSIAN_HARDNESS</code>, <code>AMERICAN_HARDNESS</code>)</td>
+</tr>
+<tr>
+<td>388–389</td>
+<td>Concentration (<code>VAL</code>, <code>GRAINS_PER_GALLON</code>)</td>
+</tr>
+<tr>
+<td>390–396</td>
+<td>Turbidity, salinity and conductivity (<code>TURBIDITY_NTU</code>, <code>TURBIDITY_FNU</code>, <code>PRACTICAL_SALINITY</code>, <code>CONDUCTIVITY_FACTOR</code>, <code>TURBIDITY_FTU</code>, <code>TURBIDITY_FAU</code>, <code>TURBIDITY_JTU</code>)</td>
+</tr>
+<tr>
+<td>397</td>
 <td><code>_SENTINEL</code> (internal bound; do not use)</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
+<p><strong>The profile opaque block is not in this enum.</strong> The C <code>value_base_unit_t</code>
+continues past 397 with the profile-only units — UCUM's arbitrary atoms and
+UNECE's package and count codes (doc/11 §7.1) — and <code>BaseUnit</code> deliberately
+stops before them, because they have no native spelling for a Python name to
+mirror. A unit carrying one is still fully usable: <code>parse_unit</code>, <code>unit_to_str</code>,
+<code>unit_is_profile_only</code> and the comparison helpers all handle it, and
+<code>unit_to_str</code> returns the profile notation (<code>"unece:XBX"</code>). Only the
+<code>BaseUnit(...)</code> <em>constructor</em> will refuse such a value, so do not call it on a
+raw base taken from a profile-only unit.</p>
 <p><strong>Note on <code>CUP</code>:</strong> the Cuban-Peso currency is exposed as <strong><code>BaseUnit.CUP_</code></strong> (trailing
 underscore), not <code>BaseUnit.CUP</code>. The plain name <code>CUP</code> is the US-cup volume unit
 (enum value 81); since Python enum member names must be unique, the currency at

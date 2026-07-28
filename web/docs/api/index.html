@@ -89,6 +89,7 @@
 <li>3.4 <a href="#34-bvn_unit_convert_value-bovnar_si_unitsh"><code>bvn_unit_convert_value</code> <em>(bovnar_si_units.h)</em></a></li>
 <li>3.5 <a href="#35-bvn_error_to_string"><code>bvn_error_to_string</code></a></li>
 <li>3.6 <a href="#36-canonicalising-observer-bvnr_canon_observer_">Canonicalising observer (<code>bvnr_canon_observer_*</code>)</a></li>
+<li>3.7 <a href="#37-unit-inspection-helpers">Unit inspection helpers</a></li>
 </ul>
 </li>
 <li><a href="#4-dom-api-bovnar_domh">DOM API (<code>bovnar_dom.h</code>)</a><ul>
@@ -1561,6 +1562,40 @@ resolves (§1.8). A version of <code>0.0</code>, or a call made after output has
 <span class="n">bvnr_canon_observer_destroy</span><span class="p">(</span><span class="n">canon</span><span class="p">);</span>
 </code></pre></div>
 
+<h3 id="37-unit-inspection-helpers">3.7 Unit inspection helpers</h3>
+<p>Three more entry points from <code>bovnar_si_units.h</code>. The Python bindings expose all of
+them — see <a href="https://www.bovnar.io/docs/python/#52-extended-unit-functions">Extended unit functions</a> —
+and they are listed here so the C side is not the poor relation.</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w">    </span><span class="nf">bvn_unit_dimension_vector</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">dims</span><span class="p">[</span><span class="n">bvn_si_dim_count</span><span class="p">]);</span>
+<span class="kt">bool</span><span class="w">    </span><span class="nf">bvn_prefix_unit_valid</span><span class="p">(</span><span class="n">value_unit_prefix_t</span><span class="w"> </span><span class="n">prefix</span><span class="p">,</span><span class="w"> </span><span class="n">value_base_unit_t</span><span class="w"> </span><span class="n">base</span><span class="p">);</span>
+<span class="kt">int32_t</span><span class="w"> </span><span class="nf">bvn_exponent_to_int</span><span class="p">(</span><span class="n">unit_exponent_t</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="n">unit_exponent_t</span><span class="w"> </span><span class="nf">bvn_int_to_exponent</span><span class="p">(</span><span class="kt">int32_t</span><span class="w"> </span><span class="n">n</span><span class="p">);</span>
+</code></pre></div>
+
+<p><strong><code>bvn_unit_dimension_vector</code></strong> fills the seven SI exponents, indexed by
+<code>bvn_si_dim_idx_t</code> — <code>bvn_si_dim_meter</code>, <code>_kilogram</code>, <code>_second</code>, <code>_ampere</code>, <code>_kelvin</code>,
+<code>_mol</code>, <code>_candela</code>, with <code>bvn_si_dim_count</code> (7) as the array length. Two units with
+the same vector are the same physical quantity however they were spelled:</p>
+<div class="codehilite"><pre><span></span><code>m/s          ok=1  [ 1, 0, -1, 0, 0, 0, 0]
+k~g·m/s²     ok=1  [ 1, 1, -2, 0, 0, 0, 0]
+N            ok=1  [ 1, 1, -2, 0, 0, 0, 0]      same vector as the compound above
+%            ok=1  [ 0, 0,  0, 0, 0, 0, 0]      dimensionless, but it HAS a vector
+$USD         ok=0                               currencies carry no dimension
+</code></pre></div>
+
+<p>The <code>false</code> return for a currency is the same fact §4.1 of the unit policy reference
+records: a currency has no dimension vector, so a screen built on dimensions alone
+declines conversions the engine can actually perform.</p>
+<p><strong><code>bvn_prefix_unit_valid</code></strong> answers whether a prefix may sit on a base unit — the IEC
+prefixes belong to <code>bit</code> and <code>byte</code> only:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">value_unit_prefix_t</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">.</span><span class="n">system</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prefix_iec</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">id</span><span class="p">.</span><span class="n">iec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iec_gibi</span><span class="w"> </span><span class="p">};</span>
+<span class="n">bvn_prefix_unit_valid</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">bu_byte</span><span class="p">);</span><span class="w">    </span><span class="cm">/* true  */</span>
+<span class="n">bvn_prefix_unit_valid</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">bu_meter</span><span class="p">);</span><span class="w">   </span><span class="cm">/* false */</span>
+</code></pre></div>
+
+<p><strong><code>bvn_exponent_to_int</code> / <code>bvn_int_to_exponent</code></strong> convert between the <code>unit_exponent_t</code>
+enum and a plain integer: <code>bvn_exponent_to_int(exp_neg_square)</code> is <code>-2</code>, and
+<code>bvn_int_to_exponent(-2)</code> is <code>exp_neg_square</code>.</p>
 <hr />
 <h2 id="4-dom-api-bovnar_domh">4. DOM API (<code>bovnar_dom.h</code>)</h2>
 <p>The SAX reader above streams events. When you instead want the whole document in

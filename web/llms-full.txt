@@ -9735,6 +9735,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 3.4 [`bvn_unit_convert_value` *(bovnar_si_units.h)*](#34-bvn_unit_convert_value-bovnar_si_unitsh)
     - 3.5 [`bvn_error_to_string`](#35-bvn_error_to_string)
     - 3.6 [Canonicalising observer (`bvnr_canon_observer_*`)](#36-canonicalising-observer-bvnr_canon_observer_)
+    - 3.7 [Unit inspection helpers](#37-unit-inspection-helpers)
 4. [DOM API (`bovnar_dom.h`)](#4-dom-api-bovnar_domh)
     - 4.1 [Parsing and lifetime](#41-parsing-and-lifetime)
     - 4.2 [Navigation](#42-navigation)
@@ -11281,6 +11282,49 @@ bvnr_read(r);
 bvnr_canon_observer_finish(canon);
 bvnr_canon_observer_destroy(canon);
 ```
+
+### 3.7 Unit inspection helpers
+
+Three more entry points from `bovnar_si_units.h`. The Python bindings expose all of
+them — see [Extended unit functions](09_bovnar_python_bindings.md#52-extended-unit-functions) —
+and they are listed here so the C side is not the poor relation.
+
+```c
+bool    bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count]);
+bool    bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base);
+int32_t bvn_exponent_to_int(unit_exponent_t e);
+unit_exponent_t bvn_int_to_exponent(int32_t n);
+```
+
+**`bvn_unit_dimension_vector`** fills the seven SI exponents, indexed by
+`bvn_si_dim_idx_t` — `bvn_si_dim_meter`, `_kilogram`, `_second`, `_ampere`, `_kelvin`,
+`_mol`, `_candela`, with `bvn_si_dim_count` (7) as the array length. Two units with
+the same vector are the same physical quantity however they were spelled:
+
+```text
+m/s          ok=1  [ 1, 0, -1, 0, 0, 0, 0]
+k~g·m/s²     ok=1  [ 1, 1, -2, 0, 0, 0, 0]
+N            ok=1  [ 1, 1, -2, 0, 0, 0, 0]      same vector as the compound above
+%            ok=1  [ 0, 0,  0, 0, 0, 0, 0]      dimensionless, but it HAS a vector
+$USD         ok=0                               currencies carry no dimension
+```
+
+The `false` return for a currency is the same fact §4.1 of the unit policy reference
+records: a currency has no dimension vector, so a screen built on dimensions alone
+declines conversions the engine can actually perform.
+
+**`bvn_prefix_unit_valid`** answers whether a prefix may sit on a base unit — the IEC
+prefixes belong to `bit` and `byte` only:
+
+```c
+value_unit_prefix_t p = { .system = prefix_iec, .id.iec = iec_gibi };
+bvn_prefix_unit_valid(p, bu_byte);    /* true  */
+bvn_prefix_unit_valid(p, bu_meter);   /* false */
+```
+
+**`bvn_exponent_to_int` / `bvn_int_to_exponent`** convert between the `unit_exponent_t`
+enum and a plain integer: `bvn_exponent_to_int(exp_neg_square)` is `-2`, and
+`bvn_int_to_exponent(-2)` is `exp_neg_square`.
 
 ---
 

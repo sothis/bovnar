@@ -232,8 +232,8 @@ bovnar/
 │   ├── bovnar_stream.h      # Framing, multiplexing & document-in-document
 │   ├── bvn_datetime.h       # Datetime / epoch helpers (spec 1.1)
 │   ├── bvn_gregorian_date.h # Gregorian calendar conversions (spec 1.1)
-│   ├── bvn_float.h
-│   └── bvn_int.h
+│   ├── bvn_float.h          # Arbitrary-precision float (`bvn_float_t`)
+│   └── bvn_int.h            # Arbitrary bit-width integer (`bvn_int_t`)
 ├── src/
 │   ├── bovnar.c             # CLI entry point
 │   ├── lexer/               # Tokeniser + state table

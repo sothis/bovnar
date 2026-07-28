@@ -1521,6 +1521,11 @@ error model, and the media type registration for the format.<a href="#section-ab
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.3">
                 <p id="section-toc.1-1.10.2.3.1"><a href="#section-10.3" class="auto internal xref">10.3</a>.  <a href="#name-error-recovery" class="internal xref">Error Recovery</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.3.2.1">
+                    <p id="section-toc.1-1.10.2.3.2.1.1"><a href="#section-10.3.1" class="auto internal xref">10.3.1</a>.  <a href="#name-what-the-two-counters-mean" class="internal xref">What the Two Counters Mean</a></p>
+</li>
+                </ul>
 </li>
             </ul>
 </li>
@@ -1528,13 +1533,16 @@ error model, and the media type registration for the format.<a href="#section-ab
             <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-conformance" class="internal xref">Conformance</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11.2.1">
-                <p id="section-toc.1-1.11.2.1.1"><a href="#section-11.1" class="auto internal xref">11.1</a>.  <a href="#name-tiers" class="internal xref">Tiers</a></p>
+                <p id="section-toc.1-1.11.2.1.1"><a href="#section-11.1" class="auto internal xref">11.1</a>.  <a href="#name-producers" class="internal xref">Producers</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11.2.2">
-                <p id="section-toc.1-1.11.2.2.1"><a href="#section-11.2" class="auto internal xref">11.2</a>.  <a href="#name-test-corpus" class="internal xref">Test Corpus</a></p>
+                <p id="section-toc.1-1.11.2.2.1"><a href="#section-11.2" class="auto internal xref">11.2</a>.  <a href="#name-tiers" class="internal xref">Tiers</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11.2.3">
-                <p id="section-toc.1-1.11.2.3.1"><a href="#section-11.3" class="auto internal xref">11.3</a>.  <a href="#name-version-stability" class="internal xref">Version Stability</a></p>
+                <p id="section-toc.1-1.11.2.3.1"><a href="#section-11.3" class="auto internal xref">11.3</a>.  <a href="#name-test-corpus" class="internal xref">Test Corpus</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11.2.4">
+                <p id="section-toc.1-1.11.2.4.1"><a href="#section-11.4" class="auto internal xref">11.4</a>.  <a href="#name-version-stability" class="internal xref">Version Stability</a></p>
 </li>
             </ul>
 </li>
@@ -1723,8 +1731,9 @@ implementations must carry.<a href="#section-1.2-2.1.1" class="pilcrow">¶</a></
             <p id="section-1.2-2.2.1">Against <strong>UCUM</strong> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span> and <strong>CF</strong> <span>[<a href="#CF" class="cite xref">CF</a>]</span>, which standardize unit
 <em>notation</em> for use inside some other format, it specifies the container
 as well, so that the unit is enforced by the parser rather than by a
-downstream convention. Bovnar can consume UCUM notation directly; see
-<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.2-2.2.1" class="pilcrow">¶</a></p>
+downstream convention. A facility for writing a unit in UCUM notation
+exists in the reference implementation but is not part of the format
+this document specifies; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.2-2.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-1.2-2.3">
             <p id="section-1.2-2.3.1">Against <strong>schema languages</strong>, it is schema-free. The description
@@ -1769,14 +1778,15 @@ under which a unit is accepted or rejected (<a href="#units" class="auto interna
             <p id="section-1.3-2.6.1">validation rules, limits, and the error model (<a href="#validation" class="auto internal xref">Section 10</a>);<a href="#section-1.3-2.6.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-1.3-2.7">
-            <p id="section-1.3-2.7.1">conformance tiers (<a href="#conformance" class="auto internal xref">Section 11</a>);<a href="#section-1.3-2.7.1" class="pilcrow">¶</a></p>
+            <p id="section-1.3-2.7.1">conformance requirements for producers and consumers
+(<a href="#conformance" class="auto internal xref">Section 11</a>);<a href="#section-1.3-2.7.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-1.3-2.8">
             <p id="section-1.3-2.8.1">the media type registration and IANA considerations (<a href="#iana" class="auto internal xref">Section 14</a>); and<a href="#section-1.3-2.8.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-1.3-2.9">
-            <p id="section-1.3-2.9.1">security and interoperability considerations (<a href="#security" class="auto internal xref">Section 15</a>,
-<a href="#interop" class="auto internal xref">Section 12</a>).<a href="#section-1.3-2.9.1" class="pilcrow">¶</a></p>
+            <p id="section-1.3-2.9.1">interoperability and security considerations (<a href="#interop" class="auto internal xref">Section 12</a>,
+<a href="#security" class="auto internal xref">Section 15</a>).<a href="#section-1.3-2.9.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-1.3-3">This document does not specify an application programming interface, a
@@ -1832,19 +1842,19 @@ appear in all capitals, as shown here.<a href="#section-2.1-1" class="pilcrow">�
 <span class="break"></span><dl class="dlParallel" id="section-2.2-1">
           <dt id="section-2.2-1.1">Document:</dt>
           <dd style="margin-left: 1.5em" id="section-2.2-1.2">
-            <p id="section-2.2-1.2.1">A complete byte sequence conforming to the <code>stream</code> rule of
+            <p id="section-2.2-1.2.1">A complete octet sequence conforming to the <code>stream</code> rule of
 <a href="#collected-abnf" class="auto internal xref">Appendix A</a>.<a href="#section-2.2-1.2.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-2.2-1.3">Assignment:</dt>
           <dd style="margin-left: 1.5em" id="section-2.2-1.4">
-            <p id="section-2.2-1.4.1">A key, the <code>=</code> sign, an optional type annotation, a value, and a
-terminating <code>;</code>. A document is a sequence of assignments.<a href="#section-2.2-1.4.1" class="pilcrow">¶</a></p>
+            <p id="section-2.2-1.4.1">A key, an <code>=</code> sign, an optional type annotation, a value, and a
+terminating semicolon. A document is a sequence of assignments.<a href="#section-2.2-1.4.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-2.2-1.5">Key:</dt>
           <dd style="margin-left: 1.5em" id="section-2.2-1.6">
-            <p id="section-2.2-1.6.1">The identifier naming an assignment, introduced by <code>.</code>.<a href="#section-2.2-1.6.1" class="pilcrow">¶</a></p>
+            <p id="section-2.2-1.6.1">The identifier naming an assignment, introduced by a leading dot.<a href="#section-2.2-1.6.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-2.2-1.7">Value kind:</dt>
@@ -1927,40 +1937,64 @@ sequence, the additional UTF-8 well-formedness requirement of
 grammar and are stated in prose only:<a href="#section-2.3-4" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-2.3-5.1">
-            <p id="section-2.3-5.1.1">UTF-8 well-formedness (<a href="#encoding" class="auto internal xref">Section 4</a>);<a href="#section-2.3-5.1.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.1.1"><strong>UTF-8 well-formedness</strong> (<a href="#encoding" class="auto internal xref">Section 4</a>).<a href="#section-2.3-5.1.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.2">
-            <p id="section-2.3-5.2.1">the placement rules for the byte order mark (<a href="#encoding" class="auto internal xref">Section 4</a>) and for the
-version declaration (<a href="#version" class="auto internal xref">Section 5</a>);<a href="#section-2.3-5.2.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.2.1"><strong>Byte order mark placement</strong> (<a href="#encoding" class="auto internal xref">Section 4</a>).<a href="#section-2.3-5.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.3">
-            <p id="section-2.3-5.3.1">the rule that a version declaration, once its prefix and the following
-horizontal whitespace have matched, <strong>commits</strong>: a malformed version
-after that point is an error and does not fall back to being an
-ordinary comment (<a href="#version" class="auto internal xref">Section 5</a>). The grammar admits the fallback,
-because <code>version-decl</code> is optional and <code>comment</code> would match the same
-octets; the prose forbids it;<a href="#section-2.3-5.3.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.3.1"><strong>Version declaration placement</strong>, and the rule that a declaration
+<strong>commits</strong>: once its prefix and the following horizontal whitespace
+have matched, a malformed version is an error and does not fall back to
+being an ordinary comment (<a href="#version" class="auto internal xref">Section 5</a>). The grammar admits the
+fallback, because <code>version-decl</code> is optional and <code>comment</code> would match
+the same octets; the prose forbids it.<a href="#section-2.3-5.3.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.4">
-            <p id="section-2.3-5.4.1">the numeric limits of <a href="#limits" class="auto internal xref">Section 10.1</a>;<a href="#section-2.3-5.4.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.4.1"><strong>Version gating.</strong> The grammar has no notion of the declared version,
+so it accepts every construct in every document. The constructs
+introduced after 1.0 - the <code>datetime</code> family, the <code>\x</code> and <code>\u{}</code>
+escapes, and reference array indexing - are valid only in a document
+that declares 1.1 or newer (<a href="#version" class="auto internal xref">Section 5</a>). This is the single largest
+class of rule the grammar cannot carry.<a href="#section-2.3-5.4.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.5">
-            <p id="section-2.3-5.5.1">the length-prefixing of octet-stream chunks (<a href="#octet-streams" class="auto internal xref">Section 9.3</a>). The
-grammar writes <code>os-data = *OCTET</code>, which says only "some octets"; the
-binding requirement that the count equal the preceding <code>os-length</code>
-field is context-sensitive and is stated in prose;<a href="#section-2.3-5.5.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.5.1"><strong>String escape semantics</strong> (<a href="#strings" class="auto internal xref">Section 6.3</a>): that <code>\u{}</code> names a Unicode
+scalar value rather than a surrogate or a value above U+10FFFF, and
+that no escape may resolve to a rejected control octet. The grammar
+permits any two hexadecimal digits and any one-to-six-digit scalar.<a href="#section-2.3-5.5.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.6">
-            <p id="section-2.3-5.6.1">the type/value and unit compatibility rules of <a href="#types" class="auto internal xref">Section 7</a> and
-<a href="#units" class="auto internal xref">Section 8</a>; and<a href="#section-2.3-5.6.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.6.1"><strong>Datetime literal field ranges and epoch compatibility</strong>
+(<a href="#datetime-literals" class="auto internal xref">Section 6.7</a>): that a month is 01-12, a day valid for its
+month and year, an hour 00-23, a second 00-60; and that the atomic GNSS
+epochs reject a literal outright. The grammar counts digits and nothing
+more.<a href="#section-2.3-5.6.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.7">
-            <p id="section-2.3-5.7.1">the sibling-comparison rules enforced at the materializing tier only
-(<a href="#conformance" class="auto internal xref">Section 11</a>).<a href="#section-2.3-5.7.1" class="pilcrow">¶</a></p>
+            <p id="section-2.3-5.7.1"><strong>The numeric limits</strong> of <a href="#limits" class="auto internal xref">Section 10.1</a>.<a href="#section-2.3-5.7.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-2.3-5.8">
+            <p id="section-2.3-5.8.1"><strong>Octet-stream chunk length-prefixing</strong> (<a href="#octet-streams" class="auto internal xref">Section 9.3</a>). The
+grammar writes <code>os-data = *OCTET</code>, which says only "some octets"; the
+binding requirement that the count equal the preceding <code>os-length</code>
+field is context-sensitive.<a href="#section-2.3-5.8.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-2.3-5.9">
+            <p id="section-2.3-5.9.1"><strong>Type/value and unit compatibility</strong> (<a href="#types" class="auto internal xref">Section 7</a>, <a href="#units" class="auto internal xref">Section 8</a>): valid
+widths, bases, and Q values; value ranges; digits within the declared
+base; that a unit resolves against the registry; and that an annotation
+unit and an inline suffix agree.<a href="#section-2.3-5.9.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-2.3-5.10">
+            <p id="section-2.3-5.10.1"><strong>The sibling-comparison rules</strong> enforced at the materializing tier
+only (<a href="#conformance" class="auto internal xref">Section 11</a>).<a href="#section-2.3-5.10.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-2.3-6">A document that satisfies the ABNF but violates any of these is not a
-valid Bovnar document.<a href="#section-2.3-6" class="pilcrow">¶</a></p>
+valid Bovnar document. Equivalently: the ABNF is a <strong>necessary</strong> condition
+for validity, never a sufficient one, and an implementation that checks
+only the grammar accepts documents this document declares invalid.<a href="#section-2.3-6" class="pilcrow">¶</a></p>
 <p id="section-2.3-7">Two points of the grammar require lookahead rather than a single-token
 decision, and an implementation built as a greedy lexer <span class="bcp14">MUST</span> account for
 them:<a href="#section-2.3-7" class="pilcrow">¶</a></p>
@@ -2438,8 +2472,12 @@ rest of the path and is interpreted only when an application resolves the
 stored path string itself. Resolution semantics, when an application
 chooses to implement them, follow the array model of <a href="#arrays" class="auto internal xref">Section 9.1</a>: a flat
 <code>/</code>-row matrix is addressed <code>[row][col]</code>, a one-dimensional array as
-<code>[i]</code>, and genuine nested arrays descend one index per level. In a 1.0 or
-undeclared document, <code>[</code> inside a reference is
+<code>[i]</code>, and genuine nested arrays descend one index per level. Three
+cases do not resolve, and an application <span class="bcp14">MUST</span> distinguish "no such value"
+from "the value is null" when it meets them: a <strong>partial</strong> index of a
+flat matrix (<code>&amp;.matrix[0]</code>, which names a row rather than an element), an
+<strong>out-of-range</strong> index, and an index applied to something that is <strong>not
+an array</strong>. In a 1.0 or undeclared document, <code>[</code> inside a reference is
 <code>error_unexpected_input_byte</code>.<a href="#section-6.5-7" class="pilcrow">¶</a></p>
 <p id="section-6.5-8">See <a href="#security-references" class="auto internal xref">Section 15.6</a> for the hazards of resolving references.<a href="#section-6.5-8" class="pilcrow">¶</a></p>
 </section>
@@ -3100,35 +3138,41 @@ first element, bare integers thereafter - remains homogeneous under
         </h3>
 <p id="section-8.1-1">A unit is an optional annotation on a numeric value. It is drawn from a
 fixed registry of named base units, prefixes, and currency codes, and may
-be compound. The full registry is <span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span>; this section
-specifies the notation and the rules, not the catalogue.<a href="#section-8.1-1" class="pilcrow">¶</a></p>
-<p id="section-8.1-2">The registry covers 180 named units across SI <span>[<a href="#SI" class="cite xref">SI</a>]</span>, IEC binary
+be compound. This section specifies the notation and the rules; the
+catalogue itself is <span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span>.<a href="#section-8.1-1" class="pilcrow">¶</a></p>
+<p id="section-8.1-2">That reference is <strong>normative</strong>, and it is the one point at which this
+document is not self-contained. A consumer <span class="bcp14">MUST</span> validate every unit
+against the registry, and the registry is too large to reproduce here and
+grows in minor revisions (<a href="#version-stability" class="auto internal xref">Section 11.4</a>). An implementer needs
+<span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span> to build a conforming parser; everything else required
+is in this document.<a href="#section-8.1-2" class="pilcrow">¶</a></p>
+<p id="section-8.1-3">The registry covers 180 named units across SI <span>[<a href="#SI" class="cite xref">SI</a>]</span>, IEC binary
 <span>[<a href="#IEC80000-13" class="cite xref">IEC80000-13</a>]</span>, imperial and US customary, CGS, radiation, electrical
 power, rotational, surveying, textile, and other families, accepting 529
 spellings in total once long-form and plural aliases are counted; plus
-216 currency codes (<a href="#currency" class="auto internal xref">Section 8.4</a>).<a href="#section-8.1-2" class="pilcrow">¶</a></p>
-<p id="section-8.1-3">Three properties govern how a unit behaves:<a href="#section-8.1-3" class="pilcrow">¶</a></p>
+216 currency codes (<a href="#currency" class="auto internal xref">Section 8.4</a>).<a href="#section-8.1-3" class="pilcrow">¶</a></p>
+<p id="section-8.1-4">Three properties govern how a unit behaves:<a href="#section-8.1-4" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="section-8.1-4.1">
-            <p id="section-8.1-4.1.1"><strong>Descriptive, not prescriptive.</strong> A consumer validates the <em>form</em> of a
+<li class="normal" id="section-8.1-5.1">
+            <p id="section-8.1-5.1.1"><strong>Descriptive, not prescriptive.</strong> A consumer validates the <em>form</em> of a
 unit and the <em>consistency</em> of the two places it may be written. It does
 not reject a document because its units do not add up dimensionally
 across assignments, and it performs no conversion. Dimensional analysis
 and conversion are services an application may request; they are not
-part of parsing.<a href="#section-8.1-4.1.1" class="pilcrow">¶</a></p>
+part of parsing.<a href="#section-8.1-5.1.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="section-8.1-4.2">
-            <p id="section-8.1-4.2.1"><strong>Total.</strong> A unit expression either resolves to a unit in the registry
+          <li class="normal" id="section-8.1-5.2">
+            <p id="section-8.1-5.2.1"><strong>Total.</strong> A unit expression either resolves to a unit in the registry
 or is an error. There is no state in which a value carries a unit the
-consumer cannot reason about.<a href="#section-8.1-4.2.1" class="pilcrow">¶</a></p>
+consumer cannot reason about.<a href="#section-8.1-5.2.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="section-8.1-4.3">
-            <p id="section-8.1-4.3.1"><strong>Additive across minor versions.</strong> New units, prefixes, currency
+          <li class="normal" id="section-8.1-5.3">
+            <p id="section-8.1-5.3.1"><strong>Additive across minor versions.</strong> New units, prefixes, currency
 codes, and accepted input spellings may be added in a minor revision. A
 document never depends on a code being <em>absent</em>, so this direction is
 safe; a consumer from an older point release may not recognize a unit
 added in a newer one, which is the expected direction of forward
-compatibility.<a href="#section-8.1-4.3.1" class="pilcrow">¶</a></p>
+compatibility.<a href="#section-8.1-5.3.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 </section>
@@ -3265,10 +3309,29 @@ silently pick one of two defensible readings:<a href="#section-8.3-5" class="pil
         </table>
 <p id="section-8.3-7">Both are <code>error_unit_illegal</code>. The separated spellings remain valid, so
 the refusal costs nothing but a character.<a href="#section-8.3-7" class="pilcrow">¶</a></p>
-<p id="section-8.3-8">Producers <span class="bcp14">MUST</span> emit the separated form <code>k~g</code> regardless of which spelling
-was read, so that a document round-tripped through a producer stays
-readable to a consumer predating the compact form.<a href="#section-8.3-8" class="pilcrow">¶</a></p>
-<p id="section-8.3-9">IEC prefixes <span class="bcp14">MUST NOT</span> be applied to currency codes. SI prefixes may be.<a href="#section-8.3-9" class="pilcrow">¶</a></p>
+<p id="section-8.3-8">Which spelling a producer emits depends on what it is doing, and the two
+cases differ:<a href="#section-8.3-8" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8.3-9.1">
+            <p id="section-8.3-9.1.1">A producer <strong>serializing a unit it holds as a value</strong> - one it
+constructed, computed, or decoded, rather than copied from an input
+document - <span class="bcp14">MUST</span> emit the canonical separated form <code>k~g</code>. The compact
+form is an input convenience; emitting it would make the output
+unreadable to a consumer that predates it, for no gain.<a href="#section-8.3-9.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-8.3-9.2">
+            <p id="section-8.3-9.2.1">A producer <strong>reproducing an existing document</strong>, such as a
+pretty-printer or canonicalizer, <span class="bcp14">MAY</span> preserve the spelling its input
+used. Both spellings denote the same unit, so preserving one is not a
+loss, and rewriting it would make round-tripping a document alter
+octets that carry no information.<a href="#section-8.3-9.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-8.3-10">The reference implementation does exactly this: its writer helpers emit
+<code>k~g</code>, while its pretty-print path reproduces <code>kg</code>, <code>MiB</code>, and <code>u~m</code> as
+written. See <a href="#interop-canonical" class="auto internal xref">Section 12.2</a> for why this means documents cannot be
+compared octet-wise.<a href="#section-8.3-10" class="pilcrow">¶</a></p>
+<p id="section-8.3-11">IEC prefixes <span class="bcp14">MUST NOT</span> be applied to currency codes. SI prefixes may be.<a href="#section-8.3-11" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="currency">
@@ -3502,8 +3565,8 @@ establishes nor breaks homogeneity, so <code>[1, , 3]</code> is valid.<a href="#
 consumer may treat its elements identically without inspection, while
 genuinely heterogeneous data is modelled with a struct. One consequence
 worth stating plainly: <strong>a ragged or mixed-type JSON array has no Bovnar
-representation.</strong> A converter must reject it rather than lose the
-structure.<a href="#section-9.1.1-3" class="pilcrow">¶</a></p>
+representation.</strong> A converter rejects it rather than losing the
+structure; <a href="#interop-json" class="auto internal xref">Section 12.3</a> states that requirement normatively.<a href="#section-9.1.1-3" class="pilcrow">¶</a></p>
 <p id="section-9.1.1-4">These checks require comparing siblings and are therefore enforced at the
 materializing tier only; see <a href="#conformance" class="auto internal xref">Section 11</a>.<a href="#section-9.1.1-4" class="pilcrow">¶</a></p>
 </section>
@@ -3766,7 +3829,7 @@ column, and octet offset at which it was detected.<a href="#section-10.2-1" clas
 value, enumerated in <a href="#error-codes" class="auto internal xref">Appendix B</a>. Those numeric values are part of
 the format's stability contract: an existing value never changes, and a
 new code is appended above the current maximum. Conformance harnesses
-(<a href="#test-corpus" class="auto internal xref">Section 11.2</a>) compare implementations at the level of these codes, so
+(<a href="#test-corpus" class="auto internal xref">Section 11.3</a>) compare implementations at the level of these codes, so
 an implementation that reports its own codes <span class="bcp14">SHOULD</span> provide a mapping
 onto them.<a href="#section-10.2-2" class="pilcrow">¶</a></p>
 <p id="section-10.2-3">A consumer <span class="bcp14">MUST</span> report the code this document specifies for a given
@@ -3811,13 +3874,48 @@ document plausibly becomes readable again.<a href="#section-10.3-3" class="pilcr
 inside skipped junk - in <code>1.5</code>, in <code>.5</code>, in binary corruption - is just
 another skipped octet. A <code>.</code> inside a bracket opened since recovery began
 opens no assignment either.<a href="#section-10.3-4" class="pilcrow">¶</a></p>
-<p id="section-10.3-5">If end of input is reached while recovering, <code>error_got_incomplete_bvnr_stream</code>
-is reported <strong>in addition to</strong> the original error, in that order.<a href="#section-10.3-5" class="pilcrow">¶</a></p>
-<p id="section-10.3-6">The skipped-octet total is the only way an application can learn what
-recovery cost: the skipped octets were never parsed, so nothing else
-mentions them. A non-zero total means the data delivered is not the whole
-document. See <a href="#security-recovery" class="auto internal xref">Section 15.3</a>.<a href="#section-10.3-6" class="pilcrow">¶</a></p>
-<p id="section-10.3-7">Recovery mode <span class="bcp14">MUST NOT</span> be the default.<a href="#section-10.3-7" class="pilcrow">¶</a></p>
+<p id="section-10.3-5">If end of input is reached while recovering,
+<code>error_got_incomplete_bvnr_stream</code> is reported <strong>in addition to</strong> the
+original error, in that order.<a href="#section-10.3-5" class="pilcrow">¶</a></p>
+<p id="section-10.3-6">The converse case is worth stating because it is easy to misread: if the
+input simply ends part-way through a value, with no earlier error, only
+the truncation is reported. A value that would have been rejected had it
+been terminated is never checked, because the check happens at the
+terminator. Truncating a document can therefore <em>hide</em> a defect rather
+than add one, and a consumer <span class="bcp14">MUST NOT</span> infer from a lone truncation error
+that the rest of the document was well-formed.<a href="#section-10.3-6" class="pilcrow">¶</a></p>
+<div id="recovery-counters">
+<section id="section-10.3.1">
+          <h4 id="name-what-the-two-counters-mean">
+<a href="#section-10.3.1" class="section-number selfRef">10.3.1. </a><a href="#name-what-the-two-counters-mean" class="section-name selfRef">What the Two Counters Mean</a>
+          </h4>
+<p id="section-10.3.1-1">The count of recovery events and the skipped-octet total answer different
+questions, and <strong>neither alone establishes that a document arrived
+intact</strong>:<a href="#section-10.3.1-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-10.3.1-2.1">
+              <p id="section-10.3.1-2.1.1"><strong>Recovery count</strong> is the number of times an error put the parser into
+recovery. It is the signal that <em>something was dropped</em>. Whenever it is
+non-zero, at least one value or assignment was rejected and is absent
+from what the consumer received.<a href="#section-10.3.1-2.1.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-10.3.1-2.2">
+              <p id="section-10.3.1-2.2.1"><strong>Skipped octets</strong> is how much raw input was discarded unparsed. It
+says what recovery <em>cost in text</em>, and it is the only way to learn
+that: the skipped octets were never parsed, so no other event mentions
+them.<a href="#section-10.3.1-2.2.1" class="pilcrow">¶</a></p>
+</li>
+          </ul>
+<p id="section-10.3.1-3">A recovery can drop a value while skipping <strong>zero</strong> octets. Where a value
+is rejected and the very next octet is the statement's own <code>;</code>, there is
+nothing to skip - yet the assignment is delivered with no value attached,
+and a consumer watching only the skipped total would conclude that
+nothing was lost. Applications <span class="bcp14">MUST</span> therefore treat a non-zero recovery
+count as authoritative for "data is missing", and read the skipped total
+only to learn how much text that cost. See <a href="#security-recovery" class="auto internal xref">Section 15.3</a>.<a href="#section-10.3.1-3" class="pilcrow">¶</a></p>
+<p id="section-10.3.1-4">Recovery mode <span class="bcp14">MUST NOT</span> be the default.<a href="#section-10.3.1-4" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 </section>
@@ -3827,18 +3925,76 @@ document. See <a href="#security-recovery" class="auto internal xref">Section 15
       <h2 id="name-conformance">
 <a href="#section-11" class="section-number selfRef">11. </a><a href="#name-conformance" class="section-name selfRef">Conformance</a>
       </h2>
-<div id="tiers">
+<div id="conformance-producers">
 <section id="section-11.1">
-        <h3 id="name-tiers">
-<a href="#section-11.1" class="section-number selfRef">11.1. </a><a href="#name-tiers" class="section-name selfRef">Tiers</a>
+        <h3 id="name-producers">
+<a href="#section-11.1" class="section-number selfRef">11.1. </a><a href="#name-producers" class="section-name selfRef">Producers</a>
         </h3>
-<p id="section-11.1-1">Four of this document's rules require comparing sibling values that a
+<p id="section-11.1-1">A conforming producer emits documents that satisfy this document. Its
+obligations are stated where each construct is defined; they are
+collected here because an implementer writing a writer has no other
+single place to find them.<a href="#section-11.1-1" class="pilcrow">¶</a></p>
+<p id="section-11.1-2">A producer <span class="bcp14">MUST</span>:<a href="#section-11.1-2" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-11.1-3.1">
+            <p id="section-11.1-3.1.1">emit well-formed UTF-8 in the text layer (<a href="#encoding" class="auto internal xref">Section 4</a>);<a href="#section-11.1-3.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-3.2">
+            <p id="section-11.1-3.2.1"><strong>emit a version declaration when the document uses any construct
+introduced after version 1.0</strong> (<a href="#version" class="auto internal xref">Section 5</a>) - the <code>datetime</code> family,
+the <code>\x</code> and <code>\u{}</code> string escapes, and reference array indexing. A
+document using one without declaring 1.1 is invalid, and the failure is
+easy to miss because every <em>other</em> value in it is usually fine;<a href="#section-11.1-3.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-3.3">
+            <p id="section-11.1-3.3.1">emit the canonical separated prefix form <code>k~g</code> when serializing a unit
+it holds as a value; a producer reproducing an existing document <span class="bcp14">MAY</span>
+instead preserve that document's spelling (<a href="#prefixes" class="auto internal xref">Section 8.3</a>);<a href="#section-11.1-3.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-3.4">
+            <p id="section-11.1-3.4.1">preserve the order of struct keys (<a href="#structs" class="auto internal xref">Section 9.2</a>);<a href="#section-11.1-3.4.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-3.5">
+            <p id="section-11.1-3.5.1">emit documents valid at the <strong>materializing</strong> tier (<a href="#conformance-tiers" class="auto internal xref">Section 11.2</a>) -
+unique keys within a scope, homogeneous arrays, rectangular sibling
+sub-arrays, consistent sibling record shapes - even when the intended
+consumer is a streaming one that would not detect a violation.<a href="#section-11.1-3.5.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-11.1-4">A producer <span class="bcp14">SHOULD</span>:<a href="#section-11.1-4" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-11.1-5.1">
+            <p id="section-11.1-5.1.1">omit the byte order mark (<a href="#encoding" class="auto internal xref">Section 4</a>);<a href="#section-11.1-5.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-5.2">
+            <p id="section-11.1-5.2.1">use the <code>.bvnr</code> extension (<a href="#interop-detection" class="auto internal xref">Section 12.4</a>);<a href="#section-11.1-5.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-5.3">
+            <p id="section-11.1-5.3.1">write line endings consistently, and consider the Net-Unicode profile
+of <span>[<a href="#RFC5198" class="cite xref">RFC5198</a>]</span>, when targeting a text channel (<a href="#interop-transport" class="auto internal xref">Section 12.1</a>);<a href="#section-11.1-5.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.1-5.4">
+            <p id="section-11.1-5.4.1">offer a mode that refuses to emit an octet stream, for use when the
+destination channel is not binary-safe (<a href="#interop-transport" class="auto internal xref">Section 12.1</a>).<a href="#section-11.1-5.4.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-11.1-6">A producer <span class="bcp14">MUST NOT</span> rely on a version declaration to cause an older
+consumer to reject a document: to a version 1.0 consumer the declaration
+is an ordinary comment (<a href="#security-version" class="auto internal xref">Section 15.4</a>).<a href="#section-11.1-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="conformance-tiers">
+<section id="section-11.2">
+        <h3 id="name-tiers">
+<a href="#section-11.2" class="section-number selfRef">11.2. </a><a href="#name-tiers" class="section-name selfRef">Tiers</a>
+        </h3>
+<p id="section-11.2-1">Four of this document's rules require comparing sibling values that a
 streaming consumer sees one at a time and cannot retain in bounded
-memory. The format therefore defines two conformance tiers.<a href="#section-11.1-1" class="pilcrow">¶</a></p>
-<p id="section-11.1-2">A <strong>streaming consumer</strong> processes a document as a sequence of events. It
-<span class="bcp14">MUST</span> enforce every rule in this document except the four listed below.<a href="#section-11.1-2" class="pilcrow">¶</a></p>
-<p id="section-11.1-3">A <strong>materializing consumer</strong> constructs a tree of the whole document. It
-<span class="bcp14">MUST</span> additionally enforce:<a href="#section-11.1-3" class="pilcrow">¶</a></p>
+memory. The format therefore defines two conformance tiers.<a href="#section-11.2-1" class="pilcrow">¶</a></p>
+<p id="section-11.2-2">A <strong>streaming consumer</strong> processes a document as a sequence of events. It
+<span class="bcp14">MUST</span> enforce every rule in this document except the four listed below.<a href="#section-11.2-2" class="pilcrow">¶</a></p>
+<p id="section-11.2-3">A <strong>materializing consumer</strong> constructs a tree of the whole document. It
+<span class="bcp14">MUST</span> additionally enforce:<a href="#section-11.2-3" class="pilcrow">¶</a></p>
 <span id="name-materializing-tier-rules"></span><table class="center" id="table-13">
           <caption>
 <a href="#table-13" class="selfRef">Table 13</a>:
@@ -3877,46 +4033,113 @@ memory. The format therefore defines two conformance tiers.<a href="#section-11.
             </tr>
           </tbody>
         </table>
-<p id="section-11.1-5">An implementation <span class="bcp14">MUST</span> document which tier it implements. An
+<p id="section-11.2-5">An implementation <span class="bcp14">MUST</span> document which tier it implements. An
 implementation offering both interfaces <span class="bcp14">MUST</span> apply the materializing-tier
-rules on its materializing interface.<a href="#section-11.1-5" class="pilcrow">¶</a></p>
-<p id="section-11.1-6">The consequence for interoperability is direct and is the most likely
+rules on its materializing interface.<a href="#section-11.2-5" class="pilcrow">¶</a></p>
+<p id="section-11.2-6">The same distinction is drawn under other names elsewhere, and an
+implementer reading more than one document will meet all three: what this
+document calls the <strong>materializing tier</strong> is the <em>DOM tier</em> in
+<span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> and is reported as <em>document-tier</em> validation by the
+reference command-line tool. They are one concept.<a href="#section-11.2-6" class="pilcrow">¶</a></p>
+<p id="section-11.2-7">The consequence for interoperability is direct and is the most likely
 source of disagreement between two conforming implementations: <strong>a
 streaming consumer accepts documents a materializing consumer rejects.</strong>
-See <a href="#security-differential" class="auto internal xref">Section 15.2</a>.<a href="#section-11.1-6" class="pilcrow">¶</a></p>
+See <a href="#security-differential" class="auto internal xref">Section 15.2</a>.<a href="#section-11.2-7" class="pilcrow">¶</a></p>
+<p id="section-11.2-8">Concretely, each document below is accepted in full by a streaming
+consumer and rejected by a materializing one.<a href="#section-11.2-8" class="pilcrow">¶</a></p>
+<span id="name-documents-the-two-tiers-jud"></span><table class="center" id="table-14">
+          <caption>
+<a href="#table-14" class="selfRef">Table 14</a>:
+<a href="#name-documents-the-two-tiers-jud" class="selfRef">Documents the two tiers judge differently</a>
+          </caption>
+<thead>
+            <tr>
+              <th class="text-left" rowspan="1" colspan="1">Document</th>
+              <th class="text-left" rowspan="1" colspan="1">Materializing-tier error</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>.a = 1; .a = 2;</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>error_duplicate_struct_key</code>
+</td>
+            </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>.b = [1, "two"];</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>error_array_element_type_mismatch</code>
+</td>
+            </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>.c = [[1,2], [3,4,5]];</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>error_array_row_size_mismatch</code>
+</td>
+            </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>.d = [{.x=1;}, {.y=1;}];</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>error_struct_shape_mismatch</code>
+</td>
+            </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>.e = [&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0];</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>error_array_element_type_mismatch</code>
+</td>
+            </tr>
+          </tbody>
+        </table>
+<p id="section-11.2-10">Note what the third row is <em>not</em>. <code>[1,2,3]/[4,5]</code> is a <code>/</code>-row width
+mismatch, and a <strong>streaming</strong> consumer catches that one as each row
+closes (<a href="#arrays" class="auto internal xref">Section 9.1</a>). The rule that needs the whole tree is the one about
+<strong>sibling sub-arrays</strong>, because nothing obliges a sibling to be adjacent
+in the octet stream. The two cases look alike and report the same error
+code; only one of them splits the tiers.<a href="#section-11.2-10" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="test-corpus">
-<section id="section-11.2">
+<section id="section-11.3">
         <h3 id="name-test-corpus">
-<a href="#section-11.2" class="section-number selfRef">11.2. </a><a href="#name-test-corpus" class="section-name selfRef">Test Corpus</a>
+<a href="#section-11.3" class="section-number selfRef">11.3. </a><a href="#name-test-corpus" class="section-name selfRef">Test Corpus</a>
         </h3>
-<p id="section-11.2-1">A conformance corpus and a driver protocol, <code>bvnr-conformance-v1</code>, are
+<p id="section-11.3-1">A conformance corpus and a driver protocol, <code>bvnr-conformance-v1</code>, are
 published with the reference implementation <span>[<a href="#BOVNAR-CONFORMANCE" class="cite xref">BOVNAR-CONFORMANCE</a>]</span>. An
 implementation claiming conformance to this document <span class="bcp14">SHOULD</span> pass that
 corpus at its declared tier and <span class="bcp14">SHOULD</span> state which test groups it was run
-against.<a href="#section-11.2-1" class="pilcrow">¶</a></p>
+against.<a href="#section-11.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="version-stability">
-<section id="section-11.3">
+<section id="section-11.4">
         <h3 id="name-version-stability">
-<a href="#section-11.3" class="section-number selfRef">11.3. </a><a href="#name-version-stability" class="section-name selfRef">Version Stability</a>
+<a href="#section-11.4" class="section-number selfRef">11.4. </a><a href="#name-version-stability" class="section-name selfRef">Version Stability</a>
         </h3>
-<p id="section-11.3-1">Within a major version, the format is additive only.<a href="#section-11.3-1" class="pilcrow">¶</a></p>
-<p id="section-11.3-2">A document valid under version 1.0 remains valid, and decodes to the same
+<p id="section-11.4-1">Within a major version, the format is additive only.<a href="#section-11.4-1" class="pilcrow">¶</a></p>
+<p id="section-11.4-2">A document valid under version 1.0 remains valid, and decodes to the same
 values, under every 1.x revision. This covers the lexical structure, the
 type families and their annotations, arrays including the homogeneity
 rules, structs, octet streams, references, and the numeric error-code
-values.<a href="#section-11.3-2" class="pilcrow">¶</a></p>
-<p id="section-11.3-3">What may grow in a minor revision: the unit and currency registry; the
+values.<a href="#section-11.4-2" class="pilcrow">¶</a></p>
+<p id="section-11.4-3">What may grow in a minor revision: the unit and currency registry; the
 accepted <em>input</em> spellings of a unit, given that canonical output is
 unchanged; new error codes appended above the maximum; new optional
 limits and options whose defaults preserve behaviour; and constructs
-gated behind a version declaration (<a href="#version" class="auto internal xref">Section 5</a>).<a href="#section-11.3-3" class="pilcrow">¶</a></p>
-<p id="section-11.3-4">What requires a major revision: anything that could render a valid
+gated behind a version declaration (<a href="#version" class="auto internal xref">Section 5</a>).<a href="#section-11.4-3" class="pilcrow">¶</a></p>
+<p id="section-11.4-4">What requires a major revision: anything that could render a valid
 document invalid, change how it decodes, renumber an error code, or alter
-the grammar.<a href="#section-11.3-4" class="pilcrow">¶</a></p>
+the grammar.<a href="#section-11.4-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -3951,8 +4174,12 @@ transformation; and<a href="#section-12.1-3.2.1" class="pilcrow">¶</a></p>
           <li class="normal" id="section-12.1-3.3">
             <p id="section-12.1-3.3.1">where a channel must remain text, have the <em>producer</em> refuse to emit an
 octet stream, rather than assume none will occur. Implementations
-<span class="bcp14">SHOULD</span> offer a text-only mode that turns this assumption into an
-enforced constraint.<a href="#section-12.1-3.3.1" class="pilcrow">¶</a></p>
+<span class="bcp14">SHOULD</span> offer a <strong>text-only mode</strong> that turns this assumption into an
+enforced constraint: a consumer so configured rejects a document
+containing an octet stream with <code>error_octet_stream_forbidden</code>, even
+though that document is perfectly valid. The rejection is an assertion
+about the channel, not a judgement about the document
+(<a href="#error-codes" class="auto internal xref">Appendix B</a>).<a href="#section-12.1-3.3.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-12.1-4">A document with no octet stream is well-formed UTF-8 text throughout and
@@ -3996,7 +4223,7 @@ spellings, or unless the signature is understood to cover those exact
 octets and nothing more.<a href="#section-12.2-3" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="mapping-to-and-from-json">
+<div id="interop-json">
 <section id="section-12.3">
         <h3 id="name-mapping-to-and-from-json">
 <a href="#section-12.3" class="section-number selfRef">12.3. </a><a href="#name-mapping-to-and-from-json" class="section-name selfRef">Mapping To and From JSON</a>
@@ -4006,8 +4233,10 @@ partially in the other.<a href="#section-12.3-1" class="pilcrow">¶</a></p>
 <p id="section-12.3-2">Bovnar to JSON loses the type annotation, the unit, the distinction
 between <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code>, the
 distinction between a symbol and a string, the reference kind, and any
-octet stream. A converter <span class="bcp14">SHOULD</span> carry the discarded information into a
-sidecar structure rather than drop it silently.<a href="#section-12.3-2" class="pilcrow">¶</a></p>
+octet stream. A converter <span class="bcp14">SHOULD NOT</span> discard that silently: it <span class="bcp14">SHOULD</span>
+either carry the discarded information into a sidecar structure or report
+what was lost. The reference converter reports, naming the values that
+lost a unit and the symbols that became strings.<a href="#section-12.3-2" class="pilcrow">¶</a></p>
 <p id="section-12.3-3">JSON to Bovnar succeeds for scalar values, objects, and homogeneous
 arrays. It fails, and <span class="bcp14">MUST</span> fail rather than distort, for:<a href="#section-12.3-3" class="pilcrow">¶</a></p>
 <ul class="normal">
@@ -4027,7 +4256,7 @@ Converting <em>to</em> Bovnar is therefore an opportunity to add units, not an
 operation that recovers them.<a href="#section-12.3-5" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="file-naming-and-detection">
+<div id="interop-detection">
 <section id="section-12.4">
         <h3 id="name-file-naming-and-detection">
 <a href="#section-12.4" class="section-number selfRef">12.4. </a><a href="#name-file-naming-and-detection" class="section-name selfRef">File Naming and Detection</a>
@@ -4330,8 +4559,8 @@ exposed than streaming ones.<a href="#section-15.1-2.5.1" class="pilcrow">¶</a>
 </li>
           <li class="normal" id="section-15.1-2.6">
             <p id="section-15.1-2.6.1"><strong>String concatenation</strong> accumulates toward <code>max_string_length</code> across
-an unbounded number of adjacent literals, so the limit must be checked
-against the running total, not per literal.<a href="#section-15.1-2.6.1" class="pilcrow">¶</a></p>
+an unbounded number of adjacent literals, so a consumer <span class="bcp14">MUST</span> check the
+limit against the running total, not against each literal.<a href="#section-15.1-2.6.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-15.1-3">Deployments <span class="bcp14">SHOULD</span> set every limit in <a href="#limits" class="auto internal xref">Section 10.1</a> explicitly at a trust
@@ -4377,9 +4606,16 @@ been removed. Where the document is a security policy, an access control
 list, or a set of calibration constants, a removed assignment is likely
 to fail open.<a href="#section-15.3-2" class="pilcrow">¶</a></p>
 <p id="section-15.3-3">Recovery mode <span class="bcp14">MUST NOT</span> be enabled when the parsed document informs a
-security decision. Where it is enabled, an application <span class="bcp14">MUST</span> check both
-the recovery count and the skipped-octet total and <span class="bcp14">MUST</span> treat a non-zero
-value as a failure of the document, not as a diagnostic.<a href="#section-15.3-3" class="pilcrow">¶</a></p>
+security decision. Where it is enabled, an application <span class="bcp14">MUST</span> check the
+<strong>recovery count</strong> and <span class="bcp14">MUST</span> treat a non-zero value as a failure of the
+document, not as a diagnostic.<a href="#section-15.3-3" class="pilcrow">¶</a></p>
+<p id="section-15.3-4">Checking the skipped-octet total instead is not sufficient, and the
+difference is a trap: a rejected value whose statement terminator follows
+immediately skips <strong>zero</strong> octets, so the total stays at zero while the
+assignment arrives stripped of its value (<a href="#recovery-counters" class="auto internal xref">Section 10.3.1</a>). An
+access-control entry that loses its value this way is indistinguishable,
+to a consumer watching only the byte total, from one that was never
+there.<a href="#section-15.3-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="security-version">
@@ -4472,8 +4708,8 @@ parse means the value fits the declared width.<a href="#section-15.7-1.1.1" clas
             <p id="section-15.7-1.2.1"><strong>Fixed-point encoders saturate.</strong> An implementation encoding a
 <code>float_fix</code> value <span class="bcp14">SHOULD</span> saturate at the representable extreme rather
 than wrap, so that an out-of-range datum cannot silently decode to an
-unrelated value. The format itself rejects such a value, but a
-producer computing one must not emit a wrapped result.<a href="#section-15.7-1.2.1" class="pilcrow">¶</a></p>
+unrelated value. The format itself rejects such a value, but a producer
+that computes one <span class="bcp14">MUST NOT</span> emit a wrapped result in its place.<a href="#section-15.7-1.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.7-1.3">
             <p id="section-15.7-1.3.1"><strong>Width is declared, not enforced by storage.</strong> The annotation says how
@@ -4503,11 +4739,23 @@ with each other, or that the producer measured what it claims.<a href="#section-
 <p id="section-15.8-2">"It parsed" therefore means the dimension is <em>stated and internally
 consistent</em>, not that it is <em>correct</em>. Applications performing physical
 or financial computation <span class="bcp14">MUST</span> still validate ranges and cross-field
-relationships. Unit conversion, where an application requests it, is an
-opt-in service and introduces its own rounding considerations.<a href="#section-15.8-2" class="pilcrow">¶</a></p>
-<p id="section-15.8-3">Cross-currency conversion is refused rather than approximated, which is
-the safe behaviour: an implementation that silently applied a rate would
-be asserting a time-varying fact the document does not contain.<a href="#section-15.8-3" class="pilcrow">¶</a></p>
+relationships.<a href="#section-15.8-2" class="pilcrow">¶</a></p>
+<p id="section-15.8-3">Where an implementation offers read-time unit conversion, a further trap
+awaits the caller. Asking for a value in some unit is a <em>request</em>, not a
+guarantee: if the conversion cannot be performed - the quantities are of
+different dimension, or they are two different currencies - the value is
+delivered <strong>in its original unit</strong>, unconverted, rather than the request
+failing. An application that assumes its request succeeded then holds a
+number it believes is in one unit and which is in fact in another, which
+is precisely the failure this format exists to prevent. A caller
+requesting a conversion <span class="bcp14">MUST</span> check whether it actually occurred before
+using the result, and <span class="bcp14">MUST NOT</span> infer success from the absence of an
+error.<a href="#section-15.8-3" class="pilcrow">¶</a></p>
+<p id="section-15.8-4">Cross-currency conversion in particular is never performed rather than
+approximated, which is the safe behaviour: an implementation that
+silently applied a rate would be asserting a time-varying fact the
+document does not contain. What the caller gets back is the original
+amount in the original denomination.<a href="#section-15.8-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="security-leap">
@@ -4598,21 +4846,25 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
 <a href="#section-16.1" class="section-number selfRef">16.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
         </h3>
 <dl class="references">
+<dt id="BOVNAR-UNITS">[BOVNAR-UNITS]</dt>
+        <dd>
+<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Unit and Currency Reference"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://www.bovnar.io/doc/05_bovnar_unit_system.md">https://www.bovnar.io/doc/05_bovnar_unit_system.md</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="IEC80000-13">[IEC80000-13]</dt>
         <dd>
-<span class="refAuthor">International Electrotechnical Commission</span>, <span class="refTitle">"Quantities and units - Part 13: Information science and technology"</span>, <span class="seriesInfo">IEC 80000-13:2008</span>, <span>n.d.</span>. </dd>
+<span class="refAuthor">International Electrotechnical Commission</span>, <span class="refTitle">"Quantities and units - Part 13: Information science and technology"</span>, <span class="seriesInfo">IEC 80000-13:2008</span>, <time datetime="2008" class="refDate">2008</time>. </dd>
 <dd class="break"></dd>
 <dt id="IEEE754">[IEEE754]</dt>
         <dd>
-<span class="refAuthor">IEEE</span>, <span class="refTitle">"IEEE Standard for Floating-Point Arithmetic"</span>, <span class="seriesInfo">IEEE 754-2019</span>, <span>n.d.</span>. </dd>
+<span class="refAuthor">IEEE</span>, <span class="refTitle">"IEEE Standard for Floating-Point Arithmetic"</span>, <span class="seriesInfo">IEEE 754-2019</span>, <time datetime="2019" class="refDate">2019</time>. </dd>
 <dd class="break"></dd>
 <dt id="ISO4217">[ISO4217]</dt>
         <dd>
-<span class="refAuthor">International Organization for Standardization</span>, <span class="refTitle">"Codes for the representation of currencies"</span>, <span class="seriesInfo">ISO 4217:2015</span>, <span>n.d.</span>. </dd>
+<span class="refAuthor">International Organization for Standardization</span>, <span class="refTitle">"Codes for the representation of currencies"</span>, <span class="seriesInfo">ISO 4217:2015</span>, <time datetime="2015" class="refDate">2015</time>. </dd>
 <dd class="break"></dd>
 <dt id="ISO8601">[ISO8601]</dt>
         <dd>
-<span class="refAuthor">International Organization for Standardization</span>, <span class="refTitle">"Date and time - Representations for information interchange"</span>, <span class="seriesInfo">ISO 8601-1:2019</span>, <span>n.d.</span>. </dd>
+<span class="refAuthor">International Organization for Standardization</span>, <span class="refTitle">"Date and time - Representations for information interchange"</span>, <span class="seriesInfo">ISO 8601-1:2019</span>, <time datetime="2019" class="refDate">2019</time>. </dd>
 <dd class="break"></dd>
 <dt id="RFC2119">[RFC2119]</dt>
         <dd>
@@ -4661,19 +4913,15 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
 <dl class="references">
 <dt id="BOVNAR-CONFORMANCE">[BOVNAR-CONFORMANCE]</dt>
         <dd>
-<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Conformance Test Tool and Corpus"</span>, <span>n.d.</span>, <span>&lt;<a href="https://www.bovnar.io/doc/13_bovnar_conformance.md">https://www.bovnar.io/doc/13_bovnar_conformance.md</a>&gt;</span>. </dd>
+<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Conformance Test Tool and Corpus"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://www.bovnar.io/doc/13_bovnar_conformance.md">https://www.bovnar.io/doc/13_bovnar_conformance.md</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="BOVNAR-EBNF">[BOVNAR-EBNF]</dt>
         <dd>
-<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Formal Grammar (ISO/IEC 14977 EBNF)"</span>, <span>n.d.</span>, <span>&lt;<a href="https://www.bovnar.io/doc/12_bovnar.ebnf">https://www.bovnar.io/doc/12_bovnar.ebnf</a>&gt;</span>. </dd>
+<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Formal Grammar (ISO/IEC 14977 EBNF)"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://www.bovnar.io/doc/12_bovnar.ebnf">https://www.bovnar.io/doc/12_bovnar.ebnf</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="BOVNAR-SPEC">[BOVNAR-SPEC]</dt>
         <dd>
-<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Specification, version 1.1"</span>, <span>n.d.</span>, <span>&lt;<a href="https://www.bovnar.io/doc/03_bovnar_spec.md">https://www.bovnar.io/doc/03_bovnar_spec.md</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="BOVNAR-UNITS">[BOVNAR-UNITS]</dt>
-        <dd>
-<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Unit and Currency Reference"</span>, <span>n.d.</span>, <span>&lt;<a href="https://www.bovnar.io/doc/05_bovnar_unit_system.md">https://www.bovnar.io/doc/05_bovnar_unit_system.md</a>&gt;</span>. </dd>
+<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Specification, version 1.1"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://www.bovnar.io/doc/03_bovnar_spec.md">https://www.bovnar.io/doc/03_bovnar_spec.md</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="CF">[CF]</dt>
         <dd>
@@ -4681,7 +4929,7 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
 <dd class="break"></dd>
 <dt id="ISO14977">[ISO14977]</dt>
         <dd>
-<span class="refAuthor">International Organization for Standardization</span>, <span class="refTitle">"Information technology - Syntactic metalanguage - Extended BNF"</span>, <span class="seriesInfo">ISO/IEC 14977:1996</span>, <span>n.d.</span>. </dd>
+<span class="refAuthor">International Organization for Standardization</span>, <span class="refTitle">"Information technology - Syntactic metalanguage - Extended BNF"</span>, <span class="seriesInfo">ISO/IEC 14977:1996</span>, <time datetime="1996" class="refDate">1996</time>. </dd>
 <dd class="break"></dd>
 <dt id="MCO">[MCO]</dt>
         <dd>
@@ -4916,9 +5164,9 @@ sup-digit     = %xC2.B9 / %xC2.B2 / %xC2.B3 ; U+00B9, U+00B2, U+00B3
       </h2>
 <p id="appendix-B-1">Every violation this document specifies is reported with one of the codes
 below. The numeric values are stable: an existing value never changes,
-and a new code is appended above the current maximum (<a href="#version-stability" class="auto internal xref">Section 11.3</a>).<a href="#appendix-B-1" class="pilcrow">¶</a></p>
-<p id="appendix-B-2">The class column distinguishes four kinds of code, only two of which say
-anything about a document:<a href="#appendix-B-2" class="pilcrow">¶</a></p>
+and a new code is appended above the current maximum (<a href="#version-stability" class="auto internal xref">Section 11.4</a>).<a href="#appendix-B-1" class="pilcrow">¶</a></p>
+<p id="appendix-B-2">The class column distinguishes six kinds of code, only two of which say
+the document is invalid:<a href="#appendix-B-2" class="pilcrow">¶</a></p>
 <span class="break"></span><dl class="dlParallel" id="appendix-B-3">
         <dt id="appendix-B-3.1">D:</dt>
         <dd style="margin-left: 1.5em" id="appendix-B-3.2">
@@ -4953,11 +5201,25 @@ reuse their values.<a href="#appendix-B-3.8.1" class="pilcrow">¶</a></p>
 read-time unit conversion, and the octet multiplexing convention -
 rather than by parsing. Neither facility is specified by this document.<a href="#appendix-B-3.10.1" class="pilcrow">¶</a></p>
 </dd>
+        <dd class="break"></dd>
+<dt id="appendix-B-3.11">C:</dt>
+        <dd style="margin-left: 1.5em" id="appendix-B-3.12">
+          <p id="appendix-B-3.12.1"><strong>Consumer policy.</strong> The document is valid; the consumer has declined it
+under a policy it was configured with. Not a defect in the document.<a href="#appendix-B-3.12.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="appendix-B-3.13">U:</dt>
+        <dd style="margin-left: 1.5em" id="appendix-B-3.14">
+          <p id="appendix-B-3.14.1"><strong>Unallocated here.</strong> The value is taken by the unit-profile facility,
+which is not part of any released format version and is not specified by
+this document (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>). The values are listed so that a future
+code is not assigned on top of them.<a href="#appendix-B-3.14.1" class="pilcrow">¶</a></p>
+</dd>
       <dd class="break"></dd>
 </dl>
-<span id="name-error-codes-2"></span><table class="center" id="table-14">
+<span id="name-error-codes-2"></span><table class="center" id="table-15">
         <caption>
-<a href="#table-14" class="selfRef">Table 14</a>:
+<a href="#table-15" class="selfRef">Table 15</a>:
 <a href="#name-error-codes-2" class="selfRef">Error codes</a>
         </caption>
 <thead>
@@ -5311,6 +5573,27 @@ rather than by parsing. Neither facility is specified by this document.<a href="
 </td>
             <td class="text-left" rowspan="1" colspan="1">X</td>
           </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">49</td>
+            <td class="text-left" rowspan="1" colspan="1">
+              <code>error_unit_profile_unknown</code>
+</td>
+            <td class="text-left" rowspan="1" colspan="1">U</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">50</td>
+            <td class="text-left" rowspan="1" colspan="1">
+              <code>error_unit_profile_unsupported</code>
+</td>
+            <td class="text-left" rowspan="1" colspan="1">U</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">51</td>
+            <td class="text-left" rowspan="1" colspan="1">
+              <code>error_octet_stream_forbidden</code>
+</td>
+            <td class="text-left" rowspan="1" colspan="1">C</td>
+          </tr>
         </tbody>
       </table>
 <p id="appendix-B-5">Two entries warrant a note.<a href="#appendix-B-5" class="pilcrow">¶</a></p>
@@ -5323,6 +5606,13 @@ not required to raise code 33.<a href="#appendix-B-6" class="pilcrow">¶</a></p>
 report <em>in addition to</em> another, rather than instead of it: reaching end
 of input while recovering from an earlier error yields the original code
 first and this one second (<a href="#error-recovery" class="auto internal xref">Section 10.3</a>).<a href="#appendix-B-7" class="pilcrow">¶</a></p>
+<p id="appendix-B-8"><code>error_octet_stream_forbidden</code> (51) is the only code here that a valid
+document can provoke. It is what a consumer opened in the text-only mode
+of <a href="#interop-transport" class="auto internal xref">Section 12.1</a> reports on meeting an octet stream: the document
+is well-formed and the octet stream is a first-class part of the format,
+but this consumer has asserted that its channel carries text. Reporting
+it is how a consumer whose pipeline normalizes line endings declines the
+document at the door instead of discovering the damage downstream.<a href="#appendix-B-8" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="examples">

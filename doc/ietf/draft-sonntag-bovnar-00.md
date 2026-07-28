@@ -31,6 +31,12 @@ normative:
   RFC7405:
   RFC6838:
   RFC6657:
+  BOVNAR-UNITS:
+    date: 2026
+    title: "Bovnar - Unit and Currency Reference"
+    author:
+      - name: Janos Sonntag
+    target: https://www.bovnar.io/doc/05_bovnar_unit_system.md
   UNICODE:
     title: "The Unicode Standard"
     author:
@@ -40,6 +46,7 @@ normative:
     title: "IEEE Standard for Floating-Point Arithmetic"
     seriesinfo:
       IEEE: 754-2019
+    date: 2019
     author:
       - org: IEEE
   SI:
@@ -51,18 +58,21 @@ normative:
     title: "Quantities and units - Part 13: Information science and technology"
     seriesinfo:
       IEC: 80000-13:2008
+    date: 2008
     author:
       - org: International Electrotechnical Commission
   ISO4217:
     title: "Codes for the representation of currencies"
     seriesinfo:
       ISO: 4217:2015
+    date: 2015
     author:
       - org: International Organization for Standardization
   ISO8601:
     title: "Date and time - Representations for information interchange"
     seriesinfo:
       ISO: 8601-1:2019
+    date: 2019
     author:
       - org: International Organization for Standardization
 
@@ -74,21 +84,19 @@ informative:
   RFC5198:
   RFC9839:
   BOVNAR-SPEC:
+    date: 2026
     title: "Bovnar - Specification, version 1.1"
     author:
       - name: Janos Sonntag
     target: https://www.bovnar.io/doc/03_bovnar_spec.md
-  BOVNAR-UNITS:
-    title: "Bovnar - Unit and Currency Reference"
-    author:
-      - name: Janos Sonntag
-    target: https://www.bovnar.io/doc/05_bovnar_unit_system.md
   BOVNAR-EBNF:
+    date: 2026
     title: "Bovnar - Formal Grammar (ISO/IEC 14977 EBNF)"
     author:
       - name: Janos Sonntag
     target: https://www.bovnar.io/doc/12_bovnar.ebnf
   BOVNAR-CONFORMANCE:
+    date: 2026
     title: "Bovnar - Conformance Test Tool and Corpus"
     author:
       - name: Janos Sonntag
@@ -112,6 +120,7 @@ informative:
     title: "Information technology - Syntactic metalanguage - Extended BNF"
     seriesinfo:
       ISO/IEC: 14977:1996
+    date: 1996
     author:
       - org: International Organization for Standardization
 
@@ -182,8 +191,9 @@ Bovnar occupies a deliberate position between three neighbours:
 * Against **UCUM** {{UCUM}} and **CF** {{CF}}, which standardize unit
   *notation* for use inside some other format, it specifies the container
   as well, so that the unit is enforced by the parser rather than by a
-  downstream convention. Bovnar can consume UCUM notation directly; see
-  {{unit-profiles}}.
+  downstream convention. A facility for writing a unit in UCUM notation
+  exists in the reference implementation but is not part of the format
+  this document specifies; see {{unit-profiles}}.
 
 * Against **schema languages**, it is schema-free. The description
   travels with each value rather than in a separate artifact that can be
@@ -209,10 +219,11 @@ This document specifies:
 * the unit system, its notation, prefixes, currencies, and the rules
   under which a unit is accepted or rejected ({{units}});
 * validation rules, limits, and the error model ({{validation}});
-* conformance tiers ({{conformance}});
+* conformance requirements for producers and consumers
+  ({{conformance}});
 * the media type registration and IANA considerations ({{iana}}); and
-* security and interoperability considerations ({{security}},
-  {{interop}}).
+* interoperability and security considerations ({{interop}},
+  {{security}}).
 
 This document does not specify an application programming interface, a
 canonical binary encoding, a schema language, a query language, or any
@@ -246,15 +257,15 @@ released format version; see {{unit-profiles}}.
 ## Terminology {#terminology}
 
 Document:
-: A complete byte sequence conforming to the `stream` rule of
+: A complete octet sequence conforming to the `stream` rule of
   {{collected-abnf}}.
 
 Assignment:
-: A key, the `=` sign, an optional type annotation, a value, and a
-  terminating `;`. A document is a sequence of assignments.
+: A key, an `=` sign, an optional type annotation, a value, and a
+  terminating semicolon. A document is a sequence of assignments.
 
 Key:
-: The identifier naming an assignment, introduced by `.`.
+: The identifier naming an assignment, introduced by a leading dot.
 
 Value kind:
 : One of: null, boolean, number, datetime, string, symbol, reference,
@@ -314,27 +325,54 @@ sequence, the additional UTF-8 well-formedness requirement of
 Several constraints of the format are not expressible in a context-free
 grammar and are stated in prose only:
 
-* UTF-8 well-formedness ({{encoding}});
-* the placement rules for the byte order mark ({{encoding}}) and for the
-  version declaration ({{version}});
-* the rule that a version declaration, once its prefix and the following
-  horizontal whitespace have matched, **commits**: a malformed version
-  after that point is an error and does not fall back to being an
-  ordinary comment ({{version}}). The grammar admits the fallback,
-  because `version-decl` is optional and `comment` would match the same
-  octets; the prose forbids it;
-* the numeric limits of {{limits}};
-* the length-prefixing of octet-stream chunks ({{octet-streams}}). The
+* **UTF-8 well-formedness** ({{encoding}}).
+
+* **Byte order mark placement** ({{encoding}}).
+
+* **Version declaration placement**, and the rule that a declaration
+  **commits**: once its prefix and the following horizontal whitespace
+  have matched, a malformed version is an error and does not fall back to
+  being an ordinary comment ({{version}}). The grammar admits the
+  fallback, because `version-decl` is optional and `comment` would match
+  the same octets; the prose forbids it.
+
+* **Version gating.** The grammar has no notion of the declared version,
+  so it accepts every construct in every document. The constructs
+  introduced after 1.0 - the `datetime` family, the `\x` and `\u{}`
+  escapes, and reference array indexing - are valid only in a document
+  that declares 1.1 or newer ({{version}}). This is the single largest
+  class of rule the grammar cannot carry.
+
+* **String escape semantics** ({{strings}}): that `\u{}` names a Unicode
+  scalar value rather than a surrogate or a value above U+10FFFF, and
+  that no escape may resolve to a rejected control octet. The grammar
+  permits any two hexadecimal digits and any one-to-six-digit scalar.
+
+* **Datetime literal field ranges and epoch compatibility**
+  ({{datetime-literals}}): that a month is 01-12, a day valid for its
+  month and year, an hour 00-23, a second 00-60; and that the atomic GNSS
+  epochs reject a literal outright. The grammar counts digits and nothing
+  more.
+
+* **The numeric limits** of {{limits}}.
+
+* **Octet-stream chunk length-prefixing** ({{octet-streams}}). The
   grammar writes `os-data = *OCTET`, which says only "some octets"; the
   binding requirement that the count equal the preceding `os-length`
-  field is context-sensitive and is stated in prose;
-* the type/value and unit compatibility rules of {{types}} and
-  {{units}}; and
-* the sibling-comparison rules enforced at the materializing tier only
-  ({{conformance}}).
+  field is context-sensitive.
+
+* **Type/value and unit compatibility** ({{types}}, {{units}}): valid
+  widths, bases, and Q values; value ranges; digits within the declared
+  base; that a unit resolves against the registry; and that an annotation
+  unit and an inline suffix agree.
+
+* **The sibling-comparison rules** enforced at the materializing tier
+  only ({{conformance}}).
 
 A document that satisfies the ABNF but violates any of these is not a
-valid Bovnar document.
+valid Bovnar document. Equivalently: the ABNF is a **necessary** condition
+for validity, never a sufficient one, and an implementation that checks
+only the grammar accepts documents this document declares invalid.
 
 Two points of the grammar require lookahead rather than a single-token
 decision, and an implementation built as a greedy lexer MUST account for
@@ -681,8 +719,12 @@ rest of the path and is interpreted only when an application resolves the
 stored path string itself. Resolution semantics, when an application
 chooses to implement them, follow the array model of {{arrays}}: a flat
 `/`-row matrix is addressed `[row][col]`, a one-dimensional array as
-`[i]`, and genuine nested arrays descend one index per level. In a 1.0 or
-undeclared document, `[` inside a reference is
+`[i]`, and genuine nested arrays descend one index per level. Three
+cases do not resolve, and an application MUST distinguish "no such value"
+from "the value is null" when it meets them: a **partial** index of a
+flat matrix (`&.matrix[0]`, which names a row rather than an element), an
+**out-of-range** index, and an index applied to something that is **not
+an array**. In a 1.0 or undeclared document, `[` inside a reference is
 `error_unexpected_input_byte`.
 
 See {{security-references}} for the hazards of resolving references.
@@ -1041,8 +1083,15 @@ first element, bare integers thereafter - remains homogeneous under
 
 A unit is an optional annotation on a numeric value. It is drawn from a
 fixed registry of named base units, prefixes, and currency codes, and may
-be compound. The full registry is {{BOVNAR-UNITS}}; this section
-specifies the notation and the rules, not the catalogue.
+be compound. This section specifies the notation and the rules; the
+catalogue itself is {{BOVNAR-UNITS}}.
+
+That reference is **normative**, and it is the one point at which this
+document is not self-contained. A consumer MUST validate every unit
+against the registry, and the registry is too large to reproduce here and
+grows in minor revisions ({{version-stability}}). An implementer needs
+{{BOVNAR-UNITS}} to build a conforming parser; everything else required
+is in this document.
 
 The registry covers 180 named units across SI {{SI}}, IEC binary
 {{IEC80000-13}}, imperial and US customary, CGS, radiation, electrical
@@ -1162,9 +1211,25 @@ silently pick one of two defensible readings:
 Both are `error_unit_illegal`. The separated spellings remain valid, so
 the refusal costs nothing but a character.
 
-Producers MUST emit the separated form `k~g` regardless of which spelling
-was read, so that a document round-tripped through a producer stays
-readable to a consumer predating the compact form.
+Which spelling a producer emits depends on what it is doing, and the two
+cases differ:
+
+* A producer **serializing a unit it holds as a value** - one it
+  constructed, computed, or decoded, rather than copied from an input
+  document - MUST emit the canonical separated form `k~g`. The compact
+  form is an input convenience; emitting it would make the output
+  unreadable to a consumer that predates it, for no gain.
+
+* A producer **reproducing an existing document**, such as a
+  pretty-printer or canonicalizer, MAY preserve the spelling its input
+  used. Both spellings denote the same unit, so preserving one is not a
+  loss, and rewriting it would make round-tripping a document alter
+  octets that carry no information.
+
+The reference implementation does exactly this: its writer helpers emit
+`k~g`, while its pretty-print path reproduces `kg`, `MiB`, and `u~m` as
+written. See {{interop-canonical}} for why this means documents cannot be
+compared octet-wise.
 
 IEC prefixes MUST NOT be applied to currency codes. SI prefixes may be.
 
@@ -1351,13 +1416,13 @@ The design intent is that a bare array of measurements is uniform, so a
 consumer may treat its elements identically without inspection, while
 genuinely heterogeneous data is modelled with a struct. One consequence
 worth stating plainly: **a ragged or mixed-type JSON array has no Bovnar
-representation.** A converter must reject it rather than lose the
-structure.
+representation.** A converter rejects it rather than losing the
+structure; {{interop-json}} states that requirement normatively.
 
 These checks require comparing siblings and are therefore enforced at the
 materializing tier only; see {{conformance}}.
 
-## Structs
+## Structs {#structs}
 
 ~~~ abnf
 struct       = "{" ws *( assignment ws ) "}"
@@ -1512,19 +1577,84 @@ inside skipped junk - in `1.5`, in `.5`, in binary corruption - is just
 another skipped octet. A `.` inside a bracket opened since recovery began
 opens no assignment either.
 
-If end of input is reached while recovering, `error_got_incomplete_bvnr_stream`
-is reported **in addition to** the original error, in that order.
+If end of input is reached while recovering,
+`error_got_incomplete_bvnr_stream` is reported **in addition to** the
+original error, in that order.
 
-The skipped-octet total is the only way an application can learn what
-recovery cost: the skipped octets were never parsed, so nothing else
-mentions them. A non-zero total means the data delivered is not the whole
-document. See {{security-recovery}}.
+The converse case is worth stating because it is easy to misread: if the
+input simply ends part-way through a value, with no earlier error, only
+the truncation is reported. A value that would have been rejected had it
+been terminated is never checked, because the check happens at the
+terminator. Truncating a document can therefore *hide* a defect rather
+than add one, and a consumer MUST NOT infer from a lone truncation error
+that the rest of the document was well-formed.
+
+### What the Two Counters Mean {#recovery-counters}
+
+The count of recovery events and the skipped-octet total answer different
+questions, and **neither alone establishes that a document arrived
+intact**:
+
+* **Recovery count** is the number of times an error put the parser into
+  recovery. It is the signal that *something was dropped*. Whenever it is
+  non-zero, at least one value or assignment was rejected and is absent
+  from what the consumer received.
+
+* **Skipped octets** is how much raw input was discarded unparsed. It
+  says what recovery *cost in text*, and it is the only way to learn
+  that: the skipped octets were never parsed, so no other event mentions
+  them.
+
+A recovery can drop a value while skipping **zero** octets. Where a value
+is rejected and the very next octet is the statement's own `;`, there is
+nothing to skip - yet the assignment is delivered with no value attached,
+and a consumer watching only the skipped total would conclude that
+nothing was lost. Applications MUST therefore treat a non-zero recovery
+count as authoritative for "data is missing", and read the skipped total
+only to learn how much text that cost. See {{security-recovery}}.
 
 Recovery mode MUST NOT be the default.
 
 # Conformance {#conformance}
 
-## Tiers
+## Producers {#conformance-producers}
+
+A conforming producer emits documents that satisfy this document. Its
+obligations are stated where each construct is defined; they are
+collected here because an implementer writing a writer has no other
+single place to find them.
+
+A producer MUST:
+
+* emit well-formed UTF-8 in the text layer ({{encoding}});
+* **emit a version declaration when the document uses any construct
+  introduced after version 1.0** ({{version}}) - the `datetime` family,
+  the `\x` and `\u{}` string escapes, and reference array indexing. A
+  document using one without declaring 1.1 is invalid, and the failure is
+  easy to miss because every *other* value in it is usually fine;
+* emit the canonical separated prefix form `k~g` when serializing a unit
+  it holds as a value; a producer reproducing an existing document MAY
+  instead preserve that document's spelling ({{prefixes}});
+* preserve the order of struct keys ({{structs}});
+* emit documents valid at the **materializing** tier ({{conformance-tiers}}) -
+  unique keys within a scope, homogeneous arrays, rectangular sibling
+  sub-arrays, consistent sibling record shapes - even when the intended
+  consumer is a streaming one that would not detect a violation.
+
+A producer SHOULD:
+
+* omit the byte order mark ({{encoding}});
+* use the `.bvnr` extension ({{interop-detection}});
+* write line endings consistently, and consider the Net-Unicode profile
+  of {{RFC5198}}, when targeting a text channel ({{interop-transport}});
+* offer a mode that refuses to emit an octet stream, for use when the
+  destination channel is not binary-safe ({{interop-transport}}).
+
+A producer MUST NOT rely on a version declaration to cause an older
+consumer to reject a document: to a version 1.0 consumer the declaration
+is an ordinary comment ({{security-version}}).
+
+## Tiers {#conformance-tiers}
 
 Four of this document's rules require comparing sibling values that a
 streaming consumer sees one at a time and cannot retain in bounded
@@ -1548,10 +1678,35 @@ An implementation MUST document which tier it implements. An
 implementation offering both interfaces MUST apply the materializing-tier
 rules on its materializing interface.
 
+The same distinction is drawn under other names elsewhere, and an
+implementer reading more than one document will meet all three: what this
+document calls the **materializing tier** is the *DOM tier* in
+{{BOVNAR-SPEC}} and is reported as *document-tier* validation by the
+reference command-line tool. They are one concept.
+
 The consequence for interoperability is direct and is the most likely
 source of disagreement between two conforming implementations: **a
 streaming consumer accepts documents a materializing consumer rejects.**
 See {{security-differential}}.
+
+Concretely, each document below is accepted in full by a streaming
+consumer and rejected by a materializing one.
+
+| Document | Materializing-tier error |
+|---|---|
+| `.a = 1; .a = 2;` | `error_duplicate_struct_key` |
+| `.b = [1, "two"];` | `error_array_element_type_mismatch` |
+| `.c = [[1,2], [3,4,5]];` | `error_array_row_size_mismatch` |
+| `.d = [{.x=1;}, {.y=1;}];` | `error_struct_shape_mismatch` |
+| `.e = [<float:64,m> 1.0, <float:64,k~g> 2.0];` | `error_array_element_type_mismatch` |
+{: title="Documents the two tiers judge differently"}
+
+Note what the third row is *not*. `[1,2,3]/[4,5]` is a `/`-row width
+mismatch, and a **streaming** consumer catches that one as each row
+closes ({{arrays}}). The rule that needs the whole tree is the one about
+**sibling sub-arrays**, because nothing obliges a sibling to be adjacent
+in the octet stream. The two cases look alike and report the same error
+code; only one of them splits the tiers.
 
 ## Test Corpus {#test-corpus}
 
@@ -1601,8 +1756,12 @@ Deployments SHOULD therefore:
   transformation; and
 * where a channel must remain text, have the *producer* refuse to emit an
   octet stream, rather than assume none will occur. Implementations
-  SHOULD offer a text-only mode that turns this assumption into an
-  enforced constraint.
+  SHOULD offer a **text-only mode** that turns this assumption into an
+  enforced constraint: a consumer so configured rejects a document
+  containing an octet stream with `error_octet_stream_forbidden`, even
+  though that document is perfectly valid. The rejection is an assertion
+  about the channel, not a judgement about the document
+  ({{error-codes}}).
 
 A document with no octet stream is well-formed UTF-8 text throughout and
 is safe on a text channel, subject to the usual caveat about line-ending
@@ -1630,7 +1789,7 @@ has first been passed through a producer that emits the canonical
 spellings, or unless the signature is understood to cover those exact
 octets and nothing more.
 
-## Mapping To and From JSON
+## Mapping To and From JSON {#interop-json}
 
 A Bovnar document maps to JSON {{RFC8259}} lossily in one direction and
 partially in the other.
@@ -1638,8 +1797,10 @@ partially in the other.
 Bovnar to JSON loses the type annotation, the unit, the distinction
 between `uint`, `sint`, `float`, `float_fix`, and `float_dec`, the
 distinction between a symbol and a string, the reference kind, and any
-octet stream. A converter SHOULD carry the discarded information into a
-sidecar structure rather than drop it silently.
+octet stream. A converter SHOULD NOT discard that silently: it SHOULD
+either carry the discarded information into a sidecar structure or report
+what was lost. The reference converter reports, naming the values that
+lost a unit and the symbols that became strings.
 
 JSON to Bovnar succeeds for scalar values, objects, and homogeneous
 arrays. It fails, and MUST fail rather than distort, for:
@@ -1653,7 +1814,7 @@ JSON has no unit, so a converted document is dimensionless throughout.
 Converting *to* Bovnar is therefore an opportunity to add units, not an
 operation that recovers them.
 
-## File Naming and Detection
+## File Naming and Detection {#interop-detection}
 
 The canonical file extension is `.bvnr`. The longer `.bovnar` is also
 registered ({{media-type}}) and MUST be recognized by tooling that
@@ -1876,8 +2037,8 @@ rather than for hostile input.
   exposed than streaming ones.
 
 * **String concatenation** accumulates toward `max_string_length` across
-  an unbounded number of adjacent literals, so the limit must be checked
-  against the running total, not per literal.
+  an unbounded number of adjacent literals, so a consumer MUST check the
+  limit against the running total, not against each literal.
 
 Deployments SHOULD set every limit in {{limits}} explicitly at a trust
 boundary, and SHOULD prefer a streaming consumer where the application
@@ -1918,9 +2079,17 @@ list, or a set of calibration constants, a removed assignment is likely
 to fail open.
 
 Recovery mode MUST NOT be enabled when the parsed document informs a
-security decision. Where it is enabled, an application MUST check both
-the recovery count and the skipped-octet total and MUST treat a non-zero
-value as a failure of the document, not as a diagnostic.
+security decision. Where it is enabled, an application MUST check the
+**recovery count** and MUST treat a non-zero value as a failure of the
+document, not as a diagnostic.
+
+Checking the skipped-octet total instead is not sufficient, and the
+difference is a trap: a rejected value whose statement terminator follows
+immediately skips **zero** octets, so the total stays at zero while the
+assignment arrives stripped of its value ({{recovery-counters}}). An
+access-control entry that loses its value this way is indistinguishable,
+to a consumer watching only the byte total, from one that was never
+there.
 
 ## Version Leniency {#security-version}
 
@@ -1989,8 +2158,8 @@ chooses to resolve them:
 * **Fixed-point encoders saturate.** An implementation encoding a
   `float_fix` value SHOULD saturate at the representable extreme rather
   than wrap, so that an out-of-range datum cannot silently decode to an
-  unrelated value. The format itself rejects such a value, but a
-  producer computing one must not emit a wrapped result.
+  unrelated value. The format itself rejects such a value, but a producer
+  that computes one MUST NOT emit a wrapped result in its place.
 
 * **Width is declared, not enforced by storage.** The annotation says how
   wide the value is; nothing in the document proves the producer honoured
@@ -2013,12 +2182,25 @@ with each other, or that the producer measured what it claims.
 "It parsed" therefore means the dimension is *stated and internally
 consistent*, not that it is *correct*. Applications performing physical
 or financial computation MUST still validate ranges and cross-field
-relationships. Unit conversion, where an application requests it, is an
-opt-in service and introduces its own rounding considerations.
+relationships.
 
-Cross-currency conversion is refused rather than approximated, which is
-the safe behaviour: an implementation that silently applied a rate would
-be asserting a time-varying fact the document does not contain.
+Where an implementation offers read-time unit conversion, a further trap
+awaits the caller. Asking for a value in some unit is a *request*, not a
+guarantee: if the conversion cannot be performed - the quantities are of
+different dimension, or they are two different currencies - the value is
+delivered **in its original unit**, unconverted, rather than the request
+failing. An application that assumes its request succeeded then holds a
+number it believes is in one unit and which is in fact in another, which
+is precisely the failure this format exists to prevent. A caller
+requesting a conversion MUST check whether it actually occurred before
+using the result, and MUST NOT infer success from the absence of an
+error.
+
+Cross-currency conversion in particular is never performed rather than
+approximated, which is the safe behaviour: an implementation that
+silently applied a rate would be asserting a time-varying fact the
+document does not contain. What the caller gets back is the original
+amount in the original denomination.
 
 ## Leap-Second Table Drift {#security-leap}
 
@@ -2270,8 +2452,8 @@ Every violation this document specifies is reported with one of the codes
 below. The numeric values are stable: an existing value never changes,
 and a new code is appended above the current maximum ({{version-stability}}).
 
-The class column distinguishes four kinds of code, only two of which say
-anything about a document:
+The class column distinguishes six kinds of code, only two of which say
+the document is invalid:
 
 D:
 : **Document.** The document is invalid. Every conforming consumer
@@ -2296,6 +2478,16 @@ X:
 : **Extension.** Raised by a facility layered on the wire format - opt-in
   read-time unit conversion, and the octet multiplexing convention -
   rather than by parsing. Neither facility is specified by this document.
+
+C:
+: **Consumer policy.** The document is valid; the consumer has declined it
+  under a policy it was configured with. Not a defect in the document.
+
+U:
+: **Unallocated here.** The value is taken by the unit-profile facility,
+  which is not part of any released format version and is not specified by
+  this document ({{unit-profiles}}). The values are listed so that a future
+  code is not assigned on top of them.
 
 | Value | Name | Class |
 |---|---|---|
@@ -2348,6 +2540,9 @@ X:
 | 46 | `error_datetime_literal_unsupported_epoch` | D |
 | 47 | `error_unit_inexact` | X |
 | 48 | `error_octet_stream_truncated` | X |
+| 49 | `error_unit_profile_unknown` | U |
+| 50 | `error_unit_profile_unsupported` | U |
+| 51 | `error_octet_stream_forbidden` | C |
 {: title="Error codes"}
 
 Two entries warrant a note.
@@ -2362,6 +2557,14 @@ not required to raise code 33.
 report *in addition to* another, rather than instead of it: reaching end
 of input while recovering from an earlier error yields the original code
 first and this one second ({{error-recovery}}).
+
+`error_octet_stream_forbidden` (51) is the only code here that a valid
+document can provoke. It is what a consumer opened in the text-only mode
+of {{interop-transport}} reports on meeting an octet stream: the document
+is well-formed and the octet stream is a first-class part of the format,
+but this consumer has asserted that its channel carries text. Reporting
+it is how a consumer whose pipeline normalizes line endings declines the
+document at the door instead of discovering the damage downstream.
 
 
 # Examples {#examples}

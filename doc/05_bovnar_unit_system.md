@@ -988,12 +988,27 @@ groups raise `error_unit_illegal`.
 
 ## 6. Exponents
 
-Exponents are limited to integer values in the range **−9 … +9**.
+Exponents are integers in the range **−100 … +100**, with **zero reserved**: a
+component raised to zero is malformed, not dimensionless, so `m^0` and `m⁰` are
+not units. The bounds are `BVN_EXPONENT_MIN` and `BVN_EXPONENT_MAX` in
+`include/bovnar.h`.
+
+The named enumerators of `unit_exponent_t` cover only ±1…±9 and are kept because
+that is what most units need and what existing source says. They are **not** the
+whole domain — any integer in the range is a valid exponent, so a `switch` over
+the type needs a `default` and code must not assume it can enumerate the values.
+
+At most **three digits** are scanned, which is exactly what 100 needs. That is
+what makes an over-long exponent fail cleanly: `m^1000` leaves a digit where the
+scan expects the `^`, so no exponent is recognised at all and the whole token
+fails to resolve as a base symbol. A value that scans but lands outside the
+range — `m^200` — is refused on the range check.
 
 ### 6.1 Unicode Superscript Form
 
 | Glyph | Code point | UTF-8 bytes      | Maps to |
 |-------|-----------|------------------|---------|
+| `⁰`   | U+2070    | `0xE2 0x81 0xB0` | digit 0 (multi-digit only) |
 | `¹`   | U+00B9    | `0xC2 0xB9`      | `exp_linear` |
 | `²`   | U+00B2    | `0xC2 0xB2`      | `exp_square` |
 | `³`   | U+00B3    | `0xC2 0xB3`      | `exp_cubic` |
@@ -1006,6 +1021,15 @@ Exponents are limited to integer values in the range **−9 … +9**.
 | `⁺`   | U+207A    | `0xE2 0x81 0xBA` | positive sign (no-op) |
 | `⁻`   | U+207B    | `0xE2 0x81 0xBB` | negate exponent |
 
+Digits **combine**, most-significant first, so `m¹⁰⁰` is the metre to the
+hundredth and `s⁻¹²` is a reciprocal twelfth power. Note that the glyphs are not
+one width — `¹ ² ³` are two UTF-8 bytes and `⁰ ⁴`–`⁹` are three — so `⁻¹⁰⁰` is
+eleven bytes, and a parser must consume one digit at a time rather than assume a
+stride.
+
+`⁰` is a digit only *within* a multi-digit exponent. A lone `m⁰` is still not a
+unit, because zero is reserved.
+
 ### 6.2 ASCII Caret Form
 
 | ASCII form | Equivalent Unicode | Parsed as |
@@ -1014,8 +1038,13 @@ Exponents are limited to integer values in the range **−9 … +9**.
 | `s^-2`     | `s⁻²`              | `exp_neg_square` |
 | `m^+2`     | `m²`               | `exp_square` |
 | `kg^1`     | `kg¹`              | `exp_linear` |
+| `m^100`    | `m¹⁰⁰`             | exponent 100 |
+| `s^-100`   | `s⁻¹⁰⁰`            | exponent −100 |
 
-Only a **single ASCII digit** is permitted after the caret.
+Up to **three ASCII digits** are permitted after the caret — exactly what
+`BVN_EXPONENT_MAX` needs. `m^1000` is not an out-of-range exponent but an
+unrecognised token: the scan stops after three digits, finds no `^`, and the
+whole string fails to resolve.
 
 ### 6.3 Exponent Edge Cases
 
@@ -1837,10 +1866,10 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 > and still collapses — `s⁻¹` is what `Hz` names, and `m~s⁻¹` comes back `k~Hz`.
 >
 > **An overflowing reduction returns `-1` rather than a unit.** When a summed
-> exponent leaves the ±9 range the format can spell, more bases survive than a
+> exponent leaves the range the format can spell, more bases survive than a
 > unit may carry, or the folded scale leaves float range, `bvn_unit_reduce` drops
 > a component — so the result is a *different* unit, not a shorter spelling of the
-> same one. `m⁹·m²` is `m¹¹`, and it used to serialise as `"no_unit"`. Without
+> same one. `m¹⁰⁰·m²` is `m¹⁰²`, and such a unit used to serialise as `"no_unit"`. Without
 > `BVN_UNIT_REDUCE` these units write normally. Rewriting an equivalent dose as an absorbed dose in the
 > document would be a stronger act than offering the conversion, which §12.4 still
 > does when a caller asks.
@@ -2145,7 +2174,7 @@ The validator raises the following unit-specific errors:
 
 | Error code | Value | Trigger condition |
 |------------|-------|-------------------|
-| `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, unknown currency code after `$`, a bare token in neither the physical-unit table nor (lacking the `$` sigil) recognised as a currency (e.g. `XYZ`, or bare `USD`), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. `m//s`), or more than 8 components |
+| `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, unknown currency code after `$`, a bare token in neither the physical-unit table nor (lacking the `$` sigil) recognised as a currency (e.g. `XYZ`, or bare `USD`), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. `m//s`), or more than `BVNR_MAX_UNIT_COMPONENTS` (32) components |
 | `error_unit_too_long` | 22 | Unit string exceeds the internal type-buffer size limit |
 | `error_unit_mismatch` | 38 | An inline unit suffix and an explicit type-annotation unit are both present, but parse to different `value_unit_t` representations |
 | `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element |

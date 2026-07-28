@@ -39,7 +39,9 @@ from bovnar.structs import (
 
 class TestConstants:
     def test_max_unit_components(self):
-        assert MAX_UNIT_COMPONENTS == 8
+        # Mirrors BVNR_MAX_UNIT_COMPONENTS in include/bovnar.h; test_abi.py
+        # proves the two agree by comparing struct sizes.
+        assert MAX_UNIT_COMPONENTS == 32
 
     def test_opaque_bytes(self):
         assert OPAQUE_BYTES >= 64

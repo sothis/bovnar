@@ -1612,6 +1612,31 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("UNT-033", "units", "IEC prefix on a currency, compact spelling",
 	           ".nav = <float_dec:64,Ki$USD> 1.0;",
 	           error_unit_illegal),
+	/* Exponents run to ±BVN_EXPONENT_MAX (100), not the ±9 the named
+	 * enumerators of unit_exponent_t cover, and both spellings reach the
+	 * whole range. Zero stays reserved. */
+	VALID("UNT-057", "units", "multi-digit exponent, ASCII caret form",
+	      ".v = <float:64,m^100> 1.0;"),
+	VALID("UNT-058", "units", "multi-digit exponent, superscript form",
+	      ".v = <float:64,m\xc2\xb9\xe2\x81\xb0\xe2\x81\xb0> 1.0;"),
+	VALID("UNT-059", "units", "the two multi-digit spellings agree",
+	      ".v = <float:64,m^100> 1.0 m\xc2\xb9\xe2\x81\xb0\xe2\x81\xb0;"),
+	VALID("UNT-060", "units", "negative multi-digit exponent",
+	      ".v = <float:64,s^-100> 1.0;"),
+	ERROR_CASE("UNT-061", "units", "one past the maximum exponent",
+	           ".v = <float:64,m^101> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-062", "units", "one past the minimum exponent",
+	           ".v = <float:64,m^-101> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-063", "units", "zero is not an exponent",
+	           ".v = <float:64,m^0> 1.0;",
+	           error_unit_illegal),
+	/* Not an over-large exponent but an unrecognised token: the scan stops
+	 * after three digits and finds no '^' where it expects one. */
+	ERROR_CASE("UNT-064", "units", "a four-digit exponent does not scan",
+	           ".v = <float:64,m^1000> 1.0;",
+	           error_unit_illegal),
 
 	/* ── UNIT PROFILE (UCUM) ─────────────────────────────────────── */
 	/* A profile expression has exactly three outcomes: it becomes a real unit,

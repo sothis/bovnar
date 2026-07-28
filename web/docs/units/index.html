@@ -2804,7 +2804,19 @@ empty groups (<code>()</code>) are rejected; nesting is bounded at 16. Unmatched
 groups raise <code>error_unit_illegal</code>.</p>
 <hr />
 <h2 id="6-exponents">6. Exponents</h2>
-<p>Exponents are limited to integer values in the range <strong>−9 … +9</strong>.</p>
+<p>Exponents are integers in the range <strong>−100 … +100</strong>, with <strong>zero reserved</strong>: a
+component raised to zero is malformed, not dimensionless, so <code>m^0</code> and <code>m⁰</code> are
+not units. The bounds are <code>BVN_EXPONENT_MIN</code> and <code>BVN_EXPONENT_MAX</code> in
+<code>include/bovnar.h</code>.</p>
+<p>The named enumerators of <code>unit_exponent_t</code> cover only ±1…±9 and are kept because
+that is what most units need and what existing source says. They are <strong>not</strong> the
+whole domain — any integer in the range is a valid exponent, so a <code>switch</code> over
+the type needs a <code>default</code> and code must not assume it can enumerate the values.</p>
+<p>At most <strong>three digits</strong> are scanned, which is exactly what 100 needs. That is
+what makes an over-long exponent fail cleanly: <code>m^1000</code> leaves a digit where the
+scan expects the <code>^</code>, so no exponent is recognised at all and the whole token
+fails to resolve as a base symbol. A value that scans but lands outside the
+range — <code>m^200</code> — is refused on the range check.</p>
 <h3 id="61-unicode-superscript-form">6.1 Unicode Superscript Form</h3>
 <table>
 <thead>
@@ -2816,6 +2828,12 @@ groups raise <code>error_unit_illegal</code>.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>⁰</code></td>
+<td>U+2070</td>
+<td><code>0xE2 0x81 0xB0</code></td>
+<td>digit 0 (multi-digit only)</td>
+</tr>
 <tr>
 <td><code>¹</code></td>
 <td>U+00B9</td>
@@ -2884,6 +2902,13 @@ groups raise <code>error_unit_illegal</code>.</p>
 </tr>
 </tbody>
 </table>
+<p>Digits <strong>combine</strong>, most-significant first, so <code>m¹⁰⁰</code> is the metre to the
+hundredth and <code>s⁻¹²</code> is a reciprocal twelfth power. Note that the glyphs are not
+one width — <code>¹ ² ³</code> are two UTF-8 bytes and <code>⁰ ⁴</code>–<code>⁹</code> are three — so <code>⁻¹⁰⁰</code> is
+eleven bytes, and a parser must consume one digit at a time rather than assume a
+stride.</p>
+<p><code>⁰</code> is a digit only <em>within</em> a multi-digit exponent. A lone <code>m⁰</code> is still not a
+unit, because zero is reserved.</p>
 <h3 id="62-ascii-caret-form">6.2 ASCII Caret Form</h3>
 <table>
 <thead>
@@ -2914,9 +2939,22 @@ groups raise <code>error_unit_illegal</code>.</p>
 <td><code>kg¹</code></td>
 <td><code>exp_linear</code></td>
 </tr>
+<tr>
+<td><code>m^100</code></td>
+<td><code>m¹⁰⁰</code></td>
+<td>exponent 100</td>
+</tr>
+<tr>
+<td><code>s^-100</code></td>
+<td><code>s⁻¹⁰⁰</code></td>
+<td>exponent −100</td>
+</tr>
 </tbody>
 </table>
-<p>Only a <strong>single ASCII digit</strong> is permitted after the caret.</p>
+<p>Up to <strong>three ASCII digits</strong> are permitted after the caret — exactly what
+<code>BVN_EXPONENT_MAX</code> needs. <code>m^1000</code> is not an out-of-range exponent but an
+unrecognised token: the scan stops after three digits, finds no <code>^</code>, and the
+whole string fails to resolve.</p>
 <h3 id="63-exponent-edge-cases">6.3 Exponent Edge Cases</h3>
 <ul>
 <li><strong><code>exp_invalid</code> (value 0):</strong> Zero-initialized sentinel. API functions that have an error output path reject it and signal an error. The two prefix query functions (<code>bvn_unit_prefix_factor</code>, <code>bvn_unit_prefix_exponent</code>) silently skip components with <code>exp_invalid</code>.</li>
@@ -4938,10 +4976,10 @@ a dimension vector, as do <code>Bq</code>, <code>Bd</code> and <code>Hz</code>, 
 reduces to itself. A lone base at an exponent other than 1 is a different case
 and still collapses — <code>s⁻¹</code> is what <code>Hz</code> names, and <code>m~s⁻¹</code> comes back <code>k~Hz</code>.</p>
 <p><strong>An overflowing reduction returns <code>-1</code> rather than a unit.</strong> When a summed
-exponent leaves the ±9 range the format can spell, more bases survive than a
+exponent leaves the range the format can spell, more bases survive than a
 unit may carry, or the folded scale leaves float range, <code>bvn_unit_reduce</code> drops
 a component — so the result is a <em>different</em> unit, not a shorter spelling of the
-same one. <code>m⁹·m²</code> is <code>m¹¹</code>, and it used to serialise as <code>"no_unit"</code>. Without
+same one. <code>m¹⁰⁰·m²</code> is <code>m¹⁰²</code>, and such a unit used to serialise as <code>"no_unit"</code>. Without
 <code>BVN_UNIT_REDUCE</code> these units write normally. Rewriting an equivalent dose as an absorbed dose in the
 document would be a stronger act than offering the conversion, which §12.4 still
 does when a caller asks.</p>
@@ -5211,7 +5249,7 @@ ev_data   data=&quot;1500&quot;
 <tr>
 <td><code>error_unit_illegal</code></td>
 <td>32</td>
-<td>Unparseable unit string: unknown prefix, unknown base unit, unknown currency code after <code>$</code>, a bare token in neither the physical-unit table nor (lacking the <code>$</code> sigil) recognised as a currency (e.g. <code>XYZ</code>, or bare <code>USD</code>), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. <code>m//s</code>), or more than 8 components</td>
+<td>Unparseable unit string: unknown prefix, unknown base unit, unknown currency code after <code>$</code>, a bare token in neither the physical-unit table nor (lacking the <code>$</code> sigil) recognised as a currency (e.g. <code>XYZ</code>, or bare <code>USD</code>), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. <code>m//s</code>), or more than <code>BVNR_MAX_UNIT_COMPONENTS</code> (32) components</td>
 </tr>
 <tr>
 <td><code>error_unit_too_long</code></td>

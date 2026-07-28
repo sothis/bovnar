@@ -590,7 +590,32 @@ CURRENCY_EXT_FIRST    = BaseUnit.ZWG
 CURRENCY_EXT_LAST     = BaseUnit.XCG
 
 
+EXPONENT_MIN = -100
+EXPONENT_MAX =  100
+
+
 class Exponent(IntEnum):
+    """A component's exponent: any integer in [EXPONENT_MIN, EXPONENT_MAX].
+
+    The members below name +-1..+-9 because that is what most units need and
+    what existing code says; they are NOT the whole domain. Mirroring
+    unit_exponent_t in include/bovnar.h, any value in the range is legal, so
+    this enum is deliberately OPEN -- Exponent(42) yields a pseudo-member
+    rather than raising, because a strict IntEnum here would turn a perfectly
+    valid unit read off the wire into a ValueError inside the accessor.
+
+    Zero stays INVALID: a component with exponent 0 is malformed, not
+    dimensionless.
+    """
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, int) and EXPONENT_MIN <= value <= EXPONENT_MAX:
+            obj = int.__new__(cls, value)
+            obj._name_ = ("NEG_%d" % -value) if value < 0 else ("POW_%d" % value)
+            obj._value_ = value
+            return obj
+        return None
 
     INVALID     =  0
     LINEAR      =  1

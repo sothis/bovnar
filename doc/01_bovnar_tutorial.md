@@ -923,7 +923,7 @@ The `bvnr_data_t` structure passed with `ev_data` carries:
 
 - `type` — the token type (`token_is_number`, `token_is_string`, `token_is_symbol`, `token_is_reference`, `token_is_array_number`, `token_is_array_string`, `token_is_bool`, `token_is_null_value`, `token_is_octet_stream`)
 - `value_type` — the `value_type_spec_t` (family, width, base/Q)
-- `value_unit` — the `value_unit_t` (up to 8 components)
+- `value_unit` — the `value_unit_t` (up to `BVNR_MAX_UNIT_COMPONENTS` components)
 - `data` — pointer to the raw value bytes
 - `length` — byte count
 

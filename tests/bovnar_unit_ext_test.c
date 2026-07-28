@@ -2179,15 +2179,21 @@ static void test_longest_unit_fits_the_declared_bound(void)
 	 * 128-byte buffer, a stack-buffer-overflow reachable from a legal document.
 	 * Every unit buffer is now sized from BVNR_UNIT_STRING_MAX, and gen_units.py
 	 * fails the build if the table outgrows it. This pins the worst case the
-	 * generator computes: eight components, the longest prefixable symbol, a
-	 * two-byte prefix and an all-negative exponent set (which is written as a
-	 * flat product, the one shape that renders "\u207b\u2079" at full width). */
+	 * generator computes: BVNR_MAX_UNIT_COMPONENTS components, the longest
+	 * prefixable symbol, a two-byte prefix and an all-negative exponent set at
+	 * BVN_EXPONENT_MIN (which is written as a flat product, the one shape that
+	 * renders "\u207b\u00b9\u2070\u2070" at full width).
+	 *
+	 * 766 = 32 * (2 + 1 + 8 + 11) + 31 * 2. The generator's bound is 799: it
+	 * budgets 12 bytes for the exponent where "\u207b\u00b9\u2070\u2070" needs 11,
+	 * because \u00b9 is two bytes and the rest are three, and rounding that up is
+	 * cheaper than teaching the generator the encoding widths. */
 	value_unit_t u;
 	memset(&u, 0, sizeof u);
 	u.num_components = BVNR_MAX_UNIT_COMPONENTS;
 	for (uint32_t i = 0; i < BVNR_MAX_UNIT_COMPONENTS; i++) {
 		u.components[i].base            = bu_fluid_ounce_uk;   /* "fl_oz_uk" */
-		u.components[i].exponent        = exp_neg_nonic;
+		u.components[i].exponent        = (unit_exponent_t)BVN_EXPONENT_MIN;
 		u.components[i].prefix.system   = prefix_si;
 		u.components[i].prefix.id.si    = si_micro;            /* two-byte "\u00b5" */
 	}
@@ -2196,10 +2202,10 @@ static void test_longest_unit_fits_the_declared_bound(void)
 	ASSERT_TRUE(n > 0, "the worst-case unit fits BVNR_UNIT_STRING_MAX");
 	ASSERT_TRUE((size_t)n + 1u <= (size_t)BVNR_UNIT_STRING_MAX,
 		    "...with the NUL inside the bound");
-	ASSERT_EQ_INT(n, 150, "and it is the 150 bytes gen_units.py computes");
+	ASSERT_EQ_INT(n, 766, "and it is inside the 799 gen_units.py computes");
 	/* One byte short must REFUSE, not truncate -- and must not be mistaken for
 	 * success by a caller that only checks for a non-empty buffer. */
-	char tight[150];
+	char tight[766];
 	ASSERT_TRUE(bvn_unit_to_string(u, tight, sizeof tight) < 0,
 		    "a buffer one byte short is refused");
 	/* and it round-trips */

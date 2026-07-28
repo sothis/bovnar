@@ -58,55 +58,26 @@
  * (bvn_unit_reduce). The exponent enum <-> int helpers at the top bridge the
  * compact unit_exponent_t representation and ordinary arithmetic.
  */
+/*
+ * These two were exhaustive switches over the ±1..±9 enumerators. With the
+ * range now [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX] a switch cannot enumerate it,
+ * so both are range checks — and both still map everything outside the domain
+ * onto exp_invalid/0 rather than asserting. A library must not abort its host
+ * over a struct a caller filled in wrongly, and the shipped Release build keeps
+ * asserts live, so `u.components[0].exponent = 4000` has to be survivable.
+ */
 int32_t bvn_exponent_to_int(unit_exponent_t e)
 {
-	switch (e) {
-	case exp_invalid:     return 0;
-	case exp_linear:      return 1;
-	case exp_square:      return 2;
-	case exp_cubic:       return 3;
-	case exp_quartic:     return 4;
-	case exp_quintic:     return 5;
-	case exp_sextic:      return 6;
-	case exp_septic:      return 7;
-	case exp_octic:       return 8;
-	case exp_nonic:       return 9;
-	case exp_neg_square:  return -2;
-	case exp_neg_cubic:   return -3;
-	case exp_neg_quartic: return -4;
-	case exp_neg_quintic: return -5;
-	case exp_neg_sextic:  return -6;
-	case exp_neg_septic:  return -7;
-	case exp_neg_octic:   return -8;
-	case exp_neg_nonic:   return -9;
-	case exp_neg_linear:  return -1;
-	default:              return 0;
-	}
+	int32_t n = (int32_t)e;
+	if (n < BVN_EXPONENT_MIN || n > BVN_EXPONENT_MAX)
+		return 0;
+	return n;
 }
 unit_exponent_t bvn_int_to_exponent(int32_t n)
 {
-	switch (n) {
-	case  0: return exp_invalid;
-	case  1: return exp_linear;
-	case  2: return exp_square;
-	case  3: return exp_cubic;
-	case  4: return exp_quartic;
-	case  5: return exp_quintic;
-	case  6: return exp_sextic;
-	case  7: return exp_septic;
-	case  8: return exp_octic;
-	case  9: return exp_nonic;
-	case -1: return exp_neg_linear;
-	case -2: return exp_neg_square;
-	case -3: return exp_neg_cubic;
-	case -4: return exp_neg_quartic;
-	case -5: return exp_neg_quintic;
-	case -6: return exp_neg_sextic;
-	case -7: return exp_neg_septic;
-	case -8: return exp_neg_octic;
-	case -9: return exp_neg_nonic;
-	default: return exp_invalid;
-	}
+	if (n < BVN_EXPONENT_MIN || n > BVN_EXPONENT_MAX)
+		return exp_invalid;
+	return (unit_exponent_t)n;
 }
 typedef struct {
 	value_base_unit_t base;

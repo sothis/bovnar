@@ -40,7 +40,10 @@ OPAQUE_BYTES = 256
 # struct's (pointer-aligned).  c_uint8 arrays have alignment 1.
 _OPAQUE_WORDS = OPAQUE_BYTES // 8
 
-MAX_UNIT_COMPONENTS = 8
+# Must match BVNR_MAX_UNIT_COMPONENTS in include/bovnar.h -- value_unit_t
+# embeds the array inline, so a mismatch silently misreads every struct that
+# contains a unit. tests/test_abi.py compares the two sizes on every run.
+MAX_UNIT_COMPONENTS = 32
 
 ON_ERROR_FUNC = ctypes.CFUNCTYPE(
     None,

@@ -66,26 +66,37 @@ extern "C" {
  */
 #define BVNR_SPEC_VERSION_MAJOR		1
 #define BVNR_SPEC_VERSION_MINOR		1
-#define BVNR_MAX_UNIT_COMPONENTS		8
+/*
+ * Components in one compound unit. value_unit_t embeds the array inline and is
+ * passed BY VALUE across this API, so this number is the struct's size: at 32 a
+ * value_unit_t is 516 bytes against the 132 it was at 8. That is deliberate —
+ * the old limit turned real UCUM and UDUNITS expressions into
+ * error_unit_too_many_components — but it is an ABI break, and any caller
+ * compiled against the old header must be rebuilt rather than relinked.
+ */
+#define BVNR_MAX_UNIT_COMPONENTS		32
 /*
  * Bytes a buffer needs to hold ANY unit bvn_unit_to_string can emit, NUL
  * included. Size unit buffers from this rather than by eye.
  *
- * The worst case is 150 bytes + NUL: eight components, each the longest
- * prefixable canonical symbol ("fl_oz_uk", 8 bytes) with a two-byte prefix, a
- * '~', and the six-byte "⁻⁹" — negative exponents render at full width only when
- * EVERY component is negative, because a mixed unit moves them into the
- * denominator and renders them positive at three bytes. Seven '·' separators at
- * two bytes each complete it.
+ * The worst case is 798 bytes + NUL: BVNR_MAX_UNIT_COMPONENTS components, each
+ * the longest prefixable canonical symbol ("fl_oz_uk", 8 bytes) with a two-byte
+ * prefix, a '~', and the twelve-byte "⁻¹⁰⁰" — negative exponents render at full
+ * width only when EVERY component is negative, because a mixed unit moves them
+ * into the denominator and renders them positive. The '·' separators at two
+ * bytes each complete it. A profile spelling is bounded separately and lands
+ * slightly higher (808) because "udunits:" and its long spelled-out atoms cost
+ * more than the native symbols do.
  *
- * gen_units.py recomputes that bound from src/gendata/units.bvnr on every build
- * and fails if a new symbol outgrows this, because the margin is data-driven and
- * the failure is not graceful: bvn_unit_to_string returns -1 WITHOUT writing a
- * NUL, so a caller that ignores the return and hands the buffer to "%s" reads off
- * the end of it. That was a live stack-buffer-overflow in `bovnar events -d`,
- * reachable from a legal document with a long compound unit.
+ * gen_units.py and gen_profiles.py recompute that bound from src/gendata on
+ * every build and fail if a symbol or a code outgrows this, because the margin
+ * is data-driven and the failure is not graceful: bvn_unit_to_string returns -1
+ * WITHOUT writing a NUL, so a caller that ignores the return and hands the
+ * buffer to "%s" reads off the end of it. That was a live stack-buffer-overflow
+ * in `bovnar events -d`, reachable from a legal document with a long compound
+ * unit.
  */
-#define BVNR_UNIT_STRING_MAX			192u
+#define BVNR_UNIT_STRING_MAX			1024u
 #define BVN_MAX_INT_WIDTH			32768u
 /*
  * Sentinel for bvnr_read_flags_t.max_file_size and bvnr_write_flags_t.max_file_size:
@@ -315,7 +326,26 @@ typedef enum value_base_unit_e {
 	 */
 #include "bovnar_profiles.gen.h"
 } value_base_unit_t;
+/*
+ * A component's exponent, as an integer in [BVN_EXPONENT_MIN,
+ * BVN_EXPONENT_MAX] with ZERO RESERVED for "not an exponent".
+ *
+ * The named enumerators below cover ±1..±9 and are kept because they are what
+ * existing source says; they are NOT the whole domain. Any integer in the range
+ * is a valid exponent and bvn_int_to_exponent will produce it, so a switch over
+ * this type must have a default and code must not assume it can enumerate the
+ * values. exp_invalid is zero: a component with exponent 0 is malformed, not a
+ * dimensionless one, and every consumer already tests for it.
+ *
+ * The bounds are enumerators too, which is what forces the underlying type wide
+ * enough to hold them on every conforming compiler. The field has been four
+ * bytes since before the range grew, so widening it cost no ABI change.
+ */
+#define BVN_EXPONENT_MIN	(-100)
+#define BVN_EXPONENT_MAX	( 100)
 typedef enum unit_exponent_e {
+	exp_range_min  = BVN_EXPONENT_MIN,
+	exp_range_max  = BVN_EXPONENT_MAX,
 	exp_invalid    =   0,
 	exp_linear     =   1,
 	exp_square     =   2,

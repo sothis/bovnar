@@ -673,117 +673,109 @@ bool bvn_bu_index_selfcheck(void)
  * Unicode superscript minus for negative exponents. Defaulting to exp_linear
  * when absent means "m" and "m^1" parse identically.
  */
+/*
+ * One superscript digit ENDING at s[end-1]. Returns 0-9 and sets *blen to its
+ * byte length, or -1 when the bytes there are not a superscript digit.
+ *
+ * The widths are not uniform and that is Unicode's doing, not ours: ¹ ² ³ live
+ * in the Latin-1 supplement at two bytes (C2 B9/B2/B3) while ⁰ and ⁴-⁹ live in
+ * the superscripts block at three (E2 81 B0/B4-B9). A multi-digit exponent
+ * therefore mixes widths -- "¹⁰⁰" is 2+3+3 -- so the scan has to consume one
+ * digit at a time rather than assume a stride.
+ */
+static int bvni_sup_digit_back(const char* s, uint32_t end, uint32_t* blen)
+{
+	if (end >= 3 && (uint8_t)s[end - 3] == 0xE2 &&
+	                (uint8_t)s[end - 2] == 0x81) {
+		uint8_t b = (uint8_t)s[end - 1];
+		if (b == 0xB0)              { *blen = 3; return 0; }
+		if (b >= 0xB4 && b <= 0xB9) { *blen = 3; return 4 + (b - 0xB4); }
+	}
+	if (end >= 2 && (uint8_t)s[end - 2] == 0xC2) {
+		switch ((uint8_t)s[end - 1]) {
+		case 0xB9: *blen = 2; return 1;
+		case 0xB2: *blen = 2; return 2;
+		case 0xB3: *blen = 2; return 3;
+		default:   break;
+		}
+	}
+	return -1;
+}
+/*
+ * Both forms scan BACKWARDS from the end of the token, because this is a suffix
+ * parser: the caller has the whole component and needs to know how many bytes
+ * to strip before resolving the rest as prefix+base.
+ *
+ * At most three digits are consumed. That is not an arbitrary cap but exactly
+ * what BVN_EXPONENT_MAX (100) needs, and it is what makes an out-of-range
+ * exponent fail: "m^1000" leaves a '0' where the scan expects a '^', so no
+ * suffix is recognised, "m^1000" is resolved as a base symbol, and that fails.
+ * A value that scans cleanly but lands outside the range -- "m^200" -- is
+ * refused by bvn_int_to_exponent returning exp_invalid.
+ */
 static uint32_t parse_unit_exponent_suffix(
 	const char* s, uint32_t len, unit_exponent_t* exp)
 {
-	if (len >= 2 && s[len - 2] == '^') {
-		char d = s[len - 1];
-		if (d >= '1' && d <= '9') {
-			static const unit_exponent_t pos_tab[10] = {
-				exp_invalid,  exp_linear,  exp_square,  exp_cubic,
-				exp_quartic,  exp_quintic, exp_sextic,  exp_septic,
-				exp_octic,    exp_nonic
-			};
-			*exp = pos_tab[(uint8_t)(d - '0')];
-			return 2;
+	/* ── ASCII caret form: "^2", "^-3", "^100", "^-100" ──────────────── */
+	{
+		uint32_t p = len, nd = 0;
+		while (p > 0 && nd < 3 && s[p - 1] >= '0' && s[p - 1] <= '9') {
+			p--; nd++;
+		}
+		if (nd > 0) {
+			uint32_t q   = p;
+			bool     neg = false;
+			if (q > 0 && (s[q - 1] == '-' || s[q - 1] == '+')) {
+				neg = (s[q - 1] == '-');
+				q--;
+			}
+			if (q > 0 && s[q - 1] == '^') {
+				int32_t v = 0;
+				for (uint32_t i = p; i < len; i++)
+					v = v * 10 + (s[i] - '0');
+				unit_exponent_t e = bvn_int_to_exponent(neg ? -v : v);
+				if (e == exp_invalid)
+					return 0;
+				*exp = e;
+				return len - (q - 1);
+			}
 		}
 	}
-	if (len >= 3 && s[len - 3] == '^' &&
-		(s[len - 2] == '+' || s[len - 2] == '-')) {
-		char sign = s[len - 2];
-		char d    = s[len - 1];
-		if (d >= '1' && d <= '9') {
-			static const unit_exponent_t pos_tab[10] = {
-				exp_invalid,  exp_linear,  exp_square,  exp_cubic,
-				exp_quartic,  exp_quintic, exp_sextic,  exp_septic,
-				exp_octic,    exp_nonic
-			};
-			static const unit_exponent_t neg_tab[10] = {
-				exp_invalid,  exp_neg_linear, exp_neg_square,
-				exp_neg_cubic, exp_neg_quartic, exp_neg_quintic,
-				exp_neg_sextic, exp_neg_septic, exp_neg_octic,
-				exp_neg_nonic
-			};
-			uint8_t idx = (uint8_t)(d - '0');
-			*exp = (sign == '-') ? neg_tab[idx] : pos_tab[idx];
-			return 3;
+	/* ── Unicode superscript form: "²", "⁻³", "¹⁰⁰", "⁻¹⁰⁰" ──────────── */
+	{
+		uint32_t p = len, nd = 0;
+		int      digs[3];
+		while (nd < 3) {
+			uint32_t bl = 0;
+			int      d  = bvni_sup_digit_back(s, p, &bl);
+			if (d < 0)
+				break;
+			digs[nd++] = d;
+			p -= bl;
 		}
-	}
-	unit_exponent_t base_exp = exp_linear;
-	uint32_t        dig_len  = 0;
-	if (len >= 3 &&
-		(uint8_t)s[len - 3] == 0xE2 &&
-		(uint8_t)s[len - 2] == 0x81) {
-		switch ((uint8_t)s[len - 1]) {
-		case 0xB4: base_exp = exp_quartic;  dig_len = 3; break;
-		case 0xB5: base_exp = exp_quintic;  dig_len = 3; break;
-		case 0xB6: base_exp = exp_sextic;   dig_len = 3; break;
-		case 0xB7: base_exp = exp_septic;   dig_len = 3; break;
-		case 0xB8: base_exp = exp_octic;    dig_len = 3; break;
-		case 0xB9: base_exp = exp_nonic;    dig_len = 3; break;
-		default:   break;
+		if (nd == 0)
+			return 0;
+		bool negative = false;
+		if (p >= 3 && (uint8_t)s[p - 3] == 0xE2 &&
+		              (uint8_t)s[p - 2] == 0x81) {
+			uint8_t b = (uint8_t)s[p - 1];
+			if      (b == 0xBB) { negative = true;  p -= 3; }
+			else if (b == 0xBA) { negative = false; p -= 3; }
 		}
+		int32_t v = 0;
+		for (int32_t i = (int32_t)nd - 1; i >= 0; i--)
+			v = v * 10 + digs[i];
+		unit_exponent_t e = bvn_int_to_exponent(negative ? -v : v);
+		if (e == exp_invalid)
+			return 0;
+		*exp = e;
+		return len - p;
 	}
-	if (!dig_len && len >= 2 && (uint8_t)s[len - 2] == 0xC2) {
-		switch ((uint8_t)s[len - 1]) {
-		case 0xB9: base_exp = exp_linear; dig_len = 2; break;
-		case 0xB2: base_exp = exp_square; dig_len = 2; break;
-		case 0xB3: base_exp = exp_cubic;  dig_len = 2; break;
-		default:   break;
-		}
-	}
-	if (!dig_len)
-		return 0;
-	uint32_t pos      = len - dig_len;
-	bool     negative = false;
-	uint32_t sign_len = 0;
-	if (pos >= 3 &&
-		(uint8_t)s[pos - 3] == 0xE2 &&
-		(uint8_t)s[pos - 2] == 0x81) {
-		uint8_t b = (uint8_t)s[pos - 1];
-		if      (b == 0xBB) { negative = true;  sign_len = 3; }
-		else if (b == 0xBA) { negative = false; sign_len = 3; }
-	}
-	if (negative) {
-		switch (base_exp) {
-		case exp_linear:  base_exp = exp_neg_linear;  break;
-		case exp_square:  base_exp = exp_neg_square;  break;
-		case exp_cubic:   base_exp = exp_neg_cubic;   break;
-		case exp_quartic: base_exp = exp_neg_quartic; break;
-		case exp_quintic: base_exp = exp_neg_quintic; break;
-		case exp_sextic:  base_exp = exp_neg_sextic;  break;
-		case exp_septic:  base_exp = exp_neg_septic;  break;
-		case exp_octic:   base_exp = exp_neg_octic;   break;
-		case exp_nonic:   base_exp = exp_neg_nonic;   break;
-		default:          break;
-		}
-	}
-	*exp = base_exp;
-	return dig_len + sign_len;
 }
 static unit_exponent_t bvn_negate_exponent(unit_exponent_t e)
 {
-	switch (e) {
-	case exp_linear:      return exp_neg_linear;
-	case exp_square:      return exp_neg_square;
-	case exp_cubic:       return exp_neg_cubic;
-	case exp_quartic:     return exp_neg_quartic;
-	case exp_quintic:     return exp_neg_quintic;
-	case exp_sextic:      return exp_neg_sextic;
-	case exp_septic:      return exp_neg_septic;
-	case exp_octic:       return exp_neg_octic;
-	case exp_nonic:       return exp_neg_nonic;
-	case exp_neg_linear:  return exp_linear;
-	case exp_neg_square:  return exp_square;
-	case exp_neg_cubic:   return exp_cubic;
-	case exp_neg_quartic: return exp_quartic;
-	case exp_neg_quintic: return exp_quintic;
-	case exp_neg_sextic:  return exp_sextic;
-	case exp_neg_septic:  return exp_septic;
-	case exp_neg_octic:   return exp_octic;
-	case exp_neg_nonic:   return exp_nonic;
-	default:              return e;
-	}
+	int32_t n = bvn_exponent_to_int(e);
+	return (n == 0) ? e : bvn_int_to_exponent(-n);
 }
 /*
  * Parse one unit component "[prefix[~]]base[^exp]" into its structured form.
@@ -1139,144 +1131,56 @@ static const char* base_unit_str(value_base_unit_t b)
 	}
 }
 /*
- * Render an exponent as a Unicode superscript suffix (e.g. ² ³ ⁻²). This is the
+ * Render an exponent as a Unicode superscript suffix (² ³ ⁻² ⁻¹⁰⁰). This is the
  * default, pretty form; bvn_write_exponent_suffix_ascii produces the plain
  * "^2" / "^-2" form selected by BVN_UNIT_ASCII_EXP for ASCII-only consumers.
  * exp_linear writes nothing (the implied exponent 1 is never spelled out).
+ *
+ * Both were exhaustive switches over ±1..±9. With the range now up to ±100 that
+ * is no longer enumerable, so both convert the magnitude to decimal digits and
+ * emit them most-significant first. The superscript digits are not one width --
+ * ¹ ² ³ are two bytes and ⁰ ⁴-⁹ are three -- so the writer indexes a table of
+ * (bytes, length) rather than computing an offset from the digit.
  */
+static const struct { const char* utf8; uint8_t len; } bvni_sup_digit[10] = {
+	{ "\xe2\x81\xb0", 3 },  /* ⁰ */
+	{ "\xc2\xb9",     2 },  /* ¹ */
+	{ "\xc2\xb2",     2 },  /* ² */
+	{ "\xc2\xb3",     2 },  /* ³ */
+	{ "\xe2\x81\xb4", 3 },  /* ⁴ */
+	{ "\xe2\x81\xb5", 3 },  /* ⁵ */
+	{ "\xe2\x81\xb6", 3 },  /* ⁶ */
+	{ "\xe2\x81\xb7", 3 },  /* ⁷ */
+	{ "\xe2\x81\xb8", 3 },  /* ⁸ */
+	{ "\xe2\x81\xb9", 3 },  /* ⁹ */
+};
 static int32_t bvn_write_exponent_suffix(
 	char* buf, size_t bufsize, unit_exponent_t e)
 {
+	int32_t n = bvn_exponent_to_int(e);
+	if (n == 0)
+		return -1;                     /* exp_invalid has no spelling */
+	if (n == 1) {                          /* implied, never written */
+		if (bufsize < 1) return -1;
+		buf[0] = '\0';
+		return 0;
+	}
 	int32_t pos = 0;
-	switch (e) {
-	case exp_linear:
-		break;
-	case exp_square:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xc2;
-		buf[pos++] = (char)0xb2;
-		break;
-	case exp_cubic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xc2;
-		buf[pos++] = (char)0xb3;
-		break;
-	case exp_quartic:
+	if (n < 0) {
 		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb4;
-		break;
-	case exp_quintic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb5;
-		break;
-	case exp_sextic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb6;
-		break;
-	case exp_septic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb7;
-		break;
-	case exp_octic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb8;
-		break;
-	case exp_nonic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb9;
-		break;
-	case exp_neg_linear:
-		if (pos + 5 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
+		buf[pos++] = (char)0xe2;       /* ⁻ U+207B */
 		buf[pos++] = (char)0x81;
 		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xc2;
-		buf[pos++] = (char)0xb9;
-		break;
-	case exp_neg_square:
-		if (pos + 5 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xc2;
-		buf[pos++] = (char)0xb2;
-		break;
-	case exp_neg_cubic:
-		if (pos + 5 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xc2;
-		buf[pos++] = (char)0xb3;
-		break;
-	case exp_neg_quartic:
-		if (pos + 6 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb4;
-		break;
-	case exp_neg_quintic:
-		if (pos + 6 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb5;
-		break;
-	case exp_neg_sextic:
-		if (pos + 6 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb6;
-		break;
-	case exp_neg_septic:
-		if (pos + 6 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb7;
-		break;
-	case exp_neg_octic:
-		if (pos + 6 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb8;
-		break;
-	case exp_neg_nonic:
-		if (pos + 6 >= (int32_t)bufsize) return -1;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xbb;
-		buf[pos++] = (char)0xe2;
-		buf[pos++] = (char)0x81;
-		buf[pos++] = (char)0xb9;
-		break;
-	case exp_invalid:
-		return -1;
+		n = -n;
+	}
+	int32_t digs[3], nd = 0;
+	while (n > 0 && nd < 3) { digs[nd++] = n % 10; n /= 10; }
+	for (int32_t i = nd - 1; i >= 0; i--) {
+		const char* d   = bvni_sup_digit[digs[i]].utf8;
+		int32_t     dl  = bvni_sup_digit[digs[i]].len;
+		if (pos + dl >= (int32_t)bufsize) return -1;
+		memcpy(buf + pos, d, (size_t)dl);
+		pos += dl;
 	}
 	buf[pos] = '\0';
 	return pos;
@@ -1284,80 +1188,27 @@ static int32_t bvn_write_exponent_suffix(
 static int32_t bvn_write_exponent_suffix_ascii(
 	char* buf, size_t bufsize, unit_exponent_t e)
 {
-	int32_t pos = 0;
-	switch (e) {
-	case exp_linear:
-		break;
-	case exp_square:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '2';
-		break;
-	case exp_cubic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '3';
-		break;
-	case exp_quartic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '4';
-		break;
-	case exp_quintic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '5';
-		break;
-	case exp_sextic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '6';
-		break;
-	case exp_septic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '7';
-		break;
-	case exp_octic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '8';
-		break;
-	case exp_nonic:
-		if (pos + 2 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '9';
-		break;
-	case exp_neg_linear:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '1';
-		break;
-	case exp_neg_square:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '2';
-		break;
-	case exp_neg_cubic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '3';
-		break;
-	case exp_neg_quartic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '4';
-		break;
-	case exp_neg_quintic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '5';
-		break;
-	case exp_neg_sextic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '6';
-		break;
-	case exp_neg_septic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '7';
-		break;
-	case exp_neg_octic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '8';
-		break;
-	case exp_neg_nonic:
-		if (pos + 3 >= (int32_t)bufsize) return -1;
-		buf[pos++] = '^'; buf[pos++] = '-'; buf[pos++] = '9';
-		break;
-	case exp_invalid:
+	int32_t n = bvn_exponent_to_int(e);
+	if (n == 0)
 		return -1;
+	if (n == 1) {
+		if (bufsize < 1) return -1;
+		buf[0] = '\0';
+		return 0;
+	}
+	int32_t pos = 0;
+	if (pos + 1 >= (int32_t)bufsize) return -1;
+	buf[pos++] = '^';
+	if (n < 0) {
+		if (pos + 1 >= (int32_t)bufsize) return -1;
+		buf[pos++] = '-';
+		n = -n;
+	}
+	int32_t digs[3], nd = 0;
+	while (n > 0 && nd < 3) { digs[nd++] = n % 10; n /= 10; }
+	for (int32_t i = nd - 1; i >= 0; i--) {
+		if (pos + 1 >= (int32_t)bufsize) return -1;
+		buf[pos++] = (char)('0' + digs[i]);
 	}
 	buf[pos] = '\0';
 	return pos;

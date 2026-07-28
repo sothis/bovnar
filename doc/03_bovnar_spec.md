@@ -1581,7 +1581,7 @@ Exponents can be written in two forms:
 
 | Constraint | Limit |
 |------------|-------|
-| Maximum components per compound unit | 8 (`BVNR_MAX_UNIT_COMPONENTS`) |
+| Maximum components per compound unit | 32 (`BVNR_MAX_UNIT_COMPONENTS`) |
 
 If a compound unit string contains more than `BVNR_MAX_UNIT_COMPONENTS` components after parsing, the validator raises `error_unit_illegal`.
 
@@ -2185,7 +2185,7 @@ typedef struct value_type_spec_s {
                                /* for float_dec:        unused (always 0)             */
 } value_type_spec_t;
 
-#define BVNR_MAX_UNIT_COMPONENTS     8
+#define BVNR_MAX_UNIT_COMPONENTS     32
 
 typedef struct value_unit_prefix_s {
     prefix_system_t system;
@@ -3077,7 +3077,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 | reader default max_text_bytes | 2 147 483 647 | Default applied by the reader when `max_text_bytes` is 0 |
 | reader default max_file_size | 0 (unlimited / endless) | A `max_file_size` of 0 imposes no byte-count cap; set to 16 777 216 (16 MiB) in production |
 | recommended file size cap | 16 777 216 | Suggested explicit value for `max_file_size` (16 MiB) |
-| `BVNR_MAX_UNIT_COMPONENTS` | 8 | Maximum number of unit components in a compound unit |
+| `BVNR_MAX_UNIT_COMPONENTS` | 32 | Maximum number of unit components in a compound unit |
 | `BVN_MAX_INT_WIDTH` | 32768 | Maximum bit-width for `uint` and `sint` types. The validator and writer reject any declared width exceeding this value with `error_illegal_value_type`. |
 
 ---

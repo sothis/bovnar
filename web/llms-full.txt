@@ -13,8 +13,8 @@ This single file concatenates the Bovnar landing page and the complete documenta
 - **Website:** https://www.bovnar.io
 - **Prebuilt downloads:** https://github.com/sothis/bovnar/releases
 - **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
-- **DOI — Bovnar 1.1.0 Documentation and Specification:** https://zenodo.org/records/21443296
-- **DOI — Bovnar 1.1.0 Source:** https://zenodo.org/records/21443009
+- **DOI — Documentation and Specification (latest):** https://doi.org/10.5281/zenodo.21443295
+- **DOI — Source (latest):** https://doi.org/10.5281/zenodo.21443008
 
 ---
 
@@ -14096,7 +14096,7 @@ reader- and writer-side unit policies a profile unit has to survive unchanged).
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (541 assertions across the five profiles, plus 2847 in the cross-vocabulary
+files named above (567 assertions across the five profiles, plus 2847 in the cross-vocabulary
 suite). What is **not** machine-verified, and must not be read as such, is the VOCABULARY side: the
 transliteration tables in `src/gendata/*.bvnr` state what each foreign code is worth, and nothing in
 this repository checks that against the publications those codes come from. §9.2 says exactly what
@@ -14171,7 +14171,8 @@ is explicit that five tables wrong in the same way would agree with each other p
 13. [The UDUNITS profile](#13-the-udunits-profile)
     - 13.1 [An expression profile, sharing the UCUM parser](#131-an-expression-profile-sharing-the-ucum-parser)
     - 13.2 [Space does not multiply, and cannot](#132-space-does-not-multiply-and-cannot)
-    - 13.3 [Reference time is refused, and why](#133-reference-time-is-refused-and-why)
+    - 13.3 [The near misses: codes that name a native unit and are not it](#133-the-near-misses-codes-that-name-a-native-unit-and-are-not-it)
+    - 13.4 [Reference time is refused, and why](#134-reference-time-is-refused-and-why)
 14. [The cross-vocabulary conformance suite](#14-the-cross-vocabulary-conformance-suite)
     - 14.1 [A concept table, checked pairwise](#141-a-concept-table-checked-pairwise)
     - 14.2 [The negative half is not optional](#142-the-negative-half-is-not-optional)
@@ -14754,8 +14755,8 @@ to go. That is the Old German units, the water-hardness degrees, the turbidity k
 starts in Bovnar's native registry may have nowhere to go.
 
 Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **605** combinations survive a native → UCUM → native round trip
-unchanged, **1200** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+`si_none da h k M G T d c m µ n` — **601** combinations survive a native → UCUM → native round trip
+unchanged, **1204** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -15279,7 +15280,7 @@ risk, and §10.4 records it as unbuilt.
 
 The generator also emits the **reverse** table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 605
+searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 601
 round trips quoted in §5.3 are the check that it agrees with the forward direction.
 
 ### 9.3 Tests
@@ -15583,7 +15584,7 @@ namespace and falls through to the native parser, which rejects it as it always 
 
 > `udunits:` — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 > of netCDF and the CF conventions.
-> Data file `src/gendata/udunits.bvnr`; pinned by `tests/bovnar_udunits_test.c` (127 assertions).
+> Data file `src/gendata/udunits.bvnr`; pinned by `tests/bovnar_udunits_test.c` (153 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 
@@ -15621,7 +15622,39 @@ This is a symptom of something larger, recorded in §10.2: **a space anywhere in
 annotation is silently deleted**, so `<float:64,k g>` is accepted as `k~g`. That predates the
 profiles and affects native units too.
 
-### 13.3 Reference time is refused, and why
+### 13.3 The near misses: codes that name a native unit and are not it
+
+UDUNITS is the profile with the most spellings that look like a native unit, carry the same
+dimension, and differ only in factor. Each is refused as `error_unit_profile_unsupported` rather
+than mapped, because a factor-only error is the one shape nothing downstream can catch — the same
+reasoning §6.3 applies to the BTU and the apothecary dram.
+
+| UDUNITS code | Is | Native unit of that name | Apart by |
+|---|---|---|---|
+| `year`, `yr` | tropical year, `3.15569259747e7` s | `yr`, the Julian year `31557600` s | 674 s — 11 min/yr |
+| `month` | a twelfth of the tropical year | `mo`, a twelfth of the Julian year | as above |
+| `calorie`, `cal` | IT calorie, `4.1868` J | `cal`, thermochemical `4.184` J | 0.067 % |
+| `chain`, `rod`, `furlong`, `fathom` | built on the US **survey** foot | international, on the `0.3048` m foot | 2 ppm |
+| `acre` | US survey acre, `160` survey rod² | `ac`, international `4046.8564224` m² | 4 ppm |
+
+`Julian_year` is UDUNITS' own spelling for what `yr` means and **does** map. The BTU runs the other
+way: UDUNITS' unqualified `Btu` is the IT BTU, which is exactly what native `Btu` is, so it maps
+here although UCUM's unqualified `[Btu]` cannot (§6.3).
+
+Two spelling traps in the same family, neither of them factor errors:
+
+- **`oz` is a volume.** In UDUNITS it is a symbol of the US *fluid* ounce, not the avoirdupois
+  ounce, so it translates to `fl_oz`. The mass is spelled `avoirdupois_ounce`. Reading `udunits:oz`
+  as a mass was a dimension error, and the two are now not even compatible.
+- **`b` is the barn**, not the bit — the collision §6.2 records for UCUM, present here for the same
+  reason and resolved the same way.
+
+`thermochemical_calorie` is native `cal` exactly and would map, but at 22 bytes it pushes this
+profile's worst-case emitted string past `BVNR_UNIT_STRING_MAX` and `gen_profiles.py` refuses to
+generate the table (§2.5). Raising that constant to 224 would admit it; it sizes only stack buffers
+in the writer and the CLI. Until then the native `cal` is the way to write it.
+
+### 13.4 Reference time is refused, and why
 
 `<unit> since <timestamp>` is UDUNITS' most distinctive construct and the one most often asked for.
 It is **refused**, as `error_unit_profile_unsupported`, for a structural reason rather than a

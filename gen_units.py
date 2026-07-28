@@ -301,11 +301,21 @@ def check_unit_string_bound(units, prefixes):
     """
     hdr = os.path.join(REPO, "include", "bovnar.h")
     with open(hdr, encoding="utf-8") as f:
-        m = re.search(r"#define\s+BVNR_UNIT_STRING_MAX\s+(\d+)", f.read())
+        text = f.read()
+    m = re.search(r"#define\s+BVNR_UNIT_STRING_MAX\s+(\d+)", text)
     if not m:
         raise SystemExit("gen_units: BVNR_UNIT_STRING_MAX is not defined in "
                          "include/bovnar.h -- nothing to check the bound against")
     declared = int(m.group(1))
+    # Read the component count from the header rather than keeping a second
+    # copy here. It used to be a module constant with a "must match bovnar.h"
+    # comment, which is the kind of duplication that is correct until the day
+    # one of the two moves.
+    mc = re.search(r"#define\s+BVNR_MAX_UNIT_COMPONENTS\s+(\d+)", text)
+    if not mc:
+        raise SystemExit("gen_units: BVNR_MAX_UNIT_COMPONENTS is not defined "
+                         "in include/bovnar.h")
+    ncomp = int(mc.group(1))
     pfx_max = max(byte_len(p["symbol"])
                   for sysname in ("si_prefixes", "iec_prefixes")
                   for p in prefixes[sysname])
@@ -313,10 +323,12 @@ def check_unit_string_bound(units, prefixes):
     sym_max = max(byte_len(u["symbol"]) + (pfx_max + 1 if u["prefix"] not in NO_PREFIX
                                            else 0)
                   for u in units)
-    EXP_MAX = 6                      # "⁻⁹" as bvn_write_exponent_suffix emits it
+    # "⁻¹⁰⁰" as bvn_write_exponent_suffix emits it: ⁻ and ⁰ are three bytes
+    # each, ¹ is two, so the widest exponent is 3+2+3+3 = 11. One spare byte
+    # keeps the arithmetic honest if a digit's encoding width ever changes.
+    EXP_MAX = 12
     SEP     = 2                      # "·"
-    worst = (BVNR_MAX_UNIT_COMPONENTS * (sym_max + EXP_MAX)
-             + (BVNR_MAX_UNIT_COMPONENTS - 1) * SEP + 1)
+    worst = (ncomp * (sym_max + EXP_MAX) + (ncomp - 1) * SEP + 1)
     if worst > declared:
         raise SystemExit(
             "gen_units: the longest unit this table can emit needs %d bytes, but "
@@ -326,7 +338,6 @@ def check_unit_string_bound(units, prefixes):
     return worst, declared
 
 
-BVNR_MAX_UNIT_COMPONENTS = 8   # must match BVNR_MAX_UNIT_COMPONENTS in bovnar.h
 
 
 def gen_prefix_policy(units):

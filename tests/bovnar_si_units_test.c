@@ -98,7 +98,19 @@ static void test_int_to_exponent(void)
 	ASSERT_TRUE(bvn_int_to_exponent(-1) == exp_neg_linear,  "-1 → exp_neg_linear");
 	ASSERT_TRUE(bvn_int_to_exponent(-2) == exp_neg_square,  "-2 → exp_neg_square");
 	ASSERT_TRUE(bvn_int_to_exponent(-3) == exp_neg_cubic,   "-3 → exp_neg_cubic");
-	ASSERT_TRUE(bvn_int_to_exponent(99) == exp_invalid,  "99 → exp_invalid (out of range)");
+	/* The range is [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX], not the ±9 the named
+	 * enumerators cover, so a two- or three-digit exponent round-trips. */
+	ASSERT_TRUE(bvn_int_to_exponent(99)   == 99,   "99 round-trips");
+	ASSERT_TRUE(bvn_int_to_exponent(100)  == 100,  "100 is the maximum");
+	ASSERT_TRUE(bvn_int_to_exponent(-100) == -100, "-100 is the minimum");
+	ASSERT_TRUE(bvn_exponent_to_int(bvn_int_to_exponent(-42)) == -42,
+	            "-42 survives both directions");
+	/* Zero stays reserved, and anything past the bounds is refused. */
+	ASSERT_TRUE(bvn_int_to_exponent(0)    == exp_invalid, "0 → exp_invalid");
+	ASSERT_TRUE(bvn_int_to_exponent(101)  == exp_invalid, "101 → exp_invalid");
+	ASSERT_TRUE(bvn_int_to_exponent(-101) == exp_invalid, "-101 → exp_invalid");
+	ASSERT_TRUE(bvn_exponent_to_int((unit_exponent_t)5000) == 0,
+	            "an out-of-range struct value reads as 0, it does not abort");
 }
 
 static void test_si_factor_simple(void)
@@ -2014,9 +2026,12 @@ static void test_malformed_exponent_never_aborts(void)
 	/* A caller can fill a value_unit_t by hand, and an exponent outside
 	 * unit_exponent_t used to pass bvn_unit_valid, get silently dropped by the
 	 * formatter, and then trip an assert() that the shipped Release build kept
-	 * live — a library taking down its host process over a bad argument. */
+	 * live — a library taking down its host process over a bad argument.
+	 *
+	 * 10 used to be out of range and is now an ordinary exponent, so the value
+	 * that exercises this has to be past BVN_EXPONENT_MAX. */
 	value_unit_t u = BVN_UNIT_NO_PREFIX(bu_meter);
-	u.components[0].exponent = (unit_exponent_t)10;
+	u.components[0].exponent = (unit_exponent_t)(BVN_EXPONENT_MAX + 1);
 	char buf[64];
 	ASSERT_TRUE(!bvn_unit_valid(u), "out-of-enum exponent fails bvn_unit_valid");
 	ASSERT_TRUE(bvn_unit_to_string(u, buf, sizeof buf) < 0,

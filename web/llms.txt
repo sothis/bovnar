@@ -25,8 +25,8 @@ Bovnar is a self-describing data serialization format: every value carries its o
 - [Website](https://www.bovnar.io/): The Bovnar homepage and interactive browser playground.
 - [Source (GitHub)](https://github.com/sothis/bovnar): The C99 reference implementation, Python bindings, and tooling (MIT-licensed).
 - [IANA media type (text/vnd.bovnar)](https://www.iana.org/assignments/media-types/text/vnd.bovnar): The registered media type for .bvnr documents.
-- [DOI — Documentation & Specification (1.1.0)](https://zenodo.org/records/21443296): Archived, citable release of the specification and documentation.
-- [DOI — Source (1.1.0)](https://zenodo.org/records/21443009): Archived, citable release of the source code.
+- [DOI — Documentation & Specification (latest)](https://doi.org/10.5281/zenodo.21443295): Concept DOI for the archived, citable specification and documentation; resolves to the newest version.
+- [DOI — Source (latest)](https://doi.org/10.5281/zenodo.21443008): Concept DOI for the archived, citable source code; resolves to the newest release.
 
 ## Optional
 

@@ -527,7 +527,7 @@ divisor, use a negative exponent instead:
 .force_alt = <float:64,k~g·m·s⁻²> 9.81;   # identical to k~g·m/s²
 ```
 
-The maximum number of unit components in a compound unit is 8; exceeding that
+The maximum number of unit components in a compound unit is 32; exceeding that
 is `error_unit_illegal`.
 
 ---
@@ -541,10 +541,13 @@ Yes. Both forms are accepted and produce identical internal representations:
 .area2 = <float:64,m^2>  100.0;   # ASCII caret form — same result
 .inv1  = <float:64,s⁻¹>  50.0;
 .inv2  = <float:64,s^-1> 50.0;
+.big   = <float:64,m^100> 1.0;    # multi-digit, up to ±100
+.big2  = <float:64,m¹⁰⁰>  1.0;    # the same unit
 ```
 
-Only a single ASCII digit is supported after `^`; multi-digit exponents are
-a parse error.
+Up to three ASCII digits are supported after `^` — exactly what the ±100 range
+needs. A longer run is not an over-large exponent but an unrecognised token:
+`m^1000` fails because the scan finds no `^` where it expects one.
 
 ---
 
@@ -1385,7 +1388,7 @@ throughput by skipping the `on_verified` callback.
 
 **How many unit components can a compound unit have?**
 
-A maximum of 8 (`BVNR_MAX_UNIT_COMPONENTS`). Exceeding this limit during
+A maximum of 32 (`BVNR_MAX_UNIT_COMPONENTS`). Exceeding this limit during
 parsing is `error_unit_illegal`.
 
 ---

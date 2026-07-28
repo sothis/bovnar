@@ -758,7 +758,7 @@ ev_data                        → value = &quot;42&quot;, type = {uint, 64}
 <ul>
 <li><code>type</code> — the token type (<code>token_is_number</code>, <code>token_is_string</code>, <code>token_is_symbol</code>, <code>token_is_reference</code>, <code>token_is_array_number</code>, <code>token_is_array_string</code>, <code>token_is_bool</code>, <code>token_is_null_value</code>, <code>token_is_octet_stream</code>)</li>
 <li><code>value_type</code> — the <code>value_type_spec_t</code> (family, width, base/Q)</li>
-<li><code>value_unit</code> — the <code>value_unit_t</code> (up to 8 components)</li>
+<li><code>value_unit</code> — the <code>value_unit_t</code> (up to <code>BVNR_MAX_UNIT_COMPONENTS</code> components)</li>
 <li><code>data</code> — pointer to the raw value bytes</li>
 <li><code>length</code> — byte count</li>
 </ul>

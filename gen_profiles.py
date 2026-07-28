@@ -281,7 +281,7 @@ def check_profile_string_bound(p):
     if p.grammar == "flat":
         worst = ns + code_max + 1
     else:
-        EXP_MAX = 2                      # "-9"
+        EXP_MAX = 4                      # "-100"
         SEP = 1                          # "."
         worst = ns + ncomp * (code_max + EXP_MAX) + (ncomp - 1) * SEP + 1
     if worst > declared:

@@ -97,11 +97,7 @@ static inline double bvni_pow10(int32_t n)
 }
 static inline bool bvni_is_neg_exp(unit_exponent_t e)
 {
-	return e == exp_neg_linear  || e == exp_neg_square  ||
-	       e == exp_neg_cubic   || e == exp_neg_quartic ||
-	       e == exp_neg_quintic || e == exp_neg_sextic  ||
-	       e == exp_neg_septic  || e == exp_neg_octic   ||
-	       e == exp_neg_nonic;
+	return bvn_exponent_to_int(e) < 0;
 }
 /*
  * |exponent|, or 0 for one that is not a member of unit_exponent_t.

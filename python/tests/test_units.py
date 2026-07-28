@@ -31,7 +31,7 @@ from bovnar.enums import (
     PrefixSystem, ValueTypeFamily, Event,
 )
 from bovnar.structs import (
-    ValueUnit, ValueUnitPrefix,
+    ValueUnit, ValueUnitPrefix, MAX_UNIT_COMPONENTS,
     make_unit_si, make_unit_iec, make_unit_dimensionless,
     make_unit_none,
 )
@@ -333,8 +333,16 @@ class TestUnitParsing:
             self._parse("m//s")
 
     def test_too_many_components(self):
+        # One past BVNR_MAX_UNIT_COMPONENTS, built FROM the constant rather
+        # than pinning a count of its own -- this test used to hard-code the
+        # nine components that overflowed a limit of eight.
+        atoms = ["m", "s", "g", "A", "K", "mol", "cd", "b", "B", "Hz", "N",
+                 "Pa", "J", "W", "V", "F", "C", "S", "Wb", "T", "H", "lm",
+                 "lx", "Bq", "Gy", "Sv", "kat", "L", "min", "h", "d", "wk",
+                 "yr", "rad", "sr", "bar", "eV", "t", "ha", "au"]
+        assert len(atoms) > MAX_UNIT_COMPONENTS, "need one atom past the limit"
         with pytest.raises(BovnarArgumentError):
-            self._parse("m*s*k~g*A*K*mol*cd*b*B")
+            self._parse("*".join(atoms[:MAX_UNIT_COMPONENTS + 1]))
 
     def test_celsius(self):
         vu = self._parse("\u00b0C")

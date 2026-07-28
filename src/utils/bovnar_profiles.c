@@ -670,7 +670,11 @@ static bool materialise_atom(const bvn_prof_atom_t* atom, int32_t total,
 		value_unit_component_t c = base.components[i];
 		int32_t ce = bvn_exponent_to_int(c.exponent);
 		int32_t ne = ce * total;
-		if (ne == 0 || ne > 9 || ne < -9) {
+		/* The atom's own exponent times the one written on it: "kat2" is the
+		 * katal's mol·s⁻¹ squared. The product is what has to land in range,
+		 * not either factor -- and it is computed in int32 so the multiply
+		 * cannot wrap before the check sees it. */
+		if (ne == 0 || ne > BVN_EXPONENT_MAX || ne < BVN_EXPONENT_MIN) {
 			*status = bvni_profile_unsupported;
 			return false;
 		}
@@ -829,7 +833,8 @@ static bool parse_component(const bvn_profile_t* p, const char* s,
 					*status = bvni_profile_illegal;
 					return false;
 				}
-				if (exp == 0 || exp > 9 || exp < -9) {
+				if (exp == 0 || exp > BVN_EXPONENT_MAX ||
+				    exp < BVN_EXPONENT_MIN) {
 					*status = bvni_profile_unsupported;
 					return false;
 				}
@@ -852,8 +857,9 @@ static bool parse_component(const bvn_profile_t* p, const char* s,
 			 * in practice "ucum:m999999999999999999" wrapped to a plausible
 			 * exponent and parsed as m⁻¹ rather than being refused. A unit
 			 * parameter may be 255 bytes, so this is reachable from a document.
-			 * The bound is well above the ±9 the format can spell; anything past
-			 * it is caught by the range check below.
+			 * The bound admits at most three digits, which is exactly what
+			 * BVN_EXPONENT_MAX needs; a value that scans inside it but lands
+			 * outside the range is caught by the range check below.
 			 */
 			int32_t v = 0;
 			for (uint32_t k = d; k < len; k++) {
@@ -873,9 +879,9 @@ static bool parse_component(const bvn_profile_t* p, const char* s,
 		*status = bvni_profile_illegal;
 		return false;
 	}
-	if (exp == 0 || exp > 9 || exp < -9) {
-		/* Bovnar spells exponents -9..+9 and has no representation for a
-		 * component raised to zero. */
+	if (exp == 0 || exp > BVN_EXPONENT_MAX || exp < BVN_EXPONENT_MIN) {
+		/* Bovnar spells exponents BVN_EXPONENT_MIN..BVN_EXPONENT_MAX and has
+		 * no representation for a component raised to zero. */
 		*status = bvni_profile_unsupported;
 		return false;
 	}

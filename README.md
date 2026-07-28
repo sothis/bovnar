@@ -38,8 +38,8 @@
 - **Website:** https://www.bovnar.io
 - **Prebuilt downloads:** https://github.com/sothis/bovnar/releases
 - **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
-- **DOI — Bovnar 1.1.0 Documentation and Specification:** https://zenodo.org/records/21443296
-- **DOI — Bovnar 1.1.0 Source:** https://zenodo.org/records/21443009
+- **DOI — Documentation and Specification (latest):** https://doi.org/10.5281/zenodo.21443295
+- **DOI — Source (latest):** https://doi.org/10.5281/zenodo.21443008
 
 ---
 
@@ -87,7 +87,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 411-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 419-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -527,7 +527,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 411-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 419-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -771,7 +771,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 | [Unit Profiles](doc/11_bovnar_unit_profiles.md) | Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite. |
 | [Formal EBNF](doc/12_bovnar.ebnf) | Machine-readable grammar. |
-| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (411 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (419 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
 
@@ -782,6 +782,8 @@ See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including 
 To cite Bovnar in published work, use the concept DOI, which always resolves to the newest archived release:
 
 > Sonntag, J. *Bovnar*. https://doi.org/10.5281/zenodo.21443008
+
+The documentation and specification are archived separately, under their own concept DOI: https://doi.org/10.5281/zenodo.21443295
 
 To pin a particular release instead, use its version DOI — [1.1.0 source](https://doi.org/10.5281/zenodo.21443009), [1.1.0 documentation and specification](https://doi.org/10.5281/zenodo.21443296).
 

@@ -67,12 +67,14 @@ PROJECT_LINKS = [
     ("https://www.iana.org/assignments/media-types/text/vnd.bovnar",
      "IANA media type (text/vnd.bovnar)",
      "The registered media type for .bvnr documents."),
-    ("https://zenodo.org/records/21443296",
-     "DOI — Documentation & Specification (1.1.0)",
-     "Archived, citable release of the specification and documentation."),
-    ("https://zenodo.org/records/21443009",
-     "DOI — Source (1.1.0)",
-     "Archived, citable release of the source code."),
+    ("https://doi.org/10.5281/zenodo.21443295",
+     "DOI — Documentation & Specification (latest)",
+     "Concept DOI for the archived, citable specification and documentation; "
+     "resolves to the newest version."),
+    ("https://doi.org/10.5281/zenodo.21443008",
+     "DOI — Source (latest)",
+     "Concept DOI for the archived, citable source code; resolves to the "
+     "newest release."),
 ]
 
 
@@ -218,8 +220,8 @@ def build_index_md_de(sections):
         f"- **Website:** {SITE}",
         "- **IANA-Medientyp (`text/vnd.bovnar`):** "
         "https://www.iana.org/assignments/media-types/text/vnd.bovnar",
-        "- **DOI — Dokumentation & Spezifikation 1.1.0:** https://zenodo.org/records/21443296",
-        "- **DOI — Quellcode 1.1.0:** https://zenodo.org/records/21443009",
+        "- **DOI — Dokumentation & Spezifikation (aktuell):** https://doi.org/10.5281/zenodo.21443295",
+        "- **DOI — Quellcode (aktuell):** https://doi.org/10.5281/zenodo.21443008",
         "",
         "## Überblick",
         "",

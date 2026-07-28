@@ -142,7 +142,7 @@ cc<span class="w"> </span>-o<span class="w"> </span>my_impl_adapter<span class="
 <div class="codehilite"><pre><span></span><code>┌───────────────────────────────────────────────────────────────────┐
 │                       bvnr_conformance                            │
 │                                                                   │
-│  Test corpus (411 cases) ──→ for each test case:                │
+│  Test corpus (419 cases) ──→ for each test case:                │
 │                                                                   │
 │  Self-test mode:                    IUT mode:                     │
 │  ┌─────────────────────┐            ┌──────────────────────────┐  │
@@ -785,8 +785,8 @@ specifies:</p>
 </tr>
 <tr>
 <td><code>units</code></td>
-<td>70</td>
-<td>SI/IEC prefixes, compact prefix form, compound, inline, errors</td>
+<td>78</td>
+<td>SI/IEC prefixes, compact prefix form, compound, inline, multi-digit exponents and their bounds, errors</td>
 </tr>
 <tr>
 <td><code>unit_profile</code></td>
@@ -825,7 +825,7 @@ specifies:</p>
 </tr>
 <tr>
 <td><strong>Total</strong></td>
-<td><strong>411</strong></td>
+<td><strong>419</strong></td>
 <td></td>
 </tr>
 </tbody>
@@ -836,7 +836,7 @@ specifies:</p>
 natively by CTest and many CI systems. Each case <strong>group</strong> is a TAP 14 <em>subtest</em>:
 a 4-space-indented child stream of the individual cases, a trailing child plan,
 and a leading <code># Subtest:</code> comment, rolled up into one parent test point. The
-parent plan therefore counts the groups (currently 23), not the 411 cases.</p>
+parent plan therefore counts the groups (currently 23), not the 419 cases.</p>
 <div class="codehilite"><pre><span></span><code>TAP version 14
 1..23
 # Subtest: encoding

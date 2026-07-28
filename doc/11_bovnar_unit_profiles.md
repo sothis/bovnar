@@ -403,7 +403,7 @@ UCUM's binary prefixes (`Ki`, `Mi`, …) map to `prefix_iec` and are subject to 
 |---|---|---|
 | `.` | `·` | multiplication |
 | `/` | `/` | division — see below |
-| `m2`, `s-1` | `m²`, `s⁻¹` | exponent directly after the atom; range ±9 as natively (doc/05 §6) |
+| `m2`, `s-1` | `m²`, `s⁻¹` | exponent directly after the atom; range ±100 as natively (doc/05 §6) |
 | `(` `)` | `(` `)` | grouping, mapped through the native group parser (doc/05 §5.2) |
 | `1` | *(nothing)* | the unity atom; contributes no component |
 

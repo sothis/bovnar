@@ -519,7 +519,14 @@ static void test_regressions(void)
 	 */
 	chk_error("ucum:m99999999999999999999", error_unit_profile_unsupported);
 	chk_error("ucum:m-99999999999999999999", error_unit_profile_unsupported);
-	chk_error("ucum:m10", error_unit_profile_unsupported);
+	/* 10 used to be past the limit. The range is now
+	 * BVN_EXPONENT_MIN..BVN_EXPONENT_MAX, so the first refusal is at 101. */
+	chk_str("ucum:m10",    "m¹⁰");
+	chk_str("ucum:m100",   "m¹⁰⁰");
+	chk_str("ucum:m-100",  "m⁻¹⁰⁰");
+	chk_error("ucum:m101",  error_unit_profile_unsupported);
+	chk_error("ucum:m-101", error_unit_profile_unsupported);
+	chk_error("ucum:m0",    error_unit_profile_unsupported);
 	chk_error("ucum:m0",  error_unit_profile_unsupported);
 
 	/*

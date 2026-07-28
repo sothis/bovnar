@@ -2245,7 +2245,7 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <tbody>
 <tr>
 <td>Maximum components per compound unit</td>
-<td>8 (<code>BVNR_MAX_UNIT_COMPONENTS</code>)</td>
+<td>32 (<code>BVNR_MAX_UNIT_COMPONENTS</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -3104,7 +3104,7 @@ alone would: <code>;</code> remains a boundary in every case it was one before.<
 <span class="w">                               </span><span class="cm">/* for float_dec:        unused (always 0)             */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">value_type_spec_t</span><span class="p">;</span>
 
-<span class="cp">#define BVNR_MAX_UNIT_COMPONENTS     8</span>
+<span class="cp">#define BVNR_MAX_UNIT_COMPONENTS     32</span>
 
 <span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">value_unit_prefix_s</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">prefix_system_t</span><span class="w"> </span><span class="n">system</span><span class="p">;</span>
@@ -3935,7 +3935,7 @@ float_dec:
 </tr>
 <tr>
 <td><code>BVNR_MAX_UNIT_COMPONENTS</code></td>
-<td>8</td>
+<td>32</td>
 <td>Maximum number of unit components in a compound unit</td>
 </tr>
 <tr>

@@ -267,16 +267,24 @@ def main():
         html = build_html(title, subtitle, body, label)
         out = os.path.join(OUT_DIR, slug + ".pdf")
         HTML(string=html, base_url=DOC_DIR).write_pdf(out)
-        written.append(out)
+        written.append((src, out))
         kb = os.path.getsize(out) // 1024
         print(f"  {slug + '.pdf':32s} {kb:5d} KB   <- {src}")
 
     # Bundle every generated PDF into a single flat zip for the "download all"
-    # link on the website. Sorted by name so the archive is reproducible.
+    # link on the website, in DOCS order -- deterministic, like sorting by name,
+    # but the order is the one the set is meant to be read in.
+    #
+    # The entries carry the document's number, which the individual PDF slugs do
+    # not: extracted into one folder, "bovnar-cheatsheet.pdf" and friends sort
+    # alphabetically, so the archive opened with the tutorial in ninth place and
+    # nothing to say which document came first. The published per-file URLs are
+    # unaffected -- this prefix exists only inside the zip.
     zip_path = os.path.join(OUT_DIR, ZIP_NAME)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for pdf in sorted(written, key=os.path.basename):
-            zf.write(pdf, arcname=os.path.basename(pdf))
+        for src, pdf in written:
+            num = src.split("_", 1)[0]
+            zf.write(pdf, arcname=f"{num}-{os.path.basename(pdf)}")
     kb = os.path.getsize(zip_path) // 1024
     print(f"  {ZIP_NAME:32s} {kb:5d} KB   <- {len(written)} PDFs")
 

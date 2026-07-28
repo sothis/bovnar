@@ -1,0 +1,60 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: Bovnar
+abbreviation: BVNR
+abstract: >-
+  A text-based serialization format in which every value carries its own type
+  family, bit width, numeric base and physical unit inline, with no external
+  schema, so that dimensional mismatches are rejected by the parser rather than
+  by a separate validation pass. Ships a dependency-free C99 reference
+  implementation with a streaming reader, DOM API, writer, command-line tool,
+  WebAssembly build and pure-ctypes Python bindings.
+authors:
+  - family-names: Sonntag
+    given-names: Janos
+    orcid: "https://orcid.org/0009-0008-1299-6534"
+version: 1.1.0
+date-released: "2026-07-19"
+license: MIT
+repository-code: "https://github.com/sothis/bovnar"
+url: "https://www.bovnar.io"
+doi: 10.5281/zenodo.21443008
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21443008
+    description: Concept DOI, resolving to the latest archived release
+  - type: doi
+    value: 10.5281/zenodo.21443009
+    description: Archived source of version 1.1.0
+  - type: doi
+    value: 10.5281/zenodo.21443296
+    description: Archived documentation and specification of version 1.1.0
+keywords:
+  - serialization
+  - units of measure
+  - dimensional analysis
+  - metrology
+  - data interchange
+  - self-describing data
+  - scientific data
+  - C
+  - Python
+
+# Once a paper describing Bovnar is published, uncomment and complete the block
+# below. `preferred-citation` redirects citation tools to the paper while the
+# metadata above continues to identify the software itself.
+#
+# preferred-citation:
+#   type: article
+#   title: "Bovnar: a unit-safe serialization format with parse-time dimensional validation"
+#   authors:
+#     - family-names: Sonntag
+#       given-names: Janos
+#       orcid: "https://orcid.org/0009-0008-1299-6534"
+#   journal: Journal of Open Source Software
+#   year: 2026
+#   volume: 0
+#   issue: 0
+#   start: 0
+#   doi: 10.21105/joss.00000

@@ -27,6 +27,7 @@
 - [Web Playground](#web-playground)
 - [Use Cases](#use-cases)
 - [Documentation](#documentation)
+- [Citation](#citation)
 - [License](#license)
 
 ---
@@ -734,6 +735,18 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (387 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
+
+---
+
+## Citation
+
+To cite Bovnar in published work, use the concept DOI, which always resolves to the newest archived release:
+
+> Sonntag, J. *Bovnar*. https://doi.org/10.5281/zenodo.21443008
+
+To pin a particular release instead, use its version DOI — [1.1.0 source](https://doi.org/10.5281/zenodo.21443009), [1.1.0 documentation and specification](https://doi.org/10.5281/zenodo.21443296).
+
+Machine-readable metadata lives in [`CITATION.cff`](CITATION.cff): GitHub's *Cite this repository* button reads it, and `cffconvert` renders it as BibTeX, APA or RIS.
 
 ---
 

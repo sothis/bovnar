@@ -186,12 +186,24 @@ server {
     # includes them (the same trap as the home-page locations above). pdf and zip
     # are in the list because the documentation ships as both.
     location ~* \.(js|css|woff2|jpe?g|png|svg|ico|pdf|zip)$ {
+        # A renamed document's PDF, same map and same reason as the .md and
+        # .ebnf locations: 301 before try_files can answer 404.
+        if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
+
         add_header Cache-Control "$bvnr_cache_ctl" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
 
     location / {
+        # A rendered page that has been renamed: 301 before try_files can answer
+        # (see the $bvnr_page_moved map). This lives here rather than in a
+        # location /docs/ of its own: a prefix block would take over every
+        # /docs/ request and have to restate this one's headers and try_files,
+        # and $bvnr_page_moved is empty for everything else, so the test costs
+        # one variable lookup and changes nothing it does not name.
+        if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
+
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri $uri/ =404;
@@ -364,6 +376,10 @@ map $uri $bvnr_doc_moved {
     "/doc/ucum_profile.md"              "/doc/11_bovnar_unit_profiles.md";
     "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
     "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
+    # A renamed document renames its PDF too. The asset location below applies
+    # this same map, so the old download keeps working instead of 404ing the
+    # moment a --delete publish prunes it.
+    "/doc/pdf/bovnar-ucum-profile.pdf"  "/doc/pdf/bovnar-unit-profiles.pdf";
 }
 
 # Renamed RENDERED pages. Separate from $bvnr_doc_moved above: that one answers
@@ -377,11 +393,12 @@ map $uri $bvnr_page_moved {
 ```
 
 ```nginx
-    # first line of BOTH location ~ \.md$ and location ~ \.ebnf$, so the
-    # redirect happens before try_files can answer 404
+    # first line of location ~ \.md$, location ~ \.ebnf$ AND the static-asset
+    # location (a renamed document renames its PDF), so the redirect happens
+    # before try_files can answer 404
     if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
 
-    # and the same shape in location /docs/, for a renamed RENDERED page
+    # and the same shape at the top of location /, for a renamed RENDERED page
     if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
 ```
 
@@ -543,6 +560,10 @@ map $uri $bvnr_doc_moved {
     "/doc/ucum_profile.md"              "/doc/11_bovnar_unit_profiles.md";
     "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
     "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
+    # A renamed document renames its PDF too. The asset location below applies
+    # this same map, so the old download keeps working instead of 404ing the
+    # moment a --delete publish prunes it.
+    "/doc/pdf/bovnar-ucum-profile.pdf"  "/doc/pdf/bovnar-unit-profiles.pdf";
 }
 
 # Renamed RENDERED pages. Separate from $bvnr_doc_moved above: that one answers
@@ -659,15 +680,6 @@ server {
 
     # .md as Markdown (RFC 7763) + UTF-8; plus the canonical->HTML header for the
     # doc .md (empty, hence omitted, for /index.md and /de/index.md).
-    # A rendered page that has been renamed: 301 before try_files can 404 it
-    # (see the $bvnr_page_moved map). /docs/ucum/ was indexed before the UCUM
-    # profile document became the unit-profiles document.
-    location /docs/ {
-        if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
-        include snippets/bovnar-headers.conf;
-        try_files $uri $uri/ $uri/index.html =404;
-    }
-
     location ~ \.md$ {
         # A document that has been renamed: 301 to its current path before
         # try_files can turn it into a 404 (see the $bvnr_doc_moved map).
@@ -726,6 +738,10 @@ server {
     # what to do. They are regenerated on publish, hence the map's short default
     # rather than a year -- a stale PDF for an hour, not for a year.
     location ~* \.(js|css|woff2|jpe?g|png|svg|ico|pdf|zip)$ {
+        # A renamed document's PDF, same map and same reason as the .md and
+        # .ebnf locations: 301 before try_files can answer 404.
+        if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
+
         add_header Cache-Control "$bvnr_cache_ctl" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -741,6 +757,14 @@ server {
     # still stores the copy; it just makes the browser ask, and the ETag turns
     # that into a 304.
     location / {
+        # A rendered page that has been renamed: 301 before try_files can answer
+        # (see the $bvnr_page_moved map). This lives here rather than in a
+        # location /docs/ of its own: a prefix block would take over every
+        # /docs/ request and have to restate this one's headers and try_files,
+        # and $bvnr_page_moved is empty for everything else, so the test costs
+        # one variable lookup and changes nothing it does not name.
+        if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
+
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri $uri/ =404;

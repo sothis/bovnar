@@ -16,7 +16,9 @@ avoirdupois ounce when UDUNITS defines it as the US fluid ounce (a volume read
 as a mass), the unqualified `calorie` mapped to the thermochemical one when
 UDUNITS means the IT calorie, `year`/`month` mapped to the Julian year when
 UDUNITS means the tropical one, and `acre`/`chain`/`rod`/`furlong` mapped onto
-international lengths when UDUNITS builds them on the US survey foot.
+international lengths when UDUNITS builds them on the US survey foot. Extending
+it to QUDT found six local names that vocabulary does not define, a month that
+was the lunar one, and a rotational speed 2π out.
 
 WHY IT ASKS THE LIBRARY RATHER THAN COMPUTING THE NATIVE SIDE ITSELF. A second
 implementation of the native unit grammar in Python is exactly how a generated
@@ -38,13 +40,26 @@ THREE OUTCOMES, AND ONLY TWO ARE ERRORS.
              table does not map it. Advisory: it is a coverage suggestion, not a
              defect, and the decision to carry a unit is editorial.
 
-WHAT IT DOES NOT CHECK. Only the vocabularies that publish machine-readable
-definitions WITH factors: UCUM and UDUNITS, the two expression profiles. QUDT
-ships Turtle with conversion multipliers and could be added; UN/ECE Rec 20
-publishes a code list whose conversion factors are prose, and is out of reach.
-Arbitrary and special units (UCUM `isArbitrary`/`isSpecial`) have no factor to
-check and are skipped — they are exactly the ones bovnar carries as opaque or
-refuses outright.
+WHAT IT DOES NOT CHECK. Four of the five profiles are covered: `ucum`, `udunits`,
+`qudt` and `qudt-qk`. UN/ECE Rec 20 is the one left out — it publishes a code
+list whose conversion factors are prose, so there is nothing to resolve. (QUDT
+does carry a `qudt:uneceCommonCode` cross-reference on many units, which would
+give a machine-readable handle on Rec 20 at one remove; it would be QUDT's claim
+about UNECE rather than UNECE's own, and is not used here.)
+
+Arbitrary and special units (UCUM `isArbitrary`/`isSpecial`, QUDT units with no
+`conversionMultiplier`) have no factor to check and are skipped — they are
+exactly the ones bovnar carries as opaque or refuses outright.
+
+QUDT NEEDS NO EVALUATOR. UCUM and UDUNITS state a unit as an EXPRESSION over
+other units, so both need a parser; QUDT states each unit's own
+`conversionMultiplier` and its dimension vector as an IRI local name
+("A0E0L1I0M0H0T0D0"), so reading it is a table lookup. Its quantity kinds have
+no multiplier at all, and there the check is the claim doc/11 §12.3 actually
+makes: that a kind maps to the COHERENT SI unit of that kind. Reporting a kind
+as (1.0, its dimensions) turns that into two ordinary assertions — the
+dimensions agree and the native factor is exactly 1 — so a kind mapped to a
+non-coherent unit fails on the factor even though its dimensions are perfect.
 
 THE TWO UNIT SYSTEMS ARE NOT THE SAME SYSTEM, and the corrections below are the
 substance of the UCUM comparison rather than a detail of it:
@@ -99,6 +114,17 @@ SOURCES = {
         ("ucum-essence.xml",
          "https://raw.githubusercontent.com/ucum-org/ucum/main/ucum-essence.xml"),
     ],
+    # One file serves both QUDT namespaces' checks; `qudt-qk` additionally needs
+    # the quantity-kind vocabulary. Both are served by content negotiation off
+    # the versioned base URI, which is the form that actually resolves — the
+    # GitHub raw path for the same file 404s.
+    "qudt": [
+        ("qudt-units.ttl", "https://qudt.org/3.1.0/vocab/unit"),
+    ],
+    "qudt-qk": [
+        ("qudt-units.ttl", "https://qudt.org/3.1.0/vocab/unit"),
+        ("qudt-quantitykinds.ttl", "https://qudt.org/3.1.0/vocab/quantitykind"),
+    ],
 }
 
 # Bovnar's dimension order, as bvn_unit_dimension_vector fills it.
@@ -126,10 +152,19 @@ TOL = 1e-6
 # and byte as two base units of information with no factor between them; UCUM
 # and UDUNITS both define the byte as the number 8, which is a different and
 # equally defensible model, not a wrong conversion.
+#
+# QUDT goes further than the other two: it models information as ENTROPY, so its
+# bit is ln(2) = 0.693 and its byte 8·ln(2) = 5.545, the SI-coherent unit of
+# entropy being the nat. bovnar's bit is 1. qudt-qk.bvnr already refuses
+# `InformationEntropy` for exactly this reason.
 WAIVED_MODEL = {
     ("ucum", "bit"), ("ucum", "By"), ("ucum", "Bd"),
     ("udunits", "bit"), ("udunits", "byte"), ("udunits", "baud"),
     ("udunits", "Bd"), ("udunits", "bps"),
+    ("qudt", "BIT"), ("qudt", "BYTE"),
+    ("qudt", "KiloBYTE"), ("qudt", "MegaBYTE"), ("qudt", "GigaBYTE"),
+    ("qudt", "TeraBYTE"), ("qudt", "KibiBYTE"), ("qudt", "MebiBYTE"),
+    ("qudt", "GibiBYTE"), ("qudt", "TebiBYTE"),
 }
 
 # Places where the PUBLISHER is wrong, or states a value rounded past the
@@ -146,6 +181,10 @@ WAIVED_UPSTREAM = {
         "UCUM rounds the mercury column to 133.3220 kPa (7 digits); native mmHg "
         "is the exact conventional 133.322387415 Pa. 2.9 ppm, publisher "
         "rounding rather than a different unit.",
+    ("qudt", "TORR"):
+        "QUDT rounds the torr to 133.322 Pa (6 digits); native Torr is the "
+        "exact 101325/760. 2.8 ppm, the same publisher rounding as UCUM's "
+        "mercury column.",
 }
 
 
@@ -589,7 +628,142 @@ class Ucum:
         return f, d
 
 
-VOCABS = {"udunits": Udunits, "ucum": Ucum}
+# ── QUDT ────────────────────────────────────────────────────────────────────
+
+# QUDT states a dimension vector as an IRI local name, "A0E0L1I0M0H0T0D0", and
+# the letters are its own: A is amount of substance, E electric current, H
+# thermodynamic temperature, I luminous intensity, D a dimensionless marker this
+# comparison ignores.
+QKDV = re.compile(r'A(-?[\d.]+)E(-?[\d.]+)L(-?[\d.]+)I(-?[\d.]+)'
+                  r'M(-?[\d.]+)H(-?[\d.]+)T(-?[\d.]+)D(-?[\d.]+)')
+QKDV_SLOT = {'L': LENGTH, 'M': MASS, 'T': TIME,
+             'E': CURRENT, 'H': TEMP, 'A': AMOUNT, 'I': LUM}
+
+
+def parse_qkdv(local):
+    """The dimension IRI's local name -> bovnar's vector, or None if any
+    exponent is fractional (QUDT has a few; bovnar's are integers)."""
+    m = QKDV.fullmatch(local)
+    if not m:
+        return None
+    vals = dict(zip("AELIMHTD", m.groups()))
+    d = zero()
+    for letter, slot in QKDV_SLOT.items():
+        v = float(vals[letter])
+        if v != int(v):
+            return None
+        d[slot] = int(v)
+    return d
+
+
+def parse_ttl(path, subject_prefix):
+    """Subject local name -> {predicate local name: [values]}.
+
+    A hand-rolled scan rather than rdflib, which is not a dependency this repo
+    has. It is safe on exactly the shape QUDT publishes -- one subject per
+    block, starting in column 0, properties indented, terminated by a lone '.'
+    -- and it reads only three literal-valued predicates, so it never has to
+    understand a quoted string containing a semicolon.
+    """
+    out, subj, props = {}, None, None
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith(subject_prefix + ":"):
+                if subj:
+                    out[subj] = props
+                subj = line.strip().split()[0][len(subject_prefix) + 1:]
+                props = {}
+                continue
+            if subj is None:
+                continue
+            t = line.strip()
+            if t == ".":
+                out[subj] = props
+                subj, props = None, None
+                continue
+            m = re.match(r'(?:qudt):(\w+)\s+(.+?)\s*[;.]?$', t)
+            if m:
+                props.setdefault(m.group(1), []).append(m.group(2))
+    if subj:
+        out[subj] = props
+    return out
+
+
+def _num(vals):
+    if not vals:
+        return None
+    try:
+        return float(vals[0].split('^^')[0].strip('"'))
+    except ValueError:
+        return None
+
+
+class Qudt:
+    """QUDT unit local names. Nothing to evaluate: each unit states its own
+    conversionMultiplier and dimension vector, so this is a table read rather
+    than an expression parser."""
+
+    name = "qudt"
+
+    def __init__(self, cache):
+        self.rows = parse_ttl(os.path.join(cache, "qudt-units.ttl"), "unit")
+
+    def accepts(self, code):
+        return code in self.rows
+
+    def spellings(self):
+        return set(self.rows)
+
+    def resolve(self, code):
+        p = self.rows.get(code)
+        if p is None:
+            return None
+        # An affine unit has no multiplicative factor; the native side returns
+        # None for the same reason, so both drop out of the comparison.
+        if _num(p.get("conversionOffset")):
+            return None
+        mult = _num(p.get("conversionMultiplier"))
+        dv = p.get("hasDimensionVector")
+        if mult is None or not dv:
+            return None
+        d = parse_qkdv(dv[0].split(":")[-1])
+        if d is None:
+            return None
+        return (mult, d)
+
+
+class QudtQk(Qudt):
+    """QUDT quantity kinds.
+
+    A kind has no scale, so there is no multiplier to compare. What CAN be
+    checked is the thing doc/11 §12.3 actually claims: that the code maps to the
+    COHERENT SI unit of the kind. That is two assertions -- the dimensions
+    agree, and the native target's factor is exactly 1 -- and both fall out of
+    the ordinary comparison once a kind is reported as (1.0, its dimensions).
+    A row mapped to a non-coherent unit (`FT` for Length, say) fails on the
+    factor even though its dimensions are perfect.
+    """
+
+    name = "qudt-qk"
+
+    def __init__(self, cache):
+        self.rows = parse_ttl(os.path.join(cache, "qudt-quantitykinds.ttl"),
+                              "quantitykind")
+
+    def resolve(self, code):
+        p = self.rows.get(code)
+        if p is None:
+            return None
+        dv = p.get("hasDimensionVector")
+        if not dv:
+            return None
+        d = parse_qkdv(dv[0].split(":")[-1])
+        if d is None:
+            return None
+        return (1.0, d)
+
+
+VOCABS = {"udunits": Udunits, "ucum": Ucum, "qudt": Qudt, "qudt-qk": QudtQk}
 
 
 # ── the comparison ──────────────────────────────────────────────────────────

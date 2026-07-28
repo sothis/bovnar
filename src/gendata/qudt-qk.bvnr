@@ -96,7 +96,7 @@
   { .code = "Voltage";                 .bovnar = "V";        },
   { .code = "ElectricPotential";       .bovnar = "V";        },
   { .code = "Resistance";              .bovnar = "Ω";        },
-  { .code = "ElectricResistance";      .bovnar = "Ω";        },
+  { .code = "ElectricalResistance";     .bovnar = "Ω";        },   # not ElectricResistance
   { .code = "Capacitance";             .bovnar = "F";        },
   { .code = "Inductance";              .bovnar = "H";        },
   { .code = "Conductance";             .bovnar = "S";        },

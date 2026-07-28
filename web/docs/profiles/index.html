@@ -2017,11 +2017,11 @@ in the generator. <code>gen_profiles.py</code> still carries no UCUM value: <cod
 not what the publisher says it is worth. Where a value was uncertain, or certainly <em>close but not
 equal</em> to a native unit, the atom went into <code>.unsupported</code> instead — which is why <code>osm</code>, <code>[Btu]</code>,
 <code>cal_IT</code> and <code>[dr_ap]</code> are refused rather than mapped onto the nearly-right native unit.</p>
-<p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for the two vocabularies
-that publish machine-readable definitions with factors. It reads UCUM's <code>ucum-essence.xml</code> and the
-UDUNITS-2 XML database, resolves every code to a factor and a dimension vector, asks the <strong>reference
-library</strong> — not a second Python implementation of the unit grammar — what the mapped native target
-is worth, and compares. See §9.5.</p>
+<p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for four of the five
+profiles. It reads UCUM's <code>ucum-essence.xml</code>, the UDUNITS-2 XML database and QUDT's Turtle
+vocabularies, resolves every code to a factor and a dimension vector, asks the <strong>reference library</strong>
+— not a second Python implementation of the unit grammar — what the mapped native target is worth,
+and compares. See §9.5.</p>
 <p>The generator also emits the <strong>reverse</strong> table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
 searching the forward table at run time is what makes <code>bvn_unit_to_ucum</code> deterministic; the 599
@@ -2155,21 +2155,34 @@ is a known limit, not an oversight.</p>
 sees is how a regression hides behind an old excuse:</p>
 <ul>
 <li><strong>Modelling.</strong> bovnar carries bit and byte as two base units of information with no factor between
-  them; UCUM and UDUNITS both define the byte as the number 8. A different model, not a wrong
-  conversion.</li>
+  them; UCUM and UDUNITS both define the byte as the number 8. QUDT goes further and models
+  information as <em>entropy</em>, so its bit is <code>ln 2</code> and its byte <code>8·ln 2</code>, the coherent unit being the
+  nat — which is exactly why <code>qudt-qk.bvnr</code> already refuses <code>InformationEntropy</code>. A different model,
+  not a wrong conversion.</li>
 <li><strong>The publisher is wrong.</strong> UCUM defines the phot as <code>1e-4 lx</code>. A phot is one lumen per square
   centimetre, i.e. <code>1e4 lx</code> — the value is inverted. Native <code>ph</code> is correct and the profile keeps
-  mapping to it. UCUM also rounds the mercury column to <code>133.3220 kPa</code>, 2.9 ppm from the exact
-  conventional value native <code>mmHg</code> carries.</li>
+  mapping to it. UCUM also rounds the mercury column to <code>133.3220 kPa</code> and QUDT the torr to
+  <code>133.322 Pa</code>, both under 3 ppm from the exact conventional values bovnar carries.</li>
 </ul>
 <p><strong>It needs the publications, and a test must not fetch.</strong> The files are cached under
 <code>&lt;build&gt;/vocab/</code>; populate it once with <code>python3 check_profile_factors.py --fetch</code>. Without a cache
 the test <strong>skips green</strong>, which is the same rule <code>bvnr_web_links</code> follows. CI should fetch and then
 pass <code>--strict</code>, so that a skip there is a failure rather than a quiet pass.</p>
-<p><strong>What it does not cover.</strong> QUDT publishes Turtle with conversion multipliers and could be added;
-UN/ECE Rec 20's conversion factors are prose and are out of reach. Arbitrary and special units
-(<code>isArbitrary</code>, <code>isSpecial</code>) have no factor to check — they are exactly the ones carried as opaque or
-refused. So the standing risk of §10.2 is now <strong>narrowed to three of the five profiles</strong>, not
+<p><strong>QUDT needs no evaluator, and its quantity kinds get a sharper check than the others.</strong> UCUM and
+UDUNITS state a unit as an expression over other units, so both need a parser. QUDT states each
+unit's own <code>conversionMultiplier</code> and its dimension vector as an IRI local name
+(<code>A0E0L1I0M0H0T0D0</code>), so reading it is a table lookup. A quantity kind has no multiplier at all —
+and there the check is the claim §12.3 actually makes, that a kind maps to the <strong>coherent</strong> SI unit
+of that kind. Reporting a kind as <code>(1.0, its dimensions)</code> turns that into two ordinary assertions —
+the dimensions agree, and the native factor is exactly 1 — so <code>qudt-qk:Length</code> mapped to <code>ft</code> would
+fail on the factor although its dimensions are perfect.</p>
+<p><strong>What it does not cover.</strong> UN/ECE Rec 20 is the one profile left out: it publishes a code list
+whose conversion factors are prose, so there is nothing to resolve. QUDT does carry a
+<code>qudt:uneceCommonCode</code> cross-reference on many units, which would give a machine-readable handle on
+Rec 20 at one remove — but it is QUDT's claim about UNECE rather than UNECE's own, and this tool
+does not use it. Arbitrary and special units (<code>isArbitrary</code>, <code>isSpecial</code>, and any QUDT unit with no
+<code>conversionMultiplier</code>) have no factor to check — they are exactly the ones carried as opaque or
+refused. So the standing risk of §10.2 is now <strong>narrowed to one of the five profiles</strong>, not
 retired.</p>
 <hr />
 <h2 id="10-cost-risk-and-what-is-left-out">10. Cost, risk, and what is left out</h2>
@@ -2298,7 +2311,7 @@ one paragraph to read rather than four sections to cross-check.</p>
 <tr>
 <td>~~The generator's factor proof against UCUM's own values~~</td>
 <td>§9.2, §9.5</td>
-<td><strong>Built</strong> as <code>check_profile_factors.py</code>, outside the generator. Covers <code>ucum</code> and <code>udunits</code>; <code>unece</code>, <code>qudt</code> and <code>qudt-qk</code> still rest on the table author</td>
+<td><strong>Built</strong> as <code>check_profile_factors.py</code>, outside the generator. Covers <code>ucum</code>, <code>udunits</code>, <code>qudt</code> and <code>qudt-qk</code>; only <code>unece</code> still rests on the table author</td>
 </tr>
 <tr>
 <td><code>BVNR_WITH_UCUM_PROFILE</code> and feature reporting</td>
@@ -2306,19 +2319,19 @@ one paragraph to read rather than four sections to cross-check.</p>
 <td>The profiles are unconditional, which is a simplification rather than a loss</td>
 </tr>
 <tr>
-<td>A machine check of the three remaining tables against their publishers</td>
+<td>A machine check of the <code>unece</code> table against its publisher</td>
 <td>§9.2, §10.2</td>
-<td><code>ucum</code> and <code>udunits</code> are checked (§9.5); <code>unece</code>, <code>qudt</code> and <code>qudt-qk</code> are not</td>
+<td>The other four are checked (§9.5); Rec 20's factors are prose</td>
 </tr>
 </tbody>
 </table>
-<p>The factor proof was the one worth building next and is now built (§9.5) — it caught four wrong
-udunits rows and two wrong UCUM spellings on its first run, and it found a defect in UCUM's own
-data. It reaches only <code>ucum</code> and <code>udunits</code>, because they are the two vocabularies publishing
-machine-readable definitions with factors, so §14's caveat still stands undiminished for <code>unece</code>,
-<code>qudt</code> and <code>qudt-qk</code>: the suite can prove those three agree with the other two, not that any of them
-agrees with its publisher. Extending it to QUDT's Turtle is the next piece. Verbatim source
-preservation is second.</p>
+<p>The factor proof was the one worth building next and is now built (§9.5). It caught four wrong
+udunits rows and two wrong UCUM spellings on its first run and found a defect in UCUM's own data;
+extending it to QUDT caught six local names QUDT does not define, a month that was the lunar one and
+a rotational speed 2π out. It reaches four of the five profiles, <code>unece</code> being the one whose
+publisher states factors in prose — so §14's caveat still stands for that table alone: the suite can
+prove <code>unece</code> agrees with the other four, not that it agrees with Rec 20. Verbatim source
+preservation is next.</p>
 <hr />
 <h2 id="11-the-unece-profile">11. The UNECE profile</h2>
 <blockquote>
@@ -2421,7 +2434,11 @@ inside a namespace separator for no gain, since the local name is the identifyin
 <p>Flat, for the same reason UNECE is (§11.2), and here the temptation is sharper because QUDT's naming
 <em>looks</em> decomposable: <code>KiloGM</code> really is kilo + GM. It is not taken apart, because the naming is
 regular enough to tempt a parser and irregular enough that the parser would be wrong — <code>MI</code> is the
-mile and <code>PC</code> the parsec.</p>
+mile, not a milli-anything.</p>
+<p><strong>And the local name is the identifier, not the symbol.</strong> QUDT's <code>PCA</code> carries the symbol <code>pc</code>, and
+it is the <em>pica</em>, a typographic length; the parsec is <code>PARSEC</code>. A table built by matching symbols
+rather than local names gets a length wrong by nineteen orders of magnitude, which is why the
+<code>bvnr_profile_factors</code> gate (§9.5) resolves every row against QUDT's own definitions.</p>
 <p><code>MebiBYTE</code> is the one case where a flat code names a <strong>binary</strong>-prefixed unit. Since a binary prefix
 has no decade, the reverse table carries the IEC prefix identity alongside the decimal decade, and
 an expression profile — which reaches a scale by emitting a decimal prefix, and there is none

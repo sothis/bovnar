@@ -158,12 +158,27 @@ static void test_flatness(void)
 	/*
 	 * QUDT's naming is regular enough to tempt a parser into decomposing
 	 * "KiloGM" into Kilo + GM, and irregular enough that the parser would be
-	 * wrong: "MI" is the mile, not a milli-anything, and "PC" is the parsec.
-	 * Nothing in this namespace decomposes.
+	 * wrong: "MI" is the mile, not a milli-anything. Nothing in this namespace
+	 * decomposes.
 	 */
 	chk_str("qudt:MI", "mi");
-	chk_str("qudt:PC", "pc");
 	chk_str("qudt:IN", "in");
+
+	/* The parsec is "PARSEC". QUDT has no "PC" at all, and its "PCA" -- whose
+	 * SYMBOL is "pc" -- is the PICA, a typographic length: reading the symbol
+	 * rather than the local name is how a length becomes 7e18 times too small.
+	 */
+	chk_str("qudt:PARSEC", "pc");
+	chk_error("qudt:PC", error_unit_illegal);
+
+	/* QUDT's MO is the SYNODAL month (29.53 days); native mo is a twelfth of
+	 * the Julian year. Three per cent apart and dimensionally identical. */
+	chk_error("qudt:MO", error_unit_profile_unsupported);
+
+	/* REV-PER-MIN is an ANGULAR VELOCITY in QUDT -- 2π/60, a revolution being
+	 * 2π radians -- not the revolution-counting rpm. */
+	chk_str("qudt:REV-PER-MIN", "rev/min");
+	chk_factor("qudt:REV-PER-MIN", 6.283185307179586 / 60.0);
 
 	chk_error("qudt:Kilo",        error_unit_illegal);
 	chk_error("qudt:KiloM-PER",   error_unit_illegal);

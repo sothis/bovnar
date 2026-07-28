@@ -265,18 +265,19 @@ Editing a table under `src/gendata/*.bvnr` changes what a foreign unit code
 means, and `gen_profiles.py` only checks that a `.bovnar` target names something
 this build's registry has — not that the code is worth what the table says.
 
-`check_profile_factors.py` is the outside check, for the two vocabularies that
-publish machine-readable definitions with factors:
+`check_profile_factors.py` is the outside check. It covers four of the five
+profiles — `ucum`, `udunits`, `qudt` and `qudt-qk`; only `unece` is left out,
+because Rec 20 states its conversion factors in prose:
 
 ```
 python3 check_profile_factors.py --fetch     # once, populates <build>/vocab/
 python3 check_profile_factors.py --verbose   # every row, not just the failures
 ```
 
-It compares each mapped row against UCUM's and UDUNITS' own definitions, using
-the built library for the native side. Without the cache the CTest gate
+It compares each mapped row against the publisher's own definitions, using the
+built library for the native side. Without the cache the CTest gate
 (`bvnr_profile_factors`) **skips green**, because a test must not depend on the
-network — so run it yourself after touching `ucum.bvnr` or `udunits.bvnr`, and
+network — so run it yourself after touching any of those four data files, and
 pass `--strict` in CI where the fetch has run. See doc/11 §9.5 for what it does
 and does not prove.
 

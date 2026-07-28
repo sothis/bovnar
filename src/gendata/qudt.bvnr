@@ -59,9 +59,12 @@
   { .code = "FT";         .bovnar = "ft";     },
   { .code = "YD";         .bovnar = "yd";     },
   { .code = "MI";         .bovnar = "mi";     },
-  { .code = "NAUT_MI";    .bovnar = "nmi";    },
+  { .code = "MI_N";       .bovnar = "nmi";    },   # not NAUT_MI
   { .code = "LY";         .bovnar = "ly";     },
-  { .code = "PC";         .bovnar = "pc";     },
+  # PARSEC, not PC: QUDT's "PC" does not exist and its PCA -- whose symbol
+  # really is "pc" -- is the PICA, a typographic length. Matching on the
+  # symbol is how that trap is walked into.
+  { .code = "PARSEC";     .bovnar = "pc";     },
   { .code = "AU";         .bovnar = "au";     },
 
   # Area
@@ -116,7 +119,6 @@
   { .code = "HR";         .bovnar = "h";      },
   { .code = "DAY";        .bovnar = "d";      },
   { .code = "WK";         .bovnar = "wk";     },
-  { .code = "MO";         .bovnar = "mo";     },
   { .code = "YR";         .bovnar = "yr";     },
 
   # Temperature
@@ -183,8 +185,12 @@
   { .code = "MilliM_HG";  .bovnar = "mmHg";   },
   { .code = "EV";         .bovnar = "eV";     },
   { .code = "ERG";        .bovnar = "erg";    },
-  { .code = "CAL";        .bovnar = "cal";    },
-  { .code = "BTU";        .bovnar = "Btu";    },
+  # The qualified codes only. QUDT carries CAL_TH (4.184 J) and CAL_IT
+  # (4.1868), and BTU_IT beside four other BTUs; native cal is the
+  # thermochemical one and native Btu the IT one, so those are the two that
+  # map. There is no unqualified "CAL" or "BTU" in QUDT to map anyway.
+  { .code = "CAL_TH";     .bovnar = "cal";    },
+  { .code = "BTU_IT";     .bovnar = "Btu";    },
   { .code = "W-HR";       .bovnar = "W·h";    },
   { .code = "KiloW-HR";   .bovnar = "k~W·h";  },
   { .code = "MegaW-HR";   .bovnar = "M~W·h";  },
@@ -199,7 +205,12 @@
   { .code = "GM-PER-CentiM3"; .bovnar = "g/c~m^3"; },
   { .code = "MOL-PER-L";      .bovnar = "mol/L";   },
   { .code = "N-M";            .bovnar = "N·m";     },
-  { .code = "REV-PER-MIN";    .bovnar = "rpm";     },
+  # rev/min, NOT rpm. QUDT's REV-PER-MIN is an ANGULAR VELOCITY: its
+  # multiplier is 2π/60, one revolution being 2π radians -- which is what
+  # native rev is too. Native rpm counts revolutions instead, 1/60 s⁻¹, so
+  # mapping to it read every QUDT rotational speed 2π times too small while
+  # remaining dimensionally perfect.
+  { .code = "REV-PER-MIN";    .bovnar = "rev/min"; },
 
   # Angle and ratio
   { .code = "RAD";        .bovnar = "rad";    },
@@ -212,8 +223,8 @@
   { .code = "PPM";        .bovnar = "ppm";    },
   { .code = "PPB";        .bovnar = "ppb";    },
   { .code = "PH";         .bovnar = "pH";     },
-  { .code = "DECIBEL";    .bovnar = "dB";     },
-  { .code = "NEPER";      .bovnar = "Np";     },
+  { .code = "DeciB";      .bovnar = "dB";     },   # not DECIBEL
+  { .code = "NP";         .bovnar = "Np";     },   # not NEPER
 
   # Information. QUDT keeps the decimal and binary families apart, and so does
   # bovnar: KiloBYTE is 10^3 bytes and KibiBYTE is 2^10.
@@ -242,6 +253,13 @@
   # bare count compare equal to a percentage.
   { .code = "UNITLESS"; .why = "the absence of a unit — write no unit at all"; },
   { .code = "NUM";      .why = "a bare count — write no unit at all"; },
+
+  # QUDT's MO is the SYNODAL month -- 2551442.976 s, 29.53 days, the lunar
+  # cycle -- while native mo is a twelfth of the Julian year, 2629800 s. Three
+  # per cent apart, dimensionally identical, and it was mapped straight onto mo.
+  # Same shape as UDUNITS' tropical year (doc/11 §13.3); bovnar has no synodal
+  # month to map it to.
+  { .code = "MO";       .why = "the synodal (lunar) month, 29.53 days; native mo is a twelfth of the Julian year"; },
 
   # Currency. Bovnar has ISO 4217 natively with minor-unit metadata, written
   # with the mandatory $ sigil, and a currency is not a physical unit.

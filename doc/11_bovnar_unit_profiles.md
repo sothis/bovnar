@@ -1341,6 +1341,26 @@ tool implements all three rather than quietly treating the result as primary:
   claimant; most are aliases of one unit, but `J62` is claimed by both a barrels-per-hour and a
   barrels-per-second unit, which differ by 3600. Where claimants disagree the code goes unchecked.
 
+The cross-reference also **grew the table**, from 100 mapped codes to 201. The tool listed 151 codes
+whose value is exactly a native unit and which `unece.bvnr` did not carry; 101 were taken. What
+decided the other fifty is worth stating, because it is precisely what a value-only match cannot
+do: **a suggestion is a claim about a number, not about a meaning.** Dimensions collapse, so `D13`
+(the sievert) matched the gray, `D44` (var) and `D46` (volt-ampere) both matched the watt, `NU` (the
+newton metre) matched the joule, and `C80` (the rad) matched the rem. Accepted on the number alone,
+each would have mapped one quantity onto another that bovnar deliberately keeps distinct (doc/07
+§12). Every row was read against QUDT's label for the unit carrying the code, and the ones left out
+divide into three groups:
+
+| Left out | Why |
+|---|---|
+| ratios of two named units — `mg/kg`, `mL/L`, `cm³/m³`, `bar/bar` | each is worth exactly `ppm`, `‰` or 1, but the code says a ratio *of what*, and collapsing it onto the generic unit loses that |
+| logarithmic and information scales — `phon`, `sone`, `Erlang`, `Nat`, `baud` | no native form, or a modelling difference: QUDT makes `baud` dimensionless where native `Bd` is a rate |
+| a quantity that is not the matched unit — `J/m³` (energy density, matched `Pa`), `J/kg` (specific energy, matched `Gy`), `W/sr` (radiant intensity, matched `W`) | same dimension, different quantity |
+
+`J39` (mean BTU) and `DRI` (UK dram) were left out for the reason §6.3 already gives for their UCUM
+counterparts: native `Btu` is the IT one and native `dr` the avoirdupois, and a code whose label
+says otherwise is a factor trap rather than a coverage gap.
+
 Arbitrary and special units (`isArbitrary`, `isSpecial`, and any QUDT unit with no
 `conversionMultiplier`) have no factor to check — they are exactly the ones carried as opaque or
 refused. The standing risk of §10.2 is **reduced everywhere and retired nowhere**: four tables now

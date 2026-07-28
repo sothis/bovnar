@@ -179,6 +179,161 @@
   # Angle and ratio
   { .code = "DD";  .bovnar = "°";      },   # degree of angle
   { .code = "P1";  .bovnar = "%";      },   # percent
+
+  # ── Codes reached through QUDT's uneceCommonCode cross-reference ─────────
+  # Every row below was found by check_profile_factors.py: its value is exactly
+  # a native unit's and the table did not carry it. The VALUE is machine-checked
+  # on every run; what is NOT machine-checkable, and what decided which of the
+  # 151 candidates landed here, is whether the code MEANS that unit. Dimensions
+  # collapse -- D13 (sievert) matched the gray, D44 (var) and D46 (volt-ampere)
+  # both matched the watt, NU (newton metre) matched the joule -- so a suggestion
+  # accepted on its number alone would have mapped a dose equivalent onto an
+  # absorbed dose and a torque onto an energy. Each row was read against QUDT's
+  # label for the unit carrying the code.
+  #
+  # Reached through a SECONDARY source (doc/11 §9.5): QUDT asserting what a Rec
+  # 20 code means, not UN/ECE. Wrong here costs a wrong number, so the rule was
+  # to leave out anything whose label did not name the unit outright.
+
+  # Length
+  { .code = "77";  .bovnar = "thou";   },   # milli-inch
+  { .code = "A11"; .bovnar = "Å";      },   # angstrom
+  { .code = "A12"; .bovnar = "au";     },   # astronomical unit
+  { .code = "B57"; .bovnar = "ly";     },   # light year
+  { .code = "C63"; .bovnar = "pc";     },   # parsec
+  { .code = "AK";  .bovnar = "fath";   },   # fathom
+  { .code = "M50"; .bovnar = "fur";    },   # furlong
+  { .code = "M51"; .bovnar = "ftUS";   },   # US survey foot
+  { .code = "X1";  .bovnar = "ch";     },   # chain
+
+  # Area, volume
+  { .code = "A14"; .bovnar = "barn";   },   # barn
+  { .code = "BUA"; .bovnar = "bsh";    },   # bushel (US)
+  { .code = "G23"; .bovnar = "pk";     },   # peck (US)
+  { .code = "PY";  .bovnar = "pk";     },   # peck (US), second code
+  { .code = "G21"; .bovnar = "cup";    },   # cup (US)
+  { .code = "G24"; .bovnar = "tbsp";   },   # tablespoon
+  { .code = "G25"; .bovnar = "tsp";    },   # teaspoon
+  { .code = "GIA"; .bovnar = "gi";     },   # gill (US)
+  { .code = "GII"; .bovnar = "gi_uk";  },   # gill (UK)
+  { .code = "OZA"; .bovnar = "fl_oz";  },   # fluid ounce (US)
+  { .code = "OZI"; .bovnar = "fl_oz_uk"; }, # fluid ounce (UK)
+  { .code = "PT";  .bovnar = "pt";     },   # liquid pint (US)
+  { .code = "PTL"; .bovnar = "pt";     },   # liquid pint (US), second code
+  { .code = "PTI"; .bovnar = "pt_uk";  },   # pint (UK)
+  { .code = "QT";  .bovnar = "qt";     },   # liquid quart (US)
+  { .code = "QTL"; .bovnar = "qt";     },   # liquid quart (US), second code
+  { .code = "QTI"; .bovnar = "qt_uk";  },   # quart (UK)
+
+  # Mass
+  { .code = "2U";  .bovnar = "t";      },   # megagram
+  { .code = "DWT"; .bovnar = "dwt";    },   # pennyweight
+  { .code = "D43"; .bovnar = "Da";     },   # unified atomic mass unit
+  { .code = "F13"; .bovnar = "slug";   },   # slug
+
+  # Force, pressure
+  { .code = "C78"; .bovnar = "lbf";    },   # pound-force
+  { .code = "B37"; .bovnar = "kgf";    },   # kilogram-force
+  { .code = "B51"; .bovnar = "kgf";    },   # kilopond, the same unit
+  { .code = "M75"; .bovnar = "kip";    },   # kip
+  { .code = "DU";  .bovnar = "dyn";    },   # dyne
+  { .code = "A58"; .bovnar = "dyn";    },   # erg per centimetre, the same unit
+  { .code = "M77"; .bovnar = "N";      },   # kilogram metre per second squared
+  { .code = "B12"; .bovnar = "N";      },   # joule per metre
+  { .code = "PS";  .bovnar = "psi";    },   # pound-force per square inch
+  { .code = "ATT"; .bovnar = "at";     },   # technical atmosphere
+  { .code = "E42"; .bovnar = "at";     },   # kilogram-force per square centimetre
+  { .code = "HN";  .bovnar = "mmHg";   },   # millimetre of mercury
+  { .code = "F79"; .bovnar = "inHg";   },   # inch of mercury
+  { .code = "C55"; .bovnar = "Pa";     },   # newton per square metre
+
+  # Energy, power
+  { .code = "A53"; .bovnar = "eV";     },   # electronvolt
+  { .code = "A57"; .bovnar = "erg";    },   # erg
+  { .code = "J94"; .bovnar = "erg";    },   # dyne centimetre, the same unit
+  { .code = "D35"; .bovnar = "cal";    },   # thermochemical calorie, which native cal is
+  { .code = "N72"; .bovnar = "thm";    },   # therm (US), which native thm is
+  { .code = "J55"; .bovnar = "J";      },   # watt second
+  { .code = "85";  .bovnar = "ft_lb";  },   # foot pound-force
+  { .code = "M92"; .bovnar = "ft_lb";  },   # pound-force foot, the same unit
+  { .code = "P14"; .bovnar = "W";      },   # joule per second
+  { .code = "HJ";  .bovnar = "PS";     },   # metric horsepower
+  # NOT the joule: a newton metre is a torque, and doc/07 §12 keeps the two
+  # apart although they share a dimension.
+  { .code = "NU";  .bovnar = "N·m";    },   # newton metre
+
+  # Electricity and magnetism
+  { .code = "81";  .bovnar = "H";      },   # henry
+  { .code = "A8";  .bovnar = "C";      },   # ampere second
+  { .code = "D33"; .bovnar = "T";      },   # tesla
+  { .code = "F90"; .bovnar = "Wb";     },   # newton metre per ampere
+  { .code = "NQ";  .bovnar = "S";      },   # mho
+  { .code = "B65"; .bovnar = "Mx";     },   # maxwell
+  { .code = "76";  .bovnar = "G";      },   # gauss
+  { .code = "66";  .bovnar = "Oe";     },   # oersted
+  # Apparent and reactive power are NOT the watt; bovnar carries all three
+  # (doc/07 §12) and they share a dimension.
+  { .code = "D46"; .bovnar = "VA";     },   # volt-ampere
+  { .code = "D44"; .bovnar = "var";    },   # volt-ampere reactive
+
+  # Radioactivity and dose
+  { .code = "A95"; .bovnar = "Gy";     },   # gray
+  { .code = "D13"; .bovnar = "Sv";     },   # sievert -- NOT the gray
+  { .code = "C80"; .bovnar = "c~Gy";   },   # rad, the absorbed dose
+  { .code = "D91"; .bovnar = "rem";    },   # rem
+  { .code = "2C";  .bovnar = "R";      },   # roentgen
+
+  # Amount, catalytic activity, photometry
+  { .code = "C34"; .bovnar = "mol";    },   # mole
+  { .code = "KAT"; .bovnar = "kat";    },   # katal
+  { .code = "E95"; .bovnar = "kat";    },   # mole per second, the same unit
+  { .code = "B60"; .bovnar = "lx";     },   # lumen per square metre
+  { .code = "A24"; .bovnar = "cd/m^2"; },   # candela per square metre -- a
+                                            # LUMINANCE, not the lux
+  { .code = "P26"; .bovnar = "ph";     },   # phot
+  { .code = "P31"; .bovnar = "sb";     },   # stilb
+
+  # Viscosity, acceleration, textile
+  { .code = "89";  .bovnar = "P";      },   # poise
+  { .code = "N41"; .bovnar = "P";      },   # gram per centimetre second
+  { .code = "91";  .bovnar = "St";     },   # stokes
+  { .code = "M81"; .bovnar = "St";     },   # square centimetre per second
+  { .code = "A76"; .bovnar = "Gal";    },   # galileo
+  { .code = "M39"; .bovnar = "Gal";    },   # centimetre per square second
+  { .code = "K40"; .bovnar = "gn";     },   # standard gravity
+  { .code = "D34"; .bovnar = "tex";    },   # tex
+  { .code = "C12"; .bovnar = "tex";    },   # milligram per metre, the same unit
+
+  # Speed, rotation, frequency
+  { .code = "HM";  .bovnar = "mph";    },   # mile per hour
+  { .code = "M44"; .bovnar = "rev";    },   # revolution
+  { .code = "C94"; .bovnar = "rpm";    },   # reciprocal minute
+  { .code = "C97"; .bovnar = "s^-1";   },   # reciprocal second
+  # J38 (baud) is NOT here. QUDT models it as DIMENSIONLESS -- information
+  # again, the same modelling difference as the bit and the byte -- while
+  # native Bd is a symbol RATE, s⁻¹. The cross-reference cannot confirm
+  # this one, so it stays out rather than gaining a waiver written to let
+  # it through.
+
+  # Angle. These are the ones a value-only match gets most wrong: an angle is
+  # dimensionless, so a radian collides with every pure ratio in the registry.
+  # Ratio. Only the two whose label names a generic parts-per unit outright.
+  # The dozen codes spelling a ratio of two NAMED units -- mg/kg, mL/L, cm³/m³
+  # -- are each worth exactly ppm or ‰ and are deliberately left out: they say
+  # a ratio OF WHAT, and collapsing them onto the generic unit loses that in the
+  # same way doc/11 §6.3 records for a UCUM annotation.
+  { .code = "59";  .bovnar = "ppm";    },   # parts per million
+  { .code = "61";  .bovnar = "ppb";    },   # parts per billion
+
+  { .code = "C81"; .bovnar = "rad";    },   # radian
+  { .code = "D27"; .bovnar = "sr";     },   # steradian
+  { .code = "A91"; .bovnar = "grad";   },   # gon
+  { .code = "D61"; .bovnar = "arcmin"; },   # minute of angle
+  { .code = "D62"; .bovnar = "arcsec"; },   # second of angle
+  { .code = "A48"; .bovnar = "°Ra";    },   # degree Rankine
+  { .code = "2A";  .bovnar = "rad/s";  },   # radian per second
+  { .code = "C25"; .bovnar = "m~rad";  },   # milliradian
+  { .code = "B97"; .bovnar = "µ~rad";  },   # microradian
 ];
 
 # ── Rec 20 / Rec 21: opaque count units ─────────────────────────────────────

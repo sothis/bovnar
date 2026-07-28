@@ -2194,6 +2194,40 @@ tool implements all three rather than quietly treating the result as primary:</p
   claimant; most are aliases of one unit, but <code>J62</code> is claimed by both a barrels-per-hour and a
   barrels-per-second unit, which differ by 3600. Where claimants disagree the code goes unchecked.</li>
 </ul>
+<p>The cross-reference also <strong>grew the table</strong>, from 100 mapped codes to 201. The tool listed 151 codes
+whose value is exactly a native unit and which <code>unece.bvnr</code> did not carry; 101 were taken. What
+decided the other fifty is worth stating, because it is precisely what a value-only match cannot
+do: <strong>a suggestion is a claim about a number, not about a meaning.</strong> Dimensions collapse, so <code>D13</code>
+(the sievert) matched the gray, <code>D44</code> (var) and <code>D46</code> (volt-ampere) both matched the watt, <code>NU</code> (the
+newton metre) matched the joule, and <code>C80</code> (the rad) matched the rem. Accepted on the number alone,
+each would have mapped one quantity onto another that bovnar deliberately keeps distinct (doc/07
+§12). Every row was read against QUDT's label for the unit carrying the code, and the ones left out
+divide into three groups:</p>
+<table>
+<thead>
+<tr>
+<th>Left out</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ratios of two named units — <code>mg/kg</code>, <code>mL/L</code>, <code>cm³/m³</code>, <code>bar/bar</code></td>
+<td>each is worth exactly <code>ppm</code>, <code>‰</code> or 1, but the code says a ratio <em>of what</em>, and collapsing it onto the generic unit loses that</td>
+</tr>
+<tr>
+<td>logarithmic and information scales — <code>phon</code>, <code>sone</code>, <code>Erlang</code>, <code>Nat</code>, <code>baud</code></td>
+<td>no native form, or a modelling difference: QUDT makes <code>baud</code> dimensionless where native <code>Bd</code> is a rate</td>
+</tr>
+<tr>
+<td>a quantity that is not the matched unit — <code>J/m³</code> (energy density, matched <code>Pa</code>), <code>J/kg</code> (specific energy, matched <code>Gy</code>), <code>W/sr</code> (radiant intensity, matched <code>W</code>)</td>
+<td>same dimension, different quantity</td>
+</tr>
+</tbody>
+</table>
+<p><code>J39</code> (mean BTU) and <code>DRI</code> (UK dram) were left out for the reason §6.3 already gives for their UCUM
+counterparts: native <code>Btu</code> is the IT one and native <code>dr</code> the avoirdupois, and a code whose label
+says otherwise is a factor trap rather than a coverage gap.</p>
 <p>Arbitrary and special units (<code>isArbitrary</code>, <code>isSpecial</code>, and any QUDT unit with no
 <code>conversionMultiplier</code>) have no factor to check — they are exactly the ones carried as opaque or
 refused. The standing risk of §10.2 is <strong>reduced everywhere and retired nowhere</strong>: four tables now

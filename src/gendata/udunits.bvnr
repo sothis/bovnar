@@ -161,21 +161,28 @@
   { .code = "barn";     .bovnar = "barn"; .metric = false; },
   { .code = "parsec";   .bovnar = "pc";  .metric = true;  },
   { .code = "pc";       .bovnar = "pc";  .metric = true;  },
+  { .code = "au";       .bovnar = "au";  .metric = false; },
+  { .code = "ua";       .bovnar = "au";  .metric = false; },
+  { .code = "astronomical_unit"; .bovnar = "au"; .metric = false; },
+  { .code = "light_year";        .bovnar = "ly"; .metric = false; },
 
   # ── Time ─────────────────────────────────────────────────────────────────
-  # bovnar's yr is 31557600 s (365.25 d) and its mo is 2629800 s, the JULIAN
-  # year and month, which is what UDUNITS' unqualified "year" and "month" are.
-  { .code = "min";      .bovnar = "min"; .metric = false; },
-  { .code = "minute";   .bovnar = "min"; .metric = false; },
-  { .code = "h";        .bovnar = "h";   .metric = false; },
-  { .code = "hr";       .bovnar = "h";   .metric = false; },
-  { .code = "hour";     .bovnar = "h";   .metric = false; },
-  { .code = "d";        .bovnar = "d";   .metric = false; },
-  { .code = "day";      .bovnar = "d";   .metric = false; },
-  { .code = "week";     .bovnar = "wk";  .metric = false; },
-  { .code = "month";    .bovnar = "mo";  .metric = false; },
-  { .code = "year";     .bovnar = "yr";  .metric = false; },
-  { .code = "yr";       .bovnar = "yr";  .metric = false; },
+  # bovnar's yr is 31557600 s (365.25 d) and its mo is 2629800 s -- the JULIAN
+  # year and its twelfth. UDUNITS' unqualified "year" is NOT that: it is
+  # 3.15569259747e7 s, the TROPICAL year, and its "month" is that over twelve.
+  # The two differ by 674 s -- eleven minutes a year, an hour every five -- which
+  # is dimensionally perfect and invisible downstream, so "year", "yr" and
+  # "month" are refused below and the Julian spelling is what maps.
+  { .code = "min";         .bovnar = "min"; .metric = false; },
+  { .code = "minute";      .bovnar = "min"; .metric = false; },
+  { .code = "h";           .bovnar = "h";   .metric = false; },
+  { .code = "hr";          .bovnar = "h";   .metric = false; },
+  { .code = "hour";        .bovnar = "h";   .metric = false; },
+  { .code = "d";           .bovnar = "d";   .metric = false; },
+  { .code = "day";         .bovnar = "d";   .metric = false; },
+  { .code = "week";        .bovnar = "wk";  .metric = false; },
+  { .code = "Julian_year"; .bovnar = "yr";  .metric = false; },
+  { .code = "fortnight";   .bovnar = "fn";  .metric = false; },
 
   # ── Temperature ──────────────────────────────────────────────────────────
   # The native affine discipline applies unchanged: valid at exponent 1 only,
@@ -199,39 +206,176 @@
   { .code = "arcsecond";  .bovnar = "arcsec"; .metric = false; },
   { .code = "grade";      .bovnar = "grad";   .metric = false; },
 
-  # ── Imperial and US customary ────────────────────────────────────────────
-  { .code = "in";        .bovnar = "in";  .metric = false; },
-  { .code = "inch";      .bovnar = "in";  .metric = false; },
-  { .code = "ft";        .bovnar = "ft";  .metric = false; },
-  { .code = "foot";      .bovnar = "ft";  .metric = false; },
-  { .code = "feet";      .bovnar = "ft";  .metric = false; },
-  { .code = "yd";        .bovnar = "yd";  .metric = false; },
-  { .code = "yard";      .bovnar = "yd";  .metric = false; },
-  { .code = "mi";        .bovnar = "mi";  .metric = false; },
-  { .code = "mile";      .bovnar = "mi";  .metric = false; },
-  { .code = "nmi";       .bovnar = "nmi"; .metric = false; },
-  { .code = "lb";        .bovnar = "lb";  .metric = false; },
-  { .code = "pound";     .bovnar = "lb";  .metric = false; },
-  { .code = "oz";        .bovnar = "oz";  .metric = false; },
-  { .code = "ounce";     .bovnar = "oz";  .metric = false; },
-  { .code = "gallon";    .bovnar = "gal"; .metric = false; },
-  { .code = "quart";     .bovnar = "qt";  .metric = false; },
-  { .code = "pint";      .bovnar = "pt";  .metric = false; },
-  { .code = "acre";      .bovnar = "ac";  .metric = false; },
-  { .code = "knot";      .bovnar = "kn";  .metric = false; },
-  { .code = "psi";       .bovnar = "psi"; .metric = false; },
-  { .code = "atm";       .bovnar = "atm"; .metric = false; },
-  { .code = "atmosphere"; .bovnar = "atm"; .metric = false; },
-  { .code = "calorie";   .bovnar = "cal"; .metric = false; },
-  { .code = "cal";       .bovnar = "cal"; .metric = false; },
-  { .code = "erg";       .bovnar = "erg"; .metric = false; },
-  { .code = "dyne";      .bovnar = "dyn"; .metric = false; },
-  { .code = "poise";     .bovnar = "P";   .metric = false; },
-  { .code = "stokes";    .bovnar = "St";  .metric = false; },
-  { .code = "gauss";     .bovnar = "G";   .metric = false; },
-  { .code = "curie";     .bovnar = "Ci";  .metric = false; },
-  { .code = "rem";       .bovnar = "rem"; .metric = false; },
-  { .code = "torr";      .bovnar = "Torr"; .metric = false; },
+  # ── Imperial and US customary: length ────────────────────────────────────
+  # The international foot and its multiples only. UDUNITS defines "chain",
+  # "rod", "furlong" and "fathom" on the US SURVEY foot (1200/3937 m), not on
+  # the international one, so they are 2 ppm off the native atoms of the same
+  # name and are refused below rather than mapped -- the same rule ucum.bvnr
+  # applies to the survey inch and the survey mile.
+  { .code = "in";                  .bovnar = "in";   .metric = false; },
+  { .code = "inch";                .bovnar = "in";   .metric = false; },
+  { .code = "international_inch";  .bovnar = "in";   .metric = false; },
+  { .code = "ft";                  .bovnar = "ft";   .metric = false; },
+  { .code = "foot";                .bovnar = "ft";   .metric = false; },
+  { .code = "feet";                .bovnar = "ft";   .metric = false; },
+  { .code = "international_foot";  .bovnar = "ft";   .metric = false; },
+  { .code = "yd";                  .bovnar = "yd";   .metric = false; },
+  { .code = "yard";                .bovnar = "yd";   .metric = false; },
+  { .code = "international_yard";  .bovnar = "yd";   .metric = false; },
+  { .code = "mi";                  .bovnar = "mi";   .metric = false; },
+  { .code = "mile";                .bovnar = "mi";   .metric = false; },
+  { .code = "international_mile";  .bovnar = "mi";   .metric = false; },
+  { .code = "nmi";                 .bovnar = "nmi";  .metric = false; },
+  { .code = "nmile";               .bovnar = "nmi";  .metric = false; },
+  { .code = "nautical_mile";       .bovnar = "nmi";  .metric = false; },
+  { .code = "US_survey_foot";      .bovnar = "ftUS"; .metric = false; },
+  { .code = "mil";                 .bovnar = "thou"; .metric = false; },
+
+  # ── Imperial and US customary: mass ──────────────────────────────────────
+  # "oz" is NOT here: in UDUNITS it is a symbol of the US FLUID ounce, a
+  # volume. See the volume block. The avoirdupois ounce is spelled out.
+  { .code = "lb";                  .bovnar = "lb";   .metric = false; },
+  { .code = "pound";               .bovnar = "lb";   .metric = false; },
+  { .code = "avoirdupois_pound";   .bovnar = "lb";   .metric = false; },
+  { .code = "avoirdupois_ounce";   .bovnar = "oz";   .metric = false; },
+  { .code = "dr";                  .bovnar = "dr";   .metric = false; },
+  { .code = "dram";                .bovnar = "dr";   .metric = false; },
+  { .code = "grain";               .bovnar = "gr";   .metric = false; },
+  { .code = "troy_ounce";          .bovnar = "oz_t"; .metric = false; },
+  { .code = "apothecary_ounce";    .bovnar = "oz_t"; .metric = false; },
+  { .code = "apounce";             .bovnar = "oz_t"; .metric = false; },
+  { .code = "pennyweight";         .bovnar = "dwt";  .metric = false; },
+  { .code = "scruple";             .bovnar = "sc";   .metric = false; },
+  { .code = "carat";               .bovnar = "ct";   .metric = false; },
+  { .code = "slug";                .bovnar = "slug"; .metric = false; },
+  { .code = "ton";                 .bovnar = "tn_sh"; .metric = false; },
+  { .code = "short_ton";           .bovnar = "tn_sh"; .metric = false; },
+  { .code = "long_ton";            .bovnar = "tn_l";  .metric = false; },
+  { .code = "metric_ton";          .bovnar = "t";     .metric = false; },
+
+  # ── Imperial and US customary: volume ────────────────────────────────────
+  # UDUNITS' bare "oz", "floz", "cup", "gill", "pint" and "quart" are the US
+  # LIQUID measures; the UK ones carry a UK_ prefix and are separate atoms
+  # here, as they are natively.
+  { .code = "gallon";              .bovnar = "gal";      .metric = false; },
+  { .code = "US_liquid_gallon";    .bovnar = "gal";      .metric = false; },
+  { .code = "quart";               .bovnar = "qt";       .metric = false; },
+  { .code = "US_liquid_quart";     .bovnar = "qt";       .metric = false; },
+  { .code = "pint";                .bovnar = "pt";       .metric = false; },
+  { .code = "US_liquid_pint";      .bovnar = "pt";       .metric = false; },
+  { .code = "cup";                 .bovnar = "cup";      .metric = false; },
+  { .code = "US_liquid_cup";       .bovnar = "cup";      .metric = false; },
+  { .code = "gill";                .bovnar = "gi";       .metric = false; },
+  { .code = "US_liquid_gill";      .bovnar = "gi";       .metric = false; },
+  { .code = "oz";                  .bovnar = "fl_oz";    .metric = false; },
+  { .code = "floz";                .bovnar = "fl_oz";    .metric = false; },
+  { .code = "fluid_ounce";         .bovnar = "fl_oz";    .metric = false; },
+  { .code = "US_fluid_ounce";      .bovnar = "fl_oz";    .metric = false; },
+  { .code = "US_liquid_ounce";     .bovnar = "fl_oz";    .metric = false; },
+  { .code = "fldr";                .bovnar = "fl_dr";    .metric = false; },
+  { .code = "fluid_dram";          .bovnar = "fl_dr";    .metric = false; },
+  { .code = "tbsp";                .bovnar = "tbsp";     .metric = false; },
+  { .code = "tablespoon";          .bovnar = "tbsp";     .metric = false; },
+  { .code = "tsp";                 .bovnar = "tsp";      .metric = false; },
+  { .code = "teaspoon";            .bovnar = "tsp";      .metric = false; },
+  { .code = "pk";                  .bovnar = "pk";       .metric = false; },
+  { .code = "peck";                .bovnar = "pk";       .metric = false; },
+  { .code = "bu";                  .bovnar = "bsh";      .metric = false; },
+  { .code = "bushel";              .bovnar = "bsh";      .metric = false; },
+  { .code = "bbl";                 .bovnar = "bbl";      .metric = false; },
+  { .code = "barrel";              .bovnar = "bbl";      .metric = false; },
+  { .code = "UK_liquid_gallon";    .bovnar = "gal_uk";   .metric = false; },
+  { .code = "UK_liquid_quart";     .bovnar = "qt_uk";    .metric = false; },
+  { .code = "UK_liquid_pint";      .bovnar = "pt_uk";    .metric = false; },
+  { .code = "UK_liquid_gill";      .bovnar = "gi_uk";    .metric = false; },
+  { .code = "UK_fluid_ounce";      .bovnar = "fl_oz_uk"; .metric = false; },
+  { .code = "UK_liquid_ounce";     .bovnar = "fl_oz_uk"; .metric = false; },
+
+  # ── Area ─────────────────────────────────────────────────────────────────
+  # "are" is 100 m², a hundredth of the hectare, which is the same target UCUM
+  # reaches for its "ar". "acre" is NOT here: UDUNITS defines it as 160 rod²
+  # on the survey rod, so it is the US SURVEY acre and 4 ppm off native ac.
+  { .code = "are";                 .bovnar = "c~ha"; .metric = false; },
+
+  # ── Force, pressure, energy, power ───────────────────────────────────────
+  # The unqualified "calorie" is NOT here. UDUNITS defines it as 4.1868 J, the
+  # IT calorie, while bovnar's cal is the thermochemical 4.184 J -- 0.067 %
+  # apart, dimensionally identical, and invisible to every later check. Only
+  # the spelled-out thermochemical one maps; see .unsupported. UDUNITS' "Btu"
+  # goes the other way: it is 1.05505585262e3 J, the IT BTU, which is exactly
+  # what native Btu is, so it maps where UCUM's unqualified "[Btu]" cannot.
+  { .code = "psi";                    .bovnar = "psi";  .metric = false; },
+  { .code = "atm";                    .bovnar = "atm";  .metric = false; },
+  { .code = "atmosphere";             .bovnar = "atm";  .metric = false; },
+  { .code = "standard_atmosphere";    .bovnar = "atm";  .metric = false; },
+  { .code = "at";                     .bovnar = "at";   .metric = false; },
+  { .code = "technical_atmosphere";   .bovnar = "at";   .metric = false; },
+  { .code = "torr";                   .bovnar = "Torr"; .metric = false; },
+  { .code = "mmHg";                   .bovnar = "mmHg"; .metric = false; },
+  { .code = "mm_Hg";                  .bovnar = "mmHg"; .metric = false; },
+  { .code = "inHg";                   .bovnar = "inHg"; .metric = false; },
+  { .code = "in_Hg";                  .bovnar = "inHg"; .metric = false; },
+  { .code = "inch_Hg";                .bovnar = "inHg"; .metric = false; },
+  { .code = "lbf";                    .bovnar = "lbf";  .metric = false; },
+  { .code = "pound_force";            .bovnar = "lbf";  .metric = false; },
+  { .code = "force_pound";            .bovnar = "lbf";  .metric = false; },
+  { .code = "kgf";                    .bovnar = "kgf";  .metric = false; },
+  { .code = "kilogram_force";         .bovnar = "kgf";  .metric = false; },
+  { .code = "force_kilogram";         .bovnar = "kgf";  .metric = false; },
+  { .code = "dyne";                   .bovnar = "dyn";  .metric = false; },
+  { .code = "gravity";                .bovnar = "gn";   .metric = false; },
+  { .code = "standard_free_fall";     .bovnar = "gn";   .metric = false; },
+  { .code = "Btu";                    .bovnar = "Btu";  .metric = false; },
+  { .code = "IT_Btu";                 .bovnar = "Btu";  .metric = false; },
+  { .code = "therm";                  .bovnar = "thm";  .metric = false; },
+  { .code = "US_therm";               .bovnar = "thm";  .metric = false; },
+  { .code = "erg";                    .bovnar = "erg";  .metric = false; },
+  { .code = "electron_volt";          .bovnar = "eV";   .metric = true;  },
+  { .code = "horsepower";             .bovnar = "hp";   .metric = false; },
+  { .code = "shaft_horsepower";       .bovnar = "hp";   .metric = false; },
+  { .code = "voltampere";             .bovnar = "VA";   .metric = false; },
+  { .code = "VA";                     .bovnar = "VA";   .metric = false; },
+
+  # ── Speed, rotation, mass concentration ──────────────────────────────────
+  { .code = "knot";                .bovnar = "kn";      .metric = false; },
+  { .code = "kt";                  .bovnar = "kn";      .metric = false; },
+  { .code = "international_knot";  .bovnar = "kn";      .metric = false; },
+  { .code = "revolution";          .bovnar = "rev";     .metric = false; },
+  { .code = "rotation";            .bovnar = "rev";     .metric = false; },
+  { .code = "turn";                .bovnar = "rev";     .metric = false; },
+  { .code = "cycle";               .bovnar = "rev";     .metric = false; },
+  { .code = "circle";              .bovnar = "rev";     .metric = false; },
+  { .code = "denier";              .bovnar = "den";     .metric = false; },
+  { .code = "tex";                 .bovnar = "tex";     .metric = false; },
+
+  # ── CGS electromagnetic, photometric, radiological ───────────────────────
+  # "b" is the BARN here, not the bit -- the same collision UCUM has, and the
+  # reason doc/11 §6.2 exists. Native "b" is unaffected: a profile code is
+  # only ever read against its own atom table.
+  { .code = "poise";      .bovnar = "P";     .metric = false; },
+  { .code = "stokes";     .bovnar = "St";    .metric = false; },
+  { .code = "gauss";      .bovnar = "G";     .metric = false; },
+  { .code = "maxwell";    .bovnar = "Mx";    .metric = false; },
+  { .code = "oersted";    .bovnar = "Oe";    .metric = false; },
+  { .code = "abampere";   .bovnar = "da~A";  .metric = false; },
+  { .code = "stilb";      .bovnar = "sb";    .metric = false; },
+  { .code = "phot";       .bovnar = "ph";    .metric = false; },
+  { .code = "nit";        .bovnar = "cd/m^2"; .metric = false; },
+  { .code = "nt";         .bovnar = "cd/m^2"; .metric = false; },
+  { .code = "b";          .bovnar = "barn";  .metric = false; },
+  { .code = "curie";      .bovnar = "Ci";    .metric = false; },
+  { .code = "roentgen";   .bovnar = "R";     .metric = false; },
+  { .code = "R";          .bovnar = "R";     .metric = false; },
+  { .code = "rem";        .bovnar = "rem";   .metric = false; },
+
+  # ── Mass of an atom ──────────────────────────────────────────────────────
+  # "unified_atomic_mass_unit" is UDUNITS' fourth spelling and is NOT here: at
+  # 24 bytes it pushes this profile's worst-case emitted string past
+  # BVNR_UNIT_STRING_MAX, which gen_profiles.py refuses to generate. The three
+  # shorter spellings reach the same unit.
+  { .code = "u";                  .bovnar = "Da"; .metric = false; },
+  { .code = "amu";                .bovnar = "Da"; .metric = false; },
+  { .code = "atomic_mass_unit";   .bovnar = "Da"; .metric = false; },
 
   # ── Ratios and logarithms ────────────────────────────────────────────────
   { .code = "percent";   .bovnar = "%";   .metric = false; },
@@ -245,8 +389,13 @@
   { .code = "pH";        .bovnar = "pH";  .metric = false; },
 
   # ── Information ──────────────────────────────────────────────────────────
+  # UDUNITS' "byte" is defined as 8 (dimensionless), i.e. eight bits; bovnar
+  # models bit and byte as two base units of information with no factor
+  # between them, so the 8 is a modelling difference and not a scale to fold.
   { .code = "bit";       .bovnar = "b";   .metric = true;  },
   { .code = "byte";      .bovnar = "B";   .metric = true;  },
+  { .code = "baud";      .bovnar = "Bd";  .metric = true;  },
+  { .code = "Bd";        .bovnar = "Bd";  .metric = true;  },
 ];
 
 # UDUNITS has no assay-defined units the way UCUM does; everything either maps
@@ -299,7 +448,54 @@
   # ── Sidereal and tropical time ───────────────────────────────────────────
   # bovnar's yr is the Julian year exactly; these are different lengths and
   # have no native form.
+  #
+  # "year", "yr" and "month" belong to this list and not to .mapped, which is
+  # the correction this block exists to record. UDUNITS' unqualified year is
+  # 3.15569259747e7 s -- the TROPICAL year -- not the Julian 3.15576e7 s the
+  # native yr is. Mapping them onto yr was wrong by 674 s per year: the same
+  # shape of error doc/11 §6.3 records for the BTU, and just as invisible.
+  # "Julian_year" is UDUNITS' own spelling for what bovnar means and it maps.
+  { .code = "year";          .why = "the unqualified UDUNITS year is the tropical year (3.15569259747e7 s); bovnar's yr is the Julian year — write Julian_year"; },
+  { .code = "yr";            .why = "the unqualified UDUNITS yr is the tropical year; bovnar's yr is the Julian year — write Julian_year"; },
+  { .code = "month";         .why = "a twelfth of the tropical year; bovnar's mo is a twelfth of the Julian year"; },
   { .code = "tropical_year"; .why = "no native form — bovnar's yr is the Julian year"; },
   { .code = "sidereal_year"; .why = "no native form — bovnar's yr is the Julian year"; },
+  { .code = "Gregorian_year"; .why = "no native form — bovnar's yr is the Julian year"; },
+  { .code = "common_year";   .why = "365 days exactly — no native form"; },
+  { .code = "leap_year";     .why = "366 days exactly — no native form"; },
   { .code = "sidereal_day";  .why = "no native form — bovnar's d is the solar day"; },
+  { .code = "lunar_month";   .why = "synodal month — no native form"; },
+  { .code = "sidereal_month"; .why = "no native form — bovnar's mo is the Julian month"; },
+  { .code = "tropical_month"; .why = "no native form — bovnar's mo is the Julian month"; },
+
+  # ── Survey-foot lengths ──────────────────────────────────────────────────
+  # UDUNITS builds these on the US survey foot (1200/3937 m), so each is
+  # 2 ppm longer than the native atom that shares its name -- and the acre,
+  # being an area, is 4 ppm out. Mapping them would be dimensionally perfect
+  # and silently wrong, which is the one failure this format exists to stop.
+  # ucum.bvnr refuses the survey inch and mile for exactly this reason.
+  { .code = "chain";   .why = "US survey chain (66 survey feet); native ch is the international chain"; },
+  { .code = "rod";     .why = "US survey rod (16.5 survey feet); native rd is the international rod"; },
+  { .code = "furlong"; .why = "US survey furlong (660 survey feet); native fur is the international furlong"; },
+  { .code = "fathom";  .why = "US survey fathom (6 survey feet); native fath is the international fathom"; },
+  { .code = "acre";    .why = "US survey acre (160 survey rod²); native ac is the international acre"; },
+
+  # ── Calories that are not the thermochemical one ─────────────────────────
+  # Native cal is 4.184 J. UDUNITS' unqualified "calorie" is the IT calorie,
+  # 4.1868 J -- 0.067 % away and dimensionally identical, so it cannot map.
+  #
+  # UDUNITS' own "thermochemical_calorie" IS native cal exactly, and would map
+  # but for its length: 22 bytes puts this profile's worst case over
+  # BVNR_UNIT_STRING_MAX (192), which gen_profiles.py refuses. Raising that
+  # constant to 224 would let it in -- it sizes only stack buffers in the
+  # writer and CLI -- and is the one thing standing between a correct
+  # thermochemical calorie and an error message. Until then: write the native
+  # "cal", which is the same unit.
+  { .code = "calorie";                .why = "the unqualified UDUNITS calorie is the IT calorie (4.1868 J); native cal is thermochemical — write the native cal"; },
+  { .code = "cal";                    .why = "the unqualified UDUNITS cal is the IT calorie; native cal is thermochemical — write the native cal"; },
+  { .code = "IT_calorie";             .why = "IT calorie (4.1868 J); native cal is thermochemical"; },
+  { .code = "thermochemical_calorie"; .why = "is native cal exactly, but the spelling exceeds this profile's BVNR_UNIT_STRING_MAX budget — write the native cal"; },
+
+  # ── Scales with no decade to fold into ───────────────────────────────────
+  { .code = "shake"; .why = "1e-8 s — there is no SI prefix for 10⁻⁸"; },
 ];

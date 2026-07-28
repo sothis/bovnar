@@ -172,10 +172,14 @@
   { .code = "[nmi_i]";  .bovnar = "nmi";  .metric = false; },
   { .code = "[ft_us]";  .bovnar = "ftUS"; .metric = false; },
   { .code = "[fth_i]";  .bovnar = "fath"; .metric = false; },
-  { .code = "[fur_us]"; .bovnar = "fur";  .metric = false; },
-  { .code = "[ch_us]";  .bovnar = "ch";   .metric = false; },
-  { .code = "[rd_us]";  .bovnar = "rd";   .metric = false; },
-  { .code = "[acr_us]"; .bovnar = "ac";   .metric = false; },
+  # [fur_us], [ch_us], [rd_us] and [acr_us] are NOT here. Every one is a US
+  # SURVEY unit, built on the survey foot (1200/3937 m), while the native fur,
+  # ch, rd and ac are international -- 2 ppm apart for the lengths and 4 ppm
+  # for the area. They were mapped onto the international atoms, which is the
+  # same class of error this file already refuses [in_us] and [mi_us] for, and
+  # exactly the shape doc/11 §6.3 warns about for the BTU: dimensionally
+  # perfect, far inside anything a later check would notice, and wrong.
+  # UCUM has no international chain, rod or furlong to map instead.
 
   # Mass
   { .code = "[lb_av]";    .bovnar = "lb";    .metric = false; },
@@ -412,6 +416,16 @@
   # US survey lengths other than the foot.
   { .code = "[in_us]"; .why = "US survey inch — bovnar carries only the survey foot"; },
   { .code = "[mi_us]"; .why = "US survey mile — bovnar carries only the survey foot"; },
+  { .code = "[yd_us]"; .why = "US survey yard — bovnar carries only the survey foot"; },
+  # These four used to map onto the INTERNATIONAL fur, ch, rd and ac, which are
+  # 2 ppm (4 ppm for the acre) away from the survey units these codes name.
+  # UCUM defines no international chain, rod or furlong, so there is nothing to
+  # map them to; refusing is the only honest answer until the native registry
+  # grows the survey series.
+  { .code = "[fur_us]"; .why = "US survey furlong — bovnar carries only the survey foot; native fur is the international furlong"; },
+  { .code = "[ch_us]";  .why = "US survey chain — bovnar carries only the survey foot; native ch is the international chain"; },
+  { .code = "[rd_us]";  .why = "US survey rod — bovnar carries only the survey foot; native rd is the international rod"; },
+  { .code = "[acr_us]"; .why = "US survey acre — bovnar carries only the survey foot; native ac is the international acre"; },
 
   # Chemical and clinical atoms with no native form.
   { .code = "[S]";      .why = "Svedberg unit — no native form"; },

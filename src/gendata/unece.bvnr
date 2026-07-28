@@ -166,6 +166,13 @@
 
   # Speed
   { .code = "MTS"; .bovnar = "m/s";    },
+  # The target is the COMPOUND, not the native kph atom. Both spell the same
+  # quantity, but a named unit and its compound are structurally different
+  # (doc/07 §11) and so are not bvn_unit_equal. The compound is what this code
+  # has to be: udunits:km/h can only ever parse to the compound, and the
+  # cross-vocabulary suite requires every spelling of one concept to agree.
+  # The consequence -- <float:64,kph> 1.0 unece:KMH is error_unit_mismatch --
+  # is the general named-vs-compound rule, not a quirk of this row.
   { .code = "KMH"; .bovnar = "k~m/h";  },
   { .code = "KNT"; .bovnar = "kn";     },   # knot
 

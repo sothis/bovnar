@@ -143,10 +143,55 @@ static void test_spellings(void)
 	            "meter and metre are one unit");
 
 	/* A whole atom beats a prefix, the same rule every other profile applies:
-	 * "min" is the minute, not milli-inch, and "cal" is the calorie. */
+	 * "min" is the minute, not milli-inch, and "at" is the technical
+	 * atmosphere, not an atto-tonne. */
 	chk_str("udunits:min", "min");
-	chk_str("udunits:cal", "cal");
+	chk_str("udunits:at",  "at");
 	chk_str("udunits:pc",  "pc");
+}
+
+/* ── the traps: codes that look mappable and are not ────────────────────── */
+
+/* Each of these is dimensionally identical to a native unit of the same name
+ * and differs only in factor, which is the one error shape nothing downstream
+ * can catch. They are refused rather than mapped. */
+static void test_near_miss_refusals(void)
+{
+	/* UDUNITS' unqualified year is the TROPICAL year (3.15569259747e7 s),
+	 * not the Julian year native yr is. 674 s apart. */
+	chk_error("udunits:year", error_unit_profile_unsupported);
+	chk_error("udunits:yr", error_unit_profile_unsupported);
+	chk_error("udunits:month", error_unit_profile_unsupported);
+	chk_str("udunits:Julian_year", "yr");
+
+	/* UDUNITS' unqualified calorie is the IT calorie (4.1868 J); native cal
+	 * is the thermochemical 4.184 J. 0.067 % apart. */
+	chk_error("udunits:calorie", error_unit_profile_unsupported);
+	chk_error("udunits:cal", error_unit_profile_unsupported);
+	chk_error("udunits:IT_calorie", error_unit_profile_unsupported);
+
+	/* UDUNITS builds these on the US SURVEY foot, 2 ppm longer than the
+	 * international foot the native atoms of the same name use. */
+	chk_error("udunits:chain", error_unit_profile_unsupported);
+	chk_error("udunits:rod", error_unit_profile_unsupported);
+	chk_error("udunits:furlong", error_unit_profile_unsupported);
+	chk_error("udunits:fathom", error_unit_profile_unsupported);
+	chk_error("udunits:acre", error_unit_profile_unsupported);
+
+	/* The BTU goes the other way: UDUNITS' is the IT BTU, which is exactly
+	 * what native Btu is, so it maps where UCUM's unqualified one cannot. */
+	chk_str("udunits:Btu", "Btu");
+
+	/* "oz" is a symbol of the US FLUID ounce in UDUNITS -- a volume. Reading
+	 * it as the avoirdupois ounce was a dimension error. */
+	chk_str("udunits:oz", "fl_oz");
+	chk_str("udunits:avoirdupois_ounce", "oz");
+	ASSERT_TRUE(!bvn_units_compatible(U("udunits:oz"),
+	                                  U("udunits:avoirdupois_ounce")),
+	            "the UDUNITS ounce is a volume and does not compare to a mass");
+
+	/* "b" is the barn, not the bit -- the collision doc/11 §6.2 records. */
+	chk_str("udunits:b", "barn");
 }
 
 /* ── operators ──────────────────────────────────────────────────────────── */
@@ -336,7 +381,10 @@ static void test_round_trip(void)
 		"udunits:L", "udunits:mL", "udunits:degree", "udunits:percent",
 		"udunits:m2", "udunits:m^3", "udunits:m*s-1", "udunits:kg*m-2*s-1",
 		"udunits:km/h", "udunits:inch", "udunits:foot", "udunits:mile",
-		"udunits:pound", "udunits:knot", "udunits:psi", "udunits:calorie",
+		"udunits:pound", "udunits:knot", "udunits:psi", "udunits:Btu",
+		"udunits:horsepower", "udunits:troy_ounce", "udunits:fluid_ounce",
+		"udunits:maxwell", "udunits:roentgen", "udunits:tex",
+		"udunits:Julian_year", "udunits:fortnight", "udunits:light_year",
 	};
 	for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
 		bool ok = true;
@@ -398,6 +446,7 @@ int main(void)
 	printf("UDUNITS-2 unit profile\n");
 
 	test_spellings();
+	test_near_miss_refusals();
 	test_operators();
 	test_no_syntax_leak();
 	test_reference_time();

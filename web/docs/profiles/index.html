@@ -95,7 +95,7 @@ resolved, and the pairs that look interchangeable), and <a href="https://www.bov
 reader- and writer-side unit policies a profile unit has to survive unchanged).</p>
 <p>Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (541 assertions across the five profiles, plus 2847 in the cross-vocabulary
+files named above (567 assertions across the five profiles, plus 2847 in the cross-vocabulary
 suite). What is <strong>not</strong> machine-verified, and must not be read as such, is the VOCABULARY side: the
 transliteration tables in <code>src/gendata/*.bvnr</code> state what each foreign code is worth, and nothing in
 this repository checks that against the publications those codes come from. §9.2 says exactly what
@@ -192,7 +192,8 @@ is explicit that five tables wrong in the same way would agree with each other p
 <li><a href="#13-the-udunits-profile">The UDUNITS profile</a><ul>
 <li>13.1 <a href="#131-an-expression-profile-sharing-the-ucum-parser">An expression profile, sharing the UCUM parser</a></li>
 <li>13.2 <a href="#132-space-does-not-multiply-and-cannot">Space does not multiply, and cannot</a></li>
-<li>13.3 <a href="#133-reference-time-is-refused-and-why">Reference time is refused, and why</a></li>
+<li>13.3 <a href="#133-the-near-misses-codes-that-name-a-native-unit-and-are-not-it">The near misses: codes that name a native unit and are not it</a></li>
+<li>13.4 <a href="#134-reference-time-is-refused-and-why">Reference time is refused, and why</a></li>
 </ul>
 </li>
 <li><a href="#14-the-cross-vocabulary-conformance-suite">The cross-vocabulary conformance suite</a><ul>
@@ -769,8 +770,8 @@ to go. That is the Old German units, the water-hardness degrees, the turbidity k
 <em>reader</em> and a partial UCUM <em>writer</em>. A round trip that starts in UCUM returns to UCUM; one that
 starts in Bovnar's native registry may have nowhere to go.</p>
 <p>Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
-<code>si_none da h k M G T d c m µ n</code> — <strong>605</strong> combinations survive a native → UCUM → native round trip
-unchanged, <strong>1200</strong> have no UCUM code, 355 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
+<code>si_none da h k M G T d c m µ n</code> — <strong>601</strong> combinations survive a native → UCUM → native round trip
+unchanged, <strong>1204</strong> have no UCUM code, 355 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
 before the question arises, and <strong>none round-trips to a different unit</strong>. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so <code>test_sweep_round_trip</code> in
 <code>tests/bovnar_ucum_test.c</code> pins all three rather than leaving them as prose.</p>
@@ -2030,7 +2031,7 @@ refused rather than mapped onto the nearly-right native unit. §10.2 treats this
 risk, and §10.4 records it as unbuilt.</p>
 <p>The generator also emits the <strong>reverse</strong> table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes <code>bvn_unit_to_ucum</code> deterministic; the 605
+searching the forward table at run time is what makes <code>bvn_unit_to_ucum</code> deterministic; the 601
 round trips quoted in §5.3 are the check that it agrees with the forward direction.</p>
 <h3 id="93-tests">9.3 Tests</h3>
 <p><code>tests/bovnar_ucum_test.c</code> (CTest target <code>bvnr_ucum_test</code>, labels <code>unit;si;ucum</code>, <strong>121
@@ -2393,7 +2394,7 @@ namespace and falls through to the native parser, which rejects it as it always 
 <blockquote>
 <p><code>udunits:</code> — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 of netCDF and the CF conventions.
-Data file <code>src/gendata/udunits.bvnr</code>; pinned by <code>tests/bovnar_udunits_test.c</code> (127 assertions).</p>
+Data file <code>src/gendata/udunits.bvnr</code>; pinned by <code>tests/bovnar_udunits_test.c</code> (153 assertions).</p>
 </blockquote>
 <h3 id="131-an-expression-profile-sharing-the-ucum-parser">13.1 An expression profile, sharing the UCUM parser</h3>
 <p>UDUNITS is the second <strong>expression</strong> profile, and it runs through the same translator as UCUM with
@@ -2423,7 +2424,69 @@ multiplication set sees what it would actually mean.</p>
 <p>This is a symptom of something larger, recorded in §10.2: <strong>a space anywhere inside a type
 annotation is silently deleted</strong>, so <code>&lt;float:64,k g&gt;</code> is accepted as <code>k~g</code>. That predates the
 profiles and affects native units too.</p>
-<h3 id="133-reference-time-is-refused-and-why">13.3 Reference time is refused, and why</h3>
+<h3 id="133-the-near-misses-codes-that-name-a-native-unit-and-are-not-it">13.3 The near misses: codes that name a native unit and are not it</h3>
+<p>UDUNITS is the profile with the most spellings that look like a native unit, carry the same
+dimension, and differ only in factor. Each is refused as <code>error_unit_profile_unsupported</code> rather
+than mapped, because a factor-only error is the one shape nothing downstream can catch — the same
+reasoning §6.3 applies to the BTU and the apothecary dram.</p>
+<table>
+<thead>
+<tr>
+<th>UDUNITS code</th>
+<th>Is</th>
+<th>Native unit of that name</th>
+<th>Apart by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>year</code>, <code>yr</code></td>
+<td>tropical year, <code>3.15569259747e7</code> s</td>
+<td><code>yr</code>, the Julian year <code>31557600</code> s</td>
+<td>674 s — 11 min/yr</td>
+</tr>
+<tr>
+<td><code>month</code></td>
+<td>a twelfth of the tropical year</td>
+<td><code>mo</code>, a twelfth of the Julian year</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>calorie</code>, <code>cal</code></td>
+<td>IT calorie, <code>4.1868</code> J</td>
+<td><code>cal</code>, thermochemical <code>4.184</code> J</td>
+<td>0.067 %</td>
+</tr>
+<tr>
+<td><code>chain</code>, <code>rod</code>, <code>furlong</code>, <code>fathom</code></td>
+<td>built on the US <strong>survey</strong> foot</td>
+<td>international, on the <code>0.3048</code> m foot</td>
+<td>2 ppm</td>
+</tr>
+<tr>
+<td><code>acre</code></td>
+<td>US survey acre, <code>160</code> survey rod²</td>
+<td><code>ac</code>, international <code>4046.8564224</code> m²</td>
+<td>4 ppm</td>
+</tr>
+</tbody>
+</table>
+<p><code>Julian_year</code> is UDUNITS' own spelling for what <code>yr</code> means and <strong>does</strong> map. The BTU runs the other
+way: UDUNITS' unqualified <code>Btu</code> is the IT BTU, which is exactly what native <code>Btu</code> is, so it maps
+here although UCUM's unqualified <code>[Btu]</code> cannot (§6.3).</p>
+<p>Two spelling traps in the same family, neither of them factor errors:</p>
+<ul>
+<li><strong><code>oz</code> is a volume.</strong> In UDUNITS it is a symbol of the US <em>fluid</em> ounce, not the avoirdupois
+  ounce, so it translates to <code>fl_oz</code>. The mass is spelled <code>avoirdupois_ounce</code>. Reading <code>udunits:oz</code>
+  as a mass was a dimension error, and the two are now not even compatible.</li>
+<li><strong><code>b</code> is the barn</strong>, not the bit — the collision §6.2 records for UCUM, present here for the same
+  reason and resolved the same way.</li>
+</ul>
+<p><code>thermochemical_calorie</code> is native <code>cal</code> exactly and would map, but at 22 bytes it pushes this
+profile's worst-case emitted string past <code>BVNR_UNIT_STRING_MAX</code> and <code>gen_profiles.py</code> refuses to
+generate the table (§2.5). Raising that constant to 224 would admit it; it sizes only stack buffers
+in the writer and the CLI. Until then the native <code>cal</code> is the way to write it.</p>
+<h3 id="134-reference-time-is-refused-and-why">13.4 Reference time is refused, and why</h3>
 <p><code>&lt;unit&gt; since &lt;timestamp&gt;</code> is UDUNITS' most distinctive construct and the one most often asked for.
 It is <strong>refused</strong>, as <code>error_unit_profile_unsupported</code>, for a structural reason rather than a
 scheduling one.</p>

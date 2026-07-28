@@ -842,7 +842,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — which reading wins when a token could mean two things
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit attaches to a value
 - [FAQ §4 — Units](02_bovnar_faq.md#4-units) — the questions these tables raise most often
-- [UCUM Unit Profile](11_bovnar_ucum_profile.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
+- [UCUM Unit Profile](11_bovnar_unit_profiles.md) — writing these same units as UCUM codes, and the 32 assay-defined units that exist only there
 
 ---
 

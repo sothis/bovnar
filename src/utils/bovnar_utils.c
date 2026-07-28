@@ -39,7 +39,7 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
-#include "bvn_ucum_impl.h"
+#include "bvn_profile_impl.h"
 /*
  * ===========================================================================
  * Shared utilities: number parsing/formatting/validation and unit handling
@@ -1044,7 +1044,7 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 	}
 	/*
 	 * spec 1.2 — a "name:" namespace hands the string to the unit profile
-	 * (doc/11_bovnar_ucum_profile.md). This is the SINGLE door: every path that
+	 * (doc/11_bovnar_unit_profiles.md). This is the SINGLE door: every path that
 	 * reaches a unit goes through bvn_parse_unit, so a profile unit cannot arrive by a
 	 * route that skips a check, and the policy strings of bvnr_unit_policy_t
 	 * accept the notation with no change at all.
@@ -1054,9 +1054,9 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 	 * meaning.
 	 */
 	if (bvni_unit_has_profile((const char*)unit, len)) {
-		bvni_ucum_status_t st = bvni_ucum_ok;
+		bvni_profile_status_t st = bvni_profile_ok;
 		value_unit_t u = bvni_parse_profile_unit((const char*)unit, len, &st);
-		*ok = (st == bvni_ucum_ok);
+		*ok = (st == bvni_profile_ok);
 		return u;
 	}
 	return bvn_parse_unit_expr((const char*)unit, len, 0, ok);
@@ -1076,18 +1076,25 @@ error_code_t bvn_unit_error_code(const uint8_t* unit, uint32_t len)
 		(void)bvn_parse_unit_expr((const char*)unit, len, 0, &ok);
 		return ok ? error_none : error_unit_illegal;
 	}
-	bvni_ucum_status_t st = bvni_ucum_ok;
+	bvni_profile_status_t st = bvni_profile_ok;
 	(void)bvni_parse_profile_unit((const char*)unit, len, &st);
 	switch (st) {
-	case bvni_ucum_ok:              return error_none;
-	case bvni_ucum_unsupported:     return error_unit_profile_unsupported;
-	case bvni_ucum_unknown_profile: return error_unit_profile_unknown;
+	case bvni_profile_ok:              return error_none;
+	case bvni_profile_unsupported:     return error_unit_profile_unsupported;
+	case bvni_profile_unknown_ns: return error_unit_profile_unknown;
 	default:                        return error_unit_illegal;
 	}
 }
 bool bvn_unit_is_profile_only(value_unit_t u)
 {
-	return bvni_unit_has_arbitrary(u);
+	return bvni_unit_has_opaque(u);
+}
+int32_t bvn_unit_to_profile(const char* ns, value_unit_t u, char* buf,
+                            size_t bufsize)
+{
+	if (!ns)
+		return -1;
+	return bvni_unit_to_profile(ns, (uint32_t)strlen(ns), u, buf, bufsize);
 }
 int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize)
 {
@@ -1119,10 +1126,10 @@ static const char* base_unit_str(value_base_unit_t b)
 	 * gen_units.py. The default: case below handles currencies. */
 #include "bovnar_base_unit_str.gen.inc"
 	/* UCUM arbitrary units — generated from src/gendata/ucum.bvnr by
-	 * gen_ucum.py. Their canonical spelling IS the UCUM code, because they have
+	 * gen_profiles.py. Their canonical spelling IS the UCUM code, because they have
 	 * no native one; bvn_unit_to_string wraps the whole expression in "ucum:"
 	 * when one of these is present. */
-#include "bovnar_ucum_str.gen.inc"
+#include "bovnar_profiles_str.gen.inc"
 	default:
 		if (bvn_unit_is_currency((int)b)) {
 			const bvn_currency_info_t *info = bvn_currency_info((int)b);
@@ -1695,16 +1702,10 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 	 * a unit towards named SI, and an arbitrary unit has no SI form to fold
 	 * towards — its conversion row exists only to keep the table well-formed.
 	 */
-	if (bvni_unit_has_arbitrary(u)) {
+	if (bvni_unit_has_opaque(u)) {
 		if (!bvn_unit_valid(u))
 			return -1;
-		if (bufsize < 6)
-			return -1;
-		memcpy(buf, "ucum:", 5);
-		int32_t w = bvni_unit_to_ucum(u, buf + 5, bufsize - 5);
-		if (w < 0)
-			return -1;
-		return w + 5;
+		return bvni_unit_profile_spelling(u, buf, bufsize);
 	}
 	if (flags & BVN_UNIT_REDUCE) {
 		double   scale;
@@ -1847,19 +1848,13 @@ int32_t bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize)
 		return -1;
 	if (!bvn_unit_valid(u))
 		return -1;
-	/* spec 1.2 — a unit carrying a UCUM arbitrary atom has no native spelling,
-	 * so its canonical form is the profile one. Same rule as in
-	 * bvn_unit_to_string_ex; the two formatters are separate implementations and
-	 * a unit that printed differently through them would be a round-trip hole. */
-	if (bvni_unit_has_arbitrary(u)) {
-		if (bufsize < 6)
-			return -1;
-		memcpy(buf, "ucum:", 5);
-		int32_t pw = bvni_unit_to_ucum(u, buf + 5, bufsize - 5);
-		if (pw < 0)
-			return -1;
-		return pw + 5;
-	}
+	/* spec 1.2 — a unit carrying an opaque base unit has no native spelling, so
+	 * its canonical form is the profile one, in the namespace that owns it. Same
+	 * rule as in bvn_unit_to_string_ex; the two formatters are separate
+	 * implementations and a unit that printed differently through them would be
+	 * a round-trip hole. */
+	if (bvni_unit_has_opaque(u))
+		return bvni_unit_profile_spelling(u, buf, bufsize);
 	uint32_t nc = u.num_components < BVNR_MAX_UNIT_COMPONENTS
 	            ? u.num_components : BVNR_MAX_UNIT_COMPONENTS;
 	if (nc == 0) {

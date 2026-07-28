@@ -295,7 +295,7 @@ map $uri $bvnr_canon_hdr {
     "/doc/08_bovnar_readwrite_api.md"    "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
     "/doc/09_bovnar_python_bindings.md"  "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
     "/doc/10_bovnar_streaming.md"        "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
-    "/doc/11_bovnar_ucum_profile.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
+    "/doc/11_bovnar_unit_profiles.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
     "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
 }
@@ -351,8 +351,8 @@ map $uri $bvnr_doc_moved {
     "/doc/3_bovnar_readwrite_api.md"    "/doc/08_bovnar_readwrite_api.md";
     "/doc/4_bovnar_python_bindings.md"  "/doc/09_bovnar_python_bindings.md";
     "/doc/9_bovnar_streaming.md"        "/doc/10_bovnar_streaming.md";
-    "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_ucum_profile.md";
-    "/doc/ucum_profile.md"              "/doc/11_bovnar_ucum_profile.md";
+    "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_unit_profiles.md";
+    "/doc/ucum_profile.md"              "/doc/11_bovnar_unit_profiles.md";
     "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
     "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
 }
@@ -386,12 +386,26 @@ The published registration at
 <https://www.iana.org/assignments/media-types/text/vnd.bovnar> cites the
 specification, the unit system, the grammar, the FAQ and the conformance suite
 as **`github.com/sothis/bovnar/blob/main/doc/<old-name>`** URLs, not
-`www.bovnar.io` ones. All five are 404. No configuration of this web server can
-affect them — they are served by GitHub from the repository tree, so the only
-things that fix them are a change to the repository or a corrected registration.
-The `Published specification` field in the registration template in
-`doc/ietf/draft-sonntag-bovnar-00.md` uses `www.bovnar.io` paths, which is what
-the requested registration update would replace them with.
+`www.bovnar.io` ones. No configuration of this web server can affect them — they
+are served by GitHub from the repository tree, so the only things that reach them
+are a change to the repository or a corrected registration.
+
+The repository change was made: `doc/1_bovnar_spec.md`,
+`doc/2_bovnar_unit_system.md`, `doc/5_bovnar.ebnf`, `doc/6_bovnar_faq.md` and
+`doc/7_bovnar_conformance.md` are back as **pointer files** — each names the
+document it moved to, in the repository and on the site, and says it is not
+normative. All five cited URLs resolve again. They are not in `WEBDOCS` in
+`publish_web.sh`, so they exist for GitHub only and never reach the site, where
+the `map` above already answers those paths with a 301.
+
+The pointers are the stopgap, not the fix: they keep a published registration
+resolving, but the registry entry still depends on this repository preserving
+five filenames indefinitely. The `Published specification` field in the
+registration template in `doc/ietf/draft-sonntag-bovnar-00.md` uses
+`www.bovnar.io` paths instead — redirected across renames rather than
+invalidated by them — and §"Corrections to the Existing Registration" there
+lists the replacement as one of the changes requested. The pointer files stay
+until that update is accepted.
 
 ## Response headers (`/etc/nginx/snippets/bovnar-headers.conf`)
 
@@ -501,8 +515,8 @@ map $uri $bvnr_doc_moved {
     "/doc/3_bovnar_readwrite_api.md"    "/doc/08_bovnar_readwrite_api.md";
     "/doc/4_bovnar_python_bindings.md"  "/doc/09_bovnar_python_bindings.md";
     "/doc/9_bovnar_streaming.md"        "/doc/10_bovnar_streaming.md";
-    "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_ucum_profile.md";
-    "/doc/ucum_profile.md"              "/doc/11_bovnar_ucum_profile.md";
+    "/doc/10_bovnar_ucum_profile.md"    "/doc/11_bovnar_unit_profiles.md";
+    "/doc/ucum_profile.md"              "/doc/11_bovnar_unit_profiles.md";
     "/doc/5_bovnar.ebnf"                "/doc/12_bovnar.ebnf";
     "/doc/7_bovnar_conformance.md"      "/doc/13_bovnar_conformance.md";
 }
@@ -529,7 +543,7 @@ map $uri $bvnr_canon_hdr {
     "/doc/08_bovnar_readwrite_api.md"    "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
     "/doc/09_bovnar_python_bindings.md"  "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
     "/doc/10_bovnar_streaming.md"        "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
-    "/doc/11_bovnar_ucum_profile.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
+    "/doc/11_bovnar_unit_profiles.md"     "<https://www.bovnar.io/docs/ucum/>; rel=\"canonical\"";
     "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
 }

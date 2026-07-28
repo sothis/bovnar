@@ -202,7 +202,7 @@ result unchanged. <strong>The notation is under implementation</strong> — it i
 published specification, and a document must opt in with a <code>#!bovnar 1.2</code>
 directive that this build does not itself advertise. A native unit is
 unaffected in every version. See
-<a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a>.</p>
+<a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a>.</p>
 </blockquote>
 <h3 id="21-parameter-ordering-flexibility">2.1 Parameter Ordering Flexibility</h3>
 <div class="codehilite"><pre><code class="language-bovnar">.val = &lt;uint:32,_10,no_unit&gt; 42;
@@ -1777,7 +1777,7 @@ other — see §3.12 and the note under §3.2.</p>
 <p>Every Prussian unit here reproduces its historical definition from the 1816 Fuß (0.313853 m):
 Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 square Ruten. <code>test_unit_factors_derived.py</code> checks each of them against that definition.</p>
-<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–396</strong> (<code>bu_ph_scale</code> … <code>bu_turbidity_jtu</code>), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy <strong>397–428</strong>, above every native unit — a range test is what makes them incommensurable (see <a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a>), so a native unit appended past 397 would silently join them. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>429</strong>, held to the highest enumerator by the static assert <code>BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT</code> in <code>src/utils/bvn_internal_dims.h</code>; a second assert there pins <code>bu_turbidity_jtu &lt; BVN_UCUM_ARBITRARY_FIRST</code>. Currencies begin at 134, immediately after the last non-German physical unit.</p>
+<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–396</strong> (<code>bu_ph_scale</code> … <code>bu_turbidity_jtu</code>), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy <strong>397–428</strong>, above every native unit — a range test is what makes them incommensurable (see <a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a>), so a native unit appended past 397 would silently join them. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>429</strong>, held to the highest enumerator by the static assert <code>BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT</code> in <code>src/utils/bvn_internal_dims.h</code>; a second assert there pins <code>bu_turbidity_jtu &lt; BVN_UCUM_ARBITRARY_FIRST</code>. Currencies begin at 134, immediately after the last non-German physical unit.</p>
 </blockquote>
 <h3 id="321-additional-length-units">3.21 Additional Length Units</h3>
 <table>
@@ -4811,9 +4811,17 @@ groups raise <code>error_unit_illegal</code>.</p>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">           </span><span class="n">length</span><span class="p">;</span>
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w">        </span><span class="n">frac_data</span><span class="p">;</span><span class="w">    </span><span class="cm">/* spec 1.1 — ISO datetime sub-second digits, else NULL */</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">           </span><span class="n">frac_length</span><span class="p">;</span><span class="w">  </span><span class="cm">/* spec 1.1 — length of frac_data, else 0 */</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w">               </span><span class="n">converted</span><span class="p">;</span><span class="w">    </span><span class="cm">/* a read-time conversion restated this value */</span>
+<span class="w">    </span><span class="n">bvnr_converted_t</span><span class="w">   </span><span class="n">conv</span><span class="p">;</span><span class="w">         </span><span class="cm">/* its result: the unit delivered, and the digits */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="p">;</span>
 </code></pre></div>
 
+<p><code>converted</code> and <code>conv</code> are the unit-facing half of the struct: when a <code>want_unit</code>
+hook or a <a href="https://www.bovnar.io/docs/policy/">unit policy</a> restated a value, <code>conv</code>
+carries the unit it was delivered in and the converted digits, while
+<code>value_unit</code> still carries the unit the <strong>document</strong> wrote. A consumer that
+requested a conversion must read <code>converted</code> to know whether it happened — see
+<a href="https://www.bovnar.io/docs/policy/#22-conversion-targets">Unit Policy §2.2</a>.</p>
 <h3 id="113-convenience-macros">11.3 Convenience Macros</h3>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* Dimensionless or single-component without prefix */</span>
 <span class="cp">#define BVN_UNIT_NO_PREFIX(b)          \</span>
@@ -5348,7 +5356,7 @@ ev_data   data=&quot;1500&quot;
 <li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — how a unit is attached to a value</li>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit &amp; Currency Cheat Sheet</a> — every symbol in this registry, in table form</li>
 <li><a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> — every token that could plausibly mean two things</li>
-<li><a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a> — writing UCUM codes in a unit slot, and where the two namespaces disagree</li>
+<li><a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a> — writing UCUM codes in a unit slot, and where the two namespaces disagree</li>
 <li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — <code>bvn_parse_unit</code>, <code>bvn_unit_to_string</code>, and read-time conversion</li>
 <li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the same unit model from Python, with the NumPy and pint bridges</li>
 </ul>

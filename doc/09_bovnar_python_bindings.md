@@ -92,7 +92,7 @@ import time via the standard `ctypes.CDLL` machinery.
 | Requirement | Notes |
 |---|---|
 | Python ≥ 3.10 | `dataclasses`, `enum.IntEnum`, union-type annotations (`X \| Y`) |
-| `libbvnr.so` | Runtime only; see *Library discovery* below |
+| `libbvnr.so` | Runtime only, and bundled inside the wheel — see *Library discovery* below |
 | `numpy` ≥ 1.24 | **Optional** — only for the NumPy bridge (`pip install bovnar[numpy]`) |
 | `pint` ≥ 0.22 | **Optional** — only for the pint bridge (`pip install bovnar[pint]`) |
 | pytest ≥ 7 | Test suite only (`pip install bovnar[dev]`) |
@@ -105,8 +105,9 @@ bridge functions — importing `bovnar` never requires either to be installed.
 ## 2. Installation
 
 ```bash
-# Editable install from source (recommended during development)
-pip install -e ".[dev]"
+# From PyPI. The wheels bundle libbvnr, so there is nothing to build and no
+# system dependency to install.
+pip install bovnar
 ```
 
 Optional extras pull in the dependencies for the bridges:
@@ -115,6 +116,18 @@ Optional extras pull in the dependencies for the bridges:
 pip install "bovnar[numpy]"   # NumPy bridge
 pip install "bovnar[pint]"    # pint bridge
 pip install "bovnar[all]"     # both numpy and pint
+```
+
+From a source checkout instead. `pyproject.toml` lives at the **repository
+root**, not under `python/` — the pure-Python package there is mapped into the
+wheel by `[tool.scikit-build] wheel.packages`, so the editable install runs from
+the root:
+
+```bash
+cmake -B build . && cmake --build build      # produces build/libbvnr.so
+export LIBBOVNAR_PATH="$PWD/build/libbvnr.so"
+
+pip install -e ".[dev]"                      # from the repository root
 ```
 
 ---
@@ -131,8 +144,13 @@ The bindings search for `libbvnr.so` in this order:
    ```bash
    export LIBBOVNAR_DIR=/opt/bovnar/lib
    ```
-3. **`ctypes.util.find_library('bvnr')`** — standard `ldconfig` / `LD_LIBRARY_PATH` search.
-4. **In-tree build paths** — `../../build/`, `../../build/release/`, `../../`,
+3. **Bundled in the package** — the library sitting next to `_ffi.py` inside the
+   installed `bovnar` package. This is the normal path after `pip install
+   bovnar`: CMake installs `libbvnr.*` into the package directory when the wheel
+   is built, so an installed wheel resolves here and needs no environment
+   variable at all.
+4. **`ctypes.util.find_library('bvnr')`** — standard `ldconfig` / `LD_LIBRARY_PATH` search.
+5. **In-tree build paths** — `../../build/`, `../../build/release/`, `../../`,
    `.` (resolved relative to the `_ffi.py` file; useful when building Bovnar
    alongside the bindings from a mono-repo).
 
@@ -341,7 +359,7 @@ In a **document** the notation additionally requires a `#!bovnar 1.2` directive;
 without it `loads` raises with `unit_illegal`. `parse_unit` has no document and
 therefore no declared version, so it accepts the notation unconditionally.
 
-See [UCUM Unit Profile](11_bovnar_ucum_profile.md) for the transliteration table
+See [UCUM Unit Profile](11_bovnar_unit_profiles.md) for the transliteration table
 and the codes that have no representation.
 
 ### 5.2 Extended unit functions
@@ -580,7 +598,8 @@ rules about exactness is how a document ends up meaning two things.
 Two module-level helpers back the same decisions outside the reader:
 
 ```python
-from bovnar import units_convertible, unit_si_normal_form, parse_unit
+from bovnar import (units_compatible, units_convertible,
+                    unit_si_normal_form, parse_unit)
 
 # units_compatible is the wrong screen for a conversion target: a currency
 # carries no dimension, so it is reported incompatible with itself.

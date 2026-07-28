@@ -48,8 +48,10 @@ DOCS = [
      "The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges."),
     ("10_bovnar_streaming.md",    "Streaming & framing",
      "Octet streams, frames, multiplexing/demultiplexing, and embedded documents."),
-    ("11_bovnar_ucum_profile.md","UCUM unit profile",
-     "The ucum: notation, its transliteration table, and what it refuses."),
+    ("11_bovnar_unit_profiles.md","Unit profiles",
+     "The ucum:, unece:, qudt:, qudt-qk: and udunits: notations, their "
+     "transliteration tables, what they refuse, and how they are checked "
+     "against each other."),
     ("12_bovnar.ebnf",            "EBNF grammar",
      "The formal grammar, annotated against the reference lexer/validator."),
     ("13_bovnar_conformance.md",  "Conformance",

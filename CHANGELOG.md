@@ -66,7 +66,7 @@ reading the grown by-value structs at the wrong size.
   `src/gendata/ucum.bvnr`; the
   specification, the transliteration table and the list of what has NO
   representation are in
-  [doc/11_bovnar_ucum_profile.md](doc/11_bovnar_ucum_profile.md).
+  [doc/11_bovnar_unit_profiles.md](doc/11_bovnar_unit_profiles.md).
 
   The lexer accepts five new bytes in a unit — `'`, `[`, `]`, `{`, `}` — which
   is the profile's one visible effect on a document that never uses it:
@@ -412,7 +412,73 @@ reading the grown by-value structs at the wrong size.
   counterpart (lossy for wide values): multiplicative + affine conversion in one
   call. The C equivalent of Python `convert_value` (which delegates to it).
 
+- **§18 Security Considerations in the specification.** The format's threat
+  surface was written down in the Internet-Draft and in the IANA registration
+  but not in the document both of those cite as the published specification.
+  §18 states it there: the resource-exhaustion defaults that are chosen for
+  trusted pipelines, recovery mode delivering a subset with nothing in the data
+  saying so, version leniency, transport corruption of length-prefixed chunks,
+  the hazards a reference resolver inherits, special numbers bypassing range
+  validation, the difference between a unit being *validated* and being *right*
+  (including a conversion request that is not a guarantee), leap-second table
+  drift between builds, byte-compared keys, and the absence of any integrity or
+  authenticity property. Nothing here changes what parses; it is a description
+  of behaviour that was already specified piecemeal.
+
+- **`SECURITY.md`** — the reporting policy, the supported versions, and, above
+  all, an explicit out-of-scope list, so a report does not have to guess which
+  of these are defects and which are documented properties of the format.
+
 ### Fixed
+
+- **Both formal grammars referenced rules they never defined.** `doc/12_bovnar.ebnf`
+  wrote the seven datetime-literal productions over a lowercase `digit` that has
+  no definition anywhere — the terminal is `DIGIT`, as every other production
+  spells it — so the one document whose stated purpose is to be machine-readable
+  did not resolve. The draft's collected ABNF referenced `base-unit` and
+  `currency-code` with no productions at all; both now have rules that bound a
+  token's shape (verified to admit all 529 registered spellings and all 216
+  currency codes, and nothing else), leaving membership where it belongs, in the
+  registry. Both grammars are now closed: every referenced rule is defined, and
+  the only unreferenced ones are the two documented entry points.
+
+- **doc/11 §5.3's round-trip sweep was stale and unpinned.** It reported 592
+  spellings surviving native → UCUM → native; the registry has since grown and
+  the figure is 594. `test_sweep_round_trip` now pins all three counts and the
+  invariant that matters — that nothing round-trips to a *different* unit —
+  and the document states the prefix set the measurement uses, which it did not
+  before.
+
+- **A copy-paste failure in the Python bindings reference.** The helper example
+  in §7 imports `units_convertible` and then calls `units_compatible`, which the
+  import line omits: the block as printed raises `NameError`.
+
+- **Struct listings in the documentation had fallen behind their headers.** The
+  `bvnr_unit_policy_t` listing in the read/write API omitted `rules` and
+  `num_rules` — the two fields the example immediately below it assigns, and the
+  first two in the header — along with `bvnr_unit_rule_t` itself, so the sample
+  used a type the document never showed. The specification's `bvnr_read_flags_t`
+  listing, which is otherwise complete down to `_reserved`, was missing
+  `text_only`, though §16.10 already names that flag as what raises code 51. The
+  `bvnr_data_t` listing in the unit reference dropped `converted` and `conv`,
+  which are precisely the unit-facing fields a conversion reports through. A
+  check now compares every struct listing in `doc/` against the header it
+  restates.
+
+- **Stale numbers in the conformance and gendata documents.** doc/13's
+  illustrative TAP block still showed `1..21` groups and an `encoding` plan of
+  `1..9`, against a suite that has run 23 groups and 14 encoding cases for some
+  time; the coverage-table gate did not reach into an example. It does now, and
+  it also holds the prose group count beside it. `src/gendata/README.md` still
+  said 163 physical units (the 1.0 figure; there are 180) and documented neither
+  `ucum.bvnr` nor `gen_profiles.py` nor any of the seven tables they generate.
+
+- **Both sets of release notes pointed at an amalgamation that was never
+  there.** They told a C consumer to vendor `dist/bovnar.h` + `dist/bovnar.c`;
+  no such paths have existed at any tag. The amalgamation is regenerated into
+  `build/amalgamate/` by every build and ships as the `…-amalgamate.tar.xz`
+  release asset. `dist/README.md` in turn described only `mime/` and
+  `linguist/`, omitting the tracked `wasm/` npm package entirely.
 
 - **`bovnar query` and `bovnar convert` printed short round numbers in
   scientific notation.** `120.0` came out as `1.2e+02` and `250.0` as
@@ -1301,12 +1367,12 @@ Second release-review pass:
 
 See [`RELEASE_NOTES_v1.1.0.md`](RELEASE_NOTES_v1.1.0.md) for the full notes.
 
-## [1.0.1]
+## [1.0.1] - 2026-06-15
 
 Implementation maintenance over 1.0.0 — no format change; every 1.0.0 document
 is unaffected.
 
-## [1.0.0]
+## [1.0.0] - 2026-06-15
 
 First stable release and the **format freeze**: a document valid under spec 1.0
 stays valid, and decodes to the same values, under every 1.x release. This
@@ -1315,6 +1381,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
+[Unreleased]: https://github.com/sothis/bovnar/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/sothis/bovnar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/sothis/bovnar/releases/tag/v1.0.1
 [1.0.0]: https://github.com/sothis/bovnar/releases/tag/v1.0.0

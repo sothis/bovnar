@@ -1,0 +1,140 @@
+#!bovnar 1.1
+# qudt-qk.bvnr — single source of truth for the QUDT quantity-kind profile.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# READ THIS FIRST: A QUANTITY KIND IS NOT A UNIT
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Every other profile in src/gendata/ spells a UNIT. This one spells a KIND OF
+# QUANTITY -- QUDT's Length, Mass, Velocity, Pressure -- which says what is being
+# measured and says NOTHING about the scale it is measured on. "Length" does not
+# mean metres. It does not mean anything with a number attached to it at all.
+#
+# So this profile has to decide what "qudt-qk:Length" means in a slot whose whole
+# job is to fix the scale, and there are only three honest answers:
+#
+#   (a) Refuse it. Correct, and useless: it makes the namespace an error message.
+#
+#   (b) Carry the dimension WITHOUT a scale. Not representable: a value_unit_t is
+#       a product of prefixed base units, and there is no way to spell "a length,
+#       scale unspecified" in one. Adding a fourth state to the unit model would
+#       break the invariant every other part of the library is built on
+#       (doc/11 section 1.3), which is the one thing that must not change.
+#
+#   (c) TRANSLATE TO THE COHERENT SI UNIT OF THE KIND. Length -> m, Mass -> k~g,
+#       Velocity -> m/s. This is what the profile does.
+#
+# WHY (c) IS DEFENSIBLE, AND WHERE IT CAN STILL BITE
+#   It is not this file guessing. QUDT itself relates a QuantityKind to exactly
+#   one coherent SI unit, and ISO 80000 defines a kind of quantity together with
+#   the coherent unit of the system it belongs to. Writing
+#   "<float:64,qudt-qk:Length> 3.0" therefore means three metres, because the
+#   coherent SI unit of length IS the metre, not because this table picked one.
+#
+#   The bite: a producer who knows only the KIND and whose numbers are NOT in
+#   coherent SI units will write a wrong value that parses cleanly. If your
+#   lengths are in feet, "qudt-qk:Length" is the wrong thing to write and
+#   "qudt:FT" is the right one. This namespace is for a producer whose data is
+#   already coherent-SI and whose metadata carries a kind rather than a unit --
+#   which is the common shape of a QUDT-sourced or DTDL-sourced feed, and is the
+#   only reason the namespace exists.
+#
+#   A kind whose coherent unit bovnar cannot spell is REFUSED, not approximated.
+#
+# HOW THIS WORKS
+#   Hand-edited; gen_profiles.py regenerates the C tables. A FLAT profile: a kind
+#   name is one whole token. Local names only, no full IRIs -- see qudt.bvnr.
+#
+# PROVENANCE
+#   Same standing gap as every other profile here: nothing in this repository
+#   checks the QUDT side. See the note in qudt.bvnr.
+
+.schema_version = <uint:16> 1;
+
+# .bovnar is the COHERENT SI UNIT of the kind, never a convenient one.
+.mapped = [
+  # ── ISO 80000 base quantities ────────────────────────────────────────────
+  { .code = "Length";                  .bovnar = "m";        },
+  { .code = "Mass";                    .bovnar = "k~g";      },
+  { .code = "Time";                    .bovnar = "s";        },
+  { .code = "ElectricCurrent";         .bovnar = "A";        },
+  { .code = "ThermodynamicTemperature"; .bovnar = "K";       },
+  { .code = "AmountOfSubstance";       .bovnar = "mol";      },
+  { .code = "LuminousIntensity";       .bovnar = "cd";       },
+
+  # ── Space and time ───────────────────────────────────────────────────────
+  { .code = "Area";                    .bovnar = "m^2";      },
+  { .code = "Volume";                  .bovnar = "m^3";      },
+  { .code = "Angle";                   .bovnar = "rad";      },
+  { .code = "PlaneAngle";              .bovnar = "rad";      },
+  { .code = "SolidAngle";              .bovnar = "sr";       },
+  { .code = "Velocity";                .bovnar = "m/s";      },
+  { .code = "Speed";                   .bovnar = "m/s";      },
+  { .code = "Acceleration";            .bovnar = "m/s^2";    },
+  { .code = "AngularVelocity";         .bovnar = "rad/s";    },
+  { .code = "Frequency";               .bovnar = "Hz";       },
+  { .code = "VolumeFlowRate";          .bovnar = "m^3/s";    },
+  { .code = "MassFlowRate";            .bovnar = "k~g/s";    },
+
+  # ── Mechanics ────────────────────────────────────────────────────────────
+  { .code = "Force";                   .bovnar = "N";        },
+  { .code = "Weight";                  .bovnar = "N";        },
+  { .code = "Pressure";                .bovnar = "Pa";       },
+  { .code = "Stress";                  .bovnar = "Pa";       },
+  { .code = "Energy";                  .bovnar = "J";        },
+  { .code = "Work";                    .bovnar = "J";        },
+  { .code = "Power";                   .bovnar = "W";        },
+  { .code = "Torque";                  .bovnar = "N·m";      },
+  { .code = "Density";                 .bovnar = "k~g/m^3";  },
+  { .code = "MassDensity";             .bovnar = "k~g/m^3";  },
+  { .code = "Momentum";                .bovnar = "k~g·m/s";  },
+  { .code = "DynamicViscosity";        .bovnar = "Pa·s";     },
+  { .code = "KinematicViscosity";      .bovnar = "m^2/s";    },
+
+  # ── Electricity and magnetism ────────────────────────────────────────────
+  { .code = "ElectricCharge";          .bovnar = "C";        },
+  { .code = "Voltage";                 .bovnar = "V";        },
+  { .code = "ElectricPotential";       .bovnar = "V";        },
+  { .code = "Resistance";              .bovnar = "Ω";        },
+  { .code = "ElectricResistance";      .bovnar = "Ω";        },
+  { .code = "Capacitance";             .bovnar = "F";        },
+  { .code = "Inductance";              .bovnar = "H";        },
+  { .code = "Conductance";             .bovnar = "S";        },
+  { .code = "MagneticFlux";            .bovnar = "Wb";       },
+  { .code = "MagneticFluxDensity";     .bovnar = "T";        },
+
+  # ── Light, radiation, chemistry ──────────────────────────────────────────
+  { .code = "LuminousFlux";            .bovnar = "lm";       },
+  { .code = "Illuminance";             .bovnar = "lx";       },
+  { .code = "Activity";                .bovnar = "Bq";       },
+  { .code = "AbsorbedDose";            .bovnar = "Gy";       },
+  { .code = "DoseEquivalent";          .bovnar = "Sv";       },
+  { .code = "CatalyticActivity";       .bovnar = "kat";      },
+  { .code = "AmountOfSubstanceConcentration"; .bovnar = "mol/m^3"; },
+
+  # ── Thermodynamics ───────────────────────────────────────────────────────
+  { .code = "HeatCapacity";            .bovnar = "J/K";      },
+  # Explicit negative exponents, not "J/k~g·K^-1". The native '/' LATCHES for the
+  # rest of the expression (unit-system doc section 5.4), so that spelling would
+  # invert the K^-1 back to K^+1 and give J·kg⁻¹·K, which is not a specific heat
+  # capacity at all -- and would still have parsed cleanly.
+  { .code = "SpecificHeatCapacity";    .bovnar = "J·k~g^-1·K^-1"; },
+  { .code = "ThermalConductivity";     .bovnar = "W·m^-1·K^-1";   },
+];
+
+.opaque = [];
+
+.unsupported = [
+  # Dimensionless kinds. Bovnar spells "no unit" by omitting the unit, and
+  # mapping these onto the unity would let a ratio compare equal to a count.
+  { .code = "Dimensionless";      .why = "no unit at all — omit the unit slot"; },
+  { .code = "DimensionlessRatio"; .why = "no unit at all — omit the unit slot, or write % if it is a percentage"; },
+  { .code = "Count";              .why = "a bare count — omit the unit slot"; },
+
+  # Kinds whose coherent unit bovnar cannot spell, refused rather than
+  # approximated. Refusing costs an error message; approximating costs a number.
+  { .code = "CelsiusTemperature"; .why = "an affine scale, not a coherent unit — write °C, or K for the thermodynamic kind"; },
+  { .code = "LogarithmicRatio";   .why = "no coherent unit — dB and Np carry no reference level"; },
+  { .code = "Currency";           .why = "not a physical kind — write an ISO 4217 unit with the $ sigil"; },
+  { .code = "InformationEntropy"; .why = "QUDT's coherent unit here is the bit, which bovnar treats as a unit of information rather than of entropy"; },
+];

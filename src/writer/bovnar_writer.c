@@ -35,7 +35,7 @@
 #include "bovnar_si_units.h"
 #include "bvn_io_impl.h"
 #include "bvn_val_impl.h"
-#include "bvn_ucum_impl.h"
+#include "bvn_profile_impl.h"
 /*
  * ===========================================================================
  * Writer / serializer
@@ -755,7 +755,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		 * native mmHg, which every version accepts. Only the profile-only units
 		 * force the notation.
 		 */
-		if (bvni_unit_has_arbitrary(data->value_unit) &&
+		if (bvni_unit_has_opaque(data->value_unit) &&
 			!(w->ser.version_emitted &&
 			  (w->ser.version_major > 1u ||
 			   (w->ser.version_major == 1u && w->ser.version_minor >= 2u))))

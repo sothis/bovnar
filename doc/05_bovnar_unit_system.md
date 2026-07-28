@@ -147,7 +147,7 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
 > unaffected in every version. See
-> [UCUM Unit Profile](11_bovnar_ucum_profile.md).
+> [UCUM Unit Profile](11_bovnar_unit_profiles.md).
 
 ### 2.1 Parameter Ordering Flexibility
 
@@ -542,7 +542,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](11_bovnar_ucum_profile.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The UCUM arbitrary units of the unit profile (under implementation) occupy **397–428**, above every native unit — a range test is what makes them incommensurable (see [UCUM Unit Profile](11_bovnar_unit_profiles.md)), so a native unit appended past 397 would silently join them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **429**, held to the highest enumerator by the static assert `BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
 
 ### 3.21 Additional Length Units
 
@@ -1711,8 +1711,17 @@ typedef struct bvnr_data_s {
     uint32_t           length;
     const void*        frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t           frac_length;  /* spec 1.1 — length of frac_data, else 0 */
+    bool               converted;    /* a read-time conversion restated this value */
+    bvnr_converted_t   conv;         /* its result: the unit delivered, and the digits */
 } bvnr_data_t;
 ```
+
+`converted` and `conv` are the unit-facing half of the struct: when a `want_unit`
+hook or a [unit policy](06_bovnar_unit_policy.md) restated a value, `conv`
+carries the unit it was delivered in and the converted digits, while
+`value_unit` still carries the unit the **document** wrote. A consumer that
+requested a conversion must read `converted` to know whether it happened — see
+[Unit Policy §2.2](06_bovnar_unit_policy.md#22-conversion-targets).
 
 ### 11.3 Convenience Macros
 
@@ -2291,7 +2300,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit is attached to a value
 - [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in this registry, in table form
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — every token that could plausibly mean two things
-- [UCUM Unit Profile](11_bovnar_ucum_profile.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
+- [UCUM Unit Profile](11_bovnar_unit_profiles.md) — writing UCUM codes in a unit slot, and where the two namespaces disagree
 - [Read & Write API](08_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
 - [Python Bindings](09_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 

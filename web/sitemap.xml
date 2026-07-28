@@ -66,7 +66,7 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.bovnar.io/docs/ucum/</loc>
+    <loc>https://www.bovnar.io/docs/profiles/</loc>
     <lastmod>2026-07-28</lastmod>
     <priority>0.7</priority>
   </url>
@@ -131,7 +131,7 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.bovnar.io/doc/pdf/bovnar-ucum-profile.pdf</loc>
+    <loc>https://www.bovnar.io/doc/pdf/bovnar-unit-profiles.pdf</loc>
     <lastmod>2026-07-28</lastmod>
     <priority>0.6</priority>
   </url>

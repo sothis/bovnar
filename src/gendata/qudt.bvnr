@@ -1,0 +1,255 @@
+#!bovnar 1.1
+# qudt.bvnr — single source of truth for the QUDT unit profile.
+#
+# HOW THIS WORKS
+#   Hand-edited. gen_profiles.py (at the repo root) regenerates the C profile
+#   tables from this file on every build; never edit the generated *.gen.{h,inc}.
+#
+# WHAT THIS VOCABULARY IS
+#   QUDT (Quantities, Units, Dimensions and Data Types), the RDF/OWL unit
+#   ontology at qudt.org. Its units are IRIs under http://qudt.org/vocab/unit/,
+#   and this profile spells them by their LOCAL NAME -- the part after the last
+#   '/'. QUDT is the unit vocabulary of the digital-twin and building-semantics
+#   world (DTDL, Brick, ASHRAE 223P, IOF), which is why the profile exists.
+#
+#   A FLAT profile. A QUDT local name is ONE WHOLE TOKEN: "KiloGM" is the
+#   kilogram as a single symbol, and although it LOOKS like a prefix applied to
+#   "GM", nothing here takes it apart. That is deliberate. QUDT's naming is
+#   regular enough to tempt a parser into decomposing it and irregular enough
+#   that the parser would be wrong -- "MI" is the mile, not a milli-anything.
+#
+# FULL IRIs ARE NOT ACCEPTED
+#   "qudt:M-PER-SEC", never "qudt:http://qudt.org/vocab/unit/M-PER-SEC". A unit
+#   slot is at most 255 bytes and a ':' inside it already means something here;
+#   admitting a URI would put a second scheme separator inside a namespace
+#   separator for no gain, since the local name is the identifying part.
+#
+# PROVENANCE — READ THIS BEFORE TRUSTING A ROW
+#   The .bovnar target of every row is checked against this build's native
+#   registry by gen_profiles.py, and the translation is pinned by
+#   tests/bovnar_qudt_test.c. NEITHER checks the QUDT side: nothing in this
+#   repository verifies that "KiloGM" is really QUDT's kilogram, or that a local
+#   name spelled here exists in the vocabulary at all. That gap is the same
+#   standing risk doc/11 records for the UCUM table. This list is therefore a
+#   CONFIDENT SUBSET: a name that is not here fails loudly as error_unit_illegal,
+#   which costs a producer an error message, while a name that is here and wrong
+#   costs them a wrong number.
+#
+# WHAT IS DELIBERATELY ABSENT
+#   QUDT's quantity kinds — those are a separate namespace, "qudt-qk:", in
+#   qudt-qk.bvnr, because a kind of quantity is not a unit. QUDT's currency
+#   units: bovnar has ISO 4217 natively, written with the $ sigil. Every unit
+#   whose QUDT value this file cannot state exactly.
+
+.schema_version = <uint:16> 1;
+
+.mapped = [
+  # Length
+  { .code = "M";          .bovnar = "m";      },
+  { .code = "KiloM";      .bovnar = "k~m";    },
+  { .code = "HectoM";     .bovnar = "h~m";    },
+  { .code = "DeciM";      .bovnar = "d~m";    },
+  { .code = "CentiM";     .bovnar = "c~m";    },
+  { .code = "MilliM";     .bovnar = "m~m";    },
+  { .code = "MicroM";     .bovnar = "µ~m";    },
+  { .code = "NanoM";      .bovnar = "n~m";    },
+  { .code = "PicoM";      .bovnar = "p~m";    },
+  { .code = "ANGSTROM";   .bovnar = "Å";      },
+  { .code = "IN";         .bovnar = "in";     },
+  { .code = "FT";         .bovnar = "ft";     },
+  { .code = "YD";         .bovnar = "yd";     },
+  { .code = "MI";         .bovnar = "mi";     },
+  { .code = "NAUT_MI";    .bovnar = "nmi";    },
+  { .code = "LY";         .bovnar = "ly";     },
+  { .code = "PC";         .bovnar = "pc";     },
+  { .code = "AU";         .bovnar = "au";     },
+
+  # Area
+  { .code = "M2";         .bovnar = "m^2";    },
+  { .code = "KiloM2";     .bovnar = "k~m^2";  },
+  { .code = "DeciM2";     .bovnar = "d~m^2";  },
+  { .code = "CentiM2";    .bovnar = "c~m^2";  },
+  { .code = "MilliM2";    .bovnar = "m~m^2";  },
+  { .code = "HA";         .bovnar = "ha";     },
+  { .code = "AC";         .bovnar = "ac";     },
+  { .code = "IN2";        .bovnar = "in^2";   },
+  { .code = "FT2";        .bovnar = "ft^2";   },
+  { .code = "YD2";        .bovnar = "yd^2";   },
+
+  # Volume
+  { .code = "M3";         .bovnar = "m^3";    },
+  { .code = "DeciM3";     .bovnar = "d~m^3";  },
+  { .code = "CentiM3";    .bovnar = "c~m^3";  },
+  { .code = "MilliM3";    .bovnar = "m~m^3";  },
+  { .code = "L";          .bovnar = "L";      },
+  { .code = "HectoL";     .bovnar = "h~L";    },
+  { .code = "DeciL";      .bovnar = "d~L";    },
+  { .code = "CentiL";     .bovnar = "c~L";    },
+  { .code = "MilliL";     .bovnar = "m~L";    },
+  { .code = "MicroL";     .bovnar = "µ~L";    },
+  { .code = "IN3";        .bovnar = "in^3";   },
+  { .code = "FT3";        .bovnar = "ft^3";   },
+  { .code = "YD3";        .bovnar = "yd^3";   },
+
+  # Mass
+  { .code = "GM";         .bovnar = "g";      },
+  { .code = "KiloGM";     .bovnar = "k~g";    },
+  { .code = "MilliGM";    .bovnar = "m~g";    },
+  { .code = "MicroGM";    .bovnar = "µ~g";    },
+  { .code = "TON_Metric"; .bovnar = "t";      },
+  { .code = "LB";         .bovnar = "lb";     },
+  { .code = "OZ";         .bovnar = "oz";     },
+  { .code = "OZ_TROY";    .bovnar = "oz_t";   },
+  { .code = "GRAIN";      .bovnar = "gr";     },
+  { .code = "TON_SHORT";  .bovnar = "tn_sh";  },
+  { .code = "TON_LONG";   .bovnar = "tn_l";   },
+  { .code = "CARAT";      .bovnar = "ct";     },
+  { .code = "U";          .bovnar = "Da";     },   # unified atomic mass unit
+
+  # Time
+  { .code = "SEC";        .bovnar = "s";      },
+  { .code = "MilliSEC";   .bovnar = "m~s";    },
+  { .code = "MicroSEC";   .bovnar = "µ~s";    },
+  { .code = "NanoSEC";    .bovnar = "n~s";    },
+  { .code = "PicoSEC";    .bovnar = "p~s";    },
+  { .code = "MIN";        .bovnar = "min";    },
+  { .code = "HR";         .bovnar = "h";      },
+  { .code = "DAY";        .bovnar = "d";      },
+  { .code = "WK";         .bovnar = "wk";     },
+  { .code = "MO";         .bovnar = "mo";     },
+  { .code = "YR";         .bovnar = "yr";     },
+
+  # Temperature
+  { .code = "K";          .bovnar = "K";      },
+  { .code = "DEG_C";      .bovnar = "°C";     },
+  { .code = "DEG_F";      .bovnar = "°F";     },
+  { .code = "DEG_R";      .bovnar = "°Ra";    },
+
+  # Electric current, amount, luminous intensity
+  { .code = "A";          .bovnar = "A";      },
+  { .code = "MilliA";     .bovnar = "m~A";    },
+  { .code = "MicroA";     .bovnar = "µ~A";    },
+  { .code = "KiloA";      .bovnar = "k~A";    },
+  { .code = "MOL";        .bovnar = "mol";    },
+  { .code = "MilliMOL";   .bovnar = "m~mol";  },
+  { .code = "CD";         .bovnar = "cd";     },
+
+  # Named SI-derived
+  { .code = "HZ";         .bovnar = "Hz";     },
+  { .code = "KiloHZ";     .bovnar = "k~Hz";   },
+  { .code = "MegaHZ";     .bovnar = "M~Hz";   },
+  { .code = "GigaHZ";     .bovnar = "G~Hz";   },
+  { .code = "N";          .bovnar = "N";      },
+  { .code = "KiloN";      .bovnar = "k~N";    },
+  { .code = "PA";         .bovnar = "Pa";     },
+  { .code = "HectoPA";    .bovnar = "h~Pa";   },
+  { .code = "KiloPA";     .bovnar = "k~Pa";   },
+  { .code = "MegaPA";     .bovnar = "M~Pa";   },
+  { .code = "J";          .bovnar = "J";      },
+  { .code = "KiloJ";      .bovnar = "k~J";    },
+  { .code = "MegaJ";      .bovnar = "M~J";    },
+  { .code = "W";          .bovnar = "W";      },
+  { .code = "KiloW";      .bovnar = "k~W";    },
+  { .code = "MegaW";      .bovnar = "M~W";    },
+  { .code = "MilliW";     .bovnar = "m~W";    },
+  { .code = "V";          .bovnar = "V";      },
+  { .code = "KiloV";      .bovnar = "k~V";    },
+  { .code = "MilliV";     .bovnar = "m~V";    },
+  { .code = "MicroV";     .bovnar = "µ~V";    },
+  { .code = "OHM";        .bovnar = "Ω";      },
+  { .code = "KiloOHM";    .bovnar = "k~Ω";    },
+  { .code = "MegaOHM";    .bovnar = "M~Ω";    },
+  { .code = "FARAD";      .bovnar = "F";      },
+  { .code = "MicroFARAD"; .bovnar = "µ~F";    },
+  { .code = "C";          .bovnar = "C";      },
+  { .code = "S";          .bovnar = "S";      },
+  { .code = "WB";         .bovnar = "Wb";     },
+  { .code = "T";          .bovnar = "T";      },
+  { .code = "H";          .bovnar = "H";      },
+  { .code = "MilliH";     .bovnar = "m~H";    },
+  { .code = "LM";         .bovnar = "lm";     },
+  { .code = "LUX";        .bovnar = "lx";     },
+  { .code = "BQ";         .bovnar = "Bq";     },
+  { .code = "GRAY";       .bovnar = "Gy";     },
+  { .code = "SV";         .bovnar = "Sv";     },
+  { .code = "KAT";        .bovnar = "kat";    },
+
+  # Pressure and energy, non-SI
+  { .code = "BAR";        .bovnar = "bar";    },
+  { .code = "MilliBAR";   .bovnar = "m~bar";  },
+  { .code = "ATM";        .bovnar = "atm";    },
+  { .code = "PSI";        .bovnar = "psi";    },
+  { .code = "TORR";       .bovnar = "Torr";   },
+  { .code = "MilliM_HG";  .bovnar = "mmHg";   },
+  { .code = "EV";         .bovnar = "eV";     },
+  { .code = "ERG";        .bovnar = "erg";    },
+  { .code = "CAL";        .bovnar = "cal";    },
+  { .code = "BTU";        .bovnar = "Btu";    },
+  { .code = "W-HR";       .bovnar = "W·h";    },
+  { .code = "KiloW-HR";   .bovnar = "k~W·h";  },
+  { .code = "MegaW-HR";   .bovnar = "M~W·h";  },
+
+  # Compounds: the "-PER-" and exponent conventions
+  { .code = "M-PER-SEC";      .bovnar = "m/s";     },
+  { .code = "M-PER-SEC2";     .bovnar = "m/s^2";   },
+  { .code = "KiloM-PER-HR";   .bovnar = "k~m/h";   },
+  { .code = "MI-PER-HR";      .bovnar = "mph";     },
+  { .code = "KN";             .bovnar = "kn";      },
+  { .code = "KiloGM-PER-M3";  .bovnar = "k~g/m^3"; },
+  { .code = "GM-PER-CentiM3"; .bovnar = "g/c~m^3"; },
+  { .code = "MOL-PER-L";      .bovnar = "mol/L";   },
+  { .code = "N-M";            .bovnar = "N·m";     },
+  { .code = "REV-PER-MIN";    .bovnar = "rpm";     },
+
+  # Angle and ratio
+  { .code = "RAD";        .bovnar = "rad";    },
+  { .code = "SR";         .bovnar = "sr";     },
+  { .code = "DEG";        .bovnar = "°";      },
+  { .code = "GRAD";       .bovnar = "grad";   },
+  { .code = "ARCMIN";     .bovnar = "arcmin"; },
+  { .code = "ARCSEC";     .bovnar = "arcsec"; },
+  { .code = "PERCENT";    .bovnar = "%";      },
+  { .code = "PPM";        .bovnar = "ppm";    },
+  { .code = "PPB";        .bovnar = "ppb";    },
+  { .code = "PH";         .bovnar = "pH";     },
+  { .code = "DECIBEL";    .bovnar = "dB";     },
+  { .code = "NEPER";      .bovnar = "Np";     },
+
+  # Information. QUDT keeps the decimal and binary families apart, and so does
+  # bovnar: KiloBYTE is 10^3 bytes and KibiBYTE is 2^10.
+  { .code = "BIT";        .bovnar = "b";      },
+  { .code = "BYTE";       .bovnar = "B";      },
+  { .code = "KiloBYTE";   .bovnar = "k~B";    },
+  { .code = "MegaBYTE";   .bovnar = "M~B";    },
+  { .code = "GigaBYTE";   .bovnar = "G~B";    },
+  { .code = "TeraBYTE";   .bovnar = "T~B";    },
+  { .code = "KibiBYTE";   .bovnar = "Ki~B";   },
+  { .code = "MebiBYTE";   .bovnar = "Mi~B";   },
+  { .code = "GibiBYTE";   .bovnar = "Gi~B";   },
+  { .code = "TebiBYTE";   .bovnar = "Ti~B";   },
+];
+
+# QUDT's units all map onto native ones or are refused; nothing here is
+# assay-defined the way UCUM's arbitrary atoms are, so this profile contributes
+# no opaque units at all. The empty list is deliberate and is what tells
+# gen_profiles.py the profile owns no sub-range of the block.
+.opaque = [];
+
+.unsupported = [
+  # Dimensionless "units" that are not quantities. QUDT uses these as the object
+  # of a hasUnit assertion where the value genuinely has no unit; bovnar spells
+  # that by omitting the unit, and translating them to the unity would make a
+  # bare count compare equal to a percentage.
+  { .code = "UNITLESS"; .why = "the absence of a unit — write no unit at all"; },
+  { .code = "NUM";      .why = "a bare count — write no unit at all"; },
+
+  # Currency. Bovnar has ISO 4217 natively with minor-unit metadata, written
+  # with the mandatory $ sigil, and a currency is not a physical unit.
+  { .code = "USD";      .why = "a currency — write $USD, which carries minor-unit metadata"; },
+  { .code = "EUR";      .why = "a currency — write $EUR, which carries minor-unit metadata"; },
+
+  # Units whose QUDT definition carries a reference this profile cannot state.
+  { .code = "DECIBEL_M";  .why = "dBm — dB carries no reference level"; },
+  { .code = "DECIBEL_W";  .why = "dBW — dB carries no reference level"; },
+  { .code = "DECIBEL_V";  .why = "dBV — dB carries no reference level"; },
+];

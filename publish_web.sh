@@ -71,7 +71,7 @@ WEBDOCS=(
     "08_bovnar_readwrite_api.md"
     "09_bovnar_python_bindings.md"
     "10_bovnar_streaming.md"
-    "11_bovnar_ucum_profile.md"
+    "11_bovnar_unit_profiles.md"
     "12_bovnar.ebnf"
     "13_bovnar_conformance.md"
 )

@@ -88,6 +88,11 @@ The parser is intended to be pointed at untrusted bytes arriving over a socket.
 Fuzz findings reachable from `bvnr_read()` on hostile input are handled as
 security reports.
 
+[`SECURITY.md`](SECURITY.md) has the full policy: what to include, which
+versions are supported, and — the part worth reading before writing a
+report — what is a documented property of the format rather than a defect.
+§18 of the specification is the normative side of that list.
+
 ## Proposing a Change
 
 **Implementation changes** — bug fixes, portability work, performance, error
@@ -152,8 +157,12 @@ To run the Python tests directly:
 
 ```bash
 export LIBBOVNAR_PATH="$PWD/build/libbvnr.so"
-cd python && pip install -e ".[dev]" && pytest tests -v
+pip install -e ".[dev]" && pytest python/tests -v
 ```
+
+`pyproject.toml` sits at the repository root, not under `python/`, so the
+editable install runs from the root; `python/bovnar` is mapped into the wheel
+from there.
 
 To enable the repository's git hooks, once per clone (git does not track
 `.git/hooks`):
@@ -200,7 +209,7 @@ source and re-run the generator instead.
 |---|---|---|
 | `include/bovnar_units.gen.h` | `src/gendata/units.bvnr` | `gen_units.py` |
 | `include/bovnar_si_prefix.gen.h`, `include/bovnar_iec_prefix.gen.h` | `src/gendata/prefixes.bvnr` | `gen_prefixes.py` |
-| `include/bovnar_ucum.gen.h` | `src/gendata/ucum.bvnr` | `gen_ucum.py` |
+| `include/bovnar_profiles.gen.h` | `src/gendata/ucum.bvnr` | `gen_profiles.py` |
 | `build/generated/bovnar_currency_table.gen.inc` | `src/gendata/currencies.bvnr` | `gen_currencies.py` |
 | `python/bovnar/_pint_units.py` | the unit registry | `gen_units.py` |
 | `web/docs/*.html` | `doc/*.md` | `gen_html_docs.py` |

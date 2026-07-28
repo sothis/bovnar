@@ -179,18 +179,25 @@
 </ul>
 </li>
 <li><a href="#17-versioning--stability">Versioning &amp; Stability</a></li>
-</ol>
-<ul>
-<li><a href="#appendix-a-event-sequence-reference">Appendix A: Event Sequence Reference</a><ul>
+<li><a href="#18-security-considerations">Security Considerations</a><ul>
+<li>18.1 <a href="#181-resource-exhaustion">Resource Exhaustion</a></li>
+<li>18.2 <a href="#182-recovery-mode-discards-data-silently">Recovery Mode Discards Data Silently</a></li>
+<li>18.3 <a href="#183-version-leniency">Version Leniency</a></li>
+<li>18.4 <a href="#184-transport-corruption-of-octet-streams">Transport Corruption of Octet Streams</a></li>
+<li>18.5 <a href="#185-reference-resolution">Reference Resolution</a></li>
+<li>18.6 <a href="#186-numeric-interpretation">Numeric Interpretation</a></li>
+<li>18.7 <a href="#187-units-are-validated-not-verified">Units Are Validated, Not Verified</a></li>
+<li>18.8 <a href="#188-leap-second-table-drift">Leap-Second Table Drift</a></li>
+<li>18.9 <a href="#189-confusable-and-non-normalized-keys">Confusable and Non-Normalized Keys</a></li>
+<li>18.10 <a href="#1810-no-confidentiality-integrity-or-authenticity">No Confidentiality, Integrity, or Authenticity</a></li>
+<li><a href="#appendix-a-event-sequence-reference">Appendix A: Event Sequence Reference</a></li>
 <li>A.1 <a href="#a1-simple-assignment-untyped">Simple Assignment (Untyped)</a></li>
 <li>A.2 <a href="#a2-typed-assignment">Typed Assignment</a></li>
 <li>A.3 <a href="#a3-compound-unit-assignment">Compound Unit Assignment</a></li>
 <li>A.4 <a href="#a4-array">Array</a></li>
 <li>A.5 <a href="#a5-struct">Struct</a></li>
 <li>A.6 <a href="#a6-octet-stream">Octet Stream</a></li>
-</ul>
-</li>
-<li><a href="#appendix-b-implementation-notes">Appendix B: Implementation Notes</a><ul>
+<li><a href="#appendix-b-implementation-notes">Appendix B: Implementation Notes</a></li>
 <li>B.1 <a href="#b1-keyword-state-machine">Keyword State Machine</a></li>
 <li>B.2 <a href="#b2-special-number-keywords">Special Number Keywords</a></li>
 <li>B.3 <a href="#b3-default-width-base-and-q">Default Width, Base, and Q</a></li>
@@ -198,11 +205,11 @@
 <li>B.5 <a href="#b5-numeric-type-check">Numeric Type Check</a></li>
 <li>B.6 <a href="#b6-unit-component-access">Unit Component Access</a></li>
 <li>B.7 <a href="#b7-fixed-point-and-decimal-float-wire-representations">Fixed-point and Decimal Float Wire Representations</a></li>
-</ul>
-</li>
 <li><a href="#appendix-c-limits-summary">Appendix C: Limits Summary</a></li>
 <li><a href="#see-also">See also</a></li>
 </ul>
+</li>
+</ol>
 <hr />
 <h2 id="1-overview">1. Overview</h2>
 <p><strong>Bovnar</strong> (BVNR) is <strong>unit-safe serialization for scientific and industrial systems</strong>: a <strong>typed, self-describing, text-binary hybrid</strong> format that carries a validated physical unit with every value. It combines a human-readable text layer with an efficient binary octet-stream escape mechanism and a rich, unit-aware type annotation system.</p>
@@ -2253,10 +2260,51 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <blockquote>
 <p><strong>Under implementation.</strong> Nothing in this section is part of a released specification. It describes work in the reference implementation, reachable only by opting in to a version the build does not advertise, and the version it will ship under is not settled.</p>
 </blockquote>
-<p>A unit parameter that begins with a lowercase namespace and a colon — <code>name:code</code> — is a <strong>unit profile</strong>: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged.</p>
-<p>One namespace is defined, <code>ucum</code> (Unified Code for Units of Measure):</p>
+<p>A unit parameter that begins with a namespace and a colon — <code>name:code</code> — is a <strong>unit profile</strong>: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged. A namespace is lowercase letters, digits and <code>-</code>; the hyphen may not lead.</p>
+<p>Five namespaces are defined:</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Vocabulary</th>
+<th>Code shape</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ucum</code></td>
+<td>UCUM — Unified Code for Units of Measure</td>
+<td>an expression over prefixed atoms</td>
+</tr>
+<tr>
+<td><code>unece</code></td>
+<td>UN/ECE Recommendation 20 and 21</td>
+<td>one whole code, never decomposed</td>
+</tr>
+<tr>
+<td><code>qudt</code></td>
+<td>QUDT unit local names</td>
+<td>one whole code, never decomposed</td>
+</tr>
+<tr>
+<td><code>qudt-qk</code></td>
+<td>QUDT quantity kinds — translated to the <strong>coherent SI unit</strong> of the kind</td>
+<td>one whole code, never decomposed</td>
+</tr>
+<tr>
+<td><code>udunits</code></td>
+<td>UDUNITS-2, the CF/netCDF units syntax</td>
+<td>an expression over prefixed atoms</td>
+</tr>
+</tbody>
+</table>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
-.systolic = &lt;float_dec:64,ucum:mm[Hg]&gt; 120.00;   # the same unit as &lt;...,mmHg&gt;</code></pre></div>
+.systolic = &lt;float_dec:64,ucum:mm[Hg]&gt;  120.00;   # the same unit as &lt;...,mmHg&gt;
+.mass     = &lt;float:64,unece:KGM&gt;         12.5;    # the same unit as &lt;...,k~g&gt;
+.velocity = &lt;float:64,qudt:M-PER-SEC&gt;     9.81;   # the same unit as &lt;...,m/s&gt;
+.length   = &lt;float:64,qudt-qk:Length&gt;     3.0;    # the coherent unit of the kind: m
+.flux     = &lt;float:64,udunits:kg*m-2*s-1&gt; 0.5;</code></pre></div>
+<p>A code that is one whole token is <strong>never decomposed</strong>: <code>unece:KGM</code> is the kilogram, not a <code>k</code> prefix on a <code>GM</code>, and <code>qudt:MI</code> is the mile, not a milli-anything. Only an expression namespace strips prefixes and recognises operators.</p>
 <p><strong>Gated on the declared version.</strong> A profile unit requires a <code>#!bovnar</code> directive declaring 1.2 or later, exactly as the datetime family and the <code>\x</code>/<code>\u</code> escapes require 1.1 (§3.4). In a document declaring less — or declaring nothing, which declares less than anything — a profile unit is <code>error_unit_illegal</code>, because in that version it is not a unit. A <strong>native</strong> unit is unaffected in every version; the notation is purely additive.</p>
 <p><strong>Three outcomes, and no fourth.</strong> A profile expression becomes a real unit, or it becomes an error. There is no state in which a value carries a unit the parser cannot reason about — every guarantee this section makes is a guarantee about units the parser understands. The refusals are distinguished so a producer can act on them:</p>
 <table>
@@ -2272,8 +2320,8 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <td>An ordinary unit; indistinguishable from the native spelling</td>
 </tr>
 <tr>
-<td>A UCUM <em>arbitrary</em> unit (<code>[IU]</code>, <code>[PFU]</code>, …)</td>
-<td>A unit with no native spelling: comparable, never convertible</td>
+<td>An <strong>opaque</strong> unit — a UCUM <em>arbitrary</em> atom (<code>[IU]</code>, <code>[PFU]</code>, …) or a UNECE package/count code (<code>XBX</code>, <code>C62</code>, …)</td>
+<td>A unit with no native spelling and no dimension: comparable with itself, never convertible to anything else. It serialises back in the notation of the namespace that owns it</td>
 </tr>
 <tr>
 <td>Not a valid expression in the profile, or an atom it does not define</td>
@@ -2290,7 +2338,7 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 </tbody>
 </table>
 <p><strong>Character set.</strong> A profile unit may use <code>'</code>, <code>[</code>, <code>]</code>, <code>{</code> and <code>}</code> in addition to the native unit characters (§11.4). A <code>,</code> inside <code>{…}</code> belongs to the unit rather than ending the type parameter. <code>;</code>, <code>#</code>, <code>&lt;</code>, <code>&gt;</code> and <code>"</code> remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.</p>
-<p>The complete notation, the transliteration table, and the codes that have no representation are specified in <a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a>.</p>
+<p>The complete notation, the transliteration table, and the codes that have no representation are specified in <a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a>.</p>
 <hr />
 <h2 id="12-validation--constraints">12. Validation &amp; Constraints</h2>
 <h3 id="121-utf-8-validation">12.1 UTF-8 Validation</h3>
@@ -3198,6 +3246,7 @@ alone would: <code>;</code> remains a boundary in every case it was one before.<
 <span class="w">    </span><span class="kt">bool</span><span class="w">      </span><span class="n">continue_on_error</span><span class="p">;</span>
 <span class="w">    </span><span class="n">bvnr_on_error_fn</span><span class="w"> </span><span class="n">on_error</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">bool</span><span class="w">      </span><span class="n">strict_version</span><span class="p">;</span><span class="w">                 </span><span class="c1">// reject a declared spec version newer than this build</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w">      </span><span class="n">text_only</span><span class="p">;</span><span class="w">                      </span><span class="c1">// refuse a document containing an octet stream (§16.10 code 51)</span>
 <span class="w">    </span><span class="kt">bool</span><span class="w">      </span><span class="n">want_unit_allow_nonterminating</span><span class="p">;</span><span class="w"> </span><span class="c1">// deliver a non-terminating exact conversion as a rational</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">  </span><span class="n">max_conversion_length</span><span class="p">;</span><span class="w">          </span><span class="c1">// 0 → 1024; longest want_unit conversion text, in chars</span>
 <span class="w">    </span><span class="kt">bool</span><span class="w">    </span><span class="p">(</span><span class="o">*</span><span class="n">want_unit</span><span class="p">)(</span><span class="kt">void</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="o">*</span><span class="p">);</span><span class="w">  </span><span class="c1">// read-time lossless unit/base conversion hook</span>
@@ -3525,6 +3574,119 @@ reference), <strong>array element homogeneity</strong> (§7.4), and <strong><cod
 validation</strong> (§6.2, rejecting a value the declared Q-format cannot represent) —
 were exactly such breaks, so they were made <em>before</em> 1.0 and cannot be
 reconsidered within 1.x.</p>
+<hr />
+<h2 id="18-security-considerations">18. Security Considerations</h2>
+<p>A <code>.bvnr</code> document is passive data. It carries no scripting, no macros, no
+external entity references, and no include directive; a reference (§4.5) is an
+inert string that the parser never follows. A conforming consumer therefore
+performs no I/O beyond reading the bytes it was handed, and parsing a document
+cannot by itself cause code execution or a network fetch.</p>
+<p>What follows is what remains after that — the places where a consumer of
+untrusted input has to do something the format cannot do for it. The
+Internet-Draft in <code>doc/ietf/</code> carries the same material at greater length, with
+normative keywords.</p>
+<h3 id="181-resource-exhaustion">18.1 Resource Exhaustion</h3>
+<p>The defaults of §12.2 are chosen for trusted pipelines, not for hostile input.
+<strong>Document size is unbounded by default</strong> — <code>max_file_size</code> of 0 means endless,
+which is right for a telemetry stream and wrong for an untrusted one. A consumer
+at a trust boundary sets every limit in §12.2 explicitly.</p>
+<p>Four constructs give an attacker a high ratio of work to input bytes: integer
+and float widths reach 32768 bits (<code>BVN_MAX_INT_WIDTH</code>), and validating one
+value at that width is arbitrary-precision arithmetic; a non-decimal base is
+written as a quoted string (§5.5), so a 32768-bit value in base 2 is a 32768-character
+literal well inside the default <code>max_string_length</code>, and base conversion is
+superlinear in most implementations; array elements default to 2³¹−1 against the
+one-byte-per-element syntax <code>[,,,,,]</code>; and adjacent string literals accumulate
+toward <code>max_string_length</code> across the running total, not per literal.</p>
+<p>Nesting defaults to 64 with a hard cap of 255, but the depth is only known after
+the bytes are read, so a recursive-descent consumer bounds its own stack rather
+than relying on the declared depth. A streaming consumer is less exposed than a
+materializing one throughout.</p>
+<h3 id="182-recovery-mode-discards-data-silently">18.2 Recovery Mode Discards Data Silently</h3>
+<p>Recovery mode (§13.2) delivers a <em>subset</em> of the document, and nothing in the
+data says that a subset is what it is. Where the document is an access-control
+list, a security policy, or a set of calibration constants, a dropped assignment
+is likely to fail open.</p>
+<p>Recovery must not be enabled where the parsed document informs a security
+decision. Where it is enabled, check the <strong>recovery count</strong> and treat a non-zero
+value as a failure of the document rather than a diagnostic. Watching the
+skipped-byte total instead is a trap: a rejected value whose <code>;</code> follows
+immediately skips <em>zero</em> bytes, so the total stays at zero while the assignment
+arrives stripped of its value.</p>
+<h3 id="183-version-leniency">18.3 Version Leniency</h3>
+<p>By default a reader accepts a declared version newer than it supports and fails
+only on a construct it does not implement (§3.4). A document declaring
+<code>#!bovnar 2.0</code> but using only 1.0 constructs parses without complaint. A 1.0
+reader does not see the directive at all — it is lexically a comment — so a
+producer cannot rely on the declaration to cause rejection by an older reader.
+For untrusted input, enable <code>strict_version</code> so an unsupported version is
+rejected at the directive rather than possibly not at all.</p>
+<h3 id="184-transport-corruption-of-octet-streams">18.4 Transport Corruption of Octet Streams</h3>
+<p>Octet-stream chunks are length-prefixed (§9.2). A transport that rewrites a byte
+inside a payload — line-ending normalisation above all — shifts every subsequent
+length field, and the reader begins interpreting attacker-supplied payload as tag
+and length fields. The common outcome is a quick <code>error_octet_stream_out_of_sync</code>,
+but that is not guaranteed, and a chunk length read out of a corrupted field is
+an allocation request. Bound the memory committed to a single chunk independently
+of its declared length, and carry documents containing octet streams over
+transports that do not transform content.</p>
+<h3 id="185-reference-resolution">18.5 Reference Resolution</h3>
+<p>References are stored unresolved and never followed (§4.5), so every hazard lands
+in the application that resolves them. Cycles are not detected — <code>.a = &amp;.b; .b = &amp;.a;</code>
+does not terminate under a naive resolver. Dangling paths are valid documents, so
+a resolver must define what a missing target means rather than defaulting to
+empty. A reference path is not a URI: it has no scheme, no authority, and no
+network semantics, and must never be handed to a resolver that might fetch it.
+Index syntax is uninterpreted — <code>&amp;.a[0][1]</code> is stored verbatim, digits included,
+and must be range-checked against the actual array.</p>
+<h3 id="186-numeric-interpretation">18.6 Numeric Interpretation</h3>
+<p><strong>Special numbers bypass range validation.</strong> <code>&lt;uint:8&gt; nan</code> and <code>&lt;sint:16&gt; ninf</code>
+are valid (§6.4). A successful parse does not mean the value fits the declared
+width, so a consumer mapping values onto fixed-width integers must handle a
+non-finite value arriving on an integer channel.</p>
+<p><strong>Width is declared, not proven.</strong> The annotation states how wide the value is;
+nothing in the document shows the producer honoured it. Range validation at the
+consumer is the only check. Bases 64 and 85 are <code>uint</code>-only for the same family
+of reason: their alphabets use <code>+</code> and <code>-</code> as digits, so permitting a signed
+value there would introduce an ambiguity the format does not have.</p>
+<h3 id="187-units-are-validated-not-verified">18.7 Units Are Validated, Not Verified</h3>
+<p>The unit system rejects a unit that is malformed, unregistered, or contradicted
+by an inline suffix on the same value (§6.5, §12.8). It cannot verify that the
+value is a plausible measurement in that unit, that two assignments are
+dimensionally consistent with each other, or that the producer measured what it
+claims. <em>It parsed</em> means the dimension is stated and internally consistent, not
+that it is correct.</p>
+<p>Read-time unit conversion carries a further trap: asking for a value in some
+unit is a <strong>request, not a guarantee</strong>. Where the conversion cannot be
+performed — different dimensions, or two different currencies — the value is
+delivered in its <em>original</em> unit rather than the request failing. A caller that
+assumes success then holds a number it believes is in one unit and which is in
+another, which is exactly the failure this format exists to prevent. Check
+whether the conversion occurred; do not infer it from the absence of an error.</p>
+<h3 id="188-leap-second-table-drift">18.8 Leap-Second Table Drift</h3>
+<p>The <code>tai</code> epoch requires a leap-second table, which is a static snapshot of an
+IERS bulletin. Two builds of differing vintage may convert the same civil literal
+to different <code>tai</code> values for instants after the older table ends. Where exact
+agreement matters, transmit an integer carrier rather than a literal, and do not
+assume that timestamps converted by different builds compare correctly.</p>
+<h3 id="189-confusable-and-non-normalized-keys">18.9 Confusable and Non-Normalized Keys</h3>
+<p>Keys admit arbitrary non-ASCII characters and are compared as byte sequences with
+no Unicode normalisation (§3.1, §4.2). Two keys that are canonically equivalent
+under Unicode but differ in bytes are distinct keys and do not collide under the
+duplicate-key rule; two keys that are visually identical but differ in code
+point — Latin and Cyrillic homoglyphs — are distinct keys that a human reviewer
+cannot tell apart. Where keys drive authorization or routing, apply a
+normalisation and confusable-detection policy before matching, and prefer ASCII
+keys where the application permits.</p>
+<h3 id="1810-no-confidentiality-integrity-or-authenticity">18.10 No Confidentiality, Integrity, or Authenticity</h3>
+<p>The format defines no encryption, no checksum, no signature, and no notion of an
+author. All three properties must come from the transport or an enclosing
+envelope. Note also that no canonical form is defined: a signature over the bytes
+is a signature over one <em>spelling</em> of the data, and a producer that re-emits the
+document invalidates it without changing what it means.</p>
+<p>Comments are bytes of the document and not part of its data (§4.1). A producer
+that copies a document forward carries its comments forward with it, including
+any that were never meant to leave the system that wrote them.</p>
 <hr />
 <h2 id="appendix-a-event-sequence-reference">Appendix A: Event Sequence Reference</h2>
 <h3 id="a1-simple-assignment-untyped">A.1 Simple Assignment (Untyped)</h3>

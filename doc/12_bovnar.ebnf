@@ -220,14 +220,14 @@ raw-value    = null-value
 datetime-literal = year , "-" , month , "-" , day ,
                    [ "T" , hour , ":" , minute , ":" , second ,
                      [ "." , dt-fraction ] , [ dt-zone ] ] ;
-dt-fraction  = digit , { digit } ;          (* kept verbatim; carrier is whole seconds *)
+dt-fraction  = DIGIT , { DIGIT } ;          (* kept verbatim; carrier is whole seconds *)
 dt-zone      = "Z" | ( "+" | "-" ) , hour , ":" , minute ;  (* tz offset *)
-year         = digit , digit , digit , digit ;
-month        = digit , digit ;   (* 01..12                             *)
-day          = digit , digit ;   (* 01..28/29/30/31 per month          *)
-hour         = digit , digit ;   (* 00..23                             *)
-minute       = digit , digit ;   (* 00..59                             *)
-second       = digit , digit ;   (* 00..60 (60 = UTC leap second; on the *)
+year         = DIGIT , DIGIT , DIGIT , DIGIT ;
+month        = DIGIT , DIGIT ;   (* 01..12                             *)
+day          = DIGIT , DIGIT ;   (* 01..28/29/30/31 per month          *)
+hour         = DIGIT , DIGIT ;   (* 00..23                             *)
+minute       = DIGIT , DIGIT ;   (* 00..59                             *)
+second       = DIGIT , DIGIT ;   (* 00..60 (60 = UTC leap second; on the *)
                                 (* tai epoch it is its own instant, on  *)
                                 (* the civil ones it folds onto the     *)
                                 (* following second -- see the spec)    *)
@@ -386,7 +386,7 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (*                                                                     *)
 (* A "name:" namespace hands the parameter to a unit PROFILE, which    *)
 (* translates it into the same value_unit_t a native expression        *)
-(* produces.  See doc/11_bovnar_ucum_profile.md.  "ucum" is the only   *)
+(* produces.  See doc/11_bovnar_unit_profiles.md.  "ucum" is the only   *)
 (* namespace defined; any other is error_unit_profile_unknown, and     *)
 (* a profile expression that is malformed or names an atom the         *)
 (* profile does not know is error_unit_illegal.  There is no third     *)

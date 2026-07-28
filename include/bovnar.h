@@ -304,7 +304,7 @@ typedef enum value_base_unit_e {
 	bu_zwg = 378, bu_xcg,
 	/*
 	 * UCUM arbitrary units (spec 1.2) — generated from src/gendata/ucum.bvnr by
-	 * gen_ucum.py. Assay-defined quantities that are commensurable with nothing,
+	 * gen_profiles.py. Assay-defined quantities that are commensurable with nothing,
 	 * not even with each other, so each needs its own id: collapsing them onto
 	 * one would make [IU] and [PFU] compare equal. They have no native spelling
 	 * and are reachable only through the "ucum:" notation.
@@ -312,7 +312,7 @@ typedef enum value_base_unit_e {
 	 * These ARE the highest enumerators, so BVN_VALUE_BASE_UNIT_COUNT in
 	 * bvn_internal_dims.h now tracks the last of them.
 	 */
-#include "bovnar_ucum.gen.h"
+#include "bovnar_profiles.gen.h"
 } value_base_unit_t;
 typedef enum unit_exponent_e {
 	exp_invalid    =   0,
@@ -1021,23 +1021,33 @@ BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsiz
 BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
 BVN_API bool         bvn_unit_valid(value_unit_t u);
-/* The UCUM unit profile (doc/11_bovnar_ucum_profile.md). UNRELEASED --
+/* The unit profiles (doc/11_bovnar_unit_profiles.md). UNRELEASED --
  * see that document's status line.
  *
  * bvn_unit_error_code says WHY a unit string bvn_parse_unit rejected is not a
  * unit: error_unit_illegal for malformed input, error_unit_profile_unknown for
- * an unrecognised "name:" namespace, error_unit_profile_unsupported for valid
- * UCUM this build cannot represent. It re-parses, so it is for the error path
- * only. Passing a string that DOES parse returns error_none.
+ * an unrecognised "name:" namespace, error_unit_profile_unsupported for a code
+ * that is valid in its vocabulary but which this build cannot represent. It
+ * re-parses, so it is for the error path only. Passing a string that DOES parse
+ * returns error_none.
  *
  * bvn_unit_is_profile_only is true when a unit has no native spelling -- it
- * contains a UCUM arbitrary atom -- so bvn_unit_to_string emits it in profile
- * notation. bvn_unit_to_ucum writes a UCUM code (without the "ucum:" prefix) for
- * a unit that has one, and is partial by construction: it returns -1 for every
- * native unit outside the transliteration table, which includes the Old German
- * units, the water-hardness degrees, the turbidity kinds and every currency. */
+ * contains an OPAQUE base unit, such as a UCUM arbitrary atom or a UNECE package
+ * code -- so bvn_unit_to_string emits it in the profile notation of whichever
+ * namespace owns it.
+ *
+ * bvn_unit_to_profile writes a unit as a code in the named vocabulary (without
+ * the "<ns>:" prefix); bvn_unit_to_ucum is the "ucum" case, kept for callers
+ * that predate the others. Both are partial by construction and return -1 for a
+ * native unit outside that vocabulary's transliteration table -- which includes
+ * the Old German units, the water-hardness degrees, the turbidity kinds and
+ * every currency -- for an opaque unit belonging to a DIFFERENT profile, and,
+ * in a flat vocabulary such as UNECE, for any compound or exponentiated unit,
+ * since a flat code is one whole token with nothing to build it out of. */
 BVN_API error_code_t bvn_unit_error_code(const uint8_t* unit, uint32_t len);
 BVN_API bool         bvn_unit_is_profile_only(value_unit_t u);
+BVN_API int32_t      bvn_unit_to_profile(const char* ns, value_unit_t u,
+                                         char* buf, size_t bufsize);
 BVN_API int32_t      bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
 BVN_API bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
 BVN_API double       bvn_unit_prefix_factor(value_unit_t u);

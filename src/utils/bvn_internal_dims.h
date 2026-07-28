@@ -30,7 +30,7 @@
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
-#define BVN_VALUE_BASE_UNIT_COUNT  429
+#define BVN_VALUE_BASE_UNIT_COUNT  454
 typedef char bvn_internal_dims_event_check[
 	(ev_stream_end + 1 == BVN_EVENT_COUNT) ? 1 : -1];
 /* Anchored to the LAST enumerator, like the event and unit checks below — not to
@@ -49,16 +49,17 @@ typedef char bvn_internal_dims_iec_prefix_check[
 /* The highest enumerator, whichever block it lives in: physical units run
  * 1..133, 348..377 and 380..396, the currency gap is 134..347, the appended
  * currencies bu_zwg/bu_xcg sit at 378..379 between the two physical runs, and
- * the UCUM arbitrary units (spec 1.2) run 397.. at the top. Adding a unit, a
- * currency or an arbitrary unit therefore has to move this — the tables sized by
- * BVN_VALUE_BASE_UNIT_COUNT are indexed BY the enum value, so an undersized
- * count is an out-of-bounds read, not a cosmetic mismatch. */
+ * the profile OPAQUE BLOCK (spec 1.2) runs 397.. at the top, one contiguous
+ * range shared by every profile in gen_profiles.py's registry order. Adding a
+ * unit, a currency or an opaque unit therefore has to move this — the tables
+ * sized by BVN_VALUE_BASE_UNIT_COUNT are indexed BY the enum value, so an
+ * undersized count is an out-of-bounds read, not a cosmetic mismatch. */
 typedef char bvn_internal_dims_value_base_unit_check[
-	(BVN_UCUM_ARBITRARY_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT) ? 1 : -1];
-/* And the arbitrary block really does sit above every native unit — the
- * membership test in bvni_is_arbitrary() is a range comparison, so a native unit
- * appended past BVN_UCUM_ARBITRARY_FIRST would silently become incommensurable
- * with everything. */
-typedef char bvn_internal_dims_arbitrary_block_check[
-	(bu_turbidity_jtu < BVN_UCUM_ARBITRARY_FIRST) ? 1 : -1];
+	(BVN_PROFILE_OPAQUE_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT) ? 1 : -1];
+/* And the opaque block really does sit above every native unit — the membership
+ * test in bvni_is_opaque() is a range comparison, so a native unit appended past
+ * BVN_PROFILE_OPAQUE_FIRST would silently become incommensurable with
+ * everything. */
+typedef char bvn_internal_dims_opaque_block_check[
+	(bu_turbidity_jtu < BVN_PROFILE_OPAQUE_FIRST) ? 1 : -1];
 #endif

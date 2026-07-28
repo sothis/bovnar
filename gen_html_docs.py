@@ -140,10 +140,11 @@ DOCS = [
      "Bovnar Streaming, Framing & Multiplexing",
      "Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded "
      "documents for transport over sockets and files."),
-    ("11_bovnar_ucum_profile.md", "ucum", "bovnar-ucum-profile",
-     "Bovnar UCUM Unit Profile",
-     "Writing UCUM codes in a Bovnar unit slot: the transliteration table, the "
-     "collisions between the two namespaces, and what has no representation."),
+    ("11_bovnar_unit_profiles.md", "profiles", "bovnar-unit-profiles",
+     "Bovnar Unit Profiles",
+     "Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the "
+     "transliteration tables, the collisions between the namespaces, what has "
+     "no representation, and the cross-vocabulary conformance suite."),
     ("12_bovnar.ebnf", "grammar", "bovnar-grammar",
      "Bovnar EBNF Grammar",
      "The formal EBNF grammar of the Bovnar format, annotated against the reference "

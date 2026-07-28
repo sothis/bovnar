@@ -8,7 +8,7 @@
 #
 # WHAT IS IN HERE
 #   Three atom lists, one per outcome the profile can reach
-#   (doc/11_bovnar_ucum_profile.md section 3.1), plus UCUM's own prefix
+#   (doc/11_bovnar_unit_profiles.md section 3.1), plus UCUM's own prefix
 #   spellings.
 #
 #     .prefixes    UCUM prefix spelling -> decimal decade. UCUM's spellings, not
@@ -22,11 +22,13 @@
 #                  lets "m[Hg]" -> "k~mmHg" and "mm[Hg]" -> "mmHg" both fall out
 #                  of one rule (see the fold in gen/parse).
 #
-#     .arbitrary   A UCUM arbitrary unit: assay-defined, commensurable with
+#     .opaque      A UCUM arbitrary unit: assay-defined, commensurable with
 #                  nothing, not even with another arbitrary unit. Each gets its
-#                  own value_base_unit_t id, appended after the last native
-#                  enumerator, and NO native alias -- these are reachable only
-#                  through "ucum:" and serialise back the same way.
+#                  own value_base_unit_t id in the shared OPAQUE BLOCK, and NO
+#                  native alias -- these are reachable only through "ucum:" and
+#                  serialise back the same way. The block is shared with every
+#                  other profile and the ids are assigned by gen_profiles.py, so
+#                  there is no .id field here to keep in step.
 #
 #     .unsupported A UCUM atom this profile knows but cannot represent. Listed so
 #                  that it fails as error_unit_profile_unsupported ("you wrote it
@@ -80,6 +82,9 @@
   { .code = "m";    .bovnar = "m";   .metric = true; },
   { .code = "s";    .bovnar = "s";   .metric = true; },
   { .code = "g";    .bovnar = "g";   .metric = true; },
+  # The ampere. Absent until the cross-vocabulary suite asked every vocabulary
+  # for all seven SI base units and this was the one that did not answer.
+  { .code = "A";    .bovnar = "A";   .metric = true; },
   { .code = "K";    .bovnar = "K";   .metric = true; },
   { .code = "mol";  .bovnar = "mol"; .metric = true; },
   { .code = "cd";   .bovnar = "cd";  .metric = true; },
@@ -257,7 +262,7 @@
   # Digital and ratio. UCUM's "b" is the BARN and its "By" is the byte; bovnar's
   # native "b" is the bit and its "B" is the byte. The namespaces disagree on
   # three letters and the profile keeps them apart
-  # (doc/11_bovnar_ucum_profile.md 6.2).
+  # (doc/11_bovnar_unit_profiles.md 6.2).
   { .code = "bit";    .bovnar = "b";   .metric = true;  },
   { .code = "By";     .bovnar = "B";   .metric = true;  },
   { .code = "Bd";     .bovnar = "Bd";  .metric = true;  },
@@ -278,47 +283,51 @@
 ];
 
 # ── UCUM arbitrary units ────────────────────────────────────────────────────
-# Assay-defined; commensurable with nothing, including each other. .id continues
-# the value_base_unit_t enumeration after the last native unit; append-only, and
-# adding one must move the last-enumerator check in src/utils/bvn_internal_dims.h
-# exactly as adding a native unit does.
+# Assay-defined; commensurable with nothing, including each other. These occupy
+# the shared opaque block, which continues the value_base_unit_t enumeration
+# after the last native unit. gen_profiles.py assigns the ids in registry order,
+# so this list is APPEND-ONLY: inserting a row renumbers every opaque unit below
+# it, in this profile and in every profile registered after it. Adding one must
+# move the last-enumerator check in src/utils/bvn_internal_dims.h exactly as
+# adding a native unit does.
 #
-# .name is the enumerator suffix (the C constant is bu_<name>). There is no
-# .aliases field on purpose: an arbitrary unit has no native spelling, is
-# reachable only through "ucum:", and serialises back as "ucum:<code>".
-.arbitrary = [
-  { .id = <uint:16> 397; .name = "ucum_iu";        .code = "[IU]";        .metric = true;  },
-  { .id = <uint:16> 398; .name = "ucum_iu_i";      .code = "[iU]";        .metric = true;  },
-  { .id = <uint:16> 399; .name = "ucum_arb_u";     .code = "[arb'U]";     .metric = false; },
-  { .id = <uint:16> 400; .name = "ucum_usp_u";     .code = "[USP'U]";     .metric = false; },
-  { .id = <uint:16> 401; .name = "ucum_gpl_u";     .code = "[GPL'U]";     .metric = false; },
-  { .id = <uint:16> 402; .name = "ucum_mpl_u";     .code = "[MPL'U]";     .metric = false; },
-  { .id = <uint:16> 403; .name = "ucum_apl_u";     .code = "[APL'U]";     .metric = false; },
-  { .id = <uint:16> 404; .name = "ucum_beth_u";    .code = "[beth'U]";    .metric = false; },
-  { .id = <uint:16> 405; .name = "ucum_anti_xa_u"; .code = "[anti'Xa'U]"; .metric = false; },
-  { .id = <uint:16> 406; .name = "ucum_todd_u";    .code = "[todd'U]";    .metric = false; },
-  { .id = <uint:16> 407; .name = "ucum_dye_u";     .code = "[dye'U]";     .metric = false; },
-  { .id = <uint:16> 408; .name = "ucum_smgy_u";    .code = "[smgy'U]";    .metric = false; },
-  { .id = <uint:16> 409; .name = "ucum_bdsk_u";    .code = "[bdsk'U]";    .metric = false; },
-  { .id = <uint:16> 410; .name = "ucum_ka_u";      .code = "[ka'U]";      .metric = false; },
-  { .id = <uint:16> 411; .name = "ucum_knk_u";     .code = "[knk'U]";     .metric = false; },
-  { .id = <uint:16> 412; .name = "ucum_mclg_u";    .code = "[mclg'U]";    .metric = false; },
-  { .id = <uint:16> 413; .name = "ucum_tb_u";      .code = "[tb'U]";      .metric = false; },
-  { .id = <uint:16> 414; .name = "ucum_ccid_50";   .code = "[CCID_50]";   .metric = false; },
-  { .id = <uint:16> 415; .name = "ucum_tcid_50";   .code = "[TCID_50]";   .metric = false; },
-  { .id = <uint:16> 416; .name = "ucum_eid_50";    .code = "[EID_50]";    .metric = false; },
-  { .id = <uint:16> 417; .name = "ucum_pfu";       .code = "[PFU]";       .metric = false; },
-  { .id = <uint:16> 418; .name = "ucum_ffu";       .code = "[FFU]";       .metric = false; },
-  { .id = <uint:16> 419; .name = "ucum_cfu";       .code = "[CFU]";       .metric = false; },
-  { .id = <uint:16> 420; .name = "ucum_bau";       .code = "[BAU]";       .metric = false; },
-  { .id = <uint:16> 421; .name = "ucum_au_allerg"; .code = "[AU]";        .metric = false; },
-  { .id = <uint:16> 422; .name = "ucum_amb_a_1_u"; .code = "[Amb'a'1'U]"; .metric = false; },
-  { .id = <uint:16> 423; .name = "ucum_pnu";       .code = "[PNU]";       .metric = false; },
-  { .id = <uint:16> 424; .name = "ucum_lf";        .code = "[Lf]";        .metric = false; },
-  { .id = <uint:16> 425; .name = "ucum_d_ag_u";    .code = "[D'ag'U]";    .metric = false; },
-  { .id = <uint:16> 426; .name = "ucum_feu";       .code = "[FEU]";       .metric = false; },
-  { .id = <uint:16> 427; .name = "ucum_elu";       .code = "[ELU]";       .metric = false; },
-  { .id = <uint:16> 428; .name = "ucum_eu";        .code = "[EU]";        .metric = false; },
+# .name is the enumerator suffix (the C constant is bu_<name>) and must start
+# "ucum_" so the enum stays namespaced. There is no .aliases field on purpose:
+# an arbitrary unit has no native spelling, is reachable only through "ucum:",
+# and serialises back as "ucum:<code>".
+.opaque = [
+  { .name = "ucum_iu";        .code = "[IU]";        .metric = true;  },
+  { .name = "ucum_iu_i";      .code = "[iU]";        .metric = true;  },
+  { .name = "ucum_arb_u";     .code = "[arb'U]";     .metric = false; },
+  { .name = "ucum_usp_u";     .code = "[USP'U]";     .metric = false; },
+  { .name = "ucum_gpl_u";     .code = "[GPL'U]";     .metric = false; },
+  { .name = "ucum_mpl_u";     .code = "[MPL'U]";     .metric = false; },
+  { .name = "ucum_apl_u";     .code = "[APL'U]";     .metric = false; },
+  { .name = "ucum_beth_u";    .code = "[beth'U]";    .metric = false; },
+  { .name = "ucum_anti_xa_u"; .code = "[anti'Xa'U]"; .metric = false; },
+  { .name = "ucum_todd_u";    .code = "[todd'U]";    .metric = false; },
+  { .name = "ucum_dye_u";     .code = "[dye'U]";     .metric = false; },
+  { .name = "ucum_smgy_u";    .code = "[smgy'U]";    .metric = false; },
+  { .name = "ucum_bdsk_u";    .code = "[bdsk'U]";    .metric = false; },
+  { .name = "ucum_ka_u";      .code = "[ka'U]";      .metric = false; },
+  { .name = "ucum_knk_u";     .code = "[knk'U]";     .metric = false; },
+  { .name = "ucum_mclg_u";    .code = "[mclg'U]";    .metric = false; },
+  { .name = "ucum_tb_u";      .code = "[tb'U]";      .metric = false; },
+  { .name = "ucum_ccid_50";   .code = "[CCID_50]";   .metric = false; },
+  { .name = "ucum_tcid_50";   .code = "[TCID_50]";   .metric = false; },
+  { .name = "ucum_eid_50";    .code = "[EID_50]";    .metric = false; },
+  { .name = "ucum_pfu";       .code = "[PFU]";       .metric = false; },
+  { .name = "ucum_ffu";       .code = "[FFU]";       .metric = false; },
+  { .name = "ucum_cfu";       .code = "[CFU]";       .metric = false; },
+  { .name = "ucum_bau";       .code = "[BAU]";       .metric = false; },
+  { .name = "ucum_au_allerg"; .code = "[AU]";        .metric = false; },
+  { .name = "ucum_amb_a_1_u"; .code = "[Amb'a'1'U]"; .metric = false; },
+  { .name = "ucum_pnu";       .code = "[PNU]";       .metric = false; },
+  { .name = "ucum_lf";        .code = "[Lf]";        .metric = false; },
+  { .name = "ucum_d_ag_u";    .code = "[D'ag'U]";    .metric = false; },
+  { .name = "ucum_feu";       .code = "[FEU]";       .metric = false; },
+  { .name = "ucum_elu";       .code = "[ELU]";       .metric = false; },
+  { .name = "ucum_eu";        .code = "[EU]";        .metric = false; },
 ];
 
 # ── Atoms UCUM defines that have no native representation ───────────────────

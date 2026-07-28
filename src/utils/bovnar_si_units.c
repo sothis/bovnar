@@ -34,7 +34,7 @@
 #include "bovnar_si_units.h"
 #include "bovnar_currency.h"
 #include "bvn_unit_impl.h"
-#include "bvn_ucum_impl.h"
+#include "bvn_profile_impl.h"
 #include <limits.h>
 #include "bvn_int.h"
 #include "bvn_float.h"
@@ -142,7 +142,7 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	 */
 #include "bovnar_si_conv_table.gen.inc"
 	/*
-	 * UCUM arbitrary units — generated from src/gendata/ucum.bvnr by gen_ucum.py.
+	 * UCUM arbitrary units — generated from src/gendata/ucum.bvnr by gen_profiles.py.
 	 * These rows exist so the table stays well-formed (bvn_verify_conv_table
 	 * asserts .base == index for every non-currency slot); their VALUES are never
 	 * used, because bvn_unit_to_si_factor and bvn_unit_dimension_vector refuse an
@@ -150,7 +150,7 @@ static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
 	 * incommensurable — without it the 1.0 factor and zero dimension vector here
 	 * would say [IU] is a dimensionless quantity worth one, i.e. a plain count.
 	 */
-#include "bovnar_ucum_conv.gen.inc"
+#include "bovnar_profiles_conv.gen.inc"
 };
 #define SI_CONV_TABLE_SIZE \
 	((uint32_t)(sizeof(si_conv_table) / sizeof(si_conv_table[0])))
@@ -231,7 +231,7 @@ double bvn_unit_to_si_factor(value_unit_t u,
 		 * fallback still relates [IU]/L to [IU]/mL, exactly as it does for a
 		 * currency, which has no SI row for the same reason.
 		 */
-		if (bvni_is_arbitrary(c->base)) {
+		if (bvni_is_opaque(c->base)) {
 			*ok = false;
 			return f;
 		}
@@ -302,7 +302,7 @@ bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
 		if (c->exponent == exp_invalid)
 			return false;
 		/* An arbitrary unit has no dimension — see bvn_unit_to_si_factor. */
-		if (bvni_is_arbitrary(c->base))
+		if (bvni_is_opaque(c->base))
 			return false;
 		if (!bvn_prefix_unit_valid(c->prefix, c->base))
 			return false;
@@ -1263,7 +1263,7 @@ static const uint8_t bu_prefix_policy[BVN_VALUE_BASE_UNIT_COUNT] = {
 	 * [arb'U] does not. Without these the slots keep the array's zero default,
 	 * which is BVN_PFX_DEFAULT — "any SI prefix" — and k[arb'U] would translate
 	 * although UCUM forbids it. */
-#include "bovnar_ucum_policy.gen.inc"
+#include "bovnar_profiles_policy.gen.inc"
 };
 /*
  * Enforce which prefixes may legally attach to which base unit — the rule set

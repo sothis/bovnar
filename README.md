@@ -17,6 +17,7 @@
 - [Format at a Glance](#format-at-a-glance)
 - [Where Bovnar Fits](#where-bovnar-fits)
 - [Bovnar vs UCUM and CF](#bovnar-vs-ucum-and-cf)
+- [Carrying other vocabularies](#carrying-other-vocabularies-unit-profiles-under-implementation)
 - [Repository Layout](#repository-layout)
 - [Building](#building)
 - [Command-Line Tool](#command-line-tool)
@@ -194,30 +195,48 @@ In earth-system science, CF wins and will keep winning. The entire tool ecosyste
 
 Bovnar's ground is where CF does not reach: heterogeneous documents rather than arrays, text and binary payloads in one file, configuration mixed with measurements, log streams, industrial telemetry, financial data with units. That is the space between JSON (no type, no unit) and netCDF (arrays, external schema, binary container).
 
-### Using UCUM codes in Bovnar (under implementation)
+### Carrying other vocabularies: unit profiles (under implementation)
 
-Because UCUM sits at a different layer, it can be a component rather than an alternative. A `ucum:` notation is accepted in the unit slot, alongside the native one:
+Because these code systems sit at a different layer, they can be **components rather than alternatives**. Five foreign notations are accepted in the unit slot, alongside the native one:
 
 ```bovnar
 #!bovnar 1.2
-.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;
-.count    = <uint:32,ucum:10*3/uL>     4500;
-.titre    = <float:64,ucum:[IU]/mL>    12.5;
+.systolic = <float_dec:64,ucum:mm[Hg]>    120.00;   # UCUM        → mmHg
+.mass     = <float:64,unece:KGM>           12.5;    # UN/ECE Rec 20 → k~g
+.velocity = <float:64,qudt:M-PER-SEC>       9.81;   # QUDT        → m/s
+.length   = <float:64,qudt-qk:Length>       3.0;    # a QUDT quantity KIND → m
+.flux     = <float:64,udunits:kg*m-2*s-1>   0.5;    # UDUNITS / CF
+.boxes    = <uint:32,unece:XBX>            12;      # Rec 21: a count of boxes
 ```
 
-This notation is **under implementation** and is not in a released version: the current specification is 1.1. A document reaches it only by opting in to a version the build does not advertise, which is why the `#!bovnar 1.2` directive is required. A UCUM expression is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used — `ucum:mm[Hg]` and `mmHg` compare equal, convert identically, and satisfy the same `--require-field` rule. Powers of ten fold into prefixes (`ucum:10*3/uL` is `n~L⁻¹`, 10¹² L⁻¹), UCUM's `/` binds to one term where Bovnar's latches, and annotations are inert as UCUM defines them.
+| Namespace | Vocabulary | Where it is spoken |
+|---|---|---|
+| `ucum:` | UCUM | HL7 FHIR, LOINC, clinical systems |
+| `unece:` | UN/ECE Rec 20 / Rec 21 | EDIFACT, UBL, Peppol/EN 16931, ISO 20022, OPC UA |
+| `qudt:` | QUDT unit local names | DTDL, Brick, ASHRAE 223P, digital twins |
+| `qudt-qk:` | QUDT quantity kinds | the same, where metadata carries a *kind* rather than a unit |
+| `udunits:` | UDUNITS-2 | netCDF and the CF conventions |
 
-The enforcement point does not move. A UCUM expression either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
+This notation is **under implementation** and is not in a released version: the current specification is 1.1. A document reaches it only by opting in to a version the build does not advertise, which is why the `#!bovnar 1.2` directive is required.
+
+A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 2847 assertions over 53 concepts checks every spelling against every other one pairwise.
+
+The enforcement point does not move. A profile code either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
 
 ```
-ucum:mm[Hg]  →  mmHg                          translated
-ucum:[IU]    →  ucum:[IU]                     an assay unit: comparable, never convertible
-ucum:metre   →  error_unit_illegal            not a UCUM atom
-ucum:B[SPL]  →  error_unit_profile_unsupported valid UCUM, no representation here
-cf:m         →  error_unit_profile_unknown    no such profile
+ucum:mm[Hg]   →  mmHg                          translated
+unece:KGM     →  k~g                           translated, from a different vocabulary
+unece:XBX     →  unece:XBX                     a count of boxes: comparable, never convertible
+ucum:[IU]     →  ucum:[IU]                     an assay unit: comparable, never convertible
+ucum:metre    →  error_unit_illegal            not a UCUM atom
+ucum:B[SPL]   →  error_unit_profile_unsupported valid UCUM, no representation here
+udunits:days since 1970-01-01
+              →  error_unit_profile_unsupported valid UDUNITS; an epoch is a type
+                                                parameter here, not a unit
+cf:m          →  error_unit_profile_unknown    no such profile
 ```
 
-Full specification, the transliteration table, the collisions between the two namespaces (`st` is the stone natively and the stere in UCUM), and an explicit list of what does *not* map: [doc/11_bovnar_ucum_profile.md](doc/11_bovnar_ucum_profile.md).
+Full specification, the transliteration tables, the collisions between namespaces (`st` is the stone natively and the *stere* in UCUM; UCUM's `B` is the bel where QUDT's `BYTE` is the byte), an explicit list of what does *not* map, and the cross-vocabulary suite: [doc/11_bovnar_unit_profiles.md](doc/11_bovnar_unit_profiles.md).
 
 ---
 
@@ -283,7 +302,7 @@ bovnar/
 │   ├── 08_bovnar_readwrite_api.md
 │   ├── 09_bovnar_python_bindings.md
 │   ├── 10_bovnar_streaming.md         # Streaming, framing & multiplexing
-│   ├── 11_bovnar_ucum_profile.md      # UCUM codes in a Bovnar unit slot
+│   ├── 11_bovnar_unit_profiles.md      # UCUM codes in a Bovnar unit slot
 │   ├── 12_bovnar.ebnf                 # Formal EBNF grammar
 │   └── 13_bovnar_conformance.md       # Conformance test tool and IUT protocol
 ├── CMakeLists.txt
@@ -443,7 +462,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 
 | Command | Description |
 |---|---|
-| `bovnar validate [opts] <file>` | Validate a `.bvnr` file; exit non-zero on the first error. `--require-unit` additionally rejects any numeric value that carries no unit; `--require-dimension <unit>` (repeatable) requires every numeric value to be validly convertible to one of the named units — "this document is lengths, in whatever unit it wrote them". `--text-only` (under implementation) rejects a document containing an octet stream, for a consumer whose transport is not binary-safe. |
+| `bovnar validate [opts] <file>` | Validate a `.bvnr` file; exit non-zero on the first error. `--require-unit` additionally rejects any numeric value that carries no unit; `--require-dimension <unit>` (repeatable) requires every numeric value to be validly convertible to one of the named units — "this document is lengths, in whatever unit it wrote them". `--require-field <path>=<unit>` (repeatable) asserts one key path rather than the whole document, and a path may end in `.*` to name a subtree. `--text-only` (under implementation) rejects a document containing an octet stream, for a consumer whose transport is not binary-safe. |
 | `bovnar query [opts] <path> <file>` | Print a single **value** by dotted path, e.g. `.sensor.temperature` — the number alone, so it pipes into other tools; the unit is deliberately not printed, so read `25` from a `°C` field as 25 °C and not 25 K. Floats print as the shortest decimal that reads back as the same double; a `float_dec` or `float:128` wider than a double is rounded on the way through the DOM, so use the reader or the Python bindings when you need the stored digits verbatim. Takes the same unit-policy options as `events`, so a query can assert what it expects and ask for the unit it wants back: `--field .a.b=m`, `--require-unit`. |
 | `bovnar pretty-print <file>` | Re-serialise a document in canonical pretty form. |
 | `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |
@@ -487,11 +506,16 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_reader_test` | Core reader, all token types |
 | `bvnr_extended_reader_test` | Edge cases, resync, error recovery |
 | `bvnr_writer_test` | Serialiser output |
+| `bvnr_write_read_roundtrip_test` | Writer output re-read by the reader, value for value |
 | `bvnr_socketpair_roundtrip_test` | Full round-trip over a POSIX socketpair |
 | `bvnr_stream_test` | Framing, multiplexing, and document-in-document streaming |
+| `bvnr_concurrency_test` | Independent readers and writers driven from several threads |
 | `bvnr_dom_test` | DOM builder and traversal |
 | `bvnr_si_test` | SI/IEC unit parsing and formatting |
 | `bvnr_unit_ext_test` | Extended unit symbols, long-name aliases, prefix enforcement |
+| `bvnr_unit_policy_test` | Unit policy: the `require_*` assertions, the target list, SI normalisation |
+| `bvnr_want_unit_test` | The reader's `want_unit` conversion hook — factor exactness, output bases, refusal modes |
+| `bvnr_ucum_test` | The `ucum:` notation: transliteration, the decade fold, refusals |
 | `bvnr_currency_test` | Fiat and crypto currency lookup, minor units, prefix rules |
 | `bvnr_utils_test` | Utility functions |
 | `bvnr_int_test` | Arbitrary-precision integer arithmetic |
@@ -519,8 +543,8 @@ Pure-Python tests (`ctest -L python_pure`) run without the shared library; integ
 
 ```bash
 export LIBBOVNAR_PATH=$(pwd)/build/libbvnr.so
-cd python && pip install -e ".[dev]"
-pytest tests -v
+pip install -e ".[dev]"          # from the repository root — pyproject.toml is there
+pytest python/tests -v
 ```
 
 ---
@@ -601,16 +625,27 @@ See [doc/08_bovnar_readwrite_api.md](doc/08_bovnar_readwrite_api.md) for the com
 ### Requirements
 
 - **Python ≥ 3.10**
-- The shared library `libbvnr.so` (built as shown above)
+- The shared library `libbvnr.so` — bundled inside the wheel, so only a
+  from-source install has to build it
 
 ### Installation
+
+```bash
+pip install bovnar                # wheels bundle libbvnr; nothing to build
+
+pip install "bovnar[numpy]"       # optional NumPy bridge
+pip install "bovnar[pint]"        # optional Pint bridge
+pip install "bovnar[all]"         # both
+```
+
+From a source checkout instead — `pyproject.toml` lives at the repository root,
+so the editable install runs there and not in `python/`:
 
 ```bash
 cmake -B build . && cmake --build build
 
 export LIBBOVNAR_PATH=$(pwd)/build/libbvnr.so
 
-cd python
 pip install -e ".[dev]"
 ```
 
@@ -730,7 +765,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Read & Write API](doc/08_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/09_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
-| [UCUM Unit Profile](doc/11_bovnar_ucum_profile.md) | Writing UCUM codes in a Bovnar unit slot: the transliteration table, the collisions between the two namespaces, and what has no representation. |
+| [UCUM Unit Profile](doc/11_bovnar_unit_profiles.md) | Writing UCUM codes in a Bovnar unit slot: the transliteration table, the collisions between the two namespaces, and what has no representation. |
 | [Formal EBNF](doc/12_bovnar.ebnf) | Machine-readable grammar. |
 | [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (387 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 

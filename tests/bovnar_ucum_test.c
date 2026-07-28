@@ -24,7 +24,7 @@
 
 /*
  * The UCUM unit profile (spec 1.2). Specified in
- * doc/11_bovnar_ucum_profile.md; this file is what holds the specification to
+ * doc/11_bovnar_unit_profiles.md; this file is what holds the specification to
  * the implementation.
  *
  * The tests are grouped by the claim they defend rather than by the function
@@ -203,7 +203,7 @@ static void test_annotations(void)
 	/* UCUM defines an annotation as carrying no meaning, and a standalone one as
 	 * the unity. Implemented faithfully, which means two units a clinician reads
 	 * as different compare as the same -- documented in
-	 * doc/11_bovnar_ucum_profile.md 6.3 as a trap rather than hidden. */
+	 * doc/11_bovnar_unit_profiles.md 6.3 as a trap rather than hidden. */
 	chk_str("ucum:mL{total}", "m~L");
 	ASSERT_TRUE(bvn_unit_equal(U("ucum:mL{total}"), U("ucum:mL")),
 	            "an annotation does not change the unit");
@@ -382,6 +382,93 @@ static void test_round_trip(void)
 			        *c, buf);
 			failures++;
 		}
+	}
+}
+
+/*
+ * doc/11 §5.3 quotes a sweep of the whole native registry: how many spellings
+ * survive native -> UCUM -> native unchanged, how many have no UCUM code, and
+ * -- the one that is a correctness claim rather than a statistic -- that none
+ * lands on a DIFFERENT unit. Nothing pinned any of the three, and the first had
+ * already drifted by two as the registry grew.
+ *
+ * The prefix list and the physical-unit id ranges are part of the measurement:
+ * change either and the counts change, which is why they are spelled out here
+ * and in the document rather than left to be inferred.
+ */
+static void test_sweep_round_trip(void)
+{
+	static const si_prefix_id_t PREFIXES[] = {
+		si_none, si_deca, si_hecto, si_kilo, si_mega, si_giga,
+		si_tera, si_deci, si_centi, si_milli, si_micro, si_nano
+	};
+	long same = 0, no_code = 0, differ = 0, rejected = 0;
+
+	printf("  sweeping the registry for native -> UCUM -> native...\n");
+	for (int b = 1; b < BVN_VALUE_BASE_UNIT_COUNT; b++) {
+		/* physical units only: the 180 of the registry. The currency block
+		 * (134..347) and the UCUM arbitrary block (397..) are not native
+		 * spellings and are covered by their own tests. */
+		if (!((b >= 1 && b <= 133) || (b >= 348 && b <= 377)
+		      || (b >= 380 && b <= 396)))
+			continue;
+		for (size_t p = 0; p < sizeof(PREFIXES) / sizeof(PREFIXES[0]); p++) {
+			value_unit_prefix_t pf;
+			memset(&pf, 0, sizeof(pf));
+			pf.system = prefix_si;
+			pf.id.si  = PREFIXES[p];
+			if (!bvn_prefix_unit_valid(pf, (value_base_unit_t)b)) {
+				rejected++;
+				continue;
+			}
+			value_unit_t u;
+			memset(&u, 0, sizeof(u));
+			u.num_components         = 1;
+			u.components[0].base     = (value_base_unit_t)b;
+			u.components[0].exponent = exp_linear;
+			u.components[0].prefix   = pf;
+
+			char native[BVNR_UNIT_STRING_MAX], code[BVNR_UNIT_STRING_MAX];
+			if (bvn_unit_to_string(u, native, sizeof(native)) < 0) {
+				rejected++;
+				continue;
+			}
+			if (bvn_unit_to_ucum(u, code, sizeof(code)) < 0) {
+				no_code++;
+				continue;
+			}
+			char qualified[BVNR_UNIT_STRING_MAX + 8];
+			snprintf(qualified, sizeof(qualified), "ucum:%s", code);
+			bool ok = true;
+			value_unit_t back = bvn_parse_unit((const uint8_t*)qualified, &ok);
+			if (!ok || !bvn_unit_equal(u, back)) {
+				differ++;
+				fprintf(stderr, "FAIL: %s -> ucum:%s did not return to itself\n",
+				        native, code);
+				continue;
+			}
+			same++;
+		}
+	}
+
+	tests++;
+	if (differ != 0) {
+		fprintf(stderr, "FAIL: %ld unit(s) round-tripped to a different unit\n",
+		        differ);
+		failures++;
+	}
+	/* The figures doc/11 §5.3 quotes. Kept as named constants so the failure
+	 * message cannot disagree with what is actually compared. */
+	enum { DOC_SAME = 605, DOC_NO_CODE = 1200, DOC_REJECTED = 355 };
+	tests++;
+	if (same != DOC_SAME || no_code != DOC_NO_CODE || rejected != DOC_REJECTED) {
+		fprintf(stderr,
+		        "FAIL: sweep is %ld same / %ld without a code / %ld rejected; "
+		        "doc/11 §5.3 says %d / %d / %d. Update the document with the "
+		        "measured figures if the registry grew.\n",
+		        same, no_code, rejected,
+		        DOC_SAME, DOC_NO_CODE, DOC_REJECTED);
+		failures++;
 	}
 }
 
@@ -615,6 +702,7 @@ int main(void)
 	test_collisions();
 	test_arbitrary();
 	test_round_trip();
+	test_sweep_round_trip();
 	test_to_ucum();
 	test_regressions();
 	test_version_gate();

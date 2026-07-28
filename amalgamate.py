@@ -53,7 +53,7 @@ IMPL_SOURCES = [
     "src/utils/bvn_datetime.c",
     "src/utils/bovnar_si_units.c",
     "src/utils/bovnar_currency.c",
-    "src/utils/bovnar_ucum.c",
+    "src/utils/bovnar_profiles.c",
     "src/utils/bovnar_utils.c",
     "src/io/bovnar_io.c",
     "src/lexer/bovnar_state_table.c",

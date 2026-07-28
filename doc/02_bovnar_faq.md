@@ -591,7 +591,7 @@ Watch the two vocabularies where they disagree on a spelling — UCUM's `st` is
 the stere and Bovnar's is the stone, UCUM's `B` is the bel and Bovnar's is the
 byte — which is exactly why the namespace is mandatory rather than a fallback.
 The full transliteration table, the collisions, and the codes that have no
-representation are in [UCUM Unit Profile](11_bovnar_ucum_profile.md).
+representation are in [UCUM Unit Profile](11_bovnar_unit_profiles.md).
 
 ---
 
@@ -1223,7 +1223,9 @@ apply to `max_struct_nesting`.
 **Do the Python bindings require a compiled extension module?**
 
 No. The bindings are pure `ctypes` and load `libbvnr.so` at import time
-via `ctypes.CDLL`. No compilation step beyond building the C library is needed.
+via `ctypes.CDLL`. The PyPI wheels bundle that library inside the package, so
+`pip install bovnar` needs no compilation step at all; building the C library is
+only the source-checkout path.
 
 ---
 
@@ -1231,8 +1233,10 @@ via `ctypes.CDLL`. No compilation step beyond building the C library is needed.
 
 1. `LIBBOVNAR_PATH` environment variable — absolute path to the `.so`.
 2. `LIBBOVNAR_DIR` environment variable — directory containing the `.so`.
-3. `ctypes.util.find_library('bvnr')` — standard `ldconfig`/`LD_LIBRARY_PATH` search.
-4. In-tree build paths relative to `_ffi.py` (`../../build/`, etc.).
+3. The copy bundled next to `_ffi.py` inside the installed package — how an
+   installed wheel finds its own library, with no environment variable set.
+4. `ctypes.util.find_library('bvnr')` — standard `ldconfig`/`LD_LIBRARY_PATH` search.
+5. In-tree build paths relative to `_ffi.py` (`../../build/`, etc.).
 
 If none of these resolves the library, `BovnarLibraryNotFound` is raised with
 the list of searched paths.

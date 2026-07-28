@@ -157,7 +157,7 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 </tr>
 <tr>
 <td><code>libbvnr.so</code></td>
-<td>Runtime only; see <em>Library discovery</em> below</td>
+<td>Runtime only, and bundled inside the wheel — see <em>Library discovery</em> below</td>
 </tr>
 <tr>
 <td><code>numpy</code> ≥ 1.24</td>
@@ -177,14 +177,25 @@ import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 bridge functions — importing <code>bovnar</code> never requires either to be installed.</p>
 <hr />
 <h2 id="2-installation">2. Installation</h2>
-<div class="codehilite"><pre><span></span><code><span class="c1"># Editable install from source (recommended during development)</span>
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+<div class="codehilite"><pre><span></span><code><span class="c1"># From PyPI. The wheels bundle libbvnr, so there is nothing to build and no</span>
+<span class="c1"># system dependency to install.</span>
+pip<span class="w"> </span>install<span class="w"> </span>bovnar
 </code></pre></div>
 
 <p>Optional extras pull in the dependencies for the bridges:</p>
 <div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bovnar[numpy]&quot;</span><span class="w">   </span><span class="c1"># NumPy bridge</span>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bovnar[pint]&quot;</span><span class="w">    </span><span class="c1"># pint bridge</span>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bovnar[all]&quot;</span><span class="w">     </span><span class="c1"># both numpy and pint</span>
+</code></pre></div>
+
+<p>From a source checkout instead. <code>pyproject.toml</code> lives at the <strong>repository
+root</strong>, not under <code>python/</code> — the pure-Python package there is mapped into the
+wheel by <code>[tool.scikit-build] wheel.packages</code>, so the editable install runs from
+the root:</p>
+<div class="codehilite"><pre><span></span><code>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w">      </span><span class="c1"># produces build/libbvnr.so</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LIBBOVNAR_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/build/libbvnr.so&quot;</span>
+
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span><span class="w">                      </span><span class="c1"># from the repository root</span>
 </code></pre></div>
 
 <hr />
@@ -197,6 +208,11 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 <li><strong><code>LIBBOVNAR_DIR</code></strong> — directory that <em>contains</em> the <code>.so</code>, e.g.
    <code>bash
    export LIBBOVNAR_DIR=/opt/bovnar/lib</code></li>
+<li><strong>Bundled in the package</strong> — the library sitting next to <code>_ffi.py</code> inside the
+   installed <code>bovnar</code> package. This is the normal path after <code>pip install
+   bovnar</code>: CMake installs <code>libbvnr.*</code> into the package directory when the wheel
+   is built, so an installed wheel resolves here and needs no environment
+   variable at all.</li>
 <li><strong><code>ctypes.util.find_library('bvnr')</code></strong> — standard <code>ldconfig</code> / <code>LD_LIBRARY_PATH</code> search.</li>
 <li><strong>In-tree build paths</strong> — <code>../../build/</code>, <code>../../build/release/</code>, <code>../../</code>,
    <code>.</code> (resolved relative to the <code>_ffi.py</code> file; useful when building Bovnar
@@ -409,7 +425,7 @@ degrees, the turbidity kinds and every currency.</p>
 <p>In a <strong>document</strong> the notation additionally requires a <code>#!bovnar 1.2</code> directive;
 without it <code>loads</code> raises with <code>unit_illegal</code>. <code>parse_unit</code> has no document and
 therefore no declared version, so it accepts the notation unconditionally.</p>
-<p>See <a href="https://www.bovnar.io/docs/ucum/">UCUM Unit Profile</a> for the transliteration table
+<p>See <a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a> for the transliteration table
 and the codes that have no representation.</p>
 <h3 id="52-extended-unit-functions">5.2 Extended unit functions</h3>
 <p>The following functions operate on <code>ValueUnit</code> objects and are available both
@@ -610,7 +626,8 @@ a bare number reaching the file:</p>
 rewriting is <code>UnitFlags.REDUCE</code>'s job, and two rewriting modes with different
 rules about exactness is how a document ends up meaning two things.</p>
 <p>Two module-level helpers back the same decisions outside the reader:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">units_convertible</span><span class="p">,</span> <span class="n">unit_si_normal_form</span><span class="p">,</span> <span class="n">parse_unit</span>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">units_compatible</span><span class="p">,</span> <span class="n">units_convertible</span><span class="p">,</span>
+                    <span class="n">unit_si_normal_form</span><span class="p">,</span> <span class="n">parse_unit</span><span class="p">)</span>
 
 <span class="c1"># units_compatible is the wrong screen for a conversion target: a currency</span>
 <span class="c1"># carries no dimension, so it is reported incompatible with itself.</span>

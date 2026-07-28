@@ -48,7 +48,7 @@ DOCS = [
     ("08_bovnar_readwrite_api.md",   "bovnar-readwrite-api",    "Read & Write API"),
     ("09_bovnar_python_bindings.md", "bovnar-python-bindings",  "Python Bindings"),
     ("10_bovnar_streaming.md",       "bovnar-streaming",        "Streaming, Framing & Multiplexing"),
-    ("11_bovnar_ucum_profile.md",   "bovnar-ucum-profile",     "UCUM Unit Profile"),
+    ("11_bovnar_unit_profiles.md",   "bovnar-unit-profiles",    "Unit Profiles"),
     ("12_bovnar.ebnf",               "bovnar-grammar",          "EBNF Grammar"),
     ("13_bovnar_conformance.md",     "bovnar-conformance",      "Conformance Test Tool"),
 ]

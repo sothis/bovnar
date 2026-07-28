@@ -110,7 +110,17 @@
     - 16.9 [Typed Write Helpers](#169-typed-write-helpers)
     - 16.10 [Error Codes](#1610-error-codes)
 17. [Versioning & Stability](#17-versioning--stability)
-
+18. [Security Considerations](#18-security-considerations)
+    - 18.1 [Resource Exhaustion](#181-resource-exhaustion)
+    - 18.2 [Recovery Mode Discards Data Silently](#182-recovery-mode-discards-data-silently)
+    - 18.3 [Version Leniency](#183-version-leniency)
+    - 18.4 [Transport Corruption of Octet Streams](#184-transport-corruption-of-octet-streams)
+    - 18.5 [Reference Resolution](#185-reference-resolution)
+    - 18.6 [Numeric Interpretation](#186-numeric-interpretation)
+    - 18.7 [Units Are Validated, Not Verified](#187-units-are-validated-not-verified)
+    - 18.8 [Leap-Second Table Drift](#188-leap-second-table-drift)
+    - 18.9 [Confusable and Non-Normalized Keys](#189-confusable-and-non-normalized-keys)
+    - 18.10 [No Confidentiality, Integrity, or Authenticity](#1810-no-confidentiality-integrity-or-authenticity)
 - [Appendix A: Event Sequence Reference](#appendix-a-event-sequence-reference)
     - A.1 [Simple Assignment (Untyped)](#a1-simple-assignment-untyped)
     - A.2 [Typed Assignment](#a2-typed-assignment)
@@ -1593,14 +1603,28 @@ A **fully untyped** value (no annotation at all) instead defaults to dimensionle
 
 > **Under implementation.** Nothing in this section is part of a released specification. It describes work in the reference implementation, reachable only by opting in to a version the build does not advertise, and the version it will ship under is not settled.
 
-A unit parameter that begins with a lowercase namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged.
+A unit parameter that begins with a namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged. A namespace is lowercase letters, digits and `-`; the hyphen may not lead.
 
-One namespace is defined, `ucum` (Unified Code for Units of Measure):
+Five namespaces are defined:
+
+| Namespace | Vocabulary | Code shape |
+|-----------|------------|------------|
+| `ucum` | UCUM — Unified Code for Units of Measure | an expression over prefixed atoms |
+| `unece` | UN/ECE Recommendation 20 and 21 | one whole code, never decomposed |
+| `qudt` | QUDT unit local names | one whole code, never decomposed |
+| `qudt-qk` | QUDT quantity kinds — translated to the **coherent SI unit** of the kind | one whole code, never decomposed |
+| `udunits` | UDUNITS-2, the CF/netCDF units syntax | an expression over prefixed atoms |
 
 ```bovnar
 #!bovnar 1.2
-.systolic = <float_dec:64,ucum:mm[Hg]> 120.00;   # the same unit as <...,mmHg>
+.systolic = <float_dec:64,ucum:mm[Hg]>  120.00;   # the same unit as <...,mmHg>
+.mass     = <float:64,unece:KGM>         12.5;    # the same unit as <...,k~g>
+.velocity = <float:64,qudt:M-PER-SEC>     9.81;   # the same unit as <...,m/s>
+.length   = <float:64,qudt-qk:Length>     3.0;    # the coherent unit of the kind: m
+.flux     = <float:64,udunits:kg*m-2*s-1> 0.5;
 ```
+
+A code that is one whole token is **never decomposed**: `unece:KGM` is the kilogram, not a `k` prefix on a `GM`, and `qudt:MI` is the mile, not a milli-anything. Only an expression namespace strips prefixes and recognises operators.
 
 **Gated on the declared version.** A profile unit requires a `#!bovnar` directive declaring 1.2 or later, exactly as the datetime family and the `\x`/`\u` escapes require 1.1 (§3.4). In a document declaring less — or declaring nothing, which declares less than anything — a profile unit is `error_unit_illegal`, because in that version it is not a unit. A **native** unit is unaffected in every version; the notation is purely additive.
 
@@ -1609,14 +1633,14 @@ One namespace is defined, `ucum` (Unified Code for Units of Measure):
 | Outcome | Result |
 |---------|--------|
 | Translates onto the unit registry | An ordinary unit; indistinguishable from the native spelling |
-| A UCUM *arbitrary* unit (`[IU]`, `[PFU]`, …) | A unit with no native spelling: comparable, never convertible |
+| An **opaque** unit — a UCUM *arbitrary* atom (`[IU]`, `[PFU]`, …) or a UNECE package/count code (`XBX`, `C62`, …) | A unit with no native spelling and no dimension: comparable with itself, never convertible to anything else. It serialises back in the notation of the namespace that owns it |
 | Not a valid expression in the profile, or an atom it does not define | `error_unit_illegal` |
 | Valid in the profile, with no representation in this unit system | `error_unit_profile_unsupported` |
 | The namespace is not a profile this implementation supports | `error_unit_profile_unknown` |
 
 **Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
 
-The complete notation, the transliteration table, and the codes that have no representation are specified in [UCUM Unit Profile](11_bovnar_ucum_profile.md).
+The complete notation, the transliteration table, and the codes that have no representation are specified in [UCUM Unit Profile](11_bovnar_unit_profiles.md).
 
 ---
 
@@ -2309,6 +2333,7 @@ typedef struct bvnr_read_flags_s {
     bool      continue_on_error;
     bvnr_on_error_fn on_error;
     bool      strict_version;                 // reject a declared spec version newer than this build
+    bool      text_only;                      // refuse a document containing an octet stream (§16.10 code 51)
     bool      want_unit_allow_nonterminating; // deliver a non-terminating exact conversion as a rational
     uint32_t  max_conversion_length;          // 0 → 1024; longest want_unit conversion text, in chars
     bool    (*want_unit)(void*, const bvnr_data_t*, value_unit_t*, uint32_t*);  // read-time lossless unit/base conversion hook
@@ -2657,6 +2682,149 @@ reference), **array element homogeneity** (§7.4), and **`float_fix` value-range
 validation** (§6.2, rejecting a value the declared Q-format cannot represent) —
 were exactly such breaks, so they were made *before* 1.0 and cannot be
 reconsidered within 1.x.
+
+---
+
+## 18. Security Considerations
+
+A `.bvnr` document is passive data. It carries no scripting, no macros, no
+external entity references, and no include directive; a reference (§4.5) is an
+inert string that the parser never follows. A conforming consumer therefore
+performs no I/O beyond reading the bytes it was handed, and parsing a document
+cannot by itself cause code execution or a network fetch.
+
+What follows is what remains after that — the places where a consumer of
+untrusted input has to do something the format cannot do for it. The
+Internet-Draft in `doc/ietf/` carries the same material at greater length, with
+normative keywords.
+
+### 18.1 Resource Exhaustion
+
+The defaults of §12.2 are chosen for trusted pipelines, not for hostile input.
+**Document size is unbounded by default** — `max_file_size` of 0 means endless,
+which is right for a telemetry stream and wrong for an untrusted one. A consumer
+at a trust boundary sets every limit in §12.2 explicitly.
+
+Four constructs give an attacker a high ratio of work to input bytes: integer
+and float widths reach 32768 bits (`BVN_MAX_INT_WIDTH`), and validating one
+value at that width is arbitrary-precision arithmetic; a non-decimal base is
+written as a quoted string (§5.5), so a 32768-bit value in base 2 is a 32768-character
+literal well inside the default `max_string_length`, and base conversion is
+superlinear in most implementations; array elements default to 2³¹−1 against the
+one-byte-per-element syntax `[,,,,,]`; and adjacent string literals accumulate
+toward `max_string_length` across the running total, not per literal.
+
+Nesting defaults to 64 with a hard cap of 255, but the depth is only known after
+the bytes are read, so a recursive-descent consumer bounds its own stack rather
+than relying on the declared depth. A streaming consumer is less exposed than a
+materializing one throughout.
+
+### 18.2 Recovery Mode Discards Data Silently
+
+Recovery mode (§13.2) delivers a *subset* of the document, and nothing in the
+data says that a subset is what it is. Where the document is an access-control
+list, a security policy, or a set of calibration constants, a dropped assignment
+is likely to fail open.
+
+Recovery must not be enabled where the parsed document informs a security
+decision. Where it is enabled, check the **recovery count** and treat a non-zero
+value as a failure of the document rather than a diagnostic. Watching the
+skipped-byte total instead is a trap: a rejected value whose `;` follows
+immediately skips *zero* bytes, so the total stays at zero while the assignment
+arrives stripped of its value.
+
+### 18.3 Version Leniency
+
+By default a reader accepts a declared version newer than it supports and fails
+only on a construct it does not implement (§3.4). A document declaring
+`#!bovnar 2.0` but using only 1.0 constructs parses without complaint. A 1.0
+reader does not see the directive at all — it is lexically a comment — so a
+producer cannot rely on the declaration to cause rejection by an older reader.
+For untrusted input, enable `strict_version` so an unsupported version is
+rejected at the directive rather than possibly not at all.
+
+### 18.4 Transport Corruption of Octet Streams
+
+Octet-stream chunks are length-prefixed (§9.2). A transport that rewrites a byte
+inside a payload — line-ending normalisation above all — shifts every subsequent
+length field, and the reader begins interpreting attacker-supplied payload as tag
+and length fields. The common outcome is a quick `error_octet_stream_out_of_sync`,
+but that is not guaranteed, and a chunk length read out of a corrupted field is
+an allocation request. Bound the memory committed to a single chunk independently
+of its declared length, and carry documents containing octet streams over
+transports that do not transform content.
+
+### 18.5 Reference Resolution
+
+References are stored unresolved and never followed (§4.5), so every hazard lands
+in the application that resolves them. Cycles are not detected — `.a = &.b; .b = &.a;`
+does not terminate under a naive resolver. Dangling paths are valid documents, so
+a resolver must define what a missing target means rather than defaulting to
+empty. A reference path is not a URI: it has no scheme, no authority, and no
+network semantics, and must never be handed to a resolver that might fetch it.
+Index syntax is uninterpreted — `&.a[0][1]` is stored verbatim, digits included,
+and must be range-checked against the actual array.
+
+### 18.6 Numeric Interpretation
+
+**Special numbers bypass range validation.** `<uint:8> nan` and `<sint:16> ninf`
+are valid (§6.4). A successful parse does not mean the value fits the declared
+width, so a consumer mapping values onto fixed-width integers must handle a
+non-finite value arriving on an integer channel.
+
+**Width is declared, not proven.** The annotation states how wide the value is;
+nothing in the document shows the producer honoured it. Range validation at the
+consumer is the only check. Bases 64 and 85 are `uint`-only for the same family
+of reason: their alphabets use `+` and `-` as digits, so permitting a signed
+value there would introduce an ambiguity the format does not have.
+
+### 18.7 Units Are Validated, Not Verified
+
+The unit system rejects a unit that is malformed, unregistered, or contradicted
+by an inline suffix on the same value (§6.5, §12.8). It cannot verify that the
+value is a plausible measurement in that unit, that two assignments are
+dimensionally consistent with each other, or that the producer measured what it
+claims. *It parsed* means the dimension is stated and internally consistent, not
+that it is correct.
+
+Read-time unit conversion carries a further trap: asking for a value in some
+unit is a **request, not a guarantee**. Where the conversion cannot be
+performed — different dimensions, or two different currencies — the value is
+delivered in its *original* unit rather than the request failing. A caller that
+assumes success then holds a number it believes is in one unit and which is in
+another, which is exactly the failure this format exists to prevent. Check
+whether the conversion occurred; do not infer it from the absence of an error.
+
+### 18.8 Leap-Second Table Drift
+
+The `tai` epoch requires a leap-second table, which is a static snapshot of an
+IERS bulletin. Two builds of differing vintage may convert the same civil literal
+to different `tai` values for instants after the older table ends. Where exact
+agreement matters, transmit an integer carrier rather than a literal, and do not
+assume that timestamps converted by different builds compare correctly.
+
+### 18.9 Confusable and Non-Normalized Keys
+
+Keys admit arbitrary non-ASCII characters and are compared as byte sequences with
+no Unicode normalisation (§3.1, §4.2). Two keys that are canonically equivalent
+under Unicode but differ in bytes are distinct keys and do not collide under the
+duplicate-key rule; two keys that are visually identical but differ in code
+point — Latin and Cyrillic homoglyphs — are distinct keys that a human reviewer
+cannot tell apart. Where keys drive authorization or routing, apply a
+normalisation and confusable-detection policy before matching, and prefer ASCII
+keys where the application permits.
+
+### 18.10 No Confidentiality, Integrity, or Authenticity
+
+The format defines no encryption, no checksum, no signature, and no notion of an
+author. All three properties must come from the transport or an enclosing
+envelope. Note also that no canonical form is defined: a signature over the bytes
+is a signature over one *spelling* of the data, and a producer that re-emits the
+document invalidates it without changing what it means.
+
+Comments are bytes of the document and not part of its data (§4.1). A producer
+that copies a document forward carries its comments forward with it, including
+any that were never meant to leave the system that wrote them.
 
 ---
 

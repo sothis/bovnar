@@ -3,8 +3,9 @@
 Units, prefixes, and currencies are defined once, as **data**, in the `*.bvnr`
 files here; the C tables are generated from them. So the enum, conversion table,
 symbol map, parse/alias tables, prefix scale/policy tables, and currency
-catalogue cannot drift out of sync. Covers 163 physical units, 34 SI/IEC
-prefixes, and 216 currencies.
+catalogue cannot drift out of sync. Covers 180 physical units (529 accepted
+spellings), 34 SI/IEC prefixes, 216 currencies, and the UCUM profile's atom
+tables.
 
 Each `.bvnr` file's comment header documents its fields and the editing rules
 (stable, append-only ids). **To add or change an entry, edit a record there and
@@ -14,10 +15,11 @@ rebuild — never edit the generated `*.gen.{h,inc}`.**
 
 | File | Location | Role |
 |------|----------|------|
-| `units.bvnr` | `src/gendata/` | the data: all 163 physical units |
+| `units.bvnr` | `src/gendata/` | the data: all 180 physical units |
 | `prefixes.bvnr` | `src/gendata/` | the data: 24 SI + 10 IEC prefixes |
 | `currencies.bvnr` | `src/gendata/` | the data: all 216 currencies |
-| `gen_units.py` / `gen_prefixes.py` / `gen_currencies.py` | repo root | the generators |
+| `ucum.bvnr` | `src/gendata/` | the data: the UCUM profile — prefixes, mapped atoms, arbitrary units, and the atoms that are known but refused |
+| `gen_units.py` / `gen_prefixes.py` / `gen_currencies.py` / `gen_profiles.py` | repo root | the generators |
 | `bvnr_data.py` | repo root | the small built-in `.bvnr` reader they use |
 
 ## Building
@@ -29,7 +31,8 @@ configure time, regenerating when the snippets are missing or always with
 compiler. To regenerate by hand, from the repo root:
 
 ```
-python3 gen_units.py && python3 gen_prefixes.py && python3 gen_currencies.py
+python3 gen_units.py && python3 gen_prefixes.py && \
+python3 gen_currencies.py && python3 gen_profiles.py
 ```
 
 Generated outputs:
@@ -56,6 +59,10 @@ Each hand-written span was replaced with an `#include` of a generated fragment.
 | `<build>/generated/bovnar_si_prefix_str.gen.inc` / `bovnar_iec_prefix_str.gen.inc` | symbol maps in `bovnar_utils.c` |
 | `<build>/generated/bovnar_si_table.gen.inc` / `bovnar_iec_table.gen.inc` | prefix parse tables in `bovnar_utils.c` |
 | `<build>/generated/bovnar_currency_table.gen.inc` | `g_currency_table` in `bovnar_currency.c` |
+| `include/bovnar_profiles.gen.h` | the UCUM arbitrary-unit enumerators and the block's FIRST/LAST bracketing macros |
+| `<build>/generated/bovnar_profile_ucum_prefix.gen.inc` / `bovnar_profile_ucum_atom.gen.inc` / `bovnar_profile_ucum_unsupported.gen.inc` / `bovnar_profile_ucum_reverse.gen.inc` | the profile tables in `bovnar_profiles.c` |
+| `<build>/generated/bovnar_profiles_conv.gen.inc` / `bovnar_profiles_policy.gen.inc` | `si_conv_table` and the prefix policy in `bovnar_si_units.c` |
+| `<build>/generated/bovnar_profiles_str.gen.inc` | `base_unit_str()` in `bovnar_utils.c` |
 
 The generated files carry **data only**. The conversion/parse/lookup functions,
 the range predicates, `bvn_currency_index()`, and the rule body of

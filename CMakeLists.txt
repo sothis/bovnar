@@ -287,7 +287,7 @@ set(BVNR_SOURCES_UTILS
     src/utils/bovnar_utils.c
     src/utils/bovnar_si_units.c
     src/utils/bovnar_currency.c
-    src/utils/bovnar_ucum.c
+    src/utils/bovnar_profiles.c
     src/utils/bvn_int.c
     src/utils/bvn_float.c
     src/utils/bvn_gregorian_date.c
@@ -332,10 +332,14 @@ set(BVNR_GEN_INPUTS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/prefixes.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/currencies.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/ucum.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/unece.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/qudt.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/qudt-qk.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/udunits.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_units.py
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_prefixes.py
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_currencies.py
-    ${CMAKE_CURRENT_SOURCE_DIR}/gen_ucum.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen_profiles.py
     ${CMAKE_CURRENT_SOURCE_DIR}/bvnr_data.py)
 set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_si_conv_table.gen.inc
@@ -351,14 +355,27 @@ set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_si_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_iec_table.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_currency_table.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_prefix.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_atom.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_unsupported.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_conv.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_policy.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_str.gen.inc
-    ${BVNR_GENERATED_DIR}/bovnar_ucum_reverse.gen.inc
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_ucum.gen.h
+    ${BVNR_GENERATED_DIR}/bovnar_profile_ucum_prefix.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_ucum_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_ucum_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profiles_conv.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profiles_policy.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profiles_str.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_ucum_reverse.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_unece_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_unece_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_unece_reverse.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_qudt_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_qudt_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_qudt_reverse.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_qudt_qk_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_qudt_qk_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_qudt_qk_reverse.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_prefix.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_reverse.gen.inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_profiles.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_units.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_si_prefix.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_iec_prefix.gen.h)
@@ -394,7 +411,7 @@ endif()
 
 if(_bvnr_regen)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    foreach(_gen gen_units gen_prefixes gen_currencies gen_ucum)
+    foreach(_gen gen_units gen_prefixes gen_currencies gen_profiles)
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E env
                     BVNR_GENERATED_DIR=${BVNR_GENERATED_DIR}

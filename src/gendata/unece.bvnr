@@ -1,0 +1,248 @@
+#!bovnar 1.1
+# unece.bvnr — single source of truth for the UNECE unit profile.
+#
+# HOW THIS WORKS
+#   Hand-edited. gen_profiles.py (at the repo root) regenerates the C profile
+#   tables from this file on every build; never edit the generated *.gen.{h,inc}.
+#   To add or change a code, edit a record below and rebuild.
+#
+# WHAT THIS VOCABULARY IS
+#   UN/ECE Recommendation 20, "Codes for Units of Measure Used in International
+#   Trade", and Recommendation 21, "Codes for Passengers, Types of Cargo,
+#   Packages and Packaging Materials". They are the unit code list of UN/EDIFACT,
+#   UBL, Peppol/EN 16931, ISO 20022 and OPC UA's EUInformation, which is why the
+#   profile exists: a producer whose unit arrives as "KGM" should not have to
+#   translate it before it can be written down.
+#
+#   A FLAT profile (see the grammar note in bovnar_profiles.c). A Rec 20 code is
+#   ONE WHOLE TOKEN and never decomposes: "KGM" is the kilogram, not a kilo
+#   applied to a "GM", and "MTS" is the metre per second, not a mega-TS. There
+#   are no operators, no exponents and no prefixes in this namespace at all.
+#
+# PROVENANCE — READ THIS BEFORE TRUSTING A ROW
+#   The .bovnar target of every row is checked against this build's native
+#   registry by gen_profiles.py, and the resulting translation is pinned by
+#   tests/bovnar_unece_test.c. NEITHER of those checks the UNECE side: nothing in
+#   this repository verifies that "KGM" is really UNECE's kilogram rather than
+#   something this table asserts it to be. That gap is the same standing risk
+#   doc/11 section 10.2 records for the UCUM table, and it is why this list is
+#   deliberately a CONFIDENT SUBSET of Rec 20 rather than a transcription of all
+#   of it: a code that is not here fails loudly as error_unit_illegal, which
+#   costs a producer an error message, while a code that is here and wrong costs
+#   them a wrong number.
+#
+#   When in doubt an entry goes in .unsupported, or is left out entirely.
+#
+# WHAT IS DELIBERATELY ABSENT
+#   Rec 20's Annex II/III "level" and sector qualifiers. The X-prefixed Rec 21
+#   codes that name packaging MATERIAL rather than a countable package. Every
+#   code whose value this file cannot state exactly.
+
+.schema_version = <uint:16> 1;
+
+# ── Rec 20: codes that translate onto the native registry ───────────────────
+# .code is the UNECE common code, .bovnar a native unit expression parsed by
+# bvn_parse_unit at table build time. There is no .metric field: a flat profile
+# has no prefix mechanism, so a prefixed unit is spelled by its own code (MMT is
+# the millimetre; there is no "m" to put in front of "MTR").
+.mapped = [
+  # Length
+  { .code = "MTR"; .bovnar = "m";      },
+  { .code = "DMT"; .bovnar = "d~m";    },
+  { .code = "CMT"; .bovnar = "c~m";    },
+  { .code = "MMT"; .bovnar = "m~m";    },
+  { .code = "KMT"; .bovnar = "k~m";    },
+  { .code = "INH"; .bovnar = "in";     },
+  { .code = "FOT"; .bovnar = "ft";     },
+  { .code = "YRD"; .bovnar = "yd";     },
+  { .code = "SMI"; .bovnar = "mi";     },   # statute mile
+  { .code = "NMI"; .bovnar = "nmi";    },
+
+  # Area
+  { .code = "MTK"; .bovnar = "m^2";    },
+  { .code = "DMK"; .bovnar = "d~m^2";  },
+  { .code = "CMK"; .bovnar = "c~m^2";  },
+  { .code = "MMK"; .bovnar = "m~m^2";  },
+  { .code = "KMK"; .bovnar = "k~m^2";  },
+  { .code = "INK"; .bovnar = "in^2";   },
+  { .code = "FTK"; .bovnar = "ft^2";   },
+  { .code = "YDK"; .bovnar = "yd^2";   },
+  { .code = "ACR"; .bovnar = "ac";     },
+  { .code = "HAR"; .bovnar = "ha";     },
+
+  # Volume
+  { .code = "MTQ"; .bovnar = "m^3";    },
+  { .code = "DMQ"; .bovnar = "d~m^3";  },
+  { .code = "CMQ"; .bovnar = "c~m^3";  },
+  { .code = "MMQ"; .bovnar = "m~m^3";  },
+  { .code = "LTR"; .bovnar = "L";      },
+  { .code = "MLT"; .bovnar = "m~L";    },
+  { .code = "CLT"; .bovnar = "c~L";    },
+  { .code = "DLT"; .bovnar = "d~L";    },
+  { .code = "HLT"; .bovnar = "h~L";    },
+  { .code = "INQ"; .bovnar = "in^3";   },
+  { .code = "FTQ"; .bovnar = "ft^3";   },
+  { .code = "YDQ"; .bovnar = "yd^3";   },
+  { .code = "GLL"; .bovnar = "gal";    },   # US gallon
+  { .code = "GLI"; .bovnar = "gal_uk"; },
+  { .code = "BLL"; .bovnar = "bbl";    },   # barrel, US petroleum
+
+  # Mass
+  { .code = "KGM"; .bovnar = "k~g";    },
+  { .code = "GRM"; .bovnar = "g";      },
+  { .code = "DG";  .bovnar = "d~g";    },
+  { .code = "CGM"; .bovnar = "c~g";    },
+  { .code = "MGM"; .bovnar = "m~g";    },
+  { .code = "MC";  .bovnar = "µ~g";    },   # microgram
+  { .code = "TNE"; .bovnar = "t";      },   # tonne, metric
+  { .code = "DTN"; .bovnar = "qntl";   },   # decitonne = quintal, 100 kg
+  { .code = "LBR"; .bovnar = "lb";     },
+  { .code = "ONZ"; .bovnar = "oz";     },
+  { .code = "APZ"; .bovnar = "oz_t";   },   # troy ounce
+  { .code = "GRN"; .bovnar = "gr";     },   # grain
+  { .code = "STI"; .bovnar = "st";     },   # stone, UK
+  { .code = "STN"; .bovnar = "tn_sh";  },   # short ton, US
+  { .code = "LTN"; .bovnar = "tn_l";   },   # long ton, UK
+  { .code = "CTM"; .bovnar = "ct";     },   # metric carat
+
+  # Time
+  { .code = "SEC"; .bovnar = "s";      },
+  { .code = "MIN"; .bovnar = "min";    },
+  { .code = "HUR"; .bovnar = "h";      },
+  { .code = "DAY"; .bovnar = "d";      },
+  { .code = "WEE"; .bovnar = "wk";     },
+  { .code = "MON"; .bovnar = "mo";     },
+  { .code = "ANN"; .bovnar = "yr";     },
+
+  # Temperature. The native affine discipline applies unchanged: valid at
+  # exponent 1 only, and a compound containing one yields no conversion value.
+  { .code = "KEL"; .bovnar = "K";      },
+  { .code = "CEL"; .bovnar = "°C";     },
+  { .code = "FAH"; .bovnar = "°F";     },
+
+  # Amount of substance, light
+  { .code = "MOL"; .bovnar = "mol";    },
+  { .code = "CDL"; .bovnar = "cd";     },
+  { .code = "LUM"; .bovnar = "lm";     },
+  { .code = "LUX"; .bovnar = "lx";     },
+
+  # Force, pressure
+  { .code = "NEW"; .bovnar = "N";      },
+  { .code = "PAL"; .bovnar = "Pa";     },
+  { .code = "KPA"; .bovnar = "k~Pa";   },
+  { .code = "MPA"; .bovnar = "M~Pa";   },
+  { .code = "BAR"; .bovnar = "bar";    },
+  { .code = "MBR"; .bovnar = "m~bar";  },   # millibar
+  { .code = "ATM"; .bovnar = "atm";    },   # standard atmosphere
+
+  # Energy, power
+  { .code = "JOU"; .bovnar = "J";      },
+  { .code = "KJO"; .bovnar = "k~J";    },
+  { .code = "WTT"; .bovnar = "W";      },
+  { .code = "KWT"; .bovnar = "k~W";    },
+  { .code = "MAW"; .bovnar = "M~W";    },
+  { .code = "WHR"; .bovnar = "W·h";    },   # watt hour
+  { .code = "KWH"; .bovnar = "k~W·h";  },
+  { .code = "MWH"; .bovnar = "M~W·h";  },
+  { .code = "BTU"; .bovnar = "Btu";    },
+
+  # Electricity and magnetism
+  { .code = "AMP"; .bovnar = "A";      },
+  { .code = "VLT"; .bovnar = "V";      },
+  { .code = "OHM"; .bovnar = "Ω";      },
+  { .code = "FAR"; .bovnar = "F";      },
+  { .code = "COU"; .bovnar = "C";      },
+  { .code = "SIE"; .bovnar = "S";      },
+  { .code = "HEN"; .bovnar = "H";      },
+  { .code = "WEB"; .bovnar = "Wb";     },
+  { .code = "HTZ"; .bovnar = "Hz";     },
+  { .code = "KHZ"; .bovnar = "k~Hz";   },
+  { .code = "MHZ"; .bovnar = "M~Hz";   },
+
+  # Radioactivity
+  { .code = "BQL"; .bovnar = "Bq";     },
+  { .code = "CUR"; .bovnar = "Ci";     },
+  { .code = "GRY"; .bovnar = "Gy";     },
+
+  # Speed
+  { .code = "MTS"; .bovnar = "m/s";    },
+  { .code = "KMH"; .bovnar = "k~m/h";  },
+  { .code = "KNT"; .bovnar = "kn";     },   # knot
+
+  # Angle and ratio
+  { .code = "DD";  .bovnar = "°";      },   # degree of angle
+  { .code = "P1";  .bovnar = "%";      },   # percent
+];
+
+# ── Rec 20 / Rec 21: opaque count units ─────────────────────────────────────
+# A count of discrete things and nothing else. These have no dimension, convert
+# to nothing, and compare equal only to themselves -- exactly the treatment
+# UCUM's arbitrary atoms get, through exactly the same mechanism: no SI
+# conversion row, so bvn_units_compatible is false and bvn_unit_convert_factor
+# falls through to the prefix-only path.
+#
+#     unece:XBX -> unece:XBX     factor 1     (same base)
+#     unece:XBX -> unece:XPX     refused      (different bases)
+#     unece:XBX -> unece:C62     refused      (a box is not a bare count)
+#
+# That is the right answer and not merely a convenient one. Twelve boxes and
+# twelve pallets are not the same quantity, nothing in the code list says how
+# many of one make the other, and a format whose whole claim is that a wrong
+# unit fails loudly must not invent a factor here.
+#
+# These occupy the shared opaque block; gen_profiles.py assigns the ids in
+# registry order, so this list is APPEND-ONLY. .name is the enumerator suffix
+# (the C constant is bu_<name>) and must start "unece_".
+.opaque = [
+  # Rec 20 counts
+  { .name = "unece_one";       .code = "C62"; },   # one (unit)
+  { .name = "unece_piece";     .code = "H87"; },   # piece
+  { .name = "unece_article";   .code = "NAR"; },   # number of articles
+  { .name = "unece_pair";      .code = "NPR"; },   # number of pairs
+  { .name = "unece_set";       .code = "SET"; },   # set
+
+  # Rec 21 packages. X-prefixed, and countable: "12 boxes" is a quantity in
+  # exactly the way "12 pieces" is.
+  { .name = "unece_bag";       .code = "XBG"; },
+  { .name = "unece_barrel";    .code = "XBA"; },
+  { .name = "unece_bottle";    .code = "XBO"; },
+  { .name = "unece_box";       .code = "XBX"; },
+  { .name = "unece_bunch";     .code = "XBH"; },
+  { .name = "unece_can";       .code = "XCA"; },
+  { .name = "unece_carton";    .code = "XCT"; },
+  { .name = "unece_case";      .code = "XCS"; },
+  { .name = "unece_container"; .code = "XCN"; },
+  { .name = "unece_crate";     .code = "XCR"; },
+  { .name = "unece_drum";      .code = "XDR"; },
+  { .name = "unece_package";   .code = "XPK"; },
+  { .name = "unece_packet";    .code = "XPA"; },
+  { .name = "unece_pallet";    .code = "XPX"; },
+  { .name = "unece_reel";      .code = "XRL"; },
+  { .name = "unece_roll";      .code = "XRO"; },
+  { .name = "unece_sack";      .code = "XSK"; },
+  { .name = "unece_sheet";     .code = "XST"; },
+  { .name = "unece_tube";      .code = "XTU"; },
+  { .name = "unece_vial";      .code = "XVI"; },
+];
+
+# ── Known, and refused ──────────────────────────────────────────────────────
+# Listed so that they fail as error_unit_profile_unsupported ("you wrote it
+# right and we cannot carry it") rather than error_unit_illegal ("that is not a
+# UNECE code"). A code in NONE of the three lists is error_unit_illegal.
+.unsupported = [
+  # Scaled counts. The count units above are opaque and carry no factor, so
+  # there is no way to say "twelve of one" -- a dozen would have to become
+  # 12 x an opaque base, and an opaque base admits no multiplier at all.
+  { .code = "DZN"; .why = "dozen — a scaled count, and an opaque base takes no factor"; },
+  { .code = "GRO"; .why = "gross — a scaled count, and an opaque base takes no factor"; },
+  { .code = "DPC"; .why = "dozen piece — a scaled count"; },
+  { .code = "DZP"; .why = "dozen pack — a scaled count"; },
+
+  # Units whose value depends on the commodity being measured.
+  { .code = "B32"; .why = "kilogram per metre — ambiguous in Rec 20's own annex without the sector qualifier"; },
+
+  # Rec 21 codes naming packaging MATERIAL rather than a countable package.
+  # "wooden" is not a quantity.
+  { .code = "XWD"; .why = "packaging material, not a countable package"; },
+  { .code = "XZZ"; .why = "mutually defined — the code list explicitly declines to say what this is"; },
+];

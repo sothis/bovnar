@@ -1,0 +1,305 @@
+#!bovnar 1.1
+# udunits.bvnr — single source of truth for the UDUNITS-2 unit profile.
+#
+# HOW THIS WORKS
+#   Hand-edited. gen_profiles.py regenerates the C profile tables on every build;
+#   never edit the generated *.gen.{h,inc}.
+#
+# WHAT THIS VOCABULARY IS
+#   UDUNITS-2, Unidata's unit library and its XML unit database. Its string
+#   grammar is the de-facto units syntax of netCDF and the CF conventions, which
+#   is why the profile exists: an earth-science producer whose unit arrives as
+#   "m s-1" or "kg m-2 s-1" should not have to translate it first.
+#
+#   An EXPR profile, sharing the parser with UCUM. UDUNITS' operators differ --
+#   '*' also multiplies and '^' introduces an exponent -- and those differences
+#   are configured on the registry row in bovnar_profiles.c rather than forked
+#   into a second parser. The DIVISION rule is the same: '/' inverts the term
+#   that follows it, which is ordinary left-to-right arithmetic and is what both
+#   vocabularies mean.
+#
+# SPACE DOES NOT MULTIPLY HERE, AND CANNOT
+#   UDUNITS multiplies with a space, and CF's commonest spelling is "kg m-2 s-1".
+#   Bovnar cannot accept it: the lexer deletes whitespace inside a type
+#   annotation, so the slot "udunits:m s-1" arrives as "udunits:ms-1" -- which is
+#   itself valid UDUNITS, meaning RECIPROCAL MILLISECONDS. Treating space as an
+#   operator would not have made the space-separated form work; it would have
+#   made the wrong reading of it look supported. Write "kg*m-2*s-1" or
+#   "kg.m-2.s-1", both of which UDUNITS also accepts.
+#
+# ATOMS, NOT CODES
+#   Every record is an ATOM. "km" is not a row -- "m" is, and "k" is a prefix.
+#   UDUNITS accepts both symbols and spelled-out names for units AND prefixes, so
+#   both appear here: "m" and "meter" are separate rows because UDUNITS treats
+#   them as separate spellings of one unit, and "kilo" is a prefix beside "k".
+#
+# REFERENCE-TIME ("<unit> since <timestamp>") IS NOT HERE
+#   UDUNITS' most distinctive construct is deliberately refused, with its own
+#   reason string, and it is refused for a structural reason rather than a
+#   scheduling one. See section 10.3 of doc/11_bovnar_unit_profiles.md. In short:
+#   a bovnar timestamp is <datetime:width,epoch>, whose EPOCH lives in the type
+#   spec's base slot -- not in the unit slot -- and whose carrier is defined as a
+#   count of SECONDS. A unit-slot expression can therefore neither select the
+#   datetime family nor rescale its carrier to days, so "days since 1970-01-01"
+#   has nowhere to land. Refusing it costs a producer an error message that says
+#   exactly this; accepting it would cost them a silently wrong instant.
+#
+# PROVENANCE — READ THIS BEFORE TRUSTING A ROW
+#   The .bovnar target of every row is checked against this build's native
+#   registry by gen_profiles.py, and the translation is pinned by
+#   tests/bovnar_udunits_test.c. NEITHER checks the UDUNITS side. Same standing
+#   risk as every other profile here; a confident subset, and when in doubt an
+#   atom goes in .unsupported.
+
+.schema_version = <uint:16> 1;
+
+# ── UDUNITS prefixes ────────────────────────────────────────────────────────
+# Symbols and spelled-out names both, because UDUNITS accepts both. .decade is
+# the power of ten, applied on top of whatever the atom's native target already
+# is -- the same fold UCUM uses.
+.prefixes = [
+  { .code = "yotta"; .decade =  24; },  { .code = "Y";  .decade =  24; },
+  { .code = "zetta"; .decade =  21; },  { .code = "Z";  .decade =  21; },
+  { .code = "exa";   .decade =  18; },  { .code = "E";  .decade =  18; },
+  { .code = "peta";  .decade =  15; },  { .code = "P";  .decade =  15; },
+  { .code = "tera";  .decade =  12; },  { .code = "T";  .decade =  12; },
+  { .code = "giga";  .decade =   9; },  { .code = "G";  .decade =   9; },
+  { .code = "mega";  .decade =   6; },  { .code = "M";  .decade =   6; },
+  { .code = "kilo";  .decade =   3; },  { .code = "k";  .decade =   3; },
+  { .code = "hecto"; .decade =   2; },  { .code = "h";  .decade =   2; },
+  { .code = "deka";  .decade =   1; },  { .code = "da"; .decade =   1; },
+  { .code = "deci";  .decade =  -1; },  { .code = "d";  .decade =  -1; },
+  { .code = "centi"; .decade =  -2; },  { .code = "c";  .decade =  -2; },
+  { .code = "milli"; .decade =  -3; },  { .code = "m";  .decade =  -3; },
+  { .code = "micro"; .decade =  -6; },  { .code = "u";  .decade =  -6; },
+  { .code = "µ";     .decade =  -6; },
+  { .code = "nano";  .decade =  -9; },  { .code = "n";  .decade =  -9; },
+  { .code = "pico";  .decade = -12; },  { .code = "p";  .decade = -12; },
+  { .code = "femto"; .decade = -15; },  { .code = "f";  .decade = -15; },
+  { .code = "atto";  .decade = -18; },  { .code = "a";  .decade = -18; },
+  { .code = "zepto"; .decade = -21; },  { .code = "z";  .decade = -21; },
+  { .code = "yocto"; .decade = -24; },  { .code = "y";  .decade = -24; },
+];
+
+.mapped = [
+  # ── SI base ──────────────────────────────────────────────────────────────
+  { .code = "m";        .bovnar = "m";   .metric = true;  },
+  { .code = "meter";    .bovnar = "m";   .metric = true;  },
+  { .code = "metre";    .bovnar = "m";   .metric = true;  },
+  { .code = "s";        .bovnar = "s";   .metric = true;  },
+  { .code = "sec";      .bovnar = "s";   .metric = true;  },
+  { .code = "second";   .bovnar = "s";   .metric = true;  },
+  { .code = "g";        .bovnar = "g";   .metric = true;  },
+  { .code = "gram";     .bovnar = "g";   .metric = true;  },
+  { .code = "gramme";   .bovnar = "g";   .metric = true;  },
+  { .code = "A";        .bovnar = "A";   .metric = true;  },
+  { .code = "ampere";   .bovnar = "A";   .metric = true;  },
+  { .code = "amp";      .bovnar = "A";   .metric = true;  },
+  { .code = "K";        .bovnar = "K";   .metric = true;  },
+  { .code = "kelvin";   .bovnar = "K";   .metric = true;  },
+  { .code = "mol";      .bovnar = "mol"; .metric = true;  },
+  { .code = "mole";     .bovnar = "mol"; .metric = true;  },
+  { .code = "cd";       .bovnar = "cd";  .metric = true;  },
+  { .code = "candela";  .bovnar = "cd";  .metric = true;  },
+
+  # ── Named SI-derived ─────────────────────────────────────────────────────
+  { .code = "Hz";       .bovnar = "Hz";  .metric = true;  },
+  { .code = "hertz";    .bovnar = "Hz";  .metric = true;  },
+  { .code = "N";        .bovnar = "N";   .metric = true;  },
+  { .code = "newton";   .bovnar = "N";   .metric = true;  },
+  { .code = "Pa";       .bovnar = "Pa";  .metric = true;  },
+  { .code = "pascal";   .bovnar = "Pa";  .metric = true;  },
+  { .code = "J";        .bovnar = "J";   .metric = true;  },
+  { .code = "joule";    .bovnar = "J";   .metric = true;  },
+  { .code = "W";        .bovnar = "W";   .metric = true;  },
+  { .code = "watt";     .bovnar = "W";   .metric = true;  },
+  { .code = "V";        .bovnar = "V";   .metric = true;  },
+  { .code = "volt";     .bovnar = "V";   .metric = true;  },
+  { .code = "ohm";      .bovnar = "Ω";   .metric = true;  },
+  { .code = "F";        .bovnar = "F";   .metric = true;  },
+  { .code = "farad";    .bovnar = "F";   .metric = true;  },
+  { .code = "C";        .bovnar = "C";   .metric = true;  },
+  { .code = "coulomb";  .bovnar = "C";   .metric = true;  },
+  { .code = "S";        .bovnar = "S";   .metric = true;  },
+  { .code = "siemens";  .bovnar = "S";   .metric = true;  },
+  { .code = "Wb";       .bovnar = "Wb";  .metric = true;  },
+  { .code = "weber";    .bovnar = "Wb";  .metric = true;  },
+  { .code = "T";        .bovnar = "T";   .metric = true;  },
+  { .code = "tesla";    .bovnar = "T";   .metric = true;  },
+  { .code = "H";        .bovnar = "H";   .metric = true;  },
+  { .code = "henry";    .bovnar = "H";   .metric = true;  },
+  { .code = "lm";       .bovnar = "lm";  .metric = true;  },
+  { .code = "lumen";    .bovnar = "lm";  .metric = true;  },
+  { .code = "lx";       .bovnar = "lx";  .metric = true;  },
+  { .code = "lux";      .bovnar = "lx";  .metric = true;  },
+  { .code = "Bq";       .bovnar = "Bq";  .metric = true;  },
+  { .code = "becquerel"; .bovnar = "Bq"; .metric = true;  },
+  { .code = "Gy";       .bovnar = "Gy";  .metric = true;  },
+  { .code = "gray";     .bovnar = "Gy";  .metric = true;  },
+  { .code = "Sv";       .bovnar = "Sv";  .metric = true;  },
+  { .code = "sievert";  .bovnar = "Sv";  .metric = true;  },
+  { .code = "kat";      .bovnar = "kat"; .metric = true;  },
+  { .code = "katal";    .bovnar = "kat"; .metric = true;  },
+  { .code = "rad";      .bovnar = "rad"; .metric = true;  },
+  { .code = "radian";   .bovnar = "rad"; .metric = true;  },
+  { .code = "sr";       .bovnar = "sr";  .metric = true;  },
+  { .code = "steradian"; .bovnar = "sr"; .metric = true;  },
+
+  # ── Metric non-SI ────────────────────────────────────────────────────────
+  { .code = "L";        .bovnar = "L";   .metric = true;  },
+  { .code = "l";        .bovnar = "L";   .metric = true;  },
+  { .code = "liter";    .bovnar = "L";   .metric = true;  },
+  { .code = "litre";    .bovnar = "L";   .metric = true;  },
+  { .code = "t";        .bovnar = "t";   .metric = true;  },
+  { .code = "tonne";    .bovnar = "t";   .metric = true;  },
+  { .code = "bar";      .bovnar = "bar"; .metric = true;  },
+  { .code = "eV";       .bovnar = "eV";  .metric = true;  },
+  { .code = "electronvolt"; .bovnar = "eV"; .metric = true; },
+  { .code = "hectare";  .bovnar = "ha";  .metric = false; },
+  { .code = "angstrom"; .bovnar = "Å";   .metric = false; },
+  { .code = "Å";        .bovnar = "Å";   .metric = false; },
+  { .code = "barn";     .bovnar = "barn"; .metric = false; },
+  { .code = "parsec";   .bovnar = "pc";  .metric = true;  },
+  { .code = "pc";       .bovnar = "pc";  .metric = true;  },
+
+  # ── Time ─────────────────────────────────────────────────────────────────
+  # bovnar's yr is 31557600 s (365.25 d) and its mo is 2629800 s, the JULIAN
+  # year and month, which is what UDUNITS' unqualified "year" and "month" are.
+  { .code = "min";      .bovnar = "min"; .metric = false; },
+  { .code = "minute";   .bovnar = "min"; .metric = false; },
+  { .code = "h";        .bovnar = "h";   .metric = false; },
+  { .code = "hr";       .bovnar = "h";   .metric = false; },
+  { .code = "hour";     .bovnar = "h";   .metric = false; },
+  { .code = "d";        .bovnar = "d";   .metric = false; },
+  { .code = "day";      .bovnar = "d";   .metric = false; },
+  { .code = "week";     .bovnar = "wk";  .metric = false; },
+  { .code = "month";    .bovnar = "mo";  .metric = false; },
+  { .code = "year";     .bovnar = "yr";  .metric = false; },
+  { .code = "yr";       .bovnar = "yr";  .metric = false; },
+
+  # ── Temperature ──────────────────────────────────────────────────────────
+  # The native affine discipline applies unchanged: valid at exponent 1 only,
+  # and a compound containing one yields no conversion value.
+  { .code = "degC";             .bovnar = "°C"; .metric = false; },
+  { .code = "celsius";          .bovnar = "°C"; .metric = false; },
+  { .code = "degree_Celsius";   .bovnar = "°C"; .metric = false; },
+  { .code = "degrees_Celsius";  .bovnar = "°C"; .metric = false; },
+  { .code = "degF";             .bovnar = "°F"; .metric = false; },
+  { .code = "degree_Fahrenheit"; .bovnar = "°F"; .metric = false; },
+  { .code = "degR";             .bovnar = "°Ra"; .metric = false; },
+
+  # ── Angle ────────────────────────────────────────────────────────────────
+  { .code = "degree";     .bovnar = "°";      .metric = false; },
+  { .code = "degrees";    .bovnar = "°";      .metric = false; },
+  { .code = "deg";        .bovnar = "°";      .metric = false; },
+  { .code = "arcdeg";     .bovnar = "°";      .metric = false; },
+  { .code = "arcmin";     .bovnar = "arcmin"; .metric = false; },
+  { .code = "arcminute";  .bovnar = "arcmin"; .metric = false; },
+  { .code = "arcsec";     .bovnar = "arcsec"; .metric = false; },
+  { .code = "arcsecond";  .bovnar = "arcsec"; .metric = false; },
+  { .code = "grade";      .bovnar = "grad";   .metric = false; },
+
+  # ── Imperial and US customary ────────────────────────────────────────────
+  { .code = "in";        .bovnar = "in";  .metric = false; },
+  { .code = "inch";      .bovnar = "in";  .metric = false; },
+  { .code = "ft";        .bovnar = "ft";  .metric = false; },
+  { .code = "foot";      .bovnar = "ft";  .metric = false; },
+  { .code = "feet";      .bovnar = "ft";  .metric = false; },
+  { .code = "yd";        .bovnar = "yd";  .metric = false; },
+  { .code = "yard";      .bovnar = "yd";  .metric = false; },
+  { .code = "mi";        .bovnar = "mi";  .metric = false; },
+  { .code = "mile";      .bovnar = "mi";  .metric = false; },
+  { .code = "nmi";       .bovnar = "nmi"; .metric = false; },
+  { .code = "lb";        .bovnar = "lb";  .metric = false; },
+  { .code = "pound";     .bovnar = "lb";  .metric = false; },
+  { .code = "oz";        .bovnar = "oz";  .metric = false; },
+  { .code = "ounce";     .bovnar = "oz";  .metric = false; },
+  { .code = "gallon";    .bovnar = "gal"; .metric = false; },
+  { .code = "quart";     .bovnar = "qt";  .metric = false; },
+  { .code = "pint";      .bovnar = "pt";  .metric = false; },
+  { .code = "acre";      .bovnar = "ac";  .metric = false; },
+  { .code = "knot";      .bovnar = "kn";  .metric = false; },
+  { .code = "psi";       .bovnar = "psi"; .metric = false; },
+  { .code = "atm";       .bovnar = "atm"; .metric = false; },
+  { .code = "atmosphere"; .bovnar = "atm"; .metric = false; },
+  { .code = "calorie";   .bovnar = "cal"; .metric = false; },
+  { .code = "cal";       .bovnar = "cal"; .metric = false; },
+  { .code = "erg";       .bovnar = "erg"; .metric = false; },
+  { .code = "dyne";      .bovnar = "dyn"; .metric = false; },
+  { .code = "poise";     .bovnar = "P";   .metric = false; },
+  { .code = "stokes";    .bovnar = "St";  .metric = false; },
+  { .code = "gauss";     .bovnar = "G";   .metric = false; },
+  { .code = "curie";     .bovnar = "Ci";  .metric = false; },
+  { .code = "rem";       .bovnar = "rem"; .metric = false; },
+  { .code = "torr";      .bovnar = "Torr"; .metric = false; },
+
+  # ── Ratios and logarithms ────────────────────────────────────────────────
+  { .code = "percent";   .bovnar = "%";   .metric = false; },
+  { .code = "%";         .bovnar = "%";   .metric = false; },
+  { .code = "ppm";       .bovnar = "ppm"; .metric = false; },
+  { .code = "ppb";       .bovnar = "ppb"; .metric = false; },
+  { .code = "dB";        .bovnar = "dB";  .metric = false; },
+  { .code = "decibel";   .bovnar = "dB";  .metric = false; },
+  { .code = "Np";        .bovnar = "Np";  .metric = true;  },
+  { .code = "neper";     .bovnar = "Np";  .metric = true;  },
+  { .code = "pH";        .bovnar = "pH";  .metric = false; },
+
+  # ── Information ──────────────────────────────────────────────────────────
+  { .code = "bit";       .bovnar = "b";   .metric = true;  },
+  { .code = "byte";      .bovnar = "B";   .metric = true;  },
+];
+
+# UDUNITS has no assay-defined units the way UCUM does; everything either maps
+# onto the native registry or is refused, so this profile owns no opaque range.
+.opaque = [];
+
+.unsupported = [
+  # ── Reference time ───────────────────────────────────────────────────────
+  # The construct this profile is most often asked for, and the one it cannot
+  # carry. A bovnar timestamp is <datetime:width,epoch>: the EPOCH lives in the
+  # type spec's base slot, which a unit-slot expression cannot reach, and the
+  # CARRIER is defined as a count of seconds, which "days since ..." is not.
+  # Both would have to change for this to land, and neither is a unit question.
+  #
+  # The refusal is NOT driven by this row. A reference-time expression cannot be
+  # split into atoms at all -- the lexer has already deleted its spaces, so
+  # "days since 1970-01-01" arrives as one token -- so bovnar_profiles.c refuses
+  # any udunits code CONTAINING "since", via the refuse_substr hook on the
+  # registry row. The row is kept because this is where a maintainer looks for
+  # the reason, and because it makes a bare "udunits:since" refuse identically.
+  { .code = "since"; .why = "reference time — a bovnar timestamp is <datetime:width,epoch>; the epoch is a type parameter, not a unit, and the carrier counts seconds"; },
+
+  # ── Dimensionless placeholders ───────────────────────────────────────────
+  # CF writes a dimensionless variable's units as "1". There is no row for "1"
+  # here: the shared expr parser resolves a bare power of ten to UNITY before
+  # any table is consulted, so "udunits:1" yields a value with no unit, exactly
+  # as "ucum:1" does. That is the right answer and listing it would be dead
+  # data. "count" is a name rather than a numeral and does need a row.
+  { .code = "count"; .why = "a bare count — omit the unit slot instead"; },
+
+  # ── Coordinate pseudo-units ──────────────────────────────────────────────
+  # CF's rotated-pole and geographic direction markers. These are not units at
+  # all: they say which way an angle is measured, which is a coordinate-system
+  # statement bovnar's unit model has no place for.
+  { .code = "degrees_north"; .why = "a coordinate direction, not a unit — write ° and record the direction elsewhere"; },
+  { .code = "degrees_east";  .why = "a coordinate direction, not a unit — write ° and record the direction elsewhere"; },
+  { .code = "degrees_south"; .why = "a coordinate direction, not a unit"; },
+  { .code = "degrees_west";  .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_north";  .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_east";   .why = "a coordinate direction, not a unit"; },
+
+  # ── Logarithms with a reference level ────────────────────────────────────
+  # UDUNITS spells these lg(re 1 mW) and similar; bovnar's dB carries no
+  # reference, so translating would let a power level compare equal to a
+  # voltage level.
+  { .code = "dBm";  .why = "dB relative to a milliwatt — dB carries no reference level"; },
+  { .code = "dBW";  .why = "dB relative to a watt — dB carries no reference level"; },
+  { .code = "dBV";  .why = "dB relative to a volt — dB carries no reference level"; },
+
+  # ── Sidereal and tropical time ───────────────────────────────────────────
+  # bovnar's yr is the Julian year exactly; these are different lengths and
+  # have no native form.
+  { .code = "tropical_year"; .why = "no native form — bovnar's yr is the Julian year"; },
+  { .code = "sidereal_year"; .why = "no native form — bovnar's yr is the Julian year"; },
+  { .code = "sidereal_day";  .why = "no native form — bovnar's d is the solar day"; },
+];

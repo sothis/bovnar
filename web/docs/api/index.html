@@ -189,10 +189,13 @@
 <span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">max_file_size</span><span class="p">;</span><span class="w">        </span><span class="cm">/* 0 → unlimited / endless (default); set positive to cap */</span>
 <span class="w">    </span><span class="kt">uint8_t</span><span class="w">  </span><span class="n">max_struct_nesting</span><span class="p">;</span><span class="w">   </span><span class="cm">/* 0 → 64 internal default; hard cap 255 */</span>
 <span class="w">    </span><span class="kt">uint8_t</span><span class="w">  </span><span class="n">max_array_nesting</span><span class="p">;</span><span class="w">    </span><span class="cm">/* 0 → 64 internal default; hard cap 255 */</span>
-<span class="w">    </span><span class="cm">/* ... other size limits ... */</span>
+<span class="w">    </span><span class="cm">/* ... the remaining size limits, plus strict_version, text_only (§1.13),</span>
+<span class="cm">     * and the want_unit hook and its two knobs (§1.10) ... */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">bvnr_read_flags_t</span><span class="p">;</span>
 </code></pre></div>
 
+<p>The full struct is in <code>include/bovnar.h</code>, and the specification lists it in
+§16.4.</p>
 <p><code>on_verified</code> is the callback you will implement almost always. <code>on_unverified</code> fires before semantic validation — use it only for diagnostics or partial inspection. The one exception is read-time unit conversion: <code>want_unit</code> (§1.10) runs ahead of <strong>both</strong> callbacks, so with it installed an <code>on_unverified</code> consumer also sees a populated <code>converted</code>/<code>conv</code> on <code>ev_data</code>. Both callbacks must return <code>true</code> to continue parsing, <code>false</code> to abort (sets <code>error_scanner_callback_failed</code>).</p>
 <p>The <code>options</code> pointer is not stored; the struct is read during <code>bvnr_open_read_source</code> only, so it may live on the stack.</p>
 <p><strong><code>max_text_bytes</code> is not a total-size cap.</strong> It counts the bytes the <em>text</em>
@@ -610,18 +613,32 @@ no exact rational to hand over in the first place.</p>
 contain, and what unit the consumer wants values delivered in. Everything is
 expressed as unit <strong>text</strong>, so a binding can drive it without a function pointer.</p>
 <div class="codehilite"><pre><span></span><code><span class="cp">#define BVNR_MAX_UNIT_TARGETS 8u</span>
+<span class="cp">#define BVNR_MAX_UNIT_RULES   8u</span>
+<span class="cp">#define BVNR_MAX_UNIT_PATH    96u</span>
 
 <span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_unit_target_s</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">;</span><span class="w">   </span><span class="cm">/* &quot;m/s&quot;; parsed when the policy is set */</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">    </span><span class="n">base</span><span class="p">;</span><span class="w">   </span><span class="cm">/* output base, 0 = the value&#39;s own */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="p">;</span>
 
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_unit_rule_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w">            </span><span class="o">*</span><span class="n">path</span><span class="p">;</span><span class="w">   </span><span class="cm">/* &quot;.inlet.temperature&quot;, or &quot;.inlet.*&quot; */</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w">            </span><span class="o">*</span><span class="n">unit</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">               </span><span class="n">base</span><span class="p">;</span><span class="w">   </span><span class="cm">/* output base for bvnr_rule_convert, 0 = own */</span>
+<span class="w">    </span><span class="n">bvnr_unit_rule_mode_t</span><span class="w">  </span><span class="n">mode</span><span class="p">;</span><span class="w">   </span><span class="cm">/* bvnr_rule_convert | bvnr_rule_require */</span>
+<span class="p">}</span><span class="w"> </span><span class="n">bvnr_unit_rule_t</span><span class="p">;</span>
+
 <span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_unit_policy_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="cm">/* per-field rules — consulted before everything below */</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_rule_t</span><span class="w">     </span><span class="o">*</span><span class="n">rules</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">num_rules</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* conversion */</span>
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_unit_target_t</span><span class="w">   </span><span class="o">*</span><span class="n">targets</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">num_targets</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">base</span><span class="p">;</span><span class="w">         </span><span class="cm">/* output base for `normalise` */</span>
 <span class="w">    </span><span class="n">bvnr_unit_normalise_t</span><span class="w">       </span><span class="n">normalise</span><span class="p">;</span><span class="w">    </span><span class="cm">/* none | bvnr_normalise_si */</span>
 <span class="w">    </span><span class="n">bvnr_unit_inexact_policy_t</span><span class="w">  </span><span class="n">on_inexact</span><span class="p">;</span><span class="w">   </span><span class="cm">/* error | leave */</span>
+<span class="w">    </span><span class="cm">/* validation — these reject a document and never change a value */</span>
 <span class="w">    </span><span class="kt">bool</span><span class="w">                        </span><span class="n">require_unit</span><span class="p">;</span>
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w">         </span><span class="o">*</span><span class="n">require_dimension_of</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">                    </span><span class="n">num_require_dimension_of</span><span class="p">;</span>
@@ -882,6 +899,9 @@ into the sink yourself. To size writer output, ask the writer:</p>
 <li><code>options</code> — configuration struct. Zero-initialise for defaults.</li>
 </ul>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_write_flags_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="cm">/* Regrouped for exposition — see include/bovnar.h for the declaration</span>
+<span class="cm">       order, and zero-initialise rather than relying on this one. ... */</span>
+
 <span class="w">    </span><span class="cm">/* ── Writer enforces these ─────────────────────────────────── */</span>
 <span class="w">    </span><span class="kt">uint8_t</span><span class="w">  </span><span class="n">max_struct_nesting</span><span class="p">;</span><span class="w">      </span><span class="cm">/* 0 → 64 internal default; hard cap 255 */</span>
 <span class="w">    </span><span class="kt">uint8_t</span><span class="w">  </span><span class="n">max_array_nesting</span><span class="p">;</span><span class="w">       </span><span class="cm">/* 0 → 64 internal default; hard cap 255 */</span>
@@ -902,6 +922,8 @@ into the sink yourself. To size writer output, ask the writer:</p>
 <span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">max_file_size</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">bool</span><span class="w">     </span><span class="n">continue_on_error</span><span class="p">;</span><span class="w">       </span><span class="cm">/* no-op in the writer */</span>
 <span class="w">    </span><span class="n">bvnr_on_error_fn</span><span class="w"> </span><span class="n">on_error</span><span class="p">;</span><span class="w">        </span><span class="cm">/* no-op in the writer */</span>
+
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">_reserved</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span><span class="w">            </span><span class="cm">/* padding for future fields; leave zero */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">bvnr_write_flags_t</span><span class="p">;</span>
 </code></pre></div>
 

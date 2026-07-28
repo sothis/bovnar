@@ -40,12 +40,14 @@ THREE OUTCOMES, AND ONLY TWO ARE ERRORS.
              table does not map it. Advisory: it is a coverage suggestion, not a
              defect, and the decision to carry a unit is editorial.
 
-WHAT IT DOES NOT CHECK. Four of the five profiles are covered: `ucum`, `udunits`,
-`qudt` and `qudt-qk`. UN/ECE Rec 20 is the one left out — it publishes a code
-list whose conversion factors are prose, so there is nothing to resolve. (QUDT
-does carry a `qudt:uneceCommonCode` cross-reference on many units, which would
-give a machine-readable handle on Rec 20 at one remove; it would be QUDT's claim
-about UNECE rather than UNECE's own, and is not used here.)
+ALL FIVE PROFILES ARE COVERED, BUT NOT ALL EQUALLY. `ucum`, `udunits`, `qudt`
+and `qudt-qk` are checked against their publishers' own definitions. `unece` is
+checked at ONE REMOVE, through QUDT's `qudt:uneceCommonCode` cross-reference,
+because Rec 20 states its conversion factors in prose and there is no primary
+artefact to resolve. That is QUDT asserting what a Rec 20 code means, so a
+disagreement there is evidence that one of the two tables is wrong, never proof
+of which — `class Unece` says what follows from that, and the run prints the
+distinction rather than letting a secondary result read like a primary one.
 
 Arbitrary and special units (UCUM `isArbitrary`/`isSpecial`, QUDT units with no
 `conversionMultiplier`) have no factor to check and are skipped — they are
@@ -125,6 +127,12 @@ SOURCES = {
         ("qudt-units.ttl", "https://qudt.org/3.1.0/vocab/unit"),
         ("qudt-quantitykinds.ttl", "https://qudt.org/3.1.0/vocab/quantitykind"),
     ],
+    # UN/ECE is checked through QUDT's uneceCommonCode cross-reference, so it
+    # needs the same file and no publication of its own. See class Unece for
+    # what that does and does not prove.
+    "unece": [
+        ("qudt-units.ttl", "https://qudt.org/3.1.0/vocab/unit"),
+    ],
 }
 
 # Bovnar's dimension order, as bvn_unit_dimension_vector fills it.
@@ -181,6 +189,13 @@ WAIVED_UPSTREAM = {
         "UCUM rounds the mercury column to 133.3220 kPa (7 digits); native mmHg "
         "is the exact conventional 133.322387415 Pa. 2.9 ppm, publisher "
         "rounding rather than a different unit.",
+    ("unece", "MON"):
+        "Reached through QUDT, which attaches uneceCommonCode \"MON\" to its own "
+        "MO — a unit its description calls the SYNODIC month, 29.53059 days. Rec "
+        "20's MON is a commercial month, so this is the cross-reference being "
+        "wrong rather than the table: a trade code list does not mean the lunar "
+        "cycle. Exactly the limit a secondary source has, and the reason this "
+        "vocabulary's disagreements are evidence rather than proof.",
     ("qudt", "TORR"):
         "QUDT rounds the torr to 133.322 Pa (6 digits); native Torr is the "
         "exact 101325/760. 2.8 ppm, the same publisher rounding as UCUM's "
@@ -763,7 +778,65 @@ class QudtQk(Qudt):
         return (1.0, d)
 
 
-VOCABS = {"udunits": Udunits, "ucum": Ucum, "qudt": Qudt, "qudt-qk": QudtQk}
+class Unece(Qudt):
+    """UN/ECE Rec 20, checked THROUGH QUDT rather than against Rec 20 itself.
+
+    THIS IS A SECONDARY SOURCE and everything below follows from that. Rec 20
+    publishes a code list whose conversion factors are prose, so there is no
+    primary artefact to resolve. QUDT carries a `qudt:uneceCommonCode` on many
+    of its units, which gives a machine-readable UNECE-code-to-value map at one
+    remove — it is QUDT asserting what a Rec 20 code means, not UN/ECE. A
+    disagreement found here is evidence that one of the two tables is wrong, not
+    proof of which.
+
+    Two consequences, both of them about not overclaiming:
+
+      * `accepts` is ALWAYS TRUE. A code QUDT does not mention is not thereby
+        absent from Rec 20 — QUDT simply has no unit carrying it. Reporting such
+        a row as "dead" would be asserting something this source cannot support,
+        so the dead check is switched off for this vocabulary entirely and the
+        uncovered rows are counted separately instead.
+      * A code SEVERAL QUDT units claim is only usable when they agree. 81 codes
+        have more than one claimant; most are aliases of one unit, but some are
+        not — J62 is claimed by both a barrels-per-hour and a barrels-per-second
+        unit, which differ by 3600. Where the claimants disagree the cross-
+        reference cannot say what the code means, and the row goes unchecked.
+    """
+
+    name = "unece"
+    secondary = True
+
+    def __init__(self, cache):
+        Qudt.__init__(self, cache)
+        claims = {}
+        for local, p in self.rows.items():
+            for v in p.get("uneceCommonCode", []):
+                code = v.split("^^")[0].strip('"').strip()
+                claims.setdefault(code, []).append(local)
+        self._val, self.ambiguous = {}, set()
+        for code, locals_ in claims.items():
+            vals = [Qudt.resolve(self, l) for l in locals_]
+            vals = [v for v in vals if v is not None]
+            if not vals:
+                continue
+            f0, d0 = vals[0]
+            if all(d == d0 and close(f, f0) for f, d in vals):
+                self._val[code] = (f0, d0)
+            else:
+                self.ambiguous.add(code)
+
+    def accepts(self, code):
+        return True          # see the class docstring: cannot disprove absence
+
+    def spellings(self):
+        return set(self._val)
+
+    def resolve(self, code):
+        return self._val.get(code)
+
+
+VOCABS = {"udunits": Udunits, "ucum": Ucum, "qudt": Qudt, "qudt-qk": QudtQk,
+          "unece": Unece}
 
 
 # ── the comparison ──────────────────────────────────────────────────────────
@@ -776,7 +849,40 @@ def close(a, b, tol=TOL):
     return abs(a - b) / abs(b) < tol
 
 
-def check_profile(ns, vocab, native, verbose):
+class NativeIndex:
+    """Every native unit's (factor, dims), so a publisher's code can be matched
+    by VALUE rather than by spelling.
+
+    Built from src/gendata/units.bvnr through the reference library, one entry
+    per canonical symbol. Units sharing a dimension and a factor -- Hz and Bq,
+    Gy and Sv -- collapse onto whichever comes first, which is why a suggestion
+    is advisory: it says "this code is worth what some native unit is worth",
+    not "map it to that one".
+    """
+
+    def __init__(self, native):
+        self.rows = []
+        doc = bvnr_data.load(
+            open(os.path.join(GENDATA, "units.bvnr"), "rb").read())
+        for u in doc["units"]:
+            try:
+                r = native(u["symbol"])
+            except Unresolved:
+                continue
+            if r is None:
+                continue
+            self.rows.append((u["symbol"], r[0], list(r[1])))
+
+    def match(self, vocab, up):
+        for sym, nf, nd in self.rows:
+            uf, ud = (vocab.normalise(up, nd)
+                      if hasattr(vocab, "normalise") else up)
+            if list(ud) == nd and close(uf, nf):
+                return (sym, nf)
+        return None
+
+
+def check_profile(ns, vocab, native, native_index, verbose):
     """-> (mismatches, dead, missing) as lists of printable lines."""
     doc = bvnr_data.load(open(os.path.join(GENDATA, ns + ".bvnr"), "rb").read())
     mapped = doc.get("mapped", [])
@@ -821,23 +927,25 @@ def check_profile(ns, vocab, native, verbose):
         elif verbose:
             print("    ok      %-24s -> %-14s %.10g" % (code, target, nf))
 
-    # Coverage: a publisher's code that IS a native unit exactly, unmapped.
+    # Coverage: a publisher's code whose VALUE is exactly a native unit, and
+    # which the table does not carry.
+    #
+    # This used to ask whether the code parsed as a native unit expression,
+    # which only ever fires when the two vocabularies happen to spell a unit the
+    # same way -- so it found a little for ucum and udunits and nothing at all
+    # for the flat vocabularies, where a code like "KVA" resembles no native
+    # spelling. Matching on the VALUE instead is what makes the suggestion
+    # useful for exactly the profiles that needed it.
     for code in sorted(vocab.spellings()):
         if code in declared or (ns, code) in WAIVED_MODEL:
             continue
         up = vocab.resolve(code)
         if up is None:
             continue
-        try:
-            nat = native(code)
-        except Unresolved:
-            nat = None
-        if nat is None:
-            continue
-        nf, nd = nat
-        uf, ud = vocab.normalise(up, nd) if hasattr(vocab, "normalise") else up
-        if list(ud) == list(nd) and close(uf, nf, 1e-9):
-            missing.append("  %-24s == native %-14s (%.10g)" % (code, code, nf))
+        hit = native_index.match(vocab, up)
+        if hit:
+            missing.append("  %-22s == native %-12s (%.10g)" % (code, hit[0],
+                                                                hit[1]))
 
     return mismatch, dead, missing, notes, checked
 
@@ -903,13 +1011,28 @@ def main(argv):
         print("check_profile_factors: SKIPPED — %s" % msg)
         return 0
 
+    native_index = NativeIndex(native)
     total_mismatch = total_dead = total_missing = total_checked = 0
     for ns in available:
         vocab = VOCABS[ns](args.cache)
         if args.verbose:
             print("  %s:" % ns)
         mism, dead, missing, notes, checked = check_profile(
-            ns, vocab, native, args.verbose)
+            ns, vocab, native, native_index, args.verbose)
+        if getattr(vocab, "secondary", False):
+            doc = bvnr_data.load(
+                open(os.path.join(GENDATA, ns + ".bvnr"), "rb").read())
+            uncovered = sorted(m["code"] for m in doc.get("mapped", [])
+                               if vocab.resolve(m["code"]) is None
+                               and (ns, m["code"]) not in WAIVED_UPSTREAM)
+            print("\n%s — checked through a SECONDARY source (QUDT's "
+                  "uneceCommonCode), so a disagreement is evidence, not proof."
+                  % ns.upper())
+            print("  %d row(s) the cross-reference does not cover: %s"
+                  % (len(uncovered), ", ".join(uncovered) or "none"))
+            if vocab.ambiguous:
+                print("  %d code(s) claimed by QUDT units that disagree, so "
+                      "unusable here" % len(vocab.ambiguous))
         total_checked += checked
         if mism:
             print("\n%s — THE TABLE DISAGREES WITH THE PUBLISHER (%d):"

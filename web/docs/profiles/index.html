@@ -2017,11 +2017,11 @@ in the generator. <code>gen_profiles.py</code> still carries no UCUM value: <cod
 not what the publisher says it is worth. Where a value was uncertain, or certainly <em>close but not
 equal</em> to a native unit, the atom went into <code>.unsupported</code> instead — which is why <code>osm</code>, <code>[Btu]</code>,
 <code>cal_IT</code> and <code>[dr_ap]</code> are refused rather than mapped onto the nearly-right native unit.</p>
-<p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for four of the five
-profiles. It reads UCUM's <code>ucum-essence.xml</code>, the UDUNITS-2 XML database and QUDT's Turtle
-vocabularies, resolves every code to a factor and a dimension vector, asks the <strong>reference library</strong>
-— not a second Python implementation of the unit grammar — what the mapped native target is worth,
-and compares. See §9.5.</p>
+<p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for all five profiles,
+though not for all of them equally. It reads UCUM's <code>ucum-essence.xml</code>, the UDUNITS-2 XML database
+and QUDT's Turtle vocabularies, resolves every code to a factor and a dimension vector, asks the
+<strong>reference library</strong> — not a second Python implementation of the unit grammar — what the mapped
+native target is worth, and compares. <code>unece</code> is reached at one remove; see §9.5.</p>
 <p>The generator also emits the <strong>reverse</strong> table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
 searching the forward table at run time is what makes <code>bvn_unit_to_ucum</code> deterministic; the 599
@@ -2176,14 +2176,28 @@ and there the check is the claim §12.3 actually makes, that a kind maps to the 
 of that kind. Reporting a kind as <code>(1.0, its dimensions)</code> turns that into two ordinary assertions —
 the dimensions agree, and the native factor is exactly 1 — so <code>qudt-qk:Length</code> mapped to <code>ft</code> would
 fail on the factor although its dimensions are perfect.</p>
-<p><strong>What it does not cover.</strong> UN/ECE Rec 20 is the one profile left out: it publishes a code list
-whose conversion factors are prose, so there is nothing to resolve. QUDT does carry a
-<code>qudt:uneceCommonCode</code> cross-reference on many units, which would give a machine-readable handle on
-Rec 20 at one remove — but it is QUDT's claim about UNECE rather than UNECE's own, and this tool
-does not use it. Arbitrary and special units (<code>isArbitrary</code>, <code>isSpecial</code>, and any QUDT unit with no
+<p><strong><code>unece</code> is checked through a secondary source, and the difference is not cosmetic.</strong> Rec 20 states
+its conversion factors in prose, so there is no primary artefact to resolve. QUDT carries a
+<code>qudt:uneceCommonCode</code> on many of its units, which gives a machine-readable UNECE-code-to-value map
+at one remove — QUDT asserting what a Rec 20 code means, not UN/ECE. Three things follow, and the
+tool implements all three rather than quietly treating the result as primary:</p>
+<ul>
+<li><strong>A disagreement is evidence, not proof.</strong> It says one of the two tables is wrong, not which. The
+  first one found is a case in point: QUDT attaches <code>MON</code> to its own <code>MO</code>, a unit its description
+  calls the <em>synodic</em> month of 29.53059 days. Rec 20's <code>MON</code> is a commercial month, so the
+  cross-reference is what is wrong there — a trade code list does not mean the lunar cycle — and
+  bovnar's Julian month stays.</li>
+<li><strong>A code QUDT does not mention is not thereby absent from Rec 20.</strong> The dead-row check is
+  therefore switched off for this vocabulary entirely, and the rows the cross-reference does not
+  reach are counted and named on every run instead.</li>
+<li><strong>A code several QUDT units claim is usable only when they agree.</strong> 81 codes have more than one
+  claimant; most are aliases of one unit, but <code>J62</code> is claimed by both a barrels-per-hour and a
+  barrels-per-second unit, which differ by 3600. Where claimants disagree the code goes unchecked.</li>
+</ul>
+<p>Arbitrary and special units (<code>isArbitrary</code>, <code>isSpecial</code>, and any QUDT unit with no
 <code>conversionMultiplier</code>) have no factor to check — they are exactly the ones carried as opaque or
-refused. So the standing risk of §10.2 is now <strong>narrowed to one of the five profiles</strong>, not
-retired.</p>
+refused. The standing risk of §10.2 is <strong>reduced everywhere and retired nowhere</strong>: four tables now
+rest on their publishers, and the fifth rests on another publisher's reading of its publisher.</p>
 <hr />
 <h2 id="10-cost-risk-and-what-is-left-out">10. Cost, risk, and what is left out</h2>
 <h3 id="101-what-it-cost">10.1 What it cost</h3>
@@ -2311,7 +2325,7 @@ one paragraph to read rather than four sections to cross-check.</p>
 <tr>
 <td>~~The generator's factor proof against UCUM's own values~~</td>
 <td>§9.2, §9.5</td>
-<td><strong>Built</strong> as <code>check_profile_factors.py</code>, outside the generator. Covers <code>ucum</code>, <code>udunits</code>, <code>qudt</code> and <code>qudt-qk</code>; only <code>unece</code> still rests on the table author</td>
+<td><strong>Built</strong> as <code>check_profile_factors.py</code>, outside the generator. All five profiles, four against their own publishers and <code>unece</code> at one remove through QUDT</td>
 </tr>
 <tr>
 <td><code>BVNR_WITH_UCUM_PROFILE</code> and feature reporting</td>
@@ -2319,19 +2333,19 @@ one paragraph to read rather than four sections to cross-check.</p>
 <td>The profiles are unconditional, which is a simplification rather than a loss</td>
 </tr>
 <tr>
-<td>A machine check of the <code>unece</code> table against its publisher</td>
-<td>§9.2, §10.2</td>
-<td>The other four are checked (§9.5); Rec 20's factors are prose</td>
+<td>A machine check of <code>unece</code> against Rec 20 <strong>itself</strong></td>
+<td>§9.2, §10.2, §9.5</td>
+<td>Rec 20's factors are prose; the table is checked through QUDT's cross-reference instead, which is another publisher's reading</td>
 </tr>
 </tbody>
 </table>
 <p>The factor proof was the one worth building next and is now built (§9.5). It caught four wrong
 udunits rows and two wrong UCUM spellings on its first run and found a defect in UCUM's own data;
 extending it to QUDT caught six local names QUDT does not define, a month that was the lunar one and
-a rotational speed 2π out. It reaches four of the five profiles, <code>unece</code> being the one whose
-publisher states factors in prose — so §14's caveat still stands for that table alone: the suite can
-prove <code>unece</code> agrees with the other four, not that it agrees with Rec 20. Verbatim source
-preservation is next.</p>
+a rotational speed 2π out. <code>unece</code> is reached through QUDT's cross-reference, which is a weaker
+claim and is reported as one. §14's caveat is therefore reduced rather than lifted: the strongest
+statement available for that table is that it agrees with another publisher's reading of Rec 20.
+Verbatim source preservation is next.</p>
 <hr />
 <h2 id="11-the-unece-profile">11. The UNECE profile</h2>
 <blockquote>

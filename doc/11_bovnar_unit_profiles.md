@@ -1201,11 +1201,11 @@ not what the publisher says it is worth. Where a value was uncertain, or certain
 equal* to a native unit, the atom went into `.unsupported` instead — which is why `osm`, `[Btu]`,
 `cal_IT` and `[dr_ap]` are refused rather than mapped onto the nearly-right native unit.
 
-`check_profile_factors.py` (CTest target `bvnr_profile_factors`) closes it for four of the five
-profiles. It reads UCUM's `ucum-essence.xml`, the UDUNITS-2 XML database and QUDT's Turtle
-vocabularies, resolves every code to a factor and a dimension vector, asks the **reference library**
-— not a second Python implementation of the unit grammar — what the mapped native target is worth,
-and compares. See §9.5.
+`check_profile_factors.py` (CTest target `bvnr_profile_factors`) closes it for all five profiles,
+though not for all of them equally. It reads UCUM's `ucum-essence.xml`, the UDUNITS-2 XML database
+and QUDT's Turtle vocabularies, resolves every code to a factor and a dimension vector, asks the
+**reference library** — not a second Python implementation of the unit grammar — what the mapped
+native target is worth, and compares. `unece` is reached at one remove; see §9.5.
 
 The generator also emits the **reverse** table §5.3 uses, choosing the canonical atom for each base
 (shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
@@ -1323,14 +1323,28 @@ of that kind. Reporting a kind as `(1.0, its dimensions)` turns that into two or
 the dimensions agree, and the native factor is exactly 1 — so `qudt-qk:Length` mapped to `ft` would
 fail on the factor although its dimensions are perfect.
 
-**What it does not cover.** UN/ECE Rec 20 is the one profile left out: it publishes a code list
-whose conversion factors are prose, so there is nothing to resolve. QUDT does carry a
-`qudt:uneceCommonCode` cross-reference on many units, which would give a machine-readable handle on
-Rec 20 at one remove — but it is QUDT's claim about UNECE rather than UNECE's own, and this tool
-does not use it. Arbitrary and special units (`isArbitrary`, `isSpecial`, and any QUDT unit with no
+**`unece` is checked through a secondary source, and the difference is not cosmetic.** Rec 20 states
+its conversion factors in prose, so there is no primary artefact to resolve. QUDT carries a
+`qudt:uneceCommonCode` on many of its units, which gives a machine-readable UNECE-code-to-value map
+at one remove — QUDT asserting what a Rec 20 code means, not UN/ECE. Three things follow, and the
+tool implements all three rather than quietly treating the result as primary:
+
+- **A disagreement is evidence, not proof.** It says one of the two tables is wrong, not which. The
+  first one found is a case in point: QUDT attaches `MON` to its own `MO`, a unit its description
+  calls the *synodic* month of 29.53059 days. Rec 20's `MON` is a commercial month, so the
+  cross-reference is what is wrong there — a trade code list does not mean the lunar cycle — and
+  bovnar's Julian month stays.
+- **A code QUDT does not mention is not thereby absent from Rec 20.** The dead-row check is
+  therefore switched off for this vocabulary entirely, and the rows the cross-reference does not
+  reach are counted and named on every run instead.
+- **A code several QUDT units claim is usable only when they agree.** 81 codes have more than one
+  claimant; most are aliases of one unit, but `J62` is claimed by both a barrels-per-hour and a
+  barrels-per-second unit, which differ by 3600. Where claimants disagree the code goes unchecked.
+
+Arbitrary and special units (`isArbitrary`, `isSpecial`, and any QUDT unit with no
 `conversionMultiplier`) have no factor to check — they are exactly the ones carried as opaque or
-refused. So the standing risk of §10.2 is now **narrowed to one of the five profiles**, not
-retired.
+refused. The standing risk of §10.2 is **reduced everywhere and retired nowhere**: four tables now
+rest on their publishers, and the fifth rests on another publisher's reading of its publisher.
 
 ---
 
@@ -1429,17 +1443,17 @@ one paragraph to read rather than four sections to cross-check.
 | Not built | Where it is described | Consequence |
 |---|---|---|
 | Verbatim source preservation (`bvnr_data_t.unit_source`, writer re-emission) | §5.2, §7.3 | An annotation is dropped by a document built through the writer API. A parse-and-re-serialise round trip keeps it |
-| ~~The generator's factor proof against UCUM's own values~~ | §9.2, §9.5 | **Built** as `check_profile_factors.py`, outside the generator. Covers `ucum`, `udunits`, `qudt` and `qudt-qk`; only `unece` still rests on the table author |
+| ~~The generator's factor proof against UCUM's own values~~ | §9.2, §9.5 | **Built** as `check_profile_factors.py`, outside the generator. All five profiles, four against their own publishers and `unece` at one remove through QUDT |
 | `BVNR_WITH_UCUM_PROFILE` and feature reporting | §9.4 | The profiles are unconditional, which is a simplification rather than a loss |
-| A machine check of the `unece` table against its publisher | §9.2, §10.2 | The other four are checked (§9.5); Rec 20's factors are prose |
+| A machine check of `unece` against Rec 20 **itself** | §9.2, §10.2, §9.5 | Rec 20's factors are prose; the table is checked through QUDT's cross-reference instead, which is another publisher's reading |
 
 The factor proof was the one worth building next and is now built (§9.5). It caught four wrong
 udunits rows and two wrong UCUM spellings on its first run and found a defect in UCUM's own data;
 extending it to QUDT caught six local names QUDT does not define, a month that was the lunar one and
-a rotational speed 2π out. It reaches four of the five profiles, `unece` being the one whose
-publisher states factors in prose — so §14's caveat still stands for that table alone: the suite can
-prove `unece` agrees with the other four, not that it agrees with Rec 20. Verbatim source
-preservation is next.
+a rotational speed 2π out. `unece` is reached through QUDT's cross-reference, which is a weaker
+claim and is reported as one. §14's caveat is therefore reduced rather than lifted: the strongest
+statement available for that table is that it agrees with another publisher's reading of Rec 20.
+Verbatim source preservation is next.
 
 ---
 

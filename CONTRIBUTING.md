@@ -265,9 +265,11 @@ Editing a table under `src/gendata/*.bvnr` changes what a foreign unit code
 means, and `gen_profiles.py` only checks that a `.bovnar` target names something
 this build's registry has — not that the code is worth what the table says.
 
-`check_profile_factors.py` is the outside check. It covers four of the five
-profiles — `ucum`, `udunits`, `qudt` and `qudt-qk`; only `unece` is left out,
-because Rec 20 states its conversion factors in prose:
+`check_profile_factors.py` is the outside check. It covers all five profiles:
+`ucum`, `udunits`, `qudt` and `qudt-qk` against their own publishers, and
+`unece` at one remove through QUDT's `uneceCommonCode` cross-reference, because
+Rec 20 states its conversion factors in prose. A `unece` disagreement is
+therefore evidence that one of two tables is wrong, not proof of which:
 
 ```
 python3 check_profile_factors.py --fetch     # once, populates <build>/vocab/

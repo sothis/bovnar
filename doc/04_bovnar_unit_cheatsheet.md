@@ -373,6 +373,10 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `b`    | `bit`, `bits` | bit | `bu_bit` |
 | `B`    | `byte`, `bytes`, `Byte`, `Bytes` | byte | `bu_byte` |
 
+> `b` and `B` are separate quantity kinds: `b` → `B` is **refused**, not
+> divided by eight. Prefixes still convert within each (`Ki~B` → `B` is 1024).
+> See doc/05 §3.17.
+
 ### 4.19 CGS Units
 
 | Symbol | Long forms | Name | Enum | SI equivalent |
@@ -398,8 +402,13 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 
 | Symbol | Long forms | Name | Enum | Notes |
 |--------|-----------|------|------|-------|
-| `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless; 1 Np = 20/ln(10) dB ≈ 8.686 dB |
-| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | dimensionless |
+| `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless; does **not** convert to `dB` |
+| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | dimensionless; does **not** convert to `Np` |
+
+> Relating two logarithmic scales is a change of base, not a multiplication, so
+> the conversion engine cannot express it — and `dB` is written against both the
+> power (10·log₁₀) and field (20·log₁₀) conventions without the annotation saying
+> which. The library refuses the pair. See doc/05 §3.15.
 
 ### 4.22 Electrical Power
 

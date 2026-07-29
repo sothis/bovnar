@@ -17,6 +17,99 @@ below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 �
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Changed — every unit out-parameter is optional
+
+Passing NULL for an out-parameter of a unit function now means "do not report
+this one". The function behaves identically otherwise and its return value is
+unchanged, in every function, in `bovnar.h` and `bovnar_si_units.h` alike.
+
+It used to be three rules at once, and no way to tell which you had except by
+trying:
+
+- **crash** — `bvn_unit_to_si_factor` (all four), `bvn_unit_convert_factor`
+  (both), `bvn_unit_dimension_vector`, `bvn_parse_unit` / `_n` (which checked
+  their *input* pointer and not `ok`);
+- **don't report** — `bvn_unit_reduce`'s `overflow`, `bvn_unit_convert_rational`'s
+  `exact`, `bvn_currency_minor_unit`'s `ok`;
+- **refuse the call** — `bvn_unit_si_normal_form`'s `out` and
+  `bvn_unit_convert_value`'s `out`, neither of which appeared in those
+  functions' own documented lists of failure reasons.
+
+`bvn_unit_reduce` managed two of the three by itself: it guarded `overflow` and
+dereferenced `scale`. A caller with no use for `requires_affine`, or one reading
+a factor it means to validate itself, had to declare a variable to throw away.
+
+The two that refused now compute and discard, which leaves each of them a useful
+predicate — "does this unit have an SI normal form", "can this conversion be
+done" — and brings them into line with what their headers already said. NULL for
+an argument the answer is made *of* (a `bvn_int_t` in
+`bvn_unit_convert_rational`, a buffer to a formatter) is still a refused call.
+
+### Fixed — three wrong rationales for one right refusal
+
+`Np` and `dB` do not convert into each other, which is correct and deliberate.
+The reason given for it was wrong in three places, two of them contradicting
+each other: doc/05 §3.15 stated `1 Np = 20/ln(10) dB ≈ 8.686 dB` as a plain
+fact, in a table of units the library refuses to relate; the source comment in
+`bovnar_si_units.c` said the figure is "8.686 or 4.343 depending on whether the
+quantity is a power or a field"; and the test comment said the same thing with
+power and field swapped. Under consistent definitions ISO 80000-3 gives one
+figure, 8.685889 dB, for both.
+
+The real reason is that relating two logarithmic scales is a change of *base*,
+which the multiply-by-a-factor model every conversion entry point is built on
+cannot express — and that ISO's relation holds between *levels* referred
+consistently to one kind of quantity, which is not what a `value_unit_t`
+carries. All four places now say that.
+
+### Added — documentation for what was undocumented
+
+- **`b` → `B` is refused, not divided by eight**, and now says so. Bit and byte
+  are separate quantity kinds — a link rate in `M~b/s` and a file size in `M~B`
+  are not the same measurement — and this was implemented, tested and reasoned
+  about in the source without appearing in doc/04 or doc/05 at all. It is the
+  one pair every reader assumes converts.
+- **`bvn_unit_valid` had no documentation.** It is *structural* validity, and
+  the header now says what that does and does not cover — in particular that a
+  valid unit need not be writable.
+- **The three shapes with no spelling**, in `bvn_unit_to_string`'s contract and
+  doc/11 §5.1. A unit mixing opaque bases from two profiles was already
+  documented; the other two were not, and both follow from what a *flat*
+  vocabulary is: `unece:XBX` writes, `bu_unece_box²` and `bu_unece_box·m` have
+  no UN/ECE notation and no native one. All three are `-1` from the formatter
+  and `error_unit_illegal` from the writer, none of them reachable from a
+  document, and none of them making the unit invalid.
+- **`CF` (the hydroponic conductivity factor) had no unit-table row in doc/05** —
+  the only real unit without one, mentioned in prose in §3.29 and tabulated
+  everywhere else. It has a row now, with its conversions (1 CF = 0.1 mS/cm =
+  100 µS/cm) verified against the library.
+
+### Added — gates for what nothing checked
+
+- **`check_doc_unit_tables.py`** (`bvnr_doc_unit_tables`). doc/04 and doc/05
+  carry every unit and every currency, twice over, as hand-written markdown —
+  about 1150 rows of symbols, accepted spellings, ISO numeric codes and
+  minor-unit counts. Everything else derived from `src/gendata` is generated or
+  gated; these two documents were the copy nothing compared. It checks that each
+  documented canonical symbol IS the unit's symbol, that every spelling offered
+  to a reader is one the parser accepts, that ISO codes and minor units match
+  the catalogue, and that both documents cover all 180 units and all 216
+  currencies. `minor_unit` is the field an application formats money with.
+- **Both conversion engines are swept against each other.** `bvn_unit_convert_value`
+  works in doubles off `si_conv_table`'s `.to_si_factor`; `bvn_unit_convert_rational`
+  works in bignums off the `.factor_num`/`.factor_den` columns of the same rows.
+  Two hand-edited numbers per unit, previously only spot-checked against each
+  other. The new sweep compares every convertible pair in the registry, then
+  every pair again across five prefixes and four exponents — 14 000 comparisons
+  — and requires the two to agree on refusing as well as on answering. A factor
+  whose decimal and whose rational disagree is the worst defect this library can
+  have: both paths answer confidently, and which one a caller gets depends on
+  whether it asked for losslessness.
+- **Every opaque unit round-trips**, all 66, through text and back, and each must
+  serialise into *its own* namespace — a single hardcoded `"ucum:"` in the
+  writer would print a UN/ECE package code as `ucum:XBX`, which re-parses as
+  nothing.
+
 ### Changed — BREAKING (`value_base_unit_t` is renumbered)
 
 Every base unit id changed. **No document changed**: an id is an API number, not

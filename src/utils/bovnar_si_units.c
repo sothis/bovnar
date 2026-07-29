@@ -183,12 +183,20 @@ static const bvn_si_conv_entry_t *bvn_find_si_conv(value_base_unit_t bu)
  * °C), so an affine unit with exponent != 1, or two affine components, sets
  * *ok=false. The reported *affine_offset lets the caller apply the +offset step
  * itself (see bvn_dom_get_value_in_base_units).
+ *
+ * Every out-parameter is optional; NULL means "do not report this one". See the
+ * note on out-parameters in bovnar_si_units.h.
  */
 double bvn_unit_to_si_factor(value_unit_t u,
 			     bool *is_affine,
 			     double *affine_offset,
 			     bool *ok)
 {
+	bool   aff_scratch = false, ok_scratch = false;
+	double off_scratch = 0.0;
+	if (!is_affine)     is_affine     = &aff_scratch;
+	if (!affine_offset) affine_offset = &off_scratch;
+	if (!ok)            ok            = &ok_scratch;
 	bvn_verify_conv_table();
 	double f = 1.0;
 	*is_affine     = false;
@@ -281,6 +289,12 @@ double bvn_unit_to_si_factor(value_unit_t u,
  */
 bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
 {
+	/* Optional, like every other out-parameter here: with NULL this is just the
+	 * predicate "does `u` have a dimension vector at all", which is a question
+	 * worth asking on its own. */
+	int32_t dims_scratch[bvn_si_dim_count];
+	if (!dims)
+		dims = dims_scratch;
 	bvn_verify_conv_table();
 	memset(dims, 0, sizeof(int32_t) * (size_t)bvn_si_dim_count);
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
@@ -338,9 +352,14 @@ bool bvn_unit_dimension_vector(value_unit_t u, int32_t dims[bvn_si_dim_count])
  *                  candela in base dimensions.
  *   logarithmic  — Np, dB and pH are separate kinds. They are logarithms of a
  *                  ratio, not linear quantities (20 dB is a ratio of 100, not
- *                  twice 10 dB), so no factor can relate them; dB is ambiguous
- *                  on its own besides, being 8.686 or 4.343 per neper depending
- *                  on whether the quantity is a power or a field. pH is the
+ *                  twice 10 dB), so relating two of them is a change of BASE
+ *                  and no factor can express it. ISO 80000-3 does give
+ *                  1 Np = 8.685889 dB, but that relates two LEVELS referred
+ *                  consistently to one kind of quantity -- it does not compose
+ *                  with the exponents and prefixes a value_unit_t carries, and
+ *                  dB is written against both the power (10*log10) and field
+ *                  (20*log10) conventions with nothing in the annotation
+ *                  recording which. pH is the
  *                  same argument in a different field: it is -log10(activity),
  *                  so pH 7 is not "7 of" anything and a pH one unit lower is a
  *                  tenfold concentration. Without its own kind it would carry
@@ -593,8 +612,13 @@ bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t *out)
 		{ bvn_si_dim_mol,      bu_mol,     si_none },
 		{ bvn_si_dim_candela,  bu_candela, si_none },
 	};
+	/* Same rule as the rest of the API: NULL `out` is not a refusal, it is "do
+	 * not report the form" — leaving the bare predicate "does `u` have an SI
+	 * normal form at all", which is a question worth asking on its own and one
+	 * the header's documented list of refusals never covered. */
+	value_unit_t out_scratch;
 	if (!out)
-		return false;
+		out = &out_scratch;
 	/* A unit with no usable SI factor has no SI form either, and the dimension
 	 * vector alone will not say so: `s/°C` has perfectly good dimensions, but an
 	 * affine scale means nothing at an exponent other than 1, so the conversion
@@ -654,6 +678,10 @@ bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t *out)
 double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 			       bool *ok, bool *requires_affine)
 {
+	/* Both optional — see the note on out-parameters in bovnar_si_units.h. */
+	bool ok_scratch = false, aff_scratch = false;
+	if (!ok)              ok              = &ok_scratch;
+	if (!requires_affine) requires_affine = &aff_scratch;
 	*ok             = true;
 	*requires_affine = false;
 	/* An identity conversion has factor 1 whatever the unit is — no offset, no SI
@@ -709,8 +737,14 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 bool bvn_unit_convert_value(double value, value_unit_t from, value_unit_t to,
 			    double *out)
 {
+	/* NULL `out` used to return false — a THIRD convention in one API, and one
+	 * the header's own list of failure reasons did not include. It is the same
+	 * rule as everywhere else now: the conversion is performed and its result
+	 * discarded, so this doubles as the predicate "can this conversion be
+	 * done", which is exactly what a caller passing NULL is asking. */
+	double out_scratch = 0.0;
 	if (!out)
-		return false;
+		out = &out_scratch;
 	/* Converting a unit to itself is the identity map — no factor, no offset, and
 	 * nothing that needs an SI mapping. Short-circuiting it here is what lets a
 	 * unit with no SI row (a currency) or an irrational factor (a π-based angle)
@@ -1124,6 +1158,12 @@ done:
  */
 value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 {
+	/* `overflow` was already optional and `scale` was not, in one function.
+	 * Both are optional now — see the note on out-parameters in
+	 * bovnar_si_units.h. */
+	double scale_scratch = 1.0;
+	if (!scale)
+		scale = &scale_scratch;
 	bvn_verify_conv_table();
 	*scale = 1.0;
 	if (overflow)

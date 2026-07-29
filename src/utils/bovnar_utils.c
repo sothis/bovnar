@@ -1029,6 +1029,13 @@ static value_unit_t bvn_parse_unit_expr(
 }
 value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 {
+	/* `ok` is optional: a caller that only wants the unit can read
+	 * num_components, since a refused parse returns BVN_UNIT_NONE. The input
+	 * pointer was already guarded here and this one was not, which is the kind
+	 * of asymmetry that only shows up in somebody else's crash report. */
+	bool ok_scratch = false;
+	if (!ok)
+		ok = &ok_scratch;
 	*ok = true;
 	if (!unit || !len) {
 		*ok = false;
@@ -1094,7 +1101,10 @@ int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize)
 }
 value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok)
 {
-	if (!unit) { *ok = false; return (value_unit_t){ .num_components = 0 }; }
+	if (!unit) {
+		if (ok) *ok = false;
+		return (value_unit_t){ .num_components = 0 };
+	}
 	return bvn_parse_unit_n(unit, (uint32_t)strlen((const char*)unit), ok);
 }
 static const char* si_prefix_str(si_prefix_id_t p)

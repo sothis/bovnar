@@ -41,6 +41,23 @@ typedef enum bvn_si_dim_idx_e {
 	bvn_si_dim_candela  = 6,
 	bvn_si_dim_count    = 7
 } bvn_si_dim_idx_t;
+/*
+ * OUT-PARAMETERS ARE OPTIONAL, THROUGHOUT THIS HEADER AND THE UNIT FUNCTIONS IN
+ * bovnar.h. Passing NULL for one means "do not report this"; the function
+ * behaves identically otherwise and its return value is unchanged.
+ *
+ * This was half true and half a crash. bvn_unit_reduce guarded `overflow` and
+ * dereferenced `scale`; bvn_unit_convert_value guarded `out` and
+ * bvn_unit_convert_factor dereferenced both of its; bvn_parse_unit checked its
+ * INPUT pointer and not its `ok`. A caller with no use for `requires_affine`, or
+ * one reading a factor it will validate itself, had to declare a variable to
+ * throw away — and had no way to know which functions let it skip that except by
+ * trying. The rule is now the same everywhere.
+ *
+ * It does not extend to arguments a function's answer is made OF: a NULL
+ * bvn_int_t in bvn_unit_convert_rational, or a NULL buffer to a formatter, is a
+ * refused call (false / -1), not a silent success.
+ */
 BVN_API int32_t bvn_exponent_to_int(unit_exponent_t e);
 BVN_API unit_exponent_t bvn_int_to_exponent(int32_t n);
 BVN_API double bvn_unit_to_si_factor(value_unit_t u,

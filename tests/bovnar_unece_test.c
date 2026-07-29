@@ -294,6 +294,94 @@ static void test_opaque_block(void)
 	            "unece's opaque units fit inside its own block");
 }
 
+/*
+ * Every opaque unit of every profile, through text and back.
+ *
+ * Spot checks covered a handful of codes. This walks the blocks: each unit must
+ * be valid, report itself profile-only, serialise into ITS OWN namespace, and
+ * re-parse to exactly what it was. The namespace check is the one that matters
+ * most — a single hardcoded "ucum:" in the writer would print a UN/ECE package
+ * code as `ucum:XBX`, which re-parses as nothing at all.
+ */
+static void test_every_opaque_unit_round_trips(void)
+{
+	printf("  every opaque unit, text and back...\n");
+	static const struct { int first, last; const char *ns; } BLOCKS[] = {
+		{ BVN_PROFILE_UCUM_OPAQUE_FIRST,  BVN_PROFILE_UCUM_OPAQUE_LAST,  "ucum:"  },
+		{ BVN_PROFILE_UNECE_OPAQUE_FIRST, BVN_PROFILE_UNECE_OPAQUE_LAST, "unece:" },
+	};
+	int seen = 0;
+	for (size_t k = 0; k < sizeof BLOCKS / sizeof BLOCKS[0]; k++) {
+		for (int b = BLOCKS[k].first; b <= BLOCKS[k].last; b++) {
+			value_unit_t u = BVN_UNIT_NO_PREFIX((value_base_unit_t)b);
+			seen++;
+			ASSERT_TRUE(bvn_unit_valid(u), "an opaque unit is valid");
+			ASSERT_TRUE(bvn_unit_is_profile_only(u),
+			            "an opaque unit is profile-only");
+			char s[BVNR_UNIT_STRING_MAX];
+			if (bvn_unit_to_string(u, s, sizeof s) <= 0) {
+				ASSERT_TRUE(0, "an opaque unit has a spelling");
+				continue;
+			}
+			ASSERT_TRUE(strncmp(s, BLOCKS[k].ns, strlen(BLOCKS[k].ns)) == 0,
+			            "and it is written in its OWN namespace");
+			bool ok = false;
+			value_unit_t back = bvn_parse_unit((const uint8_t *)s, &ok);
+			ASSERT_TRUE(ok && bvn_unit_equal(u, back),
+			            "and re-parses to the unit it came from");
+			/* Commensurable with nothing, including a plain count. */
+			ASSERT_FALSE(bvn_units_compatible(u, BVN_UNIT_NO_PREFIX(bu_meter)),
+			             "an opaque unit is not a length");
+			double out = 0.0;
+			ASSERT_TRUE(bvn_unit_convert_value(1.0, u, u, &out) && out == 1.0,
+			            "but it does convert to itself");
+		}
+	}
+	ASSERT_TRUE(seen == BVN_PROFILE_OPAQUE_COUNT,
+	            "the sweep saw every opaque unit the build defines");
+}
+
+/*
+ * The three shapes with no spelling at all.
+ *
+ * A FLAT vocabulary is one whole code looked up entire, so it can write exactly
+ * one unprefixed component at exponent 1. An expr vocabulary (UCUM) has an
+ * exponent notation and can write the square. Both refusals are structural, and
+ * neither makes the unit invalid: a unit with no text is still a unit, which is
+ * what bvn_unit_valid answers and bvn_unit_to_string does not.
+ */
+static void test_units_with_no_spelling(void)
+{
+	printf("  a valid unit that cannot be written...\n");
+	char s[BVNR_UNIT_STRING_MAX];
+
+	value_unit_t sq = BVN_UNIT_SI_EXP(bu_unece_box, si_none, exp_square);
+	ASSERT_TRUE(bvn_unit_valid(sq), "a squared box is structurally valid");
+	ASSERT_TRUE(bvn_unit_to_string(sq, s, sizeof s) < 0,
+	            "but a flat vocabulary has no exponent notation");
+
+	value_unit_t inv = BVN_UNIT_SI_EXP(bu_unece_box, si_none, exp_neg_linear);
+	ASSERT_TRUE(bvn_unit_to_string(inv, s, sizeof s) < 0,
+	            "nor a reciprocal one");
+
+	value_unit_t mixed = { .num_components = 2 };
+	mixed.components[0] = BVN_UNIT_NO_PREFIX(bu_unece_box).components[0];
+	mixed.components[1] = BVN_UNIT_NO_PREFIX(bu_meter).components[0];
+	ASSERT_TRUE(bvn_unit_valid(mixed), "boxes per metre is a real quantity");
+	ASSERT_TRUE(bvn_unit_to_string(mixed, s, sizeof s) < 0,
+	            "but a flat vocabulary cannot write a product");
+
+	/* UCUM is an expr profile, so the same shape IS spellable there — which is
+	 * what makes the refusals above a property of the vocabulary rather than of
+	 * opaque units in general. */
+	value_unit_t iu2 = BVN_UNIT_SI_EXP(bu_ucum_iu, si_none, exp_square);
+	int32_t n = bvn_unit_to_string(iu2, s, sizeof s);
+	ASSERT_TRUE(n > 0, "UCUM can write a squared arbitrary unit");
+	bool ok = false;
+	ASSERT_TRUE(n > 0 && bvn_unit_equal(bvn_parse_unit((const uint8_t *)s, &ok), iu2)
+	            && ok, "and it round-trips");
+}
+
 /* ── round trip ─────────────────────────────────────────────────────────── */
 
 static void test_round_trip(void)
@@ -456,6 +544,8 @@ int main(void)
 	test_equivalence();
 	test_opaque_counts();
 	test_opaque_block();
+	test_every_opaque_unit_round_trips();
+	test_units_with_no_spelling();
 	test_round_trip();
 	test_to_unece();
 	test_policy_strings();

@@ -764,6 +764,25 @@ A unit that somehow mixed opaque bases from two namespaces has no single spellin
 one — a code is read in exactly one namespace — but the API can compose one, and the honest answer
 there is a failure rather than a string that re-parses as something else.
 
+**Three shapes have no spelling, not one.** The mixed-namespace case above is the one a reader
+expects; the other two follow from what a *flat* vocabulary is (§2.2). `unece`, `qudt` and
+`qudt-qk` match one whole code entire — no operators, no exponents, no prefixes — so a flat
+profile's opaque unit can be written only as a **single unprefixed component at exponent 1**:
+
+| Unit | Spelling | Why |
+|------|----------|-----|
+| `unece:XBX` | `unece:XBX` | one code, exponent 1 — the only shape a flat vocabulary has |
+| `bu_unece_box²` | *none* | UN/ECE has no notation for an exponent |
+| `bu_unece_box · m` | *none* | and none for a product, native component or not |
+| `ucum:[IU]²` | `ucum:[IU]2` | UCUM is an **expr** profile, so this one is spellable |
+
+All three refusals are `bvn_unit_to_string` returning -1 and the writer reporting
+`error_unit_illegal`; none of them can arise from a document, only from an API caller composing a
+`value_unit_t` by hand. Such a unit stays **structurally valid** and fully usable in memory — it
+compares, and it converts to itself — because a unit with no text is still a unit. `bvn_unit_valid`
+answers the structural question and says so in its own contract; spellability is
+`bvn_unit_to_string`'s answer, and the two are deliberately distinct.
+
 ### 5.2 What canonical output loses, and on which path
 
 Formatting a `value_unit_t` is lossy in exactly one respect: annotations. `bvn_unit_to_string` on

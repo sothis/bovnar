@@ -1124,11 +1124,55 @@ BVN_API error_code_t bvnr_writer_get_error(const bvnr_writer_t* w);
 BVN_API uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t* w);
 BVN_API uint64_t     bvnr_writer_bytes_written(const bvnr_writer_t* w);
 BVN_API const char*  bvn_error_to_string(error_code_t code);
+/*
+ * Parse a unit string. `ok` is OPTIONAL — a caller that does not want it can
+ * read the result's num_components, since a refused parse returns
+ * BVN_UNIT_NONE. Every out-parameter of every unit function is optional the same
+ * way; see the note at the top of bovnar_si_units.h.
+ *
+ * bvn_unit_error_code says WHY a string was refused, which `ok` cannot.
+ */
 BVN_API value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok);
 BVN_API value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok);
+/*
+ * Write `u` as text, NUL-terminated. Returns the length written, or -1.
+ *
+ * A short buffer is a REFUSAL, not a truncation: on -1 nothing is written at
+ * all, not even the NUL, because a truncated unit is a different unit.
+ * BVNR_UNIT_STRING_MAX is large enough for anything these functions can emit.
+ *
+ * -1 also covers a valid unit with no TEXT. That is not a contradiction — see
+ * bvn_unit_valid below — and there are three ways to reach it, all of them
+ * involving an opaque unit (one of a profile's units with no native spelling;
+ * bvn_unit_is_profile_only reports them):
+ *   - opaque bases from two different profiles in one unit: no namespace owns
+ *     it, and writing it in whichever came first would re-parse as something
+ *     else;
+ *   - an opaque unit from a FLAT profile (unece, qudt, qudt-qk) at any exponent
+ *     but 1, or beside another component: a flat vocabulary is one whole code
+ *     looked up entire, so it can spell exactly one unprefixed component;
+ *   - an opaque unit beside a native one, for the same reason.
+ * Such a unit is still perfectly usable in memory — it compares, and it
+ * converts to itself — it simply cannot be serialised, and the writer refuses
+ * it (error_unit_illegal) rather than emitting something that reads back wrong.
+ */
 BVN_API int32_t      bvn_unit_to_string(value_unit_t u, char* buf, size_t bufsize);
 BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
                                     bvn_unit_flags_t flags);
+/*
+ * STRUCTURAL validity: no more than BVNR_MAX_UNIT_COMPONENTS components, every
+ * exponent inside [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX] and non-zero, every base
+ * one this build defines, and every prefix one its base accepts
+ * (bvn_prefix_unit_valid). It is the precondition the conversion and formatting
+ * entry points share, and what a caller that filled in a value_unit_t by hand
+ * should check.
+ *
+ * It is NOT "this unit can be written": see bvn_unit_to_string above for the
+ * units that have no text. Nor is it "this unit converts" — a currency and an
+ * opaque unit are both valid and neither has an SI factor. Those are separate
+ * questions with separate functions, deliberately: a unit with no spelling is
+ * still a unit, and refusing to compare or convert it would be wrong.
+ */
 BVN_API bool         bvn_unit_valid(value_unit_t u);
 /* The unit profiles (doc/11_bovnar_unit_profiles.md). UNRELEASED --
  * see that document's status line.

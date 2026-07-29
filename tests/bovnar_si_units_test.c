@@ -1138,6 +1138,75 @@ static void test_units_compatible_exp_invalid_info(void)
  * three must refuse.
  */
 /*
+ * Every out-parameter is optional, and the same way in every function.
+ *
+ * It used to be half true. bvn_unit_reduce guarded `overflow` and dereferenced
+ * `scale` — one function, two rules. bvn_unit_convert_value guarded `out` while
+ * bvn_unit_convert_factor dereferenced both of its. bvn_parse_unit checked its
+ * INPUT pointer and not its `ok`. Each of those is a segfault in a caller that
+ * had no use for the value, and no way to find out except by trying.
+ *
+ * A crash cannot be asserted on, so what this pins is the ANSWER: passing NULL
+ * must not change what the function returns.
+ */
+static void test_out_parameters_are_optional(void)
+{
+	printf("  NULL out-parameters...\n");
+	bool pok = false;
+	value_unit_t m  = bvn_parse_unit((const uint8_t *)"m", &pok);
+	value_unit_t km = bvn_parse_unit((const uint8_t *)"k~m", &pok);
+	value_unit_t c  = bvn_parse_unit((const uint8_t *)"\xc2\xb0" "C", &pok);
+
+	bool aff = false, ok = false;
+	double off = 0.0;
+	double want = bvn_unit_to_si_factor(km, &aff, &off, &ok);
+	ASSERT_TRUE(ok && want == 1000.0, "the reference answer");
+	ASSERT_EQ_DBL(bvn_unit_to_si_factor(km, NULL, NULL, NULL), want, 0.0,
+	              "si_factor: same answer with every out-parameter NULL");
+	/* An affine unit exercises the branch that WRITES through them. */
+	(void)bvn_unit_to_si_factor(c, NULL, NULL, NULL);
+
+	double scale = 0.0;
+	bool ovf = false;
+	value_unit_t r1 = bvn_unit_reduce(km, &scale, &ovf);
+	value_unit_t r2 = bvn_unit_reduce(km, NULL, NULL);
+	ASSERT_TRUE(bvn_unit_equal(r1, r2), "reduce: same unit with both NULL");
+	ASSERT_EQ_DBL(scale, 1000.0, 1e-12, "reduce: the reference scale");
+
+	int32_t dims[bvn_si_dim_count];
+	ASSERT_TRUE(bvn_unit_dimension_vector(m, dims) ==
+	            bvn_unit_dimension_vector(m, NULL),
+	            "dimension_vector: NULL dims is the bare predicate");
+	ASSERT_TRUE(!bvn_unit_dimension_vector(
+	                bvn_parse_unit((const uint8_t *)"$USD", &pok), NULL),
+	            "dimension_vector: and still says no for a currency");
+
+	bool ra = false;
+	double f = bvn_unit_convert_factor(km, m, &ok, &ra);
+	ASSERT_EQ_DBL(bvn_unit_convert_factor(km, m, NULL, NULL), f, 0.0,
+	              "convert_factor: same answer with both NULL");
+	/* The affine path writes through requires_affine, so cover it too. */
+	(void)bvn_unit_convert_factor(c, bvn_parse_unit((const uint8_t *)"K", &pok),
+	                              NULL, NULL);
+
+	value_unit_t nf;
+	ASSERT_TRUE(bvn_unit_si_normal_form(km, &nf) ==
+	            bvn_unit_si_normal_form(km, NULL),
+	            "si_normal_form: NULL out is the bare predicate");
+	ASSERT_TRUE(bvn_unit_convert_value(1.0, km, m, NULL),
+	            "convert_value: NULL out still reports success");
+
+	value_unit_t p = bvn_parse_unit((const uint8_t *)"m/s", NULL);
+	ASSERT_TRUE(bvn_unit_equal(p, bvn_parse_unit((const uint8_t *)"m/s", &pok)),
+	            "parse_unit: NULL ok parses the same unit");
+	value_unit_t bad = bvn_parse_unit((const uint8_t *)"not_a_unit", NULL);
+	ASSERT_EQ_INT(bad.num_components, 0,
+	              "parse_unit: a refusal with NULL ok is BVN_UNIT_NONE");
+	ASSERT_EQ_INT(bvn_parse_unit_n((const uint8_t *)"m/s", 3, NULL).num_components,
+	              2, "parse_unit_n: NULL ok is fine too");
+}
+
+/*
  * A factor a double cannot hold is a FAILURE, at both ends.
  *
  * Overflow was already refused. Underflow was not, because 0.0 is finite:
@@ -1675,11 +1744,18 @@ static void test_convert_value(void)
 		"m → s: incompatible → false");
 	ASSERT_EQ_DBL(out, -12345.0, 1e-9, "m → s: out untouched on failure");
 
-	/* NULL out guarded */
-	ASSERT_TRUE(!bvn_unit_convert_value(1.0,
+	/* NULL out is "do not report the result", not a refusal — the same rule as
+	 * every other out-parameter in the unit API, which leaves this as the
+	 * predicate "can this conversion be done". It used to return false, so a
+	 * caller asking that question got "no" for m → m. */
+	ASSERT_TRUE(bvn_unit_convert_value(1.0,
 			BVN_UNIT_NO_PREFIX(bu_meter),
 			BVN_UNIT_NO_PREFIX(bu_meter), NULL),
-		"NULL out → false");
+		"NULL out: m → m still succeeds");
+	ASSERT_TRUE(!bvn_unit_convert_value(1.0,
+			BVN_UNIT_NO_PREFIX(bu_meter),
+			BVN_UNIT_NO_PREFIX(bu_second), NULL),
+		"NULL out: m → s still fails");
 }
 
 /* Convert an exact-rational value (given as a decimal/int string in `vbase`)
@@ -2220,9 +2296,12 @@ static void test_logarithmic_units_refuse(void)
 	printf("  logarithmic units are their own quantity kind...\n");
 	/* dB and Np are logarithms of a ratio, not linear quantities: 20 dB is a
 	 * ratio of 100, not twice 10 dB, so the multiply-by-a-factor model cannot
-	 * express a conversion between them. dB is ambiguous on its own too — 1 Np is
-	 * 8.686 dB for a power quantity and 4.343 dB for a field quantity, and a
-	 * document does not say which. Both carried factor 1.0 and no dimension, so
+	 * express a conversion between them: relating two logarithmic scales is a
+	 * change of base. ISO 80000-3's 1 Np = 8.685889 dB relates two LEVELS
+	 * referred consistently to one kind of quantity, which is not what a
+	 * value_unit_t carries — and dB is written against both the power
+	 * (10*log10) and field (20*log10) conventions with nothing in the
+	 * annotation recording which. Both carried factor 1.0 and no dimension, so
 	 * they compared as compatible and "1 dB" converted to "1 Np": wrong by a
 	 * factor of 8.7, silently. They are now tracked like bit/byte. */
 	value_unit_t dB = BVN_UNIT_NO_PREFIX(bu_decibel);
@@ -2652,6 +2731,119 @@ static void test_prefixed_currency_converts(void)
 		    "and a real dimension mismatch is still a mismatch");
 }
 
+/*
+ * THE TWO CONVERSION ENGINES MUST AGREE, FOR EVERY PAIR THEY BOTH ACCEPT.
+ *
+ * bvn_unit_convert_value works in doubles off si_conv_table's .to_si_factor;
+ * bvn_unit_convert_rational works in bignums off the .factor_num/.factor_den
+ * columns of the same rows. Two independent numbers per unit, edited by hand in
+ * units.bvnr, and until now only spot-checked against each other on the handful
+ * of pairs somebody thought to write a case for. A factor whose decimal and
+ * whose rational disagree is the worst shape of defect this library can have:
+ * both paths answer confidently, and which one a caller gets depends on whether
+ * it asked for losslessness.
+ *
+ * So: sweep the whole registry, both directions, and compare wherever both
+ * engines deliver. Also checked is that they AGREE ON REFUSING -- a pair one
+ * converts and the other declines is the same defect wearing a different hat.
+ *
+ * The second sweep adds prefixes and exponents, which is where the rational
+ * path stops using si_conv_table at all and does its own powers of ten and two
+ * (bvn_int_mul_pow10 / bvn_int_shl in the prefix-only shortcut).
+ *
+ * Only terminating expansions are compared: a non-terminating one is exact as a
+ * rational and has no decimal to hold against the double, which is the point of
+ * BVN_RATIONAL_NONTERMINATING.
+ */
+static void compare_engines(value_unit_t ua, value_unit_t ub,
+                            long *compared, long *disagreed, const char *what)
+{
+	double dv = 0.0;
+	bool dok = bvn_unit_convert_value(1.0, ua, ub, &dv);
+	bvn_int_t *vn = bvn_int_alloc(), *vd = bvn_int_alloc();
+	bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+	if (!vn || !vd || !on || !od) {
+		bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+		return;
+	}
+	bvn_int_from_uint64(vn, 1u);
+	bvn_int_from_uint64(vd, 1u);
+	bool exact = false;
+	bool rok = bvn_unit_convert_rational(vn, vd, ua, ub, on, od, &exact);
+	if (dok != rok) {
+		(*disagreed)++;
+		if (*disagreed <= 10)
+			fprintf(stderr, "  %s: %d -> %d: double says %d, rational says %d\n",
+			        what, (int)ua.components[0].base,
+			        (int)ub.components[0].base, (int)dok, (int)rok);
+	} else if (rok && exact) {
+		char buf[4096];
+		bool rex = false;
+		int32_t len = bvn_rational_to_str(on, od, 10u, buf, sizeof buf, &rex);
+		if (len > 0 && rex) {
+			double rv = strtod(buf, NULL);
+			double tol = fabs(dv) * 1e-9 + 1e-300;
+			if (fabs(rv - dv) <= tol) {
+				(*compared)++;
+			} else {
+				(*disagreed)++;
+				if (*disagreed <= 10)
+					fprintf(stderr, "  %s: %d -> %d: double %.17g, rational %s\n",
+					        what, (int)ua.components[0].base,
+					        (int)ub.components[0].base, dv, buf);
+			}
+		}
+	}
+	bvn_int_free(vn); bvn_int_free(vd); bvn_int_free(on); bvn_int_free(od);
+}
+
+static void test_both_conversion_engines_agree(void)
+{
+	printf("  every convertible pair, both engines...\n");
+	long compared = 0, disagreed = 0;
+
+	for (int a = BVN_UNIT_NATIVE_FIRST; a <= BVN_UNIT_NATIVE_LAST; a++) {
+		for (int b = BVN_UNIT_NATIVE_FIRST; b <= BVN_UNIT_NATIVE_LAST; b++) {
+			value_unit_t ua = BVN_UNIT_NO_PREFIX((value_base_unit_t)a);
+			value_unit_t ub = BVN_UNIT_NO_PREFIX((value_base_unit_t)b);
+			if (!bvn_unit_valid(ua) || !bvn_unit_valid(ub))
+				continue;
+			compare_engines(ua, ub, &compared, &disagreed, "bare");
+		}
+	}
+	/* 1986 native pairs convert; 110 have an irrational factor and 1079 more
+	 * expand non-terminating in base 10, leaving these to compare. */
+	ASSERT_TRUE(compared > 700, "the bare sweep really compared something");
+	ASSERT_EQ_INT(disagreed, 0, "double and rational agree on every bare pair");
+
+	static const si_prefix_id_t PFX[] = {
+		si_none, si_milli, si_kilo, si_micro, si_mega
+	};
+	static const int EXP[] = { 1, 2, -1, -3 };
+	long pcompared = 0, pdisagreed = 0;
+	for (int a = BVN_UNIT_NATIVE_FIRST; a <= BVN_UNIT_NATIVE_LAST; a++) {
+		for (int b = BVN_UNIT_NATIVE_FIRST; b <= BVN_UNIT_NATIVE_LAST; b++) {
+			for (size_t p = 0; p < sizeof PFX / sizeof PFX[0]; p++) {
+				for (size_t e = 0; e < sizeof EXP / sizeof EXP[0]; e++) {
+					unit_exponent_t ex = bvn_int_to_exponent(EXP[e]);
+					value_unit_t ua = BVN_UNIT_SI_EXP(
+						(value_base_unit_t)a, PFX[p], ex);
+					value_unit_t ub = BVN_UNIT_SI_EXP(
+						(value_base_unit_t)b, si_none, ex);
+					if (!bvn_unit_valid(ua) || !bvn_unit_valid(ub))
+						continue;
+					compare_engines(ua, ub, &pcompared, &pdisagreed,
+					                "prefixed");
+				}
+			}
+		}
+	}
+	ASSERT_TRUE(pcompared > 10000, "the prefixed sweep really compared something");
+	ASSERT_EQ_INT(pdisagreed, 0,
+	              "double and rational agree with prefixes and exponents too");
+	printf("    %ld bare + %ld prefixed comparisons\n", compared, pcompared);
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -2708,6 +2900,8 @@ int main(void)
 	test_parse_and_factor();
 	test_all_derived_dimensions();
 	test_si_factor_degree();
+	test_out_parameters_are_optional();
+	test_both_conversion_engines_agree();
 	test_si_factor_refuses_what_a_double_cannot_hold();
 	test_si_factor_undefined_base();
 	test_si_factor_num_components_overflow();

@@ -1225,7 +1225,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 154)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 155)   # 129 base + i18n_de + wrapper_sync
                                     # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
                                     #         + amalgam_smoke + convert_fail_dim_array
@@ -1471,6 +1471,23 @@ endif()
 # download, and still hand out the previous version to everyone who trusts the
 # site. The names are fully derivable from the tag, so derive them and compare --
 # same recipe as pack_artifacts.cmake, no network.
+# ── The unit and currency tables in doc/ match src/gendata ─────────────────
+# doc/04 and doc/05 carry every unit and every currency, twice over, as
+# hand-written markdown -- roughly 1150 rows of symbols, accepted spellings, ISO
+# numeric codes and minor-unit counts. Everything else derived from gendata is
+# generated or gated; these two documents were the copy nothing compared, so a
+# renamed unit or a corrected minor-unit digit could leave the reference a reader
+# trusts saying something else with the build still green. And minor_unit is the
+# field an application formats money with.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_tables.py)
+    add_test(NAME bvnr_doc_unit_tables
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_tables.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_doc_unit_tables PROPERTIES
+        LABELS "docs;units;gendata" TIMEOUT 60)
+endif()
+
 # ── The installed header set is self-contained ─────────────────────────────
 # install(FILES ...) names each public header explicitly, which is right — a
 # glob would ship whatever was lying in include/ — but it is a hand-maintained

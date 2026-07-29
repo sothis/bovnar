@@ -465,7 +465,28 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | Symbol | Long forms | Name | Enum value | Notes |
 |--------|-----------|------|------------|-------|
 | `Np`   | `neper`, `nepers` | neper | `bu_neper` | dimensionless logarithmic ratio |
-| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | 1 Np = 20/ln(10) dB ≈ 8.686 dB |
+| `dB`   | `decibel`, `decibels` | decibel | `bu_decibel` | dimensionless logarithmic ratio |
+
+> **Neper and decibel do not convert into each other.** `bvn_units_compatible`
+> reports `false` for the pair, and every conversion entry point refuses it.
+>
+> A logarithmic level is not a linear quantity: 20 dB is a ratio of 100, not
+> twice the ratio 10 dB names. Relating two logarithmic scales is a change of
+> base, which the multiply-by-a-factor model every conversion entry point is
+> built on cannot express — so bovnar gives `Np`, `dB` and `pH` a quantity kind
+> each and refuses every pair, rather than applying a factor that is only ever
+> right by coincidence.
+>
+> ISO 80000-3 does state 1 Np = 8.685889… dB, for a level referred consistently
+> to the same kind of quantity. Two things stop that from being a conversion
+> this library can perform. It is a relation between *levels*, so it does not
+> compose with the exponents and prefixes a `value_unit_t` carries; and `dB` is
+> written in practice against both the power convention (10·log₁₀) and the field
+> convention (20·log₁₀), with nothing in the annotation recording which — so the
+> number a reader would need is not determined by the unit alone.
+>
+> The same reasoning keeps a level out of a plain number: `dB` → dimensionless is
+> refused too.
 
 ### 3.16 Electrical Power Units
 
@@ -482,6 +503,18 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 |--------|-----------|------|------------|
 | `b`    | `bit`, `bits` | bit | `bu_bit` |
 | `B`    | `byte`, `bytes`, `Byte`, `Bytes` | byte | `bu_byte` |
+
+> **Bit and byte do not convert into each other.** They are separate quantity
+> kinds, so `b` → `B` is refused rather than divided by eight. A byte is eight
+> bits *on the wire*, but a value annotated in bytes and one annotated in bits
+> are usually not the same measurement — a link rate quoted in `M~b/s` and a file
+> size in `M~B` — and silently trading one for the other is the class of error
+> this format exists to prevent. Convert explicitly in the application if that
+> is genuinely what you mean.
+>
+> Prefixes still work within each: `Ki~B` → `B` is 1024, `M~b` → `k~b` is 1000.
+> Both units take IEC binary prefixes as well as SI ones, and SI prefixes on them
+> are restricted to kilo and above (§6.3).
 
 ### 3.18 Textile Linear Density
 
@@ -687,7 +720,18 @@ existing tables already say them exactly.
 | … in pre-SI spelling | `µmho/cm`, `mmho/cm` | `mho`, `mhos` and `℧` (U+2127) are accepted spellings of the siemens |
 | Total dissolved solids (TDS) | `mg/L`, `µg/L`, `g/L`, `k~g/m³` | mass concentration |
 | Resistivity (the reciprocal) | `MΩ·cm`, `M~Ω·c~m` | ultrapure-water convention |
-| … on the hydroponic scale | `CF` | `bu_conductivity_factor`; CF = EC in mS/cm × 10, so 1 CF = 0.1 mS/cm = 100 µS/cm exactly, and it converts to both. Only the uppercase spelling — `cF` is the centifarad |
+
+One quantity does get a unit of its own, because the hydroponic scale is a
+rescaling nothing else in the table expresses:
+
+| Symbol | Long form | Name | Enum value | Method | Prefixes |
+|--------|-----------|------|------------|--------|----------|
+| `CF` | `conductivity_factor` | conductivity factor | `bu_conductivity_factor` | EC in mS/cm × 10 | no |
+
+`CF` carries the dimensions of conductivity, so unlike the turbidity scales
+below it *does* convert: 1 CF = 0.1 mS/cm = 100 µS/cm, exactly, and into `S/m`
+and `dS/m` with it. Only the uppercase spelling is the conductivity factor —
+`cF` is the centifarad.
 
 > **"ppm" for TDS.** Water data writes TDS in "ppm", meaning milligrams per litre. Bovnar's `ppm`
 > is the dimensionless 10⁻⁶ — for a dilute aqueous solution at 1 kg/L the two are *numerically*

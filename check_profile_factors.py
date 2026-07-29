@@ -40,14 +40,35 @@ THREE OUTCOMES, AND ONLY TWO ARE ERRORS.
              table does not map it. Advisory: it is a coverage suggestion, not a
              defect, and the decision to carry a unit is editorial.
 
-ALL FIVE PROFILES ARE COVERED, BUT NOT ALL EQUALLY. `ucum`, `udunits`, `qudt`
-and `qudt-qk` are checked against their publishers' own definitions. `unece` is
-checked at ONE REMOVE, through QUDT's `qudt:uneceCommonCode` cross-reference,
-because Rec 20 states its conversion factors in prose and there is no primary
-artefact to resolve. That is QUDT asserting what a Rec 20 code means, so a
-disagreement there is evidence that one of the two tables is wrong, never proof
-of which — `class Unece` says what follows from that, and the run prints the
-distinction rather than letting a secondary result read like a primary one.
+ALL SEVEN PROFILES ARE COVERED, BUT NOT ALL EQUALLY. `ucum`, `udunits`, `qudt`,
+`qudt-qk`, `om` and `cf` are checked against their publishers' own definitions.
+`unece` is checked at ONE REMOVE, through QUDT's `qudt:uneceCommonCode`
+cross-reference, because Rec 20 states its conversion factors in prose and there
+is no primary artefact to resolve. That is QUDT asserting what a Rec 20 code
+means, so a disagreement there is evidence that one of the two tables is wrong,
+never proof of which — `class Unece` says what follows from that, and the run
+prints the distinction rather than letting a secondary result read like a
+primary one.
+
+THE FOUR RESOLVERS ARE FOUR DIFFERENT SHAPES, because the publishers are:
+
+  expression   UCUM and UDUNITS state a unit as an expression over other units,
+               so each needs a small evaluator.
+  table        QUDT states every unit's own multiplier and dimension vector, so
+               reading it is a lookup.
+  composition  OM states no multiplier at all. It states how a unit is BUILT --
+               prefix and base, numerator and denominator, term and term, base
+               and exponent — and the value falls out of walking that down to
+               the SI base units. `class Om` is that walk, and it is the same
+               structure om.bvnr's targets were derived from, which is the point
+               of checking it: a target and a value that came from one reading
+               of the ontology are compared against the library's independent
+               reading of the target.
+  two sources  CF states no units either; it states each standard name's
+               `canonical_units` as a UDUNITS expression. So `class Cf` reads
+               CF's table for the name and hands the string to the UDUNITS
+               evaluator above. Both publishers are primary, and neither is
+               being asked about the other's vocabulary.
 
 Arbitrary and special units (UCUM `isArbitrary`/`isSpecial`, QUDT units with no
 `conversionMultiplier`) have no factor to check and are skipped — they are
@@ -132,6 +153,26 @@ SOURCES = {
     # what that does and does not prove.
     "unece": [
         ("qudt-units.ttl", "https://qudt.org/3.1.0/vocab/unit"),
+    ],
+    "om": [
+        ("om-2.0.rdf",
+         "https://raw.githubusercontent.com/HajoRijgersberg/OM/master/om-2.0.rdf"),
+    ],
+    # CF states each standard name's canonical_units as a UDUNITS expression, so
+    # checking this vocabulary means reading TWO publishers: CF for the name's
+    # units and Unidata for what those units are worth. Both are primary.
+    "cf": [
+        ("cf-standard-name-table.xml",
+         "https://cfconventions.org/Data/cf-standard-names/current/src/"
+         "cf-standard-name-table.xml"),
+        ("udunits2-base.xml",
+         "https://raw.githubusercontent.com/Unidata/UDUNITS-2/master/lib/udunits2-base.xml"),
+        ("udunits2-derived.xml",
+         "https://raw.githubusercontent.com/Unidata/UDUNITS-2/master/lib/udunits2-derived.xml"),
+        ("udunits2-accepted.xml",
+         "https://raw.githubusercontent.com/Unidata/UDUNITS-2/master/lib/udunits2-accepted.xml"),
+        ("udunits2-common.xml",
+         "https://raw.githubusercontent.com/Unidata/UDUNITS-2/master/lib/udunits2-common.xml"),
     ],
 }
 
@@ -233,6 +274,10 @@ WAIVED_UPSTREAM = {
         "QUDT rounds the torr to 133.322 Pa (6 digits); native Torr is the "
         "exact 101325/760. 2.8 ppm, the same publisher rounding as UCUM's "
         "mercury column.",
+    ("om", "millimetreOfMercury"):
+        "OM rounds the mercury column to 133.322 Pa (6 digits); native mmHg is "
+        "the exact conventional 133.322387415 Pa. 2.9 ppm, the same publisher "
+        "rounding UCUM's m[Hg] and QUDT's TORR already carry.",
 }
 
 
@@ -868,8 +913,221 @@ class Unece(Qudt):
         return self._val.get(code)
 
 
+# ── OM 2 ────────────────────────────────────────────────────────────────────
+
+OM_NS = "{http://www.ontology-of-units-of-measure.org/resource/om-2/}"
+OM_RDF = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
+
+# OM states a Dimension individual's exponents one property at a time.
+OM_DIMPROPS = (
+    ("hasSILengthDimensionExponent", LENGTH),
+    ("hasSIMassDimensionExponent", MASS),
+    ("hasSITimeDimensionExponent", TIME),
+    ("hasSIElectricCurrentDimensionExponent", CURRENT),
+    ("hasSIThermodynamicTemperatureDimensionExponent", TEMP),
+    ("hasSIAmountOfSubstanceDimensionExponent", AMOUNT),
+    ("hasSILuminousIntensityDimensionExponent", LUM),
+)
+
+# The seven SI base units, pinned. OM defines the gram as 1e-3 kilogram and the
+# kilogram as kilo x gram, so the mass chain is a cycle and has to be cut
+# somewhere; cutting it at the coherent SI base is the convention bovnar's own
+# factors use.
+OM_BASE = {
+    "metre": LENGTH, "kilogram": MASS, "second-Time": TIME, "ampere": CURRENT,
+    "kelvin": TEMP, "mole": AMOUNT, "candela": LUM,
+}
+
+
+class Om:
+    """OM 2's OWL/RDF file, resolved by COMPOSITION.
+
+    Unlike QUDT, OM does not state a multiplier per unit. It states how the unit
+    is BUILT -- a PrefixedUnit's prefix and base, a UnitDivision's numerator and
+    denominator, a UnitMultiplication's two terms, a UnitExponentiation's base
+    and exponent, a SingularUnit's factor against the unit it is defined from --
+    and a value falls out of walking that structure down to the SI base units.
+    So this resolver is a small evaluator, like the UCUM and UDUNITS ones and
+    unlike the QUDT table read.
+
+    A named unit states its definition as `hasUnit` with NO factor: the joule IS
+    the newton metre, the becquerel IS the reciprocal second. That case is what
+    makes the coherent derived units resolve to 1 without a list of them here.
+
+    A unit OM gives a dimension and no definition at all -- calorie-15C,
+    InternationalUnit, the currencies -- resolves to None and is skipped, which
+    is right: those are exactly the rows om.bvnr refuses.
+    """
+
+    name = "om"
+
+    def __init__(self, cache):
+        root = ET.parse(os.path.join(cache, "om-2.0.rdf")).getroot()
+        self.props = {}
+        for e in root:
+            about = e.get(OM_RDF + "about")
+            if not about:
+                continue
+            local = about.rsplit("/", 1)[-1]
+            # A subject appears in several elements; merge rather than replace.
+            p = self.props.setdefault(local, {})
+            for c in e:
+                tag = c.tag.split("}")[-1]
+                res = c.get(OM_RDF + "resource")
+                if tag == "type":
+                    continue
+                val = res.rsplit("/", 1)[-1] if res else (c.text or "").strip()
+                p.setdefault(tag, []).append(val)
+        self.dims = {}
+        for local, p in self.props.items():
+            if any(k in p for k, _ in OM_DIMPROPS):
+                d = zero()
+                for k, slot in OM_DIMPROPS:
+                    d[slot] = int(p[k][0]) if k in p else 0
+                self.dims[local] = d
+        self._cache = {}
+
+    @staticmethod
+    def _one(p, key):
+        v = p.get(key)
+        return v[0] if v else None
+
+    def accepts(self, code):
+        """Is this local name a UNIT of OM's?
+
+        Recognised by what the individual states, not by its rdf:type: OM has a
+        class per prefixed shape (SquarePrefixedMetre, MolePerPrefixedMetre, a
+        dozen more), so a type list would miss the ~280 individuals carrying
+        one. A Dimension states its own exponents and a prefix states a factor
+        with no unit to apply it to, so both are excluded."""
+        p = self.props.get(code)
+        if p is None:
+            return False
+        if any(k in p for k, _ in OM_DIMPROPS):
+            return False
+        if "hasFactor" in p and "hasUnit" not in p:
+            return False
+        return ("hasDimension" in p or "hasUnit" in p or "hasNumerator" in p or
+                "hasTerm1" in p or "hasBase" in p or "symbol" in p)
+
+    def spellings(self):
+        return {c for c in self.props if self.accepts(c)}
+
+    def resolve(self, code, depth=0):
+        if code in self._cache:
+            return self._cache[code]
+        if depth > 12:
+            return None
+        self._cache[code] = None            # cycle guard
+        r = self._resolve(code, depth)
+        self._cache[code] = r
+        return r
+
+    def _resolve(self, code, depth):
+        if code in OM_BASE:
+            d = zero()
+            d[OM_BASE[code]] = 1
+            return (1.0, d)
+        p = self.props.get(code)
+        if p is None:
+            return None
+        one = self._one
+        if "hasPrefix" in p and "hasUnit" in p:
+            f = one(self.props.get(one(p, "hasPrefix"), {}), "hasFactor")
+            base = self.resolve(one(p, "hasUnit"), depth + 1)
+            if f is None or base is None:
+                return None
+            return (float(f) * base[0], base[1])
+        if "hasNumerator" in p and "hasDenominator" in p:
+            a = self.resolve(one(p, "hasNumerator"), depth + 1)
+            b = self.resolve(one(p, "hasDenominator"), depth + 1)
+            if a is None or b is None or b[0] == 0.0:
+                return None
+            return (a[0] / b[0], [x - y for x, y in zip(a[1], b[1])])
+        if "hasTerm1" in p and "hasTerm2" in p:
+            a = self.resolve(one(p, "hasTerm1"), depth + 1)
+            b = self.resolve(one(p, "hasTerm2"), depth + 1)
+            if a is None or b is None:
+                return None
+            return (a[0] * b[0], [x + y for x, y in zip(a[1], b[1])])
+        if "hasBase" in p and "hasExponent" in p:
+            a = self.resolve(one(p, "hasBase"), depth + 1)
+            n = one(p, "hasExponent")
+            if a is None or n is None:
+                return None
+            n = int(float(n))
+            return (a[0] ** n, [x * n for x in a[1]])
+        if "hasFactor" in p and "hasUnit" in p:
+            a = self.resolve(one(p, "hasUnit"), depth + 1)
+            f = one(p, "hasFactor")
+            if a is None or f is None:
+                return None
+            return (float(f) * a[0], a[1])
+        if "hasUnit" in p:
+            return self.resolve(one(p, "hasUnit"), depth + 1)
+        return None
+
+
+# ── CF standard names ───────────────────────────────────────────────────────
+
+class Cf:
+    """The CF standard name table, resolved THROUGH UDUNITS.
+
+    A standard name has no factor of its own. What it has is a
+    `canonical_units` field, and that field is a UDUNITS expression -- CF's unit
+    syntax is UDUNITS -- so the check is: evaluate the name's canonical_units
+    with the same evaluator the udunits profile is checked against, and compare
+    it with what the library says cf.bvnr's target is worth.
+
+    Both sides are primary. This is not the one-remove position `unece` is in:
+    CF publishes the name-to-units mapping itself, and Unidata publishes what
+    the units are worth, so a disagreement found here is a defect in cf.bvnr
+    rather than evidence about a third party's cross-reference.
+
+    Three canonical_units strings resolve to None and are skipped, each for a
+    reason the udunits profile already has: `degree_C` is affine, `dB` is
+    logarithmic, and `W m-2 sr-1 (m-1)-1` uses a parenthesised negative exponent
+    the UDUNITS evaluator here does not implement. The first two have no factor
+    to compare in any case.
+
+    ALIASES ARE NOT SPELLINGS. CF's deprecated names live in `<alias>` elements
+    and cf.bvnr deliberately carries none of them, so they are kept out of
+    `spellings()` too: reporting 599 absent aliases as a coverage gap would be
+    proposing exactly what that file refuses to do.
+    """
+
+    name = "cf"
+
+    def __init__(self, cache):
+        self.ud = Udunits(cache)
+        root = ET.parse(os.path.join(cache,
+                                     "cf-standard-name-table.xml")).getroot()
+        self.rows = {}
+        for e in root.findall("entry"):
+            self.rows[e.get("id")] = (e.findtext("canonical_units") or "").strip()
+        self.version = (root.findtext("version_number") or "?").strip()
+        self._cache = {}
+
+    def accepts(self, code):
+        return code in self.rows
+
+    def spellings(self):
+        return set(self.rows)
+
+    def resolve(self, code):
+        cu = self.rows.get(code)
+        if not cu:
+            return None
+        if cu not in self._cache:
+            try:
+                self._cache[cu] = self.ud._eval(cu, 0)
+            except (Unresolved, ValueError, RecursionError, ZeroDivisionError):
+                self._cache[cu] = None
+        return self._cache[cu]
+
+
 VOCABS = {"udunits": Udunits, "ucum": Ucum, "qudt": Qudt, "qudt-qk": QudtQk,
-          "unece": Unece}
+          "unece": Unece, "om": Om, "cf": Cf}
 
 
 # ── the comparison ──────────────────────────────────────────────────────────

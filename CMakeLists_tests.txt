@@ -11,6 +11,8 @@ add_executable(bvnr_ucum_test            tests/bovnar_ucum_test.c)
 add_executable(bvnr_unece_test           tests/bovnar_unece_test.c)
 add_executable(bvnr_qudt_test            tests/bovnar_qudt_test.c)
 add_executable(bvnr_udunits_test         tests/bovnar_udunits_test.c)
+add_executable(bvnr_om_test              tests/bovnar_om_test.c)
+add_executable(bvnr_cf_test              tests/bovnar_cf_test.c)
 add_executable(bvnr_crossvocab_test      tests/bovnar_crossvocab_test.c)
 add_executable(bvnr_reader_test          tests/bovnar_reader_test.c)
 add_executable(bvnr_want_unit_test       tests/bovnar_want_unit_test.c)
@@ -91,6 +93,14 @@ target_link_libraries(bvnr_qudt_test PRIVATE bvnr_static)
 target_compile_options(bvnr_udunits_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_udunits_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 target_link_libraries(bvnr_udunits_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_om_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_om_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+target_link_libraries(bvnr_om_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_cf_test PRIVATE ${BVNR_C_FLAGS})
+target_include_directories(bvnr_cf_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
+target_link_libraries(bvnr_cf_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_crossvocab_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_crossvocab_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
@@ -181,7 +191,7 @@ set_tests_properties(bvnr_unit_ext_test PROPERTIES
 
 add_test(NAME bvnr_ucum_test COMMAND bvnr_ucum_test)
 set_tests_properties(bvnr_ucum_test PROPERTIES
-    LABELS "unit;si;ucum"
+    LABELS "unit;si;profile;ucum"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
 add_test(NAME bvnr_unece_test COMMAND bvnr_unece_test)
@@ -199,7 +209,17 @@ set_tests_properties(bvnr_udunits_test PROPERTIES
     LABELS "unit;si;profile;udunits"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
-# The cross-vocabulary suite: do the five vocabularies agree with EACH OTHER?
+add_test(NAME bvnr_om_test COMMAND bvnr_om_test)
+set_tests_properties(bvnr_om_test PROPERTIES
+    LABELS "unit;si;profile;om"
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+
+add_test(NAME bvnr_cf_test COMMAND bvnr_cf_test)
+set_tests_properties(bvnr_cf_test PROPERTIES
+    LABELS "unit;si;profile;cf"
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+
+# The cross-vocabulary suite: do the vocabularies agree with EACH OTHER?
 add_test(NAME bvnr_crossvocab_test COMMAND bvnr_crossvocab_test)
 set_tests_properties(bvnr_crossvocab_test PROPERTIES
     LABELS "unit;si;profile;crossvocab;conformance"
@@ -1225,7 +1245,8 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 155)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 157)   # 129 base + i18n_de + wrapper_sync
+                                    # + om_test + cf_test
                                     # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
                                     #         + amalgam_smoke + convert_fail_dim_array

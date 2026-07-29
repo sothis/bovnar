@@ -1580,9 +1580,11 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 40 | 400000–409999 | QUDT opaque units | `src/gendata/qudt.bvnr` |
 | 50 | 500000–509999 | QUDT quantity kinds | `src/gendata/qudt-qk.bvnr` |
 | 60 | 600000–609999 | UDUNITS-2 opaque units | `src/gendata/udunits.bvnr` |
+| 70 | 700000–709999 | OM 2 opaque units | `src/gendata/om.bvnr` |
+| 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; blocks 70 and 80 are free for a further profile. Within block 10 the 180 native units run contiguously from `bu_bit` = 100000 to `bu_turbidity_jtu` = 100179, in the order of `units.bvnr`. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the 180 native units run contiguously from `bu_bit` = 100000 to `bu_turbidity_jtu` = 100179, in the order of `units.bvnr`. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 
@@ -1736,9 +1738,9 @@ typedef enum value_base_unit_e {
      * numeric base value, and the catalogue in bovnar_currency.c is
      * index-aligned to BVN_CURRENCY_FIRST. */
 
-    /* Blocks 20–60 — the profiles' opaque units — are generated into
+    /* Blocks 20–80 — the profiles' opaque units — are generated into
      * include/bovnar_profiles.gen.h: bu_ucum_iu = 200000, bu_unece_one =
-     * 300000, and so on. */
+     * 300000, and so on. Only 20 and 30 contribute any today. */
 } value_base_unit_t;
 
 /* Not a member of the enum, and NOT a bound on it: the number of rows in the

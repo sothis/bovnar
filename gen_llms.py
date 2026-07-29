@@ -49,7 +49,7 @@ DOCS = [
     ("10_bovnar_streaming.md",    "Streaming & framing",
      "Octet streams, frames, multiplexing/demultiplexing, and embedded documents."),
     ("11_bovnar_unit_profiles.md","Unit profiles",
-     "The ucum:, unece:, qudt:, qudt-qk: and udunits: notations, their "
+     "The ucum:, unece:, qudt:, qudt-qk:, udunits:, om: and cf: notations, their "
      "transliteration tables, what they refuse, and how they are checked "
      "against each other."),
     ("12_bovnar.ebnf",            "EBNF grammar",

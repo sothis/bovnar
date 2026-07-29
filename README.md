@@ -87,7 +87,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 419-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 425-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -206,6 +206,8 @@ Because these code systems sit at a different layer, they can be **components ra
 .velocity = <float:64,qudt:M-PER-SEC>       9.81;   # QUDT        → m/s
 .length   = <float:64,qudt-qk:Length>       3.0;    # a QUDT quantity KIND → m
 .flux     = <float:64,udunits:kg*m-2*s-1>   0.5;    # UDUNITS / CF
+.density  = <float:64,om:kilogramPerCubicmetre> 998.2; # OM 2       → k~g/m³
+.temp     = <float:64,cf:air_temperature>  288.15;  # a CF standard name → K
 .boxes    = <uint:32,unece:XBX>            12;      # Rec 21: a count of boxes
 ```
 
@@ -216,10 +218,12 @@ Because these code systems sit at a different layer, they can be **components ra
 | `qudt:` | QUDT unit local names | DTDL, Brick, ASHRAE 223P, digital twins |
 | `qudt-qk:` | QUDT quantity kinds | the same, where metadata carries a *kind* rather than a unit |
 | `udunits:` | UDUNITS-2 | netCDF and the CF conventions |
+| `om:` | OM 2 — Ontology of units of Measure | agrifood, food science, LCA, FAIR/ELN data, Wikidata alignment |
+| `cf:` | CF standard names (read-only) | netCDF/CF metadata, where a variable carries a standard name and no units string |
 
 This notation is **under implementation** and is not in a released version: the current specification is 1.1. A document reaches it only by opting in to a version the build does not advertise, which is why the `#!bovnar 1.2` directive is required.
 
-A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 2847 assertions over 53 concepts checks every spelling against every other one pairwise.
+A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg`, `om:kilogram` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 4776 assertions over 64 concepts checks every spelling against every other one pairwise.
 
 The enforcement point does not move. A profile code either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
 
@@ -519,7 +523,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_unece_test` | The `unece:` notation: Rec 20 units, Rec 21 packages as incommensurable counts |
 | `bvnr_qudt_test` | The `qudt:` and `qudt-qk:` notations: local names, and quantity kinds as coherent SI units |
 | `bvnr_udunits_test` | The `udunits:` notation: operators, and the two refusals that carry weight |
-| `bvnr_crossvocab_test` | Cross-vocabulary conformance: do the five vocabularies agree with each other? |
+| `bvnr_crossvocab_test` | Cross-vocabulary conformance: do the six unit vocabularies agree with each other? |
 | `bvnr_currency_test` | Fiat and crypto currency lookup, minor units, prefix rules |
 | `bvnr_utils_test` | Utility functions |
 | `bvnr_int_test` | Arbitrary-precision integer arithmetic |
@@ -527,7 +531,7 @@ Or use the convenience wrapper at the repository root:
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 419-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 425-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -771,7 +775,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
 | [Unit Profiles](doc/11_bovnar_unit_profiles.md) | Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite. |
 | [Formal EBNF](doc/12_bovnar.ebnf) | Machine-readable grammar. |
-| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (419 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (425 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
 

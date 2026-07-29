@@ -1605,7 +1605,7 @@ A **fully untyped** value (no annotation at all) instead defaults to dimensionle
 
 A unit parameter that begins with a namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged. A namespace is lowercase letters, digits and `-`; the hyphen may not lead.
 
-Five namespaces are defined:
+Seven namespaces are defined:
 
 | Namespace | Vocabulary | Code shape |
 |-----------|------------|------------|
@@ -1614,6 +1614,8 @@ Five namespaces are defined:
 | `qudt` | QUDT unit local names | one whole code, never decomposed |
 | `qudt-qk` | QUDT quantity kinds — translated to the **coherent SI unit** of the kind | one whole code, never decomposed |
 | `udunits` | UDUNITS-2, the CF/netCDF units syntax | an expression over prefixed atoms |
+| `om` | OM 2 — Ontology of units of Measure | one whole code, never decomposed |
+| `cf` | CF standard names — translated to the **`canonical_units`** CF states for the name; **read-only**, a unit is never written back as one | one whole code, never decomposed |
 
 ```bovnar
 #!bovnar 1.2

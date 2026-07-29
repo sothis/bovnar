@@ -4,10 +4,10 @@ Units, prefixes, and currencies are defined once, as **data**, in the `*.bvnr`
 files here; the C tables are generated from them. So the enum, conversion table,
 symbol map, parse/alias tables, prefix scale/policy tables, and currency
 catalogue cannot drift out of sync. Covers 180 physical units (529 accepted
-spellings), 34 SI/IEC prefixes, 216 currencies, and the atom tables of five unit
-profiles — 4722 mapped codes and 1558 named refusals, which is every code UCUM,
-UDUNITS-2 and QUDT define plus every UN/ECE code QUDT's cross-reference reaches
-(doc/11 §15).
+spellings), 34 SI/IEC prefixes, 216 currencies, and the atom tables of seven unit
+profiles — 10 493 mapped codes and 2384 named refusals, which is every code UCUM,
+UDUNITS-2, QUDT, OM 2 and the CF standard name table define, plus every UN/ECE
+code QUDT's cross-reference reaches (doc/11 §15–§17).
 
 Each `.bvnr` file's comment header documents its fields and the editing rules
 (stable, append-only ids). **To add or change an entry, edit a record there and
@@ -25,6 +25,8 @@ rebuild — never edit the generated `*.gen.{h,inc}`.**
 | `qudt.bvnr` | `src/gendata/` | the data: QUDT unit local names. All 2803, carried over through QUDT's own `ucumCode`/`udunitsCode` rather than by matching values |
 | `qudt-qk.bvnr` | `src/gendata/` | the data: QUDT quantity kinds, each mapped to the **coherent SI unit** of the kind — taken from QUDT's own `applicableUnit` list, which is what separates `Torque` (`N·m`) from `Work` (`J`). All 1164 |
 | `udunits.bvnr` | `src/gendata/` | the data: UDUNITS-2 atoms and prefixes, the CF/netCDF units syntax. All 570 spellings the database defines |
+| `om.bvnr` | `src/gendata/` | the data: OM 2 local names. Every unit individual the ontology states, with each compound's target **built from OM's own composition** — prefix and base, numerator and denominator, term and term |
+| `cf.bvnr` | `src/gendata/` | the data: CF standard names, all 5071 of table v94. A name translates to the `canonical_units` CF states for it, and the profile is **read-only**: a unit is never written back as a standard name |
 | `gen_units.py` / `gen_prefixes.py` / `gen_currencies.py` / `gen_profiles.py` | repo root | the generators |
 | `bvnr_data.py` | repo root | the small built-in `.bvnr` reader they use |
 

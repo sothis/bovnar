@@ -105,7 +105,8 @@ class Unit:
     # ── spellings ──────────────────────────────────────────────────────────
     def to_profile(self, namespace: str) -> str:
         """This unit as a code in *namespace* (``'ucum'``, ``'unece'``,
-        ``'qudt'``, ``'qudt-qk'``, ``'udunits'``), without the ``ns:`` prefix.
+        ``'qudt'``, ``'qudt-qk'``, ``'udunits'``, ``'om'``), without the
+        ``ns:`` prefix. ``'cf'`` never answers -- that namespace is read-only.
         Raises when the vocabulary has no code for it -- the reverse tables are
         partial by construction."""
         from . import unit_to_profile

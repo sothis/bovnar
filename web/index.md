@@ -56,7 +56,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 419-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 425-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -96,7 +96,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Read & Write C API](https://www.bovnar.io/doc/08_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).
 - [Python bindings](https://www.bovnar.io/doc/09_bovnar_python_bindings.md) — The pure-ctypes Python package: loads/dumps, streaming, DOM, Quantity, NumPy/Pint bridges.
 - [Streaming & framing](https://www.bovnar.io/doc/10_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
-- [Unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md) — The ucum:, unece:, qudt:, qudt-qk: and udunits: notations, their transliteration tables, what they refuse, and how they are checked against each other.
+- [Unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md) — The ucum:, unece:, qudt:, qudt-qk:, udunits:, om: and cf: notations, their transliteration tables, what they refuse, and how they are checked against each other.
 - [EBNF grammar](https://www.bovnar.io/doc/12_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
 - [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 411-case conformance suite and the IUT protocol for third-party implementations.
 

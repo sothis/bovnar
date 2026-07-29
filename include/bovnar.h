@@ -334,9 +334,13 @@ typedef enum iec_prefix_id_e {
  *         40  400000..409999   QUDT units            src/gendata/qudt.bvnr
  *         50  500000..509999   QUDT quantity kinds   src/gendata/qudt-qk.bvnr
  *         60  600000..609999   UDUNITS-2             src/gendata/udunits.bvnr
+ *         70  700000..709999   OM 2                  src/gendata/om.bvnr
+ *         80  800000..809999   CF standard names     src/gendata/cf.bvnr
  *         90  900000..909999   currencies            src/gendata/currencies.bvnr
  *
- * Blocks 70 and 80 are free for a further profile. Only a vocabulary that
+ * Every tag between the native units and the currencies is now taken; a further
+ * vocabulary needs a tag outside 10..90, and the layout above is the ABI it
+ * would have to fit into. Only a vocabulary that
  * contributes units of its OWN takes a block: a profile is a spelling for the
  * unit slot, so most of its codes translate to native units and carry native
  * ids. The ones that get a block id are the opaque units — codes with no native
@@ -1148,9 +1152,10 @@ BVN_API value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* o
  *   - opaque bases from two different profiles in one unit: no namespace owns
  *     it, and writing it in whichever came first would re-parse as something
  *     else;
- *   - an opaque unit from a FLAT profile (unece, qudt, qudt-qk) at any exponent
- *     but 1, or beside another component: a flat vocabulary is one whole code
- *     looked up entire, so it can spell exactly one unprefixed component;
+ *   - an opaque unit from a FLAT profile (unece, qudt, qudt-qk, om, cf) at
+ *     any exponent but 1, or beside another component: a flat vocabulary is
+ *     one whole code looked up entire, so it can spell exactly one unprefixed
+ *     component;
  *   - an opaque unit beside a native one, for the same reason.
  * Such a unit is still perfectly usable in memory — it compares, and it
  * converts to itself — it simply cannot be serialised, and the writer refuses
@@ -1196,7 +1201,13 @@ BVN_API bool         bvn_unit_valid(value_unit_t u);
  * the Old German units, the water-hardness degrees, the turbidity kinds and
  * every currency -- for an opaque unit belonging to a DIFFERENT profile, and,
  * in a flat vocabulary such as UNECE, for any compound or exponentiated unit,
- * since a flat code is one whole token with nothing to build it out of. */
+ * since a flat code is one whole token with nothing to build it out of.
+ *
+ * ONE NAMESPACE ANSWERS FOR NOTHING AT ALL. "cf" is read-only: a CF standard
+ * name states a QUANTITY, dozens of them state the same unit, and choosing one
+ * would make this function assert what a quantity is from a unit that does not
+ * know it. It reads like any other namespace and returns -1 here for every
+ * unit, by having no reverse table rather than by a special case. */
 BVN_API error_code_t bvn_unit_error_code(const uint8_t* unit, uint32_t len);
 BVN_API bool         bvn_unit_is_profile_only(value_unit_t u);
 BVN_API int32_t      bvn_unit_to_profile(const char* ns, value_unit_t u,

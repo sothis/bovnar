@@ -17,6 +17,61 @@ below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 �
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Added — two more unit profiles: `om:` (OM 2) and `cf:` (CF standard names)
+
+Two vocabularies bovnar could not read now have namespaces of their own, taking
+the last two free tags of the base-unit id space (70 and 80). Both are **flat**
+profiles, both are gated on `#!bovnar 1.2` like every other profile, and both
+contribute no opaque units — a document that does not use them is byte-for-byte
+unaffected.
+
+- **`om:`** — OM 2, the Ontology of units of Measure: 1255 local names mapped,
+  205 refused with a reason. The vocabulary agrifood, food science, LCA and
+  FAIR/ELN data use, and the one Wikidata's unit items align to. Its targets
+  were **derived from OM's own composition** rather than read off the local
+  name: OM states a prefix and a base, a numerator and a denominator, a term and
+  a term, so `om:gramPerPetalitre` is `g/P~L` because the ontology says so.
+- **`cf:`** — the CF conventions' standard names, all 5071 of standard name
+  table v94: 4450 mapped, 621 refused. A standard name is a *quantity*, so it
+  translates to the `canonical_units` CF itself states for it —
+  `cf:air_temperature` is the kelvin because the table says `K`. This makes a
+  netCDF/CF producer that holds a standard name and no units string able to
+  write the value down at all.
+
+**`cf:` is read-only, which is new.** `bvn_unit_to_profile("cf", u)` returns -1
+for every unit and always will: sixty-nine standard names state the kelvin, and
+writing a kelvin back as one of them would assert a quantity the unit does not
+know. `gen_profiles.py` marks such a profile unwritable and emits no reverse
+table, so the C writer reaches the refusal through its ordinary "no row names
+this base" path — there is no special case, and a `.reverse` flag in such a data
+file is now a build error.
+
+Both tables are checked against their publishers by `check_profile_factors.py`,
+which grew two resolvers of new shapes: OM states no multiplier, so its value is
+computed by walking the composition down to the SI base units, and CF states no
+units, so each name's `canonical_units` is evaluated with the same UDUNITS
+evaluator the `udunits` profile is checked against. Across all seven profiles the
+tool now compares **10263 rows with no mismatch**.
+
+What the two vocabularies disagreed with bovnar about is refused rather than
+rounded: OM's `year` is the **Gregorian** 31 556 952 s against native `yr`'s
+Julian 31 557 600 s, and everything OM builds on it falls with it; CF's year is
+UDUNITS' tropical one. OM's arbitrary units (`InternationalUnit`,
+`colonyFormingUnit`) are refused so that they cannot become a second,
+incommensurable identity for the `ucum:[IU]` bovnar already carries.
+
+**The cost is size, and it is the largest this project has paid**: the stripped
+release binary goes from 1015 KB to 1798 KB, three quarters of that being CF's
+5071 standard names, which average 54 bytes each. The per-profile build switch
+doc/11 §15.3 called for does not exist yet and now matters more.
+
+Cross-vocabulary coverage grew with it: `om:` joins 62 of the 64 concepts in
+`bovnar_crossvocab_test.c` (4776 assertions, up from 3551), and the conformance
+corpus gains six `unit_profile` cases (425 total). `cf:` is deliberately not in
+the concept table — a standard name that states the kelvin is not a *spelling*
+of it. Two cases that used `cf:m` to stand for an unknown namespace now use
+`zz:m`, since `cf` is a namespace of this build.
+
 ### Changed — every unit out-parameter is optional
 
 Passing NULL for an out-parameter of a unit function now means "do not report

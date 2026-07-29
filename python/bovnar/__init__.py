@@ -276,15 +276,17 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     """
     The code for *unit* in the named vocabulary, without the ``<ns>:`` prefix.
 
-    *namespace* is one of ``ucum``, ``unece``, ``qudt``, ``qudt-qk`` or
-    ``udunits``.
+    *namespace* is one of ``ucum``, ``unece``, ``qudt``, ``qudt-qk``,
+    ``udunits`` or ``om``. ``cf`` is accepted for READING and never answers
+    here: a CF standard name is a quantity, dozens of them state the same unit,
+    and picking one would assert something the unit does not know.
 
     Partial by construction (doc/11_bovnar_unit_profiles.md 5.3), and in three
     ways. A native unit outside that vocabulary's transliteration table has no
     form in it -- the Old German units, the water-hardness degrees, the
     turbidity kinds and every currency. An opaque unit belonging to a DIFFERENT
     profile has none either: ``[IU]`` is UCUM's and has no UNECE spelling. And a
-    FLAT vocabulary (``unece``, ``qudt``, ``qudt-qk``) can spell only a single
+    FLAT vocabulary (``unece``, ``qudt``, ``qudt-qk``, ``om``, ``cf``) can spell only a single
     unprefixed component, because a flat code is one whole token with no
     operator to build it out of -- so ``k~m/h`` has no UNECE form even though
     ``KMH`` parses to exactly it. All three raise rather than returning an

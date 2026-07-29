@@ -1491,10 +1491,29 @@ other — see §3.12 and the note under §3.2.</p>
 <td><code>decibel</code>, <code>decibels</code></td>
 <td>decibel</td>
 <td><code>bu_decibel</code></td>
-<td>1 Np = 20/ln(10) dB ≈ 8.686 dB</td>
+<td>dimensionless logarithmic ratio</td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Neper and decibel do not convert into each other.</strong> <code>bvn_units_compatible</code>
+reports <code>false</code> for the pair, and every conversion entry point refuses it.</p>
+<p>A logarithmic level is not a linear quantity: 20 dB is a ratio of 100, not
+twice the ratio 10 dB names. Relating two logarithmic scales is a change of
+base, which the multiply-by-a-factor model every conversion entry point is
+built on cannot express — so bovnar gives <code>Np</code>, <code>dB</code> and <code>pH</code> a quantity kind
+each and refuses every pair, rather than applying a factor that is only ever
+right by coincidence.</p>
+<p>ISO 80000-3 does state 1 Np = 8.685889… dB, for a level referred consistently
+to the same kind of quantity. Two things stop that from being a conversion
+this library can perform. It is a relation between <em>levels</em>, so it does not
+compose with the exponents and prefixes a <code>value_unit_t</code> carries; and <code>dB</code> is
+written in practice against both the power convention (10·log₁₀) and the field
+convention (20·log₁₀), with nothing in the annotation recording which — so the
+number a reader would need is not determined by the unit alone.</p>
+<p>The same reasoning keeps a level out of a plain number: <code>dB</code> → dimensionless is
+refused too.</p>
+</blockquote>
 <h3 id="316-electrical-power-units">3.16 Electrical Power Units</h3>
 <table>
 <thead>
@@ -1551,6 +1570,18 @@ other — see §3.12 and the note under §3.2.</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Bit and byte do not convert into each other.</strong> They are separate quantity
+kinds, so <code>b</code> → <code>B</code> is refused rather than divided by eight. A byte is eight
+bits <em>on the wire</em>, but a value annotated in bytes and one annotated in bits
+are usually not the same measurement — a link rate quoted in <code>M~b/s</code> and a file
+size in <code>M~B</code> — and silently trading one for the other is the class of error
+this format exists to prevent. Convert explicitly in the application if that
+is genuinely what you mean.</p>
+<p>Prefixes still work within each: <code>Ki~B</code> → <code>B</code> is 1024, <code>M~b</code> → <code>k~b</code> is 1000.
+Both units take IEC binary prefixes as well as SI ones, and SI prefixes on them
+are restricted to kilo and above (§6.3).</p>
+</blockquote>
 <h3 id="318-textile-linear-density">3.18 Textile Linear Density</h3>
 <table>
 <thead>
@@ -2181,13 +2212,36 @@ existing tables already say them exactly.</p>
 <td><code>MΩ·cm</code>, <code>M~Ω·c~m</code></td>
 <td>ultrapure-water convention</td>
 </tr>
+</tbody>
+</table>
+<p>One quantity does get a unit of its own, because the hydroponic scale is a
+rescaling nothing else in the table expresses:</p>
+<table>
+<thead>
 <tr>
-<td>… on the hydroponic scale</td>
+<th>Symbol</th>
+<th>Long form</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Method</th>
+<th>Prefixes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
 <td><code>CF</code></td>
-<td><code>bu_conductivity_factor</code>; CF = EC in mS/cm × 10, so 1 CF = 0.1 mS/cm = 100 µS/cm exactly, and it converts to both. Only the uppercase spelling — <code>cF</code> is the centifarad</td>
+<td><code>conductivity_factor</code></td>
+<td>conductivity factor</td>
+<td><code>bu_conductivity_factor</code></td>
+<td>EC in mS/cm × 10</td>
+<td>no</td>
 </tr>
 </tbody>
 </table>
+<p><code>CF</code> carries the dimensions of conductivity, so unlike the turbidity scales
+below it <em>does</em> convert: 1 CF = 0.1 mS/cm = 100 µS/cm, exactly, and into <code>S/m</code>
+and <code>dS/m</code> with it. Only the uppercase spelling is the conductivity factor —
+<code>cF</code> is the centifarad.</p>
 <blockquote>
 <p><strong>"ppm" for TDS.</strong> Water data writes TDS in "ppm", meaning milligrams per litre. Bovnar's <code>ppm</code>
 is the dimensionless 10⁻⁶ — for a dilute aqueous solution at 1 kg/L the two are <em>numerically</em>
@@ -4696,6 +4750,18 @@ whole string fails to resolve.</p>
 <td><code>src/gendata/udunits.bvnr</code></td>
 </tr>
 <tr>
+<td>70</td>
+<td>700000–709999</td>
+<td>OM 2 opaque units</td>
+<td><code>src/gendata/om.bvnr</code></td>
+</tr>
+<tr>
+<td>80</td>
+<td>800000–809999</td>
+<td>CF standard names</td>
+<td><code>src/gendata/cf.bvnr</code></td>
+</tr>
+<tr>
 <td>90</td>
 <td>900000–909999</td>
 <td>currencies</td>
@@ -4703,7 +4769,7 @@ whole string fails to resolve.</p>
 </tr>
 </tbody>
 </table>
-<p><code>bu_none</code> is 0 and belongs to no block; blocks 70 and 80 are free for a further profile. Within block 10 the 180 native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_turbidity_jtu</code> = 100179, in the order of <code>units.bvnr</code>. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
+<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the 180 native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_turbidity_jtu</code> = 100179, in the order of <code>units.bvnr</code>. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
 <p>Only a vocabulary that contributes units of its <em>own</em> takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the <strong>opaque</strong> units — codes with no native equivalent and no dimension, such as UCUM's assay-defined <code>[IU]</code> or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.</p>
 <blockquote>
 <p><strong>Why blocks.</strong> One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 <em>and again</em> at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.</p>
@@ -4854,9 +4920,9 @@ whole string fails to resolve.</p>
 <span class="cm">     * numeric base value, and the catalogue in bovnar_currency.c is</span>
 <span class="cm">     * index-aligned to BVN_CURRENCY_FIRST. */</span>
 
-<span class="w">    </span><span class="cm">/* Blocks 20–60 — the profiles&#39; opaque units — are generated into</span>
+<span class="w">    </span><span class="cm">/* Blocks 20–80 — the profiles&#39; opaque units — are generated into</span>
 <span class="cm">     * include/bovnar_profiles.gen.h: bu_ucum_iu = 200000, bu_unece_one =</span>
-<span class="cm">     * 300000, and so on. */</span>
+<span class="cm">     * 300000, and so on. Only 20 and 30 contribute any today. */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">value_base_unit_t</span><span class="p">;</span>
 
 <span class="cm">/* Not a member of the enum, and NOT a bound on it: the number of rows in the</span>

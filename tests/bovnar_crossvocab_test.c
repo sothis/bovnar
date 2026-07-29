@@ -28,7 +28,7 @@
  * ===========================================================================
  *
  * Every other profile test asks "does this vocabulary translate correctly?".
- * This one asks the question that actually matters once there are five of them:
+ * This one asks the question that actually matters once there are seven of them:
  * DO THEY AGREE?
  *
  * The claim under test is that a unit profile is a SPELLING and not a second
@@ -63,9 +63,9 @@
  *   "helpfully" unify them is strongest.
  *
  * WHAT THIS SUITE CANNOT TELL YOU
- *   It proves the five vocabularies agree WITH EACH OTHER. It cannot prove they
+ *   It proves the six vocabularies of units agree WITH EACH OTHER. It cannot prove they
  *   agree with their publishers: nothing in this repository checks that "KGM" is
- *   UNECE's kilogram rather than something the table asserts. Five tables that
+ *   UNECE's kilogram rather than something the table asserts. Six tables that
  *   are wrong in the same way agree perfectly. See the provenance notes at the
  *   top of each .bvnr data file under src/gendata.
  */
@@ -89,8 +89,14 @@ static int tests    = 0;
 } while (0)
 
 /* At most this many spellings per concept: native, ucum, unece, qudt, udunits,
- * qudt-qk, and room for a second spelling in a vocabulary that has one. */
-#define MAX_SPELLINGS 8
+ * qudt-qk, om, and room for a second spelling in a vocabulary that has one.
+ *
+ * `cf` is deliberately not here. A CF standard name states a unit, so it would
+ * pass every check in this file -- but it names a QUANTITY, and dozens of names
+ * state the same unit, so a row saying "the kelvin is cf:air_temperature" would
+ * be asserting a choice rather than an agreement. doc/11 §17.3 is the same argument
+ * that makes that namespace read-only. */
+#define MAX_SPELLINGS 10
 
 typedef struct {
 	const char* concept;
@@ -111,82 +117,82 @@ typedef struct {
 static const cv_concept_t g_concepts[] = {
 	/* ── SI base units ───────────────────────────────────────────────────── */
 	{ "metre", { "m", "ucum:m", "unece:MTR", "qudt:M", "udunits:m",
-	             "udunits:meter", "qudt-qk:Length", NULL } },
+	             "udunits:meter", "qudt-qk:Length", "om:metre", NULL } },
 	{ "kilogram", { "k~g", "kg", "ucum:kg", "unece:KGM", "qudt:KiloGM",
-	                "udunits:kg", "qudt-qk:Mass", NULL } },
+	                "udunits:kg", "qudt-qk:Mass", "om:kilogram", NULL } },
 	{ "second", { "s", "ucum:s", "unece:SEC", "qudt:SEC", "udunits:s",
-	              "udunits:second", "qudt-qk:Time", NULL } },
+	              "udunits:second", "qudt-qk:Time", "om:second-Time", NULL } },
 	{ "ampere", { "A", "ucum:A", "unece:AMP", "qudt:A", "udunits:ampere",
-	              "qudt-qk:ElectricCurrent", NULL } },
+	              "qudt-qk:ElectricCurrent", "om:ampere", NULL } },
 	{ "kelvin", { "K", "ucum:K", "unece:KEL", "qudt:K", "udunits:kelvin",
-	              "qudt-qk:ThermodynamicTemperature", NULL } },
+	              "qudt-qk:ThermodynamicTemperature", "om:kelvin", NULL } },
 	{ "mole", { "mol", "ucum:mol", "unece:MOL", "qudt:MOL", "udunits:mole",
-	            "qudt-qk:AmountOfSubstance", NULL } },
+	            "qudt-qk:AmountOfSubstance", "om:mole", NULL } },
 	{ "candela", { "cd", "ucum:cd", "unece:CDL", "qudt:CD", "udunits:candela",
-	               "qudt-qk:LuminousIntensity", NULL } },
+	               "qudt-qk:LuminousIntensity", "om:candela", NULL } },
 
 	/* ── named SI-derived ────────────────────────────────────────────────── */
 	{ "hertz", { "Hz", "ucum:Hz", "unece:HTZ", "qudt:HZ", "udunits:hertz",
-	             "qudt-qk:Frequency", NULL } },
+	             "qudt-qk:Frequency", "om:hertz", NULL } },
 	{ "newton", { "N", "ucum:N", "unece:NEW", "qudt:N", "udunits:newton",
-	              "qudt-qk:Force", NULL } },
+	              "qudt-qk:Force", "om:newton", NULL } },
 	{ "pascal", { "Pa", "ucum:Pa", "unece:PAL", "qudt:PA", "udunits:pascal",
-	              "qudt-qk:Pressure", NULL } },
+	              "qudt-qk:Pressure", "om:pascal", NULL } },
 	{ "joule", { "J", "ucum:J", "unece:JOU", "qudt:J", "udunits:joule",
-	             "qudt-qk:Energy", NULL } },
+	             "qudt-qk:Energy", "om:joule", NULL } },
 	{ "watt", { "W", "ucum:W", "unece:WTT", "qudt:W", "udunits:watt",
-	            "qudt-qk:Power", NULL } },
+	            "qudt-qk:Power", "om:watt", NULL } },
 	{ "volt", { "V", "ucum:V", "unece:VLT", "qudt:V", "udunits:volt",
-	            "qudt-qk:Voltage", NULL } },
+	            "qudt-qk:Voltage", "om:volt", NULL } },
 	{ "ohm", { "Ω", "ucum:Ohm", "unece:OHM", "qudt:OHM", "udunits:ohm",
-	           "qudt-qk:Resistance", NULL } },
+	           "qudt-qk:Resistance", "om:ohm", NULL } },
 	{ "farad", { "F", "ucum:F", "unece:FAR", "qudt:FARAD", "udunits:farad",
-	             "qudt-qk:Capacitance", NULL } },
+	             "qudt-qk:Capacitance", "om:farad", NULL } },
 	{ "coulomb", { "C", "ucum:C", "unece:COU", "qudt:C", "udunits:coulomb",
-	               "qudt-qk:ElectricCharge", NULL } },
+	               "qudt-qk:ElectricCharge", "om:coulomb", NULL } },
 	{ "siemens", { "S", "ucum:S", "unece:SIE", "qudt:S", "udunits:siemens",
-	               "qudt-qk:Conductance", NULL } },
+	               "qudt-qk:Conductance", "om:mho", NULL } },
 	{ "henry", { "H", "ucum:H", "unece:HEN", "qudt:H", "udunits:henry",
-	             "qudt-qk:Inductance", NULL } },
+	             "qudt-qk:Inductance", "om:henry", NULL } },
 	{ "weber", { "Wb", "ucum:Wb", "unece:WEB", "qudt:WB", "udunits:weber",
-	             "qudt-qk:MagneticFlux", NULL } },
+	             "qudt-qk:MagneticFlux", "om:weber", NULL } },
 	{ "tesla", { "T", "ucum:T", "unece:D33", "qudt:T", "udunits:tesla",
-	             "qudt-qk:MagneticFluxDensity", NULL } },
+	             "qudt-qk:MagneticFluxDensity", "om:tesla", NULL } },
 	{ "lumen", { "lm", "ucum:lm", "unece:LUM", "qudt:LM", "udunits:lumen",
-	             "qudt-qk:LuminousFlux", NULL } },
+	             "qudt-qk:LuminousFlux", "om:lumen", NULL } },
 	{ "lux", { "lx", "ucum:lx", "unece:LUX", "qudt:LUX", "udunits:lux",
-	           "qudt-qk:Illuminance", NULL } },
+	           "qudt-qk:Illuminance", "om:lux", NULL } },
 	{ "becquerel", { "Bq", "ucum:Bq", "unece:BQL", "qudt:BQ",
-	                 "udunits:becquerel", "qudt-qk:Activity", NULL } },
+	                 "udunits:becquerel", "qudt-qk:Activity", "om:becquerel", NULL } },
 	{ "gray", { "Gy", "ucum:Gy", "unece:GRY", "qudt:GRAY", "udunits:gray",
-	            "qudt-qk:AbsorbedDose", NULL } },
+	            "qudt-qk:AbsorbedDose", "om:gray", NULL } },
 	{ "sievert", { "Sv", "ucum:Sv", "unece:D13", "qudt:SV", "udunits:sievert",
-	               "qudt-qk:DoseEquivalent", NULL } },
+	               "qudt-qk:DoseEquivalent", "om:sievert", NULL } },
 	{ "katal", { "kat", "ucum:kat", "unece:KAT", "qudt:KAT", "udunits:katal",
-	             "qudt-qk:CatalyticActivity", NULL } },
+	             "qudt-qk:CatalyticActivity", "om:katal", NULL } },
 	{ "radian", { "rad", "ucum:rad", "unece:C81", "qudt:RAD", "udunits:radian",
-	              "qudt-qk:PlaneAngle", NULL } },
+	              "qudt-qk:PlaneAngle", "om:radian", NULL } },
 	{ "steradian", { "sr", "ucum:sr", "unece:D27", "qudt:SR",
-	                 "udunits:steradian", "qudt-qk:SolidAngle", NULL } },
+	                 "udunits:steradian", "qudt-qk:SolidAngle", "om:steradian", NULL } },
 
 	/* ── compounds ───────────────────────────────────────────────────────── */
 	{ "metre per second", { "m/s", "ucum:m/s", "unece:MTS", "qudt:M-PER-SEC",
 	                        "udunits:m*s-1", "udunits:m/s",
-	                        "qudt-qk:Velocity", NULL } },
+	                        "qudt-qk:Velocity", "om:metrePerSecond-Time", NULL } },
 	{ "metre per second squared", { "m/s^2", "ucum:m/s2", "unece:MSK",
 	                                "qudt:M-PER-SEC2", "udunits:m*s-2",
-	                                "qudt-qk:Acceleration", NULL } },
+	                                "qudt-qk:Acceleration", "om:metrePerSecond-TimeSquared", NULL } },
 	{ "square metre", { "m^2", "ucum:m2", "unece:MTK", "qudt:M2",
-	                    "udunits:m2", "udunits:m^2", "qudt-qk:Area", NULL } },
+	                    "udunits:m2", "udunits:m^2", "qudt-qk:Area", "om:squareMetre", NULL } },
 	{ "cubic metre", { "m^3", "ucum:m3", "unece:MTQ", "qudt:M3",
-	                   "udunits:m3", "qudt-qk:Volume", NULL } },
+	                   "udunits:m3", "qudt-qk:Volume", "om:cubicMetre", NULL } },
 	{ "kilometre per hour", { "k~m/h", "unece:KMH", "qudt:KiloM-PER-HR",
-	                          "udunits:km/h", "udunits:km*h-1", NULL } },
+	                          "udunits:km/h", "udunits:km*h-1", "om:kilometrePerHour", NULL } },
 	{ "newton metre", { "N·m", "ucum:N.m", "unece:NU", "qudt:N-M",
-	                    "udunits:N*m", "qudt-qk:Torque", NULL } },
+	                    "udunits:N*m", "qudt-qk:Torque", "om:newtonMetre", NULL } },
 	{ "kilogram per cubic metre", { "k~g/m^3", "ucum:kg/m3", "unece:KMQ",
 	                                "qudt:KiloGM-PER-M3", "udunits:kg*m-3",
-	                                "qudt-qk:Density", NULL } },
+	                                "qudt-qk:Density", "om:kilogramPerCubicmetre", NULL } },
 
 	/*
 	 * ── the coherent SI unit of a kind, in every namespace ────────────────
@@ -200,75 +206,75 @@ static const cv_concept_t g_concepts[] = {
 	 * these were carried.
 	 */
 	{ "reciprocal second", { "s^-1", "ucum:/s", "unece:C97", "qudt:PER-SEC",
-	                         "udunits:s-1", NULL } },
+	                         "udunits:s-1", "om:reciprocalSecond-Time", NULL } },
 	{ "revolution per minute", { "rev/min", "unece:M46", "qudt:REV-PER-MIN",
 	                             "udunits:rpm", NULL } },
 	{ "radian per second", { "rad/s", "ucum:rad/s", "unece:2A",
 	                         "qudt:RAD-PER-SEC", "udunits:rad*s-1",
-	                         "qudt-qk:AngularVelocity", NULL } },
+	                         "qudt-qk:AngularVelocity", "om:radianPerSecond-Time", NULL } },
 	{ "cubic metre per second", { "m^3/s", "ucum:m3/s", "unece:MQS",
 	                              "qudt:M3-PER-SEC", "udunits:m3*s-1",
-	                              "qudt-qk:VolumeFlowRate", NULL } },
+	                              "qudt-qk:VolumeFlowRate", "om:cubicMetrePerSecond-Time", NULL } },
 	{ "kilogram per second", { "k~g/s", "ucum:kg/s", "unece:KGS",
 	                           "qudt:KiloGM-PER-SEC", "udunits:kg*s-1",
-	                           "qudt-qk:MassFlowRate", NULL } },
+	                           "qudt-qk:MassFlowRate", "om:kilogramPerSecond-Time", NULL } },
 	{ "square metre per second", { "m^2/s", "ucum:m2/s", "unece:S4",
 	                               "qudt:M2-PER-SEC", "udunits:m2*s-1",
-	                               "qudt-qk:KinematicViscosity", NULL } },
+	                               "qudt-qk:KinematicViscosity", "om:squareMetrePerSecond-Time", NULL } },
 	{ "pascal second", { "Pa·s", "ucum:Pa.s", "unece:C65", "qudt:PA-SEC",
-	                     "udunits:Pa*s", "qudt-qk:DynamicViscosity", NULL } },
+	                     "udunits:Pa*s", "qudt-qk:DynamicViscosity", "om:pascalSecond-Time", NULL } },
 	{ "joule per kelvin", { "J/K", "ucum:J/K", "unece:JE", "qudt:J-PER-K",
-	                        "udunits:J*K-1", "qudt-qk:HeatCapacity", NULL } },
+	                        "udunits:J*K-1", "qudt-qk:HeatCapacity", "om:joulePerKelvin", NULL } },
 	{ "mole per cubic metre", { "mol/m^3", "ucum:mol/m3", "unece:C36",
 	                            "qudt:MOL-PER-M3", "udunits:mol*m-3",
 	                            "qudt-qk:AmountOfSubstanceConcentration",
-	                            NULL } },
+	                            "om:molePerCubicmetre", NULL } },
 	{ "kilogram metre per second", { "k~g·m/s", "ucum:kg.m/s", "unece:B31",
 	                                 "qudt:KiloGM-M-PER-SEC", "udunits:kg*m*s-1",
-	                                 "qudt-qk:Momentum", NULL } },
+	                                 "qudt-qk:Momentum", "om:metreKilogramPerSecond-Time", NULL } },
 
 	/* ── prefixed and non-SI ─────────────────────────────────────────────── */
 	{ "gram", { "g", "ucum:g", "unece:GRM", "qudt:GM", "udunits:g",
-	            "udunits:gram", NULL } },
+	            "udunits:gram", "om:gram", NULL } },
 	{ "milligram", { "m~g", "mg", "ucum:mg", "unece:MGM", "qudt:MilliGM",
-	                 "udunits:mg", "udunits:milligram", NULL } },
+	                 "udunits:mg", "udunits:milligram", "om:milligram", NULL } },
 	{ "kilometre", { "k~m", "km", "ucum:km", "unece:KMT", "qudt:KiloM",
-	                 "udunits:km", "udunits:kilometer", NULL } },
+	                 "udunits:km", "udunits:kilometer", "om:kilometre", NULL } },
 	{ "centimetre", { "c~m", "cm", "ucum:cm", "unece:CMT", "qudt:CentiM",
-	                  "udunits:cm", NULL } },
+	                  "udunits:cm", "om:centimetre", NULL } },
 	{ "litre", { "L", "ucum:L", "ucum:l", "unece:LTR", "qudt:L",
-	             "udunits:L", "udunits:litre", NULL } },
+	             "udunits:L", "udunits:litre", "om:litre", NULL } },
 	{ "millilitre", { "m~L", "mL", "ucum:mL", "unece:MLT", "qudt:MilliL",
-	                  "udunits:mL", NULL } },
+	                  "udunits:mL", "om:millilitre", NULL } },
 	{ "tonne", { "t", "ucum:t", "unece:TNE", "qudt:TON_Metric",
-	             "udunits:tonne", NULL } },
+	             "udunits:tonne", "om:tonne", NULL } },
 	/* UCUM's "ar" is the ARE, a hundredth of this; the hectare is "har". */
 	{ "hectare", { "ha", "ucum:har", "unece:HAR", "qudt:HA",
-	               "udunits:hectare", NULL } },
+	               "udunits:hectare", "om:hectare", NULL } },
 	{ "bar", { "bar", "ucum:bar", "unece:BAR", "qudt:BAR", "udunits:bar",
-	           NULL } },
+	           "om:bar", NULL } },
 	{ "hectopascal", { "h~Pa", "hPa", "ucum:hPa", "unece:A97", "qudt:HectoPA",
-	                   "udunits:hPa", NULL } },
+	                   "udunits:hPa", "om:hectopascal", NULL } },
 	{ "kilowatt hour", { "k~W·h", "unece:KWH", "qudt:KiloW-HR",
-	                     "udunits:kW*h", NULL } },
+	                     "udunits:kW*h", "om:kilowattHour", NULL } },
 	{ "degree Celsius", { "°C", "ucum:Cel", "unece:CEL", "qudt:DEG_C",
-	                      "udunits:degC", "udunits:celsius", NULL } },
+	                      "udunits:degC", "udunits:celsius", "om:degreeCelsius", NULL } },
 	{ "degree of angle", { "°", "ucum:deg", "unece:DD", "qudt:DEG",
-	                       "udunits:degree", NULL } },
+	                       "udunits:degree", "om:degree", NULL } },
 	{ "percent", { "%", "ucum:%", "unece:P1", "qudt:PERCENT",
-	               "udunits:percent", NULL } },
+	               "udunits:percent", "om:percent", NULL } },
 	/* Rec 20's per-mille code is NX, which QUDT attaches to its PPT (10⁻¹²) as
 	 * well as its PPTH (10⁻³) — a cross-reference nine decades wide settles
 	 * nothing, so unece is absent here on purpose rather than by oversight. */
 	{ "per mille", { "‰", "ucum:[ppth]", "qudt:PPTH", NULL } },
 	{ "inch", { "in", "ucum:[in_i]", "unece:INH", "qudt:IN",
-	            "udunits:inch", NULL } },
+	            "udunits:inch", "om:inch-International", NULL } },
 	{ "foot", { "ft", "ucum:[ft_i]", "unece:FOT", "qudt:FT",
-	            "udunits:foot", NULL } },
+	            "udunits:foot", "om:foot-International", NULL } },
 	{ "pound", { "lb", "ucum:[lb_av]", "unece:LBR", "qudt:LB",
-	             "udunits:pound", NULL } },
+	             "udunits:pound", "om:poundAvoirdupois", NULL } },
 	{ "knot", { "kn", "ucum:[kn_i]", "unece:KNT", "qudt:KN", "udunits:knot",
-	            NULL } },
+	            "om:knot-International", NULL } },
 };
 
 #define N_CONCEPTS (sizeof(g_concepts) / sizeof(g_concepts[0]))
@@ -533,7 +539,7 @@ static void test_enforcement(void)
 int main(void)
 {
 	printf("cross-vocabulary conformance (%zu concepts, %zu vocabularies)\n",
-	       N_CONCEPTS, (size_t)5);
+	       N_CONCEPTS, (size_t)6);
 
 	test_agreement();
 	test_must_differ();

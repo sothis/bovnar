@@ -72,14 +72,23 @@ class Profile:
                 units are numbered from block * BLOCK_SIZE. Frozen per profile
                 (it is the ABI), so it is written here rather than derived from
                 the list order -- reordering the registry must not move ids.
+    writable    may a unit be WRITTEN BACK as a code in this namespace? True for
+                every vocabulary of units. False for one whose codes name
+                QUANTITIES rather than units, where the reverse direction has no
+                honest answer: `cf` has sixty-nine standard names stating the
+                kelvin, and singling one out would make bvn_unit_to_profile
+                assert what a quantity IS from a unit that does not know. A
+                False here emits no reverse rows at all, so the choice is not
+                made badly rather than being made silently.
     """
 
-    def __init__(self, ns, data, grammar, enum_prefix, block):
+    def __init__(self, ns, data, grammar, enum_prefix, block, writable=True):
         self.ns = ns
         self.data = data
         self.grammar = grammar
         self.enum_prefix = enum_prefix
         self.block = block
+        self.writable = writable
         self.doc = None
         self.opaque_first = block * BLOCK_SIZE
         self.opaque_last = block * BLOCK_SIZE - 1
@@ -114,6 +123,8 @@ PROFILES = [
     Profile("qudt",    "qudt.bvnr",    "flat", "qudt",    40),
     Profile("qudt-qk", "qudt-qk.bvnr", "flat", "qudt_qk", 50),
     Profile("udunits", "udunits.bvnr", "expr", "udunits", 60),
+    Profile("om",      "om.bvnr",      "flat", "om",      70),
+    Profile("cf",      "cf.bvnr",      "flat", "cf",      80, writable=False),
 ]
 
 # The decades that have an SI prefix. The fold in bovnar_profiles.c can only
@@ -496,6 +507,17 @@ def gen_reverse_table(p, units, pfx, iec):
     Keying a flat profile by base alone leaves whichever code happens to be
     shortest, and every other decade becomes unwritable.
     """
+    if not p.writable:
+        # A namespace of quantity names, not unit spellings. The table is empty
+        # rather than absent: the C side still #includes it, and an empty one
+        # makes bvn_unit_to_profile return -1 for every unit, which is the
+        # answer. A `.reverse` flag in such a data file would be describing a
+        # choice nothing makes, so one is a build error rather than a no-op.
+        stray = [m["code"] for m in p.list("mapped") if "reverse" in m]
+        if stray:
+            die(p, "this profile is unwritable, so `.reverse` decides nothing; "
+                   "%d row(s) carry one, starting at %r" % (len(stray), stray[0]))
+        return BANNER % p.data, 0
     flat = (p.grammar == "flat")
     best = {}
     seen = set()

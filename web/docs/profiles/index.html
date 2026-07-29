@@ -41,12 +41,13 @@
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/11_bovnar_unit_profiles.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-profiles.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.1 — <strong>the notation described here is UNDER IMPLEMENTATION.</strong> It is not part of any published specification, and the version it will ship under is not settled (§2.2)
-<strong>Status:</strong> Under implementation — the code is in <code>src/utils/bovnar_profiles.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, <code>tests/bovnar_unece_test.c</code>, <code>tests/bovnar_qudt_test.c</code>, <code>tests/bovnar_udunits_test.c</code> and <code>tests/bovnar_crossvocab_test.c</code>, but nothing here is released: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
-<strong>Scope:</strong> How a foreign vocabulary's code may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once five of them are admitted.</p>
+<strong>Status:</strong> Under implementation — the code is in <code>src/utils/bovnar_profiles.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, <code>tests/bovnar_unece_test.c</code>, <code>tests/bovnar_qudt_test.c</code>, <code>tests/bovnar_udunits_test.c</code>, <code>tests/bovnar_om_test.c</code>, <code>tests/bovnar_cf_test.c</code> and <code>tests/bovnar_crossvocab_test.c</code>, but nothing here is released: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
+<strong>Scope:</strong> How a foreign vocabulary's code may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once seven of them are admitted.</p>
 </blockquote>
-<p><strong>Five namespaces are defined.</strong> Sections 1–10 specify the profile MECHANISM and, as its worked
-example, the <code>ucum:</code> profile in full. Sections 11–14 specify the other four and the suite that
-holds them to each other:</p>
+<p><strong>Seven namespaces are defined.</strong> Sections 1–10 specify the profile MECHANISM and, as its worked
+example, the <code>ucum:</code> profile in full. Sections 11–13 specify the next four, §14 the suite that holds
+them to each other and §15 the pass that closed their tables; §§16–17 specify the two vocabularies
+admitted after that pass, which is why they sit after it rather than beside their siblings:</p>
 <table>
 <thead>
 <tr>
@@ -93,6 +94,20 @@ holds them to each other:</p>
 <td>404, <strong>all 570 UDUNITS defines</strong></td>
 <td><a href="#13-the-udunits-profile">13</a></td>
 </tr>
+<tr>
+<td><code>om:</code></td>
+<td>OM 2 — Ontology of units of Measure</td>
+<td>flat</td>
+<td>1255 + 205 refused, <strong>every unit individual OM states</strong></td>
+<td><a href="#16-the-om-2-profile">16</a></td>
+</tr>
+<tr>
+<td><code>cf:</code></td>
+<td>CF standard names</td>
+<td>flat, read-only</td>
+<td>4450 + 621 refused, <strong>all 5071 names of table v94</strong></td>
+<td><a href="#17-the-cf-standard-name-profile">17</a></td>
+</tr>
 </tbody>
 </table>
 <p>Companion to <a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> (the native registry and notation
@@ -108,7 +123,7 @@ they wrote it in. <code>unece</code> cannot be closed the same way and §11.1 sa
 pass changed and what it cost.</p>
 <p>Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (604 assertions across the five profiles, plus 3551 in the cross-vocabulary
+files named above (741 assertions across the seven profiles, plus 4776 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is <em>worth</em> what the table says — is checked
 too, but not by the same means and not to the same strength: <code>check_profile_factors.py</code> (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and <code>unece</code>
@@ -225,6 +240,20 @@ tables wrong in the same way would agree with each other perfectly.</p>
 <li>15.1 <a href="#151-what-was-wrong">What was wrong</a></li>
 <li>15.2 <a href="#152-how-the-rows-were-produced">How the rows were produced</a></li>
 <li>15.3 <a href="#153-what-it-cost-and-what-is-still-open">What it cost, and what is still open</a></li>
+</ul>
+</li>
+<li><a href="#16-the-om-2-profile">The OM 2 profile</a><ul>
+<li>16.1 <a href="#161-why-this-vocabulary">Why this vocabulary</a></li>
+<li>16.2 <a href="#162-the-targets-were-derived-from-oms-own-structure">The targets were derived from OM's own structure</a></li>
+<li>16.3 <a href="#163-what-the-derivation-refuses">What the derivation refuses</a></li>
+<li>16.4 <a href="#164-which-name-a-unit-is-written-back-as">Which name a unit is written back as</a></li>
+</ul>
+</li>
+<li><a href="#17-the-cf-standard-name-profile">The CF standard-name profile</a><ul>
+<li>17.1 <a href="#171-why-this-vocabulary">Why this vocabulary</a></li>
+<li>17.2 <a href="#172-the-unit-is-cfs-own-canonical_units">The unit is CF's own <code>canonical_units</code></a></li>
+<li>17.3 <a href="#173-read-only-and-why-a-namespace-may-be">Read-only, and why a namespace may be</a></li>
+<li>17.4 <a href="#174-what-is-absent-and-what-it-costs">What is absent, and what it costs</a></li>
 <li><a href="#see-also">See also</a></li>
 </ul>
 </li>
@@ -372,7 +401,7 @@ may differ as long as they mean the same thing:</p>
 <p>A profile unit is a <em>unit</em>, so it is confined to the same type families (doc/05 §2.3): <code>uint</code>,
 <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>. A <code>ucum:</code> parameter on <code>utf8</code>, <code>bool</code> or <code>datetime</code> is
 <code>error_illegal_value_type</code>, unchanged.</p>
-<p>Currencies stay native-only. None of the five vocabularies yields a monetary unit — QUDT's <code>USD</code> and
+<p>Currencies stay native-only. None of the seven vocabularies yields a monetary unit — QUDT's <code>USD</code>, OM's <code>om:euro</code> and
 <code>EUR</code> are refused by name (§12.2) rather than mapped — and the <code>$</code> sigil rule (doc/05 §9.1) is
 untouched.</p>
 <h3 id="23-five-bytes-the-lexer-has-to-learn">2.3 Five bytes the lexer has to learn</h3>
@@ -870,6 +899,47 @@ two formatters would be a round-trip hole.</p>
 (negative return) rather than written in whichever namespace came first. No document can produce
 one — a code is read in exactly one namespace — but the API can compose one, and the honest answer
 there is a failure rather than a string that re-parses as something else.</p>
+<p><strong>Three shapes have no spelling, not one.</strong> The mixed-namespace case above is the one a reader
+expects; the other two follow from what a <em>flat</em> vocabulary is (§2.2). <code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>,
+<code>om</code> and <code>cf</code> match one whole code entire — no operators, no exponents, no prefixes — so a flat
+profile's opaque unit can be written only as a <strong>single unprefixed component at exponent 1</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Unit</th>
+<th>Spelling</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>unece:XBX</code></td>
+<td><code>unece:XBX</code></td>
+<td>one code, exponent 1 — the only shape a flat vocabulary has</td>
+</tr>
+<tr>
+<td><code>bu_unece_box²</code></td>
+<td><em>none</em></td>
+<td>UN/ECE has no notation for an exponent</td>
+</tr>
+<tr>
+<td><code>bu_unece_box · m</code></td>
+<td><em>none</em></td>
+<td>and none for a product, native component or not</td>
+</tr>
+<tr>
+<td><code>ucum:[IU]²</code></td>
+<td><code>ucum:[IU]2</code></td>
+<td>UCUM is an <strong>expr</strong> profile, so this one is spellable</td>
+</tr>
+</tbody>
+</table>
+<p>All three refusals are <code>bvn_unit_to_string</code> returning -1 and the writer reporting
+<code>error_unit_illegal</code>; none of them can arise from a document, only from an API caller composing a
+<code>value_unit_t</code> by hand. Such a unit stays <strong>structurally valid</strong> and fully usable in memory — it
+compares, and it converts to itself — because a unit with no text is still a unit. <code>bvn_unit_valid</code>
+answers the structural question and says so in its own contract; spellability is
+<code>bvn_unit_to_string</code>'s answer, and the two are deliberately distinct.</p>
 <h3 id="52-what-canonical-output-loses-and-on-which-path">5.2 What canonical output loses, and on which path</h3>
 <p>Formatting a <code>value_unit_t</code> is lossy in exactly one respect: annotations. <code>bvn_unit_to_string</code> on
 <code>ucum:mL{total}</code> gives <code>m~L</code>, and <code>{total}</code> is gone; <code>ucum:{RBC}/uL</code> and <code>ucum:{cells}/uL</code> both give
@@ -2217,8 +2287,10 @@ two comparisons, and the pair also tells the writer which namespace owns a given
 <span class="cm">/* … one group per profile, plus a BVN_SLOT_&lt;NS&gt; macro each */</span>
 </code></pre></div>
 
-<p>The empty-profile convention (<code>FIRST &gt; LAST</code>) is what lets <code>qudt</code>, <code>qudt-qk</code> and <code>udunits</code> share one
-registry row shape with the two that do contribute.</p>
+<p>The empty-profile convention (<code>FIRST &gt; LAST</code>) is what lets <code>qudt</code>, <code>qudt-qk</code>, <code>udunits</code>, <code>om</code> and
+<code>cf</code> share one registry row shape with the two that do contribute. <code>om</code> is a deliberate case rather
+than an accident of coverage: OM has its own arbitrary units, and giving them ids here would make
+<code>om:InternationalUnit</code> incommensurable with the <code>ucum:[IU]</code> that is the same unit (§16.3).</p>
 <p>Because the id space is now sparse, the tables the library indexes by base unit are <strong>dense</strong>: one
 row per defined unit, indexed by <code>bvni_unit_slot()</code> rather than by the id. <code>BVN_UNIT_SLOT_COUNT</code> is
 that row count — <code>bu_none</code>, then every native unit, then every opaque unit — and it is <em>not</em> a bound
@@ -2464,7 +2536,7 @@ target and not what the publisher says the code is worth. Where a value was unce
 <em>close but not equal</em> to a native unit, the code went into <code>.unsupported</code> instead — which is why
 <code>osm</code>, <code>[Btu]</code>, <code>cal_IT</code> and <code>[dr_ap]</code> are refused rather than mapped onto the nearly-right native
 unit.</p>
-<p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for all five profiles,
+<p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for all seven profiles,
 though not for all of them equally. It reads UCUM's <code>ucum-essence.xml</code>, the UDUNITS-2 XML database
 and QUDT's Turtle vocabularies, resolves every code to a factor and a dimension vector, asks the
 <strong>reference library</strong> — not a second Python implementation of the unit grammar — what the mapped
@@ -2512,14 +2584,26 @@ them to each other:</p>
 <td>§13</td>
 </tr>
 <tr>
+<td><code>tests/bovnar_om_test.c</code></td>
+<td><code>bvnr_om_test</code></td>
+<td>92</td>
+<td>§16</td>
+</tr>
+<tr>
+<td><code>tests/bovnar_cf_test.c</code></td>
+<td><code>bvnr_cf_test</code></td>
+<td>45</td>
+<td>§17</td>
+</tr>
+<tr>
 <td><code>tests/bovnar_crossvocab_test.c</code></td>
 <td><code>bvnr_crossvocab_test</code></td>
-<td>3551</td>
+<td>4776</td>
 <td>§14</td>
 </tr>
 </tbody>
 </table>
-<p><code>bvnr_ucum_test</code> (labels <code>unit;si;ucum</code>) carries the behavioural claims of sections 2–10: the three
+<p><code>bvnr_ucum_test</code> (labels <code>unit;si;profile;ucum</code>) carries the behavioural claims of sections 2–10: the three
 outcomes with their exact error codes, equivalence with the native spelling, UCUM's non-latching
 <code>/</code>, annotation inertness, every worked fold case in §3.5 including the four refused decades, each
 collision in §6.2, arbitrary-unit incommensurability including the <code>[IU]/L</code> ↔ <code>[IU]/mL</code> case,
@@ -2564,7 +2648,7 @@ dimension vector, asks the reference library what the native target is worth, an
 native side goes through <code>bvn_parse_unit</code> and <code>bvn_unit_to_si_factor</code> via the ctypes bindings, never
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).</p>
-<p>As of this tree it compares <strong>4635 rows across the five vocabularies</strong> and reports <strong>0 mismatches</strong>,
+<p>As of this tree it compares <strong>10263 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
 10 dead rows and <strong>0 coverage suggestions</strong> — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.</p>
 <p><strong>Three outcomes, and only one fails the build.</strong></p>
@@ -2629,7 +2713,7 @@ and <code>units.bvnr</code> states it at 2022 (the one measured constant in the 
 names the edition, since an edition nobody wrote down is one nobody can check). So a correct row
 still disagrees in the seventh digit. The genuine errors are far above that: the US survey foot
 at <code>2e-6</code>, the survey acre at <code>4e-6</code>, the tropical year at <code>2.1e-5</code>, the IT calorie at <code>6.7e-4</code>.</p>
-<p>What sets the bound is neither of those, but the closest real pair in any of the five vocabularies:</p>
+<p>What sets the bound is neither of those, but the closest real pair in any of the vocabularies:</p>
 <table>
 <thead>
 <tr>
@@ -2908,7 +2992,7 @@ out by name instead.</p>
 </tr>
 <tr>
 <td>Tests</td>
-<td>604 assertions across five per-vocabulary files, 3551 in the cross-vocabulary suite, 47 conformance cases; two assertions widened in <code>bovnar_unit_ext_test.c</code></td>
+<td>604 assertions across five per-vocabulary files, 3551 in the cross-vocabulary suite, 47 conformance cases; two assertions widened in <code>bovnar_unit_ext_test.c</code> (the figures for this pass; §§16–17 added two more files, 137 assertions, 1225 cross-vocabulary assertions and 6 conformance cases)</td>
 </tr>
 </tbody>
 </table>
@@ -3011,7 +3095,7 @@ cross-check.</p>
 <tr>
 <td>~~The generator's factor proof against the publishers' own values~~</td>
 <td>§9.2, §9.5</td>
-<td><strong>Built</strong> as <code>check_profile_factors.py</code>, outside the generator. All five profiles, four against their own publishers and <code>unece</code> at one remove through QUDT</td>
+<td><strong>Built</strong> as <code>check_profile_factors.py</code>, outside the generator. All seven profiles, six against their own publishers and <code>unece</code> at one remove through QUDT</td>
 </tr>
 <tr>
 <td><code>BVNR_WITH_UCUM_PROFILE</code> and feature reporting</td>
@@ -3820,7 +3904,7 @@ says exactly this; accepting it would cost them a silently wrong instant.</p>
 <hr />
 <h2 id="14-the-cross-vocabulary-conformance-suite">14. The cross-vocabulary conformance suite</h2>
 <blockquote>
-<p><code>tests/bovnar_crossvocab_test.c</code> — 64 concepts, 5 vocabularies, 3551 assertions.</p>
+<p><code>tests/bovnar_crossvocab_test.c</code> — 64 concepts, 6 vocabularies, 4776 assertions.</p>
 </blockquote>
 <p>Every other profile test asks <em>does this vocabulary translate correctly?</em>. This one asks the
 question that only exists once there are five: <strong>do they agree?</strong></p>
@@ -3890,7 +3974,7 @@ the metre. A second table pins the pairs that look interchangeable across vocabu
 <h3 id="143-what-it-found-and-what-it-cannot-tell-you">14.3 What it found, and what it cannot tell you</h3>
 <p>On its first run the suite failed on <code>ucum:A</code>: <strong>the ampere was missing from the UCUM table</strong>. One
 of the seven SI base units had no UCUM spelling, and no single-vocabulary test had asked, because
-each was written against the table it was testing. Asking all five vocabularies for the same seven
+each was written against the table it was testing. Asking every unit vocabulary for the same seven
 concepts found it immediately. That is the argument for the suite in one line.</p>
 <p><strong>What it cannot find is a concept nobody wrote a row for</strong>, and that is the limit worth stating,
 because it is the one this table keeps running into. A vocabulary left out of a row is
@@ -3900,7 +3984,7 @@ exactly like
 the newton metre it was the second. Each had been carried in <code>unece.bvnr</code> for a whole release and
 omitted from the row that would have checked it. §9.6's coverage index is what finds <em>that</em> class;
 this suite is what pins it once found. The two are not alternatives.</p>
-<p>What it also cannot tell you: it proves the five vocabularies agree <strong>with each other</strong>, not that
+<p>What it also cannot tell you: it proves the six unit vocabularies agree <strong>with each other</strong>, not that
 they agree with their publishers — that is §9.5's job, and §9.5 reaches <code>unece</code> only at one remove
 and reaches <code>CEL</code>, <code>FAH</code>, <code>GRY</code>, <code>HEN</code>, <code>MOL</code> and <code>TNE</code> not at all. <strong>Five tables that are wrong in
 the same way agree perfectly.</strong> §10.2 is where what remains uncovered is recorded.</p>
@@ -4017,6 +4101,274 @@ points and picas, the water column and the CGS electrostatic units are all refus
 rather than <em>by omission</em>, which is an improvement in the error message and not in the coverage.
 Growing the native registry to reach them is a separate decision, and doc/05 is where it belongs.</p>
 <hr />
+<h2 id="16-the-om-2-profile">16. The OM 2 profile</h2>
+<blockquote>
+<p><code>om:</code> — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
+second unit ontology of the semantic web beside QUDT.
+Data file <code>src/gendata/om.bvnr</code> (1255 mapped, 205 refused — every unit individual OM states);
+pinned by <code>tests/bovnar_om_test.c</code> (92 assertions); id block 70, contributing no opaque units.</p>
+</blockquote>
+<h3 id="161-why-this-vocabulary">16.1 Why this vocabulary</h3>
+<p>QUDT is the vocabulary of digital twins and building semantics; OM is the one agrifood, food
+science, life-cycle assessment and FAIR/ELN data reach for, and it is what Wikidata's unit items
+most often align to. A consumer reading either ontology's data had exactly one of the two namespaces
+before this, and the missing half is not a small dialect of the first: OM's local names are English
+words (<code>kilogramPerCubicmetre</code>), QUDT's are abbreviations (<code>KiloGM-PER-M3</code>), and nothing maps one to
+the other without a table.</p>
+<p>It is a <strong>flat</strong> profile for the same reason QUDT is (§12.2): <code>kilogramPerCubicmetre</code> is matched
+entire. OM's names are regular enough to tempt a parser into decomposing them and irregular enough
+that the parser would be wrong — OM writes the cubic metre in a denominator as <code>Cubicmetre</code> and in
+<code>kilogramPerCubicDecimetre</code> as <code>CubicDecimetre</code>, and a decomposer would have to decide which of
+those is the typo. Neither is: they are both the publisher's spelling, and this table follows the
+publisher.</p>
+<h3 id="162-the-targets-were-derived-from-oms-own-structure">16.2 The targets were derived from OM's own structure</h3>
+<p><strong>This is the part that is not like QUDT.</strong> QUDT states a <code>conversionMultiplier</code> per unit, so its
+table is a value read. OM states no multiplier at all. It states how each unit is <em>built</em>:</p>
+<table>
+<thead>
+<tr>
+<th>OM class</th>
+<th>states</th>
+<th>example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PrefixedUnit</code></td>
+<td><code>hasPrefix</code>, <code>hasUnit</code></td>
+<td><code>kilogram</code> = kilo × <code>gram</code></td>
+</tr>
+<tr>
+<td><code>UnitDivision</code></td>
+<td><code>hasNumerator</code>, <code>hasDenominator</code></td>
+<td><code>metrePerSecond-Time</code></td>
+</tr>
+<tr>
+<td><code>UnitMultiplication</code></td>
+<td><code>hasTerm1</code>, <code>hasTerm2</code></td>
+<td><code>newtonMetre</code></td>
+</tr>
+<tr>
+<td><code>UnitExponentiation</code></td>
+<td><code>hasBase</code>, <code>hasExponent</code></td>
+<td><code>squareMetre</code></td>
+</tr>
+<tr>
+<td><code>SingularUnit</code></td>
+<td><code>hasFactor</code>, <code>hasUnit</code></td>
+<td><code>inch-International</code> = 0.0254 × <code>metre</code></td>
+</tr>
+<tr>
+<td>a named unit</td>
+<td><code>hasUnit</code>, no factor</td>
+<td><code>joule</code> <strong>is</strong> <code>newtonMetre</code></td>
+</tr>
+</tbody>
+</table>
+<p>So every compound row's <code>.bovnar</code> target was <strong>built from that composition, bottom-up</strong>, out of the
+atoms mapped by hand — not read off the local name. <code>gramPerPetalitre</code> is <code>g/P~L</code> because OM states
+a numerator, a denominator and a prefix; a table built by reading names in English would have agreed
+on most rows and disagreed silently on the rest, which is the failure mode this whole document is
+organised against.</p>
+<p>Two consequences worth stating, because both look like bugs until you know where they come from:</p>
+<ul>
+<li><strong>The named SI units come out as themselves.</strong> OM defines the joule as the newton metre and the
+  becquerel as the reciprocal second, so a derivation that followed <code>hasUnit</code> blindly would spell
+  <code>om:joule</code> as <code>N·m</code>. The atoms are mapped first, so it does not.</li>
+<li><strong>A prefix on a compound lands on one component.</strong> OM's <code>attomolar</code> is atto × <code>molar</code>, and <code>molar</code>
+  is the mole per litre; the prefix multiplies the whole unit, so it may be attached to any
+  component standing at exponent 1. The target is <code>a~mol/L</code>, worth 10⁻¹⁵ either way.</li>
+</ul>
+<p><strong>Where the composition could not be followed, a fenced value match finished the job</strong> — §15.2's
+third preference, and used the same way here. OM builds the hectare as hecto × <code>are</code> and bovnar has
+no <code>are</code>; it builds the micron as a factor on the metre and bovnar spells that <code>µ~m</code>, which is not
+an atom of any table. In both cases the unit <em>as a whole</em> is worth exactly one native (optionally
+prefixed) unit, and that match is taken only after the structural attempt fails, only when the
+dimensions agree, and only when the native unit it lands on is itself near-coherent. Without that
+last fence, 10⁵ metres — OM's <code>_100Kilometre</code>, for which no SI prefix exists — matched the
+<strong>petaångström</strong>, a spelling that is worth the right number and that nobody would write. It is
+refused instead.</p>
+<p>The same walk is implemented independently in <code>check_profile_factors.py</code> (<code>class Om</code>), which
+resolves every local name against <code>om-2.0.rdf</code> and compares it with what the library says the target
+is worth: <strong>1198 rows compared, no mismatch</strong>. The three shapes of resolver this brings the tool to
+— expression, table read, composition — are listed in its header.</p>
+<h3 id="163-what-the-derivation-refuses">16.3 What the derivation refuses</h3>
+<p>205 local names are carried as refusals rather than mappings, and four groups are worth naming:</p>
+<ul>
+<li><strong><code>om:year</code>, and everything built on it.</strong> OM's year is the <strong>Gregorian</strong> 31 556 952 s; native
+  <code>yr</code> is the Julian 31 557 600 s. Twenty-one parts per million apart, dimensionally identical, and
+  invisible to every test that does not check the number — the same shape as UDUNITS' tropical year
+  (§13.3). <code>gigayear</code>, <code>reciprocalYear</code> and <code>cubicMetrePerYear</code> fall with it.</li>
+<li><strong>Units OM names without stating a magnitude.</strong> <code>calorie-15C</code>, <code>BritishThermalUnit-Mean</code>,
+  <code>colonyFormingUnit</code> and <code>bel</code> have a dimension or a symbol and no factor. A unit whose value the
+  publisher does not state is not one this table can carry, whatever a reader might guess it to be.</li>
+<li><strong>The arbitrary units.</strong> <code>om:InternationalUnit</code> is UCUM's <code>[IU]</code>, which bovnar already carries as
+  an opaque base unit with an identity of its own (§7.1). A second, OM-flavoured identity for the
+  same assay unit would make the two <strong>incommensurable with each other</strong> — two units that cannot be
+  compared although they are the same unit. This is why block 70 contributes no opaque ids.</li>
+<li><strong>Money, scales and dimension one.</strong> OM models currencies as units (<code>om:euro</code>); bovnar carries
+  currencies in a system of their own (§7.2). <code>KelvinScale</code> is a scale, not a unit of one.
+  <code>om:one</code>, <code>om:metrePerMetre</code> and <code>om:dozen</code> are dimension one, which bovnar spells by omitting the
+  slot — translating them would make a count compare equal to a percentage.</li>
+</ul>
+<p>Each is <code>error_unit_profile_unsupported</code>, not <code>error_unit_illegal</code>: the producer wrote a real OM
+unit and is told bovnar cannot carry it, which is the distinction §3.1 exists for.</p>
+<h3 id="164-which-name-a-unit-is-written-back-as">16.4 Which name a unit is written back as</h3>
+<p><code>om:</code> is written as well as read, and several local names are worth the same native unit, so one of
+them has to keep the reverse spelling and the rest carry <code>.reverse = false</code>. <strong>Shape decides it
+before length does</strong>, which is a rule this vocabulary needed and the others did not:</p>
+<table>
+<thead>
+<tr>
+<th>native unit</th>
+<th>candidates</th>
+<th>written back as</th>
+<th>why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>da~A</code></td>
+<td><code>abampere</code>, <code>biot</code>, <code>decaampere</code></td>
+<td><code>decaampere</code></td>
+<td>the target carries a prefix, so the name that OM builds with a prefix wins over the shorter, stranger one</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td><code>metre</code>, <code>cubicMetrePerSquareMetre</code></td>
+<td><code>metre</code></td>
+<td>a composed name is worth a metre and is not a spelling of one</td>
+</tr>
+<tr>
+<td><code>mmHg</code></td>
+<td><code>millimetreOfMercury</code></td>
+<td><code>millimetreOfMercury</code></td>
+<td>the only candidate, and 2.9 ppm from OM's rounded column — waived by name in <code>check_profile_factors.py</code>, exactly as UCUM's <code>m[Hg]</code> and QUDT's <code>TORR</code> are</td>
+</tr>
+</tbody>
+</table>
+<p>735 native units have an OM spelling as a result. A compound unit still has none: a flat vocabulary
+spells one whole code, so <code>bvn_unit_to_profile("om", m/s²)</code> returns -1 for the reason §5.1 gives.</p>
+<hr />
+<h2 id="17-the-cf-standard-name-profile">17. The CF standard-name profile</h2>
+<blockquote>
+<p><code>cf:</code> — the CF conventions' standard names, the controlled vocabulary of netCDF climate and
+forecast data.
+Data file <code>src/gendata/cf.bvnr</code> (4450 mapped, 621 refused — all 5071 names of standard name table
+<strong>v94</strong>, 2026-06-09); pinned by <code>tests/bovnar_cf_test.c</code> (45 assertions); id block 80, contributing
+no opaque units. <strong>Read-only</strong> (§17.3).</p>
+</blockquote>
+<h3 id="171-why-this-vocabulary">17.1 Why this vocabulary</h3>
+<p><code>udunits:</code> already speaks the unit half of a CF file. The other half is the <code>standard_name</code>
+attribute, and the two are not independent: CF makes <code>units</code> optional exactly when the standard name
+fixes it, so a pipeline holding a name and no units string had nothing to write down. This namespace
+is that case — and it is the same slot <code>qudt-qk:</code> fills for QUDT-sourced data, which is why it has
+the same shape.</p>
+<h3 id="172-the-unit-is-cfs-own-canonical_units">17.2 The unit is CF's own <code>canonical_units</code></h3>
+<p>A standard name is <strong>not a unit</strong>. It names what is being measured, so this namespace has to answer
+with a unit or refuse the name, and §12.3's three options apply unchanged. It answers with the unit
+<strong>CF itself states</strong>: every entry in the table carries a <code>canonical_units</code> field — a UDUNITS
+expression, because CF's unit syntax is UDUNITS — and that field, not a reading of the name, is what
+each row translates.</p>
+<div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
+.t   = &lt;float:64,cf:air_temperature&gt; 288.15;      # K, because CF says &quot;K&quot;
+.wind = &lt;float:64,cf:northward_wind&gt; -3.4;        # m/s, because CF says &quot;m s-1&quot;
+.rain = &lt;float:64,cf:rainfall_flux&gt; 0.00012;      # kg/m²·s</code></pre></div>
+<p>5071 names state only <strong>116 distinct</strong> canonical-unit strings, and only those 116 were mapped by
+hand; every row then takes the target its own <code>canonical_units</code> names. Two standard names that state
+the same units therefore cannot drift apart — there is no per-name unit to get wrong — and
+<code>cf:air_temperature</code> and <code>cf:sea_water_temperature</code> are the same <code>value_unit_t</code>.</p>
+<p><strong>The bite is <code>qudt-qk:</code>'s bite.</strong> A producer whose numbers are not in the canonical units writes a
+wrong value that parses cleanly. If your temperatures are in degrees Celsius, <code>cf:air_temperature</code>
+is the wrong thing to write and <code>udunits:degC</code> is the right one — which is what CF's own conventions
+already require of the <code>units</code> attribute.</p>
+<p>The check is unusually strong for a profile of this size, because <strong>both sides are primary</strong>:
+<code>check_profile_factors.py</code> (<code>class Cf</code>) re-evaluates each name's <code>canonical_units</code> with the same
+UDUNITS evaluator the <code>udunits</code> profile is checked against, and compares that against the library's
+reading of the target. 4430 rows compared, no mismatch. It is not the one-remove position <code>unece</code>
+is in (§11.1): CF publishes the name-to-units mapping and Unidata publishes what the units are
+worth, and neither is being asked about the other's vocabulary.</p>
+<h3 id="173-read-only-and-why-a-namespace-may-be">17.3 Read-only, and why a namespace may be</h3>
+<p><code>bvn_unit_to_profile("cf", u)</code> returns <strong>-1 for every unit</strong>, and this is the first namespace of
+which that is true. It is not a gap in the table:</p>
+<blockquote>
+<p>Sixty-nine standard names state <code>K</code>. Writing a kelvin back as one of them would pick a quantity
+out of a hat and assert it — <code>cf:air_temperature</code> for a sea-surface temperature is not a
+formatting choice, it is a false statement.</p>
+</blockquote>
+<p>A unit does not know what quantity it measures, so there is nothing this direction could honestly
+return. <code>gen_profiles.py</code> therefore marks the profile <strong>unwritable</strong> and emits no reverse rows at
+all, rather than singling one row out to be wrong; the C side reaches -1 through the ordinary "no
+row names this base" path, with no special case in the writer. A <code>.reverse</code> flag in such a data file
+is a build error, because it would be describing a choice nothing makes.</p>
+<p>The refusal is this namespace's own. The same kelvin still writes as <code>qudt:K</code> and <code>om:kelvin</code>, and a
+<code>cf:</code> unit is not "profile only" (§5.1): it translates to an ordinary native unit and writes as one.</p>
+<h3 id="174-what-is-absent-and-what-it-costs">17.4 What is absent, and what it costs</h3>
+<table>
+<thead>
+<tr>
+<th>absent</th>
+<th>count</th>
+<th>why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>deprecated aliases</td>
+<td>599</td>
+<td>CF keeps retired names in the table pointing at their replacements. A document written today should carry the replacement, and an alias fails as <code>error_unit_illegal</code>, which says so.</td>
+</tr>
+<tr>
+<td><code>canonical_units</code> of <code>1</code></td>
+<td>571</td>
+<td>dimension one — spelled in bovnar by omitting the slot. Translating it would put a cloud fraction, a percentage and a bit in one equivalence class.</td>
+</tr>
+<tr>
+<td>string-valued names</td>
+<td>17</td>
+<td><code>region</code>, <code>area_type</code>, <code>platform_name</code>: CF states no units because they label a variable rather than measure one.</td>
+</tr>
+<tr>
+<td><code>1e-3</code>, <code>1e-6</code></td>
+<td>22</td>
+<td>a bare scale factor. CF gives <code>sea_water_salinity</code> <code>1e-3</code>, which is a magnitude with no unit at all.</td>
+</tr>
+<tr>
+<td>per-<code>year</code> quantities, <code>dBZ</code>, °C in a product</td>
+<td>11</td>
+<td>the tropical year (§13.3), a logarithm against a reference bovnar cannot state, and an affine unit beside another component (§3.8).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The size, measured rather than estimated.</strong> This is by far the largest table in the repository:
+5071 codes averaging 54 bytes, against 2056 QUDT names averaging 12. <code>BVNR_UNIT_STRING_MAX</code> did not
+have to move — the longest name is 166 bytes and the cap is 1088 — but the binary did:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>stripped release <code>bovnar</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>after §15 closed the five tables</td>
+<td>1015 KB</td>
+</tr>
+<tr>
+<td>with <code>om:</code> and <code>cf:</code></td>
+<td><strong>1798 KB</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Three quarters of that is <code>cf</code>, and nearly all of <code>cf</code> is the names themselves: 502 KB of generated
+atom rows against OM's 89 KB. §15.3's warning about a per-profile build switch applies here with
+more force than it did to any earlier vocabulary — it is now the difference between a 1 MB binary
+and a 1.8 MB one for a consumer who reads no netCDF at all. The decision recorded
+here is that completeness won: a standard name that is absent from the table is indistinguishable,
+to a producer, from one bovnar has never heard of, and a vocabulary carried in part is a vocabulary
+whose absences have to be documented one by one.</p>
+<hr />
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the native registry and notation grammar these profiles sit beside</li>
@@ -4024,7 +4376,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 <li><a href="https://www.bovnar.io/docs/ambiguities/#17-the-same-spelling-in-another-namespace">Unit Ambiguities §17</a> — the reader-facing index of the cross-namespace collisions §6.2 records</li>
 <li><a href="https://www.bovnar.io/docs/policy/">Unit Policy</a> — the reader- and writer-side policies a translated unit passes through unchanged</li>
 <li><a href="https://www.bovnar.io/docs/api/#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Read/Write API</a> — the reader-side unit policy, and the <code>want_unit</code> hook a profile unit reaches unmodified</li>
-<li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — where the 47-case <code>unit_profile</code> group lives</li>
+<li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — where the 53-case <code>unit_profile</code> group lives</li>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit Cheatsheet</a> — the native spellings the transliteration tables target</li>
 <li><a href="https://www.bovnar.io/docs/grammar/">EBNF</a> — <code>unit-param</code>, <code>profile-unit</code> and the byte classes of §2.3</li>
 </ul>

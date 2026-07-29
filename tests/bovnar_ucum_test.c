@@ -143,7 +143,7 @@ static void test_outcomes(void)
 	 * for three different fixes. */
 	chk_error("ucum:metre",  error_unit_illegal);
 	chk_error("ucum:B[SPL]", error_unit_profile_unsupported);
-	chk_error("cf:m",        error_unit_profile_unknown);
+	chk_error("zz:m",        error_unit_profile_unknown);
 
 	/* A natively spelled unit is untouched by any of this. */
 	chk_error("nosuchunit",  error_unit_illegal);

@@ -1551,6 +1551,11 @@
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><code>b</code> and <code>B</code> are separate quantity kinds: <code>b</code> → <code>B</code> is <strong>refused</strong>, not
+divided by eight. Prefixes still convert within each (<code>Ki~B</code> → <code>B</code> is 1024).
+See doc/05 §3.17.</p>
+</blockquote>
 <h3 id="419-cgs-units">4.19 CGS Units</h3>
 <table>
 <thead>
@@ -1673,17 +1678,23 @@
 <td><code>neper</code>, <code>nepers</code></td>
 <td>neper</td>
 <td><code>bu_neper</code></td>
-<td>dimensionless; 1 Np = 20/ln(10) dB ≈ 8.686 dB</td>
+<td>dimensionless; does <strong>not</strong> convert to <code>dB</code></td>
 </tr>
 <tr>
 <td><code>dB</code></td>
 <td><code>decibel</code>, <code>decibels</code></td>
 <td>decibel</td>
 <td><code>bu_decibel</code></td>
-<td>dimensionless</td>
+<td>dimensionless; does <strong>not</strong> convert to <code>Np</code></td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p>Relating two logarithmic scales is a change of base, not a multiplication, so
+the conversion engine cannot express it — and <code>dB</code> is written against both the
+power (10·log₁₀) and field (20·log₁₀) conventions without the annotation saying
+which. The library refuses the pair. See doc/05 §3.15.</p>
+</blockquote>
 <h3 id="422-electrical-power">4.22 Electrical Power</h3>
 <table>
 <thead>

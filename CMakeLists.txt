@@ -341,6 +341,8 @@ set(BVNR_GEN_INPUTS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/qudt.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/qudt-qk.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/udunits.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/om.bvnr
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gendata/cf.bvnr
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_units.py
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_prefixes.py
     ${CMAKE_CURRENT_SOURCE_DIR}/gen_currencies.py
@@ -380,6 +382,12 @@ set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_atom.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_unsupported.gen.inc
     ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_reverse.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_om_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_om_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_om_reverse.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_cf_atom.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_cf_unsupported.gen.inc
+    ${BVNR_GENERATED_DIR}/bovnar_profile_cf_reverse.gen.inc
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_profiles.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_units.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_currency.gen.h

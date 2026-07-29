@@ -318,6 +318,56 @@ static const bvn_prof_rev_t udunits_rev_table[] = {
 };
 
 /*
+ * OM 2, the Ontology of units of Measure. A flat profile like QUDT, and for the
+ * same reason: "kilogramPerCubicMetre" is one token. OM does state a structure
+ * for it -- numerator, denominator, prefix, exponent -- and every target in
+ * om.bvnr was BUILT from that structure, but the structure is read at generate
+ * time and not at parse time, so a name is matched whole here.
+ */
+static const bvn_prof_atom_t om_atom_table[] = {
+#include "bovnar_profile_om_atom.gen.inc"
+	{ NULL, 0, NULL, bu_none, false }
+};
+
+static const bvn_prof_unsup_t om_unsup_table[] = {
+#include "bovnar_profile_om_unsupported.gen.inc"
+	{ NULL, 0 }
+};
+
+static const bvn_prof_rev_t om_rev_table[] = {
+#include "bovnar_profile_om_reverse.gen.inc"
+	{ bu_none, NULL, 0, 0, false, iec_none }
+};
+
+/*
+ * CF standard names, which are not units: a standard name says what quantity a
+ * variable holds, and the unit comes from the `canonical_units` CF states for
+ * it. Same shape as the QUDT quantity kinds, and the same bite (a producer
+ * whose numbers are not in the canonical units writes a wrong value that parses
+ * cleanly); the reasoning is at the top of cf.bvnr.
+ *
+ * ITS REVERSE TABLE IS EMPTY ON PURPOSE. Sixty-nine standard names state the
+ * kelvin, so writing a kelvin back as one of them would pick a quantity out of
+ * a hat and assert it. gen_profiles.py marks the profile unwritable and emits
+ * no rows, which makes bvn_unit_to_profile("cf", u) return -1 for every unit
+ * through the ordinary "no row names this base" path.
+ */
+static const bvn_prof_atom_t cf_atom_table[] = {
+#include "bovnar_profile_cf_atom.gen.inc"
+	{ NULL, 0, NULL, bu_none, false }
+};
+
+static const bvn_prof_unsup_t cf_unsup_table[] = {
+#include "bovnar_profile_cf_unsupported.gen.inc"
+	{ NULL, 0 }
+};
+
+static const bvn_prof_rev_t cf_rev_table[] = {
+#include "bovnar_profile_cf_reverse.gen.inc"
+	{ bu_none, NULL, 0, 0, false, iec_none }
+};
+
+/*
  * Every namespace this build defines. Anything else before a ':' is
  * error_unit_profile_unknown, which is how a consumer tells "this build has no
  * such profile" from "that is not a unit".
@@ -358,6 +408,14 @@ static const bvn_profile_t bvn_profiles[] = {
 	  udunits_rev_table,
 	  BVN_PROFILE_UDUNITS_OPAQUE_FIRST, BVN_PROFILE_UDUNITS_OPAQUE_LAST,
 	  "*", true, "since", false },
+	{ "om", 2, bvn_prof_grammar_flat,
+	  NULL, om_atom_table, om_unsup_table, om_rev_table,
+	  BVN_PROFILE_OM_OPAQUE_FIRST, BVN_PROFILE_OM_OPAQUE_LAST,
+	  NULL, false, NULL, false },
+	{ "cf", 2, bvn_prof_grammar_flat,
+	  NULL, cf_atom_table, cf_unsup_table, cf_rev_table,
+	  BVN_PROFILE_CF_OPAQUE_FIRST, BVN_PROFILE_CF_OPAQUE_LAST,
+	  NULL, false, NULL, false },
 };
 #define BVN_PROFILE_COUNT \
 	(sizeof(bvn_profiles) / sizeof(bvn_profiles[0]))

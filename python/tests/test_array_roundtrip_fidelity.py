@@ -38,15 +38,15 @@ DOC = (
 @needs_lib
 def test_array_unit_survives_a_typed_roundtrip():
     back = bovnar.loads(bovnar.dumps(bovnar.loads(DOC, typed=True)), typed=True)
-    assert back["dist"][0].unit_str() == "k~m"
+    assert back["dist"][0].unit_str == "k~m"
     assert back["dist"][0].value == 1.5
-    assert back["hole"][0].unit_str() == "m"
+    assert back["hole"][0].unit_str == "m"
 
 
 @needs_lib
 def test_array_element_precision_survives():
     back = bovnar.loads(bovnar.dumps(bovnar.loads(DOC, typed=True)), typed=True)
-    assert str(back["exact"][0].decimal()) == "1.2345678901234567890123456789"
+    assert str(back["exact"][0].decimal) == "1.2345678901234567890123456789"
     assert back["big"][0].value == 340282366920938463463374607431768211455
 
 

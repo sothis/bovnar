@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(bovnar VERSION 1.1.0 LANGUAGES C)
+project(bovnar VERSION 1.2.0 LANGUAGES C)
 
 # Windows builds are 64-bit only (MinGW64 and MSVC x64). CMAKE_SIZEOF_VOID_P is
 # populated by the compiler probe that project() just ran.

@@ -46,7 +46,7 @@ def test_exact_decimal64_ties_round_half_to_even():
         q = bovnar.loads(doc, typed=True)["v"]
         n += 1
         want = _CTX.create_decimal(Decimal(lit))
-        got = Decimal(q.stored_value())
+        got = Decimal(q.stored_value)
         if got != want:
             bad.append((lit, str(got), str(want)))
     assert n >= 2000
@@ -65,5 +65,5 @@ def test_named_tie_cases():
     for lit, want in cases.items():
         doc = "#!bovnar 1.1\n.v = <float_dec:64> %s;\n" % lit
         q = bovnar.loads(doc, typed=True)["v"]
-        assert Decimal(q.stored_value()) == Decimal(want), \
-            "%s -> %s, want %s" % (lit, q.stored_value(), want)
+        assert Decimal(q.stored_value) == Decimal(want), \
+            "%s -> %s, want %s" % (lit, q.stored_value, want)

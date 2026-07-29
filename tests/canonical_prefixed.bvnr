@@ -2,10 +2,16 @@
 # and with a repeated base. `bovnar pretty-print --canonical` must fold both to
 # byte-identical output -- that convergence is the whole claim of the mode.
 #
-# NOTE the float_dec value. Its trailing zeros are SIGNIFICANT in that family,
-# so 0.250 and 0.25 are not interchangeable and the canonical form deliberately
-# does not collapse them. Both files therefore write 0.25: the mode canonicalises
-# how a unit is SPELLED, not how much precision a decimal claims.
+# The mode normalises a RESCALED float back into float shape (BVN_NUM_CANONICAL),
+# which is why 5.0 km lands on "5000.0 m" and not "5000 m" -- otherwise it would
+# not agree with the file beside it, which wrote metres directly.
+#
+# What it does NOT do is rewrite a literal no rescale touched. A document that
+# writes "5000" where this one writes "5000.0" still differs, and float_dec
+# trailing zeros are left alone on purpose: 0.250 and 0.25 are not
+# interchangeable in that family, so collapsing them would discard what the
+# producer said about precision. Full number-shape canonicalisation is a larger
+# change than unit reduction and is not attempted here.
 .dist  = <float:64,k~m> 5.0;
 .area  = <float:64,m·m> 2.0;
 .speed = <float:64,k~m/h> 90.0;

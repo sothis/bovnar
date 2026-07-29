@@ -4,7 +4,7 @@
 
 bovnar.loads() decoded it with float(), so "1.8" came back as decimal 1.8 where
 the value is 1.5, and the binary-exponent form "1.0p+0" came back as a *string*
-because float() cannot parse it. Quantity.decimal() already honoured the base, so
+because float() cannot parse it. Quantity.decimal already honoured the base, so
 the two Python paths disagreed with each other as well as with the C reader.
 
 The base field means something different per family: for float_fix it carries the
@@ -47,4 +47,4 @@ def test_loads_agrees_with_quantity_decimal():
     typed = bovnar.loads(DOC, typed=True)
     plain = bovnar.loads(DOC)
     for k in EXPECT:
-        assert abs(float(typed[k].decimal()) - plain[k]) < 1e-12, k
+        assert abs(float(typed[k].decimal) - plain[k]) < 1e-12, k

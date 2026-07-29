@@ -76,7 +76,7 @@ class TestBinaryEncoderMatchesC:
     def test_negative_underflow_keeps_sign(self):
         # a negative value that underflows in the format materialises to -0.0
         q = loads(b'.a=<float:256>-1e-80000;', typed=True)['a']
-        assert q.ieee_bits()[-1] & 0x80          # sign bit set (little-endian)
+        assert q.ieee_bits[-1] & 0x80          # sign bit set (little-endian)
 
     def test_decimal_encoder_correctly_rounded_and_matches_c(self):
         # Validate the decimal-interchange encoder two ways, using Python's own
@@ -142,52 +142,52 @@ PI34 = '3.141592653589793238462643383279503'        # 34 sig digits (decimal128)
 class TestScalarLosslessRead:
     def test_float128_literal_is_exact(self):
         q = loads(('.a=<float:128>%s;' % HIPI).encode(), typed=True)['a']
-        assert q.decimal() == Decimal(HIPI)
+        assert q.decimal == Decimal(HIPI)
         assert q.value == pytest.approx(1.1)          # the lossy double path
 
     def test_float_dec_literal_is_exact(self):
         q = loads(('.p=<float_dec:128>%s;' % PI34).encode(), typed=True)['p']
-        assert q.decimal() == Decimal(PI34)
+        assert q.decimal == Decimal(PI34)
 
     def test_float_fix_fraction_is_exact(self):
         # 3.27 is not exact in Q8; the stored datum is round(3.27*256)=837
         q = loads(b'.x=<float_fix:32,q8>3.27;', typed=True)['x']
-        assert q.fraction() == Fraction(837, 256)
-        assert q.fixed_point() == (837, 8)
-        assert q.stored_value() == Decimal('3.26953125')
+        assert q.fraction == Fraction(837, 256)
+        assert q.fixed_point == (837, 8)
+        assert q.stored_value == Decimal('3.26953125')
 
     def test_stored_value_rounds_to_format(self):
         # a 34-digit literal in decimal64 (16 digits) -> stored value is rounded
         q = loads(('.p=<float_dec:64>%s;' % PI34).encode(), typed=True)['p']
-        assert q.decimal() == Decimal(PI34)                 # the literal
-        assert q.stored_value() == Decimal('3.141592653589793')   # decimal64
+        assert q.decimal == Decimal(PI34)                 # the literal
+        assert q.stored_value == Decimal('3.141592653589793')   # decimal64
 
     def test_extreme_exponent_binary_materialises_full_range(self):
         # bovnar's C parser saturates an extreme exponent, but the pure-Python
         # encoder materialises the correct binary256 value across the full range.
         q = loads(b'.a=<float:256>1e-78000;', typed=True)['a']
-        assert q.decimal() == Decimal('1e-78000')        # exact literal
-        sv = q.stored_value()
+        assert q.decimal == Decimal('1e-78000')        # exact literal
+        sv = q.stored_value
         assert sv != 0 and float(sv / Decimal('1e-78000')) == 1.0
-        assert len(q.ieee_bits()) == 32
+        assert len(q.ieee_bits) == 32
         # genuine range boundaries of binary256
-        assert loads(b'.a=<float:256>1e80000;', typed=True)['a'].stored_value() \
+        assert loads(b'.a=<float:256>1e80000;', typed=True)['a'].stored_value \
             == Decimal('Infinity')
-        assert loads(b'.a=<float:256>1e-80000;', typed=True)['a'].stored_value() == 0
+        assert loads(b'.a=<float:256>1e-80000;', typed=True)['a'].stored_value == 0
 
     def test_extreme_exponent_decimal_materialises_full_range(self):
         # the decimal-interchange path also materialises beyond the C parser's
         # cap via the pure-Python encoder.
         q = loads(b'.a=<float_dec:256>1e20000;', typed=True)['a']
-        assert q.decimal() == Decimal('1e20000')
-        assert q.stored_value() == Decimal('1E+20000')
-        assert len(q.ieee_bits()) == 32
+        assert q.decimal == Decimal('1e20000')
+        assert q.stored_value == Decimal('1E+20000')
+        assert len(q.ieee_bits) == 32
         qn = loads(b'.a=<float_dec:256>-1.5e-20000;', typed=True)['a']
-        assert qn.stored_value() == Decimal('-1.5E-20000')
+        assert qn.stored_value == Decimal('-1.5E-20000')
         # decimal64 range boundaries (Emax 384)
-        assert loads(b'.a=<float_dec:64>1e400;', typed=True)['a'].stored_value() \
+        assert loads(b'.a=<float_dec:64>1e400;', typed=True)['a'].stored_value \
             == Decimal('Infinity')
-        assert loads(b'.a=<float_dec:64>1e-400;', typed=True)['a'].stored_value() == 0
+        assert loads(b'.a=<float_dec:64>1e-400;', typed=True)['a'].stored_value == 0
 
     def test_decimal_near_emax_full_coefficient_exact(self):
         # A full-coefficient value just under the format's Emax is exactly
@@ -198,44 +198,44 @@ class TestScalarLosslessRead:
         import decimal
         s = '9999999999999999999999999999999999e6111'   # 34 nines, decimal128 max
         q = loads(('.a=<float_dec:128>%s;' % s).encode(), typed=True)['a']
-        assert q.stored_value() == Decimal(s)
+        assert q.stored_value == Decimal(s)
         # the emitted bits decode back to exactly that value
-        assert BvnFloat.from_decimal_bits(128, q.ieee_bits()).to_decimal() \
-            == q.stored_value()
+        assert BvnFloat.from_decimal_bits(128, q.ieee_bits).to_decimal() \
+            == q.stored_value
         # and it equals Python decimal's own decimal128 rounding
         ctx = decimal.Context(prec=34, Emax=6144, Emin=-6143,
                               rounding=decimal.ROUND_HALF_EVEN)
         for t in ctx.traps:
             ctx.traps[t] = False
-        assert q.stored_value() == ctx.create_decimal(Decimal(s))
+        assert q.stored_value == ctx.create_decimal(Decimal(s))
 
     def test_genuine_format_underflow_is_zero_not_refused(self):
         # a literal within the parser's range that simply rounds below the
         # format's smallest value materialises to 0 / inf, not an error.
-        assert loads(b'.a=<float:16>1e-100;', typed=True)['a'].stored_value() == 0
-        assert loads(b'.a=<float:16>1e100;', typed=True)['a'].stored_value() \
+        assert loads(b'.a=<float:16>1e-100;', typed=True)['a'].stored_value == 0
+        assert loads(b'.a=<float:16>1e100;', typed=True)['a'].stored_value \
             == Decimal('Infinity')
 
     def test_binary128_stored_value_matches_ieee(self):
         # the materialised binary128 of 0.1 differs from the literal
         q = loads(b'.a=<float:128>0.1;', typed=True)['a']
-        sv = q.stored_value()
+        sv = q.stored_value
         assert sv != Decimal('0.1')
         assert float(sv) == 0.1                              # nearest double is 0.1
-        assert len(q.ieee_bits()) == 16                      # binary128 = 16 bytes
+        assert len(q.ieee_bits) == 16                      # binary128 = 16 bytes
 
     def test_decimal_works_for_ints(self):
         q = loads(b'.n=<uint:64>18446744073709551615;', typed=True)['n']
-        assert q.decimal() == Decimal(18446744073709551615)
+        assert q.decimal == Decimal(18446744073709551615)
 
     def test_nonfinite(self):
-        assert loads(b'.z=<float:64>nan;', typed=True)['z'].decimal().is_nan()
-        assert loads(b'.z=<float:64>inf;', typed=True)['z'].decimal() == Decimal('Infinity')
+        assert loads(b'.z=<float:64>nan;', typed=True)['z'].decimal.is_nan()
+        assert loads(b'.z=<float:64>inf;', typed=True)['z'].decimal == Decimal('Infinity')
 
     def test_decimal_rejects_nonnumeric(self):
         q = loads(b'.s="hi";', typed=True)['s']
         with pytest.raises(BovnarArgumentError):
-            q.decimal()
+            q.decimal
 
 
 @needs_lib
@@ -244,7 +244,7 @@ class TestScalarLosslessWrite:
         d = Decimal(PI34)
         out = dumps({'p': d})
         assert b'<float_dec:64>' in out
-        assert loads(out, typed=True)['p'].decimal() == d
+        assert loads(out, typed=True)['p'].decimal == d
 
     def test_dumps_terminating_fraction(self):
         assert b'0.375' in dumps({'x': Fraction(3, 8)})
@@ -257,12 +257,12 @@ class TestScalarLosslessWrite:
         q = Quantity.from_number(Decimal(HIPI), family=F.FLOAT, width=128)
         out = dumps({'a': q})
         assert b'<float:128>' in out
-        assert loads(out, typed=True)['a'].decimal() == Decimal(HIPI)
+        assert loads(out, typed=True)['a'].decimal == Decimal(HIPI)
 
     def test_from_number_float_fix_roundtrip(self):
         q = Quantity.from_number(Fraction(837, 256), family=F.FLOAT_FIX,
                                  width=32, frac=8)
-        assert loads(dumps({'x': q}), typed=True)['x'].fraction() == Fraction(837, 256)
+        assert loads(dumps({'x': q}), typed=True)['x'].fraction == Fraction(837, 256)
 
     def test_from_number_float_fix_requires_frac(self):
         with pytest.raises(BovnarArgumentError, match="frac"):
@@ -282,32 +282,32 @@ class TestAllWidths:
     @pytest.mark.parametrize("width", [16, 32, 64, 128, 256])
     def test_binary_ieee_bits_and_stored_value(self, width):
         q = loads(('.a=<float:%d>0.1;' % width).encode(), typed=True)['a']
-        assert len(q.ieee_bits()) == width // 8
+        assert len(q.ieee_bits) == width // 8
         # the materialised value re-parses to the same bytes (canonical)
         from bovnar import BvnFloat
-        bits = q.ieee_bits()
+        bits = q.ieee_bits
         assert BvnFloat.from_binary_bits(width, bits).to_binary_bits(width) == bits
         # and float(stored_value) collapses back to the nearest double
-        assert isinstance(q.stored_value(), Decimal)
+        assert isinstance(q.stored_value, Decimal)
 
     def test_binary_bits_match_struct(self):
         import struct
         q32 = loads(b'.a=<float:32>0.1;', typed=True)['a']
         q64 = loads(b'.a=<float:64>0.1;', typed=True)['a']
-        assert q32.ieee_bits() == struct.pack('<f', 0.1)
-        assert q64.ieee_bits() == struct.pack('<d', 0.1)
+        assert q32.ieee_bits == struct.pack('<f', 0.1)
+        assert q64.ieee_bits == struct.pack('<d', 0.1)
 
     @pytest.mark.parametrize("width", [16, 32, 64, 128, 256])
     def test_decimal_stored_value(self, width):
         q = loads(('.p=<float_dec:%d>1.5;' % width).encode(), typed=True)['p']
-        assert q.stored_value() == Decimal('1.5')
-        assert len(q.ieee_bits()) == width // 8
+        assert q.stored_value == Decimal('1.5')
+        assert len(q.ieee_bits) == width // 8
 
     @pytest.mark.parametrize("width", [16, 32, 64, 128, 256])
     def test_fixed_point_all_widths(self, width):
         q = loads(('.x=<float_fix:%d,q4>2.5;' % width).encode(), typed=True)['x']
-        assert q.fixed_point() == (40, 4)        # 2.5 * 2**4
-        assert q.fraction() == Fraction(5, 2)
+        assert q.fixed_point == (40, 4)        # 2.5 * 2**4
+        assert q.fraction == Fraction(5, 2)
 
     @pytest.mark.parametrize("family,width,frac", [
         (F.FLOAT, 16, None), (F.FLOAT, 32, None), (F.FLOAT, 64, None),
@@ -318,11 +318,11 @@ class TestAllWidths:
     def test_write_roundtrip_every_width(self, family, width, frac):
         q = Quantity.from_number(Decimal('0.5'), family=family, width=width, frac=frac)
         back = loads(dumps({'a': q}), typed=True)['a']
-        assert back.decimal() == Decimal('0.5')
+        assert back.decimal == Decimal('0.5')
 
     def test_integers_to_256bit(self):
         big = 2 ** 200 + 7
-        assert loads(('.n=<uint:256>%d;' % big).encode(), typed=True)['n'].decimal() \
+        assert loads(('.n=<uint:256>%d;' % big).encode(), typed=True)['n'].decimal \
             == Decimal(big)
         assert loads(b'.n=<sint:128>-123;', typed=True)['n'].value == -123
 
@@ -330,9 +330,9 @@ class TestAllWidths:
         # binary float accepts any power-of-two width; the literal round-trips
         # exactly even where there is no IEEE bit encoding (>256).
         q = loads(('.a=<float:512>%s;' % HIPI).encode(), typed=True)['a']
-        assert q.decimal() == Decimal(HIPI)
+        assert q.decimal == Decimal(HIPI)
         with pytest.raises(BovnarArgumentError, match="no such encoding"):
-            q.stored_value()
+            q.stored_value
 
     @pytest.mark.parametrize("family,width,frac,ok", [
         # binary float: 16 or any multiple of 32 (incl. non-powers-of-2), to 32768
@@ -417,7 +417,7 @@ class TestNumpyLossless:
         arr = np.array([Fraction(837, 256), Fraction(3, 8)], dtype=object)
         raw = bovnar.array_to_bvnr('a', arr, float_format=('float_fix', 32, 8),
                                    pretty=False)
-        back = [q.fraction() for q in loads(raw, typed=True)['a']]
+        back = [q.fraction for q in loads(raw, typed=True)['a']]
         assert back == [Fraction(837, 256), Fraction(3, 8)]
 
     def test_currency_decimal_roundtrip_with_unit(self):

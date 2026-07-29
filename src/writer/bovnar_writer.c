@@ -1185,18 +1185,18 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 				goto done;
 		}
 		/*
-		 * Keep a float looking like a float. bvn_rational_to_str renders 5000/1
-		 * as "5000", so "<float:64,k~m> 5.0" reduced to metres came out as
-		 * "<float:64,m> 5000" while a document that already said metres kept its
-		 * "5000.0". Both re-read to the same double, so nothing was WRONG -- but
-		 * two documents that mean the same thing produced different bytes, which
-		 * is precisely what a canonical form exists to prevent, and the only
-		 * reason to reduce units document-wide at all.
+		 * BVN_NUM_CANONICAL: keep a rescaled float looking like a float.
+		 * bvn_rational_to_str renders 5000/1 as "5000", so a reduced
+		 * "<float:64,k~m> 5.0" came out as "5000" while a document already in
+		 * metres kept its "5000.0" -- two spellings of one value, which is
+		 * exactly what the canonical mode exists to prevent. Off by default, so
+		 * plain BVN_UNIT_REDUCE keeps writing the bare exact value it always did.
 		 *
-		 * Base 10 only: a base-16 float literal marks its exponent with p/P and
-		 * a bare integer mantissa is already its canonical spelling there.
+		 * Base 10 only: a base-16 float marks its exponent with p/P and a bare
+		 * integer mantissa is already its canonical spelling there.
 		 */
-		if ((d->value_type.family == vt_float ||
+		if ((s->unit_flags & BVN_NUM_CANONICAL) &&
+		    (d->value_type.family == vt_float ||
 		     d->value_type.family == vt_float_dec ||
 		     d->value_type.family == vt_float_fix) &&
 		    base == 10u && !bvn_is_special_number_string(out)) {
@@ -1207,11 +1207,9 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 					break;
 				}
 			if (!has_marker) {
-				if ((size_t)l + 3u > need) {
-					char *wider = realloc(out, (size_t)l + 3u);
-					if (!wider) goto done;
-					out = wider;
-				}
+				char *wider = realloc(out, (size_t)l + 3u);
+				if (!wider) goto done;
+				out = wider;
 				out[l++] = '.';
 				out[l++] = '0';
 				out[l]   = '\0';

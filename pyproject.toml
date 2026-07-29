@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name            = "bovnar"
-version         = "1.1.0"
+version         = "1.2.0"
 description     = "Python bindings for the Bovnar (BVNR) typed, unit-aware serialisation format"
 readme          = "python/README.md"
 license         = "MIT"
@@ -87,7 +87,7 @@ build-frontend = "build"
 # are `needs_lib`-skipif (they would silently pass-as-skipped otherwise), so
 # without this guard a wheel that cannot load its own C library could publish.
 test-requires = ["pytest", "numpy>=1.24", "pint>=0.22"]
-test-command  = "python -c \"import bovnar; assert bovnar.version() == '1.1.0'\" && pytest {project}/python/tests"
+test-command  = "python -c \"import bovnar; assert bovnar.version() == '1.2.0'\" && pytest {project}/python/tests"
 
 [tool.cibuildwheel.linux]
 # Build native aarch64 wheels on the arm runner instead of QEMU emulation.

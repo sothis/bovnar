@@ -41,6 +41,7 @@ from .reader   import Reader, EventPayload, UnitPolicy, UnitRule, MAX_FILESIZE_B
 from .writer   import Writer
 from .dom      import DomDoc, DomNode, DomType
 from .quantity import Quantity
+from .unit     import Unit
 from .units   import (
     UnitFlags,
     SIConversion, UnitConversion, ReducedUnit, SI_DIM_NAMES,
@@ -70,6 +71,7 @@ __all__ = [
     'version', 'spec_version', 'peek_version',
     'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
+    'Unit',
     'unit_to_profile', 'unit_to_ucum', 'unit_is_profile_only',
     'unit_error_code',
     'write_array',
@@ -108,7 +110,7 @@ __all__ = [
     'MAX_FILESIZE_BYTES',
 ]
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 
 
 def version() -> str:
@@ -718,7 +720,7 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
         # A <float:W,_16> carrier is a hex-float literal, not a decimal one.
         # float(text) read "1.8" as decimal 1.8 where the value is 1.5, and
         # returned the STRING "1.0p+0" for the binary-exponent form because it
-        # could not parse it at all. Quantity.decimal() already honours the base
+        # could not parse it at all. Quantity.decimal already honours the base
         # via _numeric_base(), so the two Python paths disagreed with each other
         # as well as with the C reader.
         # FLOAT only: for float_fix the base field carries the Q parameter (the
@@ -796,13 +798,13 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     fam = int(q.vtype.family)
     w.emit(Event.ASSIGNMENT_START, key=key)
     fam_name = _FAM_NAMES.get(fam)
-    if fam_name is not None and _needs_annotation(q.vtype, q.unit, q.raw):
-        w._emit_annotation(fam_name, q.vtype, q.unit)
+    if fam_name is not None and _needs_annotation(q.vtype, q.unit.raw, q.raw):
+        w._emit_annotation(fam_name, q.vtype, q.unit.raw)
     raw_bytes = q.raw.encode('utf-8') if q.raw else b''
     d = BvnrData()
     d.type       = q._tok_type
     d.value_type = q.vtype
-    d.value_unit = q.unit
+    d.value_unit = q.unit.raw
     d.data       = _ct.cast(_ct.c_char_p(raw_bytes), _ct.c_void_p)
     d.length     = len(raw_bytes)
     # spec 1.1 — pass a datetime's verbatim sub-second digits so the C writer
@@ -843,12 +845,12 @@ def _array_quantity_annotation(rows):
             if int(e.vtype.family) == int(ValueTypeFamily.DATETIME):
                 return None, None             # handled by the datetime path
             key = (int(e.vtype.family), int(e.vtype.width), int(e.vtype.base),
-                   e.unit_str())
+                   e.unit_str)
             # Ask EVERY leaf, not just the first. A sint array of mixed sign
             # needs the annotation because its non-negative elements would
             # otherwise re-read as uint, but the first element it happened to see
             # was negative and answered "no annotation needed" for the lot.
-            if _needs_annotation(e.vtype, e.unit, e.raw):
+            if _needs_annotation(e.vtype, e.unit.raw, e.raw):
                 needed = True
             if first is None:
                 first = (key, e)
@@ -863,7 +865,7 @@ def _array_quantity_annotation(rows):
     vt.family = fam
     vt.width  = width
     vt.base   = base
-    unit = sample.unit if _has_real_unit(sample.unit) else None
+    unit = sample.unit.raw if _has_real_unit(sample.unit.raw) else None
     # Only annotate when the annotation says something the defaults do not --
     # otherwise a plain [1, 2, 3] would gain a redundant <uint:64> where it
     # previously had none.

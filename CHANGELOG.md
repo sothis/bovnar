@@ -17,6 +17,43 @@ below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 �
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Changed — BREAKING (Python bindings)
+
+The Python package is **1.2.0** and two of its API shapes changed. Both were
+defects the review named, and neither could be fixed additively.
+
+- **`Quantity.unit` is now a `Unit` object, not a raw `ValueUnit`.** The struct
+  it used to return had its operations scattered across module-level functions
+  the caller had to know to look for (`bovnar.unit_to_str(q.unit)`,
+  `bovnar.units_compatible(q.unit, other.unit)`), and — worse — it compared by
+  ctypes identity, so two units that meant the same thing were never `==`.
+  `Unit` carries the same struct (`q.unit.raw`, so anything that took a
+  `ValueUnit` still works) and adds `str()`, `.factor`, `.is_dimensionless`,
+  `.is_profile_only`, `.compatible_with()`, `.convert_factor()`,
+  `.to_profile()`, and an `__eq__`/`__hash__` built on `bvn_unit_equal`. A
+  native `mmHg` and a `ucum:mm[Hg]` now compare equal, which is what the format
+  promises and what the old type denied.
+
+  *Migration:* `str(q.unit)` for the spelling, `q.unit.raw` where a `ValueUnit`
+  is genuinely wanted.
+
+- **The value accessors are all properties.** `decimal`, `fraction`,
+  `fixed_point`, `stored_value`, `ieee_bits` and `unit_str` were methods while
+  `value`, `epoch_name`, `epoch_mjd` and `datetime_fraction` were properties,
+  with no rule anyone could state — so callers guessed and got a `TypeError`
+  either way. They are now uniformly properties.
+
+  *Migration:* drop the parentheses — `q.decimal()` becomes `q.decimal`.
+
+- **`Quantity.__init__` validates.** It used to store whatever it was given, so
+  `Quantity("1", "not-a-valuetypespec")` constructed happily and every consumer
+  of `.vtype` had to defend itself against a value that could never be right.
+  `raw`, `vtype`, `tok_type` and `frac` are now type-checked and a bad one
+  raises `BovnarArgumentError` at the call that built it, rather than three
+  frames later. `unit` additionally accepts a `str` (`Quantity("1.0", vt,
+  "m/s")`) and a `Unit`, not only a `ValueUnit`.
+
+
 ### Added
 
 - **`--text-only` / `bvnr_read_flags_t.text_only`** — refuse a document that

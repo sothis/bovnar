@@ -24,24 +24,41 @@
 (_uses_spec_1_1). These exercise only Python attribute/type logic and need no
 native library."""
 
+import pytest
+
 import bovnar
 from bovnar import Quantity
+from bovnar.exceptions import BovnarArgumentError
 
 
-def test_uses_spec_1_1_tolerates_non_spec_vtype():
-    """The Quantity constructor does not enforce that vtype is a ValueTypeSpec.
-    A Quantity carrying a bare-string vtype must make the directive-detection
-    pass report 'not spec 1.1' rather than raise AttributeError on .family."""
-    q = Quantity("1", "not-a-valuetypespec")
+def test_quantity_rejects_non_spec_vtype():
+    """The Quantity constructor VALIDATES vtype (since 1.2).
+
+    It used to accept anything and store it, so Quantity("1", "not-a-vtype")
+    constructed happily and every consumer of .vtype had to defend itself
+    against a value that could never be right -- this file's own predecessor
+    tested exactly that defence. Rejecting at construction is strictly better:
+    the traceback names the caller that built the bad object rather than some
+    reader of it three frames later.
+    """
+    with pytest.raises(BovnarArgumentError, match="ValueTypeSpec"):
+        Quantity("1", "not-a-valuetypespec")
+
+
+def test_quantity_rejects_none_vtype():
+    """None is not a ValueTypeSpec either."""
+    with pytest.raises(BovnarArgumentError, match="ValueTypeSpec"):
+        Quantity("1", None)
+
+
+def test_uses_spec_1_1_stays_safe_on_containers():
+    """The directive-detection pass still walks containers without raising, on
+    Quantities that are now necessarily well-formed."""
+    vt = bovnar.make_type_spec(bovnar.ValueTypeFamily.UINT, 64, 0)
+    q = Quantity("1", vt)
     assert bovnar._uses_spec_1_1(q) is False
-    # The recursive container paths must stay safe too.
     assert bovnar._uses_spec_1_1({"k": q}) is False
     assert bovnar._uses_spec_1_1([q]) is False
-
-
-def test_uses_spec_1_1_tolerates_none_vtype():
-    """A None vtype must also degrade to 'not a datetime', not crash."""
-    assert bovnar._uses_spec_1_1(Quantity("1", None)) is False
 
 
 def test_uses_spec_1_1_false_for_plain_values():

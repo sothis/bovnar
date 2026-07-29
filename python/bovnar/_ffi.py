@@ -313,6 +313,13 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_units_compatible.restype  = c_bool
     lib.bvn_units_compatible.argtypes = [ValueUnit, ValueUnit]
 
+    # Unit.__eq__ needs this. It is NOT units_compatible: compatible is a
+    # statement about dimension (m and km are compatible), equal is a statement
+    # about the multiset of (base, exponent, prefix) triples. Only the second
+    # can back a __hash__.
+    lib.bvn_unit_equal.restype  = c_bool
+    lib.bvn_unit_equal.argtypes = [ValueUnit, ValueUnit]
+
     lib.bvn_units_convertible.restype  = c_bool
     lib.bvn_units_convertible.argtypes = [ValueUnit, ValueUnit]
 

@@ -1259,7 +1259,7 @@ static int cmd_pretty(const char *filename, bool canonical)
 	bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 	bvnr_write_flags_t wflags = {0};
 	if (canonical)
-		wflags.unit_flags = BVN_UNIT_REDUCE;
+		wflags.unit_flags = BVN_UNIT_REDUCE | BVN_NUM_CANONICAL;
 	if (!bvnr_open_write_sink(w, &sink, true, &wflags)) {
 		bvnr_writer_destroy(w); free(buf); return 1;
 	}

@@ -48,12 +48,12 @@ extern "C" {
  * #if BVNR_VERSION >= 10100.
  */
 #define BVNR_VERSION_MAJOR		1
-#define BVNR_VERSION_MINOR		1
+#define BVNR_VERSION_MINOR		2
 #define BVNR_VERSION_PATCH		0
 #define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
 					 (BVNR_VERSION_MINOR) * 100 + \
 					 (BVNR_VERSION_PATCH))
-#define BVNR_VERSION_STRING		"1.1.0"
+#define BVNR_VERSION_STRING		"1.2.0"
 /*
  * Pre-release marker for a build made from a tree that is AHEAD of the released
  * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;
@@ -608,6 +608,23 @@ typedef uint32_t bvn_unit_flags_t;
  * you; nothing else does. */
 #define BVN_UNIT_REDUCE     ((bvn_unit_flags_t)(1u << 0))
 #define BVN_UNIT_ASCII_EXP  ((bvn_unit_flags_t)(1u << 1))
+/* Render a rescaled FLOAT in float shape: append ".0" when reducing leaves the
+ * value an integer string, so "<float:64,k~m> 5.0" reduced to metres comes out
+ * as "5000.0" rather than "5000".
+ *
+ * Separate from BVN_UNIT_REDUCE on purpose. Reduction's own contract is that it
+ * writes the exact rescaled value and nothing more -- "2.5 k~g" becomes "2500 g"
+ * -- and callers depend on that. This flag is for the CANONICAL document mode,
+ * where the goal is different: two documents that mean the same thing must
+ * produce the same bytes, and a value that took the rescale path must therefore
+ * land on the same spelling as one that did not.
+ *
+ * It normalises the RESCALED literal only. A literal the producer wrote and that
+ * no rescale touched is passed through untouched, so this does not make every
+ * float in a document converge -- writing "5000" where another document wrote
+ * "5000.0" still differs. Full number-shape canonicalisation is a larger change
+ * and is not this flag. */
+#define BVN_NUM_CANONICAL   ((bvn_unit_flags_t)(1u << 2))
 /*
  * Write options. The fields mirror bvnr_read_flags_t for symmetry, but the
  * writer consults only: max_array_nesting and max_struct_nesting (enforced),

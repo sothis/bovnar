@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 from .structs import ValueTypeSpec, ValueUnit, make_type_spec, make_unit_none
+from .unit    import Unit
 from .enums   import ValueTypeFamily
 from .exceptions import BovnarArgumentError
 
@@ -124,12 +125,35 @@ class Quantity:
     def __init__(self,
                  raw:      str | None,
                  vtype:    ValueTypeSpec,
-                 unit:     ValueUnit | None = None,
+                 unit:     'Unit | ValueUnit | str | None' = None,
                  tok_type: int = 2,
                  frac:     str | None = None) -> None:
+        # VALIDATED SINCE 1.2. It used to accept anything and store it, so
+        # Quantity("1", "not-a-valuetypespec") constructed happily and every
+        # consumer of .vtype had to defend itself against a value that could
+        # never be right -- one of them by catching AttributeError on .family.
+        # A constructor that cannot say no pushes that cost onto every reader of
+        # the object, and onto whoever debugs the traceback three frames later.
+        if raw is not None and not isinstance(raw, str):
+            raise BovnarArgumentError(
+                "Quantity raw must be a str (the verbatim literal) or None; "
+                "got %s" % type(raw).__name__)
+        if not isinstance(vtype, ValueTypeSpec):
+            raise BovnarArgumentError(
+                "Quantity vtype must be a ValueTypeSpec; got %s. Build one with "
+                "bovnar.make_type_spec(family, width, base)."
+                % type(vtype).__name__)
+        if not isinstance(tok_type, int) or isinstance(tok_type, bool):
+            raise BovnarArgumentError(
+                "Quantity tok_type must be an int; got %s" % type(tok_type).__name__)
+        if frac is not None and not isinstance(frac, str):
+            raise BovnarArgumentError(
+                "Quantity frac must be the verbatim sub-second digits as a str, "
+                "or None; got %s" % type(frac).__name__)
         self.raw       = raw
         self.vtype     = vtype
-        self.unit      = unit if unit is not None else make_unit_none()
+        self.unit      = unit if isinstance(unit, Unit) else Unit(
+            Unit.parse(unit).raw if isinstance(unit, str) else unit)
         self._tok_type = tok_type
         # spec 1.1 — verbatim ISO sub-second digits of a datetime carrier (the
         # whole-second value is `raw`). None for any other value or a datetime
@@ -229,6 +253,7 @@ class Quantity:
             return Decimal('-Infinity')
         return None
 
+    @property
     def decimal(self):
         """Exact value as :class:`decimal.Decimal`, from the verbatim literal.
 
@@ -256,6 +281,7 @@ class Quantity:
         raise BovnarArgumentError(
             f"decimal() is not defined for a {_F(fam).name} value")
 
+    @property
     def fraction(self):
         """Exact value as :class:`fractions.Fraction`.
 
@@ -264,13 +290,14 @@ class Quantity:
         """
         from fractions import Fraction
         if int(self.vtype.family) == int(_F.FLOAT_FIX):
-            m, q = self.fixed_point()
+            m, q = self.fixed_point
             return Fraction(m, 1 << q)
-        d = self.decimal()
+        d = self.decimal
         if d is None:
             return None
         return Fraction(d)
 
+    @property
     def fixed_point(self) -> tuple:
         """``(mantissa, frac_bits)`` for a ``float_fix`` value; the exact value
         is ``mantissa / 2**frac_bits``. Raises for any other family."""
@@ -297,7 +324,7 @@ class Quantity:
         from ._bvnfloat import BvnFloat, decimal_to_interchange_bits
         width = int(self.vtype.width) or 64
         f = BvnFloat.from_str(self.raw, 10)
-        lit = self.decimal()
+        lit = self.decimal
         if self._parser_saturated(f, lit):
             return decimal_to_interchange_bits(lit, width)
         # Straight from the literal: encoding the parsed bvn_float would round
@@ -311,7 +338,7 @@ class Quantity:
         from ._bvnfloat import BvnFloat, decimal_stored_value
         width = int(self.vtype.width) or 64
         f = BvnFloat.from_str(self.raw, 10)
-        lit = self.decimal()
+        lit = self.decimal
         if self._parser_saturated(f, lit):
             return decimal_stored_value(lit, width)
         return BvnFloat.from_decimal_bits(
@@ -326,22 +353,23 @@ class Quantity:
         width = int(self.vtype.width) or 64
         base = self._numeric_base()
         f = BvnFloat.from_str(self.raw, base)
-        lit = self.decimal()
+        lit = self.decimal
         if base in (0, 10) and self._parser_saturated(f, lit):
             from fractions import Fraction
             return fraction_to_binary_bits(Fraction(lit), width)
         return f.to_binary_bits(width)
 
+    @property
     def stored_value(self):
         """The value as actually materialised into the declared IEEE/fixed
         format (round-to-nearest-even), as an exact :class:`decimal.Decimal`.
 
-        This differs from :meth:`decimal` only when the literal carries more
+        This differs from :attr:`decimal` only when the literal carries more
         precision than the format holds (e.g. a 40-digit ``float_dec:64``
         literal rounds to 16 significant digits here). Supported for the IEEE
         binary widths ``float:16/32/64/128/256``, every ``float_dec`` width, and
         every ``float_fix`` width. A binary ``float`` width with no IEEE
-        encoding (e.g. ``float:96``/``512``) raises; use :meth:`decimal`.
+        encoding (e.g. ``float:96``/``512``) raises; use :attr:`decimal`.
         """
         from decimal import Decimal
         from ._bvnfloat import BvnFloat
@@ -351,12 +379,12 @@ class Quantity:
         if nf is not None and fam != int(_F.FLOAT_FIX):
             return nf
         if fam == int(_F.FLOAT_FIX):
-            m, q = self.fixed_point()
+            m, q = self.fixed_point
             return Decimal(m) / Decimal(1 << q)
         if fam == int(_F.FLOAT) and width not in _IEEE_WIDTHS:
             raise BovnarArgumentError(
                 f"stored_value() materialises IEEE 16/32/64/128/256-bit floats; "
-                f"float:{width} has no such encoding — use .decimal() for the "
+                f"float:{width} has no such encoding — use .decimal for the "
                 f"exact literal value")
         if fam == int(_F.FLOAT):
             return BvnFloat.from_binary_bits(width, self._binary_bits()).to_decimal()
@@ -365,6 +393,7 @@ class Quantity:
         raise BovnarArgumentError(
             f"stored_value() is not defined for a {_F(fam).name} value")
 
+    @property
     def ieee_bits(self) -> bytes:
         """The raw IEEE-754 interchange bytes of the materialised value
         (little-endian word order): binary16/32/64/128/256 for ``float``, the
@@ -377,7 +406,7 @@ class Quantity:
         if fam == int(_F.FLOAT) and width not in _IEEE_WIDTHS:
             raise BovnarArgumentError(
                 f"ieee_bits() materialises IEEE 16/32/64/128/256-bit floats; "
-                f"float:{width} has no such encoding — use .decimal() instead")
+                f"float:{width} has no such encoding — use .decimal instead")
         if fam == int(_F.FLOAT):
             return self._binary_bits()
         if fam == int(_F.FLOAT_DEC):
@@ -385,17 +414,16 @@ class Quantity:
         raise BovnarArgumentError(
             "ieee_bits() is only valid for float (16..256) and float_dec values")
 
+    @property
     def unit_str(self) -> str:
-        """Return the canonical unit string, or '' if dimensionless."""
-        if not any(self.unit.components[i].base != 0
-                   for i in range(self.unit.num_components)):
-            return ''
-        from . import unit_to_str
-        return unit_to_str(self.unit)
+        """The canonical unit string, or ``''`` when dimensionless. Kept as a
+        distinct name from ``str(self.unit)`` -- which it now delegates to --
+        because it is what __repr__ and the writer paths ask for."""
+        return str(self.unit)
 
     def __repr__(self) -> str:
         fam = ValueTypeFamily(self.vtype.family).name
-        u   = self.unit_str()
+        u   = self.unit_str
         u_part = f' [{u}]' if u else ''
         return f'Quantity({self.raw!r}, {fam}{u_part})'
 
@@ -411,7 +439,7 @@ class Quantity:
                 and self.vtype.family == other.vtype.family
                 and self.vtype.width  == other.vtype.width
                 and self.vtype.base   == other.vtype.base
-                and self.unit_str()   == other.unit_str())
+                and self.unit_str   == other.unit_str)
 
     def __hash__(self) -> int:
         return hash((self.raw,
@@ -419,4 +447,4 @@ class Quantity:
                      self.vtype.family,
                      self.vtype.width,
                      self.vtype.base,
-                     self.unit_str()))
+                     self.unit_str))

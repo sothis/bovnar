@@ -72,7 +72,7 @@ def _signature(q):
         return None
     if isinstance(q, list):
         return [_signature(x) for x in q]
-    return (int(q.vtype.family), int(q.vtype.width), q.unit_str(), q.raw)
+    return (int(q.vtype.family), int(q.vtype.width), q.unit_str, q.raw)
 
 
 @needs_lib

@@ -268,21 +268,21 @@ def _leaf(obj, acc):
         if _is_exact_decimal_quantity(obj):
             # lossless: an object array of exact Decimals (see note above).
             acc['dtypes'].add('object')
-            us = obj.unit_str()
+            us = obj.unit_str
             if us:
-                _record_unit(acc, obj.unit, us)
+                _record_unit(acc, obj.unit.raw, us)
             else:
                 acc['bare_numeric'] = True
-            val = obj.decimal()                   # exact Decimal, or None for a null
+            val = obj.decimal                   # exact Decimal, or None for a null
             if val is None:
                 acc['null'] = True
             return val
         dt = _gather_dtype(acc, obj.vtype.family, obj.vtype.width, obj.vtype.base)
         if dt:
             acc['dtypes'].add(dt)
-        us = obj.unit_str()
+        us = obj.unit_str
         if us:
-            _record_unit(acc, obj.unit, us)
+            _record_unit(acc, obj.unit.raw, us)
         elif int(obj.vtype.family) in _NUMERIC_FAMILIES:
             acc['bare_numeric'] = True
         val = obj.value                           # a typed null decodes to None
@@ -313,7 +313,7 @@ def _leaf(obj, acc):
         if dt:
             acc['dtypes'].add(dt)
         # DomNode.unit_str is a PROPERTY returning the literal 'no_unit' for a
-        # dimensionless value, where Quantity.unit_str() returns ''. Used raw,
+        # dimensionless value, where Quantity.unit_str returns ''. Used raw,
         # every DOM-sourced array reported a truthy unit string -- contradicting
         # the documented '' contract and disagreeing with the typed-list path for
         # the same document.
@@ -321,6 +321,8 @@ def _leaf(obj, acc):
         if us == 'no_unit':
             us = ''
         if us:
+            # DomNode.unit is still a bare ValueUnit; only Quantity.unit became a
+            # Unit object. _record_unit wants the struct, so this one is already it.
             _record_unit(acc, obj.unit, us)
         elif obj.dom_type in (DomType.INT, DomType.FLOAT):
             acc['bare_numeric'] = True

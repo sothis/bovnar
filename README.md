@@ -497,10 +497,11 @@ cmake --build build
 cd build && ctest --output-on-failure
 ```
 
-Or use the convenience wrapper at the repository root:
+Or use the convenience wrapper at the repository root, which builds first, runs
+every registered test, and then sweeps the fuzz harnesses:
 
 ```bash
-./run_tests.sh
+./run_tests.sh                 # --no-fuzz to skip the sweep and the fuzz tests
 ```
 
 ### Test suite

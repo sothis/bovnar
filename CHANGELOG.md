@@ -17,6 +17,23 @@ below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 �
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — `run_tests.sh` ran 81 of the 157 registered tests
+
+The wrapper kept its own hand-written list of what to run, which is a second
+copy of the CTest registry maintained by remembering to, and it had drifted:
+every one of the seven unit-profile suites, every documentation and web gate,
+the ABI dump, the amalgamation checks, the WASM freshness stamp and two thirds
+of the CLI corpus ran only under `ctest` — while the wrapper printed "All tests
+passed".
+
+It keeps no list now. It builds, runs the whole registry through `ctest`, and
+then does the two things CTest does not: sweep the fuzz harnesses at the
+iteration count `--fuzz-iter` asks for (the registered fuzz tests are pinned to
+fixed ones), and drive a cross-built tree through Wine. It also **asserts that
+the number of tests run equals the number registered**, minus any marked
+DISABLED, so a filter — including its own `--no-fuzz` — cannot quietly shrink a
+run again.
+
 ### Added — two more unit profiles: `om:` (OM 2) and `cf:` (CF standard names)
 
 Two vocabularies bovnar could not read now have namespaces of their own, taking

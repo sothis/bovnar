@@ -137,11 +137,18 @@ cmake --build build -j"$(nproc)"
 cd build && ctest --output-on-failure
 ```
 
-Or the wrapper at the repository root, which also runs the fuzz harnesses:
+Or the wrapper at the repository root, which builds first, runs the **whole**
+CTest registry — it keeps no list of its own, so it cannot fall behind one — and
+then sweeps the fuzz harnesses at an iteration count you pick:
 
 ```bash
-./run_tests.sh                 # --no-fuzz to skip them
+./run_tests.sh                 # build + every registered test + a fuzz sweep
+./run_tests.sh --fuzz-iter 50000
+./run_tests.sh --no-fuzz       # skips the sweep AND the fuzz label, and says so
 ```
+
+It fails when the number of tests run is not the number registered, which is the
+check it lacked while its hand-written list had drifted to 81 of 157 tests.
 
 Label filters narrow a run while iterating:
 

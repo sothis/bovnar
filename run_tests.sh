@@ -1,4 +1,30 @@
 #!/usr/bin/env bash
+#
+# run_tests.sh — build, then run EVERY registered test, then sweep the fuzzers.
+#
+# THIS SCRIPT DOES NOT KEEP A LIST OF TESTS, and that is the point. It used to:
+# a hand-written sequence of run_test/run_cli_test/run_cmake_check calls that was
+# a second copy of the CTest registry, maintained by remembering to. It drifted,
+# the way a second copy of anything drifts — 81 line items here against 157
+# registered tests, and the whole of it invisible from the inside, because a
+# runner that never knew about a test cannot report it missing. Everything the
+# seven unit-profile suites check, every documentation and web gate, the ABI
+# dump, the amalgamation checks, the WASM freshness stamp and two thirds of the
+# CLI corpus ran only under `ctest` and were reported as "All tests passed" here.
+#
+# So the corpus is now CTest's, run whole and unfiltered, and this script is what
+# CTest is not:
+#
+#   * it BUILDS first, so "the tests pass" cannot mean "the tests as they were";
+#   * it sweeps the fuzz harnesses at an iteration count you choose, where the
+#     registered fuzz tests are pinned to fixed ones;
+#   * it drives a cross-built (MinGW) tree through Wine;
+#   * it ASSERTS that the number of tests run equals the number registered, so a
+#     filter — including this script's own --no-fuzz — cannot quietly shrink the
+#     run.
+#
+# Usage:
+#   ./run_tests.sh [--build-dir DIR] [--fuzz-iter N] [--no-fuzz] [-j N]
 
 set -euo pipefail
 
@@ -18,16 +44,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Cross (MinGW) build detection: if the build dir holds Windows binaries, run
-# every test executable — and the shared cmake -P helper scripts — through Wine.
-# Native builds leave RUNNER/EXE_SUFFIX/EMULATOR_ARG empty, so the logic below is
-# byte-for-byte unchanged there.
+# Cross (MinGW) build detection. CTest launches the registered tests through the
+# toolchain's CMAKE_CROSSCOMPILING_EMULATOR by itself; what needs Wine here is
+# the fuzz sweep below, which runs the executables directly.
 EXE_SUFFIX=""
 RUNNER=()
-EMULATOR_ARG=()
-WIN_BUILD=0
 if [[ -e "${BUILD_DIR}/bovnar.exe" ]]; then
-    WIN_BUILD=1
     EXE_SUFFIX=".exe"
     if command -v wine64 > /dev/null 2>&1; then
         RUNNER=(wine64)
@@ -38,7 +60,6 @@ if [[ -e "${BUILD_DIR}/bovnar.exe" ]]; then
              "cannot run the .exe tests." >&2
         exit 1
     fi
-    EMULATOR_ARG=("-DEMULATOR=${RUNNER[0]}")
 fi
 
 PASS=0
@@ -46,16 +67,12 @@ FAIL=0
 SKIP=0
 FAILED_TESTS=()
 
-# Single scratch dir for all temp artifacts (fuzz seed, idempotency / converter
-# round-trip outputs); cleaned up on exit.
+# Single scratch dir for all temp artifacts (the fuzz seed, the CTest log);
+# cleaned up on exit.
 SCRATCH_DIR="$(mktemp -d "${TMPDIR:-/tmp}/bvnr_run_tests.XXXXXX")"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
-# Repo root (this script assumes it is invoked from there) and the cmake helper
-# scripts that CTest also drives, so the shell runner and CTest share one
-# source of truth for the converter / canonical-form assertions.
-SRC_DIR="$(pwd)"
-CMAKE_BIN="${CMAKE:-cmake}"
+CTEST_BIN="${CTEST:-ctest}"
 
 _green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
 _red()    { printf '\033[0;31m%s\033[0m\n' "$*"; }
@@ -88,44 +105,98 @@ _bold "=== Building ==="
 cmake --build "$BUILD_DIR" --parallel "$JOBS"
 echo
 
-_bold "=== Unit tests ==="
+# ── The registered corpus, whole ────────────────────────────────────────────
 
-run_test "bvnr_dom_test"                  "$TESTS_DIR/bvnr_dom_test"
-run_test "bvnr_reader_test"               "$TESTS_DIR/bvnr_reader_test"
-run_test "bvnr_want_unit_test"            "$TESTS_DIR/bvnr_want_unit_test"
-run_test "bvnr_unit_policy_test"          "$TESTS_DIR/bvnr_unit_policy_test"
-run_test "bvnr_extended_reader_test"      "$TESTS_DIR/bvnr_extended_reader_test"
-run_test "bvnr_writer_test"               "$TESTS_DIR/bvnr_writer_test"
-run_test "bvnr_si_test"                   "$TESTS_DIR/bvnr_si_test"
-run_test "bvnr_unit_ext_test"             "$TESTS_DIR/bvnr_unit_ext_test"
-run_test "bvnr_utils_test"                "$TESTS_DIR/bvnr_utils_test"
-run_test "bvnr_socketpair_roundtrip_test" "$TESTS_DIR/bvnr_socketpair_roundtrip_test"
-run_test "bvnr_stream_test"               "$TESTS_DIR/bvnr_stream_test"
-run_test "bvnr_high_severity_test"        "$TESTS_DIR/bvnr_high_severity_test"
-run_test "bvnr_int_test"                  "$TESTS_DIR/bvnr_int_test"
-run_test "bvnr_float_test"                "$TESTS_DIR/bvnr_float_test"
-run_test "bvnr_float_fix_dec_test"        "$TESTS_DIR/bvnr_float_fix_dec_test"
-run_test "bvnr_datetime_test"             "$TESTS_DIR/bvnr_datetime_test"
-run_test "bvnr_currency_test"             "$TESTS_DIR/bvnr_currency_test"
+_bold "=== CTest (every registered test) ==="
 
-echo
+CTEST_FILTER=()
+if [[ $RUN_FUZZ -eq 0 ]]; then
+    # The one filter this script may apply, and it is reported below rather than
+    # left to be inferred from a smaller number.
+    CTEST_FILTER=(-LE fuzz)
+fi
 
-_bold "=== Conformance tests ==="
-
-run_test "bvnr_conformance (self)"        "$TESTS_DIR/bvnr_conformance"
-# IUT mode forks/execs the adapter — POSIX-only, so skip it on a Windows build.
-if [[ $WIN_BUILD -eq 0 ]]; then
-    run_test "bvnr_conformance (iut self)"    "$TESTS_DIR/bvnr_conformance" \
-        --iut "$TESTS_DIR/bvnr_conformance_iut"
+if ! "${CTEST_BIN}" --test-dir "${BUILD_DIR}" -N > /dev/null 2>&1; then
+    _red "  FAIL  ctest cannot read ${BUILD_DIR} — configure it first" \
+         "(cmake -S . -B ${BUILD_DIR})"
+    (( FAIL++ )) || true
+    FAILED_TESTS+=("ctest --test-dir ${BUILD_DIR}")
+    REGISTERED=0
+    RAN=0
 else
-    _yellow "  SKIP  bvnr_conformance (iut self)  (POSIX fork/exec; N/A on Windows)"
-    (( SKIP++ )) || true
+    # ${arr[@]+...} rather than a bare "${arr[@]}": an empty array under
+    # `set -u` is an unbound variable on bash 3.2, which is what macOS ships.
+    #
+    # A test marked DISABLED is listed and counted by -N and is then not run, so
+    # it is subtracted here rather than being allowed to read as a hole in the
+    # coverage below. Disabling one is a decision recorded in CMakeLists; a test
+    # that silently did not run is not.
+    LISTING=$("${CTEST_BIN}" --test-dir "${BUILD_DIR}" -N \
+        ${CTEST_FILTER[@]+"${CTEST_FILTER[@]}"})
+    REGISTERED=$(printf '%s\n' "${LISTING}" | sed -n 's/^Total Tests: //p' | tail -1)
+    DISABLED=$(printf '%s\n' "${LISTING}" | grep -c "(Disabled)" || true)
+    REGISTERED=$(( REGISTERED - DISABLED ))
+    ALL_REGISTERED=$("${CTEST_BIN}" --test-dir "${BUILD_DIR}" -N \
+        | sed -n 's/^Total Tests: //p' | tail -1)
+    if [[ $RUN_FUZZ -eq 0 ]]; then
+        _yellow "  --no-fuzz: $(( ALL_REGISTERED - REGISTERED )) fuzz test(s) excluded" \
+                "of ${ALL_REGISTERED}"
+    fi
+
+    CTEST_LOG="${SCRATCH_DIR}/ctest.log"
+    set +e
+    "${CTEST_BIN}" --test-dir "${BUILD_DIR}" -j "${JOBS}" --output-on-failure \
+        ${CTEST_FILTER[@]+"${CTEST_FILTER[@]}"} 2>&1 | tee "${CTEST_LOG}"
+    CTEST_RC=${PIPESTATUS[0]}
+    set -e
+
+    # "N% tests passed, F tests failed out of T" is the line that says what
+    # actually ran, and it is the only place CTest states T after filtering.
+    RAN=$(sed -n 's/.*tests failed out of \([0-9][0-9]*\).*/\1/p' "${CTEST_LOG}" \
+        | tail -1)
+    CTEST_FAILED=$(sed -n 's/.*, \([0-9][0-9]*\) tests failed out of.*/\1/p' \
+        "${CTEST_LOG}" | tail -1)
+    RAN=${RAN:-0}
+    CTEST_FAILED=${CTEST_FAILED:-0}
+
+    echo
+    if [[ "${CTEST_RC}" -eq 0 && "${CTEST_FAILED}" -eq 0 ]]; then
+        printf '  %-52s ' "ctest: ${RAN} test(s)"
+        _green "PASS"
+        PASS=$(( PASS + RAN ))
+    else
+        printf '  %-52s ' "ctest: ${CTEST_FAILED} of ${RAN} test(s) failed"
+        _red "FAIL"
+        PASS=$(( PASS + RAN - CTEST_FAILED ))
+        FAIL=$(( FAIL + CTEST_FAILED ))
+        while read -r t; do
+            [[ -n "$t" ]] && FAILED_TESTS+=("ctest: $t")
+        done < <(sed -n '/The following tests FAILED:/,$p' "${CTEST_LOG}" \
+                 | sed -n 's/^[[:space:]]*[0-9][0-9]*[[:space:]]*-[[:space:]]*\([^ ]*\).*/\1/p')
+    fi
+
+    # The registry is the corpus, so anything short of it is a hole in this run
+    # — a stray filter, a test CTest declined to schedule, an interrupted run.
+    # It is the check whose absence let 81 stand in for 157.
+    if [[ "${RAN}" -ne "${REGISTERED}" ]]; then
+        printf '  %-52s ' "coverage: ran ${RAN} of ${REGISTERED} enabled"
+        _red "FAIL"
+        (( FAIL++ )) || true
+        FAILED_TESTS+=("coverage: ${RAN} of ${REGISTERED} enabled tests ran")
+    fi
 fi
 
 echo
 
+# ── Beyond the registry: the fuzz harnesses, at your iteration count ────────
+#
+# CTest registers these at fixed iteration counts (bvnr_fuzz_reader and its
+# _deep/_thorough siblings), which is right for a gate and useless for a sweep.
+# The run above already covered those; this is the same harnesses driven as far
+# as --fuzz-iter asks.
+
 if [[ $RUN_FUZZ -eq 1 ]]; then
-    _bold "=== Standalone fuzz tests (--fuzz-iter $FUZZ_ITER) ==="
+    _bold "=== Fuzz sweep (--fuzz-iter $FUZZ_ITER) ==="
 
     run_test "bvnr_fuzz_test --harness reader" \
         "$TESTS_DIR/bvnr_fuzz_test" \
@@ -147,262 +218,9 @@ if [[ $RUN_FUZZ -eq 1 ]]; then
 
     echo
 else
-    _yellow "=== Standalone fuzz tests skipped (--no-fuzz) ==="
+    _yellow "=== Fuzz sweep skipped (--no-fuzz) ==="
     echo
 fi
-
-_bold "=== CLI example smoke tests ==="
-
-BOVNAR_BIN="${BUILD_DIR}/bovnar${EXE_SUFFIX}"
-EXAMPLES_DIR="./examples"
-
-run_cli_test() {
-    local label="$1"; shift
-
-    if [[ ! -e "${BOVNAR_BIN}" ]]; then
-        _yellow "  SKIP  $label  (not built: ${BOVNAR_BIN})"
-        (( SKIP++ )) || true
-        return
-    fi
-
-    printf '  %-52s ' "$label"
-    if "${RUNNER[@]}" "$@" > /dev/null 2>&1; then
-        _green "PASS"
-        (( PASS++ )) || true
-    else
-        _red "FAIL"
-        (( FAIL++ )) || true
-        FAILED_TESTS+=("$label")
-    fi
-}
-
-# Drive one of the shared cmake -P helper scripts (the same ones CTest uses)
-# and treat a zero exit as PASS.  Skipped when the bovnar binary is missing.
-run_cmake_check() {
-    local label="$1"; shift
-
-    if [[ ! -e "${BOVNAR_BIN}" ]]; then
-        _yellow "  SKIP  $label  (not built: ${BOVNAR_BIN})"
-        (( SKIP++ )) || true
-        return
-    fi
-
-    printf '  %-52s ' "$label"
-    if "${CMAKE_BIN}" "${EMULATOR_ARG[@]}" "$@" > /dev/null 2>&1; then
-        _green "PASS"
-        (( PASS++ )) || true
-    else
-        _red "FAIL"
-        (( FAIL++ )) || true
-        FAILED_TESTS+=("$label")
-    fi
-}
-
-for bvnr_file in "${EXAMPLES_DIR}"/*.bvnr; do
-    stem=$(basename "${bvnr_file}" .bvnr)
-    run_cli_test "bovnar events   ${stem}.bvnr" \
-        "${BOVNAR_BIN}" events "${bvnr_file}"
-    run_cli_test "bovnar validate ${stem}.bvnr" \
-        "${BOVNAR_BIN}" validate "${bvnr_file}"
-    run_cmake_check "pretty-print idempotent ${stem}.bvnr" \
-        -DBOVNAR="${BOVNAR_BIN}" \
-        -DBVNR_FILE="${bvnr_file}" \
-        -DTMP_FILE="${SCRATCH_DIR}/idem_${stem}.bvnr" \
-        -P "${SRC_DIR}/cmake/pretty_print_idempotent.cmake"
-done
-
-echo
-
-_bold "=== Canonical-form preservation ==="
-
-run_cmake_check "inline units preserved (units.bvnr)" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DBVNR_FILE="${SRC_DIR}/examples/units.bvnr" \
-    "-DREQUIRE=<float:64,_10,m/s> 9.81|<float:64,_10,k~g> 70.5|<uint:64,_10,Gi~B> 4|<uint:64,_10,B> 1500|<sint:64,_10,°C> -40|<float:64,_10,Pa> 101325.0" \
-    -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
-
-# An inline unit on a value that ALSO has an explicit (unit-less) annotation must
-# be kept too — it is appended inline since the annotation was already emitted.
-# (.speed_b in floats.bvnr; "<float:64> 9.81" alone would be a silent unit drop.)
-run_cmake_check "inline unit kept with explicit annotation (floats.bvnr)" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DBVNR_FILE="${SRC_DIR}/examples/floats.bvnr" \
-    "-DREQUIRE=<float:64> 9.81 m/s" \
-    -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
-
-run_cmake_check "inline currency preserved (financial.bvnr)" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DBVNR_FILE="${SRC_DIR}/examples/financial.bvnr" \
-    "-DREQUIRE=<float_dec:64,\$USD> 29.95|<float_dec:64,\$EUR> 149.00" \
-    -P "${SRC_DIR}/cmake/pretty_print_contains.cmake"
-
-echo
-
-_bold "=== JSON <-> bvnr converter ==="
-
-run_cmake_check "convert round-trip (roundtrip.json)" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DJSON_FILE="${SRC_DIR}/tests/json/roundtrip.json" \
-    -DTMP_FILE="${SCRATCH_DIR}/convert_roundtrip.bvnr" \
-    -P "${SRC_DIR}/cmake/convert_json_roundtrip.cmake"
-
-run_convert_fail() {
-    local label="$1" file="$2" needle="$3"
-    run_cmake_check "$label" \
-        -DBOVNAR="${BOVNAR_BIN}" \
-        -DJSON_FILE="${SRC_DIR}/tests/json/${file}" \
-        "-DNEEDLE=${needle}" \
-        -P "${SRC_DIR}/cmake/convert_expect_fail.cmake"
-}
-
-run_convert_fail "convert rejects bad_key.json"      bad_key.json      "not a valid bovnar identifier"
-run_convert_fail "convert rejects bad_overflow.json" bad_overflow.json "out of range"
-run_convert_fail "convert rejects bad_trailing.json" bad_trailing.json "trailing content"
-run_convert_fail "convert rejects bad_nul.json"      bad_nul.json      "NUL"
-
-# bvnr -> json must refuse a datetime carrying sub-second digits (the integer
-# carrier cannot hold the fraction) rather than silently truncate it.
-run_cmake_check "convert rejects bvnr->json datetime fraction" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DINPUT_FILE="${SRC_DIR}/tests/frac_datetime.bvnr" \
-    -DFROM=bvnr -DTO=json \
-    "-DNEEDLE=sub-second" \
-    -P "${SRC_DIR}/cmake/convert_expect_fail.cmake"
-
-# query must print a sub-second datetime as the faithful ISO literal rather than
-# the fraction-dropping integer carrier.
-run_cmake_check "query shows datetime fraction (ISO literal)" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DFILE="${SRC_DIR}/tests/frac_datetime.bvnr" \
-    -DQPATH=.t \
-    "-DNEEDLE=2026-06-15T12:00:00.123Z" \
-    -P "${SRC_DIR}/cmake/query_expect.cmake"
-
-echo
-
-_bold "=== Streaming CLI (frames + mux) ==="
-
-run_cmake_check "frames pack/list + mux pack/list round-trip" \
-    -DBOVNAR="${BOVNAR_BIN}" \
-    -DEX_DIR="${SRC_DIR}/examples" \
-    -DTMP_DIR="${SCRATCH_DIR}" \
-    -P "${SRC_DIR}/cmake/stream_cli_roundtrip.cmake"
-
-echo
-
-_bold "=== Python binding tests ==="
-
-PY_BIN="${PYTHON:-python3}"
-PY_SRC="${SRC_DIR}/python"
-PY_TESTS="${PY_SRC}/tests"
-# ABSOLUTE, because LIBBOVNAR_PATH is consumed after a `cd "${PY_SRC}"` below. A
-# relative BUILD_DIR (the default is ./build) produced a path that does not exist
-# from python/, so _ffi.py skipped the override and silently fell back to the
-# in-tree build -- i.e. `--build-dir build-asan` reported PASS having tested the
-# ORDINARY library. Empty is a hard error for the same reason: an unset override
-# is indistinguishable from a working one in the output.
-SHARED_LIB="$(ls "${BUILD_DIR}"/libbvnr.so* "${BUILD_DIR}"/libbvnr.dylib 2>/dev/null | head -1 || true)"
-if [[ -n "${SHARED_LIB}" ]]; then
-    SHARED_LIB="$(cd "$(dirname "${SHARED_LIB}")" && pwd)/$(basename "${SHARED_LIB}")"
-fi
-
-if [[ $WIN_BUILD -eq 1 ]]; then
-    # The bindings load libbvnr via ctypes from the host interpreter, which
-    # cannot load the Windows PE DLL; the C suite is the Windows coverage.
-    _yellow "  SKIP  python suite  (Windows build: host Python cannot load a PE DLL)"
-    (( SKIP++ )) || true
-elif ! command -v "${PY_BIN}" > /dev/null 2>&1; then
-    _yellow "  SKIP  python suite  (no ${PY_BIN})"
-    (( SKIP++ )) || true
-elif ! "${PY_BIN}" -m pytest --version > /dev/null 2>&1; then
-    _yellow "  SKIP  python suite  (pytest not installed)"
-    (( SKIP++ )) || true
-else
-    if [[ -z "${SHARED_LIB}" || ! -e "${SHARED_LIB}" ]]; then
-        _red "  FAIL  python suite  (no shared library in ${BUILD_DIR})"
-        (( FAIL++ )) || true
-    fi
-    printf '  %-52s ' "pytest python/tests"
-    # The integration tests find the shared lib via LIBBOVNAR_PATH; pure tests
-    # ignore it.  Tests needing the lib self-skip when it is absent.
-    if ( cd "${PY_SRC}" && LIBBOVNAR_PATH="${SHARED_LIB}" \
-            "${PY_BIN}" -m pytest "${PY_TESTS}" --tb=short -q > /dev/null 2>&1 ); then
-        _green "PASS"
-        (( PASS++ )) || true
-    else
-        _red "FAIL"
-        (( FAIL++ )) || true
-        FAILED_TESTS+=("pytest python/tests")
-    fi
-fi
-
-echo
-
-_bold "=== WASM differential test ==="
-
-# Compares the WebAssembly build (dist/wasm) against this build's native CLI over
-# the example corpus + malformed snippets. Guards the exact regression that once
-# shipped: a stale dist/wasm whose parser disagreed with the sources (e.g. rejected
-# the k~m unit). Needs node and a built dist/wasm; skips cleanly otherwise.
-#
-# Finding node: an explicit NODE=/path/to/node wins, then one on PATH, then the
-# copy emsdk ships — which is the interpreter wasm/build_wasm.sh itself just ran
-# under. emsdk_env.sh exports EMSDK_NODE and EMSDK; a shell that never sourced it
-# still has the default ~/emsdk install root. Without that last step the test
-# skipped on exactly the machines equipped to build the artifact it checks, and a
-# silent skip here is how a stale dist/wasm ships.
-_find_node() {
-    local root candidate
-    if [[ -n "${NODE:-}" ]]; then
-        printf '%s' "${NODE}"; return
-    fi
-    if command -v node > /dev/null 2>&1; then
-        printf 'node'; return
-    fi
-    if [[ -x "${EMSDK_NODE:-}" ]]; then
-        printf '%s' "${EMSDK_NODE}"; return
-    fi
-    for root in "${EMSDK:-}" "${HOME:-}/emsdk"; do
-        [[ -n "${root}" && -d "${root}/node" ]] || continue
-        # Several SDK versions may be installed side by side; take the newest.
-        candidate=$(ls -d "${root}"/node/*/bin/node 2>/dev/null | sort -V | tail -1)
-        if [[ -n "${candidate}" && -x "${candidate}" ]]; then
-            printf '%s' "${candidate}"; return
-        fi
-    done
-    printf 'node'   # nothing found: the command -v check below reports the skip
-}
-NODE_BIN="$(_find_node)"
-WASM_DIST="${SRC_DIR}/dist/wasm/index.mjs"
-WASM_DIFF="${SRC_DIR}/wasm/test/diff_test.mjs"
-
-if [[ $WIN_BUILD -eq 1 ]]; then
-    _yellow "  SKIP  wasm diff_test  (Windows build)"
-    (( SKIP++ )) || true
-elif [[ ! -e "${BOVNAR_BIN}" ]]; then
-    _yellow "  SKIP  wasm diff_test  (not built: ${BOVNAR_BIN})"
-    (( SKIP++ )) || true
-elif [[ ! -e "${WASM_DIST}" ]]; then
-    _yellow "  SKIP  wasm diff_test  (no dist/wasm; run wasm/build_wasm.sh)"
-    (( SKIP++ )) || true
-elif ! command -v "${NODE_BIN}" > /dev/null 2>&1; then
-    _yellow "  SKIP  wasm diff_test  (no node on PATH and none in \$EMSDK/~/emsdk;" \
-            "set NODE=/path/to/node)"
-    (( SKIP++ )) || true
-else
-    printf '  %-52s ' "node wasm/test/diff_test.mjs"
-    if ( cd "${SRC_DIR}" && BOVNAR_CLI="${BOVNAR_BIN}" \
-            "${NODE_BIN}" "${WASM_DIFF}" > /dev/null 2>&1 ); then
-        _green "PASS"
-        (( PASS++ )) || true
-    else
-        _red "FAIL"
-        (( FAIL++ )) || true
-        FAILED_TESTS+=("node wasm/test/diff_test.mjs")
-    fi
-fi
-
-echo
 
 _bold "=== Results ==="
 echo "  Passed: $PASS"

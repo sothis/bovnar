@@ -1505,6 +1505,14 @@ endif()
 #     python3 check_profile_factors.py --fetch
 # and every later run checks for real. CI should fetch and then use --strict so
 # that a skip there is a failure rather than a quiet pass.
+#
+# Labelled "python" although the name does not start with bvnr_py_: the label
+# records "drives libbvnr from a Python interpreter", and LIBBOVNAR_DIR below is
+# exactly that -- the checker resolves every native target through the ctypes
+# bindings. A sanitizer build cannot do it (ASan refuses a dlopen of its own
+# runtime into an uninstrumented interpreter: "ASan runtime does not come first
+# in initial library list"), so the ASan pass excludes it with -LE python, the
+# same way bvnr_data_parity is excluded. The unsanitized pass still runs it.
 if(Python3_Interpreter_FOUND
    AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_profile_factors.py)
     add_test(NAME bvnr_profile_factors
@@ -1512,7 +1520,7 @@ if(Python3_Interpreter_FOUND
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_profile_factors.py
                      --cache ${CMAKE_CURRENT_BINARY_DIR}/vocab)
     set_tests_properties(bvnr_profile_factors PROPERTIES
-        LABELS "units;profile;vocab" TIMEOUT 120
+        LABELS "python;units;profile;vocab" TIMEOUT 120
         ENVIRONMENT "LIBBOVNAR_DIR=${CMAKE_CURRENT_BINARY_DIR}")
 endif()
 

@@ -869,20 +869,50 @@ class NativeIndex:
     Gy and Sv -- collapse onto whichever comes first, which is why a suggestion
     is advisory: it says "this code is worth what some native unit is worth",
     not "map it to that one".
+
+    THE BARE SYMBOLS ARE NOT ENOUGH, and this is the half that matters for
+    keeping five tables in step. A flat vocabulary spells a PREFIXED or COMPOUND
+    unit as one whole token -- unece:A97 is the hectopascal, unece:KMQ the
+    kilogram per cubic metre, qudt:RAD-PER-SEC the radian per second -- and none
+    of those is a native symbol, so an index of symbols alone can never propose
+    them. It found nothing for exactly the codes that a table is most likely to
+    be missing while its neighbours carry them.
+
+    So every `.bovnar` target any of the five profile tables already uses is
+    indexed too. That is the right source: a target one table has written down
+    is a spelling this build is known to accept, and a code from another
+    vocabulary worth the same thing is a synchronisation gap by construction.
+    Symbols come first, so a code that is worth a bare native unit is still
+    reported against that unit rather than against some compound equal to it.
     """
 
     def __init__(self, native):
         self.rows = []
+        seen = set()
+
+        def add(expr):
+            if expr in seen:
+                return
+            seen.add(expr)
+            try:
+                r = native(expr)
+            except Unresolved:
+                return
+            if r is None:
+                return
+            self.rows.append((expr, r[0], list(r[1])))
+
         doc = bvnr_data.load(
             open(os.path.join(GENDATA, "units.bvnr"), "rb").read())
         for u in doc["units"]:
-            try:
-                r = native(u["symbol"])
-            except Unresolved:
-                continue
-            if r is None:
-                continue
-            self.rows.append((u["symbol"], r[0], list(r[1])))
+            add(u["symbol"])
+        targets = set()
+        for other in sorted(VOCABS):
+            d = bvnr_data.load(
+                open(os.path.join(GENDATA, other + ".bvnr"), "rb").read())
+            targets.update(m["bovnar"] for m in d.get("mapped", []))
+        for expr in sorted(targets):
+            add(expr)
 
     def match(self, vocab, up):
         for sym, nf, nd in self.rows:

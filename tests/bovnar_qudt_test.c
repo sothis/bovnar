@@ -184,7 +184,11 @@ static void test_flatness(void)
 	chk_error("qudt:KiloM-PER",   error_unit_illegal);
 	chk_error("qudt:M/SEC",       error_unit_illegal);
 	chk_error("qudt:M.SEC",       error_unit_illegal);
-	chk_error("qudt:M2-PER-SEC",  error_unit_illegal);
+	/* A local name built out of parts this table does carry separately is still
+	 * one whole token, and one this table does not have. M2-PER-SEC used to
+	 * stand here; it is a row now, so the assertion moved to a name QUDT itself
+	 * does not define — the point is the FLAT lookup, not which name it is. */
+	chk_error("qudt:M2-PER-SEC3", error_unit_illegal);
 
 	/* Case is QUDT's own, and significant. */
 	chk_error("qudt:kilogm", error_unit_illegal);
@@ -336,6 +340,31 @@ static void test_to_qudt(void)
 	/* Flat, so a compound has no spelling -- it has a native one instead. */
 	ASSERT_TRUE(bvn_unit_to_profile("qudt", U("m/s"), buf, sizeof(buf)) < 0,
 	            "a compound has no flat spelling");
+
+	/*
+	 * The canonical local name where QUDT gives a unit several. Shortest-wins
+	 * chose the bare, ambiguous ones -- "TON" for the SHORT ton, "PINT" for the
+	 * imperial pint, "Gs" for the gauss -- each of which is a QUDT unit and
+	 * none of which is the name that says which one it is. A flat profile takes
+	 * the first name qudt.bvnr lists instead.
+	 */
+#define CHK_QUDT(nat, want) do { \
+	tests++; \
+	if (bvn_unit_to_profile("qudt", U(nat), buf, sizeof(buf)) < 0 || \
+		strcmp(buf, (want)) != 0) { \
+		fprintf(stderr, "FAIL: %s -> QUDT %s, expected %s\n", \
+		        (nat), buf, (want)); \
+		failures++; \
+	} \
+} while (0)
+	CHK_QUDT("tn_sh", "TON_SHORT");   /* not the bare TON        */
+	CHK_QUDT("tn_l",  "TON_LONG");    /* not TON_UK              */
+	CHK_QUDT("pt_uk", "PINT_UK");     /* not the bare PINT       */
+	CHK_QUDT("t",     "TON_Metric");  /* not TONNE or MegaGM     */
+	CHK_QUDT("G",     "GAUSS");       /* not Gs                  */
+	CHK_QUDT("grad",  "GRAD");        /* not GON                 */
+	CHK_QUDT("c~Gy",  "CentiGRAY");   /* not RAD_R, which is the rad */
+#undef CHK_QUDT
 
 	/* Neither QUDT namespace owns an opaque unit, so neither can spell one. */
 	ASSERT_TRUE(bvn_unit_to_profile("qudt", U("ucum:[IU]"), buf,

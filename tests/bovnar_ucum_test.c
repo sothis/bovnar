@@ -549,7 +549,15 @@ static void test_regressions(void)
 	/*
 	 * bvn_unit_to_ucum picked whichever row the length-sorted parse table
 	 * reached first, so siemens came out as "mho" and the calorie as "cal_th".
-	 * The generated reverse table picks the shortest code, ties alphabetically.
+	 * The generated reverse table picks the shortest code, ties alphabetically
+	 * — an expression profile's competing rows are spellings of one atom, and
+	 * the vocabulary's own abbreviation is the short one.
+	 *
+	 * Except where the short one means something else. `.reverse = false` in
+	 * ucum.bvnr takes those rows out of the running: "eq" is two bytes and is
+	 * the EQUIVALENT, so shortest-wins wrote every mole out as an equivalent;
+	 * "[oz_ap]" is a byte shorter than "[oz_tr]" and says apothecary about a
+	 * document that never did.
 	 */
 	char buf[BVNR_UNIT_STRING_MAX];
 #define CHK_UCUM(nat, want) do { \
@@ -566,6 +574,12 @@ static void test_regressions(void)
 	CHK_UCUM("mo",  "mo");
 	CHK_UCUM("yr",  "a");
 	CHK_UCUM("L",   "L");
+	/* The two `.reverse = false` rows. Both spellings still PARSE — the flag
+	 * governs the writer only — so each assertion is a pair. */
+	CHK_UCUM("mol",  "mol");
+	CHK_UCUM("oz_t", "[oz_tr]");
+	chk_str("ucum:eq",       "mol");
+	chk_str("ucum:[oz_ap]",  "oz_t");
 	/*
 	 * And a base whose UCUM atom is itself prefixed had no UCUM form at all.
 	 * "m[Hg]" is a METRE of mercury — bovnar's mmHg times 10³ — so writing plain

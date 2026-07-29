@@ -357,6 +357,50 @@ static void test_to_unece(void)
 	            "m should emit as MTR");
 	ASSERT_TRUE(bvn_unit_to_profile("unece", U("k~m/h"), buf, sizeof(buf)) < 0,
 	            "a compound has no flat spelling");
+
+	/*
+	 * THE CANONICAL CODE, NOT MERELY A CORRECT ONE. Rec 20 gives several codes
+	 * one value: JOU and J55 (watt second) are both the joule, PAL and C55
+	 * (newton per square metre) both the pascal, MOL and C34 both the mole. The
+	 * writer used to take the shortest code and break ties alphabetically,
+	 * which for a code list whose every code is two or three bytes is just
+	 * "alphabetically first" — so a joule came out as "J55" and a mole as
+	 * "C34". Both are worth the right number; neither is what a Rec 20 reader
+	 * expects to receive. A flat profile now writes the FIRST code its data
+	 * file lists for a unit, which is the canonical one.
+	 *
+	 * Nothing caught this when the alias codes were added, because every
+	 * assertion here was about a unit with only one code. These are the ones
+	 * with more than one.
+	 */
+#define CHK_UNECE(nat, want) do { \
+	tests++; \
+	if (bvn_unit_to_profile("unece", U(nat), buf, sizeof(buf)) < 0 || \
+		strcmp(buf, (want)) != 0) { \
+		fprintf(stderr, "FAIL: %s -> UNECE %s, expected %s\n", \
+		        (nat), buf, (want)); \
+		failures++; \
+	} \
+} while (0)
+	CHK_UNECE("J",   "JOU");   /* not J55, the watt second               */
+	CHK_UNECE("Pa",  "PAL");   /* not C55, the newton per square metre   */
+	CHK_UNECE("N",   "NEW");   /* not B12/M77                            */
+	CHK_UNECE("W",   "WTT");   /* not P14, the joule per second          */
+	CHK_UNECE("C",   "COU");   /* not A8, the ampere second              */
+	CHK_UNECE("H",   "HEN");   /* not 81                                 */
+	CHK_UNECE("Wb",  "WEB");   /* not F90                                */
+	CHK_UNECE("lx",  "LUX");   /* not B60, the lumen per square metre    */
+	CHK_UNECE("kat", "KAT");   /* not E95, the mole per second           */
+	CHK_UNECE("mol", "MOL");   /* not C34                                */
+	CHK_UNECE("S",   "SIE");   /* not NQ, the mho                        */
+	CHK_UNECE("Gy",  "GRY");   /* not A95                                */
+	CHK_UNECE("t",   "TNE");   /* not 2U, the megagram                   */
+	CHK_UNECE("tex", "D34");   /* not C12, the milligram per metre       */
+	/* A prefixed decade is its own code, and picks its own canonical one. */
+	CHK_UNECE("k~g", "KGM");
+	CHK_UNECE("k~W", "KWT");
+	CHK_UNECE("k~Pa", "KPA");
+#undef CHK_UNECE
 	ASSERT_TRUE(bvn_unit_to_profile("unece", U("m²"), buf, sizeof(buf)) < 0,
 	            "an exponent has no flat spelling");
 

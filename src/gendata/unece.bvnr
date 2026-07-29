@@ -307,7 +307,15 @@
   # Speed, rotation, frequency
   { .code = "HM";  .bovnar = "mph";    },   # mile per hour
   { .code = "M44"; .bovnar = "rev";    },   # revolution
-  { .code = "C94"; .bovnar = "rpm";    },   # reciprocal minute
+  # C94 is the RECIPROCAL MINUTE and M46 the REVOLUTION PER MINUTE, and the two
+  # are not the same quantity although C94 and native rpm are both 1/60 s⁻¹.
+  # rpm counts revolutions; "reciprocal minute" says nothing about rotation, and
+  # C94 mapped onto rpm asserted one. The compounds keep them apart the same way
+  # C97 stays off the hertz, and M46 lands on rev/min because native rev is an
+  # ANGLE of 2π radians -- which is what Rec 20's revolution per minute is, and
+  # is why qudt:REV-PER-MIN maps there too.
+  { .code = "C94"; .bovnar = "min^-1"; },   # reciprocal minute
+  { .code = "M46"; .bovnar = "rev/min";},   # revolution per minute
   { .code = "C97"; .bovnar = "s^-1";   },   # reciprocal second
   # J38 (baud) is NOT here. QUDT models it as DIMENSIONLESS -- information
   # again, the same modelling difference as the bit and the byte -- while
@@ -334,6 +342,94 @@
   { .code = "2A";  .bovnar = "rad/s";  },   # radian per second
   { .code = "C25"; .bovnar = "m~rad";  },   # milliradian
   { .code = "B97"; .bovnar = "µ~rad";  },   # microradian
+
+  # ── Codes worth a PREFIXED or COMPOUND unit ──────────────────────────────
+  # A second synchronisation pass, and it exists because the first one could not
+  # see any of this. check_profile_factors.py matched a publisher's code against
+  # the native registry's SYMBOLS, so it could only ever propose a code worth a
+  # bare atom -- and a flat vocabulary spells every prefixed and every compound
+  # unit as one whole token. A97 is the hectopascal, KMQ the kilogram per cubic
+  # metre, MSK the metre per square second: none of them is a native symbol, and
+  # all of them were carried by qudt.bvnr while this table had no code for them.
+  # The index now also holds every target the five tables already use, which is
+  # what turned that class of gap from invisible into a printed list.
+  #
+  # Same rule as the block above: QUDT's rdfs:label for the unit carrying the
+  # code, never the number. The number is what proposed the WATT for KVA and MVA
+  # -- apparent power is not active power (doc/07 §12) -- and the HERTZ for the
+  # three becquerel codes.
+
+  # Length, time, and the reciprocals
+  { .code = "HMT"; .bovnar = "h~m";     },   # hectometre
+  { .code = "4H";  .bovnar = "µ~m";     },   # micrometre
+  { .code = "C45"; .bovnar = "n~m";     },   # nanometre
+  { .code = "C52"; .bovnar = "p~m";     },   # picometre
+  { .code = "B98"; .bovnar = "µ~s";     },   # microsecond
+  { .code = "C47"; .bovnar = "n~s";     },   # nanosecond
+  { .code = "H70"; .bovnar = "p~s";     },   # picosecond
+  # Both are the reciprocal metre and only C92 says so, so C92 leads -- which
+  # costs nothing here (an exponent makes the target a compound, and a compound
+  # has no flat spelling to write back at all) and keeps the ordering rule the
+  # rest of this file relies on true everywhere rather than only where it bites.
+  { .code = "C92"; .bovnar = "m^-1";    },   # reciprocal metre
+  { .code = "Q25"; .bovnar = "m^-1";    },   # dioptre, exactly the same unit
+  { .code = "E90"; .bovnar = "c~m^-1";  },   # reciprocal centimetre, the kayser
+
+  # Area, volume, density
+  { .code = "ARE"; .bovnar = "c~ha";    },   # are
+  { .code = "4G";  .bovnar = "µ~L";     },   # microlitre
+  { .code = "KMQ"; .bovnar = "k~g/m^3"; },   # kilogram per cubic metre
+  { .code = "23";  .bovnar = "g/c~m^3"; },   # gram per cubic centimetre
+
+  # Electricity and magnetism
+  { .code = "KVT"; .bovnar = "k~V";     },   # kilovolt
+  { .code = "2Z";  .bovnar = "m~V";     },   # millivolt
+  { .code = "D82"; .bovnar = "µ~V";     },   # microvolt
+  { .code = "B22"; .bovnar = "k~A";     },   # kiloampere
+  { .code = "4K";  .bovnar = "m~A";     },   # milliampere
+  { .code = "B84"; .bovnar = "µ~A";     },   # microampere
+  { .code = "B49"; .bovnar = "k~Ω";     },   # kilohm
+  { .code = "B75"; .bovnar = "M~Ω";     },   # megohm
+  { .code = "4O";  .bovnar = "µ~F";     },   # microfarad
+  { .code = "C14"; .bovnar = "m~H";     },   # millihenry
+  { .code = "A86"; .bovnar = "G~Hz";    },   # gigahertz
+  # Apparent and reactive power, prefixed. The kVA is the commonest unit in this
+  # whole vocabulary and had no code here at all.
+  { .code = "KVA"; .bovnar = "k~VA";    },   # kilovolt-ampere
+  { .code = "MVA"; .bovnar = "M~VA";    },   # megavolt-ampere
+  { .code = "KVR"; .bovnar = "k~var";   },   # kilovar
+  { .code = "MAR"; .bovnar = "M~var";   },   # megavar
+
+  # Force, pressure, energy, power
+  { .code = "B47"; .bovnar = "k~N";     },   # kilonewton
+  { .code = "M78"; .bovnar = "g·gn";    },   # pond, i.e. the gram-force
+  { .code = "A97"; .bovnar = "h~Pa";    },   # hectopascal
+  { .code = "3B";  .bovnar = "M~J";     },   # megajoule
+  { .code = "K53"; .bovnar = "k~cal";   },   # kilocalorie
+  { .code = "C31"; .bovnar = "m~W";     },   # milliwatt
+
+  # Radioactivity. NOT the hertz: an activity is not a frequency (doc/07 §9),
+  # and the two share a dimension and a factor exactly.
+  { .code = "2Q";  .bovnar = "k~Bq";    },   # kilobecquerel
+  { .code = "4N";  .bovnar = "M~Bq";    },   # megabecquerel
+  { .code = "GBQ"; .bovnar = "G~Bq";    },   # gigabecquerel
+
+  # Amount of substance
+  { .code = "C18"; .bovnar = "m~mol";   },   # millimole
+  { .code = "C36"; .bovnar = "mol/m^3"; },   # mole per cubic metre
+  { .code = "C38"; .bovnar = "mol/L";   },   # mole per litre
+
+  # Mechanics and thermodynamics. Every target here is the coherent SI unit of a
+  # kind qudt-qk.bvnr already carries, and no unit namespace could spell it.
+  { .code = "MSK"; .bovnar = "m/s^2";   },   # metre per second squared
+  { .code = "MQS"; .bovnar = "m^3/s";   },   # cubic metre per second
+  { .code = "KGS"; .bovnar = "k~g/s";   },   # kilogram per second
+  { .code = "S4";  .bovnar = "m^2/s";   },   # square metre per second
+  { .code = "B31"; .bovnar = "k~g·m/s"; },   # kilogram metre per second
+  { .code = "C65"; .bovnar = "Pa·s";    },   # pascal second
+  { .code = "JE";  .bovnar = "J/K";     },   # joule per kelvin
+  { .code = "B11"; .bovnar = "J·k~g^-1·K^-1"; },  # joule per kilogram kelvin
+  { .code = "D53"; .bovnar = "W·m^-1·K^-1";   },  # watt per metre kelvin
 ];
 
 # ── Rec 20 / Rec 21: opaque count units ─────────────────────────────────────

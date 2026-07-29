@@ -23,12 +23,14 @@ reader- and writer-side unit policies a profile unit has to survive unchanged).
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (567 assertions across the five profiles, plus 2847 in the cross-vocabulary
-suite). What is **not** machine-verified, and must not be read as such, is the VOCABULARY side: the
-transliteration tables in `src/gendata/*.bvnr` state what each foreign code is worth, and nothing in
-this repository checks that against the publications those codes come from. §9.2 says exactly what
-the generator does and does not prove, §10.2 treats the gap as the standing risk it is, and §14
-is explicit that five tables wrong in the same way would agree with each other perfectly.
+files named above (604 assertions across the five profiles, plus 3551 in the cross-vocabulary
+suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
+too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
+resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
+alone is reached at one remove, through QUDT's cross-reference, because Rec 20 states its factors in
+prose. §9.2 says what the generator proves on its own, §9.5 says what the outside check proves and
+where its tolerance runs out, §10.2 records what is still uncovered, and §14 is explicit that five
+tables wrong in the same way would agree with each other perfectly.
 
 ---
 
@@ -667,10 +669,29 @@ back in — a large change to the whole writer surface for a string the unit mod
 producers whose output field is UCUM-typed. It returns a negative length when it fails.
 
 The mapping is driven by a **generated reverse table**, not by searching the forward one. Two things
-depend on that. First, the choice is deterministic and canonical: where several atoms name one base,
-the shortest wins, ties alphabetically — so siemens is `S` and not `mho`, and the calorie is `cal`
-and not `cal_th`. Searching the forward table picked whichever row its length-sorted order reached
-first, which got both of those wrong.
+depend on that. First, the choice is deterministic and canonical. Searching the forward table picked
+whichever row its length-sorted order reached first, which got the siemens (`mho`) and the calorie
+(`cal_th`) wrong; the reverse table decides once, at build time, by a rule that differs with the
+grammar because the competing rows differ with it:
+
+| Grammar | The rows competing for one unit | Rule |
+|---|---|---|
+| expression (`ucum`, `udunits`) | *spellings of one atom* — `S` and `mho`, `cal` and `cal_th`, `L` and `l` | **shortest wins**, ties alphabetically: the vocabulary's own abbreviation is the short one |
+| flat (`unece`, `qudt`, `qudt-qk`) | *different codes for one unit* — `JOU` and `J55`, `PAL` and `C55`, `TON_SHORT` and `TON` | **first declared wins**: the data file lists the canonical code first and its aliases after |
+
+Applying the expression rule to a flat vocabulary is what made this worth stating. Every Rec 20 code
+is two or three bytes, so "shortest, ties alphabetically" degenerates into "alphabetically first" and
+picked the filler code every time: a joule came out as `J55` (Rec 20's *watt second*), a pascal as
+`C55` (*newton per square metre*), a mole as `C34`, a tonne as `2U` (*megagram*), and QUDT's short ton
+as the bare, ambiguous `TON`. Each is worth the right number and none is the code a reader of that
+vocabulary expects to be handed.
+
+A row may also carry **`.reverse = false`**, which removes it from the running in either grammar. It
+is for the case no ordering can see: a code whose *value* is right and whose *meaning* is a different
+quantity. UCUM's `eq` is worth a mole and means an equivalent — and, being a byte shorter than `mol`,
+was the code every mole was written as. `[oz_ap]` is worth a troy ounce and says *apothecary* about a
+document that never did. Both stay legal to read. A unit whose every row is flagged is a build error:
+something this profile can read and cannot write is a hole, not a preference.
 
 Second, each row carries the atom's own decade, which is what lets a base whose UCUM atom is *itself*
 prefixed be written at all. `m[Hg]` is a metre of mercury — bovnar's `mmHg` times 10³ — so writing
@@ -696,7 +717,7 @@ invariant; the two counts move whenever the registry gains a unit, so `test_swee
 
 ### 6.1 Verified mappings
 
-The shipped table is `src/gendata/ucum.bvnr`: 142 mapped **atoms**, 32 arbitrary units, 51 known
+The shipped table is `src/gendata/ucum.bvnr`: 141 mapped **atoms**, 32 arbitrary units, 56 known
 but refused, and UCUM's 20 prefix spellings. What follows is a reading of it in terms of whole
 codes rather than atoms, which is how a producer meets it — `mg/dL` is three atoms and two prefixes,
 not a row.
@@ -1208,14 +1229,17 @@ and QUDT's Turtle vocabularies, resolves every code to a factor and a dimension 
 **reference library** — not a second Python implementation of the unit grammar — what the mapped
 native target is worth, and compares. `unece` is reached at one remove; see §9.5.
 
-The generator also emits the **reverse** table §5.3 uses, choosing the canonical atom for each base
-(shortest code, ties alphabetically) and recording that atom's own decade. Deriving it rather than
-searching the forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 625
-round trips quoted in §5.3 are the check that it agrees with the forward direction.
+The generator also emits the **reverse** table §5.3 uses, choosing the canonical code for each base
+by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
+`.reverse = false`, and recording that code's own decade. Deriving it rather than searching the
+forward table at run time is what makes `bvn_unit_to_ucum` deterministic; the 625 round trips quoted
+in §5.3 are the check that it agrees with the forward direction. It also refuses to generate a table
+in which some unit is readable and unwritable, which is what a `.reverse` flag on every row naming
+one unit would produce.
 
 ### 9.3 Tests
 
-`tests/bovnar_ucum_test.c` (CTest target `bvnr_ucum_test`, labels `unit;si;ucum`, **121
+`tests/bovnar_ucum_test.c` (CTest target `bvnr_ucum_test`, labels `unit;si;ucum`, **130
 assertions**) pins the behavioural claims of sections 2–10: the three outcomes with their exact
 error codes, equivalence with the native spelling, UCUM's non-latching `/`, annotation inertness,
 every worked fold case in §3.5 including the four refused decades, each collision in §6.2,
@@ -1226,11 +1250,11 @@ One test file per vocabulary, each pinning the section that specifies it:
 
 | Test | Target | Assertions | Specifies |
 |---|---|---|---|
-| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 121 | §2–§10 |
-| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 117 | §11 |
-| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 176 | §12 |
-| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 127 | §13 |
-| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 2847 | §14 |
+| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 130 | §2–§10 |
+| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 134 | §11 |
+| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 187 | §12 |
+| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 153 | §13 |
+| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 3551 | §14 |
 
 `tests/bovnar_unit_ext_test.c` pins the block boundary: the last native unit sits below
 `BVN_PROFILE_OPAQUE_FIRST`, and `BVN_VALUE_BASE_UNIT_COUNT` tracks the last opaque id.
@@ -1279,7 +1303,17 @@ disagreeing with the parser it feeds (§9.1).
 |---|---|---|
 | mismatch | the code exists upstream and means something else — a different dimension, or a factor outside tolerance | **yes** |
 | dead | the table accepts a spelling the publisher does not define; unreachable from a conforming producer | no (`--strict-dead`) |
-| unmapped-but-exact | the publisher defines a code that *is* a native unit and the table does not carry it | no — a coverage suggestion, and carrying a unit is editorial |
+| unmapped-but-exact | the publisher defines a code worth something this build already spells, and the table does not carry it | no — a coverage suggestion, and carrying a unit is editorial |
+
+**What the coverage suggestion is matched against decides what it can find.** It began as an index
+of the 180 native *symbols*, which meant a code could only ever be proposed when it was worth a bare
+unprefixed atom — and a flat vocabulary spells every prefixed and every compound unit as one whole
+token. `unece:A97` is the hectopascal, `KMQ` the kilogram per cubic metre, `MSK` the metre per
+square second, `qudt:RAD-PER-SEC` the radian per second: not one of them is a native symbol, so not
+one of them could be suggested, and they were exactly the codes a table is most likely to be missing
+while its neighbours carry them. The index now also holds every `.bovnar` target any of the five
+tables already uses — a target one table has written down is a spelling this build is known to
+accept — which is what turned that whole class from invisible into a printed list of 392.
 
 **The two systems are not the same system**, and the corrections are the substance of the UCUM
 comparison rather than a detail of it. UCUM's mass base is the gram, so a factor carries 10³ per
@@ -1410,9 +1444,51 @@ and the watt for *both* the volt-ampere and the var — because those pairs are 
 differ only in quantity kind (doc/07 §12). Every row was read against the publisher's own label
 before it was accepted.
 
+**A second pass closed the compound half of the same gap.** The first pass could only see codes
+worth a bare native symbol (§9.5), which is why it reported nine for `unece` and none at all of the
+kind a flat vocabulary is most likely to be missing. Once the index carried the tables' own targets,
+another 71 rows landed — `unece` from 201 to 252 and `qudt` from 244 to 263 — and they divide into
+two groups that are worth naming, because both are gaps a flat grammar creates and an expression
+grammar cannot have:
+
+| Group | Examples | Why the expression profiles never had the gap |
+|---|---|---|
+| a **prefixed** unit | `unece:A97` hPa, `KVT` kV, `4H` µm, `2Q` kBq, `qudt:KiloCAL_TH` | `ucum` and `udunits` reach every decade by emitting a prefix; a flat vocabulary needs a separate code per decade, and there were 25 missing |
+| a **compound** unit | `unece:MSK` m·s⁻², `KGS` kg·s⁻¹, `C65` Pa·s, `JE` J·K⁻¹, `qudt:M2-PER-SEC`, `RAD-PER-SEC` | `ucum:m/s2` is an expression; `unece:MSK` is one token that resembles no native spelling at all |
+
+Most of the compound group is the coherent SI unit of a kind `qudt-qk.bvnr` already maps, which is
+the sharpest form the desynchronisation took: the two QUDT namespaces disagreed about their own
+publisher, `qudt-qk:KinematicViscosity` translating to `m²/s` while `qudt:M2-PER-SEC` — a unit QUDT
+defines — was not a code this build would accept. §14's table now carries a row for each, so the
+agreement is pinned rather than asserted.
+
+Reading by label rather than by number mattered again, and in the same direction. The value alone
+proposed the **watt** for `KVA` and `MVA` and the **hertz** for all three becquerel codes; apparent
+power is not active power and an activity is not a frequency (doc/07 §9, §12).
+
+**It also found a row that was wrong rather than missing, and the shape of it is worth keeping.**
+Three vocabularies have a code for the reciprocal minute and a *different* code for the revolution
+per minute, and native `rpm` is neither: `rpm` counts revolutions where `rev` is an **angle** of 2π
+radians, so `rpm` and `rev/min` differ by 2π and are held apart by the angle quantity kind (doc/07
+§9). `unece:C94` and `qudt:PER-MIN` — both labelled *reciprocal minute* — were mapped onto `rpm`,
+which asserted a rotation the code does not make, while `unece:M46` and `udunits:rpm`, which do mean
+the revolution per minute, were not carried at all. `qudt:REV-PER-MIN` had been correct since it was
+written, and its own comment says why; the two reciprocal-minute codes were the mirror error beside
+it. All four now agree:
+
+| Concept | native | `unece` | `qudt` | `udunits` |
+|---|---|---|---|---|
+| reciprocal minute | `min^-1` | `C94` | `PER-MIN` | — |
+| revolution per minute | `rev/min` | `M46` | `REV-PER-MIN` | `rpm` |
+
+The precedent was already in the same file: `unece:C97`, the reciprocal second, maps to `s^-1` and
+not to the hertz, for exactly this reason. `min^-1` is what it looks like beside a unit that has a
+name.
+
 What remains unclosed is deliberate: ratios of two named units, logarithmic scales with no native
 form, and the British imperial series, whose members sit inside the tolerance of §9.5 and are
 refused by name instead.
+
 ---
 
 ## 10. Cost, risk, and what is left out
@@ -1423,12 +1499,12 @@ refused by name instead.
 |---|---|
 | Lexer | 15 state-table entries across three states (§2.3); brace/bracket-depth tracking in the type-parameter scanner (§2.4) |
 | Unit parser | `src/utils/bovnar_profiles.c` — namespace dispatch, the UCUM expression parser, the translator, the fold |
-| Registry | `src/gendata/ucum.bvnr` (142 mapped, 32 arbitrary, 51 refused), `gen_profiles.py` emitting seven tables; one appended `value_base_unit_t` run (397–428); `BVN_VALUE_BASE_UNIT_COUNT` 397 → 429 |
+| Registry | `src/gendata/ucum.bvnr` (141 mapped, 32 arbitrary, 56 refused), `gen_profiles.py` emitting seven tables; one appended `value_base_unit_t` run (397–428); `BVN_VALUE_BASE_UNIT_COUNT` 397 → 429 |
 | Compatibility | Two refusals, one each in `bvn_unit_to_si_factor` and `bvn_unit_dimension_vector` (§7.2) |
 | Serialisation | One guard at the head of each of the two formatters (§5.1) |
 | ABI | Two error codes; three new functions. **No struct changed** |
 | Bindings | Three `ctypes` declarations and three wrappers |
-| Tests | `tests/bovnar_ucum_test.c`, 121 assertions; two assertions widened in `bovnar_unit_ext_test.c`. The other four vocabularies add 3267 more (§9.3) |
+| Tests | `tests/bovnar_ucum_test.c`, 130 assertions; two assertions widened in `bovnar_unit_ext_test.c`. The other four vocabularies add 4025 more (§9.3) |
 
 The unit parser is the bulk of it. Everything else is small, and — this is what §1.1 buys — the
 DOM, the writer, the streaming reader, the policy engine and the CLI needed no work at all, because
@@ -1437,20 +1513,28 @@ are the entire footprint outside the new file.
 
 ### 10.2 What can go wrong
 
-**The tables rest on their authors, and there are five of them now.** §9.2's factor proof did not
-ship, so every mapping in §6.1 — and every row of `unece.bvnr`, `qudt.bvnr`, `qudt-qk.bvnr` and
-`udunits.bvnr` — is a claim this repository cannot check. The native side of each is verified (the
-target parses, and its SI factor is asserted) but nothing confirms that UCUM's `[Btu_IT]` really is
-1055.05585262 J, or that `KGM` is UNECE's kilogram. The mitigation in place is conservative rather
-than mechanical: a code whose value was uncertain went into `.unsupported` or was left out, so the
-failure mode is a refused code rather than a wrong number. That is the right default and it is not a
-substitute for the check.
+**The tables rest on their authors less than they did, and not nowhere.** §9.5's factor proof now
+does confirm that UCUM's `[Btu_IT]` is 1055.05585262 J against `ucum-essence.xml`, and it has found
+real errors — the US survey series, the IT calorie, the tropical year, a QUDT rotational speed 2π
+out. What it cannot reach is the part of a row that is not a number:
+
+- **What a code MEANS.** A factor comparison confirms that `unece:D13` is worth what native `Sv` is
+  worth. It cannot confirm that D13 is the *sievert* rather than the gray, which is the same value
+  and a different quantity. Every one of those calls was made by reading the publisher's label, by
+  hand, and a wrong reading survives every check in this repository.
+- **The seventh digit.** §9.5's tolerance is measured at `7.5e-7` and the British imperial series
+  sits at `7.9e-7`. A real disagreement below `6.8e-7` passes.
+- **`unece` at all, primarily.** Rec 20 has no machine-readable factor artefact, so that table rests
+  on QUDT's reading of it and on the 6 rows the cross-reference does not cover at all.
+
+The conservative default is what covers the rest: a code whose value was uncertain went into
+`.unsupported` or was left out, so the failure mode is a refused code rather than a wrong number.
 
 **Five tables multiply the exposure, and the cross-vocabulary suite does not divide it.** §14 proves
 the five agree with each other, which is a real property and catches a whole class of single-table
 error — it found the missing ampere on its first run. It cannot catch a *shared* error: five tables
-wrong in the same way agree perfectly. Verifying each table against its publisher remains the
-outstanding work, and it is now the largest single item of it.
+wrong in the same way agree perfectly. That is now the argument for §9.5 rather than a gap beside
+it, since the factor proof is the only check in the tree that looks outside the tree at all.
 
 **The tables rot.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data files do not, and nothing in
 the build notices.
@@ -1528,7 +1612,7 @@ Verbatim source preservation is next.
 
 > `unece:` — UN/ECE Recommendation 20, *Codes for Units of Measure Used in International Trade*, and
 > Recommendation 21, *Codes for Passengers, Types of Cargo, Packages and Packaging Materials*.
-> Data file `src/gendata/unece.bvnr`; pinned by `tests/bovnar_unece_test.c` (117 assertions).
+> Data file `src/gendata/unece.bvnr`; pinned by `tests/bovnar_unece_test.c` (134 assertions).
 
 ### 11.1 Why this vocabulary
 
@@ -1596,7 +1680,7 @@ one.
 
 > `qudt:` — QUDT unit local names. `qudt-qk:` — QUDT quantity kinds.
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
-> pinned by `tests/bovnar_qudt_test.c` (176 assertions).
+> pinned by `tests/bovnar_qudt_test.c` (187 assertions).
 
 ### 12.1 Why this vocabulary
 
@@ -1777,7 +1861,7 @@ cost them a silently wrong instant.
 
 ## 14. The cross-vocabulary conformance suite
 
-> `tests/bovnar_crossvocab_test.c` — 53 concepts, 5 vocabularies, 2847 assertions.
+> `tests/bovnar_crossvocab_test.c` — 64 concepts, 5 vocabularies, 3551 assertions.
 
 Every other profile test asks *does this vocabulary translate correctly?*. This one asks the
 question that only exists once there are five: **do they agree?**
@@ -1826,10 +1910,19 @@ of the seven SI base units had no UCUM spelling, and no single-vocabulary test h
 each was written against the table it was testing. Asking all five vocabularies for the same seven
 concepts found it immediately. That is the argument for the suite in one line.
 
-What it cannot tell you: it proves the five vocabularies agree **with each other**, not that they
-agree with their publishers. Nothing in this repository checks that `KGM` is UNECE's kilogram rather
-than something the table asserts it to be. **Five tables that are wrong in the same way agree
-perfectly.** §10.2 is where that gap is recorded as the standing risk it remains.
+**What it cannot find is a concept nobody wrote a row for**, and that is the limit worth stating,
+because it is the one this table keeps running into. A vocabulary left out of a row is
+indistinguishable here from a vocabulary that has no code — "UNECE has no code for the katal" reads
+exactly like
+"nobody added `unece:KAT`", and for the tesla, the sievert, the katal, the radian, the steradian and
+the newton metre it was the second. Each had been carried in `unece.bvnr` for a whole release and
+omitted from the row that would have checked it. §9.6's coverage index is what finds *that* class;
+this suite is what pins it once found. The two are not alternatives.
+
+What it also cannot tell you: it proves the five vocabularies agree **with each other**, not that
+they agree with their publishers — that is §9.5's job, and §9.5 reaches `unece` only at one remove
+and reaches `CEL`, `FAH`, `GRY`, `HEN`, `MOL` and `TNE` not at all. **Five tables that are wrong in
+the same way agree perfectly.** §10.2 is where what remains uncovered is recorded.
 
 ---
 

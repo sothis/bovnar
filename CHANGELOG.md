@@ -88,12 +88,56 @@ reading the grown by-value structs at the wrong size.
   was checked by confirming all seven generated tables came out byte-identical
   with only `ucum` registered.
 
-  A **cross-vocabulary suite** (53 concepts, 2847 assertions) checks every
+  A **cross-vocabulary suite** (64 concepts, 3551 assertions) checks every
   spelling of a concept against every other one, pairwise: equality, coherent-SI
   factor, dimension and round-trip, plus a negative table for the pairs that look
   interchangeable and are not. It found the ampere missing from the UCUM table on
   its first run — one of the seven SI base units had no UCUM spelling, and no
   single-vocabulary test had asked.
+
+  **The five tables were then synchronised against each other, and against what
+  each writes back.** Three faults, in falling order of how quietly they went
+  wrong:
+
+  *A flat profile wrote back the wrong code.* The reverse table picked the
+  shortest code and broke ties alphabetically, which is right for an expression
+  profile — its competing rows are spellings of one atom, and the vocabulary's
+  own abbreviation is the short one — and meaningless for a flat one, where
+  every Rec 20 code is two or three bytes and the rule collapses into
+  "alphabetically first". So a joule was emitted as `unece:J55` (Rec 20's *watt
+  second*), a pascal as `C55` (*newton per square metre*), a mole as `C34`, a
+  tonne as `2U` (*megagram*), and a short ton as QUDT's bare, ambiguous `TON`.
+  Each is worth the right number and none is the code a reader of that
+  vocabulary expects. A flat profile now writes the FIRST code its data file
+  lists, which is the canonical one; and a new `.reverse = false` covers what no
+  ordering can see — `ucum:eq` is a byte shorter than `mol` and means the
+  *equivalent*, so every mole was leaving the UCUM writer as a different
+  quantity. Nothing caught any of this, because every write-back assertion in
+  the tree was about a unit with only one code.
+
+  *Three vocabularies disagreed about the reciprocal minute.* `unece:C94` and
+  `qudt:PER-MIN` both mean *reciprocal minute* and were mapped onto native
+  `rpm`, which counts revolutions — a claim about rotation the code does not
+  make, and 2π from `rev/min`, which is what `unece:M46` and `udunits:rpm`
+  actually mean and what neither table carried. All four now agree, and the
+  precedent was already in the same file: `unece:C97` maps to `s^-1` and not to
+  the hertz.
+
+  *The coverage check could not see the gaps a flat grammar makes.* It matched a
+  publisher's code against the native registry's SYMBOLS, so it could only ever
+  propose a code worth a bare unprefixed atom — while a flat vocabulary spells
+  every prefixed and every compound unit as one whole token. It now also indexes
+  every target the five tables already use, which surfaced 392 more candidates
+  and closed 71: `unece` 201 → 252 and `qudt` 244 → 263, most of them the
+  coherent SI unit of a kind `qudt-qk` already mapped, so that the two QUDT
+  namespaces had been disagreeing about their own publisher. Reading by label
+  rather than by number mattered as before — the value alone proposed the *watt*
+  for `KVA` and the *hertz* for the becquerel codes.
+
+  The suite gained rows for all of it, including the six concepts (`tesla`,
+  `sievert`, `katal`, `radian`, `steradian`, `newton metre`) whose UNECE code
+  had been in the table for a release while the row that would have checked it
+  left the vocabulary out.
 
   Two things are deliberately not carried. UDUNITS **reference time**
   (`days since 1970-01-01`) is refused as `error_unit_profile_unsupported`: a

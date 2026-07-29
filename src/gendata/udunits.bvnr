@@ -241,9 +241,13 @@
   { .code = "dr";                  .bovnar = "dr";   .metric = false; },
   { .code = "dram";                .bovnar = "dr";   .metric = false; },
   { .code = "grain";               .bovnar = "gr";   .metric = false; },
+  # The apothecary spellings are accepted and never emitted, the same call
+  # ucum.bvnr makes for "[oz_ap]": all three are worth one troy ounce, and only
+  # "troy_ounce" says so. Without the flag "apounce" wins on length and every
+  # troy ounce leaves this writer calling itself apothecary.
   { .code = "troy_ounce";          .bovnar = "oz_t"; .metric = false; },
-  { .code = "apothecary_ounce";    .bovnar = "oz_t"; .metric = false; },
-  { .code = "apounce";             .bovnar = "oz_t"; .metric = false; },
+  { .code = "apothecary_ounce";    .bovnar = "oz_t"; .metric = false; .reverse = false; },
+  { .code = "apounce";             .bovnar = "oz_t"; .metric = false; .reverse = false; },
   { .code = "pennyweight";         .bovnar = "dwt";  .metric = false; },
   { .code = "scruple";             .bovnar = "sc";   .metric = false; },
   { .code = "carat";               .bovnar = "ct";   .metric = false; },
@@ -348,6 +352,11 @@
   { .code = "turn";                .bovnar = "rev";     .metric = false; },
   { .code = "cycle";               .bovnar = "rev";     .metric = false; },
   { .code = "circle";              .bovnar = "rev";     .metric = false; },
+  # UDUNITS defines rpm as "rotation/minute", i.e. an ANGULAR velocity, which is
+  # rev/min here and not native rpm -- rpm counts revolutions and comes out 2π
+  # too small against it. Same reading as qudt:REV-PER-MIN and unece:M46, and
+  # the reason all three now land on one target.
+  { .code = "rpm";                 .bovnar = "rev/min"; .metric = false; },
   { .code = "denier";              .bovnar = "den";     .metric = false; },
   { .code = "tex";                 .bovnar = "tex";     .metric = false; },
 

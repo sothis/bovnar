@@ -415,10 +415,35 @@ def gen_reverse_table(p, units, pfx, iec):
     whichever row the length-sorted parse table happened to reach first, so
     siemens came out as "mho" rather than "S" and the calorie as "cal_th".
 
-    Two rules make the choice deterministic and the result the code a reader
-    expects. Among the codes naming one base, the SHORTEST wins, ties broken
-    alphabetically -- which is "S" over "mho", "cal" over "cal_th", "mo" over
-    "mo_j", "a" over "a_j", "L" over "l".
+    WHICH CODE WINS DEPENDS ON WHAT THE COMPETING ROWS ARE, and the two grammars
+    are not alike here.
+
+    An EXPR profile's competitors are SPELLINGS OF ONE ATOM -- "S" and "mho",
+    "cal" and "cal_th", "mo" and "mo_j", "L" and "l" -- and the vocabulary's own
+    abbreviation is the short one, so the SHORTEST wins, ties broken
+    alphabetically.
+
+    A FLAT profile's competitors are DIFFERENT CODES for one unit, and there
+    "shortest" carries no information: every Rec 20 code is two or three bytes,
+    so the rule collapses into "alphabetically first" and picks the filler code
+    over the mnemonic one. It wrote a joule back as "J55" (Rec 20's WATT SECOND)
+    rather than "JOU", a pascal as "C55" (newton per square metre) rather than
+    "PAL", a mole as "C34" rather than "MOL", and a short ton as QUDT's bare
+    "TON" rather than "TON_SHORT" -- every one of them a code that means the
+    right thing and is not the code a reader of that vocabulary expects. So a
+    flat profile takes the FIRST row that names the slot: the data files list the
+    canonical code first and its aliases after it ("the same unit", "second
+    code"), which is an editorial decision already recorded there rather than one
+    this function has to reconstruct from the spelling.
+
+    `.reverse = false` on a row overrides both rules by removing it from the
+    running altogether. It is for the case neither ordering can see: a code whose
+    VALUE is right and whose MEANING is a different quantity, so that writing a
+    unit back as it would change what the document says. UCUM's "eq" is worth a
+    mole and means an equivalent; its "[oz_ap]" is worth a troy ounce and means
+    the apothecary one. Both are correct to accept and wrong to emit. A slot
+    whose every row is flagged is a build error -- a unit this profile can read
+    and cannot write is a hole, not a preference.
 
     The decade is what lets a base whose code is itself prefixed be written at
     all. UCUM's "m[Hg]" is a METRE of mercury, i.e. bovnar's mmHg times 10^3, so
@@ -438,16 +463,27 @@ def gen_reverse_table(p, units, pfx, iec):
     """
     flat = (p.grammar == "flat")
     best = {}
-    for m in p.list("mapped"):
+    seen = set()
+    for order_index, m in enumerate(p.list("mapped")):
         d = decompose_target(m["bovnar"], units, pfx, iec if flat else None)
         if d is None:
             continue
         name, decade, iecp = d
         code = m["code"]
-        key = (byte_len(code), code)
         slot = (name, decade, iecp) if flat else name
+        seen.add(slot)
+        if not m.get("reverse", True):
+            continue
+        # Flat: declaration order, so the first eligible row keeps the slot.
+        # Expr: shortest, then alphabetical.
+        key = (order_index,) if flat else (byte_len(code), code)
         if slot not in best or key < best[slot][0]:
             best[slot] = (key, code, decade, bool(m.get("metric", False)), iecp)
+    silenced = sorted(str(s) for s in seen - set(best))
+    if silenced:
+        die(p, "every row naming these units carries `.reverse = false`, so "
+               "each is a unit this profile can read and cannot write:\n  %s"
+               % "\n  ".join(silenced))
     out = [BANNER % p.data]
     order = sorted(best, key=lambda k: (k[0], k[1], k[2] or "")
                    if flat else (k, 0, ""))

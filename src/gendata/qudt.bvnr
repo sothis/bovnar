@@ -331,8 +331,10 @@
   { .code = "R_man";      .bovnar = "rem";    },
   # RAD_R is the RAD, the absorbed dose -- 0.01 Gy, not 0.01 Sv. The two are
   # numerically equal and semantically not, which is the whole of doc/07 §12.
-  { .code = "RAD_R";      .bovnar = "c~Gy";   },
+  # CentiGRAY leads because a flat profile writes back the FIRST code naming a
+  # unit: a centigray that never said "rad" should not acquire the word here.
   { .code = "CentiGRAY";  .bovnar = "c~Gy";   },
+  { .code = "RAD_R";      .bovnar = "c~Gy";   },
 
   # Photometry. PHOT and STILB are equal in value and different in kind -- an
   # illuminance against a luminance -- so a value-only match cannot tell them
@@ -357,7 +359,44 @@
   # Angle and rotation
   { .code = "GON";        .bovnar = "grad";   },
   { .code = "REV";        .bovnar = "rev";    },
-  { .code = "PER-MIN";    .bovnar = "rpm";    },   # reciprocal minute
+  # PER-MIN is the RECIPROCAL MINUTE, so its target is the compound min^-1 and
+  # NOT native rpm. The two are worth the same 1/60 s⁻¹ and are not the same
+  # quantity: rpm counts revolutions, which is a claim about rotation that
+  # "reciprocal minute" does not make -- the mirror image of the REV-PER-MIN
+  # note above, and the same rule that keeps C97/PER-SEC off the hertz.
+  { .code = "PER-MIN";    .bovnar = "min^-1"; },
+  { .code = "PER-SEC";    .bovnar = "s^-1";   },   # unece spells this C97
+
+  # ── Second synchronisation pass: prefixed and compound targets ────────────
+  # The counterpart of the block at the end of unece.bvnr, and found the same
+  # way. Every row below is a QUDT unit whose value is one this build already
+  # spells and which this table did not carry -- most of them the coherent SI
+  # unit of a kind qudt-qk.bvnr maps, which made the two QUDT namespaces
+  # disagree about what their own publisher defines.
+  { .code = "M2-PER-SEC";        .bovnar = "m^2/s";   },
+  { .code = "M3-PER-SEC";        .bovnar = "m^3/s";   },
+  { .code = "KiloGM-PER-SEC";    .bovnar = "k~g/s";   },
+  { .code = "KiloGM-M-PER-SEC";  .bovnar = "k~g·m/s"; },
+  { .code = "PA-SEC";            .bovnar = "Pa·s";    },
+  { .code = "J-PER-K";           .bovnar = "J/K";     },
+  { .code = "J-PER-KiloGM-K";    .bovnar = "J·k~g^-1·K^-1"; },
+  { .code = "W-PER-M-K";         .bovnar = "W·m^-1·K^-1";   },
+  { .code = "MOL-PER-M3";        .bovnar = "mol/m^3"; },
+  { .code = "RAD-PER-SEC";       .bovnar = "rad/s";   },
+  # PER-M leads DIOPTER for the same reason, and with the same non-consequence,
+  # as unece:C92 leading Q25.
+  { .code = "PER-M";             .bovnar = "m^-1";    },
+  { .code = "DIOPTER";           .bovnar = "m^-1";    },
+  { .code = "PER-CentiM";        .bovnar = "c~m^-1";  },
+  { .code = "ARE";               .bovnar = "c~ha";    },
+  { .code = "POND";              .bovnar = "g·gn";    },
+  { .code = "KiloCAL_TH";        .bovnar = "k~cal";   },
+  { .code = "DRAM_UK";           .bovnar = "dr";      },   # avoirdupois dram
+  # Parts per thousand. ucum:[ppth] and native ‰ both had it; PPM and PPB were
+  # here and the one between them was not. NOT reached through unece:NX, which
+  # QUDT attaches to its PPT (10⁻¹²) as well -- a cross-reference that names two
+  # units nine decades apart cannot settle anything.
+  { .code = "PPTH";              .bovnar = "‰";       },
 ];
 
 # QUDT's units all map onto native ones or are refused; nothing here is

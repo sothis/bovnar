@@ -59,10 +59,34 @@ def shallow_clone():
         return False
 
 
+def dirty(relpath):
+    """True when `relpath` has changes git has not recorded yet."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", ROOT, "status", "--porcelain", "--", relpath],
+            capture_output=True, text=True, check=True)
+        return bool(out.stdout.strip())
+    except Exception:
+        return False
+
+
 def git_date(relpath, first=False):
     """Last- (or, first=True, first-) commit date YYYY-MM-DD of a repo file;
     falls back to the file mtime, then today. Meaningless in a shallow clone --
-    see shallow_clone(), which main() checks before any of this runs."""
+    see shallow_clone(), which main() checks before any of this runs.
+
+    AN EDITED DOC IS DATED TODAY, and that is what makes generate-then-commit
+    self-consistent. The last-commit date of a doc you are in the middle of
+    editing is the date of the version you just replaced, so a page generated
+    from it carries a modified_time that goes stale the moment you commit --
+    and --check then fails on CI, where the tree is clean and the doc's last
+    commit is the one you just made. It went unnoticed for as long as it did
+    only because every doc edit here had landed on the same calendar day as the
+    previous one, which makes the wrong date and the right one the same string.
+    Answering "today" for a dirty file makes the page agree with the commit that
+    is about to contain it."""
+    if not first and dirty(relpath):
+        return datetime.date.today().isoformat()
     args = ["git", "-C", ROOT, "log", "--format=%cs", "--", relpath]
     if first:
         args = ["git", "-C", ROOT, "log", "--diff-filter=A", "--follow",

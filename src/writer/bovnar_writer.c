@@ -1250,14 +1250,17 @@ static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt,
 	int64_t secs;
 	if (!bvn_parse_int64(numbuf, d->value_type, &secs))
 		return false;
-	const char* ep = bvnr_datetime_epoch_name(d->value_type);
 	/* Only the epochs whose ISO literal the reader accepts may be re-emitted as a
 	 * literal. The atomic GNSS epochs reject literals at read time, so they never
 	 * carry a reader-captured fraction; one supplied via the writer API falls back
-	 * to the integer carrier rather than producing a literal the reader rejects. */
-	if (ep == NULL ||
-	    strcmp(ep, "gps") == 0 || strcmp(ep, "galileo") == 0 ||
-	    strcmp(ep, "glonass") == 0 || strcmp(ep, "beidou") == 0)
+	 * to the integer carrier rather than producing a literal the reader rejects.
+	 *
+	 * Selected on the epoch's IDENTITY: bvnr_datetime_epoch_mjd returns the
+	 * bvn_epoch_t, and those are distinct across the table. The name is a display
+	 * string and was never the right key for this. */
+	const int32_t epoch = bvnr_datetime_epoch_mjd(d->value_type);
+	if (epoch == bvn_epoch_gps     || epoch == bvn_epoch_galileo ||
+	    epoch == bvn_epoch_glonass || epoch == bvn_epoch_beidou)
 		return false;
 	/* Zero-init so the validity guard is deterministic even when a converter
 	 * leaves *dt untouched: bvn_dt_tai_seconds_to_utc() does so on the tai
@@ -1265,11 +1268,10 @@ static bool bvn_ser_datetime_to_civil(const bvnr_data_t* d, bvn_datetime_t* dt,
 	 * dt->date untouched when the MJD is outside the gregorian range. The fields
 	 * then stay zero (month 0) and the guard below rejects them. */
 	memset(dt, 0, sizeof *dt);
-	if (strcmp(ep, "tai") == 0)
+	if (epoch == bvn_epoch_tai)
 		bvn_dt_tai_seconds_to_utc(dt, secs);
 	else
-		bvn_dt_epoch_seconds_to_datetime(dt,
-			(bvn_epoch_t)bvnr_datetime_epoch_mjd(d->value_type), secs);
+		bvn_dt_epoch_seconds_to_datetime(dt, (bvn_epoch_t)epoch, secs);
 	/* A well-formed civil time the reader can round-trip has month 1..12, a valid
 	 * day, and a 4-digit year; reject anything else (including the untouched-zero
 	 * case above) and emit the plain integer carrier instead.

@@ -213,18 +213,30 @@ static bool print_datetime_iso_literal(const bvn_dom_node_t *node)
 	int64_t secs = 0;
 	if (!bvn_dom_get_i64(node, &secs))
 		return false;
-	const char *ep = bvnr_datetime_epoch_name(vt);
-	if (ep == NULL ||
-	    strcmp(ep, "gps") == 0 || strcmp(ep, "galileo") == 0 ||
-	    strcmp(ep, "glonass") == 0 || strcmp(ep, "beidou") == 0)
+	/*
+	 * Select on the epoch's IDENTITY, not on its spelling. bvnr_datetime_epoch_mjd
+	 * returns the bvn_epoch_t -- the epoch's Modified Julian Day -- and those are
+	 * distinct across the table, so comparing them answers the same question the
+	 * old chain of strcmp(ep, "gps")... did, without depending on a name that is
+	 * really a display string.
+	 *
+	 * It also drops a -Wanalyzer-deref-before-check that was a false positive
+	 * with a real point behind it: GCC models strcmp's nonnull attribute as a
+	 * NULL CHECK, so two adjacent strcmp(ep, ...) read as "dereferenced at the
+	 * first, checked at the second" however the guard above is written. The code
+	 * was correct -- `ep == NULL ||` short-circuits -- but the only way to write
+	 * it that satisfies the analyzer is not to ask a string this question.
+	 */
+	const int32_t epoch = bvnr_datetime_epoch_mjd(vt);
+	if (epoch == bvn_epoch_gps     || epoch == bvn_epoch_galileo ||
+	    epoch == bvn_epoch_glonass || epoch == bvn_epoch_beidou)
 		return false;
 	bvn_datetime_t dt;
 	memset(&dt, 0, sizeof dt);
-	if (strcmp(ep, "tai") == 0)
+	if (epoch == bvn_epoch_tai)
 		bvn_dt_tai_seconds_to_utc(&dt, secs);
 	else
-		bvn_dt_epoch_seconds_to_datetime(&dt,
-			(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt), secs);
+		bvn_dt_epoch_seconds_to_datetime(&dt, (bvn_epoch_t)epoch, secs);
 	/* Returning false here makes the caller print the bare integer carrier, which
 	 * has nowhere to put the fraction — so the digits the spec promises will
 	 * round-trip would silently disappear. The writer refuses this case outright;

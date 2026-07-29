@@ -1099,18 +1099,20 @@ static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
 	 * "2017-01-01T00:59:60+01:00" would silently become the following second
 	 * instead of the insertion it names. */
 	dt.minute -= offset_seconds / 60;
-	const char* ep = bvnr_datetime_epoch_name(vt);   /* vt.base = epoch index */
+	/* The bvn_epoch_t IS the epoch's MJD, and they are distinct across the table,
+	 * so it identifies the epoch on its own -- the name is a display string and
+	 * selecting on it made this the third copy of the same chain of strcmp. */
+	const int32_t epoch = bvnr_datetime_epoch_mjd(vt);   /* vt.base = epoch index */
 	int64_t secs;
-	if (strcmp(ep, "tai") == 0) {
+	if (epoch == bvn_epoch_tai) {
 		secs = bvn_dt_utc_to_tai_seconds(&dt);
-	} else if (strcmp(ep, "gps") == 0 || strcmp(ep, "galileo") == 0 ||
-	           strcmp(ep, "glonass") == 0 || strcmp(ep, "beidou") == 0) {
+	} else if (epoch == bvn_epoch_gps     || epoch == bvn_epoch_galileo ||
+	           epoch == bvn_epoch_glonass || epoch == bvn_epoch_beidou) {
 		*err = error_datetime_literal_unsupported_epoch;
 		return false;
 	} else {
 		/* civil epoch; the bvn_epoch_t enum value is the epoch's MJD. */
-		secs = bvn_dt_datetime_to_epoch_seconds(&dt,
-			(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt));
+		secs = bvn_dt_datetime_to_epoch_seconds(&dt, (bvn_epoch_t)epoch);
 	}
 	if (secs == BVN_GDATE_OVF) {
 		*err = error_value_out_of_range;
@@ -1137,11 +1139,11 @@ static bool bvn_iso_to_epoch_seconds(const uint8_t* s, uint32_t n,
 		bvn_datetime_t back;
 		memset(&back, 0, sizeof back);   /* the converters leave *dt untouched
 						  * on an out-of-range/overflow input */
-		if (strcmp(ep, "tai") == 0)
+		if (epoch == bvn_epoch_tai)
 			bvn_dt_tai_seconds_to_utc(&back, secs);
 		else
 			bvn_dt_epoch_seconds_to_datetime(&back,
-				(bvn_epoch_t)bvnr_datetime_epoch_mjd(vt), secs);
+				(bvn_epoch_t)epoch, secs);
 		if (back.date.month < 1 || back.date.month > 12 ||
 		    back.date.day   < 1 || back.date.day   > 31 ||
 		    back.date.year  < 0 || back.date.year  > 9999) {

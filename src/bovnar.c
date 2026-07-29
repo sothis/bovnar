@@ -1201,7 +1201,26 @@ static int cmd_query(const char *path, const char *filename,
 	bvn_dom_doc_destroy(doc);
 	return 0;
 }
-static int cmd_pretty(const char *filename)
+/*
+ * `canonical` turns on BVN_UNIT_REDUCE for the whole document: every compound
+ * unit folds to its reduced form (m·m -> m2, and every prefix out), and the
+ * writer rescales each value to match, exactly. That is the difference between
+ * a pretty-printer and a canonicaliser -- two documents that MEAN the same
+ * thing come out as the same bytes, which is what a signature, a content hash
+ * or a semantic diff needs and what re-spelling alone does not give.
+ *
+ * Everything this needs was already plumbed: bvnr_write_flags_t.unit_flags
+ * reaches the serializer, and the serializer applies it on both the annotation
+ * and the inline-unit paths. Nothing set it, so the capability existed and was
+ * unreachable from the outside.
+ *
+ * It can FAIL where pretty-print cannot, and that is deliberate: folding a
+ * prefix multiplies the value, and where the result has no exact representation
+ * in the value's own base (1/100 in base 16) the writer refuses with
+ * error_value_out_of_range rather than rounding. A canonical form that quietly
+ * rounds is worse than none.
+ */
+static int cmd_pretty(const char *filename, bool canonical)
 {
 	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
@@ -1239,6 +1258,8 @@ static int cmd_pretty(const char *filename)
 	bvnr_sink_t sink;
 	bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 	bvnr_write_flags_t wflags = {0};
+	if (canonical)
+		wflags.unit_flags = BVN_UNIT_REDUCE;
 	if (!bvnr_open_write_sink(w, &sink, true, &wflags)) {
 		bvnr_writer_destroy(w); free(buf); return 1;
 	}
@@ -3339,7 +3360,9 @@ static void usage(const char *prog)
 		"                  Takes the same unit-policy options as events, so a\n"
 		"                  query can assert what it expects and ask for the unit\n"
 		"                  it wants back: --field .a.b=m --require-unit ...\n"
-		"  pretty-print  Pretty-print a .bvnr file\n"
+		"  pretty-print  Pretty-print a .bvnr file (--canonical: also reduce\n"
+		"                every unit to canonical form, rescaling values to match,\n"
+		"                so semantically equal documents produce equal bytes)\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
 		"                  Override with --from <fmt> --to <fmt> if needed\n"
 		"                  Supported: json -> bvnr,  bvnr -> json\n"
@@ -3396,6 +3419,7 @@ static void usage(const char *prog)
 		"  %s validate config.bvnr\n"
 		"  %s query .system.host config.bvnr\n"
 		"  %s pretty-print data.bvnr\n"
+		"  %s pretty-print --canonical data.bvnr\n"
 		"  %s convert data.json\n"
 		"  %s convert data.bvnr\n"
 		"  %s events data.bvnr\n"
@@ -3407,7 +3431,7 @@ static void usage(const char *prog)
 		"  %s bench --profile scalars --size 4096\n"
 		"  %s bench --profile all --size 1024,65536 --iterations 200 --json\n",
 		prog, prog, prog, prog, prog, prog, prog, prog,
-		prog, prog, prog, prog, prog, prog);
+		prog, prog, prog, prog, prog, prog, prog);
 }
 int main(int argc, char **argv)
 {
@@ -3456,10 +3480,26 @@ int main(int argc, char **argv)
 			return cmd_query(argv[argi], argv[argi + 1], &up);
 		}
 	} else if (strcmp(cmd, "pretty-print") == 0) {
-		if (argc < 3) { fprintf(stderr, "Usage: %s pretty-print <file>\n", argv[0]); return 1; }
-		if (argc > 3) { fprintf(stderr, "pretty-print: takes exactly one file, got %d\n",
-					argc - 2); return 2; }
-		return cmd_pretty(argv[2]);
+		bool canonical = false;
+		const char *pp_file = NULL;
+		for (int i = 2; i < argc; i++) {
+			if (strcmp(argv[i], "--canonical") == 0) {
+				canonical = true;
+			} else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+				fprintf(stderr, "pretty-print: unknown option %s\n", argv[i]);
+				return 2;
+			} else if (pp_file) {
+				fprintf(stderr, "pretty-print: takes exactly one file\n");
+				return 2;
+			} else {
+				pp_file = argv[i];
+			}
+		}
+		if (!pp_file) {
+			fprintf(stderr, "Usage: %s pretty-print [--canonical] <file>\n", argv[0]);
+			return 1;
+		}
+		return cmd_pretty(pp_file, canonical);
 	} else if (strcmp(cmd, "convert") == 0) {
 		const char *from = NULL, *to = NULL, *file = NULL;
 		for (int i = 2; i < argc; i++) {

@@ -1225,11 +1225,11 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 152)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 153)   # 129 base + i18n_de + wrapper_sync
                                     # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
                                     #         + amalgam_smoke + convert_fail_dim_array
-                                    #         + ietf_draft
+                                    #         + ietf_draft + canonical_converges
                                     #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links + release_links
@@ -1511,6 +1511,26 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_re
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
     set_tests_properties(bvnr_doc_refs PROPERTIES LABELS "docs" TIMEOUT 60)
 endif()
+
+# ── canonical document form ──────────────────────────────────────────────────
+# `pretty-print --canonical` claims something pretty-printing does not: that two
+# documents which MEAN the same thing produce the same bytes. That is what a
+# signature, a content hash or a semantic diff needs, and it is testable in
+# exactly one way -- feed it two spellings of one document and compare.
+#
+# Idempotence is checked in the same run, because a "canonical" form that moves
+# on a second pass is just one more spelling and would break any consumer storing
+# a hash of it.
+add_test(
+    NAME    bvnr_cli_canonical_converges
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DFILE_A=${CMAKE_CURRENT_SOURCE_DIR}/tests/canonical_prefixed.bvnr
+            -DFILE_B=${CMAKE_CURRENT_SOURCE_DIR}/tests/canonical_reduced.bvnr
+            -DTMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/canonical
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/canonical_converges.cmake)
+set_tests_properties(bvnr_cli_canonical_converges PROPERTIES
+    LABELS "cli;canonical;units" TIMEOUT 30)
 
 # ── the IETF draft against the header ────────────────────────────────────────
 # doc/ietf/draft-sonntag-bovnar-00 is a SECOND, independent statement of the

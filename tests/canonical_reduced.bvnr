@@ -1,0 +1,6 @@
+# The same document as canonical_prefixed.bvnr, already written in reduced
+# units. Canonicalising either must produce identical output.
+.dist  = <float:64,m> 5000.0;
+.area  = <float:64,m²> 2.0;
+.speed = <float:64,m/h> 90000.0;
+.mass  = <float_dec:64,g> 250.0;

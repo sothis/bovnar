@@ -1184,6 +1184,39 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 						    bvn_effective_q(d->value_type)))
 				goto done;
 		}
+		/*
+		 * Keep a float looking like a float. bvn_rational_to_str renders 5000/1
+		 * as "5000", so "<float:64,k~m> 5.0" reduced to metres came out as
+		 * "<float:64,m> 5000" while a document that already said metres kept its
+		 * "5000.0". Both re-read to the same double, so nothing was WRONG -- but
+		 * two documents that mean the same thing produced different bytes, which
+		 * is precisely what a canonical form exists to prevent, and the only
+		 * reason to reduce units document-wide at all.
+		 *
+		 * Base 10 only: a base-16 float literal marks its exponent with p/P and
+		 * a bare integer mantissa is already its canonical spelling there.
+		 */
+		if ((d->value_type.family == vt_float ||
+		     d->value_type.family == vt_float_dec ||
+		     d->value_type.family == vt_float_fix) &&
+		    base == 10u && !bvn_is_special_number_string(out)) {
+			bool has_marker = false;
+			for (int32_t i = 0; i < l; i++)
+				if (out[i] == '.' || out[i] == 'e' || out[i] == 'E') {
+					has_marker = true;
+					break;
+				}
+			if (!has_marker) {
+				if ((size_t)l + 3u > need) {
+					char *wider = realloc(out, (size_t)l + 3u);
+					if (!wider) goto done;
+					out = wider;
+				}
+				out[l++] = '.';
+				out[l++] = '0';
+				out[l]   = '\0';
+			}
+		}
 		*text = out;
 		*len  = l;
 		out   = NULL;

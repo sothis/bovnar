@@ -1,0 +1,12 @@
+# Paired with canonical_reduced.bvnr: the same quantities spelled with prefixes
+# and with a repeated base. `bovnar pretty-print --canonical` must fold both to
+# byte-identical output -- that convergence is the whole claim of the mode.
+#
+# NOTE the float_dec value. Its trailing zeros are SIGNIFICANT in that family,
+# so 0.250 and 0.25 are not interchangeable and the canonical form deliberately
+# does not collapse them. Both files therefore write 0.25: the mode canonicalises
+# how a unit is SPELLED, not how much precision a decimal claims.
+.dist  = <float:64,k~m> 5.0;
+.area  = <float:64,m·m> 2.0;
+.speed = <float:64,k~m/h> 90.0;
+.mass  = <float_dec:64,k~g> 0.25;

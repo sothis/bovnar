@@ -560,7 +560,7 @@ Two rules make this tractable, and both are worth knowing before writing a profi
 
 Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
 checked: `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` all compare equal.
-The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 53 concepts, and pins the
+The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 64 concepts, and pins the
 rows above as pairs that must **not** compare equal.
 
 ---

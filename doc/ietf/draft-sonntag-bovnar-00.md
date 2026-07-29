@@ -1182,7 +1182,7 @@ caret form:
 | Caret | `m^2`, `m^-3`, `m^+2` | One digit 1-9 only; `^0` is not an exponent |
 {: title="Unit exponent forms"}
 
-A compound unit MUST NOT exceed **8 components**; more is
+A compound unit MUST NOT exceed **32 components**; more is
 `error_unit_illegal`. An empty component between separators (`m//s`,
 `m*·s`), an empty group, and unbalanced parentheses are likewise
 `error_unit_illegal`.

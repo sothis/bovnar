@@ -1072,7 +1072,7 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 | Constraint | Value | Error on violation |
 |------------|-------|--------------------|
-| Maximum components per compound unit | 8 (`BVNR_MAX_UNIT_COMPONENTS`) | `error_unit_illegal` |
+| Maximum components per compound unit | 32 (`BVNR_MAX_UNIT_COMPONENTS`) | `error_unit_illegal` |
 | Empty component between separators (e.g. `m//s`) | Not allowed | `error_unit_illegal` |
 | Maximum raw unit string length | Enforced by type-buffer limit | `error_unit_too_long` |
 | Null or empty unit string | Rejected by `bvn_parse_unit` | `ok = false` |
@@ -1719,7 +1719,7 @@ typedef struct value_unit_prefix_s {
 #### `value_unit_t`
 
 ```c
-#define BVNR_MAX_UNIT_COMPONENTS  8
+#define BVNR_MAX_UNIT_COMPONENTS  32
 
 typedef struct value_unit_s {
     uint32_t               num_components;

@@ -1225,10 +1225,11 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 151)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 152)   # 129 base + i18n_de + wrapper_sync
                                     # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
                                     #         + amalgam_smoke + convert_fail_dim_array
+                                    #         + ietf_draft
                                     #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links + release_links
@@ -1509,6 +1510,29 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_re
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
     set_tests_properties(bvnr_doc_refs PROPERTIES LABELS "docs" TIMEOUT 60)
+endif()
+
+# ── the IETF draft against the header ────────────────────────────────────────
+# doc/ietf/draft-sonntag-bovnar-00 is a SECOND, independent statement of the
+# format, rendered into four committed artifacts, and nothing compared it to
+# anything: bvnr_doc_refs checks that citations resolve and that the spec's error
+# table matches the header, bvnr_doc_layout checks structure, and neither looks
+# at the draft or at any numeric CLAIM.
+#
+# So it drifted, and doc/05 with it: both said a compound unit may not exceed
+# "8 components" long after BVNR_MAX_UNIT_COMPONENTS became 32, while doc/03 said
+# 32. Someone implementing from the draft would have rejected documents the
+# reference implementation accepts -- an interoperability defect in the one
+# document whose whole purpose is interoperability.
+#
+# The renderings are checked too, not just the .md they are generated from:
+# kramdown-rfc and xml2rfc are not run here or in CI, so a fix applied to the
+# source alone would leave three committed files stating the old value.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_ietf_draft.py)
+    add_test(NAME bvnr_ietf_draft
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_ietf_draft.py)
+    set_tests_properties(bvnr_ietf_draft PROPERTIES LABELS "docs;ietf" TIMEOUT 60)
 endif()
 
 # ── the profile tables against the publications they transliterate ───────────

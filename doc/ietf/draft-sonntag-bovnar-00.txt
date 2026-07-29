@@ -1499,7 +1499,7 @@ Internet-Draft              The Bovnar Format                  July 2026
 
                         Table 8: Unit exponent forms
 
-   A compound unit MUST NOT exceed *8 components*; more is
+   A compound unit MUST NOT exceed *32 components*; more is
    error_unit_illegal.  An empty component between separators (m//s,
    m*·s), an empty group, and unbalanced parentheses are likewise
    error_unit_illegal.

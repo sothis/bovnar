@@ -1241,7 +1241,7 @@ caret form:</t>
       <c>One digit 1-9 only; <spanx style="verb">^0</spanx> is not an exponent</c>
 </texttable>
 
-<t>A compound unit <bcp14>MUST NOT</bcp14> exceed <strong>8 components</strong>; more is
+<t>A compound unit <bcp14>MUST NOT</bcp14> exceed <strong>32 components</strong>; more is
 <spanx style="verb">error_unit_illegal</spanx>. An empty component between separators (<spanx style="verb">m//s</spanx>,
 <spanx style="verb">m*·s</spanx>), an empty group, and unbalanced parentheses are likewise
 <spanx style="verb">error_unit_illegal</spanx>.</t>

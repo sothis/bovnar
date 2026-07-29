@@ -1646,6 +1646,212 @@ bool bvn_validate_type_value_compat(bvnr_reader_t* r,
  *    type/value/range checks, then emit the verified data event.
  * Every path ends by emitting the value (or its rewrite) through bvn_emit_both.
  */
+/*
+ * The token_is_type arm of bvn_val_receive, split out so that IT carries the big
+ * stack frame and the hot path does not.
+ *
+ * The buffers here are unavoidable -- a unit parameter is up to 255 bytes and
+ * bvn_parse_type_annotation writes into a caller buffer -- but they were being
+ * paid for by every OTHER token as well: the compiler allocates one frame at
+ * function entry, so bvn_val_receive opened with "sub $0xcf8,%rsp" (3320 bytes)
+ * plus a stack-protector canary on all 7.5 million calls the array benchmark
+ * makes, of which zero are type annotations. Bare array elements are the case
+ * this hurts most, because they are the case with the most tokens per byte.
+ *
+ * noinline is the point of the split and not a hint: without it the compiler is
+ * free to fold the frame straight back into the caller.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#elif defined(_MSC_VER)
+__declspec(noinline)
+#endif
+static bool bvn_val_receive_type(bvnr_reader_t* r,
+                                 const bvnr_raw_token_t* raw)
+{
+	bvnr_validator_t* v = &r->val;
+	bool type_ok = true, unit_ok = true, unit_too_long = false;
+	value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	uint8_t unit_buf[UINT8_MAX + 1];
+	uint8_t ulen = 0;
+	bvnr_data_t d = {0};
+	d.type       = token_is_type;
+	d.value_type = BVN_TYPE_PLAIN;
+	d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	d.data       = raw->type_data;
+	d.length     = raw->type_len;
+	if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
+		return false;
+	uint32_t tcache_hit_idx = (uint32_t)-1;
+	for (uint32_t i = 0; i < v->tcache_count; i++) {
+		const bvn_type_cache_slot_t* sl = &v->tcache[i];
+		if (sl->key_len == raw->type_len &&
+		    memcmp(sl->key, raw->type_data, raw->type_len) == 0) {
+			tcache_hit_idx = i;
+			break;
+		}
+	}
+	if (tcache_hit_idx != (uint32_t)-1) {
+		const bvn_type_cache_slot_t* sl =
+			&v->tcache[tcache_hit_idx];
+		v->value_type = sl->vtype;
+		parsed_unit   = sl->unit;
+		ulen          = sl->ubuf_len;
+		if (ulen)
+			memcpy(unit_buf, sl->ubuf, ulen);
+		type_ok       = sl->type_ok;
+		unit_ok       = sl->unit_ok;
+		unit_too_long = sl->unit_too_long;
+	} else {
+		v->value_type = bvn_parse_type_annotation(
+			raw->type_data, raw->type_len,
+			&type_ok, &unit_ok, &unit_too_long, &parsed_unit,
+			unit_buf, &ulen);
+		if (raw->type_len <= BVN_TYPE_CACHE_KEY_CAP &&
+		    ulen <= BVN_TYPE_CACHE_UBUF_CAP) {
+			uint32_t idx;
+			if (v->tcache_count < BVN_TYPE_CACHE_SLOTS) {
+				idx = v->tcache_count;
+				v->tcache_count = (uint8_t)(idx + 1u);
+			} else {
+				idx = v->tcache_next;
+				v->tcache_next = (uint8_t)((idx + 1u)
+					% BVN_TYPE_CACHE_SLOTS);
+			}
+			bvn_type_cache_slot_t* sl = &v->tcache[idx];
+			sl->key_len       = (uint16_t)raw->type_len;
+			memcpy(sl->key, raw->type_data, raw->type_len);
+			sl->vtype         = v->value_type;
+			sl->unit          = parsed_unit;
+			sl->ubuf_len      = ulen;
+			if (ulen)
+				memcpy(sl->ubuf, unit_buf, ulen);
+			sl->type_ok       = type_ok;
+			sl->unit_ok       = unit_ok;
+			sl->unit_too_long = unit_too_long;
+		}
+	}
+	if (!type_ok) {
+		v->last_error = error_illegal_value_type;
+		return false;
+	}
+	/* The datetime family is spec 1.1; in a 1.0/unversioned document it is
+	 * not a recognised type (error_illegal_value_type), preserving the
+	 * unversioned==1.0 contract. */
+	if (v->value_type.family == vt_datetime &&
+	    !bvn_lex_supports_1_1(&r->lex)) {
+		v->last_error = error_illegal_value_type;
+		return false;
+	}
+	/*
+	 * Prime the default-annotation suppression state so a following
+	 * bare array element of the same effective type is suppressed
+	 * identically to a synthesised-default run — without this the
+	 * canonical serialiser is not idempotent on heterogeneous arrays.
+	 */
+	v->inferred_default_vtype = v->value_type;
+	v->parsed_unit   = parsed_unit;
+	/*
+	 * Bump the serial only for a genuinely dimensioned unit. "No unit" has
+	 * two encodings here: bvn_parse_type_annotation yields BVN_UNIT_NONE
+	 * (num_components == 0) for an absent/no_unit annotation, while
+	 * BVN_UNIT_IS_NO_UNIT matches the single-component bu_none shape. Test
+	 * both so a unitless annotation never spuriously advances the serial.
+	 */
+	if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit))
+		v->parsed_unit_serial++;
+	v->unit_data_len = ulen;
+	if (ulen > 0)
+		v->has_annotation_unit = true;
+	d.value_type = v->value_type;
+	d.value_unit = v->parsed_unit;
+	if (!bvn_emit_verified(r, ev_type_annotation_start, &d))
+		return false;
+	if (!bvn_emit_both(r, ev_type_annotation_type_family, &d))
+		return false;
+	if (v->value_type.width != 0) {
+		d.type   = token_is_type_width;
+		d.data   = NULL;
+		d.length = 0;
+		if (!bvn_emit_both(r,
+				ev_type_annotation_type_family_parameter,
+				&d))
+			return false;
+	}
+	if (v->value_type.family == vt_datetime) {
+		/* base holds the epoch index; emit it as a named parameter
+		 * (e.g. "tai") rather than a numeric base. Index 0 (unix) is the
+		 * default and is left implicit so <datetime> round-trips. */
+		if (v->value_type.base != 0) {
+			const char* ep =
+				bvnr_datetime_epoch_name(v->value_type);
+			d.type   = token_is_unit;
+			d.data   = ep;
+			d.length = (uint32_t)strlen(ep);
+			if (!bvn_emit_both(r,
+					ev_type_annotation_type_family_parameter,
+					&d))
+				return false;
+		}
+	} else if (v->value_type.base != 0) {
+		d.type = (v->value_type.family == vt_float_fix)
+			? token_is_type_q
+			: token_is_type_base;
+		d.data   = NULL;
+		d.length = 0;
+		if (!bvn_emit_both(r,
+				ev_type_annotation_type_family_parameter,
+				&d))
+			return false;
+	}
+	if (ulen > 0) {
+		/*
+		 * spec 1.2 — the unit PROFILE notation ("ucum:<code>") is gated on
+		 * the declared version, exactly as the datetime family and the
+		 * \x/\u escapes are gated on 1.1. Without this a document
+		 * declaring 1.0 or 1.1 would carry a unit that every conforming
+		 * reader of that version must reject, which is the interoperability
+		 * hazard the version directive exists to prevent.
+		 *
+		 * The error is error_unit_illegal, not one of the profile codes: in
+		 * a pre-1.2 document "ucum:mm[Hg]" is simply not a unit, the same
+		 * way <datetime> in a 1.0 document is simply not a value type. A
+		 * document with no directive declares nothing and gets neither
+		 * surface.
+		 */
+		if (v->value_type.family != vt_utf8 &&
+			bvni_unit_has_profile((const char*)unit_buf, ulen) &&
+			!bvn_lex_supports_1_2(&r->lex)) {
+			v->last_error = error_unit_illegal;
+			return false;
+		}
+		if (v->value_type.family != vt_utf8 && !unit_ok) {
+			/* spec 1.2 — a profile unit distinguishes "that is not a unit"
+			 * from "valid UCUM this build cannot carry" and from "no such
+			 * profile"; bvn_unit_error_code re-parses to tell them apart, on
+			 * the error path only. A natively spelled unit still yields
+			 * error_unit_illegal, unchanged. */
+			v->last_error = unit_too_long
+							? error_unit_too_long
+							: bvn_unit_error_code(unit_buf, ulen);
+			return false;
+		}
+		d.type   = token_is_unit;
+		d.data   = unit_buf;
+		d.length = ulen;
+		if (!bvn_emit_both(r,
+				ev_type_annotation_type_family_parameter,
+				&d))
+			return false;
+	}
+	d.type   = token_is_type;
+	d.data   = raw->type_data;
+	d.length = raw->type_len;
+	if (!bvn_emit_both(r, ev_type_annotation_end, &d))
+		return false;
+	return true;
+}
+
 bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 {
 	bvnr_validator_t* v = &r->val;
@@ -1655,188 +1861,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	 * there being rules at all, so a reader without them pays one test. */
 	if (tt == token_is_identifier && v->policy.num_rules)
 		bvn_path_set_key(&v->path, raw->str_data, raw->str_len);
-	if (tt == token_is_type) {
-		bool type_ok = true, unit_ok = true, unit_too_long = false;
-		value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
-		uint8_t unit_buf[UINT8_MAX + 1];
-		uint8_t ulen = 0;
-		bvnr_data_t d = {0};
-		d.type       = token_is_type;
-		d.value_type = BVN_TYPE_PLAIN;
-		d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
-		d.data       = raw->type_data;
-		d.length     = raw->type_len;
-		if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
-			return false;
-		uint32_t tcache_hit_idx = (uint32_t)-1;
-		for (uint32_t i = 0; i < v->tcache_count; i++) {
-			const bvn_type_cache_slot_t* sl = &v->tcache[i];
-			if (sl->key_len == raw->type_len &&
-			    memcmp(sl->key, raw->type_data, raw->type_len) == 0) {
-				tcache_hit_idx = i;
-				break;
-			}
-		}
-		if (tcache_hit_idx != (uint32_t)-1) {
-			const bvn_type_cache_slot_t* sl =
-				&v->tcache[tcache_hit_idx];
-			v->value_type = sl->vtype;
-			parsed_unit   = sl->unit;
-			ulen          = sl->ubuf_len;
-			if (ulen)
-				memcpy(unit_buf, sl->ubuf, ulen);
-			type_ok       = sl->type_ok;
-			unit_ok       = sl->unit_ok;
-			unit_too_long = sl->unit_too_long;
-		} else {
-			v->value_type = bvn_parse_type_annotation(
-				raw->type_data, raw->type_len,
-				&type_ok, &unit_ok, &unit_too_long, &parsed_unit,
-				unit_buf, &ulen);
-			if (raw->type_len <= BVN_TYPE_CACHE_KEY_CAP &&
-			    ulen <= BVN_TYPE_CACHE_UBUF_CAP) {
-				uint32_t idx;
-				if (v->tcache_count < BVN_TYPE_CACHE_SLOTS) {
-					idx = v->tcache_count;
-					v->tcache_count = (uint8_t)(idx + 1u);
-				} else {
-					idx = v->tcache_next;
-					v->tcache_next = (uint8_t)((idx + 1u)
-						% BVN_TYPE_CACHE_SLOTS);
-				}
-				bvn_type_cache_slot_t* sl = &v->tcache[idx];
-				sl->key_len       = (uint16_t)raw->type_len;
-				memcpy(sl->key, raw->type_data, raw->type_len);
-				sl->vtype         = v->value_type;
-				sl->unit          = parsed_unit;
-				sl->ubuf_len      = ulen;
-				if (ulen)
-					memcpy(sl->ubuf, unit_buf, ulen);
-				sl->type_ok       = type_ok;
-				sl->unit_ok       = unit_ok;
-				sl->unit_too_long = unit_too_long;
-			}
-		}
-		if (!type_ok) {
-			v->last_error = error_illegal_value_type;
-			return false;
-		}
-		/* The datetime family is spec 1.1; in a 1.0/unversioned document it is
-		 * not a recognised type (error_illegal_value_type), preserving the
-		 * unversioned==1.0 contract. */
-		if (v->value_type.family == vt_datetime &&
-		    !bvn_lex_supports_1_1(&r->lex)) {
-			v->last_error = error_illegal_value_type;
-			return false;
-		}
-		/*
-		 * Prime the default-annotation suppression state so a following
-		 * bare array element of the same effective type is suppressed
-		 * identically to a synthesised-default run — without this the
-		 * canonical serialiser is not idempotent on heterogeneous arrays.
-		 */
-		v->inferred_default_vtype = v->value_type;
-		v->parsed_unit   = parsed_unit;
-		/*
-		 * Bump the serial only for a genuinely dimensioned unit. "No unit" has
-		 * two encodings here: bvn_parse_type_annotation yields BVN_UNIT_NONE
-		 * (num_components == 0) for an absent/no_unit annotation, while
-		 * BVN_UNIT_IS_NO_UNIT matches the single-component bu_none shape. Test
-		 * both so a unitless annotation never spuriously advances the serial.
-		 */
-		if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit))
-			v->parsed_unit_serial++;
-		v->unit_data_len = ulen;
-		if (ulen > 0)
-			v->has_annotation_unit = true;
-		d.value_type = v->value_type;
-		d.value_unit = v->parsed_unit;
-		if (!bvn_emit_verified(r, ev_type_annotation_start, &d))
-			return false;
-		if (!bvn_emit_both(r, ev_type_annotation_type_family, &d))
-			return false;
-		if (v->value_type.width != 0) {
-			d.type   = token_is_type_width;
-			d.data   = NULL;
-			d.length = 0;
-			if (!bvn_emit_both(r,
-					ev_type_annotation_type_family_parameter,
-					&d))
-				return false;
-		}
-		if (v->value_type.family == vt_datetime) {
-			/* base holds the epoch index; emit it as a named parameter
-			 * (e.g. "tai") rather than a numeric base. Index 0 (unix) is the
-			 * default and is left implicit so <datetime> round-trips. */
-			if (v->value_type.base != 0) {
-				const char* ep =
-					bvnr_datetime_epoch_name(v->value_type);
-				d.type   = token_is_unit;
-				d.data   = ep;
-				d.length = (uint32_t)strlen(ep);
-				if (!bvn_emit_both(r,
-						ev_type_annotation_type_family_parameter,
-						&d))
-					return false;
-			}
-		} else if (v->value_type.base != 0) {
-			d.type = (v->value_type.family == vt_float_fix)
-				? token_is_type_q
-				: token_is_type_base;
-			d.data   = NULL;
-			d.length = 0;
-			if (!bvn_emit_both(r,
-					ev_type_annotation_type_family_parameter,
-					&d))
-				return false;
-		}
-		if (ulen > 0) {
-			/*
-			 * spec 1.2 — the unit PROFILE notation ("ucum:<code>") is gated on
-			 * the declared version, exactly as the datetime family and the
-			 * \x/\u escapes are gated on 1.1. Without this a document
-			 * declaring 1.0 or 1.1 would carry a unit that every conforming
-			 * reader of that version must reject, which is the interoperability
-			 * hazard the version directive exists to prevent.
-			 *
-			 * The error is error_unit_illegal, not one of the profile codes: in
-			 * a pre-1.2 document "ucum:mm[Hg]" is simply not a unit, the same
-			 * way <datetime> in a 1.0 document is simply not a value type. A
-			 * document with no directive declares nothing and gets neither
-			 * surface.
-			 */
-			if (v->value_type.family != vt_utf8 &&
-				bvni_unit_has_profile((const char*)unit_buf, ulen) &&
-				!bvn_lex_supports_1_2(&r->lex)) {
-				v->last_error = error_unit_illegal;
-				return false;
-			}
-			if (v->value_type.family != vt_utf8 && !unit_ok) {
-				/* spec 1.2 — a profile unit distinguishes "that is not a unit"
-				 * from "valid UCUM this build cannot carry" and from "no such
-				 * profile"; bvn_unit_error_code re-parses to tell them apart, on
-				 * the error path only. A natively spelled unit still yields
-				 * error_unit_illegal, unchanged. */
-				v->last_error = unit_too_long
-								? error_unit_too_long
-								: bvn_unit_error_code(unit_buf, ulen);
-				return false;
-			}
-			d.type   = token_is_unit;
-			d.data   = unit_buf;
-			d.length = ulen;
-			if (!bvn_emit_both(r,
-					ev_type_annotation_type_family_parameter,
-					&d))
-				return false;
-		}
-		d.type   = token_is_type;
-		d.data   = raw->type_data;
-		d.length = raw->type_len;
-		if (!bvn_emit_both(r, ev_type_annotation_end, &d))
-			return false;
-		return true;
-	}
+	if (tt == token_is_type)
+		return bvn_val_receive_type(r, raw);
 	if (tt == token_is_symbol) {
 		const uint8_t* s = raw->str_data;
 		uint32_t       n = raw->str_len;

@@ -2013,7 +2013,14 @@ static void test_dom_and_reader_agree(void)
 static void test_every_unit_through_a_parse(void)
 {
 	uint32_t units = 0, converted = 0, left = 0, mismatches = 0;
-	char ubuf[BVNR_UNIT_STRING_MAX], doc[512], want[256], wunit[128];
+	/* doc is sized FROM ubuf rather than picked round: it holds
+	 * ".v = <float:64,<unit>> 1.0;\n", so anything smaller than
+	 * BVNR_UNIT_STRING_MAX plus that fixed text can truncate. It used to be 512,
+	 * which was provably enough while BVNR_UNIT_STRING_MAX was 192 and became a
+	 * -Wformat-truncation the moment that constant was raised to 1024. Deriving
+	 * the size means the next raise cannot reintroduce it. */
+	char ubuf[BVNR_UNIT_STRING_MAX], doc[BVNR_UNIT_STRING_MAX + 32];
+	char want[256], wunit[128];
 
 	for (int bu = 1; bu < 397; bu++) {
 		value_unit_t u;
@@ -2100,7 +2107,14 @@ static void test_every_unit_through_a_parse(void)
 static void test_every_unit_through_the_other_tiers(void)
 {
 	uint32_t units = 0, bad = 0;
-	char ubuf[BVNR_UNIT_STRING_MAX], doc[512], wbuf[256];
+	/* doc is sized FROM ubuf rather than picked round: it holds
+	 * ".v = <float:64,<unit>> 1.0;\n", so anything smaller than
+	 * BVNR_UNIT_STRING_MAX plus that fixed text can truncate. It used to be 512,
+	 * which was provably enough while BVNR_UNIT_STRING_MAX was 192 and became a
+	 * -Wformat-truncation the moment that constant was raised to 1024. Deriving
+	 * the size means the next raise cannot reintroduce it. */
+	char ubuf[BVNR_UNIT_STRING_MAX], doc[BVNR_UNIT_STRING_MAX + 32];
+	char wbuf[256];
 
 	for (int bu = 1; bu < 397; bu++) {
 		value_unit_t u;

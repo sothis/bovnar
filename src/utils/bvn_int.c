@@ -163,10 +163,28 @@ bvn_int_t *bvn_int_alloc(void)
 	if (n) n->heap = true;
 	return n;
 }
+/*
+ * Release a bvn_int_alloc() result. That is the WHOLE domain of this function,
+ * as the header says, and the `if (n->heap)` that used to guard the limb free
+ * did not widen it -- it only made the guard look like protection it was not.
+ * A non-heap bvn_int_t is a BVN_INT_LOCAL: `limbs` is a caller-provided buffer
+ * and `n` is usually a stack object, so the unconditional free(n) underneath was
+ * already undefined for exactly the input the guard pretended to handle. Half a
+ * check is worse than none, because it invites the call it cannot survive.
+ *
+ * Dropping it also settles a -Wanalyzer-malloc-leak. bvn_int_alloc sets heap on
+ * every object that reaches here, but the analyzer loses that fact across the
+ * nested carry loops in bvn_int_mul, explores the impossible heap==false branch,
+ * and correctly observes that free(n) there leaks n->limbs. With no branch there
+ * is no impossible path to explore, and the code says what it always meant.
+ *
+ * `heap` still earns its place in bigint_ensure_cap, which is the question it
+ * actually answers: may this object's storage grow?
+ */
 void bvn_int_free(bvn_int_t *n)
 {
 	if (!n) return;
-	if (n->heap) free(n->limbs);
+	free(n->limbs);
 	free(n);
 }
 bool bvn_int_is_zero(const bvn_int_t *n)

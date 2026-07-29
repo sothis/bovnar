@@ -267,6 +267,16 @@
   { .code = "US_liquid_quart";     .bovnar = "qt";       .metric = false; },
   { .code = "pint";                .bovnar = "pt";       .metric = false; },
   { .code = "US_liquid_pint";      .bovnar = "pt";       .metric = false; },
+  # "pt" is UDUNITS' SYMBOL for the pint, and leaving it out did not make it an
+  # error -- it made it a PICOTONNE. With no atom row the expression parser fell
+  # back on the prefixed reading, p + t, so "udunits:pt" parsed clean and
+  # returned 1e-9 kg for a document that said 473 mL: a mass where a volume was
+  # written, no warning, wrong by nine orders of magnitude and a wrong dimension.
+  #
+  # This is the one thing an incomplete atom table can cost that an error message
+  # cannot, and it is why closing the table matters beyond tidiness. A whole atom
+  # outranks a prefixed reading (doc/11 §3.2), so the row is the entire fix.
+  { .code = "pt";                  .bovnar = "pt";       .metric = false; .reverse = false; },
   { .code = "cup";                 .bovnar = "cup";      .metric = false; },
   { .code = "US_liquid_cup";       .bovnar = "cup";      .metric = false; },
   { .code = "gill";                .bovnar = "gi";       .metric = false; },
@@ -385,10 +395,12 @@
   { .code = "rem";        .bovnar = "rem";   .metric = false; },
 
   # ── Mass of an atom ──────────────────────────────────────────────────────
-  # "unified_atomic_mass_unit" is UDUNITS' fourth spelling and is NOT here: at
-  # 24 bytes it pushes this profile's worst-case emitted string past
-  # BVNR_UNIT_STRING_MAX, which gen_profiles.py refuses to generate. The three
-  # shorter spellings reach the same unit.
+  # "unified_atomic_mass_unit" is UDUNITS' fourth spelling and now maps too, in
+  # the completion block below. It could not when this block was written: at 24
+  # bytes it pushed this profile's worst-case emitted string past
+  # BVNR_UNIT_STRING_MAX, which gen_profiles.py refuses to generate. Closing the
+  # table admitted a longer code still -- "astronomical_unit_BIPM_2006", 27
+  # bytes -- and the constant went from 1024 to 1088 to take it.
   { .code = "u";                  .bovnar = "Da"; .metric = false; },
   { .code = "amu";                .bovnar = "Da"; .metric = false; },
   { .code = "atomic_mass_unit";   .bovnar = "Da"; .metric = false; },
@@ -412,6 +424,175 @@
   { .code = "byte";      .bovnar = "B";   .metric = true;  },
   { .code = "baud";      .bovnar = "Bd";  .metric = true;  },
   { .code = "Bd";        .bovnar = "Bd";  .metric = true;  },
+
+  # ── Closing the table against the UDUNITS-2 database ─────────────────────
+  #
+  # Every spelling below is one UDUNITS defines and this table did not name, so
+  # it came back as error_unit_illegal -- "that is not a UDUNITS unit" -- about
+  # units UDUNITS does define. Most are ALIASES of a unit already mapped here:
+  # UDUNITS treats "kelvin", "degrees_kelvin", "degK" and "deg_K" as spellings
+  # of one unit, and a table that takes the first and rejects the last is
+  # refusing CF's commonest spelling of a unit it already carries.
+  #
+  # .reverse = false throughout. These rows exist so a producer's string is
+  # READ; none of them should change what bovnar WRITES, and leaving the
+  # reverse table untouched keeps §5.3's round-trip sweep where it is.
+  #
+  # .metric is inherited from the sibling that was already mapped, and is false
+  # for a unit that had no sibling: refusing a prefixed spelling costs an error
+  # message, accepting one nothing checked costs a wrong number.
+  { .code = "Ω";                       .bovnar = "Ω";             .metric = true;  .reverse = false; },  # alias of ohm
+  { .code = "Ω";                       .bovnar = "Ω";             .metric = true;  .reverse = false; },  # alias of ohm
+  { .code = "°C";                      .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of degree_Celsius
+  { .code = "°";                       .bovnar = "°";             .metric = false; .reverse = false; },  # alias of degree
+  { .code = "arc_degree";              .bovnar = "°";             .metric = false; .reverse = false; },  # alias of degree
+  { .code = "angular_degree";          .bovnar = "°";             .metric = false; .reverse = false; },  # alias of degree
+  { .code = "'";                       .bovnar = "arcmin";        .metric = false; .reverse = false; },  # alias of arcminute
+  { .code = "′";                       .bovnar = "arcmin";        .metric = false; .reverse = false; },  # alias of arcminute
+  { .code = "arc_minute";              .bovnar = "arcmin";        .metric = false; .reverse = false; },  # alias of arcminute
+  { .code = "angular_minute";          .bovnar = "arcmin";        .metric = false; .reverse = false; },  # alias of arcminute
+  { .code = "\"";                       .bovnar = "arcsec";        .metric = false; .reverse = false; },  # alias of arcsecond
+  { .code = "″";                       .bovnar = "arcsec";        .metric = false; .reverse = false; },  # alias of arcsecond
+  { .code = "arc_second";              .bovnar = "arcsec";        .metric = false; .reverse = false; },  # alias of arcsecond
+  { .code = "angular_second";          .bovnar = "arcsec";        .metric = false; .reverse = false; },  # alias of arcsecond
+  { .code = "unified_atomic_mass_unit"; .bovnar = "Da";            .metric = false; .reverse = false; },  # alias of u
+  { .code = "atomicmassunit";          .bovnar = "Da";            .metric = false; .reverse = false; },  # alias of u
+  { .code = "astronomical_unit_BIPM_2006"; .bovnar = "au";            .metric = false; .reverse = false; },  # alias of ua
+  { .code = "knot_international";      .bovnar = "kn";            .metric = false; .reverse = false; },  # alias of international_knot
+  { .code = "Å";                       .bovnar = "Å";             .metric = false; .reverse = false; },  # alias of Å
+  { .code = "ångström";                .bovnar = "Å";             .metric = false; .reverse = false; },  # alias of Å
+  { .code = "a";                       .bovnar = "c~ha";          .metric = false; .reverse = false; },  # alias of are
+  { .code = "Ci";                      .bovnar = "Ci";            .metric = false; .reverse = false; },  # alias of curie
+  { .code = "°K";                      .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degree_kelvin";           .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degrees_kelvin";          .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degree_K";                .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degrees_K";               .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degreeK";                 .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degreesK";                .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "deg_K";                   .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degs_K";                  .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degK";                    .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "degsK";                   .bovnar = "K";             .metric = false; .reverse = false; },
+  { .code = "candle";                  .bovnar = "cd";            .metric = false; .reverse = false; },
+  { .code = "bps";                     .bovnar = "Bd";            .metric = true;  .reverse = false; },  # alias of Bd
+  { .code = "℃";                       .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "degree_C";                .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "degrees_C";               .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "degreeC";                 .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "degreesC";                .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "deg_C";                   .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "degs_C";                  .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "degsC";                   .bovnar = "°C";            .metric = false; .reverse = false; },  # alias of celsius
+  { .code = "kts";                     .bovnar = "kn";            .metric = false; .reverse = false; },  # alias of kt
+  { .code = "ppmv";                    .bovnar = "ppm";           .metric = false; .reverse = false; },  # alias of ppm
+  { .code = "ppbv";                    .bovnar = "ppb";           .metric = false; .reverse = false; },  # alias of ppb
+  { .code = "B";                       .bovnar = "da~dB";         .metric = false; .reverse = false; },
+  { .code = "gr";                      .bovnar = "gr";            .metric = false; .reverse = false; },  # alias of grain
+  { .code = "short_hundredweight";     .bovnar = "h~lb";          .metric = false; .reverse = false; },
+  { .code = "fermi";                   .bovnar = "f~m";           .metric = false; .reverse = false; },
+  { .code = "micron";                  .bovnar = "µ~m";           .metric = false; .reverse = false; },
+  { .code = "US_survey_feet";          .bovnar = "ftUS";          .metric = false; .reverse = false; },  # alias of US_survey_foot
+  { .code = "international_feet";      .bovnar = "ft";            .metric = false; .reverse = false; },  # alias of ft
+  { .code = "Canadian_liquid_gallon";  .bovnar = "gal_uk";        .metric = false; .reverse = false; },
+  { .code = "cc";                      .bovnar = "c~m^3";         .metric = false; .reverse = false; },
+  { .code = "stere";                   .bovnar = "m^3";           .metric = false; .reverse = false; },
+  { .code = "liquid_gallon";           .bovnar = "gal";           .metric = false; .reverse = false; },  # alias of US_liquid_gallon
+  { .code = "liquid_quart";            .bovnar = "qt";            .metric = false; .reverse = false; },  # alias of US_liquid_quart
+  { .code = "liquid_pint";             .bovnar = "pt";            .metric = false; .reverse = false; },  # alias of US_liquid_pint
+  { .code = "liquid_cup";              .bovnar = "cup";           .metric = false; .reverse = false; },  # alias of US_liquid_cup
+  { .code = "liquid_gill";             .bovnar = "gi";            .metric = false; .reverse = false; },  # alias of US_liquid_gill
+  { .code = "liquid_ounce";            .bovnar = "fl_oz";         .metric = false; .reverse = false; },  # alias of oz
+  { .code = "Tbl";                     .bovnar = "tbsp";          .metric = false; .reverse = false; },  # alias of tbsp
+  { .code = "Tbsp";                    .bovnar = "tbsp";          .metric = false; .reverse = false; },  # alias of tbsp
+  { .code = "Tblsp";                   .bovnar = "tbsp";          .metric = false; .reverse = false; },  # alias of tbsp
+  { .code = "tblsp";                   .bovnar = "tbsp";          .metric = false; .reverse = false; },  # alias of tbsp
+  { .code = "UK_liquid_cup";           .bovnar = "da~fl_oz_uk";   .metric = false; .reverse = false; },
+  { .code = "jiffy";                   .bovnar = "c~s";           .metric = false; .reverse = false; },
+  { .code = "sverdrup";                .bovnar = "h~m^3/s";       .metric = false; .reverse = false; },
+  { .code = "force";                   .bovnar = "gn";            .metric = false; .reverse = false; },
+  { .code = "pond";                    .bovnar = "g·gn";          .metric = false; .reverse = false; },
+  { .code = "kilograms_force";         .bovnar = "kgf";           .metric = false; .reverse = false; },  # alias of kgf
+  { .code = "ozf";                     .bovnar = "oz·gn";         .metric = false; .reverse = false; },
+  { .code = "force_ounce";             .bovnar = "oz·gn";         .metric = false; .reverse = false; },
+  { .code = "ounce_force";             .bovnar = "oz·gn";         .metric = false; .reverse = false; },
+  { .code = "ounces_force";            .bovnar = "oz·gn";         .metric = false; .reverse = false; },
+  { .code = "pounds_force";            .bovnar = "lbf";           .metric = false; .reverse = false; },  # alias of lbf
+  { .code = "poundal";                 .bovnar = "lb·ft/s^2";     .metric = false; .reverse = false; },
+  { .code = "gf";                      .bovnar = "g·gn";          .metric = false; .reverse = false; },
+  { .code = "gram_force";              .bovnar = "g·gn";          .metric = false; .reverse = false; },
+  { .code = "grams_force";             .bovnar = "g·gn";          .metric = false; .reverse = false; },
+  { .code = "force_gram";              .bovnar = "g·gn";          .metric = false; .reverse = false; },
+  { .code = "force_ton";               .bovnar = "tn_sh·gn";      .metric = false; .reverse = false; },
+  { .code = "ton_force";               .bovnar = "tn_sh·gn";      .metric = false; .reverse = false; },
+  { .code = "tons_force";              .bovnar = "tn_sh·gn";      .metric = false; .reverse = false; },
+  { .code = "cm_Hg";                   .bovnar = "da~mmHg";       .metric = false; .reverse = false; },
+  { .code = "cmHg";                    .bovnar = "da~mmHg";       .metric = false; .reverse = false; },
+  { .code = "millimeter_Hg_0C";        .bovnar = "mmHg";          .metric = false; .reverse = false; },
+  { .code = "millimeters_Hg_0C";       .bovnar = "mmHg";          .metric = false; .reverse = false; },
+  { .code = "inch_Hg_32F";             .bovnar = "inHg";          .metric = false; .reverse = false; },
+  { .code = "inches_Hg_32F";           .bovnar = "inHg";          .metric = false; .reverse = false; },
+  { .code = "mm_hg";                   .bovnar = "mmHg";          .metric = false; .reverse = false; },  # alias of mm_Hg
+  { .code = "mmhg";                    .bovnar = "mmHg";          .metric = false; .reverse = false; },  # alias of mm_Hg
+  { .code = "millimeter_Hg";           .bovnar = "mmHg";          .metric = false; .reverse = false; },  # alias of mm_Hg
+  { .code = "millimeters_Hg";          .bovnar = "mmHg";          .metric = false; .reverse = false; },  # alias of mm_Hg
+  { .code = "inches_Hg";               .bovnar = "inHg";          .metric = false; .reverse = false; },  # alias of in_Hg
+  { .code = "ksi";                     .bovnar = "kip/in^2";      .metric = false; .reverse = false; },
+  { .code = "barie";                   .bovnar = "d~N/m^2";       .metric = false; .reverse = false; },
+  { .code = "barye";                   .bovnar = "d~N/m^2";       .metric = false; .reverse = false; },
+  { .code = "St";                      .bovnar = "St";            .metric = false; .reverse = false; },  # alias of stokes
+  { .code = "rhe";                     .bovnar = "P^-1";          .metric = false; .reverse = false; },
+  { .code = "IT_Btus";                 .bovnar = "Btu";           .metric = false; .reverse = false; },  # alias of IT_Btu
+  { .code = "Btus";                    .bovnar = "Btu";           .metric = false; .reverse = false; },  # alias of IT_Btu
+  { .code = "TNT";                     .bovnar = "M~cal/k~g";     .metric = false; .reverse = false; },
+  { .code = "ton_TNT";                 .bovnar = "G~cal";         .metric = false; .reverse = false; },
+  { .code = "tons_TNT";                .bovnar = "G~cal";         .metric = false; .reverse = false; },
+  { .code = "thm";                     .bovnar = "thm";           .metric = false; .reverse = false; },  # alias of US_therm
+  { .code = "watthour";                .bovnar = "W·h";           .metric = false; .reverse = false; },
+  { .code = "bev";                     .bovnar = "G~eV";          .metric = false; .reverse = false; },
+  { .code = "hp";                      .bovnar = "hp";            .metric = false; .reverse = false; },  # alias of shaft_horsepower
+  { .code = "UK_horsepower";           .bovnar = "hp";            .metric = false; .reverse = false; },
+  { .code = "gilbert";                 .bovnar = "Oe·c~m";        .metric = false; .reverse = false; },
+  { .code = "biot";                    .bovnar = "da~A";          .metric = false; .reverse = false; },
+  { .code = "abfarad";                 .bovnar = "G~F";           .metric = false; .reverse = false; },
+  { .code = "abhenry";                 .bovnar = "n~H";           .metric = false; .reverse = false; },
+  { .code = "abmho";                   .bovnar = "G~S";           .metric = false; .reverse = false; },
+  { .code = "abohm";                   .bovnar = "n~Ω";           .metric = false; .reverse = false; },
+  { .code = "gamma";                   .bovnar = "n~T";           .metric = false; .reverse = false; },
+  { .code = "Oe";                      .bovnar = "Oe";            .metric = false; .reverse = false; },  # alias of oersted
+  { .code = "°R";                      .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degree_rankine";          .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degrees_rankine";         .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degreeR";                 .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degreesR";                .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degree_R";                .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degrees_R";               .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degsR";                   .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "deg_R";                   .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "degs_R";                  .bovnar = "°Ra";           .metric = false; .reverse = false; },  # alias of degR
+  { .code = "°F";                      .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "℉";                       .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "fahrenheit";              .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degree_fahrenheit";       .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degrees_fahrenheit";      .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degreeF";                 .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degreesF";                .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degree_F";                .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degrees_F";               .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degsF";                   .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "deg_F";                   .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "degs_F";                  .bovnar = "°F";            .metric = false; .reverse = false; },  # alias of degF
+  { .code = "footcandle";              .bovnar = "lm/ft^2";       .metric = false; .reverse = false; },
+  { .code = "sb";                      .bovnar = "sb";            .metric = false; .reverse = false; },  # alias of stilb
+  { .code = "ph";                      .bovnar = "ph";            .metric = false; .reverse = false; },  # alias of phot
+  { .code = "langley";                 .bovnar = "cal/c~m^2";     .metric = false; .reverse = false; },
+  { .code = "kayser";                  .bovnar = "c~m^-1";        .metric = false; .reverse = false; },
+  { .code = "gp";                      .bovnar = "gn";            .metric = false; .reverse = false; },
+  { .code = "geopotential";            .bovnar = "gn";            .metric = false; .reverse = false; },
+  { .code = "dynamic";                 .bovnar = "gn";            .metric = false; .reverse = false; },
+  { .code = "PVU";                     .bovnar = "m~m^2·K/s·k~g"; .metric = false; .reverse = false; },
+  { .code = "potential_vorticity_unit"; .bovnar = "m~m^2·K/s·k~g"; .metric = false; .reverse = false; },
+  { .code = "octet";                   .bovnar = "B";             .metric = true;  .reverse = false; },  # alias of byte
 ];
 
 # UDUNITS has no assay-defined units the way UCUM does; everything either maps
@@ -510,4 +691,164 @@
 
   # ── Scales with no decade to fold into ───────────────────────────────────
   { .code = "shake"; .why = "1e-8 s — there is no SI prefix for 10⁻⁸"; },
+
+  # ── Closing the table against the UDUNITS-2 database ─────────────────────
+  #
+  # The other half of the same pass. A code here is one UDUNITS defines and this
+  # build cannot carry, so it now fails as error_unit_profile_unsupported and
+  # says why, instead of as error_unit_illegal. None of these needed a
+  # conversion factor to be written down.
+  #
+  # Where a family shares an argument -- the referenced bels, the CGS
+  # electrostatic units, the 1/pi photometric units, the water column -- every
+  # spelling of it carries the same reason, so a producer who meets one and
+  # then another is told the same thing twice rather than two different things.
+  { .code = "π";                       .why = "the number pi — a constant, not a unit"; },
+  { .code = "pi";                      .why = "the number pi — a constant, not a unit"; },
+  { .code = "einstein";                .why = "a mole of photons; UDUNITS defines it as the bare mole, and carrying it as mol would lose the photon"; },
+  { .code = "avogadro_constant";       .why = "Avogadro's number — a constant, not a unit"; },
+  { .code = "ppv";                     .why = "parts per volume — UDUNITS defines it as the number one, which is worth what every native ratio is worth"; },
+  { .code = "ppt";                     .why = "parts per trillion — native ratios stop at ppb"; },
+  { .code = "pptv";                    .why = "parts per trillion — native ratios stop at ppb"; },
+  { .code = "ppq";                     .why = "parts per quadrillion — native ratios stop at ppb"; },
+  { .code = "ppqv";                    .why = "parts per quadrillion — native ratios stop at ppb"; },
+  { .code = "degree_N";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degrees_N";               .why = "a coordinate direction, not a unit"; },
+  { .code = "degreeN";                 .why = "a coordinate direction, not a unit"; },
+  { .code = "degreesN";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_E";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degrees_E";               .why = "a coordinate direction, not a unit"; },
+  { .code = "degreeE";                 .why = "a coordinate direction, not a unit"; },
+  { .code = "degreesE";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_true";             .why = "a coordinate direction, not a unit"; },
+  { .code = "degrees_true";            .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_T";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degrees_T";               .why = "a coordinate direction, not a unit"; },
+  { .code = "degreeT";                 .why = "a coordinate direction, not a unit"; },
+  { .code = "degreesT";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_west";             .why = "a coordinate direction, not a unit"; },
+  { .code = "degree_W";                .why = "a coordinate direction, not a unit"; },
+  { .code = "degrees_W";               .why = "a coordinate direction, not a unit"; },
+  { .code = "degreeW";                 .why = "a coordinate direction, not a unit"; },
+  { .code = "degreesW";                .why = "a coordinate direction, not a unit"; },
+  { .code = "assay_ton";               .why = "assay ton (29.16667 g) — not a decade off any native mass"; },
+  { .code = "long_hundredweight";      .why = "long hundredweight (112 lb) — 112 is not a decade"; },
+  { .code = "troy_pound";              .why = "troy pound (12 troy ounces) — no native form"; },
+  { .code = "apothecary_pound";        .why = "troy pound (12 troy ounces) — no native form"; },
+  { .code = "apdram";                  .why = "apothecary dram; native dr is the avoirdupois dram"; },
+  { .code = "appound";                 .why = "apothecary pound (12 troy ounces) — no native form"; },
+  { .code = "bag";                     .why = "bag (94 lb) — 94 is not a decade"; },
+  { .code = "printers_point";          .why = "printer's point — no native typographic length"; },
+  { .code = "printers_pica";           .why = "printer's pica — no native typographic length"; },
+  { .code = "pica";                    .why = "printer's pica — no native typographic length"; },
+  { .code = "US_survey_yard";          .why = "US survey yard — bovnar carries only the survey foot"; },
+  { .code = "US_survey_mile";          .why = "US survey mile — bovnar carries only the survey foot"; },
+  { .code = "US_statute_mile";         .why = "US survey mile — bovnar carries only the survey foot"; },
+  { .code = "pole";                    .why = "US survey rod (16.5 survey feet); native rd is the international rod"; },
+  { .code = "perch";                   .why = "US survey rod (16.5 survey feet); native rd is the international rod"; },
+  { .code = "big_point";               .why = "big point (1/72 inch) — no native typographic length"; },
+  { .code = "barleycorn";              .why = "barleycorn (1/3 inch) — thirds are not decades"; },
+  { .code = "arpentlin";               .why = "arpentlin (191.835 ft) — no native form"; },
+  { .code = "rps";                     .why = "rotations per second — a rotation is 2*pi radian and 2*pi is not a decade"; },
+  { .code = "cps";                     .why = "rotations per second — a rotation is 2*pi radian and 2*pi is not a decade"; },
+  { .code = "rotation_per_second";     .why = "rotations per second — a rotation is 2*pi radian and 2*pi is not a decade"; },
+  { .code = "rotations_per_second";    .why = "rotations per second — a rotation is 2*pi radian and 2*pi is not a decade"; },
+  { .code = "perm_0C";                 .why = "permeance at 0 degC — no native form"; },
+  { .code = "perms_0C";                .why = "permeance at 0 degC — no native form"; },
+  { .code = "perm_23C";                .why = "permeance at 23 degC — no native form"; },
+  { .code = "perms_23C";               .why = "permeance at 23 degC — no native form"; },
+  { .code = "circular_mil";            .why = "circular mil — pi/4 of a square mil, irrational against the native units"; },
+  { .code = "darcy";                   .why = "darcy — no native permeability unit"; },
+  { .code = "acre_foot";               .why = "acre foot — no native form"; },
+  { .code = "acre_feet";               .why = "acre foot — no native form"; },
+  { .code = "board_foot";              .why = "board foot (144 cubic inches) — 144 is not a decade"; },
+  { .code = "board_feet";              .why = "board foot (144 cubic inches) — 144 is not a decade"; },
+  { .code = "US_dry_gallon";           .why = "US dry gallon — native gal is the liquid gallon"; },
+  { .code = "register_ton";            .why = "register ton (100 cubic feet) — no native form"; },
+  { .code = "US_dry_quart";            .why = "US dry quart — native qt is the liquid quart"; },
+  { .code = "dry_quart";               .why = "US dry quart — native qt is the liquid quart"; },
+  { .code = "US_dry_pint";             .why = "US dry pint — native pt is the liquid pint"; },
+  { .code = "dry_pint";                .why = "US dry pint — native pt is the liquid pint"; },
+  { .code = "firkin";                  .why = "firkin (a quarter barrel) — quarters are not decades"; },
+  { .code = "BZ";                      .why = "bel relative to 1 mm^6/m^3 (radar reflectivity) — dB carries no reference level"; },
+  { .code = "Bz";                      .why = "bel relative to 1 mm^6/m^3 (radar reflectivity) — dB carries no reference level"; },
+  { .code = "sidereal_hour";           .why = "sidereal hour — native h is the ordinary one"; },
+  { .code = "sidereal_minute";         .why = "sidereal minute — native min is the ordinary one"; },
+  { .code = "sidereal_second";         .why = "sidereal second — native s is the ordinary one"; },
+  { .code = "eon";                     .why = "eon (1e9 UDUNITS years) — UDUNITS' year is the tropical year and native yr is the Julian one, the same disagreement that keeps the bare year itself out of the mapped list"; },
+  { .code = "H2O";                     .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "h2o";                     .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "conventional_water";      .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "water";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "water_4C";                .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "waters_4C";               .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "water_39F";               .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "waters_39F";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "water_60F";               .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "waters_60F";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "Hg";                      .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "mercury_0C";              .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "mercuries_0C";            .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "mercury_32F";             .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "mercuries_32F";           .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "conventional_mercury";    .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "conventional_mercuries";  .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "mercury_60F";             .why = "60 degF mercury column — native mmHg is the conventional 0 degC one"; },
+  { .code = "mercuries_60F";           .why = "60 degF mercury column — native mmHg is the conventional 0 degC one"; },
+  { .code = "cm_H2O";                  .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "cmH2O";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "inch_H2O_39F";            .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "inches_H2O_39F";          .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "inch_H2O_60F";            .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "inches_H2O_60F";          .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "ftH2O";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "fth2o";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "foot_water";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "feet_water";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "foot_H2O";                .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "feet_H2O";                .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "footH2O";                 .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "feetH2O";                 .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "inch_Hg_60F";             .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
+  { .code = "inches_Hg_60F";           .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
+  { .code = "B_SPL";                   .why = "bel SPL — dB carries no reference level"; },
+  { .code = "EC_therm";                .why = "EC therm (1.05506e8 J) — native thm is the US therm, 1.054804e8 J"; },
+  { .code = "boiler_horsepower";       .why = "boiler horsepower — no native form"; },
+  { .code = "electric_horsepower";     .why = "electric horsepower (746 W) — native hp is the mechanical one"; },
+  { .code = "water_horsepower";        .why = "water horsepower — no native form"; },
+  { .code = "refrigeration_ton";       .why = "ton of refrigeration (12000 Btu/h) — 12000 is not a decade"; },
+  { .code = "ton_of_refrigeration";    .why = "ton of refrigeration (12000 Btu/h) — 12000 is not a decade"; },
+  { .code = "tons_of_refrigeration";   .why = "ton of refrigeration (12000 Btu/h) — 12000 is not a decade"; },
+  { .code = "BW";                      .why = "bel watt — dB carries no reference level"; },
+  { .code = "Bm";                      .why = "bel milliwatt — dB carries no reference level"; },
+  { .code = "clo";                     .why = "clo (0.155 K.m^2/W) — not a decade off any native thermal resistance"; },
+  { .code = "statampere";              .why = "CGS electrostatic ampere — built on the speed of light, not a decade off any native unit"; },
+  { .code = "abvolt";                  .why = "abvolt (1e-8 V) — there is no decade prefix at 1e-8"; },
+  { .code = "e";                       .why = "the elementary charge — a constant, not a native unit"; },
+  { .code = "chemical_faraday";        .why = "chemical faraday — no native form"; },
+  { .code = "physical_faraday";        .why = "physical faraday — no native form"; },
+  { .code = "C12_faraday";             .why = "faraday — no native form"; },
+  { .code = "faraday";                 .why = "faraday — no native form"; },
+  { .code = "statcoulomb";             .why = "CGS electrostatic coulomb — built on the speed of light, not a decade off any native unit"; },
+  { .code = "statfarad";               .why = "CGS electrostatic farad — built on the speed of light, not a decade off any native unit"; },
+  { .code = "stathenry";               .why = "CGS electrostatic henry — built on the speed of light, not a decade off any native unit"; },
+  { .code = "statmho";                 .why = "CGS electrostatic mho — built on the speed of light, not a decade off any native unit"; },
+  { .code = "statohm";                 .why = "CGS electrostatic ohm — built on the speed of light, not a decade off any native unit"; },
+  { .code = "statvolt";                .why = "CGS electrostatic volt — built on the speed of light, not a decade off any native unit"; },
+  { .code = "unit_pole";               .why = "unit pole (4*pi*1e-8 Wb) — irrational against the native units"; },
+  { .code = "BV";                      .why = "bel volt — dB carries no reference level"; },
+  { .code = "Bv";                      .why = "bel volt — dB carries no reference level"; },
+  { .code = "BµV";                     .why = "bel microvolt — dB carries no reference level"; },
+  { .code = "footlambert";             .why = "foot lambert — 1/pi candela per square foot, irrational against the native units"; },
+  { .code = "lambert";                 .why = "lambert — 1e4/pi cd/m^2, irrational against the native units"; },
+  { .code = "blondel";                 .why = "apostilb — 1/pi cd/m^2, irrational against the native units"; },
+  { .code = "apostilb";                .why = "apostilb — 1/pi cd/m^2, irrational against the native units"; },
+  { .code = "work_year";               .why = "work year (2056 hours) — a labour convention, not a decade off any native time"; },
+  { .code = "work_month";              .why = "work month (2056/12 hours) — a labour convention, not a decade off any native time"; },
+  { .code = "DU";                      .why = "Dobson unit (446.2 umol/m^2) — 446.2 is not a decade"; },
+  { .code = "dobson";                  .why = "Dobson unit (446.2 umol/m^2) — 446.2 is not a decade"; },
+  { .code = "molecule";                .why = "one molecule — a mole divided by Avogadro's number, no native form"; },
+  { .code = "molec";                   .why = "one molecule — a mole divided by Avogadro's number, no native form"; },
+  { .code = "nucleon";                 .why = "one molecule — a mole divided by Avogadro's number, no native form"; },
+  { .code = "nuc";                     .why = "one molecule — a mole divided by Avogadro's number, no native form"; },
 ];

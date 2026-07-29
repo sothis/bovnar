@@ -174,6 +174,20 @@
   { .code = "[fth_i]";  .bovnar = "fath"; .metric = false; },
   { .code = "[ly]";     .bovnar = "ly";   .metric = true;  },
   { .code = "[mil_i]";  .bovnar = "thou"; .metric = false; },
+  # The hand is four international inches and the mesh is one per inch. Neither
+  # needs a native unit of its own: "hand" already is one, and a reciprocal
+  # length is an ordinary native exponent.
+  { .code = "[hd_i]";   .bovnar = "hand";  .metric = false; },
+  { .code = "[mesh_i]"; .bovnar = "in^-1"; .metric = false; },
+  # Ramden's chain and its link are the ONE surveyor's pair built on a length
+  # this build already has exactly: 100 US survey feet, and 1 of them. Gunter's
+  # chain, [lk_us], is not -- it is 66 survey feet and lands nowhere native.
+  #
+  # .reverse = false on the link: it is worth exactly one survey foot, so
+  # without it the reverse table has two codes for native ftUS and a plain
+  # survey foot could be written back as "a link of Ramden's chain".
+  { .code = "[rch_us]"; .bovnar = "h~ftUS"; .metric = false; },
+  { .code = "[rlk_us]"; .bovnar = "ftUS";   .metric = false; .reverse = false; },
   # NOT [ch_br], [ft_br], [yd_br] and the rest of the British series. They
   # sit 7.9e-7 from the international units of the same name -- a genuinely
   # different foot, and close enough that check_profile_factors.py matched
@@ -187,6 +201,20 @@
   # exactly the shape doc/11 §6.3 warns about for the BTU: dimensionally
   # perfect, far inside anything a later check would notice, and wrong.
   # UCUM has no international chain, rod or furlong to map instead.
+
+  # Area and volume of the international lengths. UCUM gives each its own atom;
+  # bovnar spells it as the length with an exponent, which is the same unit and
+  # needs no registry row. These are the six codes doc/11 §9.6's coverage index
+  # reported as exactly a native unit and nothing carried.
+  #
+  # The US SURVEY squares are deliberately absent for the same reason their
+  # lengths are: [srd_us], [smi_us] and [sct] are built on the survey foot.
+  { .code = "[sin_i]";  .bovnar = "in^2"; .metric = false; },
+  { .code = "[sft_i]";  .bovnar = "ft^2"; .metric = false; },
+  { .code = "[syd_i]";  .bovnar = "yd^2"; .metric = false; },
+  { .code = "[cin_i]";  .bovnar = "in^3"; .metric = false; },
+  { .code = "[cft_i]";  .bovnar = "ft^3"; .metric = false; },
+  { .code = "[cyd_i]";  .bovnar = "yd^3"; .metric = false; },
 
   # Mass
   { .code = "[lb_av]";    .bovnar = "lb";    .metric = false; },
@@ -210,6 +238,10 @@
   { .code = "[oz_ap]";    .bovnar = "oz_t";  .metric = false; .reverse = false; },
   { .code = "[ston_av]";  .bovnar = "tn_sh"; .metric = false; },
   { .code = "[lton_av]";  .bovnar = "tn_l";  .metric = false; },
+  # The SHORT hundredweight is a hundred avoirdupois pounds exactly, so the
+  # hecto prefix carries it. The LONG one is 112 pounds and is refused below:
+  # 112 is not a decade and there is no native hundredweight to land on.
+  { .code = "[scwt_av]";  .bovnar = "h~lb";  .metric = false; },
 
   # Volume
   { .code = "[gal_us]"; .bovnar = "gal";      .metric = false; },
@@ -234,6 +266,16 @@
   # Pressure, energy, force, power. "m[Hg]" is a METRE of mercury column, so its
   # native target carries the kilo that makes "mm[Hg]" come out as plain mmHg.
   { .code = "m[Hg]";    .bovnar = "k~mmHg"; .metric = true;  },
+  # The inch of mercury, and the two clinical resistances built on the mercury
+  # column. All three inherit UCUM's rounding of that column -- it states the
+  # metre of mercury to seven digits, so anything derived from it sits 2.9 ppm
+  # from the exact conventional value bovnar uses. check_profile_factors.py
+  # waives exactly that ratio for m[Hg] and now for these three, by name and
+  # with the reason printed on every run; it is publisher rounding, not a
+  # different unit. Native inHg is the exact one.
+  { .code = "[in_i'Hg]"; .bovnar = "inHg";        .metric = false; },
+  { .code = "[PRU]";     .bovnar = "mmHg·s/m~L";  .metric = false; },
+  { .code = "[wood'U]";  .bovnar = "mmHg·min/L";  .metric = false; },
   { .code = "[psi]";    .bovnar = "psi";    .metric = false; },
   { .code = "tex";      .bovnar = "tex";    .metric = true;  },
   { .code = "[den]";    .bovnar = "den";    .metric = false; },
@@ -269,6 +311,10 @@
   # The biot is ten amperes; the kayser is one reciprocal centimetre.
   { .code = "Bi";    .bovnar = "da~A";  .metric = false; },
   { .code = "Ky";    .bovnar = "c~m^-1"; .metric = true;  },
+  # The gilbert, transliterated from UCUM's own definition of it (Oe.cm) rather
+  # than from its value. Both give the same number; only this one gives a row a
+  # reader can check against the publication.
+  { .code = "Gb";    .bovnar = "Oe·c~m"; .metric = false; },
   { .code = "sb";    .bovnar = "sb";    .metric = false; },
   { .code = "ph";    .bovnar = "ph";    .metric = false; },
   { .code = "Ci";    .bovnar = "Ci";    .metric = true;  },
@@ -304,6 +350,9 @@
   # through the UCUM writer.
   { .code = "eq";  .bovnar = "mol";        .metric = true; .reverse = false; },
   { .code = "U";   .bovnar = "u~mol/min";  .metric = true; },
+  # Gram percent is UCUM's own g/dl, written the native way. It is a mass
+  # concentration and not a ratio, which is why it sits here and not beside %.
+  { .code = "g%";  .bovnar = "g/d~L";      .metric = false; },
 
   # Optics. The dioptre is exactly a reciprocal metre.
   { .code = "[diop]"; .bovnar = "m^-1"; .metric = false; },
@@ -355,6 +404,24 @@
   { .name = "ucum_feu";       .code = "[FEU]";       .metric = false; },
   { .name = "ucum_elu";       .code = "[ELU]";       .metric = false; },
   { .name = "ucum_eu";        .code = "[EU]";        .metric = false; },
+
+  # The homeopathic potency series, and the index of reactivity. UCUM flags all
+  # nine isArbitrary, which is this list's entry condition, and they were simply
+  # missed -- the table carried 32 of UCUM's 41 arbitrary units.
+  #
+  # Note the apostrophe. UCUM has TWO homeopathic families and they are not the
+  # same kind of thing: "[hp'_X]" is a SPECIAL unit, a logarithm, and is refused
+  # below; "[hp_X]" is the arbitrary one and belongs here. The four Korsakovian
+  # codes have no special twin.
+  { .name = "ucum_hp_x";      .code = "[hp_X]";      .metric = false; },
+  { .name = "ucum_hp_c";      .code = "[hp_C]";      .metric = false; },
+  { .name = "ucum_hp_m";      .code = "[hp_M]";      .metric = false; },
+  { .name = "ucum_hp_q";      .code = "[hp_Q]";      .metric = false; },
+  { .name = "ucum_kp_x";      .code = "[kp_X]";      .metric = false; },
+  { .name = "ucum_kp_c";      .code = "[kp_C]";      .metric = false; },
+  { .name = "ucum_kp_m";      .code = "[kp_M]";      .metric = false; },
+  { .name = "ucum_kp_q";      .code = "[kp_Q]";      .metric = false; },
+  { .name = "ucum_ir";        .code = "[IR]";        .metric = false; },
 ];
 
 # ── Atoms UCUM defines that have no native representation ───────────────────
@@ -456,4 +523,119 @@
   { .code = "[LPF]";    .why = "low power field — a microscope field, not a unit"; },
   { .code = "[drp]";    .why = "drop — volume varies with the dropper"; },
   { .code = "[MET]";    .why = "metabolic equivalent — 3.5 mL/min/kg, not a decade"; },
+
+  # ── Everything below closes the table against ucum-essence.xml ────────────
+  #
+  # Until these rows existed an atom in NONE of the three lists came back as
+  # error_unit_illegal, which says "that is not a UCUM atom" about 83 codes UCUM
+  # does define. That is a false statement to a conforming producer, and it is
+  # the one failure mode this list exists to prevent. Refusing a code costs an
+  # error message; misnaming the refusal costs the producer the belief that they
+  # wrote it wrong.
+  #
+  # None of these needed a conversion factor to be written down, which is why
+  # they carry no risk: a .unsupported row asserts only that UCUM has the code
+  # and this build cannot carry it.
+
+  # UCUM's two numeric bases and the number pi. They are how UCUM writes a
+  # scientific-notation exponent inside a unit ("10*-12"), not units at all,
+  # and a bovnar unit slot has no scale factor for them to become.
+  { .code = "10*";    .why = "the number ten — a numeric base for UCUM exponents, not a unit"; },
+  { .code = "10^";    .why = "the number ten — a numeric base for UCUM exponents, not a unit"; },
+  { .code = "[pi]";   .why = "the number pi — a constant, not a unit"; },
+  # Native carries ppm and ppb and stops there.
+  { .code = "[pptr]"; .why = "parts per trillion — native ratios stop at ppb"; },
+
+  # Dimensionless instrument scales. UCUM defines each as the number one, which
+  # makes every one of them worth exactly what a native ratio is worth and
+  # commensurable with all of them. Mapping on that basis is how a turbidity
+  # reading ends up comparing equal to a percentage, so all three are refused.
+  # UCUM does not flag them isArbitrary, so .opaque -- which says "UCUM calls
+  # this arbitrary" -- would misreport the publisher.
+  { .code = "[NTU]";     .why = "nephelometric turbidity unit — an instrument scale UCUM defines as the number one"; },
+  { .code = "[FNU]";     .why = "formazin nephelometric unit — an instrument scale UCUM defines as the number one"; },
+  { .code = "[hnsf'U]";  .why = "Hounsfield unit — a CT attenuation scale UCUM defines as the number one"; },
+  { .code = "[car_Au]";  .why = "carat of gold alloys — a 24ths fraction, not a decade"; },
+  # A special unit: the logarithmic bit, UCUM's ld(x) function. Same reason the
+  # bels above are refused -- native dB carries no reference and no base.
+  { .code = "bit_s";     .why = "logarithmic bit — a base-2 logarithm, no native form"; },
+
+  # The BRITISH imperial series, in full. doc/11 §6.3 and the note beside the
+  # length block already say why none of it maps: the British foot is 2.539998
+  # cm against the international 2.54, which puts the whole family 7.9e-7 from
+  # the native units of the same name -- inside the noise floor of a decimal
+  # comparison and a genuinely different unit. They were kept out by name; now
+  # they are kept out by row, so the refusal says so.
+  { .code = "[in_br]";  .why = "British inch (2.539998 cm) — native in is the international inch"; },
+  { .code = "[ft_br]";  .why = "British foot — native ft is the international foot"; },
+  { .code = "[yd_br]";  .why = "British yard — native yd is the international yard"; },
+  { .code = "[mi_br]";  .why = "British mile — native mi is the international mile"; },
+  { .code = "[nmi_br]"; .why = "British nautical mile (6080 British feet) — native nmi is 1852 m"; },
+  { .code = "[kn_br]";  .why = "British knot — built on the British nautical mile"; },
+  { .code = "[rd_br]";  .why = "British rod — native rd is the international rod"; },
+  { .code = "[ch_br]";  .why = "British Gunter's chain — native ch is the international chain"; },
+  { .code = "[lk_br]";  .why = "British link — built on the British chain"; },
+  { .code = "[fth_br]"; .why = "British fathom — native fath is the international fathom"; },
+  { .code = "[pc_br]";  .why = "British pace (2.5 British feet) — no native form"; },
+  { .code = "[acr_br]"; .why = "British acre — native ac is the international acre"; },
+  { .code = "[pk_br]";  .why = "British peck — native pk is the US dry peck"; },
+  { .code = "[bu_br]";  .why = "British bushel — native bsh is the US dry bushel"; },
+  { .code = "[fdr_br]"; .why = "British fluid dram — native fl_dr is the US one"; },
+  { .code = "[min_br]"; .why = "British minim — native minim is the US one"; },
+
+  # US SURVEY units beyond the foot and Ramden's pair, for the reason the block
+  # above gives: bovnar carries the survey foot and nothing else built on it.
+  { .code = "[lk_us]";   .why = "link for Gunter's chain — 66/100 survey feet, no native form"; },
+  { .code = "[fth_us]";  .why = "US survey fathom — bovnar carries only the survey foot"; },
+  { .code = "[srd_us]";  .why = "US survey square rod — bovnar carries only the survey foot"; },
+  { .code = "[smi_us]";  .why = "US survey square mile — bovnar carries only the survey foot"; },
+  { .code = "[sct]";     .why = "section — a survey square mile, no native form"; },
+  { .code = "[twp]";     .why = "township — 36 sections, no native form"; },
+  { .code = "[mil_us]";  .why = "US survey mil — native thou is the international mil"; },
+
+  # US dry measure below the peck, and the historical gallon it came from.
+  { .code = "[gal_wi]";  .why = "historical winchester gallon — an eighth of a dry bushel, no native form"; },
+  { .code = "[dqt_us]";  .why = "US dry quart — native qt is the liquid quart"; },
+  { .code = "[dpt_us]";  .why = "US dry pint — native pt is the liquid pint"; },
+
+  # The METRIC kitchen and jewellers' measures. Each is a round number of
+  # millilitres or grams rather than a decade off one, so the unit slot -- which
+  # scales by powers of ten and nothing else -- cannot reach them.
+  { .code = "[foz_m]";   .why = "metric fluid ounce (30 mL) — not a decade off any native volume"; },
+  { .code = "[cup_m]";   .why = "metric cup (240 mL) — not a decade off any native volume"; },
+  { .code = "[tsp_m]";   .why = "metric teaspoon (5 mL) — not a decade off any native volume"; },
+  { .code = "[tbs_m]";   .why = "metric tablespoon (15 mL) — not a decade off any native volume"; },
+  { .code = "[oz_m]";    .why = "metric ounce (28 g) — not a decade off any native mass"; },
+
+  # Imperial and troy masses with no native counterpart.
+  { .code = "[lcwt_av]"; .why = "long hundredweight (112 lb) — 112 is not a decade"; },
+  { .code = "[lb_tr]";   .why = "troy pound (12 troy ounces) — no native form"; },
+
+  # Volumes defined as a whole-number multiple of a native unit. Same reason as
+  # the metric kitchen: 144 and 128 are not powers of ten.
+  { .code = "[bf_i]";    .why = "board foot (144 cubic inches) — 144 is not a decade"; },
+  { .code = "[cr_i]";    .why = "cord (128 cubic feet) — 128 is not a decade"; },
+  { .code = "[crd_us]";  .why = "cord (128 cubic feet) — 128 is not a decade"; },
+  { .code = "[cml_i]";   .why = "circular mil — pi/4 of a square mil, irrational against the native units"; },
+  { .code = "[smoot]";   .why = "Smoot (67 inches) — 67 is not a decade"; },
+  { .code = "[Ch]";      .why = "Charriere (a third of a millimetre) — thirds are not decades"; },
+
+  # Typographic and pre-metric French lengths. Both families are built on
+  # twelfths and sixths of each other, so none of them is a decade off a native
+  # length, and bovnar has no point, pica, ligne or pouce to land on.
+  { .code = "[pnt]";     .why = "point (1/6 line) — no native typographic length"; },
+  { .code = "[pca]";     .why = "pica (12 points) — no native typographic length"; },
+  { .code = "[pnt_pr]";  .why = "printer's point (0.013837 in) — no native typographic length"; },
+  { .code = "[pca_pr]";  .why = "printer's pica — no native typographic length"; },
+  { .code = "[pied]";    .why = "pied (32.48 cm) — no native form"; },
+  { .code = "[pouce]";   .why = "pouce (1/12 pied) — no native form"; },
+  { .code = "[ligne]";   .why = "ligne (1/12 pouce) — no native form"; },
+  { .code = "[didot]";   .why = "didot (1/6 ligne) — no native form"; },
+  { .code = "[cicero]";  .why = "cicero (12 didot) — no native form"; },
+
+  # The water column. m[H2O] above is refused for want of a native form and
+  # this inherits it; the technical atmosphere is exactly ten metres of water,
+  # so a mapping onto d~at would be numerically perfect and would hand a
+  # clinician's centimetre of water back as a millitechnical atmosphere.
+  { .code = "[in_i'H2O]"; .why = "inch of water column — bovnar has no water-column unit; see m[H2O]"; },
 ];

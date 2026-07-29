@@ -5,7 +5,9 @@ files here; the C tables are generated from them. So the enum, conversion table,
 symbol map, parse/alias tables, prefix scale/policy tables, and currency
 catalogue cannot drift out of sync. Covers 180 physical units (529 accepted
 spellings), 34 SI/IEC prefixes, 216 currencies, and the atom tables of five unit
-profiles.
+profiles — 4722 mapped codes and 1558 named refusals, which is every code UCUM,
+UDUNITS-2 and QUDT define plus every UN/ECE code QUDT's cross-reference reaches
+(doc/11 §15).
 
 Each `.bvnr` file's comment header documents its fields and the editing rules
 (stable, append-only ids). **To add or change an entry, edit a record there and
@@ -18,11 +20,11 @@ rebuild — never edit the generated `*.gen.{h,inc}`.**
 | `units.bvnr` | `src/gendata/` | the data: all 180 physical units |
 | `prefixes.bvnr` | `src/gendata/` | the data: 24 SI + 10 IEC prefixes |
 | `currencies.bvnr` | `src/gendata/` | the data: all 216 currencies |
-| `ucum.bvnr` | `src/gendata/` | the data: the UCUM profile — prefixes, mapped atoms, arbitrary (opaque) units, and the atoms that are known but refused |
-| `unece.bvnr` | `src/gendata/` | the data: UN/ECE Rec 20 units, plus Rec 21 packages and Rec 20 counts as opaque units |
-| `qudt.bvnr` | `src/gendata/` | the data: QUDT unit local names |
-| `qudt-qk.bvnr` | `src/gendata/` | the data: QUDT quantity kinds, each mapped to the **coherent SI unit** of the kind |
-| `udunits.bvnr` | `src/gendata/` | the data: UDUNITS-2 atoms and prefixes, the CF/netCDF units syntax |
+| `ucum.bvnr` | `src/gendata/` | the data: the UCUM profile — prefixes, mapped atoms, arbitrary (opaque) units, and the atoms that are known but refused. All 312 atoms `ucum-essence.xml` defines |
+| `unece.bvnr` | `src/gendata/` | the data: UN/ECE Rec 20 units, plus Rec 21 packages and Rec 20 counts as opaque units. Every Rec 20 code QUDT's cross-reference reaches — Rec 20 itself states its factors in prose, so there is no list to close against |
+| `qudt.bvnr` | `src/gendata/` | the data: QUDT unit local names. All 2803, carried over through QUDT's own `ucumCode`/`udunitsCode` rather than by matching values |
+| `qudt-qk.bvnr` | `src/gendata/` | the data: QUDT quantity kinds, each mapped to the **coherent SI unit** of the kind — taken from QUDT's own `applicableUnit` list, which is what separates `Torque` (`N·m`) from `Work` (`J`). All 1164 |
+| `udunits.bvnr` | `src/gendata/` | the data: UDUNITS-2 atoms and prefixes, the CF/netCDF units syntax. All 570 spellings the database defines |
 | `gen_units.py` / `gen_prefixes.py` / `gen_currencies.py` / `gen_profiles.py` | repo root | the generators |
 | `bvnr_data.py` | repo root | the small built-in `.bvnr` reader they use |
 

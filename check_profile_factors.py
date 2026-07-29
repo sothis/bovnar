@@ -183,6 +183,10 @@ WAIVED_MODEL = {
     ("ucum", "bit"), ("ucum", "By"), ("ucum", "Bd"),
     ("udunits", "bit"), ("udunits", "byte"), ("udunits", "baud"),
     ("udunits", "Bd"), ("udunits", "bps"),
+    # UDUNITS' own alias for the byte, and the same modelling difference: it
+    # defines the octet as the number 8 where bovnar's B is a base unit of
+    # information with no factor to the bit.
+    ("udunits", "octet"),
     ("qudt", "BIT"), ("qudt", "BYTE"),
     ("qudt", "KiloBYTE"), ("qudt", "MegaBYTE"), ("qudt", "GigaBYTE"),
     ("qudt", "TeraBYTE"), ("qudt", "KibiBYTE"), ("qudt", "MebiBYTE"),
@@ -203,6 +207,21 @@ WAIVED_UPSTREAM = {
         "UCUM rounds the mercury column to 133.3220 kPa (7 digits); native mmHg "
         "is the exact conventional 133.322387415 Pa. 2.9 ppm, publisher "
         "rounding rather than a different unit.",
+    # The three atoms UCUM builds ON the mercury column. Each disagrees with the
+    # native target by the SAME 2.9 ppm and for the same reason — the rounding
+    # is inherited, not independent — so each is waived by name rather than by
+    # widening the tolerance, which would let a real disagreement through
+    # everywhere else. The ratio to check against is 0.999997094.
+    ("ucum", "[in_i'Hg]"):
+        "Inherits m[Hg]'s rounding: UCUM's inch of mercury is its rounded metre "
+        "of mercury times an inch. 2.9 ppm from the exact native inHg, the same "
+        "ratio as m[Hg].",
+    ("ucum", "[PRU]"):
+        "Peripheral resistance unit, defined by UCUM as mm[Hg].s/ml, so it "
+        "carries m[Hg]'s rounding unchanged. 2.9 ppm, same ratio as m[Hg].",
+    ("ucum", "[wood'U]"):
+        "Wood unit, defined by UCUM as mm[Hg].min/L, so it carries m[Hg]'s "
+        "rounding unchanged. 2.9 ppm, same ratio as m[Hg].",
     ("unece", "MON"):
         "Reached through QUDT, which attaches uneceCommonCode \"MON\" to its own "
         "MO — a unit its description calls the SYNODIC month, 29.53059 days. Rec "
@@ -986,6 +1005,23 @@ def check_profile(ns, vocab, native, native_index, verbose):
         up = vocab.resolve(code)
         if up is None:
             continue
+        # A coverage suggestion should ask whether a PRODUCER can write this and
+        # get the right unit, not whether the table has a row for it. An expr
+        # profile reaches "kg" as k + g and "kilogram" as kilo + gram through
+        # the prefix mechanism, with no row and nothing missing; reporting those
+        # as gaps is how a closed table still looks open. Asking the library
+        # settles it, and settles it the only way that matters — a spelling that
+        # parses to the WRONG unit is still reported, because it is a worse
+        # defect than a missing row rather than a lesser one.
+        try:
+            reached = native("%s:%s" % (ns, code))
+        except Unresolved:
+            reached = None       # the library refuses it: a genuine gap
+        if reached is not None:
+            f, d = vocab.normalise(up, reached[1]) \
+                if hasattr(vocab, "normalise") else up
+            if list(d) == list(reached[1]) and close(f, reached[0]):
+                continue
         hit = native_index.match(vocab, up)
         if hit:
             missing.append("  %-22s == native %-12s (%.10g)" % (code, hit[0],

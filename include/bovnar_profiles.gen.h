@@ -32,51 +32,60 @@
 	bu_ucum_feu         = 426,
 	bu_ucum_elu         = 427,
 	bu_ucum_eu          = 428,
+	bu_ucum_hp_x        = 429,
+	bu_ucum_hp_c        = 430,
+	bu_ucum_hp_m        = 431,
+	bu_ucum_hp_q        = 432,
+	bu_ucum_kp_x        = 433,
+	bu_ucum_kp_c        = 434,
+	bu_ucum_kp_m        = 435,
+	bu_ucum_kp_q        = 436,
+	bu_ucum_ir          = 437,
 	/* unece */
-	bu_unece_one        = 429,
-	bu_unece_piece      = 430,
-	bu_unece_article    = 431,
-	bu_unece_pair       = 432,
-	bu_unece_set        = 433,
-	bu_unece_bag        = 434,
-	bu_unece_barrel     = 435,
-	bu_unece_bottle     = 436,
-	bu_unece_box        = 437,
-	bu_unece_bunch      = 438,
-	bu_unece_can        = 439,
-	bu_unece_carton     = 440,
-	bu_unece_case       = 441,
-	bu_unece_container  = 442,
-	bu_unece_crate      = 443,
-	bu_unece_drum       = 444,
-	bu_unece_package    = 445,
-	bu_unece_packet     = 446,
-	bu_unece_pallet     = 447,
-	bu_unece_reel       = 448,
-	bu_unece_roll       = 449,
-	bu_unece_sack       = 450,
-	bu_unece_sheet      = 451,
-	bu_unece_tube       = 452,
-	bu_unece_vial       = 453,
+	bu_unece_one        = 438,
+	bu_unece_piece      = 439,
+	bu_unece_article    = 440,
+	bu_unece_pair       = 441,
+	bu_unece_set        = 442,
+	bu_unece_bag        = 443,
+	bu_unece_barrel     = 444,
+	bu_unece_bottle     = 445,
+	bu_unece_box        = 446,
+	bu_unece_bunch      = 447,
+	bu_unece_can        = 448,
+	bu_unece_carton     = 449,
+	bu_unece_case       = 450,
+	bu_unece_container  = 451,
+	bu_unece_crate      = 452,
+	bu_unece_drum       = 453,
+	bu_unece_package    = 454,
+	bu_unece_packet     = 455,
+	bu_unece_pallet     = 456,
+	bu_unece_reel       = 457,
+	bu_unece_roll       = 458,
+	bu_unece_sack       = 459,
+	bu_unece_sheet      = 460,
+	bu_unece_tube       = 461,
+	bu_unece_vial       = 462,
 
 /* The opaque block: profile-only base units with no native
  * spelling and no dimension. Bracketed for the two-comparison
  * membership test in bvni_is_opaque(). Contiguity across every
  * profile is enforced by gen_profiles.py. */
 #define BVN_PROFILE_OPAQUE_FIRST 397
-#define BVN_PROFILE_OPAQUE_LAST  453
-#define BVN_PROFILE_OPAQUE_COUNT 57
+#define BVN_PROFILE_OPAQUE_LAST  462
+#define BVN_PROFILE_OPAQUE_COUNT 66
 
 /* Per-profile sub-ranges, so the writer can name the
  * namespace that owns an opaque unit. FIRST > LAST means the
  * profile contributes none. */
 #define BVN_PROFILE_UCUM_OPAQUE_FIRST 397
-#define BVN_PROFILE_UCUM_OPAQUE_LAST  428
-#define BVN_PROFILE_UNECE_OPAQUE_FIRST 429
-#define BVN_PROFILE_UNECE_OPAQUE_LAST  453
-#define BVN_PROFILE_QUDT_OPAQUE_FIRST 454
-#define BVN_PROFILE_QUDT_OPAQUE_LAST  453
-#define BVN_PROFILE_QUDT_QK_OPAQUE_FIRST 454
-#define BVN_PROFILE_QUDT_QK_OPAQUE_LAST  453
-#define BVN_PROFILE_UDUNITS_OPAQUE_FIRST 454
-#define BVN_PROFILE_UDUNITS_OPAQUE_LAST  453
+#define BVN_PROFILE_UCUM_OPAQUE_LAST  437
+#define BVN_PROFILE_UNECE_OPAQUE_FIRST 438
+#define BVN_PROFILE_UNECE_OPAQUE_LAST  462
+#define BVN_PROFILE_QUDT_OPAQUE_FIRST 463
+#define BVN_PROFILE_QUDT_OPAQUE_LAST  462
+#define BVN_PROFILE_QUDT_QK_OPAQUE_FIRST 463
+#define BVN_PROFILE_QUDT_QK_OPAQUE_LAST  462
+#define BVN_PROFILE_UDUNITS_OPAQUE_FIRST 463
+#define BVN_PROFILE_UDUNITS_OPAQUE_LAST  462

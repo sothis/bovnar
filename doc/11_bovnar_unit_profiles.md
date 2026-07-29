@@ -10,16 +10,24 @@ holds them to each other:
 
 | Namespace | Vocabulary | Grammar | Codes carried | Section |
 |---|---|---|---|---|
-| `ucum:` | UCUM — Unified Code for Units of Measure | expression | 141 atoms + 32 arbitrary | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
-| `unece:` | UN/ECE Recommendation 20 and 21 | flat | 252 + 25 opaque | [11](#11-the-unece-profile) |
-| `qudt:` | QUDT unit local names | flat | 263 | [12](#12-the-qudt-profiles) |
-| `qudt-qk:` | QUDT quantity kinds | flat | 52 | [12.3](#123-quantity-kinds-qudt-qk) |
-| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 251 | [13](#13-the-udunits-profile) |
+| `ucum:` | UCUM — Unified Code for Units of Measure | expression | 157 atoms + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
+| `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1195 + 25 opaque | [11](#11-the-unece-profile) |
+| `qudt:` | QUDT unit local names | flat | 2056, **all 2803 QUDT defines** | [12](#12-the-qudt-profiles) |
+| `qudt-qk:` | QUDT quantity kinds | flat | 910, **all 1164 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
+| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 404, **all 570 UDUNITS defines** | [13](#13-the-udunits-profile) |
 
 Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
 grammar these profiles sit beside), [Unit Ambiguities](07_bovnar_unit_ambiguities.md) (how a unit token is
 resolved, and the pairs that look interchangeable), and [Unit Policy](06_bovnar_unit_policy.md) (the
 reader- and writer-side unit policies a profile unit has to survive unchanged).
+
+**The four enumerable tables are closed against their publishers.** Every atom `ucum-essence.xml`
+defines, every spelling the UDUNITS-2 database defines, and every local name and quantity kind QUDT
+defines is now in one of the three lists — mapped, opaque, or refused with a reason. That was not
+true before: 83 UCUM atoms, 299 UDUNITS spellings and some 3600 QUDT names came back as
+`error_unit_illegal`, which tells a conforming producer their code is not a code of the vocabulary
+they wrote it in. `unece` cannot be closed the same way and §11.1 says why. §15 records what the
+pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
@@ -100,7 +108,7 @@ tables wrong in the same way would agree with each other perfectly.
     - 12.1 [Why this vocabulary](#121-why-this-vocabulary)
     - 12.2 [Local names, not IRIs](#122-local-names-not-iris)
     - 12.3 [Quantity kinds (`qudt-qk:`)](#123-quantity-kinds-qudt-qk)
-    - 12.4 [The quantity-kind table in full](#124-the-quantity-kind-table-in-full)
+    - 12.4 [The quantity-kind table: the ISO 80000 core](#124-the-quantity-kind-table-the-iso-80000-core)
 13. [The UDUNITS profile](#13-the-udunits-profile)
     - 13.1 [An expression profile, sharing the UCUM parser](#131-an-expression-profile-sharing-the-ucum-parser)
     - 13.2 [Space does not multiply, and cannot](#132-space-does-not-multiply-and-cannot)
@@ -110,6 +118,10 @@ tables wrong in the same way would agree with each other perfectly.
     - 14.1 [A concept table, checked pairwise](#141-a-concept-table-checked-pairwise)
     - 14.2 [The negative half is not optional](#142-the-negative-half-is-not-optional)
     - 14.3 [What it found, and what it cannot tell you](#143-what-it-found-and-what-it-cannot-tell-you)
+15. [Closing the tables](#15-closing-the-tables)
+    - 15.1 [What was wrong](#151-what-was-wrong)
+    - 15.2 [How the rows were produced](#152-how-the-rows-were-produced)
+    - 15.3 [What it cost, and what is still open](#153-what-it-cost-and-what-is-still-open)
 - [See also](#see-also)
 
 ---
@@ -855,8 +867,8 @@ round trip that starts in a vocabulary returns to it; one that starts in Bovnar'
 may have nowhere to go.
 
 Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **625** combinations survive a native → UCUM → native round trip
-unchanged, **1180** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+`si_none da h k M G T d c m µ n` — **627** combinations survive a native → UCUM → native round trip
+unchanged, **1178** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -867,7 +879,7 @@ invariant; the two counts move whenever the registry gains a unit, so `test_swee
 
 ### 6.1 Verified mappings
 
-The shipped table is `src/gendata/ucum.bvnr`: 141 mapped **atoms**, 32 arbitrary units, 56 known
+The shipped table is `src/gendata/ucum.bvnr`: 157 mapped **atoms**, 41 arbitrary units, 114 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
 data file groups it. Note that these are *atoms*, which is how the table is organised and not how a
 producer meets it — `mg/dL` is three atoms and two prefixes, not a row. §6.4 reads the same table
@@ -1252,7 +1264,7 @@ As shipped, in `include/bovnar_profiles.gen.h`:
 #define BVN_PROFILE_OPAQUE_LAST        453
 #define BVN_PROFILE_OPAQUE_COUNT        57
 
-#define BVN_PROFILE_UCUM_OPAQUE_FIRST  397   /* 32 arbitrary atoms */
+#define BVN_PROFILE_UCUM_OPAQUE_FIRST  397   /* 41 arbitrary atoms */
 #define BVN_PROFILE_UCUM_OPAQUE_LAST   428
 #define BVN_PROFILE_UNECE_OPAQUE_FIRST 429   /* 5 counts + 20 packages */
 #define BVN_PROFILE_UNECE_OPAQUE_LAST  453
@@ -1491,7 +1503,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 625 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 627 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests
@@ -1560,8 +1572,9 @@ native side goes through `bvn_parse_unit` and `bvn_unit_to_si_factor` via the ct
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).
 
-As of this tree it compares **899 rows across the five vocabularies** and reports **0 mismatches**,
-10 dead rows and 1161 coverage suggestions.
+As of this tree it compares **4635 rows across the five vocabularies** and reports **0 mismatches**,
+10 dead rows and **0 coverage suggestions** — the tables are closed against their publishers, so
+there is nothing left for the coverage half to propose.
 
 **Three outcomes, and only one fails the build.**
 
@@ -1583,10 +1596,17 @@ square second, `qudt:RAD-PER-SEC` the radian per second: not one of them is a na
 one of them could be suggested, and they were exactly the codes a table is most likely to be missing
 while its neighbours carry them. The index now also holds every `.bovnar` target any of the five
 tables already uses — a target one table has written down is a spelling this build is known to
-accept — which is what turned that whole class from invisible into a printed list. The 1161
-suggestions divide as `qudt-qk` 718, `qudt` 222, `udunits` 113, `unece` 95, `ucum` 13; the
-quantity-kind figure is large because QUDT defines thousands of kinds and almost any of them is
-worth *some* native unit, which is the clearest illustration of why a suggestion is advisory.
+accept — which is what turned that whole class from invisible into a printed list. At its peak it
+printed 1161 suggestions, divided as `qudt-qk` 718, `qudt` 222, `udunits` 113, `unece` 95, `ucum`
+13. Every one of them has since been resolved, into a mapped row or a refusal with a reason, and the
+count is 0.
+
+**A suggestion asks whether a PRODUCER can write the code, not whether a row exists.** The last two
+it printed were `udunits:kg` and `udunits:kilogram`, and neither was missing: an expression profile
+reaches them through its prefix mechanism as `k` + `g` and `kilo` + `gram`, with no row and nothing
+wrong. Asking the library settles it. A spelling that parses to the *wrong* unit is still reported,
+because that is a worse defect than a missing row rather than a lesser one — which is exactly what
+`udunits:pt` was (§13.4).
 
 **The two systems are not the same system**, and the corrections are the substance of the UCUM
 comparison rather than a detail of it. UCUM's mass base is the gram, so a factor carries 10³ per
@@ -1844,7 +1864,10 @@ wrong unit is produced silently rather than refused.
 referenced bels and four decades of scale. A clinical corpus will meet several of those early, and
 each is a reason to conclude the profile does not really support UCUM. The counter-argument — that
 naming a refusal beats accepting a string you cannot reason about — is correct and will not always
-be persuasive.
+be persuasive. §15 makes this worse before it makes it better: the refusal set is now much larger,
+because every code the publisher defines and this build cannot carry is *named* rather than left to
+fall through as `error_unit_illegal`. That is the honest arrangement and it is also the one where
+an adopter can count what they are not getting.
 
 **Annotation equality will surprise someone.** §3.4 is UCUM's rule faithfully applied, and it still
 means two units a clinician reads as different compare as the same.
@@ -1901,7 +1924,8 @@ Verbatim source preservation is next.
 
 > `unece:` — UN/ECE Recommendation 20, *Codes for Units of Measure Used in International Trade*, and
 > Recommendation 21, *Codes for Passengers, Types of Cargo, Packages and Packaging Materials*.
-> Data file `src/gendata/unece.bvnr` (252 mapped, 25 opaque, 7 unsupported);
+> Data file `src/gendata/unece.bvnr` (1195 mapped, 25 opaque, 257 unsupported — every Rec 20 code
+> QUDT's cross-reference reaches, which is not the same as every Rec 20 code; §11.1);
 > pinned by `tests/bovnar_unece_test.c` (134 assertions).
 
 ### 11.1 Why this vocabulary
@@ -1912,11 +1936,19 @@ structure. A producer whose unit arrives as `KGM` should not have to translate i
 written down, and an industrial-telemetry consumer reading OPC UA payloads should not have to
 maintain a second mapping table of its own.
 
-The table is a **confident subset**, not a transcription: a code that is not in it fails loudly as
-`error_unit_illegal`, which costs a producer an error message, while a code that is in it and wrong
-costs them a wrong number. Rec 20's Annex II/III sector qualifiers, the Rec 21 codes that name
-packaging *material* rather than a countable package, and every code whose value the data file
-cannot state exactly are deliberately absent.
+**This is the one table that cannot be closed, and the reason is the vocabulary rather than the
+effort.** The other four publish a machine-readable list of everything they define, so "every code
+the publisher states is in one of the three lists" is a condition that can be met and checked. Rec
+20 states its factors in *prose*. There is no artefact to enumerate, and this profile has always
+been reached at one remove, through the `qudt:uneceCommonCode` cross-reference (§9.5). So the table
+is now closed against **what that cross-reference reaches** — 1195 mapped and 257 refused, up from
+252 and 7 — and a Rec 20 code that no QUDT unit claims is still outside it, because nothing in this
+repository can say what it is worth. Where the cross-reference contradicts *itself*, the code is
+refused saying so: 81 codes have more than one QUDT claimant, and `J62` is claimed by both a
+barrels-per-hour and a barrels-per-second unit, 3600 apart.
+
+Rec 20's Annex II/III sector qualifiers and the Rec 21 codes that name packaging *material* rather
+than a countable package remain deliberately absent.
 
 ### 11.2 Flat, and why that is not a simplification
 
@@ -2036,8 +2068,9 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 
 ## 12. The QUDT profiles
 
-> `qudt:` — QUDT unit local names (263 mapped, 8 unsupported).
-> `qudt-qk:` — QUDT quantity kinds (52 mapped, 7 unsupported).
+> `qudt:` — QUDT unit local names (2056 mapped, 752 unsupported — every one of the 2803 local
+> names QUDT defines).
+> `qudt-qk:` — QUDT quantity kinds (910 mapped, 255 unsupported — every one of the 1164 kinds).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
 > pinned by `tests/bovnar_qudt_test.c` (187 assertions).
 
@@ -2126,10 +2159,28 @@ Two consequences follow from translating to a unit, and both are honest rather t
 `qudt-qk` is also why a namespace may contain a hyphen (§2.1). It may not lead: `-qk:Mass` is not a
 namespace and falls through to the native parser, which rejects it as it always did.
 
-### 12.4 The quantity-kind table in full
+### 12.4 The quantity-kind table: the ISO 80000 core
 
-All 52 mapped kinds, with the coherent SI unit each becomes. Every row was verified to have a native
-coherent-SI factor of exactly `1.0`, which is the claim §12.3 makes.
+The table is no longer short enough to print — 910 of QUDT's 1164 kinds map. What follows is the
+ISO 80000 core it started as, which is still the part worth reading, and every row in it was
+verified to have a native coherent-SI factor of exactly `1.0`, the claim §12.3 makes. For the rest,
+read `src/gendata/qudt-qk.bvnr`.
+
+**How the other 858 were chosen, and why not by dimension.** A kind states no multiplier, so there
+is nothing to match on but the dimension vector — and dimensions cannot tell `Torque` from `Work`.
+Both are `[2,1,-2]` at factor `1`, and answering "the coherent SI unit of this kind" with `J` for
+both would be numerically perfect and would tell a reader of a torque that they had an energy. So
+the coherent unit is taken from QUDT's own `qudt:applicableUnit` list instead: the member whose
+`conversionMultiplier` is exactly `1` **is** the coherent unit of that kind, and QUDT lists `N-M`
+under `Torque` and `J` under `Work`. That unit's `qudt:ucumCode` is then carried to native through
+the UCUM table, so a quantity-kind row and a unit row cannot disagree.
+
+**The 254 that are refused are almost all dimensionless**, and refused for a reason no amount of
+work would remove: every native ratio has the same dimension vector as every other, so `Absorptance`,
+`MassFraction` and `ActivityCoefficient` are each worth exactly what `%`, `ppm`, the radian and the
+bit are worth. Nothing in this repository can say which one QUDT means, and QUDT states no
+`ucumCode` for them to settle it. Guessing would put a turbidity reading and a percentage in the
+same equivalence class.
 
 | QUDT quantity kind | Bovnar | QUDT quantity kind | Bovnar |
 |---|---|---|---|
@@ -2166,7 +2217,8 @@ coherent-SI factor of exactly `1.0`, which is the claim §12.3 makes.
 
 > `udunits:` — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 > of netCDF and the CF conventions.
-> Data file `src/gendata/udunits.bvnr` (41 prefixes, 251 mapped, 32 unsupported);
+> Data file `src/gendata/udunits.bvnr` (41 prefixes, 404 mapped, 180 unsupported — every one of
+> the 570 spellings the UDUNITS-2 database defines);
 > pinned by `tests/bovnar_udunits_test.c` (153 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
@@ -2248,16 +2300,32 @@ Two spelling traps in the same family, neither of them factor errors:
 - **`b` is the barn**, not the bit — the collision §6.2 records for UCUM, present here for the same
   reason and resolved the same way. `bit` is the bit and `byte` the byte.
 
-Also absent, and for a reason worth recording because it moved: `unified_atomic_mass_unit`, UDUNITS'
-fourth spelling of the dalton, is not in the table. At 24 bytes it pushes this profile's worst-case
-emitted string past `BVNR_UNIT_STRING_MAX` and `gen_profiles.py` refuses to generate the table
-(§9.2). The three shorter spellings — `u`, `amu`, `atomic_mass_unit` — reach the same unit.
-`thermochemical_calorie` was excluded for the same reason when that constant was 192; it is 1024
-now, and the spelling fits.
+`unified_atomic_mass_unit`, UDUNITS' fourth spelling of the dalton, used to be absent for a reason
+worth recording because it has now moved twice. At 24 bytes it pushed this profile's worst-case
+emitted string past `BVNR_UNIT_STRING_MAX` and `gen_profiles.py` refused to generate the table
+(§9.2); `thermochemical_calorie` was excluded the same way when that constant was 192. Closing the
+table against the UDUNITS database admitted a longer code still — `astronomical_unit_BIPM_2006`, 27
+bytes — and the constant went from 1024 to 1088 to take it. All four spellings now map.
 
-Six more refusals are not near misses at all but CF constructs that are not units: `count`, and the
-coordinate direction markers `degrees_north`, `degrees_east`, `degrees_south`, `degrees_west`,
-`degree_north`, `degree_east`. A direction is a coordinate-system statement; write `°` and record
+**The one thing an incomplete atom table costs that an error message cannot.** UDUNITS spells the
+pint `pt`, and that spelling was not in this table. It did not therefore fail: with no atom row the
+expression parser fell back on a *prefixed* reading, `p` + `t`, and `udunits:pt` parsed clean as a
+**picotonne**. A document saying 473 mL came back as `1e-9` kg — a mass where a volume was written,
+wrong by nine orders of magnitude, in the wrong dimension, with no diagnostic anywhere.
+
+This is the failure mode that makes closing a table worth more than tidiness. Every other missing
+code cost a producer a wrong error message; this one cost them a wrong number, and it was reachable
+from a perfectly ordinary CF file. A whole atom outranks a prefixed reading (§3.2), so the row is
+the entire fix — but nothing would have found it except enumerating the publisher's own list and
+asking, for each spelling, not "is there a row" but "what does this parse to". `check_profile_factors.py`
+now asks exactly that (§9.5), which is what turns this from a bug that was found once into a class
+of bug the build checks for.
+
+The refusals that are not near misses at all are CF constructs that are not units: `count`, and the
+coordinate direction markers — `degrees_north`, `degrees_east` and every other spelling UDUNITS
+gives them, `degreeN` through `degrees_true`, twenty in all. Before the table was closed the first
+six were refused with a reason and their fourteen siblings came back as `error_unit_illegal`, so the
+same concept produced two different errors depending on how it was spelled. A direction is a coordinate-system statement; write `°` and record
 the direction in a sibling field. Note that UDUNITS' `1`, which CF uses for a dimensionless
 variable, needs no row: the shared expression parser resolves a bare power of ten to unity before
 any table is consulted, so `udunits:1` yields no unit exactly as `ucum:1` does.
@@ -2357,6 +2425,89 @@ What it also cannot tell you: it proves the five vocabularies agree **with each 
 they agree with their publishers — that is §9.5's job, and §9.5 reaches `unece` only at one remove
 and reaches `CEL`, `FAH`, `GRY`, `HEN`, `MOL` and `TNE` not at all. **Five tables that are wrong in
 the same way agree perfectly.** §10.2 is where what remains uncovered is recorded.
+
+---
+
+## 15. Closing the tables
+
+### 15.1 What was wrong
+
+The tables were **confident subsets**, and §11.1 argued for that: a code not in the table fails
+loudly, which costs a producer an error message, while a code in it and wrong costs them a wrong
+number. That argument is sound and it justified not *mapping* a code. It never justified what
+actually happened to one.
+
+`ucum.bvnr`'s own header states the contract:
+
+> `.unsupported` — Listed so that it fails as `error_unit_profile_unsupported` ("you wrote it right
+> and we cannot carry it") rather than `error_unit_illegal` ("that is not a UCUM atom").
+
+An atom in none of the three lists is `error_unit_illegal`. Measured against the publishers, that
+was being said about 83 of UCUM's 312 atoms, 299 of UDUNITS' 570 spellings, and some 3600 QUDT
+names — a false statement to a conforming producer, indistinguishable from what they get for
+`udunits:zzzq`. The refusal list exists precisely to prevent that, and a `.unsupported` row needs no
+conversion factor, so closing this gap carried none of the risk the conservative default was
+protecting against.
+
+Two consequences were worse than a wrong error message:
+
+- **`udunits:pt` was a picotonne.** §13.3 has the detail. An expression profile falls back on a
+  prefixed reading when no atom matches, so a missing atom is not always an error — sometimes it is
+  a different unit, silently.
+- **The same concept gave two different errors.** `degrees_north` was refused with a reason and its
+  fourteen sibling spellings were called illegal.
+
+### 15.2 How the rows were produced
+
+Nothing here was matched on numbers alone, because numbers cannot tell a sievert from a gray. In
+order of preference:
+
+1. **The publisher's own definition, transliterated.** UCUM defines `[PRU]` as `mm[Hg].s/ml`; each
+   atom is replaced by whatever this table already maps it to, giving `mmHg·s/m~L`. The row is then
+   one a reader can check against the publication rather than one that merely computes the same.
+2. **The publisher's own cross-reference.** QUDT publishes `qudt:ucumCode` and `qudt:udunitsCode`,
+   so a QUDT local name is carried to native through the UCUM table this repository has already
+   proved against `ucum-essence.xml` — which is also why §14's suite cannot find these two tables
+   disagreeing. UNECE goes through QUDT the same way (§11.1).
+3. **A value match, fenced.** Only for a code with a **non-zero** dimension vector. Every
+   dimensionless native unit shares one dimension vector, so "worth 1 and dimensionless" matches the
+   bit, the radian, the turbidity units and every ratio alike; unfenced it proposed the
+   nephelometric turbidity unit as a *bit*, parts-per-trillion as a *picoradian*, and QUDT's
+   `GeneralizedMomentum` as an NTU.
+
+**Every proposal was then verified through the reference library** — same factor, same dimension
+vector, same tolerance as §9.5 — and anything that did not verify became a `.unsupported` row
+instead. `check_profile_factors.py` re-proves all of it from the publishers' files on every run:
+4635 rows compared, 0 mismatches.
+
+### 15.3 What it cost, and what is still open
+
+| | Before | After |
+|---|---|---|
+| `ucum` | 141 mapped, 32 opaque, 56 refused | 157, 41, 114 — **all 312** |
+| `udunits` | 251 mapped, 32 refused | 404, 180 — **all 570** |
+| `qudt` | 263 mapped, 8 refused | 2056, 752 — **all 2803** |
+| `qudt-qk` | 52 mapped, 7 refused | 910, 255 — **all 1164** |
+| `unece` | 252 mapped, 7 refused | 1195, 257 — all QUDT's cross-reference reaches |
+| rows `check_profile_factors.py` compares | 899 | 4635 |
+| coverage suggestions outstanding | 1161 | 0 |
+| `bovnar` binary | 617 KB | 1015 KB |
+
+**The binary is 65 % larger**, and that is the real price. It is table data — codes, targets and
+refusal strings — and the refusal reasons are written as shared literals per family so the compiler
+pools them, but a build that wants only one vocabulary still pays for five. A per-profile build
+switch is the obvious answer and does not exist yet.
+
+`BVNR_UNIT_STRING_MAX` went from 1024 to 1088 to admit `astronomical_unit_BIPM_2006` (§13.3), and
+`BVN_VALUE_BASE_UNIT_COUNT` from 454 to 463 for UCUM's nine missing arbitrary units.
+
+**What closing the tables did not do.** It did not make the rows better evidenced than §9.5 can
+make them — the "what a code MEANS" gap in §10.2 is untouched, and it is now spread over four times
+as many rows. It did not close `unece`, which has no publication to close against. It did not add a
+single native unit: the British imperial series, the pre-metric French lengths, the typographic
+points and picas, the water column and the CGS electrostatic units are all refused *by name* now
+rather than *by omission*, which is an improvement in the error message and not in the coverage.
+Growing the native registry to reach them is a separate decision, and doc/05 is where it belongs.
 
 ---
 

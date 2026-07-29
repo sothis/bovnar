@@ -104,8 +104,10 @@ extern "C" {
  * width only when EVERY component is negative, because a mixed unit moves them
  * into the denominator and renders them positive. The '·' separators at two
  * bytes each complete it. A profile spelling is bounded separately and lands
- * slightly higher (808) because "udunits:" and its long spelled-out atoms cost
- * more than the native symbols do.
+ * higher (1032) because "udunits:" and its long spelled-out atoms cost more
+ * than the native symbols do — the worst case is 32 components of UDUNITS'
+ * longest code, "astronomical_unit_BIPM_2006" at 27 bytes, each with a signed
+ * exponent and a separator.
  *
  * gen_units.py and gen_profiles.py recompute that bound from src/gendata on
  * every build and fail if a symbol or a code outgrows this, because the margin
@@ -115,7 +117,7 @@ extern "C" {
  * in `bovnar events -d`, reachable from a legal document with a long compound
  * unit.
  */
-#define BVNR_UNIT_STRING_MAX			1024u
+#define BVNR_UNIT_STRING_MAX			1088u
 #define BVN_MAX_INT_WIDTH			32768u
 /*
  * Sentinel for bvnr_read_flags_t.max_file_size and bvnr_write_flags_t.max_file_size:

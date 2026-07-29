@@ -30,7 +30,7 @@
 #define BVN_PREFIX_SYSTEM_COUNT      2
 #define BVN_SI_PREFIX_COUNT         25
 #define BVN_IEC_PREFIX_COUNT        11
-#define BVN_VALUE_BASE_UNIT_COUNT  454
+#define BVN_VALUE_BASE_UNIT_COUNT  463
 typedef char bvn_internal_dims_event_check[
 	(ev_stream_end + 1 == BVN_EVENT_COUNT) ? 1 : -1];
 /* Anchored to the LAST enumerator, like the event and unit checks below — not to

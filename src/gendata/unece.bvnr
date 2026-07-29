@@ -430,6 +430,967 @@
   { .code = "JE";  .bovnar = "J/K";     },   # joule per kelvin
   { .code = "B11"; .bovnar = "J·k~g^-1·K^-1"; },  # joule per kilogram kelvin
   { .code = "D53"; .bovnar = "W·m^-1·K^-1";   },  # watt per metre kelvin
+
+  # ── Closing the table against QUDT's Rec 20 cross-reference ──────────────
+  #
+  # WHAT "CLOSED" MEANS HERE, AND WHAT IT DOES NOT. Rec 20 states its factors in
+  # prose, so unlike the other four vocabularies there is no publication this
+  # repository can enumerate. The reachable set is every Rec 20 code that some
+  # QUDT unit claims with `qudt:uneceCommonCode` -- and a code no QUDT unit
+  # mentions is still outside this table, because nothing here can say what it
+  # is worth. That is the same limit §11.1 and check_profile_factors.py's
+  # `class Unece` already state; closing the table does not lift it.
+  #
+  # Each row below carries the native target its claiming QUDT unit already
+  # maps to, named in the comment. So a UNECE row is never better evidenced
+  # than the QUDT row behind it, which is the truth about this vocabulary, and
+  # the two tables agree by construction rather than by coincidence.
+  #
+  # .reverse = false except where the slot had no writer at all; a completion
+  # pass should not restyle what bovnar already emits.
+  { .code = "22";    .bovnar = "d~L/g";               .reverse = false; },  # via qudt:DeciL-PER-GM
+  { .code = "25";    .bovnar = "g/c~m^2";             .reverse = false; },  # via qudt:GM-PER-CentiM2
+  { .code = "28";    .bovnar = "k~g/m^2";             .reverse = false; },  # via qudt:KiloGM-PER-M2
+  { .code = "2B";    .bovnar = "rad/s^2";             .reverse = false; },  # via qudt:RAD-PER-SEC2
+  { .code = "2I";    .bovnar = "Btu/h";               .reverse = false; },  # via qudt:BTU_IT-PER-HR
+  { .code = "2J";    .bovnar = "c~m^3/s";             .reverse = false; },  # via qudt:CentiM3-PER-SEC
+  { .code = "2K";    .bovnar = "ft^3/h";              .reverse = false; },  # via qudt:FT3-PER-HR
+  { .code = "2L";    .bovnar = "ft^3/min";            .reverse = false; },  # via qudt:FT3-PER-MIN
+  { .code = "2M";    .bovnar = "c~m/s";               .reverse = false; },  # via qudt:CentiM-PER-SEC
+  { .code = "2R";    .bovnar = "k~Ci";                },  # via qudt:KiloCi
+  { .code = "2X";    .bovnar = "m/min";               .reverse = false; },  # via qudt:M-PER-MIN
+  { .code = "2Y";    .bovnar = "m~R";                 },  # via qudt:MilliR
+  { .code = "33";    .bovnar = "k~Pa·m^2/g";          .reverse = false; },  # via qudt:KiloPA-M2-PER-GM
+  { .code = "34";    .bovnar = "k~Pa/m~m";            .reverse = false; },  # via qudt:KiloPA-PER-MilliM
+  { .code = "36";    .bovnar = "ft^3/min·ft^2";       .reverse = false; },  # via qudt:FT3-PER-MIN-FT2
+  { .code = "37";    .bovnar = "oz/ft^2";             .reverse = false; },  # via qudt:OZ-PER-FT2
+  { .code = "3H";    .bovnar = "k~g/k~g";             .reverse = false; },  # via qudt:KiloGM-PER-KiloGM
+  { .code = "40";    .bovnar = "m~L/s";               .reverse = false; },  # via qudt:MilliL-PER-SEC
+  { .code = "41";    .bovnar = "m~L/min";             .reverse = false; },  # via qudt:MilliL-PER-MIN
+  { .code = "4C";    .bovnar = "c~St";                },  # via qudt:CentiST
+  { .code = "4M";    .bovnar = "m~g/h";               .reverse = false; },  # via qudt:MilliGM-PER-HR
+  { .code = "4P";    .bovnar = "N/m";                 .reverse = false; },  # via qudt:N-PER-M
+  { .code = "4Q";    .bovnar = "oz·in";               .reverse = false; },  # via qudt:OZ-IN
+  { .code = "4T";    .bovnar = "p~F";                 },  # via qudt:PicoFARAD
+  { .code = "4U";    .bovnar = "lb/h";                .reverse = false; },  # via qudt:LB-PER-HR
+  { .code = "4X";    .bovnar = "k~L/h";               .reverse = false; },  # via qudt:KiloL-PER-HR
+  { .code = "74";    .bovnar = "m~Pa";                },  # via qudt:MilliPA
+  { .code = "78";    .bovnar = "k~G";                 },  # via qudt:KiloGAUSS
+  { .code = "80";    .bovnar = "lb/in^2";             .reverse = false; },  # via qudt:LB-PER-IN2
+  { .code = "84";    .bovnar = "k~lbf/in^2";          .reverse = false; },  # via qudt:KiloLB_F-PER-IN2
+  { .code = "87";    .bovnar = "lb/ft^3";             .reverse = false; },  # via qudt:LB-PER-FT3
+  { .code = "A10";   .bovnar = "A·m^2/J·s";           .reverse = false; },  # via qudt:A-M2-PER-J-SEC
+  { .code = "A13";   .bovnar = "a~J";                 },  # via qudt:AttoJ
+  { .code = "A15";   .bovnar = "barn/eV";             .reverse = false; },  # via qudt:BARN-PER-EV
+  { .code = "A16";   .bovnar = "barn/sr·eV";          .reverse = false; },  # via qudt:BARN-PER-SR-EV
+  { .code = "A17";   .bovnar = "barn/sr";             .reverse = false; },  # via qudt:BARN-PER-SR
+  { .code = "A18";   .bovnar = "Bq/k~g";              .reverse = false; },  # via qudt:BQ-PER-KiloGM
+  { .code = "A19";   .bovnar = "Bq/m^3";              .reverse = false; },  # via qudt:BQ-PER-M3
+  { .code = "A2";    .bovnar = "A/c~m";               .reverse = false; },  # via qudt:A-PER-CentiM
+  { .code = "A20";   .bovnar = "Btu/s·ft^2·°Ra";      .reverse = false; },  # via qudt:BTU_IT-PER-SEC-FT2-DEG_R
+  { .code = "A22";   .bovnar = "Btu/s·ft·°Ra";        .reverse = false; },  # via qudt:BTU_IT-PER-SEC-FT-DEG_R
+  { .code = "A23";   .bovnar = "Btu/h·ft^2·°Ra";      .reverse = false; },  # via qudt:BTU_IT-PER-HR-FT2-DEG_R
+  { .code = "A26";   .bovnar = "C·m";                 .reverse = false; },  # via qudt:C-M
+  { .code = "A27";   .bovnar = "C·m^2/V";             .reverse = false; },  # via qudt:C-M2-PER-V
+  { .code = "A28";   .bovnar = "C/c~m^3";             .reverse = false; },  # via qudt:C-PER-CentiM3
+  { .code = "A29";   .bovnar = "C/m^3";               .reverse = false; },  # via qudt:C-PER-M3
+  { .code = "A3";    .bovnar = "A/m~m";               .reverse = false; },  # via qudt:A-PER-MilliM
+  { .code = "A30";   .bovnar = "C/m~m^3";             .reverse = false; },  # via qudt:C-PER-MilliM3
+  { .code = "A31";   .bovnar = "C/k~g·s";             .reverse = false; },  # via qudt:C-PER-KiloGM-SEC
+  { .code = "A32";   .bovnar = "C/mol";               .reverse = false; },  # via qudt:C-PER-MOL
+  { .code = "A33";   .bovnar = "C/c~m^2";             .reverse = false; },  # via qudt:C-PER-CentiM2
+  { .code = "A34";   .bovnar = "C/m^2";               .reverse = false; },  # via qudt:C-PER-M2
+  { .code = "A35";   .bovnar = "C/m~m^2";             .reverse = false; },  # via qudt:C-PER-MilliM2
+  { .code = "A36";   .bovnar = "c~m^3/mol";           .reverse = false; },  # via qudt:CentiM3-PER-MOL
+  { .code = "A37";   .bovnar = "d~m^3/mol";           .reverse = false; },  # via qudt:DeciM3-PER-MOL
+  { .code = "A38";   .bovnar = "m^3/C";               .reverse = false; },  # via qudt:M3-PER-C
+  { .code = "A39";   .bovnar = "m^3/k~g";             .reverse = false; },  # via qudt:M3-PER-KiloGM
+  { .code = "A4";    .bovnar = "A/c~m^2";             .reverse = false; },  # via qudt:A-PER-CentiM2
+  { .code = "A40";   .bovnar = "m^3/mol";             .reverse = false; },  # via qudt:M3-PER-MOL
+  { .code = "A41";   .bovnar = "A/m^2";               .reverse = false; },  # via qudt:A-PER-M2
+  { .code = "A44";   .bovnar = "da~L";                },  # via qudt:DecaL
+  { .code = "A45";   .bovnar = "da~m";                },  # via qudt:DecaM
+  { .code = "A5";    .bovnar = "A·m^2";               .reverse = false; },  # via qudt:A-M2
+  { .code = "A50";   .bovnar = "dyn·s/c~m^3";         .reverse = false; },  # via qudt:DYN-SEC-PER-CentiM3
+  { .code = "A51";   .bovnar = "dyn·s/c~m";           .reverse = false; },  # via qudt:DYN-SEC-PER-CentiM
+  { .code = "A52";   .bovnar = "dyn·s/c~m^5";         .reverse = false; },  # via qudt:DYN-SEC-PER-CentiM5
+  { .code = "A54";   .bovnar = "eV/m";                .reverse = false; },  # via qudt:EV-PER-M
+  { .code = "A55";   .bovnar = "eV·m^2";              .reverse = false; },  # via qudt:EV-M2
+  { .code = "A56";   .bovnar = "eV·m^2/k~g";          .reverse = false; },  # via qudt:EV-M2-PER-KiloGM
+  { .code = "A6";    .bovnar = "A/m^2·K^2";           .reverse = false; },  # via qudt:A-PER-M2-K2
+  { .code = "A60";   .bovnar = "erg/c~m^3";           .reverse = false; },  # via qudt:ERG-PER-CentiM3
+  { .code = "A61";   .bovnar = "erg/g";               .reverse = false; },  # via qudt:ERG-PER-GM
+  { .code = "A62";   .bovnar = "erg/g·s";             .reverse = false; },  # via qudt:ERG-PER-GM-SEC
+  { .code = "A63";   .bovnar = "erg/s";               .reverse = false; },  # via qudt:ERG-PER-SEC
+  { .code = "A65";   .bovnar = "erg/c~m^2·s";         .reverse = false; },  # via qudt:ERG-PER-CentiM2-SEC
+  { .code = "A66";   .bovnar = "erg·c~m^2";           .reverse = false; },  # via qudt:ERG-CentiM2
+  { .code = "A67";   .bovnar = "erg·c~m^2/g";         .reverse = false; },  # via qudt:ERG-CentiM2-PER-GM
+  { .code = "A68";   .bovnar = "E~J";                 },  # via qudt:ExaJ
+  { .code = "A69";   .bovnar = "F/m";                 .reverse = false; },  # via qudt:FARAD-PER-M
+  { .code = "A7";    .bovnar = "A/m~m^2";             .reverse = false; },  # via qudt:A-PER-MilliM2
+  { .code = "A70";   .bovnar = "f~J";                 },  # via qudt:FemtoJ
+  { .code = "A71";   .bovnar = "f~m";                 },  # via qudt:FM
+  { .code = "A73";   .bovnar = "ft/s^2";              .reverse = false; },  # via qudt:FT-PER-SEC2
+  { .code = "A74";   .bovnar = "ft·lbf/s";            .reverse = false; },  # via qudt:FT-LB_F-PER-SEC
+  { .code = "A84";   .bovnar = "G~C/m^3";             .reverse = false; },  # via qudt:GigaC-PER-M3
+  { .code = "A85";   .bovnar = "G~eV";                },  # via qudt:GigaEV
+  { .code = "A87";   .bovnar = "G~Ω";                 },  # via qudt:GigaOHM
+  { .code = "A88";   .bovnar = "G~Ω·m";               .reverse = false; },  # via qudt:GigaOHM-M
+  { .code = "A89";   .bovnar = "G~Pa";                },  # via qudt:GigaPA
+  { .code = "A90";   .bovnar = "G~W";                 },  # via qudt:GigaW
+  { .code = "A93";   .bovnar = "g/m^3";               .reverse = false; },  # via qudt:GM-PER-M3
+  { .code = "A94";   .bovnar = "g/mol";               .reverse = false; },  # via qudt:GM-PER-MOL
+  { .code = "A96";   .bovnar = "Gy/s";                .reverse = false; },  # via qudt:GRAY-PER-SEC
+  { .code = "A98";   .bovnar = "H/m";                 .reverse = false; },  # via qudt:H-PER-M
+  { .code = "AE";    .bovnar = "A/m";                 .reverse = false; },  # via qudt:A-PER-M
+  { .code = "AMH";   .bovnar = "A·h";                 .reverse = false; },  # via qudt:A-HR
+  { .code = "AZ";    .bovnar = "Btu/lb";              .reverse = false; },  # via qudt:BTU_IT-PER-LB
+  { .code = "B13";   .bovnar = "J/m^2";               .reverse = false; },  # via qudt:J-PER-M2
+  { .code = "B14";   .bovnar = "J/m^4";               .reverse = false; },  # via qudt:J-PER-M4
+  { .code = "B15";   .bovnar = "J/mol";               .reverse = false; },  # via qudt:J-PER-MOL
+  { .code = "B16";   .bovnar = "J/mol·K";             .reverse = false; },  # via qudt:J-PER-MOL-K
+  { .code = "B18";   .bovnar = "J·s";                 .reverse = false; },  # via qudt:J-SEC
+  { .code = "B20";   .bovnar = "J·m^2/k~g";           .reverse = false; },  # via qudt:J-M2-PER-KiloGM
+  { .code = "B21";   .bovnar = "K/W";                 .reverse = false; },  # via qudt:K-PER-W
+  { .code = "B23";   .bovnar = "k~A/m^2";             .reverse = false; },  # via qudt:KiloA-PER-M2
+  { .code = "B24";   .bovnar = "k~A/m";               .reverse = false; },  # via qudt:KiloA-PER-M
+  { .code = "B25";   .bovnar = "k~Bq/k~g";            .reverse = false; },  # via qudt:KiloBQ-PER-KiloGM
+  { .code = "B26";   .bovnar = "k~C";                 },  # via qudt:KiloC
+  { .code = "B27";   .bovnar = "k~C/m^3";             .reverse = false; },  # via qudt:KiloC-PER-M3
+  { .code = "B28";   .bovnar = "k~C/m^2";             .reverse = false; },  # via qudt:KiloC-PER-M2
+  { .code = "B29";   .bovnar = "k~eV";                },  # via qudt:KiloEV
+  { .code = "B33";   .bovnar = "k~g·m^2/s";           .reverse = false; },  # via qudt:KiloGM-M2-PER-SEC
+  { .code = "B34";   .bovnar = "k~g/d~m^3";           .reverse = false; },  # via qudt:KiloGM-PER-DeciM3
+  { .code = "B35";   .bovnar = "k~g/L";               .reverse = false; },  # via qudt:KiloGM-PER-L
+  { .code = "B36";   .bovnar = "cal/g";               .reverse = false; },  # via qudt:CAL_TH-PER-GM
+  { .code = "B38";   .bovnar = "g·gn·k~m";            .reverse = false; },  # via qudt:KiloGM_F-M
+  { .code = "B39";   .bovnar = "g·gn·k~m/s";          .reverse = false; },  # via qudt:KiloGM_F-M-PER-SEC
+  { .code = "B40";   .bovnar = "d~g·gn/c~m^2";        .reverse = false; },  # via qudt:KiloGM_F-PER-M2
+  { .code = "B41";   .bovnar = "k~J/K";               .reverse = false; },  # via qudt:KiloJ-PER-K
+  { .code = "B42";   .bovnar = "k~J/k~g";             .reverse = false; },  # via qudt:KiloJ-PER-KiloGM
+  { .code = "B43";   .bovnar = "k~J·k~g^-1·K^-1";     .reverse = false; },  # via qudt:KiloJ-PER-KiloGM-K
+  { .code = "B44";   .bovnar = "k~J/mol";             .reverse = false; },  # via qudt:KiloJ-PER-MOL
+  { .code = "B45";   .bovnar = "k~mol";               },  # via qudt:KiloMOL
+  { .code = "B46";   .bovnar = "k~mol/m^3";           .reverse = false; },  # via qudt:KiloMOL-PER-M3
+  { .code = "B48";   .bovnar = "k~N·m";               .reverse = false; },  # via qudt:KiloN-M
+  { .code = "B50";   .bovnar = "k~Ω·m";               .reverse = false; },  # via qudt:KiloOHM-M
+  { .code = "B52";   .bovnar = "k~s";                 },  # via qudt:KiloSEC
+  { .code = "B53";   .bovnar = "k~S";                 },  # via qudt:KiloS
+  { .code = "B54";   .bovnar = "k~S/m";               .reverse = false; },  # via qudt:KiloS-PER-M
+  { .code = "B55";   .bovnar = "k~V/m";               .reverse = false; },  # via qudt:KiloV-PER-M
+  { .code = "B56";   .bovnar = "k~Wb/m";              .reverse = false; },  # via qudt:KiloWB-PER-M
+  { .code = "B58";   .bovnar = "L/mol";               .reverse = false; },  # via qudt:L-PER-MOL
+  { .code = "B59";   .bovnar = "lm·h";                .reverse = false; },  # via qudt:LM-HR
+  { .code = "B61";   .bovnar = "lm/W";                .reverse = false; },  # via qudt:LM-PER-W
+  { .code = "B62";   .bovnar = "lm·s";                .reverse = false; },  # via qudt:LM-SEC
+  { .code = "B63";   .bovnar = "lx·h";                .reverse = false; },  # via qudt:LUX-HR
+  { .code = "B64";   .bovnar = "lx·s";                .reverse = false; },  # via qudt:LUX-SEC
+  { .code = "B66";   .bovnar = "M~A/m^2";             .reverse = false; },  # via qudt:MegaA-PER-M2
+  { .code = "B67";   .bovnar = "M~Bq/k~g";            .reverse = false; },  # via qudt:MegaBQ-PER-KiloGM
+  { .code = "B69";   .bovnar = "M~C/m^3";             .reverse = false; },  # via qudt:MegaC-PER-M3
+  { .code = "B70";   .bovnar = "M~C/m^2";             .reverse = false; },  # via qudt:MegaC-PER-M2
+  { .code = "B71";   .bovnar = "M~eV";                },  # via qudt:MegaEV
+  { .code = "B72";   .bovnar = "M~g/m^3";             .reverse = false; },  # via qudt:MegaGM-PER-M3
+  { .code = "B73";   .bovnar = "M~N";                 },  # via qudt:MegaN
+  { .code = "B74";   .bovnar = "M~N·m";               .reverse = false; },  # via qudt:MegaN-M
+  { .code = "B76";   .bovnar = "m·M~Ω";               .reverse = false; },  # via qudt:MegaOHM-M
+  { .code = "B77";   .bovnar = "M~S/m";               .reverse = false; },  # via qudt:MegaS-PER-M
+  { .code = "B78";   .bovnar = "M~V";                 },  # via qudt:MegaV
+  { .code = "B79";   .bovnar = "M~V/m";               .reverse = false; },  # via qudt:MegaV-PER-M
+  { .code = "B8";    .bovnar = "J/m^3";               .reverse = false; },  # via qudt:J-PER-M3
+  { .code = "B81";   .bovnar = "m^-2·s^-1";           .reverse = false; },  # via qudt:PER-M2-SEC
+  { .code = "B83";   .bovnar = "m^4";                 .reverse = false; },  # via qudt:M4
+  { .code = "B85";   .bovnar = "µ~bar";               },  # via qudt:MicroBAR
+  { .code = "B86";   .bovnar = "µ~C";                 },  # via qudt:MicroC
+  { .code = "B87";   .bovnar = "µ~C/m^3";             .reverse = false; },  # via qudt:MicroC-PER-M3
+  { .code = "B88";   .bovnar = "µ~C/m^2";             .reverse = false; },  # via qudt:MicroC-PER-M2
+  { .code = "B89";   .bovnar = "µ~F/m";               .reverse = false; },  # via qudt:MicroFARAD-PER-M
+  { .code = "B90";   .bovnar = "µ~H";                 },  # via qudt:MicroH
+  { .code = "B91";   .bovnar = "µ~H/m";               .reverse = false; },  # via qudt:MicroH-PER-M
+  { .code = "B92";   .bovnar = "µ~N";                 },  # via qudt:MicroN
+  { .code = "B93";   .bovnar = "µ~N·m";               .reverse = false; },  # via qudt:MicroN-M
+  { .code = "B94";   .bovnar = "µ~Ω";                 },  # via qudt:MicroOHM
+  { .code = "B95";   .bovnar = "m·µ~Ω";               .reverse = false; },  # via qudt:MicroOHM-M
+  { .code = "B96";   .bovnar = "µ~Pa";                },  # via qudt:MicroPA
+  { .code = "B99";   .bovnar = "µ~S";                 },  # via qudt:MicroS
+  { .code = "C10";   .bovnar = "m~F";                 },  # via qudt:MilliFARAD
+  { .code = "C11";   .bovnar = "m~Gal";               },  # via qudt:MilliGAL
+  { .code = "C13";   .bovnar = "m~Gy";                },  # via qudt:MilliGRAY
+  { .code = "C15";   .bovnar = "m~J";                 },  # via qudt:MilliJ
+  { .code = "C16";   .bovnar = "m~m/s";               .reverse = false; },  # via qudt:MilliM-PER-SEC
+  { .code = "C17";   .bovnar = "m~m^2/s";             .reverse = false; },  # via qudt:MilliM2-PER-SEC
+  { .code = "C19";   .bovnar = "mol/k~g";             .reverse = false; },  # via qudt:MOL-PER-KiloGM
+  { .code = "C20";   .bovnar = "m~N";                 },  # via qudt:MilliN
+  { .code = "C22";   .bovnar = "m~N/m";               .reverse = false; },  # via qudt:MilliN-PER-M
+  { .code = "C23";   .bovnar = "m·m~Ω";               .reverse = false; },  # via qudt:MilliOHM-M
+  { .code = "C24";   .bovnar = "m~Pa·s";              .reverse = false; },  # via qudt:MilliPA-SEC
+  { .code = "C27";   .bovnar = "m~S";                 },  # via qudt:MilliS
+  { .code = "C28";   .bovnar = "m~Sv";                },  # via qudt:MilliSV
+  { .code = "C29";   .bovnar = "m~T";                 },  # via qudt:MilliT
+  { .code = "C3";    .bovnar = "µ~V/m";               .reverse = false; },  # via qudt:MicroV-PER-M
+  { .code = "C30";   .bovnar = "m~V/m";               .reverse = false; },  # via qudt:MilliV-PER-M
+  { .code = "C32";   .bovnar = "m~W/m^2";             .reverse = false; },  # via qudt:MilliW-PER-M2
+  { .code = "C33";   .bovnar = "m~Wb";                },  # via qudt:MilliWB
+  { .code = "C35";   .bovnar = "mol/d~m^3";           .reverse = false; },  # via qudt:MOL-PER-DeciM3
+  { .code = "C39";   .bovnar = "n~A";                 },  # via qudt:NanoA
+  { .code = "C40";   .bovnar = "n~C";                 },  # via qudt:NanoC
+  { .code = "C41";   .bovnar = "n~F";                 },  # via qudt:NanoFARAD
+  { .code = "C42";   .bovnar = "n~F/m";               .reverse = false; },  # via qudt:NanoFARAD-PER-M
+  { .code = "C43";   .bovnar = "n~H";                 },  # via qudt:NanoH
+  { .code = "C44";   .bovnar = "n~H/m";               .reverse = false; },  # via qudt:NanoH-PER-M
+  { .code = "C46";   .bovnar = "n~Ω·m";               .reverse = false; },  # via qudt:NanoOHM-M
+  { .code = "C48";   .bovnar = "n~T";                 },  # via qudt:NanoT
+  { .code = "C49";   .bovnar = "n~W";                 },  # via qudt:NanoW
+  { .code = "C51";   .bovnar = "s^-1";                .reverse = false; },  # via qudt:NP-PER-SEC
+  { .code = "C53";   .bovnar = "N·m·s";               .reverse = false; },  # via qudt:N-M-SEC
+  { .code = "C54";   .bovnar = "N·m^2/k~g^2";         .reverse = false; },  # via qudt:N-M2-PER-KiloGM2
+  { .code = "C56";   .bovnar = "N/m~m^2";             .reverse = false; },  # via qudt:N-PER-MilliM2
+  { .code = "C57";   .bovnar = "N·s";                 .reverse = false; },  # via qudt:N-SEC
+  { .code = "C58";   .bovnar = "N·s/m";               .reverse = false; },  # via qudt:N-SEC-PER-M
+  { .code = "C60";   .bovnar = "Ω·c~m";               .reverse = false; },  # via qudt:OHM-CentiM
+  { .code = "C61";   .bovnar = "Ω·m";                 .reverse = false; },  # via qudt:OHM-M
+  { .code = "C64";   .bovnar = "Pa/K";                .reverse = false; },  # via qudt:PA-PER-K
+  { .code = "C66";   .bovnar = "Pa·s/m^3";            .reverse = false; },  # via qudt:PA-SEC-PER-M3
+  { .code = "C67";   .bovnar = "Pa·s/m";              .reverse = false; },  # via qudt:PA-SEC-PER-M
+  { .code = "C68";   .bovnar = "P~J";                 },  # via qudt:PetaJ
+  { .code = "C7";    .bovnar = "c~P";                 },  # via qudt:CentiPOISE
+  { .code = "C70";   .bovnar = "p~A";                 },  # via qudt:PicoA
+  { .code = "C71";   .bovnar = "p~C";                 },  # via qudt:PicoC
+  { .code = "C72";   .bovnar = "p~F/m";               .reverse = false; },  # via qudt:PicoFARAD-PER-M
+  { .code = "C73";   .bovnar = "p~H";                 },  # via qudt:PicoH
+  { .code = "C75";   .bovnar = "p~W";                 },  # via qudt:PicoW
+  { .code = "C76";   .bovnar = "p~W/m^2";             .reverse = false; },  # via qudt:PicoW-PER-M2
+  { .code = "C79";   .bovnar = "k~V·A·h";             .reverse = false; },  # via qudt:KiloV-A-HR
+  { .code = "C8";    .bovnar = "m~C/k~g";             .reverse = false; },  # via qudt:MilliC-PER-KiloGM
+  { .code = "C82";   .bovnar = "rad·m^2/mol";         .reverse = false; },  # via qudt:RAD-M2-PER-MOL
+  { .code = "C83";   .bovnar = "rad·m^2/k~g";         .reverse = false; },  # via qudt:RAD-M2-PER-KiloGM
+  { .code = "C84";   .bovnar = "rad/m";               .reverse = false; },  # via qudt:RAD-PER-M
+  { .code = "C85";   .bovnar = "Å^-1";                .reverse = false; },  # via qudt:PER-ANGSTROM
+  { .code = "C86";   .bovnar = "m^-3";                .reverse = false; },  # via qudt:PER-M3
+  { .code = "C87";   .bovnar = "m^-3·s^-1";           .reverse = false; },  # via qudt:PER-M3-SEC
+  { .code = "C88";   .bovnar = "eV^-1·m^-3";          .reverse = false; },  # via qudt:PER-EV-M3
+  { .code = "C89";   .bovnar = "H^-1";                .reverse = false; },  # via qudt:PER-H
+  { .code = "C90";   .bovnar = "J^-1·m^-3";           .reverse = false; },  # via qudt:PER-J-M3
+  { .code = "C91";   .bovnar = "K^-1";                .reverse = false; },  # via qudt:PER-K
+  { .code = "C93";   .bovnar = "m^-2";                .reverse = false; },  # via qudt:PER-M2
+  { .code = "C95";   .bovnar = "mol^-1";              .reverse = false; },  # via qudt:PER-MOL
+  { .code = "C96";   .bovnar = "Pa^-1";               .reverse = false; },  # via qudt:PER-PA
+  { .code = "C98";   .bovnar = "s^-1·m^-3";           .reverse = false; },  # via qudt:PER-SEC-M3
+  { .code = "C99";   .bovnar = "s^-1·m^-2";           .reverse = false; },  # via qudt:PER-SEC-M2
+  { .code = "CKG";   .bovnar = "C/k~g";               .reverse = false; },  # via qudt:C-PER-KiloGM
+  { .code = "CWA";   .bovnar = "h~lb";                },  # via qudt:Hundredweight_US
+  { .code = "D1";    .bovnar = "s^-1·sr^-1";          .reverse = false; },  # via qudt:PER-SEC-SR
+  { .code = "D10";   .bovnar = "S/m";                 .reverse = false; },  # via qudt:S-PER-M
+  { .code = "D12";   .bovnar = "S·m^2/mol";           .reverse = false; },  # via qudt:S-M2-PER-MOL
+  { .code = "D16";   .bovnar = "c~m^2/erg";           .reverse = false; },  # via qudt:CentiM2-PER-ERG
+  { .code = "D17";   .bovnar = "c~m^2/sr·erg";        .reverse = false; },  # via qudt:CentiM2-PER-SR-ERG
+  { .code = "D18";   .bovnar = "m·K";                 .reverse = false; },  # via qudt:M-K
+  { .code = "D19";   .bovnar = "m^2·K/W";             .reverse = false; },  # via qudt:M2-K-PER-W
+  { .code = "D2";    .bovnar = "s^-1·m^-2·sr^-1";     .reverse = false; },  # via qudt:PER-SEC-M2-SR
+  { .code = "D20";   .bovnar = "m^2/J";               .reverse = false; },  # via qudt:M2-PER-J
+  { .code = "D21";   .bovnar = "m^2/k~g";             .reverse = false; },  # via qudt:M2-PER-KiloGM
+  { .code = "D22";   .bovnar = "m^2/mol";             .reverse = false; },  # via qudt:M2-PER-MOL
+  { .code = "D24";   .bovnar = "m^2/sr";              .reverse = false; },  # via qudt:M2-PER-SR
+  { .code = "D25";   .bovnar = "m^2/sr·J";            .reverse = false; },  # via qudt:M2-PER-SR-J
+  { .code = "D26";   .bovnar = "m^2/V·s";             .reverse = false; },  # via qudt:M2-PER-V-SEC
+  { .code = "D29";   .bovnar = "T~Hz";                },  # via qudt:TeraHZ
+  { .code = "D30";   .bovnar = "T~J";                 },  # via qudt:TeraJ
+  { .code = "D31";   .bovnar = "T~W";                 },  # via qudt:TeraW
+  { .code = "D32";   .bovnar = "T~W·h";               .reverse = false; },  # via qudt:TeraW-HR
+  { .code = "D37";   .bovnar = "cal/g·K";             .reverse = false; },  # via qudt:CAL_TH-PER-GM-K
+  { .code = "D38";   .bovnar = "cal/s·c~m·K";         .reverse = false; },  # via qudt:CAL_TH-PER-SEC-CentiM-K
+  { .code = "D39";   .bovnar = "cal/s·c~m^2·K";       .reverse = false; },  # via qudt:CAL_TH-PER-SEC-CentiM2-K
+  { .code = "D41";   .bovnar = "t/m^3";               .reverse = false; },  # via qudt:TONNE-PER-M3
+  { .code = "D45";   .bovnar = "V^2/K^2";             .reverse = false; },  # via qudt:V2-PER-K2
+  { .code = "D47";   .bovnar = "V/c~m";               .reverse = false; },  # via qudt:V-PER-CentiM
+  { .code = "D48";   .bovnar = "V/K";                 .reverse = false; },  # via qudt:V-PER-K
+  { .code = "D5";    .bovnar = "k~g/c~m^2";           .reverse = false; },  # via qudt:KiloGM-PER-CentiM2
+  { .code = "D50";   .bovnar = "V/m";                 .reverse = false; },  # via qudt:V-PER-M
+  { .code = "D51";   .bovnar = "V/m~m";               .reverse = false; },  # via qudt:V-PER-MilliM
+  { .code = "D52";   .bovnar = "W/K";                 .reverse = false; },  # via qudt:W-PER-K
+  { .code = "D54";   .bovnar = "W/m^2";               .reverse = false; },  # via qudt:W-PER-M2
+  { .code = "D55";   .bovnar = "W/m^2·K";             .reverse = false; },  # via qudt:W-PER-M2-K
+  { .code = "D56";   .bovnar = "W/m^2·K^4";           .reverse = false; },  # via qudt:W-PER-M2-K4
+  { .code = "D57";   .bovnar = "W/sr";                .reverse = false; },  # via qudt:W-PER-SR
+  { .code = "D58";   .bovnar = "W/m^2·sr";            .reverse = false; },  # via qudt:W-PER-M2-SR
+  { .code = "D59";   .bovnar = "Wb/m";                .reverse = false; },  # via qudt:WB-PER-M
+  { .code = "D6";    .bovnar = "R/s";                 .reverse = false; },  # via qudt:R-PER-SEC
+  { .code = "D60";   .bovnar = "Wb/m~m";              .reverse = false; },  # via qudt:WB-PER-MilliM
+  { .code = "D69";   .bovnar = "in^4";                .reverse = false; },  # via qudt:IN4
+  { .code = "D73";   .bovnar = "J·m^2";               .reverse = false; },  # via qudt:J-M2
+  { .code = "D74";   .bovnar = "k~g/mol";             .reverse = false; },  # via qudt:KiloGM-PER-MOL
+  { .code = "D76";   .bovnar = "Btu/lb·°Ra";          .reverse = false; },  # via qudt:CAL_IT-PER-GM-K
+  { .code = "D77";   .bovnar = "M~C";                 },  # via qudt:MegaC
+  { .code = "D78";   .bovnar = "M~J/s";               .reverse = false; },  # via qudt:MegaJ-PER-SEC
+  { .code = "D80";   .bovnar = "µ~W";                 },  # via qudt:MicroW
+  { .code = "D81";   .bovnar = "µ~T";                 },  # via qudt:MicroT
+  { .code = "D83";   .bovnar = "m~N·m";               .reverse = false; },  # via qudt:MilliN-M
+  { .code = "D85";   .bovnar = "µ~W/m^2";             .reverse = false; },  # via qudt:MicroW-PER-M2
+  { .code = "D86";   .bovnar = "m~C";                 },  # via qudt:MilliC
+  { .code = "D87";   .bovnar = "m~mol/k~g";           .reverse = false; },  # via qudt:MilliMOL-PER-KiloGM
+  { .code = "D88";   .bovnar = "m~C/m^3";             .reverse = false; },  # via qudt:MilliC-PER-M3
+  { .code = "D89";   .bovnar = "m~C/m^2";             .reverse = false; },  # via qudt:MilliC-PER-M2
+  { .code = "D9";    .bovnar = "dyn/c~m^2";           .reverse = false; },  # via qudt:DYN-PER-CentiM2
+  { .code = "D94";   .bovnar = "s/m^3·rad";           .reverse = false; },  # via qudt:SEC-PER-M3-RAD
+  { .code = "D95";   .bovnar = "J/g";                 .reverse = false; },  # via qudt:J-PER-GM
+  { .code = "DAA";   .bovnar = "d~ha";                },  # via qudt:DecaARE
+  { .code = "DJ";    .bovnar = "da~g";                },  # via qudt:DecaGM
+  { .code = "DMA";   .bovnar = "da~m^3";              .reverse = false; },  # via qudt:DecaM3
+  { .code = "DN";    .bovnar = "d~N·m";               .reverse = false; },  # via qudt:DeciN-M
+  { .code = "DRI";   .bovnar = "dr";                  },  # via qudt:DRAM_UK
+  { .code = "DX";    .bovnar = "dyn/c~m";             .reverse = false; },  # via qudt:DYN-PER-CentiM
+  { .code = "E01";   .bovnar = "N/c~m^2";             .reverse = false; },  # via qudt:N-PER-CentiM2
+  { .code = "E09";   .bovnar = "m~A·h";               .reverse = false; },  # via qudt:MilliA-HR
+  { .code = "E17";   .bovnar = "ft^3/s";              .reverse = false; },  # via qudt:FT3-PER-SEC
+  { .code = "E32";   .bovnar = "L/h";                 .reverse = false; },  # via qudt:L-PER-HR
+  { .code = "E39";   .bovnar = "in^-1";               .reverse = false; },  # via qudt:DPI
+  { .code = "E41";   .bovnar = "h~at";                },  # via qudt:KiloGM_F-PER-MilliM2
+  { .code = "E43";   .bovnar = "J/c~m^2";             .reverse = false; },  # via qudt:J-PER-CentiM2
+  { .code = "E44";   .bovnar = "g·gn·k~m/c~m^2";      .reverse = false; },  # via qudt:KiloGM_F-M-PER-CentiM2
+  { .code = "E45";   .bovnar = "m~Ω";                 },  # via qudt:MilliOHM
+  { .code = "E58";   .bovnar = "E~Hz";                },  # via qudt:ExaBIT-PER-SEC
+  { .code = "E91";   .bovnar = "d^-1";                .reverse = false; },  # via qudt:PER-DAY
+  { .code = "E92";   .bovnar = "d~m^3/h";             .reverse = false; },  # via qudt:DeciM3-PER-HR
+  { .code = "E93";   .bovnar = "k~g/h";               .reverse = false; },  # via qudt:KiloGM-PER-HR
+  { .code = "E94";   .bovnar = "k~mol/s";             .reverse = false; },  # via qudt:KiloMOL-PER-SEC
+  { .code = "E96";   .bovnar = "°/s";                 .reverse = false; },  # via qudt:DEG-PER-SEC
+  { .code = "E99";   .bovnar = "h~Pa/bar";            .reverse = false; },  # via qudt:HectoPA-PER-BAR
+  { .code = "F02";   .bovnar = "K/K";                 .reverse = false; },  # via qudt:K-PER-K
+  { .code = "F03";   .bovnar = "k~Pa/bar";            .reverse = false; },  # via qudt:KiloPA-PER-BAR
+  { .code = "F04";   .bovnar = "m~bar/bar";           .reverse = false; },  # via qudt:MilliBAR-PER-BAR
+  { .code = "F05";   .bovnar = "M~Pa/bar";            .reverse = false; },  # via qudt:MegaPA-PER-BAR
+  { .code = "F06";   .bovnar = "P/bar";               .reverse = false; },  # via qudt:POISE-PER-BAR
+  { .code = "F07";   .bovnar = "Pa/bar";              .reverse = false; },  # via qudt:PA-PER-BAR
+  { .code = "F08";   .bovnar = "m~A/in";              .reverse = false; },  # via qudt:MilliA-PER-IN
+  { .code = "F10";   .bovnar = "K/h";                 .reverse = false; },  # via qudt:K-PER-HR
+  { .code = "F11";   .bovnar = "K/min";               .reverse = false; },  # via qudt:K-PER-MIN
+  { .code = "F12";   .bovnar = "K/s";                 .reverse = false; },  # via qudt:K-PER-SEC
+  { .code = "F14";   .bovnar = "g/K";                 .reverse = false; },  # via qudt:GM-PER-K
+  { .code = "F15";   .bovnar = "k~g/K";               .reverse = false; },  # via qudt:KiloGM-PER-K
+  { .code = "F16";   .bovnar = "m~g/K";               .reverse = false; },  # via qudt:MilliGM-PER-K
+  { .code = "F17";   .bovnar = "k~ft·lbf/ft^2";       .reverse = false; },  # via qudt:KiloLB_F-PER-FT
+  { .code = "F18";   .bovnar = "k~g·c~m^2";           .reverse = false; },  # via qudt:KiloGM-CentiM2
+  { .code = "F19";   .bovnar = "k~g·m~m^2";           .reverse = false; },  # via qudt:KiloGM-MilliM2
+  { .code = "F20";   .bovnar = "lb·in^2";             .reverse = false; },  # via qudt:LB-IN2
+  { .code = "F21";   .bovnar = "lbf·in";              .reverse = false; },  # via qudt:LB_F-IN
+  { .code = "F23";   .bovnar = "g/d~m^3";             .reverse = false; },  # via qudt:GM-PER-DeciM3
+  { .code = "F24";   .bovnar = "k~g/k~mol";           .reverse = false; },  # via qudt:KiloGM-PER-KiloMOL
+  { .code = "F25";   .bovnar = "g/Hz";                .reverse = false; },  # via qudt:GM-PER-HZ
+  { .code = "F26";   .bovnar = "g/d";                 .reverse = false; },  # via qudt:GM-PER-DAY
+  { .code = "F27";   .bovnar = "g/h";                 .reverse = false; },  # via qudt:GM-PER-HR
+  { .code = "F28";   .bovnar = "g/min";               .reverse = false; },  # via qudt:GM-PER-MIN
+  { .code = "F29";   .bovnar = "g/s";                 .reverse = false; },  # via qudt:GM-PER-SEC
+  { .code = "F30";   .bovnar = "k~g/d";               .reverse = false; },  # via qudt:KiloGM-PER-DAY
+  { .code = "F31";   .bovnar = "k~g/min";             .reverse = false; },  # via qudt:KiloGM-PER-MIN
+  { .code = "F32";   .bovnar = "m~g/d";               .reverse = false; },  # via qudt:MilliGM-PER-DAY
+  { .code = "F33";   .bovnar = "m~g/min";             .reverse = false; },  # via qudt:MilliGM-PER-MIN
+  { .code = "F34";   .bovnar = "m~g/s";               .reverse = false; },  # via qudt:MilliGM-PER-SEC
+  { .code = "F35";   .bovnar = "g/d·K";               .reverse = false; },  # via qudt:GM-PER-DAY-K
+  { .code = "F36";   .bovnar = "g/h·K";               .reverse = false; },  # via qudt:GM-PER-HR-K
+  { .code = "F37";   .bovnar = "g/min·K";             .reverse = false; },  # via qudt:GM-PER-MIN-K
+  { .code = "F38";   .bovnar = "g/s·K";               .reverse = false; },  # via qudt:GM-PER-SEC-K
+  { .code = "F39";   .bovnar = "k~g/d·K";             .reverse = false; },  # via qudt:KiloGM-PER-DAY-K
+  { .code = "F40";   .bovnar = "k~g/h·K";             .reverse = false; },  # via qudt:KiloGM-PER-HR-K
+  { .code = "F41";   .bovnar = "k~g/min·K";           .reverse = false; },  # via qudt:KiloGM-PER-MIN-K
+  { .code = "F42";   .bovnar = "k~g/s·K";             .reverse = false; },  # via qudt:KiloGM-PER-SEC-K
+  { .code = "F43";   .bovnar = "m~g/d·K";             .reverse = false; },  # via qudt:MilliGM-PER-DAY-K
+  { .code = "F44";   .bovnar = "m~g/h·K";             .reverse = false; },  # via qudt:MilliGM-PER-HR-K
+  { .code = "F45";   .bovnar = "m~g/min·K";           .reverse = false; },  # via qudt:MilliGM-PER-MIN-K
+  { .code = "F46";   .bovnar = "m~g/s·K";             .reverse = false; },  # via qudt:MilliGM-PER-SEC-K
+  { .code = "F47";   .bovnar = "N/m~m";               .reverse = false; },  # via qudt:N-PER-MilliM
+  { .code = "F48";   .bovnar = "lbf/in";              .reverse = false; },  # via qudt:LB_F-PER-IN
+  { .code = "F50";   .bovnar = "µ~m/K";               .reverse = false; },  # via qudt:MicroM-PER-K
+  { .code = "F51";   .bovnar = "c~m/K";               .reverse = false; },  # via qudt:CentiM-PER-K
+  { .code = "F52";   .bovnar = "m/K";                 .reverse = false; },  # via qudt:M-PER-K
+  { .code = "F53";   .bovnar = "m~m/K";               .reverse = false; },  # via qudt:MilliM-PER-K
+  { .code = "F54";   .bovnar = "m~Ω/m";               .reverse = false; },  # via qudt:MilliOHM-PER-M
+  { .code = "F55";   .bovnar = "Ω/mi";                .reverse = false; },  # via qudt:OHM-PER-MI
+  { .code = "F56";   .bovnar = "Ω/k~m";               .reverse = false; },  # via qudt:OHM-PER-KiloM
+  { .code = "F57";   .bovnar = "m~A·in^2/lbf";        .reverse = false; },  # via qudt:MilliA-IN2-PER-LB_F
+  { .code = "F58";   .bovnar = "bar^-1";              .reverse = false; },  # via qudt:PER-BAR
+  { .code = "F59";   .bovnar = "m~A/bar";             .reverse = false; },  # via qudt:MilliA-PER-BAR
+  { .code = "F60";   .bovnar = "K/bar";               .reverse = false; },  # via qudt:DEG_C-PER-BAR
+  { .code = "F61";   .bovnar = "K/bar";               .reverse = false; },  # via qudt:K-PER-BAR
+  { .code = "F62";   .bovnar = "g/d·bar";             .reverse = false; },  # via qudt:GM-PER-DAY-BAR
+  { .code = "F63";   .bovnar = "g/h·bar";             .reverse = false; },  # via qudt:GM-PER-HR-BAR
+  { .code = "F64";   .bovnar = "g/min·bar";           .reverse = false; },  # via qudt:GM-PER-MIN-BAR
+  { .code = "F65";   .bovnar = "g/s·bar";             .reverse = false; },  # via qudt:GM-PER-SEC-BAR
+  { .code = "F66";   .bovnar = "k~g/d·bar";           .reverse = false; },  # via qudt:KiloGM-PER-DAY-BAR
+  { .code = "F67";   .bovnar = "k~g/h·bar";           .reverse = false; },  # via qudt:KiloGM-PER-HR-BAR
+  { .code = "F68";   .bovnar = "k~g/min·bar";         .reverse = false; },  # via qudt:KiloGM-PER-MIN-BAR
+  { .code = "F69";   .bovnar = "k~g/s·bar";           .reverse = false; },  # via qudt:KiloGM-PER-SEC-BAR
+  { .code = "F70";   .bovnar = "m~g/d·bar";           .reverse = false; },  # via qudt:MilliGM-PER-DAY-BAR
+  { .code = "F71";   .bovnar = "m~g/h·bar";           .reverse = false; },  # via qudt:MilliGM-PER-HR-BAR
+  { .code = "F72";   .bovnar = "m~g/min·bar";         .reverse = false; },  # via qudt:MilliGM-PER-MIN-BAR
+  { .code = "F73";   .bovnar = "m~g/s·bar";           .reverse = false; },  # via qudt:MilliGM-PER-SEC-BAR
+  { .code = "F74";   .bovnar = "g/bar";               .reverse = false; },  # via qudt:GM-PER-BAR
+  { .code = "F75";   .bovnar = "m~g/bar";             .reverse = false; },  # via qudt:MilliGM-PER-BAR
+  { .code = "F76";   .bovnar = "m~A/m~m";             .reverse = false; },  # via qudt:MilliA-PER-MilliM
+  { .code = "F77";   .bovnar = "Pa·s/K";              .reverse = false; },  # via qudt:PA-SEC-PER-K
+  { .code = "F81";   .bovnar = "bar/K";               .reverse = false; },  # via qudt:BAR-PER-K
+  { .code = "F82";   .bovnar = "h~Pa/K";              .reverse = false; },  # via qudt:HectoPA-PER-K
+  { .code = "F83";   .bovnar = "k~Pa/K";              .reverse = false; },  # via qudt:KiloPA-PER-K
+  { .code = "F84";   .bovnar = "m~bar/K";             .reverse = false; },  # via qudt:MilliBAR-PER-K
+  { .code = "F85";   .bovnar = "M~Pa/K";              .reverse = false; },  # via qudt:MegaPA-PER-K
+  { .code = "F86";   .bovnar = "P/K";                 .reverse = false; },  # via qudt:POISE-PER-K
+  { .code = "F87";   .bovnar = "V/L·min";             .reverse = false; },  # via qudt:V-PER-L-MIN
+  { .code = "F88";   .bovnar = "N·c~m";               .reverse = false; },  # via qudt:N-CentiM
+  { .code = "F89";   .bovnar = "N·m/°";               .reverse = false; },  # via qudt:N-M-PER-DEG
+  { .code = "F91";   .bovnar = "bar·L/s";             .reverse = false; },  # via qudt:BAR-L-PER-SEC
+  { .code = "F92";   .bovnar = "bar·m^3/s";           .reverse = false; },  # via qudt:BAR-M3-PER-SEC
+  { .code = "F93";   .bovnar = "h~Pa·L/s";            .reverse = false; },  # via qudt:HectoPA-L-PER-SEC
+  { .code = "F94";   .bovnar = "h~Pa·m^3/s";          .reverse = false; },  # via qudt:HectoPA-M3-PER-SEC
+  { .code = "F95";   .bovnar = "m~bar·L/s";           .reverse = false; },  # via qudt:MilliBAR-L-PER-SEC
+  { .code = "F96";   .bovnar = "m~bar·m^3/s";         .reverse = false; },  # via qudt:MilliBAR-M3-PER-SEC
+  { .code = "F97";   .bovnar = "M~Pa·L/s";            .reverse = false; },  # via qudt:MegaPA-L-PER-SEC
+  { .code = "F98";   .bovnar = "M~Pa·m^3/s";          .reverse = false; },  # via qudt:MegaPA-M3-PER-SEC
+  { .code = "F99";   .bovnar = "Pa·L/s";              .reverse = false; },  # via qudt:PA-L-PER-SEC
+  { .code = "FH";    .bovnar = "µ~mol";               },  # via qudt:MicroMOL
+  { .code = "FP";    .bovnar = "lb/ft^2";             .reverse = false; },  # via qudt:LB-PER-FT2
+  { .code = "FR";    .bovnar = "ft/min";              .reverse = false; },  # via qudt:FT-PER-MIN
+  { .code = "FS";    .bovnar = "ft/s";                .reverse = false; },  # via qudt:FT-PER-SEC
+  { .code = "G01";   .bovnar = "Pa·m^3/s";            .reverse = false; },  # via qudt:PA-M3-PER-SEC
+  { .code = "G04";   .bovnar = "c~m/bar";             .reverse = false; },  # via qudt:CentiM-PER-BAR
+  { .code = "G05";   .bovnar = "m/bar";               .reverse = false; },  # via qudt:M-PER-BAR
+  { .code = "G06";   .bovnar = "m~m/bar";             .reverse = false; },  # via qudt:MilliM-PER-BAR
+  { .code = "G08";   .bovnar = "in^2/s";              .reverse = false; },  # via qudt:IN2-PER-SEC
+  { .code = "G09";   .bovnar = "m^2/s·K";             .reverse = false; },  # via qudt:M2-PER-SEC-K
+  { .code = "G10";   .bovnar = "St/K";                .reverse = false; },  # via qudt:ST-PER-K
+  { .code = "G11";   .bovnar = "g/c~m^3·bar";         .reverse = false; },  # via qudt:GM-PER-CentiM3-BAR
+  { .code = "G12";   .bovnar = "g/d~m^3·bar";         .reverse = false; },  # via qudt:GM-PER-DeciM3-BAR
+  { .code = "G13";   .bovnar = "g/L·bar";             .reverse = false; },  # via qudt:GM-PER-L-BAR
+  { .code = "G14";   .bovnar = "g/m^3·bar";           .reverse = false; },  # via qudt:GM-PER-M3-BAR
+  { .code = "G15";   .bovnar = "g/m~L·bar";           .reverse = false; },  # via qudt:GM-PER-MilliL-BAR
+  { .code = "G16";   .bovnar = "k~g/c~m^3·bar";       .reverse = false; },  # via qudt:KiloGM-PER-CentiM3-BAR
+  { .code = "G17";   .bovnar = "k~g/L·bar";           .reverse = false; },  # via qudt:KiloGM-PER-L-BAR
+  { .code = "G18";   .bovnar = "k~g/m^3·bar";         .reverse = false; },  # via qudt:KiloGM-PER-M3-BAR
+  { .code = "G19";   .bovnar = "N·m/k~g";             .reverse = false; },  # via qudt:N-M-PER-KiloGM
+  { .code = "G2";    .bovnar = "gal/min";             .reverse = false; },  # via qudt:GAL_US-PER-MIN
+  { .code = "G26";   .bovnar = "m^3";                 .reverse = false; },  # via qudt:STR
+  { .code = "G27";   .bovnar = "c~m^3/K";             .reverse = false; },  # via qudt:CentiM3-PER-K
+  { .code = "G28";   .bovnar = "L/K";                 .reverse = false; },  # via qudt:L-PER-K
+  { .code = "G29";   .bovnar = "m^3/K";               .reverse = false; },  # via qudt:M3-PER-K
+  { .code = "G30";   .bovnar = "m~L/K";               .reverse = false; },  # via qudt:MilliL-PER-K
+  { .code = "G31";   .bovnar = "k~g/c~m^3";           .reverse = false; },  # via qudt:KiloGM-PER-CentiM3
+  { .code = "G32";   .bovnar = "oz/yd^3";             .reverse = false; },  # via qudt:OZ-PER-YD3
+  { .code = "G33";   .bovnar = "g/c~m^3·K";           .reverse = false; },  # via qudt:GM-PER-CentiM3-K
+  { .code = "G34";   .bovnar = "g/d~m^3·K";           .reverse = false; },  # via qudt:GM-PER-DeciM3-K
+  { .code = "G35";   .bovnar = "g/L·K";               .reverse = false; },  # via qudt:GM-PER-L-K
+  { .code = "G36";   .bovnar = "g/m^3·K";             .reverse = false; },  # via qudt:GM-PER-M3-K
+  { .code = "G37";   .bovnar = "g/m~L·K";             .reverse = false; },  # via qudt:GM-PER-MilliL-K
+  { .code = "G38";   .bovnar = "k~g/c~m^3·K";         .reverse = false; },  # via qudt:KiloGM-PER-CentiM3-K
+  { .code = "G39";   .bovnar = "k~g/L·K";             .reverse = false; },  # via qudt:KiloGM-PER-L-K
+  { .code = "G40";   .bovnar = "k~g/m^3·K";           .reverse = false; },  # via qudt:KiloGM-PER-M3-K
+  { .code = "G41";   .bovnar = "m^2/s·bar";           .reverse = false; },  # via qudt:M2-PER-SEC-BAR
+  { .code = "G42";   .bovnar = "µ~S/c~m";             .reverse = false; },  # via qudt:MicroS-PER-CentiM
+  { .code = "G43";   .bovnar = "µ~S/m";               .reverse = false; },  # via qudt:MicroS-PER-M
+  { .code = "G44";   .bovnar = "n~S/c~m";             .reverse = false; },  # via qudt:NanoS-PER-CentiM
+  { .code = "G45";   .bovnar = "n~S/m";               .reverse = false; },  # via qudt:NanoS-PER-M
+  { .code = "G46";   .bovnar = "St/bar";              .reverse = false; },  # via qudt:ST-PER-BAR
+  { .code = "G47";   .bovnar = "c~m^3/d";             .reverse = false; },  # via qudt:CentiM3-PER-DAY
+  { .code = "G48";   .bovnar = "c~m^3/h";             .reverse = false; },  # via qudt:CentiM3-PER-HR
+  { .code = "G49";   .bovnar = "c~m^3/min";           .reverse = false; },  # via qudt:CentiM3-PER-MIN
+  { .code = "G50";   .bovnar = "gal/h";               .reverse = false; },  # via qudt:GAL_US-PER-HR
+  { .code = "G51";   .bovnar = "L/s";                 .reverse = false; },  # via qudt:L-PER-SEC
+  { .code = "G52";   .bovnar = "m^3/d";               .reverse = false; },  # via qudt:M3-PER-DAY
+  { .code = "G53";   .bovnar = "m^3/min";             .reverse = false; },  # via qudt:M3-PER-MIN
+  { .code = "G54";   .bovnar = "m~L/d";               .reverse = false; },  # via qudt:MilliL-PER-DAY
+  { .code = "G55";   .bovnar = "m~L/h";               .reverse = false; },  # via qudt:MilliL-PER-HR
+  { .code = "G56";   .bovnar = "in^3/h";              .reverse = false; },  # via qudt:IN3-PER-HR
+  { .code = "G57";   .bovnar = "in^3/min";            .reverse = false; },  # via qudt:IN3-PER-MIN
+  { .code = "G58";   .bovnar = "in^3/s";              .reverse = false; },  # via qudt:IN3-PER-SEC
+  { .code = "G59";   .bovnar = "m~A/L·min";           .reverse = false; },  # via qudt:MilliA-PER-L-MIN
+  { .code = "G60";   .bovnar = "V/bar";               .reverse = false; },  # via qudt:V-PER-BAR
+  { .code = "G61";   .bovnar = "c~m^3/d·K";           .reverse = false; },  # via qudt:CentiM3-PER-DAY-K
+  { .code = "G62";   .bovnar = "c~m^3/h·K";           .reverse = false; },  # via qudt:CentiM3-PER-HR-K
+  { .code = "G63";   .bovnar = "c~m^3/min·K";         .reverse = false; },  # via qudt:CentiM3-PER-MIN-K
+  { .code = "G64";   .bovnar = "c~m^3/s·K";           .reverse = false; },  # via qudt:CentiM3-PER-SEC-K
+  { .code = "G65";   .bovnar = "L/d·K";               .reverse = false; },  # via qudt:L-PER-DAY-K
+  { .code = "G66";   .bovnar = "L/h·K";               .reverse = false; },  # via qudt:L-PER-HR-K
+  { .code = "G67";   .bovnar = "L/min·K";             .reverse = false; },  # via qudt:L-PER-MIN-K
+  { .code = "G68";   .bovnar = "L/s·K";               .reverse = false; },  # via qudt:L-PER-SEC-K
+  { .code = "G69";   .bovnar = "m^3/d·K";             .reverse = false; },  # via qudt:M3-PER-DAY-K
+  { .code = "G70";   .bovnar = "m^3/h·K";             .reverse = false; },  # via qudt:M3-PER-HR-K
+  { .code = "G71";   .bovnar = "m^3/min·K";           .reverse = false; },  # via qudt:M3-PER-MIN-K
+  { .code = "G72";   .bovnar = "m^3/s·K";             .reverse = false; },  # via qudt:M3-PER-SEC-K
+  { .code = "G73";   .bovnar = "m~L/d·K";             .reverse = false; },  # via qudt:MilliL-PER-DAY-K
+  { .code = "G74";   .bovnar = "m~L/h·K";             .reverse = false; },  # via qudt:MilliL-PER-HR-K
+  { .code = "G75";   .bovnar = "m~L/min·K";           .reverse = false; },  # via qudt:MilliL-PER-MIN-K
+  { .code = "G76";   .bovnar = "m~L/s·K";             .reverse = false; },  # via qudt:MilliL-PER-SEC-K
+  { .code = "G77";   .bovnar = "m~m^4";               .reverse = false; },  # via qudt:MilliM4
+  { .code = "G78";   .bovnar = "c~m^3/d·bar";         .reverse = false; },  # via qudt:CentiM3-PER-DAY-BAR
+  { .code = "G79";   .bovnar = "c~m^3/h·bar";         .reverse = false; },  # via qudt:CentiM3-PER-HR-BAR
+  { .code = "G80";   .bovnar = "c~m^3/min·bar";       .reverse = false; },  # via qudt:CentiM3-PER-MIN-BAR
+  { .code = "G81";   .bovnar = "c~m^3/s·bar";         .reverse = false; },  # via qudt:CentiM3-PER-SEC-BAR
+  { .code = "G82";   .bovnar = "L/d·bar";             .reverse = false; },  # via qudt:L-PER-DAY-BAR
+  { .code = "G83";   .bovnar = "L/h·bar";             .reverse = false; },  # via qudt:L-PER-HR-BAR
+  { .code = "G84";   .bovnar = "L/min·bar";           .reverse = false; },  # via qudt:L-PER-MIN-BAR
+  { .code = "G85";   .bovnar = "L/s·bar";             .reverse = false; },  # via qudt:L-PER-SEC-BAR
+  { .code = "G86";   .bovnar = "m^3/d·bar";           .reverse = false; },  # via qudt:M3-PER-DAY-BAR
+  { .code = "G87";   .bovnar = "m^3/h·bar";           .reverse = false; },  # via qudt:M3-PER-HR-BAR
+  { .code = "G88";   .bovnar = "m^3/min·bar";         .reverse = false; },  # via qudt:M3-PER-MIN-BAR
+  { .code = "G89";   .bovnar = "m^3/s·bar";           .reverse = false; },  # via qudt:M3-PER-SEC-BAR
+  { .code = "G90";   .bovnar = "m~L/d·bar";           .reverse = false; },  # via qudt:MilliL-PER-DAY-BAR
+  { .code = "G91";   .bovnar = "m~L/h·bar";           .reverse = false; },  # via qudt:MilliL-PER-HR-BAR
+  { .code = "G92";   .bovnar = "m~L/min·bar";         .reverse = false; },  # via qudt:MilliL-PER-MIN-BAR
+  { .code = "G93";   .bovnar = "m~L/s·bar";           .reverse = false; },  # via qudt:MilliL-PER-SEC-BAR
+  { .code = "G94";   .bovnar = "c~m^3/bar";           .reverse = false; },  # via qudt:CentiM3-PER-BAR
+  { .code = "G95";   .bovnar = "L/bar";               .reverse = false; },  # via qudt:L-PER-BAR
+  { .code = "G96";   .bovnar = "m^3/bar";             .reverse = false; },  # via qudt:M3-PER-BAR
+  { .code = "G97";   .bovnar = "m~L/bar";             .reverse = false; },  # via qudt:MilliL-PER-BAR
+  { .code = "G98";   .bovnar = "µ~H/k~Ω";             .reverse = false; },  # via qudt:MicroH-PER-KiloOHM
+  { .code = "G99";   .bovnar = "µ~H/Ω";               .reverse = false; },  # via qudt:MicroH-PER-OHM
+  { .code = "GB";    .bovnar = "gal/d";               .reverse = false; },  # via qudt:GAL_US-PER-DAY
+  { .code = "GE";    .bovnar = "lb/gal";              .reverse = false; },  # via qudt:LB-PER-GAL_US
+  { .code = "GF";    .bovnar = "g/m";                 .reverse = false; },  # via qudt:GM-PER-M
+  { .code = "GJ";    .bovnar = "g/m~L";               .reverse = false; },  # via qudt:GM-PER-MilliL
+  { .code = "GK";    .bovnar = "g/k~g";               .reverse = false; },  # via qudt:GM-PER-KiloGM
+  { .code = "GL";    .bovnar = "g/L";                 .reverse = false; },  # via qudt:GM-PER-L
+  { .code = "GM";    .bovnar = "g/m^2";               .reverse = false; },  # via qudt:GM-PER-M2
+  { .code = "GO";    .bovnar = "m~g/m^2";             .reverse = false; },  # via qudt:MilliGM-PER-M2
+  { .code = "GP";    .bovnar = "m~g/m^3";             .reverse = false; },  # via qudt:MilliGM-PER-M3
+  { .code = "GQ";    .bovnar = "µ~g/m^3";             .reverse = false; },  # via qudt:MicroGM-PER-M3
+  { .code = "GV";    .bovnar = "G~J";                 },  # via qudt:GigaJ
+  { .code = "GWH";   .bovnar = "G~W·h";               .reverse = false; },  # via qudt:GigaW-HR
+  { .code = "H03";   .bovnar = "H/k~Ω";               .reverse = false; },  # via qudt:H-PER-KiloOHM
+  { .code = "H04";   .bovnar = "H/Ω";                 .reverse = false; },  # via qudt:H-PER-OHM
+  { .code = "H05";   .bovnar = "m~H/k~Ω";             .reverse = false; },  # via qudt:MilliH-PER-KiloOHM
+  { .code = "H06";   .bovnar = "m~H/Ω";               .reverse = false; },  # via qudt:MilliH-PER-OHM
+  { .code = "H07";   .bovnar = "Pa·s/bar";            .reverse = false; },  # via qudt:PA-SEC-PER-BAR
+  { .code = "H08";   .bovnar = "µ~Bq";                },  # via qudt:MicroBQ
+  { .code = "H09";   .bovnar = "yr^-1";               .reverse = false; },  # via qudt:PER-YR
+  { .code = "H10";   .bovnar = "h^-1";                .reverse = false; },  # via qudt:PER-HR
+  { .code = "H12";   .bovnar = "K/h";                 .reverse = false; },  # via qudt:DEG_C-PER-HR
+  { .code = "H13";   .bovnar = "K/min";               .reverse = false; },  # via qudt:DEG_C-PER-MIN
+  { .code = "H14";   .bovnar = "K/s";                 .reverse = false; },  # via qudt:DEG_C-PER-SEC
+  { .code = "H15";   .bovnar = "c~m^2/g";             .reverse = false; },  # via qudt:CentiM2-PER-GM
+  { .code = "H22";   .bovnar = "V·in^2/lbf";          .reverse = false; },  # via qudt:V-IN2-PER-LB_F
+  { .code = "H23";   .bovnar = "V/in";                .reverse = false; },  # via qudt:V-PER-IN
+  { .code = "H24";   .bovnar = "V/µ~s";               .reverse = false; },  # via qudt:V-PER-MicroSEC
+  { .code = "H25";   .bovnar = "%/K";                 .reverse = false; },  # via qudt:PERCENT-PER-K
+  { .code = "H26";   .bovnar = "Ω/m";                 .reverse = false; },  # via qudt:OHM-PER-M
+  { .code = "H27";   .bovnar = "°/m";                 .reverse = false; },  # via qudt:DEG-PER-M
+  { .code = "H28";   .bovnar = "µ~F/k~m";             .reverse = false; },  # via qudt:MicroFARAD-PER-KiloM
+  { .code = "H29";   .bovnar = "µ~g/L";               .reverse = false; },  # via qudt:MicroGM-PER-L
+  { .code = "H30";   .bovnar = "µ~m^2";               .reverse = false; },  # via qudt:MicroM2
+  { .code = "H31";   .bovnar = "A/k~g";               .reverse = false; },  # via qudt:A-PER-KiloGM
+  { .code = "H32";   .bovnar = "A^2·s";               .reverse = false; },  # via qudt:A2-SEC
+  { .code = "H33";   .bovnar = "F/k~m";               .reverse = false; },  # via qudt:FARAD-PER-KiloM
+  { .code = "H34";   .bovnar = "Hz·m";                .reverse = false; },  # via qudt:HZ-M
+  { .code = "H35";   .bovnar = "K·m/W";               .reverse = false; },  # via qudt:K-M-PER-W
+  { .code = "H36";   .bovnar = "M~Ω/k~m";             .reverse = false; },  # via qudt:MegaOHM-PER-KiloM
+  { .code = "H37";   .bovnar = "M~Ω/m";               .reverse = false; },  # via qudt:MegaOHM-PER-M
+  { .code = "H38";   .bovnar = "M~A";                 },  # via qudt:MegaA
+  { .code = "H39";   .bovnar = "M~Hz·m";              .reverse = false; },  # via qudt:MegaHZ-KiloM
+  { .code = "H40";   .bovnar = "N/A";                 .reverse = false; },  # via qudt:N-PER-A
+  { .code = "H41";   .bovnar = "m";                   .reverse = false; },  # via qudt:N-M-PER-W0dot5
+  { .code = "H42";   .bovnar = "Pa/m";                .reverse = false; },  # via qudt:PA-PER-M
+  { .code = "H43";   .bovnar = "S/c~m";               .reverse = false; },  # via qudt:S-PER-CentiM
+  { .code = "H44";   .bovnar = "T~Ω";                 },  # via qudt:TeraOHM
+  { .code = "H45";   .bovnar = "V·s/m";               .reverse = false; },  # via qudt:V-SEC-PER-M
+  { .code = "H46";   .bovnar = "V/s";                 .reverse = false; },  # via qudt:V-PER-SEC
+  { .code = "H47";   .bovnar = "W/m^3";               .reverse = false; },  # via qudt:W-PER-M3
+  { .code = "H48";   .bovnar = "a~F";                 },  # via qudt:AttoFARAD
+  { .code = "H49";   .bovnar = "c~m/h";               .reverse = false; },  # via qudt:CentiM-PER-HR
+  { .code = "H50";   .bovnar = "c~m^-3";              .reverse = false; },  # via qudt:PER-CentiM3
+  { .code = "H53";   .bovnar = "k~g/bar";             .reverse = false; },  # via qudt:KiloGM-PER-BAR
+  { .code = "H54";   .bovnar = "k~g/d~m^3·K";         .reverse = false; },  # via qudt:KiloGM-PER-DeciM3-K
+  { .code = "H55";   .bovnar = "k~g/d~m^3·bar";       .reverse = false; },  # via qudt:KiloGM-PER-DeciM3-BAR
+  { .code = "H56";   .bovnar = "k~g/m^2·s";           .reverse = false; },  # via qudt:KiloGM-PER-M2-SEC
+  { .code = "H58";   .bovnar = "m/V·s";               .reverse = false; },  # via qudt:M-PER-V-SEC
+  { .code = "H59";   .bovnar = "m^2/N";               .reverse = false; },  # via qudt:M2-PER-N
+  { .code = "H61";   .bovnar = "m~S/c~m";             .reverse = false; },  # via qudt:MilliS-PER-CentiM
+  { .code = "H62";   .bovnar = "m~V/min";             .reverse = false; },  # via qudt:MilliV-PER-MIN
+  { .code = "H63";   .bovnar = "m~g/c~m^2";           .reverse = false; },  # via qudt:MilliGM-PER-CentiM2
+  { .code = "H64";   .bovnar = "m~g/g";               .reverse = false; },  # via qudt:MilliGM-PER-GM
+  { .code = "H65";   .bovnar = "m~L/m^3";             .reverse = false; },  # via qudt:MilliL-PER-M3
+  { .code = "H66";   .bovnar = "m~m/yr";              .reverse = false; },  # via qudt:MilliM-PER-YR
+  { .code = "H67";   .bovnar = "m~m/h";               .reverse = false; },  # via qudt:MilliM-PER-HR
+  { .code = "H68";   .bovnar = "m~mol/g";             .reverse = false; },  # via qudt:MilliMOL-PER-GM
+  { .code = "H69";   .bovnar = "p~Pa/k~m";            .reverse = false; },  # via qudt:PicoPA-PER-KiloM
+  { .code = "H72";   .bovnar = "%/h~bar";             .reverse = false; },  # via qudt:PERCENT-PER-HectoBAR
+  { .code = "H74";   .bovnar = "W/m";                 .reverse = false; },  # via qudt:W-PER-M
+  { .code = "H75";   .bovnar = "da~Pa";               },  # via qudt:DecaPA
+  { .code = "H76";   .bovnar = "g/m~m";               .reverse = false; },  # via qudt:GM-PER-MilliM
+  { .code = "H78";   .bovnar = "m~at";                },  # via qudt:CentiM_H2O
+  { .code = "H81";   .bovnar = "m~m/min";             .reverse = false; },  # via qudt:MilliM-PER-MIN
+  { .code = "H83";   .bovnar = "L/k~g";               .reverse = false; },  # via qudt:L-PER-KiloGM
+  { .code = "H84";   .bovnar = "g·m~m";               .reverse = false; },  # via qudt:GM-MilliM
+  { .code = "H85";   .bovnar = "wk^-1";               .reverse = false; },  # via qudt:PER-WK
+  { .code = "H86";   .bovnar = "N·m/m^2";             .reverse = false; },  # via qudt:N-M-PER-M2
+  { .code = "H88";   .bovnar = "M~Ω·k~m";             .reverse = false; },  # via qudt:MegaOHM-KiloM
+  { .code = "H89";   .bovnar = "%/Ω";                 .reverse = false; },  # via qudt:PERCENT-PER-OHM
+  { .code = "H90";   .bovnar = "%/°";                 .reverse = false; },  # via qudt:PERCENT-PER-DEG
+  { .code = "H95";   .bovnar = "%/V";                 .reverse = false; },  # via qudt:PERCENT-PER-V
+  { .code = "H96";   .bovnar = "%/bar";               .reverse = false; },  # via qudt:PERCENT-PER-BAR
+  { .code = "H98";   .bovnar = "%/in";                .reverse = false; },  # via qudt:PERCENT-PER-IN
+  { .code = "H99";   .bovnar = "%/m";                 .reverse = false; },  # via qudt:PERCENT-PER-M
+  { .code = "HBA";   .bovnar = "h~bar";               },  # via qudt:HectoBAR
+  { .code = "HGM";   .bovnar = "h~g";                 },  # via qudt:HectoGM
+  { .code = "HP";    .bovnar = "d~g·gn/c~m^2";        .reverse = false; },  # via qudt:MilliM_H2O
+  { .code = "IA";    .bovnar = "lb·in";               .reverse = false; },  # via qudt:LB-IN
+  { .code = "IU";    .bovnar = "in/s";                .reverse = false; },  # via qudt:IN-PER-SEC
+  { .code = "IV";    .bovnar = "in/s^2";              .reverse = false; },  # via qudt:IN-PER-SEC2
+  { .code = "J10";   .bovnar = "%/m~m";               .reverse = false; },  # via qudt:PERCENT-PER-MilliM
+  { .code = "J2";    .bovnar = "J/k~g";               .reverse = false; },  # via qudt:J-PER-KiloGM
+  { .code = "J23";   .bovnar = "°Ra/h";               .reverse = false; },  # via qudt:DEG_F-PER-HR
+  { .code = "J24";   .bovnar = "°Ra/min";             .reverse = false; },  # via qudt:DEG_F-PER-MIN
+  { .code = "J25";   .bovnar = "°Ra/s";               .reverse = false; },  # via qudt:DEG_F-PER-SEC
+  { .code = "J28";   .bovnar = "°Ra/h";               .reverse = false; },  # via qudt:DEG_R-PER-HR
+  { .code = "J29";   .bovnar = "°Ra/min";             .reverse = false; },  # via qudt:DEG_R-PER-MIN
+  { .code = "J30";   .bovnar = "°Ra/s";               .reverse = false; },  # via qudt:DEG_R-PER-SEC
+  { .code = "J32";   .bovnar = "µ~P";                 },  # via qudt:MicroPOISE
+  { .code = "J33";   .bovnar = "µ~g/k~g";             .reverse = false; },  # via qudt:MicroGM-PER-KiloGM
+  { .code = "J34";   .bovnar = "µ~g/m^3·K";           .reverse = false; },  # via qudt:MicroGM-PER-M3-K
+  { .code = "J35";   .bovnar = "µ~g/m^3·bar";         .reverse = false; },  # via qudt:MicroGM-PER-M3-BAR
+  { .code = "J36";   .bovnar = "µ~L/L";               .reverse = false; },  # via qudt:MicroL-PER-L
+  { .code = "J39";   .bovnar = "Btu";                 .reverse = false; },  # via qudt:BTU_MEAN
+  { .code = "J45";   .bovnar = "Btu/s";               .reverse = false; },  # via qudt:BTU_IT-PER-SEC
+  { .code = "J50";   .bovnar = "cal/g·K";             .reverse = false; },  # via qudt:BTU_TH-PER-LB-DEG_F
+  { .code = "J53";   .bovnar = "C·m^2/k~g";           .reverse = false; },  # via qudt:C-M2-PER-KiloGM
+  { .code = "J56";   .bovnar = "bar/bar";             .reverse = false; },  # via qudt:BAR-PER-BAR
+  { .code = "J71";   .bovnar = "bsh/s";               .reverse = false; },  # via qudt:BU_US_DRY-PER-SEC
+  { .code = "J72";   .bovnar = "c~N·m";               .reverse = false; },  # via qudt:CentiN-M
+  { .code = "J73";   .bovnar = "c~P/K";               .reverse = false; },  # via qudt:CentiPOISE-PER-K
+  { .code = "J74";   .bovnar = "c~P/bar";             .reverse = false; },  # via qudt:CentiPOISE-PER-BAR
+  { .code = "J76";   .bovnar = "Btu/lb·°Ra";          .reverse = false; },  # via qudt:CAL_IT-PER-GM-DEG_C
+  { .code = "J78";   .bovnar = "cal/s·c~m·K";         .reverse = false; },  # via qudt:CAL_TH-PER-CentiM-SEC-DEG_C
+  { .code = "J79";   .bovnar = "cal/g·K";             .reverse = false; },  # via qudt:CAL_TH-PER-GM-DEG_C
+  { .code = "J82";   .bovnar = "cal/s";               .reverse = false; },  # via qudt:CAL_TH-PER-SEC
+  { .code = "J84";   .bovnar = "c~m/s·K";             .reverse = false; },  # via qudt:CentiM-PER-SEC-K
+  { .code = "J85";   .bovnar = "c~m/s·bar";           .reverse = false; },  # via qudt:CentiM-PER-SEC-BAR
+  { .code = "J87";   .bovnar = "c~m^3/m^3";           .reverse = false; },  # via qudt:CentiM3-PER-M3
+  { .code = "J89";   .bovnar = "da~mmHg";             },  # via qudt:CentiM_HG
+  { .code = "J90";   .bovnar = "d~m^3/d";             .reverse = false; },  # via qudt:DeciM3-PER-DAY
+  { .code = "J91";   .bovnar = "d~m^3/m^3";           .reverse = false; },  # via qudt:DeciM3-PER-M3
+  { .code = "J92";   .bovnar = "L/min";               .reverse = false; },  # via qudt:DeciM3-PER-MIN
+  { .code = "J93";   .bovnar = "d~m^3/s";             .reverse = false; },  # via qudt:DeciM3-PER-SEC
+  { .code = "J95";   .bovnar = "fl_oz_uk/d";          .reverse = false; },  # via qudt:OZ_VOL_UK-PER-DAY
+  { .code = "J96";   .bovnar = "fl_oz_uk/h";          .reverse = false; },  # via qudt:OZ_VOL_UK-PER-HR
+  { .code = "J97";   .bovnar = "fl_oz_uk/min";        .reverse = false; },  # via qudt:OZ_VOL_UK-PER-MIN
+  { .code = "J99";   .bovnar = "fl_oz/d";             .reverse = false; },  # via qudt:OZ_VOL_US-PER-DAY
+  { .code = "JK";    .bovnar = "M~J/k~g";             .reverse = false; },  # via qudt:MegaJ-PER-KiloGM
+  { .code = "JM";    .bovnar = "M~J/m^3";             .reverse = false; },  # via qudt:MegaJ-PER-M3
+  { .code = "K10";   .bovnar = "fl_oz/h";             .reverse = false; },  # via qudt:OZ_VOL_US-PER-HR
+  { .code = "K11";   .bovnar = "fl_oz/min";           .reverse = false; },  # via qudt:OZ_VOL_US-PER-MIN
+  { .code = "K12";   .bovnar = "fl_oz/s";             .reverse = false; },  # via qudt:OZ_VOL_US-PER-SEC
+  { .code = "K14";   .bovnar = "ft/h";                .reverse = false; },  # via qudt:FT-PER-HR
+  { .code = "K15";   .bovnar = "ft·lbf/h";            .reverse = false; },  # via qudt:FT-LB_F-PER-HR
+  { .code = "K16";   .bovnar = "ft·lbf/min";          .reverse = false; },  # via qudt:FT-LB_F-PER-MIN
+  { .code = "K17";   .bovnar = "ft/psi";              .reverse = false; },  # via qudt:FT-PER-PSI
+  { .code = "K19";   .bovnar = "ft/s·psi";            .reverse = false; },  # via qudt:FT-PER-SEC-PSI
+  { .code = "K22";   .bovnar = "ft^3/d";              .reverse = false; },  # via qudt:FT3-PER-DAY
+  { .code = "K23";   .bovnar = "ft^3/psi";            .reverse = false; },  # via qudt:FT3-PER-PSI
+  { .code = "K26";   .bovnar = "gal_uk/d";            .reverse = false; },  # via qudt:GAL_UK-PER-DAY
+  { .code = "K27";   .bovnar = "gal_uk/h";            .reverse = false; },  # via qudt:GAL_UK-PER-HR
+  { .code = "K28";   .bovnar = "gal_uk/s";            .reverse = false; },  # via qudt:GAL_UK-PER-SEC
+  { .code = "K3";    .bovnar = "k~W·h";               .reverse = false; },  # via qudt:KiloV-A_Reactive-HR
+  { .code = "K30";   .bovnar = "gal/s";               .reverse = false; },  # via qudt:GAL_US-PER-SEC
+  { .code = "K31";   .bovnar = "g·gn/c~m^2";          .reverse = false; },  # via qudt:GM_F-PER-CentiM2
+  { .code = "K32";   .bovnar = "gi_uk/d";             .reverse = false; },  # via qudt:GI_UK-PER-DAY
+  { .code = "K33";   .bovnar = "gi_uk/h";             .reverse = false; },  # via qudt:GI_UK-PER-HR
+  { .code = "K34";   .bovnar = "gi_uk/min";           .reverse = false; },  # via qudt:GI_UK-PER-MIN
+  { .code = "K35";   .bovnar = "gi_uk/s";             .reverse = false; },  # via qudt:GI_UK-PER-SEC
+  { .code = "K36";   .bovnar = "gi/d";                .reverse = false; },  # via qudt:GI_US-PER-DAY
+  { .code = "K37";   .bovnar = "gi/h";                .reverse = false; },  # via qudt:GI_US-PER-HR
+  { .code = "K38";   .bovnar = "gi/min";              .reverse = false; },  # via qudt:GI_US-PER-MIN
+  { .code = "K39";   .bovnar = "gi/s";                .reverse = false; },  # via qudt:GI_US-PER-SEC
+  { .code = "K41";   .bovnar = "gr/gal";              .reverse = false; },  # via qudt:GRAIN-PER-GAL
+  { .code = "K46";   .bovnar = "in/psi";              .reverse = false; },  # via qudt:IN-PER-PSI
+  { .code = "K48";   .bovnar = "in/s·psi";            .reverse = false; },  # via qudt:IN-PER-SEC-PSI
+  { .code = "K55";   .bovnar = "k~cal/s";             .reverse = false; },  # via qudt:KiloCAL-PER-SEC
+  { .code = "K58";   .bovnar = "k~mol/h";             .reverse = false; },  # via qudt:KiloMOL-PER-HR
+  { .code = "K59";   .bovnar = "k~mol/m^3·K";         .reverse = false; },  # via qudt:KiloMOL-PER-M3-K
+  { .code = "K6";    .bovnar = "k~L";                 },  # via qudt:KiloL
+  { .code = "K60";   .bovnar = "k~mol/m^3·bar";       .reverse = false; },  # via qudt:KiloMOL-PER-M3-BAR
+  { .code = "K61";   .bovnar = "k~mol/min";           .reverse = false; },  # via qudt:KiloMOL-PER-MIN
+  { .code = "K62";   .bovnar = "L/L";                 .reverse = false; },  # via qudt:L-PER-L
+  { .code = "K63";   .bovnar = "L^-1";                .reverse = false; },  # via qudt:PER-L
+  { .code = "K65";   .bovnar = "lb·ft^2";             .reverse = false; },  # via qudt:LB-FT2
+  { .code = "K66";   .bovnar = "lb/d";                .reverse = false; },  # via qudt:LB-PER-DAY
+  { .code = "K67";   .bovnar = "lb/ft·h";             .reverse = false; },  # via qudt:LB-PER-FT-HR
+  { .code = "K68";   .bovnar = "lb/ft·s";             .reverse = false; },  # via qudt:LB-PER-FT-SEC
+  { .code = "K70";   .bovnar = "lb/ft^3·psi";         .reverse = false; },  # via qudt:LB-PER-FT3-PSI
+  { .code = "K71";   .bovnar = "lb/gal_uk";           .reverse = false; },  # via qudt:LB-PER-GAL_UK
+  { .code = "K74";   .bovnar = "lb/h·psi";            .reverse = false; },  # via qudt:LB-PER-HR-PSI
+  { .code = "K76";   .bovnar = "lb/in^3·psi";         .reverse = false; },  # via qudt:LB-PER-IN3-PSI
+  { .code = "K77";   .bovnar = "lb/psi";              .reverse = false; },  # via qudt:LB-PER-PSI
+  { .code = "K78";   .bovnar = "lb/min";              .reverse = false; },  # via qudt:LB-PER-MIN
+  { .code = "K80";   .bovnar = "lb/min·psi";          .reverse = false; },  # via qudt:LB-PER-MIN-PSI
+  { .code = "K81";   .bovnar = "lb/s";                .reverse = false; },  # via qudt:LB-PER-SEC
+  { .code = "K83";   .bovnar = "lb/s·psi";            .reverse = false; },  # via qudt:LB-PER-SEC-PSI
+  { .code = "K84";   .bovnar = "lb/yd^3";             .reverse = false; },  # via qudt:LB-PER-YD3
+  { .code = "K85";   .bovnar = "lbf/ft^2";            .reverse = false; },  # via qudt:LB_F-PER-FT2
+  { .code = "K87";   .bovnar = "psi·in^3/s";          .reverse = false; },  # via qudt:PSI-IN3-PER-SEC
+  { .code = "K88";   .bovnar = "psi·L/s";             .reverse = false; },  # via qudt:PSI-L-PER-SEC
+  { .code = "K89";   .bovnar = "psi·m^3/s";           .reverse = false; },  # via qudt:PSI-M3-PER-SEC
+  { .code = "K90";   .bovnar = "psi·yd^3/s";          .reverse = false; },  # via qudt:PSI-YD3-PER-SEC
+  { .code = "K91";   .bovnar = "lbf·s/ft^2";          .reverse = false; },  # via qudt:LB_F-SEC-PER-FT2
+  { .code = "K92";   .bovnar = "lbf·s/in^2";          .reverse = false; },  # via qudt:LB_F-SEC-PER-IN2
+  { .code = "K93";   .bovnar = "psi^-1";              .reverse = false; },  # via qudt:PER-PSI
+  { .code = "K94";   .bovnar = "qt_uk/d";             .reverse = false; },  # via qudt:QT_UK-PER-DAY
+  { .code = "K95";   .bovnar = "qt_uk/h";             .reverse = false; },  # via qudt:QT_UK-PER-HR
+  { .code = "K96";   .bovnar = "qt_uk/min";           .reverse = false; },  # via qudt:QT_UK-PER-MIN
+  { .code = "K98";   .bovnar = "qt/d";                .reverse = false; },  # via qudt:QT_US-PER-DAY
+  { .code = "K99";   .bovnar = "qt/h";                .reverse = false; },  # via qudt:QT_US-PER-HR
+  { .code = "KBA";   .bovnar = "k~bar";               },  # via qudt:KiloBAR
+  { .code = "KL";    .bovnar = "k~g/m";               .reverse = false; },  # via qudt:KiloGM-PER-M
+  { .code = "KR";    .bovnar = "k~R";                 },  # via qudt:KiloR
+  { .code = "KTM";   .bovnar = "k~m";                 .reverse = false; },  # via qudt:KiloM
+  { .code = "KTN";   .bovnar = "k~t";                 },  # via qudt:KiloTONNE
+  { .code = "KW";    .bovnar = "k~g/m~m";             .reverse = false; },  # via qudt:KiloGM-PER-MilliM
+  { .code = "KX";    .bovnar = "m~L/k~g";             .reverse = false; },  # via qudt:MilliL-PER-KiloGM
+  { .code = "L10";   .bovnar = "qt/min";              .reverse = false; },  # via qudt:QT_US-PER-MIN
+  { .code = "L11";   .bovnar = "qt/s";                .reverse = false; },  # via qudt:QT_US-PER-SEC
+  { .code = "L12";   .bovnar = "m/s·K";               .reverse = false; },  # via qudt:M-PER-SEC-K
+  { .code = "L13";   .bovnar = "m/s·bar";             .reverse = false; },  # via qudt:M-PER-SEC-BAR
+  { .code = "L15";   .bovnar = "m~Pa·s/K";            .reverse = false; },  # via qudt:MilliPA-SEC-PER-K
+  { .code = "L16";   .bovnar = "m~Pa·s/bar";          .reverse = false; },  # via qudt:MilliPA-SEC-PER-BAR
+  { .code = "L17";   .bovnar = "m~g/m^3·K";           .reverse = false; },  # via qudt:MilliGM-PER-M3-K
+  { .code = "L18";   .bovnar = "m~g/m^3·bar";         .reverse = false; },  # via qudt:MilliGM-PER-M3-BAR
+  { .code = "L19";   .bovnar = "m~L/L";               .reverse = false; },  # via qudt:MilliL-PER-L
+  { .code = "L2";    .bovnar = "L/min";               .reverse = false; },  # via qudt:L-PER-MIN
+  { .code = "L20";   .bovnar = "m~m^-3";              .reverse = false; },  # via qudt:PER-MilliM3
+  { .code = "L21";   .bovnar = "m~m^3/m^3";           .reverse = false; },  # via qudt:MilliM3-PER-M3
+  { .code = "L24";   .bovnar = "mol/K·k~g";           .reverse = false; },  # via qudt:MOL-PER-KiloGM-K
+  { .code = "L25";   .bovnar = "mol/k~g·bar";         .reverse = false; },  # via qudt:MOL-PER-KiloGM-BAR
+  { .code = "L26";   .bovnar = "mol/L·K";             .reverse = false; },  # via qudt:MOL-PER-L-K
+  { .code = "L27";   .bovnar = "mol/L·bar";           .reverse = false; },  # via qudt:MOL-PER-L-BAR
+  { .code = "L28";   .bovnar = "mol/m^3·K";           .reverse = false; },  # via qudt:MOL-PER-M3-K
+  { .code = "L29";   .bovnar = "mol/m^3·bar";         .reverse = false; },  # via qudt:MOL-PER-M3-BAR
+  { .code = "L30";   .bovnar = "mol/min";             .reverse = false; },  # via qudt:MOL-PER-MIN
+  { .code = "L31";   .bovnar = "m~rem";               },  # via qudt:MilliR_man
+  { .code = "L32";   .bovnar = "n~g/k~g";             .reverse = false; },  # via qudt:NanoGM-PER-KiloGM
+  { .code = "L34";   .bovnar = "oz/h";                .reverse = false; },  # via qudt:OZ-PER-HR
+  { .code = "L35";   .bovnar = "oz/min";              .reverse = false; },  # via qudt:OZ-PER-MIN
+  { .code = "L36";   .bovnar = "oz/s";                .reverse = false; },  # via qudt:OZ-PER-SEC
+  { .code = "L37";   .bovnar = "oz/gal_uk";           .reverse = false; },  # via qudt:OZ-PER-GAL_UK
+  { .code = "L38";   .bovnar = "oz/gal";              .reverse = false; },  # via qudt:OZ-PER-GAL_US
+  { .code = "L40";   .bovnar = "oz·gn";               .reverse = false; },  # via qudt:OZ_F
+  { .code = "L42";   .bovnar = "p~S/m";               .reverse = false; },  # via qudt:PicoS-PER-M
+  { .code = "L48";   .bovnar = "pk/d";                .reverse = false; },  # via qudt:PK_US_DRY-PER-DAY
+  { .code = "L49";   .bovnar = "pk/h";                .reverse = false; },  # via qudt:PK_US_DRY-PER-HR
+  { .code = "L50";   .bovnar = "pk/min";              .reverse = false; },  # via qudt:PK_US_DRY-PER-MIN
+  { .code = "L51";   .bovnar = "pk/s";                .reverse = false; },  # via qudt:PK_US_DRY-PER-SEC
+  { .code = "L52";   .bovnar = "psi/psi";             .reverse = false; },  # via qudt:PSI-PER-PSI
+  { .code = "L54";   .bovnar = "pt_uk/h";             .reverse = false; },  # via qudt:PINT_UK-PER-HR
+  { .code = "L55";   .bovnar = "pt_uk/min";           .reverse = false; },  # via qudt:PINT_UK-PER-MIN
+  { .code = "L56";   .bovnar = "pt_uk/s";             .reverse = false; },  # via qudt:PINT_UK-PER-SEC
+  { .code = "L57";   .bovnar = "pt/d";                .reverse = false; },  # via qudt:PINT_US-PER-DAY
+  { .code = "L58";   .bovnar = "pt/h";                .reverse = false; },  # via qudt:PINT_US-PER-HR
+  { .code = "L59";   .bovnar = "pt/min";              .reverse = false; },  # via qudt:PINT_US-PER-MIN
+  { .code = "L60";   .bovnar = "pt/s";                .reverse = false; },  # via qudt:PINT_US-PER-SEC
+  { .code = "L64";   .bovnar = "lbf·s/ft^2";          .reverse = false; },  # via qudt:SLUG-PER-FT-SEC
+  { .code = "L69";   .bovnar = "t/K";                 .reverse = false; },  # via qudt:TONNE-PER-K
+  { .code = "L70";   .bovnar = "t/bar";               .reverse = false; },  # via qudt:TONNE-PER-BAR
+  { .code = "L71";   .bovnar = "t/d";                 .reverse = false; },  # via qudt:TONNE-PER-DAY
+  { .code = "L72";   .bovnar = "t/d·K";               .reverse = false; },  # via qudt:TONNE-PER-DAY-K
+  { .code = "L73";   .bovnar = "t/d·bar";             .reverse = false; },  # via qudt:TONNE-PER-DAY-BAR
+  { .code = "L74";   .bovnar = "t/h·K";               .reverse = false; },  # via qudt:TONNE-PER-HR-K
+  { .code = "L75";   .bovnar = "t/h·bar";             .reverse = false; },  # via qudt:TONNE-PER-HR-BAR
+  { .code = "L76";   .bovnar = "t/m^3·K";             .reverse = false; },  # via qudt:TONNE-PER-M3-K
+  { .code = "L77";   .bovnar = "t/m^3·bar";           .reverse = false; },  # via qudt:TONNE-PER-M3-BAR
+  { .code = "L78";   .bovnar = "t/min";               .reverse = false; },  # via qudt:TONNE-PER-MIN
+  { .code = "L79";   .bovnar = "t/min·K";             .reverse = false; },  # via qudt:TONNE-PER-MIN-K
+  { .code = "L80";   .bovnar = "t/min·bar";           .reverse = false; },  # via qudt:TONNE-PER-MIN-BAR
+  { .code = "L81";   .bovnar = "t/s";                 .reverse = false; },  # via qudt:TONNE-PER-SEC
+  { .code = "L82";   .bovnar = "t/s·K";               .reverse = false; },  # via qudt:TONNE-PER-SEC-K
+  { .code = "L83";   .bovnar = "t/s·bar";             .reverse = false; },  # via qudt:TONNE-PER-SEC-BAR
+  { .code = "L90";   .bovnar = "tn_sh/h·psi";         .reverse = false; },  # via qudt:TON_SHORT-PER-HR-PSI
+  { .code = "L91";   .bovnar = "tn_sh/psi";           .reverse = false; },  # via qudt:TON_SHORT-PER-PSI
+  { .code = "L94";   .bovnar = "tn_sh·gn";            .reverse = false; },  # via qudt:TON_F_US
+  { .code = "L99";   .bovnar = "yd/psi";              .reverse = false; },  # via qudt:YD-PER-PSI
+  { .code = "LA";    .bovnar = "lb/in^3";             .reverse = false; },  # via qudt:LB-PER-IN3
+  { .code = "LD";    .bovnar = "L/d";                 .reverse = false; },  # via qudt:L-PER-DAY
+  { .code = "M1";    .bovnar = "m~g/L";               .reverse = false; },  # via qudt:MilliGM-PER-L
+  { .code = "M12";   .bovnar = "yd^3/d";              .reverse = false; },  # via qudt:YD3-PER-DAY
+  { .code = "M13";   .bovnar = "yd^3/h";              .reverse = false; },  # via qudt:YD3-PER-HR
+  { .code = "M14";   .bovnar = "yd^3/psi";            .reverse = false; },  # via qudt:YD3-PER-PSI
+  { .code = "M15";   .bovnar = "yd^3/min";            .reverse = false; },  # via qudt:YD3-PER-MIN
+  { .code = "M16";   .bovnar = "yd^3/s";              .reverse = false; },  # via qudt:YD3-PER-SEC
+  { .code = "M17";   .bovnar = "k~Hz·m";              .reverse = false; },  # via qudt:KiloHZ-M
+  { .code = "M18";   .bovnar = "G~Hz·m";              .reverse = false; },  # via qudt:GigaHZ-M
+  { .code = "M23";   .bovnar = "N/c~m";               .reverse = false; },  # via qudt:N-PER-CentiM
+  { .code = "M24";   .bovnar = "Ω·k~m";               .reverse = false; },  # via qudt:OHM-KiloM
+  { .code = "M25";   .bovnar = "%/K";                 .reverse = false; },  # via qudt:PERCENT-PER-DEG_C
+  { .code = "M26";   .bovnar = "G~Ω/m";               .reverse = false; },  # via qudt:GigaOHM-PER-M
+  { .code = "M31";   .bovnar = "k~g/k~m";             .reverse = false; },  # via qudt:KiloGM-PER-KiloM
+  { .code = "M32";   .bovnar = "Pa·s/L";              .reverse = false; },  # via qudt:PA-SEC-PER-L
+  { .code = "M33";   .bovnar = "m~mol/L";             .reverse = false; },  # via qudt:MilliMOL-PER-L
+  { .code = "M38";   .bovnar = "k~m/s^2";             .reverse = false; },  # via qudt:KiloM-PER-SEC2
+  { .code = "M40";   .bovnar = "yd/s^2";              .reverse = false; },  # via qudt:YD-PER-SEC2
+  { .code = "M41";   .bovnar = "m~m/s^2";             .reverse = false; },  # via qudt:MilliM-PER-SEC2
+  { .code = "M45";   .bovnar = "°/s^2";               .reverse = false; },  # via qudt:DEG-PER-SEC2
+  { .code = "M5";    .bovnar = "µ~Ci";                },  # via qudt:MicroCi
+  { .code = "M53";   .bovnar = "m/Pa";                .reverse = false; },  # via qudt:M-PER-PA
+  { .code = "M55";   .bovnar = "m/rad";               .reverse = false; },  # via qudt:M-PER-RAD
+  { .code = "M56";   .bovnar = "c~P/bar";             .reverse = false; },  # via qudt:SH
+  { .code = "M57";   .bovnar = "mi/min";              .reverse = false; },  # via qudt:MI-PER-MIN
+  { .code = "M59";   .bovnar = "m/s·Pa";              .reverse = false; },  # via qudt:M-PER-SEC-PA
+  { .code = "M60";   .bovnar = "m/h";                 .reverse = false; },  # via qudt:M-PER-HR
+  { .code = "M61";   .bovnar = "in/yr";               .reverse = false; },  # via qudt:IN-PER-YR
+  { .code = "M62";   .bovnar = "k~m/s";               .reverse = false; },  # via qudt:KiloM-PER-SEC
+  { .code = "M63";   .bovnar = "in/min";              .reverse = false; },  # via qudt:IN-PER-MIN
+  { .code = "M64";   .bovnar = "yd/s";                .reverse = false; },  # via qudt:YD-PER-SEC
+  { .code = "M65";   .bovnar = "yd/min";              .reverse = false; },  # via qudt:YD-PER-MIN
+  { .code = "M66";   .bovnar = "yd/h";                .reverse = false; },  # via qudt:YD-PER-HR
+  { .code = "M69";   .bovnar = "mi^3";                .reverse = false; },  # via qudt:MI3
+  { .code = "M7";    .bovnar = "µ~in";                },  # via qudt:MicroIN
+  { .code = "M71";   .bovnar = "m^3/Pa";              .reverse = false; },  # via qudt:M3-PER-PA
+  { .code = "M73";   .bovnar = "k~g/m^3·Pa";          .reverse = false; },  # via qudt:KiloGM-PER-M3-PA
+  { .code = "M74";   .bovnar = "k~g/Pa";              .reverse = false; },  # via qudt:KiloGM-PER-PA
+  { .code = "M76";   .bovnar = "lb·ft/s^2";           .reverse = false; },  # via qudt:PDL
+  { .code = "M79";   .bovnar = "ft^2/h";              .reverse = false; },  # via qudt:FT2-PER-HR
+  { .code = "M80";   .bovnar = "St/Pa";               .reverse = false; },  # via qudt:ST-PER-PA
+  { .code = "M82";   .bovnar = "m^2/s·Pa";            .reverse = false; },  # via qudt:M2-PER-SEC-PA
+  { .code = "M84";   .bovnar = "lb/yd";               .reverse = false; },  # via qudt:LB-PER-YD
+  { .code = "M87";   .bovnar = "k~g/s·Pa";            .reverse = false; },  # via qudt:KiloGM-PER-SEC-PA
+  { .code = "M89";   .bovnar = "t/yr";                .reverse = false; },  # via qudt:TONNE-PER-YR
+  { .code = "M91";   .bovnar = "lb/lb";               .reverse = false; },  # via qudt:LB-PER-LB
+  { .code = "M93";   .bovnar = "N·m/rad";             .reverse = false; },  # via qudt:N-M-PER-RAD
+  { .code = "M94";   .bovnar = "k~g·m";               .reverse = false; },  # via qudt:KiloGM-M
+  { .code = "M95";   .bovnar = "lb·ft·ft/s^2";        .reverse = false; },  # via qudt:PDL-FT
+  { .code = "M96";   .bovnar = "lb·ft·in/s^2";        .reverse = false; },  # via qudt:PDL-IN
+  { .code = "M97";   .bovnar = "dyn·m";               .reverse = false; },  # via qudt:DYN-M
+  { .code = "M98";   .bovnar = "k~g·c~m/s";           .reverse = false; },  # via qudt:KiloGM-CentiM-PER-SEC
+  { .code = "M99";   .bovnar = "g·c~m/s";             .reverse = false; },  # via qudt:GM-CentiM-PER-SEC
+  { .code = "MAH";   .bovnar = "M~W·h";               .reverse = false; },  # via qudt:MegaV-A_Reactive-HR
+  { .code = "MAL";   .bovnar = "M~L";                 },  # via qudt:MegaL
+  { .code = "MCU";   .bovnar = "m~Ci";                },  # via qudt:MilliCi
+  { .code = "MQH";   .bovnar = "m^3/h";               .reverse = false; },  # via qudt:M3-PER-HR
+  { .code = "MTZ";   .bovnar = "m~Hz";                },  # via qudt:MilliHZ
+  { .code = "N10";   .bovnar = "lb·ft/s";             .reverse = false; },  # via qudt:LB-FT-PER-SEC
+  { .code = "N11";   .bovnar = "lb·in/s";             .reverse = false; },  # via qudt:LB-IN-PER-SEC
+  { .code = "N20";   .bovnar = "k~lbf/in^2";          .reverse = false; },  # via qudt:KIP_F-PER-IN2
+  { .code = "N21";   .bovnar = "lb·ft/s^2·ft^2";      .reverse = false; },  # via qudt:PDL-PER-FT2
+  { .code = "N22";   .bovnar = "oz/in^2";             .reverse = false; },  # via qudt:OZ-PER-IN2
+  { .code = "N24";   .bovnar = "g/m~m^2";             .reverse = false; },  # via qudt:GM-PER-MilliM2
+  { .code = "N25";   .bovnar = "lb/yd^2";             .reverse = false; },  # via qudt:LB-PER-YD2
+  { .code = "N26";   .bovnar = "lb·ft/s^2·in^2";      .reverse = false; },  # via qudt:PDL-PER-IN2
+  { .code = "N28";   .bovnar = "d~m^3/k~g";           .reverse = false; },  # via qudt:DeciM3-PER-KiloGM
+  { .code = "N29";   .bovnar = "ft^3/lb";             .reverse = false; },  # via qudt:FT3-PER-LB
+  { .code = "N3";    .bovnar = "thou";                .reverse = false; },  # via qudt:PT
+  { .code = "N30";   .bovnar = "in^3/lb";             .reverse = false; },  # via qudt:IN3-PER-LB
+  { .code = "N31";   .bovnar = "k~N/m";               .reverse = false; },  # via qudt:KiloN-PER-M
+  { .code = "N32";   .bovnar = "lb·ft/s^2·in";        .reverse = false; },  # via qudt:PDL-PER-IN
+  { .code = "N33";   .bovnar = "lbf/yd";              .reverse = false; },  # via qudt:LB_F-PER-YD
+  { .code = "N35";   .bovnar = "P/Pa";                .reverse = false; },  # via qudt:POISE-PER-PA
+  { .code = "N36";   .bovnar = "N·s/m^2";             .reverse = false; },  # via qudt:N-SEC-PER-M2
+  { .code = "N37";   .bovnar = "k~g/m·s";             .reverse = false; },  # via qudt:KiloGM-PER-M-SEC
+  { .code = "N38";   .bovnar = "k~g/m·min";           .reverse = false; },  # via qudt:KiloGM-PER-M-MIN
+  { .code = "N39";   .bovnar = "k~g/m·d";             .reverse = false; },  # via qudt:KiloGM-PER-M-DAY
+  { .code = "N40";   .bovnar = "k~g/m·h";             .reverse = false; },  # via qudt:KiloGM-PER-M-HR
+  { .code = "N42";   .bovnar = "lb·ft·s/s^2·in^2";    .reverse = false; },  # via qudt:PDL-SEC-PER-IN2
+  { .code = "N43";   .bovnar = "lb/ft·min";           .reverse = false; },  # via qudt:LB-PER-FT-MIN
+  { .code = "N44";   .bovnar = "lb/ft·d";             .reverse = false; },  # via qudt:LB-PER-FT-DAY
+  { .code = "N45";   .bovnar = "m^3/s·Pa";            .reverse = false; },  # via qudt:M3-PER-SEC-PA
+  { .code = "N46";   .bovnar = "ft·lb·ft/s^2";        .reverse = false; },  # via qudt:FT-PDL
+  { .code = "N47";   .bovnar = "in·lb·ft/s^2";        .reverse = false; },  # via qudt:IN-PDL
+  { .code = "N48";   .bovnar = "W/c~m^2";             .reverse = false; },  # via qudt:W-PER-CentiM2
+  { .code = "N49";   .bovnar = "W/in^2";              .reverse = false; },  # via qudt:W-PER-IN2
+  { .code = "N50";   .bovnar = "Btu/ft^2·h";          .reverse = false; },  # via qudt:BTU_IT-PER-FT2-HR
+  { .code = "N53";   .bovnar = "Btu/ft^2·s";          .reverse = false; },  # via qudt:BTU_IT-PER-FT2-SEC
+  { .code = "N55";   .bovnar = "Btu/in^2·s";          .reverse = false; },  # via qudt:BTU_IT-PER-IN2-SEC
+  { .code = "N56";   .bovnar = "cal/c~m^2·min";       .reverse = false; },  # via qudt:CAL_TH-PER-CentiM2-MIN
+  { .code = "N57";   .bovnar = "cal/c~m^2·s";         .reverse = false; },  # via qudt:CAL_TH-PER-CentiM2-SEC
+  { .code = "N58";   .bovnar = "Btu/ft^3";            .reverse = false; },  # via qudt:BTU_IT-PER-FT3
+  { .code = "N60";   .bovnar = "Btu/°Ra";             .reverse = false; },  # via qudt:BTU_IT-PER-DEG_F
+  { .code = "N62";   .bovnar = "Btu/°Ra";             .reverse = false; },  # via qudt:BTU_IT-PER-DEG_R
+  { .code = "N65";   .bovnar = "k~Btu/lb·°Ra";        .reverse = false; },  # via qudt:KiloCAL_IT-PER-GM-K
+  { .code = "N74";   .bovnar = "Btu/h·ft^2·°Ra";      .reverse = false; },  # via qudt:BTU_IT-PER-HR-FT2-DEG_F
+  { .code = "N76";   .bovnar = "Btu/s·ft^2·°Ra";      .reverse = false; },  # via qudt:BTU_IT-PER-FT2-SEC-DEG_F
+  { .code = "N78";   .bovnar = "k~W/m^2·K";           .reverse = false; },  # via qudt:KiloW-PER-M2-K
+  { .code = "N79";   .bovnar = "K/Pa";                .reverse = false; },  # via qudt:K-PER-PA
+  { .code = "N80";   .bovnar = "W·m^-1·K^-1";         .reverse = false; },  # via qudt:W-PER-M-DEG_C
+  { .code = "N81";   .bovnar = "k~W/m·K";             .reverse = false; },  # via qudt:KiloW-PER-M-K
+  { .code = "N82";   .bovnar = "m·k~g/s^3·m~K";       .reverse = false; },  # via qudt:KiloW-PER-M-DEG_C
+  { .code = "N83";   .bovnar = "K^-1";                .reverse = false; },  # via qudt:M-PER-DEG_C-M
+  { .code = "N90";   .bovnar = "k~F";                 },  # via qudt:KiloFARAD
+  { .code = "N91";   .bovnar = "J^-1";                .reverse = false; },  # via qudt:PER-J
+  { .code = "N92";   .bovnar = "p~S";                 },  # via qudt:PicoS
+  { .code = "N93";   .bovnar = "A/Pa";                .reverse = false; },  # via qudt:A-PER-PA
+  { .code = "N95";   .bovnar = "A·min";               .reverse = false; },  # via qudt:A-MIN
+  { .code = "N96";   .bovnar = "da~A";                },  # via qudt:BIOT
+  { .code = "N97";   .bovnar = "Oe·c~m";              .reverse = false; },  # via qudt:GI
+  { .code = "N98";   .bovnar = "V/Pa";                .reverse = false; },  # via qudt:V-PER-PA
+  { .code = "N99";   .bovnar = "p~V";                 },  # via qudt:PicoV
+  { .code = "NA";    .bovnar = "m~g/k~g";             .reverse = false; },  # via qudt:MilliGM-PER-KiloGM
+  { .code = "NR";    .bovnar = "µ~S";                 .reverse = false; },  # via qudt:MicroMHO
+  { .code = "ON";    .bovnar = "oz/yd^2";             .reverse = false; },  # via qudt:OZ-PER-YD2
+  { .code = "P10";   .bovnar = "C/m";                 .reverse = false; },  # via qudt:C-PER-M
+  { .code = "P11";   .bovnar = "k~Wb";                },  # via qudt:KiloWB
+  { .code = "P12";   .bovnar = "k~g/s^2·G~A";         .reverse = false; },  # via qudt:GAMMA
+  { .code = "P13";   .bovnar = "k~T";                 },  # via qudt:KiloT
+  { .code = "P15";   .bovnar = "J/min";               .reverse = false; },  # via qudt:J-PER-MIN
+  { .code = "P17";   .bovnar = "J/d";                 .reverse = false; },  # via qudt:J-PER-DAY
+  { .code = "P18";   .bovnar = "k~J/s";               .reverse = false; },  # via qudt:KiloJ-PER-SEC
+  { .code = "P19";   .bovnar = "k~J/min";             .reverse = false; },  # via qudt:KiloJ-PER-MIN
+  { .code = "P2";    .bovnar = "lb/ft";               .reverse = false; },  # via qudt:LB-PER-FT
+  { .code = "P20";   .bovnar = "k~J/h";               .reverse = false; },  # via qudt:KiloJ-PER-HR
+  { .code = "P21";   .bovnar = "k~J/d";               .reverse = false; },  # via qudt:KiloJ-PER-DAY
+  { .code = "P22";   .bovnar = "n~Ω";                 },  # via qudt:NanoOHM
+  { .code = "P24";   .bovnar = "k~H";                 },  # via qudt:KiloH
+  { .code = "P25";   .bovnar = "lm/ft^2";             .reverse = false; },  # via qudt:LM-PER-FT2
+  { .code = "P28";   .bovnar = "cd/in^2";             .reverse = false; },  # via qudt:CD-PER-IN2
+  { .code = "P32";   .bovnar = "cd/ft^2";             .reverse = false; },  # via qudt:CD-PER-FT2
+  { .code = "P33";   .bovnar = "k~cd";                },  # via qudt:KiloCD
+  { .code = "P34";   .bovnar = "m~cd";                },  # via qudt:MilliCD
+  { .code = "P37";   .bovnar = "Btu/ft^2";            .reverse = false; },  # via qudt:BTU_IT-PER-FT2
+  { .code = "P39";   .bovnar = "cal/c~m^2";           .reverse = false; },  # via qudt:CAL_TH-PER-CentiM2
+  { .code = "P42";   .bovnar = "Pa^2·s";              .reverse = false; },  # via qudt:PA2-SEC
+  { .code = "P47";   .bovnar = "k~mol/k~g";           .reverse = false; },  # via qudt:KiloMOL-PER-KiloGM
+  { .code = "P48";   .bovnar = "k~mol/k~g";           .reverse = false; },  # via qudt:MOL_LB-PER-LB
+  { .code = "P49";   .bovnar = "N·m^2/A";             .reverse = false; },  # via qudt:N-M2-PER-A
+  { .code = "P50";   .bovnar = "Wb·m";                .reverse = false; },  # via qudt:WB-M
+  { .code = "P51";   .bovnar = "mol/k~g·Pa";          .reverse = false; },  # via qudt:MOL-PER-KiloGM-PA
+  { .code = "P52";   .bovnar = "mol/m^3·Pa";          .reverse = false; },  # via qudt:MOL-PER-M3-PA
+  { .code = "P54";   .bovnar = "m~Gy/s";              .reverse = false; },  # via qudt:MilliGRAY-PER-SEC
+  { .code = "P55";   .bovnar = "µ~Gy/s";              .reverse = false; },  # via qudt:MicroGRAY-PER-SEC
+  { .code = "P57";   .bovnar = "Gy/min";              .reverse = false; },  # via qudt:GRAY-PER-MIN
+  { .code = "P58";   .bovnar = "m~Gy/min";            .reverse = false; },  # via qudt:MilliGRAY-PER-MIN
+  { .code = "P59";   .bovnar = "µ~Gy/min";            .reverse = false; },  # via qudt:MicroGRAY-PER-MIN
+  { .code = "P61";   .bovnar = "Gy/h";                .reverse = false; },  # via qudt:GRAY-PER-HR
+  { .code = "P62";   .bovnar = "m~Gy/h";              .reverse = false; },  # via qudt:MilliGRAY-PER-HR
+  { .code = "P63";   .bovnar = "µ~Gy/h";              .reverse = false; },  # via qudt:MicroGRAY-PER-HR
+  { .code = "P65";   .bovnar = "Sv/s";                .reverse = false; },  # via qudt:SV-PER-SEC
+  { .code = "P66";   .bovnar = "m~Sv/s";              .reverse = false; },  # via qudt:MilliSV-PER-SEC
+  { .code = "P67";   .bovnar = "µ~Sv/s";              .reverse = false; },  # via qudt:MicroSV-PER-SEC
+  { .code = "P69";   .bovnar = "rem/s";               .reverse = false; },  # via qudt:REM-PER-SEC
+  { .code = "P70";   .bovnar = "Sv/h";                .reverse = false; },  # via qudt:SV-PER-HR
+  { .code = "P71";   .bovnar = "m~Sv/h";              .reverse = false; },  # via qudt:MilliSV-PER-HR
+  { .code = "P74";   .bovnar = "Sv/min";              .reverse = false; },  # via qudt:SV-PER-MIN
+  { .code = "P75";   .bovnar = "m~Sv/min";            .reverse = false; },  # via qudt:MilliSV-PER-MIN
+  { .code = "P76";   .bovnar = "µ~Sv/min";            .reverse = false; },  # via qudt:MicroSV-PER-MIN
+  { .code = "P78";   .bovnar = "in^-2";               .reverse = false; },  # via qudt:PER-IN2
+  { .code = "P79";   .bovnar = "Pa·m^2/k~g";          .reverse = false; },  # via qudt:PA-M2-PER-KiloGM
+  { .code = "P80";   .bovnar = "m~Pa/m";              .reverse = false; },  # via qudt:MilliPA-PER-M
+  { .code = "P81";   .bovnar = "k~Pa/m";              .reverse = false; },  # via qudt:KiloPA-PER-M
+  { .code = "P82";   .bovnar = "h~Pa/m";              .reverse = false; },  # via qudt:HectoPA-PER-M
+  { .code = "P83";   .bovnar = "atm/m";               .reverse = false; },  # via qudt:ATM-PER-M
+  { .code = "P84";   .bovnar = "at/m";                .reverse = false; },  # via qudt:ATM_T-PER-M
+  { .code = "P86";   .bovnar = "psi/in";              .reverse = false; },  # via qudt:PSI-PER-IN
+  { .code = "P87";   .bovnar = "m^3/s·m^2";           .reverse = false; },  # via qudt:M3-PER-SEC-M2
+  { .code = "P89";   .bovnar = "lbf·ft/in";           .reverse = false; },  # via qudt:LB_F-FT-PER-IN
+  { .code = "P90";   .bovnar = "lbf·in/in";           .reverse = false; },  # via qudt:LB_F-IN-PER-IN
+  { .code = "P96";   .bovnar = "V^-1";                .reverse = false; },  # via qudt:PER-V
+  { .code = "P97";   .bovnar = "rad^-1";              .reverse = false; },  # via qudt:PER-RAD
+  { .code = "PO";    .bovnar = "lb/in";               .reverse = false; },  # via qudt:LB-PER-IN
+  { .code = "Q10";   .bovnar = "J/T";                 .reverse = false; },  # via qudt:J-PER-T
+  { .code = "Q19";   .bovnar = "s^-1";                .reverse = false; },  # via qudt:NAT-PER-SEC
+  { .code = "Q20";   .bovnar = "s/k~g";               .reverse = false; },  # via qudt:SEC-PER-KiloGM
+  { .code = "Q21";   .bovnar = "W·m^2";               .reverse = false; },  # via qudt:W-M2
+  { .code = "Q22";   .bovnar = "s/rad·m^3";           .reverse = false; },  # via qudt:SEC-PER-RAD-M3
+  { .code = "Q23";   .bovnar = "Wb^-1";               .reverse = false; },  # via qudt:PER-WB
+  { .code = "Q24";   .bovnar = "in^-1";               .reverse = false; },  # via qudt:PER-IN
+  { .code = "Q27";   .bovnar = "N·m/m";               .reverse = false; },  # via qudt:N-M-PER-M
+  { .code = "Q28";   .bovnar = "k~g/m^2·Pa·s";        .reverse = false; },  # via qudt:KiloGM-PER-M2-PA-SEC
+  { .code = "Q32";   .bovnar = "f~L";                 },  # via qudt:FemtoL
+  { .code = "Q33";   .bovnar = "p~L";                 },  # via qudt:PicoL
+  { .code = "Q34";   .bovnar = "n~L";                 },  # via qudt:NanoL
+  { .code = "S3";    .bovnar = "ft^2/s";              .reverse = false; },  # via qudt:FT2-PER-SEC
+  { .code = "TAH";   .bovnar = "k~A·h";               .reverse = false; },  # via qudt:KiloA-HR
+  { .code = "WA";    .bovnar = "W/k~g";               .reverse = false; },  # via qudt:W-PER-KiloGM
+  { .code = "Z9";    .bovnar = "n~mol";               },  # via qudt:NanoMOL
 ];
 
 # ── Rec 20 / Rec 21: opaque count units ─────────────────────────────────────
@@ -503,4 +1464,263 @@
   # "wooden" is not a quantity.
   { .code = "XWD"; .why = "packaging material, not a countable package"; },
   { .code = "XZZ"; .why = "mutually defined — the code list explicitly declines to say what this is"; },
+
+  # ── Closing the table against QUDT's Rec 20 cross-reference ──────────────
+  #
+  # Codes the cross-reference reaches and this build cannot carry. The third
+  # group is the one peculiar to a secondary source: 81 Rec 20 codes are claimed
+  # by more than one QUDT unit, and where the claimants DISAGREE -- J62 is
+  # claimed by both a barrels-per-hour and a barrels-per-second unit, 3600 apart
+  # -- the cross-reference cannot say what the code means. Refusing those says
+  # exactly that, which is better than picking a claimant.
+  { .code = "208";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2589997.766)"; },
+  { .code = "2P";    .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "4L";    .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "4R";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0086409)"; },
+  { .code = "4W";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.2519444444)"; },
+  { .code = "57";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "5A";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0026498)"; },
+  { .code = "A1";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.1855)"; },
+  { .code = "A21";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (426.9)"; },
+  { .code = "A42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.7e+10)"; },
+  { .code = "A49";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.1e-07)"; },
+  { .code = "AD";    .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "B1";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.84e-06)"; },
+  { .code = "B10";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
+  { .code = "B30";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "B68";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "B80";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (693147180.6)"; },
+  { .code = "BFT";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00236)"; },
+  { .code = "BLD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.115628199)"; },
+  { .code = "BUI";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.03636872)"; },
+  { .code = "C21";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "C37";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "C69";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "C74";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (693.1471806)"; },
+  { .code = "CWI";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (50.80235)"; },
+  { .code = "D11";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "D15";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "D36";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "D42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (31556925.22)"; },
+  { .code = "D70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.1868)"; },
+  { .code = "D71";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (418.68)"; },
+  { .code = "D72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (41868)"; },
+  { .code = "D75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4186.8)"; },
+  { .code = "DRA";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0038879346)"; },
+  { .code = "E14";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4186.8)"; },
+  { .code = "E15";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.162230556)"; },
+  { .code = "E20";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (693147.1806)"; },
+  { .code = "E34";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E35";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E36";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E59";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E60";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E61";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E62";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E63";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E64";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E65";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.152921505e+18)"; },
+  { .code = "E66";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.152921505e+18)"; },
+  { .code = "E67";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.152921505e+18)"; },
+  { .code = "E68";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5545177444)"; },
+  { .code = "E69";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (744261118)"; },
+  { .code = "E70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (744261118)"; },
+  { .code = "E71";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (744261118)"; },
+  { .code = "E72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (709.7827129)"; },
+  { .code = "E73";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (709.7827129)"; },
+  { .code = "E74";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (709.7827129)"; },
+  { .code = "E75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (726817.498)"; },
+  { .code = "E76";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (726817.498)"; },
+  { .code = "E77";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (726817.498)"; },
+  { .code = "E78";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E79";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.931471806e+14)"; },
+  { .code = "E80";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.125899907e+15)"; },
+  { .code = "E81";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.125899907e+15)"; },
+  { .code = "E82";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.125899907e+15)"; },
+  { .code = "E83";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "E84";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.931471806e+11)"; },
+  { .code = "E85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.099511628e+12)"; },
+  { .code = "E86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.099511628e+12)"; },
+  { .code = "E87";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.099511628e+12)"; },
+  { .code = "E88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
+  { .code = "E89";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
+  { .code = "E97";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001)"; },
+  { .code = "E98";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "F22";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1355.818009)"; },
+  { .code = "F49";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.02921)"; },
+  { .code = "F78";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (249.080024)"; },
+  { .code = "F80";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (746.043)"; },
+  { .code = "FC";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (28.31684659)"; },
+  { .code = "FIT";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "G20";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2989.067)"; },
+  { .code = "G3";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (7.576817e-05)"; },
+  { .code = "GLD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00440488377)"; },
+  { .code = "GT";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "H11";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.91935077e-07)"; },
+  { .code = "H71";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.919350773e-09)"; },
+  { .code = "H73";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001)"; },
+  { .code = "H79";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0003333333)"; },
+  { .code = "H82";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0003527778)"; },
+  { .code = "H91";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "H92";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "H93";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "H94";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "J12";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.450377e-07)"; },
+  { .code = "J13";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "J14";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J15";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J16";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J17";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J19";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1762280394)"; },
+  { .code = "J20";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "J21";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.555555556e-06)"; },
+  { .code = "J22";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1761101837)"; },
+  { .code = "J26";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.8)"; },
+  { .code = "J27";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J31";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "J38";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "J40";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.730734666)"; },
+  { .code = "J41";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.144227889)"; },
+  { .code = "J42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (519.2203999)"; },
+  { .code = "J43";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (426.9347649)"; },
+  { .code = "J44";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (17.58)"; },
+  { .code = "J46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.73)"; },
+  { .code = "J47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.2929)"; },
+  { .code = "J48";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.144131434)"; },
+  { .code = "J51";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (17.573)"; },
+  { .code = "J52";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1054.35)"; },
+  { .code = "J54";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "J57";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1591132)"; },
+  { .code = "J58";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.002651886)"; },
+  { .code = "J59";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.841587e-06)"; },
+  { .code = "J60";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.41981e-05)"; },
+  { .code = "J61";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1591132)"; },
+  { .code = "J63";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "J64";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.209343e-07)"; },
+  { .code = "J65";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.010242e-05)"; },
+  { .code = "J66";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0006061453)"; },
+  { .code = "J67";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.03636872)"; },
+  { .code = "J68";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.0786e-07)"; },
+  { .code = "J69";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (9.789e-06)"; },
+  { .code = "J70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00058732)"; },
+  { .code = "J75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.19)"; },
+  { .code = "J81";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.06973)"; },
+  { .code = "J83";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.155)"; },
+  { .code = "J98";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.84e-05)"; },
+  { .code = "K13";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.54864)"; },
+  { .code = "K18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.54864)"; },
+  { .code = "K20";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (35.31466)"; },
+  { .code = "K21";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.05097033)"; },
+  { .code = "K24";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2989.067)"; },
+  { .code = "K25";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (40636.66)"; },
+  { .code = "K42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (9809.5)"; },
+  { .code = "K45";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.04572)"; },
+  { .code = "K47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.04572)"; },
+  { .code = "K49";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (61023.76)"; },
+  { .code = "K50";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "K51";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4190)"; },
+  { .code = "K52";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.163)"; },
+  { .code = "K64";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.8164663)"; },
+  { .code = "K69";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (28.83323)"; },
+  { .code = "K73";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000226796185)"; },
+  { .code = "K75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (49823.84)"; },
+  { .code = "K79";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0136077711)"; },
+  { .code = "K82";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.8164663)"; },
+  { .code = "K86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (12410.56)"; },
+  { .code = "K97";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0011365225)"; },
+  { .code = "L14";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.859845)"; },
+  { .code = "L23";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000277778)"; },
+  { .code = "L33";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.2812e-07)"; },
+  { .code = "L41";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.007061552425)"; },
+  { .code = "L43";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.009092181)"; },
+  { .code = "L44";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.05233576e-07)"; },
+  { .code = "L45";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.525605833e-06)"; },
+  { .code = "L46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00015153635)"; },
+  { .code = "L47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.009092181)"; },
+  { .code = "L53";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.577098e-09)"; },
+  { .code = "L61";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000550610471)"; },
+  { .code = "L62";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001101220943)"; },
+  { .code = "L63";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0001689108796)"; },
+  { .code = "L65";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (515.3788206)"; },
+  { .code = "L66";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.004053861111)"; },
+  { .code = "L67";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.2432316667)"; },
+  { .code = "L68";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (14.593903)"; },
+  { .code = "L84";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.1326)"; },
+  { .code = "L85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.01175925926)"; },
+  { .code = "L86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.1326)"; },
+  { .code = "L87";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1632.932)"; },
+  { .code = "L88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.01049768519)"; },
+  { .code = "L89";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.45359237)"; },
+  { .code = "L92";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1328.877829)"; },
+  { .code = "L93";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1186.311212)"; },
+  { .code = "L95";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (31536000)"; },
+  { .code = "L96";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (31558149.76)"; },
+  { .code = "L98";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.645920016)"; },
+  { .code = "LBT";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.3732417216)"; },
+  { .code = "M10";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.307951)"; },
+  { .code = "M11";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.376198882)"; },
+  { .code = "M19";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "M42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1609.347)"; },
+  { .code = "M47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.067075e-10)"; },
+  { .code = "M48";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2589997.766)"; },
+  { .code = "M52";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1609.347)"; },
+  { .code = "M58";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1609.344)"; },
+  { .code = "M68";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.62)"; },
+  { .code = "M85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.02916667)"; },
+  { .code = "M88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0003919350773)"; },
+  { .code = "MIK";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2589997.766)"; },
+  { .code = "N27";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.008630974841)"; },
+  { .code = "N51";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.152481054)"; },
+  { .code = "N54";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (11348.93179)"; },
+  { .code = "N59";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (37234.03)"; },
+  { .code = "N61";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1897.830476)"; },
+  { .code = "N63";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1897.830476)"; },
+  { .code = "N70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.055e+18)"; },
+  { .code = "N75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.674465897)"; },
+  { .code = "N84";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.895634241)"; },
+  { .code = "N85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.896902829)"; },
+  { .code = "N86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0005265650668)"; },
+  { .code = "N87";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0005269174526)"; },
+  { .code = "N88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.933471799)"; },
+  { .code = "N89";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.938111789)"; },
+  { .code = "N94";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.335640952e-10)"; },
+  { .code = "P27";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (10.764)"; },
+  { .code = "P29";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.4262591)"; },
+  { .code = "P30";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.3183098862)"; },
+  { .code = "P38";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (11348.93179)"; },
+  { .code = "P45";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (453.59237)"; },
+  { .code = "P46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (7.559872833)"; },
+  { .code = "P53";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.256637e-07)"; },
+  { .code = "P72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.77778e-10)"; },
+  { .code = "P85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (133.322)"; },
+  { .code = "P93";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.545177444)"; },
+  { .code = "P94";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5545.177444)"; },
+  { .code = "P95";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5545177.444)"; },
+  { .code = "PLA";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
+  { .code = "PTD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000550610471)"; },
+  { .code = "Q11";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "Q14";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "Q15";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "Q16";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "Q17";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
+  { .code = "Q18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.302585093)"; },
+  { .code = "Q26";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
+  { .code = "QTD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001101220943)"; },
+  { .code = "QTR";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (12.70058636)"; },
+  { .code = "R1";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0042333)"; },
+  { .code = "RPS";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.28318531)"; },
+  { .code = "UA";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (133.322)"; },
+  { .code = "WCD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.62)"; },
+  { .code = "WSD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.672)"; },
+  { .code = "35";    .why = "QUDT's cross-reference disagrees with itself about this code (claimed by MilliL-PER-CentiM2-MIN, MilliL-PER-CentiM2-SEC), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "C26";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by DeciSEC, MilliSEC), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "E18";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by TONNE-PER-HR, TON_Metric-PER-HR, TON_US-PER-HR), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "H60";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by M3-PER-M2, M3-PER-M3), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "J62";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by BBL_US_PET-PER-HR, BBL_US_PET-PER-SEC), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "K43";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by HP, HP_Electric), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "K54";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by KiloCAL-PER-MIN, KiloCAL_TH-PER-MIN), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "L39";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by OZ-PER-IN3, OZ_F-PER-IN3), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "NX";    .why = "QUDT's cross-reference disagrees with itself about this code (claimed by PPT, PPTH), so this repository cannot say what Rec 20 means by it"; },
+  { .code = "P16";   .why = "QUDT's cross-reference disagrees with itself about this code (claimed by GigaJ-PER-HR, J-PER-HR, MegaJ-PER-HR), so this repository cannot say what Rec 20 means by it"; },
 ];
